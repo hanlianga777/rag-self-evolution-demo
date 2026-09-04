@@ -40,7 +40,7 @@ beforeEach(() => {
     return new Response(JSON.stringify(value), { status: 200 });
   }));
 });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); localStorage.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 async function render(node: ReactNode) { await act(async () => root.render(node)); }
 function button(text: string) { const found = [...document.querySelectorAll("button")].find(item => item.textContent?.includes(text)); expect(found, `button: ${text}`).toBeTruthy(); return found!; }
 async function click(text: string) { await act(async () => button(text).click()); }
@@ -110,21 +110,70 @@ describe("Readiness and action errors", () => {
 });
 
 describe("Navigation, details and active version", () => {
+  it("opens the business assistant as the default workspace", async () => {
+    await render(<App />);
+
+    expect(document.querySelector("h1")?.textContent).toBe("园区助手");
+    expect(content()).toContain("新建会话");
+  });
   it("shows the server active version even when overview has no active-version field", async () => {
     routes["/api/overview"] = { ...data.overview, active_version: undefined };
-    await render(<App />);
+    await render(<App />); await click("概览");
     expect(document.querySelector(".production")?.textContent).toContain("v1.0");
   });
   it("opens Bad Cases from overview in evaluation and removes the workspace pseudo button", async () => {
-    await render(<App />); expect([...document.querySelectorAll("button")].some(item => item.textContent?.includes("测试工作区"))).toBe(false);
+    await render(<App />); await click("概览"); expect([...document.querySelectorAll("button")].some(item => item.textContent?.includes("测试工作区"))).toBe(false);
     await click("问题案例"); expect(document.querySelector("h1")?.textContent).toBe("评测报告");
   });
   it("exposes mobile navigation to every page", async () => {
     await render(<App />); await click("菜单");
     const nav = document.querySelector('[aria-label="移动导航"]'); expect(nav).not.toBeNull();
-    expect(nav?.querySelectorAll("button")).toHaveLength(6);
+    expect(nav?.querySelectorAll("button")).toHaveLength(7);
     await act(async () => [...nav!.querySelectorAll("button")].find(item => item.textContent === "设置")!.click());
     expect(document.querySelector("h1")?.textContent).toBe("设置");
+  });
+  it("restores a browser-only conversation in the assistant workspace", async () => {
+    localStorage.setItem("rag-evolution:conversations:v1", JSON.stringify([{
+      id: "chat-1", title: "历史咨询", updatedAt: "2026-09-04T14:00:00.000Z",
+      messages: [{ id: "message-1", role: "user", content: "空调怎么报修？", createdAt: "2026-09-04T14:00:00.000Z" }],
+    }]));
+
+    await render(<App />);
+
+    expect(content()).toContain("历史咨询");
+    expect(content()).toContain("空调怎么报修？");
+  });
+  it("clears browser-only history without creating duplicate replacement chats", async () => {
+    localStorage.setItem("rag-evolution:conversations:v1", JSON.stringify([{
+      id: "chat-1", title: "历史咨询", updatedAt: "2026-09-04T14:00:00.000Z",
+      messages: [{ id: "message-1", role: "user", content: "空调怎么报修？", createdAt: "2026-09-04T14:00:00.000Z" }],
+    }]));
+    await render(<App />); await click("清空本机记录");
+
+    expect(content()).not.toContain("历史咨询");
+    expect(JSON.parse(localStorage.getItem("rag-evolution:conversations:v1") || "[]")).toHaveLength(1);
+  });
+  it("opens the matching bad-case evidence after an assistant answer is submitted as an optimization clue", async () => {
+    routes["/api/bad-cases"] = [{ ...data.badCases[0], id: "BC-001", question: "我工位空调坏了咋整？" }];
+    post = () => preview;
+    await render(<App />);
+    const input = document.querySelector('[aria-label="向园区助手提问"]') as HTMLInputElement;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "我工位空调坏了咋整？"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await click("发送"); await click("提交优化线索");
+
+    expect(document.querySelector("h1")?.textContent).toBe("评测报告");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("BC-001");
+  });
+  it("records a custom clue locally without inventing a diagnosis", async () => {
+    post = () => preview;
+    await render(<App />);
+    const input = document.querySelector('[aria-label="向园区助手提问"]') as HTMLInputElement;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "班车几点发车？"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await click("发送"); await click("提交优化线索");
+
+    expect(content()).toContain("需人工标注后才可纳入黄金数据集");
+    expect(document.querySelector("h1")?.textContent).toBe("园区助手");
+    expect(content()).not.toContain("根因 ·");
   });
   it("counts actual documents, opens native detail buttons and gives empty searches feedback", async () => {
     await render(<KnowledgePage data={data} />);

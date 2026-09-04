@@ -12,4 +12,22 @@ export type AppData = {
   readiness: Json;
 };
 
-export type Page = "overview" | "knowledge" | "evaluation" | "evolution" | "versions" | "settings";
+export type ImprovementClue = { submittedAt: string; badCaseId?: string };
+
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+  question?: string;
+  mode?: "live" | "mock";
+  model?: string | null;
+  latencyMs?: number | null;
+  fallbackReason?: string | null;
+  sources?: string[];
+  improvementClue?: ImprovementClue;
+};
+
+export type Conversation = { id: string; title: string; updatedAt: string; messages: ChatMessage[] };
+
+export type Page = "assistant" | "overview" | "knowledge" | "evaluation" | "evolution" | "versions" | "settings";

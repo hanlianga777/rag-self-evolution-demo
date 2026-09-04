@@ -1,17 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Filter } from "lucide-react";
 import { Drawer } from "../components/Dialog";
 import { Badge, Metric, Section, Status } from "../components/Primitives";
 import { displayText } from "../display";
 import { errorMessage, postJson } from "../api";
 
-export function EvaluationPage({ data, navigate }: { data: any; navigate: (page: any) => void }) {
+export function EvaluationPage({ data, navigate, selectedCaseId, onSelectedCaseOpened }: { data: any; navigate: (page: any) => void; selectedCaseId?: string; onSelectedCaseOpened?: () => void }) {
   const [filter, setFilter] = useState("All");
   const [selected, setSelected] = useState<any>(null);
   const [liveRun, setLiveRun] = useState<any>(null);
   const [runningLive, setRunningLive] = useState(false);
   const [error, setError] = useState("");
   const evaluation = data.evaluation;
+  useEffect(() => {
+    if (!selectedCaseId) return;
+    const badCase = data.badCases.find((item: any) => item.id === selectedCaseId);
+    if (badCase) setSelected(badCase);
+    onSelectedCaseOpened?.();
+  }, [data.badCases, onSelectedCaseOpened, selectedCaseId]);
   const visible = data.badCases.filter((item: any) => filter === "All" || item.failure_type.includes(filter));
   const filters = [["All", "全部"], ["Retrieval", "检索"], ["Generation", "生成"], ["Safety", "安全"], ["Latency", "延迟"]];
   const runLiveEvaluation = async () => { setRunningLive(true); setError(""); setLiveRun(null); try { setLiveRun(await postJson("/api/evaluations/live", { limit: 40 })); } catch (reason) { setError(errorMessage(reason)); } finally { setRunningLive(false); } };
