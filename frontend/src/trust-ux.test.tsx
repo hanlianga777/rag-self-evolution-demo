@@ -67,6 +67,14 @@ describe("Preview trust and recovery", () => {
     expect(content()).not.toContain("模拟回答样例"); expect(button("对比版本").disabled).toBe(false);
     post = () => preview; await click("对比版本"); expect(content()).toContain("本次真实回答");
   });
+  it("does not claim the Provider was never called when a failed attempt falls back to mock", async () => {
+    post = () => ({ ...preview, mode: "mock", model: null, fallback_reason: "Provider 超时" });
+    await render(<App />); await click("预览"); await click("对比版本");
+    const result = document.querySelector(".compare")?.textContent;
+    expect(result).toContain("未返回有效模型回答");
+    expect(result).not.toContain("未调用");
+    expect(result).toContain("Provider 超时");
+  });
 });
 
 describe("Readiness and action errors", () => {
@@ -137,6 +145,23 @@ describe("Navigation, details and active version", () => {
     post = () => { routes["/api/versions"] = versions.map(item => ({ ...item, status: item.id === "v1.2" ? "Demo Active" : "Archived" })); routes["/api/overview"] = { ...data.overview, active_version: "v1.2" }; return { id: "v1.2", name: "Candidate B" }; };
     await click("设为演示启用版本");
     expect([...document.querySelectorAll("tbody .badge")].filter(item => item.textContent?.includes("已启用"))).toHaveLength(1);
+    await click("概览"); expect(document.querySelector(".production")?.textContent).toContain("v1.2");
+  });
+  it("refreshes workspace after activation so header, versions and overview agree", async () => {
+    routes["/api/workspace"] = { ...data.workspace, environment: "Demo · v1.0", active_version: "v1.0" };
+    await render(<App />); await click("版本管理");
+    vi.mocked(fetch).mockClear();
+    post = () => {
+      routes["/api/workspace"] = { ...data.workspace, environment: "Demo · v1.2", active_version: "v1.2" };
+      routes["/api/versions"] = versions.map(item => ({ ...item, status: item.id === "v1.2" ? "Demo Active" : "Archived" }));
+      routes["/api/overview"] = { ...data.overview, active_version: "v1.2" };
+      return { id: "v1.2", name: "Candidate B" };
+    };
+    await click("设为演示启用版本");
+    expect(document.querySelector("header")?.textContent).toContain("Demo · v1.2");
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url)).pathname)).toContain("/api/workspace");
+    const activeRows = [...document.querySelectorAll("tbody tr")].filter(row => row.textContent?.includes("已启用"));
+    expect(activeRows).toHaveLength(1); expect(activeRows[0].textContent).toContain("v1.2");
     await click("概览"); expect(document.querySelector(".production")?.textContent).toContain("v1.2");
   });
 });
