@@ -1,0 +1,13 @@
+import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
+import { Badge, Metric, Section, Status } from "../components/Primitives";
+
+export function OverviewPage({ data, navigate }: { data: any; navigate: (page: any) => void }) {
+  const item = data.overview;
+  return <div className="page"><div className="eyebrow">园区运营知识助手</div><div className="page-title"><div><h1>RAG Quality Overview</h1><p>Evaluation-driven improvement, tracked from baseline to verified candidate.</p></div><div className="production"><span>Production Config</span><strong>v1.0 Baseline</strong></div></div>
+    <div className="metrics-grid"><Metric label="Overall Score" value={item.kpis.overall_score} note="Baseline" /><Metric label="Target SLA" value={`≥ ${item.kpis.target_sla}`} /><Metric label="Bad Cases" value={item.kpis.bad_cases} /><Metric label="Avg Latency" value={item.kpis.avg_latency} /><Metric label="Safety Pass" value={item.kpis.safety_pass} /></div>
+    <Section title="Evolution Pipeline" action={<Badge tone="accent"><Sparkles size={12} /> Evaluation-driven</Badge>}><div className="pipeline">{item.pipeline.map((node: any, index: number) => <button className="pipeline-node" key={node.label} onClick={() => navigate(index < 2 ? "evaluation" : index < 6 ? "evolution" : "versions")}><span>{node.label}</span><strong>{node.value}</strong>{index < item.pipeline.length - 1 && <ArrowRight className="pipeline-arrow" size={15} />}</button>)}</div></Section>
+    <div className="two-column"><Section title="Bad Case Distribution"><div className="chart"><ResponsiveContainer width="100%" height={210}><BarChart layout="vertical" data={item.distribution} margin={{ left: 28 }}><XAxis type="number" hide /><YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12, fill: "#667085" }} /><Bar dataKey="value" radius={[0, 5, 5, 0]} fill="#4757c7" /></BarChart></ResponsiveContainer></div></Section><Section title="Latest Optimization"><div className="candidate-list">{item.latest_optimization.map((candidate: any) => <div className="candidate-row" key={candidate.name}><span>{candidate.name}</span><strong>{candidate.score}</strong>{candidate.name === "Candidate B" && <Badge tone="good"><CheckCircle2 size={12} /> Recommended</Badge>}</div>)}</div></Section></div>
+    <Section title="Recent Runs" action={<button className="text-button" onClick={() => navigate("evaluation")}>View evaluation</button>}><div className="run-list">{item.recent_runs.map((run: any) => <div key={run.id}><div><strong>{run.id}</strong><span>{run.type}</span></div><Status value={run.status} /><time>{run.time}</time></div>)}</div></Section>
+  </div>;
+}
