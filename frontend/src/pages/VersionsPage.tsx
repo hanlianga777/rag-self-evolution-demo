@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { postJson } from "../api";
-import { Badge, Section, Status } from "../components/Primitives";
+import { errorMessage, postJson } from "../api";
+import { Section, Status } from "../components/Primitives";
 import { displayText } from "../display";
 
-export function VersionsPage({ data }: { data: any }) { const [active, setActive] = useState(""); const [notice, setNotice] = useState(""); const activate = async (id: string) => { const result: any = await postJson(`/api/versions/${id}/activate`); setActive(result.id); setNotice(`${displayText(result.name)} 已设为演示启用版本`); }; return <div className="page"><div className="page-title"><div><h1>版本管理</h1><p>用于可复现 RAG 对比的配置版本登记册。</p></div></div>{notice && <div className="notice"><CheckCircle2 size={16} /> {notice}</div>}<Section title="配置版本登记"><table><thead><tr><th>版本</th><th>配置</th><th>综合评分</th><th>状态</th><th></th></tr></thead><tbody>{data.versions.map((version: any) => <tr key={version.id}><td><strong>{version.id}</strong></td><td>{displayText(version.name)}</td><td>{version.score}</td><td><Status value={active === version.id ? "Demo Active" : version.status} /></td><td>{version.id === "v1.2" && <button className="secondary" onClick={() => activate(version.id)}>设为演示启用版本</button>}</td></tr>)}</tbody></table></Section><Section title="配置差异 · 基线 → 候选方案 B"><div className="config-diff">{Object.entries(data.versions[1].settings).map(([key, value]) => <div key={key}><span>{key}</span><del>{data.versions[0].settings[key] || "关闭"}</del><ins>{value as any}</ins></div>)}</div><p className="muted">此操作仅修改演示启用版本，不会部署到生产系统。</p></Section></div>; }
+export function VersionsPage({ data, onActivated }: { data: any; onActivated: () => Promise<void> }) {
+  const [notice, setNotice] = useState(""); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
+  const activate = async (id: string) => {
+    setBusy(true); setError(""); setNotice("");
+    try { await postJson(`/api/versions/${id}/activate`); await onActivated(); setNotice(`${id} 已设为演示启用版本`); }
+    catch (reason) { setError(`启用或状态刷新失败：${errorMessage(reason)}。请重试以确认服务端状态。`); }
+    finally { setBusy(false); }
+  };
+  return <div className="page"><div className="page-title"><div><h1>版本管理</h1><p>用于可复现 RAG 对比的配置版本登记册。</p></div></div>{notice && <div className="notice"><CheckCircle2 size={16} /> {notice}</div>}{error && <p className="error-notice" role="alert">{error}</p>}<Section title="配置版本登记"><div className="table-scroll" role="region" aria-label="配置版本登记表" tabIndex={0}><table><thead><tr><th>版本</th><th>配置</th><th>综合评分</th><th>状态</th><th></th></tr></thead><tbody>{data.versions.map((version: any) => <tr key={version.id}><td><strong>{version.id}</strong></td><td>{displayText(version.name)}</td><td>{version.score}</td><td><Status value={version.status} /></td><td>{version.id === "v1.2" && <button className="secondary" disabled={busy} onClick={() => activate(version.id)}>{busy ? "正在启用…" : "设为演示启用版本"}</button>}</td></tr>)}</tbody></table></div></Section><Section title="配置差异 · 基线 → 候选方案 B"><div className="config-diff">{Object.entries(data.versions.find((item: any) => item.id === "v1.2")?.settings || {}).map(([key, value]) => <div key={key}><span>{key}</span><del>{data.versions[0].settings[key] || "关闭"}</del><ins>{value as any}</ins></div>)}</div><p className="muted">此操作仅修改演示启用版本，不会部署到生产系统。</p></Section></div>;
+}

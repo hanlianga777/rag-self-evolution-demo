@@ -1,7 +1,7 @@
 const translations: Record<string, string> = {
   "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
   "completed": "已完成", "running": "运行中", "queued": "排队中", "evaluating": "评测中",
-  "live": "真实模式", "mock": "模拟模式", "Ready": "等待连接验证", "passed": "连接成功", "failed": "连接失败", "skipped": "未执行",
+  "live": "真实模式", "mock": "模拟模式", "Ready": "已验证可用", "Configured (Unverified)": "已配置（未验证）", "Unavailable": "不可用", "passed": "连接成功", "failed": "连接失败", "skipped": "未执行",
   "Indexed": "已索引", "Reviewed": "已审核", "Open": "待优化", "Active": "已启用",
   "Recommended": "推荐", "Archived": "已归档", "Passed": "通过", "Failed": "未通过",
   "Rejected": "已拒绝", "Demo Active": "演示已启用", "Retrieval Failure": "检索失败",

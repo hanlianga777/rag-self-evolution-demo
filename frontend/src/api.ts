@@ -4,11 +4,21 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8010";
 
 type Fetcher = typeof fetch;
 
+function requestError(detail: unknown, status: number): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map(item => `${item.loc?.slice(1).join(".") || "输入"}: ${item.msg}`).join("；");
+  return `请求失败（${status}），请重试`;
+}
+
+export function errorMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : "请求失败，请重试";
+}
+
 export async function getJson<T>(path: string, fetcher: Fetcher = fetch): Promise<T> {
   const response = await fetcher(`${API_BASE}${path}`);
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Request failed (${response.status})`);
+    throw new Error(requestError(body.detail, response.status));
   }
   return response.json() as Promise<T>;
 }
@@ -17,7 +27,7 @@ export async function postJson<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail || `Request failed (${response.status})`);
+    throw new Error(requestError(data.detail, response.status));
   }
   return response.json() as Promise<T>;
 }
