@@ -4,6 +4,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .seed import SeedStore
+from .ai_service import AiService
+from .config import load_settings
+from .providers import DeepSeekProvider
 from .services import DemoService
 
 
@@ -11,6 +14,7 @@ app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5174", "http://127.0.0.1:5174"], allow_methods=["*"], allow_headers=["*"])
 store = SeedStore()
 service = DemoService(store)
+ai_service = AiService(store, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1", service.compare_preview)
 
 
 @app.get("/api/overview")
@@ -63,8 +67,12 @@ def versions():
 
 @app.get("/api/readiness")
 def readiness():
-    configured = bool(os.getenv("DEEPSEEK_API_KEY"))
-    return {"mode": "configured" if configured else "mock", "provider": "DeepSeek", "status": "Configured" if configured else "Not Configured"}
+    return ai_service.readiness()
+
+
+@app.post("/api/ai-readiness/probe")
+def probe_readiness():
+    return ai_service.probe()
 
 
 @app.post("/api/experiments/run", status_code=201)
@@ -93,4 +101,12 @@ def preview(payload: dict):
     question = str(payload.get("question", "")).strip()
     if not question:
         raise HTTPException(status_code=422, detail="Question is required")
-    return service.compare_preview(question)
+    return ai_service.preview(question)
+
+
+@app.post("/api/evaluations/live")
+def live_evaluation(payload: dict):
+    limit = int(payload.get("limit", 40))
+    if limit < 1 or limit > 40:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 40")
+    return ai_service.evaluate(limit)

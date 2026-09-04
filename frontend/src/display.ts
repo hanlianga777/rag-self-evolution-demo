@@ -1,6 +1,7 @@
 const translations: Record<string, string> = {
   "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
   "completed": "已完成", "running": "运行中", "queued": "排队中", "evaluating": "评测中",
+  "live": "真实模式", "mock": "模拟模式", "Ready": "等待连接验证", "passed": "连接成功", "failed": "连接失败", "skipped": "未执行",
   "Indexed": "已索引", "Reviewed": "已审核", "Open": "待优化", "Active": "已启用",
   "Recommended": "推荐", "Archived": "已归档", "Passed": "通过", "Failed": "未通过",
   "Rejected": "已拒绝", "Demo Active": "演示已启用", "Retrieval Failure": "检索失败",
@@ -12,7 +13,7 @@ const translations: Record<string, string> = {
   "Production · v1.0": "生产环境 · v1.0", "Bad Cases": "问题案例", "Agent Analysis": "Agent 分析", "Experiments": "实验",
   "40 Cases": "40 个案例", "A / B / C": "A / B / C",
   "Overall Score": "综合评分", "Overall": "综合评分", "Correctness": "正确性", "Faithfulness": "忠实性", "Recall": "召回率", "P95 Latency": "P95 延迟",
-  "Relevant": "相关", "Irrelevant": "不相关", "Not Configured": "未配置", "Configured": "已配置", "mock": "模拟模式",
+  "Relevant": "相关", "Irrelevant": "不相关", "Not Configured": "未配置", "Configured": "已配置",
   "Recall First": "召回优先", "Balanced": "均衡方案", "Performance First": "性能优先",
   "Quality": "质量", "Safety": "安全", "Latency": "延迟", "Regression": "回归", "Result": "结果",
   "quality": "质量", "safety": "安全", "latency": "延迟", "regression": "回归", "result": "结果",

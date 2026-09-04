@@ -12,7 +12,7 @@ React/Vite 展示工作区，FastAPI 负责数据边界，SQLite 保存种子 JS
 
 ## Provider 边界
 
-当前 API 提供 readiness 与 Mock 响应。后续可在既有后端路由后增加 RAG Answer、LLM Judge、Optimization Agent Adapter；UI 组件不得直接调用 Provider。
+当前 API 通过 `AiService` 提供 readiness、显式 probe、真实 Preview 与 live evaluation。`DeepSeekProvider` 使用官方 OpenAI-compatible Chat Completions；`LocalRetriever` 只在本地种子文档中检索证据。UI 组件不得直接调用 Provider，且 API Key 永不返回给前端。
 
 ## 评测与推荐
 

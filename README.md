@@ -15,9 +15,11 @@ RAG Evolution 是一个面向园区运营知识助手的本地可演示 Demo，�
 - 可现场重跑的逻辑隔离实验，依次呈现排队、运行、评测和完成状态。
 - 只有完整 40/40 回归通过、质量/安全/延迟 SLA 均通过且无新增回归时，才推荐 Candidate B。
 
-## Mock 与后续真实能力的边界
+## 真实模式与 Mock 边界
 
-当前阶段为 **演示模拟模式**：不会调用 DeepSeek，不执行真实 RAG 检索或 LLM Judge，也不进行生产部署。后端 API 和 Provider 边界已经预留，可在后续用真实服务替换确定性夹具。
+未配置 `DEEPSEEK_API_KEY` 时，系统为 **演示模拟模式**。配置后可在设置页手动验证 DeepSeek Provider，预览接口会执行真实的本地证据检索与 DeepSeek 回答；接口会返回 `mode`、`model`、`latency_ms`、证据来源与 fallback 原因。服务启动和普通页面加载不会调用模型。
+
+本地检索是透明的中文字符/词元重叠基线，不宣称为向量检索；LLM Judge 与最多 40 条的 live evaluation API 已预留为显式触发能力。系统不进行生产部署。
 
 此处的 Sandbox 指候选配置的逻辑隔离与独立评测，不是 Docker 或容器沙箱。
 
@@ -48,9 +50,9 @@ cd frontend && npm install && npm run dev
 5. 确认 Candidate B 仅在 40/40 回归和所有 SLA 闸门通过后被推荐。
 6. 打开预览，比较基线拒答与 Candidate B 的有依据回答。
 
-## 可选的 DeepSeek 配置
+## DeepSeek 配置
 
-只有在明确实施真实 Provider 集成时，才将 `.env.example` 复制为 `.env` 并设置 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`。绝不提交 `.env`。
+将 `.env.example` 复制为 `.env` 并设置 `DEEPSEEK_API_KEY`。默认 `DEEPSEEK_BASE_URL=https://api.deepseek.com`、`DEEPSEEK_MODEL=deepseek-v4-flash`；绝不提交 `.env` 或编辑器临时文件。
 
 ## AutoRAG 参考范围
 

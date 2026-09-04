@@ -1,6 +1,9 @@
+import os
 import unittest
 
 from fastapi.testclient import TestClient
+
+os.environ["RAG_FORCE_MOCK"] = "1"
 
 from app.main import app
 
@@ -28,11 +31,12 @@ class DemoApiTests(unittest.TestCase):
         self.assertEqual(optimization["recommendation"]["candidate"], "B")
         self.assertTrue(optimization["recommendation"]["full_regression_passed"])
 
-    def test_readiness_is_mock_without_a_deepseek_key(self):
+    def test_readiness_is_mock_in_the_test_environment_and_never_leaks_a_key(self):
         response = self.client.get("/api/readiness")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["mode"], "mock")
+        self.assertNotIn("api_key", response.json())
 
     def test_experiment_starts_as_a_replay_run(self):
         response = self.client.post("/api/experiments/run")
@@ -56,6 +60,13 @@ class DemoApiTests(unittest.TestCase):
         preview = response.json()
         self.assertIn("暂时无法确认", preview["baseline"]["answer"])
         self.assertIn("30 分钟", preview["candidate_b"]["answer"])
+        self.assertEqual(preview["mode"], "mock")
+        self.assertIn("fallback_reason", preview)
+
+    def test_live_evaluation_rejects_more_than_forty_cases(self):
+        response = self.client.post("/api/evaluations/live", json={"limit": 41})
+
+        self.assertEqual(response.status_code, 422)
 
 
 if __name__ == "__main__":
