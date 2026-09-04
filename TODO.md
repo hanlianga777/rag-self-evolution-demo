@@ -1,16 +1,16 @@
-# TODO
+# 待办
 
-## Done
+## 已完成
 
-- Mock evaluation, bad-case, optimization, version, experiment, and preview flow.
-- React product UI and local startup path.
+- Mock 评测、问题案例、优化、版本、实验和预览流程。
+- React 产品 UI 与本地启动路径。
 
-## Next
+## 下一步
 
-- Add a real corpus parser, index, and retrieval trace.
-- Implement provider adapters after a DeepSeek API key is intentionally configured.
+- 接入真实语料解析、索引与检索轨迹。
+- 在明确配置 DeepSeek API Key 后实现 Provider Adapter。
 
-## Later
+## 后续
 
-- Persist experiment histories beyond the current process.
-- Add measured cost/latency telemetry and richer dataset authoring.
+- 持久化跨进程的实验历史。
+- 增加实测成本/延迟遥测和更完整的数据集编写能力。

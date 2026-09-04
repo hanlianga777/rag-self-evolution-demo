@@ -1,85 +1,54 @@
-# RAG Evolution First Phase Implementation Plan
+# RAG Evolution 第一阶段实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**目标：** 构建本地可运行、可公开展示的 RAG 评测与自进化 Demo，提供完整可点击的 Mock 工作流。
 
-**Goal:** Build a locally runnable, public-ready RAG evaluation and self-evolution demo with a fully clickable Mock workflow.
+**架构：** React SPA 展示产品 UI 并调用 FastAPI API。由 Python/SQLite 支撑的种子仓库管理所有演示事实与实验状态；API 提供稳定读模型并驱动实验重跑状态机。真实 Provider 工作保留在后端 Adapter 后，Mock mode 不需要调用真实服务。
 
-**Architecture:** A React SPA renders the product UI and calls a FastAPI API. Python's SQLite-backed seed repository owns all demo facts and experiment state; the API returns stable read models and drives the replay experiment state machine. Real provider work remains behind backend adapters and is never required in Mock mode.
+**技术栈：** React、TypeScript、Vite、Tailwind CSS、shadcn 风格原语、Lucide、Recharts、FastAPI、SQLite、Python stdlib unittest。
 
-**Tech Stack:** React, TypeScript, Vite, Tailwind CSS, shadcn-style primitives, Lucide, Recharts, FastAPI, SQLite, Python stdlib unittest.
+**设计说明：** `docs/superpowers/specs/2026-09-04-rag-evolution-design.md`
 
-**Spec:** `docs/superpowers/specs/2026-09-04-rag-evolution-design.md`
+## 全局约束
 
-## Global Constraints
+- 桌面优先的浅色 SaaS 界面，目标视口为 1440×900，1280×720 仍可使用。
+- 不使用 Docker、Redis、Kafka、微服务、真实 DeepSeek 调用、AutoRAG 依赖，也不将密钥提交到 Git。
+- Mock mode 的所有数据必须经过 FastAPI API，不允许分散在 React 组件中的业务夹具。
+- Sandbox 指逻辑配置隔离，不代表容器隔离。
+- 仅使用一个具有工具化步骤的 Optimization Agent。
 
-- Desktop-first Light SaaS interface for 1440x900 and usable at 1280x720.
-- No Docker, Redis, Kafka, microservices, real DeepSeek calls, AutoRAG dependency, or secrets in Git.
-- Mock mode must present all data through the FastAPI API, never through scattered React fixtures.
-- Sandbox means logical configuration isolation, not container isolation.
-- Use only one optimization agent model with tool-shaped backend service methods.
+## 任务 1：仓库基础与后端数据契约
 
----
+**文件：** `.gitignore`、`.env.example`、`backend/app/main.py`、`backend/app/seed.py`、`backend/tests/test_api.py`
 
-### Task 1: Repository foundation and backend data contract
+**接口：** `GET /api/overview`、`/api/documents`、`/api/dataset`、`/api/evaluation`、`/api/bad-cases`、`/api/optimization`、`/api/versions`、`/api/readiness`。
 
-**Files:**
-- Create: `.gitignore`, `.env.example`, `backend/app/main.py`, `backend/app/seed.py`, `backend/tests/test_api.py`
+- 定义种子一致性与 Candidate B 推荐的失败测试。
+- 实现 SQLite 种子仓库与 FastAPI 读取路由。
+- 运行 `PYTHONPATH=backend python3 -m unittest discover -s backend/tests -v`。
 
-**Interfaces:**
-- Produces: `GET /api/overview`, `GET /api/documents`, `GET /api/dataset`, `GET /api/evaluation`, `GET /api/bad-cases`, `GET /api/optimization`, `GET /api/versions`, `GET /api/readiness`.
+## 任务 2：实验、版本与预览写操作
 
-- [ ] Define the failing API tests for seed consistency and Candidate B recommendation.
-- [ ] Implement one SQLite seed repository and FastAPI read routes.
-- [ ] Run `PYTHONPATH=backend python3 -m unittest discover -s backend/tests -v`.
+**接口：** `POST /api/experiments/run`、`GET /api/experiments/{id}`、`POST /api/versions/{id}/activate`、`POST /api/preview`。
 
-### Task 2: Experiment, version, and preview mutations
+- 添加重跑、状态读取、版本启用与空调问题预览的失败测试。
+- 实现最小的基于时间的重跑服务与逻辑 SLA 闸门。
+- 重新运行后端测试。
 
-**Files:**
-- Create: `backend/app/services.py`
-- Modify: `backend/app/main.py`
-- Modify: `backend/tests/test_api.py`
+## 任务 3：React 外壳与 API 客户端
 
-**Interfaces:**
-- Produces: `POST /api/experiments/run`, `GET /api/experiments/{id}`, `POST /api/versions/{id}/activate`, `POST /api/preview`.
-- Experiment statuses are `queued`, `running`, `evaluating`, and `completed`.
+- 建立 TypeScript strict 与 Tailwind 兼容的构建配置。
+- 实现侧栏、工作区头部、Mock mode 徽标、预览入口、路由状态与请求客户端。
+- 在 `frontend/` 中运行 `npm run build`。
 
-- [ ] Add failing tests that start a replay, retrieve a progressing run, activate a version, and compare the fixed air-conditioner query.
-- [ ] Implement the minimal time-based replay service and logical SLA gate.
-- [ ] Re-run the backend suite.
+## 任务 4：产品页面与交互闭环
 
-### Task 3: React shell and API client
+- 实现概览 KPI/流程/图表/运行记录，文档与数据集 Tab 及文档详情。
+- 实现评测指标、筛选、问题案例 Drawer 与“优化本次运行”导航。
+- 实现 Agent 时间线、A/B/C 卡片、实验轮询、结果/SLA/回归状态、版本差异/启用和优化前后预览。
+- 重新运行前端生产构建。
 
-**Files:**
-- Create: `frontend/` Vite project files, `frontend/src/api.ts`, `frontend/src/types.ts`, `frontend/src/App.tsx`
+## 任务 5：运维与交接材料
 
-**Interfaces:**
-- Consumes all API routes from Tasks 1-2.
-- Produces route navigation and a shared API/error/loading boundary.
-
-- [ ] Scaffold strict TypeScript and Tailwind-compatible build configuration.
-- [ ] Implement the sidebar, workspace header, Mock-mode badge, preview entry, route state, and request client.
-- [ ] Run `npm run build` in `frontend/`.
-
-### Task 4: Product pages and interaction loop
-
-**Files:**
-- Create: focused page and component modules in `frontend/src/pages/` and `frontend/src/components/`
-
-**Interfaces:**
-- Consumes API read models and experiment mutation routes.
-- Produces all required Overview, Knowledge & Dataset, Evaluation, Evolution Lab, Versions, Settings, and Preview interactions.
-
-- [ ] Implement Overview KPI/pipeline/charts/runs; document and dataset tabs with document detail.
-- [ ] Implement evaluation metrics, filters, bad-case drawer, and Optimize This Run navigation.
-- [ ] Implement structured agent timeline, A/B/C cards, polling experiment replay, results/SLA/regression state, version diff/activation, and Before/After preview.
-- [ ] Re-run the frontend production build.
-
-### Task 5: Operational and handoff artifacts
-
-**Files:**
-- Create: `start.sh`, `README.md`, `ARCHITECTURE.md`, `PROJECT_CONTEXT.md`, `DECISIONS.md`, `TODO.md`, `CODEX_HANDOFF.md`, `CHANGELOG.md`, `THIRD_PARTY_NOTICES.md`
-
-- [ ] Document setup, demonstration flow, Mock versus planned capability, AutoRAG reference, and logical sandbox limit.
-- [ ] Verify one-command startup, API smoke checks, browser flow, responsive layout, and clean browser console.
-- [ ] Initialize Git, commit scoped work, create/push `hanlianga777/rag-self-evolution-demo` publicly when credentials are available, and confirm synchronization.
-
+- 编写启动、演示流程、Mock 与后续能力边界、AutoRAG 参考范围和逻辑沙箱限制。
+- 验证一键启动、API 冒烟、浏览器故事线、响应式布局和干净的浏览器 Console。
+- 初始化 Git、提交变更；在认证可用时创建并推送 `hanlianga777/rag-self-evolution-demo`，确认同步。

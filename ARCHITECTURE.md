@@ -1,19 +1,19 @@
-# Architecture
+# 架构说明
 
-## Runtime
+## 运行时
 
-React/Vite presents the workspace. FastAPI owns the data boundary. SQLite stores the seed JSON and provides a simple local persistence boundary. `start.sh` runs both processes without Docker.
+React/Vite 展示工作区，FastAPI 负责数据边界，SQLite 保存种子 JSON 并提供轻量本地持久化边界。`start.sh` 不依赖 Docker，同时启动两个进程。
 
-## Data flow
+## 数据流
 
-`SeedStore → FastAPI routes → frontend API client → product pages`
+`SeedStore → FastAPI routes → frontend API client → 产品页面`
 
-The experiment route creates an in-memory replay run. Polling maps elapsed time to queued, running, evaluating, then completed. It never changes the active production configuration. Version activation changes only the Demo selection.
+实验接口会创建内存中的重跑任务；轮询按耗时依次返回 `queued`、`running`、`evaluating`、`completed`。它不会改变生产配置，版本启用也只改变演示选择。
 
-## Provider boundary
+## Provider 边界
 
-The current API exposes readiness and Mock responses. A later implementation can add RAG Answer, LLM Judge, and Optimization Agent adapters behind the existing backend routes. UI components must not call a provider directly.
+当前 API 提供 readiness 与 Mock 响应。后续可在既有后端路由后增加 RAG Answer、LLM Judge、Optimization Agent Adapter；UI 组件不得直接调用 Provider。
 
-## Evaluation and recommendation
+## 评测与推荐
 
-The baseline evaluates all 40 Golden Dataset records. Candidate B is recommended because it has the best qualifying result: quality, safety, latency, and 40/40 regression all pass with no new regressions. Candidate A fails latency; Candidate C fails quality.
+基线评测覆盖全部 40 条黄金数据集记录。Candidate B 是满足条件的最优结果：质量、安全、延迟和 40/40 回归均通过，且没有新增回归。Candidate A 不满足延迟要求，Candidate C 不满足质量要求。

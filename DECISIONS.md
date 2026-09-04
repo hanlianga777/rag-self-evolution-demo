@@ -1,13 +1,13 @@
-# Decisions
+# 决策记录
 
-## Independent implementation over AutoRAG fork
+## 选择独立实现，而非 fork AutoRAG
 
-AutoRAG’s original Python RAG AutoML capability is located in `legacy/`, while the root project now focuses on AutoRAG 2.0. This Demo uses neither as a dependency: a direct integration would add a large evaluation stack before any real runtime exists. The legacy project remains a documented conceptual reference.
+AutoRAG 原始 Python RAG AutoML 能力位于 `legacy/`，而根项目已转向 AutoRAG 2.0。本 Demo 不将两者作为依赖：在真实运行时尚未落地前直接集成，会先引入过重的评测栈。`legacy/` 仅保留为文档化的概念参考。
 
-## One agent and logical sandbox
+## 单 Agent 与逻辑沙箱
 
-The UI represents one structured Optimization Agent with tool-shaped steps, not a chat transcript or multi-agent system. Sandbox means independent candidate configuration snapshots and evaluation runs; it is not a production container boundary.
+UI 呈现的是一个具有工具化步骤的结构化 Optimization Agent，不是聊天记录或多 Agent 系统。Sandbox 指独立的候选配置快照和评测运行，不构成生产容器边界。
 
 ## Mock-first API
 
-All display data crosses the FastAPI API, so the React UI does not own business fixtures. Real RAG, judging, and provider adapters can later replace the deterministic backend service.
+所有展示数据均经过 FastAPI API，因此 React UI 不持有业务夹具。后续可用真实 RAG、评审器和 Provider Adapter 替换确定性后端服务。

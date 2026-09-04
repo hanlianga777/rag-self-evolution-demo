@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { displayText } from "../display";
 
 export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "good" | "bad" | "warning" | "accent" }) {
   return <span className={`badge ${tone}`}>{children}</span>;
@@ -14,5 +15,5 @@ export function Section({ title, action, children }: { title: string; action?: R
 
 export function Status({ value }: { value: string }) {
   const tone = /pass|completed|indexed|active|recommended|reviewed/i.test(value) ? "good" : /fail|rejected/i.test(value) ? "bad" : /running|evaluating|queued/i.test(value) ? "accent" : "neutral";
-  return <Badge tone={tone}>{value}</Badge>;
+  return <Badge tone={tone}>{displayText(value)}</Badge>;
 }

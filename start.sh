@@ -5,11 +5,11 @@ project_root="$(cd "$(dirname "$0")" && pwd)"
 cd "$project_root"
 
 if lsof -nP -iTCP:8010 -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "Port 8010 is already in use. Stop the matching RAG Evolution process or set a different coordinated port pair."
+  echo "端口 8010 已被占用。请停止匹配的 RAG Evolution 进程，或协调修改前后端端口。"
   exit 1
 fi
 if lsof -nP -iTCP:5174 -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "Port 5174 is already in use. Stop the matching RAG Evolution process or set a different coordinated port pair."
+  echo "端口 5174 已被占用。请停止匹配的 RAG Evolution 进程，或协调修改前后端端口。"
   exit 1
 fi
 
@@ -25,6 +25,6 @@ backend_pid=$!
 cleanup() { kill "$backend_pid" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 
-echo "RAG Evolution API: http://127.0.0.1:8010/docs"
-echo "RAG Evolution Demo: http://127.0.0.1:5174"
+echo "RAG Evolution API： http://127.0.0.1:8010/docs"
+echo "RAG Evolution Demo： http://127.0.0.1:5174"
 (cd frontend && npm run dev -- --host 127.0.0.1)

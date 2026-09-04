@@ -1,0 +1,34 @@
+const translations: Record<string, string> = {
+  "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
+  "completed": "已完成", "running": "运行中", "queued": "排队中", "evaluating": "评测中",
+  "Indexed": "已索引", "Reviewed": "已审核", "Open": "待优化", "Active": "已启用",
+  "Recommended": "推荐", "Archived": "已归档", "Passed": "通过", "Failed": "未通过",
+  "Rejected": "已拒绝", "Demo Active": "演示已启用", "Retrieval Failure": "检索失败",
+  "Retrieval Noise": "检索噪声", "Over-Rejection": "过度拒答",
+  "High": "高", "Medium": "中", "Low": "低", "Positive": "正向", "Ablation": "口语化",
+  "Negative": "负向", "AI Generated": "AI 生成", "Human Added": "人工补充",
+  "Baseline": "基线", "Candidate A": "候选方案 A", "Candidate B": "候选方案 B", "Candidate C": "候选方案 C",
+  "Evaluation": "评测", "Optimization": "优化", "Production": "生产环境",
+  "Production · v1.0": "生产环境 · v1.0", "Bad Cases": "问题案例", "Agent Analysis": "Agent 分析", "Experiments": "实验",
+  "40 Cases": "40 个案例", "A / B / C": "A / B / C",
+  "Overall Score": "综合评分", "Overall": "综合评分", "Correctness": "正确性", "Faithfulness": "忠实性", "Recall": "召回率", "P95 Latency": "P95 延迟",
+  "Relevant": "相关", "Irrelevant": "不相关", "Not Configured": "未配置", "Configured": "已配置", "mock": "模拟模式",
+  "Recall First": "召回优先", "Balanced": "均衡方案", "Performance First": "性能优先",
+  "Quality": "质量", "Safety": "安全", "Latency": "延迟", "Regression": "回归", "Result": "结果",
+  "quality": "质量", "safety": "安全", "latency": "延迟", "regression": "回归", "result": "结果",
+  "Load Evaluation Report": "加载评测报告", "Analyze 8 Bad Cases": "分析 8 个问题案例", "Cluster Failure Patterns": "聚类失败模式",
+  "Identify Root Causes": "识别根因", "Generate Optimization Hypotheses": "生成优化假设", "Build Candidate Configurations": "构建候选配置",
+  "Run Sandbox Experiments": "运行沙箱实验", "Regression Evaluation": "回归评测", "Recommendation": "推荐结论",
+  "Balanced quality and latency": "平衡质量与延迟", "Quality ceiling remains": "质量提升空间有限",
+  "EVAL-0042 loaded": "EVAL-0042 已加载", "Failure patterns extracted": "已提取失败模式", "4 retrieval failures": "4 个检索失败",
+  "Query semantic gap": "Query 语义偏差", "3 viable strategies": "3 个可行策略", "A / B / C ready": "A / B / C 已就绪",
+  "Historical run completed": "历史运行已完成", "40 / 40 completed": "40 / 40 已完成",
+  "Maximize Retrieval Recall": "最大化检索召回率", "Expected Token and Latency increase": "预计增加 Token 与延迟",
+  "Improve Recall while controlling response latency": "提升召回率，同时控制响应延迟", "Fix primary Retrieval issue while keeping low latency": "修复主要检索问题，同时保持低延迟",
+  "Today 14:32": "今天 14:32", "Today 14:12": "今天 14:12", "Today 14:36": "今天 14:36", "Yesterday": "昨天", "Mon": "周一",
+  "PDF text parser": "PDF 文本解析器", "512 tokens / 80 overlap": "512 tokens / 80 重叠", "Logical isolation · no containers": "逻辑隔离 · 不使用容器",
+};
+
+export function displayText(value: string): string {
+  return translations[value] || value;
+}
