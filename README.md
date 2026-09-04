@@ -6,11 +6,11 @@ RAG Evolution 是一个面向园区运营知识助手的本地可演示 Demo，�
 
 ## 业务与技术架构
 
-![RAG Evolution 业务架构图](docs/architecture/assets/business-architecture.png)
+![RAG Evolution 业务流程图](架构/业务流程图.png)
 
-![RAG Evolution 技术架构图](docs/architecture/assets/technical-architecture.png)
+![RAG Evolution 技术架构图](架构/技术架构图.png)
 
-完整的模块职责、数据流、状态生命周期、接口边界与能力范围见 [RAG Evolution 平台架构说明](docs/architecture/RAG自进化平台架构说明.md)。
+完整的模块职责、数据流、状态生命周期、接口边界与能力范围见 [RAG Evolution 平台架构说明](架构/RAG自进化平台架构说明.md)。
 
 ## 与普通 RAG Demo 的区别
 
