@@ -4,6 +4,14 @@
 
 RAG Evolution 是一个面向园区运营知识助手的本地可演示 Demo，完整呈现「知识与黄金数据集 → 基线评测 → 问题案例证据 → 结构化优化诊断 → A/B/C 沙箱实验 → 全量回归 → SLA 闸门推荐」闭环。
 
+## 业务与技术架构
+
+![RAG Evolution 业务架构图](docs/architecture/assets/business-architecture.png)
+
+![RAG Evolution 技术架构图](docs/architecture/assets/technical-architecture.png)
+
+完整的模块职责、数据流、状态生命周期、接口边界与能力范围见 [RAG Evolution 平台架构说明](docs/architecture/RAG自进化平台架构说明.md)。
+
 ## 与普通 RAG Demo 的区别
 
 本项目不以单次回答“成功”作为结论；它把评测证据、问题案例、候选配置、质量/延迟权衡和完整的 40 题回归放在同一个可审计闭环中展示。
