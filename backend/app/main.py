@@ -1,7 +1,8 @@
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, field_validator
 
 from .seed import SeedStore
 from .ai_service import AiService
@@ -11,10 +12,32 @@ from .services import DemoService
 
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5174", "http://127.0.0.1:5174"], allow_methods=["*"], allow_headers=["*"])
+TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
+app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 store = SeedStore()
 service = DemoService(store)
 ai_service = AiService(store, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1", service.compare_preview)
+
+
+class PreviewRequest(BaseModel):
+    question: str = Field(strict=True, min_length=1, max_length=1000)
+
+    @field_validator("question")
+    @classmethod
+    def non_blank_question(cls, value):
+        if not value.strip():
+            raise ValueError("Question is required")
+        return value.strip()
+
+
+class EvaluationRequest(BaseModel):
+    limit: int = Field(default=40, strict=True, ge=1, le=40)
+
+
+def require_trusted_origin(request: Request):
+    origin = request.headers.get("origin")
+    if origin is not None and origin not in TRUSTED_ORIGINS:
+        raise HTTPException(status_code=403, detail="Untrusted Origin")
 
 
 @app.get("/api/overview")
@@ -70,7 +93,7 @@ def readiness():
     return ai_service.readiness()
 
 
-@app.post("/api/ai-readiness/probe")
+@app.post("/api/ai-readiness/probe", dependencies=[Depends(require_trusted_origin)])
 def probe_readiness():
     return ai_service.probe()
 
@@ -96,17 +119,11 @@ def activate_version(version_id: str):
     return result
 
 
-@app.post("/api/preview")
-def preview(payload: dict):
-    question = str(payload.get("question", "")).strip()
-    if not question:
-        raise HTTPException(status_code=422, detail="Question is required")
-    return ai_service.preview(question)
+@app.post("/api/preview", dependencies=[Depends(require_trusted_origin)])
+def preview(payload: PreviewRequest):
+    return ai_service.preview(payload.question)
 
 
-@app.post("/api/evaluations/live")
-def live_evaluation(payload: dict):
-    limit = int(payload.get("limit", 40))
-    if limit < 1 or limit > 40:
-        raise HTTPException(status_code=422, detail="limit must be between 1 and 40")
-    return ai_service.evaluate(limit)
+@app.post("/api/evaluations/live", dependencies=[Depends(require_trusted_origin)])
+def live_evaluation(payload: EvaluationRequest):
+    return ai_service.evaluate(payload.limit)

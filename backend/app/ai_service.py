@@ -21,7 +21,8 @@ class AiService:
         if not self.live_enabled:
             reason = "测试环境强制使用 Mock" if self.force_mock else "未配置 DEEPSEEK_API_KEY"
             return {"mode": "mock", "provider": "DeepSeek", "model": self.provider.settings.model, "status": "Not Configured", "reason": reason, "last_probe": self.last_probe}
-        return {"mode": "live", "provider": "DeepSeek", "model": self.provider.settings.model, "status": "Ready", "last_probe": self.last_probe}
+        status = "Configured (Unverified)" if self.last_probe is None else "Ready" if self.last_probe["status"] == "passed" else "Unavailable"
+        return {"mode": "live", "provider": "DeepSeek", "model": self.provider.settings.model, "status": status, "last_probe": self.last_probe}
 
     def probe(self) -> dict:
         if not self.live_enabled:
@@ -59,7 +60,11 @@ class AiService:
         started_at = time.perf_counter()
         for record in records:
             try:
-                answer = self.preview(record["question"])["candidate_b"]["answer"]
+                preview = self.preview(record["question"])
+                if preview["mode"] != "live":
+                    failures += 1
+                    continue
+                answer = preview["candidate_b"]["answer"]
                 judgment = self.provider.judge(record["question"], record["expected_answer"], answer)
                 scores.append(judgment["score"])
             except ProviderUnavailable:

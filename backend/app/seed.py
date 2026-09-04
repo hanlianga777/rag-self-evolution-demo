@@ -97,6 +97,7 @@ class SeedStore:
         try:
             connection.execute("CREATE TABLE IF NOT EXISTS demo_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             connection.execute("INSERT OR IGNORE INTO demo_state(key, value) VALUES (?, ?)", ("seed", json.dumps(build_seed(), ensure_ascii=False)))
+            connection.execute("INSERT OR IGNORE INTO demo_state(key, value) VALUES (?, ?)", ("demo_active_version", "v1.0"))
             connection.commit()
         finally:
             connection.close()
@@ -105,6 +106,23 @@ class SeedStore:
         connection = sqlite3.connect(self.database_path)
         try:
             payload = json.loads(connection.execute("SELECT value FROM demo_state WHERE key = 'seed'").fetchone()[0])
+            active_version = connection.execute("SELECT value FROM demo_state WHERE key = 'demo_active_version'").fetchone()[0]
         finally:
             connection.close()
+        if key == "workspace":
+            payload[key].update(active_version=active_version, environment=f"Demo · {active_version}", document_count=len(payload["documents"]))
+        elif key == "versions":
+            for version in payload[key]:
+                if version["id"] == active_version:
+                    version["status"] = "Demo Active"
+                elif version["status"] in ("Active", "Demo Active"):
+                    version["status"] = "Archived"
         return payload[key]
+
+    def set_active_version(self, version_id):
+        connection = sqlite3.connect(self.database_path)
+        try:
+            connection.execute("UPDATE demo_state SET value = ? WHERE key = 'demo_active_version'", (version_id,))
+            connection.commit()
+        finally:
+            connection.close()

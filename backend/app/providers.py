@@ -1,4 +1,5 @@
 import json
+import math
 import urllib.error
 import urllib.request
 
@@ -39,8 +40,8 @@ class DeepSeekProvider:
             content = body["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as error:
             raise ProviderUnavailable("DeepSeek 响应缺少内容") from error
-        if not content:
-            raise ProviderUnavailable("DeepSeek 返回空内容")
+        if not isinstance(content, str) or not content.strip():
+            raise ProviderUnavailable("DeepSeek 返回的内容必须是非空字符串")
         return content
 
     def judge(self, question: str, expected: str, answer: str) -> dict:
@@ -51,6 +52,9 @@ class DeepSeekProvider:
         )
         try:
             result = json.loads(content)
-            return {"score": float(result["score"]), "rationale": str(result["rationale"])}
+            score = result["score"]
+            if type(score) not in (int, float) or not 0 <= score <= 100 or not math.isfinite(score):
+                raise ValueError("Judge score must be a finite number between 0 and 100")
+            return {"score": float(score), "rationale": str(result["rationale"])}
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
             raise ProviderUnavailable("DeepSeek Judge 未返回有效 JSON") from error

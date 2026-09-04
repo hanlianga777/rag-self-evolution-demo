@@ -7,7 +7,6 @@ class DemoService:
     def __init__(self, store):
         self.store = store
         self.runs = {}
-        self.active_version = "v1.0"
 
     def start_experiment(self):
         run_id = f"EXP-{len(self.runs) + 1:04d}"
@@ -30,7 +29,7 @@ class DemoService:
         candidates = []
         for candidate, completed_cases in zip(self.store.get("optimization")["candidates"], completed):
             candidates.append({"id": candidate["id"], "name": candidate["name"], "completed_cases": completed_cases, "total_cases": 40})
-        payload = {"id": run_id, "status": status, "candidates": candidates}
+        payload = {"id": run_id, "status": status, "candidates": candidates, "mode": "mock", "source": "seeded_replay"}
         if status == "completed":
             payload["result"] = self.store.get("optimization")["recommendation"]
         return payload
@@ -40,7 +39,7 @@ class DemoService:
         version = next((item for item in versions if item["id"] == version_id), None)
         if not version:
             return None
-        self.active_version = version_id
+        self.store.set_active_version(version_id)
         return {"id": version_id, "status": "Demo Active", "name": version["name"]}
 
     def compare_preview(self, question):
