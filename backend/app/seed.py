@@ -12,6 +12,43 @@ DOCUMENTS = [
     {"id": "DOC-006", "name": "设备巡检SOP.pdf", "category": "设备运维", "pages": 19, "chunks": 56, "status": "Indexed", "updated_at": "Mon", "parser": "PDF text parser", "chunk_strategy": "512 tokens / 80 overlap", "samples": ["巡检异常须记录位置、设备编号和风险等级。", "一般异常应在当日创建维修工单。"]},
 ]
 
+DOCUMENT_CONTENT = {
+    "DOC-001": [
+        "服务范围\n园区服务平台受理物业服务、报事报修与咨询，并为服务请求保留可追溯的处理记录。",
+        "提交方式\n用户可在园区服务平台填写问题描述、位置和联系方式；涉及设备的问题应补充设备名称或编号。",
+        "响应说明\n普通服务请求将在一个工作日内回复；紧急安全事项应按相应应急流程处理。",
+    ],
+    "DOC-002": [
+        "适用范围\n本标准适用于园区物业服务、设备报修和安全事项的受理、分派与响应。",
+        "设备故障\n普通设备故障工单应在 30 分钟内响应，并向提交人同步受理进度。",
+        "紧急事项\n紧急安全事件应立即升级至值班经理，由值班经理组织后续处置与信息同步。",
+    ],
+    "DOC-003": [
+        "申请要求\n装修开始前须提交装修申请，明确施工范围、施工单位、施工时段和现场负责人。",
+        "审批条件\n申请经审核并取得书面许可后方可进入施工；未经许可不得提前进场或开工。",
+        "现场管理\n施工人员须遵守园区安全管理要求，服从现场巡查与出入管理安排。",
+    ],
+    "DOC-004": [
+        "报修入口\n办公区域空调故障可通过园区服务平台提交设备报修工单，并填写故障位置和现象。",
+        "受理时限\n普通故障响应时间为 30 分钟以内；处理人员会根据工单信息联系现场确认。",
+        "处理记录\n工单应记录报修时间、故障描述、处理过程和完成状态，便于后续查询。",
+    ],
+    "DOC-005": [
+        "火情发现\n发现火情应立即按下手动报警按钮并拨打 119，同时向园区值班人员报告现场位置。",
+        "人员疏散\n应按照疏散指示有序撤离；疏散时不得使用电梯，不得返回危险区域取回物品。",
+        "现场配合\n到达安全区域后配合现场管理人员清点人员，并等待后续通知。",
+    ],
+    "DOC-006": [
+        "巡检记录\n巡检异常须记录位置、设备编号和风险等级，并附上足以确认问题的现场描述。",
+        "异常处置\n一般异常应在当日创建维修工单；需立即处理的事项应同步告知现场负责人。",
+        "闭环要求\n处理完成后应补充处理结果和复核情况，确保巡检记录与维修工单能够对应查询。",
+    ],
+}
+
+
+def document_records():
+    return [{**document, "content": DOCUMENT_CONTENT[document["id"]]} for document in DOCUMENTS]
+
 
 def _questions():
     positive = [
@@ -86,7 +123,7 @@ def build_seed():
         {"id": "B", "name": "Candidate B", "strategy": "Balanced", "settings": {"Query Rewrite": "ON", "Multi Query": "ON", "Rerank": "ON", "TopK": "6"}, "goal": "提升 Recall，同时控制响应延迟", "tradeoff": "Balanced quality and latency", "metrics": {"correctness": 92, "faithfulness": 94, "recall": 94, "p95_latency": 2.4, "overall": 87.6}, "sla": {"quality": "Passed", "safety": "Passed", "latency": "Passed", "regression": "Passed", "result": "Recommended"}},
         {"id": "C", "name": "Candidate C", "strategy": "Performance First", "settings": {"Query Rewrite": "ON", "Multi Query": "OFF", "Rerank": "ON", "TopK": "4"}, "goal": "修复主要 Retrieval 问题，同时保持低延迟", "tradeoff": "Quality ceiling remains", "metrics": {"correctness": 85, "faithfulness": 93, "recall": 88, "p95_latency": 1.9, "overall": 82.9}, "sla": {"quality": "Failed", "safety": "Passed", "latency": "Passed", "regression": "Passed", "result": "Rejected"}},
     ]
-    return {"workspace": {"name": "园区运营知识助手", "environment": "Production · v1.0", "document_count": 12, "chunk_count": 438}, "documents": DOCUMENTS, "dataset": _questions(), "bad_cases": bad_cases, "evaluation": {"id": "EVAL-0042", "config": "baseline_v1", "dataset": "golden_v1.3", "questions": 40, "status": "Completed", "metrics": {"correctness": 78, "faithfulness": 91, "completeness": 74, "recall": 82, "mrr": 0.76, "safety": 96, "p50_latency": 1.8, "p95_latency": 3.6, "cost": 0.021, "overall": 72.4}, "sla": [{"label": "Overall Score", "actual": "72.4", "target": "85", "status": "Failed"}, {"label": "Safety", "actual": "96", "target": "95", "status": "Passed"}, {"label": "P95 Latency", "actual": "3.6s", "target": "3.0s", "status": "Failed"}]}, "optimization": {"id": "OPT-0012", "timeline": [{"action": "Load Evaluation Report", "result": "EVAL-0042 loaded", "status": "completed"}, {"action": "Analyze 8 Bad Cases", "result": "Failure patterns extracted", "status": "completed"}, {"action": "Cluster Failure Patterns", "result": "4 retrieval failures", "status": "completed"}, {"action": "Identify Root Causes", "result": "Query semantic gap", "status": "completed"}, {"action": "Generate Optimization Hypotheses", "result": "3 viable strategies", "status": "completed"}, {"action": "Build Candidate Configurations", "result": "A / B / C ready", "status": "completed"}, {"action": "Run Sandbox Experiments", "result": "Historical run completed", "status": "completed"}, {"action": "Regression Evaluation", "result": "40 / 40 completed", "status": "completed"}, {"action": "Recommendation", "result": "Candidate B", "status": "completed"}], "diagnosis": {"primary": "Retrieval Failure", "secondary": "Retrieval Noise", "other": {"Over-Rejection": 1, "Latency": 1}, "summary": "当前主要瓶颈集中于口语化 Query 与知识库正式术语之间的语义偏差。建议优先优化 Query Expansion 与 Retrieval，再控制 Rerank 带来的延迟增长。"}, "candidates": candidates, "recommendation": {"candidate": "B", "name": "Candidate B", "full_regression_passed": True, "bad_cases_resolved": "6 / 8", "new_regressions": 0, "unresolved": 2}}, "versions": [{"id": "v1.0", "name": "Baseline", "score": 72.4, "status": "Active", "settings": {"Query Rewrite": "OFF", "Multi Query": "OFF", "Rerank": "OFF", "TopK": "4"}}, {"id": "v1.1", "name": "Candidate A", "score": 84.1, "status": "Archived", "settings": candidates[0]["settings"]}, {"id": "v1.2", "name": "Candidate B", "score": 87.6, "status": "Recommended", "settings": candidates[1]["settings"]}, {"id": "v1.3", "name": "Candidate C", "score": 82.9, "status": "Archived", "settings": candidates[2]["settings"]}], "overview": {"kpis": {"overall_score": 72.4, "target_sla": 85, "bad_cases": "8 / 40", "avg_latency": "2.8s", "safety_pass": "96%"}, "pipeline": [{"label": "Baseline", "value": "72.4"}, {"label": "Evaluation", "value": "40 Cases"}, {"label": "Bad Cases", "value": "8"}, {"label": "Agent Analysis", "value": "Completed"}, {"label": "Experiments", "value": "A / B / C"}, {"label": "Regression", "value": "87.6"}, {"label": "Recommended", "value": "Candidate B"}], "distribution": [{"name": "Retrieval Failure", "value": 4}, {"name": "Retrieval Noise", "value": 2}, {"name": "Over-Rejection", "value": 1}, {"name": "Latency", "value": 1}], "latest_optimization": [{"name": "Baseline", "score": 72.4}, {"name": "Candidate A", "score": 84.1}, {"name": "Candidate B", "score": 87.6}, {"name": "Candidate C", "score": 82.9}], "recent_runs": [{"id": "OPT-0012", "type": "Optimization", "status": "Completed", "time": "Today 14:36"}, {"id": "EVAL-0042", "type": "Evaluation", "status": "Completed", "time": "Today 14:12"}, {"id": "EVAL-0041", "type": "Evaluation", "status": "Completed", "time": "Yesterday"}], "recommended_candidate": "Candidate B"}}
+    return {"workspace": {"name": "园区运营知识助手", "environment": "Production · v1.0", "document_count": 12, "chunk_count": 438}, "documents": document_records(), "dataset": _questions(), "bad_cases": bad_cases, "evaluation": {"id": "EVAL-0042", "config": "baseline_v1", "dataset": "golden_v1.3", "questions": 40, "status": "Completed", "metrics": {"correctness": 78, "faithfulness": 91, "completeness": 74, "recall": 82, "mrr": 0.76, "safety": 96, "p50_latency": 1.8, "p95_latency": 3.6, "cost": 0.021, "overall": 72.4}, "sla": [{"label": "Overall Score", "actual": "72.4", "target": "85", "status": "Failed"}, {"label": "Safety", "actual": "96", "target": "95", "status": "Passed"}, {"label": "P95 Latency", "actual": "3.6s", "target": "3.0s", "status": "Failed"}]}, "optimization": {"id": "OPT-0012", "timeline": [{"action": "Load Evaluation Report", "result": "EVAL-0042 loaded", "status": "completed"}, {"action": "Analyze 8 Bad Cases", "result": "Failure patterns extracted", "status": "completed"}, {"action": "Cluster Failure Patterns", "result": "4 retrieval failures", "status": "completed"}, {"action": "Identify Root Causes", "result": "Query semantic gap", "status": "completed"}, {"action": "Generate Optimization Hypotheses", "result": "3 viable strategies", "status": "completed"}, {"action": "Build Candidate Configurations", "result": "A / B / C ready", "status": "completed"}, {"action": "Run Sandbox Experiments", "result": "Historical run completed", "status": "completed"}, {"action": "Regression Evaluation", "result": "40 / 40 completed", "status": "completed"}, {"action": "Recommendation", "result": "Candidate B", "status": "completed"}], "diagnosis": {"primary": "Retrieval Failure", "secondary": "Retrieval Noise", "other": {"Over-Rejection": 1, "Latency": 1}, "summary": "当前主要瓶颈集中于口语化 Query 与知识库正式术语之间的语义偏差。建议优先优化 Query Expansion 与 Retrieval，再控制 Rerank 带来的延迟增长。"}, "candidates": candidates, "recommendation": {"candidate": "B", "name": "Candidate B", "full_regression_passed": True, "bad_cases_resolved": "6 / 8", "new_regressions": 0, "unresolved": 2}}, "versions": [{"id": "v1.0", "name": "Baseline", "score": 72.4, "status": "Active", "settings": {"Query Rewrite": "OFF", "Multi Query": "OFF", "Rerank": "OFF", "TopK": "4"}}, {"id": "v1.1", "name": "Candidate A", "score": 84.1, "status": "Archived", "settings": candidates[0]["settings"]}, {"id": "v1.2", "name": "Candidate B", "score": 87.6, "status": "Recommended", "settings": candidates[1]["settings"]}, {"id": "v1.3", "name": "Candidate C", "score": 82.9, "status": "Archived", "settings": candidates[2]["settings"]}], "overview": {"kpis": {"overall_score": 72.4, "target_sla": 85, "bad_cases": "8 / 40", "avg_latency": "2.8s", "safety_pass": "96%"}, "pipeline": [{"label": "Baseline", "value": "72.4"}, {"label": "Evaluation", "value": "40 Cases"}, {"label": "Bad Cases", "value": "8"}, {"label": "Agent Analysis", "value": "Completed"}, {"label": "Experiments", "value": "A / B / C"}, {"label": "Regression", "value": "87.6"}, {"label": "Recommended", "value": "Candidate B"}], "distribution": [{"name": "Retrieval Failure", "value": 4}, {"name": "Retrieval Noise", "value": 2}, {"name": "Over-Rejection", "value": 1}, {"name": "Latency", "value": 1}], "latest_optimization": [{"name": "Baseline", "score": 72.4}, {"name": "Candidate A", "score": 84.1}, {"name": "Candidate B", "score": 87.6}, {"name": "Candidate C", "score": 82.9}], "recent_runs": [{"id": "OPT-0012", "type": "Optimization", "status": "Completed", "time": "Today 14:36"}, {"id": "EVAL-0042", "type": "Evaluation", "status": "Completed", "time": "Today 14:12"}, {"id": "EVAL-0041", "type": "Evaluation", "status": "Completed", "time": "Yesterday"}], "recommended_candidate": "Candidate B"}}
 
 
 class SeedStore:
@@ -109,6 +146,7 @@ class SeedStore:
             active_version = connection.execute("SELECT value FROM demo_state WHERE key = 'demo_active_version'").fetchone()[0]
         finally:
             connection.close()
+        payload["documents"] = document_records()
         if key == "workspace":
             payload[key].update(active_version=active_version, environment=f"Demo · {active_version}", document_count=len(payload["documents"]))
         elif key == "versions":

@@ -6,7 +6,7 @@ describe("displayText", () => {
     expect(displayText("Completed")).toBe("已完成");
     expect(displayText("Retrieval Failure")).toBe("检索失败");
     expect(displayText("Candidate B")).toBe("候选方案 B");
-    expect(displayText("live")).toBe("真实模式");
+    expect(displayText("live")).toBe("服务回答");
   });
 
   it("does not alter an unknown API value", () => {

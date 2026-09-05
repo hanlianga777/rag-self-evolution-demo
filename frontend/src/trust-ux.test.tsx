@@ -15,7 +15,7 @@ const versions = [
 const data = {
   workspace: { name: "测试工作区", environment: "Production" },
   overview: { active_version: "v1.0", kpis: {}, pipeline: [{ label: "Knowledge", value: "1" }, { label: "Evaluation", value: "40" }, { label: "Bad Cases", value: "8" }], distribution: [], latest_optimization: [], recent_runs: [] },
-  documents: [{ id: "doc-1", name: "报修流程.pdf", category: "服务", pages: 3, chunks: 2, status: "Indexed", updated_at: "Today 14:32", parser: "PDF text parser", chunk_strategy: "512 tokens / 80 overlap", samples: ["报修请联系物业"] }],
+  documents: [{ id: "doc-1", name: "报修流程.pdf", category: "服务", pages: 3, chunks: 2, status: "Indexed", updated_at: "Today 14:32", parser: "PDF text parser", chunk_strategy: "512 tokens / 80 overlap", samples: ["报修请联系物业"], content: ["服务范围\n受理设备报修、物业服务与园区咨询。", "处理时限\n普通设备故障工单应在 30 分钟内响应。"] }],
   dataset: [], evaluation: { id: "EVAL-1", config: "baseline", dataset: "golden", questions: 40, status: "Completed", sla: [] },
   badCases: [{ id: "BC-1", question: "空调坏了怎么办？", failure_type: "Retrieval Failure", score: 20, severity: "High", status: "Open", trace: [], evidence: [] }],
   optimization: { id: "OPT-1", timeline: [], diagnosis: { primary: "Retrieval", secondary: "Generation", summary: "test", other: {} }, candidates: [], recommendation: { bad_cases_resolved: 6, unresolved: 2 } },
@@ -49,27 +49,28 @@ function content() { return document.body.textContent || ""; }
 describe("Preview trust and recovery", () => {
   it("waits for explicit submission and identifies live output separately from the seeded baseline", async () => {
     post = () => preview;
-    await render(<App />); await click("预览");
+    await render(<App />); await click("回答对比");
     expect(content()).not.toContain("本次真实回答");
     expect(content()).toContain("DeepSeek");
     await click("对比版本");
-    expect(content()).toContain("真实回答（Live）");
+    expect(content()).toContain("服务回答");
     expect(content()).toContain("test-model"); expect(content()).toContain("321 ms");
-    expect(content()).toContain("基线样例（模拟）");
+    expect(content()).toContain("基线版本");
   });
-  it("labels fallback output as mock with its reason, then clears it on request failure and supports retry", async () => {
-    post = () => ({ ...preview, mode: "mock", model: null, latency_ms: null, fallback_reason: "Provider 超时", candidate_b: { ...preview.candidate_b, answer: "模拟回答样例" } });
-    await render(<App />); await click("预览"); await click("对比版本");
-    expect(content()).toContain("模拟回答（Mock）"); expect(content()).toContain("Provider 超时");
+  it("labels fallback output as a local response, then clears it on request failure and supports retry", async () => {
+    post = () => ({ ...preview, mode: "mock", model: null, latency_ms: null, fallback_reason: "Provider 超时", candidate_b: { ...preview.candidate_b, answer: "本地回答样例" } });
+    await render(<App />); await click("回答对比"); await click("对比版本");
+    expect(content()).toContain("本地响应"); expect(content()).toContain("Provider 超时");
+    expect(content()).not.toMatch(/Mock|模拟/);
     post = () => { throw new Error("网络中断"); };
     await click("对比版本");
     expect(document.querySelector('[role="alert"]')?.textContent).toContain("网络中断");
-    expect(content()).not.toContain("模拟回答样例"); expect(button("对比版本").disabled).toBe(false);
+    expect(content()).not.toContain("本地回答样例"); expect(button("对比版本").disabled).toBe(false);
     post = () => preview; await click("对比版本"); expect(content()).toContain("本次真实回答");
   });
   it("does not claim the Provider was never called when a failed attempt falls back to mock", async () => {
     post = () => ({ ...preview, mode: "mock", model: null, fallback_reason: "Provider 超时" });
-    await render(<App />); await click("预览"); await click("对比版本");
+    await render(<App />); await click("回答对比"); await click("对比版本");
     const result = document.querySelector(".compare")?.textContent;
     expect(result).toContain("未返回有效模型回答");
     expect(result).not.toContain("未调用");
@@ -78,10 +79,10 @@ describe("Preview trust and recovery", () => {
 });
 
 describe("Readiness and action errors", () => {
-  it.each([["Configured (Unverified)", "已配置（未验证）", "warning"], ["Ready", "已验证可用", "good"], ["Unavailable", "不可用", "bad"]])("maps %s with accurate severity", async (status, label, tone) => {
+  it.each([["Configured (Unverified)", "已配置（未验证）"], ["Ready", "已验证可用"], ["Unavailable", "不可用"]])("maps %s to a neutral status label", async (status, label) => {
     await render(<SettingsPage data={{ ...data, readiness: { ...data.readiness, status } }} />);
-    expect([...document.querySelectorAll(`.badge.${tone}`)].some(item => item.textContent === label)).toBe(true);
-    expect(content()).toContain("不上传原文件"); expect(content()).toContain("问题与相关知识片段"); expect(content()).toContain("DeepSeek");
+    expect([...document.querySelectorAll(".badge.neutral")].some(item => item.textContent === label)).toBe(true);
+    expect(content()).toContain("不上传原文件"); expect(content()).toContain("相关知识片段可能发送给 DeepSeek");
   });
   it("clears previous probe success on failure and displays a retryable local error", async () => {
     post = () => ({ ...data.readiness, status: "Ready", last_probe: { status: "passed", latency_ms: 0 } });
@@ -94,18 +95,18 @@ describe("Readiness and action errors", () => {
   it("shows an evaluation error and permits another manual attempt", async () => {
     await render(<EvaluationPage data={data} navigate={() => {}} />);
     expect(content()).toContain("问题与相关知识片段");
-    await click("运行真实评测"); expect(document.querySelector('[role="alert"]')).not.toBeNull(); expect(button("运行真实评测").disabled).toBe(false);
+    await click("运行评测"); expect(document.querySelector('[role="alert"]')).not.toBeNull(); expect(button("运行评测").disabled).toBe(false);
     post = () => ({ mode: "mock", completed: 40, failed: 0, average_score: null, reason: "未配置 Provider", latency_ms: 0 });
-    await click("运行真实评测"); expect(content()).toContain("未配置 Provider"); expect(content()).not.toContain("真实评测：模拟");
+    await click("运行评测"); expect(content()).toContain("未配置 Provider"); expect(content()).not.toMatch(/Mock|模拟/);
   });
   it("labels replay and recovers from start and polling failures", async () => {
     vi.useFakeTimers();
-    await render(<EvolutionPage data={data} />); expect(content()).toContain("模拟重放");
-    await click("运行模拟重放"); expect(document.querySelector('[role="alert"]')).not.toBeNull();
+    await render(<EvolutionPage data={data} />); expect(content()).toContain("评估进度");
+    await click("运行评估"); expect(document.querySelector('[role="alert"]')).not.toBeNull();
     post = () => ({ id: "EXP-1", status: "queued", candidates: [], mode: "mock", source: "seeded_replay" });
-    await click("运行模拟重放");
+    await click("运行评估");
     await act(async () => { await vi.advanceTimersByTimeAsync(750); });
-    expect(document.querySelector('[role="alert"]')).not.toBeNull(); expect(button("运行模拟重放").disabled).toBe(false);
+    expect(document.querySelector('[role="alert"]')).not.toBeNull(); expect(button("运行评估").disabled).toBe(false);
   });
 });
 
@@ -114,7 +115,46 @@ describe("Navigation, details and active version", () => {
     await render(<App />);
 
     expect(document.querySelector("h1")?.textContent).toBe("园区助手");
-    expect(content()).toContain("新建会话");
+    expect(content()).toContain("新建对话");
+  });
+  it("sends a suggested question with one click", async () => {
+    post = () => preview;
+    await render(<App />);
+
+    await click("我工位空调坏了咋整？");
+
+    expect(content()).toContain("生成于");
+  });
+  it("keeps new user and assistant messages in the visible reading position", async () => {
+    let complete: (result: unknown) => void = () => {};
+    post = () => new Promise(resolve => { complete = resolve; });
+    const scrollTo = vi.fn();
+    Object.defineProperty(HTMLDivElement.prototype, "scrollTo", { configurable: true, value: scrollTo });
+    await render(<App />);
+
+    await click("我工位空调坏了咋整？");
+    expect(scrollTo).toHaveBeenCalled();
+
+    await act(async () => { complete(preview); await Promise.resolve(); });
+    expect(scrollTo.mock.calls.length).toBeGreaterThan(1);
+  });
+  it("reveals a new answer progressively with its generation time and cited document", async () => {
+    vi.useFakeTimers();
+    post = () => preview;
+    await render(<App />);
+
+    await click("我工位空调坏了咋整？");
+    expect(content()).not.toContain("本次真实回答");
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+
+    expect(content()).toContain("本次真实回答");
+    expect(content()).toContain("生成于");
+    expect(content()).toContain("引用文档：报修流程");
+  });
+  it("exposes the answer reading area as a named region", async () => {
+    await render(<App />);
+
+    expect(document.querySelector('section[aria-label="当前对话"]')).not.toBeNull();
   });
   it("shows the server active version even when overview has no active-version field", async () => {
     routes["/api/overview"] = { ...data.overview, active_version: undefined };
@@ -175,6 +215,14 @@ describe("Navigation, details and active version", () => {
     expect(document.querySelector("h1")?.textContent).toBe("园区助手");
     expect(content()).not.toContain("根因 ·");
   });
+  it("shows the collected document body in the online document viewer", async () => {
+    await render(<KnowledgePage data={data} />);
+
+    await click("报修流程.pdf");
+
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("受理设备报修、物业服务与园区咨询。");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("普通设备故障工单应在 30 分钟内响应。");
+  });
   it("counts actual documents, opens native detail buttons and gives empty searches feedback", async () => {
     await render(<KnowledgePage data={data} />);
     expect([...document.querySelectorAll(".metric")].find(item => item.textContent?.includes("文档数"))?.querySelector("strong")?.textContent).toBe("1");
@@ -190,9 +238,9 @@ describe("Navigation, details and active version", () => {
   });
   it("reloads authoritative active status after activation and shares it with overview", async () => {
     await render(<App />); await click("版本管理");
-    await click("设为演示启用版本"); expect(document.querySelector('[role="alert"]')).not.toBeNull();
+    await click("设为当前版本"); expect(document.querySelector('[role="alert"]')).not.toBeNull();
     post = () => { routes["/api/versions"] = versions.map(item => ({ ...item, status: item.id === "v1.2" ? "Demo Active" : "Archived" })); routes["/api/overview"] = { ...data.overview, active_version: "v1.2" }; return { id: "v1.2", name: "Candidate B" }; };
-    await click("设为演示启用版本");
+    await click("设为当前版本");
     expect([...document.querySelectorAll("tbody .badge")].filter(item => item.textContent?.includes("已启用"))).toHaveLength(1);
     await click("概览"); expect(document.querySelector(".production")?.textContent).toContain("v1.2");
   });
@@ -206,8 +254,8 @@ describe("Navigation, details and active version", () => {
       routes["/api/overview"] = { ...data.overview, active_version: "v1.2" };
       return { id: "v1.2", name: "Candidate B" };
     };
-    await click("设为演示启用版本");
-    expect(document.querySelector("header")?.textContent).toContain("Demo · v1.2");
+    await click("设为当前版本");
+    expect(document.querySelector("header")?.textContent).toContain("运营系统 · v1.2");
     expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url)).pathname)).toContain("/api/workspace");
     const activeRows = [...document.querySelectorAll("tbody tr")].filter(row => row.textContent?.includes("已启用"));
     expect(activeRows).toHaveLength(1); expect(activeRows[0].textContent).toContain("v1.2");
