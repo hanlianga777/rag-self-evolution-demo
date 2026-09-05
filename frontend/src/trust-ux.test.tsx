@@ -21,7 +21,7 @@ const data = {
   optimization: { id: "OPT-1", timeline: [], diagnosis: { primary: "Retrieval", secondary: "Generation", summary: "test", other: {} }, candidates: [], recommendation: { bad_cases_resolved: 6, unresolved: 2 } },
   versions, readiness: { mode: "live", model: "test-model", status: "Configured (Unverified)", last_probe: null },
 };
-const preview = { question: "空调", mode: "live", model: "test-model", latency_ms: 321, fallback_reason: null, baseline: { version: "v1.0", answer: "旧基线样例" }, candidate_b: { version: "v1.2", answer: "本次真实回答", sources: ["报修流程"] } };
+const preview = { question: "空调", mode: "live", model: "test-model", latency_ms: 321, fallback_reason: null, baseline: { version: "v1.0", answer: "旧基线样例" }, candidate_b: { version: "v1.2", answer: "本次真实回答", sources: ["报修流程.pdf · 分块 1"] } };
 let root: Root;
 let host: HTMLDivElement;
 let routes: Record<string, unknown>;
@@ -94,7 +94,6 @@ describe("Readiness and action errors", () => {
   });
   it("shows an evaluation error and permits another manual attempt", async () => {
     await render(<EvaluationPage data={data} navigate={() => {}} />);
-    expect(content()).toContain("问题与相关知识片段");
     await click("运行评测"); expect(document.querySelector('[role="alert"]')).not.toBeNull(); expect(button("运行评测").disabled).toBe(false);
     post = () => ({ mode: "mock", completed: 40, failed: 0, average_score: null, reason: "未配置 Provider", latency_ms: 0 });
     await click("运行评测"); expect(content()).toContain("未配置 Provider"); expect(content()).not.toMatch(/Mock|模拟/);
@@ -114,7 +113,7 @@ describe("Navigation, details and active version", () => {
   it("opens the business assistant as the default workspace", async () => {
     await render(<App />);
 
-    expect(document.querySelector("h1")?.textContent).toBe("园区助手");
+    expect(document.querySelector("h1")?.textContent).toBe("AI知识库问答");
     expect(content()).toContain("新建对话");
   });
   it("sends a suggested question with one click", async () => {
@@ -123,7 +122,7 @@ describe("Navigation, details and active version", () => {
 
     await click("我工位空调坏了咋整？");
 
-    expect(content()).toContain("生成于");
+    expect(content()).toContain("AI助手");
   });
   it("keeps new user and assistant messages in the visible reading position", async () => {
     let complete: (result: unknown) => void = () => {};
@@ -138,7 +137,7 @@ describe("Navigation, details and active version", () => {
     await act(async () => { complete(preview); await Promise.resolve(); });
     expect(scrollTo.mock.calls.length).toBeGreaterThan(1);
   });
-  it("reveals a new answer progressively with its generation time and cited document", async () => {
+  it("reveals a new answer progressively with a concise assistant label and linked document", async () => {
     vi.useFakeTimers();
     post = () => preview;
     await render(<App />);
@@ -148,18 +147,20 @@ describe("Navigation, details and active version", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
 
     expect(content()).toContain("本次真实回答");
-    expect(content()).toContain("生成于");
-    expect(content()).toContain("引用文档：报修流程");
+    expect(content()).toContain("AI助手");
+    expect(content()).not.toContain("生成于");
+    expect(content()).not.toContain("服务回答");
+    expect(button("报修流程.pdf")).toBeTruthy();
   });
   it("exposes the answer reading area as a named region", async () => {
     await render(<App />);
 
     expect(document.querySelector('section[aria-label="当前对话"]')).not.toBeNull();
   });
-  it("shows the server active version even when overview has no active-version field", async () => {
+  it("keeps overview free of an active-version summary", async () => {
     routes["/api/overview"] = { ...data.overview, active_version: undefined };
     await render(<App />); await click("概览");
-    expect(document.querySelector(".production")?.textContent).toContain("v1.0");
+    expect(document.querySelector(".production")).toBeNull();
   });
   it("opens Bad Cases from overview in evaluation and removes the workspace pseudo button", async () => {
     await render(<App />); await click("概览"); expect([...document.querySelectorAll("button")].some(item => item.textContent?.includes("测试工作区"))).toBe(false);
@@ -172,7 +173,7 @@ describe("Navigation, details and active version", () => {
     await act(async () => [...nav!.querySelectorAll("button")].find(item => item.textContent === "设置")!.click());
     expect(document.querySelector("h1")?.textContent).toBe("设置");
   });
-  it("restores a browser-only conversation in the assistant workspace", async () => {
+  it("starts every browser open with a blank conversation", async () => {
     localStorage.setItem("rag-evolution:conversations:v1", JSON.stringify([{
       id: "chat-1", title: "历史咨询", updatedAt: "2026-09-04T14:00:00.000Z",
       messages: [{ id: "message-1", role: "user", content: "空调怎么报修？", createdAt: "2026-09-04T14:00:00.000Z" }],
@@ -180,10 +181,11 @@ describe("Navigation, details and active version", () => {
 
     await render(<App />);
 
-    expect(content()).toContain("历史咨询");
-    expect(content()).toContain("空调怎么报修？");
+    expect(content()).not.toContain("历史咨询");
+    expect(content()).not.toContain("空调怎么报修？");
+    expect(content()).toContain("新建对话");
   });
-  it("clears browser-only history without creating duplicate replacement chats", async () => {
+  it("clears the current blank chat without restoring browser history", async () => {
     localStorage.setItem("rag-evolution:conversations:v1", JSON.stringify([{
       id: "chat-1", title: "历史咨询", updatedAt: "2026-09-04T14:00:00.000Z",
       messages: [{ id: "message-1", role: "user", content: "空调怎么报修？", createdAt: "2026-09-04T14:00:00.000Z" }],
@@ -191,13 +193,14 @@ describe("Navigation, details and active version", () => {
     await render(<App />); await click("清空本机记录");
 
     expect(content()).not.toContain("历史咨询");
-    expect(JSON.parse(localStorage.getItem("rag-evolution:conversations:v1") || "[]")).toHaveLength(1);
+    expect(content()).toContain("新建对话");
+    expect(content()).toContain("尚未提问");
   });
   it("opens the matching bad-case evidence after an assistant answer is submitted as an optimization clue", async () => {
     routes["/api/bad-cases"] = [{ ...data.badCases[0], id: "BC-001", question: "我工位空调坏了咋整？" }];
     post = () => preview;
     await render(<App />);
-    const input = document.querySelector('[aria-label="向园区助手提问"]') as HTMLInputElement;
+    const input = document.querySelector('[aria-label="向 AI 知识库问答提问"]') as HTMLInputElement;
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "我工位空调坏了咋整？"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     await click("发送"); await click("提交优化线索");
 
@@ -207,12 +210,12 @@ describe("Navigation, details and active version", () => {
   it("records a custom clue locally without inventing a diagnosis", async () => {
     post = () => preview;
     await render(<App />);
-    const input = document.querySelector('[aria-label="向园区助手提问"]') as HTMLInputElement;
+    const input = document.querySelector('[aria-label="向 AI 知识库问答提问"]') as HTMLInputElement;
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "班车几点发车？"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     await click("发送"); await click("提交优化线索");
 
     expect(content()).toContain("需人工标注后才可纳入黄金数据集");
-    expect(document.querySelector("h1")?.textContent).toBe("园区助手");
+    expect(document.querySelector("h1")?.textContent).toBe("AI知识库问答");
     expect(content()).not.toContain("根因 ·");
   });
   it("shows the collected document body in the online document viewer", async () => {
@@ -222,6 +225,17 @@ describe("Navigation, details and active version", () => {
 
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("受理设备报修、物业服务与园区咨询。");
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("普通设备故障工单应在 30 分钟内响应。");
+  });
+  it("opens an assistant citation in the corresponding document viewer", async () => {
+    vi.useFakeTimers();
+    post = () => preview;
+    await render(<App />); await click("我工位空调坏了咋整？");
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+
+    await click("报修流程.pdf");
+
+    expect(document.querySelector("h1")?.textContent).toBe("知识与数据集");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("受理设备报修、物业服务与园区咨询。");
   });
   it("counts actual documents, opens native detail buttons and gives empty searches feedback", async () => {
     await render(<KnowledgePage data={data} />);
@@ -242,7 +256,7 @@ describe("Navigation, details and active version", () => {
     post = () => { routes["/api/versions"] = versions.map(item => ({ ...item, status: item.id === "v1.2" ? "Demo Active" : "Archived" })); routes["/api/overview"] = { ...data.overview, active_version: "v1.2" }; return { id: "v1.2", name: "Candidate B" }; };
     await click("设为当前版本");
     expect([...document.querySelectorAll("tbody .badge")].filter(item => item.textContent?.includes("已启用"))).toHaveLength(1);
-    await click("概览"); expect(document.querySelector(".production")?.textContent).toContain("v1.2");
+    await click("概览"); expect(document.querySelector("h1")?.textContent).toBe("RAG 质量概览");
   });
   it("refreshes workspace after activation so header, versions and overview agree", async () => {
     routes["/api/workspace"] = { ...data.workspace, environment: "Demo · v1.0", active_version: "v1.0" };
@@ -255,10 +269,10 @@ describe("Navigation, details and active version", () => {
       return { id: "v1.2", name: "Candidate B" };
     };
     await click("设为当前版本");
-    expect(document.querySelector("header")?.textContent).toContain("运营系统 · v1.2");
+    expect(document.querySelector("header")?.textContent).toContain("AI知识库问答");
     expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url)).pathname)).toContain("/api/workspace");
     const activeRows = [...document.querySelectorAll("tbody tr")].filter(row => row.textContent?.includes("已启用"));
     expect(activeRows).toHaveLength(1); expect(activeRows[0].textContent).toContain("v1.2");
-    await click("概览"); expect(document.querySelector(".production")?.textContent).toContain("v1.2");
+    await click("概览"); expect(document.querySelector("h1")?.textContent).toBe("RAG 质量概览");
   });
 });
