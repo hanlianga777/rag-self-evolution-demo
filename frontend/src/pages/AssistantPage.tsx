@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageCirclePlus, Send, Trash2 } from "lucide-react";
 import { postJson } from "../api";
+import { loadConversations, saveConversations } from "../conversations";
 import type { ChatMessage, Conversation } from "../types";
 
 const suggestedQuestions = ["我工位空调坏了咋整？", "装修能不能直接开干", "着火了咋办"];
@@ -11,7 +12,10 @@ function newConversation(): Conversation { return { id: id("chat"), title: "新�
 function matchBadCase(question: string, badCases: any[]) { return badCases.find(item => item.question.trim() === question.trim()); }
 
 export function AssistantPage({ badCases, onOpenBadCase, onOpenDocument }: { badCases: any[]; onOpenBadCase: (caseId: string) => void; onOpenDocument: (name: string) => void }) {
-  const [conversations, setConversations] = useState<Conversation[]>(() => [newConversation()]);
+  const [conversations, setConversations] = useState<Conversation[]>(() => {
+    const saved = loadConversations();
+    return saved.length ? saved : [newConversation()];
+  });
   const [activeId, setActiveId] = useState(() => conversations[0].id);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,6 +33,7 @@ export function AssistantPage({ badCases, onOpenBadCase, onOpenDocument }: { bad
   }, []);
   const completeTyping = useCallback(() => setTypingId(null), []);
   useEffect(() => { scrollMessages("smooth"); }, [active.id, active.messages.length, scrollMessages]);
+  useEffect(() => { saveConversations(conversations); }, [conversations]);
   const updateActive = (change: (conversation: Conversation) => Conversation) => setConversations(current => current.map(item => item.id === active.id ? change(item) : item));
   const create = () => { const conversation = newConversation(); setConversations(current => [conversation, ...current]); setActiveId(conversation.id); setDraft(""); setError(""); setNotice(""); setTypingId(null); };
   const remove = (conversationId: string) => {

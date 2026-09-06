@@ -178,7 +178,7 @@ describe("Navigation, details and active version", () => {
     await act(async () => [...nav!.querySelectorAll("button")].find(item => item.textContent === "设置")!.click());
     expect(document.querySelector("h1")?.textContent).toBe("设置");
   });
-  it("starts every browser open with a blank conversation", async () => {
+  it("restores browser-saved conversations on open", async () => {
     localStorage.setItem("rag-evolution:conversations:v1", JSON.stringify([{
       id: "chat-1", title: "历史咨询", updatedAt: "2026-09-04T14:00:00.000Z",
       messages: [{ id: "message-1", role: "user", content: "空调怎么报修？", createdAt: "2026-09-04T14:00:00.000Z" }],
@@ -186,9 +186,25 @@ describe("Navigation, details and active version", () => {
 
     await render(<App />);
 
-    expect(content()).not.toContain("历史咨询");
-    expect(content()).not.toContain("空调怎么报修？");
-    expect(content()).toContain("新建对话");
+    expect(content()).toContain("历史咨询");
+    expect(content()).toContain("空调怎么报修？");
+  });
+  it("keeps a pending answer when navigating away from the assistant", async () => {
+    let complete: (result: unknown) => void = () => {};
+    post = () => new Promise(resolve => { complete = resolve; });
+    await render(<App />); await click("我工位空调坏了咋整？"); await click("概览");
+
+    await act(async () => { complete(preview); await Promise.resolve(); });
+    await click("AI 问答");
+
+    expect(content()).toContain("我工位空调坏了咋整？");
+    expect(content()).toContain("AI助手");
+  });
+  it("stores each submitted question in browser storage", async () => {
+    post = () => preview;
+    await render(<App />); await click("我工位空调坏了咋整？");
+
+    expect(localStorage.getItem("rag-evolution:conversations:v1")).toContain("我工位空调坏了咋整？");
   });
   it("clears the current blank chat without restoring browser history", async () => {
     localStorage.setItem("rag-evolution:conversations:v1", JSON.stringify([{
