@@ -116,6 +116,11 @@ describe("Navigation, details and active version", () => {
     expect(document.querySelector("h1")?.textContent).toBe("AI知识库问答");
     expect(content()).toContain("新建对话");
   });
+  it("keeps the assistant question input visually blank", async () => {
+    await render(<App />);
+
+    expect((document.querySelector('[aria-label="向 AI 知识库问答提问"]') as HTMLInputElement).placeholder).toBe("");
+  });
   it("sends a suggested question with one click", async () => {
     post = () => preview;
     await render(<App />);
