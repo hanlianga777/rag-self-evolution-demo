@@ -14,14 +14,14 @@ const versions = [
 ];
 const data = {
   workspace: { name: "测试工作区", environment: "Production" },
-  overview: { active_version: "v1.0", kpis: {}, pipeline: [{ label: "Knowledge", value: "1" }, { label: "Evaluation", value: "40" }, { label: "Bad Cases", value: "8" }], distribution: [], latest_optimization: [], recent_runs: [] },
-  documents: [{ id: "doc-1", name: "报修流程.pdf", category: "服务", pages: 3, chunks: 2, status: "Indexed", updated_at: "Today 14:32", parser: "PDF text parser", chunk_strategy: "512 tokens / 80 overlap", samples: ["报修请联系物业"], content: ["服务范围\n受理设备报修、物业服务与园区咨询。", "处理时限\n普通设备故障工单应在 30 分钟内响应。"] }],
-  dataset: [], evaluation: { id: "EVAL-1", config: "baseline", dataset: "golden", questions: 40, status: "Completed", sla: [] },
-  badCases: [{ id: "BC-1", question: "空调坏了怎么办？", failure_type: "Retrieval Failure", score: 20, severity: "High", status: "Open", trace: [], evidence: [] }],
+  overview: { active_version: "v1.0", kpis: {}, pipeline: [{ label: "Robot PDFs", value: "1" }, { label: "Evaluation", value: "8" }, { label: "Bad Cases", value: "1" }], distribution: [], latest_optimization: [], recent_runs: [] },
+  documents: [{ id: "doc-1", name: "B2遥控器使用说明.pdf", category: "工业巡检", pages: 13, chunks: 2, status: "Indexed", updated_at: "Today 14:32", parser: "PDF text parser", chunk_strategy: "512 tokens / 80 overlap", pdf_url: "/documents/B2遥控器使用说明.pdf", samples: ["遥控器低电量时应连接充电器。"], content: ["遥控器充电\n遥控器低电量时应连接充电器。", "充电状态\n四个指示灯全亮表示电量充满。"] }],
+  dataset: [], evaluation: { id: "EVAL-1", config: "baseline", dataset: "robot_pdf_review_v1", questions: 8, status: "Completed", sla: [] },
+  badCases: [{ id: "BC-1", question: "B2遥控器低电量时如何充电？", failure_type: "Retrieval Failure", score: 20, severity: "High", status: "Open", trace: [], evidence: [] }],
   optimization: { id: "OPT-1", timeline: [], diagnosis: { primary: "Retrieval", secondary: "Generation", summary: "test", other: {} }, candidates: [], recommendation: { bad_cases_resolved: 6, unresolved: 2 } },
   versions, readiness: { mode: "live", model: "test-model", status: "Configured (Unverified)", last_probe: null },
 };
-const preview = { question: "空调", mode: "live", model: "test-model", latency_ms: 321, fallback_reason: null, baseline: { version: "v1.0", answer: "旧基线样例" }, candidate_b: { version: "v1.2", answer: "本次真实回答", sources: ["报修流程.pdf · 分块 1"] } };
+const preview = { question: "B2遥控器低电量时如何充电？", mode: "live", model: "test-model", latency_ms: 321, fallback_reason: null, baseline: { version: "v1.0", answer: "旧基线样例" }, candidate_b: { version: "v1.2", answer: "本次真实回答", sources: ["B2遥控器使用说明.pdf · 充电说明"] } };
 let root: Root;
 let host: HTMLDivElement;
 let routes: Record<string, unknown>;
@@ -113,19 +113,19 @@ describe("Navigation, details and active version", () => {
   it("opens the business assistant as the default workspace", async () => {
     await render(<App />);
 
-    expect(document.querySelector("h1")?.textContent).toBe("AI知识库问答");
+    expect(document.querySelector("h1")?.textContent).toBe("机器人知识库问答");
     expect(content()).toContain("新建对话");
   });
   it("keeps the assistant question input visually blank", async () => {
     await render(<App />);
 
-    expect((document.querySelector('[aria-label="向 AI 知识库问答提问"]') as HTMLInputElement).placeholder).toBe("");
+    expect((document.querySelector('[aria-label="向机器人知识库提问"]') as HTMLInputElement).placeholder).toBe("");
   });
   it("sends a suggested question with one click", async () => {
     post = () => preview;
     await render(<App />);
 
-    await click("我工位空调坏了咋整？");
+    await click("B2 遥控器低电量时如何充电？");
 
     expect(content()).toContain("AI助手");
   });
@@ -136,7 +136,7 @@ describe("Navigation, details and active version", () => {
     Object.defineProperty(HTMLDivElement.prototype, "scrollTo", { configurable: true, value: scrollTo });
     await render(<App />);
 
-    await click("我工位空调坏了咋整？");
+    await click("B2 遥控器低电量时如何充电？");
     expect(scrollTo).toHaveBeenCalled();
 
     await act(async () => { complete(preview); await Promise.resolve(); });
@@ -147,7 +147,7 @@ describe("Navigation, details and active version", () => {
     post = () => preview;
     await render(<App />);
 
-    await click("我工位空调坏了咋整？");
+    await click("B2 遥控器低电量时如何充电？");
     expect(content()).not.toContain("本次真实回答");
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
 
@@ -155,7 +155,7 @@ describe("Navigation, details and active version", () => {
     expect(content()).toContain("AI助手");
     expect(content()).not.toContain("生成于");
     expect(content()).not.toContain("服务回答");
-    expect(button("报修流程.pdf")).toBeTruthy();
+    expect(button("B2遥控器使用说明.pdf")).toBeTruthy();
   });
   it("exposes the answer reading area as a named region", async () => {
     await render(<App />);
@@ -179,37 +179,37 @@ describe("Navigation, details and active version", () => {
     expect(document.querySelector("h1")?.textContent).toBe("设置");
   });
   it("restores browser-saved conversations on open", async () => {
-    localStorage.setItem("rag-evolution:conversations:v1", JSON.stringify([{
+    localStorage.setItem("rag-evolution:conversations:v2", JSON.stringify([{
       id: "chat-1", title: "历史咨询", updatedAt: "2026-09-04T14:00:00.000Z",
-      messages: [{ id: "message-1", role: "user", content: "空调怎么报修？", createdAt: "2026-09-04T14:00:00.000Z" }],
+      messages: [{ id: "message-1", role: "user", content: "B2怎么充电？", createdAt: "2026-09-04T14:00:00.000Z" }],
     }]));
 
     await render(<App />);
 
     expect(content()).toContain("历史咨询");
-    expect(content()).toContain("空调怎么报修？");
+    expect(content()).toContain("B2怎么充电？");
   });
   it("keeps a pending answer when navigating away from the assistant", async () => {
     let complete: (result: unknown) => void = () => {};
     post = () => new Promise(resolve => { complete = resolve; });
-    await render(<App />); await click("我工位空调坏了咋整？"); await click("概览");
+    await render(<App />); await click("B2 遥控器低电量时如何充电？"); await click("概览");
 
     await act(async () => { complete(preview); await Promise.resolve(); });
     await click("AI 问答");
 
-    expect(content()).toContain("我工位空调坏了咋整？");
+    expect(content()).toContain("B2 遥控器低电量时如何充电？");
     expect(content()).toContain("AI助手");
   });
   it("stores each submitted question in browser storage", async () => {
     post = () => preview;
-    await render(<App />); await click("我工位空调坏了咋整？");
+    await render(<App />); await click("B2 遥控器低电量时如何充电？");
 
-    expect(localStorage.getItem("rag-evolution:conversations:v1")).toContain("我工位空调坏了咋整？");
+    expect(localStorage.getItem("rag-evolution:conversations:v2")).toContain("B2 遥控器低电量时如何充电？");
   });
   it("clears the current blank chat without restoring browser history", async () => {
-    localStorage.setItem("rag-evolution:conversations:v1", JSON.stringify([{
+    localStorage.setItem("rag-evolution:conversations:v2", JSON.stringify([{
       id: "chat-1", title: "历史咨询", updatedAt: "2026-09-04T14:00:00.000Z",
-      messages: [{ id: "message-1", role: "user", content: "空调怎么报修？", createdAt: "2026-09-04T14:00:00.000Z" }],
+      messages: [{ id: "message-1", role: "user", content: "B2怎么充电？", createdAt: "2026-09-04T14:00:00.000Z" }],
     }]));
     await render(<App />); await click("清空本机记录");
 
@@ -218,11 +218,11 @@ describe("Navigation, details and active version", () => {
     expect(content()).toContain("尚未提问");
   });
   it("opens the matching bad-case evidence after an assistant answer is submitted as an optimization clue", async () => {
-    routes["/api/bad-cases"] = [{ ...data.badCases[0], id: "BC-001", question: "我工位空调坏了咋整？" }];
+    routes["/api/bad-cases"] = [{ ...data.badCases[0], id: "BC-001", question: "B2遥控器低电量时如何充电？" }];
     post = () => preview;
     await render(<App />);
-    const input = document.querySelector('[aria-label="向 AI 知识库问答提问"]') as HTMLInputElement;
-    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "我工位空调坏了咋整？"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    const input = document.querySelector('[aria-label="向机器人知识库提问"]') as HTMLInputElement;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "B2遥控器低电量时如何充电？"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     await click("发送"); await click("提交优化线索");
 
     expect(document.querySelector("h1")?.textContent).toBe("评测报告");
@@ -231,37 +231,38 @@ describe("Navigation, details and active version", () => {
   it("records a custom clue locally without inventing a diagnosis", async () => {
     post = () => preview;
     await render(<App />);
-    const input = document.querySelector('[aria-label="向 AI 知识库问答提问"]') as HTMLInputElement;
-    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "班车几点发车？"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    const input = document.querySelector('[aria-label="向机器人知识库提问"]') as HTMLInputElement;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "未知型号如何维护？"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     await click("发送"); await click("提交优化线索");
 
     expect(content()).toContain("需人工标注后才可纳入黄金数据集");
-    expect(document.querySelector("h1")?.textContent).toBe("AI知识库问答");
+    expect(document.querySelector("h1")?.textContent).toBe("机器人知识库问答");
     expect(content()).not.toContain("根因 ·");
   });
   it("shows the collected document body in the online document viewer", async () => {
     await render(<KnowledgePage data={data} />);
 
-    await click("报修流程.pdf");
+    await click("B2遥控器使用说明.pdf");
 
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("受理设备报修、物业服务与园区咨询。");
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("普通设备故障工单应在 30 分钟内响应。");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("遥控器低电量时应连接充电器。");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("四个指示灯全亮表示电量充满。");
+    expect(document.querySelector<HTMLAnchorElement>('[role="dialog"] a[href="/documents/B2遥控器使用说明.pdf"]')?.textContent).toContain("打开 PDF");
   });
   it("opens an assistant citation in the corresponding document viewer", async () => {
     vi.useFakeTimers();
     post = () => preview;
-    await render(<App />); await click("我工位空调坏了咋整？");
+    await render(<App />); await click("B2 遥控器低电量时如何充电？");
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
 
-    await click("报修流程.pdf");
+    await click("B2遥控器使用说明.pdf");
 
     expect(document.querySelector("h1")?.textContent).toBe("知识与数据集");
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("受理设备报修、物业服务与园区咨询。");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("遥控器低电量时应连接充电器。");
   });
   it("counts actual documents, opens native detail buttons and gives empty searches feedback", async () => {
     await render(<KnowledgePage data={data} />);
     expect([...document.querySelectorAll(".metric")].find(item => item.textContent?.includes("文档数"))?.querySelector("strong")?.textContent).toBe("1");
-    await click("报修流程.pdf"); expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    await click("B2遥控器使用说明.pdf"); expect(document.querySelector('[role="dialog"]')).not.toBeNull();
     await act(async () => (document.querySelector('[aria-label="关闭"]') as HTMLButtonElement).click());
     const input = document.querySelector('input[placeholder="搜索文档"]') as HTMLInputElement;
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "missing"); input.dispatchEvent(new Event("input", { bubbles: true })); });
@@ -269,7 +270,7 @@ describe("Navigation, details and active version", () => {
     expect(document.querySelector(".table-scroll table")).not.toBeNull();
   });
   it("opens bad-case details through a native button", async () => {
-    await render(<EvaluationPage data={data} navigate={() => {}} />); await click("BC-1"); expect(document.querySelector('[role="dialog"]')?.textContent).toContain("空调坏了怎么办");
+    await render(<EvaluationPage data={data} navigate={() => {}} />); await click("BC-1"); expect(document.querySelector('[role="dialog"]')?.textContent).toContain("B2遥控器低电量时如何充电");
   });
   it("reloads authoritative active status after activation and shares it with overview", async () => {
     await render(<App />); await click("版本管理");
@@ -290,7 +291,7 @@ describe("Navigation, details and active version", () => {
       return { id: "v1.2", name: "Candidate B" };
     };
     await click("设为当前版本");
-    expect(document.querySelector("header")?.textContent).toContain("AI知识库问答");
+    expect(document.querySelector("header")?.textContent).toContain("机器人知识库问答");
     expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url)).pathname)).toContain("/api/workspace");
     const activeRows = [...document.querySelectorAll("tbody tr")].filter(row => row.textContent?.includes("已启用"));
     expect(activeRows).toHaveLength(1); expect(activeRows[0].textContent).toContain("v1.2");

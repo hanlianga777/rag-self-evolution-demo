@@ -37,10 +37,10 @@ class LiveServiceTests(unittest.TestCase):
         store = SeedStore(Path(directory.name) / "demo.db")
         return AiService(store, self.provider, False, DemoService(store).compare_preview)
 
-    def test_local_retriever_ranks_air_conditioner_repair_evidence_first(self):
-        evidence = LocalRetriever(DOCUMENTS).search("我工位空调坏了咋整？")
+    def test_local_retriever_ranks_b2_remote_control_evidence_first(self):
+        evidence = LocalRetriever(DOCUMENTS).search("B2遥控器低电量怎么充电？")
 
-        self.assertEqual(evidence[0]["document"], "空调设备报修流程.pdf")
+        self.assertEqual(evidence[0]["document"], "宇树_B2遥控器使用说明_中文版.pdf")
         self.assertGreater(evidence[0]["score"], 0)
 
     def test_provider_without_key_never_sends_a_request(self):

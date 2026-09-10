@@ -39,7 +39,7 @@ class DemoApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["kpis"]["overall_score"], 72.4)
-        self.assertEqual(payload["kpis"]["bad_cases"], "8 / 40")
+        self.assertEqual(payload["kpis"]["bad_cases"], "4 / 8")
         self.assertEqual(payload["recommended_candidate"], "Candidate B")
 
     def test_evaluation_has_eight_bad_cases_and_recommends_b(self):
@@ -47,8 +47,8 @@ class DemoApiTests(unittest.TestCase):
         bad_cases = self.client.get("/api/bad-cases").json()
         optimization = self.client.get("/api/optimization").json()
 
-        self.assertEqual(evaluation["questions"], 40)
-        self.assertEqual(len(bad_cases), 8)
+        self.assertEqual(evaluation["questions"], 8)
+        self.assertEqual(len(bad_cases), 4)
         self.assertEqual(optimization["recommendation"]["candidate"], "B")
         self.assertTrue(optimization["recommendation"]["full_regression_passed"])
 
@@ -75,12 +75,12 @@ class DemoApiTests(unittest.TestCase):
         self.assertEqual(response.json()["status"], "Demo Active")
 
     def test_preview_compares_the_known_bad_case(self):
-        response = self.client.post("/api/preview", json={"question": "我工位空调坏了咋整？"})
+        response = self.client.post("/api/preview", json={"question": "B2遥控器低电量时如何充电？"})
 
         self.assertEqual(response.status_code, 200)
         preview = response.json()
-        self.assertIn("暂时无法确认", preview["baseline"]["answer"])
-        self.assertIn("30 分钟", preview["candidate_b"]["answer"])
+        self.assertIn("未检索到", preview["baseline"]["answer"])
+        self.assertIn("5V/2A", preview["candidate_b"]["answer"])
         self.assertEqual(preview["mode"], "mock")
         self.assertIn("fallback_reason", preview)
 
@@ -127,7 +127,7 @@ class DemoApiTests(unittest.TestCase):
                 self.assertEqual(next(v["status"] for v in versions if v["id"] == "v1.2"), "Demo Active")
                 workspace = self.client.get("/api/workspace").json()
                 self.assertEqual(workspace["active_version"], "v1.2")
-                self.assertEqual(workspace["environment"], "Demo · v1.2")
+                self.assertEqual(workspace["environment"], "Robot PDF Demo · v1.2")
         restarted = DemoService(SeedStore(self.store.database_path))
         self.assertEqual(restarted.activate_version("v1.3")["status"], "Demo Active")
         self.assertEqual(self.store.get("workspace")["active_version"], "v1.3")
@@ -137,18 +137,32 @@ class DemoApiTests(unittest.TestCase):
     def test_workspace_document_count_matches_seed_documents(self):
         self.assertEqual(self.client.get("/api/workspace").json()["document_count"], len(self.client.get("/api/documents").json()))
 
-    def test_existing_seed_database_gains_separate_demo_state_without_overwriting_seed(self):
+    def test_documents_are_verified_robot_pdfs_with_local_targets(self):
+        documents = self.client.get("/api/documents").json()
+
+        self.assertEqual([document["name"] for document in documents], [
+            "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "宇树_B2四足机器人用户手册_中文版.pdf",
+            "宇树_B2遥控器使用说明_中文版.pdf",
+            "宇树_B2电池与充电器使用说明_中文版.pdf",
+        ])
+        for document in documents:
+            response = self.client.get(document["pdf_url"])
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers["content-type"], "application/pdf")
+
+    def test_existing_seed_database_refreshes_robot_seed_and_preserves_active_version(self):
         connection = sqlite3.connect(self.store.database_path)
         try:
-            seed_before = connection.execute("SELECT value FROM demo_state WHERE key = 'seed'").fetchone()[0]
             connection.execute("DELETE FROM demo_state WHERE key = 'demo_active_version'")
             connection.commit()
             migrated = SeedStore(self.store.database_path)
             self.assertEqual(migrated.get("workspace")["active_version"], "v1.0")
-            self.assertEqual(migrated.get("workspace")["document_count"], len(json.loads(seed_before)["documents"]))
+            self.assertEqual(migrated.get("workspace")["document_count"], 4)
             DemoService(migrated).activate_version("v1.2")
             self.assertEqual(connection.execute("SELECT value FROM demo_state WHERE key = 'demo_active_version'").fetchone()[0], "v1.2")
-            self.assertEqual(connection.execute("SELECT value FROM demo_state WHERE key = 'seed'").fetchone()[0], seed_before)
+            seed = json.loads(connection.execute("SELECT value FROM demo_state WHERE key = 'seed'").fetchone()[0])
+            self.assertEqual(seed["workspace"]["name"], "机器人智能问答评测与优化 Agent")
         finally:
             connection.close()
 

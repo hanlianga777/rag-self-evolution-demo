@@ -1,7 +1,9 @@
 import os
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from .seed import SeedStore
@@ -12,6 +14,7 @@ from .services import DemoService
 
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
+app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1] / "documents"), name="documents")
 TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
 app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 store = SeedStore()

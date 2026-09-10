@@ -1,6 +1,6 @@
 import type { ChatMessage, Conversation } from "./types";
 
-export const CONVERSATIONS_STORAGE_KEY = "rag-evolution:conversations:v1";
+export const CONVERSATIONS_STORAGE_KEY = "rag-evolution:conversations:v2";
 
 function isMessage(value: unknown): value is ChatMessage {
   if (!value || typeof value !== "object") return false;
@@ -11,7 +11,7 @@ function isMessage(value: unknown): value is ChatMessage {
 function isConversation(value: unknown): value is Conversation {
   if (!value || typeof value !== "object") return false;
   const conversation = value as Record<string, unknown>;
-  return typeof conversation.id === "string" && typeof conversation.title === "string" && typeof conversation.updatedAt === "string" && Array.isArray(conversation.messages) && conversation.messages.every(isMessage);
+  return typeof conversation.id === "string" && typeof conversation.title === "string" && typeof conversation.updatedAt === "string" && Array.isArray(conversation.messages) && conversation.messages.every(isMessage) && conversation.messages.every(message => message.role !== "assistant" || !(message.sources || []).some(source => !/^(卡赫_|宇树_)/.test(source)));
 }
 
 export function loadConversations(): Conversation[] {

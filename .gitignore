@@ -1,4 +1,5 @@
 .DS_Store
+机器人真实公开文档库_v2/excluded_archive/
 .env
 *.swp
 node_modules/

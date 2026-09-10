@@ -5,9 +5,9 @@ import type { Conversation } from "./types";
 
 const conversation: Conversation = {
   id: "chat-1",
-  title: "空调报修",
+  title: "B2 充电",
   updatedAt: "2026-09-04T14:00:00.000Z",
-  messages: [{ id: "message-1", role: "user", content: "我工位空调坏了咋整？", createdAt: "2026-09-04T14:00:00.000Z" }],
+  messages: [{ id: "message-1", role: "user", content: "B2遥控器低电量时如何充电？", createdAt: "2026-09-04T14:00:00.000Z" }],
 };
 
 afterEach(() => localStorage.clear());

@@ -45,7 +45,7 @@ class AiService:
         started_at = time.perf_counter()
         try:
             answer = self.provider.complete(
-                "你是园区运营知识助手。只能基于给定证据回答；证据不足时明确说明。回答使用中文，简洁、可执行。",
+                "你是机器人官方 PDF 知识助手。只能基于给定证据回答；证据不足时明确说明。回答使用中文，简洁、可执行。",
                 f"问题：{question}\n证据：\n{context}",
             )
         except ProviderUnavailable as error:
