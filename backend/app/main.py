@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from .seed import SeedStore
 from .ai_service import AiService
+from .corpus import CorpusStore
 from .config import load_settings
 from .providers import DeepSeekProvider
 from .services import DemoService
@@ -18,8 +19,9 @@ app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1
 TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
 app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 store = SeedStore()
+corpus = CorpusStore()
 service = DemoService(store)
-ai_service = AiService(store, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1", service.compare_preview)
+ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")
 
 
 class PreviewRequest(BaseModel):
@@ -50,12 +52,23 @@ def overview():
 
 @app.get("/api/workspace")
 def workspace():
-    return store.get("workspace")
+    payload = store.get("workspace")
+    documents = corpus.documents()
+    payload.update(document_count=len(documents), chunk_count=sum(item["chunks"] for item in documents))
+    return payload
 
 
 @app.get("/api/documents")
 def documents():
-    return store.get("documents")
+    return corpus.documents()
+
+
+@app.get("/api/documents/{document_id}")
+def document_detail(document_id: str):
+    result = corpus.detail(document_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return result
 
 
 @app.get("/api/dataset")

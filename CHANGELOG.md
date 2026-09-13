@@ -1,5 +1,12 @@
 # 变更记录
 
+## 0.2.0 — 2026-09-13
+
+- 新增本地 PDF OCR、章节/页内段落真实切片、BAAI/bge-small-zh-v1.5 向量与 FAISS IndexFlatIP 持久化索引。
+- 移除人工 `samples` 作为问答语料的路径；无证据问题直接拒答，且不会调用 DeepSeek。
+- 新增含页码、Chunk ID、相关度与原文预览的结构化 evidence；Document Inspector 支持 PDF、分块与索引信息三标签及页码定位。
+- 索引产物、PDF 指纹与模型/OCR 缓存均保持本地，不提交 Git；评测/优化/A-B-C 回放维持 Demo 数据边界。
+
 ## 0.1.0 — 2026-09-04
 
 - 初始化 RAG Evolution Mock Demo，呈现评测驱动的优化故事线。

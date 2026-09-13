@@ -1,16 +1,16 @@
 import time
 
 from .providers import ProviderUnavailable
-from .retrieval import LocalRetriever
+from .retrieval import VectorRetriever
 
 
 class AiService:
-    def __init__(self, store, provider, force_mock: bool, fallback_preview):
+    def __init__(self, store, corpus, provider, force_mock: bool):
         self.store = store
+        self.corpus = corpus
         self.provider = provider
         self.force_mock = force_mock
-        self.fallback_preview = fallback_preview
-        self.retriever = LocalRetriever(store.get("documents"))
+        self.retriever = VectorRetriever(corpus)
         self.last_probe = None
 
     @property
@@ -35,13 +35,42 @@ class AiService:
             self.last_probe = {"status": "failed", "reason": str(error), "model": self.provider.settings.model}
         return {**self.readiness(), "probe": self.last_probe["status"]}
 
+    @staticmethod
+    def _preview_compatibility(question: str) -> dict:
+        # Keep the historic response shape without reusing fake source answers.
+        return {"question": question, "baseline": {"version": "v1.0", "answer": "基线示例回答已移除；请查看基于真实 PDF 的候选检索结果。", "sources": []}}
+
     def preview(self, question: str) -> dict:
-        fallback = self.fallback_preview(question)
-        if not self.live_enabled:
-            return {**fallback, "mode": "mock", "model": None, "latency_ms": None, "fallback_reason": "未配置 DEEPSEEK_API_KEY"}
         evidence = self.retriever.search(question)
-        sources = [f"{item['document']} · 分块 {item['chunk']}" for item in evidence]
+        citations = [{key: value for key, value in item.items() if key != "content"} for item in evidence]
+        sources = [f"{item['document']} · P.{item['page_start']} · {item['chunk_id']}" for item in evidence]
+        if not evidence:
+            answer = "当前机器人知识库没有足够证据回答该问题。"
+            return {
+                **self._preview_compatibility(question),
+                "mode": "mock" if not self.live_enabled else "live",
+                "model": None if not self.live_enabled else self.provider.settings.model,
+                "latency_ms": 0,
+                "fallback_reason": "未配置 DEEPSEEK_API_KEY" if not self.live_enabled else None,
+                "retrieval": [],
+                "candidate_b": {"version": "v1.2", "answer": answer, "sources": [], "evidence": []},
+            }
         context = "\n".join(f"- {item['content']}" for item in evidence)
+        if not self.live_enabled:
+            return {
+                **self._preview_compatibility(question),
+                "mode": "mock",
+                "model": None,
+                "latency_ms": None,
+                "fallback_reason": "未配置 DEEPSEEK_API_KEY",
+                "retrieval": citations,
+                "candidate_b": {
+                    "version": "v1.2",
+                    "answer": "已检索到以下官方 PDF 原文证据；未配置生成服务，因此不生成技术结论。",
+                    "sources": sources,
+                    "evidence": citations,
+                },
+            }
         started_at = time.perf_counter()
         try:
             answer = self.provider.complete(
@@ -49,8 +78,16 @@ class AiService:
                 f"问题：{question}\n证据：\n{context}",
             )
         except ProviderUnavailable as error:
-            return {**fallback, "mode": "mock", "model": None, "latency_ms": None, "fallback_reason": str(error), "retrieval": evidence}
-        return {**fallback, "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000), "fallback_reason": None, "retrieval": evidence, "candidate_b": {"version": "v1.2", "answer": answer, "sources": sources}}
+            return {
+                **self._preview_compatibility(question),
+                "mode": "mock",
+                "model": None,
+                "latency_ms": None,
+                "fallback_reason": str(error),
+                "retrieval": citations,
+                "candidate_b": {"version": "v1.2", "answer": "生成服务不可用；以下为本地检索到的官方 PDF 原文证据。", "sources": sources, "evidence": citations},
+            }
+        return {**self._preview_compatibility(question), "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000), "fallback_reason": None, "retrieval": citations, "candidate_b": {"version": "v1.2", "answer": answer, "sources": sources, "evidence": citations}}
 
     def evaluate(self, limit: int) -> dict:
         records = self.store.get("dataset")[:limit]

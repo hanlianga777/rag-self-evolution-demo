@@ -13,12 +13,15 @@ if lsof -nP -iTCP:5174 -sTCP:LISTEN >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! python3 -c 'import fastapi, uvicorn' >/dev/null 2>&1; then
+if ! python3 -c 'import fastapi, uvicorn, pymupdf, faiss, sentence_transformers, rapidocr' >/dev/null 2>&1; then
   python3 -m pip install -r backend/requirements.txt
 fi
 if [ ! -d frontend/node_modules ]; then
   (cd frontend && npm install --cache .npm-cache)
 fi
+
+echo "检查本地机器人 PDF 索引…"
+PYTHONPATH=backend python3 -m app.build_index --if-needed
 
 python3 -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8010 &
 backend_pid=$!

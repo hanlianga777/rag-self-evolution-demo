@@ -13,6 +13,16 @@ export type AppData = {
 };
 
 export type ImprovementClue = { submittedAt: string; badCaseId?: string };
+export type Citation = {
+  document_id: string;
+  document: string;
+  chunk_id: string;
+  section_path: string;
+  page_start: number;
+  page_end: number;
+  score: number;
+  content_preview: string;
+};
 
 export type ChatMessage = {
   id: string;
@@ -25,6 +35,7 @@ export type ChatMessage = {
   latencyMs?: number | null;
   fallbackReason?: string | null;
   sources?: string[];
+  evidence?: Citation[];
   improvementClue?: ImprovementClue;
 };
 

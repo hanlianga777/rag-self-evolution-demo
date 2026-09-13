@@ -15,13 +15,14 @@ const versions = [
 const data = {
   workspace: { name: "测试工作区", environment: "Production" },
   overview: { active_version: "v1.0", kpis: {}, pipeline: [{ label: "Robot PDFs", value: "1" }, { label: "Evaluation", value: "8" }, { label: "Bad Cases", value: "1" }], distribution: [], latest_optimization: [], recent_runs: [] },
-  documents: [{ id: "doc-1", name: "B2遥控器使用说明.pdf", category: "工业巡检", pages: 13, chunks: 2, status: "Indexed", updated_at: "Today 14:32", parser: "PDF text parser", chunk_strategy: "512 tokens / 80 overlap", pdf_url: "/documents/B2遥控器使用说明.pdf", samples: ["遥控器低电量时应连接充电器。"], content: ["遥控器充电\n遥控器低电量时应连接充电器。", "充电状态\n四个指示灯全亮表示电量充满。"] }],
+  documents: [{ id: "doc-1", name: "B2遥控器使用说明.pdf", category: "工业巡检", pages: 13, chunks: 2, status: "Indexed", updated_at: "Today 14:32", parser: "PyMuPDF + RapidOCR", ocr: "RapidOCR 本地中文 OCR", chunk_strategy: "目录/页内自然段落，400 tokens，60 overlap", pdf_url: "/documents/B2遥控器使用说明.pdf" }],
   dataset: [], evaluation: { id: "EVAL-1", config: "baseline", dataset: "robot_pdf_review_v1", questions: 8, status: "Completed", sla: [] },
   badCases: [{ id: "BC-1", question: "B2遥控器低电量时如何充电？", failure_type: "Retrieval Failure", score: 20, severity: "High", status: "Open", trace: [], evidence: [] }],
   optimization: { id: "OPT-1", timeline: [], diagnosis: { primary: "Retrieval", secondary: "Generation", summary: "test", other: {} }, candidates: [], recommendation: { bad_cases_resolved: 6, unresolved: 2 } },
   versions, readiness: { mode: "live", model: "test-model", status: "Configured (Unverified)", last_probe: null },
 };
-const preview = { question: "B2遥控器低电量时如何充电？", mode: "live", model: "test-model", latency_ms: 321, fallback_reason: null, baseline: { version: "v1.0", answer: "旧基线样例" }, candidate_b: { version: "v1.2", answer: "本次真实回答", sources: ["B2遥控器使用说明.pdf · 充电说明"] } };
+const citation = { document_id: "doc-1", document: "B2遥控器使用说明.pdf", chunk_id: "B2-REMOTE-CHUNK-0005", section_path: "充电", page_start: 5, page_end: 5, score: 0.91, content_preview: "遥控器低电量时应连接充电器。" };
+const preview = { question: "B2遥控器低电量时如何充电？", mode: "live", model: "test-model", latency_ms: 321, fallback_reason: null, baseline: { version: "v1.0", answer: "旧基线样例" }, candidate_b: { version: "v1.2", answer: "本次真实回答", sources: ["B2遥控器使用说明.pdf · P.5 · B2-REMOTE-CHUNK-0005"], evidence: [citation] } };
 let root: Root;
 let host: HTMLDivElement;
 let routes: Record<string, unknown>;
@@ -32,6 +33,7 @@ beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   routes = Object.fromEntries(Object.entries(data).map(([key, value]) => [`/api/${key === "badCases" ? "bad-cases" : key}`, structuredClone(value)]));
+  routes["/api/documents/doc-1"] = { ...data.documents[0], index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", top_k: 4 }, chunks: [{ ...citation, text: "遥控器低电量时应连接充电器。" }] };
   post = () => { throw new Error("请求失败，请重试"); };
   vi.stubGlobal("fetch", vi.fn(async (url: string, options?: RequestInit) => {
     const path = new URL(url).pathname;
@@ -239,14 +241,16 @@ describe("Navigation, details and active version", () => {
     expect(document.querySelector("h1")?.textContent).toBe("机器人知识库问答");
     expect(content()).not.toContain("根因 ·");
   });
-  it("shows the collected document body in the online document viewer", async () => {
+  it("shows PDF, real chunks and index information in the document inspector", async () => {
     await render(<KnowledgePage data={data} />);
 
     await click("B2遥控器使用说明.pdf");
 
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("遥控器低电量时应连接充电器。");
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("四个指示灯全亮表示电量充满。");
-    expect(document.querySelector<HTMLAnchorElement>('[role="dialog"] a[href="/documents/B2遥控器使用说明.pdf"]')?.textContent).toContain("打开 PDF");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("PDF 原文");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("分块结果");
+    expect(document.querySelector<HTMLIFrameElement>('iframe')?.getAttribute("src")).toContain("/documents/B2遥控器使用说明.pdf#page=1");
+    await click("分块结果"); expect(content()).toContain("B2-REMOTE-CHUNK-0005");
+    await click("索引信息"); expect(content()).toContain("BAAI/bge-small-zh-v1.5");
   });
   it("opens an assistant citation in the corresponding document viewer", async () => {
     vi.useFakeTimers();
@@ -257,7 +261,7 @@ describe("Navigation, details and active version", () => {
     await click("B2遥控器使用说明.pdf");
 
     expect(document.querySelector("h1")?.textContent).toBe("知识与数据集");
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("遥控器低电量时应连接充电器。");
+    expect(document.querySelector<HTMLIFrameElement>('iframe')?.src).toContain("#page=5");
   });
   it("counts actual documents, opens native detail buttons and gives empty searches feedback", async () => {
     await render(<KnowledgePage data={data} />);

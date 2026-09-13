@@ -19,7 +19,8 @@ RAG Evolution 是一个面向机器人官方 PDF 知识问答的本地可演示 
 ## 已实现内容
 
 - 五个核心页面：概览、知识与数据集、评测、进化实验室、版本管理，以及设置和优化前后预览。
-- 基于 FastAPI Mock API 与 SQLite 统一种子数据：当前 4 份已核验的机器人官方 PDF（卡赫 KIRA B 50 与宇树 B2 系列）、10 个证据片段、8 道已复核评测问题、4 个问题案例，以及预置 A/B/C 实验结果；页面文档数以接口列表为准。
+- 当前 4 份机器人官方 PDF（卡赫 KIRA B 50 与宇树 B2 系列）会在本机经 PyMuPDF / RapidOCR 解析为真实分块，再以 BAAI/bge-small-zh-v1.5 和 FAISS IndexFlatIP 检索。当前实际构建产物为 187 个原文分块；文件、页码、Chunk ID 与分数可在 Document Inspector 追溯。
+- 8 道已复核评测问题、4 个问题案例与 A/B/C 实验结果仍是独立的演示数据，不应被误认为本次真实向量检索或生产评测结果。
 - 可现场运行模拟重放，依次呈现排队、运行、评测和完成状态；进度和结果来自预置演示数据，不是本次 Live 实验。
 - 只有完整 8/8 回归通过、质量/安全/延迟 SLA 均通过且无新增回归时，才推荐 Candidate B。
 
@@ -31,7 +32,9 @@ RAG Evolution 是一个面向机器人官方 PDF 知识问答的本地可演示 
 
 不上传原文件，但真实回答会把问题与相关知识片段发送给 DeepSeek；真实评测的 Judge 还会接收问题、预期回答与生成回答。验证连接仅发送固定测试消息。各手动触发点均显示相应提醒。
 
-本地检索是透明的中文字符/词元重叠基线，不宣称为向量检索；LLM Judge 与最多 40 条的 live evaluation API 已预留为显式触发能力。系统不进行生产部署。
+默认问答检索为本地 BGE 向量与 FAISS；固定 TopK=4。仅当相关度达到门槛时才将真实分块传给 Provider；否则返回“当前机器人知识库没有足够证据回答该问题”，不调用 DeepSeek，也不返回虚假引用。旧词元检索只保留为测试/调试兼容路径。
+
+索引文件位于 `backend/data/index/`，包含 `faiss.index`、`chunks.json`、`documents.json` 与 PDF 指纹，均被 Git 忽略。`./start.sh` 仅在原始 PDF 或索引设置变化时运行 `python -m app.build_index --if-needed`；首次构建会下载本地 BGE 权重和 RapidOCR 运行依赖，原始 PDF 不会上传。原生浏览器 PDF Viewer 使用 `/documents/...pdf#page=N`，未引入 PDF.js。
 
 此处的 Sandbox 指候选配置的逻辑隔离与独立评测，不是 Docker 或容器沙箱。
 
@@ -53,6 +56,12 @@ PYTHONPATH=backend python3 -m uvicorn app.main:app --port 8010
 cd frontend && npm install && npm run dev
 ```
 
+如需手工强制重建索引：
+
+```bash
+PYTHONPATH=backend python3 -m app.build_index --force
+```
+
 ## 演示故事线
 
 1. 在概览查看基线 72.4、4 个机器人问题案例和进化流程。
@@ -72,4 +81,4 @@ cd frontend && npm install && npm run dev
 
 ## 路线图
 
-在保持既有 API/UI 契约的前提下，后续接入真实语料库与索引、RAG 运行时、Provider Adapter 和实测评测执行。
+后续将对真实语料新增、OCR 质量复核与实测评测执行建立独立的可审计流程。

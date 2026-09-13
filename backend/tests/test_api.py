@@ -9,9 +9,17 @@ from fastapi.testclient import TestClient
 
 from app.ai_service import AiService
 from app.config import Settings
+from app.corpus import CorpusStore
 from app.providers import DeepSeekProvider
 from app.seed import SeedStore
 from app.services import DemoService
+
+
+class FakeRetriever:
+    def search(self, question):
+        if "MacBook" in question:
+            return []
+        return [{"document_id": "DOC-003", "document": "宇树_B2遥控器使用说明_中文版.pdf", "chunk_id": "B2-REMOTE-CHUNK-0005", "section_path": "充电", "page_start": 5, "page_end": 5, "score": 0.91, "content_preview": "遥控器充电原文", "content": "遥控器充电原文"}]
 
 with tempfile.TemporaryDirectory() as startup_directory:
     with patch("app.config.load_settings", return_value=Settings("", "https://example.invalid", "test-model")), patch("app.seed.SeedStore", return_value=SeedStore(Path(startup_directory) / "demo.db")):
@@ -26,7 +34,8 @@ class DemoApiTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.store = SeedStore(Path(directory.name) / "demo.db")
         service = DemoService(self.store)
-        ai_service = AiService(self.store, DeepSeekProvider(Settings("", "https://example.invalid", "test-model")), True, service.compare_preview)
+        ai_service = AiService(self.store, CorpusStore(), DeepSeekProvider(Settings("", "https://example.invalid", "test-model")), True)
+        ai_service.retriever = FakeRetriever()
         for name, value in (("store", self.store), ("service", service), ("ai_service", ai_service)):
             patcher = patch.object(main, name, value)
             patcher.start()
@@ -74,13 +83,13 @@ class DemoApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "Demo Active")
 
-    def test_preview_compares_the_known_bad_case(self):
+    def test_preview_returns_structured_real_evidence_without_manual_answer(self):
         response = self.client.post("/api/preview", json={"question": "B2遥控器低电量时如何充电？"})
 
         self.assertEqual(response.status_code, 200)
         preview = response.json()
-        self.assertIn("未检索到", preview["baseline"]["answer"])
-        self.assertIn("5V/2A", preview["candidate_b"]["answer"])
+        self.assertIn("官方 PDF 原文证据", preview["candidate_b"]["answer"])
+        self.assertEqual(preview["candidate_b"]["evidence"][0]["chunk_id"], "B2-REMOTE-CHUNK-0005")
         self.assertEqual(preview["mode"], "mock")
         self.assertIn("fallback_reason", preview)
 
@@ -96,6 +105,14 @@ class DemoApiTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 422)
         for question in ("问", "问" * 1000):
             self.assertEqual(self.client.post("/api/preview", json={"question": question}).status_code, 200)
+
+    def test_preview_rejects_unrelated_question_without_evidence_or_provider_call(self):
+        response = self.client.post("/api/preview", json={"question": "MacBook 怎么开机？"})
+
+        self.assertEqual(response.status_code, 200)
+        preview = response.json()
+        self.assertEqual(preview["candidate_b"]["answer"], "当前机器人知识库没有足够证据回答该问题。")
+        self.assertEqual(preview["candidate_b"]["evidence"], [])
 
     def test_evaluation_requires_a_bounded_strict_integer(self):
         for limit in (None, True, False, "1", 1.0, [], {}, 0, -1, 41):
@@ -158,7 +175,7 @@ class DemoApiTests(unittest.TestCase):
             connection.commit()
             migrated = SeedStore(self.store.database_path)
             self.assertEqual(migrated.get("workspace")["active_version"], "v1.0")
-            self.assertEqual(migrated.get("workspace")["document_count"], 4)
+            self.assertEqual(migrated.get("workspace")["document_count"], 0)
             DemoService(migrated).activate_version("v1.2")
             self.assertEqual(connection.execute("SELECT value FROM demo_state WHERE key = 'demo_active_version'").fetchone()[0], "v1.2")
             seed = json.loads(connection.execute("SELECT value FROM demo_state WHERE key = 'seed'").fetchone()[0])

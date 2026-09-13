@@ -9,6 +9,7 @@ frontend/dist/
 frontend/.npm-cache/
 .npm-cache/
 backend/data/*.db
+backend/data/index/
 __pycache__/
 *.py[cod]
 .pytest_cache/

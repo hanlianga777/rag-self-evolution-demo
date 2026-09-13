@@ -8,9 +8,14 @@ from unittest.mock import patch
 from app.config import Settings
 from app.ai_service import AiService
 from app.providers import DeepSeekProvider, ProviderUnavailable
+from app.corpus import CorpusStore
 from app.retrieval import LocalRetriever
-from app.seed import DOCUMENTS, SeedStore
-from app.services import DemoService
+from app.seed import SeedStore
+
+
+class FakeRetriever:
+    def search(self, question):
+        return [{"document_id": "DOC-003", "document": "宇树_B2遥控器使用说明_中文版.pdf", "chunk_id": "B2-REMOTE-CHUNK-0005", "section_path": "充电", "page_start": 5, "page_end": 5, "score": 0.91, "content_preview": "遥控器充电原文", "content": "遥控器充电原文"}]
 
 
 class FakeResponse:
@@ -35,12 +40,14 @@ class LiveServiceTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         store = SeedStore(Path(directory.name) / "demo.db")
-        return AiService(store, self.provider, False, DemoService(store).compare_preview)
+        service = AiService(store, CorpusStore(), self.provider, False)
+        service.retriever = FakeRetriever()
+        return service
 
-    def test_local_retriever_ranks_b2_remote_control_evidence_first(self):
-        evidence = LocalRetriever(DOCUMENTS).search("B2遥控器低电量怎么充电？")
+    def test_legacy_retriever_is_not_the_default_corpus_path(self):
+        evidence = LocalRetriever([{"name": "调试.pdf", "samples": ["B2遥控器低电量时连接充电器。"]}]).search("B2遥控器低电量怎么充电？")
 
-        self.assertEqual(evidence[0]["document"], "宇树_B2遥控器使用说明_中文版.pdf")
+        self.assertEqual(evidence[0]["document"], "调试.pdf")
         self.assertGreater(evidence[0]["score"], 0)
 
     def test_provider_without_key_never_sends_a_request(self):
