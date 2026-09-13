@@ -4,6 +4,8 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8010";
 
 type Fetcher = typeof fetch;
 
+export function apiUrl(path: string): string { return `${API_BASE}${path}`; }
+
 function requestError(detail: unknown, status: number): string {
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail)) return detail.map(item => `${item.loc?.slice(1).join(".") || "输入"}: ${item.msg}`).join("；");
@@ -15,7 +17,7 @@ export function errorMessage(reason: unknown): string {
 }
 
 export async function getJson<T>(path: string, fetcher: Fetcher = fetch): Promise<T> {
-  const response = await fetcher(`${API_BASE}${path}`);
+  const response = await fetcher(apiUrl(path));
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(requestError(body.detail, response.status));
@@ -24,7 +26,7 @@ export async function getJson<T>(path: string, fetcher: Fetcher = fetch): Promis
 }
 
 export async function postJson<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(apiUrl(path), { method: "POST", headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new Error(requestError(data.detail, response.status));

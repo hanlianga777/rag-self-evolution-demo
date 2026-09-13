@@ -1,5 +1,10 @@
 # 变更记录
 
+## 0.2.1 — 2026-09-13
+
+- PDF Inspector 改用 API 原点的绝对 URL，避免前端 SPA 回退被错误嵌入为“PDF 原文”。
+- `start_demo.command` 改为 Finder 可双击的本地后台启动入口；它不修改模型配置或 `.env`。
+
 ## 0.2.0 — 2026-09-13
 
 - 新增本地 PDF OCR、章节/页内段落真实切片、BAAI/bge-small-zh-v1.5 向量与 FAISS IndexFlatIP 持久化索引。

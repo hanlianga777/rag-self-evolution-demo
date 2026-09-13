@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { getJson, postJson } from "./api";
+import { apiUrl, getJson, postJson } from "./api";
 
 describe("getJson", () => {
+  it("builds PDF asset URLs on the API origin instead of the Vite origin", () => {
+    expect(apiUrl("/documents/宇树_B2电池与充电器使用说明_中文版.pdf")).toBe("http://localhost:8010/documents/宇树_B2电池与充电器使用说明_中文版.pdf");
+  });
+
   it("returns parsed API data", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ mode: "mock" }), { status: 200 }));
 

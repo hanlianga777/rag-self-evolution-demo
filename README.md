@@ -34,7 +34,7 @@ RAG Evolution 是一个面向机器人官方 PDF 知识问答的本地可演示 
 
 默认问答检索为本地 BGE 向量与 FAISS；固定 TopK=4。仅当相关度达到门槛时才将真实分块传给 Provider；否则返回“当前机器人知识库没有足够证据回答该问题”，不调用 DeepSeek，也不返回虚假引用。旧词元检索只保留为测试/调试兼容路径。
 
-索引文件位于 `backend/data/index/`，包含 `faiss.index`、`chunks.json`、`documents.json` 与 PDF 指纹，均被 Git 忽略。`./start.sh` 仅在原始 PDF 或索引设置变化时运行 `python -m app.build_index --if-needed`；首次构建会下载本地 BGE 权重和 RapidOCR 运行依赖，原始 PDF 不会上传。原生浏览器 PDF Viewer 使用 `/documents/...pdf#page=N`，未引入 PDF.js。
+索引文件位于 `backend/data/index/`，包含 `faiss.index`、`chunks.json`、`documents.json` 与 PDF 指纹，均被 Git 忽略。`./start.sh` 仅在原始 PDF 或索引设置变化时运行 `python -m app.build_index --if-needed`；首次构建会下载本地 BGE 权重和 RapidOCR 运行依赖，原始 PDF 不会上传。原生浏览器 PDF Viewer 使用 API 原点的 `http://localhost:8010/documents/...pdf#page=N`，未引入 PDF.js，因此不会再加载前端 Demo 页面。
 
 此处的 Sandbox 指候选配置的逻辑隔离与独立评测，不是 Docker 或容器沙箱。
 
@@ -47,6 +47,8 @@ RAG Evolution 是一个面向机器人官方 PDF 知识问答的本地可演示 
 ```
 
 打开 [http://127.0.0.1:5174](http://127.0.0.1:5174)，FastAPI API 文档位于 [http://127.0.0.1:8010/docs](http://127.0.0.1:8010/docs)。
+
+macOS 下可在 Finder 双击 `start_demo.command` 一次。它会在后台启动本项目并打开上述网址；其后直接访问该网址即可，无需打开终端。日志仅保存在本机 `.demo-logs/launcher.log`，不修改 `.env`、模型设置或其他 Demo 的运行环境。
 
 手动启动：
 
