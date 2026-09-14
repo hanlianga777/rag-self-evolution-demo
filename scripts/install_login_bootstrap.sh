@@ -8,7 +8,9 @@ plist="$agents_dir/$label.plist"
 domain="gui/$(id -u)"
 
 mkdir -p "$agents_dir"
-launchctl print "$domain/$label" >/dev/null 2>&1 && launchctl bootout "$domain/$label"
+for stale_label in com.zhanghaohan.rag-evolution.api com.zhanghaohan.rag-evolution.web "$label"; do
+  launchctl print "$domain/$stale_label" >/dev/null 2>&1 && launchctl bootout "$domain/$stale_label"
+done
 
 cat > "$plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
