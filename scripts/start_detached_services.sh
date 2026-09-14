@@ -12,7 +12,7 @@ listener_pid() {
   printf '%s\n' "$pids"
 }
 
-started_at() { ps -p "$1" -o lstart= 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'; }
+started_at() { LC_ALL=C ps -p "$1" -o lstart= 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'; }
 
 record_is_running() {
   local record="$1" pid started actual_started

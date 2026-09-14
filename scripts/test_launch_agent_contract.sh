@@ -25,6 +25,7 @@ grep -Fq 'exec ./node_modules/.bin/vite --host 127.0.0.1 --port 5174 --strictPor
 
 grep -Fq 'nohup "$runner"' "$starter" || fail "services are not detached from the Finder terminal"
 grep -Fq 'RAG_RESTART' "$starter" || fail "Finder refresh cannot restart recorded services"
+grep -Fq 'LC_ALL=C ps -p "$1" -o lstart=' "$starter" || fail "recorded supervisor timestamps are locale-dependent"
 grep -Fq 'while true' "$api_supervisor" || fail "API does not restart after an unexpected exit"
 grep -Fq 'while true' "$web_supervisor" || fail "web does not restart after an unexpected exit"
 grep -Fq 'RAG_RESTART=1' "$root/scripts/login_start.command" || fail "login bootstrap does not refresh recorded services"
