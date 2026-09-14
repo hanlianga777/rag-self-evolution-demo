@@ -24,4 +24,13 @@ describe("conversation storage", () => {
 
     expect(loadConversations()).toEqual([]);
   });
+
+  it("never restores or saves blank conversations", () => {
+    const blank = { ...conversation, id: "chat-empty", title: "新咨询", messages: [] };
+    localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify([blank, conversation]));
+
+    expect(loadConversations()).toEqual([conversation]);
+    saveConversations([blank, conversation]);
+    expect(JSON.parse(localStorage.getItem(CONVERSATIONS_STORAGE_KEY) || "[]")).toEqual([conversation]);
+  });
 });

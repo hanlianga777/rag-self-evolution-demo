@@ -208,6 +208,42 @@ describe("Navigation, details and active version", () => {
 
     expect(localStorage.getItem("rag-evolution:conversations:v2")).toContain("B2 遥控器低电量时如何充电？");
   });
+  it("keeps repeated new conversations transient until the first question", async () => {
+    await render(<App />);
+    for (let count = 0; count < 10; count += 1) await click("新建对话");
+
+    expect(document.querySelectorAll(".conversation-item")).toHaveLength(0);
+    expect(localStorage.getItem("rag-evolution:conversations:v2")).toBe("[]");
+    post = () => preview;
+    await click("B2 遥控器低电量时如何充电？");
+    expect(document.querySelectorAll(".conversation-item")).toHaveLength(1);
+  });
+  it("keeps long histories and messages inside their dedicated chat panes", async () => {
+    post = () => preview;
+    await render(<App />);
+    for (let count = 0; count < 15; count += 1) {
+      await click("新建对话");
+      await act(async () => ([...document.querySelectorAll("button.secondary")].find(item => item.textContent === "B2 遥控器低电量时如何充电？") as HTMLButtonElement).click());
+    }
+
+    expect(document.querySelectorAll(".conversation-item")).toHaveLength(15);
+    const panel = document.querySelector(".chat-panel")!;
+    expect([...panel.children].map(item => item.className)).toEqual(["chat-header", "message-list", "chat-composer"]);
+    expect(document.querySelector(".conversation-list")).not.toBeNull();
+    expect(document.querySelector(".message-list")).not.toBeNull();
+  });
+  it("keeps fifteen questions in the message list without changing the composer position", async () => {
+    post = () => preview;
+    await render(<App />);
+    const input = document.querySelector('[aria-label="向机器人知识库提问"]') as HTMLInputElement;
+    for (let count = 0; count < 15; count += 1) {
+      await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, `B2 遥控器如何充电 ${count}`); input.dispatchEvent(new Event("input", { bubbles: true })); });
+      await click("发送");
+    }
+
+    expect(document.querySelectorAll(".message-list .chat-message")).toHaveLength(30);
+    expect(document.querySelector(".chat-panel")?.lastElementChild?.className).toBe("chat-composer");
+  });
   it("clears the current blank chat without restoring browser history", async () => {
     localStorage.setItem("rag-evolution:conversations:v2", JSON.stringify([{
       id: "chat-1", title: "历史咨询", updatedAt: "2026-09-04T14:00:00.000Z",
@@ -217,7 +253,7 @@ describe("Navigation, details and active version", () => {
 
     expect(content()).not.toContain("历史咨询");
     expect(content()).toContain("新建对话");
-    expect(content()).toContain("尚未提问");
+    expect(content()).not.toContain("尚未提问");
   });
   it("opens the matching bad-case evidence after an assistant answer is submitted as an optimization clue", async () => {
     routes["/api/bad-cases"] = [{ ...data.badCases[0], id: "BC-001", question: "B2遥控器低电量时如何充电？" }];

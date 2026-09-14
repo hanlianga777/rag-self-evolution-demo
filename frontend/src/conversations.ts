@@ -19,10 +19,10 @@ export function loadConversations(): Conversation[] {
     const value = localStorage.getItem(CONVERSATIONS_STORAGE_KEY);
     if (!value) return [];
     const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) && parsed.every(isConversation) ? parsed : [];
+    return Array.isArray(parsed) && parsed.every(isConversation) ? parsed.filter(conversation => conversation.messages.length) : [];
   } catch { return []; }
 }
 
 export function saveConversations(conversations: Conversation[]) {
-  try { localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(conversations)); } catch { /* Browser storage is optional for the demo. */ }
+  try { localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(conversations.filter(conversation => conversation.messages.length))); } catch { /* Browser storage is optional for the demo. */ }
 }
