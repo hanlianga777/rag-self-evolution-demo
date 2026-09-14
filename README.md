@@ -48,7 +48,7 @@ RAG Evolution 是一个面向机器人官方 PDF 知识问答的本地可演示 
 
 打开 [http://127.0.0.1:5174](http://127.0.0.1:5174)，FastAPI API 文档位于 [http://127.0.0.1:8010/docs](http://127.0.0.1:8010/docs)。
 
-macOS 下可在 Finder 双击 `start_demo.command` 一次。它会在后台启动本项目并打开上述网址；其后直接访问该网址即可，无需打开终端。日志仅保存在本机 `.demo-logs/launcher.log`，不修改 `.env`、模型设置或其他 Demo 的运行环境。
+macOS 下可在 Finder 双击 `start_demo.command` 一次。它会登记登录启动项并打开上述网址；之后直接访问该网址即可，无需手动运行终端。登录启动项会以隐藏的 Terminal 上下文启动受保护 `Documents` 目录内的服务，服务随后脱离 Terminal 常驻。日志仅保存在本机 `.demo-logs/`，不修改 `.env`、模型设置或其他 Demo 的运行环境。
 
 手动启动：
 
