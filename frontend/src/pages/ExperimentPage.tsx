@@ -1,0 +1,10 @@
+import { useState } from "react";
+import { errorMessage, postJson } from "../api";
+import { Badge, Section } from "../components/Primitives";
+import type { Citation } from "../types";
+
+export function ExperimentPage({ onOpenCitation }: { onOpenCitation: (citation: Citation) => void }) {
+  const [question, setQuestion] = useState("B2 遥控器低电量时如何充电？"); const [result, setResult] = useState<any>(null); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  const ask = async () => { setLoading(true); setError(""); setResult(null); try { setResult(await postJson("/api/preview", { question })); } catch (reason) { setError(errorMessage(reason)); } finally { setLoading(false); } };
+  return <div className="page"><div className="page-title"><div><h1>问答试验</h1><p>对同一机器人问题，查看基线版本与候选方案 B 的回答对照。</p></div></div><Section title="按当前配置对比回答"><p className="notice">不上传原文件。提交问题后，相关知识片段可能发送至 DeepSeek。</p><label className="question-input">问题<input maxLength={1000} value={question} onChange={event => setQuestion(event.target.value)} /></label><button className="primary" onClick={ask} disabled={loading || !question.trim()}>{loading ? "正在对比…" : "对比版本"}</button>{error && <p className="error-notice" role="alert">预览失败：{error}。请重试。</p>}{result && <div className="compare"><p className="muted">本次问题：{result.question}</p><article><Badge tone="neutral">基线版本 · {result.baseline.version}</Badge><p>{result.baseline.answer}</p></article><article><Badge tone="neutral">{result.mode === "live" ? "服务回答" : "本地响应"} · 候选方案 B {result.candidate_b.version}</Badge><p className="muted">模型：{result.model ?? "未返回有效模型回答"} · 延迟：{result.latency_ms == null ? "未测量" : `${result.latency_ms} ms`}</p><p className="muted">处理说明：{result.fallback_reason || "无"}</p><p>{result.candidate_b.answer}</p>{result.candidate_b.evidence?.map((citation: Citation) => <button className="document-link" key={citation.chunk_id} onClick={() => onOpenCitation(citation)}>{citation.document} · P.{citation.page_start} · {citation.chunk_id} · {citation.score.toFixed(2)}</button>)}</article></div>}</Section></div>;
+}

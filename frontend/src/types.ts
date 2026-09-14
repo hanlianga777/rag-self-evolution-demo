@@ -41,4 +41,4 @@ export type ChatMessage = {
 
 export type Conversation = { id: string; title: string; updatedAt: string; messages: ChatMessage[] };
 
-export type Page = "assistant" | "overview" | "knowledge" | "evaluation" | "evolution" | "versions" | "settings";
+export type Page = "assistant" | "experiment" | "overview" | "knowledge" | "evaluation" | "evolution" | "versions" | "settings";

@@ -48,10 +48,12 @@ function button(text: string) { const found = [...document.querySelectorAll("but
 async function click(text: string) { await act(async () => button(text).click()); }
 function content() { return document.body.textContent || ""; }
 
-describe("Preview trust and recovery", () => {
+describe("Question experiment trust and recovery", () => {
   it("waits for explicit submission and identifies live output separately from the seeded baseline", async () => {
     post = () => preview;
-    await render(<App />); await click("回答对比");
+    await render(<App />); await click("问答试验");
+    expect(document.querySelector("h1")?.textContent).toBe("问答试验");
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(content()).not.toContain("本次真实回答");
     expect(content()).toContain("DeepSeek");
     await click("对比版本");
@@ -61,7 +63,7 @@ describe("Preview trust and recovery", () => {
   });
   it("labels fallback output as a local response, then clears it on request failure and supports retry", async () => {
     post = () => ({ ...preview, mode: "mock", model: null, latency_ms: null, fallback_reason: "Provider 超时", candidate_b: { ...preview.candidate_b, answer: "本地回答样例" } });
-    await render(<App />); await click("回答对比"); await click("对比版本");
+    await render(<App />); await click("问答试验"); await click("对比版本");
     expect(content()).toContain("本地响应"); expect(content()).toContain("Provider 超时");
     expect(content()).not.toMatch(/Mock|模拟/);
     post = () => { throw new Error("网络中断"); };
@@ -72,7 +74,7 @@ describe("Preview trust and recovery", () => {
   });
   it("does not claim the Provider was never called when a failed attempt falls back to mock", async () => {
     post = () => ({ ...preview, mode: "mock", model: null, fallback_reason: "Provider 超时" });
-    await render(<App />); await click("回答对比"); await click("对比版本");
+    await render(<App />); await click("问答试验"); await click("对比版本");
     const result = document.querySelector(".compare")?.textContent;
     expect(result).toContain("未返回有效模型回答");
     expect(result).not.toContain("未调用");
@@ -117,6 +119,12 @@ describe("Navigation, details and active version", () => {
 
     expect(document.querySelector("h1")?.textContent).toBe("机器人知识库问答");
     expect(content()).toContain("新建对话");
+  });
+  it("moves answer comparison into navigation and removes the header status", async () => {
+    await render(<App />);
+
+    expect([...document.querySelectorAll('[aria-label="主导航"] button')].some(item => item.textContent === "问答试验")).toBe(true);
+    expect(document.querySelector("header")?.textContent).not.toMatch(/服务已连接|本地响应|回答对比/);
   });
   it("keeps the assistant question input visually blank", async () => {
     await render(<App />);
@@ -176,7 +184,8 @@ describe("Navigation, details and active version", () => {
   it("exposes mobile navigation to every page", async () => {
     await render(<App />); await click("菜单");
     const nav = document.querySelector('[aria-label="移动导航"]'); expect(nav).not.toBeNull();
-    expect(nav?.querySelectorAll("button")).toHaveLength(7);
+    expect(nav?.querySelectorAll("button")).toHaveLength(8);
+    expect([...nav!.querySelectorAll("button")].some(item => item.textContent === "问答试验")).toBe(true);
     await act(async () => [...nav!.querySelectorAll("button")].find(item => item.textContent === "设置")!.click());
     expect(document.querySelector("h1")?.textContent).toBe("设置");
   });
