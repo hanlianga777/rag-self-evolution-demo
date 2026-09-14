@@ -54,6 +54,10 @@ describe("Question experiment trust and recovery", () => {
     await render(<App />); await click("问答试验");
     expect(document.querySelector("h1")?.textContent).toBe("问答试验");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.querySelector(".experiment-query")).not.toBeNull();
+    expect(document.querySelector(".experiment-pipelines")?.textContent).toContain("Pipeline A");
+    expect(document.querySelector(".experiment-pipelines")?.textContent).toContain("Pipeline B");
+    expect(document.querySelector(".experiment-results")?.textContent).toContain("提交问题后显示 Pipeline A 的回答");
     expect(content()).not.toContain("本次真实回答");
     expect(content()).toContain("DeepSeek");
     await click("对比版本");
@@ -75,7 +79,7 @@ describe("Question experiment trust and recovery", () => {
   it("does not claim the Provider was never called when a failed attempt falls back to mock", async () => {
     post = () => ({ ...preview, mode: "mock", model: null, fallback_reason: "Provider 超时" });
     await render(<App />); await click("问答试验"); await click("对比版本");
-    const result = document.querySelector(".compare")?.textContent;
+    const result = document.querySelector(".experiment-results")?.textContent;
     expect(result).toContain("未返回有效模型回答");
     expect(result).not.toContain("未调用");
     expect(result).toContain("Provider 超时");
@@ -189,7 +193,7 @@ describe("Navigation, details and active version", () => {
     await act(async () => [...nav!.querySelectorAll("button")].find(item => item.textContent === "设置")!.click());
     expect(document.querySelector("h1")?.textContent).toBe("设置");
   });
-  it("restores browser-saved conversations on open", async () => {
+  it("keeps browser-saved conversations in the sidebar while refresh starts from recommended questions", async () => {
     localStorage.setItem("rag-evolution:conversations:v2", JSON.stringify([{
       id: "chat-1", title: "历史咨询", updatedAt: "2026-09-04T14:00:00.000Z",
       messages: [{ id: "message-1", role: "user", content: "B2怎么充电？", createdAt: "2026-09-04T14:00:00.000Z" }],
@@ -198,7 +202,13 @@ describe("Navigation, details and active version", () => {
     await render(<App />);
 
     expect(content()).toContain("历史咨询");
-    expect(content()).toContain("B2怎么充电？");
+    expect(document.querySelector(".empty-chat")?.textContent).toContain("从一个机器人问题开始");
+    expect(content()).toContain("KIRA B 50 首次使用前应该做什么？");
+    expect(document.querySelector('section[aria-label="当前对话"]')?.textContent).not.toContain("B2怎么充电？");
+
+    await click("历史咨询");
+
+    expect(document.querySelector('section[aria-label="当前对话"]')?.textContent).toContain("B2怎么充电？");
   });
   it("keeps a pending answer when navigating away from the assistant", async () => {
     let complete: (result: unknown) => void = () => {};

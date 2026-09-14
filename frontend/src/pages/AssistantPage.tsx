@@ -14,7 +14,7 @@ function matchBadCase(question: string, badCases: any[]) { return badCases.find(
 export function AssistantPage({ badCases, onOpenBadCase, onOpenCitation, onOpenDocument }: { badCases: any[]; onOpenBadCase: (caseId: string) => void; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void }) {
   const [conversations, setConversations] = useState<Conversation[]>(loadConversations);
   const [blankConversation, setBlankConversation] = useState(newConversation);
-  const [activeId, setActiveId] = useState<string | undefined>(() => conversations[0]?.id);
+  const [activeId, setActiveId] = useState<string | undefined>();
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
