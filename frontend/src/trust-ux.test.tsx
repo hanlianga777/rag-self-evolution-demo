@@ -33,7 +33,7 @@ beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   routes = Object.fromEntries(Object.entries(data).map(([key, value]) => [`/api/${key === "badCases" ? "bad-cases" : key}`, structuredClone(value)]));
-  routes["/api/documents/doc-1"] = { ...data.documents[0], index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", top_k: 4 }, chunks: [{ ...citation, text: "遥控器低电量时应连接充电器。" }] };
+  routes["/api/documents/doc-1"] = { ...data.documents[0], index: { embedding_model: "BAAI/bge-small-zh-v1.5", tokenizer_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", top_k: 4 }, chunks: [{ ...citation, section: "充电", token_count: 24, chunk_text: "遥控器低电量时应连接充电器。", text: "遥控器低电量时应连接充电器。", embedding_status: "Indexed" }] };
   post = () => { throw new Error("请求失败，请重试"); };
   vi.stubGlobal("fetch", vi.fn(async (url: string, options?: RequestInit) => {
     const path = new URL(url).pathname;
@@ -249,7 +249,7 @@ describe("Navigation, details and active version", () => {
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("PDF 原文");
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("分块结果");
     expect(document.querySelector<HTMLIFrameElement>('iframe')?.getAttribute("src")).toContain("/documents/B2遥控器使用说明.pdf#page=1");
-    await click("分块结果"); expect(content()).toContain("B2-REMOTE-CHUNK-0005");
+    await click("分块结果"); expect(content()).toContain("B2-REMOTE-CHUNK-0005"); expect(content()).toContain("Token Count: 24"); expect(content()).toContain("Embedding Status: Indexed");
     await click("索引信息"); expect(content()).toContain("BAAI/bge-small-zh-v1.5");
   });
   it("opens an assistant citation in the corresponding document viewer", async () => {

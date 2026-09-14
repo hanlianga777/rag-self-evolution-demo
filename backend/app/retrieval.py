@@ -32,10 +32,9 @@ class LocalRetriever:
 class VectorRetriever:
     """Local BGE + FAISS retrieval over persisted, real PDF chunks."""
 
-    def __init__(self, corpus, index_dir: Path = INDEX_DIR, minimum_score: float = 0.52):
+    def __init__(self, corpus, index_dir: Path = INDEX_DIR):
         self.corpus = corpus
         self.index_dir = index_dir
-        self.minimum_score = minimum_score
         self._index = None
         self._model = None
 
@@ -58,10 +57,6 @@ class VectorRetriever:
             return False
 
     def search(self, question: str, limit: int = TOP_K) -> list[dict]:
-        # Explicitly reject clearly unrelated consumer-computing requests before
-        # semantic similarity can mistake a generic verb such as “开机” for a match.
-        if re.search(r"macbook|苹果电脑|iphone|windows", question, re.IGNORECASE):
-            return []
         if not self._load():
             return []
         chunks = self.corpus.chunks()
@@ -71,7 +66,7 @@ class VectorRetriever:
         scores, positions = self._index.search(vector, TOP_K)
         evidence = []
         for score, position in zip(scores[0], positions[0]):
-            if position < 0 or position >= len(chunks) or float(score) < self.minimum_score:
+            if position < 0 or position >= len(chunks):
                 continue
             chunk = chunks[int(position)]
             evidence.append(
@@ -83,8 +78,8 @@ class VectorRetriever:
                     "page_start": chunk["page_start"],
                     "page_end": chunk["page_end"],
                     "score": round(float(score), 4),
-                    "content_preview": chunk["text"][:220],
-                    "content": chunk["text"],
+                    "content_preview": chunk.get("chunk_text", chunk["text"])[:220],
+                    "content": chunk.get("chunk_text", chunk["text"]),
                 }
             )
         return evidence[:limit]

@@ -63,65 +63,114 @@ def _read_json(path: Path, fallback):
         return fallback
 
 
-def _token_count(text: str) -> int:
-    # Chinese has no spaces; counting CJK characters yields a predictable local
-    # approximation and avoids a second tokenizer model solely for chunking.
-    return len(re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9]+", text))
+def tokenizer_token_count(tokenizer, text: str) -> int:
+    """Count exactly the token ids used by the installed BGE tokenizer."""
+    return len(tokenizer.encode(text, add_special_tokens=False))
 
 
-def _sentences(text: str) -> list[str]:
-    return [part.strip() for part in re.split(r"(?<=[。！？；.!?])\s*|\n+", text) if part.strip()]
+def _paragraphs(text: str) -> list[str]:
+    return [part.strip() for part in text.split("\n") if part.strip()]
 
 
-def _overlap(sentences: list[str], token_counter: Callable[[str], int], overlap_tokens: int) -> list[str]:
+def _overlap(parts: list[dict], token_counter: Callable[[str], int], overlap_tokens: int) -> list[dict]:
     kept, total = [], 0
-    for sentence in reversed(sentences):
-        count = token_counter(sentence)
+    for part in reversed(parts):
+        count = token_counter(part["text"])
         if kept and total + count > overlap_tokens:
             break
-        kept.insert(0, sentence)
+        kept.insert(0, part)
         total += count
     return kept
+
+
+def _split_long_part(text: str, page: int, token_counter: Callable[[str], int], target_tokens: int) -> list[dict]:
+    """Split only an oversize paragraph; token boundaries are always measured."""
+    if token_counter(text) <= target_tokens:
+        return [{"page": page, "text": text}]
+
+    sentences = [part.strip() for part in re.split(r"(?<=[。！？；.!?])\s*", text) if part.strip()]
+    units = sentences or [text]
+    result: list[dict] = []
+    for unit in units:
+        if token_counter(unit) <= target_tokens:
+            result.append({"page": page, "text": unit})
+            continue
+        current = ""
+        for char in unit:
+            proposed = current + char
+            if current and token_counter(proposed) > target_tokens:
+                result.append({"page": page, "text": current})
+                current = char
+            else:
+                current = proposed
+        if current:
+            result.append({"page": page, "text": current})
+    return result
 
 
 def chunk_sections(
     document: dict,
     pages: list[dict],
-    token_counter: Callable[[str], int] = _token_count,
+    token_counter: Callable[[str], int],
     target_tokens: int = TARGET_TOKENS,
     overlap_tokens: int = OVERLAP_TOKENS,
 ) -> list[dict]:
-    """Create stable chunks, never joining text from different source documents."""
-    chunks, serial = [], 1
-    for page in pages:
-        sentences = _sentences(page.get("text", ""))
-        current = []
-        for sentence in sentences:
-            proposed = "".join(current + [sentence])
+    """Chunk contiguous same-section paragraphs with true-token limits."""
+    chunks, serial, group = [], 1, []
+
+    def flush_group(section_pages: list[dict]) -> None:
+        nonlocal serial
+        if not section_pages:
+            return
+        section_path = section_pages[0].get("section_path") or f"第 {section_pages[0]['page']} 页"
+        parts = []
+        for source in section_pages:
+            for paragraph in _paragraphs(source.get("text", "")):
+                parts.extend(_split_long_part(paragraph, source["page"], token_counter, target_tokens))
+        current: list[dict] = []
+        for part in parts:
+            proposed = "\n".join(item["text"] for item in current + [part])
             if current and token_counter(proposed) > target_tokens:
-                text = "".join(current)
-                chunks.append(_chunk(document, serial, page, text, token_counter(text)))
+                chunks.append(_chunk(document, serial, section_path, current, token_counter("\n".join(item["text"] for item in current))))
                 serial += 1
-                current = _overlap(current, token_counter, overlap_tokens) + [sentence]
+                overlap = _overlap(current, token_counter, overlap_tokens)
+                while overlap and token_counter("\n".join(item["text"] for item in overlap + [part])) > target_tokens:
+                    overlap.pop(0)
+                current = overlap + [part]
             else:
-                current.append(sentence)
+                current.append(part)
         if current:
-            text = "".join(current)
-            chunks.append(_chunk(document, serial, page, text, token_counter(text)))
+            text = "\n".join(item["text"] for item in current)
+            chunks.append(_chunk(document, serial, section_path, current, token_counter(text)))
             serial += 1
+
+    for page in pages:
+        if group and page.get("section_path") != group[0].get("section_path"):
+            flush_group(group)
+            group = []
+        group.append(page)
+    flush_group(group)
     return chunks
 
 
-def _chunk(document: dict, serial: int, page: dict, text: str, token_count: int) -> dict:
+def _chunk(document: dict, serial: int, section_path: str, parts: list[dict], token_count: int) -> dict:
+    text = "\n".join(part["text"] for part in parts)
+    page_start = min(part["page"] for part in parts)
+    page_end = max(part["page"] for part in parts)
     return {
         "chunk_id": f"{document['chunk_prefix']}-CHUNK-{serial:04d}",
         "document_id": document["id"],
         "document_name": document["name"],
-        "section_path": page.get("section_path") or f"第 {page['page']} 页",
-        "page_start": page["page"],
-        "page_end": page["page"],
+        "vendor": document.get("vendor"),
+        "product": document.get("product"),
+        "section": section_path.split(" / ")[-1],
+        "section_path": section_path,
+        "page_start": page_start,
+        "page_end": page_end,
         "token_count": token_count,
+        "chunk_text": text,
         "text": text,
+        "embedding_status": "Pending",
     }
 
 
@@ -138,8 +187,10 @@ def source_fingerprint(document: dict) -> str | None:
 
 def current_manifest() -> dict:
     return {
-        "schema": 1,
+        "schema": 2,
         "embedding_model": EMBEDDING_MODEL,
+        "tokenizer_model": EMBEDDING_MODEL,
+        "chunking_strategy_version": "section-aware-v2",
         "target_tokens": TARGET_TOKENS,
         "overlap_tokens": OVERLAP_TOKENS,
         "sources": {entry["id"]: source_fingerprint(entry) for entry in DOCUMENT_CATALOG},
@@ -194,6 +245,7 @@ class CorpusStore:
         return {
             "status": "Current" if is_current() else "Needs rebuild",
             "embedding_model": manifest.get("embedding_model", EMBEDDING_MODEL),
+            "tokenizer_model": manifest.get("tokenizer_model", EMBEDDING_MODEL),
             "vector_index": "FAISS IndexFlatIP (normalized cosine similarity)",
             "top_k": TOP_K,
             "chunk_target_tokens": manifest.get("target_tokens", TARGET_TOKENS),

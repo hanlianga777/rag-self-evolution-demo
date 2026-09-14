@@ -17,8 +17,6 @@ from app.services import DemoService
 
 class FakeRetriever:
     def search(self, question):
-        if "MacBook" in question:
-            return []
         return [{"document_id": "DOC-003", "document": "宇树_B2遥控器使用说明_中文版.pdf", "chunk_id": "B2-REMOTE-CHUNK-0005", "section_path": "充电", "page_start": 5, "page_end": 5, "score": 0.91, "content_preview": "遥控器充电原文", "content": "遥控器充电原文"}]
 
 with tempfile.TemporaryDirectory() as startup_directory:
@@ -106,13 +104,13 @@ class DemoApiTests(unittest.TestCase):
         for question in ("问", "问" * 1000):
             self.assertEqual(self.client.post("/api/preview", json={"question": question}).status_code, 200)
 
-    def test_preview_rejects_unrelated_question_without_evidence_or_provider_call(self):
+    def test_preview_keeps_vector_evidence_for_unrelated_question(self):
         response = self.client.post("/api/preview", json={"question": "MacBook 怎么开机？"})
 
         self.assertEqual(response.status_code, 200)
         preview = response.json()
-        self.assertEqual(preview["candidate_b"]["answer"], "当前机器人知识库没有足够证据回答该问题。")
-        self.assertEqual(preview["candidate_b"]["evidence"], [])
+        self.assertIn("官方 PDF 原文证据", preview["candidate_b"]["answer"])
+        self.assertEqual(preview["candidate_b"]["evidence"][0]["chunk_id"], "B2-REMOTE-CHUNK-0005")
 
     def test_evaluation_requires_a_bounded_strict_integer(self):
         for limit in (None, True, False, "1", 1.0, [], {}, 0, -1, 41):
