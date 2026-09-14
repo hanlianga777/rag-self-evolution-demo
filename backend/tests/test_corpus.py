@@ -56,7 +56,7 @@ class CorpusTests(unittest.TestCase):
         self.assertTrue(all(chunk["token_count"] <= 120 for chunk in chunks))
 
     def test_vector_retriever_uses_normalized_bge_vector_and_fixed_top_k(self):
-        chunks = [{"document_id": "DOC-003", "document_name": "遥控器.pdf", "chunk_id": f"B2-REMOTE-CHUNK-{index:04d}", "section_path": "充电", "page_start": index, "page_end": index, "text": "真实 OCR 文本"} for index in range(1, 6)]
+        chunks = [{"document_id": "DOC-003", "document_name": "遥控器.pdf", "product": "B2 遥控器", "chunk_id": f"B2-REMOTE-CHUNK-{index:04d}", "section": "充电", "section_path": "充电", "page_start": index, "page_end": index, "text": "真实 OCR 文本"} for index in range(1, 6)]
         corpus = Mock()
         corpus.chunks.return_value = chunks
         retriever = VectorRetriever(corpus)
@@ -73,6 +73,8 @@ class CorpusTests(unittest.TestCase):
         self.assertEqual(retriever._model.encode.call_args.args[0], ["MacBook 怎么开机？"])
         self.assertEqual(len(evidence), 4)
         self.assertEqual(evidence[0]["chunk_id"], "B2-REMOTE-CHUNK-0001")
+        self.assertEqual(evidence[0]["product"], "B2 遥控器")
+        self.assertEqual(evidence[0]["section"], "充电")
 
 
 if __name__ == "__main__":

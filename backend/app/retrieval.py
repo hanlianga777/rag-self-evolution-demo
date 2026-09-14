@@ -73,7 +73,9 @@ class VectorRetriever:
                 {
                     "document_id": chunk["document_id"],
                     "document": chunk["document_name"],
+                    "product": chunk.get("product"),
                     "chunk_id": chunk["chunk_id"],
+                    "section": chunk.get("section"),
                     "section_path": chunk["section_path"],
                     "page_start": chunk["page_start"],
                     "page_end": chunk["page_end"],
