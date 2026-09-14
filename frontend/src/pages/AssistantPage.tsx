@@ -8,7 +8,7 @@ const suggestedQuestions = ["KIRA B 50 首次使用前应该做什么？", "B2 �
 
 function now() { return new Date().toISOString(); }
 function id(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
-function newConversation(): Conversation { return { id: id("chat"), title: "新咨询", updatedAt: now(), messages: [] }; }
+function newConversation(): Conversation { return { id: id("chat"), title: "新对话", updatedAt: now(), messages: [] }; }
 function matchBadCase(question: string, badCases: any[]) { return badCases.find(item => item.question.trim() === question.trim()); }
 
 export function AssistantPage({ badCases, onOpenBadCase, onOpenCitation, onOpenDocument }: { badCases: any[]; onOpenBadCase: (caseId: string) => void; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void }) {
@@ -20,6 +20,7 @@ export function AssistantPage({ badCases, onOpenBadCase, onOpenCitation, onOpenD
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [typingId, setTypingId] = useState<string | null>(null);
+  const [thinkingStartedAt, setThinkingStartedAt] = useState<number>();
   const messageListRef = useRef<HTMLDivElement>(null);
   const active = useMemo(() => conversations.find(item => item.id === activeId) || blankConversation, [activeId, blankConversation, conversations]);
 
@@ -30,7 +31,7 @@ export function AssistantPage({ badCases, onOpenBadCase, onOpenCitation, onOpenD
     else list.scrollTop = list.scrollHeight;
   }, []);
   const completeTyping = useCallback(() => setTypingId(null), []);
-  useEffect(() => { scrollMessages("smooth"); }, [active.id, active.messages.length, scrollMessages]);
+  useEffect(() => { scrollMessages("smooth"); }, [active.id, active.messages.length, busy, scrollMessages]);
   useEffect(() => { saveConversations(conversations); }, [conversations]);
   const updateConversation = (conversationId: string, change: (conversation: Conversation) => Conversation) => setConversations(current => current.map(item => item.id === conversationId ? change(item) : item));
   const create = () => { setBlankConversation(newConversation()); setActiveId(undefined); setDraft(""); setError(""); setNotice(""); setTypingId(null); };
@@ -43,7 +44,7 @@ export function AssistantPage({ badCases, onOpenBadCase, onOpenCitation, onOpenD
     const question = value.trim();
     if (!question || busy) return;
     const user: ChatMessage = { id: id("user"), role: "user", content: question, createdAt: now() };
-    setBusy(true); setError(""); setNotice("");
+    setBusy(true); setThinkingStartedAt(Date.now()); setError(""); setNotice("");
     const started = { ...active, title: active.messages.length ? active.title : question.slice(0, 18), updatedAt: user.createdAt, messages: [...active.messages, user] };
     if (activeId) updateConversation(active.id, () => started); else { setConversations(current => [started, ...current]); setActiveId(started.id); }
     setDraft("");
@@ -53,7 +54,7 @@ export function AssistantPage({ badCases, onOpenBadCase, onOpenCitation, onOpenD
       setTypingId(assistant.id);
       updateConversation(started.id, conversation => ({ ...conversation, updatedAt: assistant.createdAt, messages: [...conversation.messages, assistant] }));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "请求失败，请重试"); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setThinkingStartedAt(undefined); }
   };
   const submit = (event: FormEvent) => { event.preventDefault(); void ask(draft); };
   const submitClue = (message: ChatMessage) => {
@@ -64,7 +65,13 @@ export function AssistantPage({ badCases, onOpenBadCase, onOpenCitation, onOpenD
     else setNotice("线索已保存在本机；需人工标注后才可纳入黄金数据集。当前不会生成根因或优化结论。");
   };
 
-  return <div className="page assistant-page"><div className="assistant-intro"><h1>机器人知识库问答</h1></div><div className="assistant-workspace"><aside className="conversation-sidebar" aria-label="会话列表"><button className="primary new-conversation" onClick={create}><MessageCirclePlus size={15} />新建对话</button><div className="conversation-list">{conversations.map(conversation => <div className={`conversation-item ${conversation.id === activeId ? "selected" : ""}`} key={conversation.id}><button onClick={() => { setActiveId(conversation.id); setError(""); setNotice(""); setTypingId(null); }}><strong>{conversation.title}</strong><span>{conversation.messages.length} 条消息</span></button><button className="icon-button conversation-delete" aria-label={`删除会话 ${conversation.title}`} onClick={() => remove(conversation.id)}><Trash2 size={13} /></button></div>)}</div></aside><section className="chat-panel" aria-label="当前对话"><div className="chat-header"><div><strong>{active.title}</strong><span>仅保存在本机浏览器</span></div><button className="text-button" onClick={clear}>清空本机记录</button></div><div className="message-list" ref={messageListRef}>{active.messages.length ? active.messages.map(message => <Message key={message.id} message={message} typing={message.id === typingId} onTypingProgress={scrollMessages} onTypingComplete={completeTyping} onOpenCitation={onOpenCitation} onOpenDocument={onOpenDocument} onSubmitClue={submitClue} />) : <div className="empty-chat"><h2>从一个机器人问题开始</h2><p>选择已核验的官方 PDF 问题，查看可追溯的回答。</p><div>{suggestedQuestions.map(question => <button className="secondary" key={question} onClick={() => void ask(question)}>{question}</button>)}</div></div>}{notice && <p className="notice" role="status">{notice}</p>}{error && <p className="error-notice" role="alert">回答失败：{error}。请重试。</p>}</div><form className="chat-composer" onSubmit={submit}><input aria-label="向机器人知识库提问" maxLength={1000} value={draft} onChange={event => setDraft(event.target.value)} /><button className="primary" disabled={busy || !draft.trim()}>{busy ? "正在回答…" : <><Send size={15} />发送</>}</button></form></section></div></div>;
+  return <div className="page assistant-page"><div className="assistant-intro"><h1>机器人知识库问答</h1></div><div className="assistant-workspace"><aside className="conversation-sidebar" aria-label="会话列表"><button className="primary new-conversation" onClick={create}><MessageCirclePlus size={15} />新建对话</button><div className="conversation-list">{conversations.map(conversation => <div className={`conversation-item ${conversation.id === activeId ? "selected" : ""}`} key={conversation.id}><button onClick={() => { setActiveId(conversation.id); setError(""); setNotice(""); setTypingId(null); }}><strong>{conversation.title}</strong><span>{conversation.messages.length} 条消息</span></button><button className="icon-button conversation-delete" aria-label={`删除会话 ${conversation.title}`} onClick={() => remove(conversation.id)}><Trash2 size={13} /></button></div>)}</div></aside><section className="chat-panel" aria-label="当前对话"><div className="chat-header"><div><strong>{active.title}</strong><span>仅保存在本机浏览器</span></div><button className="text-button" onClick={clear}>清空本机记录</button></div><div className="message-list" ref={messageListRef}>{active.messages.length ? active.messages.map(message => <Message key={message.id} message={message} typing={message.id === typingId} onTypingProgress={scrollMessages} onTypingComplete={completeTyping} onOpenCitation={onOpenCitation} onOpenDocument={onOpenDocument} onSubmitClue={submitClue} />) : <div className="empty-chat"><h2>从一个机器人问题开始</h2><div>{suggestedQuestions.map(question => <button className="secondary" key={question} onClick={() => void ask(question)}>{question}</button>)}</div></div>}{busy && thinkingStartedAt && <Thinking startedAt={thinkingStartedAt} />}{notice && <p className="notice" role="status">{notice}</p>}{error && <p className="error-notice" role="alert">回答失败：{error}。请重试。</p>}</div><form className="chat-composer" onSubmit={submit}><input aria-label="向机器人知识库提问" maxLength={1000} value={draft} onChange={event => setDraft(event.target.value)} /><button className="primary" disabled={busy || !draft.trim()}>{busy ? "正在回答…" : <><Send size={15} />发送</>}</button></form></section></div></div>;
+}
+
+function Thinking({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => { const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100); return () => window.clearInterval(timer); }, [startedAt]);
+  return <article className="chat-message assistant thinking-message" aria-live="polite"><div className="message-label"><span>AI助手</span><time>{elapsed.toFixed(1)} 秒</time></div><p>正在思考<span className="thinking-dots" aria-hidden="true">...</span></p></article>;
 }
 
 function Message({ message, typing, onTypingProgress, onTypingComplete, onOpenCitation, onOpenDocument, onSubmitClue }: { message: ChatMessage; typing: boolean; onTypingProgress: () => void; onTypingComplete: () => void; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void; onSubmitClue: (message: ChatMessage) => void }) {

@@ -55,30 +55,33 @@ describe("Question experiment trust and recovery", () => {
     expect(document.querySelector("h1")?.textContent).toBe("问答试验");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.querySelector(".experiment-query")).not.toBeNull();
+    expect(document.querySelectorAll(".pipeline-selector")).toHaveLength(2);
     expect(document.querySelector(".experiment-pipelines")?.textContent).toContain("Pipeline A");
     expect(document.querySelector(".experiment-pipelines")?.textContent).toContain("Pipeline B");
-    expect(document.querySelector(".experiment-results")?.textContent).toContain("提交问题后显示 Pipeline A 的回答");
+    expect(document.querySelector(".experiment-results")?.textContent).toContain("发送问题后显示 Pipeline A 的回答");
     expect(content()).not.toContain("本次真实回答");
-    expect(content()).toContain("DeepSeek");
-    await click("对比版本");
+    expect(content()).not.toContain("对同一机器人问题，查看基线版本与候选方案 B 的回答对照。");
+    expect(content()).not.toContain("不上传原文件。提交问题后");
+    await click("发送");
     expect(content()).toContain("服务回答");
     expect(content()).toContain("test-model"); expect(content()).toContain("321 ms");
-    expect(content()).toContain("基线版本");
+    expect(content()).toContain("Baseline");
+    expect(content()).toContain("Top K");
   });
   it("labels fallback output as a local response, then clears it on request failure and supports retry", async () => {
     post = () => ({ ...preview, mode: "mock", model: null, latency_ms: null, fallback_reason: "Provider 超时", candidate_b: { ...preview.candidate_b, answer: "本地回答样例" } });
-    await render(<App />); await click("问答试验"); await click("对比版本");
+    await render(<App />); await click("问答试验"); await click("发送");
     expect(content()).toContain("本地响应"); expect(content()).toContain("Provider 超时");
     expect(content()).not.toMatch(/Mock|模拟/);
     post = () => { throw new Error("网络中断"); };
-    await click("对比版本");
+    await click("发送");
     expect(document.querySelector('[role="alert"]')?.textContent).toContain("网络中断");
-    expect(content()).not.toContain("本地回答样例"); expect(button("对比版本").disabled).toBe(false);
-    post = () => preview; await click("对比版本"); expect(content()).toContain("本次真实回答");
+    expect(content()).not.toContain("本地回答样例"); expect(button("发送").disabled).toBe(false);
+    post = () => preview; await click("发送"); expect(content()).toContain("本次真实回答");
   });
   it("does not claim the Provider was never called when a failed attempt falls back to mock", async () => {
     post = () => ({ ...preview, mode: "mock", model: null, fallback_reason: "Provider 超时" });
-    await render(<App />); await click("问答试验"); await click("对比版本");
+    await render(<App />); await click("问答试验"); await click("发送");
     const result = document.querySelector(".experiment-results")?.textContent;
     expect(result).toContain("未返回有效模型回答");
     expect(result).not.toContain("未调用");
@@ -128,7 +131,7 @@ describe("Navigation, details and active version", () => {
     await render(<App />);
 
     expect([...document.querySelectorAll('[aria-label="主导航"] button')].some(item => item.textContent === "问答试验")).toBe(true);
-    expect(document.querySelector("header")?.textContent).not.toMatch(/服务已连接|本地响应|回答对比/);
+    expect(document.querySelector("header")).toBeNull();
   });
   it("keeps the assistant question input visually blank", async () => {
     await render(<App />);
@@ -142,6 +145,22 @@ describe("Navigation, details and active version", () => {
     await click("B2 遥控器低电量时如何充电？");
 
     expect(content()).toContain("AI助手");
+  });
+  it("shows a live thinking timer while an answer is pending", async () => {
+    vi.useFakeTimers();
+    let complete: (result: unknown) => void = () => {};
+    post = () => new Promise(resolve => { complete = resolve; });
+    await render(<App />);
+
+    await click("B2 遥控器低电量时如何充电？");
+
+    expect(document.querySelector(".thinking-message")?.textContent).toContain("正在思考");
+    expect(document.querySelector(".thinking-message")?.textContent).toContain("0.0 秒");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1200); });
+    expect(document.querySelector(".thinking-message")?.textContent).toContain("1.2 秒");
+
+    await act(async () => { complete(preview); await Promise.resolve(); });
+    expect(document.querySelector(".thinking-message")).toBeNull();
   });
   it("keeps new user and assistant messages in the visible reading position", async () => {
     let complete: (result: unknown) => void = () => {};
@@ -350,7 +369,7 @@ describe("Navigation, details and active version", () => {
       return { id: "v1.2", name: "Candidate B" };
     };
     await click("设为当前版本");
-    expect(document.querySelector("header")?.textContent).toContain("机器人知识库问答");
+    expect(document.querySelector("header")).toBeNull();
     expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url)).pathname)).toContain("/api/workspace");
     const activeRows = [...document.querySelectorAll("tbody tr")].filter(row => row.textContent?.includes("已启用"));
     expect(activeRows).toHaveLength(1); expect(activeRows[0].textContent).toContain("v1.2");
