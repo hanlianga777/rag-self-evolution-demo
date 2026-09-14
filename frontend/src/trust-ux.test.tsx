@@ -57,9 +57,12 @@ describe("Question experiment trust and recovery", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.querySelector(".experiment-query")).not.toBeNull();
     expect(document.querySelectorAll(".pipeline-selector")).toHaveLength(2);
-    expect(document.querySelector(".experiment-pipelines")?.textContent).toContain("Pipeline A");
-    expect(document.querySelector(".experiment-pipelines")?.textContent).toContain("Pipeline B");
+    expect(document.querySelector(".question-input span")).toBeNull();
+    expect(document.querySelectorAll(".experiment-pipelines > article")).toHaveLength(0);
+    expect(document.querySelectorAll(".experiment-pipelines > .pipeline-selector")).toHaveLength(2);
     expect(document.querySelector(".experiment-results")?.textContent).toContain("发送问题后显示 Pipeline A 的回答");
+    expect(document.querySelector(".experiment-results")?.textContent).toContain("发送问题后显示 Pipeline B 的回答。");
+    expect(document.querySelector(".experiment-results")?.textContent).not.toContain("发送问题后显示 Pipeline B 的回答与可追溯引用。");
     expect(content()).not.toContain("本次真实回答");
     expect(content()).not.toContain("对同一机器人问题，查看基线版本与候选方案 B 的回答对照。");
     expect(content()).not.toContain("不上传原文件。提交问题后");

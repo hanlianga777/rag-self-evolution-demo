@@ -145,10 +145,8 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .question-input textarea { border: 1px solid #cfd7df; border-radius: 14px; min-height: 72px; outline-color: #526782; padding: 12px 14px; resize: vertical; width: 100%; }
 .experiment-composer { display: flex; justify-content: flex-end; }
 .experiment-pipelines, .experiment-results { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
-.experiment-pipelines article, .experiment-answer-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 7px 18px rgba(28, 39, 56, .035); min-width: 0; padding: 18px 20px; }
-.experiment-pipelines h2 { font-size: 16px; margin: 13px 0 7px; }
-.pipeline-selector { display: grid; font-size: 11px; gap: 6px; margin-top: 14px; }
-.pipeline-selector span { color: var(--muted); }
+.experiment-answer-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 7px 18px rgba(28, 39, 56, .035); min-width: 0; padding: 18px 20px; }
+.pipeline-selector { display: block; }
 .pipeline-selector select { background: #fafbfc; border: 1px solid #cfd7df; border-radius: 10px; color: var(--ink); padding: 8px 10px; width: 100%; }
 .experiment-results { grid-template-rows: minmax(0, 1fr) auto; margin-top: 14px; min-height: 0; }
 .experiment-answer-card { display: grid; gap: 12px; grid-template-rows: auto minmax(0, 1fr); min-height: 0; overflow: hidden; padding: 14px; }
@@ -161,7 +159,7 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .evidence-list > span { color: var(--muted); font-size: 11px; font-weight: 700; }
 .evidence-list .document-link { align-self: start; text-align: left; }
 .experiment-results > .run-parameters { grid-row: 2; }
-.run-parameters { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 0 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 12px; }
+.run-parameters { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 0 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-self: center; margin: 0; padding: 10px 12px; width: 92%; }
 .run-parameters div { border-top: 1px solid var(--line-soft); padding: 8px 0; }
 .run-parameters div:nth-child(-n+2) { border-top: 0; padding-top: 0; }
 .run-parameters dt { color: var(--muted); font-size: 10px; margin-bottom: 3px; }
@@ -284,7 +282,8 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 @media (min-width: 761px) {
   .experiment-page { display: grid; gap: 14px; grid-template-rows: auto auto auto minmax(0, 1fr); height: 100vh; overflow: hidden; padding-bottom: 18px; }
   .experiment-page .page-title, .experiment-page .experiment-query, .experiment-page .experiment-pipelines, .experiment-page .experiment-results { margin: 0; }
-  .experiment-page .experiment-query { padding: 14px 18px; }
+  .experiment-page .experiment-query { justify-self: start; padding: 14px 18px; width: min(760px, 100%); }
+  .experiment-page .question-input, .experiment-page .experiment-composer { max-width: 50%; }
 }
 
 @media (max-width: 1100px) {
@@ -318,10 +317,12 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
   .experiment-pipelines, .experiment-results { grid-template-columns: 1fr; }
   .experiment-page { display: block; height: auto; overflow: visible; }
   .experiment-page .page-title, .experiment-page .experiment-query { margin-bottom: 22px; }
+  .experiment-page .question-input, .experiment-page .experiment-composer { max-width: none; }
   .experiment-results { grid-template-rows: auto; }
   .experiment-answer-card { min-height: 260px; }
   .answer-scroll { overflow: visible; }
   .experiment-results > .run-parameters { grid-row: auto; }
+  .run-parameters { width: 100%; }
   .metric-groups { grid-template-columns: 1fr; }
   .metric-group, .metric-group + .metric-group { border-left: 0; border-top: 1px solid var(--line-soft); padding: 14px 0 0; }
   .section-head, .filters, .dataset-flow { flex-wrap: wrap; }
