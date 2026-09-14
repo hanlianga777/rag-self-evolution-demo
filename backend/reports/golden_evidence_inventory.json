@@ -1,0 +1,1544 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-14T14:59:22.553Z",
+  "scope": {
+    "purpose": "真实 PDF Evidence Inventory；仅用于后续 Golden Dataset Ground Truth 设计，不是 Golden Dataset。",
+    "formal_document_ids": [
+      "DOC-001",
+      "DOC-002",
+      "DOC-003",
+      "DOC-004"
+    ],
+    "excluded": "Synthetic Reference、封面、目录、版权页、产品编号、OCR 噪声、无文字证据的图片和重复知识点。",
+    "chunk_id_note": "source_chunk_ids 仅为当前索引版本的追溯信息；未来 Ground Truth 不得依赖固定 Chunk ID。"
+  },
+  "source_index": {
+    "manifest": {
+      "schema": 2,
+      "embedding_model": "BAAI/bge-small-zh-v1.5",
+      "tokenizer_model": "BAAI/bge-small-zh-v1.5",
+      "chunking_strategy_version": "section-aware-v2",
+      "target_tokens": 400,
+      "overlap_tokens": 60,
+      "sources": {
+        "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+        "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+        "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+        "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+      }
+    },
+    "formal_corpus": [
+      {
+        "document_id": "DOC-001",
+        "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+        "vendor": "卡赫",
+        "product": "KIRA B 50",
+        "pages": 113,
+        "chunk_count": 177,
+        "source_fingerprint": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2"
+      },
+      {
+        "document_id": "DOC-002",
+        "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+        "vendor": "宇树科技",
+        "product": "B2 四足机器人",
+        "pages": 19,
+        "chunk_count": 38,
+        "source_fingerprint": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb"
+      },
+      {
+        "document_id": "DOC-003",
+        "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+        "vendor": "宇树科技",
+        "product": "B2 遥控器",
+        "pages": 13,
+        "chunk_count": 16,
+        "source_fingerprint": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+      },
+      {
+        "document_id": "DOC-004",
+        "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+        "vendor": "宇树科技",
+        "product": "B2 电池与充电器",
+        "pages": 12,
+        "chunk_count": 21,
+        "source_fingerprint": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+      }
+    ]
+  },
+  "summary": {
+    "total_evidence_topics": 40,
+    "by_product": {
+      "B2 四足机器人": 8,
+      "B2 电池与充电器": 8,
+      "B2 遥控器": 8,
+      "KIRA B 50": 16
+    },
+    "by_knowledge_type": {
+      "charging": 4,
+      "maintenance": 7,
+      "operation": 11,
+      "safety": 4,
+      "setup": 7,
+      "specification": 2,
+      "troubleshooting": 3,
+      "usage_limit": 2
+    },
+    "by_question_potential": {
+      "multi_chunk": 7,
+      "multi_document": 0,
+      "single": 33
+    },
+    "multi_source_evidence": [
+      "EV-B2R-001",
+      "EV-B2B-006"
+    ]
+  },
+  "topics": [
+    {
+      "evidence_id": "EV-KIRA-001",
+      "topic": "首次使用前阅读操作说明",
+      "knowledge_type": "setup",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 2,
+      "page_end": 2,
+      "section": "一般提示",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0003"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0003",
+          "chunk_text": "一般提示\n在您第一次使用设备之前，请先阅读原厂操作说明书并遵守。\n为后续使用或者为后续的车主保管好操作说明书。\n在第一次调试设备之前，请完整阅读操作说明书，可以在设备显示屏上查阅本操作说明书，也可以下载到智能手机上。\n本设备可能包含根据开源授权获得许可和/或由第三方开发的组件。可以在设备的触摸屏上显示设备中存在的开源软件组件的列表\n（包括版权所有者和许可条款）。若要查看，请打开主菜单，调用设置并打开系统信息。\n"
+        }
+      ],
+      "evidence_summary": "为后续使用或者为后续的车主保管好操作说明书。；在第一次调试设备之前，请完整阅读操作说明书，可以在设备显示屏上查阅本操作说明书，也可以下载到智能手机上。；本设备可能包含根据开源授权获得许可和/或由第三方开发的组件。可以在设备的触摸屏上显示设备中存在的开源软件组件的列表",
+      "key_points": [
+        "为后续使用或者为后续的车主保管好操作说明书。",
+        "在第一次调试设备之前，请完整阅读操作说明书，可以在设备显示屏上查阅本操作说明书，也可以下载到智能手机上。",
+        "本设备可能包含根据开源授权获得许可和/或由第三方开发的组件。可以在设备的触摸屏上显示设备中存在的开源软件组件的列表",
+        "（包括版权所有者和许可条款）。若要查看，请打开主菜单，调用设置并打开系统信息。"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-002",
+      "topic": "操作前的安全前提",
+      "knowledge_type": "safety",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 3,
+      "page_end": 3,
+      "section": "安全提示",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0006"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0006",
+          "chunk_text": "安全提示\n首次使用本设备前，请注意仔细阅读本操作说明书以及完整操作说明书（设备显示屏中），然后按其操作。\n在护罩和所有盖子均已关闭的情况下，才能操作本设备。\n按下紧急停机按钮，在紧急情况下立即停用。\n只能在不超过最大允许坡度的场地上操作设备（参见小节“技术数据”）。\n在对接过程中，请勿将任何身体部位伸入对接站和设备之间。"
+        }
+      ],
+      "evidence_summary": "在护罩和所有盖子均已关闭的情况下，才能操作本设备。；按下紧急停机按钮，在紧急情况下立即停用。；只能在不超过最大允许坡度的场地上操作设备（参见小节“技术数据”）。",
+      "key_points": [
+        "在护罩和所有盖子均已关闭的情况下，才能操作本设备。",
+        "按下紧急停机按钮，在紧急情况下立即停用。",
+        "只能在不超过最大允许坡度的场地上操作设备（参见小节“技术数据”）。",
+        "在对接过程中，请勿将任何身体部位伸入对接站和设备之间。"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-003",
+      "topic": "危险环境与物质限制",
+      "knowledge_type": "safety",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 7,
+      "page_end": 8,
+      "section": "运行",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0012"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0012",
+          "chunk_text": "运行\n危险\n在调试前，请按照“检查设备”一章所述检查本设备。\n危险\n请遵守在“自动运行规定”一章中描述的自动运行规定。\n危险\n在危险区域（如加油站）使用设备时要注意相关的安全规定。\n危险\n禁止在有爆炸危险的区域运行设备。\n危险\n切勿喷洒和吸入爆炸性液体、易燃气体、爆炸性粉尘以及未稀释的酸和溶剂。其中包括汽油、油漆稀释剂或取暖油，它们与吸\n入空气混合后会形成爆炸性蒸气或混合物，此外还包括丙酮、未稀释的酸和溶剂，因为它们会侵蚀设备上使用的材料。\n危险\n不得吸入易燃或闷烧的物体。\n警告\n不得使用设备抽吸人或动物。\n警告\n请勿在湿滑地面上使用本设备。\n警告\n\n在倾斜表面上，请勿超过操作说明书中指定的侧向和行进方向的倾斜角度值。\n警告\n穿着紧身的衣服，以免被旋转的零件卷入（不打领带，不穿长裙等）。\n小心\n检查设备和附件，特别是电源连接导线和延长线缆，在每次运行前都要检查其是否状态正常以及是否具有运行安全性。如有损\n坏，拔下电源插头，不得使用设备。"
+        }
+      ],
+      "evidence_summary": "请遵守在“自动运行规定”一章中描述的自动运行规定。；在危险区域（如加油站）使用设备时要注意相关的安全规定。；禁止在有爆炸危险的区域运行设备。",
+      "key_points": [
+        "请遵守在“自动运行规定”一章中描述的自动运行规定。",
+        "在危险区域（如加油站）使用设备时要注意相关的安全规定。",
+        "禁止在有爆炸危险的区域运行设备。",
+        "切勿喷洒和吸入爆炸性液体、易燃气体、爆炸性粉尘以及未稀释的酸和溶剂。其中包括汽油、油漆稀释剂或取暖油，它们与吸"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-004",
+      "topic": "示教路线环境准备",
+      "knowledge_type": "setup",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 17,
+      "page_end": 17,
+      "section": "环境准备工作",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0036"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0036",
+          "chunk_text": "环境准备工作\n清除设备无法吸取的污物（如胶带、托盘上的碎片和透明膜），因为这些可能会损坏设备。\n请确保路线上不存在季节性陈列物，以及其他非永久性障碍物。\n请在待清洁场地的工作负荷最低时，示教新路线。最好避开正常营业和工作时间。"
+        }
+      ],
+      "evidence_summary": "清除设备无法吸取的污物（如胶带、托盘上的碎片和透明膜），因为这些可能会损坏设备。；请确保路线上不存在季节性陈列物，以及其他非永久性障碍物。；请在待清洁场地的工作负荷最低时，示教新路线。最好避开正常营业和工作时间。",
+      "key_points": [
+        "清除设备无法吸取的污物（如胶带、托盘上的碎片和透明膜），因为这些可能会损坏设备。",
+        "请确保路线上不存在季节性陈列物，以及其他非永久性障碍物。",
+        "请在待清洁场地的工作负荷最低时，示教新路线。最好避开正常营业和工作时间。"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-005",
+      "topic": "自动路线空间限制",
+      "knowledge_type": "usage_limit",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 19,
+      "page_end": 19,
+      "section": "到危险点的距离和设备的限制",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0041"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0041",
+          "chunk_text": "到危险点的距离和设备的限制\n墙壁与设备右侧之间的理想距\n离\n10\ncm\n单向运行的最小通道宽度\n1.05\nm\n掉头时的最小通道宽度\n1.7\nm\n到跌落边缘的最小距离（并行\n行驶）\n1.5\nm\n为了让设备在自动模式下执行所示教的路线，必须遵守规定的极限值。可以考虑装入边刷，以保持边缘距离。"
+        }
+      ],
+      "evidence_summary": "墙壁与设备右侧之间的理想距；单向运行的最小通道宽度；掉头时的最小通道宽度",
+      "key_points": [
+        "墙壁与设备右侧之间的理想距",
+        "单向运行的最小通道宽度",
+        "掉头时的最小通道宽度",
+        "到跌落边缘的最小距离（并行"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-006",
+      "topic": "自动路线启动条件",
+      "knowledge_type": "operation",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 21,
+      "page_end": 22,
+      "section": "启动条件",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0046"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0046",
+          "chunk_text": "启动条件\n在自动模式下播放路线之前，请注意以下几点：\n执行清洁工作的工作负荷是否足够低，或者应当在正常营业时间之外执行清洁？\n清水箱已满？\n污水箱已空？\n设备蓄电池已充电？\n提示\n请确保智能填充 (Smart Fill) 功能起点和终点必须相同。为此请使用屏幕。在这里通过一个圆圈标记一条路线的起点。\n将场地划分为无障碍物的区域。否则可能会导致该场地无法清洁。\n在一条路线期间允许多次智能填充 (Smart Fill)。\n请避免铺设地毯的地面。\n\n待清洁场地上的粗大污染物已清除？\n环境已清理？\n场地上不存在新的大型障碍物？\n将设备置于正确的位置代码前方？"
+        }
+      ],
+      "evidence_summary": "执行清洁工作的工作负荷是否足够低，或者应当在正常营业时间之外执行清洁？；清水箱已满？；污水箱已空？",
+      "key_points": [
+        "执行清洁工作的工作负荷是否足够低，或者应当在正常营业时间之外执行清洁？",
+        "清水箱已满？",
+        "污水箱已空？",
+        "设备蓄电池已充电？"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-007",
+      "topic": "日常维护内容",
+      "knowledge_type": "maintenance",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 24,
+      "page_end": 24,
+      "section": "日常维护",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0049"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0049",
+          "chunk_text": "日常维护\n日常维护包括：\n传感器的清洁。\n机器整体状态的检修。\n开启机器后检查自动驾驶。\n此外，操作人员在运行期间应当留在现场。经常检查清洁进度，尤其是对于极长的清洁工作。"
+        }
+      ],
+      "evidence_summary": "传感器的清洁。；机器整体状态的检修。；开启机器后检查自动驾驶。",
+      "key_points": [
+        "传感器的清洁。",
+        "机器整体状态的检修。",
+        "开启机器后检查自动驾驶。",
+        "此外，操作人员在运行期间应当留在现场。经常检查清洁进度，尤其是对于极长的清洁工作。"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-008",
+      "topic": "开机前设备检查",
+      "knowledge_type": "maintenance",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 46,
+      "page_end": 46,
+      "section": "检查设备",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0084"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0084",
+          "chunk_text": "检查设备\n1. 检查设备是否密封。\n2. 检查紧急停机按钮的功能。\n3. 检查两个安全开关的功能（在手动运行的过程中，当两个安全开关均已释放时，设备是否制动？）\n4. 检查传感器是否脏污，必要时清洁。\n5. 重新启动设备。\n6. 检查传感器的功能（设备是否检测到障碍物？）"
+        }
+      ],
+      "evidence_summary": "2. 检查紧急停机按钮的功能。；3. 检查两个安全开关的功能（在手动运行的过程中，当两个安全开关均已释放时，设备是否制动？）；4. 检查传感器是否脏污，必要时清洁。",
+      "key_points": [
+        "2. 检查紧急停机按钮的功能。",
+        "3. 检查两个安全开关的功能（在手动运行的过程中，当两个安全开关均已释放时，设备是否制动？）",
+        "4. 检查传感器是否脏污，必要时清洁。",
+        "5. 重新启动设备。"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-009",
+      "topic": "接通设备步骤",
+      "knowledge_type": "operation",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 46,
+      "page_end": 47,
+      "section": "接通设备",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0085"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0085",
+          "chunk_text": "接通设备\n1. 通过旋转解锁紧急停机按钮。\n2. 按下启动键。\n设备启动。\n3. 请等待，直到触摸屏上出现登录界面。\n提示\n将两个间隔滚轮设置为相同的高度。\n警告\n事故危险\n损坏或有缺陷的设备可能会在运行过程中导致事故。\n请在使用前检查设备，如有任何损坏或故障，请向负责人报告。\n如果设备损坏或出现功能故障，请勿使用。\n危险\n由于安全开关故障而导致的事故危险\n如果一个或两个安全开关不能可靠地返回未操作的位置，请立即停止设备。\n\n主管：可用设备的全部功能，并拥有所有用户权限。\n服务：只适用于客户服务。\n操作人员：通过 主管 所分配的权限定义功能范围，可利用该功能范围。\n4. 创建一个新用户资料。\n5. 指定密码。\n在主菜单中显示可执行的功能。\n新用户\n1\n主管\n2\n服务\n3\n操作人员\n4\n"
+        }
+      ],
+      "evidence_summary": "2. 按下启动键。；3. 请等待，直到触摸屏上出现登录界面。；将两个间隔滚轮设置为相同的高度。",
+      "key_points": [
+        "2. 按下启动键。",
+        "3. 请等待，直到触摸屏上出现登录界面。",
+        "将两个间隔滚轮设置为相同的高度。",
+        "损坏或有缺陷的设备可能会在运行过程中导致事故。"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-010",
+      "topic": "手动清洁操作",
+      "knowledge_type": "operation",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 57,
+      "page_end": 58,
+      "section": "手动模式",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0093"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0093",
+          "chunk_text": "手动模式\n在手动运行的过程中，由操作人员在待清洁的场地上引导该设备。\n1. 在触摸屏上选择功能“手动清洁”。\n执行维护工作\n1\n完成对接\n2\n完成对接，开始自动运行\n3\n隐藏/显示菜单项“刷子功率和抽吸功率”\n1\n电池充电状态\n2\n清洁剂计量\n3\n抽吸功率\n4\n刷子功率\n5\n\n2. 操作并握紧安全开关。\n3. 将设备推到使用地。\n4. 松开安全开关。\n5. 选择水量、清洁剂计量、刷子功率和抽吸功率的所需设置。\n6. 激活所需功能（抽吸、清洁头、边刷）。\n已激活的功能用绿色标记。\n7. 操作并握紧安全开关。\n8. 将设备推到待清洁的场地上。"
+        }
+      ],
+      "evidence_summary": "1. 在触摸屏上选择功能“手动清洁”。；执行维护工作；完成对接，开始自动运行",
+      "key_points": [
+        "1. 在触摸屏上选择功能“手动清洁”。",
+        "执行维护工作",
+        "完成对接，开始自动运行",
+        "隐藏/显示菜单项“刷子功率和抽吸功率”"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-011",
+      "topic": "结束清洁顺序",
+      "knowledge_type": "operation",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 58,
+      "page_end": 58,
+      "section": "结束清洁",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0094"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0094",
+          "chunk_text": "结束清洁\n1. 停用清洁头和边刷。\n2. 继续行驶一小段线路，抽吸残余水分。\n3. 停用抽吸装置。"
+        }
+      ],
+      "evidence_summary": "2. 继续行驶一小段线路，抽吸残余水分。；3. 停用抽吸装置。",
+      "key_points": [
+        "2. 继续行驶一小段线路，抽吸残余水分。",
+        "3. 停用抽吸装置。"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-012",
+      "topic": "无对接站排放污水",
+      "knowledge_type": "maintenance",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 82,
+      "page_end": 83,
+      "section": "排放污水",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0114"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0114",
+          "chunk_text": "排放污水\n结合对接站运行时，会自动排空污水箱。\n不含对接站：\n1. 打开设备舱的门。\n已清洁的面积，以平方米为单位\n1\n符合程度\n2\n清洁线路的长度\n3\n清洁时长\n4\n设备位置\n5\n已清洁的面积\n6\n未清洁的面积（障碍物）\n7\n速度。快速蓝色绿色黄色橙色红色慢速\n8\n小心\n污水中的污染物和清洁剂可能会危害您的健康或污染环境。\n请遵守当地适用的废水处理规定。\n\n2. 从支架中取出排放软管。\n3. 将排放软管降低到合适的收集装置上。\n4. 压合或弯折计量装置。\n5. 打开盖子。\n6. 通过压力或弯曲计量装置控制污水流量。\n7. 冲洗污水箱。\n8. 关闭盖子。\n9. 将排放软管压入设备舱内的支架中。\n10. 关闭设备舱的门。"
+        }
+      ],
+      "evidence_summary": "不含对接站：；1. 打开设备舱的门。；已清洁的面积，以平方米为单位",
+      "key_points": [
+        "不含对接站：",
+        "1. 打开设备舱的门。",
+        "已清洁的面积，以平方米为单位",
+        "清洁线路的长度"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-013",
+      "topic": "每次运行后维护",
+      "knowledge_type": "maintenance",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 86,
+      "page_end": 86,
+      "section": "在每次运行之后",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0120"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0120",
+          "chunk_text": "在每次运行之后\n1. ## 排放污水。\n2. ## 冲洗污水箱。\n3. 清洁涡轮机防护网。\n4. 从污水箱中取出粗大污染物滤网并清洗。\n5. 使用抹布和洗涤用碱液清洁设备外部。\n6. 检查绒毛滤网，必要时清洁。\n7. 拆下并清洁清洁头上的粗大污染物容器。\n8. 清洗清洁头上的分水条。\n9. 清洁吸水扒中的吸水胶条，检查是否存在磨损。翻转或更换已磨损的吸水胶条。\n10. 检查吸水胶条在吸水扒中的正确配合。必要时，将吸水胶条重新正确装入吸水扒的凹槽中。\n11. 清洁清洁头两侧的削刮胶条，检查是否存在磨损。更换已磨损的削刮胶条。\n12. 检查刷子是否磨损。更换已磨损的刷子。\n提示：如果黄色指示器刷毛与其他刷毛长度相同，则说明刷辊已磨损。\n13. ## 给蓄电池充电。"
+        }
+      ],
+      "evidence_summary": "1. ## 排放污水。；2. ## 冲洗污水箱。；3. 清洁涡轮机防护网。",
+      "key_points": [
+        "1. ## 排放污水。",
+        "2. ## 冲洗污水箱。",
+        "3. 清洁涡轮机防护网。",
+        "4. 从污水箱中取出粗大污染物滤网并清洗。"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-014",
+      "topic": "清洁传感器",
+      "knowledge_type": "maintenance",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 98,
+      "page_end": 98,
+      "section": "清洁传感器",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0139"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0139",
+          "chunk_text": "清洁传感器\n1. 使用湿微纤维抹布清洁图中所示的所有传感器。如有必要，请额外使用玻璃清洁剂。\n2. 清洁后重新启动设备。"
+        }
+      ],
+      "evidence_summary": "2. 清洁后重新启动设备。",
+      "key_points": [
+        "2. 清洁后重新启动设备。"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-015",
+      "topic": "急停激活后处理",
+      "knowledge_type": "troubleshooting",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 99,
+      "page_end": 100,
+      "section": "紧急停止按钮已激活",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0142"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0142",
+          "chunk_text": "紧急停止按钮已激活\n\n原因:\n排除故障:\n1. 机器人停止驾驶和清洁。检查机器人和周围环境。如果没有危险，请松开紧急停止按钮。"
+        }
+      ],
+      "evidence_summary": "1. 机器人停止驾驶和清洁。检查机器人和周围环境。如果没有危险，请松开紧急停止按钮。",
+      "key_points": [
+        "1. 机器人停止驾驶和清洁。检查机器人和周围环境。如果没有危险，请松开紧急停止按钮。"
+      ]
+    },
+    {
+      "evidence_id": "EV-KIRA-016",
+      "topic": "对接失败处理",
+      "knowledge_type": "troubleshooting",
+      "question_potential": "single",
+      "document_id": "DOC-001",
+      "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "vendor": "卡赫",
+      "product": "KIRA B 50",
+      "page_start": 101,
+      "page_end": 101,
+      "section": "对接失败",
+      "source_chunk_ids": [
+        "KIRA-B50-CHUNK-0148"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "KIRA-B50-CHUNK-0148",
+          "chunk_text": "对接失败\n原因:\n机器人失去了定位功能。\n排除故障:\n1. 将机器人驱动到位置代码处，并开始清洁任务。如果错误仍然存在，重新示教路线。"
+        }
+      ],
+      "evidence_summary": "1. 将机器人驱动到位置代码处，并开始清洁任务。如果错误仍然存在，重新示教路线。",
+      "key_points": [
+        "1. 将机器人驱动到位置代码处，并开始清洁任务。如果错误仍然存在，重新示教路线。"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2M-001",
+      "topic": "使用环境与地形限制",
+      "knowledge_type": "usage_limit",
+      "question_potential": "multi_chunk",
+      "document_id": "DOC-002",
+      "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 四足机器人",
+      "page_start": 10,
+      "page_end": 10,
+      "section": "使用环境要求",
+      "source_chunk_ids": [
+        "B2-MANUAL-CHUNK-0018",
+        "B2-MANUAL-CHUNK-0019"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0018",
+          "chunk_text": "使用说明\nbotics\n使用环境要求\n1. 在-20℃-55℃，天气良好的环境下运行。恶劣天气请勿运行，如雷电、龙卷风天气等。水中运行则务必\n遵守IP67防护等级说明所述要求。\ntics\n2.使用时，请保持机器人在视线范围内控制，使机器人时刻与障碍物、复杂地面、人群、水面等物体保持\n至少2米以上的安全距离。\n3. 请不要在电磁干扰环境下运行机器人。电磁干扰源包括但不仅限于：高压电线、高压输电站、移动电话\n基站和电视广播信号塔。\n4. 请不要在Wi-Fi信号干扰环境下运行机器人。Wi-Fi信号干扰通常由于同频干扰引起。受到干扰时，务必\n关闭部分或全部其他无线设备Wi-Fi信号源，然后再使用遥控器操作机器人。\n5. 由于实际操控人员的操控熟练水平不一，故为了可靠稳妥起见，请在空旷无遮挡平整地面环境使用。操\n作机器人时应注意，AI运控模式下台阶需低于25cm、低速档时斜坡小于45°、高速档时斜坡小于30°；常规运"
+        },
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0019",
+          "chunk_text": "作机器人时应注意，AI运控模式下台阶需低于25cm、低速档时斜坡小于45°、高速档时斜坡小于30°；常规运\n控模式下台阶需低于20cm，斜坡小于20°，不满足条件可能会导致机器人摔倒。机器人在复杂地面或有一定起\n伏和坡度的地形行走时，操控人员应当降低机器人的行走速度，小心操控，以免机器人被障碍物绊倒。\n6. 足式机器人对行走的地面有一定的要求。请勿在摩擦力非常小的地面使用机器人，如冰面。请勿在松软\n的地面使用机器人，如较厚的海绵地面。如果在较光滑的地面使用，如玻璃、瓷砖等地面，请小心并柔顺的操\n控机器人进行运动，避免剧烈运动，并降低机器人的行走速度，防止机器人足端打滑而摔倒。\n开箱\n在平整的地面上按照放置要求摆放箱体(正面朝上)，然后打开上箱体，把机器人整体抬出。将四足机器\n人和遥控器、充电器等分别从箱内取出，将四足机器人平放在平整的地面上，然后进行开机准备。\nCS\n开机前检查\n1. 仅使用Unitree正品部件并保证所有部件工作状态良好。\n2"
+        }
+      ],
+      "evidence_summary": "1. 在-20℃-55℃，天气良好的环境下运行。恶劣天气请勿运行，如雷电、龙卷风天气等。水中运行则务必；遵守IP67防护等级说明所述要求。；2.使用时，请保持机器人在视线范围内控制，使机器人时刻与障碍物、复杂地面、人群、水面等物体保持",
+      "key_points": [
+        "1. 在-20℃-55℃，天气良好的环境下运行。恶劣天气请勿运行，如雷电、龙卷风天气等。水中运行则务必",
+        "遵守IP67防护等级说明所述要求。",
+        "2.使用时，请保持机器人在视线范围内控制，使机器人时刻与障碍物、复杂地面、人群、水面等物体保持",
+        "至少2米以上的安全距离。"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2M-002",
+      "topic": "开机前检查",
+      "knowledge_type": "setup",
+      "question_potential": "single",
+      "document_id": "DOC-002",
+      "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 四足机器人",
+      "page_start": 10,
+      "page_end": 10,
+      "section": "开机前检查",
+      "source_chunk_ids": [
+        "B2-MANUAL-CHUNK-0020"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0020",
+          "chunk_text": "CS\n开机前检查\n1. 仅使用Unitree正品部件并保证所有部件工作状态良好。\n2\n确保固件等已经更新至最新版本。\n3. 用户确保自己不在醉酒、药物影响或无法集中注意力情况下操控机器人。\nRobo\n4. 熟悉了解每种步态模式的特点。熟悉机器人失稳/失控情况下紧急制动方法。\nUnit\n5. 确保机器人及各部件内部没有任何异物(如：水、油、沙、土等)。\n6. 保证遥控模块、电池包电量充足。\n7. 若使用扩展接口，检查线缆连接是否正确。\n©2023 宇树科技版权所有\n9\nUnitre"
+        }
+      ],
+      "evidence_summary": "确保固件等已经更新至最新版本。；3. 用户确保自己不在醉酒、药物影响或无法集中注意力情况下操控机器人。；4. 熟悉了解每种步态模式的特点。熟悉机器人失稳/失控情况下紧急制动方法。",
+      "key_points": [
+        "确保固件等已经更新至最新版本。",
+        "3. 用户确保自己不在醉酒、药物影响或无法集中注意力情况下操控机器人。",
+        "4. 熟悉了解每种步态模式的特点。熟悉机器人失稳/失控情况下紧急制动方法。",
+        "5. 确保机器人及各部件内部没有任何异物(如：水、油、沙、土等)。"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2M-003",
+      "topic": "电池安装与机身摆放",
+      "knowledge_type": "setup",
+      "question_potential": "single",
+      "document_id": "DOC-002",
+      "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 四足机器人",
+      "page_start": 11,
+      "page_end": 11,
+      "section": "开机前准备",
+      "source_chunk_ids": [
+        "B2-MANUAL-CHUNK-0021"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0021",
+          "chunk_text": "tics\n开机前准备\n(1) 安装电池包\n将 B2放在平坦的地面上，将电池包从机器人侧面插入电池槽，注意安装方向，防呆接口朝上，如无法完全\n插入电池包，请调整电池包方向，不要强行按压，以免损坏电池接口和卡扣，当听到“咔哒~”声，电池包安装\n完成。请确保卡扣卡到位！\ntics\n(2) 机身摆放（重要步骤！！！）\n卧式开机：请确保开机运行前机器人放置在平整地面上，机器人腹部支撑垫需平贴地面，机身水平无倾斜\n趴在地面，机器人小腿呈完全收起状态(如下图)，四个膝关节以及足端平放在地面上，确保机器人大腿和小\n腿都没被机身压住。\n启动 B2\n机器人完成开机前检查，和开机前准备要求摆放好后，按照如下步骤开机：先短按电源开关一次，再长按\n电源开关3秒以上，即可开启电池(电池开启时，指示灯为绿灯常亮，指示灯显示当前电池电量)。电池启动\n后等待2分钟，机器人自动站立，机身与地面平行，即开机成功。\n短按+长按3秒以上\nRobotics\nUnitree\nA\n●若开机失败，请仔细检查机身摆放。"
+        }
+      ],
+      "evidence_summary": "将 B2放在平坦的地面上，将电池包从机器人侧面插入电池槽，注意安装方向，防呆接口朝上，如无法完全；插入电池包，请调整电池包方向，不要强行按压，以免损坏电池接口和卡扣，当听到“咔哒~”声，电池包安装；完成。请确保卡扣卡到位！",
+      "key_points": [
+        "将 B2放在平坦的地面上，将电池包从机器人侧面插入电池槽，注意安装方向，防呆接口朝上，如无法完全",
+        "插入电池包，请调整电池包方向，不要强行按压，以免损坏电池接口和卡扣，当听到“咔哒~”声，电池包安装",
+        "完成。请确保卡扣卡到位！",
+        "(2) 机身摆放（重要步骤！！！）"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2M-004",
+      "topic": "启动 B2",
+      "knowledge_type": "operation",
+      "question_potential": "multi_chunk",
+      "document_id": "DOC-002",
+      "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 四足机器人",
+      "page_start": 11,
+      "page_end": 11,
+      "section": "启动 B2",
+      "source_chunk_ids": [
+        "B2-MANUAL-CHUNK-0021",
+        "B2-MANUAL-CHUNK-0022"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0021",
+          "chunk_text": "tics\n开机前准备\n(1) 安装电池包\n将 B2放在平坦的地面上，将电池包从机器人侧面插入电池槽，注意安装方向，防呆接口朝上，如无法完全\n插入电池包，请调整电池包方向，不要强行按压，以免损坏电池接口和卡扣，当听到“咔哒~”声，电池包安装\n完成。请确保卡扣卡到位！\ntics\n(2) 机身摆放（重要步骤！！！）\n卧式开机：请确保开机运行前机器人放置在平整地面上，机器人腹部支撑垫需平贴地面，机身水平无倾斜\n趴在地面，机器人小腿呈完全收起状态(如下图)，四个膝关节以及足端平放在地面上，确保机器人大腿和小\n腿都没被机身压住。\n启动 B2\n机器人完成开机前检查，和开机前准备要求摆放好后，按照如下步骤开机：先短按电源开关一次，再长按\n电源开关3秒以上，即可开启电池(电池开启时，指示灯为绿灯常亮，指示灯显示当前电池电量)。电池启动\n后等待2分钟，机器人自动站立，机身与地面平行，即开机成功。\n短按+长按3秒以上\nRobotics\nUnitree\nA\n●若开机失败，请仔细检查机身摆放。"
+        },
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0022",
+          "chunk_text": "后等待2分钟，机器人自动站立，机身与地面平行，即开机成功。\n短按+长按3秒以上\nRobotics\nUnitree\nA\n●若开机失败，请仔细检查机身摆放。\n●大小腿靠外伸或小腿靠内被压住都可能导致B2开机失败。\n● 运动关节处小心夹手，请小心谨慎!\n● B2开机成功后会自动站立，请保持一定的安全距离！开机后默认进去AI运控模式。\n© 2023\n宇树科技版权所有\n10\nUn"
+        }
+      ],
+      "evidence_summary": "将 B2放在平坦的地面上，将电池包从机器人侧面插入电池槽，注意安装方向，防呆接口朝上，如无法完全；插入电池包，请调整电池包方向，不要强行按压，以免损坏电池接口和卡扣，当听到“咔哒~”声，电池包安装；完成。请确保卡扣卡到位！",
+      "key_points": [
+        "将 B2放在平坦的地面上，将电池包从机器人侧面插入电池槽，注意安装方向，防呆接口朝上，如无法完全",
+        "插入电池包，请调整电池包方向，不要强行按压，以免损坏电池接口和卡扣，当听到“咔哒~”声，电池包安装",
+        "完成。请确保卡扣卡到位！",
+        "(2) 机身摆放（重要步骤！！！）"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2M-005",
+      "topic": "首次绑定 Explore App",
+      "knowledge_type": "setup",
+      "question_potential": "multi_chunk",
+      "document_id": "DOC-002",
+      "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 四足机器人",
+      "page_start": 12,
+      "page_end": 13,
+      "section": "连接 Unitree Explore App",
+      "source_chunk_ids": [
+        "B2-MANUAL-CHUNK-0023",
+        "B2-MANUAL-CHUNK-0024"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0023",
+          "chunk_text": "icS\n连接 Unitree Explore App\n首次使用需要先绑定，绑定过程中，请打开手机蓝牙，将手机靠近B2，保证蓝牙实时通讯。\n① 下载并安装 Unitree Explore App，根据 Unitree 提供的企业账号和密码完成登录。\n登录\n手机号\n若无全业账号请联系字树科技新售服务人员开通\n密码\n共已同法并同热《的私政策》《用户协议》《法律声明》\n登录\nRobotics\nUnitree\n●若无企业账号请联系宇树科技销售服务人员开通账号！\nB2 电源启动后，在 Unitree Explore App 添加机器狗：打开手机系统蓝牙->首页点击添加机器人->选\n择您要添加的设备。\n图库\n我的\n添加设备\n请选择要添加的设备\n正在扫描\nB2_10001\nB2_10001\nB2_10001\n添加机器人\nB2_10001\n十\n添加机器人\n绑定 B2：您可以选择 AP直连模式和 Wi-Fi 连接模式进行连接，连接成功后您可以学习内置教程来快\n速掌握操控技巧。\nAP 直连模式\nAP 直连模式\nWi-Fi 连接模式\n设置机器狗热点名称\n手机连接机器狗热点\n手机通过路由器连接机器狗\n设置密码\n下一步\n© 2023\n3 宇树科技版权所有\n11\nUnit"
+        },
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0024",
+          "chunk_text": "ics\n①帮助？\n正在连接设备\n①请先关闭手机4G/5G蜂窝网络\n请保持网络通畅耐心等待\n②手机请连接Wi-Fi:100111001110011\n与去连接\n00:14\n热点设置\n热点连接\n连接机器狗\n热点设置\n热点连接\n连接机器构\nucs\nWi-Fi 连接模式\nWi-Fi 连接模式\n选择 Wi-Fi 网络并输入密码\n输入Wi-Fi名称\n输入Wi-Fi密码\n连接成功\n下一步\n返回首页\n●如何更换账户绑定？\n首页点击【设置】-[机器人设置]，选择点击解除绑定，可以对已绑定的机器狗进行解绑。机器狗解除绑定后，\n可以被其他账户绑定。\n机器狗设置\nAP 路由器模式\n设备SN\nB42940000N832MX8X\n复材\n型号\nB2 EDU\nWi-Fi 连接模式\n(011)\n切换连接\nAP 路由器模式\n解除绑定\n确定要解除与机器狗的绑定关系吗?\n解除绑定后，\n将无法通过 App 控制机器狗\n取消\n确定\nobotics\n●连接过程中请保持手机蓝牙开启！\nUnitree Rob\n● 蓝牙连接报错：Unitree Explore App 需要获取蓝牙权限，请在手机 App 中打开 Unitree Explore 蓝牙权限。\n●若忘记绑定账户、账户丢失，请与Unitree相关人员联系！\n© 2023\n3 宇树科技版权所有\n12\nUnitre"
+        }
+      ],
+      "evidence_summary": "首次使用需要先绑定，绑定过程中，请打开手机蓝牙，将手机靠近B2，保证蓝牙实时通讯。；① 下载并安装 Unitree Explore App，根据 Unitree 提供的企业账号和密码完成登录。；若无全业账号请联系字树科技新售服务人员开通",
+      "key_points": [
+        "首次使用需要先绑定，绑定过程中，请打开手机蓝牙，将手机靠近B2，保证蓝牙实时通讯。",
+        "① 下载并安装 Unitree Explore App，根据 Unitree 提供的企业账号和密码完成登录。",
+        "若无全业账号请联系字树科技新售服务人员开通",
+        "共已同法并同热《的私政策》《用户协议》《法律声明》"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2M-006",
+      "topic": "关闭 B2",
+      "knowledge_type": "operation",
+      "question_potential": "single",
+      "document_id": "DOC-002",
+      "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 四足机器人",
+      "page_start": 15,
+      "page_end": 15,
+      "section": "关闭 B2",
+      "source_chunk_ids": [
+        "B2-MANUAL-CHUNK-0027"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0027",
+          "chunk_text": "tics\n关闭 B2\n关机前，请务必确保机器人站立在平整地面上，确保机器人处于静态站立状态（机器人机身位置处于开机\n起立后的初始状态，机身水平，手柄无任何操作，静态站立时的状态）。\n● 按2次L2+A 键，机器人依次完成关节锁定，卧倒动作；\n● 机器人进入卧倒状态后，先短按电源键再长按电源键3秒以上关机。\ntics\n关机后，请按照机身摆放要求，摆放好机器人大小腿和髋关节位置，为下次开机做准备。若长时间不使用\nB2，请及时取出电池包：往外拉出电池包提带，电池包即可弹出取下。\nA\n● 请确保机器人处于趴下状态(卧倒状态或阻尼状态)下进行关机，否则机器人关机掉电后会重重地摔在地上，\n可能会造成机身损坏，并存在一定的安全隐患！若开机失败，请检查机器人机身摆放是否正确。\n●运动关节处小心夹手，请小心谨慎！\n装箱\n装箱前准备：将四足机器人的腿转动到如图示的位置(后腿收起步骤：旋转后腿髋关节电机使后大腿摆放\n至上图示位置，同时收起后小腿摆放至图示位置。\notics"
+        }
+      ],
+      "evidence_summary": "起立后的初始状态，机身水平，手柄无任何操作，静态站立时的状态）。；● 按2次L2+A 键，机器人依次完成关节锁定，卧倒动作；；● 机器人进入卧倒状态后，先短按电源键再长按电源键3秒以上关机。",
+      "key_points": [
+        "起立后的初始状态，机身水平，手柄无任何操作，静态站立时的状态）。",
+        "● 按2次L2+A 键，机器人依次完成关节锁定，卧倒动作；",
+        "● 机器人进入卧倒状态后，先短按电源键再长按电源键3秒以上关机。",
+        "关机后，请按照机身摆放要求，摆放好机器人大小腿和髋关节位置，为下次开机做准备。若长时间不使用"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2M-007",
+      "topic": "遥控失效强制关机",
+      "knowledge_type": "troubleshooting",
+      "question_potential": "single",
+      "document_id": "DOC-002",
+      "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 四足机器人",
+      "page_start": 16,
+      "page_end": 16,
+      "section": "如何在遥控模块失效时关闭机器人",
+      "source_chunk_ids": [
+        "B2-MANUAL-CHUNK-0030"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0030",
+          "chunk_text": "● App 连接异常\nnitr\n若采用 AP直连模式，可检查手机是否连上B2发出的Ap热点。若热点配置失败，请确保设置的热点名称\n没有特殊符号和空格，确保机器狗、手机二者靠近后，重启机器狗和App再尝试连接。\n若采用Wi-Fi连接模式，可检查所连接Wi-Fi网络是否正常，能连上外网。\n●如何在遥控模块失效时关闭机器人\n当遇到由于遥控模块失效(如遥控器、手机电量耗尽等原因)导致的无法使用遥控模块使机器人趴地待机。\n只能采用按电池电源键强制关机。\n强制关机：使机器人与障碍物、复杂地面、人群、水面等物体保持至少2米以上的安全距离。抬住机器人\n头部和尾部，短按电源开关一次，再长按电源开关3秒以上关闭电源。机器人掉电后缓慢将其抬至地面上。\n●机器人容易摔倒，开机无法站立\n没有使用正确的开机姿势，导致机身电机角度错误，使用正确的开机姿势后重新开机。若重启机器人无法\n解决问题，此时需要按照 Unitree Explore App 相关步骤对机器人关节重新进行标定。"
+        }
+      ],
+      "evidence_summary": "若采用 AP直连模式，可检查手机是否连上B2发出的Ap热点。若热点配置失败，请确保设置的热点名称；没有特殊符号和空格，确保机器狗、手机二者靠近后，重启机器狗和App再尝试连接。；若采用Wi-Fi连接模式，可检查所连接Wi-Fi网络是否正常，能连上外网。",
+      "key_points": [
+        "若采用 AP直连模式，可检查手机是否连上B2发出的Ap热点。若热点配置失败，请确保设置的热点名称",
+        "没有特殊符号和空格，确保机器狗、手机二者靠近后，重启机器狗和App再尝试连接。",
+        "若采用Wi-Fi连接模式，可检查所连接Wi-Fi网络是否正常，能连上外网。",
+        "●如何在遥控模块失效时关闭机器人"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2M-008",
+      "topic": "整机清洁存放与例检",
+      "knowledge_type": "maintenance",
+      "question_potential": "multi_chunk",
+      "document_id": "DOC-002",
+      "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 四足机器人",
+      "page_start": 18,
+      "page_end": 19,
+      "section": "日常保养与维护",
+      "source_chunk_ids": [
+        "B2-MANUAL-CHUNK-0036",
+        "B2-MANUAL-CHUNK-0037",
+        "B2-MANUAL-CHUNK-0038"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0036",
+          "chunk_text": "日常保养与维护\nbotics\n整机清洁\n1. 清洁\n当B2在恶劣环境下（雨天、沙尘、湿地)使用后，请及时清洁机身表面。\ntics\n清洗机身前请先关闭电源，使用干净的软布对机身进行擦拭，尤其关注多目深度相机是否擦拭干净。清洁\n时严禁使用金属刷、砂纸等，以免刮伤零件表面。清洗后，请用软布将机身擦干。擦干后可用风扇或风枪将机\n器人表面、关节缝隙处的积水吹干，避免留下水痕。\nA\n● 注意！B2 整机(含电池包)IP67 级防水，清洁时请勿取下电池包！\n2. 存放\nB2需存放于干燥、阴凉的室内，避免日晒及雨淋，以免零部件锈蚀而缩短使用寿命。长时间存放时取出电\n池包。\n检查保养\n在使用前后开展例行检查，可大幅度提升产品可靠性能，降低安全隐患，延长使用寿命。\n不带电检查表\n类型\n要点\n1. 机身外观是否清洁、无破损或变形痕迹\n整机外观\n2. 相机表面镜片有无异物\n3. 头部激光雷达周围有无异物遮挡\n1. 目视及触摸检查机身、各个关节及连接处、足端组件是否完好，有裂纹或者有破损需及时更"
+        },
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0037",
+          "chunk_text": "3. 头部激光雷达周围有无异物遮挡\n1. 目视及触摸检查机身、各个关节及连接处、足端组件是否完好，有裂纹或者有破损需及时更\n换和联系 Unitree 售后\n结构\n2. 各个连接部件螺丝是否锁紧，尤其关注关节连接件和电池锁紧旋钮的螺丝\n3. 散热风扇进出口有无异物阻塞\n足端组件\n检查有无明显的足垫破损，若有破损请及时更换\n1. 机身的电池包接口有无异物，变形\n电池包\n2. 电池包安装是否可靠，确保运行时不会松脱\nRobotics\n3. 电池包外壳是否有明显损伤，有明显损伤的电池包禁止用于使用\nUnitr\n1. 遥控器摇杆是都在中位，摇杆是否进入沙土等异物\n遥控器\n2. 遥控器的各个按键是否存在卡顿\n© 2023 宇树科技版权所有\n17\nUnitre"
+        },
+        {
+          "chunk_id": "B2-MANUAL-CHUNK-0038",
+          "chunk_text": "上电检查\n类型\n要点\npotics\n遥控器\n1. 确认摇杆的基本操作功能是否正常\n2. 确认当前电量是否充足\n电池\n确认当前电量是否充足\n散热风扇\n用耳朵仔细听，确认散热风扇正常工作，且无剐蹭等声音\n电池包保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池包进行充电\n2. 切勿将电池包存储在室温超过40℃的环境下。\n3. 切勿过充电池包，否则将对电芯造成损害。\nee Robotics\n4. 若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于30%，请把电池充电到70%后再继续\n保存。以免电池过放而损坏电池。\n●建议每次外出使用前，执行以上检查！\n●若有配件损坏需要更换，请及时联系Unitree售后!\nUnitree Robotics\n©2023 宇树科技版权所有\n18\nUnitree Robotics"
+        }
+      ],
+      "evidence_summary": "当B2在恶劣环境下（雨天、沙尘、湿地)使用后，请及时清洁机身表面。；清洗机身前请先关闭电源，使用干净的软布对机身进行擦拭，尤其关注多目深度相机是否擦拭干净。清洁；时严禁使用金属刷、砂纸等，以免刮伤零件表面。清洗后，请用软布将机身擦干。擦干后可用风扇或风枪将机",
+      "key_points": [
+        "当B2在恶劣环境下（雨天、沙尘、湿地)使用后，请及时清洁机身表面。",
+        "清洗机身前请先关闭电源，使用干净的软布对机身进行擦拭，尤其关注多目深度相机是否擦拭干净。清洁",
+        "时严禁使用金属刷、砂纸等，以免刮伤零件表面。清洗后，请用软布将机身擦干。擦干后可用风扇或风枪将机",
+        "器人表面、关节缝隙处的积水吹干，避免留下水痕。"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2R-001",
+      "topic": "遥控器低电量充电",
+      "knowledge_type": "charging",
+      "question_potential": "single",
+      "document_id": "DOC-003",
+      "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 遥控器",
+      "page_start": 5,
+      "page_end": 5,
+      "section": "遥控器充电",
+      "source_chunk_ids": [
+        "B2-REMOTE-CHUNK-0006"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-REMOTE-CHUNK-0006",
+          "chunk_text": "B2遥控器使用手册\ntics\n音效/震动开关\n●关闭振动/声音：快速按下F1按钮3次，关闭振动/声音。\n●开启振动/声音：快速按下F1按钮3次，开启振动/声音。\nUnitree\nSTART\nRobotics\n快按3次F1\n●修改遥控器反馈功能后，默认是不保存的，如果需要下次开机生效，则按住F1进行关机操作保存当前模式。\n遥控器充电\n当遥控器电量指示灯显示低电量时，应将遥控器连接充电器，如下图所示：\n交流电源\n100-240V\nUSB 充电器\n0\nUSB-Type C 线\nSELEOT\n1. 推荐使用符合 FCC/CE 标准，规格为 5V/2A的 USB 充电器。\n2. 给遥控器充电前，确保遥控器处于关闭状态。\n3. 充电状态下电源指示灯会按1Hz(1秒/次)频率闪烁，并指示当前电量。\n4. 电量指示灯全部常亮时表示电池包已经充满，请取下充电器，完成充电。\ntics\n充电指示灯\nLED1\nLED2\nLED3\nLED4\n当前电量\nOOOOO\n0\nO\nO\n0%-25%\nUr\nOOOO\nO OOO\nO\n25%-50%\n50%-75%\n75%-100%\n充满\n©2024 宇树科技版权所有\n5"
+        }
+      ],
+      "evidence_summary": "音效/震动开关；●关闭振动/声音：快速按下F1按钮3次，关闭振动/声音。；●开启振动/声音：快速按下F1按钮3次，开启振动/声音。",
+      "key_points": [
+        "音效/震动开关",
+        "●关闭振动/声音：快速按下F1按钮3次，关闭振动/声音。",
+        "●开启振动/声音：快速按下F1按钮3次，开启振动/声音。",
+        "快按3次F1"
+      ],
+      "acceptable_evidence_sources": [
+        {
+          "document_id": "DOC-002",
+          "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+          "vendor": "宇树科技",
+          "product": "B2 四足机器人",
+          "page_start": 9,
+          "page_end": 9,
+          "section": "遥控器充电",
+          "source_chunk_ids": [
+            "B2-MANUAL-CHUNK-0017"
+          ],
+          "evidence_text": [
+            {
+              "chunk_id": "B2-MANUAL-CHUNK-0017",
+              "chunk_text": "tics\n遥控器充电\n当遥控器电量指示灯显示低电量时，应将遥控器连接充电器，如下图所示：\nR\n④\n④\n交流电源\n100-240V\nUSB 充电器\n③\n③\nUSB-Type C 线\notics\n0\noo\nUnitr\n1. 请使用官方 USB 充电器。如不使用官方充电器，推荐使用符合 FCC/CE 标准，规格为 5V/2A 的 USB\n充电器。\n2. 给遥控器充电前，确保遥控器处于关闭状态。\n3. 充电状态下电源指示灯会按1Hz（1秒/次）频率闪烁，并指示当前电量。\n4. 电量指示灯全部熄灭时表示电池包已经充满，请取下充电器，完成充电。\n充电指示灯\nLED1\nLED2\nLED3\nLED4\n当前电量\nOOOO\nO\nO\nO\n0%-25%\nOOO\n0\nO\n25%-50%\nOO\nO\n50%-75%\nO\n75%-100%\n充满\nUnitree Rob\n© 2023\n3 宇树科技版权所有\n8\nUnitree Robotics"
+            }
+          ],
+          "evidence_summary": "100-240V；USB 充电器；USB-Type C 线",
+          "key_points": [
+            "100-240V",
+            "USB 充电器",
+            "USB-Type C 线",
+            "1. 请使用官方 USB 充电器。如不使用官方充电器，推荐使用符合 FCC/CE 标准，规格为 5V/2A 的 USB"
+          ]
+        },
+        {
+          "document_id": "DOC-003",
+          "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+          "vendor": "宇树科技",
+          "product": "B2 遥控器",
+          "page_start": 10,
+          "page_end": 10,
+          "section": "遥控器充电（R1）",
+          "source_chunk_ids": [
+            "B2-REMOTE-CHUNK-0012",
+            "B2-REMOTE-CHUNK-0013"
+          ],
+          "evidence_text": [
+            {
+              "chunk_id": "B2-REMOTE-CHUNK-0012",
+              "chunk_text": "ics\n遥控器摇杆校准\n手持遥控但不要触碰摇杆，按下遥控上按键F1和F3并同时松开，此时遥控器发出连续“嘀~嘀~”声(1\n次/秒)代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀~嘀~”声停止，此时校\n准就绪。单按F3一次使校准生效，完成校准。\n：●校准摇杆时，校准前请不要触碰摇杆，进入校准模式才可以动摇杆。校准后可通过 App查看校准后的摇杆状态。\nIcs\n开启/关闭遥控器\n开启遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀~”的一声，即遥控开启。\nUni\n● 关闭遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀~嘀~嘀~”三声，即遥控关闭。\n遥控器充电\n当遥控器电量指示灯显示低电量时，应将遥控器连接充电器，如下图所示：\n交流电源\n100-240V\nUSB 充电器\n④\ne\nUSB-Type C 线\n1. 推荐使用符合 FCC/CE 标准，规格为 5V/2A 的 USB 充电器。\n2. 给遥控器充电前，确保遥控器处于关闭状态。"
+            },
+            {
+              "chunk_id": "B2-REMOTE-CHUNK-0013",
+              "chunk_text": "USB 充电器\n④\ne\nUSB-Type C 线\n1. 推荐使用符合 FCC/CE 标准，规格为 5V/2A 的 USB 充电器。\n2. 给遥控器充电前，确保遥控器处于关闭状态。\n3. 充电状态下电源指示灯会按1Hz（1秒/次）频率闪烁，并指示当前电量。\n4. 电量指示灯全部熄灭时表示电池包已经充满，请取下充电器，完成充电。\nCS\n充电指示灯\nLED1\nLED2\nLED3\nLED4\n当前电量\nOOOO\nO\nO\nO\n0%-25%\nOOO\nO\nO\n25%-50%\nO\nO\n50%-75%\n75%-100%\nO\nO\n充满\n© 2024\n宇树科技版权所有\n10"
+            }
+          ],
+          "evidence_summary": "手持遥控但不要触碰摇杆，按下遥控上按键F1和F3并同时松开，此时遥控器发出连续“嘀~嘀~”声(1；次/秒)代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀~嘀~”声停止，此时校；准就绪。单按F3一次使校准生效，完成校准。",
+          "key_points": [
+            "手持遥控但不要触碰摇杆，按下遥控上按键F1和F3并同时松开，此时遥控器发出连续“嘀~嘀~”声(1",
+            "次/秒)代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀~嘀~”声停止，此时校",
+            "准就绪。单按F3一次使校准生效，完成校准。",
+            "：●校准摇杆时，校准前请不要触碰摇杆，进入校准模式才可以动摇杆。校准后可通过 App查看校准后的摇杆状态。"
+          ]
+        }
+      ]
+    },
+    {
+      "evidence_id": "EV-B2R-002",
+      "topic": "R3 遥控器规格",
+      "knowledge_type": "specification",
+      "question_potential": "single",
+      "document_id": "DOC-003",
+      "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 遥控器",
+      "page_start": 3,
+      "page_end": 3,
+      "section": "技术规格",
+      "source_chunk_ids": [
+        "B2-REMOTE-CHUNK-0004"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-REMOTE-CHUNK-0004",
+          "chunk_text": "B2 遥控器使用手册\ntics\n技术规格\n参数\n规格\n备注\n充电电压\n5.0V\n充电电流\n700mA\n锂电池容量\n780mAh\n通信方式\n数传模块，蓝牙\noics\n运行时间\n5h\n遥控距离\n100m 以上\n空旷环境\nUr\n安装摇杆\nStep1：取出摇杆。如同所示，用右手将遥控器平稳缓慢的拉出，取出收纳槽当中的2个摇杆。\nSELEOT\nSTNT\nStep2：安装摇杆。如图所示，按照顺时针方向，将摇杆固定在遥控器上，拧紧。\nUnitree Rol\nree Robotics\n如需收纳，请拆下摇杆后放回收纳槽中。\n© 2024\n宇树科技版权所有\n3\nUnitr"
+        }
+      ],
+      "evidence_summary": "780mAh；数传模块，蓝牙；100m 以上",
+      "key_points": [
+        "780mAh",
+        "数传模块，蓝牙",
+        "100m 以上",
+        "Step1：取出摇杆。如同所示，用右手将遥控器平稳缓慢的拉出，取出收纳槽当中的2个摇杆。"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2R-003",
+      "topic": "安装收纳遥控器摇杆",
+      "knowledge_type": "setup",
+      "question_potential": "single",
+      "document_id": "DOC-003",
+      "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 遥控器",
+      "page_start": 3,
+      "page_end": 3,
+      "section": "安装摇杆",
+      "source_chunk_ids": [
+        "B2-REMOTE-CHUNK-0004"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-REMOTE-CHUNK-0004",
+          "chunk_text": "B2 遥控器使用手册\ntics\n技术规格\n参数\n规格\n备注\n充电电压\n5.0V\n充电电流\n700mA\n锂电池容量\n780mAh\n通信方式\n数传模块，蓝牙\noics\n运行时间\n5h\n遥控距离\n100m 以上\n空旷环境\nUr\n安装摇杆\nStep1：取出摇杆。如同所示，用右手将遥控器平稳缓慢的拉出，取出收纳槽当中的2个摇杆。\nSELEOT\nSTNT\nStep2：安装摇杆。如图所示，按照顺时针方向，将摇杆固定在遥控器上，拧紧。\nUnitree Rol\nree Robotics\n如需收纳，请拆下摇杆后放回收纳槽中。\n© 2024\n宇树科技版权所有\n3\nUnitr"
+        }
+      ],
+      "evidence_summary": "780mAh；数传模块，蓝牙；100m 以上",
+      "key_points": [
+        "780mAh",
+        "数传模块，蓝牙",
+        "100m 以上",
+        "Step1：取出摇杆。如同所示，用右手将遥控器平稳缓慢的拉出，取出收纳槽当中的2个摇杆。"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2R-004",
+      "topic": "遥控器摇杆校准",
+      "knowledge_type": "operation",
+      "question_potential": "single",
+      "document_id": "DOC-003",
+      "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 遥控器",
+      "page_start": 4,
+      "page_end": 4,
+      "section": "遥控器摇杆校准",
+      "source_chunk_ids": [
+        "B2-REMOTE-CHUNK-0005"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-REMOTE-CHUNK-0005",
+          "chunk_text": "ics\n遥控器摇杆校准\n手持遥控但不要触碰摇杆，按下遥控上按键F1和F3并同时松开，此时遥控器发出连续“嘀~嘀~”声（1\n次/秒)代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀~嘀~”声停止，此时校\n准就绪。单按F3一次使校准生效，完成校准。\nics\n●校准摇杆时，校准前请不要触碰摇杆，进入校准模式才可以动摇杆。校准后可通过APP查看校准后的摇杆状态。\n开启/关闭遥控器\n开启遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀~嘀~”两声，即遥控开启。\n● 关闭遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀~嘀~嘀~”三声，即遥控关闭。\nPH0\nSTART\n短按+长按2秒及以上\n音效/震动切换\n●切换振动：快速按下F3按钮3次，切换到振动模式。\n●切换声音：快速按下F3按钮3次，切换到声音模式。\nUnitree\nRobotics\nSELEOT\nSTART\n快按3次F3\n© 2024 宇树科技 版权所有\n4\nUnitr"
+        }
+      ],
+      "evidence_summary": "手持遥控但不要触碰摇杆，按下遥控上按键F1和F3并同时松开，此时遥控器发出连续“嘀~嘀~”声（1；次/秒)代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀~嘀~”声停止，此时校；准就绪。单按F3一次使校准生效，完成校准。",
+      "key_points": [
+        "手持遥控但不要触碰摇杆，按下遥控上按键F1和F3并同时松开，此时遥控器发出连续“嘀~嘀~”声（1",
+        "次/秒)代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀~嘀~”声停止，此时校",
+        "准就绪。单按F3一次使校准生效，完成校准。",
+        "●校准摇杆时，校准前请不要触碰摇杆，进入校准模式才可以动摇杆。校准后可通过APP查看校准后的摇杆状态。"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2R-005",
+      "topic": "开关 R3 遥控器",
+      "knowledge_type": "operation",
+      "question_potential": "single",
+      "document_id": "DOC-003",
+      "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 遥控器",
+      "page_start": 4,
+      "page_end": 4,
+      "section": "开启/关闭遥控器",
+      "source_chunk_ids": [
+        "B2-REMOTE-CHUNK-0005"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-REMOTE-CHUNK-0005",
+          "chunk_text": "ics\n遥控器摇杆校准\n手持遥控但不要触碰摇杆，按下遥控上按键F1和F3并同时松开，此时遥控器发出连续“嘀~嘀~”声（1\n次/秒)代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀~嘀~”声停止，此时校\n准就绪。单按F3一次使校准生效，完成校准。\nics\n●校准摇杆时，校准前请不要触碰摇杆，进入校准模式才可以动摇杆。校准后可通过APP查看校准后的摇杆状态。\n开启/关闭遥控器\n开启遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀~嘀~”两声，即遥控开启。\n● 关闭遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀~嘀~嘀~”三声，即遥控关闭。\nPH0\nSTART\n短按+长按2秒及以上\n音效/震动切换\n●切换振动：快速按下F3按钮3次，切换到振动模式。\n●切换声音：快速按下F3按钮3次，切换到声音模式。\nUnitree\nRobotics\nSELEOT\nSTART\n快按3次F3\n© 2024 宇树科技 版权所有\n4\nUnitr"
+        }
+      ],
+      "evidence_summary": "手持遥控但不要触碰摇杆，按下遥控上按键F1和F3并同时松开，此时遥控器发出连续“嘀~嘀~”声（1；次/秒)代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀~嘀~”声停止，此时校；准就绪。单按F3一次使校准生效，完成校准。",
+      "key_points": [
+        "手持遥控但不要触碰摇杆，按下遥控上按键F1和F3并同时松开，此时遥控器发出连续“嘀~嘀~”声（1",
+        "次/秒)代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀~嘀~”声停止，此时校",
+        "准就绪。单按F3一次使校准生效，完成校准。",
+        "●校准摇杆时，校准前请不要触碰摇杆，进入校准模式才可以动摇杆。校准后可通过APP查看校准后的摇杆状态。"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2R-006",
+      "topic": "音效震动设置",
+      "knowledge_type": "operation",
+      "question_potential": "single",
+      "document_id": "DOC-003",
+      "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 遥控器",
+      "page_start": 5,
+      "page_end": 5,
+      "section": "音效/震动开关",
+      "source_chunk_ids": [
+        "B2-REMOTE-CHUNK-0006"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-REMOTE-CHUNK-0006",
+          "chunk_text": "B2遥控器使用手册\ntics\n音效/震动开关\n●关闭振动/声音：快速按下F1按钮3次，关闭振动/声音。\n●开启振动/声音：快速按下F1按钮3次，开启振动/声音。\nUnitree\nSTART\nRobotics\n快按3次F1\n●修改遥控器反馈功能后，默认是不保存的，如果需要下次开机生效，则按住F1进行关机操作保存当前模式。\n遥控器充电\n当遥控器电量指示灯显示低电量时，应将遥控器连接充电器，如下图所示：\n交流电源\n100-240V\nUSB 充电器\n0\nUSB-Type C 线\nSELEOT\n1. 推荐使用符合 FCC/CE 标准，规格为 5V/2A的 USB 充电器。\n2. 给遥控器充电前，确保遥控器处于关闭状态。\n3. 充电状态下电源指示灯会按1Hz(1秒/次)频率闪烁，并指示当前电量。\n4. 电量指示灯全部常亮时表示电池包已经充满，请取下充电器，完成充电。\ntics\n充电指示灯\nLED1\nLED2\nLED3\nLED4\n当前电量\nOOOOO\n0\nO\nO\n0%-25%\nUr\nOOOO\nO OOO\nO\n25%-50%\n50%-75%\n75%-100%\n充满\n©2024 宇树科技版权所有\n5"
+        }
+      ],
+      "evidence_summary": "音效/震动开关；●关闭振动/声音：快速按下F1按钮3次，关闭振动/声音。；●开启振动/声音：快速按下F1按钮3次，开启振动/声音。",
+      "key_points": [
+        "音效/震动开关",
+        "●关闭振动/声音：快速按下F1按钮3次，关闭振动/声音。",
+        "●开启振动/声音：快速按下F1按钮3次，开启振动/声音。",
+        "快按3次F1"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2R-007",
+      "topic": "R3 绑定与连接状态",
+      "knowledge_type": "setup",
+      "question_potential": "single",
+      "document_id": "DOC-003",
+      "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 遥控器",
+      "page_start": 6,
+      "page_end": 6,
+      "section": "R3 遥控器基本操作",
+      "source_chunk_ids": [
+        "B2-REMOTE-CHUNK-0007"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-REMOTE-CHUNK-0007",
+          "chunk_text": "ics\nR3 遥控器基本操作\n首次使用遥控器需要在Unitree Explore App上进行遥控器绑定，【设置】->【遥控器设置】-打开遥控器开\n关，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。\n设置\n遥控器设置\n机器人设置\n遥控器ID\n123456\n修改\nIcs\n数据\n遥控器设置\n报警信息\n遥控器开机并且与 B2 连接成功后，右侧DL 指示灯亮，这就意味着遥控器与 B2 数传模块已连接，此时可\n通过遥控器控制 B2。使用遥控器摇杆操控 B2 时，摇杆的操控方式如下所示：\n左摇杆\n右摇杆\nnitre\n(AI运控模式下不支持抬头低头)\ntics\niteuc\nUnitree\nRobotics\n●摇杆回中/中位：遥控器的摇杆处于中间位置。\n●摇杆杆量：遥控器摇杆偏离摇杆中位的偏移量。\n●墙面、门等阻挡物会极大削弱机器狗和遥控模块之间的信号，请务必在空旷的场地操作机器狗。\n©2024 宇树科技版权所有\n6\nUnit"
+        }
+      ],
+      "evidence_summary": "首次使用遥控器需要在Unitree Explore App上进行遥控器绑定，【设置】->【遥控器设置】-打开遥控器开；关，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。；123456",
+      "key_points": [
+        "首次使用遥控器需要在Unitree Explore App上进行遥控器绑定，【设置】->【遥控器设置】-打开遥控器开",
+        "关，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。",
+        "123456",
+        "遥控器开机并且与 B2 连接成功后，右侧DL 指示灯亮，这就意味着遥控器与 B2 数传模块已连接，此时可"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2R-008",
+      "topic": "R3 遥控指令映射",
+      "knowledge_type": "operation",
+      "question_potential": "single",
+      "document_id": "DOC-003",
+      "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 遥控器",
+      "page_start": 7,
+      "page_end": 7,
+      "section": "遥控指令",
+      "source_chunk_ids": [
+        "B2-REMOTE-CHUNK-0008"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-REMOTE-CHUNK-0008",
+          "chunk_text": "B2 遥控器使用手册\n机器狗参照示意图：\notics\n侧视图\n俯视图\n正视图\n机器狗\n6tics\n参照图\nUnitr\n遥控指令：\n按键\n效果\n左摇杆\n前后左右\n右摇杆\n左右旋转\n姿态切换\n解除锁定\nSTART\n灵动模式(默认）\nL2(长按) + A (单击)\n站立锁定/卧倒姿态切换\nL2 (长按) + B (单击)\n阻尼模式（软急停）\nR1 (双击)\n经典模式\nL2 (长按) + START (单击)\n跑步模式\notics\nL2 (长按) + X (单击)\n摔倒恢复站立\nX(单击)\n视觉模式\nSELECT\n摆姿势\nL2 (双击)\n低速档\nL1 (双击)\n© 2024 宇树科技 版权所有\nUnit"
+        }
+      ],
+      "evidence_summary": "机器狗参照示意图：；灵动模式(默认）；L2(长按) + A (单击)",
+      "key_points": [
+        "机器狗参照示意图：",
+        "灵动模式(默认）",
+        "L2(长按) + A (单击)",
+        "站立锁定/卧倒姿态切换"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2B-001",
+      "topic": "电池首次使用要求",
+      "knowledge_type": "charging",
+      "question_potential": "single",
+      "document_id": "DOC-004",
+      "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 电池与充电器",
+      "page_start": 2,
+      "page_end": 2,
+      "section": "简介",
+      "source_chunk_ids": [
+        "B2-BATTERY-CHUNK-0002"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0002",
+          "chunk_text": "B2电池&充电器使用手册\n电池\nobotics\n简介\n电池是专门为B2四足机器人设计的一款带有充放电管理功能的电池。该款电池采用高性能电芯，并使用\nCS\n宇树科技Unitree自主开发的先进电池管理系统(BMS)为 B2 四足机器人提供强劲的电力。\nUnit\n243.00\n96.00\n337.00\nA\n●首次使用电池前，务必将电池充满！\n部件名称\n[]\n[1] 电源开关键\n[2] LED 灯\n[2]\n[3] 提带\n.\n-[1]\n[4] 卡扣\n[3]\n-[4]\n[5] 泄压阀孔\n[6]充电器接口\n[5]\nUnitr\n[]]\n[7] 防呆接口\nobotics\nO\n-[6]\n3宇树科技版权所有\n2"
+        }
+      ],
+      "evidence_summary": "obotics；电池是专门为B2四足机器人设计的一款带有充放电管理功能的电池。该款电池采用高性能电芯，并使用；宇树科技Unitree自主开发的先进电池管理系统(BMS)为 B2 四足机器人提供强劲的电力。",
+      "key_points": [
+        "obotics",
+        "电池是专门为B2四足机器人设计的一款带有充放电管理功能的电池。该款电池采用高性能电芯，并使用",
+        "宇树科技Unitree自主开发的先进电池管理系统(BMS)为 B2 四足机器人提供强劲的电力。",
+        "243.00"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2B-002",
+      "topic": "电池保护功能",
+      "knowledge_type": "safety",
+      "question_potential": "multi_chunk",
+      "document_id": "DOC-004",
+      "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 电池与充电器",
+      "page_start": 3,
+      "page_end": 3,
+      "section": "电池功能",
+      "source_chunk_ids": [
+        "B2-BATTERY-CHUNK-0003",
+        "B2-BATTERY-CHUNK-0004"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0003",
+          "chunk_text": "ics\n技术规格\n电池\n参数\n规格\n备注\n尺寸\n337mm*243mm*96mm\n额定电压\nDC 50.4V\nics\n充电限制电压\nDC 58.5V\n额定容量\n45000mA，2268Wh\n运行时长\n4-6h\nUr\n电池功能\n1. 电量显示：电池自带电量指示灯，可以显示当前电池电量。\n2. 平衡充电保护：自动平衡电池内部电芯电压，以保护电池。\nnitr\n3. 过充电保护：过度充电会严重损伤电池，当电池充满后将自动停止充电。\n4. 充电温度保护：在温度为0℃以下或50℃以上时充电会损坏电池，在此温度时电池将触发充电异常。\n5. 充电电流保护：大电流充电将严重损伤电池，当充电电流大于20A，电池会触发充电过流异常。\n6. 过放电保护：过度放电会严重损伤电池，当电池放电至39V，电池会切断输出，当电芯电压低于35V时\n复充会先使用预充电功能，电流约300mA，直至恢复至42V电压为止等待时间较久。\n7. 短路保护：在电池检测到短路的情况下，会切断输出，以保护电池；同时电池将使用指示灯提示故障。"
+        },
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0004",
+          "chunk_text": "7. 短路保护：在电池检测到短路的情况下，会切断输出，以保护电池；同时电池将使用指示灯提示故障。\n8. 电池负载检测保护：当电池未插入机器狗时，电池将无法开启。当从机器狗拔出已开启的电池时，电池\n将自动关闭。\n9. 异常显示：电池LED灯可显示由异常导致的电池自保护的相关信息。\nUnitree\n©2023 宇树科技版权所有\n3\nUnitree Robotics"
+        }
+      ],
+      "evidence_summary": "DC 50.4V；充电限制电压；DC 58.5V",
+      "key_points": [
+        "DC 50.4V",
+        "充电限制电压",
+        "DC 58.5V",
+        "45000mA，2268Wh"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2B-003",
+      "topic": "查看与开关电池包",
+      "knowledge_type": "operation",
+      "question_potential": "single",
+      "document_id": "DOC-004",
+      "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 电池与充电器",
+      "page_start": 4,
+      "page_end": 4,
+      "section": "电量指示",
+      "source_chunk_ids": [
+        "B2-BATTERY-CHUNK-0005"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0005",
+          "chunk_text": "B2电池&充电器使用手册\ntics\n电量指示\n在电池包关闭状态下，短按电池开关一次，可查看当前电量。\n电量指示灯可用于显示电池包充放电过程中的电池电量，指示灯定义如下。\nO\n表示LED灯常亮\n表示LED灯闪烁\nO\n表示LED 灯熄灭\nics\n电量指示灯\nLED1\nLED2\nLED3\nLED4\n当前电量\nO\n87.5%-100%\nO\nO\n75%-87.5%\nO\n62.5%-75%\nO\nO\n50%-62.5%\nO\nO\n37.5%-50%\nO\nO\nO\n25%-37.5%\nO\nO\nO\nO\n12.5%-25%\nO\nO\nO\n0%-12.5%\nO\nO\nO\nO\n=0%\n开启/关闭电池\n●开启电池：在关闭状态下，先短按池开关（按键）一次，再长按\n电池开关（按键)3秒以上，即可开启电池。电池开启时，指示灯为绿\n灯且显示当前电池电量。\n●关闭电池：在开启状态下，先短按电池开关（按键）一次，再长\nLED4\n按电源开关3秒以上，即可关闭电池。电池关闭后，指示灯均熄灭。\nLED2\nO\nLED1\n6tics\nUnitree\nLED3\n宇树科技版权所有\n4"
+        }
+      ],
+      "evidence_summary": "在电池包关闭状态下，短按电池开关一次，可查看当前电量。；电量指示灯可用于显示电池包充放电过程中的电池电量，指示灯定义如下。；表示LED灯常亮",
+      "key_points": [
+        "在电池包关闭状态下，短按电池开关一次，可查看当前电量。",
+        "电量指示灯可用于显示电池包充放电过程中的电池电量，指示灯定义如下。",
+        "表示LED灯常亮",
+        "表示LED灯闪烁"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2B-004",
+      "topic": "插入式充电器规格",
+      "knowledge_type": "specification",
+      "question_potential": "single",
+      "document_id": "DOC-004",
+      "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 电池与充电器",
+      "page_start": 5,
+      "page_end": 5,
+      "section": "充电器",
+      "source_chunk_ids": [
+        "B2-BATTERY-CHUNK-0006"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0006",
+          "chunk_text": "充电器\nbotics\n简介\n插入式充电器是专门为B2电池配置的一个充电设备，体积小，重量轻，方便携带，为电池提供稳定的电\nCS\n力。\n0.\nUnitre\nree Roboti\n接触式充电器是专门为B2设计的，可与视觉识别、SLAM导航等技术相结合，自主规划充电路线，完成\n自动充电，大幅提升作业时间和效率，为全天候作业提供有力的保障。B2-接触式充电器由锂电池充电器和接触\n式充电板组成。\n【充电电极】\n0.\nHics\n【电源接口】\n锂电池充电器\n接触式充电板\n技术规格\nYCS\n插入式充电器\n参数\n规格\n备注\n产品尺寸\n268mm*133mm*68.5mm\n输入\n100-240V~50/60Hz 7.5A\n输出\n58.8V, 10A, 588W\n充电时长\n3h'20min\n© 2023 宇树科技 版权所有\n5\nUnit"
+        }
+      ],
+      "evidence_summary": "Unitre；ree Roboti；接触式充电器是专门为B2设计的，可与视觉识别、SLAM导航等技术相结合，自主规划充电路线，完成",
+      "key_points": [
+        "Unitre",
+        "ree Roboti",
+        "接触式充电器是专门为B2设计的，可与视觉识别、SLAM导航等技术相结合，自主规划充电路线，完成",
+        "自动充电，大幅提升作业时间和效率，为全天候作业提供有力的保障。B2-接触式充电器由锂电池充电器和接触"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2B-005",
+      "topic": "接触式充电器保护",
+      "knowledge_type": "safety",
+      "question_potential": "multi_chunk",
+      "document_id": "DOC-004",
+      "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 电池与充电器",
+      "page_start": 6,
+      "page_end": 6,
+      "section": "接触式充电器功能",
+      "source_chunk_ids": [
+        "B2-BATTERY-CHUNK-0007",
+        "B2-BATTERY-CHUNK-0008"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0007",
+          "chunk_text": "B2 电池&充电器使用手册\ntics\n接触式充电器\n参数\n规格\n备注\n适用型号\nB2\n充电板尺寸\n684mm*390mm*19.5mm\n输入\n100-240V~50/60Hz 7.5A\n输出\n58.8V, 10A, 588W\nics\n充电时长\n3h'20min\n工作环境温度\n5℃-40℃\n理想充电温度\n防护等级\nIP67\n不小于IP67\n存储温度\n22℃-28℃\n理想保存温度\n相对湿度\n≤95%\n大气压力\n70~106Kpa\n冷却方式\n自冷+风冷\n接触式充电器功能\n1. 型号识别：充电板可识别机器人型号，避免不同电池型号(电压)的机器人错误连接充电板，避免充电\n板对未知型号的机器人/电池/负载进行供电。\n2. 过流保护：大电流充电将严重损伤电池，当充电电流大于15A，充电板会触发充电过流异常提醒。\n3. 极板短路保护：在充电极板短路瞬间触发，保护会切断短路极板与充电器/电池的连接，短路点断开后自\n动恢复充电。\n4. 极板抖动保护：在充电极板不可靠接触时，保护会切断充电器与电池的连接，避免接触时产生的极板打\n火现象，机器人起身并再次卧下后可自动恢复充电。"
+        },
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0008",
+          "chunk_text": "火现象，机器人起身并再次卧下后可自动恢复充电。\n5. 充满断路保护：充电电流<1A时，自动断开充电器与电池的连接。\nUnitre\n6"
+        }
+      ],
+      "evidence_summary": "接触式充电器；684mm*390mm*19.5mm；100-240V~50/60Hz 7.5A",
+      "key_points": [
+        "接触式充电器",
+        "684mm*390mm*19.5mm",
+        "100-240V~50/60Hz 7.5A",
+        "58.8V, 10A, 588W"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2B-006",
+      "topic": "插入式充电流程",
+      "knowledge_type": "charging",
+      "question_potential": "single",
+      "document_id": "DOC-004",
+      "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 电池与充电器",
+      "page_start": 7,
+      "page_end": 7,
+      "section": "电池充电",
+      "source_chunk_ids": [
+        "B2-BATTERY-CHUNK-0009"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0009",
+          "chunk_text": "电池充电\nbotics\n插入式充电器\n1. 连接充电器到交流电源(100-240V，50/60Hz)。连接前必须确保外接电源电压与充电器额定输入电压\n匹配，否则会导致充电器损坏（在充电器铭牌上有标识该充电器的额定输入电压）。\n2. 给电池充电前，先插入输入交流电源，然后充电器接电池。\n4. 对电池包进行充电时，需要将电池包从机身内取出。\n5. 充电状态下电池包电量指示灯会按1Hz(1 秒/次）频率闪烁，并指示当前电量。\nRobotics\n6. 电量指示灯全部熄灭时表示电池包已充满。请取下电池包和充电器，完成充电。\n7. 机器人运行结束后电池包温度可能较高，必须待电池包温度降至室温后再对电池包进行充电。\n8. 充电连接示意图：\nUnit\ntics\n。\nUnitree R\n© 2023 宇树科技 版权所有\n7\nUnitree Robotics"
+        }
+      ],
+      "evidence_summary": "1. 连接充电器到交流电源(100-240V，50/60Hz)。连接前必须确保外接电源电压与充电器额定输入电压；匹配，否则会导致充电器损坏（在充电器铭牌上有标识该充电器的额定输入电压）。；2. 给电池充电前，先插入输入交流电源，然后充电器接电池。",
+      "key_points": [
+        "1. 连接充电器到交流电源(100-240V，50/60Hz)。连接前必须确保外接电源电压与充电器额定输入电压",
+        "匹配，否则会导致充电器损坏（在充电器铭牌上有标识该充电器的额定输入电压）。",
+        "2. 给电池充电前，先插入输入交流电源，然后充电器接电池。",
+        "4. 对电池包进行充电时，需要将电池包从机身内取出。"
+      ],
+      "acceptable_evidence_sources": [
+        {
+          "document_id": "DOC-002",
+          "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+          "vendor": "宇树科技",
+          "product": "B2 四足机器人",
+          "page_start": 8,
+          "page_end": 8,
+          "section": "电池充电",
+          "source_chunk_ids": [
+            "B2-MANUAL-CHUNK-0015",
+            "B2-MANUAL-CHUNK-0016"
+          ],
+          "evidence_text": [
+            {
+              "chunk_id": "B2-MANUAL-CHUNK-0015",
+              "chunk_text": "如何充电\nbotics\n由于运输和储存过程中电池自耗等原因，首次使用时电量偏低或电量为空属于正常现象，按照以下方式充\n电即可。\n电池充电\ndics\n1tre\n①将电池从 B2 机身中取出\n充电器先插入输入交流电源\n(向外拉出电池包提带)\n(100-240V,50/60Hz)\n0.\n③\n连接 B2 电池\n④充满电后手动断电\nics\n1. 连接充电器到交流电源(100-240V，50/60Hz)。连接前必须确保外接电源电压与充电器额定输入电压\n匹配，否则会导致充电器损坏（在充电器铭牌上有标识该充电器的额定输入电压)。\n2.\n给电池充电前，先插入输入交流电源，然后充电器接电池。\n3. 给电池充电前，请确保电池包处于关闭状态，否则会损坏电池和充电器。\nRob\n4. 对电池包进行充电时，需要将电池包从机身内取出。\nUni\n5. 充电状态下电池包电量指示灯会按1Hz（1秒/次）频率闪烁，并指示当前电量。\n6. 电量指示灯全部熄灭时表示电池包已充满。请取下电池包和充电器，完成充电。"
+            },
+            {
+              "chunk_id": "B2-MANUAL-CHUNK-0016",
+              "chunk_text": "6. 电量指示灯全部熄灭时表示电池包已充满。请取下电池包和充电器，完成充电。\n7. 机器人运行结束后电池包温度可能较高，必须待电池包温度降至室温后再对电池包进行充电。\n©2023 宇树科技版权所有\n7"
+            }
+          ],
+          "evidence_summary": "①将电池从 B2 机身中取出；充电器先插入输入交流电源；(向外拉出电池包提带)",
+          "key_points": [
+            "①将电池从 B2 机身中取出",
+            "充电器先插入输入交流电源",
+            "(向外拉出电池包提带)",
+            "(100-240V,50/60Hz)"
+          ]
+        }
+      ]
+    },
+    {
+      "evidence_id": "EV-B2B-007",
+      "topic": "接触式充电流程",
+      "knowledge_type": "charging",
+      "question_potential": "single",
+      "document_id": "DOC-004",
+      "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 电池与充电器",
+      "page_start": 8,
+      "page_end": 8,
+      "section": "接触式充电器",
+      "source_chunk_ids": [
+        "B2-BATTERY-CHUNK-0010"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0010",
+          "chunk_text": "B2电池&充电器使用手册\ntics\n接触式充电器\n1. 充电前检查：在每次充电前，请检查 B2机身底部的充电电极是否有异物遮挡，以及充电板充电电极表\n面是否有异物遮挡。请使用干燥抹布擦拭充电电极表面，确保充电过程中良好接触。\n2. 连接电源：将 B2 接触式充电器放置在空旷室内，先将锂电池充电器接入输入交流电源，然后连接接触\n式充电板电源接口，如下图所示。\n交流电源\n①\n110-220V\nUn\n☐。\n②\nee Rdbotics\n接触式充电板\n锂电池充电器\n3. 充电：使用接触式充电器充电时，先用遥控器操控机器人按照充电板面贴方向卧倒，请勿反冲！使 B2\n机器人底部2个充电电极与充电板2个充电电极接触，实现充电。当电量充满时，会自动断开充电器与\n电池的连接。\nRobot\nbotics\nUnitre\n8"
+        }
+      ],
+      "evidence_summary": "接触式充电器；1. 充电前检查：在每次充电前，请检查 B2机身底部的充电电极是否有异物遮挡，以及充电板充电电极表；面是否有异物遮挡。请使用干燥抹布擦拭充电电极表面，确保充电过程中良好接触。",
+      "key_points": [
+        "接触式充电器",
+        "1. 充电前检查：在每次充电前，请检查 B2机身底部的充电电极是否有异物遮挡，以及充电板充电电极表",
+        "面是否有异物遮挡。请使用干燥抹布擦拭充电电极表面，确保充电过程中良好接触。",
+        "2. 连接电源：将 B2 接触式充电器放置在空旷室内，先将锂电池充电器接入输入交流电源，然后连接接触"
+      ]
+    },
+    {
+      "evidence_id": "EV-B2B-008",
+      "topic": "电池长期存放维护",
+      "knowledge_type": "maintenance",
+      "question_potential": "multi_chunk",
+      "document_id": "DOC-004",
+      "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+      "vendor": "宇树科技",
+      "product": "B2 电池与充电器",
+      "page_start": 11,
+      "page_end": 11,
+      "section": "存储和运输",
+      "source_chunk_ids": [
+        "B2-BATTERY-CHUNK-0017",
+        "B2-BATTERY-CHUNK-0018"
+      ],
+      "evidence_text": [
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0017",
+          "chunk_text": "存储和运输\nitre\n1. 不使用电池包时，请将电池包从机器人中取出并存放在儿童接触不到的地方。\n2. 禁止将电池包放在靠近热源的地方，比如阳光直射或热天的车内、火源或加热炉。电池包理想保存温度\n为 20℃-25℃，电池包理想保存环境湿度：45%-75%。\n3. 储存时，请注意确保电池周边的环境散热良好，没有杂物等易燃易爆物品。\n4. 存放电池包的环境应保持干燥。请勿将电池包置于水中或者可能会漏水的地方。\n5. 禁止机械撞击、碾压、刺穿电池包，禁止将电池包跌落或人为短路。\n6. 禁止将电池包与眼镜、手表、金属项链、发夹或者其他金属物体一起贮藏或运输。\n7. 切勿运输有破损的电池包。一旦需要运输电池包，务必将电池包放电至65%电量左右。\n8. 切勿将电池包彻底放完电后长时间存储，以避免电池包进入过放状态，造成电芯损坏，将无法恢复使用。\n●保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 40℃的环境下。"
+        },
+        {
+          "chunk_id": "B2-BATTERY-CHUNK-0018",
+          "chunk_text": "●保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 40℃的环境下。\n3. 切勿过充电池，否则将对电芯造成损害。\ntics\n若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于30%，请把电池充电到70%后\n再继续保存。以免电池过放而损坏电池。\nUni\n废弃\nRo\n鼓包、跌落、进水、破损等损坏的电池需要进行报废处理，不得继续使用，以免引起安全风险。务必将电\n池彻底放完电后，才将电池置于指定的电池回收箱中。电池是危险化学品，严禁废置于普通垃圾箱。相关细节，\n请遵循当地电池回收和弃置的法律法规。\n©2023 宇树科技版权所有\n11\nUnitr"
+        }
+      ],
+      "evidence_summary": "2. 禁止将电池包放在靠近热源的地方，比如阳光直射或热天的车内、火源或加热炉。电池包理想保存温度；为 20℃-25℃，电池包理想保存环境湿度：45%-75%。；3. 储存时，请注意确保电池周边的环境散热良好，没有杂物等易燃易爆物品。",
+      "key_points": [
+        "2. 禁止将电池包放在靠近热源的地方，比如阳光直射或热天的车内、火源或加热炉。电池包理想保存温度",
+        "为 20℃-25℃，电池包理想保存环境湿度：45%-75%。",
+        "3. 储存时，请注意确保电池周边的环境散热良好，没有杂物等易燃易爆物品。",
+        "4. 存放电池包的环境应保持干燥。请勿将电池包置于水中或者可能会漏水的地方。"
+      ]
+    }
+  ],
+  "quality_checks": {
+    "method": "固定种子 20260914；按 evidence_id 字典序以 LCG 排序取前 10 条。每条核对 Chunk 元数据、逐字 Chunk Text、摘要/要点与原始 PDF 页。",
+    "sample_size": 10,
+    "passed": 10,
+    "results": [
+      {
+        "evidence_id": "EV-KIRA-004",
+        "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+        "page_start": 17,
+        "page_end": 17,
+        "source_chunk_ids": [
+          "KIRA-B50-CHUNK-0036"
+        ],
+        "status": "Passed",
+        "checks": [
+          "Chunk ID uniquely resolved in chunks.json",
+          "Document, page, and section match selected chunk metadata",
+          "evidence_text equals current chunk_text",
+          "Summary and key points manually checked against source chunk and PDF page"
+        ]
+      },
+      {
+        "evidence_id": "EV-KIRA-008",
+        "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+        "page_start": 46,
+        "page_end": 46,
+        "source_chunk_ids": [
+          "KIRA-B50-CHUNK-0084"
+        ],
+        "status": "Passed",
+        "checks": [
+          "Chunk ID uniquely resolved in chunks.json",
+          "Document, page, and section match selected chunk metadata",
+          "evidence_text equals current chunk_text",
+          "Summary and key points manually checked against source chunk and PDF page"
+        ]
+      },
+      {
+        "evidence_id": "EV-KIRA-009",
+        "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+        "page_start": 46,
+        "page_end": 47,
+        "source_chunk_ids": [
+          "KIRA-B50-CHUNK-0085"
+        ],
+        "status": "Passed",
+        "checks": [
+          "Chunk ID uniquely resolved in chunks.json",
+          "Document, page, and section match selected chunk metadata",
+          "evidence_text equals current chunk_text",
+          "Summary and key points manually checked against source chunk and PDF page"
+        ]
+      },
+      {
+        "evidence_id": "EV-KIRA-011",
+        "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+        "page_start": 58,
+        "page_end": 58,
+        "source_chunk_ids": [
+          "KIRA-B50-CHUNK-0094"
+        ],
+        "status": "Passed",
+        "checks": [
+          "Chunk ID uniquely resolved in chunks.json",
+          "Document, page, and section match selected chunk metadata",
+          "evidence_text equals current chunk_text",
+          "Summary and key points manually checked against source chunk and PDF page"
+        ]
+      },
+      {
+        "evidence_id": "EV-KIRA-013",
+        "document_name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+        "page_start": 86,
+        "page_end": 86,
+        "source_chunk_ids": [
+          "KIRA-B50-CHUNK-0120"
+        ],
+        "status": "Passed",
+        "checks": [
+          "Chunk ID uniquely resolved in chunks.json",
+          "Document, page, and section match selected chunk metadata",
+          "evidence_text equals current chunk_text",
+          "Summary and key points manually checked against source chunk and PDF page"
+        ]
+      },
+      {
+        "evidence_id": "EV-B2M-001",
+        "document_name": "宇树_B2四足机器人用户手册_中文版.pdf",
+        "page_start": 10,
+        "page_end": 10,
+        "source_chunk_ids": [
+          "B2-MANUAL-CHUNK-0018",
+          "B2-MANUAL-CHUNK-0019"
+        ],
+        "status": "Passed",
+        "checks": [
+          "Chunk ID uniquely resolved in chunks.json",
+          "Document, page, and section match selected chunk metadata",
+          "evidence_text equals current chunk_text",
+          "Summary and key points manually checked against source chunk and PDF page"
+        ]
+      },
+      {
+        "evidence_id": "EV-B2R-001",
+        "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+        "page_start": 5,
+        "page_end": 5,
+        "source_chunk_ids": [
+          "B2-REMOTE-CHUNK-0006"
+        ],
+        "status": "Passed",
+        "checks": [
+          "Chunk ID uniquely resolved in chunks.json",
+          "Document, page, and section match selected chunk metadata",
+          "evidence_text equals current chunk_text",
+          "Summary and key points manually checked against source chunk and PDF page"
+        ]
+      },
+      {
+        "evidence_id": "EV-B2R-005",
+        "document_name": "宇树_B2遥控器使用说明_中文版.pdf",
+        "page_start": 4,
+        "page_end": 4,
+        "source_chunk_ids": [
+          "B2-REMOTE-CHUNK-0005"
+        ],
+        "status": "Passed",
+        "checks": [
+          "Chunk ID uniquely resolved in chunks.json",
+          "Document, page, and section match selected chunk metadata",
+          "evidence_text equals current chunk_text",
+          "Summary and key points manually checked against source chunk and PDF page"
+        ]
+      },
+      {
+        "evidence_id": "EV-B2B-003",
+        "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+        "page_start": 4,
+        "page_end": 4,
+        "source_chunk_ids": [
+          "B2-BATTERY-CHUNK-0005"
+        ],
+        "status": "Passed",
+        "checks": [
+          "Chunk ID uniquely resolved in chunks.json",
+          "Document, page, and section match selected chunk metadata",
+          "evidence_text equals current chunk_text",
+          "Summary and key points manually checked against source chunk and PDF page"
+        ]
+      },
+      {
+        "evidence_id": "EV-B2B-006",
+        "document_name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+        "page_start": 7,
+        "page_end": 7,
+        "source_chunk_ids": [
+          "B2-BATTERY-CHUNK-0009"
+        ],
+        "status": "Passed",
+        "checks": [
+          "Chunk ID uniquely resolved in chunks.json",
+          "Document, page, and section match selected chunk metadata",
+          "evidence_text equals current chunk_text",
+          "Summary and key points manually checked against source chunk and PDF page"
+        ]
+      }
+    ]
+  }
+}
