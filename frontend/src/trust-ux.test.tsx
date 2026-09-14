@@ -47,6 +47,7 @@ async function render(node: ReactNode) { await act(async () => root.render(node)
 function button(text: string) { const found = [...document.querySelectorAll("button")].find(item => item.textContent?.includes(text)); expect(found, `button: ${text}`).toBeTruthy(); return found!; }
 async function click(text: string) { await act(async () => button(text).click()); }
 function content() { return document.body.textContent || ""; }
+async function setExperimentQuestion(value: string) { const input = document.querySelector('[aria-label="试验问题"]') as HTMLTextAreaElement; await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); }); }
 
 describe("Question experiment trust and recovery", () => {
   it("waits for explicit submission and identifies live output separately from the seeded baseline", async () => {
@@ -62,15 +63,22 @@ describe("Question experiment trust and recovery", () => {
     expect(content()).not.toContain("本次真实回答");
     expect(content()).not.toContain("对同一机器人问题，查看基线版本与候选方案 B 的回答对照。");
     expect(content()).not.toContain("不上传原文件。提交问题后");
+    expect((document.querySelector('[aria-label="试验问题"]') as HTMLTextAreaElement).value).toBe("");
+    expect(button("发送").disabled).toBe(true);
+    await setExperimentQuestion("巡检机器人 B2 遥控器低电量时如何充电？");
     await click("发送");
     expect(content()).toContain("服务回答");
     expect(content()).toContain("test-model"); expect(content()).toContain("321 ms");
     expect(content()).toContain("Baseline");
     expect(content()).toContain("Top K");
+    expect(document.querySelectorAll(".experiment-results > .experiment-answer-card")).toHaveLength(2);
+    expect(document.querySelectorAll(".answer-scroll")).toHaveLength(2);
+    expect(document.querySelectorAll(".experiment-results > .run-parameters")).toHaveLength(2);
+    expect(document.querySelectorAll(".experiment-answer-card .run-parameters")).toHaveLength(0);
   });
   it("labels fallback output as a local response, then clears it on request failure and supports retry", async () => {
     post = () => ({ ...preview, mode: "mock", model: null, latency_ms: null, fallback_reason: "Provider 超时", candidate_b: { ...preview.candidate_b, answer: "本地回答样例" } });
-    await render(<App />); await click("问答试验"); await click("发送");
+    await render(<App />); await click("问答试验"); await setExperimentQuestion("巡检机器人 B2 遥控器低电量时如何充电？"); await click("发送");
     expect(content()).toContain("本地响应"); expect(content()).toContain("Provider 超时");
     expect(content()).not.toMatch(/Mock|模拟/);
     post = () => { throw new Error("网络中断"); };
@@ -81,7 +89,7 @@ describe("Question experiment trust and recovery", () => {
   });
   it("does not claim the Provider was never called when a failed attempt falls back to mock", async () => {
     post = () => ({ ...preview, mode: "mock", model: null, fallback_reason: "Provider 超时" });
-    await render(<App />); await click("问答试验"); await click("发送");
+    await render(<App />); await click("问答试验"); await setExperimentQuestion("巡检机器人 B2 遥控器低电量时如何充电？"); await click("发送");
     const result = document.querySelector(".experiment-results")?.textContent;
     expect(result).toContain("未返回有效模型回答");
     expect(result).not.toContain("未调用");
@@ -261,7 +269,7 @@ describe("Navigation, details and active version", () => {
     await render(<App />);
     for (let count = 0; count < 15; count += 1) {
       await click("新建对话");
-      await act(async () => ([...document.querySelectorAll("button.secondary")].find(item => item.textContent === "B2 遥控器低电量时如何充电？") as HTMLButtonElement).click());
+      await act(async () => ([...document.querySelectorAll("button.secondary")].find(item => item.textContent?.includes("B2 遥控器低电量时如何充电？")) as HTMLButtonElement).click());
     }
 
     expect(document.querySelectorAll(".conversation-item")).toHaveLength(15);
