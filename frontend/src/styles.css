@@ -167,9 +167,9 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .evidence-list > span { color: var(--muted); font-size: 11px; font-weight: 700; }
 .evidence-list .document-link { align-self: start; justify-self: start; text-align: left; }
 .experiment-results > .run-parameters { grid-row: 2; }
-.run-parameters { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 5px 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); justify-self: center; margin: 0; padding: 8px 10px; width: 66.667%; }
-.run-parameters div { padding: 0; }
-.run-parameters dt { color: var(--muted); font-size: 9px; margin-bottom: 2px; }
+.run-parameters { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 4px 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); justify-self: stretch; margin: 0; padding: 7px 10px; width: 100%; }
+.run-parameters div { min-width: 0; padding: 0; }
+.run-parameters dt { color: var(--muted); font-size: 9px; margin-bottom: 1px; }
 .run-parameters dd { font-size: 11px; font-weight: 650; margin: 0; overflow-wrap: anywhere; }
 
 .metric-groups { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); margin-bottom: 24px; }

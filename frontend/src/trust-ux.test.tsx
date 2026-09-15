@@ -87,6 +87,8 @@ describe("Question experiment trust and recovery", () => {
     expect(document.querySelectorAll(".experiment-results > .run-parameters")).toHaveLength(2);
     expect(document.querySelectorAll(".experiment-answer-card .run-parameters")).toHaveLength(0);
     expect(document.querySelector(".evidence-list .document-link")).not.toBeNull();
+    expect([...document.querySelectorAll(".experiment-results > .run-parameters")][1].querySelectorAll("dt")).toHaveLength(7);
+    expect([...document.querySelectorAll(".experiment-results > .run-parameters")][1].querySelectorAll("dt")[3]?.textContent).toBe("处理说明");
   });
   it("shows thinking time before typing both pipeline answers", async () => {
     vi.useFakeTimers();
