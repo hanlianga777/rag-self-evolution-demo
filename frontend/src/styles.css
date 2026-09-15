@@ -145,13 +145,14 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .question-input { display: grid; margin: 0; min-width: 0; }
 .question-input textarea { border: 1px solid #cfd7df; border-radius: 14px; font-size: 13px; min-height: 72px; outline-color: #526782; padding: 12px 14px; resize: vertical; width: 100%; }
 .question-input textarea::placeholder { color: #8a96a4; }
+.chat-composer input::placeholder { color: #8a96a4; }
 .question-input textarea:focus::placeholder, .chat-composer input:focus::placeholder { color: transparent; }
 .experiment-composer { display: flex; justify-content: flex-end; }
 .experiment-query > .error-notice { grid-column: 1 / -1; }
 .experiment-pipelines, .experiment-results { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
 .experiment-answer-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 7px 18px rgba(28, 39, 56, .035); min-width: 0; padding: 18px 20px; }
 .pipeline-selector { display: block; }
-.pipeline-selector select { background: #fafbfc; border: 1px solid #cfd7df; border-radius: 10px; color: var(--ink); font-size: 11px; padding: 8px 10px; width: 100%; }
+.pipeline-selector select { background: #fafbfc; border: 1px solid #cfd7df; border-radius: 10px; color: var(--ink); font-size: 11px; font-weight: 700; padding: 8px 10px; width: 100%; }
 .experiment-results { grid-template-rows: minmax(0, 1fr) auto; margin-top: 14px; min-height: 0; }
 .experiment-answer-card { display: grid; gap: 12px; grid-template-rows: auto minmax(0, 1fr); min-height: 0; overflow: hidden; padding: 14px; }
 .answer-card-header { background: transparent; border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; box-shadow: none; display: block; margin: 0 4px; padding: 0 0 10px; }
@@ -164,9 +165,9 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .experiment-thinking p { margin: 8px 0 0; }
 .evidence-list { align-items: flex-start; border-top: 1px solid var(--line-soft); display: grid; gap: 7px; padding-top: 12px; }
 .evidence-list > span { color: var(--muted); font-size: 11px; font-weight: 700; }
-.evidence-list .document-link { align-self: start; text-align: left; }
+.evidence-list .document-link { align-self: start; justify-self: start; text-align: left; }
 .experiment-results > .run-parameters { grid-row: 2; }
-.run-parameters { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 8px 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 10px 12px; width: 100%; }
+.run-parameters { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 5px 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); justify-self: center; margin: 0; padding: 8px 10px; width: 66.667%; }
 .run-parameters div { padding: 0; }
 .run-parameters dt { color: var(--muted); font-size: 9px; margin-bottom: 2px; }
 .run-parameters dd { font-size: 11px; font-weight: 650; margin: 0; overflow-wrap: anywhere; }
@@ -326,7 +327,7 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
   .experiment-answer-card { min-height: 260px; }
   .answer-scroll { overflow: visible; }
   .experiment-results > .run-parameters { grid-row: auto; }
-  .run-parameters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .run-parameters { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
   .metric-groups { grid-template-columns: 1fr; }
   .metric-group, .metric-group + .metric-group { border-left: 0; border-top: 1px solid var(--line-soft); padding: 14px 0 0; }
   .section-head, .filters, .dataset-flow { flex-wrap: wrap; }

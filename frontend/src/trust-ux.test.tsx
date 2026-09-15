@@ -74,6 +74,7 @@ describe("Question experiment trust and recovery", () => {
     const experimentInput = document.querySelector('[aria-label="试验问题"]') as HTMLTextAreaElement;
     expect(experimentInput.value).toBe("");
     expect(experimentInput.placeholder).toBe("请输入你的问题…");
+    expect(document.querySelector(".chat-composer input")?.getAttribute("placeholder")).toBe("请输入你的问题…");
     expect(button("发送").disabled).toBe(true);
     await setExperimentQuestion("巡检机器人 B2 遥控器低电量时如何充电？");
     await click("发送");
@@ -85,6 +86,7 @@ describe("Question experiment trust and recovery", () => {
     expect(document.querySelectorAll(".answer-scroll")).toHaveLength(2);
     expect(document.querySelectorAll(".experiment-results > .run-parameters")).toHaveLength(2);
     expect(document.querySelectorAll(".experiment-answer-card .run-parameters")).toHaveLength(0);
+    expect(document.querySelector(".evidence-list .document-link")).not.toBeNull();
   });
   it("shows thinking time before typing both pipeline answers", async () => {
     vi.useFakeTimers();
