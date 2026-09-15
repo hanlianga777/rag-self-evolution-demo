@@ -463,10 +463,10 @@
   - 可切换到振动模式。
   - 可切换到声音模式。
 - Acceptable Evidence：
-  - 宇树_B2遥控器使用说明_中文版.pdf（DOC-003，P.5–5，音效/震动开关）
+  - 宇树_B2遥控器使用说明_中文版.pdf（DOC-003，P.4–4，音效/震动切换）
     - 快速按 F3 3次。
-    - 切换振动或声音模式。
-    - 当前版本 trace：B2-REMOTE-CHUNK-0006
+    - 切换到振动模式或声音模式。
+    - 当前版本 trace：B2-REMOTE-CHUNK-0005
 - Source Evidence IDs：EV-B2R-006
 - Reviewer Note：需人工复核原始 PDF 的措辞与页码。
 
