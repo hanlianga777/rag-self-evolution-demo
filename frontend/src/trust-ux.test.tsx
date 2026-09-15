@@ -66,7 +66,9 @@ describe("Question experiment trust and recovery", () => {
     expect(content()).not.toContain("本次真实回答");
     expect(content()).not.toContain("对同一机器人问题，查看基线版本与候选方案 B 的回答对照。");
     expect(content()).not.toContain("不上传原文件。提交问题后");
-    expect((document.querySelector('[aria-label="试验问题"]') as HTMLTextAreaElement).value).toBe("");
+    const experimentInput = document.querySelector('[aria-label="试验问题"]') as HTMLTextAreaElement;
+    expect(experimentInput.value).toBe("");
+    expect(experimentInput.placeholder).toBe("请输入你的问题…");
     expect(button("发送").disabled).toBe(true);
     await setExperimentQuestion("巡检机器人 B2 遥控器低电量时如何充电？");
     await click("发送");
@@ -79,7 +81,21 @@ describe("Question experiment trust and recovery", () => {
     expect(document.querySelectorAll(".experiment-results > .run-parameters")).toHaveLength(2);
     expect(document.querySelectorAll(".experiment-answer-card .run-parameters")).toHaveLength(0);
   });
+  it("shows thinking time before typing both pipeline answers", async () => {
+    vi.useFakeTimers();
+    let complete: (result: unknown) => void = () => {};
+    post = () => new Promise(resolve => { complete = resolve; });
+    await render(<App />); await click("问答试验"); await setExperimentQuestion("巡检机器人 B2 遥控器低电量时如何充电？"); await click("发送");
+    expect(document.querySelectorAll(".experiment-thinking")).toHaveLength(2);
+    expect(document.querySelector(".experiment-thinking")?.textContent).toContain("0.0 秒");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1200); });
+    expect(document.querySelector(".experiment-thinking")?.textContent).toContain("1.2 秒");
+    await act(async () => { complete(preview); await Promise.resolve(); });
+    expect(document.querySelectorAll(".experiment-thinking")).toHaveLength(0);
+    expect(document.querySelectorAll(".experiment-answer-card .typing-cursor")).toHaveLength(2);
+  });
   it("labels fallback output as a local response, then clears it on request failure and supports retry", async () => {
+    vi.useFakeTimers();
     post = () => ({ ...preview, mode: "mock", model: null, latency_ms: null, fallback_reason: "Provider 超时", candidate_b: { ...preview.candidate_b, answer: "本地回答样例" } });
     await render(<App />); await click("问答试验"); await setExperimentQuestion("巡检机器人 B2 遥控器低电量时如何充电？"); await click("发送");
     expect(content()).toContain("本地响应"); expect(content()).toContain("Provider 超时");
@@ -88,7 +104,7 @@ describe("Question experiment trust and recovery", () => {
     await click("发送");
     expect(document.querySelector('[role="alert"]')?.textContent).toContain("网络中断");
     expect(content()).not.toContain("本地回答样例"); expect(button("发送").disabled).toBe(false);
-    post = () => preview; await click("发送"); expect(content()).toContain("本次真实回答");
+    post = () => preview; await click("发送"); await act(async () => { await vi.advanceTimersByTimeAsync(1000); }); expect(content()).toContain("本次真实回答");
   });
   it("does not claim the Provider was never called when a failed attempt falls back to mock", async () => {
     post = () => ({ ...preview, mode: "mock", model: null, fallback_reason: "Provider 超时" });
@@ -144,10 +160,10 @@ describe("Navigation, details and active version", () => {
     expect([...document.querySelectorAll('[aria-label="主导航"] button')].some(item => item.textContent === "问答试验")).toBe(true);
     expect(document.querySelector("header")).toBeNull();
   });
-  it("keeps the assistant question input visually blank", async () => {
+  it("shows a neutral placeholder in the assistant question input", async () => {
     await render(<App />);
 
-    expect((document.querySelector('[aria-label="向机器人知识库提问"]') as HTMLInputElement).placeholder).toBe("");
+    expect((document.querySelector('[aria-label="向机器人知识库提问"]') as HTMLInputElement).placeholder).toBe("请输入你的问题…");
   });
   it("sends a suggested question with one click", async () => {
     post = () => preview;
@@ -357,6 +373,11 @@ describe("Navigation, details and active version", () => {
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "missing"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     expect(content()).toContain("未找到匹配文档");
     expect(document.querySelector(".table-scroll table")).not.toBeNull();
+  });
+  it("pads the source document table to the golden dataset length", async () => {
+    await render(<KnowledgePage data={{ ...data, dataset: Array.from({ length: 4 }, (_, id) => ({ id })) }} />);
+
+    expect(document.querySelectorAll(".source-placeholder-row")).toHaveLength(3);
   });
   it("opens bad-case details through a native button", async () => {
     await render(<EvaluationPage data={data} navigate={() => {}} />); await click("BC-1"); expect(document.querySelector('[role="dialog"]')?.textContent).toContain("B2遥控器低电量时如何充电");

@@ -141,29 +141,35 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .chunk-card > small { display: block; }
 .chunk-card > .text-button { margin-top: 10px; }
 .trace { border-bottom: 1px solid var(--line-soft); display: grid; gap: 10px; grid-template-columns: 1fr 40px auto; padding: 9px 0; }
-.question-input { display: grid; font-size: 12px; font-weight: 700; gap: 6px; margin: 10px 0; }
-.question-input textarea { border: 1px solid #cfd7df; border-radius: 14px; min-height: 72px; outline-color: #526782; padding: 12px 14px; resize: vertical; width: 100%; }
+.experiment-query { align-items: end; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) auto; }
+.question-input { display: grid; margin: 0; min-width: 0; }
+.question-input textarea { border: 1px solid #cfd7df; border-radius: 14px; font-size: 13px; min-height: 72px; outline-color: #526782; padding: 12px 14px; resize: vertical; width: 100%; }
+.question-input textarea::placeholder { color: #8a96a4; }
+.question-input textarea:focus::placeholder, .chat-composer input:focus::placeholder { color: transparent; }
 .experiment-composer { display: flex; justify-content: flex-end; }
+.experiment-query > .error-notice { grid-column: 1 / -1; }
 .experiment-pipelines, .experiment-results { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
 .experiment-answer-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 7px 18px rgba(28, 39, 56, .035); min-width: 0; padding: 18px 20px; }
 .pipeline-selector { display: block; }
-.pipeline-selector select { background: #fafbfc; border: 1px solid #cfd7df; border-radius: 10px; color: var(--ink); padding: 8px 10px; width: 100%; }
+.pipeline-selector select { background: #fafbfc; border: 1px solid #cfd7df; border-radius: 10px; color: var(--ink); font-size: 11px; padding: 8px 10px; width: 100%; }
 .experiment-results { grid-template-rows: minmax(0, 1fr) auto; margin-top: 14px; min-height: 0; }
 .experiment-answer-card { display: grid; gap: 12px; grid-template-rows: auto minmax(0, 1fr); min-height: 0; overflow: hidden; padding: 14px; }
-.experiment-answer-card header { background: transparent; border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; box-shadow: none; display: block; padding: 0 0 10px; }
+.experiment-answer-card header { background: transparent; border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; box-shadow: none; display: block; margin: 0 4px; padding: 0 0 10px; }
 .answer-scroll { background: #f8fafb; border: 1px solid var(--line-soft); border-radius: 12px; min-height: 0; overflow-y: auto; padding: 12px; }
 .answer-scroll > .muted { margin: 0; }
 .answer-content { display: grid; gap: 9px; }
 .answer-content p { font-size: 13px; line-height: 1.7; margin: 0; white-space: pre-wrap; }
+.experiment-thinking { color: var(--muted); font-size: 12px; }
+.experiment-thinking time { font-variant-numeric: tabular-nums; }
+.experiment-thinking p { margin: 8px 0 0; }
 .evidence-list { align-items: flex-start; border-top: 1px solid var(--line-soft); display: grid; gap: 7px; padding-top: 12px; }
 .evidence-list > span { color: var(--muted); font-size: 11px; font-weight: 700; }
 .evidence-list .document-link { align-self: start; text-align: left; }
 .experiment-results > .run-parameters { grid-row: 2; }
-.run-parameters { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 0 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-self: center; margin: 0; padding: 10px 12px; width: 92%; }
-.run-parameters div { border-top: 1px solid var(--line-soft); padding: 8px 0; }
-.run-parameters div:nth-child(-n+2) { border-top: 0; padding-top: 0; }
-.run-parameters dt { color: var(--muted); font-size: 10px; margin-bottom: 3px; }
-.run-parameters dd { font-size: 12px; font-weight: 650; margin: 0; overflow-wrap: anywhere; }
+.run-parameters { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 8px 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 10px 12px; width: 100%; }
+.run-parameters div { padding: 0; }
+.run-parameters dt { color: var(--muted); font-size: 9px; margin-bottom: 2px; }
+.run-parameters dd { font-size: 11px; font-weight: 650; margin: 0; overflow-wrap: anywhere; }
 
 .metric-groups { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); margin-bottom: 24px; }
 .metric-group { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 7px 18px rgba(28, 39, 56, .035); min-height: 142px; padding: 18px; }
@@ -282,8 +288,7 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 @media (min-width: 761px) {
   .experiment-page { display: grid; gap: 14px; grid-template-rows: auto auto auto minmax(0, 1fr); height: 100vh; overflow: hidden; padding-bottom: 18px; }
   .experiment-page .page-title, .experiment-page .experiment-query, .experiment-page .experiment-pipelines, .experiment-page .experiment-results { margin: 0; }
-  .experiment-page .experiment-query { justify-self: start; padding: 14px 18px; width: min(760px, 100%); }
-  .experiment-page .question-input, .experiment-page .experiment-composer { max-width: 50%; }
+  .experiment-page .experiment-query { padding: 14px 18px; width: 100%; }
 }
 
 @media (max-width: 1100px) {
@@ -317,12 +322,11 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
   .experiment-pipelines, .experiment-results { grid-template-columns: 1fr; }
   .experiment-page { display: block; height: auto; overflow: visible; }
   .experiment-page .page-title, .experiment-page .experiment-query { margin-bottom: 22px; }
-  .experiment-page .question-input, .experiment-page .experiment-composer { max-width: none; }
   .experiment-results { grid-template-rows: auto; }
   .experiment-answer-card { min-height: 260px; }
   .answer-scroll { overflow: visible; }
   .experiment-results > .run-parameters { grid-row: auto; }
-  .run-parameters { width: 100%; }
+  .run-parameters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric-groups { grid-template-columns: 1fr; }
   .metric-group, .metric-group + .metric-group { border-left: 0; border-top: 1px solid var(--line-soft); padding: 14px 0 0; }
   .section-head, .filters, .dataset-flow { flex-wrap: wrap; }
