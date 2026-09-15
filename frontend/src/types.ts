@@ -24,6 +24,19 @@ export type Citation = {
   content_preview: string;
 };
 
+export type PipelinePreview = {
+  pipeline: "baseline" | "candidate_b";
+  question: string;
+  version: string;
+  answer: string;
+  latency_ms: number;
+  mode?: "live" | "mock";
+  model?: string | null;
+  fallback_reason?: string | null;
+  sources?: string[];
+  evidence?: Citation[];
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";

@@ -7,6 +7,7 @@ import { KnowledgePage } from "./pages/KnowledgePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { EvaluationPage } from "./pages/EvaluationPage";
 import { EvolutionPage } from "./pages/EvolutionPage";
+import type { PipelinePreview } from "./types";
 
 const versions = [
   { id: "v1.0", name: "Baseline", score: 72, status: "Active", settings: {} },
@@ -23,6 +24,9 @@ const data = {
 };
 const citation = { document_id: "doc-1", document: "B2遥控器使用说明.pdf", chunk_id: "B2-REMOTE-CHUNK-0005", section_path: "充电", page_start: 5, page_end: 5, score: 0.91, content_preview: "遥控器低电量时应连接充电器。" };
 const preview = { question: "B2遥控器低电量时如何充电？", mode: "live", model: "test-model", latency_ms: 321, fallback_reason: null, baseline: { version: "v1.0", answer: "旧基线样例" }, candidate_b: { version: "v1.2", answer: "本次真实回答", sources: ["B2遥控器使用说明.pdf · P.5 · B2-REMOTE-CHUNK-0005"], evidence: [citation] } };
+const baselinePreview: PipelinePreview = { pipeline: "baseline", question: preview.question, version: "v1.0", answer: "基线示例回答已移除；请查看基于真实 PDF 的候选检索结果。", sources: [], latency_ms: 12 };
+const candidatePreview: PipelinePreview = { pipeline: "candidate_b", question: preview.question, version: "v1.2", answer: "本次真实回答", sources: preview.candidate_b.sources, evidence: [citation], mode: "live", model: "test-model", latency_ms: 321, fallback_reason: null };
+const experimentPreview = (path: string) => path.endsWith("/baseline") ? baselinePreview : candidatePreview;
 let root: Root;
 let host: HTMLDivElement;
 let routes: Record<string, unknown>;
@@ -51,7 +55,7 @@ async function setExperimentQuestion(value: string) { const input = document.que
 
 describe("Question experiment trust and recovery", () => {
   it("waits for explicit submission and identifies live output separately from the seeded baseline", async () => {
-    post = () => preview;
+    post = experimentPreview;
     await render(<App />); await click("问答试验");
     expect(document.querySelector("h1")?.textContent).toBe("问答试验");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -63,6 +67,7 @@ describe("Question experiment trust and recovery", () => {
     expect(document.querySelector(".experiment-results")?.textContent).toContain("发送问题后显示 Pipeline A 的回答");
     expect(document.querySelector(".experiment-results")?.textContent).toContain("发送问题后显示 Pipeline B 的回答。");
     expect(document.querySelector(".experiment-results")?.textContent).not.toContain("发送问题后显示 Pipeline B 的回答与可追溯引用。");
+    expect(document.querySelectorAll(".experiment-results > .run-parameters")).toHaveLength(2);
     expect(content()).not.toContain("本次真实回答");
     expect(content()).not.toContain("对同一机器人问题，查看基线版本与候选方案 B 的回答对照。");
     expect(content()).not.toContain("不上传原文件。提交问题后");
@@ -83,20 +88,20 @@ describe("Question experiment trust and recovery", () => {
   });
   it("shows thinking time before typing both pipeline answers", async () => {
     vi.useFakeTimers();
-    let complete: (result: unknown) => void = () => {};
-    post = () => new Promise(resolve => { complete = resolve; });
+    const complete: ((result: unknown) => void)[] = [];
+    post = () => new Promise(resolve => { complete.push(resolve); });
     await render(<App />); await click("问答试验"); await setExperimentQuestion("巡检机器人 B2 遥控器低电量时如何充电？"); await click("发送");
     expect(document.querySelectorAll(".experiment-thinking")).toHaveLength(2);
     expect(document.querySelector(".experiment-thinking")?.textContent).toContain("0.0 秒");
     await act(async () => { await vi.advanceTimersByTimeAsync(1200); });
     expect(document.querySelector(".experiment-thinking")?.textContent).toContain("1.2 秒");
-    await act(async () => { complete(preview); await Promise.resolve(); });
+    await act(async () => { complete[0](baselinePreview); complete[1](candidatePreview); await Promise.resolve(); });
     expect(document.querySelectorAll(".experiment-thinking")).toHaveLength(0);
     expect(document.querySelectorAll(".experiment-answer-card .typing-cursor")).toHaveLength(2);
   });
   it("labels fallback output as a local response, then clears it on request failure and supports retry", async () => {
     vi.useFakeTimers();
-    post = () => ({ ...preview, mode: "mock", model: null, latency_ms: null, fallback_reason: "Provider 超时", candidate_b: { ...preview.candidate_b, answer: "本地回答样例" } });
+    post = path => path.endsWith("/baseline") ? baselinePreview : { ...candidatePreview, mode: "mock", model: null, latency_ms: 15, fallback_reason: "Provider 超时", answer: "本地回答样例" };
     await render(<App />); await click("问答试验"); await setExperimentQuestion("巡检机器人 B2 遥控器低电量时如何充电？"); await click("发送");
     expect(content()).toContain("本地响应"); expect(content()).toContain("Provider 超时");
     expect(content()).not.toMatch(/Mock|模拟/);
@@ -104,15 +109,37 @@ describe("Question experiment trust and recovery", () => {
     await click("发送");
     expect(document.querySelector('[role="alert"]')?.textContent).toContain("网络中断");
     expect(content()).not.toContain("本地回答样例"); expect(button("发送").disabled).toBe(false);
-    post = () => preview; await click("发送"); await act(async () => { await vi.advanceTimersByTimeAsync(1000); }); expect(content()).toContain("本次真实回答");
+    post = experimentPreview; await click("发送"); await act(async () => { await vi.advanceTimersByTimeAsync(1000); }); expect(content()).toContain("本次真实回答");
   });
   it("does not claim the Provider was never called when a failed attempt falls back to mock", async () => {
-    post = () => ({ ...preview, mode: "mock", model: null, fallback_reason: "Provider 超时" });
+    post = path => path.endsWith("/baseline") ? baselinePreview : { ...candidatePreview, mode: "mock", model: null, fallback_reason: "Provider 超时" };
     await render(<App />); await click("问答试验"); await setExperimentQuestion("巡检机器人 B2 遥控器低电量时如何充电？"); await click("发送");
     const result = document.querySelector(".experiment-results")?.textContent;
     expect(result).toContain("未返回有效模型回答");
     expect(result).not.toContain("未调用");
     expect(result).toContain("Provider 超时");
+  });
+  it("renders a completed baseline while the candidate remains thinking", async () => {
+    vi.useFakeTimers();
+    let resolveBaseline: (result: PipelinePreview) => void = () => {};
+    let resolveCandidate: (result: PipelinePreview) => void = () => {};
+    post = path => new Promise<PipelinePreview>(resolve => { if (path.endsWith("/baseline")) resolveBaseline = resolve; else resolveCandidate = resolve; });
+    await render(<App />); await click("问答试验"); await setExperimentQuestion(preview.question); await click("发送");
+
+    await act(async () => { resolveBaseline(baselinePreview); await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(content()).toContain("基线示例回答已移除");
+    expect(document.querySelectorAll(".experiment-thinking")).toHaveLength(1);
+    expect(document.querySelector(".experiment-results")?.textContent).toContain("12 ms");
+    await act(async () => { resolveCandidate(candidatePreview); await Promise.resolve(); });
+  });
+  it("keeps an experiment result after navigation without refresh", async () => {
+    post = experimentPreview;
+    await render(<App />); await click("问答试验"); await setExperimentQuestion(preview.question); await click("发送");
+    await click("概览"); await click("问答试验");
+
+    expect((document.querySelector('[aria-label="试验问题"]') as HTMLTextAreaElement).value).toBe(preview.question);
+    expect(content()).toContain("B2-REMOTE-CHUNK-0005");
   });
 });
 
