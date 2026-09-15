@@ -91,6 +91,19 @@ class DemoApiTests(unittest.TestCase):
         self.assertEqual(preview["mode"], "mock")
         self.assertIn("fallback_reason", preview)
 
+    def test_independent_preview_routes_return_flat_pipeline_results(self):
+        baseline = self.client.post("/api/preview/baseline", json={"question": "B2遥控器低电量时如何充电？"}).json()
+        candidate = self.client.post("/api/preview/candidate", json={"question": "B2遥控器低电量时如何充电？"}).json()
+
+        self.assertEqual(baseline["pipeline"], "baseline")
+        self.assertEqual(baseline["version"], "v1.0")
+        self.assertIsInstance(baseline["latency_ms"], int)
+        self.assertGreaterEqual(baseline["latency_ms"], 0)
+        self.assertEqual(candidate["pipeline"], "candidate_b")
+        self.assertEqual(candidate["evidence"][0]["chunk_id"], "B2-REMOTE-CHUNK-0005")
+        self.assertIsInstance(candidate["latency_ms"], int)
+        self.assertGreaterEqual(candidate["latency_ms"], 0)
+
     def test_live_evaluation_rejects_more_than_forty_cases(self):
         response = self.client.post("/api/evaluations/live", json={"limit": 41})
 
@@ -99,10 +112,12 @@ class DemoApiTests(unittest.TestCase):
     def test_preview_requires_a_bounded_strict_string(self):
         for question in (None, 1, True, [], {}, "", "   ", "问" * 1001):
             with self.subTest(question_type=type(question).__name__, length=len(question) if isinstance(question, str) else None):
-                response = self.client.post("/api/preview", json={"question": question})
-                self.assertEqual(response.status_code, 422)
+                for route in ("/api/preview", "/api/preview/baseline", "/api/preview/candidate"):
+                    response = self.client.post(route, json={"question": question})
+                    self.assertEqual(response.status_code, 422)
         for question in ("问", "问" * 1000):
-            self.assertEqual(self.client.post("/api/preview", json={"question": question}).status_code, 200)
+            for route in ("/api/preview", "/api/preview/baseline", "/api/preview/candidate"):
+                self.assertEqual(self.client.post(route, json={"question": question}).status_code, 200)
 
     def test_preview_keeps_vector_evidence_for_unrelated_question(self):
         response = self.client.post("/api/preview", json={"question": "MacBook 怎么开机？"})
@@ -122,7 +137,7 @@ class DemoApiTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/evaluations/live", json={}).status_code, 200)
 
     def test_untrusted_origins_cannot_trigger_paid_post_work(self):
-        routes = (("/api/preview", {"question": "问"}, "preview"), ("/api/evaluations/live", {"limit": 1}, "evaluate"), ("/api/ai-readiness/probe", {}, "probe"))
+        routes = (("/api/preview", {"question": "问"}, "preview"), ("/api/preview/baseline", {"question": "问"}, "baseline_preview"), ("/api/preview/candidate", {"question": "问"}, "candidate_preview"), ("/api/evaluations/live", {"limit": 1}, "evaluate"), ("/api/ai-readiness/probe", {}, "probe"))
         for route, payload, method in routes:
             for origin in ("https://evil.example", "null", "http://localhost:5174.evil.example", "http://localhost:3000"):
                 with self.subTest(route=route, origin=origin), patch.object(main.ai_service, method, return_value={}) as operation:

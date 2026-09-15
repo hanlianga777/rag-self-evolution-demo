@@ -40,38 +40,46 @@ class AiService:
         # Keep the historic response shape without reusing fake source answers.
         return {"question": question, "baseline": {"version": "v1.0", "answer": "基线示例回答已移除；请查看基于真实 PDF 的候选检索结果。", "sources": []}}
 
-    def preview(self, question: str) -> dict:
+    def baseline_preview(self, question: str) -> dict:
+        started_at = time.perf_counter()
+        baseline = self._preview_compatibility(question)["baseline"]
+        return {"pipeline": "baseline", "question": question, **baseline, "latency_ms": round((time.perf_counter() - started_at) * 1000)}
+
+    def candidate_preview(self, question: str) -> dict:
+        started_at = time.perf_counter()
         evidence = self.retriever.search(question)
         citations = [{key: value for key, value in item.items() if key != "content"} for item in evidence]
         sources = [f"{item['document']} · P.{item['page_start']} · {item['chunk_id']}" for item in evidence]
         if not evidence:
             answer = "当前机器人知识库没有足够证据回答该问题。"
             return {
-                **self._preview_compatibility(question),
+                "pipeline": "candidate_b",
+                "question": question,
+                "version": "v1.2",
+                "answer": answer,
                 "mode": "mock" if not self.live_enabled else "live",
                 "model": None if not self.live_enabled else self.provider.settings.model,
-                "latency_ms": 0,
+                "latency_ms": round((time.perf_counter() - started_at) * 1000),
                 "fallback_reason": "未配置 DEEPSEEK_API_KEY" if not self.live_enabled else None,
                 "retrieval": [],
-                "candidate_b": {"version": "v1.2", "answer": answer, "sources": [], "evidence": []},
+                "sources": [],
+                "evidence": [],
             }
         context = "\n".join(f"- {item['content']}" for item in evidence)
         if not self.live_enabled:
             return {
-                **self._preview_compatibility(question),
+                "pipeline": "candidate_b",
+                "question": question,
+                "version": "v1.2",
+                "answer": "已检索到以下官方 PDF 原文证据；未配置生成服务，因此不生成技术结论。",
                 "mode": "mock",
                 "model": None,
-                "latency_ms": None,
+                "latency_ms": round((time.perf_counter() - started_at) * 1000),
                 "fallback_reason": "未配置 DEEPSEEK_API_KEY",
                 "retrieval": citations,
-                "candidate_b": {
-                    "version": "v1.2",
-                    "answer": "已检索到以下官方 PDF 原文证据；未配置生成服务，因此不生成技术结论。",
-                    "sources": sources,
-                    "evidence": citations,
-                },
+                "sources": sources,
+                "evidence": citations,
             }
-        started_at = time.perf_counter()
         try:
             answer = self.provider.complete(
                 "你是机器人官方 PDF 知识助手。只能基于给定证据回答；证据不足时明确说明。回答使用中文，简洁、可执行。",
@@ -79,15 +87,33 @@ class AiService:
             )
         except ProviderUnavailable as error:
             return {
-                **self._preview_compatibility(question),
+                "pipeline": "candidate_b",
+                "question": question,
+                "version": "v1.2",
+                "answer": "生成服务不可用；以下为本地检索到的官方 PDF 原文证据。",
                 "mode": "mock",
                 "model": None,
-                "latency_ms": None,
+                "latency_ms": round((time.perf_counter() - started_at) * 1000),
                 "fallback_reason": str(error),
                 "retrieval": citations,
-                "candidate_b": {"version": "v1.2", "answer": "生成服务不可用；以下为本地检索到的官方 PDF 原文证据。", "sources": sources, "evidence": citations},
+                "sources": sources,
+                "evidence": citations,
             }
-        return {**self._preview_compatibility(question), "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000), "fallback_reason": None, "retrieval": citations, "candidate_b": {"version": "v1.2", "answer": answer, "sources": sources, "evidence": citations}}
+        return {"pipeline": "candidate_b", "question": question, "version": "v1.2", "answer": answer, "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000), "fallback_reason": None, "retrieval": citations, "sources": sources, "evidence": citations}
+
+    def preview(self, question: str) -> dict:
+        baseline = self.baseline_preview(question)
+        candidate = self.candidate_preview(question)
+        return {
+            "question": question,
+            "baseline": {key: baseline[key] for key in ("version", "answer", "sources")},
+            "mode": candidate["mode"],
+            "model": candidate["model"],
+            "latency_ms": candidate["latency_ms"],
+            "fallback_reason": candidate["fallback_reason"],
+            "retrieval": candidate["retrieval"],
+            "candidate_b": {key: candidate[key] for key in ("version", "answer", "sources", "evidence")},
+        }
 
     def evaluate(self, limit: int) -> dict:
         records = self.store.get("dataset")[:limit]

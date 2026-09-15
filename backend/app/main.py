@@ -140,6 +140,16 @@ def preview(payload: PreviewRequest):
     return ai_service.preview(payload.question)
 
 
+@app.post("/api/preview/baseline", dependencies=[Depends(require_trusted_origin)])
+def preview_baseline(payload: PreviewRequest):
+    return ai_service.baseline_preview(payload.question)
+
+
+@app.post("/api/preview/candidate", dependencies=[Depends(require_trusted_origin)])
+def preview_candidate(payload: PreviewRequest):
+    return ai_service.candidate_preview(payload.question)
+
+
 @app.post("/api/evaluations/live", dependencies=[Depends(require_trusted_origin)])
 def live_evaluation(payload: EvaluationRequest):
     return ai_service.evaluate(payload.limit)
