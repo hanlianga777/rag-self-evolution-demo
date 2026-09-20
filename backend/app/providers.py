@@ -46,15 +46,28 @@ class DeepSeekProvider:
 
     def judge(self, question: str, expected: str, answer: str) -> dict:
         content = self.complete(
-            "你是 RAG 评测 Judge。请只返回 JSON：{\"score\": 0-100, \"rationale\": \"中文理由\"}。",
+            "你是 RAG 评测 Judge。请只返回 JSON：{\"correctness\":0-4整数,\"completeness\":0-1数值,\"faithfulness\":0-1数值,\"behavior_pass\":布尔值,\"reason\":\"中文理由\",\"missing_points\":[],\"unsupported_claims\":[]}。",
             f"问题：{question}\n预期回答：{expected}\n实际回答：{answer}",
             json_mode=True,
         )
         try:
             result = json.loads(content)
-            score = result["score"]
-            if type(score) not in (int, float) or not 0 <= score <= 100 or not math.isfinite(score):
-                raise ValueError("Judge score must be a finite number between 0 and 100")
-            return {"score": float(score), "rationale": str(result["rationale"])}
+            correctness = result["correctness"]
+            completeness = result["completeness"]
+            faithfulness = result["faithfulness"]
+            behavior_pass = result["behavior_pass"]
+            if type(correctness) is not int or not 0 <= correctness <= 4:
+                raise ValueError("correctness must be an integer between 0 and 4")
+            if type(completeness) not in (int, float) or not 0 <= completeness <= 1 or not math.isfinite(completeness):
+                raise ValueError("completeness must be a finite number between 0 and 1")
+            if type(faithfulness) not in (int, float) or not 0 <= faithfulness <= 1 or not math.isfinite(faithfulness):
+                raise ValueError("faithfulness must be a finite number between 0 and 1")
+            if type(behavior_pass) is not bool:
+                raise ValueError("behavior_pass must be boolean")
+            missing = result.get("missing_points", [])
+            unsupported = result.get("unsupported_claims", [])
+            if not isinstance(missing, list) or not isinstance(unsupported, list):
+                raise ValueError("Judge list fields must be lists")
+            return {"correctness": correctness, "completeness": float(completeness), "faithfulness": float(faithfulness), "behavior_pass": behavior_pass, "reason": str(result["reason"]), "missing_points": [str(item) for item in missing], "unsupported_claims": [str(item) for item in unsupported]}
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
             raise ProviderUnavailable("DeepSeek Judge 未返回有效 JSON") from error

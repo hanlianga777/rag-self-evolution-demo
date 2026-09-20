@@ -2,18 +2,18 @@
 
 ## 运行时
 
-React/Vite 展示工作区，FastAPI 负责数据边界，SQLite 保存种子 JSON 并提供轻量本地持久化边界。`start.sh` 不依赖 Docker，同时启动两个进程。
+React/Vite 展示工作区，FastAPI 负责数据边界，SQLite 以增量 migration 保存治理、评测、实验与版本记录；旧 `demo_state` 保留但不再作为正式页面数据源。`start.sh` 不依赖 Docker，同时启动两个进程。
 
 ## 数据流
 
-`SeedStore → FastAPI routes → frontend API client → 产品页面`
+`Golden Draft → GovernanceStore → FastAPI routes → frontend API client → 产品页面`
 
-实验接口会创建内存中的重跑任务；轮询按耗时依次返回 `queued`、`running`、`evaluating`、`completed`。它不会改变生产配置，版本启用也只改变演示选择。
+Evaluation 固化 approved Question Snapshot、Production Config、Judge 元数据和逐题结果；后台线程只写 SQLite 运行记录。Optimization Agent 只能从真实 Bad Case 中生成 A/B/C，且只能使用 Tool Registry 的 available 参数。每个 Candidate 在 Baseline Snapshot 上独立回归，直到 Candidate Approval 与 Release Approval 都通过才会生成 Production Version；回滚只切换保留版本。
 
 ## Provider 边界
 
-当前 API 通过 `AiService` 提供 readiness、显式 probe、真实 Preview 与 live evaluation。`DeepSeekProvider` 使用官方 OpenAI-compatible Chat Completions；`LocalRetriever` 只在本地种子文档中检索证据。UI 组件不得直接调用 Provider，且 API Key 永不返回给前端。
+当前 API 通过 `AiService` 提供 readiness、显式 probe 与真实 Preview；`DeepSeekProvider` 使用官方 OpenAI-compatible Chat Completions，并对 Evaluation Judge / Optimization Agent 强制结构化 JSON。UI 组件不得直接调用 Provider，且 API Key 永不返回给前端。
 
 ## 评测与推荐
 
-基线评测覆盖全部 40 条黄金数据集记录。Candidate B 是满足条件的最优结果：质量、安全、延迟和 40/40 回归均通过，且没有新增回归。Candidate A 不满足延迟要求，Candidate C 不满足质量要求。
+正式评测只覆盖人工批准的 Golden Question；初始 40 题均为 Pending Review。Overall 使用 Draft Scoring Policy（Correctness 35%、Completeness 25%、Faithfulness 30%、Behavior/Safety 10%），红线独立于总分；无真实运行时没有推荐结果。

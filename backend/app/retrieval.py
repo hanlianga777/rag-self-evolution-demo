@@ -56,19 +56,21 @@ class VectorRetriever:
             self._model = None
             return False
 
-    def search(self, question: str, limit: int = TOP_K) -> list[dict]:
+    def search(self, question: str, limit: int = TOP_K, min_score: float | None = None) -> list[dict]:
         if not self._load():
             return []
         chunks = self.corpus.chunks()
         if not chunks:
             return []
         vector = self._model.encode([question], normalize_embeddings=True)
-        scores, positions = self._index.search(vector, TOP_K)
+        scores, positions = self._index.search(vector, limit)
         evidence = []
         for score, position in zip(scores[0], positions[0]):
             if position < 0 or position >= len(chunks):
                 continue
             chunk = chunks[int(position)]
+            if min_score is not None and float(score) < min_score:
+                continue
             evidence.append(
                 {
                     "document_id": chunk["document_id"],
@@ -84,4 +86,4 @@ class VectorRetriever:
                     "content": chunk.get("chunk_text", chunk["text"]),
                 }
             )
-        return evidence[:limit]
+        return evidence
