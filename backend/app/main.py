@@ -106,6 +106,8 @@ def review_question(question_id: str, payload: ReviewRequest):
         return store.review_question(question_id, payload.decision, payload.actor)
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.put("/api/governance/questions/{question_id}", dependencies=[Depends(require_trusted_origin)])
@@ -128,10 +130,17 @@ def probe_question(question_id: str):
 @app.post("/api/governance/questions/{question_id}/qc", dependencies=[Depends(require_trusted_origin)])
 def qc_question(question_id: str):
     try:
-        result = ai_service.quality_check(store.question(question_id))
+        item = store.question(question_id)
+        if item["probe_status"] != "probe_passed":
+            raise HTTPException(status_code=409, detail="Probe Passed 后才能运行 QC")
+        result = ai_service.quality_check(item)
         return store.record_qc(question_id, result, result["status"])
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except HTTPException:
+        raise
     except Exception as error:
         return store.record_qc(question_id, {"reason": str(error)}, "failed")
 

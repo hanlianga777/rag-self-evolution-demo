@@ -29,6 +29,10 @@ def _load(value, fallback):
         return fallback
 
 
+def _normalized(value: str) -> str:
+    return "".join(character.lower() for character in value if character.isalnum())
+
+
 class GovernanceStore:
     """Small persistence boundary; JSON keeps evidence and run snapshots immutable."""
 
@@ -56,7 +60,7 @@ class GovernanceStore:
                 CREATE TABLE IF NOT EXISTS questions (
                     id TEXT PRIMARY KEY, stage TEXT NOT NULL, legacy_question_type TEXT NOT NULL,
                     test_category TEXT NOT NULL, negative_subtype TEXT, review_status TEXT NOT NULL,
-                    probe_status TEXT NOT NULL, question TEXT NOT NULL, reference_answer TEXT,
+                    probe_status TEXT NOT NULL, qc_status TEXT NOT NULL, question TEXT NOT NULL, reference_answer TEXT,
                     evidence_json TEXT NOT NULL, raw_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS probe_results (id INTEGER PRIMARY KEY, question_id TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL);
@@ -83,9 +87,9 @@ class GovernanceStore:
                     category = "positive" if legacy_type.startswith("grounded") else "negative"
                     subtype = legacy_type if category == "negative" else None
                     connection.execute(
-                        "INSERT OR IGNORE INTO questions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT OR IGNORE INTO questions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (
-                            item["id"], "candidate", legacy_type, category, subtype, "human_review_pending", "probe_pending",
+                            item["id"], "candidate", legacy_type, category, subtype, "human_review_pending", "probe_pending", "qc_pending",
                             item["question"], item.get("reference_answer"), _json(item.get("acceptable_evidence", [])), _json(item), now, now,
                         ),
                     )
@@ -98,6 +102,21 @@ class GovernanceStore:
                     ("baseline-v1", "active", _json({"top_k": 4, "min_score": None}), None, None, None, None, now),
                 )
                 connection.execute("INSERT INTO schema_migrations VALUES (?, ?)", ("golden-draft-v1", now))
+            if not connection.execute("SELECT 1 FROM schema_migrations WHERE name = 'governance-flow-v2'").fetchone():
+                columns = {row[1] for row in connection.execute("PRAGMA table_info(questions)")}
+                if "qc_status" not in columns:
+                    connection.execute("ALTER TABLE questions ADD COLUMN qc_status TEXT NOT NULL DEFAULT 'qc_pending'")
+                connection.execute(
+                    """UPDATE questions SET qc_status = COALESCE((
+                        SELECT CASE status WHEN 'passed' THEN 'qc_passed' ELSE 'qc_failed' END
+                        FROM qc_results WHERE qc_results.question_id = questions.id ORDER BY id DESC LIMIT 1
+                    ), 'qc_pending')"""
+                )
+                invalid = connection.execute("SELECT id FROM questions WHERE stage = 'golden' AND (probe_status != 'probe_passed' OR qc_status != 'qc_passed')").fetchall()
+                for row in invalid:
+                    connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", ("candidate", "human_review_pending", _now(), row["id"]))
+                    connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (row["id"], "dataset", "workflow_repaired", "migration", _now()))
+                connection.execute("INSERT INTO schema_migrations VALUES (?, ?)", ("governance-flow-v2", _now()))
             for name, availability, description in (
                 ("top_k", "available", "调整向量检索返回条数"),
                 ("min_score", "available", "过滤低相关度向量结果"),
@@ -144,6 +163,9 @@ class GovernanceStore:
     def review_question(self, question_id: str, decision: str, actor: str):
         if decision not in {"approved", "rejected", "needs_revision"}:
             raise ValueError("Unsupported review decision")
+        current = self.question(question_id)
+        if decision == "approved" and (current["probe_status"] != "probe_passed" or current["qc_status"] != "qc_passed"):
+            raise ValueError("Probe Passed 和 QC Passed 后才能批准 Golden")
         status = "approved" if decision == "approved" else decision
         stage = "golden" if decision == "approved" else "candidate"
         with self.connection() as connection:
@@ -165,7 +187,7 @@ class GovernanceStore:
             return current
         raw = {**current["raw"], "question": question, "reference_answer": reference_answer, "acceptable_evidence": evidence}
         with self.connection() as connection:
-            connection.execute("UPDATE questions SET stage = ?, review_status = ?, probe_status = ?, question = ?, reference_answer = ?, evidence_json = ?, raw_json = ?, updated_at = ? WHERE id = ?", ("candidate", "human_review_pending", "probe_pending", question, reference_answer, _json(evidence), _json(raw), _now(), question_id))
+            connection.execute("UPDATE questions SET stage = ?, review_status = ?, probe_status = ?, qc_status = ?, question = ?, reference_answer = ?, evidence_json = ?, raw_json = ?, updated_at = ? WHERE id = ?", ("candidate", "human_review_pending", "probe_pending", "qc_pending", question, reference_answer, _json(evidence), _json(raw), _now(), question_id))
             connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (question_id, "dataset", "invalidated", actor, _now()))
             connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "invalidated", actor, _now()))
         return self.question(question_id)
@@ -178,37 +200,49 @@ class GovernanceStore:
             connection.execute("INSERT INTO dataset_versions VALUES (?, ?, ?, ?, ?)", (version_id, "approved", "human_review", _json(snapshot), _now()))
         return {"id": version_id, **snapshot}
 
-    def run_probe(self, question_id: str, retriever, chunks: list[dict], thresholds=None):
+    def run_probe(self, question_id: str, retriever, chunks: list[dict]):
         item = self.question(question_id)
-        thresholds = thresholds or {"high": 0.65, "medium": 0.35}
         evidence = item["evidence"]
         expected_chunks = {chunk_id for source in evidence for chunk_id in source.get("source_chunk_ids", [])}
         available_chunks = {chunk.get("chunk_id") for chunk in chunks}
         positive = item["test_category"] == "positive"
+        expected_behavior = item["raw"].get("expected_behavior")
         programmatic = {
             "question": bool(item["question"].strip()),
-            "reference_answer": bool(item["reference_answer"] or not positive),
-            "evidence": bool(evidence),
-            "source_chunks": expected_chunks.issubset(available_chunks),
+            "reference_answer": bool(item["reference_answer"]) if positive else True,
+            "expected_behavior": True if positive else expected_behavior in {"clarify", "insufficient_evidence"},
+            "evidence": bool(evidence) if positive else True,
+            "source_chunks": expected_chunks.issubset(available_chunks) if positive else True,
         }
         hits = retriever.search(item["question"], limit=4)
         best = max((hit.get("score", 0) for hit in hits), default=0)
-        signal = "high" if best >= thresholds["high"] else "medium" if best >= thresholds["medium"] else "low"
-        haystack = " ".join(chunk.get("text", chunk.get("chunk_text", "")) for chunk in chunks)
+        source_texts = {chunk.get("chunk_id"): chunk.get("text", chunk.get("chunk_text", "")) for chunk in chunks}
+        haystack = " ".join(source_texts.values())
         phrases = [point for source in evidence for point in source.get("evidence_key_points", [])]
-        full_text = {"matched": any(phrase and phrase in haystack for phrase in phrases), "phrases": phrases}
-        result = {"question_id": question_id, "programmatic": {"checks": programmatic, "passed": all(programmatic.values())}, "vector": {"top_k": hits, "best_similarity": best, "signal": signal, "thresholds": thresholds}, "full_text": full_text}
-        status = "probe_passed" if result["programmatic"]["passed"] else "needs_revision"
+        matched = [phrase for phrase in phrases if phrase and phrase in haystack]
+        source_checks = [{"chunk_id": chunk_id, "text_available": bool(source_texts.get(chunk_id, "").strip())} for chunk_id in sorted(expected_chunks)]
+        normalized_query = _normalized(item["question"])
+        corpus_matches = [chunk_id for chunk_id, text in source_texts.items() if normalized_query and normalized_query in _normalized(text)]
+        full_text = {"mode": "evidence" if positive else "behavior_only", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else bool(expected_behavior)}
+        passed = all(programmatic.values()) and full_text["passed"]
+        result = {"question_id": question_id, "programmatic": {"checks": programmatic, "passed": all(programmatic.values())}, "vector": {"top_k": hits, "best_similarity": best, "signal": "observed_only"}, "full_text": full_text, "passed": passed}
+        status = "probe_passed" if passed else "needs_revision"
         with self.connection() as connection:
             connection.execute("INSERT INTO probe_results(question_id, result_json, created_at) VALUES (?, ?, ?)", (question_id, _json(result), _now()))
-            connection.execute("UPDATE questions SET probe_status = ?, updated_at = ? WHERE id = ?", (status, _now(), question_id))
+            review_status = "needs_revision" if not passed else item["review_status"]
+            connection.execute("UPDATE questions SET probe_status = ?, review_status = ?, updated_at = ? WHERE id = ?", (status, review_status, _now(), question_id))
         return result
 
     def record_qc(self, question_id: str, result: dict, status: str):
-        self.question(question_id)
+        item = self.question(question_id)
+        if item["probe_status"] != "probe_passed":
+            raise ValueError("Probe Passed 后才能运行 QC")
+        qc_status = "qc_passed" if status == "passed" else "qc_failed"
         with self.connection() as connection:
-            connection.execute("INSERT INTO qc_results(question_id, status, result_json, created_at) VALUES (?, ?, ?, ?)", (question_id, status, _json(result), _now()))
-        return {"question_id": question_id, "status": status, "result": result}
+            connection.execute("INSERT INTO qc_results(question_id, status, result_json, created_at) VALUES (?, ?, ?, ?)", (question_id, qc_status, _json(result), _now()))
+            review_status = item["review_status"] if qc_status == "qc_passed" else "needs_revision"
+            connection.execute("UPDATE questions SET qc_status = ?, review_status = ?, updated_at = ? WHERE id = ?", (qc_status, review_status, _now(), question_id))
+        return {"question_id": question_id, "status": qc_status, "result": result}
 
     def qc_history(self, question_id: str):
         with self.connection() as connection:

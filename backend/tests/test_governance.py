@@ -20,7 +20,7 @@ class FakeRetriever:
             "page_start": 2,
             "page_end": 2,
             "score": 0.73,
-            "content": "第一次调试前完整阅读操作说明书。",
+            "content": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。",
         }]
 
 
@@ -39,8 +39,17 @@ class GovernanceStoreTests(unittest.TestCase):
         self.assertEqual(summary["approved"], 0)
         self.assertEqual(self.store.question("GGC-033")["negative_subtype"], "ambiguous")
         self.assertEqual(self.store.question("GGC-001")["review_status"], "human_review_pending")
+        self.assertEqual(self.store.question("GGC-001")["qc_status"], "qc_pending")
 
     def test_human_approval_creates_an_auditable_golden_snapshot(self):
+        with self.assertRaisesRegex(ValueError, "Probe"):
+            self.store.review_question("GGC-001", "approved", "local_user")
+
+        self.store.run_probe("GGC-001", FakeRetriever(), [{
+            "chunk_id": "KIRA-B50-CHUNK-0003",
+            "text": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。",
+        }])
+        self.store.record_qc("GGC-001", {"status": "passed", "issues": [], "reason": "证据自洽"}, "passed")
         self.store.review_question("GGC-001", "approved", "local_user")
 
         snapshot = self.store.create_dataset_snapshot()
@@ -50,23 +59,44 @@ class GovernanceStoreTests(unittest.TestCase):
         self.assertEqual(self.store.review_history("GGC-001")[0]["decision"], "approved")
 
     def test_changing_approved_question_evidence_or_answer_invalidates_approval(self):
+        self.store.run_probe("GGC-001", FakeRetriever(), [{"chunk_id": "KIRA-B50-CHUNK-0003", "text": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。"}])
+        self.store.record_qc("GGC-001", {"status": "passed", "issues": [], "reason": "证据自洽"}, "passed")
         approved = self.store.review_question("GGC-001", "approved", "local_user")
         changed = self.store.update_question(approved["id"], approved["question"], "已修改的答案", approved["evidence"], "local_user")
 
         self.assertEqual(changed["stage"], "candidate")
         self.assertEqual(changed["review_status"], "human_review_pending")
         self.assertEqual(changed["probe_status"], "probe_pending")
+        self.assertEqual(changed["qc_status"], "qc_pending")
 
     def test_probe_persists_independent_programmatic_vector_and_full_text_signals(self):
         result = self.store.run_probe("GGC-001", FakeRetriever(), [{
             "chunk_id": "KIRA-B50-CHUNK-0003",
-            "text": "第一次调试前完整阅读操作说明书。",
+            "text": "在您第一次使用设备之前，请先阅读原厂操作说明书并遵守。为后续使用或者为后续的车主保管好操作说明书。",
         }])
 
         self.assertTrue(result["programmatic"]["passed"])
-        self.assertEqual(result["vector"]["signal"], "high")
-        self.assertTrue(result["full_text"]["matched"])
+        self.assertEqual(result["vector"]["signal"], "observed_only")
+        self.assertTrue(result["full_text"]["passed"])
         self.assertEqual(self.store.question("GGC-001")["probe_status"], "probe_passed")
+
+    def test_failed_probe_or_qc_requires_revision_and_qc_cannot_skip_probe(self):
+        with self.assertRaisesRegex(ValueError, "Probe"):
+            self.store.record_qc("GGC-001", {}, "failed")
+
+        self.store.run_probe("GGC-001", FakeRetriever(), [])
+        self.assertEqual(self.store.question("GGC-001")["review_status"], "needs_revision")
+
+        self.store.run_probe("GGC-033", FakeRetriever(), [])
+        self.store.record_qc("GGC-033", {"reason": "题目需改写"}, "failed")
+        self.assertEqual(self.store.question("GGC-033")["qc_status"], "qc_failed")
+        self.assertEqual(self.store.question("GGC-033")["review_status"], "needs_revision")
+
+    def test_negative_probe_records_a_normalized_full_text_scan(self):
+        result = self.store.run_probe("GGC-039", FakeRetriever(), [{"chunk_id": "KIRA-B50-CHUNK-0003", "text": "机器人操作说明"}])
+
+        self.assertIn("normalized_query", result["full_text"])
+        self.assertEqual(result["full_text"]["corpus_match_chunk_ids"], [])
 
 
 class GovernanceApiTests(unittest.TestCase):
@@ -78,14 +108,14 @@ class GovernanceApiTests(unittest.TestCase):
         self.addCleanup(setattr, main, "store", self.previous_store)
         self.client = TestClient(main.app)
 
-    def test_governance_endpoints_expose_candidates_and_persist_human_review(self):
+    def test_governance_endpoints_block_review_until_probe_and_qc_pass(self):
         summary = self.client.get("/api/governance/summary").json()
         review = self.client.post("/api/governance/questions/GGC-001/review", json={"decision": "approved"})
 
         self.assertEqual(summary["total"], 40)
         self.assertEqual(summary["approved"], 0)
-        self.assertEqual(review.status_code, 200)
-        self.assertEqual(review.json()["stage"], "golden")
+        self.assertEqual(review.status_code, 409)
+        self.assertIn("Probe", review.json()["detail"])
         self.assertEqual(self.client.get("/api/dataset").json()[0]["id"], "GGC-001")
 
 
@@ -105,8 +135,13 @@ class EvaluationRunnerTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / "demo.db")
 
-    def test_runner_uses_only_approved_snapshot_and_persists_real_case_results(self):
+    def approve_one(self):
+        self.store.run_probe("GGC-001", FakeRetriever(), [{"chunk_id": "KIRA-B50-CHUNK-0003", "text": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。"}])
+        self.store.record_qc("GGC-001", {"status": "passed", "issues": [], "reason": "证据自洽"}, "passed")
         self.store.review_question("GGC-001", "approved", "local_user")
+
+    def test_runner_uses_only_approved_snapshot_and_persists_real_case_results(self):
+        self.approve_one()
         run = EvaluationRunner(self.store, FakeEvaluationRuntime()).run_baseline()
 
         self.assertEqual(run["status"], "completed")
@@ -120,7 +155,7 @@ class EvaluationRunnerTests(unittest.TestCase):
             EvaluationRunner(self.store, FakeEvaluationRuntime()).run_baseline()
 
     def test_candidate_run_reuses_the_completed_baseline_snapshot_and_keeps_production_unchanged(self):
-        self.store.review_question("GGC-001", "approved", "local_user")
+        self.approve_one()
         baseline = EvaluationRunner(self.store, FakeEvaluationRuntime()).run_baseline()
         experiment_id = self.store.create_experiment(baseline["id"])
         self.store.save_candidate(experiment_id, "A", {"top_k": 6, "min_score": None}, {"hypothesis": "扩大召回"})
@@ -132,7 +167,7 @@ class EvaluationRunnerTests(unittest.TestCase):
         self.assertEqual(self.store.active_production()["id"], "baseline-v1")
 
     def test_approved_candidate_can_publish_then_roll_back_without_overwriting_history(self):
-        self.store.review_question("GGC-001", "approved", "local_user")
+        self.approve_one()
         baseline = EvaluationRunner(self.store, FakeEvaluationRuntime()).run_baseline()
         experiment_id = self.store.create_experiment(baseline["id"])
         candidate_id = f"{experiment_id}-A"
