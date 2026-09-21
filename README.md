@@ -4,6 +4,17 @@
 
 RAG Evolution 是一个面向机器人官方 PDF 知识问答的本地 Demo，提供「可追溯资料 → 人工复核数据集 → 基线评测 → 问题案例证据 → 受限 A/B/C 候选 → 独立 Sandbox 回归 → 人工发布/回滚」的可审计基础闭环。
 
+## Current Project Stage
+
+本项目当前处于 **SPEC Design / Product Definition** 阶段。
+
+- **Current Implementation：** 本 README 所述的现有 Demo 与运行时能力。
+- **Target Source of Truth：** 下一版产品需求以 [RAG Self-Evolution SPEC](docs/RAG_SELF_EVOLUTION_SPEC.md) 为唯一正式来源，变更历史见 [SPEC ChangeLog](docs/SPEC_CHANGELOG.md)。
+- **SPEC Version：** V0.2 — Core Lifecycle。
+- **Current Status：** Core Lifecycle Confirmed · Detailed Parameters Pending · Implementation NOT Authorized。
+- **Implementation Rule：** Current Implementation 与 Target SPEC 存在差异属于正常状态；SPEC V1.0 Frozen 前，禁止因这些差异自行修改业务代码。
+- **Future GPT / Codex / SpecKit Rule：** 后续工作必须优先读取上述两份 SPEC 文档，不得重新推导已确认决策；产品讨论应优先围绕 `[OPEN]` / `[TBD]` 项目推进。
+
 ## 业务与技术架构
 
 ![RAG Evolution 业务流程图](架构/业务流程图.png)
