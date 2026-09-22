@@ -1,8 +1,8 @@
 # RAG Self-Evolution Platform 产品规格
 
 > **唯一正式 Source of Truth**
-> **SPEC Version：V0.2 — Core Lifecycle**
-> **Status：Core Lifecycle Confirmed · Detailed Parameters Pending · Implementation NOT Authorized**
+> **SPEC Version：V0.3 — Optimization Agent & Search Space**
+> **Status：Core Lifecycle + Optimization Agent & Search Space Confirmed · Detailed Parameters Pending · Implementation NOT Authorized**
 
 ## 1. 文档地位与使用规则
 
@@ -21,8 +21,8 @@
 
 核心职责边界：
 
-- Evaluation 负责识别 Bad Case。
-- Optimization Agent 不主动寻找 Bad Case；它从已经被 Evaluation 识别出的 Bad Case 开始，依次进行 Diagnosis、Hypothesis、Candidate Generation、Experiment 与 Recommendation。
+- Evaluation 负责识别评测中的 Bad Case；Monitoring 可自动识别新 Bad Case 或异常 Signal，并仅生成待处理 Optimization Trigger。
+- Optimization Agent 不主动寻找 Bad Case；它从 Evaluation Bad Case 或经 Human Confirm 的 Monitoring Trigger 开始，依次进行 Diagnosis、Hypothesis、Candidate Generation、Experiment 与 Recommendation。
 
 完整产品主线：
 
@@ -125,6 +125,28 @@ Probe 出现 `RETRIEVAL_INCOHERENT` 不等同题目失败；若 Evidence 存在�
 
 Baseline 是当前 Production Pipeline 在固定 Golden Snapshot、固定 Judge Model、固定 Evaluation Rules、固定 Metrics Version 下的一次正式 Evaluation。它不是永远固定的初始版本；Candidate 发布为新的 Production 后，新 Production 成为下一轮优化的 Baseline。
 
+在一次 Optimization Run 中，Baseline 是固定对照组。Candidate A/B/C 的变化不得反向修改 Baseline。
+
+V0.3 Target Baseline 默认参数如下；它们是 Target SPEC，不表示 Current Implementation 已支持：
+
+| Parameter | Target Baseline |
+| --- | --- |
+| CandidateK | `12` |
+| TopK | `4` |
+| MinScore | `0` |
+| Hybrid Search | `ON` |
+| Hybrid Alpha | `0.5` |
+| Rerank | `ON` |
+| Query Rewrite | `OFF` |
+| MultiQuery | `OFF` |
+| HyDE | `OFF` |
+| Metadata Filter | `OFF` / 不全局强制 |
+| Alias Mapping | `OFF` |
+| Generation Prompt | 当前 Baseline Prompt |
+| Temperature | `0.2` |
+
+`CandidateK` 是初始召回的候选 Chunk 数；`Rerank` 对候选 Chunk 重新做相关性排序；`TopK` 是最终进入生成模型上下文的 Chunk 数。例如 `CandidateK=12 → Rerank → TopK=4` 表示先召回 12 个候选，经重排后选取 4 个生成证据。V0.3 不新增 `Rerank TopN`。
+
 ### 7.2 Evaluation Framework
 
 | Dimension | Metrics / 关注点 | 回答的问题 |
@@ -140,7 +162,7 @@ Overall Score 可用于 Dashboard、Before / After 与 Candidate Comparison 的�
 
 ### 7.3 Bad Case Detection
 
-Bad Case 由 Evaluation 自动识别，不能以单一 Overall Score 阈值定义；不同 Question Type 使用不同失败规则。单个 Bad Case 可同时拥有多个 Failure Tag，例如：
+Bad Case 可由 Evaluation 自动识别；Monitoring 识别到新 Bad Case 或异常 Signal 时仅生成待处理 Optimization Trigger，须经 Human Confirm 才能启动 Agent。Bad Case 不能以单一 Overall Score 阈值定义；不同 Question Type 使用不同失败规则。单个 Bad Case 可同时拥有多个 Failure Tag，例如：
 
 - Retrieval Failure
 - Ranking Failure
@@ -153,59 +175,158 @@ Bad Case 由 Evaluation 自动识别，不能以单一 Overall Score 阈值定�
 
 Evaluation 识别“哪里失败”，Optimization Agent 分析“为什么失败”。
 
-## 8. Optimization、Sandbox 与 Recommendation `[CONFIRMED]`
+## 8. Optimization Agent 与 Search Space `[CONFIRMED]`
 
-### 8.1 Agent Input 与 Diagnosis
+### 8.1 Run、Diagnosis 与 Bad Case Cluster
 
-每次 Optimization Run 至少输入 Baseline Report、Bad Case Set、Per-Case Evidence、Production Pipeline Snapshot、Golden Snapshot、Allowed Search Space 与 Constraints。Per-Case Evidence 可包含 Golden Evidence、Actual Retrieved Chunks、Rank、Similarity、Answer、Citation、Metrics 与 Failure Tags。
+Optimization Agent 的完整逻辑为：
 
-Agent 不得修改 Golden Answer、删除失败题、修改 Golden Snapshot 或通过修改考试数据提高成绩。程序优先提供确定性 Observations，Agent 必须基于 `Observed Evidence → Root Cause Diagnosis → Hypothesis → Proposed Change` 推理，不能跳过 Evidence 凭感觉调参。
+`Baseline Evaluation → Bad Case → Bad Case Cluster → Root Cause → Optimization Hypothesis → A/B/C Candidates → Sandbox Evaluation → Regression / Safety / Performance / Red Line → Conditional Composite Candidate D → Recommendation → Human Release Gate → Production Version → Monitoring / Rollback`
 
-典型诊断方向包括：Golden Evidence 未进入 Candidate Pool 对应 Recall / Query Understanding；已进入但排名靠后对应 Ranking；跨产品错误召回对应 Product Confusion；Golden Evidence Rank 1 但 Answer 错误对应 Generation / Prompt。
+每次 Optimization Run 至少输入 Baseline Evaluation Result、Bad Case Set、Retrieved Chunks、Similarity / Ranking、Final Answer、LLM Judge、Bad Case Label、Evidence Match、Product / Document Group Result、Production Pipeline Snapshot、Golden Snapshot、Allowed Search Space 与 Constraints。
 
-### 8.2 Candidate A/B/C 与 Conditional D
+Agent 不得修改 Golden Answer、删除失败题、修改 Golden Snapshot 或通过修改考试数据提高成绩。它必须基于 `Observed Evidence → Root Cause Diagnosis → Hypothesis → Proposed Change` 推理，不能因最终 Answer 错误而随机调参。
 
-每个 Candidate 必须是一条可解释的 Hypothesis 加最小必要参数集合；“Search Space 覆盖多种优化能力”不等同于每个 Candidate 必须修改三项以上参数。A/B/C 不是随机参数组合。
+Root Cause 先判断问题层级：Query、Retrieval、Ranking、Metadata / Entity、Generation、Safety、Performance。一个 Bad Case 可有多个 Root Cause，必须记录 Primary Root Cause 与 Secondary Root Cause，并优先围绕 Primary Root Cause 设计 Candidate。
 
-Candidate D 不是固定存在。仅当 A/B/C 分别验证出可组合的有效能力时，Agent 可条件生成 Composite D；D 必须重新执行完整 Sandbox 与 Regression，不能因组成部分有效而自动认定最优。无组合价值时不生成 D。
+Agent 优先按 Root Cause / Problem Pattern 聚类 Bad Case，例如 Retrieval Miss、Cross-product Confusion、Ranking Error、Answer Incomplete、Hallucination、Over-refusal、Unsafe Answer、Performance Issue。同一 Cluster 使用共同 Hypothesis；不建议每题独立启动完整 Optimization Run。
 
-### 8.3 Sandbox 与 Regression
+### 8.2 One Candidate 与 A/B/C Generation
 
-Sandbox 是不影响 Production 的隔离实验环境。同一 Optimization Run 中 Baseline、A/B/C 和条件触发的 D 必须锁定同一 Golden Snapshot、Judge Model、Judge Rules、Evaluation Metrics Version 与运行环境；仅 Candidate Pipeline Snapshot 可变。
+`One Candidate = One Explainable Hypothesis + Minimum Necessary Parameter Set`。它不限制 Candidate 只能修改一个参数：可修改一个参数、多个相关参数，或在存在明确理由时跨多个能力调整。判断标准是参数是否共同服务于清晰、可解释的 Hypothesis；禁止无原因地把大量能力全部开启碰运气。
 
-Sandbox 必须保留 Config Diff、Per-Question Result、Retrieval Evidence、Answer、Metrics、Latency、Token、Cost 与 Bad Case Changes，不能只保存 Overall Score。
+每轮 Agent 必须生成 Candidate A、Candidate B、Candidate C 三个并列 Candidate：
 
-Regression 独立版本化，来源可包括历史 Approved Golden、关键业务题、Safety Cases 与历史已修复的重要 Bad Cases；状态至少为 Still Pass、Recovered、Still Fail、Regressed。其问题是“修复当前 Bad Case 是否破坏既有正常能力”。
+- A/B/C 不是 A → B → C 的逐级叠加，而是三个不同、可解释的 Hypothesis / Strategy。
+- 它们可针对相同 Root Cause 使用不同解决策略，也可使用不同参数组合，但不得机械穷举数字。
+- 即使当前轮的 A 先满足 Release Gate，也必须完成当轮 A/B/C 的 Evaluation 后再统一比较。
 
-### 8.4 Recommendation 与 Human-in-the-loop
+每个 Candidate 必须记录 Candidate ID、Related Bad Case Cluster、Primary / Secondary Root Cause、Optimization Hypothesis、Parameter Diff、Why This Parameter Set、Expected Metric Improvement、Potential Risk、Full Pipeline Snapshot、Evaluation Result 与 Failure Reason。
 
-最高 Sandbox Overall Score 不等于自动推荐发布。Recommendation 必须综合 Bad Case Recovery、Regression、Safety Gate、Performance Gate、Latency、Cost 与 Config Complexity，并输出 Recommended Candidate、Reason、Recovered Bad Cases、New Regressions、Safety Result、Latency / Cost Impact、Config Diff 与 Risk。
+### 8.3 V0.3 自动 Search Space
 
-系统可自动进行分析、Hypothesis、Candidate、Sandbox、Regression 与 Recommendation；正式 Production Release 必须保留 Human Approval。Recommendation 不等于自动 Release。
+| Capability | Baseline | Allowed Search Space | 适用范围与约束 |
+| --- | --- | --- | --- |
+| CandidateK | `12` | `12 / 24` | Retrieval Miss、Evidence Coverage Insufficient 时可扩大初始召回深度。 |
+| TopK | `4` | `4 / 6` | Retrieval Miss、Evidence Coverage Insufficient、Multi-chunk Evidence 不完整时可提高最终生成证据数。 |
+| MinScore | `0` | `0 / 0.1 / 0.2 / 0.3` | 仅低相关噪声、误回答、知识边界等 Root Cause 时调整；提高可降噪，也可能误删真实 Evidence 并降低 Recall。 |
+| Hybrid Search | `ON` | `ON / OFF` | Vector + BM25 / Keyword Search；由 Root Cause 决定，非每轮穷举。 |
+| Hybrid Alpha | `0.5` | `0.3 / 0.5 / 0.7` | 仅 Hybrid ON 时有效；`0.3` 偏 Keyword / BM25，`0.5` 平衡，`0.7` 偏向量语义。 |
+| Rerank | `ON` | `ON / OFF` | 可因 Ranking Error、Performance、Latency 与实际收益调整；Rerank Model 固定。 |
+| Query Rewrite | `OFF` | `OFF / ON` | Retrieval 前执行，适用于口语化表达、Query 与知识库标准表达偏差、Query 导致检索偏移。 |
+| MultiQuery | `OFF` | `OFF / 2 / 4 / 6` | 开启后生成对应数量的扩展 Query，必须保留原始 Query；可改善单一问法召回不足，也可能引入扩展噪声。 |
+| HyDE | `OFF` | `OFF / ON` | Query 与文档表达差异大、直接向量检索召回不足时，用 Hypothetical Answer / Document Representation 辅助 Retrieval。 |
+| Metadata Filter | `OFF` / 不全局强制 | `OFF / STRICT / FALLBACK` | 重点字段为 `product`、`version`、`vendor`，后续 Metadata 完整可扩展 `document_type`。 |
+| Alias Mapping | `OFF` | `OFF / ON` | 使用版本化 Dictionary 做 Entity / Terminology Normalization，不等同 Query Rewrite。 |
+| Prompt Strategy | 当前 Baseline Prompt | Grounded / Completeness / Abstention | 受控修改 Prompt，不允许每轮完全自由生成新 Prompt。 |
 
-## 9. Release、Version 与 Monitoring `[CONFIRMED]`
+CandidateK 与 TopK 可作为同一 Candidate 的参数组合，例如 `CandidateK 12 → 24` 加 `TopK 4 → 6`，前提是共同服务于“扩大 Retrieval Depth / Evidence Coverage”这一 Hypothesis。
 
-### 9.1 Release / Version
+Metadata Filter 的 `STRICT` 在识别到可靠 Metadata 后仅检索对应范围；`FALLBACK` 优先过滤，但无结果、结果不足或 Evidence Coverage 不足时退回更宽范围。它用于 Cross-product、Cross-version、Vendor Confusion；实体识别不明确时不得强制过滤到某产品。
+
+Alias Mapping 可启用既有版本化 Dictionary，也可提议新增 Mapping；新增 Mapping 必须审核后才正式生效。示例包括“手柄 → B2 遥控器”“B2遥控 → B2 遥控器”“Dock → 充电座”。
+
+Prompt Strategy 的边界：Grounded 处理 Hallucination、脱离 Evidence 的补充与引用不严谨；Completeness 处理 Evidence 已召回完整但回答漏步骤、限制条件或关键事实；Abstention 处理 Unanswerable / Negative、Evidence 不足仍强答与知识边界不足。每次 Prompt Optimization 必须保存 Original Prompt、New Prompt、Strategy、Prompt Diff、Change Reason、Related Bad Case、Root Cause、Version、Sandbox Result。
+
+### 8.4 明确排除的自动 Search Space
+
+以下能力可继续存在于 Pipeline Config，但 V0.3 Agent 不自动修改：
+
+- Parser / OCR：MinerU、OCR、VLM Parser、Table Normalize 等。
+- Chunk：Chunk Method、Section-aware、Parent-Child、Page-level、Chunk Size、Child / Parent Chunk Size、Chunk Overlap。
+- Embedding Model：固定；不自动 Re-embedding 或重建 Index。
+- Generation Model：固定；不自动切换 DeepSeek、Qwen 等。
+- Rerank Model：固定；仅允许 Rerank ON/OFF。
+- Temperature：固定为 `0.2`。
+- Query Decompose：Pipeline Future Capability，不进入自动 Search Space。
+- Retrieval MaxTokens：保留为 Pipeline Config，不进入自动 Search Space。
+- Rerank TopN：V0.3 不新增且不自动修改。
+
+### 8.5 Root Cause → Search Guidance
+
+此映射是 Candidate Generation 的候选范围，不要求全部执行：
+
+| Root Cause | 可考虑的能力 |
+| --- | --- |
+| Retrieval Miss | CandidateK、TopK、HyDE、MultiQuery、Hybrid、Hybrid Alpha |
+| Cross-product / Version Confusion | Metadata Filter、Alias Mapping、Rerank |
+| Ranking Error | Rerank、Retrieval Strategy、Hybrid Strategy |
+| Answer Incomplete | Prompt Completeness、TopK |
+| Hallucination | Grounded Prompt、MinScore |
+| Over-refusal / Unanswerable Handling | Abstention Prompt、MinScore |
+
+### 8.6 Parameter Validation 与 Candidate 去重
+
+Candidate 进入 Sandbox 前必须通过 Parameter Rule Check：参数属于合法 Search Space、未修改禁止参数、参数依赖满足、参数值合法、无明显冲突且不重复历史 Candidate。非法 Candidate 不进入 Sandbox，直接要求 Agent 重新生成。
+
+依赖规则：Hybrid Alpha 只在 Hybrid ON 时有效；`MultiQuery = 2 / 4 / 6` 表示已开启 MultiQuery；Metadata Filter 的 STRICT / FALLBACK 只在 Filter 启用后有意义。
+
+Agent 在生成新 Candidate 前必须查询历史。相同 Hypothesis 加相同 Parameter Combination 已运行时禁止重复执行；失败 Candidate 也必须保留，以避免重复踩坑。
+
+### 8.7 Sandbox、Regression、max_evals 与停止条件
+
+Sandbox 是不影响 Production 的隔离实验环境。A/B/C 必须使用同一 Baseline Snapshot、Golden Dataset Snapshot、Evaluation Rules 与 Release Gate；技术上可并行或顺序执行，但在产品语义上是并列实验。
+
+每次 Candidate Evaluation 至少保存：
+
+1. Pipeline Snapshot
+2. Golden / Evaluation Snapshot
+3. Overall Score
+4. Positive、Ablation、Negative Metrics
+5. Product / Document Group Metrics
+6. Per-question Result
+7. Bad Case Fix Result
+8. Latency、Token、Cost
+9. Regression、Safety、Performance、Red Line Result
+10. Pass / Fail 与 Failure Reason
+
+Regression 独立版本化，来源可包括历史 Approved Golden、关键业务题、Safety Cases 与历史已修复的重要 Bad Cases；状态至少为 Still Pass、Recovered、Still Fail、Regressed。
+
+`max_evals = 12`：单次 Optimization Run 最多累计进行 12 次 Candidate Evaluation，不要求跑满。A/B/C 全失败后，Agent 必须读取 Sandbox Result、Regression、Failure Reason、Bad Case Change、Root Cause Evidence，重新判断 Root Cause / Hypothesis 后生成下一轮 A/B/C；禁止原样重复、机械调整数字或无解释扩大 Search Space。
+
+满足以下任一条件可停止：已出现满足 Release Gate 且没有值得继续验证的明确 Hypothesis 的 Candidate；达到 `max_evals = 12`；连续迭代没有有效提升；持续触发 Safety / Performance / Regression Red Line；没有新的可解释 Hypothesis。12 次仍无合格 Candidate 时，状态为 `No Qualified Candidate / Needs Human Review`：保留 Baseline、不发布失败方案、保存全部实验、输出失败原因与人工检查方向。
+
+即使已有 Candidate 满足 Release Gate，仅在仍有明确剩余 Bad Case、存在新的合理 Hypothesis，且没有明显 Cost / Performance 风险时才继续下一轮；禁止为多几分无限优化。
+
+### 8.8 Conditional Composite Candidate D
+
+A/B/C 不是递进叠加。D 是条件触发的 Composite Candidate：仅当 A/B/C 中存在多个已独立验证有效、且有明确组合价值的能力 / Candidate 时生成。D 可组合多个能力 / 参数，不设最多两项或三项的死限制，仍遵循 `Minimum Necessary Combination`。
+
+D 必须重新执行 Sandbox、Golden Evaluation、Regression、Safety、Performance、Red Line。D 不天然优于 A/B/C；若失败、引入明显 Regression 或 Cost / Latency 不合理，退回最佳已验证 A/B/C，不得为展示组合能力强制选择 D。
+
+## 9. Recommendation、Release、Version 与 Monitoring `[CONFIRMED]`
+
+### 9.1 Recommendation
+
+Candidate 不能仅因 Overall Score 最高获胜。先检查 Safety、Negative、Regression、Performance、Red Line、Release Gate；任何 Hard Gate 未通过即直接淘汰。通过后才综合 Overall Score、Positive / Ablation / Negative、Bad Case Fix Rate、Regression、Latency、Token、Cost、Parameter Complexity 与 Remaining Risk。
+
+Recommendation Report 至少包括：Recommended Candidate、Candidate Hypothesis、Root Cause、Before / After Pipeline、Parameter Diff、Overall / Positive / Ablation / Negative Before / After、Product / Document Group Results、Bad Case Fixed、Remaining Bad Case、Regression、Latency / Token / Cost Change、Safety、Performance、Red Line、Risks、Why Recommended、Why Other Candidates Were Not Selected。无合格 Candidate 时必须明确 `No Qualified Candidate`，不得强行选 Winner。
+
+### 9.2 Human Release Gate 与 Direct Release
 
 发布链路为：
 
 `Recommendation → Human Approval → Release Gate → Version Snapshot → Production`
 
-Release Gate 检查 Golden Evaluation、Regression、Critical Regression、Safety Gate 与 Performance / SLA Gate；具体阈值为 `[OPEN]`。新 Production 发布后，旧 Production 不得覆盖或删除，必须保留 Pipeline Snapshot、Evaluation Result、Release Record、Version History 与 Rollback Capability。
+Optimization Agent 只能生成 Recommendation，不能自动修改 Production；Human Approve 后才能生成新的 Production Version。Release Gate 检查 Golden Evaluation、Regression、Critical Regression、Safety Gate 与 Performance / SLA Gate；具体阈值为 `[OPEN]`。
 
-### 9.2 V1 Release Strategy
+V1 保留 Direct Release：人工已明确确认某个 Pipeline Configuration 时，不需要经过 Agent 搜索即可进入发布流程。Direct Release 不能绕过 Version Snapshot、Release Record、Audit Trail、Rollback Capability，也不等同于 Agent 自动绕过 Sandbox。
 
-V1 只实现 Direct Release、Human Approval、Release Gate、Production Version Switch 与 Rollback。不实现虚假的 1% → 10% → 50% → 100% Canary / Gray Release；当前面试 Demo 不具备真实生产流量分流环境。`direct / canary` 可作为未来架构与数据模型的预留能力，但 Canary / Gray Release 不属于 V1 核心实现。
+V1 不实现虚假的 1% → 10% → 50% → 100% Canary / Gray Release。`direct / canary` 可作为未来架构与数据模型的预留能力，但 Canary / Gray Release 不属于 V1 核心实现。
 
-### 9.3 Production Monitoring
+### 9.3 Version Snapshot 与 Rollback
 
-V1 采用轻量 Production Monitoring，不建设复杂 APM、完整 Observability Platform 或真实流量调度平台。Monitoring 可关注 Query、Answer Success、Safe Rejection、Latency、Token / Cost、Failure / Feedback，具体 Metrics 与 Trigger Rule 为 `[OPEN]`。
+每次 Production Release 前必须保存完整 Version Snapshot，至少包括 Pipeline Config、Prompt、Model Version、Rerank Model、Embedding Model、Golden Snapshot、Evaluation Report、Release Gate Result、Release Time、Release Operator、Previous Version。旧 Production 不得覆盖或删除，出现异常时支持人工 Rollback 至上一已发布版本。
 
-Monitoring 只为下一轮 Evaluation 提供触发信号：
+### 9.4 Production Monitoring
 
-`Monitoring / New Knowledge / Scheduled Evaluation → Evaluation → Bad Case Detection → Optimization Agent → Next Evolution`
+V0.3 采用半自动闭环与轻量 Production Monitoring，不建设复杂 APM、完整 Observability Platform 或真实流量调度平台。Monitoring 可自动识别新 Bad Case、指标下降、Safety 异常、Performance 异常、Regression Signal，并生成 `Optimization Trigger / Pending Optimization Task`。
 
-Monitoring Signal 不得绕过 Evaluation 直接成为 Optimization Agent Bad Case。
+Monitoring 不直接自动启动完整 Agent 调参或自动发布。流程为：
+
+`Monitoring → Trigger → Human Confirm → Optimization Agent`
+
+具体 Monitoring Metrics 与 Trigger 数值仍为 `[OPEN]`。
 
 ## 10. 问答验证 `[CONFIRMED]`
 
@@ -218,50 +339,40 @@ Monitoring Signal 不得绕过 Evaluation 直接成为 Optimization Agent Bad Ca
 
 ## 11. 完整 Self-Evolution Lifecycle `[CONFIRMED]`
 
-`Knowledge → Golden Dataset Generation → Hard Validation → Probe → QC → Human Review → Golden Snapshot → Production Baseline Evaluation → Bad Case Detection → Optimization Agent → Root Cause Diagnosis → Hypothesis → Candidate A/B/C → Sandbox → Conditional Composite D → Regression → Recommendation → Human Approval → Release Gate → Version Snapshot → Production → Production Monitoring → Trigger New Evaluation → Next Evolution`
+`Knowledge → Golden Dataset Generation → Hard Validation → Probe → QC → Human Review → Golden Snapshot → Production Baseline Evaluation → Bad Case → Bad Case Cluster → Root Cause Diagnosis → Optimization Hypothesis → Candidate A/B/C → Sandbox Evaluation → Regression / Safety / Performance / Red Line → Conditional Composite Candidate D → Recommendation → Human Release Gate → Version Snapshot → Production Version → Monitoring / Rollback`
 
 ## 12. OPEN / TBD 清单
 
 以下内容尚未完成产品讨论，不得自行决定：
 
-1. Pipeline Search Space 最终参数列表
-2. 各参数允许 Range
-3. TopK 范围
-4. CandidateK 范围
-5. Query Rewrite 模式
-6. MultiQuery 数量
-7. HyDE
-8. Hybrid Search
-9. BM25 / Vector Weight
-10. Min Similarity
-11. Rerank
-12. Rerank TopN
-13. Metadata Filter
-14. Alias Mapping
-15. Prompt Optimization
-16. Agent 每轮最大修改范围
-17. Agent Iteration Limit
-18. Overall Score 具体权重
-19. Positive Evaluation Threshold
-20. Ablation Evaluation Threshold
-21. Negative Evaluation Threshold
-22. Safety Gate Threshold
-23. Performance Gate Threshold
-24. Regression Gate Threshold
-25. Probe Detailed Threshold / Detailed Rule
-26. QC Judge Model
-27. Release Gate Threshold
-28. Production Monitoring 具体指标
-29. Monitoring Trigger Rule
-30. 页面详细字段
-31. 最终 UI Layout
-32. 具体 Demo 数据
-33. A/B/C 初始实验配置
-34. Pipeline Snapshot 完整 Schema
-35. Evaluation Report 完整 Schema
-36. Bad Case Schema
-37. Recommendation Report Schema
-38. Version Snapshot Schema
+1. Overall Score 具体权重
+2. Positive Evaluation Threshold
+3. Ablation Evaluation Threshold
+4. Negative Evaluation Threshold
+5. Safety Gate Threshold
+6. Performance Gate Threshold
+7. Regression Gate Threshold
+8. Probe Detailed Threshold / Detailed Rule
+9. QC Judge Model
+10. Release Gate Threshold
+11. Production Monitoring 具体指标
+12. Monitoring Trigger 数值
+13. 页面详细字段
+14. 最终 UI Layout
+15. 具体 Demo 数据
+16. A/B/C 初始实验配置
+17. Pipeline Snapshot 完整 Schema 的剩余字段
+18. Evaluation Report 完整 Schema 的剩余字段
+19. Bad Case Schema 的剩余字段
+20. Recommendation Report 完整 Schema 的剩余字段
+21. Version Snapshot 完整 Schema 的剩余字段
+22. `max_evals` 对 Composite Candidate D 的计数方式及预算不足时的处理
+23. “连续迭代没有有效提升”的判定标准与连续次数
+24. Candidate 历史去重的适用范围
+25. Prompt Strategy 允许的变换、模板 / 片段来源与审批边界
+26. Hybrid Alpha 的融合公式、归一化方式与施加位置
+27. MinScore 的比较分数、数值尺度与生效阶段
+28. Direct Release 是否必须经过 Sandbox / 各 Release Gate 及其验证顺序
 
 ## 13. Current Implementation 与历史文档治理
 
