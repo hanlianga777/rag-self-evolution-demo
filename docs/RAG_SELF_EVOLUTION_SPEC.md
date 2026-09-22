@@ -1,17 +1,17 @@
 # RAG Self-Evolution Platform 产品规格
 
 > **唯一正式 Source of Truth**
-> **SPEC Version：V0.4 — Evaluation, Gate & Quality Governance**
-> **Status：Core Lifecycle + Optimization Agent & Search Space + Evaluation, Gate & Quality Governance Confirmed · Detailed Parameters Pending · Implementation NOT Authorized**
+> **SPEC Version：V1.0 — Final SPEC Closure**
+> **Status：Final Target SPEC Frozen · Implementation NOT Authorized**
 
 ## 1. 文档地位与使用规则
 
 本文件定义 RAG Self-Evolution Platform 的下一版目标产品规格（Target Product SPEC）。后续 ChatGPT、Codex 与 SpecKit 在处理本项目之前，必须先读取本文件及 [SPEC ChangeLog](SPEC_CHANGELOG.md)，不得重新推导已经标记为 `[CONFIRMED]` 的决策。
 
 - 当前仓库中可运行的 Demo 是 **Current Implementation**，不是本文件的实现证明，也不等同于 Target SPEC。
-- 当前 Demo 与 Target SPEC 的差异属于正常状态；在 SPEC V1.0 Frozen 前，不得因差异修改业务代码、数据、Pipeline、页面或运行时。
-- 本文未明确标记为 `[CONFIRMED]` 的内容一律为 `[OPEN]` 或 `[TBD]`，不得以“合理默认值”补充为正式需求。
-- 产品讨论先更新本文件，再追加 ChangeLog；SPEC V1.0 Frozen 后，才可进入 SpecKit、Implementation Plan、Tasks 与统一实施。
+- 当前 Demo 与 Target SPEC 的差异属于正常状态；本次 V1.0 文档冻结不授权因差异修改业务代码、数据、Pipeline、页面或运行时。
+- V1.0 范围内的产品决策均已冻结；实现可以选择数据字段、像素和样例内容的表现方式，但不得借此改变本文件的产品规则。
+- 新的产品决策必须先更新本文件，再追加 ChangeLog；任何业务实施仍须经单独授权的 SpecKit、Implementation Plan 与 Tasks。
 
 ## 2. 产品定位 `[CONFIRMED]`
 
@@ -82,7 +82,7 @@ Mini、Medium、Full 表示生成规模与知识覆盖等级，不表示 LLM 推
 | Medium | 20 | 10 | 20 | 50 |
 | Full | 40 | 20 | 40 | 100 |
 
-该比例不是行业标准；未来可根据 Knowledge Base Size、Coverage、Document Scale 与 Evaluation Cost 配置，具体配置规则为 `[OPEN]`。
+该比例不是行业标准；V1.0 仅采用上述 Mini、Medium、Full Profile。任何后续 Profile 规则调整均须作为新的产品规格变更处理，而非本版本的待定决策。
 
 ## 6. Golden Governance `[CONFIRMED]`
 
@@ -98,7 +98,7 @@ Hard Validation 位于 Probe 之前，使用 Deterministic Rules 检查 Question
 
 ### 6.2 Probe
 
-Probe 回答“这道题是否真的成立”，用于 Golden Candidate 自身质量检查，不是 RAG Evaluation。Probe Pass 的确认门槛为 `Score ≥ 90`；Probe Fail 不能进入正式 Approved Golden，必须进入 `needs_revision`，修改后重新 Probe / QC。Probe 详细评分规则仍为 `[OPEN]`。
+Probe 回答“这道题是否真的成立”，用于 Golden Candidate 自身质量检查，不是 RAG Evaluation。总分为 100：Question Quality `30`、Golden Answer Quality `30`、Evidence Support `40`。Probe Pass 的确认门槛为 `Score ≥ 90`；Evidence 明显无法支撑 Golden Answer 时直接 Probe Failed，不允许依赖其他项目分数补偿。Probe Fail 不能进入正式 Approved Golden，必须进入 `needs_revision`，修改后重新 Probe / QC。
 
 - Positive / Ablation：以真实 Question 进入当前 Retrieval Pipeline，检查 Golden Evidence 是否被召回。Evidence 确实存在但未召回时，应标记类似 `RETRIEVAL_INCOHERENT`，而非简单删除；它可能是高价值 Retrieval Bad Case。
 - Negative：使用 Vector Probe 加 Full-text Probe。后者补足 Table、Exact Number、Model Number、Exact Term 等向量检索盲区；必要时才由 LLM 判断检出的原文是否实际可回答问题。核心目标是避免 Fake Negative。
@@ -175,13 +175,13 @@ Positive 与 Ablation 均使用 Answer Correctness、Faithfulness、Completeness
 
 TTFT、Token Cost、Recall@K、Precision@K、MRR 不属于 11 项 Hard Gate，但必须用于 Baseline、Candidate A、B、C 及条件触发 D 的横向比较：
 
-- TTFT（Time To First Token）必须记录，用于比较用户首 Token / 首字响应体验；当前不设 Hard Threshold。
-- Token Cost 必须记录，用于比较质量提升与 LLM 调用成本；当前不设 Hard Threshold，不新增 Token Count Hard Gate。
-- Recall@K 用于判断正确 Evidence 是否被 Retrieval 找回；当前不设 Hard Threshold。
-- Precision@K 用于判断 Retrieval Chunk 中相关 Evidence 的比例；当前不设 Hard Threshold。
-- MRR 用于分析 Ranking Error、Rerank Effect 与 Retrieval Ranking Quality；当前不设 Hard Threshold。
+- TTFT（Time To First Token）必须记录，用于比较用户首 Token / 首字响应体验。`TTFT ≤ 5s` 是展示目标；超过时 UI 可标黄 / Warning，但不导致 Candidate Failed，也不新增 Hard Gate。
+- Token Cost 必须展示，用于 Baseline / Candidate 横向比较；不设 Budget Limit、不属于 Hard Gate，且不得因 Token Cost 高自动淘汰 Candidate。
+- Recall@K 用于判断正确 Evidence 是否被 Retrieval 找回；`Recall@K ≥ 85%` 是 Target / Diagnostic Metric，不属于 Hard Gate。
+- Precision@K 用于判断 Retrieval Chunk 中相关 Evidence 的比例；`Precision@K ≥ 50%` 是 Target / Diagnostic Metric，不属于 Hard Gate。
+- MRR 用于分析 Ranking Error、Rerank Effect 与 Retrieval Ranking Quality；`MRR ≥ 75%` 是 Target / Diagnostic Metric，不属于 Hard Gate。
 
-当多个 Candidate 通过 11 项 Hard Gate 时，Recommendation 必须能解释其 TTFT、Token Cost、Recall@K、Precision@K、MRR 的差异；当前不得自行新增综合加权公式。Overall Score 是否在后续 UI 中展示及其算法仍为 `[OPEN]`。
+当多个 Candidate 通过 11 项 Hard Gate 时，Recommendation 必须能解释其 TTFT、Token Cost、Recall@K、Precision@K、MRR 的差异。UI 可保留 `0–100` Overall Score 用于展示和快速比较，但它不是发布 Hard Gate，也不得改变 Candidate 的 Qualified 判定；不得重新引入 40/20/40 或其他 Overall Score 加权公式作为发布依据。
 
 ### 7.4 Bad Case Detection
 
@@ -245,11 +245,17 @@ Agent 优先按 Root Cause / Problem Pattern 聚类 Bad Case，例如 Retrieval 
 
 CandidateK 与 TopK 可作为同一 Candidate 的参数组合，例如 `CandidateK 12 → 24` 加 `TopK 4 → 6`，前提是共同服务于“扩大 Retrieval Depth / Evidence Coverage”这一 Hypothesis。
 
+Hybrid Alpha 统一表示 Vector Search 权重：`0.3 = Vector 30% / BM25 70%`，`0.5 = Vector 50% / BM25 50%`，`0.7 = Vector 70% / BM25 30%`。Vector 与 BM25 分数必须先完成可比较的归一化，再进行融合。
+
+MinScore 用于最终候选 Evidence 进入 LLM Context 前的过滤：未开启 Rerank 时，在 Retrieval / Hybrid 后执行；开启 Rerank 时，以 Rerank 后的最终候选结果执行。
+
 Metadata Filter 的 `STRICT` 在识别到可靠 Metadata 后仅检索对应范围；`FALLBACK` 优先过滤，但无结果、结果不足或 Evidence Coverage 不足时退回更宽范围。它用于 Cross-product、Cross-version、Vendor Confusion；实体识别不明确时不得强制过滤到某产品。
 
 Alias Mapping 可启用既有版本化 Dictionary，也可提议新增 Mapping；新增 Mapping 必须审核后才正式生效。示例包括“手柄 → B2 遥控器”“B2遥控 → B2 遥控器”“Dock → 充电座”。
 
 Prompt Strategy 的边界：Grounded 处理 Hallucination、脱离 Evidence 的补充与引用不严谨；Completeness 处理 Evidence 已召回完整但回答漏步骤、限制条件或关键事实；Abstention 处理 Unanswerable / Negative、Evidence 不足仍强答与知识边界不足。每次 Prompt Optimization 必须保存 Original Prompt、New Prompt、Strategy、Prompt Diff、Change Reason、Related Bad Case、Root Cause、Version、Sandbox Result。
+
+Optimization Agent 可受控修改回答约束、Evidence / Citation 要求、Refusal Rule、输出结构与格式；不得修改业务事实、Golden Answer、Golden Evidence，不得将测试答案直接写入 Prompt，也不得通过针对测试集作弊提高成绩。
 
 ### 8.4 明确排除的自动 Search Space
 
@@ -284,29 +290,25 @@ Candidate 进入 Sandbox 前必须通过 Parameter Rule Check：参数属于合�
 
 依赖规则：Hybrid Alpha 只在 Hybrid ON 时有效；`MultiQuery = 2 / 4 / 6` 表示已开启 MultiQuery；Metadata Filter 的 STRICT / FALLBACK 只在 Filter 启用后有意义。
 
-Agent 在生成新 Candidate 前必须查询历史。相同 Hypothesis 加相同 Parameter Combination 已运行时禁止重复执行；失败 Candidate 也必须保留，以避免重复踩坑。
+Agent 在生成新 Candidate 前必须查询历史。以实际生效的 Candidate Configuration 判断：最终参数组合完全一致即为 Duplicate Candidate，不重复执行完整 Evaluation；失败 Candidate 也必须保留，以避免重复踩坑。
 
 ### 8.7 Sandbox、Regression、max_evals 与停止条件
 
 Sandbox 是不影响 Production 的隔离实验环境。A/B/C 必须使用同一 Baseline Snapshot、Golden Dataset Snapshot、Evaluation Rules 与 Release Gate；技术上可并行或顺序执行，但在产品语义上是并列实验。
 
-每次 Candidate Evaluation 至少保存：
+每次 Candidate 完整 Evaluation 至少保存：
 
-1. Pipeline Snapshot
-2. Golden / Evaluation Snapshot
-3. Positive、Ablation、Negative Group Metrics
-4. 11 项 Hard Gate Result
-5. Product / Document Group Metrics
-6. Per-question Result
-7. Bad Case Fix Result
-8. TTFT、Latency、Token Cost
-9. Recall@K、Precision@K、MRR
-10. Regression Result、Safety / Performance Result、Red Line Observation
-11. Pass / Fail 与 Failure Reason
+1. Version / Candidate ID、实际生效的 Candidate Configuration、Pipeline Snapshot 与 Timestamp
+2. Model Version、Dataset / Golden Snapshot Version、Golden / Evaluation Snapshot
+3. Positive、Ablation、Negative Group Metrics、Product / Document Group Metrics 与 Per-question Result
+4. 11 项 Hard Gate Result、Pass / Fail 与 Failure Reason
+5. Bad Case Fix Result、Bad Case Count、Regression Result、Safety / Performance Result、Red Line Observation
+6. TTFT、Latency、Token Cost、Recall@K、Precision@K、MRR
+7. Recommendation Reason，以及 Human Operator / Release Information
 
-Regression 独立版本化，来源可包括历史 Approved Golden、关键业务题、Safety Cases 与历史已修复的重要 Bad Cases；状态至少为 Still Pass、Recovered、Still Fail、Regressed。Regression 是 Sandbox 到 Release Gate 的必须验证步骤，但 Regression 数值 Gate、Critical Zero Regression、Net Fix、取整公式、允许退化题数及 Red Line 细则均为 `[OPEN]`。
+Regression 独立版本化，来源可包括历史 Approved Golden、关键业务题、Safety Cases 与历史已修复的重要 Bad Cases；状态至少为 Still Pass、Recovered、Still Fail、Regressed。Regression 是 Sandbox 到 Release Gate 的必须验证步骤：Safety / Critical 类题目不允许新增失败；普通题最多允许新增 `1` 个失败；超过即 Regression Failed。
 
-`max_evals = 12`：单次 Optimization Run 最多累计进行 12 次 Candidate Evaluation，不要求跑满。A/B/C 全失败后，Agent 必须读取 Sandbox Result、Regression、Failure Reason、Bad Case Change、Root Cause Evidence，重新判断 Root Cause / Hypothesis 后生成下一轮 A/B/C；禁止原样重复、机械调整数字或无解释扩大 Search Space。
+`max_evals = 12`：单次 Optimization Run 最多累计进行 12 次 Candidate 完整 Evaluation，不要求跑满。Conditional / Composite Candidate D 同样计入；所有实际执行过完整 Evaluation 的 Candidate 都计入 Evaluation Budget。A/B/C 全失败后，Agent 必须读取 Sandbox Result、Regression、Failure Reason、Bad Case Change、Root Cause Evidence，重新判断 Root Cause / Hypothesis 后生成下一轮 A/B/C；禁止原样重复、机械调整数字或无解释扩大 Search Space。
 
 满足以下任一条件可停止：已出现满足 Release Gate 且没有值得继续验证的明确 Hypothesis 的 Candidate；达到 `max_evals = 12`；连续迭代没有有效提升；持续触发 Safety / Performance / Regression Red Line；没有新的可解释 Hypothesis。12 次仍无合格 Candidate 时，状态为 `No Qualified Candidate / Needs Human Review`：保留 Baseline、不发布失败方案、保存全部实验、输出失败原因与人工检查方向。
 
@@ -316,15 +318,15 @@ Regression 独立版本化，来源可包括历史 Approved Golden、关键业�
 
 A/B/C 不是递进叠加。D 是条件触发的 Composite Candidate：仅当 A/B/C 中存在多个已独立验证有效、且有明确组合价值的能力 / Candidate 时生成。D 可组合多个能力 / 参数，不设最多两项或三项的死限制，仍遵循 `Minimum Necessary Combination`。
 
-D 必须重新执行 Sandbox、Golden Evaluation、Regression、Safety、Performance、Red Line。D 不天然优于 A/B/C；若失败、引入明显 Regression 或 Cost / Latency 不合理，退回最佳已验证 A/B/C，不得为展示组合能力强制选择 D。
+D 必须重新执行 Sandbox、Golden Evaluation、Regression、Safety、Performance、Red Line。D 不天然优于 A/B/C；若失败、引入明显 Regression 或 Cost / Latency 不合理，退回最佳已验证 A/B/C，不得为展示组合能力强制选择 D。D 的完整 Evaluation 与任何其他 Candidate 相同计入 `max_evals = 12`。
 
 ## 9. Recommendation、Release、Version 与 Monitoring `[CONFIRMED]`
 
 ### 9.1 Recommendation
 
-Candidate 只有在 11 项 Hard Gate 全部 PASS 后，才进入 Qualified Candidate / Recommendation 范围；任一 Gate FAIL 即直接淘汰。多个 Qualified Candidate 之间，再比较 Positive / Ablation / Negative Group Metrics、Bad Case Fix Result、TTFT、Token Cost、Recall@K、Precision@K、MRR、Parameter Complexity 与 Remaining Risk。Regression 必须报告，但其数值 Gate 与 Red Line 细则尚未冻结。
+Candidate 只有同时满足以下条件，才进入 Qualified Candidate / Recommendation 范围：11 项 Hard Gate 全部 PASS、Regression PASS、至少修复 `1` 个本轮目标 Bad Case，且全量 Evaluation 后 Bad Case 总数至少减少 `1` 个。任一条件失败即直接淘汰。多个 Qualified Candidate 之间，再比较 Positive / Ablation / Negative Group Metrics、TTFT、Token Cost、Recall@K、Precision@K、MRR、Parameter Complexity 与 Remaining Risk。
 
-Recommendation Report 至少包括：Recommended Candidate、Candidate Hypothesis、Root Cause、Before / After Pipeline、Parameter Diff、三组 Evaluation Metrics、11 项 Hard Gate Result、Product / Document Group Results、Bad Case Fixed、Remaining Bad Case、Regression、TTFT / Latency / Token Cost Change、Recall@K / Precision@K / MRR Change、Risks、Why Recommended、Why Other Candidates Were Not Selected。无合格 Candidate 时必须明确 `No Qualified Candidate`，不得强行选 Winner。Report 的完整 Schema 剩余字段为 `[OPEN]`。
+Recommendation Report 必须复用 Sandbox 已保存的实验记录，并至少包括：Recommended Candidate、Candidate Hypothesis、Root Cause、Before / After Pipeline、Parameter Diff、三组 Evaluation Metrics、11 项 Hard Gate Result、Product / Document Group Results、Bad Case Fixed、Remaining Bad Case、Regression、TTFT / Latency / Token Cost Change、Recall@K / Precision@K / MRR Change、Risks、Why Recommended、Why Other Candidates Were Not Selected。无合格 Candidate 时必须明确 `No Qualified Candidate`，不得强行选 Winner。
 
 ### 9.2 Human Release Gate 与 Direct Release
 
@@ -332,9 +334,9 @@ Recommendation Report 至少包括：Recommended Candidate、Candidate Hypothesi
 
 `Recommendation → Human Approval → Release Gate → Version Snapshot → Production`
 
-Optimization Agent 只能生成 Recommendation，不能自动修改 Production；Human Approve 后才能生成新的 Production Version。Release Gate 的确认门槛是 11 项 Hard Gate 全部 PASS。Regression 继续必须完成并进入发布审计，但其数值 Gate、Critical Regression 与 Red Line 细则为 `[OPEN]`。
+Optimization Agent 只能生成 Recommendation，不能自动修改 Production；Human Approve 后才能生成新的 Production Version。Release Gate 的确认门槛是 11 项 Hard Gate 全部 PASS 与 Regression PASS；Human Release 是最终发布决策，不是绕过 Gate 的快捷入口。
 
-V1 保留 Direct Release：人工已明确确认某个 Pipeline Configuration 时，不需要经过 Agent 搜索即可进入发布流程。Direct Release 不能绕过 Version Snapshot、Release Record、Audit Trail、Rollback Capability，也不等同于 Agent 自动绕过 Sandbox。
+V1 保留 Direct Release：人工已明确确认某个 Pipeline Configuration 时，不需要经过 Agent 搜索即可进入发布流程。Direct Release 仍必须完成 Sandbox 质量验证、11 项 Hard Gate 全部 PASS、Regression PASS、Version Snapshot、Release Record、Audit Trail 与 Rollback Capability；它不等同于 Agent 自动绕过 Sandbox。
 
 V1 不实现虚假的 1% → 10% → 50% → 100% Canary / Gray Release。`direct / canary` 可作为未来架构与数据模型的预留能力，但 Canary / Gray Release 不属于 V1 核心实现。
 
@@ -344,13 +346,13 @@ V1 不实现虚假的 1% → 10% → 50% → 100% Canary / Gray Release。`direc
 
 ### 9.4 Production Monitoring
 
-V0.4 采用半自动闭环与轻量 Production Monitoring，不建设复杂 APM、完整 Observability Platform 或真实流量调度平台。Monitoring 可自动识别新 Bad Case、核心 Evaluation Metric 下降、Safety 异常、Performance 异常、Regression Signal，并生成 `Optimization Trigger / Pending Optimization Task`。
+V1.0 采用半自动闭环与轻量 Production Monitoring，不建设复杂 APM、完整 Observability Platform 或真实流量调度平台。满足任一条件时，Monitoring 生成 `Optimization Trigger / Pending Optimization Task`：出现 `1` 个 Safety Critical Bad Case；或最近 `20` 次有效问答中 Bad Case `≥ 4`。有效问答仅指有完整问题、回答及可判定 Bad Case 结果的完成记录；中断、缺字段或不可判定记录不计入。
 
 Monitoring 不直接自动启动完整 Agent 调参或自动发布。流程为：
 
 `Monitoring → Trigger → Human Confirm → Optimization Agent`
 
-具体 Monitoring Metrics 与 Trigger 数值仍为 `[OPEN]`。
+Monitoring 绝不直接自动启动 Agent 调参或自动发布，Human Confirm 不得被自动绕过。
 
 ## 10. 问答验证 `[CONFIRMED]`
 
@@ -359,38 +361,19 @@ Monitoring 不直接自动启动完整 Agent 调参或自动发布。流程为�
 - Production Q&A：真实体验当前 Production Pipeline。
 - Before / After：在同一 Question 下比较 Production 与 Candidate / New Production，可展示 Answer、Citation、Retrieved Evidence、Latency 与 Pipeline Difference。
 
-具体 UI、页面字段与最终 Layout 均为 `[OPEN]`；本版本仅冻结模块职责。
+V1.0 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语言，不重新推翻设计；保持卡片化表达，信息层级、对齐和间距整齐；Baseline / A / B / C / Recommendation 的比较必须容易理解；最终展示质量应达到 AI 解决方案工程师面试 Demo 水平；禁止为“科技感”堆砌无业务意义组件。像素、具体字段扩展与布局细节属于实现表现层，不构成产品规格缺口。
+
+最终 Demo 必须采用稳定、可重复演示的数据链：`Baseline → Evaluation → Bad Case → Optimization Agent → A/B/C → Sandbox → Regression → Recommendation → Human Release`。数据必须清晰体现 Before / After，不得让所有页面只显示随机数据或无法对应的 Mock 数字。A/B/C 必须体现不同的 Optimization Strategy / Parameter Combination，但不得硬编码某一个 Candidate 永远胜出；最终 Recommendation 必须来自实际 Sandbox Evaluation、Gate 与 Regression 结果。
 
 ## 11. 完整 Self-Evolution Lifecycle `[CONFIRMED]`
 
 `Knowledge → Golden Dataset Generation → Hard Validation → Probe ≥90 → QC ≥85 → Human Review → Golden Snapshot → Production Baseline Evaluation → Bad Case → Bad Case Cluster → Root Cause Diagnosis → Optimization Hypothesis → Candidate A/B/C → Sandbox Evaluation → 11 Hard Gates + Regression Validation → Conditional Composite Candidate D → Recommendation → Human Release Gate → Version Snapshot → Production Version → Monitoring / Rollback`
 
-## 12. OPEN / TBD 清单
+## 12. V1.0 Final Closure `[CONFIRMED]`
 
-以下内容尚未完成产品讨论，不得自行决定：
+V0.2–V0.4 遗留的产品决策已在本版本全部关闭：Overall Score、Regression、Monitoring Trigger、TTFT、Token Cost、Retrieval Metrics、Probe、Hybrid Alpha、MinScore、Direct Release、Composite D Budget、有效提升、Candidate 去重、Prompt Strategy、Snapshot / Report、UI、Demo 数据与 A/B/C 初始原则均以本文件第 6 至 10 节为准。
 
-1. Overall Score 是否在未来 UI 展示及其算法
-2. Regression 具体数值 Gate、Critical Zero Regression、Net Fix、取整公式、允许退化题数与 Red Line 细则
-3. Monitoring 时间窗口、Metric 下降幅度、单条 / Cluster Bad Case、Safety / Performance 异常的数值 Trigger Rule
-4. TTFT 是否需要未来 Threshold
-5. Token Cost 是否需要未来 Cost Budget
-6. Recall@K、Precision@K、MRR 是否需要未来 Target
-7. Probe Detailed Score Rule
-8. Hybrid Alpha 的融合公式、归一化方式与施加位置
-9. MinScore 的比较分数、数值尺度与生效阶段
-10. Direct Release 是否必须经过 Sandbox / 各 Release Gate 及其验证顺序
-11. `max_evals` 对 Composite Candidate D 的计数方式及预算不足时的处理
-12. “连续迭代没有有效提升”的判定标准与连续次数
-13. Candidate 历史去重的适用范围
-14. Prompt Strategy 允许的变换、模板 / 片段来源与审批边界
-15. Pipeline Snapshot 完整 Schema 的剩余字段
-16. Evaluation Report 完整 Schema 的剩余字段
-17. Bad Case Schema 的剩余字段
-18. Recommendation Report 完整 Schema 的剩余字段
-19. Version Snapshot 完整 Schema 的剩余字段
-20. 页面详细字段与最终 UI Layout
-21. 具体 Demo 数据
-22. A/B/C 初始实验配置
+本文件不定义 Report 的非必填字段、像素级 UI、具体演示题材或固定 Candidate 参数；这些是实现表现层细节，不得反向改变已冻结的流程、质量门槛、审计记录、数据可追溯性或人工发布边界。
 
 ## 13. Current Implementation 与历史文档治理
 
@@ -406,7 +389,7 @@ Monitoring 不直接自动启动完整 Agent 调参或自动发布。流程为�
 
 ## 14. 本轮实施边界 `[CONFIRMED]`
 
-本轮仅建立和维护本文件、[SPEC ChangeLog](SPEC_CHANGELOG.md) 及 README 的 Source-of-Truth 说明。禁止：
+本轮仅建立和维护本文件、[SPEC ChangeLog](SPEC_CHANGELOG.md) 及 README 的 Source-of-Truth 说明。V1.0 Final Closure 本身不授权业务实施。禁止：
 
 - 修改 Frontend、Backend、Database、Migration、Pipeline Configuration、Demo UI 或业务逻辑。
 - 重新生成 Golden Dataset、删除现有 40 道历史题、修改 Golden Candidate、Probe / QC Runtime、Evaluation / Baseline / Bad Case 数据。
