@@ -10,9 +10,9 @@ RAG Evolution 是一个面向机器人官方 PDF 知识问答的本地 Demo，�
 
 - **Current Implementation：** 本 README 所述的现有 Demo 与运行时能力。
 - **Target Source of Truth：** 下一版产品需求以 [RAG Self-Evolution SPEC](docs/RAG_SELF_EVOLUTION_SPEC.md) 为唯一正式来源，变更历史见 [SPEC ChangeLog](docs/SPEC_CHANGELOG.md)。
-- **SPEC Version：** V1.0 — Final SPEC Closure。
+- **SPEC Version：** V1.0.1 — Final Closure Patch。
 - **Current Status：** Final Target SPEC Frozen · Implementation NOT Authorized。
-- **V1.0 Boundary：** 本轮完成 Target SPEC 的最终产品决策；Evaluation Engine、阈值判定、Release Gate、页面和 Demo 数据链均尚未实施。
+- **V1.0.1 Boundary：** 本轮仅澄清 Overall Score 的 UI 计算方式及 A/B/C Example Seed 定位；Evaluation Engine、阈值判定、Release Gate、页面和 Demo 数据链均尚未实施。
 - **Implementation Rule：** Current Implementation 与 Target SPEC 存在差异属于正常状态。本次冻结不授权修改业务代码；后续实施必须经单独授权的 SpecKit / Implementation Plan。
 - **Future GPT / Codex / SpecKit Rule：** 后续工作必须优先读取上述两份 SPEC 文档，不得重新推导已确认决策；新的产品决策必须先追加到正式 SPEC 与 ChangeLog。
 

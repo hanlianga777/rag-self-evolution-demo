@@ -1,7 +1,7 @@
 # RAG Self-Evolution Platform 产品规格
 
 > **唯一正式 Source of Truth**
-> **SPEC Version：V1.0 — Final SPEC Closure**
+> **SPEC Version：V1.0.1 — Final Closure Patch**
 > **Status：Final Target SPEC Frozen · Implementation NOT Authorized**
 
 ## 1. 文档地位与使用规则
@@ -151,7 +151,7 @@ V0.3 Target Baseline 默认参数如下；它们是 Target SPEC，不表示 Curr
 
 ### 7.2 Evaluation Framework 与 Release Gate
 
-正式 Evaluation 按 Positive、Ablation、Negative 三组分别执行。当前不定义 `Positive × 40% + Ablation × 20% + Negative × 40%` 或其他新的 Overall Score 加权公式；此前讨论的 40/20/40 权重明确废弃，不进入本 SPEC。Evaluation 采用“指标实际值 → 对照 Target → PASS / FAIL”。
+正式 Evaluation 按 Positive、Ablation、Negative 三组分别执行。`Positive × 40% + Ablation × 20% + Negative × 40%` 的公式及其权重明确废弃，不得用于任何发布判断。Evaluation 采用“指标实际值 → 对照 Target → PASS / FAIL”。
 
 | Group | Metric | Target | Release Gate |
 | --- | --- | --- | --- |
@@ -181,7 +181,7 @@ TTFT、Token Cost、Recall@K、Precision@K、MRR 不属于 11 项 Hard Gate，�
 - Precision@K 用于判断 Retrieval Chunk 中相关 Evidence 的比例；`Precision@K ≥ 50%` 是 Target / Diagnostic Metric，不属于 Hard Gate。
 - MRR 用于分析 Ranking Error、Rerank Effect 与 Retrieval Ranking Quality；`MRR ≥ 75%` 是 Target / Diagnostic Metric，不属于 Hard Gate。
 
-当多个 Candidate 通过 11 项 Hard Gate 时，Recommendation 必须能解释其 TTFT、Token Cost、Recall@K、Precision@K、MRR 的差异。UI 可保留 `0–100` Overall Score 用于展示和快速比较，但它不是发布 Hard Gate，也不得改变 Candidate 的 Qualified 判定；不得重新引入 40/20/40 或其他 Overall Score 加权公式作为发布依据。
+当多个 Candidate 通过 11 项 Hard Gate 时，Recommendation 必须能解释其 TTFT、Token Cost、Recall@K、Precision@K、MRR 的差异。Overall Score 仅用于 UI 展示和 Candidate 横向比较：`Overall Score = (Positive Correctness + Positive Faithfulness + Positive Completeness + Ablation Correctness + Ablation Faithfulness + Ablation Completeness + Safe Rejection Rate + Safety Critical Accuracy + Prompt Injection Resistance) / 9`。以上 9 项均为 `0–100` 百分比质量指标，等权平均并保留 `1` 位小数。Latency P50 / P99、TTFT、Token Cost、Recall@K、Precision@K、MRR 均不计入 Overall Score。Overall Score 不是发布 Hard Gate，也不得改变 Candidate 的 Qualified 判定；即使 Overall Score 很高，只要 11 个 Hard Gate 任一失败，Candidate 仍为 Not Qualified。不得重新引入 40/20/40 或其他 Overall Score 加权公式作为发布依据。
 
 ### 7.4 Bad Case Detection
 
@@ -223,6 +223,12 @@ Agent 优先按 Root Cause / Problem Pattern 聚类 Bad Case，例如 Retrieval 
 - A/B/C 不是 A → B → C 的逐级叠加，而是三个不同、可解释的 Hypothesis / Strategy。
 - 它们可针对相同 Root Cause 使用不同解决策略，也可使用不同参数组合，但不得机械穷举数字。
 - 即使当前轮的 A 先满足 Release Gate，也必须完成当轮 A/B/C 的 Evaluation 后再统一比较。
+
+### A/B/C Generation Principle
+
+A/B/C 主要由 Optimization Agent 根据 Bad Case、Root Cause、Current Baseline Configuration、Allowed Search Space 与 Historical Evaluation Results 动态生成。首次 Demo 可预置一组 A/B/C Example Seed Configuration，以保证初始展示具有完整、清晰的产品流程；它仅用于 Demo 初始化，不代表生产规则，不限制 Agent 后续生成新的 Candidate。
+
+Seed 或后续 Candidate 的参数必须属于 V0.3 已冻结的 Search Space。Agent 可因 Root Cause 判断某些参数不应修改而保持 Baseline，也可同时修改多个共同服务于同一 Hypothesis 的相关参数；A/B/C 不限制为单变量实验。不得硬编码 Candidate A、B 或 C 永远获胜；Recommendation 必须来自真实 Evaluation、Hard Gate、Regression 与 Comparison Metrics。
 
 每个 Candidate 必须记录 Candidate ID、Related Bad Case Cluster、Primary / Secondary Root Cause、Optimization Hypothesis、Parameter Diff、Why This Parameter Set、Expected Metric Improvement、Potential Risk、Full Pipeline Snapshot、Evaluation Result 与 Failure Reason。
 
@@ -369,9 +375,9 @@ V1.0 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语�
 
 `Knowledge → Golden Dataset Generation → Hard Validation → Probe ≥90 → QC ≥85 → Human Review → Golden Snapshot → Production Baseline Evaluation → Bad Case → Bad Case Cluster → Root Cause Diagnosis → Optimization Hypothesis → Candidate A/B/C → Sandbox Evaluation → 11 Hard Gates + Regression Validation → Conditional Composite Candidate D → Recommendation → Human Release Gate → Version Snapshot → Production Version → Monitoring / Rollback`
 
-## 12. V1.0 Final Closure `[CONFIRMED]`
+## 12. V1.0.1 Final Closure Patch `[CONFIRMED]`
 
-V0.2–V0.4 遗留的产品决策已在本版本全部关闭：Overall Score、Regression、Monitoring Trigger、TTFT、Token Cost、Retrieval Metrics、Probe、Hybrid Alpha、MinScore、Direct Release、Composite D Budget、有效提升、Candidate 去重、Prompt Strategy、Snapshot / Report、UI、Demo 数据与 A/B/C 初始原则均以本文件第 6 至 10 节为准。
+V0.2–V1.0 遗留的产品决策已在本版本全部关闭：Overall Score、Regression、Monitoring Trigger、TTFT、Token Cost、Retrieval Metrics、Probe、Hybrid Alpha、MinScore、Direct Release、Composite D Budget、有效提升、Candidate 去重、Prompt Strategy、Snapshot / Report、UI、Demo 数据与 A/B/C 初始原则均以本文件第 6 至 10 节为准。V1.0.1 进一步固定 Overall Score 的展示计算方式与 A/B/C Example Seed 的 Demo 初始化定位。
 
 本文件不定义 Report 的非必填字段、像素级 UI、具体演示题材或固定 Candidate 参数；这些是实现表现层细节，不得反向改变已冻结的流程、质量门槛、审计记录、数据可追溯性或人工发布边界。
 
@@ -389,7 +395,7 @@ V0.2–V0.4 遗留的产品决策已在本版本全部关闭：Overall Score、R
 
 ## 14. 本轮实施边界 `[CONFIRMED]`
 
-本轮仅建立和维护本文件、[SPEC ChangeLog](SPEC_CHANGELOG.md) 及 README 的 Source-of-Truth 说明。V1.0 Final Closure 本身不授权业务实施。禁止：
+本轮仅建立和维护本文件、[SPEC ChangeLog](SPEC_CHANGELOG.md) 及 README 的 Source-of-Truth 说明。V1.0.1 Final Closure Patch 本身不授权业务实施。禁止：
 
 - 修改 Frontend、Backend、Database、Migration、Pipeline Configuration、Demo UI 或业务逻辑。
 - 重新生成 Golden Dataset、删除现有 40 道历史题、修改 Golden Candidate、Probe / QC Runtime、Evaluation / Baseline / Bad Case 数据。

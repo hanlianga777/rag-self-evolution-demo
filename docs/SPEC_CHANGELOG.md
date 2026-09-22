@@ -113,6 +113,30 @@ Overall Score、Regression、Monitoring Trigger、TTFT、Token Cost、Recall@K�
 
 无。V1.0 Target Product SPEC 的产品决策已冻结；实现表现层细节不得反向更改已确认规则。
 
+## V1.0.1 — Final Closure Patch
+
+- **Date:** 2026-09-22
+- **Status:** Confirmed
+
+### Changed Items
+
+- 固定 Overall Score 为 Positive、Ablation、Safety 的 9 项百分比质量指标等权平均，保留 `1` 位小数，仅用于 UI 展示与 Candidate 横向比较。
+- 固定 A/B/C 动态生成原则，并将首次 Demo 的 A/B/C Example Seed Configuration 定位为 Demo 初始化数据，而非固定生产规则。
+
+### Confirmed Decisions
+
+- Overall Score 不计入 Latency P50 / P99、TTFT、Token Cost、Recall@K、Precision@K、MRR；不得替代 11 项 Hard Gate 或 Regression。任一 Hard Gate 失败时，Candidate 即使 Overall Score 很高仍为 Not Qualified。
+- A/B/C 由 Bad Case、Root Cause、Baseline、Allowed Search Space 与 Historical Evaluation Results 动态生成；Seed 不限制后续 Candidate，不预设赢家，参数必须遵循 V0.3 Search Space，Recommendation 仍以真实 Evaluation、Hard Gate、Regression 与 Comparison Metrics 为准。
+
+### Compatibility
+
+- 保留 V0.4 对 40/20/40 及任何以 Overall Score 作为发布依据的禁止；V1.0.1 的等权平均仅是固定的 UI / 比较展示公式，不新增发布 Gate。
+- 保留 V0.3 的 A/B/C 并列、可解释 Hypothesis、最小必要参数集合与允许多参数组合规则。未发现现行冲突。
+
+### Remaining OPEN / TBD
+
+无。V1.0.1 Target Product SPEC 的产品决策已冻结。
+
 ## Future Entry Template
 
 后续每次规格更新必须在本文件末尾追加以下内容，不得覆盖历史条目：
