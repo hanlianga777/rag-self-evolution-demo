@@ -61,6 +61,17 @@ class GovernanceApiTests(unittest.TestCase):
         self.assertEqual(response.json()["status"], "completed")
         self.assertIsNone(response.json()["recommendation"])
 
+    def test_candidate_approval_blocks_an_incomplete_a_b_c_round(self):
+        experiment = main.store.create_experiment("EVAL-real")
+        candidate_id = f"{experiment}-R1-A"
+        main.store.save_candidate(experiment, "R1-A", {}, {"round": 1, "candidate_label": "A"})
+        main.store.finish_candidate(candidate_id, "evaluated", {"qualification": {"qualified": True}})
+
+        response = self.client.post(f"/api/candidates/{candidate_id}/approval", json={"decision": "approved"}, headers={"Origin": "http://127.0.0.1:5174"})
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("Round A/B/C", response.json()["detail"])
+
 
 if __name__ == "__main__":
     unittest.main()

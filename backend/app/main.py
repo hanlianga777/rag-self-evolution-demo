@@ -81,6 +81,11 @@ class ExperimentRequest(BaseModel):
     trigger_id: str | None = None
 
 
+class RecommendationRequest(BaseModel):
+    candidate_id: str = Field(min_length=1, max_length=120)
+    actor: str = Field(default="local_user", min_length=1, max_length=80)
+
+
 class AliasRequest(BaseModel):
     alias: str = Field(min_length=1, max_length=120)
     canonical: str = Field(min_length=1, max_length=120)
@@ -158,13 +163,18 @@ def approve_alias(payload: AliasRequest):
 def generate_mini_golden():
     try:
         generated = ai_service.generate_mini_golden(corpus.chunks())
-        saved = store.save_mini_golden_candidates(generated["candidates"], ai_service.model, coverage_plan=generated["coverage_plan"], hard_validation=generated["hard_validation"])
+        if generated["status"] == "failed":
+            failed = store.save_failed_generation_run(generated["profile"], ai_service.model, generated["coverage_plan"], generated["hard_validation"], generated["slot_audit"], generated["failed_slots"])
+            raise HTTPException(status_code=409, detail=f"Generation Run {failed['id']} failed: {', '.join(generated['failed_slots'])}")
+        saved = store.save_mini_golden_candidates(generated["candidates"], ai_service.model, coverage_plan=generated["coverage_plan"], hard_validation=generated["hard_validation"], slot_audit=generated["slot_audit"])
         for candidate in saved:
-            probe = store.run_probe(candidate["id"], ai_service.retriever, corpus.chunks())
+            probe = store.run_probe(candidate["id"], ai_service.retriever, corpus.chunks(), ai_service.answerability_check)
             if probe["status"] == "passed":
                 qc = ai_service.quality_check(store.question(candidate["id"]))
                 store.record_qc(candidate["id"], qc, "passed" if qc["score"] >= 85 else "failed")
         return {"profile": generated["profile"], "generation_run_id": saved[0]["raw"]["generation_run_id"], "candidates": [store.question(item["id"]) for item in saved]}
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -211,7 +221,7 @@ def update_question(question_id: str, payload: QuestionUpdateRequest):
 @app.post("/api/governance/questions/{question_id}/probe", dependencies=[Depends(require_trusted_origin)])
 def probe_question(question_id: str):
     try:
-        result = store.run_probe(question_id, ai_service.retriever, corpus.chunks())
+        result = store.run_probe(question_id, ai_service.retriever, corpus.chunks(), ai_service.answerability_check)
         return {"status": store.question(question_id)["probe_status"], **result}
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
@@ -356,6 +366,16 @@ def continue_experiment(run_id: str):
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 
+@app.post("/api/experiments/{run_id}/recommendation", dependencies=[Depends(require_trusted_origin)])
+def select_recommendation(run_id: str, payload: RecommendationRequest):
+    if store.experiment(run_id) is None:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    try:
+        return store.select_recommendation(run_id, payload.candidate_id, payload.actor)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @app.post("/api/candidates/{candidate_id}/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def run_candidate(candidate_id: str):
     runner = EvaluationRunner(store, ai_service)
@@ -376,6 +396,10 @@ def approve_candidate(candidate_id: str, payload: ReviewRequest):
         raise HTTPException(status_code=409, detail="Candidate 必须先完成 Sandbox")
     if payload.decision == "approved" and not candidate["result"].get("qualification", {}).get("qualified"):
         raise HTTPException(status_code=409, detail="Candidate 必须通过 11/11 Gate、Regression 与有效提升后才能进入 Human Release")
+    if payload.decision == "approved":
+        store.refresh_recommendation(candidate["experiment_id"])
+        if error := store.release_gate_error(candidate):
+            raise HTTPException(status_code=409, detail=error)
     try:
         return store.approve("candidate", candidate_id, payload.decision, payload.actor)
     except ValueError as error:
@@ -384,8 +408,13 @@ def approve_candidate(candidate_id: str, payload: ReviewRequest):
 
 @app.post("/api/candidates/{candidate_id}/release-approval", dependencies=[Depends(require_trusted_origin)])
 def approve_release(candidate_id: str, payload: ReviewRequest):
-    if store.candidate(candidate_id) is None:
+    candidate = store.candidate(candidate_id)
+    if candidate is None:
         raise HTTPException(status_code=404, detail="Candidate not found")
+    if payload.decision == "approved":
+        store.refresh_recommendation(candidate["experiment_id"])
+        if error := store.release_gate_error(candidate):
+            raise HTTPException(status_code=409, detail=error)
     if (store.latest_approval("candidate", candidate_id) or {}).get("decision") != "approved":
         raise HTTPException(status_code=409, detail="需要 Candidate Approval")
     try:

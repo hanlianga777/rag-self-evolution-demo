@@ -26,16 +26,22 @@ class OptimizationAgent:
         completed = sum(item["status"] == "evaluated" for item in self.store.candidates(existing_experiment)) if existing_experiment else 0
         if completed >= MAX_EVALS:
             raise ValueError(f"evaluation budget exhausted: max_evals={MAX_EVALS}")
+        prior_candidates = []
         if existing_experiment:
             existing = self.store.experiment(existing_experiment)
             if existing is None or existing["baseline_run_id"] != baseline_run_id:
                 raise ValueError("Optimization Run 不属于该 Baseline")
             prior_candidates = self.store.candidates(existing_experiment)
-            if len(prior_candidates) < 3 or any(item["status"] != "evaluated" for item in prior_candidates[-3:]):
+            round_numbers = [item.get("reasoning", {}).get("round") for item in prior_candidates if isinstance(item.get("reasoning", {}).get("round"), int)]
+            current_round = max(round_numbers) if round_numbers else 0
+            current = [item for item in prior_candidates if item.get("reasoning", {}).get("round") == current_round]
+            if current_round == 0 or len(current) != 3 or any(item["status"] != "evaluated" for item in current):
                 raise ValueError("上一轮 A/B/C 必须全部完成 Sandbox 后才能继续优化")
-            if any(item["result"].get("qualification", {}).get("qualified") for item in prior_candidates[-3:]):
+            if any(item["result"].get("qualification", {}).get("qualified") for item in current):
                 raise ValueError("已有合格 Candidate，无需继续生成下一轮")
-            round_number = len(prior_candidates) // 3 + 1
+            if completed + 3 > MAX_EVALS:
+                raise ValueError(f"evaluation budget exhausted: remaining={MAX_EVALS - completed}, next round requires 3")
+            round_number = current_round + 1
         else:
             round_number = 1
         experiment_id = existing_experiment or self.store.create_experiment(baseline_run_id)
@@ -57,6 +63,8 @@ class OptimizationAgent:
             for candidate in candidates:
                 if not all(isinstance(candidate.get(field), str) and candidate[field].strip() for field in ("hypothesis", "proposal", "risk")):
                     raise ValueError("Agent Candidate 缺少可解释 Hypothesis / Proposal / Risk")
+                if candidate["hypothesis"].strip() in {item.get("reasoning", {}).get("hypothesis", "").strip() for item in prior_candidates}:
+                    raise ValueError("下一轮必须提出新的 Hypothesis")
                 config = {**base_config, **candidate.get("config", {})}
                 check = validate_candidate_config(config, prior_configs=prior, completed_evals=completed)
                 if not check["valid"]:

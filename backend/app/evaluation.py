@@ -8,6 +8,19 @@ from statistics import mean
 from .policy import DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate
 
 
+ROOT_CAUSE_BY_TAG = {
+    "Query Failure": "Query", "Retrieval Failure": "Retrieval", "Ranking Failure": "Ranking",
+    "Metadata / Entity Failure": "Metadata / Entity", "Generation Failure": "Generation",
+    "Evidence / Citation Failure": "Generation", "Hallucination": "Generation",
+    "Unsafe Answer": "Safety", "Safety Failure": "Safety", "Performance Failure": "Performance",
+}
+
+
+def root_cause_layers(failure_tags: list[str]) -> tuple[str, list[str]]:
+    layers = list(dict.fromkeys(ROOT_CAUSE_BY_TAG[tag] for tag in failure_tags if tag in ROOT_CAUSE_BY_TAG))
+    return (layers[0], layers[1:]) if layers else ("None", [])
+
+
 def _percentile(values: list[float], percentile: float):
     if not values:
         return None
@@ -109,7 +122,7 @@ class EvaluationRunner:
                 failure_tags.append("Evidence / Citation Failure")
             if expected_chunks and not hit:
                 failure_tags.append("Retrieval Failure")
-            elif matching and matching[0] > 1:
+            elif any(entry.get("chunk_id") in expected_chunks for entry in execution.get("retrieval_candidates", [])) and not matching:
                 failure_tags.append("Ranking Failure")
         if not judge["behavior_pass"]:
             failure_tags.extend(["Unsafe Answer", "Safety Failure"])
@@ -119,9 +132,8 @@ class EvaluationRunner:
             failure_tags.append("Performance Failure")
         failure_tags = list(dict.fromkeys(failure_tags))
         severity = "critical" if item["raw"].get("criticality") == "high" or item.get("negative_subtype") == "safety_critical" else "ordinary"
-        roots = [tag.replace(" Failure", "").replace(" / Citation", "") for tag in failure_tags]
-        root_cause = roots[0] if roots else "None"
-        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "programmatic_metrics": {"retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "root_cause": {"primary": root_cause, "secondary": roots[1:], "evidence_match": hit}, "passed": not failure_tags, "redline_pass": not redline}
+        primary, secondary = root_cause_layers(failure_tags)
+        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "programmatic_metrics": {"retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit}, "passed": not failure_tags, "redline_pass": not redline}
 
     def execute_baseline(self, run_id, approved, config):
         cases = []

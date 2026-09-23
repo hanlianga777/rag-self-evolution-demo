@@ -92,6 +92,76 @@ class FinalGovernanceTests(unittest.TestCase):
         self.assertEqual(artifacts["hard_validation"]["counts"], {"positive": 8, "ablation": 4, "negative": 8})
         self.assertEqual(len(artifacts["coverage_plan"]), 20)
 
+    def test_failed_generation_run_keeps_slot_audit_without_candidate_workspace(self):
+        run = self.store.save_failed_generation_run(
+            {"positive": 8, "ablation": 4, "negative": 8}, "test-model", [{"slot": "Q01"}],
+            {"status": "failed"}, {"Q01": [{"attempt": 3, "validation_error": "duplicate question"}]}, ["Q01"],
+        )
+
+        self.assertEqual(run["status"], "failed")
+        self.assertEqual(run["question_ids"], [])
+        self.assertEqual(run["artifacts"]["slot_audit"]["Q01"][-1]["validation_error"], "duplicate question")
+        self.assertEqual(len([item for item in self.store.questions() if item["legacy_question_type"] == "v1_mini"]), 0)
+
+    def test_ambiguous_negative_uses_answerability_judge_and_rejects_fake_negative(self):
+        candidates = self._mini_candidates()
+        negative = next(item for item in self.store.save_mini_golden_candidates(candidates, "test-model") if item["test_category"] == "negative")
+
+        class AmbiguousRetriever:
+            def search(self, *_args, **_kwargs):
+                return [{"chunk_id": "C1", "score": .8}]
+
+        result = self.store.run_probe(negative["id"], AmbiguousRetriever(), [{"chunk_id": "C1", "text": "无关正文"}], answerability_judge=lambda *_: {"answerable": True, "confidence": .9, "reason": "存在足够证据", "supporting_chunk_ids": ["C1"]})
+
+        self.assertEqual(result["classification"], "FAKE_NEGATIVE_RISK")
+        self.assertEqual(result["probe_details"]["negative_checks"]["answerability"]["answerable"], True)
+
+    def test_recommendation_waits_for_all_three_candidates_in_the_round(self):
+        experiment = self.store.create_experiment("EVAL-1")
+        for label in "ABC":
+            candidate_id = f"{experiment}-R1-{label}"
+            self.store.save_candidate(experiment, f"R1-{label}", {"top_k": 4}, {"round": 1, "candidate_label": label})
+            if label == "A":
+                self.store.finish_candidate(candidate_id, "evaluated", self._qualified_result())
+
+        recommendation = self.store.refresh_recommendation(experiment)
+
+        self.assertEqual(recommendation["status"], "WAITING_FOR_ROUND_COMPLETION")
+        self.assertEqual(recommendation["round_completion"], {"evaluated": 1, "total": 3})
+
+    def test_round_budget_is_derived_from_evaluated_candidates(self):
+        experiment = self.store.create_experiment("EVAL-1")
+        for label in "ABC":
+            candidate_id = f"{experiment}-R1-{label}"
+            self.store.save_candidate(experiment, f"R1-{label}", {"top_k": 4}, {"round": 1, "candidate_label": label})
+            self.store.finish_candidate(candidate_id, "evaluated", self._qualified_result(False))
+
+        self.assertEqual(self.store.experiment(experiment)["evaluation_budget"], {"used": 3, "max": 12})
+
+    def test_multiple_pareto_candidates_require_human_recommendation(self):
+        experiment = self.store.create_experiment("EVAL-1")
+        for label in "ABC":
+            candidate_id = f"{experiment}-R1-{label}"
+            self.store.save_candidate(experiment, f"R1-{label}", {"top_k": 4}, {"round": 1, "candidate_label": label})
+            self.store.finish_candidate(candidate_id, "evaluated", self._qualified_result(label != "C"))
+
+        recommendation = self.store.refresh_recommendation(experiment)
+
+        self.assertEqual(recommendation["status"], "Needs Human Recommendation")
+        selected = self.store.select_recommendation(experiment, f"{experiment}-R1-A", "reviewer")
+        self.assertEqual(selected["recommended_candidate"], f"{experiment}-R1-A")
+
+    @staticmethod
+    def _qualified_result(qualified=True):
+        return {"qualification": {"qualified": qualified}, "metrics": {"positive_correctness": 80}, "comparison_metrics": {"recall_at_k": 90}, "gates": {"passed": qualified, "passed_count": 11, "total": 11}, "regression": {"passed": qualified, "status": "PASS" if qualified else "FAIL"}, "target_bad_cases_fixed": 1, "bad_case_count": 1}
+
+    def _mini_candidates(self):
+        candidates = []
+        for category, count in (("positive", 8), ("ablation", 4), ("negative", 8)):
+            for index in range(count):
+                candidates.append({"test_category": category, "question": f"{category}-negative-check-{index}", "reference_answer": "证据答案" if category != "negative" else None, "expected_behavior": "insufficient_evidence" if category == "negative" else None, "evidence": [{"source_chunk_ids": ["C1"], "evidence_key_points": ["支持"]}] if category != "negative" else []})
+        return candidates
+
     def test_batch_review_preflights_every_candidate_before_writing_any_approval(self):
         candidates = []
         for category, count in (("positive", 8), ("ablation", 4), ("negative", 8)):

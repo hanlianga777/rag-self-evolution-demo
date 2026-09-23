@@ -174,6 +174,18 @@ class EvaluationRunnerTests(unittest.TestCase):
         self.assertEqual(candidate["result"]["baseline_run_id"], baseline["id"])
         self.assertEqual(self.store.active_production()["id"], "baseline-v1")
 
+    def test_rank_two_evidence_inside_final_context_is_not_a_ranking_failure(self):
+        class RankTwoRuntime(FakeEvaluationRuntime):
+            def answer(self, question, config):
+                result = super().answer(question, config)
+                result["retrieval"] = [{"chunk_id": "NOISE", "score": .95}, {"chunk_id": "KIRA-B50-CHUNK-0003", "score": .9}]
+                return result
+
+        result = EvaluationRunner(self.store, RankTwoRuntime())._case_result(self.store.question("GGC-001"), {})
+
+        self.assertNotIn("Ranking Failure", result["failure_tags"])
+        self.assertEqual(result["root_cause"]["primary"], "None")
+
     def test_approved_candidate_can_publish_then_roll_back_without_overwriting_history(self):
         self.approve_one()
         baseline = EvaluationRunner(self.store, FakeEvaluationRuntime()).run_baseline()
