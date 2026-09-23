@@ -14,6 +14,6 @@ export function Section({ title, action, children }: { title: string; action?: R
 }
 
 export function Status({ value }: { value: string }) {
-  const tone = /pass|completed|indexed|active|recommended|reviewed/i.test(value) ? "good" : /fail|rejected/i.test(value) ? "bad" : /running|evaluating|queued/i.test(value) ? "accent" : "neutral";
+  const tone = /pass|completed|indexed|active|recommended|reviewed|qualified|evaluated/i.test(value) ? "good" : /fail|rejected|not_qualified|needs_revision/i.test(value) ? "bad" : /running|evaluating|queued/i.test(value) ? "accent" : /pending|human_review|not_run|not_evaluable|legacy/i.test(value) ? "warning" : "neutral";
   return <Badge tone={tone}>{displayText(value)}</Badge>;
 }

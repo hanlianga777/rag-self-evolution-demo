@@ -69,6 +69,7 @@ class MonitoringAssessmentRequest(BaseModel):
 class BatchReviewRequest(BaseModel):
     question_ids: list[str] = Field(min_length=1, max_length=20)
     actor: str = Field(default="local_user", min_length=1, max_length=80)
+    confirmed_manual_review: bool = False
 
 
 class DirectReleaseRequest(BaseModel):
@@ -135,6 +136,16 @@ def governance_questions(stage: str | None = None):
     return store.questions(stage)
 
 
+@app.get("/api/governance/generation-runs")
+def generation_runs():
+    return store.generation_runs()
+
+
+@app.get("/api/governance/snapshots")
+def governance_snapshots():
+    return store.dataset_snapshots()
+
+
 @app.post("/api/governance/aliases", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def approve_alias(payload: AliasRequest):
     try:
@@ -146,14 +157,14 @@ def approve_alias(payload: AliasRequest):
 @app.post("/api/governance/generate-mini", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def generate_mini_golden():
     try:
-        candidates = ai_service.generate_mini_golden(corpus.chunks())
-        saved = store.save_mini_golden_candidates(candidates, ai_service.model)
+        generated = ai_service.generate_mini_golden(corpus.chunks())
+        saved = store.save_mini_golden_candidates(generated["candidates"], ai_service.model, coverage_plan=generated["coverage_plan"], hard_validation=generated["hard_validation"])
         for candidate in saved:
             probe = store.run_probe(candidate["id"], ai_service.retriever, corpus.chunks())
             if probe["status"] == "passed":
                 qc = ai_service.quality_check(store.question(candidate["id"]))
                 store.record_qc(candidate["id"], qc, "passed" if qc["score"] >= 85 else "failed")
-        return {"profile": {"positive": 8, "ablation": 4, "negative": 8}, "candidates": [store.question(item["id"]) for item in saved]}
+        return {"profile": generated["profile"], "generation_run_id": saved[0]["raw"]["generation_run_id"], "candidates": [store.question(item["id"]) for item in saved]}
     except Exception as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -172,9 +183,19 @@ def review_question(question_id: str, payload: ReviewRequest):
 def review_mini_batch(payload: BatchReviewRequest):
     """A single explicit operator action writes individual, auditable Human Review decisions."""
     try:
-        return store.review_generation_batch(payload.question_ids, payload.actor)
+        return store.review_generation_batch(payload.question_ids, payload.actor, confirmed_manual_review=payload.confirmed_manual_review)
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/governance/generation-runs/{generation_run_id}/snapshot", status_code=201, dependencies=[Depends(require_trusted_origin)])
+def create_generation_snapshot(generation_run_id: str):
+    try:
+        return store.create_generation_snapshot(generation_run_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Generation run not found")
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -322,6 +343,17 @@ def experiment(run_id: str):
     if result is None:
         raise HTTPException(status_code=404, detail="Experiment not found")
     return result
+
+
+@app.post("/api/experiments/{run_id}/continue", dependencies=[Depends(require_trusted_origin)])
+def continue_experiment(run_id: str):
+    experiment = store.experiment(run_id)
+    if experiment is None:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    try:
+        return OptimizationAgent(store, ai_service.provider).generate(experiment["baseline_run_id"], experiment_id=run_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.post("/api/candidates/{candidate_id}/run", status_code=201, dependencies=[Depends(require_trusted_origin)])

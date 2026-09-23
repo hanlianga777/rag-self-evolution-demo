@@ -36,8 +36,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .header-actions { align-items: center; display: flex; gap: 10px; }
 .page { margin: 0 auto; max-width: 1380px; padding: 28px 42px 64px; }
 .page-title { align-items: flex-start; display: flex; gap: 24px; justify-content: space-between; margin-bottom: 28px; }
-.page-title h1, .assistant-intro h1 { font-size: 28px; font-weight: 600; letter-spacing: -.05em; line-height: 1.15; margin: 3px 0 8px; }
-.page-title p, .muted { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 0; }
+.page-title h1, .assistant-intro h1 { font-size: 31px; font-weight: 700; letter-spacing: -.04em; line-height: 1.15; margin: 3px 0 8px; }
+.page-title p, .muted { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0; }
 .eyebrow { color: #61718a; font-size: 11px; font-weight: 750; letter-spacing: .1em; margin-bottom: 7px; text-transform: uppercase; }
 .production { border-left: 2px solid #aeb9c6; min-width: 170px; padding: 3px 0 3px 12px; }
 .production span { color: var(--muted); display: block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
@@ -54,7 +54,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .full { width: 100%; }
 
 .badge { align-items: center; background: var(--status-bg); border-radius: 999px; color: var(--status); display: inline-flex; font-size: 10px; font-weight: 600; gap: 4px; padding: 4px 8px; white-space: nowrap; }
-.badge.good, .badge.bad, .badge.warning { background: var(--status-bg); color: var(--status); }
+.badge.good { background: #e7f4ea; color: #29613a; }
+.badge.warning { background: #faf0d8; color: #75521a; }
+.badge.bad { background: #f9e7e7; color: #8a3333; }
 .badge.accent { background: #e9eef3; color: #3e526b; }
 
 .metrics-grid { background: transparent; border: 0; display: grid; gap: 12px; grid-template-columns: repeat(5, 1fr); margin-bottom: 24px; overflow: visible; }
@@ -88,8 +90,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .recharts-rectangle { fill: #263c57 !important; }
 
 table { border-collapse: collapse; font-size: 12px; width: 100%; }
-th { border-bottom: 1px solid var(--line); color: #7a8797; font-size: 10px; letter-spacing: .06em; padding: 0 10px 10px; text-align: left; text-transform: uppercase; vertical-align: top; }
-td { border-bottom: 1px solid var(--line-soft); padding: 12px 10px; vertical-align: top; }
+th { border-bottom: 1px solid var(--line); color: #7a8797; font-size: 12px; font-weight: 650; letter-spacing: .01em; padding: 0 10px 10px; text-align: left; text-transform: none; vertical-align: top; }
+td { border-bottom: 1px solid var(--line-soft); font-size: 13px; padding: 12px 10px; vertical-align: top; }
 tbody tr:hover { background: #fafbfc; }
 td:first-child { font-weight: 600; }
 td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }

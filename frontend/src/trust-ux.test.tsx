@@ -11,8 +11,8 @@ afterEach(() => { root?.unmount(); document.body.innerHTML = ""; });
 it("shows Not Run rather than a historical seed score", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<EvaluationPage data={{ evaluation: { status: "not_run" } }} navigate={() => {}} />); });
-  expect(document.body.textContent).toContain("Not Run");
-  expect(document.body.textContent).toContain("暂无真实单题结果");
+  expect(document.body.textContent).toContain("未运行");
+  expect(document.body.textContent).toContain("尚未运行 Baseline");
 });
 
 it("summarizes current governance without inventing an optimization result", async () => {

@@ -6,7 +6,7 @@ const translations: Record<string, string> = {
   "Recommended": "推荐", "Archived": "已归档", "Passed": "通过", "Failed": "未通过",
   "Rejected": "已拒绝", "Demo Active": "已启用", "Retrieval Failure": "检索失败",
   "Retrieval Noise": "检索噪声", "Over-Rejection": "过度拒答",
-  "High": "高", "Medium": "中", "Low": "低", "Positive": "正向", "Ablation": "口语化",
+  "High": "高", "Medium": "中", "Low": "低", "Positive": "正向测试", "Ablation": "鲁棒性测试（Ablation）",
   "Negative": "负向", "AI Generated": "AI 生成", "Human Added": "人工补充",
   "Baseline": "基线", "Candidate A": "候选方案 A", "Candidate B": "候选方案 B", "Candidate C": "候选方案 C",
   "Evaluation": "评测", "Optimization": "优化", "Production": "生产环境",
@@ -28,6 +28,11 @@ const translations: Record<string, string> = {
   "Improve Recall while controlling response latency": "提升召回率，同时控制响应延迟", "Fix primary Retrieval issue while keeping low latency": "修复主要检索问题，同时保持低延迟",
   "Today 14:32": "今天 14:32", "Today 14:12": "今天 14:12", "Today 14:36": "今天 14:36", "Yesterday": "昨天", "Mon": "周一",
   "PDF text parser": "PDF 文本解析器", "512 tokens / 80 overlap": "512 tokens / 80 重叠", "Logical isolation · no containers": "逻辑隔离 · 不使用容器",
+  "not_run": "未运行", "not_evaluable": "不可评测", "NOT_EVALUABLE": "不可评测",
+  "positive": "正向测试", "ablation": "鲁棒性测试（Ablation）", "negative": "负向 / 边界测试",
+  "probe_pending": "待 Probe", "probe_passed": "Probe 通过", "qc_pending": "待 QC", "qc_passed": "QC 通过", "qc_failed": "QC 未通过", "needs_revision": "待修订", "human_review_pending": "待人工审核", "legacy_unverified": "历史未验证", "pending_human_confirm": "待人工确认",
+  "QUALIFIED": "已合格", "NOT_QUALIFIED": "未合格", "RETRIEVAL_INCOHERENT": "检索不一致（保留人工审核）", "EVIDENCE_VALID": "证据有效", "EVIDENCE_INVALID": "证据无效", "NEGATIVE_VALID": "负向边界有效", "FAKE_NEGATIVE_RISK": "疑似伪负向",
+  "active": "生产中", "archived": "已归档", "generated": "待沙箱评测", "evaluated": "已完成沙箱评测", "partial": "部分完成",
 };
 
 export function displayText(value: string): string {

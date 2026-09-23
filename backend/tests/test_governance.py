@@ -145,6 +145,7 @@ class EvaluationRunnerTests(unittest.TestCase):
             self.store.record_probe_result(question_id, {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40, "evidence_direct_failure": False, "reason": "test", "rule_version": "v1.0.1"})
             self.store.record_qc(question_id, {"score": 90, "priority": "P2", "issues": [], "reason": "test", "model": "test"}, "passed")
             self.store.review_question(question_id, "approved", "local_user")
+        self.store.create_dataset_snapshot()
 
     def test_runner_uses_only_approved_snapshot_and_persists_real_case_results(self):
         self.approve_one()
@@ -158,7 +159,7 @@ class EvaluationRunnerTests(unittest.TestCase):
         self.assertEqual(len(self.store.evaluation_case_results(run["id"])), 4)
 
     def test_runner_blocks_formal_evaluation_without_an_approved_question(self):
-        with self.assertRaisesRegex(ValueError, "approved"):
+        with self.assertRaisesRegex(ValueError, "Snapshot"):
             EvaluationRunner(self.store, FakeEvaluationRuntime()).run_baseline()
 
     def test_candidate_run_reuses_the_completed_baseline_snapshot_and_keeps_production_unchanged(self):

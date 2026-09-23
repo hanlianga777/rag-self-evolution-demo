@@ -7,6 +7,9 @@ describe("displayText", () => {
     expect(displayText("Retrieval Failure")).toBe("检索失败");
     expect(displayText("Candidate B")).toBe("候选方案 B");
     expect(displayText("live")).toBe("服务回答");
+    expect(displayText("not_run")).toBe("未运行");
+    expect(displayText("RETRIEVAL_INCOHERENT")).toBe("检索不一致（保留人工审核）");
+    expect(displayText("Ablation")).toBe("鲁棒性测试（Ablation）");
   });
 
   it("does not alter an unknown API value", () => {

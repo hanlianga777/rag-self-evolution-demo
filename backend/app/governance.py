@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .policy import DEFAULT_PIPELINE_CONFIG
+from .corpus import EMBEDDING_MODEL
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +20,7 @@ GENERATION_PROFILES = {
     "medium": {"positive": 20, "ablation": 10, "negative": 20},
     "full": {"positive": 40, "ablation": 20, "negative": 40},
 }
+NEGATIVE_EXPECTED_BEHAVIORS = {"clarify", "insufficient_evidence", "safe_rejection", "prompt_injection_resistance"}
 
 
 def _now() -> str:
@@ -217,7 +219,7 @@ class GovernanceStore:
             connection.execute("INSERT OR REPLACE INTO alias_mappings VALUES (?, ?, ?, ?, ?)", (alias.strip(), canonical.strip(), "approved", actor, _now()))
         return {"alias": alias.strip(), "canonical": canonical.strip(), "status": "approved", "actor": actor}
 
-    def save_mini_golden_candidates(self, candidates: list[dict], model_version: str):
+    def save_mini_golden_candidates(self, candidates: list[dict], model_version: str, *, coverage_plan: list[dict] | None = None, hard_validation: dict | None = None):
         """Persist the V1 Mini profile only as review-pending candidates, never as Golden."""
         expected = GENERATION_PROFILES["mini"]
         actual = {category: sum(item.get("test_category") == category for item in candidates) for category in expected}
@@ -232,23 +234,28 @@ class GovernanceStore:
                 answer = candidate.get("reference_answer")
                 expected_behavior = candidate.get("expected_behavior")
                 evidence = candidate.get("evidence") or []
-                if not question or (category != "negative" and (not isinstance(answer, str) or not answer.strip() or not evidence)) or (category == "negative" and expected_behavior not in {"clarify", "insufficient_evidence", "safe_rejection", "prompt_injection_resistance"}):
+                if not question or (category != "negative" and (not isinstance(answer, str) or not answer.strip() or not evidence)) or (category == "negative" and expected_behavior not in NEGATIVE_EXPECTED_BEHAVIORS):
                     raise ValueError("Generated Golden candidate failed hard validation")
                 question_id = f"V1G-{run_id[-12:]}-{serial:02d}"
-                raw = {"id": question_id, "question": question, "reference_answer": answer, "acceptable_evidence": evidence, "expected_behavior": expected_behavior, "generation_profile": "v1-mini-8-4-8", "generation_run_id": run_id, "generation_model": model_version}
+                raw = {"id": question_id, "question": question, "reference_answer": answer, "acceptable_evidence": evidence, "expected_behavior": expected_behavior, "generation_profile": "v1-mini-8-4-8", "generation_run_id": run_id, "generation_model": model_version, "ablation_attribute": candidate.get("ablation_attribute"), "coverage_slot": candidate.get("coverage_slot")}
                 connection.execute("INSERT INTO questions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, "candidate", "v1_mini", category, candidate.get("negative_subtype"), "human_review_pending", "probe_pending", "qc_pending", question, answer, _json(evidence), _json(raw), now, now))
                 question_ids.append(question_id)
             connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(expected), model_version, "candidate_generated", _json(question_ids), now))
-            coverage_plan = [{"test_category": item["test_category"], "source_chunk_ids": [chunk_id for source in item.get("evidence", []) for chunk_id in source.get("source_chunk_ids", [])]} for item in candidates]
-            question_plan = [{"question_id": question_id, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype")} for question_id, item in zip(question_ids, candidates)]
-            hard_validation = {"status": "passed", "profile": "mini", "counts": actual, "validated_at": now}
-            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json(coverage_plan), _json(question_plan), _json(hard_validation)))
+            coverage = coverage_plan or [{"test_category": item["test_category"], "source_chunk_ids": [chunk_id for source in item.get("evidence", []) for chunk_id in source.get("source_chunk_ids", [])]} for item in candidates]
+            question_plan = [{"question_id": question_id, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "ablation_attribute": item.get("ablation_attribute"), "coverage_slot": item.get("coverage_slot")} for question_id, item in zip(question_ids, candidates)]
+            validation = {"status": "passed", "profile": "mini", "counts": actual, "validated_at": now, **(hard_validation or {})}
+            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json(coverage), _json(question_plan), _json(validation)))
         return [self.question(question_id) for question_id in question_ids]
 
     def generation_artifacts(self, generation_run_id: str):
         with self.connection() as connection:
             row = connection.execute("SELECT * FROM golden_generation_artifacts WHERE generation_run_id = ?", (generation_run_id,)).fetchone()
         return {**dict(row), "coverage_plan": _load(row["coverage_plan_json"], []), "question_plan": _load(row["question_plan_json"], []), "hard_validation": _load(row["hard_validation_json"], {})} if row else None
+
+    def generation_runs(self):
+        with self.connection() as connection:
+            rows = connection.execute("SELECT * FROM golden_generation_runs ORDER BY created_at DESC").fetchall()
+        return [{**dict(row), "profile": _load(row["profile_json"], {}), "question_ids": _load(row["question_ids_json"], []), "artifacts": self.generation_artifacts(row["id"])} for row in rows]
 
     def review_question(self, question_id: str, decision: str, actor: str):
         if decision not in {"approved", "rejected", "needs_revision"}:
@@ -282,13 +289,31 @@ class GovernanceStore:
             connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "invalidated", actor, _now()))
         return self.question(question_id)
 
-    def create_dataset_snapshot(self):
-        approved = self.questions("golden")
+    def create_dataset_snapshot(self, approved: list[dict] | None = None, generation_run_id: str | None = None):
+        approved = approved if approved is not None else self.questions("golden")
         snapshot = {"question_ids": [item["id"] for item in approved], "questions": [item["raw"] for item in approved]}
+        if generation_run_id:
+            snapshot["generation_run_id"] = generation_run_id
         version_id = f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
         with self.connection() as connection:
             connection.execute("INSERT INTO dataset_versions VALUES (?, ?, ?, ?, ?)", (version_id, "approved", "human_review", _json(snapshot), _now()))
         return {"id": version_id, **snapshot}
+
+    def dataset_snapshots(self):
+        with self.connection() as connection:
+            rows = connection.execute("SELECT * FROM dataset_versions WHERE status = 'approved' ORDER BY created_at DESC").fetchall()
+        return [{**dict(row), "snapshot": {"id": row["id"], **_load(row["snapshot_json"], {})}} for row in rows]
+
+    def create_generation_snapshot(self, generation_run_id: str):
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM golden_generation_runs WHERE id = ?", (generation_run_id,)).fetchone()
+        if row is None:
+            raise KeyError(generation_run_id)
+        question_ids = _load(row["question_ids_json"], [])
+        approved = [self.question(question_id) for question_id in question_ids]
+        if len(approved) != 20 or any(item["stage"] != "golden" for item in approved):
+            raise ValueError("同一 V1 Mini Generation Run 的 20 道题必须全部完成人工批准后才能创建 Snapshot")
+        return self.create_dataset_snapshot(approved, generation_run_id)
 
     def run_probe(self, question_id: str, retriever, chunks: list[dict]):
         item = self.question(question_id)
@@ -300,11 +325,14 @@ class GovernanceStore:
         programmatic = {
             "question": bool(item["question"].strip()),
             "reference_answer": bool(item["reference_answer"]) if positive else True,
-            "expected_behavior": True if positive else expected_behavior in {"clarify", "insufficient_evidence"},
+            "expected_behavior": True if positive else expected_behavior in NEGATIVE_EXPECTED_BEHAVIORS,
             "evidence": bool(evidence) if positive else True,
             "source_chunks": expected_chunks.issubset(available_chunks) if positive else True,
         }
-        hits = retriever.search(item["question"], limit=4)
+        if positive and hasattr(retriever, "retrieve"):
+            hits = retriever.retrieve(item["question"], DEFAULT_PIPELINE_CONFIG)
+        else:
+            hits = retriever.search(item["question"], limit=4)
         best = max((hit.get("score", 0) for hit in hits), default=0)
         source_texts = {chunk.get("chunk_id"): chunk.get("text", chunk.get("chunk_text", "")) for chunk in chunks}
         haystack = " ".join(source_texts.values())
@@ -314,7 +342,9 @@ class GovernanceStore:
         normalized_query = _normalized(item["question"])
         corpus_matches = [chunk_id for chunk_id, text in source_texts.items() if normalized_query and normalized_query in _normalized(text)]
         full_text = {"mode": "evidence" if positive else "fake_negative_check", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else bool(expected_behavior) and not corpus_matches}
-        checks_passed = all(programmatic.values()) and full_text["passed"]
+        evidence_valid = all(programmatic.values()) and full_text["passed"]
+        recalled = bool(expected_chunks & {hit.get("chunk_id") for hit in hits}) if positive else None
+        classification = "RETRIEVAL_INCOHERENT" if positive and evidence_valid and not recalled else "EVIDENCE_VALID" if positive and evidence_valid else "EVIDENCE_INVALID" if positive else "NEGATIVE_VALID" if evidence_valid else "FAKE_NEGATIVE_RISK"
         negative_checks = None if positive else {
             "vector_probe": {"observed_hits": hits, "passed": not any(hit.get("score", 0) >= .95 for hit in hits)},
             "full_text_probe": {"corpus_match_chunk_ids": corpus_matches, "passed": not corpus_matches},
@@ -323,14 +353,14 @@ class GovernanceStore:
         result = self.record_probe_result(question_id, {
             "question_quality": 30 if bool(item["question"].strip()) else 0,
             "golden_answer_quality": 30 if (not positive or bool(item["reference_answer"])) else 0,
-            "evidence_support": 40 if checks_passed else 0,
-            "evidence_direct_failure": not full_text["passed"],
-            "reason": "Programmatic evidence check" if checks_passed else "Evidence or required fields cannot support Golden",
+            "evidence_support": 40 if evidence_valid else 0,
+            "evidence_direct_failure": not evidence_valid,
+            "reason": "Evidence exists but the production pipeline did not recall it" if classification == "RETRIEVAL_INCOHERENT" else "Programmatic evidence check" if evidence_valid else "Evidence or required fields cannot support Golden",
             "rule_version": "v1.0.1",
             "model_version": "programmatic-probe-v1",
-            "probe_details": {"vector": {"top_k": hits, "best_similarity": best}, "full_text": full_text, "negative_checks": negative_checks},
+            "probe_details": {"pipeline": "CandidateK → Hybrid → Lightweight second-stage ranking → MinScore → TopK" if positive else "vector + full-text fake-negative check", "vector": {"top_k": hits, "best_similarity": best}, "full_text": full_text, "negative_checks": negative_checks, "classification": classification, "retrieval_coherent": recalled},
         })
-        return {**result, "programmatic": {"checks": programmatic, "passed": all(programmatic.values())}, "vector": {"top_k": hits, "best_similarity": best, "signal": "observed_only"}, "full_text": full_text, "passed": result["status"] == "passed"}
+        return {**result, "classification": classification, "programmatic": {"checks": programmatic, "passed": all(programmatic.values())}, "vector": {"top_k": hits, "best_similarity": best, "signal": "observed_only"}, "full_text": full_text, "passed": result["status"] == "passed"}
 
     def record_probe_result(self, question_id: str, result: dict):
         """Persist the frozen 30/30/40 probe; evidence failure is non-compensable."""
@@ -358,7 +388,9 @@ class GovernanceStore:
             connection.execute("UPDATE questions SET probe_status = ?, review_status = ?, updated_at = ? WHERE id = ?", ("probe_passed" if passed else "needs_revision", "human_review_pending" if passed else "needs_revision", _now(), question_id))
         return stored
 
-    def review_generation_batch(self, question_ids: list[str], actor: str):
+    def review_generation_batch(self, question_ids: list[str], actor: str, *, confirmed_manual_review: bool = False):
+        if not confirmed_manual_review:
+            raise ValueError("Human Review confirmation is required")
         candidates = [self.question(question_id) for question_id in question_ids]
         runs = {item["raw"].get("generation_run_id") for item in candidates}
         if len(candidates) != 20 or len(runs) != 1 or None in runs or any(item["raw"].get("generation_profile") != "v1-mini-8-4-8" for item in candidates):
@@ -371,7 +403,7 @@ class GovernanceStore:
                 connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", ("golden", "approved", now, question_id))
                 connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (question_id, "dataset", "approved", actor, now))
                 connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "approved", actor, now))
-        return {"reviewed": [self.question(question_id) for question_id in question_ids], "snapshot": self.create_dataset_snapshot()}
+        return {"reviewed": [self.question(question_id) for question_id in question_ids], "generation_run_id": next(iter(runs))}
 
     def record_qc(self, question_id: str, result: dict, status: str):
         item = self.question(question_id)
@@ -561,7 +593,7 @@ class GovernanceStore:
         with self.connection() as connection:
             if previous:
                 connection.execute("UPDATE production_versions SET status = 'archived' WHERE id = ?", (previous["id"],))
-            snapshot = {"version": version_id, "candidate_id": candidate_id, "candidate_configuration": candidate["config"], "model_version": run["judge"].get("model"), "dataset_snapshot_version": run["dataset_version_id"], "hard_gate_results": candidate["result"].get("gates"), "comparison_metrics": candidate["result"].get("comparison_metrics"), "bad_case_count": candidate["result"].get("bad_case_count"), "regression": candidate["result"].get("regression"), "recommendation_reason": (self.recommendation(candidate["experiment_id"]) or {}).get("result", {}).get("why"), "human_release": release, "timestamp": _now()}
+            snapshot = {"version": version_id, "candidate_id": candidate_id, "pipeline_config": candidate["config"], "candidate_configuration": candidate["config"], "prompt_strategy": candidate["config"].get("prompt_strategy"), "prompt_version": "grounded-prompt-v1", "generation_model": run["judge"].get("model"), "model_version": run["judge"].get("model"), "rerank_mode": "lightweight_second_stage" if candidate["config"].get("rerank") else "disabled", "embedding_model": EMBEDDING_MODEL, "golden_snapshot": run["dataset_version_id"], "dataset_snapshot_version": run["dataset_version_id"], "evaluation_run": run["id"], "evaluation_result": candidate["result"], "hard_gate_results": candidate["result"].get("gates"), "comparison_metrics": candidate["result"].get("comparison_metrics"), "bad_case_count": candidate["result"].get("bad_case_count"), "regression": candidate["result"].get("regression"), "recommendation": self.recommendation(candidate["experiment_id"]), "recommendation_reason": (self.recommendation(candidate["experiment_id"]) or {}).get("result", {}).get("why"), "human_release": release, "release_operator": release.get("actor"), "release_time": _now(), "previous_version": previous["id"] if previous else None, "timestamp": _now()}
             connection.execute("INSERT INTO production_versions (id, status, config_json, evaluation_run_id, dataset_version_id, approval_id, previous_version_id, created_at, snapshot_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (version_id, "active", _json(candidate["config"]), run["id"], run["dataset_version_id"], release["id"], previous["id"] if previous else None, _now(), _json(snapshot)))
         return self.active_production()
 

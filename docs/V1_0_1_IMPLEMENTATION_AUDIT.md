@@ -5,8 +5,8 @@
 | SPEC 能力 | 当前 Backend | 当前 Frontend（改造前） | 状态 | 本轮动作 |
 | --- | --- | --- | --- | --- |
 | Knowledge Base | `CorpusStore` 提供 PDF、Chunk、BGE/FAISS 索引与详情 | 与测试集共用旧页面 | Keep | 知识库仅保留文档与 Inspector |
-| Dataset Governance | `GovernanceStore` 保存 Candidate、Review、Snapshot | 混在“知识与数据集”Tab | Rebuild UI | 拆为测试集治理页 |
-| Probe / QC | `/api/governance/questions/{id}/probe`、`/qc`；30/30/40、QC ≥85 | 旧 Tab | Keep | 在治理页保留受控操作 |
+| Dataset Governance | Coverage Plan、Hard Validation、Candidate、显式 Review/Snapshot 审计 | 独立测试集治理页 | Implemented | 历史与 V1 Run 分离 |
+| Probe / QC | 正向/鲁棒性走真实检索 Pipeline；Negative 多重伪负向检查 | 治理页受控操作 | Implemented | `RETRIEVAL_INCOHERENT` 保留人工审核 |
 | Human Review | 单题与批量审核、Snapshot 审计 | 旧 Tab | Keep | 明示 AI 不可自动批准 |
 | Baseline / Evaluation | `EvaluationRunner`、三组指标、11 Hard Gates、逐题记录 | 内容过薄 | Fix UI | 展示 Gate、指标、逐题结果与 Bad Case |
 | Bad Case | `bad_cases` 持久化且有标签/根因 | 分散显示 | Fix UI | 评测为入口、进化实验室读取 |
@@ -19,6 +19,6 @@
 
 ## 结论
 
-- 后端 V1.0.1 规则和审计存储可复用；本轮不重建 Pipeline、数据库或 Provider。
+- 后端 V1.0.1 规则和审计存储已扩展为 Coverage、Hard Validation、显式 Snapshot 与真实 Probe 边界；未重建 Pipeline、数据库或 Provider。
 - 当前运行库含 40 条历史候选、0 条 Approved Golden；正式 Baseline、Sandbox、Recommendation、Release 必须如实显示 `Not Run` 或 `Not Qualified`。
 - 发现 `/api/optimization` 原先固定返回 `not_run`，即使数据库已有 Experiment；本轮只补最近持久化实验的只读聚合，不改变任何实验或发布状态。

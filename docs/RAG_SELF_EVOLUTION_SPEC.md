@@ -2,7 +2,7 @@
 
 > **唯一正式 Source of Truth**
 > **SPEC Version：V1.0.1 — Final Closure Patch**
-> **Status：Final Target SPEC Frozen · Implementation NOT Authorized**
+> **Status：Final Target SPEC Frozen · Implementation Authorized / In Progress**
 
 ## 1. 文档地位与使用规则
 
@@ -395,7 +395,7 @@ V0.2–V1.0 遗留的产品决策已在本版本全部关闭：Overall Score、R
 
 ## 14. 本轮实施边界 `[CONFIRMED]`
 
-本轮仅建立和维护本文件、[SPEC ChangeLog](SPEC_CHANGELOG.md) 及 README 的 Source-of-Truth 说明。V1.0.1 Final Closure Patch 本身不授权业务实施。禁止：
+V1.0.1 的 `[CONFIRMED]` 产品规则保持冻结。本次已获得独立实施授权；实现必须保持真实数据边界、审计记录与人工发布边界，不得以实现便利改变已确认业务规则。禁止：
 
 - 修改 Frontend、Backend、Database、Migration、Pipeline Configuration、Demo UI 或业务逻辑。
 - 重新生成 Golden Dataset、删除现有 40 道历史题、修改 Golden Candidate、Probe / QC Runtime、Evaluation / Baseline / Bad Case 数据。

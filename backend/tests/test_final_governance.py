@@ -102,8 +102,41 @@ class FinalGovernanceTests(unittest.TestCase):
             self.store.record_probe_result(item["id"], {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40, "evidence_direct_failure": False, "reason": "test"})
             self.store.record_qc(item["id"], {"score": 90, "priority": "P2", "reason": "test", "model": "test"}, "passed")
         with self.assertRaisesRegex(ValueError, "All Mini"):
-            self.store.review_generation_batch([item["id"] for item in generated], "reviewer")
+            self.store.review_generation_batch([item["id"] for item in generated], "reviewer", confirmed_manual_review=True)
         self.assertEqual(sum(item["stage"] == "golden" for item in self.store.questions()), 0)
+
+    def test_batch_review_requires_explicit_confirmation_and_snapshot_is_separate(self):
+        candidates = []
+        for category, count in (("positive", 8), ("ablation", 4), ("negative", 8)):
+            for index in range(count):
+                candidates.append({"test_category": category, "question": f"{category}-{index}", "reference_answer": "证据答案" if category != "negative" else None, "expected_behavior": "insufficient_evidence" if category == "negative" else None, "evidence": [{"source_chunk_ids": ["C1"], "evidence_key_points": ["支持"]}] if category != "negative" else []})
+        generated = self.store.save_mini_golden_candidates(candidates, "test-model")
+        for item in generated:
+            self.store.record_probe_result(item["id"], {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40, "evidence_direct_failure": False, "reason": "test"})
+            self.store.record_qc(item["id"], {"score": 90, "priority": "P2", "reason": "test", "model": "test"}, "passed")
+        with self.assertRaisesRegex(ValueError, "confirmation"):
+            self.store.review_generation_batch([item["id"] for item in generated], "reviewer", confirmed_manual_review=False)
+
+        reviewed = self.store.review_generation_batch([item["id"] for item in generated], "reviewer", confirmed_manual_review=True)
+        self.assertNotIn("snapshot", reviewed)
+        snapshot = self.store.create_generation_snapshot(generated[0]["raw"]["generation_run_id"])
+        self.assertEqual(len(snapshot["question_ids"]), 20)
+        self.assertEqual(snapshot["generation_run_id"], generated[0]["raw"]["generation_run_id"])
+
+    def test_probe_keeps_valid_evidence_as_retrieval_incoherent(self):
+        candidates = []
+        for category, count in (("positive", 8), ("ablation", 4), ("negative", 8)):
+            for index in range(count):
+                candidates.append({"test_category": category, "question": f"{category}-{index}", "reference_answer": "证据答案" if category != "negative" else None, "expected_behavior": "insufficient_evidence" if category == "negative" else None, "evidence": [{"source_chunk_ids": ["C1"], "evidence_key_points": ["支持"]}] if category != "negative" else []})
+        item = self.store.save_mini_golden_candidates(candidates, "test-model")[0]
+
+        class PipelineRetriever:
+            def retrieve(self, *_args, **_kwargs):
+                return [{"chunk_id": "OTHER", "score": .8, "final_score": .8}]
+
+        result = self.store.run_probe(item["id"], PipelineRetriever(), [{"chunk_id": "C1", "text": "支持证据"}])
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["classification"], "RETRIEVAL_INCOHERENT")
 
     def test_alias_mapping_uses_only_explicitly_approved_entries(self):
         self.assertEqual(self.store.approved_aliases(), {})
