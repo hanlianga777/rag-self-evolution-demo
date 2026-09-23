@@ -125,13 +125,16 @@ class AiService:
         except (json.JSONDecodeError, TypeError, ValueError) as error:
             raise ProviderUnavailable("DeepSeek Answerability 未返回有效 JSON") from error
 
-    def generate_mini_golden(self, chunks: list[dict]) -> dict:
+    def generate_mini_golden(self, chunks: list[dict], on_progress=None) -> dict:
         """Generate a coverage-planned V1 Mini; approval remains human-only."""
         if not self.live_enabled:
             raise ProviderUnavailable("未配置 DEEPSEEK_API_KEY，无法生成 Golden Candidate")
         if not chunks:
             raise ProviderUnavailable("知识库没有可用于 Golden Generation 的 Chunk")
         plan, candidates, slot_audit, failed_slots = self._mini_coverage_plan(chunks), [], {}, []
+        coverage = [{key: value for key, value in slot.items() if key != "sources"} for slot in plan]
+        if on_progress:
+            on_progress({"stage": "coverage", "coverage_plan": coverage})
         for slot in plan:
             attempts, candidate = [], None
             for attempt in range(1, 4):
@@ -146,15 +149,21 @@ class AiService:
                 except (json.JSONDecodeError, ProviderUnavailable, ValueError) as caught:
                     error = "invalid JSON" if isinstance(caught, json.JSONDecodeError) else str(caught)
                 attempts.append({"slot": slot["slot"], "attempt": attempt, "validation_error": error, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction})
+                slot_audit[slot["slot"]] = attempts
                 if not error:
                     candidates.append(candidate)
+                if on_progress:
+                    on_progress({"stage": "generating", "slot": slot["slot"], "attempt": attempt, "completed_slots": len(slot_audit) - (1 if error and attempt < 3 else 0), "slot_audit": slot_audit.copy(), "valid_slots": candidates.copy()})
+                if not error:
                     break
             slot_audit[slot["slot"]] = attempts
             if attempts[-1]["validation_error"]:
                 failed_slots.append(slot["slot"])
         validation = self._hard_validate(candidates, chunks)
         status = "candidate_generated" if not failed_slots and len(candidates) == 20 else "failed"
-        return {"status": status, "profile": {"positive": 8, "ablation": 4, "negative": 8}, "coverage_plan": [{key: value for key, value in slot.items() if key != "sources"} for slot in plan], "candidates": candidates if status == "candidate_generated" else [], "valid_slots": candidates, "failed_slots": failed_slots, "slot_audit": slot_audit, "hard_validation": {**validation, "status": "passed" if status == "candidate_generated" else "failed"}}
+        if on_progress:
+            on_progress({"stage": "validation", "completed_slots": 20, "slot_audit": slot_audit, "valid_slots": candidates, "failed_slots": failed_slots, "hard_validation": validation})
+        return {"status": status, "profile": {"positive": 8, "ablation": 4, "negative": 8}, "coverage_plan": coverage, "candidates": candidates if status == "candidate_generated" else [], "valid_slots": candidates, "failed_slots": failed_slots, "slot_audit": slot_audit, "hard_validation": {**validation, "status": "passed" if status == "candidate_generated" else "failed"}}
 
     @staticmethod
     def _slot_instruction(slot: dict, repair_reason: str | None) -> str:

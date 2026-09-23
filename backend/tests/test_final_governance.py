@@ -103,6 +103,17 @@ class FinalGovernanceTests(unittest.TestCase):
         self.assertEqual(run["artifacts"]["slot_audit"]["Q01"][-1]["validation_error"], "duplicate question")
         self.assertEqual(len([item for item in self.store.questions() if item["legacy_question_type"] == "v1_mini"]), 0)
 
+    def test_async_run_keeps_slot_audit_then_atomically_adds_review_pending_candidates(self):
+        run_id = self.store.start_generation_run("test-model")
+        self.store.update_generation_run(run_id, status="generating", progress={"stage": "generating", "slot": "Q01", "completed_slots": 1}, validation={"slot_audit": {"Q01": [{"attempt": 1, "validation_error": None}]}, "valid_slots": [{"question": "first"}]})
+        self.assertEqual(self.store.generation_run(run_id)["artifacts"]["hard_validation"]["progress"]["completed_slots"], 1)
+        self.assertEqual(len([item for item in self.store.questions() if item["legacy_question_type"] == "v1_mini"]), 0)
+        saved = self.store.save_mini_golden_candidates(self._mini_candidates(), "test-model", run_id=run_id)
+        self.assertEqual(len(saved), 20)
+        self.assertEqual(self.store.generation_run(run_id)["status"], "probing")
+        self.assertEqual(self.store.generation_run(run_id)["artifacts"]["slot_audit"]["Q01"][0]["attempt"], 1)
+        self.assertTrue(all(item["review_status"] == "human_review_pending" for item in saved))
+
     def test_ambiguous_negative_uses_answerability_judge_and_rejects_fake_negative(self):
         candidates = self._mini_candidates()
         negative = next(item for item in self.store.save_mini_golden_candidates(candidates, "test-model") if item["test_category"] == "negative")

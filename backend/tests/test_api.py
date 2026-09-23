@@ -1,4 +1,5 @@
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -40,6 +41,39 @@ class GovernanceApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 4)
+
+    def test_mini_generation_returns_run_before_worker_finishes_and_persists_progress(self):
+        entered, release = threading.Event(), threading.Event()
+        previous_service = main.ai_service
+
+        class SlowService:
+            model = "test-model"
+
+            def generate_mini_golden(self, chunks, on_progress=None):
+                on_progress({"stage": "coverage", "coverage_plan": [{"slot": "Q01"}]})
+                on_progress({"stage": "generating", "slot": "Q01", "attempt": 1, "completed_slots": 1, "slot_audit": {"Q01": [{"attempt": 1, "validation_error": None}]}})
+                entered.set()
+                release.wait(5)
+                return {"status": "failed", "profile": {"positive": 8, "ablation": 4, "negative": 8}, "coverage_plan": [{"slot": "Q01"}], "hard_validation": {"status": "failed"}, "slot_audit": {"Q01": [{"attempt": 1, "validation_error": None}]}, "failed_slots": ["Q02"]}
+
+        main.ai_service = SlowService()
+        self.addCleanup(setattr, main, "ai_service", previous_service)
+        self.addCleanup(release.set)
+        response = self.client.post("/api/governance/generate-mini", headers={"Origin": "http://127.0.0.1:5174"})
+        self.assertEqual(response.status_code, 202)
+        run_id = response.json()["run_id"]
+        self.assertTrue(entered.wait(2))
+        status = self.client.get(f"/api/governance/generation-runs/{run_id}")
+        self.assertEqual(status.status_code, 200)
+        self.assertEqual(status.json()["artifacts"]["hard_validation"]["progress"]["completed_slots"], 1)
+        self.assertEqual(self.client.post("/api/governance/generate-mini", headers={"Origin": "http://127.0.0.1:5174"}).status_code, 409)
+        release.set()
+        for _ in range(50):
+            if self.client.get(f"/api/governance/generation-runs/{run_id}").json()["status"] == "failed":
+                break
+            threading.Event().wait(0.01)
+        self.assertEqual(self.client.get(f"/api/governance/generation-runs/{run_id}").json()["status"], "failed")
+        self.assertEqual(self.client.get("/api/dataset").json().__len__(), 40)
 
     def test_monitoring_trigger_is_pending_until_human_confirm(self):
         event = self.client.post("/api/monitoring/events", json={"question": "安全问题", "answer": "错误回答", "bad_case": True, "severity": "critical"}, headers={"Origin": "http://127.0.0.1:5174"})

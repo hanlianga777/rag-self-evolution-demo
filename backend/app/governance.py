@@ -219,13 +219,36 @@ class GovernanceStore:
             connection.execute("INSERT OR REPLACE INTO alias_mappings VALUES (?, ?, ?, ?, ?)", (alias.strip(), canonical.strip(), "approved", actor, _now()))
         return {"alias": alias.strip(), "canonical": canonical.strip(), "status": "approved", "actor": actor}
 
-    def save_mini_golden_candidates(self, candidates: list[dict], model_version: str, *, coverage_plan: list[dict] | None = None, hard_validation: dict | None = None, slot_audit: dict | None = None):
+    def start_generation_run(self, model_version: str):
+        run_id, now = f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", _now()
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status IN ('queued', 'coverage', 'generating', 'validation', 'probing', 'qc') LIMIT 1").fetchone():
+                raise ValueError("已有 V1 Mini Generation Run 正在执行")
+            connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(GENERATION_PROFILES["mini"]), model_version, "queued", _json([]), now))
+            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json([]), _json([]), _json({"progress": {"stage": "queued", "completed_slots": 0, "total_slots": 20, "probe_completed": 0, "qc_completed": 0}})))
+        return run_id
+
+    def update_generation_run(self, run_id: str, *, status: str, progress: dict | None = None, coverage_plan: list[dict] | None = None, validation: dict | None = None):
+        with self.connection() as connection:
+            row = connection.execute("SELECT coverage_plan_json, hard_validation_json FROM golden_generation_artifacts WHERE generation_run_id = ?", (run_id,)).fetchone()
+            if row is None:
+                raise KeyError(run_id)
+            audit = _load(row["hard_validation_json"], {})
+            audit.update(validation or {})
+            if progress:
+                audit["progress"] = {**audit.get("progress", {}), **progress}
+            connection.execute("UPDATE golden_generation_runs SET status = ? WHERE id = ?", (status, run_id))
+            connection.execute("UPDATE golden_generation_artifacts SET coverage_plan_json = ?, hard_validation_json = ? WHERE generation_run_id = ?", (_json(coverage_plan if coverage_plan is not None else _load(row["coverage_plan_json"], [])), _json(audit), run_id))
+
+    def save_mini_golden_candidates(self, candidates: list[dict], model_version: str, *, coverage_plan: list[dict] | None = None, hard_validation: dict | None = None, slot_audit: dict | None = None, run_id: str | None = None):
         """Persist the V1 Mini profile only as review-pending candidates, never as Golden."""
         expected = GENERATION_PROFILES["mini"]
         actual = {category: sum(item.get("test_category") == category for item in candidates) for category in expected}
         if actual != expected or len(candidates) != 20:
             raise ValueError("V1 Mini Golden profile must be Positive 8 / Ablation 4 / Negative 8")
-        run_id = f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        existing_run = run_id is not None
+        run_id = run_id or f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         question_ids, now = [], _now()
         with self.connection() as connection:
             for serial, candidate in enumerate(candidates, start=1):
@@ -240,11 +263,15 @@ class GovernanceStore:
                 raw = {"id": question_id, "question": question, "reference_answer": answer, "acceptable_evidence": evidence, "expected_behavior": expected_behavior, "generation_profile": "v1-mini-8-4-8", "generation_run_id": run_id, "generation_model": model_version, "ablation_attribute": candidate.get("ablation_attribute"), "ablation_metadata": candidate.get("ablation_metadata", {}), "coverage_slot": candidate.get("coverage_slot"), "generation_instruction": candidate.get("generation_instruction")}
                 connection.execute("INSERT INTO questions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, "candidate", "v1_mini", category, candidate.get("negative_subtype"), "human_review_pending", "probe_pending", "qc_pending", question, answer, _json(evidence), _json(raw), now, now))
                 question_ids.append(question_id)
-            connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(expected), model_version, "candidate_generated", _json(question_ids), now))
+            if existing_run:
+                connection.execute("UPDATE golden_generation_runs SET status = 'probing', question_ids_json = ? WHERE id = ?", (_json(question_ids), run_id))
+            else:
+                connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(expected), model_version, "candidate_generated", _json(question_ids), now))
             coverage = coverage_plan or [{"test_category": item["test_category"], "source_chunk_ids": [chunk_id for source in item.get("evidence", []) for chunk_id in source.get("source_chunk_ids", [])]} for item in candidates]
             question_plan = [{"question_id": question_id, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "ablation_attribute": item.get("ablation_attribute"), "coverage_slot": item.get("coverage_slot")} for question_id, item in zip(question_ids, candidates)]
-            validation = {"status": "passed", "profile": "mini", "counts": actual, "validated_at": now, "slot_audit": slot_audit or {}, **(hard_validation or {})}
-            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json(coverage), _json(question_plan), _json(validation)))
+            previous = _load(connection.execute("SELECT hard_validation_json FROM golden_generation_artifacts WHERE generation_run_id = ?", (run_id,)).fetchone()[0], {}) if existing_run else {}
+            validation = {**previous, "status": "passed", "profile": "mini", "counts": actual, "validated_at": now, "slot_audit": slot_audit if slot_audit is not None else previous.get("slot_audit", {}), **(hard_validation or {})}
+            connection.execute("INSERT OR REPLACE INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json(coverage), _json(question_plan), _json(validation)))
         return [self.question(question_id) for question_id in question_ids]
 
     def save_failed_generation_run(self, profile: dict, model_version: str, coverage_plan: list[dict], hard_validation: dict, slot_audit: dict, failed_slots: list[str]):
@@ -268,6 +295,11 @@ class GovernanceStore:
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM golden_generation_runs ORDER BY created_at DESC").fetchall()
         return [{**dict(row), "profile": _load(row["profile_json"], {}), "question_ids": _load(row["question_ids_json"], []), "artifacts": self.generation_artifacts(row["id"])} for row in rows]
+
+    def generation_run(self, run_id: str):
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM golden_generation_runs WHERE id = ?", (run_id,)).fetchone()
+        return {**dict(row), "profile": _load(row["profile_json"], {}), "question_ids": _load(row["question_ids_json"], []), "artifacts": self.generation_artifacts(run_id)} if row else None
 
     def review_question(self, question_id: str, decision: str, actor: str):
         if decision not in {"approved", "rejected", "needs_revision"}:

@@ -146,6 +146,14 @@ def generation_runs():
     return store.generation_runs()
 
 
+@app.get("/api/governance/generation-runs/{run_id}")
+def generation_run_status(run_id: str):
+    result = store.generation_run(run_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Generation run not found")
+    return result
+
+
 @app.get("/api/governance/snapshots")
 def governance_snapshots():
     return store.dataset_snapshots()
@@ -159,24 +167,40 @@ def approve_alias(payload: AliasRequest):
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
-@app.post("/api/governance/generate-mini", status_code=201, dependencies=[Depends(require_trusted_origin)])
+@app.post("/api/governance/generate-mini", status_code=202, dependencies=[Depends(require_trusted_origin)])
 def generate_mini_golden():
     try:
-        generated = ai_service.generate_mini_golden(corpus.chunks())
-        if generated["status"] == "failed":
-            failed = store.save_failed_generation_run(generated["profile"], ai_service.model, generated["coverage_plan"], generated["hard_validation"], generated["slot_audit"], generated["failed_slots"])
-            raise HTTPException(status_code=409, detail=f"Generation Run {failed['id']} failed: {', '.join(generated['failed_slots'])}")
-        saved = store.save_mini_golden_candidates(generated["candidates"], ai_service.model, coverage_plan=generated["coverage_plan"], hard_validation=generated["hard_validation"], slot_audit=generated["slot_audit"])
-        for candidate in saved:
-            probe = store.run_probe(candidate["id"], ai_service.retriever, corpus.chunks(), ai_service.answerability_check)
-            if probe["status"] == "passed":
-                qc = ai_service.quality_check(store.question(candidate["id"]))
-                store.record_qc(candidate["id"], qc, "passed" if qc["score"] >= 85 else "failed")
-        return {"profile": generated["profile"], "generation_run_id": saved[0]["raw"]["generation_run_id"], "candidates": [store.question(item["id"]) for item in saved]}
-    except HTTPException:
-        raise
-    except Exception as error:
+        run_id = store.start_generation_run(ai_service.model)
+    except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+    threading.Thread(target=_run_mini_generation, args=(run_id, store, ai_service, corpus), daemon=True).start()
+    return {"run_id": run_id, "status": "queued"}
+
+
+def _run_mini_generation(run_id, run_store, service, run_corpus):
+    def on_progress(event):
+        stage = event["stage"]
+        run_store.update_generation_run(run_id, status=stage, coverage_plan=event.get("coverage_plan"), validation={key: event[key] for key in ("slot_audit", "valid_slots", "failed_slots", "hard_validation") if key in event}, progress={key: event[key] for key in ("stage", "slot", "attempt", "completed_slots") if key in event})
+
+    try:
+        generated = service.generate_mini_golden(run_corpus.chunks(), on_progress=on_progress)
+        if generated["status"] == "failed":
+            run_store.update_generation_run(run_id, status="failed", validation={**generated["hard_validation"], "slot_audit": generated["slot_audit"], "failed_slots": generated["failed_slots"]}, progress={"stage": "failed"})
+            return
+        saved = run_store.save_mini_golden_candidates(generated["candidates"], service.model, coverage_plan=generated["coverage_plan"], hard_validation=generated["hard_validation"], slot_audit=generated["slot_audit"], run_id=run_id)
+        run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "probe_completed": 0})
+        qc_completed = 0
+        for index, candidate in enumerate(saved, start=1):
+            probe = run_store.run_probe(candidate["id"], service.retriever, run_corpus.chunks(), service.answerability_check)
+            run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "slot": candidate["raw"].get("coverage_slot"), "probe_completed": index})
+            if probe["status"] == "passed":
+                qc = service.quality_check(run_store.question(candidate["id"]))
+                run_store.record_qc(candidate["id"], qc, "passed" if qc["score"] >= 85 else "failed")
+                qc_completed += 1
+            run_store.update_generation_run(run_id, status="qc", progress={"stage": "qc", "slot": candidate["raw"].get("coverage_slot"), "qc_completed": qc_completed})
+        run_store.update_generation_run(run_id, status="completed", progress={"stage": "completed"})
+    except Exception as error:
+        run_store.update_generation_run(run_id, status="failed", validation={"error": str(error)}, progress={"stage": "failed"})
 
 
 @app.post("/api/governance/questions/{question_id}/review", dependencies=[Depends(require_trusted_origin)])
