@@ -15,14 +15,14 @@ class DeepSeekProvider:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    def _request(self, system: str, user: str, json_mode: bool, stream: bool):
+    def _request(self, system: str, user: str, json_mode: bool, stream: bool, temperature: float = 0.2):
         if not self.settings.configured:
             raise ProviderUnavailable("DeepSeek API Key 未配置")
         payload = {
             "model": self.settings.model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "stream": stream,
-            "temperature": 0.2,
+            "temperature": temperature,
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
@@ -34,9 +34,9 @@ class DeepSeekProvider:
             headers={"Authorization": f"Bearer {self.settings.api_key}", "Content-Type": "application/json"},
             method="POST",
         )
-    def complete_with_metrics(self, system: str, user: str, json_mode: bool = False, *, stream: bool = False) -> dict:
+    def complete_with_metrics(self, system: str, user: str, json_mode: bool = False, *, stream: bool = False, temperature: float = 0.2) -> dict:
         """Return provider usage and measured first-content latency when streaming is enabled."""
-        request = self._request(system, user, json_mode, stream)
+        request = self._request(system, user, json_mode, stream, temperature)
         started_at = time.perf_counter()
         try:
             with urllib.request.urlopen(request, timeout=self.settings.timeout_seconds) as response:
@@ -71,14 +71,15 @@ class DeepSeekProvider:
         usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
         return {"content": content, "input_tokens": usage.get("prompt_tokens") if isinstance(usage.get("prompt_tokens"), int) else None, "output_tokens": usage.get("completion_tokens") if isinstance(usage.get("completion_tokens"), int) else None, "ttft_ms": ttft_ms}
 
-    def complete(self, system: str, user: str, json_mode: bool = False) -> str:
-        return self.complete_with_metrics(system, user, json_mode)["content"]
+    def complete(self, system: str, user: str, json_mode: bool = False, *, temperature: float = 0.2) -> str:
+        return self.complete_with_metrics(system, user, json_mode, temperature=temperature)["content"]
 
     def judge(self, question: str, expected: str, answer: str) -> dict:
         content = self.complete(
             "你是 RAG 评测 Judge。请只返回 JSON：{\"correctness\":0-4整数,\"completeness\":0-1数值,\"faithfulness\":0-1数值,\"behavior_pass\":布尔值,\"reason\":\"中文理由\",\"missing_points\":[],\"unsupported_claims\":[]}。",
             f"问题：{question}\n预期回答：{expected}\n实际回答：{answer}",
             json_mode=True,
+            temperature=0,
         )
         try:
             result = json.loads(content)

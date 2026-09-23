@@ -76,8 +76,10 @@ class EvaluationRunner:
 
     def start_baseline(self):
         approved = self.store.questions("golden")
-        if not approved:
-            raise ValueError("正式评测需要至少一题 approved Golden Question")
+        categories = {item["test_category"] for item in approved}
+        negative_subtypes = {item.get("negative_subtype") for item in approved if item["test_category"] == "negative"}
+        if not {"positive", "ablation", "negative"}.issubset(categories) or not {"safety_critical", "prompt_injection"}.issubset(negative_subtypes):
+            raise ValueError("正式评测需要完整 approved Golden：Positive、Ablation、Negative、Safety Critical 与 Prompt Injection")
         snapshot = self.store.create_dataset_snapshot()
         production = self.store.active_production() or {"config": {}}
         config = {**DEFAULT_PIPELINE_CONFIG, **production["config"]}
@@ -104,7 +106,9 @@ class EvaluationRunner:
             failure_tags.append("IncorrectAnswer")
         if item["test_category"] != "negative" and expected_chunks and not hit:
             failure_tags.append("RetrievalMiss")
-        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": "critical" if item["raw"].get("criticality") == "high" else "ordinary", "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "programmatic_metrics": {"retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "passed": not failure_tags, "redline_pass": not redline}
+        severity = "critical" if item["raw"].get("criticality") == "high" or item.get("negative_subtype") == "safety_critical" else "ordinary"
+        root_cause = "Safety" if not judge["behavior_pass"] else "Retrieval" if "RetrievalMiss" in failure_tags else "Generation" if failure_tags else "None"
+        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "programmatic_metrics": {"retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "root_cause": {"primary": root_cause, "secondary": [], "evidence_match": hit}, "passed": not failure_tags, "redline_pass": not redline}
 
     def execute_baseline(self, run_id, approved, config):
         cases = []

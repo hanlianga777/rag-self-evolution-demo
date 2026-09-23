@@ -168,8 +168,17 @@ class VectorRetriever:
         for chunk_id in candidate_ids:
             vector_score, bm25_score = vector_normalized.get(chunk_id, 0.0), bm25_normalized.get(chunk_id, 0.0)
             combined = alpha * vector_score + (1 - alpha) * bm25_score if config.get("hybrid_search", True) else vector_score
-            rerank_score = (0.65 * vector_score + 0.35 * bm25_score) if config.get("rerank", True) else None
-            final_score = rerank_score if rerank_score is not None else combined
-            ranked.append({**self._materialize(by_id[chunk_id], final_score), "vector_normalized": round(vector_score, 4), "bm25_normalized": round(bm25_score, 4), "hybrid_score": round(combined, 4), "rerank_score": round(rerank_score, 4) if rerank_score is not None else None, "final_score": round(final_score, 4)})
+            ranked.append({"chunk_id": chunk_id, "vector_score": vector_score, "bm25_score": bm25_score, "combined": combined})
+        # CandidateK caps the shared recall pool before the optional second stage.
+        ranked = sorted(ranked, key=lambda item: item["combined"], reverse=True)[:candidate_k]
+        output = []
+        query_terms = _terms(" ".join(query_list))
+        for item in ranked:
+            chunk = by_id[item["chunk_id"]]
+            lexical_coverage = len(query_terms & _terms(chunk.get("chunk_text", chunk.get("text", "")))) / max(1, len(query_terms))
+            # Keep the fused score in the rerank signal: Alpha must remain observable when rerank is enabled.
+            rerank_score = (0.8 * item["combined"] + 0.2 * lexical_coverage) if config.get("rerank", True) else None
+            final_score = rerank_score if rerank_score is not None else item["combined"]
+            output.append({**self._materialize(chunk, final_score), "vector_normalized": round(item["vector_score"], 4), "bm25_normalized": round(item["bm25_score"], 4), "hybrid_score": round(item["combined"], 4), "rerank_score": round(rerank_score, 4) if rerank_score is not None else None, "final_score": round(final_score, 4)})
         minimum = float(config.get("min_score", 0))
-        return [item for item in sorted(ranked, key=lambda item: item["final_score"], reverse=True) if item["final_score"] >= minimum][:int(config.get("top_k", 4))]
+        return [item for item in sorted(output, key=lambda item: item["final_score"], reverse=True) if item["final_score"] >= minimum][:int(config.get("top_k", 4))]

@@ -14,6 +14,11 @@ from .policy import DEFAULT_PIPELINE_CONFIG
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATABASE = ROOT / "data" / "demo.db"
 GOLDEN_DRAFT = ROOT / "reports" / "golden_dataset_full_draft.json"
+GENERATION_PROFILES = {
+    "mini": {"positive": 8, "ablation": 4, "negative": 8},
+    "medium": {"positive": 20, "ablation": 10, "negative": 20},
+    "full": {"positive": 40, "ablation": 20, "negative": 40},
+}
 
 
 def _now() -> str:
@@ -98,6 +103,10 @@ class GovernanceStore:
                 CREATE TABLE IF NOT EXISTS alias_mappings (
                     alias TEXT PRIMARY KEY, canonical TEXT NOT NULL, status TEXT NOT NULL,
                     actor TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS golden_generation_artifacts (
+                    generation_run_id TEXT PRIMARY KEY, coverage_plan_json TEXT NOT NULL,
+                    question_plan_json TEXT NOT NULL, hard_validation_json TEXT NOT NULL
                 );
                 """
             )
@@ -210,7 +219,7 @@ class GovernanceStore:
 
     def save_mini_golden_candidates(self, candidates: list[dict], model_version: str):
         """Persist the V1 Mini profile only as review-pending candidates, never as Golden."""
-        expected = {"positive": 8, "ablation": 4, "negative": 8}
+        expected = GENERATION_PROFILES["mini"]
         actual = {category: sum(item.get("test_category") == category for item in candidates) for category in expected}
         if actual != expected or len(candidates) != 20:
             raise ValueError("V1 Mini Golden profile must be Positive 8 / Ablation 4 / Negative 8")
@@ -230,7 +239,16 @@ class GovernanceStore:
                 connection.execute("INSERT INTO questions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, "candidate", "v1_mini", category, candidate.get("negative_subtype"), "human_review_pending", "probe_pending", "qc_pending", question, answer, _json(evidence), _json(raw), now, now))
                 question_ids.append(question_id)
             connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(expected), model_version, "candidate_generated", _json(question_ids), now))
+            coverage_plan = [{"test_category": item["test_category"], "source_chunk_ids": [chunk_id for source in item.get("evidence", []) for chunk_id in source.get("source_chunk_ids", [])]} for item in candidates]
+            question_plan = [{"question_id": question_id, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype")} for question_id, item in zip(question_ids, candidates)]
+            hard_validation = {"status": "passed", "profile": "mini", "counts": actual, "validated_at": now}
+            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json(coverage_plan), _json(question_plan), _json(hard_validation)))
         return [self.question(question_id) for question_id in question_ids]
+
+    def generation_artifacts(self, generation_run_id: str):
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM golden_generation_artifacts WHERE generation_run_id = ?", (generation_run_id,)).fetchone()
+        return {**dict(row), "coverage_plan": _load(row["coverage_plan_json"], []), "question_plan": _load(row["question_plan_json"], []), "hard_validation": _load(row["hard_validation_json"], {})} if row else None
 
     def review_question(self, question_id: str, decision: str, actor: str):
         if decision not in {"approved", "rejected", "needs_revision"}:
@@ -277,7 +295,7 @@ class GovernanceStore:
         evidence = item["evidence"]
         expected_chunks = {chunk_id for source in evidence for chunk_id in source.get("source_chunk_ids", [])}
         available_chunks = {chunk.get("chunk_id") for chunk in chunks}
-        positive = item["test_category"] == "positive"
+        positive = item["test_category"] != "negative"
         expected_behavior = item["raw"].get("expected_behavior")
         programmatic = {
             "question": bool(item["question"].strip()),
@@ -295,8 +313,13 @@ class GovernanceStore:
         source_checks = [{"chunk_id": chunk_id, "text_available": bool(source_texts.get(chunk_id, "").strip())} for chunk_id in sorted(expected_chunks)]
         normalized_query = _normalized(item["question"])
         corpus_matches = [chunk_id for chunk_id, text in source_texts.items() if normalized_query and normalized_query in _normalized(text)]
-        full_text = {"mode": "evidence" if positive else "behavior_only", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else bool(expected_behavior)}
+        full_text = {"mode": "evidence" if positive else "fake_negative_check", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else bool(expected_behavior) and not corpus_matches}
         checks_passed = all(programmatic.values()) and full_text["passed"]
+        negative_checks = None if positive else {
+            "vector_probe": {"observed_hits": hits, "passed": not any(hit.get("score", 0) >= .95 for hit in hits)},
+            "full_text_probe": {"corpus_match_chunk_ids": corpus_matches, "passed": not corpus_matches},
+            "fake_negative_check": {"expected_behavior": expected_behavior, "passed": bool(expected_behavior) and not corpus_matches},
+        }
         result = self.record_probe_result(question_id, {
             "question_quality": 30 if bool(item["question"].strip()) else 0,
             "golden_answer_quality": 30 if (not positive or bool(item["reference_answer"])) else 0,
@@ -305,6 +328,7 @@ class GovernanceStore:
             "reason": "Programmatic evidence check" if checks_passed else "Evidence or required fields cannot support Golden",
             "rule_version": "v1.0.1",
             "model_version": "programmatic-probe-v1",
+            "probe_details": {"vector": {"top_k": hits, "best_similarity": best}, "full_text": full_text, "negative_checks": negative_checks},
         })
         return {**result, "programmatic": {"checks": programmatic, "passed": all(programmatic.values())}, "vector": {"top_k": hits, "best_similarity": best, "signal": "observed_only"}, "full_text": full_text, "passed": result["status"] == "passed"}
 
@@ -327,11 +351,27 @@ class GovernanceStore:
             "status": "passed" if passed else "failed", "reason": str(result.get("reason", "")),
             "rule_version": str(result.get("rule_version", "v1.0.1")),
             "model_version": str(result.get("model_version", "programmatic-probe-v1")),
+            "probe_details": result.get("probe_details", {}),
         }
         with self.connection() as connection:
             connection.execute("INSERT INTO probe_results(question_id, result_json, created_at) VALUES (?, ?, ?)", (question_id, _json(stored), _now()))
             connection.execute("UPDATE questions SET probe_status = ?, review_status = ?, updated_at = ? WHERE id = ?", ("probe_passed" if passed else "needs_revision", "human_review_pending" if passed else "needs_revision", _now(), question_id))
         return stored
+
+    def review_generation_batch(self, question_ids: list[str], actor: str):
+        candidates = [self.question(question_id) for question_id in question_ids]
+        runs = {item["raw"].get("generation_run_id") for item in candidates}
+        if len(candidates) != 20 or len(runs) != 1 or None in runs or any(item["raw"].get("generation_profile") != "v1-mini-8-4-8" for item in candidates):
+            raise ValueError("Batch review only accepts one complete V1 Mini generation run")
+        if any(item["probe_status"] != "probe_passed" or item["qc_status"] != "qc_passed" for item in candidates):
+            raise ValueError("All Mini candidates must pass Probe and QC before batch approval")
+        now = _now()
+        with self.connection() as connection:
+            for question_id in question_ids:
+                connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", ("golden", "approved", now, question_id))
+                connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (question_id, "dataset", "approved", actor, now))
+                connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "approved", actor, now))
+        return {"reviewed": [self.question(question_id) for question_id in question_ids], "snapshot": self.create_dataset_snapshot()}
 
     def record_qc(self, question_id: str, result: dict, status: str):
         item = self.question(question_id)
@@ -459,12 +499,30 @@ class GovernanceStore:
             result = {"status": "No Qualified Candidate", "recommended_candidate": None, "why": "No Candidate passed 11/11 Hard Gate, Regression and effective-improvement rules.", "candidates": [{"id": item["id"], "status": item["status"], "qualified": item["result"].get("qualification", {}).get("qualified", False)} for item in candidates]}
             candidate_id = None
         else:
-            def ranking(item):
-                comparison = item["result"].get("comparison_metrics", {})
-                return (-float(item["result"].get("overall_score") or 0), len(item["reasoning"].get("changed_parameters", {})), float(comparison.get("ttft_seconds") or 10**9), float(comparison.get("token_cost") or 10**9))
-            selected = sorted(qualified, key=ranking)[0]
-            result = {"status": "Recommended", "recommended_candidate": selected["id"], "why": "Qualified candidates are compared by quality display score, parameter complexity, TTFT and measured provider cost; Gate and Regression remain mandatory prerequisites.", "not_selected": [item["id"] for item in qualified if item["id"] != selected["id"]]}
-            candidate_id = selected["id"]
+            higher_is_better = ("positive_correctness", "positive_faithfulness", "positive_completeness", "ablation_correctness", "ablation_faithfulness", "ablation_completeness", "safe_rejection_rate", "safety_critical_accuracy", "prompt_injection_resistance", "recall_at_k", "precision_at_k", "mrr")
+            lower_is_better = ("ttft_seconds", "token_cost", "parameter_complexity")
+
+            def values(item):
+                return {**item["result"].get("metrics", {}), **item["result"].get("comparison_metrics", {}), "parameter_complexity": len(item["reasoning"].get("changed_parameters", {}))}
+
+            def dominates(left, right):
+                left_values, right_values, better = values(left), values(right), False
+                for metric in (*higher_is_better, *lower_is_better):
+                    a, b = left_values.get(metric), right_values.get(metric)
+                    if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
+                        continue
+                    if metric in higher_is_better and a < b:
+                        return False
+                    if metric in lower_is_better and a > b:
+                        return False
+                    better = better or a != b
+                return better
+
+            frontier = [item for item in qualified if not any(other["id"] != item["id"] and dominates(other, item) for other in qualified)]
+            selected = frontier[0] if len(frontier) == 1 else None
+            report = [{"candidate_id": item["id"], "group_metrics": item["result"].get("group_metrics", {}), "safety_metrics": item["result"].get("safety_metrics", {}), "comparison_metrics": item["result"].get("comparison_metrics", {}), "parameter_diff": item["reasoning"].get("changed_parameters", {}), "fixed_bad_cases": item["result"].get("target_bad_cases_fixed"), "remaining_bad_cases": item["result"].get("bad_case_count"), "regression": item["result"].get("regression"), "risks": item["reasoning"].get("risk")} for item in qualified]
+            result = {"status": "Recommended" if selected else "Needs Human Recommendation", "recommended_candidate": selected["id"] if selected else None, "why": "Pareto comparison uses only observed Group Metrics, TTFT, measured Token Cost, Retrieval Metrics and parameter complexity; Overall Score is display-only.", "not_selected": [item["id"] for item in qualified if selected and item["id"] != selected["id"]], "comparison": report, "pareto_frontier": [item["id"] for item in frontier]}
+            candidate_id = selected["id"] if selected else None
         with self.connection() as connection:
             connection.execute("INSERT OR REPLACE INTO recommendations VALUES (?, ?, ?, ?, ?)", (experiment_id, candidate_id, result["status"], _json(result), _now()))
         return result
@@ -538,6 +596,18 @@ class GovernanceStore:
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM monitoring_events ORDER BY created_at DESC").fetchall()
         return [{**dict(row), "bad_case": bool(row["bad_case"]), "determinable": bool(row["determinable"])} for row in rows]
+
+    def assess_monitoring_event(self, event_id: str, *, bad_case: bool, severity: str):
+        if severity not in {"ordinary", "critical"}:
+            raise ValueError("Unsupported monitoring severity")
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM monitoring_events WHERE id = ?", (event_id,)).fetchone()
+            if row is None:
+                raise KeyError(event_id)
+            connection.execute("UPDATE monitoring_events SET bad_case = ?, severity = ?, determinable = 1 WHERE id = ?", (int(bad_case), severity, event_id))
+        event = next(item for item in self.monitoring_events() if item["id"] == event_id)
+        self._create_monitoring_trigger_if_needed(event)
+        return event
 
     def _create_monitoring_trigger_if_needed(self, event: dict):
         reason = None

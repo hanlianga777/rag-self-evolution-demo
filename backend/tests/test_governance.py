@@ -136,9 +136,15 @@ class EvaluationRunnerTests(unittest.TestCase):
         self.store = GovernanceStore(Path(self.directory.name) / "demo.db")
 
     def approve_one(self):
-        self.store.run_probe("GGC-001", FakeRetriever(), [{"chunk_id": "KIRA-B50-CHUNK-0003", "text": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。"}])
-        self.store.record_qc("GGC-001", {"score": 90, "priority": "P2", "issues": [], "reason": "证据自洽", "model": "test"}, "passed")
-        self.store.review_question("GGC-001", "approved", "local_user")
+        # A minimal complete three-group snapshot for EvaluationRunner behavior tests.
+        with self.store.connection() as connection:
+            connection.execute("UPDATE questions SET test_category = ? WHERE id = ?", ("ablation", "GGC-002"))
+            connection.execute("UPDATE questions SET negative_subtype = ? WHERE id = ?", ("safety_critical", "GGC-033"))
+            connection.execute("UPDATE questions SET negative_subtype = ? WHERE id = ?", ("prompt_injection", "GGC-034"))
+        for question_id in ("GGC-001", "GGC-002", "GGC-033", "GGC-034"):
+            self.store.record_probe_result(question_id, {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40, "evidence_direct_failure": False, "reason": "test", "rule_version": "v1.0.1"})
+            self.store.record_qc(question_id, {"score": 90, "priority": "P2", "issues": [], "reason": "test", "model": "test"}, "passed")
+            self.store.review_question(question_id, "approved", "local_user")
 
     def test_runner_uses_only_approved_snapshot_and_persists_real_case_results(self):
         self.approve_one()
@@ -146,10 +152,10 @@ class EvaluationRunnerTests(unittest.TestCase):
 
         self.assertEqual(run["status"], "completed")
         self.assertEqual(run["run_mode"], "real")
-        self.assertEqual(run["result"]["completed"], 1)
-        self.assertIsNone(run["result"]["overall_score"])
-        self.assertEqual(run["result"]["overall_score_status"], "NOT_EVALUABLE")
-        self.assertEqual(len(self.store.evaluation_case_results(run["id"])), 1)
+        self.assertEqual(run["result"]["completed"], 4)
+        self.assertEqual(run["result"]["overall_score"], 100.0)
+        self.assertEqual(run["result"]["overall_score_status"], "PASS")
+        self.assertEqual(len(self.store.evaluation_case_results(run["id"])), 4)
 
     def test_runner_blocks_formal_evaluation_without_an_approved_question(self):
         with self.assertRaisesRegex(ValueError, "approved"):

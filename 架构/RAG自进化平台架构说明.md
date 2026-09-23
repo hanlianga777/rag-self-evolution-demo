@@ -10,7 +10,7 @@
 
 ## 运行边界
 
-系统使用本地官方 PDF、BGE/FAISS、SQLite、FastAPI、React 和 DeepSeek。没有已人工批准的 Positive、Ablation、Negative Golden Snapshot 时，正式 Baseline、Sandbox、Recommendation 与 Release 均保持 `Not Run / Not Qualified`；历史候选题与展示 Seed 绝不作为已验证结果。
+系统使用本地官方 PDF、BGE/FAISS、SQLite、FastAPI、React 和 DeepSeek。Generation Run 会持久化 Coverage Plan、Question Plan 与 Hard Validation；没有已人工批准的 Positive、Ablation、Negative Golden Snapshot 时，正式 Baseline、Sandbox、Recommendation 与 Release 均保持 `Not Run / Not Qualified`；历史候选题与展示 Seed 绝不作为已验证结果。
 
 ## 已实现链路
 
@@ -22,7 +22,7 @@ Mini Golden 的自动步骤只生成候选与机器检查。Human Review 是唯�
 
 运行时管道为：`Query → CandidateK → Vector/BM25 normalization + Hybrid → optional Rerank → MinScore → TopK Context → DeepSeek`。Candidate 配置仅可使用冻结 Search Space；Parser/OCR、Chunk、模型、Temperature、Query Decompose、Retrieval MaxTokens 与 Rerank TopN 不可由 Agent 修改。
 
-逐题结果保存检索排序、证据、Judge、Latency、TTFT、Token Usage / Provider Cost、检索指标及 Bad Case 标签。后端统一计算三组评测、11/11 Hard Gate、Regression、Qualified 与 Recommendation。Overall Score 只展示九项质量指标等权平均，不是发布 Gate。
+逐题结果保存检索排序、证据、Judge、Latency、TTFT、Token Usage / Provider Cost、检索指标、Bad Case 标签和结构化 Root Cause。后端统一计算三组评测、11/11 Hard Gate、Regression、Qualified 与 Recommendation；多个合格候选使用 Pareto 比较，取舍保留给 Human Release。Overall Score 只展示九项质量指标等权平均，不是发布 Gate。
 
 ## 治理接口
 

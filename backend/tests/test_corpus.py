@@ -94,6 +94,19 @@ class CorpusTests(unittest.TestCase):
         self.assertIn("bm25_normalized", evidence[0])
         self.assertIn("rerank_score", evidence[0])
 
+    def test_hybrid_alpha_remains_effective_when_rerank_is_enabled(self):
+        chunks = [
+            {"document_id": "DOC-1", "document_name": "one.pdf", "product": "A", "vendor": "厂商", "chunk_id": "A", "section": "维护", "section_path": "维护", "page_start": 1, "page_end": 1, "text": "机器人充电 " + "无关内容 " * 20},
+            {"document_id": "DOC-2", "document_name": "two.pdf", "product": "B", "vendor": "厂商", "chunk_id": "B", "section": "维护", "section_path": "维护", "page_start": 1, "page_end": 1, "text": "机器人充电"},
+        ]
+        corpus = Mock(); corpus.chunks.return_value = chunks
+        retriever = VectorRetriever(corpus)
+        retriever.vector_candidates = Mock(return_value=[{"chunk_id": "A", "score": .9}, {"chunk_id": "B", "score": .2}])
+        base = {"candidate_k": 12, "top_k": 2, "min_score": 0, "hybrid_search": True, "rerank": True, "metadata_filter": "OFF"}
+        keyword_first = retriever.retrieve("机器人充电", {**base, "hybrid_alpha": .3})
+        vector_first = retriever.retrieve("机器人充电", {**base, "hybrid_alpha": .7})
+        self.assertNotEqual(keyword_first[0]["chunk_id"], vector_first[0]["chunk_id"])
+
 
 if __name__ == "__main__":
     unittest.main()

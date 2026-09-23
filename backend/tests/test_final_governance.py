@@ -88,6 +88,22 @@ class FinalGovernanceTests(unittest.TestCase):
 
         self.assertEqual(len(generated), 20)
         self.assertTrue(all(item["stage"] == "candidate" and item["review_status"] == "human_review_pending" for item in generated))
+        artifacts = self.store.generation_artifacts(generated[0]["raw"]["generation_run_id"])
+        self.assertEqual(artifacts["hard_validation"]["counts"], {"positive": 8, "ablation": 4, "negative": 8})
+        self.assertEqual(len(artifacts["coverage_plan"]), 20)
+
+    def test_batch_review_preflights_every_candidate_before_writing_any_approval(self):
+        candidates = []
+        for category, count in (("positive", 8), ("ablation", 4), ("negative", 8)):
+            for index in range(count):
+                candidates.append({"test_category": category, "question": f"{category}-{index}", "reference_answer": "证据答案" if category != "negative" else None, "expected_behavior": "insufficient_evidence" if category == "negative" else None, "evidence": [{"source_chunk_ids": ["C1"], "evidence_key_points": ["支持"]}] if category != "negative" else []})
+        generated = self.store.save_mini_golden_candidates(candidates, "test-model")
+        for item in generated[:-1]:
+            self.store.record_probe_result(item["id"], {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40, "evidence_direct_failure": False, "reason": "test"})
+            self.store.record_qc(item["id"], {"score": 90, "priority": "P2", "reason": "test", "model": "test"}, "passed")
+        with self.assertRaisesRegex(ValueError, "All Mini"):
+            self.store.review_generation_batch([item["id"] for item in generated], "reviewer")
+        self.assertEqual(sum(item["stage"] == "golden" for item in self.store.questions()), 0)
 
     def test_alias_mapping_uses_only_explicitly_approved_entries(self):
         self.assertEqual(self.store.approved_aliases(), {})

@@ -61,6 +61,11 @@ class MonitoringEventRequest(BaseModel):
     determinable: bool = True
 
 
+class MonitoringAssessmentRequest(BaseModel):
+    bad_case: bool
+    severity: str = Field(pattern="^(ordinary|critical)$")
+
+
 class BatchReviewRequest(BaseModel):
     question_ids: list[str] = Field(min_length=1, max_length=20)
     actor: str = Field(default="local_user", min_length=1, max_length=80)
@@ -167,12 +172,7 @@ def review_question(question_id: str, payload: ReviewRequest):
 def review_mini_batch(payload: BatchReviewRequest):
     """A single explicit operator action writes individual, auditable Human Review decisions."""
     try:
-        candidates = [store.question(question_id) for question_id in payload.question_ids]
-        runs = {item["raw"].get("generation_run_id") for item in candidates}
-        if len(candidates) != 20 or len(runs) != 1 or None in runs or any(item["raw"].get("generation_profile") != "v1-mini-8-4-8" for item in candidates):
-            raise ValueError("Batch review only accepts one complete V1 Mini generation run")
-        reviewed = [store.review_question(question_id, "approved", payload.actor) for question_id in payload.question_ids]
-        return {"reviewed": reviewed, "snapshot": store.create_dataset_snapshot()}
+        return store.review_generation_batch(payload.question_ids, payload.actor)
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:
@@ -253,6 +253,17 @@ def record_monitoring_event(payload: MonitoringEventRequest):
     try:
         event = store.record_monitoring_event(question=payload.question, answer=payload.answer, bad_case=payload.bad_case, severity=payload.severity, determinable=payload.determinable)
         return {"event": event, "trigger": store.optimization_trigger_for_event(event["id"])}
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/monitoring/events/{event_id}/assessment", dependencies=[Depends(require_trusted_origin)])
+def assess_monitoring_event(event_id: str, payload: MonitoringAssessmentRequest):
+    try:
+        event = store.assess_monitoring_event(event_id, bad_case=payload.bad_case, severity=payload.severity)
+        return {"event": event, "trigger": store.optimization_trigger_for_event(event_id)}
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Monitoring event not found")
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -400,7 +411,12 @@ def start_evaluation():
 
 @app.post("/api/preview", dependencies=[Depends(require_trusted_origin)])
 def preview(payload: PreviewRequest):
-    return ai_service.preview(payload.question)
+    result = ai_service.preview(payload.question)
+    baseline = result.get("baseline", {})
+    if result.get("mode") in {"live", "local"} and not result.get("fallback_reason"):
+        event = store.record_monitoring_event(question=payload.question, answer=baseline.get("answer", ""), bad_case=False, severity="ordinary", determinable=False)
+        result["monitoring_event_id"] = event["id"]
+    return result
 
 
 @app.post("/api/preview/baseline", dependencies=[Depends(require_trusted_origin)])
