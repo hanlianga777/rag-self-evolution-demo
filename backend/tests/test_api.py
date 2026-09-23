@@ -50,6 +50,17 @@ class GovernanceApiTests(unittest.TestCase):
         self.assertEqual(confirmed.status_code, 200)
         self.assertEqual(confirmed.json()["status"], "human_confirmed")
 
+    def test_optimization_returns_the_latest_persisted_experiment(self):
+        experiment_id = main.store.create_experiment("EVAL-real")
+        main.store.save_agent_trace(experiment_id, "completed", {"root_cause_cluster": "Retrieval Miss"})
+
+        response = self.client.get("/api/optimization")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["id"], experiment_id)
+        self.assertEqual(response.json()["status"], "completed")
+        self.assertIsNone(response.json()["recommendation"])
+
 
 if __name__ == "__main__":
     unittest.main()

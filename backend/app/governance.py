@@ -668,4 +668,9 @@ class GovernanceStore:
             candidates = connection.execute("SELECT * FROM candidate_configs WHERE experiment_id = ? ORDER BY id", (experiment_id,)).fetchall()
         if row is None:
             return None
-        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**dict(candidate), "config": _load(candidate["config_json"], {}), "reasoning": _load(candidate["reasoning_json"], {})} for candidate in candidates]}
+        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**dict(candidate), "config": _load(candidate["config_json"], {}), "reasoning": _load(candidate["reasoning_json"], {}), "result": _load(candidate["result_json"], {})} for candidate in candidates]}
+
+    def latest_experiment(self):
+        with self.connection() as connection:
+            row = connection.execute("SELECT id FROM experiments ORDER BY created_at DESC LIMIT 1").fetchone()
+        return self.experiment(row["id"]) if row else None

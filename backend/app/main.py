@@ -235,7 +235,10 @@ def bad_case(case_id: str):
 
 @app.get("/api/optimization")
 def optimization():
-    return {"status": "not_run", "data_source": "real", "message": "需先完成真实 Baseline Evaluation"}
+    experiment = store.latest_experiment()
+    if experiment is None:
+        return {"status": "not_run", "data_source": "real", "message": "需先完成真实 Baseline Evaluation"}
+    return {**experiment, "data_source": "real", "recommendation": store.recommendation(experiment["id"])}
 
 
 @app.get("/api/versions")
