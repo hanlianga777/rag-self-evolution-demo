@@ -3,6 +3,7 @@ import { MessageCirclePlus, Send, Trash2 } from "lucide-react";
 import { postJson } from "../api";
 import { loadConversations, saveConversations } from "../conversations";
 import type { ChatMessage, Citation, Conversation } from "../types";
+import { useOperation } from "../operation";
 
 const suggestedQuestions = ["清洁机器人 KIRA B 50 首次使用前应该做什么？", "巡检机器人 B2 遥控器低电量时如何充电？", "巡检机器人 B2 电池首次使用前有什么要求？"];
 
@@ -12,6 +13,7 @@ function newConversation(): Conversation { return { id: id("chat"), title: "新�
 function matchBadCase(question: string, badCases: any[]) { return badCases.find(item => item.question.trim() === question.trim()); }
 
 export function AssistantPage({ productionVersion, badCases, onOpenBadCase, onOpenCitation, onOpenDocument }: { productionVersion?: string; badCases: any[]; onOpenBadCase: (caseId: string) => void; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void }) {
+  const operation = useOperation();
   const [conversations, setConversations] = useState<Conversation[]>(loadConversations);
   const [blankConversation, setBlankConversation] = useState(newConversation);
   const [activeId, setActiveId] = useState<string | undefined>();
@@ -49,7 +51,7 @@ export function AssistantPage({ productionVersion, badCases, onOpenBadCase, onOp
     if (activeId) updateConversation(active.id, () => started); else { setConversations(current => [started, ...current]); setActiveId(started.id); }
     setDraft("");
     try {
-      const result: any = await postJson("/api/preview", { question });
+      const result: any = await operation.run("DeepSeek 正在生成回答", () => postJson("/api/preview", { question }));
       const assistant: ChatMessage = { id: id("assistant"), role: "assistant", content: result.baseline.answer, question, createdAt: now(), mode: result.mode, model: result.model, latencyMs: result.latency_ms, fallbackReason: result.fallback_reason, sources: result.baseline.sources, evidence: result.baseline.evidence };
       setTypingId(assistant.id);
       updateConversation(started.id, conversation => ({ ...conversation, updatedAt: assistant.createdAt, messages: [...conversation.messages, assistant] }));
@@ -71,7 +73,7 @@ export function AssistantPage({ productionVersion, badCases, onOpenBadCase, onOp
 function Thinking({ startedAt }: { startedAt: number }) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => { const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100); return () => window.clearInterval(timer); }, [startedAt]);
-  return <article className="chat-message assistant thinking-message" aria-live="polite"><div className="message-label"><span>AI助手</span><time>{elapsed.toFixed(1)} 秒</time></div><p>正在思考<span className="thinking-dots" aria-hidden="true">...</span></p></article>;
+  return <article className="chat-message assistant thinking-message" aria-live="polite"><div className="message-label"><span>AI助手</span><time>{elapsed.toFixed(1)} 秒</time></div><p>正在生成回答<span className="thinking-dots" aria-hidden="true">...</span></p></article>;
 }
 
 function Message({ message, typing, onTypingProgress, onTypingComplete, onOpenCitation, onOpenDocument, onSubmitClue }: { message: ChatMessage; typing: boolean; onTypingProgress: () => void; onTypingComplete: () => void; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void; onSubmitClue: (message: ChatMessage) => void }) {

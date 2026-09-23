@@ -120,7 +120,7 @@ class GovernanceStore:
                     category = "positive" if legacy_type.startswith("grounded") else "negative"
                     subtype = legacy_type if category == "negative" else None
                     connection.execute(
-                        "INSERT OR IGNORE INTO questions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT OR IGNORE INTO questions (id, stage, legacy_question_type, test_category, negative_subtype, review_status, probe_status, qc_status, question, reference_answer, evidence_json, raw_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (
                             item["id"], "candidate", legacy_type, category, subtype, "human_review_pending", "probe_pending", "qc_pending",
                             item["question"], item.get("reference_answer"), _json(item.get("acceptable_evidence", [])), _json(item), now, now,
@@ -131,7 +131,7 @@ class GovernanceStore:
                     ("GD-candidate-v1", "candidate", "golden_dataset_full_draft.json", _json({"question_ids": [item["id"] for item in draft.get("cases", [])]}), now),
                 )
                 connection.execute(
-                    "INSERT OR IGNORE INTO production_versions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO production_versions (id, status, config_json, evaluation_run_id, dataset_version_id, approval_id, previous_version_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     ("baseline-v1", "active", _json({"top_k": 4, "min_score": None}), None, None, None, None, now),
                 )
                 connection.execute("INSERT INTO schema_migrations VALUES (?, ?)", ("golden-draft-v1", now))
@@ -154,10 +154,10 @@ class GovernanceStore:
                 trigger_columns = {row[1] for row in connection.execute("PRAGMA table_info(optimization_triggers)")}
                 if "optimization_run_id" not in trigger_columns:
                     connection.execute("ALTER TABLE optimization_triggers ADD COLUMN optimization_run_id TEXT")
-                version_columns = {row[1] for row in connection.execute("PRAGMA table_info(production_versions)")}
-                if "snapshot_json" not in version_columns:
-                    connection.execute("ALTER TABLE production_versions ADD COLUMN snapshot_json TEXT NOT NULL DEFAULT '{}'")
                 connection.execute("INSERT INTO schema_migrations VALUES (?, ?)", ("v101-governance-results", _now()))
+            version_columns = {row[1] for row in connection.execute("PRAGMA table_info(production_versions)")}
+            if "snapshot_json" not in version_columns:
+                connection.execute("ALTER TABLE production_versions ADD COLUMN snapshot_json TEXT NOT NULL DEFAULT '{}'")
             if not connection.execute("SELECT 1 FROM schema_migrations WHERE name = 'v101-provenance-boundary'").fetchone():
                 connection.execute("UPDATE questions SET stage = 'candidate', review_status = 'human_review_pending', probe_status = 'probe_pending', qc_status = 'qc_pending', updated_at = ? WHERE stage = 'golden' AND raw_json NOT LIKE '%\"generation_profile\": \"v1-mini-8-4-8\"%'", (_now(),))
                 connection.execute("UPDATE dataset_versions SET status = 'legacy_unverified' WHERE status = 'approved' AND snapshot_json NOT LIKE '%\"generation_profile\": \"v1-mini-8-4-8\"%'")
@@ -261,7 +261,7 @@ class GovernanceStore:
                     raise ValueError("Generated Golden candidate failed hard validation")
                 question_id = f"V1G-{run_id[-12:]}-{serial:02d}"
                 raw = {"id": question_id, "question": question, "reference_answer": answer, "acceptable_evidence": evidence, "expected_behavior": expected_behavior, "generation_profile": "v1-mini-8-4-8", "generation_run_id": run_id, "generation_model": model_version, "ablation_attribute": candidate.get("ablation_attribute"), "ablation_metadata": candidate.get("ablation_metadata", {}), "coverage_slot": candidate.get("coverage_slot"), "generation_instruction": candidate.get("generation_instruction")}
-                connection.execute("INSERT INTO questions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, "candidate", "v1_mini", category, candidate.get("negative_subtype"), "human_review_pending", "probe_pending", "qc_pending", question, answer, _json(evidence), _json(raw), now, now))
+                connection.execute("INSERT INTO questions (id, stage, legacy_question_type, test_category, negative_subtype, review_status, probe_status, qc_status, question, reference_answer, evidence_json, raw_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, "candidate", "v1_mini", category, candidate.get("negative_subtype"), "human_review_pending", "probe_pending", "qc_pending", question, answer, _json(evidence), _json(raw), now, now))
                 question_ids.append(question_id)
             if existing_run:
                 connection.execute("UPDATE golden_generation_runs SET status = 'probing', question_ids_json = ? WHERE id = ?", (_json(question_ids), run_id))

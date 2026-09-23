@@ -178,29 +178,39 @@ def generate_mini_golden():
 
 
 def _run_mini_generation(run_id, run_store, service, run_corpus):
+    stage = "generation"
+
     def on_progress(event):
+        nonlocal stage
         stage = event["stage"]
         run_store.update_generation_run(run_id, status=stage, coverage_plan=event.get("coverage_plan"), validation={key: event[key] for key in ("slot_audit", "valid_slots", "failed_slots", "hard_validation") if key in event}, progress={key: event[key] for key in ("stage", "slot", "attempt", "completed_slots") if key in event})
 
     try:
         generated = service.generate_mini_golden(run_corpus.chunks(), on_progress=on_progress)
         if generated["status"] == "failed":
-            run_store.update_generation_run(run_id, status="failed", validation={**generated["hard_validation"], "slot_audit": generated["slot_audit"], "failed_slots": generated["failed_slots"]}, progress={"stage": "failed"})
+            run_store.update_generation_run(run_id, status="failed", validation={**generated["hard_validation"], "slot_audit": generated["slot_audit"], "failed_slots": generated["failed_slots"], "failed_stage": stage}, progress={"stage": "failed"})
             return
+        stage = "candidate_persistence"
         saved = run_store.save_mini_golden_candidates(generated["candidates"], service.model, coverage_plan=generated["coverage_plan"], hard_validation=generated["hard_validation"], slot_audit=generated["slot_audit"], run_id=run_id)
-        run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "probe_completed": 0})
-        qc_completed = 0
+        stage = "probing"
+        run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "probe_completed": 0, "qc_skipped": 0})
+        qc_completed = qc_skipped = 0
         for index, candidate in enumerate(saved, start=1):
+            stage = "probing"
             probe = run_store.run_probe(candidate["id"], service.retriever, run_corpus.chunks(), service.answerability_check)
             run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "slot": candidate["raw"].get("coverage_slot"), "probe_completed": index})
             if probe["status"] == "passed":
+                stage = "qc"
                 qc = service.quality_check(run_store.question(candidate["id"]))
                 run_store.record_qc(candidate["id"], qc, "passed" if qc["score"] >= 85 else "failed")
                 qc_completed += 1
-            run_store.update_generation_run(run_id, status="qc", progress={"stage": "qc", "slot": candidate["raw"].get("coverage_slot"), "qc_completed": qc_completed})
+            else:
+                qc_skipped += 1
+            run_store.update_generation_run(run_id, status="qc", progress={"stage": "qc", "slot": candidate["raw"].get("coverage_slot"), "qc_completed": qc_completed, "qc_skipped": qc_skipped})
+        stage = "completed"
         run_store.update_generation_run(run_id, status="completed", progress={"stage": "completed"})
     except Exception as error:
-        run_store.update_generation_run(run_id, status="failed", validation={"error": str(error)}, progress={"stage": "failed"})
+        run_store.update_generation_run(run_id, status="failed", validation={"error": str(error), "failed_stage": stage}, progress={"stage": "failed"})
 
 
 @app.post("/api/governance/questions/{question_id}/review", dependencies=[Depends(require_trusted_origin)])

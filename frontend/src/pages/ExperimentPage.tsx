@@ -3,12 +3,14 @@ import { Send } from "lucide-react";
 import { errorMessage, postJson } from "../api";
 import { Badge } from "../components/Primitives";
 import type { Citation, PipelinePreview } from "../types";
+import { useOperation } from "../operation";
 
 type Run = { result?: PipelinePreview; error?: string };
 
 export function ExperimentPage({ onOpenCitation }: { onOpenCitation: (citation: Citation) => void }) {
+  const operation = useOperation();
   const [question, setQuestion] = useState(""); const [baseline, setBaseline] = useState<Run>({}); const [candidate, setCandidate] = useState<Run>({}); const [busy, setBusy] = useState(false);
-  const ask = async () => { setBusy(true); setBaseline({}); setCandidate({}); try { const [base, sandbox] = await Promise.all([postJson<PipelinePreview>("/api/preview/baseline", { question }), postJson<PipelinePreview>("/api/preview/candidate", { question })]); setBaseline({ result: base }); setCandidate({ result: sandbox }); } catch (reason) { const error = errorMessage(reason); setBaseline({ error }); setCandidate({ error }); } finally { setBusy(false); } };
+  const ask = async () => { setBusy(true); setBaseline({}); setCandidate({}); const id = operation.start("Before / After 对比", { current: 0, total: 2 }); let completed = 0; const done = () => operation.update(id, { current: ++completed }); try { const [base, sandbox] = await Promise.all([postJson<PipelinePreview>("/api/preview/baseline", { question }).then(value => { done(); return value; }), postJson<PipelinePreview>("/api/preview/candidate", { question }).then(value => { done(); return value; })]); setBaseline({ result: base }); setCandidate({ result: sandbox }); operation.succeed(id); } catch (reason) { operation.fail(id, reason); const error = errorMessage(reason); setBaseline({ error }); setCandidate({ error }); } finally { setBusy(false); } };
   return <div className="page experiment-page"><div className="page-title"><div><h1>Before / After 验证</h1><p>同一问题分别调用当前 Production 与已评测 Candidate；没有 Qualified Candidate 时保持真实空状态。</p></div></div><section className="panel experiment-query"><label className="question-input"><textarea aria-label="试验问题" placeholder="请输入你的问题…" maxLength={1000} value={question} onChange={event => setQuestion(event.target.value)} /></label><button className="primary" disabled={busy || !question.trim()} onClick={() => void ask()}><Send size={15} />{busy ? "正在发送…" : "发送"}</button></section><section className="experiment-results" aria-label="Pipeline 回答"><AnswerCard label="Production Baseline" run={baseline} onOpenCitation={onOpenCitation} empty="发送问题后显示当前 Production 回答。" /><AnswerCard label="Sandbox Candidate" run={candidate} onOpenCitation={onOpenCitation} empty="暂无 Qualified Candidate；先完成真实 Sandbox、Gate 与 Regression。" /></section></div>;
 }
 
