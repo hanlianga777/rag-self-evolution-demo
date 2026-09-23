@@ -76,6 +76,24 @@ class CorpusTests(unittest.TestCase):
         self.assertEqual(evidence[0]["product"], "B2 遥控器")
         self.assertEqual(evidence[0]["section"], "充电")
 
+    def test_pipeline_normalizes_vector_and_bm25_before_hybrid_then_filters_after_rerank(self):
+        chunks = [
+            {"document_id": "DOC-1", "document_name": "one.pdf", "product": "产品A", "vendor": "厂商", "chunk_id": "A", "section": "维护", "section_path": "维护", "page_start": 1, "page_end": 1, "text": "机器人 充电 操作"},
+            {"document_id": "DOC-2", "document_name": "two.pdf", "product": "产品B", "vendor": "厂商", "chunk_id": "B", "section": "维护", "section_path": "维护", "page_start": 1, "page_end": 1, "text": "机器人 充电 安全"},
+        ]
+        corpus = Mock(); corpus.chunks.return_value = chunks
+        retriever = VectorRetriever(corpus)
+        retriever.vector_candidates = Mock(return_value=[
+            {"chunk_id": "A", "score": 0.9, **chunks[0]}, {"chunk_id": "B", "score": 0.2, **chunks[1]},
+        ])
+
+        evidence = retriever.retrieve("机器人充电", {"candidate_k": 12, "top_k": 1, "min_score": 0.6, "hybrid_search": True, "hybrid_alpha": 0.5, "rerank": True, "metadata_filter": "OFF"})
+
+        self.assertEqual(len(evidence), 1)
+        self.assertIn("vector_normalized", evidence[0])
+        self.assertIn("bm25_normalized", evidence[0])
+        self.assertIn("rerank_score", evidence[0])
+
 
 if __name__ == "__main__":
     unittest.main()

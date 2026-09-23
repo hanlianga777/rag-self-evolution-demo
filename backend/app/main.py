@@ -13,6 +13,7 @@ from .config import load_settings
 from .evaluation import EvaluationRunner
 from .governance import GovernanceStore
 from .optimization import OptimizationAgent
+from .policy import DEFAULT_PIPELINE_CONFIG, validate_candidate_config
 from .providers import DeepSeekProvider
 
 
@@ -52,6 +53,34 @@ class QuestionUpdateRequest(BaseModel):
     actor: str = Field(default="local_user", min_length=1, max_length=80)
 
 
+class MonitoringEventRequest(BaseModel):
+    question: str = Field(strict=True, min_length=1, max_length=1000)
+    answer: str = Field(strict=True, min_length=1, max_length=8000)
+    bad_case: bool
+    severity: str = Field(pattern="^(ordinary|critical)$")
+    determinable: bool = True
+
+
+class BatchReviewRequest(BaseModel):
+    question_ids: list[str] = Field(min_length=1, max_length=20)
+    actor: str = Field(default="local_user", min_length=1, max_length=80)
+
+
+class DirectReleaseRequest(BaseModel):
+    config: dict
+    actor: str = Field(default="local_user", min_length=1, max_length=80)
+
+
+class ExperimentRequest(BaseModel):
+    trigger_id: str | None = None
+
+
+class AliasRequest(BaseModel):
+    alias: str = Field(min_length=1, max_length=120)
+    canonical: str = Field(min_length=1, max_length=120)
+    actor: str = Field(default="local_user", min_length=1, max_length=80)
+
+
 def require_trusted_origin(request: Request):
     origin = request.headers.get("origin")
     if origin is not None and origin not in TRUSTED_ORIGINS:
@@ -62,8 +91,9 @@ def require_trusted_origin(request: Request):
 def overview():
     summary = store.dataset_summary()
     production = store.active_production()
-    latest = store.evaluation_runs()[:1]
-    return {"data_source": "real", "production": production, "dataset": summary, "latest_evaluation": latest[0] if latest else None}
+    latest = [item for item in store.evaluation_runs() if item["status"] != "legacy_unverified"][:1]
+    triggers = store.optimization_triggers()
+    return {"data_source": "real", "production": production, "dataset": summary, "latest_evaluation": latest[0] if latest else None, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
 
 
 @app.get("/api/workspace")
@@ -100,10 +130,49 @@ def governance_questions(stage: str | None = None):
     return store.questions(stage)
 
 
+@app.post("/api/governance/aliases", status_code=201, dependencies=[Depends(require_trusted_origin)])
+def approve_alias(payload: AliasRequest):
+    try:
+        return store.approve_alias(payload.alias, payload.canonical, payload.actor)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/governance/generate-mini", status_code=201, dependencies=[Depends(require_trusted_origin)])
+def generate_mini_golden():
+    try:
+        candidates = ai_service.generate_mini_golden(corpus.chunks())
+        saved = store.save_mini_golden_candidates(candidates, ai_service.model)
+        for candidate in saved:
+            probe = store.run_probe(candidate["id"], ai_service.retriever, corpus.chunks())
+            if probe["status"] == "passed":
+                qc = ai_service.quality_check(store.question(candidate["id"]))
+                store.record_qc(candidate["id"], qc, "passed" if qc["score"] >= 85 else "failed")
+        return {"profile": {"positive": 8, "ablation": 4, "negative": 8}, "candidates": [store.question(item["id"]) for item in saved]}
+    except Exception as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @app.post("/api/governance/questions/{question_id}/review", dependencies=[Depends(require_trusted_origin)])
 def review_question(question_id: str, payload: ReviewRequest):
     try:
         return store.review_question(question_id, payload.decision, payload.actor)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Golden question not found")
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/governance/review-batch", dependencies=[Depends(require_trusted_origin)])
+def review_mini_batch(payload: BatchReviewRequest):
+    """A single explicit operator action writes individual, auditable Human Review decisions."""
+    try:
+        candidates = [store.question(question_id) for question_id in payload.question_ids]
+        runs = {item["raw"].get("generation_run_id") for item in candidates}
+        if len(candidates) != 20 or len(runs) != 1 or None in runs or any(item["raw"].get("generation_profile") != "v1-mini-8-4-8" for item in candidates):
+            raise ValueError("Batch review only accepts one complete V1 Mini generation run")
+        reviewed = [store.review_question(question_id, "approved", payload.actor) for question_id in payload.question_ids]
+        return {"reviewed": reviewed, "snapshot": store.create_dataset_snapshot()}
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:
@@ -134,7 +203,7 @@ def qc_question(question_id: str):
         if item["probe_status"] != "probe_passed":
             raise HTTPException(status_code=409, detail="Probe Passed 后才能运行 QC")
         result = ai_service.quality_check(item)
-        return store.record_qc(question_id, result, result["status"])
+        return store.record_qc(question_id, result, "passed" if result["score"] >= 85 else "failed")
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:
@@ -142,12 +211,12 @@ def qc_question(question_id: str):
     except HTTPException:
         raise
     except Exception as error:
-        return store.record_qc(question_id, {"reason": str(error)}, "failed")
+        return store.record_qc(question_id, {"score": 0, "priority": "P0", "reason": str(error), "model": ai_service.model}, "failed")
 
 
 @app.get("/api/evaluation")
 def evaluation():
-    runs = store.evaluation_runs()
+    runs = [item for item in store.evaluation_runs() if item["status"] != "legacy_unverified"]
     return runs[0] if runs else {"status": "not_run", "data_source": "real", "message": "暂无真实实验数据"}
 
 
@@ -174,6 +243,32 @@ def versions():
     return store.production_versions()
 
 
+@app.get("/api/monitoring")
+def monitoring():
+    return {"events": store.monitoring_events(), "triggers": store.optimization_triggers()}
+
+
+@app.post("/api/monitoring/events", status_code=201, dependencies=[Depends(require_trusted_origin)])
+def record_monitoring_event(payload: MonitoringEventRequest):
+    try:
+        event = store.record_monitoring_event(question=payload.question, answer=payload.answer, bad_case=payload.bad_case, severity=payload.severity, determinable=payload.determinable)
+        return {"event": event, "trigger": store.optimization_trigger_for_event(event["id"])}
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/monitoring/triggers/{trigger_id}/confirm", dependencies=[Depends(require_trusted_origin)])
+def confirm_monitoring_trigger(trigger_id: str, payload: ReviewRequest):
+    if payload.decision != "approved":
+        raise HTTPException(status_code=422, detail="Human Confirm 必须为 approved；拒绝时保留 Pending Trigger 供人工处理")
+    try:
+        return store.confirm_optimization_trigger(trigger_id, payload.actor)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Optimization Trigger not found")
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @app.get("/api/readiness")
 def readiness():
     return ai_service.readiness()
@@ -185,14 +280,26 @@ def probe_readiness():
 
 
 @app.post("/api/experiments/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
-def run_experiments():
+def run_experiments(payload: ExperimentRequest | None = None):
     completed = next((item for item in store.evaluation_runs() if item["status"] == "completed"), None)
     if completed is None:
         raise HTTPException(status_code=409, detail="需先完成真实 Baseline Evaluation")
     try:
-        return OptimizationAgent(store, ai_service.provider).generate(completed["id"])
+        return OptimizationAgent(store, ai_service.provider).generate(completed["id"], payload.trigger_id if payload else None)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/direct-release", status_code=201, dependencies=[Depends(require_trusted_origin)])
+def start_direct_release(payload: DirectReleaseRequest):
+    baseline = next((item for item in store.evaluation_runs() if item["status"] == "completed"), None)
+    if baseline is None:
+        raise HTTPException(status_code=409, detail="Direct Release 仍需先完成真实 Baseline Evaluation")
+    config = {**DEFAULT_PIPELINE_CONFIG, **payload.config}
+    check = validate_candidate_config(config, prior_configs=[item["config"] for item in store.candidates()], completed_evals=0)
+    if not check["valid"]:
+        raise HTTPException(status_code=409, detail="Direct Release Config 不符合冻结 Search Space：" + "; ".join(check["errors"]))
+    return store.create_direct_release_candidate(baseline["id"], config, payload.actor)
 
 
 @app.get("/api/experiments/{run_id}")
@@ -221,6 +328,8 @@ def approve_candidate(candidate_id: str, payload: ReviewRequest):
         raise HTTPException(status_code=404, detail="Candidate not found")
     if payload.decision == "approved" and candidate["status"] != "evaluated":
         raise HTTPException(status_code=409, detail="Candidate 必须先完成 Sandbox")
+    if payload.decision == "approved" and not candidate["result"].get("qualification", {}).get("qualified"):
+        raise HTTPException(status_code=409, detail="Candidate 必须通过 11/11 Gate、Regression 与有效提升后才能进入 Human Release")
     try:
         return store.approve("candidate", candidate_id, payload.decision, payload.actor)
     except ValueError as error:

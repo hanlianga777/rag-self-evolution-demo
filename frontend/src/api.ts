@@ -35,8 +35,8 @@ export async function postJson<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export async function loadAppData(): Promise<AppData> {
-  const [workspace, overview, documents, dataset, evaluation, badCases, optimization, versions, readiness] = await Promise.all([
-    getJson("/api/workspace"), getJson("/api/overview"), getJson("/api/documents"), getJson("/api/dataset"), getJson("/api/evaluation"), getJson("/api/bad-cases"), getJson("/api/optimization"), getJson("/api/versions"), getJson("/api/readiness"),
+  const [workspace, overview, documents, dataset, evaluation, badCases, optimization, versions, readiness, monitoring] = await Promise.all([
+    getJson("/api/workspace"), getJson("/api/overview"), getJson("/api/documents"), getJson("/api/dataset"), getJson("/api/evaluation"), getJson("/api/bad-cases"), getJson("/api/optimization"), getJson("/api/versions"), getJson("/api/readiness"), getJson("/api/monitoring"),
   ]);
-  return { workspace: workspace as Json, overview: overview as Json, documents: documents as Json[], dataset: dataset as Json[], evaluation: evaluation as Json, badCases: badCases as Json[], optimization: optimization as Json, versions: versions as Json[], readiness: readiness as Json };
+  return { workspace: workspace as Json, overview: overview as Json, documents: documents as Json[], dataset: dataset as Json[], evaluation: evaluation as Json, badCases: badCases as Json[], optimization: optimization as Json, versions: versions as Json[], readiness: readiness as Json, monitoring: monitoring as Json };
 }

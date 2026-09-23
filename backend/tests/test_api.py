@@ -41,6 +41,15 @@ class GovernanceApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 4)
 
+    def test_monitoring_trigger_is_pending_until_human_confirm(self):
+        event = self.client.post("/api/monitoring/events", json={"question": "安全问题", "answer": "错误回答", "bad_case": True, "severity": "critical"}, headers={"Origin": "http://127.0.0.1:5174"})
+        self.assertEqual(event.status_code, 201)
+        trigger = event.json()["trigger"]
+        self.assertEqual(trigger["status"], "pending_human_confirm")
+        confirmed = self.client.post(f"/api/monitoring/triggers/{trigger['id']}/confirm", json={"decision": "approved"}, headers={"Origin": "http://127.0.0.1:5174"})
+        self.assertEqual(confirmed.status_code, 200)
+        self.assertEqual(confirmed.json()["status"], "human_confirmed")
+
 
 if __name__ == "__main__":
     unittest.main()

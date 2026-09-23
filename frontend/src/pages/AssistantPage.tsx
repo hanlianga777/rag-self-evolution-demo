@@ -50,7 +50,7 @@ export function AssistantPage({ productionVersion, badCases, onOpenBadCase, onOp
     setDraft("");
     try {
       const result: any = await postJson("/api/preview", { question });
-      const assistant: ChatMessage = { id: id("assistant"), role: "assistant", content: result.candidate_b.answer, question, createdAt: now(), mode: result.mode, model: result.model, latencyMs: result.latency_ms, fallbackReason: result.fallback_reason, sources: result.candidate_b.sources, evidence: result.candidate_b.evidence };
+      const assistant: ChatMessage = { id: id("assistant"), role: "assistant", content: result.baseline.answer, question, createdAt: now(), mode: result.mode, model: result.model, latencyMs: result.latency_ms, fallbackReason: result.fallback_reason, sources: result.baseline.sources, evidence: result.baseline.evidence };
       setTypingId(assistant.id);
       updateConversation(started.id, conversation => ({ ...conversation, updatedAt: assistant.createdAt, messages: [...conversation.messages, assistant] }));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "请求失败，请重试"); }

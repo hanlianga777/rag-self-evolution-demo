@@ -1,5 +1,6 @@
 import json
 import math
+import time
 import urllib.error
 import urllib.request
 
@@ -14,26 +15,51 @@ class DeepSeekProvider:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    def complete(self, system: str, user: str, json_mode: bool = False) -> str:
+    def _request(self, system: str, user: str, json_mode: bool, stream: bool):
         if not self.settings.configured:
             raise ProviderUnavailable("DeepSeek API Key 未配置")
         payload = {
             "model": self.settings.model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "stream": False,
+            "stream": stream,
             "temperature": 0.2,
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
-        request = urllib.request.Request(
+        if stream:
+            payload["stream_options"] = {"include_usage": True}
+        return urllib.request.Request(
             f"{self.settings.base_url}/chat/completions",
             data=json.dumps(payload).encode(),
             headers={"Authorization": f"Bearer {self.settings.api_key}", "Content-Type": "application/json"},
             method="POST",
         )
+    def complete_with_metrics(self, system: str, user: str, json_mode: bool = False, *, stream: bool = False) -> dict:
+        """Return provider usage and measured first-content latency when streaming is enabled."""
+        request = self._request(system, user, json_mode, stream)
+        started_at = time.perf_counter()
         try:
             with urllib.request.urlopen(request, timeout=self.settings.timeout_seconds) as response:
-                body = json.loads(response.read())
+                if stream:
+                    content, usage, ttft_started = [], {}, None
+                    for raw_line in response:
+                        line = raw_line.decode("utf-8").strip()
+                        if not line.startswith("data: ") or line == "data: [DONE]":
+                            continue
+                        event = json.loads(line[6:])
+                        choice = (event.get("choices") or [{}])[0]
+                        delta = choice.get("delta", {}).get("content")
+                        if isinstance(delta, str) and delta:
+                            if ttft_started is None:
+                                ttft_started = time.perf_counter()
+                            content.append(delta)
+                        if isinstance(event.get("usage"), dict):
+                            usage = event["usage"]
+                    body = {"choices": [{"message": {"content": "".join(content)}}], "usage": usage}
+                    ttft_ms = round(((ttft_started or time.perf_counter()) - started_at) * 1000)
+                else:
+                    body = json.loads(response.read())
+                    ttft_ms = round((time.perf_counter() - started_at) * 1000)
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
             raise ProviderUnavailable(f"DeepSeek 调用不可用：{error}") from error
         try:
@@ -42,7 +68,11 @@ class DeepSeekProvider:
             raise ProviderUnavailable("DeepSeek 响应缺少内容") from error
         if not isinstance(content, str) or not content.strip():
             raise ProviderUnavailable("DeepSeek 返回的内容必须是非空字符串")
-        return content
+        usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
+        return {"content": content, "input_tokens": usage.get("prompt_tokens") if isinstance(usage.get("prompt_tokens"), int) else None, "output_tokens": usage.get("completion_tokens") if isinstance(usage.get("completion_tokens"), int) else None, "ttft_ms": ttft_ms}
+
+    def complete(self, system: str, user: str, json_mode: bool = False) -> str:
+        return self.complete_with_metrics(system, user, json_mode)["content"]
 
     def judge(self, question: str, expected: str, answer: str) -> dict:
         content = self.complete(

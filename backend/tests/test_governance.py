@@ -49,7 +49,7 @@ class GovernanceStoreTests(unittest.TestCase):
             "chunk_id": "KIRA-B50-CHUNK-0003",
             "text": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。",
         }])
-        self.store.record_qc("GGC-001", {"status": "passed", "issues": [], "reason": "证据自洽"}, "passed")
+        self.store.record_qc("GGC-001", {"score": 90, "priority": "P2", "issues": [], "reason": "证据自洽", "model": "test"}, "passed")
         self.store.review_question("GGC-001", "approved", "local_user")
 
         snapshot = self.store.create_dataset_snapshot()
@@ -60,7 +60,7 @@ class GovernanceStoreTests(unittest.TestCase):
 
     def test_changing_approved_question_evidence_or_answer_invalidates_approval(self):
         self.store.run_probe("GGC-001", FakeRetriever(), [{"chunk_id": "KIRA-B50-CHUNK-0003", "text": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。"}])
-        self.store.record_qc("GGC-001", {"status": "passed", "issues": [], "reason": "证据自洽"}, "passed")
+        self.store.record_qc("GGC-001", {"score": 90, "priority": "P2", "issues": [], "reason": "证据自洽", "model": "test"}, "passed")
         approved = self.store.review_question("GGC-001", "approved", "local_user")
         changed = self.store.update_question(approved["id"], approved["question"], "已修改的答案", approved["evidence"], "local_user")
 
@@ -88,7 +88,7 @@ class GovernanceStoreTests(unittest.TestCase):
         self.assertEqual(self.store.question("GGC-001")["review_status"], "needs_revision")
 
         self.store.run_probe("GGC-033", FakeRetriever(), [])
-        self.store.record_qc("GGC-033", {"reason": "题目需改写"}, "failed")
+        self.store.record_qc("GGC-033", {"score": 0, "priority": "P1", "reason": "题目需改写", "model": "test"}, "failed")
         self.assertEqual(self.store.question("GGC-033")["qc_status"], "qc_failed")
         self.assertEqual(self.store.question("GGC-033")["review_status"], "needs_revision")
 
@@ -137,7 +137,7 @@ class EvaluationRunnerTests(unittest.TestCase):
 
     def approve_one(self):
         self.store.run_probe("GGC-001", FakeRetriever(), [{"chunk_id": "KIRA-B50-CHUNK-0003", "text": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。"}])
-        self.store.record_qc("GGC-001", {"status": "passed", "issues": [], "reason": "证据自洽"}, "passed")
+        self.store.record_qc("GGC-001", {"score": 90, "priority": "P2", "issues": [], "reason": "证据自洽", "model": "test"}, "passed")
         self.store.review_question("GGC-001", "approved", "local_user")
 
     def test_runner_uses_only_approved_snapshot_and_persists_real_case_results(self):
@@ -147,7 +147,8 @@ class EvaluationRunnerTests(unittest.TestCase):
         self.assertEqual(run["status"], "completed")
         self.assertEqual(run["run_mode"], "real")
         self.assertEqual(run["result"]["completed"], 1)
-        self.assertEqual(run["result"]["overall_score"], 100.0)
+        self.assertIsNone(run["result"]["overall_score"])
+        self.assertEqual(run["result"]["overall_score_status"], "NOT_EVALUABLE")
         self.assertEqual(len(self.store.evaluation_case_results(run["id"])), 1)
 
     def test_runner_blocks_formal_evaluation_without_an_approved_question(self):
@@ -176,17 +177,14 @@ class EvaluationRunnerTests(unittest.TestCase):
         self.store.approve("candidate", candidate_id, "approved", "local_user")
         self.store.approve("release", candidate_id, "approved", "local_user")
 
-        version = self.store.publish_candidate(candidate_id, "local_user")
-        rollback = self.store.rollback_to("baseline-v1", "local_user")
-
-        self.assertEqual(version["status"], "active")
-        self.assertEqual(rollback["id"], "baseline-v1")
-        self.assertEqual(len(self.store.production_versions()), 2)
+        with self.assertRaisesRegex(ValueError, "11/11 Gate"):
+            self.store.publish_candidate(candidate_id, "local_user")
+        self.assertEqual(self.store.active_production()["id"], "baseline-v1")
 
 
 class FakeAgentProvider:
     def complete(self, *_args, **_kwargs):
-        return '{"root_cause":"检索范围不足","candidates":[{"id":"A","config":{"top_k":6,"min_score":null},"hypothesis":"扩大召回","risk":"延迟"},{"id":"B","config":{"top_k":4,"min_score":0.2},"hypothesis":"过滤噪声","risk":"拒答"},{"id":"C","config":{"top_k":3,"min_score":0.1},"hypothesis":"平衡","risk":"召回"}]}'
+        return '{"root_cause_cluster":"检索范围不足","observed_evidence":["召回缺失"],"candidates":[{"id":"A","config":{"top_k":6},"hypothesis":"扩大召回","proposal":"增加上下文","risk":"延迟"},{"id":"B","config":{"min_score":0.2},"hypothesis":"过滤噪声","proposal":"提升过滤","risk":"拒答"},{"id":"C","config":{"min_score":0.1},"hypothesis":"平衡","proposal":"平衡召回","risk":"召回"}]}'
 
 
 class OptimizationAgentTests(unittest.TestCase):

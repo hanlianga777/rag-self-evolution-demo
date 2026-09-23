@@ -10,6 +10,7 @@ export type AppData = {
   optimization: Json;
   versions: Json[];
   readiness: Json;
+  monitoring: Json;
 };
 
 export type ImprovementClue = { submittedAt: string; badCaseId?: string };
@@ -25,9 +26,10 @@ export type Citation = {
 };
 
 export type PipelinePreview = {
-  pipeline: "baseline" | "candidate_b";
+  pipeline: "baseline" | "candidate";
   question: string;
   version: string;
+  status?: string;
   answer: string;
   latency_ms: number;
   mode?: "live" | "mock";

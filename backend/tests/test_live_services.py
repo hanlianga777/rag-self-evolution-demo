@@ -44,6 +44,16 @@ class ProviderTests(unittest.TestCase):
                 provider.complete("system", "question")
         request.assert_not_called()
 
+    def test_complete_with_metrics_persists_provider_usage_when_present(self):
+        payload = {"choices": [{"message": {"content": "回答"}}], "usage": {"prompt_tokens": 12, "completion_tokens": 8}}
+        with patch("app.providers.urllib.request.urlopen", return_value=FakeResponse(payload)):
+            result = self.provider.complete_with_metrics("system", "question")
+
+        self.assertEqual(result["content"], "回答")
+        self.assertEqual(result["input_tokens"], 12)
+        self.assertEqual(result["output_tokens"], 8)
+        self.assertIsInstance(result["ttft_ms"], int)
+
 
 if __name__ == "__main__":
     unittest.main()

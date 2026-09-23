@@ -8,6 +8,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .policy import DEFAULT_PIPELINE_CONFIG
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATABASE = ROOT / "data" / "demo.db"
@@ -77,6 +79,26 @@ class GovernanceStore:
                 CREATE TABLE IF NOT EXISTS production_versions (id TEXT PRIMARY KEY, status TEXT NOT NULL, config_json TEXT NOT NULL, evaluation_run_id TEXT, dataset_version_id TEXT, approval_id INTEGER, previous_version_id TEXT, created_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS rollback_history (id INTEGER PRIMARY KEY, from_version_id TEXT NOT NULL, to_version_id TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS tool_registry (name TEXT PRIMARY KEY, availability TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS monitoring_events (
+                    id TEXT PRIMARY KEY, question TEXT NOT NULL, answer TEXT NOT NULL, bad_case INTEGER NOT NULL,
+                    severity TEXT NOT NULL, determinable INTEGER NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS optimization_triggers (
+                    id TEXT PRIMARY KEY, reason TEXT NOT NULL, event_id TEXT, status TEXT NOT NULL,
+                    actor TEXT, created_at TEXT NOT NULL, confirmed_at TEXT, optimization_run_id TEXT
+                );
+                CREATE TABLE IF NOT EXISTS golden_generation_runs (
+                    id TEXT PRIMARY KEY, profile_json TEXT NOT NULL, model_version TEXT NOT NULL,
+                    status TEXT NOT NULL, question_ids_json TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS recommendations (
+                    experiment_id TEXT PRIMARY KEY, candidate_id TEXT, status TEXT NOT NULL,
+                    result_json TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS alias_mappings (
+                    alias TEXT PRIMARY KEY, canonical TEXT NOT NULL, status TEXT NOT NULL,
+                    actor TEXT NOT NULL, created_at TEXT NOT NULL
+                );
                 """
             )
             if not connection.execute("SELECT 1 FROM schema_migrations WHERE name = 'golden-draft-v1'").fetchone():
@@ -117,6 +139,20 @@ class GovernanceStore:
                     connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", ("candidate", "human_review_pending", _now(), row["id"]))
                     connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (row["id"], "dataset", "workflow_repaired", "migration", _now()))
                 connection.execute("INSERT INTO schema_migrations VALUES (?, ?)", ("governance-flow-v2", _now()))
+            if not connection.execute("SELECT 1 FROM schema_migrations WHERE name = 'v101-governance-results'").fetchone():
+                trigger_columns = {row[1] for row in connection.execute("PRAGMA table_info(optimization_triggers)")}
+                if "optimization_run_id" not in trigger_columns:
+                    connection.execute("ALTER TABLE optimization_triggers ADD COLUMN optimization_run_id TEXT")
+                version_columns = {row[1] for row in connection.execute("PRAGMA table_info(production_versions)")}
+                if "snapshot_json" not in version_columns:
+                    connection.execute("ALTER TABLE production_versions ADD COLUMN snapshot_json TEXT NOT NULL DEFAULT '{}'")
+                connection.execute("INSERT INTO schema_migrations VALUES (?, ?)", ("v101-governance-results", _now()))
+            if not connection.execute("SELECT 1 FROM schema_migrations WHERE name = 'v101-provenance-boundary'").fetchone():
+                connection.execute("UPDATE questions SET stage = 'candidate', review_status = 'human_review_pending', probe_status = 'probe_pending', qc_status = 'qc_pending', updated_at = ? WHERE stage = 'golden' AND raw_json NOT LIKE '%\"generation_profile\": \"v1-mini-8-4-8\"%'", (_now(),))
+                connection.execute("UPDATE dataset_versions SET status = 'legacy_unverified' WHERE status = 'approved' AND snapshot_json NOT LIKE '%\"generation_profile\": \"v1-mini-8-4-8\"%'")
+                connection.execute("UPDATE evaluation_runs SET status = 'legacy_unverified' WHERE result_json NOT LIKE '%\"gates\"%'")
+                connection.execute("UPDATE production_versions SET config_json = ? WHERE id = 'baseline-v1'", (_json(DEFAULT_PIPELINE_CONFIG),))
+                connection.execute("INSERT INTO schema_migrations VALUES (?, ?)", ("v101-provenance-boundary", _now()))
             for name, availability, description in (
                 ("top_k", "available", "调整向量检索返回条数"),
                 ("min_score", "available", "过滤低相关度向量结果"),
@@ -159,6 +195,42 @@ class GovernanceStore:
             "approved": sum(row["stage"] == "golden" for row in rows),
             "pending_review": sum(row["review_status"] == "human_review_pending" for row in rows),
         }
+
+    def approved_aliases(self):
+        with self.connection() as connection:
+            rows = connection.execute("SELECT alias, canonical FROM alias_mappings WHERE status = 'approved' ORDER BY alias").fetchall()
+        return {row["alias"]: row["canonical"] for row in rows}
+
+    def approve_alias(self, alias: str, canonical: str, actor: str):
+        if not alias.strip() or not canonical.strip():
+            raise ValueError("Alias and canonical value are required")
+        with self.connection() as connection:
+            connection.execute("INSERT OR REPLACE INTO alias_mappings VALUES (?, ?, ?, ?, ?)", (alias.strip(), canonical.strip(), "approved", actor, _now()))
+        return {"alias": alias.strip(), "canonical": canonical.strip(), "status": "approved", "actor": actor}
+
+    def save_mini_golden_candidates(self, candidates: list[dict], model_version: str):
+        """Persist the V1 Mini profile only as review-pending candidates, never as Golden."""
+        expected = {"positive": 8, "ablation": 4, "negative": 8}
+        actual = {category: sum(item.get("test_category") == category for item in candidates) for category in expected}
+        if actual != expected or len(candidates) != 20:
+            raise ValueError("V1 Mini Golden profile must be Positive 8 / Ablation 4 / Negative 8")
+        run_id = f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        question_ids, now = [], _now()
+        with self.connection() as connection:
+            for serial, candidate in enumerate(candidates, start=1):
+                category = candidate["test_category"]
+                question = str(candidate.get("question", "")).strip()
+                answer = candidate.get("reference_answer")
+                expected_behavior = candidate.get("expected_behavior")
+                evidence = candidate.get("evidence") or []
+                if not question or (category != "negative" and (not isinstance(answer, str) or not answer.strip() or not evidence)) or (category == "negative" and expected_behavior not in {"clarify", "insufficient_evidence", "safe_rejection", "prompt_injection_resistance"}):
+                    raise ValueError("Generated Golden candidate failed hard validation")
+                question_id = f"V1G-{run_id[-12:]}-{serial:02d}"
+                raw = {"id": question_id, "question": question, "reference_answer": answer, "acceptable_evidence": evidence, "expected_behavior": expected_behavior, "generation_profile": "v1-mini-8-4-8", "generation_run_id": run_id, "generation_model": model_version}
+                connection.execute("INSERT INTO questions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, "candidate", "v1_mini", category, candidate.get("negative_subtype"), "human_review_pending", "probe_pending", "qc_pending", question, answer, _json(evidence), _json(raw), now, now))
+                question_ids.append(question_id)
+            connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(expected), model_version, "candidate_generated", _json(question_ids), now))
+        return [self.question(question_id) for question_id in question_ids]
 
     def review_question(self, question_id: str, decision: str, actor: str):
         if decision not in {"approved", "rejected", "needs_revision"}:
@@ -224,20 +296,55 @@ class GovernanceStore:
         normalized_query = _normalized(item["question"])
         corpus_matches = [chunk_id for chunk_id, text in source_texts.items() if normalized_query and normalized_query in _normalized(text)]
         full_text = {"mode": "evidence" if positive else "behavior_only", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else bool(expected_behavior)}
-        passed = all(programmatic.values()) and full_text["passed"]
-        result = {"question_id": question_id, "programmatic": {"checks": programmatic, "passed": all(programmatic.values())}, "vector": {"top_k": hits, "best_similarity": best, "signal": "observed_only"}, "full_text": full_text, "passed": passed}
-        status = "probe_passed" if passed else "needs_revision"
+        checks_passed = all(programmatic.values()) and full_text["passed"]
+        result = self.record_probe_result(question_id, {
+            "question_quality": 30 if bool(item["question"].strip()) else 0,
+            "golden_answer_quality": 30 if (not positive or bool(item["reference_answer"])) else 0,
+            "evidence_support": 40 if checks_passed else 0,
+            "evidence_direct_failure": not full_text["passed"],
+            "reason": "Programmatic evidence check" if checks_passed else "Evidence or required fields cannot support Golden",
+            "rule_version": "v1.0.1",
+            "model_version": "programmatic-probe-v1",
+        })
+        return {**result, "programmatic": {"checks": programmatic, "passed": all(programmatic.values())}, "vector": {"top_k": hits, "best_similarity": best, "signal": "observed_only"}, "full_text": full_text, "passed": result["status"] == "passed"}
+
+    def record_probe_result(self, question_id: str, result: dict):
+        """Persist the frozen 30/30/40 probe; evidence failure is non-compensable."""
+        self.question(question_id)
+        caps = {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40}
+        scores = {}
+        for field, cap in caps.items():
+            value = result.get(field)
+            if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value <= cap:
+                raise ValueError(f"Invalid {field} score")
+            scores[field] = float(value)
+        evidence_direct_failure = result.get("evidence_direct_failure") is True
+        score = round(sum(scores.values()), 1)
+        passed = score >= 90 and not evidence_direct_failure
+        stored = {
+            "question_id": question_id, **scores, "score": score,
+            "threshold": 90, "evidence_direct_failure": evidence_direct_failure,
+            "status": "passed" if passed else "failed", "reason": str(result.get("reason", "")),
+            "rule_version": str(result.get("rule_version", "v1.0.1")),
+            "model_version": str(result.get("model_version", "programmatic-probe-v1")),
+        }
         with self.connection() as connection:
-            connection.execute("INSERT INTO probe_results(question_id, result_json, created_at) VALUES (?, ?, ?)", (question_id, _json(result), _now()))
-            review_status = "needs_revision" if not passed else item["review_status"]
-            connection.execute("UPDATE questions SET probe_status = ?, review_status = ?, updated_at = ? WHERE id = ?", (status, review_status, _now(), question_id))
-        return result
+            connection.execute("INSERT INTO probe_results(question_id, result_json, created_at) VALUES (?, ?, ?)", (question_id, _json(stored), _now()))
+            connection.execute("UPDATE questions SET probe_status = ?, review_status = ?, updated_at = ? WHERE id = ?", ("probe_passed" if passed else "needs_revision", "human_review_pending" if passed else "needs_revision", _now(), question_id))
+        return stored
 
     def record_qc(self, question_id: str, result: dict, status: str):
         item = self.question(question_id)
         if item["probe_status"] != "probe_passed":
             raise ValueError("Probe Passed 后才能运行 QC")
-        qc_status = "qc_passed" if status == "passed" else "qc_failed"
+        score = result.get("score")
+        priority = result.get("priority")
+        if not isinstance(score, (int, float)) or isinstance(score, bool) or not 0 <= score <= 100:
+            raise ValueError("QC score must be between 0 and 100")
+        if priority not in {"P0", "P1", "P2"}:
+            raise ValueError("QC priority must be P0, P1, or P2")
+        qc_status = "qc_passed" if status == "passed" and score >= 85 else "qc_failed"
+        result = {**result, "score": float(score), "priority": priority, "threshold": 85, "status": qc_status, "rule_version": result.get("rule_version", "v1.0.1")}
         with self.connection() as connection:
             connection.execute("INSERT INTO qc_results(question_id, status, result_json, created_at) VALUES (?, ?, ?, ?)", (question_id, qc_status, _json(result), _now()))
             review_status = item["review_status"] if qc_status == "qc_passed" else "needs_revision"
@@ -252,7 +359,7 @@ class GovernanceStore:
     def production_versions(self):
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM production_versions ORDER BY created_at DESC").fetchall()
-        return [{**dict(row), "config": _load(row["config_json"], {})} for row in rows]
+        return [{**dict(row), "config": _load(row["config_json"], {}), "snapshot": _load(row["snapshot_json"] if "snapshot_json" in row.keys() else "{}", {})} for row in rows]
 
     def active_production(self):
         return next((item for item in self.production_versions() if item["status"] == "active"), None)
@@ -260,7 +367,7 @@ class GovernanceStore:
     def evaluation_runs(self):
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM evaluation_runs ORDER BY created_at DESC").fetchall()
-        return [{**dict(row), "result": _load(row["result_json"], {}), "config": _load(row["config_json"], {})} for row in rows]
+        return [{**dict(row), "result": _load(row["result_json"], {}), "config": _load(row["config_json"], {}), "judge": _load(row["judge_json"], {})} for row in rows]
 
     def evaluation_run(self, run_id: str):
         return next((item for item in self.evaluation_runs() if item["id"] == run_id), None)
@@ -304,10 +411,10 @@ class GovernanceStore:
             rows = connection.execute("SELECT * FROM tool_registry ORDER BY name").fetchall()
         return [{"name": row["name"], "availability": row["availability"], **_load(row["metadata_json"], {})} for row in rows]
 
-    def create_experiment(self, baseline_run_id: str):
+    def create_experiment(self, baseline_run_id: str, status: str = "analyzing"):
         experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         with self.connection() as connection:
-            connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline_run_id, "analyzing", _json({}), _now()))
+            connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline_run_id, status, _json({}), _now()))
         return experiment_id
 
     def save_agent_trace(self, experiment_id: str, status: str, result: dict, error_message: str | None = None):
@@ -319,6 +426,11 @@ class GovernanceStore:
         with self.connection() as connection:
             connection.execute("INSERT OR REPLACE INTO candidate_configs VALUES (?, ?, ?, ?, ?, ?, ?)", (f"{experiment_id}-{candidate_id}", experiment_id, "generated", _json(config), _json(reasoning), _json({}), _now()))
 
+    def create_direct_release_candidate(self, baseline_run_id: str, config: dict, actor: str):
+        experiment_id = self.create_experiment(baseline_run_id, "direct_release")
+        self.save_candidate(experiment_id, "DIRECT", config, {"root_cause_cluster": "Human Direct Release", "observed_evidence": [], "hypothesis": "Human-confirmed configuration", "proposal": "Skip Agent search only; preserve Sandbox validation", "risk": "Requires complete Gate and Regression verification", "changed_parameters": config, "operator": actor})
+        return self.candidate(f"{experiment_id}-DIRECT")
+
     def candidate(self, candidate_id: str):
         with self.connection() as connection:
             row = connection.execute("SELECT * FROM candidate_configs WHERE id = ?", (candidate_id,)).fetchone()
@@ -326,10 +438,41 @@ class GovernanceStore:
             return None
         return {**dict(row), "config": _load(row["config_json"], {}), "reasoning": _load(row["reasoning_json"], {}), "result": _load(row["result_json"], {})}
 
+    def candidates(self, experiment_id: str | None = None):
+        with self.connection() as connection:
+            query, args = "SELECT * FROM candidate_configs", []
+            if experiment_id:
+                query += " WHERE experiment_id = ?"
+                args.append(experiment_id)
+            rows = connection.execute(query + " ORDER BY created_at", args).fetchall()
+        return [{**dict(row), "config": _load(row["config_json"], {}), "reasoning": _load(row["reasoning_json"], {}), "result": _load(row["result_json"], {})} for row in rows]
+
     def finish_candidate(self, candidate_id: str, status: str, result: dict):
         with self.connection() as connection:
             connection.execute("UPDATE candidate_configs SET status = ?, result_json = ? WHERE id = ?", (status, _json(result), candidate_id))
         return self.candidate(candidate_id)
+
+    def refresh_recommendation(self, experiment_id: str):
+        candidates = self.candidates(experiment_id)
+        qualified = [item for item in candidates if item["status"] == "evaluated" and item["result"].get("qualification", {}).get("qualified")]
+        if not qualified:
+            result = {"status": "No Qualified Candidate", "recommended_candidate": None, "why": "No Candidate passed 11/11 Hard Gate, Regression and effective-improvement rules.", "candidates": [{"id": item["id"], "status": item["status"], "qualified": item["result"].get("qualification", {}).get("qualified", False)} for item in candidates]}
+            candidate_id = None
+        else:
+            def ranking(item):
+                comparison = item["result"].get("comparison_metrics", {})
+                return (-float(item["result"].get("overall_score") or 0), len(item["reasoning"].get("changed_parameters", {})), float(comparison.get("ttft_seconds") or 10**9), float(comparison.get("token_cost") or 10**9))
+            selected = sorted(qualified, key=ranking)[0]
+            result = {"status": "Recommended", "recommended_candidate": selected["id"], "why": "Qualified candidates are compared by quality display score, parameter complexity, TTFT and measured provider cost; Gate and Regression remain mandatory prerequisites.", "not_selected": [item["id"] for item in qualified if item["id"] != selected["id"]]}
+            candidate_id = selected["id"]
+        with self.connection() as connection:
+            connection.execute("INSERT OR REPLACE INTO recommendations VALUES (?, ?, ?, ?, ?)", (experiment_id, candidate_id, result["status"], _json(result), _now()))
+        return result
+
+    def recommendation(self, experiment_id: str):
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM recommendations WHERE experiment_id = ?", (experiment_id,)).fetchone()
+        return {**dict(row), "result": _load(row["result_json"], {})} if row else None
 
     def approve(self, gate: str, target_id: str, decision: str, actor: str):
         if decision not in {"approved", "rejected"}:
@@ -347,8 +490,8 @@ class GovernanceStore:
         candidate = self.candidate(candidate_id)
         if candidate is None or candidate["status"] != "evaluated":
             raise ValueError("仅已完成 Sandbox 的 Candidate 可发布")
-        if not candidate["result"].get("redline_pass"):
-            raise ValueError("红线未通过，不能发布")
+        if not candidate["result"].get("qualification", {}).get("qualified"):
+            raise ValueError("Candidate 未通过 11/11 Gate、Regression 或有效提升要求，不能发布")
         if (self.latest_approval("candidate", candidate_id) or {}).get("decision") != "approved":
             raise ValueError("需要 Candidate Approval")
         release = self.latest_approval("release", candidate_id)
@@ -360,7 +503,8 @@ class GovernanceStore:
         with self.connection() as connection:
             if previous:
                 connection.execute("UPDATE production_versions SET status = 'archived' WHERE id = ?", (previous["id"],))
-            connection.execute("INSERT INTO production_versions VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (version_id, "active", _json(candidate["config"]), run["id"], run["dataset_version_id"], release["id"], previous["id"] if previous else None, _now()))
+            snapshot = {"version": version_id, "candidate_id": candidate_id, "candidate_configuration": candidate["config"], "model_version": run["judge"].get("model"), "dataset_snapshot_version": run["dataset_version_id"], "hard_gate_results": candidate["result"].get("gates"), "comparison_metrics": candidate["result"].get("comparison_metrics"), "bad_case_count": candidate["result"].get("bad_case_count"), "regression": candidate["result"].get("regression"), "recommendation_reason": (self.recommendation(candidate["experiment_id"]) or {}).get("result", {}).get("why"), "human_release": release, "timestamp": _now()}
+            connection.execute("INSERT INTO production_versions (id, status, config_json, evaluation_run_id, dataset_version_id, approval_id, previous_version_id, created_at, snapshot_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (version_id, "active", _json(candidate["config"]), run["id"], run["dataset_version_id"], release["id"], previous["id"] if previous else None, _now(), _json(snapshot)))
         return self.active_production()
 
     def rollback_to(self, version_id: str, actor: str):
@@ -374,6 +518,79 @@ class GovernanceStore:
                 connection.execute("UPDATE production_versions SET status = 'active' WHERE id = ?", (version_id,))
                 connection.execute("INSERT INTO rollback_history(from_version_id, to_version_id, actor, created_at) VALUES (?, ?, ?, ?)", (previous["id"], version_id, actor, _now()))
         return self.active_production()
+
+    def record_monitoring_event(self, *, question: str, answer: str, bad_case: bool, severity: str, determinable: bool):
+        if severity not in {"ordinary", "critical"}:
+            raise ValueError("Unsupported monitoring severity")
+        if not question.strip() or not answer.strip():
+            raise ValueError("Monitoring requires a complete question and answer")
+        event_id = f"MON-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        with self.connection() as connection:
+            connection.execute(
+                "INSERT INTO monitoring_events VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (event_id, question.strip(), answer.strip(), int(bool(bad_case)), severity, int(bool(determinable)), _now()),
+            )
+        event = {"id": event_id, "question": question.strip(), "answer": answer.strip(), "bad_case": bool(bad_case), "severity": severity, "determinable": bool(determinable)}
+        self._create_monitoring_trigger_if_needed(event)
+        return event
+
+    def monitoring_events(self):
+        with self.connection() as connection:
+            rows = connection.execute("SELECT * FROM monitoring_events ORDER BY created_at DESC").fetchall()
+        return [{**dict(row), "bad_case": bool(row["bad_case"]), "determinable": bool(row["determinable"])} for row in rows]
+
+    def _create_monitoring_trigger_if_needed(self, event: dict):
+        reason = None
+        if event["bad_case"] and event["severity"] == "critical":
+            reason = "safety_critical_bad_case"
+        else:
+            recent = [item for item in self.monitoring_events() if item["determinable"]][:20]
+            if sum(item["bad_case"] for item in recent) >= 4:
+                reason = "recent_20_bad_cases>=4"
+        if reason is None:
+            return None
+        with self.connection() as connection:
+            existing = connection.execute(
+                "SELECT * FROM optimization_triggers WHERE reason = ? AND status = 'pending_human_confirm' ORDER BY created_at DESC LIMIT 1", (reason,),
+            ).fetchone()
+            if existing:
+                return dict(existing)
+            trigger_id = f"TRG-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+            connection.execute(
+                "INSERT INTO optimization_triggers (id, reason, event_id, status, actor, created_at, confirmed_at, optimization_run_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (trigger_id, reason, event["id"], "pending_human_confirm", None, _now(), None, None),
+            )
+        return self.optimization_trigger(trigger_id)
+
+    def optimization_triggers(self):
+        with self.connection() as connection:
+            rows = connection.execute("SELECT * FROM optimization_triggers ORDER BY created_at DESC").fetchall()
+        return [dict(row) for row in rows]
+
+    def optimization_trigger(self, trigger_id: str):
+        return next((item for item in self.optimization_triggers() if item["id"] == trigger_id), None)
+
+    def optimization_trigger_for_event(self, event_id: str):
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM optimization_triggers WHERE event_id = ? ORDER BY created_at DESC LIMIT 1", (event_id,)).fetchone()
+        return dict(row) if row else None
+
+    def confirm_optimization_trigger(self, trigger_id: str, actor: str):
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM optimization_triggers WHERE id = ?", (trigger_id,)).fetchone()
+            if row is None:
+                raise KeyError(trigger_id)
+            if row["status"] != "pending_human_confirm":
+                raise ValueError("Trigger is not pending human confirmation")
+            baseline = connection.execute("SELECT id FROM evaluation_runs WHERE status = 'completed' ORDER BY completed_at DESC LIMIT 1").fetchone()
+            experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+            connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline["id"] if baseline else f"MONITORING-{trigger_id}", "pending_agent", _json({"trigger_id": trigger_id}), _now()))
+            connection.execute("UPDATE optimization_triggers SET status = ?, actor = ?, confirmed_at = ?, optimization_run_id = ? WHERE id = ?", ("human_confirmed", actor, _now(), experiment_id, trigger_id))
+            connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("monitoring_trigger", trigger_id, "approved", actor, _now()))
+        return self.optimization_trigger(trigger_id)
+
+    def trigger_is_confirmed(self, trigger_id: str):
+        return (self.optimization_trigger(trigger_id) or {}).get("status") == "human_confirmed"
 
     def experiment(self, experiment_id: str):
         with self.connection() as connection:
