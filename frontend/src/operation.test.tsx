@@ -3,6 +3,7 @@ import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { OperationProvider, useOperation } from "./operation";
+import { SettingsPage } from "./pages/SettingsPage";
 
 // React's DOM act() needs this flag when tests dispatch real button clicks.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -67,5 +68,15 @@ it("keeps a running operation visible while navigating without exposing reasonin
   expect(document.body.textContent).toContain("验证 Provider");
   expect(document.querySelector(".operation-console progress:not([value])")).not.toBeNull();
   expect(document.body.textContent).not.toMatch(/思考过程|推理链|已完成 50%/);
+  await act(async () => root.unmount());
+});
+
+it("does not report a failed Provider probe as a successful operation", async () => {
+  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify({ mode: "live", status: "Unavailable", probe: "failed", last_probe: { reason: "连接失败" } }), { status: 200 }))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider restore={false}><SettingsPage data={{ readiness: { mode: "live", status: "Configured (Unverified)" } }} /></OperationProvider>));
+  await act(async () => document.querySelector<HTMLButtonElement>(".settings-page button.secondary")!.click());
+  expect(document.querySelector(".operation-console[role=alert]")?.textContent).toContain("运行失败");
+  expect(document.body.textContent).toContain("验证失败：连接失败");
   await act(async () => root.unmount());
 });
