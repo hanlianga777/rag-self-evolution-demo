@@ -408,6 +408,17 @@ class GovernanceStore:
     def revision_history(self, question_id: str):
         return [run for run in self.revision_runs() if question_id in run.get("question_ids", [])]
 
+    def revision_positive(self, run: dict, drafts: dict | None = None):
+        for item in (drafts or {}).values():
+            if item["test_category"] == "positive" and item["raw"].get("coverage_slot") == "Q01":
+                return item
+        generation = self.generation_run(run["generation_run_id"])
+        for item_id in generation["question_ids"]:
+            item = self.question(item_id)
+            if item["raw"].get("coverage_slot") == "Q01":
+                return item
+        return None
+
     def update_revision(self, revision_id: str, *, status: str | None = None, **changes):
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -445,8 +456,6 @@ class GovernanceStore:
             linked = next((self.question(item_id) for item_id in run["question_ids"] if self.question(item_id)["raw"].get("coverage_slot") == other_slot), None)
             if not linked or linked["stage"] == "golden" or linked["review_status"] not in {"needs_revision", "rejected"}:
                 raise ValueError("关联题已批准或不在待修订状态")
-            if not ({key for evidence in current["evidence"] for key in evidence.get("source_chunk_ids", [])} & {key for evidence in linked["evidence"] for key in evidence.get("source_chunk_ids", [])}):
-                raise ValueError("关联题没有共同的原始证据")
             ids = [item_id for item_id in run["question_ids"] if item_id in {question_id, linked["id"]}]
         if mode == "manual_edit" and set(changes_by_id) != set(ids):
             raise ValueError("人工修订须为所选题目分别填写草案")
@@ -478,6 +487,9 @@ class GovernanceStore:
         self.update_revision(revision_id, status="validating", stage="hard_validation")
         drafts, errors, new_hash, changed_fields = self._validate_revision_drafts(run, chunks, similarity, generated or run["changes"])
         if errors:
+            editable_errors = ("草案未改变", "ABLATION_TOO_SIMILAR", "参考答案不一致", "证据不一致", "知识点不一致", "答案锚点", "成对题必须")
+            if run["mode"] == "manual_edit" and len(drafts) == len(run["question_ids"]) and all(any(marker in error for marker in editable_errors) for error in errors):
+                return self.update_revision(revision_id, status="preview_ready", stage="preview_ready", error="；".join(errors), drafts=drafts, new_hash=new_hash, changed_fields=changed_fields, apply_blocked=True, validation={"passed": False, "errors": errors}, progress={"current": len(drafts), "total": len(drafts)})
             return self.update_revision(revision_id, status="failed", stage="hard_validation", error="；".join(errors), drafts=drafts, new_hash=new_hash, changed_fields=changed_fields, validation={"passed": False, "errors": errors})
         return self.update_revision(revision_id, status="preview_ready", stage="preview_ready", drafts=drafts, new_hash=new_hash, changed_fields=changed_fields, validation={"passed": True, "errors": []}, progress={"current": len(drafts), "total": len(drafts)})
 
@@ -535,6 +547,31 @@ class GovernanceStore:
                         break
         changed_fields = {item_id: [field for field in ("question", "reference_answer", "evidence") if draft[field] != run["before"][item_id][field]] for item_id, draft in drafts.items()}
         new_hash = {item_id: self._revision_hash(draft) for item_id, draft in drafts.items()}
+        for item_id, draft in drafts.items():
+            if draft["test_category"] != "ablation" or draft["raw"].get("ablation_attribute") != "weak_keywords":
+                continue
+            positive = self.revision_positive(run, drafts)
+            if positive is None:
+                errors.append(f"{item_id}: 关联 Positive 不存在")
+                continue
+            if _normalized(str(draft["reference_answer"] or "")) != _normalized(str(positive["reference_answer"] or "")):
+                errors.append(f"{item_id}: Ablation 与 Positive 的参考答案不一致")
+            own_ids = {key for source in draft["evidence"] for key in source["source_chunk_ids"]}
+            positive_ids = {key for source in positive["evidence"] for key in source["source_chunk_ids"]}
+            related = bool(own_ids & positive_ids) or any(by_chunk[a].get("document_id") == by_chunk[b].get("document_id") and by_chunk[a].get("section_path") and by_chunk[a].get("section_path") == by_chunk[b].get("section_path") for a in own_ids for b in positive_ids if a in by_chunk and b in by_chunk)
+            if not related:
+                errors.append(f"{item_id}: Ablation 与 Positive 的证据不一致")
+            try:
+                if similarity(draft["question"], positive["question"]) < .45:
+                    errors.append(f"{item_id}: Ablation 与 Positive 的知识点不一致")
+            except Exception as error:
+                errors.append(f"{item_id}: Ablation 语义校验不可用：{error}")
+            left, right = (_normalized(question) for question in (draft["question"], positive["question"]))
+            first = {left[index:index + 2] for index in range(len(left) - 1)}
+            second = {right[index:index + 2] for index in range(len(right) - 1)}
+            # ponytail: fixed bigram gate for this V1 corpus; calibrate with labeled pairs if false positives appear.
+            if first and second and len(first & second) / len(first | second) >= .12:
+                errors.append(f"{item_id}: ABLATION_TOO_SIMILAR")
         if len(drafts) == 2:
             positive = next((item for item in drafts.values() if item["test_category"] == "positive"), None)
             ablation = next((item for item in drafts.values() if item["test_category"] == "ablation"), None)

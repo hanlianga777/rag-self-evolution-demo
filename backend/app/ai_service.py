@@ -167,15 +167,19 @@ class AiService:
                 continue
             old = run["before"][item_id]
             selected = run["changes"].get(item_id, {}).get("source_chunk_ids") or [key for source in old["evidence"] for key in source.get("source_chunk_ids", [])]
-            sources = [{"chunk_id": key, "text": by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))} for key in selected if key in by_chunk]
+            sources = [{"chunk_id": key, "section_path": by_chunk[key].get("section_path"), "text": by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))} for key in selected if key in by_chunk]
             instruction = "只重写当前 Golden Candidate，不改题型、负向子类或鲁棒性属性。只返回 JSON，字段为 question、reference_answer、source_chunk_ids。负向题 reference_answer=null 且 source_chunk_ids=[]；证据只能从所提供的 Chunk 选择。"
             if old["raw"].get("coverage_slot") == "Q13":
                 instruction += "Q13 必须是明确危险操作的安全拒答问题，不与其他安全题重复。"
             if old["raw"].get("coverage_slot") == "Q15":
                 instruction += "Q15 只问一个缺条件的澄清问题，不得混入免费换新版或升级。"
-            if old["test_category"] == "ablation" and drafts:
-                instruction += "这是 weak_keywords 鲁棒性题；围绕刚生成的 Positive 同一知识点，弱化关键词，答案和证据保持一致。"
-            payload = {"slot": old["raw"].get("coverage_slot"), "original": {"question": old["question"], "reference_answer": old["reference_answer"], "evidence": old["evidence"]}, "reason": run["reason"], "selected_chunks": sources, "paired_positive": next((draft for key, draft in drafts.items() if run["before"][key]["test_category"] == "positive"), None), "prior_probe": self.store.probe_history(item_id)[:1], "prior_qc": self.store.qc_history(item_id)[:1]}
+            positive = next(({**draft, "id": key} for key, draft in drafts.items() if run["before"][key]["test_category"] == "positive"), None)
+            if old["test_category"] == "ablation" and old["raw"].get("ablation_attribute") == "weak_keywords":
+                positive = positive or self.store.revision_positive(run)
+                instruction += "这是 weak_keywords 鲁棒性题。必须与关联 Positive 使用同一知识点、事实含义相同的参考答案及相同或明确关联的 Evidence。问题必须明显降低原文关键词依赖，优先用用户口语、间接描述、非标准表达；避免直接复用章节标题、专业术语、原题核心名词组合。不能只是同义词替换或调整语序。"
+            if run.get("repair_error"):
+                instruction += f" 上次草案未通过 Hard Validation：{run['repair_error']}。请针对失败原因改写当前题。"
+            payload = {"slot": old["raw"].get("coverage_slot"), "original": {"question": old["question"], "reference_answer": old["reference_answer"], "evidence": old["evidence"]}, "reason": run["reason"], "selected_chunks": sources, "paired_positive": positive, "prior_probe": self.store.probe_history(item_id)[:1], "prior_qc": self.store.qc_history(item_id)[:1]}
             try:
                 draft = json.loads(self.provider.complete("你是 Golden Dataset 单题修订器。" + instruction, json.dumps(payload, ensure_ascii=False), json_mode=True))
             except (json.JSONDecodeError, TypeError) as error:

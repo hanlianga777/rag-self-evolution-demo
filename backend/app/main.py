@@ -372,12 +372,46 @@ def _prepare_revision(revision_id, run_store, service, run_corpus):
             run_store.update_revision(revision_id, status="generating", stage="generating")
             def progress(index, total, item_id, drafts):
                 run_store.update_revision(revision_id, stage="generating", progress={"current": index, "total": total}, generated_drafts=drafts)
-            if not generated or len(generated) < len(run["question_ids"]):
-                generated = service.generate_revision_drafts(run, chunks, on_progress=progress, existing=generated)
+            generated = _generate_revision_with_weak_keyword_repair(run, run_store, service, chunks, generated, progress)
             run_store.update_revision(revision_id, status="queued", stage="generated")
         run_store.prepare_revision(revision_id, chunks, similarity=service.revision_similarity, generated=generated)
     except Exception as error:
         run_store.update_revision(revision_id, status="failed", stage="failed", error=str(error))
+
+
+def _generate_revision_with_weak_keyword_repair(run, run_store, service, chunks, existing=None, on_progress=None):
+    generated = dict(existing or {})
+    target = next((item_id for item_id in run["question_ids"] if run["before"][item_id]["test_category"] == "ablation" and run["before"][item_id]["raw"].get("ablation_attribute") == "weak_keywords"), None)
+    attempts = list(run.get("generation_attempts", []))
+    draft_attempt = (run.get("active_draft") or {}).get("number")
+    start_attempt = 1 + sum(item.get("draft_attempt") == draft_attempt and item.get("question_id") == target for item in attempts)
+    for attempt in range(start_attempt, 4):
+        if len(generated) < len(run["question_ids"]):
+            prompt_run = {**run, "repair_error": "ABLATION_TOO_SIMILAR" if attempt > 1 else None}
+            kwargs = {"existing": generated}
+            if on_progress:
+                kwargs["on_progress"] = on_progress
+            try:
+                generated = service.generate_revision_drafts(prompt_run, chunks, **kwargs)
+            except Exception as error:
+                if target:
+                    partial = run_store.revision_run(run["id"]).get("generated_drafts", generated)
+                    pending = sorted(run["question_ids"], key=lambda item_id: run["before"][item_id]["test_category"] == "ablation")
+                    failed_id = next((item_id for item_id in pending if item_id not in partial), target)
+                    attempts.append({"question_id": failed_id, "draft_attempt": draft_attempt, "attempt": attempt, "at": datetime.now(timezone.utc).isoformat(), "draft": None, "error": str(error)})
+                    run_store.update_revision(run["id"], generation_attempts=attempts)
+                raise
+        if not target or target not in generated:
+            break
+        _, errors, _, _ = run_store._validate_revision_drafts(run, chunks, service.revision_similarity, generated)
+        lexical_error = any("ABLATION_TOO_SIMILAR" in error for error in errors)
+        attempts.append({"question_id": target, "draft_attempt": draft_attempt, "attempt": attempt, "at": datetime.now(timezone.utc).isoformat(), "draft": generated[target], "error": "ABLATION_TOO_SIMILAR" if lexical_error else None, "validation_errors": errors})
+        run_store.update_revision(run["id"], generation_attempts=attempts, generated_drafts=generated)
+        if not lexical_error or attempt == 3:
+            break
+        generated = {key: value for key, value in generated.items() if key != target}
+        run_store.update_revision(run["id"], generated_drafts=generated)
+    return generated
 
 
 @app.post("/api/governance/revisions/{revision_id}/edit-draft", dependencies=[Depends(require_trusted_origin)])
@@ -410,7 +444,7 @@ def _regenerate_revision_draft(revision_id, run_store, service, run_corpus):
         existing = {item_id: run_store._draft_change(run["drafts"][item_id]) for item_id in run["question_ids"] if item_id != target}
         selected = run_store._draft_change(run["drafts"][target])["source_chunk_ids"]
         prompt_run = {**run, "changes": {**run["changes"], target: {"source_chunk_ids": selected}}}
-        generated = service.generate_revision_drafts(prompt_run, run_corpus.chunks(), existing=existing)
+        generated = _generate_revision_with_weak_keyword_repair(prompt_run, run_store, service, run_corpus.chunks(), existing)
         run_store.finish_revision_regeneration(revision_id, {target: generated[target]}, run_corpus.chunks(), similarity=service.revision_similarity)
     except Exception as error:
         run_store.fail_revision_regeneration(revision_id, str(error))
