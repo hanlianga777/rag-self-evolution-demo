@@ -1,7 +1,34 @@
-import { ArrowRight, Sparkles } from "lucide-react";
-import { Badge, Metric, Section, Status } from "../components/Primitives";
+import { ArrowRight } from "lucide-react";
+import { Metric, Section } from "../components/Primitives";
+import { displayText } from "../display";
+import type { Page } from "../types";
 
-export function OverviewPage({ data, navigate }: { data: any; navigate: (page: any) => void }) {
-  const item = data.overview || {}; const production = item.production || data.versions?.find((version: any) => version.status === "active"); const summary = item.dataset || {}; const run = item.latest_evaluation; const monitoring = data.monitoring || {};
-  return <div className="page overview-page"><div className="page-title"><div><h1>RAG 自进化概览</h1><p>真实治理数据；不会展示历史 Seed 分数。</p></div></div><div className="metrics-grid"><Metric label="当前 Production" value={production?.id || "Not Run"} /><Metric label="Golden 已批准" value={String(summary.approved || 0)} /><Metric label="待人工审核" value={String(summary.pending_review || 0)} /><Metric label="最近评分" value={run?.result?.overall_score ?? "Not Run"} /><Metric label="待确认 Trigger" value={String((monitoring.triggers || []).filter((item: any) => item.status === "pending_human_confirm").length)} /></div><Section title="Self-Evolution Pipeline" action={<Badge tone="neutral"><Sparkles size={12} /> 后端真实状态</Badge>}><div className="pipeline">{[["知识库", `${data.documents?.length || 0} 文档`, "knowledge"], ["测试集治理", `${summary.approved || 0} 已批准`, "governance"], ["Baseline Evaluation", run?.status || "Not Run", "evaluation"], ["Bad Case", `${data.badCases?.length || 0}`, "evaluation"], ["Optimization Agent", data.optimization?.status || "Not Run", "evolution"], ["Production Version", production?.id || "baseline-v1", "versions"], ["Monitoring", (monitoring.triggers || []).some((item: any) => item.status === "pending_human_confirm") ? "Human Confirm" : "Normal", "verification"]].map(([label, value, page]) => <button className="pipeline-node" key={label} onClick={() => navigate(page)}><span>{label}</span><strong>{value}</strong><ArrowRight className="pipeline-arrow" size={15} /></button>)}</div></Section><div className="two-column"><Section title="当前 Production"><dl><dt>版本</dt><dd>{production?.id || "baseline-v1"}</dd><dt>配置</dt><dd>TopK {production?.config?.top_k ?? 4}</dd><dt>评分</dt><dd>{run?.result?.overall_score ?? "Not Run"}</dd><dt>发布资格</dt><dd>{run?.result?.gates?.passed ? "11 / 11 PASS" : "Not Qualified"}</dd></dl></Section><Section title="Next Action"><p className="muted">{summary.approved ? "运行固定 Golden Snapshot 的 Baseline Evaluation。" : "先完成 Candidate 的 Probe、QC 与 Human Review，创建正式 Golden Snapshot。"}</p></Section></div></div>;
+export function OverviewPage({ data, navigate }: { data: any; navigate: (page: Page) => void }) {
+  const item = data.overview || {};
+  const production = item.production || data.versions?.find((version: any) => version.status === "active");
+  const summary = item.dataset || {};
+  const run = item.latest_evaluation;
+  const monitoring = data.monitoring || {};
+  const needsReview = !summary.approved;
+  const nextPage: Page = needsReview ? "governance" : "evaluation";
+  const pipeline: [string, string, Page][] = [
+    ["知识库", `${data.documents?.length || 0} 文档`, "knowledge"],
+    ["测试集治理", `${summary.approved || 0} 已批准`, "governance"],
+    ["Baseline Evaluation", displayText(run?.status || "not_run"), "evaluation"],
+    ["Bad Case", `${data.badCases?.length || 0}`, "evaluation"],
+    ["Optimization Agent", displayText(data.optimization?.status || "not_run"), "evolution"],
+    ["Production Version", production?.id || data.workspace?.active_version || "未发布", "versions"],
+    ["Monitoring", (monitoring.triggers || []).some((trigger: any) => trigger.status === "pending_human_confirm") ? "待人工确认" : "正常", "verification"],
+  ];
+
+  return <div className="page overview-page">
+    <div className="page-title"><div><h1>RAG 自进化概览</h1><p>真实治理数据，不展示历史 Seed 分数。</p></div></div>
+    <section className="next-action" aria-labelledby="next-action-title">
+      <div><span className="next-action-label">当前下一步</span><h2 id="next-action-title">{needsReview ? "推进测试集治理" : "确认 Golden Snapshot 与 Baseline 前置条件"}</h2><p>{needsReview ? "查看当前 V1 Mini 的 Probe、QC 与人工审核状态；符合条件后创建 Golden Snapshot。" : "核对 Golden Snapshot 和 Provider 状态后，运行 Baseline Evaluation。"}</p></div>
+      <a className="primary" href={`#${nextPage}`} onClick={() => navigate(nextPage)}>{needsReview ? "前往测试集治理" : "前往评测"}<ArrowRight size={15} aria-hidden="true" /></a>
+    </section>
+    <div className="metrics-grid overview-metrics"><Metric label="当前 Production" value={production?.id || data.workspace?.active_version || "未发布"} /><Metric label="Golden 已批准" value={String(summary.approved || 0)} /><Metric label="待人工审核" value={String(summary.pending_review || 0)} note="含历史候选题" /><Metric label="最近评分" value={run?.result?.overall_score ?? "未运行"} /><Metric label="待确认 Trigger" value={String((monitoring.triggers || []).filter((trigger: any) => trigger.status === "pending_human_confirm").length)} /></div>
+    <Section title="自进化流程"><div className="pipeline">{pipeline.map(([label, value, page]) => <a className="pipeline-node" href={`#${page}`} key={label} onClick={() => navigate(page)}><span>{label}</span><strong>{value}</strong><ArrowRight className="pipeline-arrow" size={15} aria-hidden="true" /></a>)}</div></Section>
+    <Section title="当前 Production"><dl className="production-details"><div><dt>版本</dt><dd>{production?.id || data.workspace?.active_version || "未发布"}</dd></div><div><dt>配置</dt><dd>TopK {production?.config?.top_k ?? "未提供"}</dd></div><div><dt>评分</dt><dd>{run?.result?.overall_score ?? "未运行"}</dd></div><div><dt>发布资格</dt><dd>{run?.result?.gates?.passed ? "11 / 11 PASS" : run?.id ? "未获得资格" : "未评测"}</dd></div></dl></Section>
+  </div>;
 }
