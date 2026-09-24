@@ -135,7 +135,7 @@ it("shows only Revision Draft while a paired preview is active", async () => {
 });
 
 it("starts Q09 alone by default and includes Q01 only when explicitly checked", async () => {
-  const questions = Array.from({ length: 20 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: `原题 ${index + 1}`, reference_answer: "正确操作", test_category: index < 8 ? "positive" : "ablation", legacy_question_type: "v1_mini", probe_status: "probe_passed", qc_status: "qc_passed", review_status: index === 0 || index === 8 ? "needs_revision" : "approved", stage: index === 0 || index === 8 ? "candidate" : "golden", evidence: [{ source_chunk_ids: ["C1"] }], evidence_details: [{ chunks: [{ chunk_id: "C1", document_id: "DOC-001" }] }] }));
+  const questions = Array.from({ length: 20 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: `原题 ${index + 1}`, reference_answer: "正确操作", test_category: index < 8 ? "positive" : "ablation", raw: index === 8 ? { source_positive_id: "V1-1" } : {}, legacy_question_type: "v1_mini", probe_status: "probe_passed", qc_status: "qc_passed", review_status: index === 0 || index === 8 ? "needs_revision" : "approved", stage: index === 0 || index === 8 ? "candidate" : "golden", evidence: [{ source_chunk_ids: ["C1"] }], evidence_details: [{ chunks: [{ chunk_id: "C1", document_id: "DOC-001" }] }] }));
   questions[8].evidence = [{ source_chunk_ids: ["C2"] }];
   questions[8].evidence_details = [{ chunks: [{ chunk_id: "C2", document_id: "DOC-001" }] }];
   const requests: Array<{ url: string; init?: RequestInit }> = [];

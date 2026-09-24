@@ -1,23 +1,20 @@
 # RAG Self-Evolution Platform 产品规格
 
 > **唯一正式 Source of Truth**
-> **SPEC Version：V1.0.1 — Final Closure Patch**
-> **Status：Final Target SPEC Frozen · Implementation Authorized / In Progress**
+> **SPEC Version：V1.1 — Simplified & End-to-End Verified Demo Baseline**
+> **Status：Current Product Baseline · Implementation Authorized**
 
 ## 1. 文档地位与使用规则
 
-本文件定义 RAG Self-Evolution Platform 的下一版目标产品规格（Target Product SPEC）。后续 ChatGPT、Codex 与 SpecKit 在处理本项目之前，必须先读取本文件及 [SPEC ChangeLog](SPEC_CHANGELOG.md)，不得重新推导已经标记为 `[CONFIRMED]` 的决策。
+本文件是当前 V1.1 Demo 的唯一产品 Source of Truth。[SPEC ChangeLog](SPEC_CHANGELOG.md) 仅记录历史，不产生并行的当前规则。运行能力和数据状态仍以代码及持久化记录为证，不能用规格文字冒充已完成的评测或发布。
 
-- 当前仓库中可运行的 Demo 是 **Current Implementation**，不是本文件的实现证明，也不等同于 Target SPEC。
-- 当前 Demo 与 Target SPEC 的差异属于正常状态；本次 V1.0 文档冻结不授权因差异修改业务代码、数据、Pipeline、页面或运行时。
-- V1.0 范围内的产品决策均已冻结；实现可以选择数据字段、像素和样例内容的表现方式，但不得借此改变本文件的产品规则。
-- 新的产品决策必须先更新本文件，再追加 ChangeLog；任何业务实施仍须经单独授权的 SpecKit、Implementation Plan 与 Tasks。
+修改产品规则时先更新本文件，再检查并同步代码、测试、README、项目上下文、交接文档、决策记录、TODO、架构说明与图、当前 Demo；无影响项须说明原因。历史 Seed、Legacy 和测试 Fixture 不得充当正式 V1 结果。
 
 ## 2. 产品定位 `[CONFIRMED]`
 
 产品暂定名：**RAG Self-Evolution Platform / RAG 自进化平台**。
 
-它不是普通 RAG Chatbot，也不是单纯的 RAG 参数调优工具。其目标是将企业 RAG 上线后的持续评测、问题发现、自动优化、实验验证、发布与持续监控过程产品化。
+它是面向 3–5 分钟面试展示的评测驱动 RAG 持续优化 Demo，不是普通 Chatbot、大型 RAGOps、多 Agent 或企业审批平台。
 
 核心职责边界：
 
@@ -26,7 +23,7 @@
 
 完整产品主线：
 
-`Knowledge → Golden Dataset → Evaluation → Bad Case → Optimization Agent → Sandbox → Regression → Recommendation → Human Approval → Release → Production Monitoring → New Evaluation → Next Evolution`
+`Knowledge → Mini Golden Generation → Hard Validation → Probe → QC → Human Review → Approved Golden → Golden Snapshot → Baseline Evaluation → Bad Case → Optimization Agent → A/B/C → Sandbox → Regression → Recommendation → Human Release → Production Version → Production QA / Monitoring → Human Confirm Trigger → Next Optimization Run`
 
 ## 3. 一级信息架构 `[CONFIRMED]`
 
@@ -72,17 +69,15 @@ Golden Dataset 是 Evaluation 测试资产，不是知识库的附属功能，�
 
 Golden 中的 Ablation Question 不等同于关闭 Rerank、Rewrite 等能力的策略消融实验；两者必须在后续产品与实现中保持区分。
 
-### 5.3 V1 Default Generation Profile
+### 5.3 V1.1 Generation Profile
 
-Mini、Medium、Full 表示生成规模与知识覆盖等级，不表示 LLM 推理能力等级。V1 默认比例为 `Positive : Ablation : Negative = 2 : 1 : 2`：
+当前仅实现 Mini；Profile 元数据保存类别配额与 `expected_count`，通用治理流程不得依赖题号或固定长度常量。
 
 | Profile | Positive | Ablation | Negative | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Mini | 8 | 4 | 8 | 20 |
-| Medium | 20 | 10 | 20 | 50 |
-| Full | 40 | 20 | 40 | 100 |
 
-该比例不是行业标准；V1.0 仅采用上述 Mini、Medium、Full Profile。任何后续 Profile 规则调整均须作为新的产品规格变更处理，而非本版本的待定决策。
+Medium / Full 属于未来版本，不是 V1.1 实现或验收要求。
 
 ## 6. Golden Governance `[CONFIRMED]`
 
@@ -91,6 +86,8 @@ Mini、Medium、Full 表示生成规模与知识覆盖等级，不表示 LLM 推
 `Candidate → Hard Validation → Probe → QC → Human Review → Approved Golden → Golden Snapshot`
 
 任何 Candidate 均不得由 AI 自动成为正式 Golden。
+
+Human Review 仅有批准、需修订、拒绝三个业务决定。需修订题可单独编辑 Question / Reference Answer / 真实 Evidence，或请求 AI 草案；保存后重新 Hard Validation → Probe → QC → 人工复审。Draft、版本哈希和尝试历史是内部事务与审计，不是额外人工审批阶段。Positive–Ablation 关系由 `source_positive_id` 等明确元数据表达，不以 Qxx 题号或共享 Evidence 推断，也不强制成对修订。
 
 ### 6.1 Hard Validation
 
@@ -105,7 +102,7 @@ Probe 回答“这道题是否真的成立”，用于 Golden Candidate 自身�
 
 ### 6.3 QC
 
-QC 回答“这道题作为 Golden Test Case 写得好不好”，采用 LLM Judge 加 Deterministic Rules，可检查 Question Clarity、Answer Quality、Evidence Support、Ambiguity、Fake Negative Risk、Unsupported Answer 与 Question / Evidence Alignment。V0.4 Target SPEC 复用现有 DeepSeek API / DeepSeek Model，不引入新的模型供应商；Judge Temperature 固定为 `0` 或当前 API / 模型可支持的最接近值，以减少同一 Candidate 多次 QC 的判定漂移。
+QC 回答“这道题作为 Golden Test Case 写得好不好”，采用 LLM Judge 加 Deterministic Rules，可检查 Question Clarity、Answer Quality、Evidence Support、Ambiguity、Fake Negative Risk、Unsupported Answer 与 Question / Evidence Alignment。当前复用现有 DeepSeek API / DeepSeek Model，不引入新的模型供应商；Judge Temperature 固定为 `0` 或当前 API / 模型可支持的最接近值，以减少同一 Candidate 多次 QC 的判定漂移。
 
 QC Pass Threshold 为 `Score ≥ 85`。QC Fail 必须进入 `needs_revision`，修改后重新进入治理流程；Probe / QC 都不能替代最终 Human Review。
 
@@ -129,7 +126,7 @@ Baseline 是当前 Production Pipeline 在固定 Golden Snapshot、固定 Judge 
 
 在一次 Optimization Run 中，Baseline 是固定对照组。Candidate A/B/C 的变化不得反向修改 Baseline。
 
-V0.3 Target Baseline 默认参数如下；它们是 Target SPEC，不表示 Current Implementation 已支持：
+V1.1 默认 Baseline 参数如下；实际执行配置仍以 Evaluation Snapshot 为准：
 
 | Parameter | Target Baseline |
 | --- | --- |
@@ -147,7 +144,7 @@ V0.3 Target Baseline 默认参数如下；它们是 Target SPEC，不表示 Curr
 | Generation Prompt | 当前 Baseline Prompt |
 | Temperature | `0.2` |
 
-`CandidateK` 是初始召回的候选 Chunk 数；`Rerank` 对候选 Chunk 重新做相关性排序；`TopK` 是最终进入生成模型上下文的 Chunk 数。例如 `CandidateK=12 → Rerank → TopK=4` 表示先召回 12 个候选，经重排后选取 4 个生成证据。V0.3 不新增 `Rerank TopN`。
+`CandidateK` 是初始召回的候选 Chunk 数；当前 `Rerank` 是轻量二阶段重排，不是独立 Rerank Model；`TopK` 是最终进入生成模型上下文的 Chunk 数。实际管道为 `Query → CandidateK → Vector/BM25 归一化 Hybrid → 可选 Lightweight Rerank → MinScore → TopK Context → DeepSeek`。
 
 ### 7.2 Evaluation Framework 与 Release Gate
 
@@ -173,7 +170,7 @@ Positive 与 Ablation 均使用 Answer Correctness、Faithfulness、Completeness
 
 ### 7.3 Comparison Metrics
 
-TTFT、Token Cost、Recall@K、Precision@K、MRR 不属于 11 项 Hard Gate，但必须用于 Baseline、Candidate A、B、C 及条件触发 D 的横向比较：
+TTFT、Token Cost、Recall@K、Precision@K、MRR 不属于 11 项 Hard Gate，但必须用于 Baseline 与 Candidate A/B/C 的横向比较：
 
 - TTFT（Time To First Token）必须记录，用于比较用户首 Token / 首字响应体验。`TTFT ≤ 5s` 是展示目标；超过时 UI 可标黄 / Warning，但不导致 Candidate Failed，也不新增 Hard Gate。
 - Token Cost 必须展示，用于 Baseline / Candidate 横向比较；不设 Budget Limit、不属于 Hard Gate，且不得因 Token Cost 高自动淘汰 Candidate。
@@ -204,7 +201,7 @@ Evaluation 识别“哪里失败”，Optimization Agent 分析“为什么失�
 
 Optimization Agent 的完整逻辑为：
 
-`Baseline Evaluation → Bad Case → Bad Case Cluster → Root Cause → Optimization Hypothesis → A/B/C Candidates → Sandbox Evaluation → Regression / Safety / Performance / Red Line → Conditional Composite Candidate D → Recommendation → Human Release Gate → Production Version → Monitoring / Rollback`
+`Baseline Evaluation → Bad Case → Bad Case Cluster → Root Cause → Optimization Hypothesis → A/B/C Candidates → Sandbox Evaluation → Regression / Safety / Performance / Red Line → Recommendation → Human Release → Production Version → Monitoring / Rollback`
 
 每次 Optimization Run 至少输入 Baseline Evaluation Result、Bad Case Set、Retrieved Chunks、Similarity / Ranking、Final Answer、LLM Judge、Bad Case Label、Evidence Match、Product / Document Group Result、Production Pipeline Snapshot、Golden Snapshot、Allowed Search Space 与 Constraints。
 
@@ -226,13 +223,13 @@ Agent 优先按 Root Cause / Problem Pattern 聚类 Bad Case，例如 Retrieval 
 
 ### A/B/C Generation Principle
 
-A/B/C 主要由 Optimization Agent 根据 Bad Case、Root Cause、Current Baseline Configuration、Allowed Search Space 与 Historical Evaluation Results 动态生成。首次 Demo 可预置一组 A/B/C Example Seed Configuration，以保证初始展示具有完整、清晰的产品流程；它仅用于 Demo 初始化，不代表生产规则，不限制 Agent 后续生成新的 Candidate。
+A/B/C 由 Optimization Agent 根据 Bad Case、Root Cause、Current Baseline Configuration、Allowed Search Space 与 Historical Evaluation Results 动态生成。测试 Fixture 可提供示例配置，但正式 V1.1 流程不得依赖 Seed 生成 Candidate、结果或赢家。
 
-Seed 或后续 Candidate 的参数必须属于 V0.3 已冻结的 Search Space。Agent 可因 Root Cause 判断某些参数不应修改而保持 Baseline，也可同时修改多个共同服务于同一 Hypothesis 的相关参数；A/B/C 不限制为单变量实验。不得硬编码 Candidate A、B 或 C 永远获胜；Recommendation 必须来自真实 Evaluation、Hard Gate、Regression 与 Comparison Metrics。
+Candidate 参数必须属于下述已冻结的 Search Space。Agent 可因 Root Cause 判断某些参数不应修改而保持 Baseline，也可同时修改多个共同服务于同一 Hypothesis 的相关参数；A/B/C 不限制为单变量实验。不得硬编码 Candidate A、B 或 C 永远获胜；Recommendation 必须来自真实 Evaluation、Hard Gate、Regression 与 Comparison Metrics。
 
 每个 Candidate 必须记录 Candidate ID、Related Bad Case Cluster、Primary / Secondary Root Cause、Optimization Hypothesis、Parameter Diff、Why This Parameter Set、Expected Metric Improvement、Potential Risk、Full Pipeline Snapshot、Evaluation Result 与 Failure Reason。
 
-### 8.3 V0.3 自动 Search Space
+### 8.3 当前自动 Search Space
 
 | Capability | Baseline | Allowed Search Space | 适用范围与约束 |
 | --- | --- | --- | --- |
@@ -241,7 +238,7 @@ Seed 或后续 Candidate 的参数必须属于 V0.3 已冻结的 Search Space。
 | MinScore | `0` | `0 / 0.1 / 0.2 / 0.3` | 仅低相关噪声、误回答、知识边界等 Root Cause 时调整；提高可降噪，也可能误删真实 Evidence 并降低 Recall。 |
 | Hybrid Search | `ON` | `ON / OFF` | Vector + BM25 / Keyword Search；由 Root Cause 决定，非每轮穷举。 |
 | Hybrid Alpha | `0.5` | `0.3 / 0.5 / 0.7` | 仅 Hybrid ON 时有效；`0.3` 偏 Keyword / BM25，`0.5` 平衡，`0.7` 偏向量语义。 |
-| Rerank | `ON` | `ON / OFF` | 可因 Ranking Error、Performance、Latency 与实际收益调整；Rerank Model 固定。 |
+| Lightweight Rerank | `ON` | `ON / OFF` | 可因 Ranking Error、Performance、Latency 与实际收益调整；不声称集成独立重排模型。 |
 | Query Rewrite | `OFF` | `OFF / ON` | Retrieval 前执行，适用于口语化表达、Query 与知识库标准表达偏差、Query 导致检索偏移。 |
 | MultiQuery | `OFF` | `OFF / 2 / 4 / 6` | 开启后生成对应数量的扩展 Query，必须保留原始 Query；可改善单一问法召回不足，也可能引入扩展噪声。 |
 | HyDE | `OFF` | `OFF / ON` | Query 与文档表达差异大、直接向量检索召回不足时，用 Hypothetical Answer / Document Representation 辅助 Retrieval。 |
@@ -265,17 +262,17 @@ Optimization Agent 可受控修改回答约束、Evidence / Citation 要求、Re
 
 ### 8.4 明确排除的自动 Search Space
 
-以下能力可继续存在于 Pipeline Config，但 V0.3 Agent 不自动修改：
+以下能力可继续存在于 Pipeline Config，但当前 Agent 不自动修改：
 
 - Parser / OCR：MinerU、OCR、VLM Parser、Table Normalize 等。
 - Chunk：Chunk Method、Section-aware、Parent-Child、Page-level、Chunk Size、Child / Parent Chunk Size、Chunk Overlap。
 - Embedding Model：固定；不自动 Re-embedding 或重建 Index。
 - Generation Model：固定；不自动切换 DeepSeek、Qwen 等。
-- Rerank Model：固定；仅允许 Rerank ON/OFF。
+- Lightweight Rerank：当前是轻量二阶段重排，不是独立 Rerank Model；仅允许 ON/OFF。
 - Temperature：固定为 `0.2`。
 - Query Decompose：Pipeline Future Capability，不进入自动 Search Space。
 - Retrieval MaxTokens：保留为 Pipeline Config，不进入自动 Search Space。
-- Rerank TopN：V0.3 不新增且不自动修改。
+- Rerank TopN：当前不新增且不自动修改。
 
 ### 8.5 Root Cause → Search Guidance
 
@@ -314,17 +311,15 @@ Sandbox 是不影响 Production 的隔离实验环境。A/B/C 必须使用同一
 
 Regression 独立版本化，来源可包括历史 Approved Golden、关键业务题、Safety Cases 与历史已修复的重要 Bad Cases；状态至少为 Still Pass、Recovered、Still Fail、Regressed。Regression 是 Sandbox 到 Release Gate 的必须验证步骤：Safety / Critical 类题目不允许新增失败；普通题最多允许新增 `1` 个失败；超过即 Regression Failed。
 
-`max_evals = 12`：单次 Optimization Run 最多累计进行 12 次 Candidate 完整 Evaluation，不要求跑满。Conditional / Composite Candidate D 同样计入；所有实际执行过完整 Evaluation 的 Candidate 都计入 Evaluation Budget。A/B/C 全失败后，Agent 必须读取 Sandbox Result、Regression、Failure Reason、Bad Case Change、Root Cause Evidence，重新判断 Root Cause / Hypothesis 后生成下一轮 A/B/C；禁止原样重复、机械调整数字或无解释扩大 Search Space。
+`max_evals = 12`：单次 Optimization Run 最多累计进行 12 次 Candidate 完整 Evaluation，不要求跑满。仅 A/B/C 回合的实际完整 Evaluation 计入预算。A/B/C 全失败后，Agent 必须读取 Sandbox Result、Regression、Failure Reason、Bad Case Change、Root Cause Evidence，重新判断 Root Cause / Hypothesis 后生成下一轮 A/B/C；禁止原样重复、机械调整数字或无解释扩大 Search Space。
 
 满足以下任一条件可停止：已出现满足 Release Gate 且没有值得继续验证的明确 Hypothesis 的 Candidate；达到 `max_evals = 12`；连续迭代没有有效提升；持续触发 Safety / Performance / Regression Red Line；没有新的可解释 Hypothesis。12 次仍无合格 Candidate 时，状态为 `No Qualified Candidate / Needs Human Review`：保留 Baseline、不发布失败方案、保存全部实验、输出失败原因与人工检查方向。
 
 即使已有 Candidate 满足 Release Gate，仅在仍有明确剩余 Bad Case、存在新的合理 Hypothesis，且没有明显 Cost / Performance 风险时才继续下一轮；禁止为多几分无限优化。
 
-### 8.8 Conditional Composite Candidate D
+### 8.8 当前 Candidate 边界
 
-A/B/C 不是递进叠加。D 是条件触发的 Composite Candidate：仅当 A/B/C 中存在多个已独立验证有效、且有明确组合价值的能力 / Candidate 时生成。D 可组合多个能力 / 参数，不设最多两项或三项的死限制，仍遵循 `Minimum Necessary Combination`。
-
-D 必须重新执行 Sandbox、Golden Evaluation、Regression、Safety、Performance、Red Line。D 不天然优于 A/B/C；若失败、引入明显 Regression 或 Cost / Latency 不合理，退回最佳已验证 A/B/C，不得为展示组合能力强制选择 D。D 的完整 Evaluation 与任何其他 Candidate 相同计入 `max_evals = 12`。
+V1.1 仅有每轮并列的 A/B/C；Composite D 不进入当前产品、UI 或预算规则。
 
 ## 9. Recommendation、Release、Version 与 Monitoring `[CONFIRMED]`
 
@@ -334,25 +329,23 @@ Candidate 只有同时满足以下条件，才进入 Qualified Candidate / Recom
 
 Recommendation Report 必须复用 Sandbox 已保存的实验记录，并至少包括：Recommended Candidate、Candidate Hypothesis、Root Cause、Before / After Pipeline、Parameter Diff、三组 Evaluation Metrics、11 项 Hard Gate Result、Product / Document Group Results、Bad Case Fixed、Remaining Bad Case、Regression、TTFT / Latency / Token Cost Change、Recall@K / Precision@K / MRR Change、Risks、Why Recommended、Why Other Candidates Were Not Selected。无合格 Candidate 时必须明确 `No Qualified Candidate`，不得强行选 Winner。
 
-### 9.2 Human Release Gate 与 Direct Release
+### 9.2 单次 Human Release
 
 发布链路为：
 
-`Recommendation → Human Approval → Release Gate → Version Snapshot → Production`
+`Qualified Candidate → Recommendation → Human Release / 确认发布 → Version Snapshot → Production`
 
-Optimization Agent 只能生成 Recommendation，不能自动修改 Production；Human Approve 后才能生成新的 Production Version。Release Gate 的确认门槛是 11 项 Hard Gate 全部 PASS 与 Regression PASS；Human Release 是最终发布决策，不是绕过 Gate 的快捷入口。
-
-V1 保留 Direct Release：人工已明确确认某个 Pipeline Configuration 时，不需要经过 Agent 搜索即可进入发布流程。Direct Release 仍必须完成 Sandbox 质量验证、11 项 Hard Gate 全部 PASS、Regression PASS、Version Snapshot、Release Record、Audit Trail 与 Rollback Capability；它不等同于 Agent 自动绕过 Sandbox。
+Optimization Agent 只能生成 Recommendation，不能自动修改 Production。用户只执行一次“确认发布”；服务端在同一事务中复核 Sandbox、11/11 Hard Gate、Regression、Recommendation，写入 Human Release 审计及 Version Snapshot。旧 Candidate Approval / Release Approval 记录仅用于历史追溯，不是当前发布前置条件。Direct Release 不属于 V1.1 主线；若保留内部入口，也不得绕过 Sandbox、Gate、Regression 与人工发布。
 
 V1 不实现虚假的 1% → 10% → 50% → 100% Canary / Gray Release。`direct / canary` 可作为未来架构与数据模型的预留能力，但 Canary / Gray Release 不属于 V1 核心实现。
 
 ### 9.3 Version Snapshot 与 Rollback
 
-每次 Production Release 前必须保存完整 Version Snapshot，至少包括 Pipeline Config、Prompt、Model Version、Rerank Model、Embedding Model、Golden Snapshot、Evaluation Report、Release Gate Result、Release Time、Release Operator、Previous Version。旧 Production 不得覆盖或删除，出现异常时支持人工 Rollback 至上一已发布版本。
+每次 Production Release 必须在同一事务内保存完整 Version Snapshot，至少包括 Pipeline Config、Prompt、Model Version、Lightweight Rerank 模式、Embedding Model、Golden Snapshot、Evaluation Report、Release Gate Result、Release Time、Release Operator、Previous Version。旧 Production 不得覆盖或删除，出现异常时支持人工 Rollback 至上一已发布版本。
 
 ### 9.4 Production Monitoring
 
-V1.0 采用半自动闭环与轻量 Production Monitoring，不建设复杂 APM、完整 Observability Platform 或真实流量调度平台。满足任一条件时，Monitoring 生成 `Optimization Trigger / Pending Optimization Task`：出现 `1` 个 Safety Critical Bad Case；或最近 `20` 次有效问答中 Bad Case `≥ 4`。有效问答仅指有完整问题、回答及可判定 Bad Case 结果的完成记录；中断、缺字段或不可判定记录不计入。
+V1.1 采用半自动闭环与轻量 Production Monitoring，不建设复杂 APM、完整 Observability Platform 或真实流量调度平台。满足任一条件时，Monitoring 生成 `Optimization Trigger / Pending Optimization Task`：出现 `1` 个 Safety Critical Bad Case；或最近 `20` 次有效问答中 Bad Case `≥ 4`。有效问答仅指有完整问题、回答及可判定 Bad Case 结果的完成记录；中断、缺字段或不可判定记录不计入。
 
 Monitoring 不直接自动启动完整 Agent 调参或自动发布。流程为：
 
@@ -365,38 +358,34 @@ Monitoring 绝不直接自动启动 Agent 调参或自动发布，Human Confirm 
 “问答验证”作为一级模块，承载 Production Q&A 与 Before / After Comparison：
 
 - Production Q&A：真实体验当前 Production Pipeline。
-- Before / After：在同一 Question 下比较 Production 与 Candidate / New Production，可展示 Answer、Citation、Retrieved Evidence、Latency 与 Pipeline Difference。
+- Before / After：仅在同一 Question 下比较当前 Production 与已合格 Sandbox Candidate；无合格候选时显示真实空状态。
 
-V1.0 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语言，不重新推翻设计；保持卡片化表达，信息层级、对齐和间距整齐；Baseline / A / B / C / Recommendation 的比较必须容易理解；最终展示质量应达到 AI 解决方案工程师面试 Demo 水平；禁止为“科技感”堆砌无业务意义组件。像素、具体字段扩展与布局细节属于实现表现层，不构成产品规格缺口。
+V1.1 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语言，不重新推翻设计；保持卡片化表达，信息层级、对齐和间距整齐；Baseline / A / B / C / Recommendation 的比较必须容易理解；最终展示质量应达到 AI 解决方案工程师面试 Demo 水平；禁止为“科技感”堆砌无业务意义组件。像素、具体字段扩展与布局细节属于实现表现层，不构成产品规格缺口。
 
 最终 Demo 必须采用稳定、可重复演示的数据链：`Baseline → Evaluation → Bad Case → Optimization Agent → A/B/C → Sandbox → Regression → Recommendation → Human Release`。数据必须清晰体现 Before / After，不得让所有页面只显示随机数据或无法对应的 Mock 数字。A/B/C 必须体现不同的 Optimization Strategy / Parameter Combination，但不得硬编码某一个 Candidate 永远胜出；最终 Recommendation 必须来自实际 Sandbox Evaluation、Gate 与 Regression 结果。
 
 ## 11. 完整 Self-Evolution Lifecycle `[CONFIRMED]`
 
-`Knowledge → Golden Dataset Generation → Hard Validation → Probe ≥90 → QC ≥85 → Human Review → Golden Snapshot → Production Baseline Evaluation → Bad Case → Bad Case Cluster → Root Cause Diagnosis → Optimization Hypothesis → Candidate A/B/C → Sandbox Evaluation → 11 Hard Gates + Regression Validation → Conditional Composite Candidate D → Recommendation → Human Release Gate → Version Snapshot → Production Version → Monitoring / Rollback`
+`Knowledge → Mini Golden Generation → Hard Validation → Probe ≥90 → QC ≥85 → Human Review → Golden Snapshot → Production Baseline Evaluation → Bad Case → Root Cause Diagnosis → Candidate A/B/C → Sandbox Evaluation → 11 Hard Gates + Regression → Recommendation → Human Release → Production Version → Production QA / Monitoring → Human Confirm Trigger → Next Optimization Run`
 
-## 12. V1.0.1 Final Closure Patch `[CONFIRMED]`
+## 12. V1.1 收口原则 `[CONFIRMED]`
 
-V0.2–V1.0 遗留的产品决策已在本版本全部关闭：Overall Score、Regression、Monitoring Trigger、TTFT、Token Cost、Retrieval Metrics、Probe、Hybrid Alpha、MinScore、Direct Release、Composite D Budget、有效提升、Candidate 去重、Prompt Strategy、Snapshot / Report、UI、Demo 数据与 A/B/C 初始原则均以本文件第 6 至 10 节为准。V1.0.1 进一步固定 Overall Score 的展示计算方式与 A/B/C Example Seed 的 Demo 初始化定位。
+当前有效规则是本文件第 1–11 节。V1.0.1 与更早版本的 Decision / ChangeLog 只作历史追溯；不得据此恢复 Composite D、双层发布审批、Seed 结果或题号驱动业务规则。
 
 本文件不定义 Report 的非必填字段、像素级 UI、具体演示题材或固定 Candidate 参数；这些是实现表现层细节，不得反向改变已冻结的流程、质量门槛、审计记录、数据可追溯性或人工发布边界。
 
 ## 13. Current Implementation 与历史文档治理
 
-当前仓库中的 Demo、README 中的启动说明与现有运行时描述继续作为 Current Implementation 保留。它们不能因为与本 Target SPEC 不一致而在本阶段被删除、重构或改造成目标能力。
+代码与运行记录证明已实现能力；若与本产品规则冲突，应先修正实现并在交付中如实报告未完成项，不得把 Target 文字当作运行证据。
 
 以下材料均为历史实现设计或参考资料，不得作为当前 Target Implementation Requirement：
 
 - `docs/superpowers/specs/`：Legacy / Reference。
 - `docs/superpowers/plans/`：历史实施计划，仅供追溯。
-- `架构/RAG自进化平台架构说明.md`：Current Implementation / 历史架构参考，不是 Target SPEC。
+- `架构/RAG自进化平台架构说明.md`：当前实现说明，必须与本 SPEC 一致；不产生额外产品规则。
 
-当上述文档与本文件冲突时，以本文件为下一版产品设计的唯一依据；实际已运行能力仍以 Current Implementation 的可验证事实为准。
+历史材料与本文件冲突时，以 V1.1 为当前产品规则；实际结果仍以可验证记录为准。
 
-## 14. 本轮实施边界 `[CONFIRMED]`
+## 14. V1.1 实施与验收边界 `[CONFIRMED]`
 
-V1.0.1 的 `[CONFIRMED]` 产品规则保持冻结。本次已获得独立实施授权；实现必须保持真实数据边界、审计记录与人工发布边界，不得以实现便利改变已确认业务规则。禁止：
-
-- 修改 Frontend、Backend、Database、Migration、Pipeline Configuration、Demo UI 或业务逻辑。
-- 重新生成 Golden Dataset、删除现有 40 道历史题、修改 Golden Candidate、Probe / QC Runtime、Evaluation / Baseline / Bad Case 数据。
-- 启动 SpecKit Implementation，或依据 Target SPEC 自动修复 Current Implementation。
+保持七个一级页面、FastAPI / SQLite / React、11 Hard Gates、Probe ≥90、QC ≥85、人工 Golden Review 与人工发布。不得自动修改现有 Candidate、应用未确认 Preview、生成真实 Golden、批准 Snapshot 或发布版本。确定性完整 E2E 在隔离数据库中运行；真实 Provider 只做隔离 Live Smoke。Medium / Full、Composite D、新模型、多 Agent、Docker、复杂监控和 UI 重设计均不在本版本范围。

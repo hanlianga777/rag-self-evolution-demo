@@ -33,9 +33,8 @@ class GovernanceStoreTests(unittest.TestCase):
     def test_migration_imports_the_audited_candidate_draft_without_approving_it(self):
         summary = self.store.dataset_summary()
 
-        self.assertEqual(summary["total"], 40)
-        self.assertEqual(summary["positive"], 32)
-        self.assertEqual(summary["negative"], 8)
+        self.assertEqual(summary["total"], 0)
+        self.assertEqual(summary["legacy_total"], 40)
         self.assertEqual(summary["approved"], 0)
         self.assertEqual(self.store.question("GGC-033")["negative_subtype"], "ambiguous")
         self.assertEqual(self.store.question("GGC-001")["review_status"], "human_review_pending")
@@ -112,7 +111,8 @@ class GovernanceApiTests(unittest.TestCase):
         summary = self.client.get("/api/governance/summary").json()
         review = self.client.post("/api/governance/questions/GGC-001/review", json={"decision": "approved"})
 
-        self.assertEqual(summary["total"], 40)
+        self.assertEqual(summary["total"], 0)
+        self.assertEqual(summary["legacy_total"], 40)
         self.assertEqual(summary["approved"], 0)
         self.assertEqual(review.status_code, 409)
         self.assertIn("Probe", review.json()["detail"])

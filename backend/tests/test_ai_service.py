@@ -68,7 +68,8 @@ class AiServiceTests(unittest.TestCase):
         generated = service.generate_mini_golden(chunks)
 
         self.assertEqual(len(generated["candidates"]), 20)
-        self.assertEqual({category: sum(candidate["test_category"] == category for candidate in generated["candidates"]) for category in generated["profile"]}, {"positive": 8, "ablation": 4, "negative": 8})
+        self.assertEqual({category: sum(candidate["test_category"] == category for candidate in generated["candidates"]) for category in ("positive", "ablation", "negative")}, {"positive": 8, "ablation": 4, "negative": 8})
+        self.assertEqual(generated["profile"]["expected_count"], 20)
         self.assertEqual({item["document_id"] for item in generated["coverage_plan"] if item["test_category"] != "negative"}, {"DOC-1", "DOC-2", "DOC-3", "DOC-4"})
         self.assertTrue(any(item.get("ablation_attribute") == "cross_chunk" and len(item["evidence"][0]["source_chunk_ids"]) == 2 for item in generated["candidates"]))
 

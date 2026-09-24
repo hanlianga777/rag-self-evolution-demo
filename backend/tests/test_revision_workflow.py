@@ -35,6 +35,9 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.store = GovernanceStore(Path(directory.name) / "demo.db")
         self.rows = self.store.save_mini_golden_candidates(candidates(), "test-model")
         self.ids = [row["id"] for row in self.rows]
+        with self.store.connection() as connection:
+            pair = self.store.question(self.ids[8])
+            connection.execute("UPDATE questions SET raw_json=? WHERE id=?", (json.dumps({**pair["raw"], "source_positive_id": self.ids[0]}), pair["id"]))
         self.chunks = [
             {"chunk_id": "C1", "document_id": "DOC-001", "chunk_text": "正确操作步骤", "section_path": "欧盟一致性声明"},
             {"chunk_id": "C2", "document_id": "DOC-001", "chunk_text": "启动前检查急停按钮，确认安全后开始清洁。", "section_path": "安全操作"},
@@ -84,7 +87,7 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.assertEqual(run["question_ids"], [pair])
         self.assertEqual(self.store.revision_positive(run)["id"], first)
         self.assertEqual(self.store.question(first), before)
-        self.assertEqual(self.store.question(pair)["raw"].get("source_positive_id"), None)
+        self.assertEqual(self.store.question(pair)["raw"].get("source_positive_id"), first)
         ready = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .6)
         self.assertFalse(ready.get("apply_blocked", False))
         self.store.apply_revision(run["id"], self.chunks, similarity=lambda _a, _b: .6)
@@ -184,7 +187,7 @@ class RevisionWorkflowTests(unittest.TestCase):
         rejected = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .95)
         self.assertEqual(rejected["status"], "failed")
         self.assertIn("近重复", rejected["error"])
-        for index, question, fragment in ((12, "请问设备报价？", "Q13"), (14, "免费换新版时要补充哪些条件？", "Q15")):
+        for index, question, fragment in ((12, "请问设备报价？", "安全拒答"),):
             question_id = self.ids[index]
             run = self.store.start_revision(question_id, "manual_edit", "修订边界", False, {question_id: {"question": question, "source_chunk_ids": []}}, self.chunks)
             rejected = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)

@@ -94,7 +94,7 @@ class MonitoringAssessmentRequest(BaseModel):
 
 
 class BatchReviewRequest(BaseModel):
-    question_ids: list[str] = Field(min_length=1, max_length=20)
+    question_ids: list[str] = Field(min_length=1)
     actor: str = Field(default="local_user", min_length=1, max_length=80)
     confirmed_manual_review: bool = False
 
@@ -286,7 +286,9 @@ def _run_mini_generation(run_id, run_store, service, run_corpus):
 @app.post("/api/governance/generation-runs/{generation_run_id}/rerun-quality", status_code=202, dependencies=[Depends(require_trusted_origin)])
 def rerun_generation_quality(generation_run_id: str):
     try:
-        ids = store.update_quality_rerun(generation_run_id, {"status": "running", "stage": "probe", "completed": 0, "total": 20, "probe_passed": 0, "probe_failed": 0, "qc_passed": 0, "qc_failed": 0, "qc_skipped": 0, "slots": {}, "started_at": datetime.now(timezone.utc).isoformat()}, start=True)
+        run = store.generation_run(generation_run_id)
+        expected = store._expected_count(run) if run else 0
+        ids = store.update_quality_rerun(generation_run_id, {"status": "running", "stage": "probe", "completed": 0, "total": expected, "probe_passed": 0, "probe_failed": 0, "qc_passed": 0, "qc_failed": 0, "qc_skipped": 0, "slots": {}, "started_at": datetime.now(timezone.utc).isoformat()}, start=True)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Generation run not found") from error
     except ValueError as error:
@@ -727,44 +729,10 @@ def run_candidate(candidate_id: str):
     return {"id": run_id, "candidate_id": candidate_id, "status": "running", "run_mode": "real", "data_source": "real"}
 
 
-@app.post("/api/candidates/{candidate_id}/approval", dependencies=[Depends(require_trusted_origin)])
-def approve_candidate(candidate_id: str, payload: ReviewRequest):
-    candidate = store.candidate(candidate_id)
-    if candidate is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
-    if payload.decision == "approved" and candidate["status"] != "evaluated":
-        raise HTTPException(status_code=409, detail="Candidate 必须先完成 Sandbox")
-    if payload.decision == "approved" and not candidate["result"].get("qualification", {}).get("qualified"):
-        raise HTTPException(status_code=409, detail="Candidate 必须通过 11/11 Gate、Regression 与有效提升后才能进入 Human Release")
-    if payload.decision == "approved":
-        store.refresh_recommendation(candidate["experiment_id"])
-        if error := store.release_gate_error(candidate):
-            raise HTTPException(status_code=409, detail=error)
-    try:
-        return store.approve("candidate", candidate_id, payload.decision, payload.actor)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
-
-
-@app.post("/api/candidates/{candidate_id}/release-approval", dependencies=[Depends(require_trusted_origin)])
-def approve_release(candidate_id: str, payload: ReviewRequest):
-    candidate = store.candidate(candidate_id)
-    if candidate is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
-    if payload.decision == "approved":
-        store.refresh_recommendation(candidate["experiment_id"])
-        if error := store.release_gate_error(candidate):
-            raise HTTPException(status_code=409, detail=error)
-    if (store.latest_approval("candidate", candidate_id) or {}).get("decision") != "approved":
-        raise HTTPException(status_code=409, detail="需要 Candidate Approval")
-    try:
-        return store.approve("release", candidate_id, payload.decision, payload.actor)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
-
-
 @app.post("/api/candidates/{candidate_id}/publish", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def publish_candidate(candidate_id: str, payload: ReviewRequest):
+    if payload.decision != "approved":
+        raise HTTPException(status_code=422, detail="确认发布需要明确批准")
     try:
         return store.publish_candidate(candidate_id, payload.actor)
     except ValueError as error:
@@ -786,7 +754,7 @@ def tools():
 
 @app.post("/api/versions/{version_id}/activate")
 def activate_version(version_id: str):
-    raise HTTPException(status_code=409, detail="发布需通过 Release Approval")
+    raise HTTPException(status_code=409, detail="版本切换请使用受保护的发布或回滚流程")
 
 
 @app.get("/api/evaluations")

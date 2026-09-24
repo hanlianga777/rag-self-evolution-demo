@@ -9,6 +9,7 @@ frontend/dist/
 frontend/.npm-cache/
 .npm-cache/
 backend/data/*.db
+backend/data/*.bak
 backend/data/index/
 .demo-logs/
 __pycache__/

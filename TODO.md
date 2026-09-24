@@ -1,16 +1,14 @@
-# 待办
+# 待办（当前 V1.1）
 
-## 已完成
+## Completed
 
-- Mock 评测、问题案例、优化、版本、实验和预览流程。
-- React 产品 UI 与本地启动路径。
+- 本地 PDF / Chunk / BGE / FAISS 知识链、FastAPI + SQLite + React Demo、Mini Candidate、Probe/QC、人工治理、正式 Evaluation、A/B/C Sandbox、Monitoring 与版本审计能力。
 
-## 下一步
+## Current V1.1
 
-- 在新增 PDF 前人工复核 OCR 质量与来源元数据。
-- 以独立、可复现的真实评测集验证当前向量检索；不得把现有 Demo 评测指标当作实测结果。
+- 用户逐题处理当前 Run 的 4 道需修订 Candidate，完成 Probe/QC 和人工复审；20/20 批准后由用户显式创建 Golden Snapshot。
+- 正式 Baseline、Agent、Sandbox、Recommendation 和 Human Release 只能在真实前置条件满足后由用户触发；当前无正式 Snapshot，不展示虚构结果。
 
-## 后续
+## Future / Out of Scope
 
-- 持久化跨进程的实验历史。
-- 增加实测成本/延迟遥测和更完整的数据集编写能力。
+- Medium / Full Golden、更大模型或独立 Rerank Model、复杂 Monitoring / Canary、生产部署与多 Agent 均不属于当前版本。

@@ -43,7 +43,8 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
   const [previewEditing, setPreviewEditing] = useState(false);
   const [previewChanges, setPreviewChanges] = useState<Record<string, Candidate>>({});
 
-  const linked = row && ["Q01", "Q09"].includes(row.slot) ? peers.find(item => item.slot === (row.slot === "Q01" ? "Q09" : "Q01")) : undefined;
+  const linkedId = row && (row.raw?.source_positive_id || row.raw?.paired_question_id || peers.find(item => item.raw?.source_positive_id === row.id || item.raw?.paired_question_id === row.id)?.id || (revision?.question_ids?.includes(row.id) && revision.question_ids.length === 2 ? revision.question_ids.find((id: string) => id !== row.id) : undefined));
+  const linked = linkedId ? peers.find(item => item.id === linkedId) : undefined;
   const selectedRows: Candidate[] = row ? linked && paired ? [row, linked].sort((a, b) => a.slot.localeCompare(b.slot)) : [row] : [];
   const activeRevision = !!revisionRun && ["queued", "generating", "validating", "preview_ready", "probing", "qc", "interrupted"].includes(revisionRun.status);
 

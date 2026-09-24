@@ -1,4 +1,4 @@
-"""Manually started, bounded Optimization Agent for the frozen V1.0.1 search space."""
+"""Manually started, bounded A/B/C Optimization Agent for V1.1."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ class OptimizationAgent:
         prompt = {
             "bad_cases": bad_cases,
             "baseline_configuration": base_config,
-            "allowed_parameter_values": "V1.0.1 frozen search space only; do not propose parser/OCR/chunk/model/temperature/query_decompose/retrieval_max_tokens/rerank_top_n",
+            "allowed_parameter_values": "V1.1 frozen search space only; do not propose parser/OCR/chunk/model/temperature/query_decompose/retrieval_max_tokens/rerank_top_n",
             "rule": f"当前为 Round {round_number}。返回 A/B/C 三个并列、可解释 Candidate；config 可只写相对 Baseline 的改动。每个 Candidate 必须有 root_cause_cluster、observed_evidence、hypothesis、proposal、risk。",
         }
         try:
@@ -79,17 +79,3 @@ class OptimizationAgent:
         except (ProviderUnavailable, ValueError, json.JSONDecodeError) as error:
             self.store.save_agent_trace(experiment_id, "failed", {}, str(error))
             raise ValueError(str(error)) from error
-
-    def generate_composite_d(self, experiment_id: str, config: dict, reasoning: dict):
-        """Conditional D is permitted only after independently evaluated candidates show a combination value."""
-        evaluated = [item for item in self.store.candidates(experiment_id) if item["status"] == "evaluated" and item["result"].get("qualification", {}).get("qualified")]
-        if len(evaluated) < 2:
-            raise ValueError("Composite D requires at least two independently qualified Candidates")
-        if not all(isinstance(reasoning.get(field), str) and reasoning[field].strip() for field in ("hypothesis", "proposal", "risk")):
-            raise ValueError("Composite D requires hypothesis, proposal and risk")
-        prior = [item["config"] for item in self.store.candidates()]
-        check = validate_candidate_config(config, prior_configs=prior, completed_evals=sum(item["status"] == "evaluated" for item in self.store.candidates(experiment_id)))
-        if not check["valid"]:
-            raise ValueError("Composite D does not satisfy Search Space: " + "; ".join(check["errors"]))
-        self.store.save_candidate(experiment_id, "D", config, reasoning)
-        return self.store.candidate(f"{experiment_id}-D")

@@ -1,6 +1,6 @@
 # RAG Self-Evolution SPEC ChangeLog
 
-本文件是产品规格变更的正式、追加式历史记录。当前 Target Product SPEC 见 [RAG_SELF_EVOLUTION_SPEC.md](RAG_SELF_EVOLUTION_SPEC.md)。不得覆盖或重写既有条目。
+本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.1 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
 
 ## V0.2 — Core Lifecycle
 
@@ -136,6 +136,23 @@ Overall Score、Regression、Monitoring Trigger、TTFT、Token Cost、Recall@K�
 ### Remaining OPEN / TBD
 
 无。V1.0.1 Target Product SPEC 的产品决策已冻结。
+
+## V1.1 — Simplified & End-to-End Verified Demo Baseline
+
+- **Date:** 2026-09-25
+- **Status:** Current / Confirmed
+
+### Changed Items
+
+- 当前唯一产品 Source of Truth 改为 V1.1；Mini 8/4/8 是唯一当前 Generation Profile，Medium / Full 移至未来范围。
+- Golden 修订以题型、负向子类、Ablation 属性及明确关联元数据判断；取消题号特判和强制成对修订，保留审计、草案哈希及人工复审。
+- Optimization 仅生成每轮 A/B/C；Composite D 退出当前流程。现有 Hybrid、Rewrite、HyDE、Lightweight Rerank 等能力按真实实现记录，不暗示独立 Rerank Model。
+- 发布收敛为一次 Human Release / 确认发布；旧两层审批仅保留历史记录。Legacy、Seed、旧 Run 不计入当前 V1 主 KPI 或正式结果。
+- 建立确定性业务级 E2E 与 Fresh / Existing DB 验证，并要求业务变更执行文档、图、测试和 Demo 的 Impact Check。
+
+### Compatibility
+
+旧版本决策和审批审计继续保留作历史追溯；11 项 Hard Gate、Probe ≥90、QC ≥85、Golden 人工审核、Regression、Pareto 人工选择、Rollback 与 Monitoring Human Confirm 不变。
 
 ## Future Entry Template
 
