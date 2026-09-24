@@ -36,10 +36,12 @@ export function GovernancePage({ data }: { data: any }) {
   const legacy = items.filter(row => row.legacy_question_type !== "v1_mini");
   const selected = current.find(row => row.id === selectedId) || legacy.find(row => row.id === selectedId);
   const running = ["queued", "coverage", "generating", "validation", "probing", "qc"].includes(currentRun?.status);
+  const qualityRerun = currentRun?.artifacts?.hard_validation?.quality_rerun;
+  const qualityRunning = qualityRerun?.status === "running";
   const progress = currentRun?.artifacts?.hard_validation?.progress;
   const runStartedAt = currentRun?.created_at ? Date.parse(currentRun.created_at) : NaN;
   const elapsed = Number.isFinite(runStartedAt) && (running || runDuration?.id === currentRun?.id) ? `${(Math.max(0, (runDuration?.id === currentRun?.id ? runDuration?.ms : now - runStartedAt) ?? 0) / 1000).toFixed(1)}s` : null;
-  useEffect(() => { if (!running) return; const timer = window.setInterval(() => setNow(Date.now()), 100); return () => window.clearInterval(timer); }, [running]);
+  useEffect(() => { if (!running && !qualityRunning) return; const timer = window.setInterval(() => setNow(Date.now()), 100); return () => window.clearInterval(timer); }, [running, qualityRunning]);
 
   const loadReview = async (run: Candidate | undefined) => {
     if (run?.question_ids?.length === 20) {
@@ -59,7 +61,7 @@ export function GovernancePage({ data }: { data: any }) {
     else void loadReview(data.generationRuns[0]).catch(reason => setError(errorMessage(reason)));
   }, [data.generationRuns]);
   useEffect(() => {
-    if (!running || !currentRun?.id) return;
+    if ((!running && !qualityRunning) || !currentRun?.id) return;
     let cancelled = false;
     const poll = async () => {
       try {
@@ -68,13 +70,13 @@ export function GovernancePage({ data }: { data: any }) {
         setRuns(previous => [updated, ...previous.filter(row => row.id !== updated.id)]);
         if (updated.question_ids?.length === 20) void loadReview(updated).catch(reason => setError(errorMessage(reason)));
         if (["completed", "failed"].includes(updated.status) && updated.created_at) setRunDuration({ id: updated.id, ms: Date.now() - Date.parse(updated.created_at) });
-        if (["completed", "failed"].includes(updated.status)) void reload().catch(reason => setError(errorMessage(reason)));
+        if (["completed", "failed"].includes(updated.status) && (running || updated.artifacts?.hard_validation?.quality_rerun?.status !== "running")) void reload().catch(reason => setError(errorMessage(reason)));
       } catch (reason) { if (!cancelled) setError(errorMessage(reason)); }
     };
     void poll();
     const timer = window.setInterval(() => void poll(), 1000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [currentRun?.id, currentRun?.status]);
+  }, [currentRun?.id, currentRun?.status, qualityRunning]);
 
   const filters = useMemo(() => [
     { key: "all", label: "全部", count: current.length, match: (_row: Candidate) => true },
@@ -110,16 +112,26 @@ export function GovernancePage({ data }: { data: any }) {
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusy(false); }
   };
+  const rerunQuality = async () => {
+    setBusy(true); setError("");
+    try {
+      await postJson(`/api/governance/generation-runs/${currentRun.id}/rerun-quality`);
+      const updated = await getJson<Candidate>(`/api/governance/generation-runs/${currentRun.id}`);
+      setRuns(previous => [updated, ...previous.filter(row => row.id !== updated.id)]);
+    } catch (reason) { setError(errorMessage(reason)); }
+    finally { setBusy(false); }
+  };
   const questionAction = (id: string, name: "probe" | "qc") => action(() => postJson(`/api/governance/questions/${id}/${name}`), name === "probe" ? "运行单题 Probe" : "运行单题 QC");
   const reviewAction = (id: string, decision: string) => action(() => postJson(`/api/governance/questions/${id}/review`, { decision }), "人工审核 Candidate");
 
   return <div className={`page governance-page ${!currentRun && tab === "run" ? "is-empty" : ""}`}>
-    <div className="page-title"><div><h1>测试集治理</h1><p>Coverage → Hard Validation → Probe ≥90 → QC ≥85 → Human Review → Snapshot</p></div><button className="secondary" disabled={busy || running} onClick={() => void createMini()}>{currentRun?.status === "failed" ? "重新运行 V1 Mini 8 / 4 / 8" : "生成 V1 Mini 8 / 4 / 8"}</button></div>
+    <div className="page-title"><div><h1>测试集治理</h1><p>Coverage → Hard Validation → Probe ≥90 → QC ≥85 → Human Review → Snapshot</p></div><button className="secondary" disabled={busy || running || qualityRunning} onClick={() => void createMini()}>{currentRun?.status === "failed" ? "重新运行 V1 Mini 8 / 4 / 8" : "生成 V1 Mini 8 / 4 / 8"}</button></div>
     {error && <p className="error-notice" role="alert">{error}</p>}
     <div className="tabs"><button aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前 V1 Run</button><button aria-pressed={tab === "snapshot"} className={tab === "snapshot" ? "active" : ""} onClick={() => setTab("snapshot")}>Golden Snapshot</button><button aria-pressed={tab === "legacy"} className={tab === "legacy" ? "active" : ""} onClick={() => setTab("legacy")}>Legacy</button></div>
-    {tab === "run" && <Section title="当前 V1 Generation Run" action={<div className="header-actions">{currentRun && <Badge tone="accent">{currentRun.id}</Badge>}{current.length === 20 && <details className="export-menu"><summary className="secondary">导出测试集 ▾</summary><div>{(["markdown", "csv", "json"] as const).map(format => <a key={format} href={apiUrl(`/api/governance/generation-runs/${currentRun.id}/export?format=${format}`)} download>导出 {format === "markdown" ? "Markdown" : format.toUpperCase()}</a>)}</div></details>}</div>}>
+    {tab === "run" && <Section title="当前 V1 Generation Run" action={<div className="header-actions">{currentRun && <Badge tone="accent">{currentRun.id}</Badge>}{current.length === 20 && currentRun?.status === "completed" && <button className="secondary" disabled={busy || qualityRunning} onClick={() => void rerunQuality()}>重新运行 Probe / QC</button>}{current.length === 20 && <details className="export-menu"><summary className="secondary">导出测试集 ▾</summary><div>{(["markdown", "csv", "json"] as const).map(format => <a key={format} href={apiUrl(`/api/governance/generation-runs/${currentRun.id}/export?format=${format}`)} download>导出 {format === "markdown" ? "Markdown" : format.toUpperCase()}</a>)}</div></details>}</div>}>
       {currentRun ? <>
-        <div className="run-summary"><span role="status">{stageName[currentRun.status] || displayText(currentRun.status)} · {current.length} 题 · Slot {progress?.completed_slots || 0} / {progress?.total_slots || 20}{progress?.slot ? ` · ${progress.slot}` : ""} · Probe {progress?.probe_completed || 0} / 20 · QC {progress?.qc_completed || 0} / 20{progress?.qc_skipped ? ` · QC 跳过 ${progress.qc_skipped}` : ""}{elapsed ? ` · 运行耗时 ${elapsed}` : ""}{running ? " · 状态来自数据库（Worker 未验证）" : ""}</span>{currentRun.status === "failed" && <button className="text-button" onClick={() => setRunErrorOpen(true)}>查看错误</button>}</div>
+        <div className="run-summary"><span role="status">{qualityRerun ? "首次生成：" : ""}{stageName[currentRun.status] || displayText(currentRun.status)} · {current.length} 题 · Slot {progress?.completed_slots || 0} / {progress?.total_slots || 20}{progress?.slot ? ` · ${progress.slot}` : ""} · Probe {progress?.probe_completed || 0} / 20 · QC {progress?.qc_completed || 0} / 20{progress?.qc_skipped ? ` · QC 跳过 ${progress.qc_skipped}` : ""}{elapsed ? ` · 运行耗时 ${elapsed}` : ""}{running ? " · 状态来自数据库（Worker 未验证）" : ""}</span>{currentRun.status === "failed" && <button className="text-button" onClick={() => setRunErrorOpen(true)}>查看错误</button>}</div>
+        {qualityRerun && <div className="run-summary" role="status"><span>Probe / QC 重跑：{qualityRerun.status === "running" ? "运行中" : qualityRerun.status === "completed" ? "已完成" : "运行失败"} · {qualityRerun.stage === "qc" ? "质量检查" : qualityRerun.stage === "probe" ? "检索验证" : "—"} {qualityRerun.slot || ""} · {qualityRerun.completed || 0} / 20 · Probe 通过 {qualityRerun.probe_passed || 0}，失败 {qualityRerun.probe_failed || 0} · QC 通过 {qualityRerun.qc_passed || 0}，失败 {qualityRerun.qc_failed || 0}，跳过 {qualityRerun.qc_skipped || 0}{qualityRunning && qualityRerun.started_at ? ` · 运行耗时 ${((now - Date.parse(qualityRerun.started_at)) / 1000).toFixed(1)}s` : ""}{qualityRunning ? " · 状态来自数据库（Worker 未验证）" : ""}</span>{qualityRerun.status === "failed" && <button className="text-button" onClick={() => setRunErrorOpen(true)}>查看错误</button>}</div>}
         <div className="review-filters" aria-label="Candidate 筛选">{filters.map(item => <button key={item.key} aria-pressed={filter === item.key} className={filter === item.key ? "active" : ""} onClick={() => setFilter(item.key)}>{item.label} {item.count}</button>)}</div>
         <QuestionTable rows={visible} onDetail={row => setSelectedId(row.id)} />
         {current.length === 20 && <div className="review-batch"><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> 我已人工审核本次 V1 Mini 的全部有效 Candidate</label><button className="primary" disabled={busy || !!batchReason} onClick={() => void action(() => postJson("/api/governance/review-batch", { question_ids: currentIds, confirmed_manual_review: true }), "批量批准 Golden")}>批量批准 Golden</button>{batchReason && <span className="muted">{batchReason}</span>}{current.every(row => row.stage === "golden") && <button className="secondary" disabled={busy} onClick={() => void action(() => postJson(`/api/governance/generation-runs/${currentRun.id}/snapshot`), "创建 Golden Snapshot")}>创建 Golden Snapshot</button>}</div>}
@@ -127,8 +139,8 @@ export function GovernancePage({ data }: { data: any }) {
     </Section>}
     {tab === "snapshot" && <Section title="Approved Golden Snapshot"><div className="run-list">{snapshots.map(snapshot => <div key={snapshot.id}><strong>{snapshot.id}</strong><span>{snapshot.snapshot?.generation_run_id || "历史快照"} · {snapshot.snapshot?.question_ids?.length || 0} 题</span><Status value={snapshot.status} /></div>)}{!snapshots.length && <p className="muted">尚未创建正式 Golden Snapshot。</p>}</div></Section>}
     {tab === "legacy" && <Section title="历史 Candidate（Legacy / 未验证）"><details><summary>展开 {legacy.length} 道历史 Candidate</summary><p className="muted">仅供追溯，不参与本轮统计、正式 Baseline 或发布判断。</p><QuestionTable rows={legacy} onDetail={row => setSelectedId(row.id)} /></details></Section>}
-    <Drawer open={!!selected} onOpenChange={open => !open && setSelectedId(null)} title="Candidate 详情"><CandidateDetail row={selected} busy={busy} onRun={questionAction} onReview={reviewAction} /></Drawer>
-    <Drawer open={runErrorOpen} onOpenChange={setRunErrorOpen} title="Generation Run 错误详情"><div className="drawer-body"><p>阶段：{stageName[currentRun?.artifacts?.hard_validation?.failed_stage] || "未知"}</p><pre>{currentRun?.artifacts?.hard_validation?.error || "请查看运行审计"}</pre></div></Drawer>
+    <Drawer open={!!selected} onOpenChange={open => !open && setSelectedId(null)} title="Candidate 详情"><CandidateDetail row={selected} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} onRun={questionAction} onReview={reviewAction} /></Drawer>
+    <Drawer open={runErrorOpen} onOpenChange={setRunErrorOpen} title="Run 错误详情"><div className="drawer-body"><p>阶段：{qualityRerun?.status === "failed" ? qualityRerun?.slots?.[qualityRerun?.slot]?.failed_stage || qualityRerun?.stage : stageName[currentRun?.artifacts?.hard_validation?.failed_stage] || "未知"}</p><pre>{qualityRerun?.status === "failed" ? qualityRerun.error : currentRun?.artifacts?.hard_validation?.error || "请查看运行审计"}</pre></div></Drawer>
   </div>;
 }
 
@@ -136,10 +148,10 @@ function QuestionTable({ rows, onDetail }: { rows: Candidate[]; onDetail: (row: 
   return <div className="table-scroll review-table"><table><thead><tr><th>#</th><th>类型</th><th>问题</th><th>Probe</th><th>QC</th><th>人工审核</th><th>操作</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td>{row.slot || row.id}</td><td><Badge tone={row.test_category === "negative" ? "warning" : "neutral"}>{displayText(row.test_category)}</Badge></td><td><span className="review-question">{row.question}</span></td><td>{probeLabel(row.probe_status)}</td><td>{qcLabel(row.qc_status)}</td><td>{reviewLabel(row)}</td><td><button className="secondary" onClick={() => onDetail(row)}>查看详情</button></td></tr>)}{!rows.length && <tr><td colSpan={7} className="empty-state">暂无对应数据。</td></tr>}</tbody></table></div>;
 }
 
-function CandidateDetail({ row, busy, onRun, onReview }: { row?: Candidate; busy: boolean; onRun: (id: string, name: "probe" | "qc") => void; onReview: (id: string, decision: string) => void }) {
+function CandidateDetail({ row, rerunSlot, busy, onRun, onReview }: { row?: Candidate; rerunSlot?: Candidate; busy: boolean; onRun: (id: string, name: "probe" | "qc") => void; onReview: (id: string, decision: string) => void }) {
   if (!row) return null;
   const probe = row.probe || row.raw?.probe_details || {};
-  const qc = row.qc || row.raw?.qc || {};
+  const qc = row.qc_status === "qc_pending" ? {} : row.qc || row.raw?.qc || {};
   const details = row.evidence_details || (row.evidence || []).map((evidence: Candidate) => ({ ...evidence, chunks: (evidence.source_chunk_ids || []).map((chunk_id: string) => ({ chunk_id, resolution: "missing_current_index" })) }));
   const ready = row.probe_status === "probe_passed" && row.qc_status === "qc_passed";
   const block = row.probe_status !== "probe_passed" ? `Probe ${numberText(probe.score)} < ${numberText(probe.threshold || 90)} 或未通过，当前不可批准` : row.qc_status !== "qc_passed" ? `QC ${numberText(qc.score)} < ${numberText(qc.threshold || 85)} 或未通过，当前不可批准` : "";
@@ -151,7 +163,7 @@ function CandidateDetail({ row, busy, onRun, onReview }: { row?: Candidate; busy
     <h4>参考答案</h4><p className="review-full-text">{row.reference_answer || "不适用（负向题无参考答案）"}</p>
     <h4>Golden Evidence</h4>{details.length ? details.map((evidence: Candidate, index: number) => <div className="review-evidence" key={index}>{evidence.chunks.map((chunk: Candidate) => <div key={chunk.chunk_id}><strong>{chunk.document_name || chunk.document_id || "当前索引未匹配"}</strong><p>章节：{chunk.section_path || "当前索引未匹配"} · 页码：{chunk.page_start ?? "—"}–{chunk.page_end ?? "—"} · Chunk ID：{chunk.chunk_id}</p><p className="review-full-text">{chunk.chunk_text || "当前索引未匹配，无法展示证据原文"}</p></div>)}{evidence.evidence_key_points?.length > 0 && <p>证据要点：{evidence.evidence_key_points.join("；")}</p>}</div>) : <p className="muted">无预设证据（负向题）。</p>}
     <h4>Probe</h4><dl><dt>分数 / 阈值</dt><dd>{numberText(probe.score)} / {numberText(probe.threshold || 90)}</dd><dt>状态</dt><dd>{probeLabel(row.probe_status)}</dd><dt>分类</dt><dd>{displayText(probe.probe_details?.classification || probe.classification || "not_run")}</dd><dt>检索一致性</dt><dd>{probe.probe_details?.retrieval_coherent === true ? "一致" : probe.probe_details?.retrieval_coherent === false ? "不一致" : "未判定"}</dd><dt>预期证据排名</dt><dd>{rank < 0 ? "未进入 TopK" : `第 ${rank + 1} 位`}</dd><dt>失败原因</dt><dd>{probe.reason || probe.probe_details?.failure_reason || "—"}</dd></dl><p>Retrieved TopK：{topK.length ? topK.map((item: Candidate, index: number) => `${index + 1}. ${item.chunk_id} (${numberText(item.score)})`).join("；") : "未记录"}</p><button className="secondary" disabled={busy || row.stage === "golden"} onClick={() => onRun(row.id, "probe")}>运行 Probe</button>
-    <h4>QC</h4><dl><dt>分数 / 阈值</dt><dd>{numberText(qc.score)} / {numberText(qc.threshold || 85)}</dd><dt>优先级</dt><dd>{qc.priority || "—"}</dd><dt>状态</dt><dd>{qcLabel(row.qc_status)}</dd><dt>原因</dt><dd>{qc.reason || "—"}</dd><dt>问题</dt><dd>{qc.issues?.join("；") || "—"}</dd>{row.test_category === "ablation" && <><dt>鲁棒性属性有效</dt><dd>{qc.ablation_valid === true ? "是" : qc.ablation_valid === false ? "否" : "未评估"}</dd></>}</dl><button className="secondary" disabled={busy || row.stage === "golden" || row.probe_status !== "probe_passed"} onClick={() => onRun(row.id, "qc")}>运行 QC</button>
+    <h4>QC</h4>{rerunSlot?.qc === "skipped" && <p className="muted">本次重跑因 Probe 未通过，已跳过 QC；旧 QC 记录仅供历史审计。</p>}<dl><dt>分数 / 阈值</dt><dd>{numberText(qc.score)} / {numberText(qc.threshold || 85)}</dd><dt>优先级</dt><dd>{qc.priority || "—"}</dd><dt>状态</dt><dd>{qcLabel(row.qc_status)}</dd><dt>原因</dt><dd>{qc.reason || "—"}</dd><dt>问题</dt><dd>{qc.issues?.join("；") || "—"}</dd><dt>行为准则</dt><dd>{qc.behavior_criteria || "—"}</dd>{row.test_category === "ablation" && <><dt>鲁棒性属性有效</dt><dd>{qc.ablation_valid === true ? "是" : qc.ablation_valid === false ? "否" : "未评估"}</dd></>}</dl>{qc.qc_input_evidence?.map((source: Candidate) => <div className="review-evidence" key={source.chunk_id}><strong>实际送入 QC：{source.chunk_id}</strong><p className="review-full-text">{source.chunk_text}</p></div>)}{qc.evidence_support_sentences?.length > 0 && <p>支持句：{qc.evidence_support_sentences.join("；")}</p>}{qc.probe_basis && <details><summary>Probe 判定依据</summary><pre>{JSON.stringify(qc.probe_basis, null, 2)}</pre></details>}<button className="secondary" disabled={busy || row.stage === "golden" || row.probe_status !== "probe_passed"} onClick={() => onRun(row.id, "qc")}>运行 QC</button>
     <h4>Human Review</h4><p>当前状态：{reviewLabel(row)}</p>{row.stage !== "golden" && <><div className="header-actions"><button className="primary" disabled={busy || !ready} onClick={() => onReview(row.id, "approved")}>批准</button><button className="secondary" disabled={busy} onClick={() => onReview(row.id, "needs_revision")}>需修订</button><button className="secondary" disabled={busy} onClick={() => onReview(row.id, "rejected")}>拒绝</button></div>{block && <p className="muted">{block}</p>}</>}
   </div>;
 }

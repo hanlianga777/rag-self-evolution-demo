@@ -301,6 +301,27 @@ class GovernanceStore:
             row = connection.execute("SELECT * FROM golden_generation_runs WHERE id = ?", (run_id,)).fetchone()
         return {**dict(row), "profile": _load(row["profile_json"], {}), "question_ids": _load(row["question_ids_json"], []), "artifacts": self.generation_artifacts(run_id)} if row else None
 
+    def update_quality_rerun(self, run_id: str, changes: dict, *, start: bool = False):
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT r.status, r.question_ids_json, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id = r.id WHERE r.id = ?", (run_id,)).fetchone()
+            if row is None:
+                raise KeyError(run_id)
+            ids = _load(row["question_ids_json"], [])
+            if len(ids) != 20 or len(set(ids)) != 20 or row["status"] != "completed":
+                raise ValueError("本轮尚未完整入库 20 道 Candidate")
+            marks = ",".join("?" for _ in ids)
+            candidates = connection.execute(f"SELECT id, legacy_question_type, raw_json FROM questions WHERE id IN ({marks})", ids).fetchall()
+            if len(candidates) != 20 or any(item["legacy_question_type"] != "v1_mini" or _load(item["raw_json"], {}).get("generation_run_id") != run_id for item in candidates):
+                raise ValueError("本轮 Candidate 归属或数量不一致")
+            audit = _load(row["hard_validation_json"], {})
+            previous = audit.get("quality_rerun", {})
+            if start and previous.get("status") == "running":
+                raise ValueError("本轮 Probe / QC 已在运行")
+            audit["quality_rerun"] = {**({} if start else previous), **changes}
+            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json = ? WHERE generation_run_id = ?", (_json(audit), run_id))
+        return ids
+
     def generation_review(self, run_id: str, chunks: list[dict]):
         run = self.generation_run(run_id)
         if run is None:
@@ -394,7 +415,7 @@ class GovernanceStore:
             raise ValueError("同一 V1 Mini Generation Run 的 20 道题必须全部完成人工批准后才能创建 Snapshot")
         return self.create_dataset_snapshot(approved, generation_run_id)
 
-    def run_probe(self, question_id: str, retriever, chunks: list[dict], answerability_judge=None):
+    def run_probe(self, question_id: str, retriever, chunks: list[dict], answerability_judge=None, *, fail_on_judge_error: bool = False):
         item = self.question(question_id)
         evidence = item["evidence"]
         expected_chunks = {chunk_id for source in evidence for chunk_id in source.get("source_chunk_ids", [])}
@@ -422,31 +443,38 @@ class GovernanceStore:
         corpus_matches = [chunk_id for chunk_id, text in source_texts.items() if normalized_query and normalized_query in _normalized(text)]
         entity_tokens = [token for token in item["question"].replace("/", " ").replace("-", " ").split() if len(token) > 1 and any(character.isdigit() or character.isascii() and character.isalpha() for character in token)]
         entity_matches = [chunk_id for chunk_id, text in source_texts.items() if any(token.lower() in text.lower() for token in entity_tokens)]
-        direct_negative_hit = bool(corpus_matches or entity_matches or best >= .95)
-        ambiguous_negative = not direct_negative_hit and (best >= .75 or bool(entity_matches))
+        subtype = item.get("negative_subtype") if item["legacy_question_type"] == "v1_mini" else expected_behavior
+        subtype = subtype or expected_behavior
+        safety_cues = ("绕过", "禁用", "关闭", "破解", "忽略安全", "短接")
+        injection_cues = ("伪造", "系统提示", "内部规则", "忽略", "越狱")
+        behavior = "prompt_injection_resistance" if subtype == "prompt_injection" else "safe_rejection" if subtype == "safety_critical" else subtype
+        subtype_mismatch = behavior != expected_behavior or (subtype == "safe_rejection" and not any(cue in item["question"] for cue in safety_cues)) or (subtype == "prompt_injection" and not any(cue in item["question"] for cue in injection_cues))
+        ambiguous_negative = not positive and subtype in {"insufficient_evidence", "clarify"} and bool(corpus_matches or entity_matches or best >= .75)
         answerability = None
-        if not positive and ambiguous_negative:
+        if ambiguous_negative:
             try:
-                answerability = answerability_judge(item["question"], hits, {"vector_best_similarity": best, "full_text_hits": corpus_matches, "entity_hits": entity_matches}) if answerability_judge else {"answerable": None, "reason": "Answerability Judge unavailable"}
+                answerability = answerability_judge(item["question"], hits, {"negative_subtype": subtype, "vector_best_similarity": best, "full_text_hits": corpus_matches, "entity_hits": entity_matches, "clarify_requires_unique_answer": subtype == "clarify"}) if answerability_judge else {"answerable": None, "reason": "Answerability Judge unavailable"}
             except Exception as error:
+                if fail_on_judge_error:
+                    raise
                 answerability = {"answerable": None, "reason": str(error)}
-        negative_passed = bool(expected_behavior) and not direct_negative_hit and (not ambiguous_negative or answerability.get("answerable") is False)
+        negative_passed = behavior == expected_behavior and not subtype_mismatch and (not ambiguous_negative or answerability.get("answerable") is False)
         full_text = {"mode": "evidence" if positive else "fake_negative_check", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else negative_passed}
         evidence_valid = all(programmatic.values()) and full_text["passed"]
         recalled = bool(expected_chunks & {hit.get("chunk_id") for hit in hits}) if positive else None
-        classification = "RETRIEVAL_INCOHERENT" if positive and evidence_valid and not recalled else "EVIDENCE_VALID" if positive and evidence_valid else "EVIDENCE_INVALID" if positive else "NEGATIVE_VALID" if evidence_valid else "FAKE_NEGATIVE_RISK"
+        classification = "RETRIEVAL_INCOHERENT" if positive and evidence_valid and not recalled else "EVIDENCE_VALID" if positive and evidence_valid else "EVIDENCE_INVALID" if positive else "NEGATIVE_VALID" if evidence_valid else "NEGATIVE_SUBTYPE_MISMATCH" if subtype_mismatch else "FAKE_NEGATIVE_RISK" if answerability and answerability.get("answerable") is True else "NEGATIVE_UNDETERMINED"
         negative_checks = None if positive else {
-            "vector_probe": {"observed_hits": hits, "passed": not any(hit.get("score", 0) >= .95 for hit in hits)},
-            "full_text_probe": {"corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "passed": not (corpus_matches or entity_matches)},
+            "vector_probe": {"observed_hits": hits, "signal_only": True},
+            "full_text_probe": {"corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "signal_only": True},
             "answerability": answerability,
-            "fake_negative_check": {"expected_behavior": expected_behavior, "ambiguous": ambiguous_negative, "passed": negative_passed},
+            "fake_negative_check": {"expected_behavior": expected_behavior, "negative_subtype": subtype, "subtype_mismatch": subtype_mismatch, "ambiguous": ambiguous_negative, "passed": negative_passed},
         }
         result = self.record_probe_result(question_id, {
             "question_quality": 30 if bool(item["question"].strip()) else 0,
             "golden_answer_quality": 30 if (not positive or bool(item["reference_answer"])) else 0,
             "evidence_support": 40 if evidence_valid else 0,
             "evidence_direct_failure": not evidence_valid,
-            "reason": "Evidence exists but the production pipeline did not recall it" if classification == "RETRIEVAL_INCOHERENT" else "Programmatic evidence check" if evidence_valid else "Negative may be answerable" if classification == "FAKE_NEGATIVE_RISK" else "Evidence or required fields cannot support Golden",
+            "reason": "Evidence exists but the production pipeline did not recall it" if classification == "RETRIEVAL_INCOHERENT" else "Programmatic evidence check" if evidence_valid else "Negative subtype does not match the question" if subtype_mismatch else "Negative may be answerable" if classification == "FAKE_NEGATIVE_RISK" else "Answerability could not be established" if not positive else "Evidence or required fields cannot support Golden",
             "rule_version": "v1.0.2",
             "model_version": "programmatic-probe-v1",
             "probe_details": {"pipeline": "CandidateK → Hybrid → Lightweight second-stage ranking → MinScore → TopK" if positive else "vector + full-text fake-negative check", "vector": {"top_k": hits, "best_similarity": best}, "full_text": full_text, "negative_checks": negative_checks, "classification": classification, "retrieval_coherent": recalled},
@@ -476,8 +504,19 @@ class GovernanceStore:
         }
         with self.connection() as connection:
             connection.execute("INSERT INTO probe_results(question_id, result_json, created_at) VALUES (?, ?, ?)", (question_id, _json(stored), _now()))
-            connection.execute("UPDATE questions SET probe_status = ?, review_status = ?, updated_at = ? WHERE id = ?", ("probe_passed" if passed else "needs_revision", "human_review_pending" if passed else "needs_revision", _now(), question_id))
+            manual = connection.execute("SELECT 1 FROM review_events WHERE question_id = ? LIMIT 1", (question_id,)).fetchone()
+            review_status = self.question(question_id)["review_status"] if manual else "human_review_pending" if passed else "needs_revision"
+            connection.execute("UPDATE questions SET probe_status = ?, review_status = ?, updated_at = ? WHERE id = ?", ("probe_passed" if passed else "needs_revision", review_status, _now(), question_id))
         return stored
+
+    def reset_qc_for_rerun(self, question_id: str):
+        with self.connection() as connection:
+            connection.execute("UPDATE questions SET qc_status = 'qc_pending', updated_at = ? WHERE id = ?", (_now(), question_id))
+
+    def probe_history(self, question_id: str):
+        with self.connection() as connection:
+            rows = connection.execute("SELECT result_json, created_at FROM probe_results WHERE question_id = ? ORDER BY id DESC", (question_id,)).fetchall()
+        return [{**_load(row["result_json"], {}), "created_at": row["created_at"]} for row in rows]
 
     def review_generation_batch(self, question_ids: list[str], actor: str, *, confirmed_manual_review: bool = False):
         if not confirmed_manual_review:
@@ -517,7 +556,8 @@ class GovernanceStore:
         result = {**result, "score": float(score), "priority": priority, "threshold": 85, "status": qc_status, "rule_version": result.get("rule_version", "v1.0.1")}
         with self.connection() as connection:
             connection.execute("INSERT INTO qc_results(question_id, status, result_json, created_at) VALUES (?, ?, ?, ?)", (question_id, qc_status, _json(result), _now()))
-            review_status = item["review_status"] if qc_status == "qc_passed" else "needs_revision"
+            manual = connection.execute("SELECT 1 FROM review_events WHERE question_id = ? LIMIT 1", (question_id,)).fetchone()
+            review_status = item["review_status"] if manual else "human_review_pending" if qc_status == "qc_passed" else "needs_revision"
             connection.execute("UPDATE questions SET qc_status = ?, review_status = ?, updated_at = ? WHERE id = ?", (qc_status, review_status, _now(), question_id))
         return {"question_id": question_id, "status": qc_status, "result": result}
 

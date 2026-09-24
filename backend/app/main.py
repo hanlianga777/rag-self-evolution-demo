@@ -3,6 +3,7 @@ import io
 import json
 import os
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -253,6 +254,51 @@ def _run_mini_generation(run_id, run_store, service, run_corpus):
         run_store.update_generation_run(run_id, status="failed", validation={"error": str(error), "failed_stage": stage}, progress={"stage": "failed"})
 
 
+@app.post("/api/governance/generation-runs/{generation_run_id}/rerun-quality", status_code=202, dependencies=[Depends(require_trusted_origin)])
+def rerun_generation_quality(generation_run_id: str):
+    try:
+        ids = store.update_quality_rerun(generation_run_id, {"status": "running", "stage": "probe", "completed": 0, "total": 20, "probe_passed": 0, "probe_failed": 0, "qc_passed": 0, "qc_failed": 0, "qc_skipped": 0, "slots": {}, "started_at": datetime.now(timezone.utc).isoformat()}, start=True)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Generation run not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    threading.Thread(target=_run_quality_rerun, args=(generation_run_id, ids, store, ai_service, corpus), daemon=True).start()
+    return {"run_id": generation_run_id, "status": "running"}
+
+
+def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
+    counters = {"completed": 0, "probe_passed": 0, "probe_failed": 0, "qc_passed": 0, "qc_failed": 0, "qc_skipped": 0}
+    slots = {}
+    try:
+        chunks = run_corpus.chunks()
+        for index, question_id in enumerate(ids, 1):
+            slot = f"Q{index:02d}"
+            run_store.update_quality_rerun(run_id, {**counters, "stage": "probe", "slot": slot, "slots": slots})
+            try:
+                run_store.reset_qc_for_rerun(question_id)
+                probe = run_store.run_probe(question_id, service.retriever, chunks, service.answerability_check, fail_on_judge_error=True)
+                counters["probe_passed" if probe["status"] == "passed" else "probe_failed"] += 1
+                slots[slot] = {"question_id": question_id, "probe": probe["status"], "classification": probe["classification"], "probe_reason": probe["reason"]}
+                if probe["status"] == "passed":
+                    run_store.update_quality_rerun(run_id, {**counters, "stage": "qc", "slot": slot, "slots": slots})
+                    qc = service.quality_check(run_store.question(question_id))
+                    saved = run_store.record_qc(question_id, qc, "passed" if qc["score"] >= 85 else "failed")
+                    counters["qc_passed" if saved["status"] == "qc_passed" else "qc_failed"] += 1
+                    slots[slot]["qc"] = saved["status"]
+                    slots[slot]["qc_reason"] = qc["reason"]
+                else:
+                    counters["qc_skipped"] += 1
+                    slots[slot]["qc"] = "skipped"
+                counters["completed"] += 1
+                run_store.update_quality_rerun(run_id, {**counters, "stage": "qc" if probe["status"] == "passed" else "probe", "slot": slot, "slots": slots})
+            except Exception as error:
+                slots[slot] = {**slots.get(slot, {"question_id": question_id}), "error": str(error), "failed_stage": "qc" if slots.get(slot, {}).get("probe") == "passed" else "probe"}
+                raise
+        run_store.update_quality_rerun(run_id, {**counters, "status": "completed", "stage": "completed", "slots": slots, "finished_at": datetime.now(timezone.utc).isoformat()})
+    except Exception as error:
+        run_store.update_quality_rerun(run_id, {**counters, "status": "failed", "stage": "failed", "slots": slots, "error": str(error), "finished_at": datetime.now(timezone.utc).isoformat()})
+
+
 @app.post("/api/governance/questions/{question_id}/review", dependencies=[Depends(require_trusted_origin)])
 def review_question(question_id: str, payload: ReviewRequest):
     try:
@@ -316,7 +362,7 @@ def qc_question(question_id: str):
     except HTTPException:
         raise
     except Exception as error:
-        return store.record_qc(question_id, {"score": 0, "priority": "P0", "reason": str(error), "model": ai_service.model}, "failed")
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @app.get("/api/evaluation")
