@@ -28,6 +28,8 @@ export function GovernancePage({ data }: { data: any }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [runErrorOpen, setRunErrorOpen] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  const [runDuration, setRunDuration] = useState<{ id: string; ms: number } | null>(null);
   const currentRun = runs[0];
   const currentIds: string[] = currentRun?.question_ids || [];
   const current = currentIds.map(id => review.find(row => row.id === id) || items.find(row => row.id === id)).filter(Boolean) as Candidate[];
@@ -35,6 +37,9 @@ export function GovernancePage({ data }: { data: any }) {
   const selected = current.find(row => row.id === selectedId) || legacy.find(row => row.id === selectedId);
   const running = ["queued", "coverage", "generating", "validation", "probing", "qc"].includes(currentRun?.status);
   const progress = currentRun?.artifacts?.hard_validation?.progress;
+  const runStartedAt = currentRun?.created_at ? Date.parse(currentRun.created_at) : NaN;
+  const elapsed = Number.isFinite(runStartedAt) && (running || runDuration?.id === currentRun?.id) ? `${(Math.max(0, (runDuration?.id === currentRun?.id ? runDuration?.ms : now - runStartedAt) ?? 0) / 1000).toFixed(1)}s` : null;
+  useEffect(() => { if (!running) return; const timer = window.setInterval(() => setNow(Date.now()), 100); return () => window.clearInterval(timer); }, [running]);
 
   const loadReview = async (run: Candidate | undefined) => {
     if (run?.question_ids?.length === 20) {
@@ -61,6 +66,8 @@ export function GovernancePage({ data }: { data: any }) {
         const updated = await getJson<Candidate>(`/api/governance/generation-runs/${currentRun.id}`);
         if (cancelled) return;
         setRuns(previous => [updated, ...previous.filter(row => row.id !== updated.id)]);
+        if (updated.question_ids?.length === 20) void loadReview(updated).catch(reason => setError(errorMessage(reason)));
+        if (["completed", "failed"].includes(updated.status) && updated.created_at) setRunDuration({ id: updated.id, ms: Date.now() - Date.parse(updated.created_at) });
         if (["completed", "failed"].includes(updated.status)) void reload().catch(reason => setError(errorMessage(reason)));
       } catch (reason) { if (!cancelled) setError(errorMessage(reason)); }
     };
@@ -93,7 +100,16 @@ export function GovernancePage({ data }: { data: any }) {
     try { await operation.run(title, work); } catch (reason) { setError(errorMessage(reason)); }
     finally { await reload().catch(() => {}); setBusy(false); }
   };
-  const createMini = () => action(async () => { const started: any = await postJson("/api/governance/generate-mini"); operation.watchGeneration(started.run_id); }, "启动 V1 Mini Generation");
+  const createMini = async () => {
+    setBusy(true); setError(""); setRunDuration(null);
+    try {
+      const started: { run_id: string } = await postJson("/api/governance/generate-mini");
+      const run = await getJson<Candidate>(`/api/governance/generation-runs/${started.run_id}`);
+      setRuns(previous => [run, ...previous.filter(row => row.id !== run.id)]);
+      setReview([]); setFilter("all");
+    } catch (reason) { setError(errorMessage(reason)); }
+    finally { setBusy(false); }
+  };
   const questionAction = (id: string, name: "probe" | "qc") => action(() => postJson(`/api/governance/questions/${id}/${name}`), name === "probe" ? "运行单题 Probe" : "运行单题 QC");
   const reviewAction = (id: string, decision: string) => action(() => postJson(`/api/governance/questions/${id}/review`, { decision }), "人工审核 Candidate");
 
@@ -103,7 +119,7 @@ export function GovernancePage({ data }: { data: any }) {
     <div className="tabs"><button aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前 V1 Run</button><button aria-pressed={tab === "snapshot"} className={tab === "snapshot" ? "active" : ""} onClick={() => setTab("snapshot")}>Golden Snapshot</button><button aria-pressed={tab === "legacy"} className={tab === "legacy" ? "active" : ""} onClick={() => setTab("legacy")}>Legacy</button></div>
     {tab === "run" && <Section title="当前 V1 Generation Run" action={<div className="header-actions">{currentRun && <Badge tone="accent">{currentRun.id}</Badge>}{current.length === 20 && <details className="export-menu"><summary className="secondary">导出测试集 ▾</summary><div>{(["markdown", "csv", "json"] as const).map(format => <a key={format} href={apiUrl(`/api/governance/generation-runs/${currentRun.id}/export?format=${format}`)} download>导出 {format === "markdown" ? "Markdown" : format.toUpperCase()}</a>)}</div></details>}</div>}>
       {currentRun ? <>
-        <div className="run-summary"><span role="status">{stageName[currentRun.status] || displayText(currentRun.status)} · {current.length} 题 · Slot {progress?.completed_slots || 0} / {progress?.total_slots || 20}{progress?.slot ? ` · ${progress.slot}` : ""} · Probe {progress?.probe_completed || 0} / 20 · QC {progress?.qc_completed || 0} / 20</span>{currentRun.status === "failed" && <button className="text-button" onClick={() => setRunErrorOpen(true)}>查看错误</button>}</div>
+        <div className="run-summary"><span role="status">{stageName[currentRun.status] || displayText(currentRun.status)} · {current.length} 题 · Slot {progress?.completed_slots || 0} / {progress?.total_slots || 20}{progress?.slot ? ` · ${progress.slot}` : ""} · Probe {progress?.probe_completed || 0} / 20 · QC {progress?.qc_completed || 0} / 20{progress?.qc_skipped ? ` · QC 跳过 ${progress.qc_skipped}` : ""}{elapsed ? ` · 运行耗时 ${elapsed}` : ""}{running ? " · 状态来自数据库（Worker 未验证）" : ""}</span>{currentRun.status === "failed" && <button className="text-button" onClick={() => setRunErrorOpen(true)}>查看错误</button>}</div>
         <div className="review-filters" aria-label="Candidate 筛选">{filters.map(item => <button key={item.key} aria-pressed={filter === item.key} className={filter === item.key ? "active" : ""} onClick={() => setFilter(item.key)}>{item.label} {item.count}</button>)}</div>
         <QuestionTable rows={visible} onDetail={row => setSelectedId(row.id)} />
         {current.length === 20 && <div className="review-batch"><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> 我已人工审核本次 V1 Mini 的全部有效 Candidate</label><button className="primary" disabled={busy || !!batchReason} onClick={() => void action(() => postJson("/api/governance/review-batch", { question_ids: currentIds, confirmed_manual_review: true }), "批量批准 Golden")}>批量批准 Golden</button>{batchReason && <span className="muted">{batchReason}</span>}{current.every(row => row.stage === "golden") && <button className="secondary" disabled={busy} onClick={() => void action(() => postJson(`/api/governance/generation-runs/${currentRun.id}/snapshot`), "创建 Golden Snapshot")}>创建 Golden Snapshot</button>}</div>}
