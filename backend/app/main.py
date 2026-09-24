@@ -30,6 +30,7 @@ app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=
 store = GovernanceStore()
 corpus = CorpusStore()
 ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")
+store.interrupt_revision_runs()
 
 
 class PreviewRequest(BaseModel):
@@ -50,6 +51,16 @@ class EvaluationRequest(BaseModel):
 class ReviewRequest(BaseModel):
     decision: str = Field(pattern="^(approved|rejected|needs_revision)$")
     actor: str = Field(default="local_user", min_length=1, max_length=80)
+    reason: str | None = Field(default=None, max_length=2000)
+    tags: list[str] = Field(default_factory=list, max_length=8)
+
+
+class RevisionRequest(BaseModel):
+    mode: Literal["manual_edit", "ai_regenerate"]
+    reason: str = Field(min_length=1, max_length=2000)
+    paired: bool = False
+    changes: dict[str, dict] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list, max_length=8)
 
 
 class QuestionUpdateRequest(BaseModel):
@@ -192,6 +203,14 @@ def export_generation_run(run_id: str, format: Literal["json", "csv", "markdown"
             lines.append(f'  Evidence Key Points: {"；".join(evidence.get("evidence_key_points", [])) or "—"}')
         probe, qc = item["probe"] or {}, item["qc"] or {}
         lines += ["", "Probe:", f'- Score: {probe.get("score", "未运行")} / {probe.get("threshold", 90)}', f'- Status: {item["probe_status"]}', f'- Classification: {probe.get("probe_details", {}).get("classification", "—")}', f'- Reason: {probe.get("reason", "—")}', "", "QC:", f'- Score: {qc.get("score", "未运行")} / {qc.get("threshold", 85)}', f'- Status: {item["qc_status"]}', f'- Priority: {qc.get("priority", "—")}', f'- Reason: {qc.get("reason", "—")}', f'- Issues: {"；".join(qc.get("issues", [])) or "—"}', "", "Human Review:", f'- Status: {item["review_status"]}', ""]
+        if item["revision_history"]:
+            lines += ["Revision History:"]
+            for revision in item["revision_history"]:
+                lines += [f'- {revision["id"]} · {revision["status"]} · v{revision.get("version_from", {}).get(item["id"], 1)} → v{revision.get("version_to", {}).get(item["id"], "—")} · 原因：{revision["reason"]}']
+                if item["id"] in revision.get("drafts", {}):
+                    before, after = revision["before"][item["id"]], revision["drafts"][item["id"]]
+                    lines += [f'  原问题：{before["question"]}', f'  新问题：{after["question"]}', f'  原参考答案：{before["reference_answer"] or "—"}', f'  新参考答案：{after["reference_answer"] or "—"}', f'  变更字段：{"、".join(revision.get("changed_fields", {}).get(item["id"], [])) or "草案未应用"}']
+            lines.append("")
     return Response("\n".join(lines), media_type="text/markdown; charset=utf-8", headers=headers)
 
 
@@ -302,11 +321,106 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
 @app.post("/api/governance/questions/{question_id}/review", dependencies=[Depends(require_trusted_origin)])
 def review_question(question_id: str, payload: ReviewRequest):
     try:
-        return store.review_question(question_id, payload.decision, payload.actor)
+        return store.review_question(question_id, payload.decision, payload.actor, reason=payload.reason, tags=payload.tags)
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/governance/revisions")
+def revision_runs(generation_run_id: str | None = None):
+    return store.revision_runs(generation_run_id)
+
+
+@app.get("/api/governance/revisions/{revision_id}")
+def revision_status(revision_id: str):
+    try:
+        return store.revision_run(revision_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Revision Run not found") from error
+
+
+@app.post("/api/governance/questions/{question_id}/revision", status_code=202, dependencies=[Depends(require_trusted_origin)])
+def create_revision(question_id: str, payload: RevisionRequest):
+    try:
+        run = store.start_revision(question_id, payload.mode, payload.reason, payload.paired, payload.changes, corpus.chunks(), tags=payload.tags)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Candidate not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    threading.Thread(target=_prepare_revision, args=(run["id"], store, ai_service, corpus), daemon=True).start()
+    return {"id": run["id"], "status": "queued"}
+
+
+def _prepare_revision(revision_id, run_store, service, run_corpus):
+    try:
+        chunks = run_corpus.chunks()
+        run = run_store.revision_run(revision_id)
+        generated = run.get("generated_drafts") if run["mode"] == "ai_regenerate" else None
+        if run["mode"] == "ai_regenerate":
+            run_store.update_revision(revision_id, status="generating", stage="generating")
+            def progress(index, total, item_id, drafts):
+                run_store.update_revision(revision_id, stage="generating", progress={"current": index, "total": total}, generated_drafts=drafts)
+            if not generated or len(generated) < len(run["question_ids"]):
+                generated = service.generate_revision_drafts(run, chunks, on_progress=progress, existing=generated)
+            run_store.update_revision(revision_id, status="queued", stage="generated")
+        run_store.prepare_revision(revision_id, chunks, similarity=service.revision_similarity, generated=generated)
+    except Exception as error:
+        run_store.update_revision(revision_id, status="failed", stage="failed", error=str(error))
+
+
+@app.post("/api/governance/revisions/{revision_id}/apply", status_code=202, dependencies=[Depends(require_trusted_origin)])
+def apply_revision(revision_id: str):
+    try:
+        run = store.apply_revision(revision_id, corpus.chunks())
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Revision Run not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    threading.Thread(target=_run_revision_quality, args=(revision_id, store, ai_service, corpus), daemon=True).start()
+    return {"id": run["id"], "status": run["status"]}
+
+
+@app.post("/api/governance/revisions/{revision_id}/resume", status_code=202, dependencies=[Depends(require_trusted_origin)])
+def resume_revision(revision_id: str):
+    try:
+        run = store.revision_run(revision_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Revision Run not found") from error
+    if run["status"] != "interrupted":
+        raise HTTPException(status_code=409, detail="仅中断的 Revision Run 可继续")
+    if run.get("applied_at"):
+        store.update_revision(revision_id, status="probing", stage="probe")
+        worker = _run_revision_quality
+    else:
+        store.update_revision(revision_id, status="queued", stage="queued")
+        worker = _prepare_revision
+    threading.Thread(target=worker, args=(revision_id, store, ai_service, corpus), daemon=True).start()
+    return {"id": revision_id, "status": "queued"}
+
+
+def _run_revision_quality(revision_id, run_store, service, run_corpus):
+    results = {}
+    try:
+        chunks = run_corpus.chunks()
+        run = run_store.revision_run(revision_id)
+        for index, item_id in enumerate(run["question_ids"], 1):
+            run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index - 1, "total": len(run["question_ids"])}, quality_results=results)
+            run_store.reset_qc_for_rerun(item_id)
+            probe = run_store.run_probe(item_id, service.retriever, chunks, service.answerability_check, fail_on_judge_error=True)
+            results[item_id] = {"probe": probe["status"], "probe_reason": probe.get("reason")}
+            if probe["status"] == "passed":
+                run_store.update_revision(revision_id, status="qc", stage="qc", quality_results=results)
+                qc = service.quality_check(run_store.question(item_id))
+                saved = run_store.record_qc(item_id, qc, "passed" if qc["score"] >= 85 else "failed")
+                results[item_id].update({"qc": saved["status"], "qc_reason": qc.get("reason")})
+            else:
+                results[item_id]["qc"] = "skipped"
+            run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index, "total": len(run["question_ids"])}, quality_results=results)
+        run_store.finish_revision_quality(revision_id, results)
+    except Exception as error:
+        run_store.finish_revision_quality(revision_id, results, error=str(error))
 
 
 @app.post("/api/governance/review-batch", dependencies=[Depends(require_trusted_origin)])
@@ -336,6 +450,8 @@ def update_question(question_id: str, payload: QuestionUpdateRequest):
         return store.update_question(question_id, payload.question.strip(), payload.reference_answer, payload.evidence, payload.actor)
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.post("/api/governance/questions/{question_id}/probe", dependencies=[Depends(require_trusted_origin)])

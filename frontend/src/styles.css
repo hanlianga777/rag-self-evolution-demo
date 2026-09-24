@@ -170,6 +170,16 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .export-menu a:hover { background: #f3f5f7; }
 .candidate-detail .review-evidence { border: 1px solid var(--line-soft); border-radius: 10px; margin-bottom: 9px; padding: 12px; }
 .candidate-detail .review-evidence p { margin: 6px 0; }
+.revision-form, .revision-status { border: 1px solid var(--line-soft); border-radius: 10px; margin-top: 12px; padding: 14px; }
+.revision-form > label, .revision-question > label { display: grid; gap: 5px; margin: 10px 0; }
+.revision-form input:not([type="radio"]):not([type="checkbox"]), .revision-form textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; padding: 8px; width: 100%; }
+.revision-form textarea { min-height: 76px; resize: vertical; }
+.revision-question { border-top: 1px solid var(--line-soft); margin-top: 14px; padding-top: 12px; }
+.revision-question fieldset { border: 1px solid var(--line-soft); border-radius: 8px; }
+.revision-chunks { max-height: 220px; overflow: auto; }
+.revision-chunks label { border-bottom: 1px solid var(--line-soft); display: block; padding: 6px 0; }
+.revision-chunks small { color: var(--muted); display: block; line-height: 1.35; margin-left: 20px; max-height: 36px; overflow: hidden; }
+.revision-pair label { margin-right: 12px; }
 .review-full-text { overflow-wrap: anywhere; white-space: pre-wrap; }
 
 .drawer { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: -18px 0 38px rgba(16, 24, 39, .08); height: calc(100dvh - 24px); overflow: auto; overscroll-behavior: contain; padding: 24px; position: fixed; right: 12px; top: 12px; width: min(1040px, calc(100vw - 24px)); z-index: 20; }

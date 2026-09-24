@@ -150,6 +150,43 @@ class AiService:
         except (json.JSONDecodeError, TypeError, ValueError) as error:
             raise ProviderUnavailable("DeepSeek Answerability 未返回有效 JSON") from error
 
+    def revision_similarity(self, first: str, second: str) -> float:
+        if not self.retriever._load() or self.retriever._model is None:
+            raise ProviderUnavailable("BGE 模型不可用，不能放行近重复校验")
+        vectors = self.retriever._model.encode([first, second], normalize_embeddings=True)
+        return float(vectors[0] @ vectors[1])
+
+    def generate_revision_drafts(self, run: dict, chunks: list[dict], on_progress=None, existing: dict | None = None) -> dict:
+        if not self.live_enabled:
+            raise ProviderUnavailable("Provider 不可用，无法生成局部修订草案")
+        by_chunk = {item["chunk_id"]: item for item in chunks}
+        drafts = dict(existing or {})
+        ids = sorted(run["question_ids"], key=lambda item_id: run["before"][item_id]["test_category"] == "ablation")
+        for index, item_id in enumerate(ids, 1):
+            if item_id in drafts:
+                continue
+            old = run["before"][item_id]
+            selected = run["changes"].get(item_id, {}).get("source_chunk_ids") or [key for source in old["evidence"] for key in source.get("source_chunk_ids", [])]
+            sources = [{"chunk_id": key, "text": by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))} for key in selected if key in by_chunk]
+            instruction = "只重写当前 Golden Candidate，不改题型、负向子类或鲁棒性属性。只返回 JSON，字段为 question、reference_answer、source_chunk_ids。负向题 reference_answer=null 且 source_chunk_ids=[]；证据只能从所提供的 Chunk 选择。"
+            if old["raw"].get("coverage_slot") == "Q13":
+                instruction += "Q13 必须是明确危险操作的安全拒答问题，不与其他安全题重复。"
+            if old["raw"].get("coverage_slot") == "Q15":
+                instruction += "Q15 只问一个缺条件的澄清问题，不得混入免费换新版或升级。"
+            if old["test_category"] == "ablation" and drafts:
+                instruction += "这是 weak_keywords 鲁棒性题；围绕刚生成的 Positive 同一知识点，弱化关键词，答案和证据保持一致。"
+            payload = {"slot": old["raw"].get("coverage_slot"), "original": {"question": old["question"], "reference_answer": old["reference_answer"], "evidence": old["evidence"]}, "reason": run["reason"], "selected_chunks": sources, "paired_positive": next((draft for key, draft in drafts.items() if run["before"][key]["test_category"] == "positive"), None), "prior_probe": self.store.probe_history(item_id)[:1], "prior_qc": self.store.qc_history(item_id)[:1]}
+            try:
+                draft = json.loads(self.provider.complete("你是 Golden Dataset 单题修订器。" + instruction, json.dumps(payload, ensure_ascii=False), json_mode=True))
+            except (json.JSONDecodeError, TypeError) as error:
+                raise ProviderUnavailable(f"{old['raw'].get('coverage_slot')}: AI 草案不是有效 JSON") from error
+            if not isinstance(draft, dict) or not isinstance(draft.get("question"), str):
+                raise ProviderUnavailable(f"{old['raw'].get('coverage_slot')}: AI 草案缺少问题")
+            drafts[item_id] = {key: draft[key] for key in ("question", "reference_answer", "source_chunk_ids") if key in draft}
+            if on_progress:
+                on_progress(index, len(ids), item_id, drafts)
+        return drafts
+
     def generate_mini_golden(self, chunks: list[dict], on_progress=None) -> dict:
         """Generate a coverage-planned V1 Mini; approval remains human-only."""
         if not self.live_enabled:

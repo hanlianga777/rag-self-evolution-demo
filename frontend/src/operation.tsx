@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { getJson } from "./api";
 
-type Operation = { id: string; title: string; status: "running" | "completed" | "failed"; kind?: "evaluation"; stage?: string; current?: number; total?: number; error?: string; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
+type Operation = { id: string; title: string; status: "running" | "completed" | "failed"; kind?: "evaluation" | "revision"; stage?: string; current?: number; total?: number; error?: string; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
 type OperationContextValue = {
   start: (title: string, detail?: Partial<Operation>) => string;
   update: (id: string, detail: Partial<Operation>) => void;
@@ -9,9 +9,10 @@ type OperationContextValue = {
   fail: (id: string, reason: unknown) => void;
   run: <T>(title: string, work: () => Promise<T>) => Promise<T>;
   watchEvaluation: (id: string, title: string) => void;
+  watchRevision: (id: string) => void;
 };
 
-const fallback: OperationContextValue = { start: () => "", update: () => {}, succeed: () => {}, fail: () => {}, run: (_title, work) => work(), watchEvaluation: () => {} };
+const fallback: OperationContextValue = { start: () => "", update: () => {}, succeed: () => {}, fail: () => {}, run: (_title, work) => work(), watchEvaluation: () => {}, watchRevision: () => {} };
 const OperationContext = createContext<OperationContextValue>(fallback);
 export function useOperation() { return useContext(OperationContext); }
 
@@ -50,6 +51,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     catch (reason) { fail(id, reason); throw reason; }
   }, [start, succeed, fail]);
   const watchEvaluation = useCallback((id: string, title: string) => start(title, { id, kind: "evaluation" }), [start]);
+  const watchRevision = useCallback((id: string) => start("局部修订", { id, kind: "revision" }), [start]);
 
   useEffect(() => {
     if (!restore) return;
@@ -57,6 +59,10 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     getJson<any[]>("/api/evaluations").then(evaluations => {
       if (cancelled) return;
       for (const item of evaluations.filter(item => item.status === "running")) start(item.config?.candidate_id ? `Candidate ${item.config.candidate_id} Sandbox` : "Baseline Evaluation", { id: item.id, kind: "evaluation", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
+    }).catch(() => {});
+    getJson<any[]>("/api/governance/revisions").then(revisions => {
+      if (cancelled) return;
+      for (const item of revisions.filter(item => ["queued", "generating", "validating", "probing", "qc"].includes(item.status))) start("局部修订", { id: item.id, kind: "revision", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [restore, start]);
@@ -66,8 +72,8 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     if (!active.length) return;
     const timer = window.setInterval(() => {
       for (const item of active) {
-        void getJson<any>(`/api/evaluations/${item.id}`).then(result => {
-          const next = evaluation(result);
+        void getJson<any>(item.kind === "revision" ? `/api/governance/revisions/${item.id}` : `/api/evaluations/${item.id}`).then(result => {
+          const next: Partial<Operation> = item.kind === "revision" ? { status: ["preview_ready", "completed"].includes(result.status) ? "completed" : ["failed", "failed_quality", "interrupted"].includes(result.status) ? "failed" : "running", stage: ({ queued: "等待草案", generating: "AI 单题生成", validating: "Hard Validation", probing: "Probe", qc: "QC", preview_ready: "草案待确认应用", completed: "待人工复审", interrupted: "进程已中断，需手动继续" } as Record<string, string>)[result.status] || result.stage, current: result.progress?.current, total: result.progress?.total, error: result.error || (result.status === "interrupted" ? "进程重启后 Worker 不会自动恢复" : undefined) } : evaluation(result);
           update(item.id, next);
           if (next.status === "completed") succeed(item.id);
           if (next.status === "failed") fail(item.id, next.error || "评测失败");
@@ -78,7 +84,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   }, [operations, update, succeed, fail]);
 
   const visible = operations.filter(item => !item.dismissed).slice(-3);
-  return <OperationContext.Provider value={{ start, update, succeed, fail, run, watchEvaluation }}>
+  return <OperationContext.Provider value={{ start, update, succeed, fail, run, watchEvaluation, watchRevision }}>
     {children}
     {!!visible.length && <div className="operation-stack" aria-label="运行状态">{visible.map(item => <section className="operation-console" key={item.id} role={item.status === "failed" ? "alert" : "status"}>
       <div className="operation-head"><strong>{item.title}</strong><button aria-label="关闭运行状态" onClick={() => setOperations(current => current.map(row => row.id === item.id && row.status === "running" ? { ...row, dismissed: true } : row).filter(row => row.id !== item.id || row.status === "running"))}>×</button></div>

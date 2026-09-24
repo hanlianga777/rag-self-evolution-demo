@@ -79,3 +79,20 @@ it("shows persisted quality rerun progress and resumes polling after refresh", a
   expect(document.body.textContent).toContain("本次重跑因 Probe 未通过，已跳过 QC");
   await act(async () => root.unmount());
 });
+
+it("requires a revision reason and previews a persisted paired draft without applying it", async () => {
+  const questions = Array.from({ length: 20 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: `原题 ${index + 1}`, reference_answer: index < 12 ? "正确操作" : null, test_category: index < 8 ? "positive" : index < 12 ? "ablation" : "negative", legacy_question_type: "v1_mini", probe_status: "probe_passed", qc_status: "qc_passed", review_status: index === 0 || index === 8 ? "needs_revision" : "approved", stage: index === 0 || index === 8 ? "candidate" : "golden", evidence: index === 0 || index === 8 ? [{ source_chunk_ids: ["C1"] }] : [], evidence_details: index === 0 || index === 8 ? [{ chunks: [{ chunk_id: "C1", document_id: "DOC-001" }] }] : [] }));
+  const revision = { id: "REV-test", status: "preview_ready", stage: "preview_ready", question_ids: ["V1-1", "V1-9"], before: { "V1-1": { ...questions[0], raw: { coverage_slot: "Q01" } }, "V1-9": { ...questions[8], raw: { coverage_slot: "Q09" } } }, drafts: { "V1-1": { ...questions[0], question: "新题 1" }, "V1-9": { ...questions[8], question: "新题 9" } }, progress: { current: 2, total: 2 } };
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.includes("/api/governance/revisions") ? [revision] : url.includes("/api/documents/") ? { chunks: [{ chunk_id: "C1", section_path: "操作", page_start: 2, chunk_text: "正确操作" }] } : { questions }), { status: 200 }))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }], dataset: questions }} />));
+  await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
+  expect(document.body.textContent).toContain("草案预览（尚未应用）");
+  expect(document.body.textContent).toContain("新题 1");
+  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "修订 Candidate") as HTMLButtonElement).click());
+  expect(document.body.textContent).toContain("关联题：Q09");
+  expect(document.body.textContent).toContain("同时修订");
+  expect((([...document.querySelectorAll("button")].find(button => button.textContent === "生成修订草案")) as HTMLButtonElement).disabled).toBe(true);
+  expect(document.body.textContent).toContain("确认应用并运行 Probe / QC");
+  await act(async () => root.unmount());
+});

@@ -11,9 +11,9 @@ type Filter = "all" | "positive" | "ablation" | "negative" | "probe" | "qc" | "p
 const stageName: Record<string, string> = { queued: "排队中", coverage: "规划覆盖", generating: "逐题生成与修复", validation: "硬校验", candidate_persistence: "候选题入库", probing: "检索验证", qc: "质量检查", completed: "已完成", failed: "运行失败", candidate_generated: "候选题已生成" };
 const probeLabel = (value?: string) => value === "probe_passed" ? "通过" : value === "needs_revision" ? "未通过" : "未运行";
 const qcLabel = (value?: string) => value === "qc_passed" ? "通过" : value === "qc_failed" ? "未通过" : "未运行";
-const latestDecision = (row: Candidate) => row.review_history?.[0]?.decision;
-const reviewLabel = (row: Candidate) => displayText(latestDecision(row) || row.review_status || "human_review_pending");
+const reviewLabel = (row: Candidate) => displayText(row.review_status || "human_review_pending");
 const numberText = (value: unknown) => typeof value === "number" ? String(value) : "—";
+const revisionStatus = (value: string) => value === "failed" ? "草案校验失败" : value === "completed" ? "待人工复审" : displayText(value);
 
 export function GovernancePage({ data }: { data: any }) {
   const operation = useOperation();
@@ -22,6 +22,7 @@ export function GovernancePage({ data }: { data: any }) {
   const [runs, setRuns] = useState<Candidate[]>(data.generationRuns || []);
   const [snapshots, setSnapshots] = useState<Candidate[]>(data.snapshots || []);
   const [review, setReview] = useState<Candidate[]>([]);
+  const [revisions, setRevisions] = useState<Candidate[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -50,15 +51,15 @@ export function GovernancePage({ data }: { data: any }) {
     } else setReview([]);
   };
   const reload = async () => {
-    const [questions, generationRuns, goldenSnapshots] = await Promise.all([
-      getJson<Candidate[]>("/api/dataset"), getJson<Candidate[]>("/api/governance/generation-runs"), getJson<Candidate[]>("/api/governance/snapshots"),
+    const [questions, generationRuns, goldenSnapshots, revisionRuns] = await Promise.all([
+      getJson<Candidate[]>("/api/dataset"), getJson<Candidate[]>("/api/governance/generation-runs"), getJson<Candidate[]>("/api/governance/snapshots"), getJson<Candidate[]>("/api/governance/revisions"),
     ]);
-    setItems(questions); setRuns(generationRuns); setSnapshots(goldenSnapshots);
+    setItems(questions); setRuns(generationRuns); setSnapshots(goldenSnapshots); setRevisions(Array.isArray(revisionRuns) ? revisionRuns : []);
     await loadReview(generationRuns[0]);
   };
   useEffect(() => {
     if (!data.generationRuns) void reload().catch(reason => setError(errorMessage(reason)));
-    else void loadReview(data.generationRuns[0]).catch(reason => setError(errorMessage(reason)));
+    else { void loadReview(data.generationRuns[0]).catch(reason => setError(errorMessage(reason))); if (data.generationRuns[0]?.question_ids?.length === 20) void getJson<Candidate[]>("/api/governance/revisions").then(value => setRevisions(Array.isArray(value) ? value : [])).catch(() => {}); }
   }, [data.generationRuns]);
   useEffect(() => {
     if ((!running && !qualityRunning) || !currentRun?.id) return;
@@ -85,13 +86,13 @@ export function GovernancePage({ data }: { data: any }) {
     { key: "negative", label: "负向", count: current.filter(row => row.test_category === "negative").length, match: (row: Candidate) => row.test_category === "negative" },
     { key: "probe", label: "Probe 未通过", count: current.filter(row => row.probe_status === "needs_revision").length, match: (row: Candidate) => row.probe_status === "needs_revision" },
     { key: "qc", label: "QC 未通过", count: current.filter(row => row.qc_status === "qc_failed").length, match: (row: Candidate) => row.qc_status === "qc_failed" },
-    { key: "pending", label: "待人工审核", count: current.filter(row => !latestDecision(row) && row.review_status === "human_review_pending").length, match: (row: Candidate) => !latestDecision(row) && row.review_status === "human_review_pending" },
+    { key: "pending", label: "待人工审核", count: current.filter(row => row.review_status === "human_review_pending").length, match: (row: Candidate) => row.review_status === "human_review_pending" },
     { key: "approved", label: "已批准", count: current.filter(row => row.stage === "golden").length, match: (row: Candidate) => row.stage === "golden" },
-    { key: "revision", label: "需修订 / 已拒绝", count: current.filter(row => ["needs_revision", "rejected"].includes(latestDecision(row) || row.review_status)).length, match: (row: Candidate) => ["needs_revision", "rejected"].includes(latestDecision(row) || row.review_status) },
+    { key: "revision", label: "需修订 / 已拒绝", count: current.filter(row => ["needs_revision", "rejected"].includes(row.review_status)).length, match: (row: Candidate) => ["needs_revision", "rejected"].includes(row.review_status) },
   ] as const, [current]);
   const visible = current.filter(filters.find(item => item.key === filter)?.match || (() => true));
   const gateBlocked = current.filter(row => row.stage !== "golden" && (row.probe_status !== "probe_passed" || row.qc_status !== "qc_passed"));
-  const manualBlocked = current.filter(row => row.stage !== "golden" && ["needs_revision", "rejected"].includes(latestDecision(row)));
+  const manualBlocked = current.filter(row => row.stage !== "golden" && row.review_history?.some((event: Candidate) => ["needs_revision", "rejected"].includes(event.decision)));
   const probeFailed = current.filter(row => row.probe_status === "needs_revision").length;
   const qcFailed = current.filter(row => row.qc_status === "qc_failed").length;
   const probePending = current.filter(row => !["probe_passed", "needs_revision"].includes(row.probe_status)).length;
@@ -122,7 +123,7 @@ export function GovernancePage({ data }: { data: any }) {
     finally { setBusy(false); }
   };
   const questionAction = (id: string, name: "probe" | "qc") => action(() => postJson(`/api/governance/questions/${id}/${name}`), name === "probe" ? "运行单题 Probe" : "运行单题 QC");
-  const reviewAction = (id: string, decision: string) => action(() => postJson(`/api/governance/questions/${id}/review`, { decision }), "人工审核 Candidate");
+  const reviewAction = (id: string, decision: string, reason?: string, tags?: string[]) => action(() => postJson(`/api/governance/questions/${id}/review`, { decision, reason, tags }), "人工审核 Candidate");
 
   return <div className={`page governance-page ${!currentRun && tab === "run" ? "is-empty" : ""}`}>
     <div className="page-title"><div><h1>测试集治理</h1><p>Coverage → Hard Validation → Probe ≥90 → QC ≥85 → Human Review → Snapshot</p></div><button className="secondary" disabled={busy || running || qualityRunning} onClick={() => void createMini()}>{currentRun?.status === "failed" ? "重新运行 V1 Mini 8 / 4 / 8" : "生成 V1 Mini 8 / 4 / 8"}</button></div>
@@ -139,7 +140,7 @@ export function GovernancePage({ data }: { data: any }) {
     </Section>}
     {tab === "snapshot" && <Section title="Approved Golden Snapshot"><div className="run-list">{snapshots.map(snapshot => <div key={snapshot.id}><strong>{snapshot.id}</strong><span>{snapshot.snapshot?.generation_run_id || "历史快照"} · {snapshot.snapshot?.question_ids?.length || 0} 题</span><Status value={snapshot.status} /></div>)}{!snapshots.length && <p className="muted">尚未创建正式 Golden Snapshot。</p>}</div></Section>}
     {tab === "legacy" && <Section title="历史 Candidate（Legacy / 未验证）"><details><summary>展开 {legacy.length} 道历史 Candidate</summary><p className="muted">仅供追溯，不参与本轮统计、正式 Baseline 或发布判断。</p><QuestionTable rows={legacy} onDetail={row => setSelectedId(row.id)} /></details></Section>}
-    <Drawer open={!!selected} onOpenChange={open => !open && setSelectedId(null)} title="Candidate 详情"><CandidateDetail row={selected} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} onRun={questionAction} onReview={reviewAction} /></Drawer>
+    <Drawer open={!!selected} onOpenChange={open => !open && setSelectedId(null)} title="Candidate 详情"><CandidateDetail key={selected?.id} row={selected} peers={current} revision={revisions.find(item => item.question_ids?.includes(selected?.id))} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} onRun={questionAction} onReview={reviewAction} onRefresh={reload} operation={operation} /></Drawer>
     <Drawer open={runErrorOpen} onOpenChange={setRunErrorOpen} title="Run 错误详情"><div className="drawer-body"><p>阶段：{qualityRerun?.status === "failed" ? qualityRerun?.slots?.[qualityRerun?.slot]?.failed_stage || qualityRerun?.stage : stageName[currentRun?.artifacts?.hard_validation?.failed_stage] || "未知"}</p><pre>{qualityRerun?.status === "failed" ? qualityRerun.error : currentRun?.artifacts?.hard_validation?.error || "请查看运行审计"}</pre></div></Drawer>
   </div>;
 }
@@ -148,9 +149,65 @@ function QuestionTable({ rows, onDetail }: { rows: Candidate[]; onDetail: (row: 
   return <div className="table-scroll review-table"><table><thead><tr><th>#</th><th>类型</th><th>问题</th><th>Probe</th><th>QC</th><th>人工审核</th><th>操作</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td>{row.slot || row.id}</td><td><Badge tone={row.test_category === "negative" ? "warning" : "neutral"}>{displayText(row.test_category)}</Badge></td><td><span className="review-question">{row.question}</span></td><td>{probeLabel(row.probe_status)}</td><td>{qcLabel(row.qc_status)}</td><td>{reviewLabel(row)}</td><td><button className="secondary" onClick={() => onDetail(row)}>查看详情</button></td></tr>)}{!rows.length && <tr><td colSpan={7} className="empty-state">暂无对应数据。</td></tr>}</tbody></table></div>;
 }
 
-function CandidateDetail({ row, rerunSlot, busy, onRun, onReview }: { row?: Candidate; rerunSlot?: Candidate; busy: boolean; onRun: (id: string, name: "probe" | "qc") => void; onReview: (id: string, decision: string) => void }) {
+function CandidateDetail({ row, peers, revision, rerunSlot, busy, onRun, onReview, onRefresh, operation }: { row?: Candidate; peers: Candidate[]; revision?: Candidate; rerunSlot?: Candidate; busy: boolean; onRun: (id: string, name: "probe" | "qc") => void; onReview: (id: string, decision: string, reason?: string, tags?: string[]) => void; onRefresh: () => Promise<void>; operation: ReturnType<typeof useOperation> }) {
+  const [reason, setReason] = useState("");
+  const [tags, setTags] = useState("");
+  const [reviewForm, setReviewForm] = useState(false);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [mode, setMode] = useState<"manual_edit" | "ai_regenerate">("manual_edit");
+  const [paired, setPaired] = useState(true);
+  const [changes, setChanges] = useState<Record<string, Candidate>>({});
+  const [chunks, setChunks] = useState<Candidate[]>([]);
+  const [revisionRun, setRevisionRun] = useState<Candidate | undefined>(revision);
+  const [revisionError, setRevisionError] = useState("");
+  const [revisionBusy, setRevisionBusy] = useState(false);
+  const linked = row && ["Q01", "Q09"].includes(row.slot) ? peers.find(item => item.slot === (row.slot === "Q01" ? "Q09" : "Q01") && item.evidence?.some((source: Candidate) => source.source_chunk_ids?.some((id: string) => row.evidence?.some((own: Candidate) => own.source_chunk_ids?.includes(id))))) : undefined;
+  const primary = row?.slot === "Q09" && linked ? linked : row;
+  const selectedRows: Candidate[] = row ? linked && paired ? [row, linked].sort((a, b) => a.slot.localeCompare(b.slot)) : [primary!] : [];
+  useEffect(() => { setRevisionRun(revision); }, [revision?.id]);
+  useEffect(() => {
+    const documentId = row?.evidence_details?.[0]?.chunks?.[0]?.document_id;
+    if (!documentId) return;
+    getJson<Candidate>(`/api/documents/${documentId}`).then(document => setChunks(document.chunks || [])).catch(() => setChunks([]));
+  }, [row?.id]);
+  useEffect(() => {
+    if (!revisionRun?.id || !["queued", "generating", "validating", "probing", "qc"].includes(revisionRun.status)) return;
+    let cancelled = false;
+    const poll = async () => {
+      try { const updated = await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`); if (!cancelled) { setRevisionRun(updated); if (["preview_ready", "completed", "failed", "failed_quality", "interrupted"].includes(updated.status)) void onRefresh(); } }
+      catch (error) { if (!cancelled) setRevisionError(errorMessage(error)); }
+    };
+    const timer = window.setInterval(() => void poll(), 1000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [revisionRun?.id, revisionRun?.status]);
+  const edit = (id: string, field: string, value: unknown) => setChanges(previous => ({ ...previous, [id]: { ...previous[id], [field]: value } }));
+  const beginRevision = async () => {
+    if (!row || !reason.trim()) { setRevisionError("请填写本次修订原因"); return; }
+    if (row.review_status === "rejected" && !window.confirm("该题已拒绝。确认重新打开并修订？")) return;
+    setRevisionBusy(true); setRevisionError("");
+    try {
+      const payload = { mode, reason, paired: !!linked && paired, changes: Object.fromEntries(selectedRows.map(item => [item.id, mode === "manual_edit" ? { question: changes[item.id]?.question ?? item.question, reference_answer: item.test_category === "negative" ? null : changes[item.id]?.reference_answer ?? item.reference_answer, source_chunk_ids: item.test_category === "negative" ? [] : changes[item.id]?.source_chunk_ids ?? item.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []) ?? [] } : { source_chunk_ids: item.test_category === "negative" ? [] : changes[item.id]?.source_chunk_ids ?? item.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []) ?? [] }])), tags: tags.split(/[，,]/).map(value => value.trim()).filter(Boolean) };
+      const started = await postJson<{ id: string }>(`/api/governance/questions/${paired ? row.id : primary?.id}/revision`, payload);
+      setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${started.id}`)); operation.watchRevision(started.id); await onRefresh();
+    } catch (error) { setRevisionError(errorMessage(error)); }
+    finally { setRevisionBusy(false); }
+  };
+  const applyDraft = async () => {
+    if (!revisionRun || !window.confirm("确认应用草案？原题将替换，旧 Probe/QC 立即失效，并只重跑所选题目。")) return;
+    setRevisionBusy(true); setRevisionError("");
+    try { await postJson(`/api/governance/revisions/${revisionRun.id}/apply`); setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); operation.watchRevision(revisionRun.id); await onRefresh(); }
+    catch (error) { setRevisionError(errorMessage(error)); }
+    finally { setRevisionBusy(false); }
+  };
+  const resume = async () => {
+    if (!revisionRun) return;
+    setRevisionBusy(true); setRevisionError("");
+    try { await postJson(`/api/governance/revisions/${revisionRun.id}/resume`); setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); operation.watchRevision(revisionRun.id); }
+    catch (error) { setRevisionError(errorMessage(error)); }
+    finally { setRevisionBusy(false); }
+  };
   if (!row) return null;
-  const probe = row.probe || row.raw?.probe_details || {};
+  const probe = row.probe_status === "probe_pending" ? {} : row.probe || row.raw?.probe_details || {};
   const qc = row.qc_status === "qc_pending" ? {} : row.qc || row.raw?.qc || {};
   const details = row.evidence_details || (row.evidence || []).map((evidence: Candidate) => ({ ...evidence, chunks: (evidence.source_chunk_ids || []).map((chunk_id: string) => ({ chunk_id, resolution: "missing_current_index" })) }));
   const ready = row.probe_status === "probe_passed" && row.qc_status === "qc_passed";
@@ -164,6 +221,10 @@ function CandidateDetail({ row, rerunSlot, busy, onRun, onReview }: { row?: Cand
     <h4>Golden Evidence</h4>{details.length ? details.map((evidence: Candidate, index: number) => <div className="review-evidence" key={index}>{evidence.chunks.map((chunk: Candidate) => <div key={chunk.chunk_id}><strong>{chunk.document_name || chunk.document_id || "当前索引未匹配"}</strong><p>章节：{chunk.section_path || "当前索引未匹配"} · 页码：{chunk.page_start ?? "—"}–{chunk.page_end ?? "—"} · Chunk ID：{chunk.chunk_id}</p><p className="review-full-text">{chunk.chunk_text || "当前索引未匹配，无法展示证据原文"}</p></div>)}{evidence.evidence_key_points?.length > 0 && <p>证据要点：{evidence.evidence_key_points.join("；")}</p>}</div>) : <p className="muted">无预设证据（负向题）。</p>}
     <h4>Probe</h4><dl><dt>分数 / 阈值</dt><dd>{numberText(probe.score)} / {numberText(probe.threshold || 90)}</dd><dt>状态</dt><dd>{probeLabel(row.probe_status)}</dd><dt>分类</dt><dd>{displayText(probe.probe_details?.classification || probe.classification || "not_run")}</dd><dt>检索一致性</dt><dd>{probe.probe_details?.retrieval_coherent === true ? "一致" : probe.probe_details?.retrieval_coherent === false ? "不一致" : "未判定"}</dd><dt>预期证据排名</dt><dd>{rank < 0 ? "未进入 TopK" : `第 ${rank + 1} 位`}</dd><dt>失败原因</dt><dd>{probe.reason || probe.probe_details?.failure_reason || "—"}</dd></dl><p>Retrieved TopK：{topK.length ? topK.map((item: Candidate, index: number) => `${index + 1}. ${item.chunk_id} (${numberText(item.score)})`).join("；") : "未记录"}</p><button className="secondary" disabled={busy || row.stage === "golden"} onClick={() => onRun(row.id, "probe")}>运行 Probe</button>
     <h4>QC</h4>{rerunSlot?.qc === "skipped" && <p className="muted">本次重跑因 Probe 未通过，已跳过 QC；旧 QC 记录仅供历史审计。</p>}<dl><dt>分数 / 阈值</dt><dd>{numberText(qc.score)} / {numberText(qc.threshold || 85)}</dd><dt>优先级</dt><dd>{qc.priority || "—"}</dd><dt>状态</dt><dd>{qcLabel(row.qc_status)}</dd><dt>原因</dt><dd>{qc.reason || "—"}</dd><dt>问题</dt><dd>{qc.issues?.join("；") || "—"}</dd><dt>行为准则</dt><dd>{qc.behavior_criteria || "—"}</dd>{row.test_category === "ablation" && <><dt>鲁棒性属性有效</dt><dd>{qc.ablation_valid === true ? "是" : qc.ablation_valid === false ? "否" : "未评估"}</dd></>}</dl>{qc.qc_input_evidence?.map((source: Candidate) => <div className="review-evidence" key={source.chunk_id}><strong>实际送入 QC：{source.chunk_id}</strong><p className="review-full-text">{source.chunk_text}</p></div>)}{qc.evidence_support_sentences?.length > 0 && <p>支持句：{qc.evidence_support_sentences.join("；")}</p>}{qc.probe_basis && <details><summary>Probe 判定依据</summary><pre>{JSON.stringify(qc.probe_basis, null, 2)}</pre></details>}<button className="secondary" disabled={busy || row.stage === "golden" || row.probe_status !== "probe_passed"} onClick={() => onRun(row.id, "qc")}>运行 QC</button>
-    <h4>Human Review</h4><p>当前状态：{reviewLabel(row)}</p>{row.stage !== "golden" && <><div className="header-actions"><button className="primary" disabled={busy || !ready} onClick={() => onReview(row.id, "approved")}>批准</button><button className="secondary" disabled={busy} onClick={() => onReview(row.id, "needs_revision")}>需修订</button><button className="secondary" disabled={busy} onClick={() => onReview(row.id, "rejected")}>拒绝</button></div>{block && <p className="muted">{block}</p>}</>}
+    <h4>Human Review</h4><p>当前状态：{reviewLabel(row)}</p>{row.stage !== "golden" && <><div className="header-actions"><button className="primary" disabled={busy || !ready} onClick={() => onReview(row.id, "approved")}>批准</button><button className="secondary" disabled={busy} onClick={() => setReviewForm(value => !value)}>需修订</button><button className="secondary" disabled={busy} onClick={() => onReview(row.id, "rejected")}>拒绝</button></div>{block && <p className="muted">{block}</p>}{reviewForm && <div className="revision-form"><label>修订原因（必填）<textarea value={reason} onChange={event => setReason(event.target.value)} placeholder="请写明本题需要修订的具体原因" /></label><label>标签（可选，逗号分隔）<input value={tags} onChange={event => setTags(event.target.value)} /></label><button className="secondary" disabled={!reason.trim() || busy} onClick={() => { onReview(row.id, "needs_revision", reason, tags.split(/[，,]/).map(value => value.trim()).filter(Boolean)); setReviewForm(false); }}>保存人工决定</button></div>}</>}
+    {row.stage !== "golden" && ["needs_revision", "rejected"].includes(row.review_status) && <><h4>局部修订</h4><button className="secondary" onClick={() => setRevisionOpen(value => !value)}>{row.review_status === "rejected" ? "重新打开并修订" : "修订 Candidate"}</button>{revisionOpen && <div className="revision-form"><p className="muted">先生成并校验草案，预览后由你确认应用。不会修改 Generation Coverage Plan。</p>{linked && <div className="revision-pair"><strong>关联题：{linked.slot}</strong><p>两题共享原始证据；默认同时修订。</p><label><input type="radio" checked={paired} onChange={() => setPaired(true)} /> 同时修订</label><label><input type="radio" checked={!paired} onChange={() => setPaired(false)} /> 仅修订 {primary?.slot}</label><button className="text-button" onClick={() => setRevisionOpen(false)}>取消</button></div>}<label>修订原因<input value={reason} onChange={event => setReason(event.target.value)} placeholder="历史人工决定未记录原因，请在此填写" /></label><label>标签（可选）<input value={tags} onChange={event => setTags(event.target.value)} /></label><div className="header-actions"><label><input type="radio" checked={mode === "manual_edit"} onChange={() => setMode("manual_edit")} /> 人工编辑</label><label><input type="radio" checked={mode === "ai_regenerate"} onChange={() => setMode("ai_regenerate")} /> AI 单 Slot 重生成</label></div>{selectedRows.map(item => <div className="revision-question" key={item.id}><strong>{item.slot} · {displayText(item.test_category)}</strong>{mode === "manual_edit" && <><label>问题<textarea value={changes[item.id]?.question ?? item.question} onChange={event => edit(item.id, "question", event.target.value)} /></label>{item.test_category !== "negative" && <label>参考答案<textarea value={changes[item.id]?.reference_answer ?? item.reference_answer ?? ""} onChange={event => edit(item.id, "reference_answer", event.target.value)} /></label>}</>}{item.test_category !== "negative" && <fieldset><legend>真实 Chunk（原文档内选择）</legend><div className="revision-chunks">{chunks.map(chunk => { const selected = changes[item.id]?.source_chunk_ids ?? item.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []) ?? []; return <label key={chunk.chunk_id}><input type="checkbox" checked={selected.includes(chunk.chunk_id)} onChange={event => edit(item.id, "source_chunk_ids", event.target.checked ? [...selected, chunk.chunk_id] : selected.filter((id: string) => id !== chunk.chunk_id))} /> {chunk.chunk_id} · {chunk.section_path} · P.{chunk.page_start}<small>{chunk.chunk_text || chunk.text}</small></label>; })}</div></fieldset>}</div>)}<button className="primary" disabled={revisionBusy || !reason.trim() || !!revisionRun && ["queued", "generating", "validating", "preview_ready", "probing", "qc", "interrupted"].includes(revisionRun.status)} onClick={() => void beginRevision()}>生成修订草案</button></div>}</>}
+    {revisionError && <p className="error-notice" role="alert">{revisionError}</p>}
+    {revisionRun && <div className="revision-status" role="status"><h4>Revision Run · {revisionRun.id}</h4><p>{revisionStatus(revisionRun.status)} · {revisionStatus(revisionRun.stage || revisionRun.status)} · {revisionRun.progress?.current ?? 0} / {revisionRun.progress?.total ?? revisionRun.question_ids?.length ?? 1}</p>{revisionRun.error && <p className="error-notice">{revisionRun.error}</p>}{revisionRun.status === "interrupted" && <button className="secondary" disabled={revisionBusy} onClick={() => void resume()}>手动继续校验</button>}{revisionRun.status === "preview_ready" && <><h4>草案预览（尚未应用）</h4>{revisionRun.question_ids.map((itemId: string) => { const before = revisionRun.before[itemId], draft = revisionRun.drafts[itemId]; return <div key={itemId} className="review-evidence"><strong>{before.raw?.coverage_slot} · v{revisionRun.version_from?.[itemId] || 1}</strong><p>原题：{before.question}</p><p>新题：{draft.question}</p><p>原答案：{before.reference_answer || "不适用"}</p><p>新答案：{draft.reference_answer || "不适用"}</p><p>变更字段：{(revisionRun.changed_fields?.[itemId] || []).map(displayText).join("、") || "—"}</p><p>原证据：{before.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []).join("、") || "无预设证据"}</p><p>新证据：{draft.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []).join("、") || "无预设证据"}</p>{draft.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []).map((id: string) => { const chunk = chunks.find(item => item.chunk_id === id); return <p className="review-full-text" key={id}>{id} · {chunk?.section_path || "当前索引未匹配"} · P.{chunk?.page_start ?? "—"}：{chunk?.chunk_text || chunk?.text || "当前索引未匹配"}</p>; })}</div>; })}<button className="primary" disabled={revisionBusy} onClick={() => void applyDraft()}>确认应用并运行 Probe / QC</button></>}{revisionRun.status === "completed" && <p>双 Gate 已通过，待人工逐题复审；没有自动批准。</p>}</div>}
+    {!!row.revision_history?.length && <details><summary>Revision History · {row.revision_history.length}</summary>{row.revision_history.map((item: Candidate) => <p key={item.id}>{item.id} · {displayText(item.status)} · {item.reason} · {item.created_at}</p>)}</details>}
   </div>;
 }
