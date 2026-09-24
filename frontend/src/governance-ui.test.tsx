@@ -6,6 +6,45 @@ import { GovernancePage } from "./pages/GovernancePage";
 
 afterEach(() => { document.body.innerHTML = ""; vi.restoreAllMocks(); });
 
+it("keeps human review actions visible and technical audit out of the default view", async () => {
+  const question = { id: "V1-02", slot: "Q02", question: "怎样完成设备检查？", reference_answer: "先检查电源和刷盘。", test_category: "positive", legacy_question_type: "v1_mini", review_status: "human_review_pending", probe_status: "probe_passed", qc_status: "qc_passed", stage: "candidate", evidence: [{ source_chunk_ids: ["C2"], evidence_key_points: ["检查电源和刷盘"] }], evidence_details: [{ chunks: [{ chunk_id: "C2", document_name: "操作说明.pdf", section_path: "检查", page_start: 4, chunk_text: "检查电源和刷盘。\n□\n检查电源和刷盘。" }] }], probe: { score: 96, threshold: 90, probe_details: { top_k: [{ chunk_id: "C2", score: 0.9 }] } }, qc: { score: 93, threshold: 85 } };
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: [question.id], artifacts: {} }], dataset: [question] }} />));
+  await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
+  expect(document.querySelector(".candidate-workspace .candidate-actionbar")?.textContent).toContain("批准");
+  expect(document.querySelector(".candidate-workspace .candidate-scroll")?.textContent).toContain("检查电源和刷盘");
+  expect(document.querySelector(".candidate-workspace .candidate-scroll")?.textContent).not.toContain("Retrieved TopK");
+  expect(document.querySelector(".candidate-evidence-preview")?.textContent).not.toContain("□");
+  await act(async () => root.unmount());
+});
+
+it("shows negative expected behavior and reveals full technical audit only on request", async () => {
+  const question = { id: "V1-13", slot: "Q13", question: "如何绕过安全锁？", reference_answer: null, test_category: "negative", negative_subtype: "safe_rejection", raw: { expected_behavior: "safe_rejection" }, legacy_question_type: "v1_mini", review_status: "needs_revision", probe_status: "needs_revision", qc_status: "qc_pending", stage: "candidate", evidence: [], probe: { score: 55, threshold: 90, reason: "Negative subtype does not match the question", probe_details: { vector: { top_k: [{ chunk_id: "C4", score: 0.8 }] } } }, probe_history: [{ score: 55 }], qc_history: [] };
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-13", status: "completed", question_ids: [question.id], artifacts: {} }], dataset: [question] }} />));
+  await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
+  expect(document.querySelector(".review-workspace")?.textContent).toContain("预期行为");
+  expect(document.querySelector(".review-workspace")?.textContent).toContain("应拒绝危险操作请求");
+  expect(document.querySelector(".review-workspace")?.textContent).toContain("负向子类与题目不符");
+  expect(document.querySelector(".review-workspace")?.textContent).not.toContain("Negative subtype does not match the question");
+  expect(document.querySelector(".review-workspace")?.textContent).not.toContain("Retrieved TopK");
+  await act(async () => ([...document.querySelectorAll(".candidate-menu button")].find(button => button.textContent === "查看技术审计") as HTMLButtonElement).click());
+  await act(async () => ([...document.querySelectorAll(".audit-tabs button")].find(button => button.textContent === "Probe") as HTMLButtonElement).click());
+  expect(document.querySelector(".audit-workspace")?.textContent).toContain("Retrieved TopK");
+  expect(document.querySelector(".audit-workspace")?.textContent).toContain("C4");
+  await act(async () => root.unmount());
+});
+
+it("shows Snapshot as the next action only after this run has 20 approved questions", async () => {
+  const questions = Array.from({ length: 20 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: "测试题", test_category: "positive", legacy_question_type: "v1_mini", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", stage: "golden", evidence: [] }));
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ questions }), { status: 200 })));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(row => row.id), artifacts: {} }], dataset: questions }} />));
+  expect(document.querySelector(".snapshot-next")?.textContent).toContain("创建 Golden Snapshot");
+  expect(document.querySelectorAll(".snapshot-next button")).toHaveLength(1);
+  await act(async () => root.unmount());
+});
+
 it("keeps Golden approval disabled until Probe and QC both pass", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ stage: "golden" }), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
@@ -76,7 +115,7 @@ it("shows persisted quality rerun progress and resumes polling after refresh", a
   expect((([...(document.querySelectorAll("button"))].find(button => button.textContent === "重新运行 Probe / QC")) as HTMLButtonElement).disabled).toBe(true);
   expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-quality"));
   await act(async () => { ([...document.querySelectorAll("button")].find(button => button.textContent === "查看详情") as HTMLButtonElement).click(); });
-  expect(document.body.textContent).toContain("本次重跑因 Probe 未通过，已跳过 QC");
+  expect(document.body.textContent).toContain("本次 Probe 未通过，QC 已跳过");
   await act(async () => root.unmount());
 });
 
@@ -87,11 +126,11 @@ it("shows only Revision Draft while a paired preview is active", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }], dataset: questions }} />));
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
-  expect(document.body.textContent).toContain("Revision Draft");
+  expect(document.body.textContent).toContain("修订草案");
   expect(document.body.textContent).toContain("新题 1");
   expect(document.body.textContent).not.toContain("发起 Candidate 修订");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "生成修订草案")).toBe(false);
-  expect(document.body.textContent).toContain("确认应用并运行 Probe / QC");
+  expect(document.querySelector(".candidate-actionbar")?.textContent).toContain("确认应用");
   await act(async () => root.unmount());
 });
 
@@ -109,20 +148,22 @@ it("starts Q09 alone by default and includes Q01 only when explicitly checked", 
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }], dataset: questions }} />));
   await act(async () => (document.querySelectorAll<HTMLButtonElement>(".review-table tbody button")[8]).click());
   expect(document.body.textContent).toContain("关联 Positive：Q01");
+  await act(async () => ([...document.querySelectorAll(".candidate-actionbar button")].find(button => button.textContent === "需修订") as HTMLButtonElement).click());
   const pair = document.querySelector<HTMLInputElement>(".revision-pair input[type='checkbox']")!;
   expect(pair.checked).toBe(false);
-  expect(document.querySelectorAll(".revision-form .revision-question")).toHaveLength(0);
+  expect(document.querySelectorAll(".draft-workspace")).toHaveLength(0);
   await act(async () => pair.click());
   expect(pair.checked).toBe(true);
-  expect(document.querySelectorAll(".revision-form fieldset")).toHaveLength(2);
+  expect(document.querySelectorAll(".revision-workspace button").length).toBeGreaterThan(2);
   await act(async () => pair.click());
   expect(pair.checked).toBe(false);
-  expect(document.querySelectorAll(".revision-form fieldset")).toHaveLength(1);
-  const reason = document.querySelector<HTMLInputElement>(".revision-form input[placeholder]")!;
-  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(reason, "独立修 Q09"); reason.dispatchEvent(new Event("input", { bubbles: true })); });
+  expect([...document.querySelectorAll(".revision-workspace button")].filter(button => button.textContent === "更换证据")).toHaveLength(1);
+  const reason = document.querySelector<HTMLTextAreaElement>(".revision-workspace textarea")!;
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(reason, "独立修 Q09"); reason.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "生成修订草案") as HTMLButtonElement).click());
   const started = requests.find(item => item.url.endsWith("/api/governance/questions/V1-9/revision"));
   expect(started).toBeTruthy();
+  expect(requests.some(item => item.url.endsWith("/api/governance/questions/V1-9/review"))).toBe(false);
   expect(JSON.parse(started!.init!.body as string).paired).toBe(false);
   expect(Object.keys(JSON.parse(started!.init!.body as string).changes)).toEqual(["V1-9"]);
   await act(async () => root.unmount());
@@ -142,23 +183,22 @@ it("lets a paired preview regenerate only Q09 and discard without applying", asy
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }], dataset: questions }} />));
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
-  expect(document.body.textContent).toContain("编辑当前草案");
-  expect(document.body.textContent).toContain("重新生成当前题");
-  expect(document.body.textContent).toContain("放弃草案");
-  const target = document.querySelector<HTMLSelectElement>("[aria-label='选择要调整的题目']")!;
-  await act(async () => { target.value = "V1-9"; target.dispatchEvent(new Event("change", { bubbles: true })); });
-  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "编辑当前草案") as HTMLButtonElement).click());
-  expect(document.querySelector<HTMLTextAreaElement>(".revision-status textarea")?.value).toBe("新题 9");
-  expect((document.querySelector<HTMLInputElement>(".revision-status .revision-chunks input[type='checkbox']")?.checked)).toBe(true);
+  expect(document.querySelector(".candidate-actionbar")?.textContent).toContain("编辑草案");
+  expect(document.querySelector(".candidate-actionbar")?.textContent).toContain("重新生成");
+  await act(async () => ([...document.querySelectorAll(".draft-tabs button")].find(button => button.textContent?.includes("Q09")) as HTMLButtonElement).click());
+  await act(async () => ([...document.querySelectorAll(".candidate-actionbar button")].find(button => button.textContent === "编辑草案") as HTMLButtonElement).click());
+  expect(document.querySelector<HTMLTextAreaElement>(".draft-workspace textarea")?.value).toBe("新题 9");
+  const edited = document.querySelector<HTMLTextAreaElement>(".draft-workspace textarea")!;
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(edited, "新的 Q09 问法"); edited.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "保存并校验草案") as HTMLButtonElement).click());
   const editRequest = requests.find(item => item.url.endsWith("/edit-draft"));
   expect(Object.keys(JSON.parse(editRequest!.init!.body as string).changes)).toEqual(["V1-9"]);
-  expect((([...document.querySelectorAll("button")].find(button => button.textContent === "确认应用并运行 Probe / QC")) as HTMLButtonElement).disabled).toBe(true);
-  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "重新生成当前题") as HTMLButtonElement).click());
+  expect((([...document.querySelectorAll("button")].find(button => button.textContent === "确认应用")) as HTMLButtonElement).disabled).toBe(true);
+  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "重新生成") as HTMLButtonElement).click());
   const regeneration = requests.find(item => item.url.endsWith("/regenerate-draft"));
   expect(regeneration).toBeTruthy();
   expect(JSON.parse(regeneration!.init!.body as string)).toEqual({ question_id: "V1-9", expected_hash: "hash-nine" });
-  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "放弃草案") as HTMLButtonElement).click());
+  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "放弃") as HTMLButtonElement).click());
   expect(requests.some(item => item.url.endsWith("/discard"))).toBe(true);
   expect(requests.some(item => item.url.endsWith("/apply"))).toBe(false);
   await act(async () => root.unmount());
