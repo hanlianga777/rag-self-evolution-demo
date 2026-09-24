@@ -171,6 +171,7 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .candidate-detail .review-evidence { border: 1px solid var(--line-soft); border-radius: 10px; margin-bottom: 9px; padding: 12px; }
 .candidate-detail .review-evidence p { margin: 6px 0; }
 .revision-form, .revision-status { border: 1px solid var(--line-soft); border-radius: 10px; margin-top: 12px; padding: 14px; }
+.revision-status select { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); margin: 8px 0 12px; padding: 8px; width: 100%; }
 .revision-form > label, .revision-question > label { display: grid; gap: 5px; margin: 10px 0; }
 .revision-form input:not([type="radio"]):not([type="checkbox"]), .revision-form textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; padding: 8px; width: 100%; }
 .revision-form textarea { min-height: 76px; resize: vertical; }

@@ -472,16 +472,22 @@ class GovernanceStore:
         return self.revision_run(revision_id)
 
     def prepare_revision(self, revision_id: str, chunks: list[dict], *, similarity, generated: dict | None = None):
-        from .ai_service import AiService
         run = self.revision_run(revision_id)
         if run["status"] not in {"queued", "interrupted"}:
             raise ValueError("Revision Run 不可重复校验")
+        self.update_revision(revision_id, status="validating", stage="hard_validation")
+        drafts, errors, new_hash, changed_fields = self._validate_revision_drafts(run, chunks, similarity, generated or run["changes"])
+        if errors:
+            return self.update_revision(revision_id, status="failed", stage="hard_validation", error="；".join(errors), drafts=drafts, new_hash=new_hash, changed_fields=changed_fields, validation={"passed": False, "errors": errors})
+        return self.update_revision(revision_id, status="preview_ready", stage="preview_ready", drafts=drafts, new_hash=new_hash, changed_fields=changed_fields, validation={"passed": True, "errors": []}, progress={"current": len(drafts), "total": len(drafts)})
+
+    def _validate_revision_drafts(self, run: dict, chunks: list[dict], similarity, changes: dict):
+        from .ai_service import AiService
         by_chunk = {chunk["chunk_id"]: chunk for chunk in chunks}
         drafts, errors = {}, []
-        self.update_revision(revision_id, status="validating", stage="hard_validation")
         for item_id in run["question_ids"]:
             old = run["before"][item_id]
-            change = (generated or run["changes"]).get(item_id, {})
+            change = changes.get(item_id, {})
             if not isinstance(change, dict):
                 errors.append(f"{item_id}: 草案格式错误")
                 continue
@@ -490,7 +496,7 @@ class GovernanceStore:
                 errors.append(f"{item_id}: 包含不可修改字段")
                 continue
             source_ids = change.get("source_chunk_ids", [key for evidence in old["evidence"] for key in evidence.get("source_chunk_ids", [])])
-            if not isinstance(source_ids, list) or any(key not in by_chunk for key in source_ids):
+            if not isinstance(source_ids, list) or any(not isinstance(key, str) or key not in by_chunk for key in source_ids):
                 errors.append(f"{item_id}: Chunk 不存在于当前索引")
                 continue
             old_documents = {by_chunk[key]["document_id"] for evidence in old["evidence"] for key in evidence.get("source_chunk_ids", []) if key in by_chunk}
@@ -500,14 +506,14 @@ class GovernanceStore:
             if old["test_category"] == "negative" and source_ids:
                 errors.append(f"{item_id}: 负向题不能添加 Golden Evidence")
                 continue
-            evidence = [] if old["test_category"] == "negative" else [{"source_chunk_ids": source_ids, "evidence_key_points": [by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))[:160] for key in source_ids]}]
+            evidence = [] if old["test_category"] == "negative" else [{"source_chunk_ids": source_ids, "evidence_key_points": [by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))[:160] for key in source_ids if key in by_chunk]}]
             candidate = {"question": str(change.get("question", old["question"])).strip(), "reference_answer": change.get("reference_answer", old["reference_answer"]), "evidence": evidence, "test_category": old["test_category"], "expected_behavior": old["raw"].get("expected_behavior"), "ablation_attribute": old["raw"].get("ablation_attribute"), "ablation_metadata": change.get("ablation_metadata", old["raw"].get("ablation_metadata", {}))}
             errors.extend(f"{item_id}: {message}" for message in AiService._candidate_errors(candidate, chunks, set()))
             if old["raw"].get("coverage_slot") == "Q13" and (old["raw"].get("expected_behavior") != "safe_rejection" or not any(cue in candidate["question"] for cue in ("绕过", "禁用", "关闭", "短接", "忽略安全"))):
                 errors.append(f"{item_id}: Q13 必须保持安全拒答问题")
             if old["raw"].get("coverage_slot") == "Q15" and (old["raw"].get("expected_behavior") != "clarify" or any(cue in candidate["question"] for cue in ("免费", "换新版", "升级新版"))):
                 errors.append(f"{item_id}: Q15 必须保持单一澄清目标")
-            if old["test_category"] != "negative":
+            if old["test_category"] != "negative" and all(key in by_chunk for key in source_ids):
                 text = " ".join(by_chunk[key].get("chunk_text", by_chunk[key].get("text", "")) for key in source_ids)
                 answer = str(candidate["reference_answer"] or "")
                 if not answer or not (_normalized(answer) in _normalized(text) or any(_normalized(part) in _normalized(text) for part in answer.replace("，", "。").split("。") if len(_normalized(part)) >= 4)):
@@ -529,24 +535,128 @@ class GovernanceStore:
                         break
         changed_fields = {item_id: [field for field in ("question", "reference_answer", "evidence") if draft[field] != run["before"][item_id][field]] for item_id, draft in drafts.items()}
         new_hash = {item_id: self._revision_hash(draft) for item_id, draft in drafts.items()}
-        if errors:
-            return self.update_revision(revision_id, status="failed", stage="hard_validation", error="；".join(errors), drafts=drafts, new_hash=new_hash, changed_fields=changed_fields, validation={"passed": False, "errors": errors})
         if len(drafts) == 2:
             positive = next((item for item in drafts.values() if item["test_category"] == "positive"), None)
             ablation = next((item for item in drafts.values() if item["test_category"] == "ablation"), None)
             if not positive or not ablation or ablation["raw"].get("ablation_attribute") != "weak_keywords" or _normalized(positive["question"]) == _normalized(ablation["question"]) or _normalized(positive["reference_answer"] or "") != _normalized(ablation["reference_answer"] or "") or not {key for evidence in positive["evidence"] for key in evidence["source_chunk_ids"]}.intersection({key for evidence in ablation["evidence"] for key in evidence["source_chunk_ids"]}):
-                return self.update_revision(revision_id, status="failed", stage="hard_validation", error="成对题必须共享知识点且保持 weak_keywords", drafts=drafts, new_hash=new_hash, changed_fields=changed_fields, validation={"passed": False, "errors": ["成对知识点不一致"]})
-        return self.update_revision(revision_id, status="preview_ready", stage="preview_ready", drafts=drafts, new_hash=new_hash, changed_fields=changed_fields, validation={"passed": True, "errors": []}, progress={"current": len(drafts), "total": len(drafts)})
+                errors.append("成对题必须共享知识点且保持 weak_keywords")
+        return drafts, errors, new_hash, changed_fields
 
-    def apply_revision(self, revision_id: str, chunks: list[dict]):
+    @staticmethod
+    def _draft_change(draft: dict):
+        return {"question": draft["question"], "reference_answer": draft["reference_answer"], "source_chunk_ids": [key for evidence in draft["evidence"] for key in evidence.get("source_chunk_ids", [])], "ablation_metadata": draft["raw"].get("ablation_metadata", {})}
+
+    def _begin_preview_attempt(self, revision_id: str, question_ids: list[str], expected_hashes: dict, kind: str, changes: dict | None = None):
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT status, audit_json FROM candidate_revision_runs WHERE id=?", (revision_id,)).fetchone()
+            if row is None:
+                raise KeyError(revision_id)
+            if row["status"] != "preview_ready":
+                raise ValueError("草案操作运行中或状态不允许")
+            audit = _load(row["audit_json"], {})
+            if not question_ids or set(question_ids) - set(audit["question_ids"]) or set(expected_hashes) != set(question_ids):
+                raise ValueError("只能修改当前 Revision Run 的指定题目")
+            if any(expected_hashes[item_id] != audit["new_hash"].get(item_id) for item_id in question_ids):
+                raise ValueError("草案版本已过期，请刷新后重试")
+            attempt = {"number": len(audit.get("draft_attempts", [])) + 1, "kind": kind, "question_ids": question_ids, "started_at": _now(), "status": "running", "previous_hash": {item_id: audit["new_hash"][item_id] for item_id in question_ids}, "before_drafts": {item_id: audit["drafts"][item_id] for item_id in question_ids}}
+            if changes is not None:
+                attempt["changes"] = changes
+            audit["draft_attempts"] = [*audit.get("draft_attempts", []), attempt]
+            audit["active_draft"] = {"number": attempt["number"], "kind": kind, "question_ids": question_ids, "changes": changes}
+            audit["stage"] = "generating" if kind == "regenerate" else "hard_validation"
+            audit["error"] = None
+            connection.execute("UPDATE candidate_revision_runs SET status=?, audit_json=?, updated_at=? WHERE id=?", ("generating" if kind == "regenerate" else "validating", _json(audit), _now(), revision_id))
+        return self.revision_run(revision_id)
+
+    def edit_revision_preview(self, revision_id: str, changes: dict, expected_hashes: dict, chunks: list[dict], *, similarity):
+        if not changes or any(not isinstance(value, dict) for value in changes.values()):
+            raise ValueError("请选择要编辑的草案")
+        self._begin_preview_attempt(revision_id, list(changes), expected_hashes, "edit", changes)
+        try:
+            return self._finish_preview_attempt(revision_id, changes, chunks, similarity=similarity)
+        except Exception as error:
+            self.fail_revision_regeneration(revision_id, str(error))
+            raise
+
+    def begin_revision_regeneration(self, revision_id: str, question_id: str, expected_hash: str):
+        return self._begin_preview_attempt(revision_id, [question_id], {question_id: expected_hash}, "regenerate")
+
+    def finish_revision_regeneration(self, revision_id: str, generated: dict, chunks: list[dict], *, similarity):
+        return self._finish_preview_attempt(revision_id, generated, chunks, similarity=similarity)
+
+    def _finish_preview_attempt(self, revision_id: str, replacements: dict, chunks: list[dict], *, similarity):
         run = self.revision_run(revision_id)
-        if run["status"] != "preview_ready":
+        active = run.get("active_draft")
+        if run["status"] not in {"validating", "generating", "interrupted"} or not active or set(replacements) != set(active["question_ids"]):
+            raise ValueError("草案操作运行中或状态不允许")
+        changes = {item_id: self._draft_change(run["drafts"][item_id]) for item_id in run["question_ids"]}
+        changes.update(replacements)
+        drafts, errors, new_hash, changed_fields = self._validate_revision_drafts(run, chunks, similarity, changes)
+        if active["kind"] == "regenerate":
+            for item_id in active["question_ids"]:
+                selected = self._draft_change(run["drafts"][item_id])["source_chunk_ids"]
+                if changes[item_id].get("source_chunk_ids") != selected:
+                    errors.append(f"{item_id}: 重生成必须沿用当前选定的证据 Chunk")
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT status, audit_json FROM candidate_revision_runs WHERE id=?", (revision_id,)).fetchone()
+            if row is None:
+                raise KeyError(revision_id)
+            audit = _load(row["audit_json"], {})
+            if row["status"] not in {"validating", "generating", "interrupted"} or audit.get("active_draft", {}).get("number") != active["number"]:
+                raise ValueError("草案操作已变化，请刷新后重试")
+            attempt = {**audit["draft_attempts"][-1], "status": "failed" if errors else "passed", "completed_at": _now(), "error": "；".join(errors) if errors else None, "result": replacements, "validated_drafts": {item_id: drafts[item_id] for item_id in active["question_ids"] if item_id in drafts}}
+            audit["draft_attempts"][-1] = attempt
+            audit.update({"active_draft": None, "stage": "preview_ready", "apply_blocked": bool(errors), "error": attempt["error"], "last_attempt_validation": {"passed": not errors, "errors": errors}})
+            if not errors:
+                audit.update({"drafts": {**audit["drafts"], **{item_id: drafts[item_id] for item_id in active["question_ids"]}}, "new_hash": {**audit["new_hash"], **{item_id: new_hash[item_id] for item_id in active["question_ids"]}}, "changed_fields": changed_fields, "validation": {"passed": True, "errors": []}})
+            connection.execute("UPDATE candidate_revision_runs SET status='preview_ready', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), revision_id))
+        return self.revision_run(revision_id)
+
+    def fail_revision_regeneration(self, revision_id: str, error: str):
+        run = self.revision_run(revision_id)
+        if run["status"] not in {"generating", "validating", "interrupted"} or not run.get("active_draft"):
+            raise ValueError("草案操作不在运行中")
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT status, audit_json FROM candidate_revision_runs WHERE id=?", (revision_id,)).fetchone()
+            audit = _load(row["audit_json"], {})
+            if row["status"] not in {"generating", "validating", "interrupted"} or not audit.get("active_draft"):
+                raise ValueError("草案操作不在运行中")
+            audit["draft_attempts"][-1].update({"status": "failed", "completed_at": _now(), "error": error})
+            audit.update({"active_draft": None, "stage": "preview_ready", "apply_blocked": True, "error": error, "last_attempt_validation": {"passed": False, "errors": [error]}})
+            connection.execute("UPDATE candidate_revision_runs SET status='preview_ready', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), revision_id))
+        return self.revision_run(revision_id)
+
+    def discard_revision(self, revision_id: str):
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT status, audit_json FROM candidate_revision_runs WHERE id=?", (revision_id,)).fetchone()
+            if row is None:
+                raise KeyError(revision_id)
+            audit = _load(row["audit_json"], {})
+            if row["status"] not in {"preview_ready", "interrupted"} or not audit.get("drafts") or audit.get("applied_at") or audit.get("active_draft"):
+                raise ValueError("仅可放弃未应用且未运行中的草案")
+            audit.update({"stage": "discarded", "discarded_at": _now()})
+            connection.execute("UPDATE candidate_revision_runs SET status='cancelled', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), revision_id))
+        return self.revision_run(revision_id)
+
+    def apply_revision(self, revision_id: str, chunks: list[dict], *, similarity):
+        run = self.revision_run(revision_id)
+        if run["status"] != "preview_ready" or run.get("apply_blocked"):
+            if run.get("apply_blocked"):
+                raise ValueError("最近一次草案校验失败，已暂停应用")
             raise ValueError("草案尚未通过 Hard Validation")
+        changes = {item_id: self._draft_change(run["drafts"][item_id]) for item_id in run["question_ids"]}
+        _, errors, hashes, _ = self._validate_revision_drafts(run, chunks, similarity, changes)
+        if errors or any(hashes.get(item_id) != run["new_hash"].get(item_id) for item_id in run["question_ids"]):
+            raise ValueError("草案重新 Hard Validation 未通过：" + "；".join(errors or ["草案版本已变化"]))
         ids = run["question_ids"]
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            status_row = connection.execute("SELECT status FROM candidate_revision_runs WHERE id=?", (revision_id,)).fetchone()
-            if status_row is None or status_row["status"] != "preview_ready":
+            status_row = connection.execute("SELECT status, audit_json FROM candidate_revision_runs WHERE id=?", (revision_id,)).fetchone()
+            if status_row is None or status_row["status"] != "preview_ready" or _load(status_row["audit_json"], {}).get("apply_blocked") or _load(status_row["audit_json"], {}).get("new_hash") != run["new_hash"]:
                 raise ValueError("草案已被应用或不再可用")
             current = {item_id: self._row(connection.execute("SELECT * FROM questions WHERE id = ?", (item_id,)).fetchone()) for item_id in ids}
             if any(current[item_id]["stage"] == "golden" or self._revision_hash(current[item_id]) != run["previous_hash"][item_id] for item_id in ids):
@@ -567,7 +677,8 @@ class GovernanceStore:
                 new_hash[item_id] = self._revision_hash({**draft, "stage": "candidate", "review_status": "needs_revision"})
                 connection.execute("UPDATE questions SET question=?, reference_answer=?, evidence_json=?, raw_json=?, stage='candidate', review_status='needs_revision', probe_status='probe_pending', qc_status='qc_pending', updated_at=? WHERE id=?", (draft["question"], draft["reference_answer"], _json(draft["evidence"]), _json(draft["raw"]), _now(), item_id))
                 connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at, metadata_json) VALUES (?, 'revision', 'revision_applied', 'local_user', ?, ?)", (item_id, _now(), _json({"revision_id": revision_id})))
-            audit = {**{key: run[key] for key in ("question_ids", "mode", "reason", "tags", "attempt", "before", "previous_hash", "changes", "drafts", "validation")}, "new_hash": new_hash, "changed_fields": changed_fields, "version_from": versions, "version_to": {key: value + 1 for key, value in versions.items()}, "stage": "probe", "progress": {"current": 0, "total": len(ids)}, "applied_at": _now()}
+            audit = {**_load(status_row["audit_json"], {}), "new_hash": new_hash, "changed_fields": changed_fields, "version_from": versions, "version_to": {key: value + 1 for key, value in versions.items()}, "stage": "probe", "progress": {"current": 0, "total": len(ids)}, "applied_at": _now()}
+            audit["drafts"] = {**audit["drafts"], **{item_id: run["drafts"][item_id] for item_id in ids}}
             connection.execute("UPDATE candidate_revision_runs SET status='probing', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), revision_id))
         return self.revision_run(revision_id)
 
@@ -584,7 +695,7 @@ class GovernanceStore:
                     latest = connection.execute("SELECT decision FROM review_events WHERE question_id=? AND created_at > ? AND gate='dataset' ORDER BY id DESC LIMIT 1", (item_id, run["applied_at"])).fetchone()
                     if latest is None:
                         connection.execute("UPDATE questions SET review_status='human_review_pending', updated_at=? WHERE id=? AND stage='candidate' AND probe_status='probe_passed' AND qc_status='qc_passed'", (_now(), item_id))
-            audit = {key: run[key] for key in ("question_ids", "mode", "reason", "tags", "attempt", "before", "previous_hash", "changes", "drafts", "validation", "new_hash", "changed_fields", "version_from", "version_to", "applied_at")}
+            audit = _load(run["audit_json"], {})
             audit.update({"stage": status, "quality_results": results, "error": error, "progress": {"current": len(results), "total": len(run["question_ids"])}, "finished_at": _now()})
             connection.execute("UPDATE candidate_revision_runs SET status=?, audit_json=?, updated_at=? WHERE id=?", (status, _json(audit), _now(), revision_id))
         return self.revision_run(revision_id)

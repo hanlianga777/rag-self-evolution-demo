@@ -63,6 +63,16 @@ class RevisionRequest(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=8)
 
 
+class RevisionDraftEditRequest(BaseModel):
+    changes: dict[str, dict]
+    expected_hashes: dict[str, str]
+
+
+class RevisionDraftRegenerateRequest(BaseModel):
+    question_id: str
+    expected_hash: str
+
+
 class QuestionUpdateRequest(BaseModel):
     question: str = Field(strict=True, min_length=1, max_length=1000)
     reference_answer: str | None = Field(default=None, max_length=4000)
@@ -370,10 +380,56 @@ def _prepare_revision(revision_id, run_store, service, run_corpus):
         run_store.update_revision(revision_id, status="failed", stage="failed", error=str(error))
 
 
+@app.post("/api/governance/revisions/{revision_id}/edit-draft", dependencies=[Depends(require_trusted_origin)])
+def edit_revision_draft(revision_id: str, payload: RevisionDraftEditRequest):
+    try:
+        return store.edit_revision_preview(revision_id, payload.changes, payload.expected_hashes, corpus.chunks(), similarity=ai_service.revision_similarity)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Revision Run not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/governance/revisions/{revision_id}/regenerate-draft", status_code=202, dependencies=[Depends(require_trusted_origin)])
+def regenerate_revision_draft(revision_id: str, payload: RevisionDraftRegenerateRequest):
+    try:
+        run = store.begin_revision_regeneration(revision_id, payload.question_id, payload.expected_hash)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Revision Run not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    threading.Thread(target=_regenerate_revision_draft, args=(revision_id, store, ai_service, corpus), daemon=True).start()
+    return {"id": run["id"], "status": run["status"]}
+
+
+def _regenerate_revision_draft(revision_id, run_store, service, run_corpus):
+    try:
+        run = run_store.revision_run(revision_id)
+        active = run["active_draft"]
+        target = active["question_ids"][0]
+        existing = {item_id: run_store._draft_change(run["drafts"][item_id]) for item_id in run["question_ids"] if item_id != target}
+        selected = run_store._draft_change(run["drafts"][target])["source_chunk_ids"]
+        prompt_run = {**run, "changes": {**run["changes"], target: {"source_chunk_ids": selected}}}
+        generated = service.generate_revision_drafts(prompt_run, run_corpus.chunks(), existing=existing)
+        run_store.finish_revision_regeneration(revision_id, {target: generated[target]}, run_corpus.chunks(), similarity=service.revision_similarity)
+    except Exception as error:
+        run_store.fail_revision_regeneration(revision_id, str(error))
+
+
+@app.post("/api/governance/revisions/{revision_id}/discard", dependencies=[Depends(require_trusted_origin)])
+def discard_revision_draft(revision_id: str):
+    try:
+        return store.discard_revision(revision_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Revision Run not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @app.post("/api/governance/revisions/{revision_id}/apply", status_code=202, dependencies=[Depends(require_trusted_origin)])
 def apply_revision(revision_id: str):
     try:
-        run = store.apply_revision(revision_id, corpus.chunks())
+        run = store.apply_revision(revision_id, corpus.chunks(), similarity=ai_service.revision_similarity)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Revision Run not found") from error
     except ValueError as error:
@@ -393,11 +449,25 @@ def resume_revision(revision_id: str):
     if run.get("applied_at"):
         store.update_revision(revision_id, status="probing", stage="probe")
         worker = _run_revision_quality
+    elif run.get("active_draft", {}).get("kind") == "regenerate":
+        store.update_revision(revision_id, status="generating", stage="generating")
+        worker = _regenerate_revision_draft
+    elif run.get("active_draft", {}).get("kind") == "edit":
+        store.update_revision(revision_id, status="validating", stage="hard_validation")
+        worker = _resume_revision_edit
     else:
         store.update_revision(revision_id, status="queued", stage="queued")
         worker = _prepare_revision
     threading.Thread(target=worker, args=(revision_id, store, ai_service, corpus), daemon=True).start()
-    return {"id": revision_id, "status": "queued"}
+    return {"id": revision_id, "status": store.revision_run(revision_id)["status"]}
+
+
+def _resume_revision_edit(revision_id, run_store, service, run_corpus):
+    run = run_store.revision_run(revision_id)
+    try:
+        run_store._finish_preview_attempt(revision_id, run["active_draft"]["changes"], run_corpus.chunks(), similarity=service.revision_similarity)
+    except Exception as error:
+        run_store.fail_revision_regeneration(revision_id, str(error))
 
 
 def _run_revision_quality(revision_id, run_store, service, run_corpus):

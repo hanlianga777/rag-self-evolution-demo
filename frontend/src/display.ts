@@ -36,7 +36,7 @@ const translations: Record<string, string> = {
   "probe_pending": "待 Probe", "probe_passed": "Probe 通过", "qc_pending": "待 QC", "qc_passed": "QC 通过", "qc_failed": "QC 未通过", "needs_revision": "待修订", "approved": "已批准", "rejected": "已拒绝", "human_review_pending": "待人工审核", "legacy_unverified": "历史未验证", "pending_human_confirm": "待人工确认",
   "QUALIFIED": "已合格", "NOT_QUALIFIED": "未合格", "RETRIEVAL_INCOHERENT": "检索不一致（保留人工审核）", "EVIDENCE_VALID": "证据有效", "EVIDENCE_INVALID": "证据无效", "NEGATIVE_VALID": "负向边界有效", "FAKE_NEGATIVE_RISK": "疑似伪负向", "NEGATIVE_SUBTYPE_MISMATCH": "负向子类与题目不符", "NEGATIVE_UNDETERMINED": "负向可回答性未判定",
   "active": "生产中", "archived": "已归档", "generated": "待沙箱评测", "evaluated": "已完成沙箱评测", "partial": "部分完成",
-  "generating": "生成草案中", "validating": "硬校验中", "preview_ready": "草案待确认", "probing": "检索验证中", "qc": "质量检查中", "failed_quality": "质量未通过", "interrupted": "运行已中断", "manual_edit": "人工编辑", "ai_regenerate": "AI 单题重生成", "hard_validation": "硬校验", "revision_applied": "已应用修订",
+  "generating": "生成草案中", "validating": "硬校验中", "preview_ready": "草案待确认", "probing": "检索验证中", "qc": "质量检查中", "failed_quality": "质量未通过", "interrupted": "运行已中断", "cancelled": "已放弃", "discarded": "草案已放弃", "manual_edit": "人工编辑", "ai_regenerate": "AI 单题重生成", "hard_validation": "硬校验", "revision_applied": "已应用修订",
   "question": "问题", "reference_answer": "参考答案", "evidence": "证据", "raw": "元数据",
 };
 

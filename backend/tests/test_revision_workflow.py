@@ -62,7 +62,7 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.assertEqual([self.store.question(qid)["question"] for qid in (first, pair)], original)
         self.store.prepare_revision(revision["id"], self.chunks, similarity=lambda _a, _b: 0.1)
         self.assertEqual(self.store.revision_run(revision["id"])["status"], "preview_ready")
-        self.store.apply_revision(revision["id"], self.chunks)
+        self.store.apply_revision(revision["id"], self.chunks, similarity=lambda _a, _b: .1)
         self.assertEqual(self.store.question(first)["question"], "清洁前如何检查急停按钮？")
         self.assertEqual(self.store.question(pair)["raw"]["source_positive_id"], first)
         self.assertEqual(self.store.question(pair)["raw"]["ablation_attribute"], "weak_keywords")
@@ -84,7 +84,7 @@ class RevisionWorkflowTests(unittest.TestCase):
         with self.store.connection() as connection:
             connection.execute("UPDATE questions SET question='外部并发修改' WHERE id=?", (first,))
         with self.assertRaisesRegex(ValueError, "已变化"):
-            self.store.apply_revision(revision["id"], self.chunks)
+            self.store.apply_revision(revision["id"], self.chunks, similarity=lambda _a, _b: .1)
 
     def test_approved_question_cannot_enter_revision_or_snapshot_before_twenty_approvals(self):
         with self.assertRaisesRegex(ValueError, "已批准"):
@@ -157,6 +157,175 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.assertEqual(len(prompts), 3)
         self.assertEqual(prompts[-1][1]["paired_positive"]["question"], drafts[first]["question"])
 
+    def test_preview_edit_regenerate_and_discard_preserve_original_until_apply(self):
+        first, pair = self.ids[0], self.ids[8]
+        run = self.store.start_revision(first, "manual_edit", "改善两题", True, {
+            first: {"question": "清洁前如何检查急停按钮？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+            pair: {"question": "开机清洁前，急停按钮咋确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+        }, self.chunks)
+        ready = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        first_hash = ready["new_hash"][first]
+        pair_hash = ready["new_hash"][pair]
+        edited = self.store.edit_revision_preview(run["id"], {pair: {
+            "question": "准备清洁时，那个红色急停如何确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"],
+        }}, {pair: pair_hash}, self.chunks, similarity=lambda _a, _b: .1)
+        self.assertEqual(edited["status"], "preview_ready")
+        self.assertEqual(edited["new_hash"][first], first_hash)
+        self.assertEqual(edited["drafts"][first], ready["drafts"][first])
+        self.assertEqual(edited["draft_attempts"][-1]["question_ids"], [pair])
+        self.assertEqual(self.store.question(pair)["question"], "原题 9")
+        with self.assertRaisesRegex(ValueError, "过期"):
+            self.store.edit_revision_preview(run["id"], {pair: {"question": "旧版"}}, {pair: pair_hash}, self.chunks, similarity=lambda _a, _b: .1)
+        blocked = self.store.edit_revision_preview(run["id"], {pair: {"question": "无法使用的证据", "source_chunk_ids": ["MISSING"]}}, {pair: edited["new_hash"][pair]}, self.chunks, similarity=lambda _a, _b: .1)
+        self.assertTrue(blocked["apply_blocked"])
+        self.assertEqual(blocked["drafts"], edited["drafts"])
+        with self.assertRaisesRegex(ValueError, "暂停"):
+            self.store.apply_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        cancelled = self.store.discard_revision(run["id"])
+        self.assertEqual((cancelled["status"], cancelled["stage"]), ("cancelled", "discarded"))
+        self.assertEqual(self.store.question(first)["question"], "原题 1")
+        self.assertEqual(self.store.question(pair)["question"], "原题 9")
+        self.assertEqual(self.store.question(first)["probe_status"], "probe_passed")
+        self.assertEqual(self.store.question(pair)["qc_status"], "qc_passed")
+        self.assertEqual(len(self.store.probe_history(first)), 1)
+        self.assertEqual(len(self.store.qc_history(pair)), 1)
+        self.assertEqual(len(cancelled["draft_attempts"]), 2)
+        self.store.start_revision(first, "manual_edit", "新一轮", False, {first: {"question": "清洁前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
+
+    def test_targeted_regeneration_uses_current_evidence_and_keeps_pair_draft(self):
+        first, pair = self.ids[0], self.ids[8]
+        run = self.store.start_revision(first, "manual_edit", "改善两题", True, {
+            first: {"question": "清洁前如何检查急停按钮？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+            pair: {"question": "开机清洁前，急停按钮咋确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+        }, self.chunks)
+        ready = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        started = self.store.begin_revision_regeneration(run["id"], pair, ready["new_hash"][pair])
+        self.assertEqual(started["status"], "generating")
+        with self.assertRaisesRegex(ValueError, "运行中"):
+            self.store.begin_revision_regeneration(run["id"], pair, ready["new_hash"][pair])
+        self.store.interrupt_revision_runs()
+        interrupted = self.store.revision_run(run["id"])
+        self.assertEqual(interrupted["active_draft"]["question_ids"], [pair])
+        prompts = []
+        class Provider:
+            settings = SimpleNamespace(configured=True, model="controlled-model")
+            def complete(self, instruction, payload, **kwargs):
+                prompts.append(json.loads(payload))
+                return json.dumps({"question": "开工前红色急停要咋查？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}, ensure_ascii=False)
+        service = AiService(self.store, SimpleNamespace(), Provider(), False)
+        generated = service.generate_revision_drafts({**interrupted, "changes": {**interrupted["changes"], pair: {"source_chunk_ids": ["C2"]}}}, self.chunks, existing={first: {"question": ready["drafts"][first]["question"], "reference_answer": ready["drafts"][first]["reference_answer"], "source_chunk_ids": ["C2"]}})
+        updated = self.store.finish_revision_regeneration(run["id"], {pair: generated[pair]}, self.chunks, similarity=lambda _a, _b: .1)
+        self.assertEqual(len(prompts), 1)
+        self.assertEqual(prompts[0]["selected_chunks"][0]["chunk_id"], "C2")
+        self.assertEqual(updated["drafts"][first], ready["drafts"][first])
+        self.assertEqual(updated["draft_attempts"][-1]["question_ids"], [pair])
+        self.assertEqual(updated["draft_attempts"][-1]["status"], "passed")
+        self.assertEqual(updated["draft_attempts"][-1]["before_drafts"][pair]["question"], ready["drafts"][pair]["question"])
+        self.assertEqual(updated["draft_attempts"][-1]["validated_drafts"][pair]["question"], "开工前红色急停要咋查？")
+        self.store.apply_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        history = self.store.revision_run(run["id"])
+        self.assertEqual(len(history["draft_attempts"]), 1)
+        self.assertEqual(self.store.question(pair)["probe_status"], "probe_pending")
+        self.assertEqual(self.store.question(pair)["qc_status"], "qc_pending")
+        self.store.finish_revision_quality(run["id"], {first: {"probe": "passed", "qc": "qc_passed"}, pair: {"probe": "passed", "qc": "qc_passed"}})
+        self.assertEqual(len(self.store.revision_run(run["id"])["draft_attempts"]), 1)
+
+    def test_preview_can_edit_both_paired_drafts_in_one_validation(self):
+        first, pair = self.ids[0], self.ids[8]
+        run = self.store.start_revision(first, "manual_edit", "改善两题", True, {
+            first: {"question": "清洁前如何检查急停按钮？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+            pair: {"question": "开机清洁前，急停按钮咋确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+        }, self.chunks)
+        ready = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        edited = self.store.edit_revision_preview(run["id"], {
+            first: {"question": "启动清洁前怎样检查急停按钮？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+            pair: {"question": "开工前那个急停按键咋确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+        }, ready["new_hash"], self.chunks, similarity=lambda _a, _b: .1)
+        self.assertFalse(edited["apply_blocked"])
+        self.assertEqual(edited["drafts"][first]["question"], "启动清洁前怎样检查急停按钮？")
+        self.assertEqual(edited["drafts"][pair]["question"], "开工前那个急停按键咋确认？")
+        self.assertEqual(set(edited["draft_attempts"][-1]["question_ids"]), {first, pair})
+
+    def test_preview_routes_require_origin_and_keep_candidate_unchanged(self):
+        first, pair = self.ids[0], self.ids[8]
+        run = self.store.start_revision(first, "manual_edit", "改善两题", True, {
+            first: {"question": "清洁前如何检查急停按钮？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+            pair: {"question": "开机清洁前，急停按钮咋确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+        }, self.chunks)
+        ready = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        old_store, old_corpus = main.store, main.corpus
+        main.store = self.store
+        main.corpus = type("Corpus", (), {"chunks": lambda _self: self.chunks})()
+        self.addCleanup(setattr, main, "store", old_store)
+        self.addCleanup(setattr, main, "corpus", old_corpus)
+        client = TestClient(main.app)
+        path = f"/api/governance/revisions/{run['id']}"
+        payload = {"changes": {pair: {"question": "准备清洁时，急停按钮如何确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, "expected_hashes": {pair: ready["new_hash"][pair]}}
+        self.assertEqual(client.post(path + "/edit-draft", json=payload, headers={"Origin": "https://untrusted.example"}).status_code, 403)
+        with patch.object(main.ai_service, "revision_similarity", side_effect=lambda _a, _b: .1):
+            edited = client.post(path + "/edit-draft", json=payload, headers={"Origin": "http://localhost:5174"})
+        self.assertEqual(edited.status_code, 200)
+        self.assertEqual(edited.json()["status"], "preview_ready")
+        self.assertEqual(self.store.question(pair)["question"], "原题 9")
+        regeneration = {"question_id": pair, "expected_hash": edited.json()["new_hash"][pair]}
+        self.assertEqual(client.post(path + "/regenerate-draft", json=regeneration, headers={"Origin": "https://untrusted.example"}).status_code, 403)
+        with patch.object(main.threading, "Thread"):
+            started = client.post(path + "/regenerate-draft", json=regeneration, headers={"Origin": "http://localhost:5174"})
+        self.assertEqual(started.status_code, 202)
+        self.assertEqual(self.store.revision_run(run["id"])["active_draft"]["question_ids"], [pair])
+        self.store.fail_revision_regeneration(run["id"], "Provider unavailable")
+        self.assertTrue(self.store.revision_run(run["id"])["apply_blocked"])
+        self.assertEqual(client.post(path + "/discard", headers={"Origin": "https://untrusted.example"}).status_code, 403)
+        discarded = client.post(path + "/discard", headers={"Origin": "http://localhost:5174"})
+        self.assertEqual(discarded.status_code, 200)
+        self.assertEqual(discarded.json()["status"], "cancelled")
+
+    def test_interrupted_preview_edit_resumes_only_selected_question(self):
+        first, pair = self.ids[0], self.ids[8]
+        run = self.store.start_revision(first, "manual_edit", "改善两题", True, {
+            first: {"question": "清洁前如何检查急停按钮？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+            pair: {"question": "开机清洁前，急停按钮咋确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+        }, self.chunks)
+        ready = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        self.store._begin_preview_attempt(run["id"], [pair], {pair: ready["new_hash"][pair]}, "edit", {pair: {"question": "准备清洁时，急停按钮如何确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}})
+        self.store.interrupt_revision_runs()
+        service = SimpleNamespace(revision_similarity=lambda _a, _b: .1)
+        main._resume_revision_edit(run["id"], self.store, service, SimpleNamespace(chunks=lambda: self.chunks))
+        restored = self.store.revision_run(run["id"])
+        self.assertEqual(restored["status"], "preview_ready")
+        self.assertEqual(restored["drafts"][first], ready["drafts"][first])
+        self.assertEqual(restored["draft_attempts"][-1]["question_ids"], [pair])
+
+    def test_regeneration_worker_calls_provider_for_only_selected_pair_member(self):
+        first, pair = self.ids[0], self.ids[8]
+        run = self.store.start_revision(first, "manual_edit", "改善两题", True, {
+            first: {"question": "清洁前如何检查急停按钮？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+            pair: {"question": "开机清洁前，急停按钮咋确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+        }, self.chunks)
+        ready = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        self.store.begin_revision_regeneration(run["id"], pair, ready["new_hash"][pair])
+        calls = []
+        class Service:
+            revision_similarity = staticmethod(lambda _a, _b: .1)
+            def generate_revision_drafts(self, prompt_run, chunks, *, existing):
+                calls.append((prompt_run, existing))
+                return {**existing, pair: {"question": "准备清洁时急停按钮咋确认？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}
+        main._regenerate_revision_draft(run["id"], self.store, Service(), SimpleNamespace(chunks=lambda: self.chunks))
+        updated = self.store.revision_run(run["id"])
+        self.assertEqual(updated["status"], "preview_ready")
+        self.assertEqual(calls[0][0]["changes"][pair]["source_chunk_ids"], ["C2"])
+        self.assertEqual(list(calls[0][1]), [first])
+        self.assertEqual(updated["drafts"][first], ready["drafts"][first])
+        self.assertEqual(updated["draft_attempts"][-1]["question_ids"], [pair])
+
+    def test_apply_revalidates_and_rejects_stale_current_index(self):
+        first = self.ids[0]
+        run = self.store.start_revision(first, "manual_edit", "换证据", False, {first: {"question": "清洁前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
+        self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        with self.assertRaisesRegex(ValueError, "Hard Validation"):
+            self.store.apply_revision(run["id"], self.chunks[:1], similarity=lambda _a, _b: .1)
+        self.assertEqual(self.store.question(first)["question"], "原题 1")
+
     def test_restart_marks_unfinished_worker_interrupted_without_losing_audit(self):
         first = self.ids[0]
         run = self.store.start_revision(first, "manual_edit", "补证据", False, {first: {"question": "如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
@@ -170,7 +339,7 @@ class RevisionWorkflowTests(unittest.TestCase):
         first = self.ids[0]
         run = self.store.start_revision(first, "manual_edit", "修订操作", False, {first: {"question": "清洁前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
         self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
-        self.store.apply_revision(run["id"], self.chunks)
+        self.store.apply_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
         self.assertEqual(self.store.question(first)["review_status"], "needs_revision")
         self.assertEqual(self.store.question(first)["probe_status"], "probe_pending")
         self.assertEqual(self.store.question(first)["qc_status"], "qc_pending")

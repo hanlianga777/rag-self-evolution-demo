@@ -161,10 +161,14 @@ function CandidateDetail({ row, peers, revision, rerunSlot, busy, onRun, onRevie
   const [revisionRun, setRevisionRun] = useState<Candidate | undefined>(revision);
   const [revisionError, setRevisionError] = useState("");
   const [revisionBusy, setRevisionBusy] = useState(false);
+  const [previewTarget, setPreviewTarget] = useState(row?.id || "");
+  const [previewEditing, setPreviewEditing] = useState(false);
+  const [previewBoth, setPreviewBoth] = useState(false);
+  const [previewChanges, setPreviewChanges] = useState<Record<string, Candidate>>({});
   const linked = row && ["Q01", "Q09"].includes(row.slot) ? peers.find(item => item.slot === (row.slot === "Q01" ? "Q09" : "Q01") && item.evidence?.some((source: Candidate) => source.source_chunk_ids?.some((id: string) => row.evidence?.some((own: Candidate) => own.source_chunk_ids?.includes(id))))) : undefined;
   const primary = row?.slot === "Q09" && linked ? linked : row;
   const selectedRows: Candidate[] = row ? linked && paired ? [row, linked].sort((a, b) => a.slot.localeCompare(b.slot)) : [primary!] : [];
-  useEffect(() => { setRevisionRun(revision); }, [revision?.id]);
+  useEffect(() => { setRevisionRun(revision); setPreviewTarget(row?.id || ""); setPreviewEditing(false); setPreviewBoth(false); }, [revision?.id, row?.id]);
   useEffect(() => {
     const documentId = row?.evidence_details?.[0]?.chunks?.[0]?.document_id;
     if (!documentId) return;
@@ -181,6 +185,38 @@ function CandidateDetail({ row, peers, revision, rerunSlot, busy, onRun, onRevie
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [revisionRun?.id, revisionRun?.status]);
   const edit = (id: string, field: string, value: unknown) => setChanges(previous => ({ ...previous, [id]: { ...previous[id], [field]: value } }));
+  const selectedPreviewIds: string[] = previewBoth ? revisionRun?.question_ids || [] : [revisionRun?.question_ids?.includes(previewTarget) ? previewTarget : revisionRun?.question_ids?.[0]].filter(Boolean);
+  const previewEdit = (id: string, field: string, value: unknown) => setPreviewChanges(previous => ({ ...previous, [id]: { ...previous[id], [field]: value } }));
+  const openPreviewEdit = () => {
+    if (!revisionRun) return;
+    setPreviewChanges(Object.fromEntries(revisionRun.question_ids.map((id: string) => [id, { question: revisionRun.drafts[id].question, reference_answer: revisionRun.drafts[id].reference_answer, source_chunk_ids: revisionRun.drafts[id].evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []) || [] }])));
+    setPreviewEditing(true);
+  };
+  const savePreviewEdit = async () => {
+    if (!revisionRun) return;
+    setRevisionBusy(true); setRevisionError("");
+    try {
+      const updated = await postJson<Candidate>(`/api/governance/revisions/${revisionRun.id}/edit-draft`, { changes: Object.fromEntries(selectedPreviewIds.map(id => [id, previewChanges[id]])), expected_hashes: Object.fromEntries(selectedPreviewIds.map(id => [id, revisionRun.new_hash[id]])) });
+      setRevisionRun(updated); setPreviewEditing(false); await onRefresh();
+    } catch (error) { setRevisionError(errorMessage(error)); }
+    finally { setRevisionBusy(false); }
+  };
+  const regeneratePreview = async () => {
+    if (!revisionRun || selectedPreviewIds.length !== 1) return;
+    setRevisionBusy(true); setRevisionError("");
+    try {
+      await postJson(`/api/governance/revisions/${revisionRun.id}/regenerate-draft`, { question_id: selectedPreviewIds[0], expected_hash: revisionRun.new_hash[selectedPreviewIds[0]] });
+      setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); operation.watchRevision(revisionRun.id); await onRefresh();
+    } catch (error) { setRevisionError(errorMessage(error)); }
+    finally { setRevisionBusy(false); }
+  };
+  const discardPreview = async () => {
+    if (!revisionRun || !window.confirm("放弃本轮未应用草案？当前 Candidate 与原 Probe/QC 不会变化。")) return;
+    setRevisionBusy(true); setRevisionError("");
+    try { setRevisionRun(await postJson<Candidate>(`/api/governance/revisions/${revisionRun.id}/discard`)); setPreviewEditing(false); await onRefresh(); }
+    catch (error) { setRevisionError(errorMessage(error)); }
+    finally { setRevisionBusy(false); }
+  };
   const beginRevision = async () => {
     if (!row || !reason.trim()) { setRevisionError("请填写本次修订原因"); return; }
     if (row.review_status === "rejected" && !window.confirm("该题已拒绝。确认重新打开并修订？")) return;
@@ -224,7 +260,27 @@ function CandidateDetail({ row, peers, revision, rerunSlot, busy, onRun, onRevie
     <h4>Human Review</h4><p>当前状态：{reviewLabel(row)}</p>{row.stage !== "golden" && <><div className="header-actions"><button className="primary" disabled={busy || !ready} onClick={() => onReview(row.id, "approved")}>批准</button><button className="secondary" disabled={busy} onClick={() => setReviewForm(value => !value)}>需修订</button><button className="secondary" disabled={busy} onClick={() => onReview(row.id, "rejected")}>拒绝</button></div>{block && <p className="muted">{block}</p>}{reviewForm && <div className="revision-form"><label>修订原因（必填）<textarea value={reason} onChange={event => setReason(event.target.value)} placeholder="请写明本题需要修订的具体原因" /></label><label>标签（可选，逗号分隔）<input value={tags} onChange={event => setTags(event.target.value)} /></label><button className="secondary" disabled={!reason.trim() || busy} onClick={() => { onReview(row.id, "needs_revision", reason, tags.split(/[，,]/).map(value => value.trim()).filter(Boolean)); setReviewForm(false); }}>保存人工决定</button></div>}</>}
     {row.stage !== "golden" && ["needs_revision", "rejected"].includes(row.review_status) && <><h4>局部修订</h4><button className="secondary" onClick={() => setRevisionOpen(value => !value)}>{row.review_status === "rejected" ? "重新打开并修订" : "修订 Candidate"}</button>{revisionOpen && <div className="revision-form"><p className="muted">先生成并校验草案，预览后由你确认应用。不会修改 Generation Coverage Plan。</p>{linked && <div className="revision-pair"><strong>关联题：{linked.slot}</strong><p>两题共享原始证据；默认同时修订。</p><label><input type="radio" checked={paired} onChange={() => setPaired(true)} /> 同时修订</label><label><input type="radio" checked={!paired} onChange={() => setPaired(false)} /> 仅修订 {primary?.slot}</label><button className="text-button" onClick={() => setRevisionOpen(false)}>取消</button></div>}<label>修订原因<input value={reason} onChange={event => setReason(event.target.value)} placeholder="历史人工决定未记录原因，请在此填写" /></label><label>标签（可选）<input value={tags} onChange={event => setTags(event.target.value)} /></label><div className="header-actions"><label><input type="radio" checked={mode === "manual_edit"} onChange={() => setMode("manual_edit")} /> 人工编辑</label><label><input type="radio" checked={mode === "ai_regenerate"} onChange={() => setMode("ai_regenerate")} /> AI 单 Slot 重生成</label></div>{selectedRows.map(item => <div className="revision-question" key={item.id}><strong>{item.slot} · {displayText(item.test_category)}</strong>{mode === "manual_edit" && <><label>问题<textarea value={changes[item.id]?.question ?? item.question} onChange={event => edit(item.id, "question", event.target.value)} /></label>{item.test_category !== "negative" && <label>参考答案<textarea value={changes[item.id]?.reference_answer ?? item.reference_answer ?? ""} onChange={event => edit(item.id, "reference_answer", event.target.value)} /></label>}</>}{item.test_category !== "negative" && <fieldset><legend>真实 Chunk（原文档内选择）</legend><div className="revision-chunks">{chunks.map(chunk => { const selected = changes[item.id]?.source_chunk_ids ?? item.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []) ?? []; return <label key={chunk.chunk_id}><input type="checkbox" checked={selected.includes(chunk.chunk_id)} onChange={event => edit(item.id, "source_chunk_ids", event.target.checked ? [...selected, chunk.chunk_id] : selected.filter((id: string) => id !== chunk.chunk_id))} /> {chunk.chunk_id} · {chunk.section_path} · P.{chunk.page_start}<small>{chunk.chunk_text || chunk.text}</small></label>; })}</div></fieldset>}</div>)}<button className="primary" disabled={revisionBusy || !reason.trim() || !!revisionRun && ["queued", "generating", "validating", "preview_ready", "probing", "qc", "interrupted"].includes(revisionRun.status)} onClick={() => void beginRevision()}>生成修订草案</button></div>}</>}
     {revisionError && <p className="error-notice" role="alert">{revisionError}</p>}
-    {revisionRun && <div className="revision-status" role="status"><h4>Revision Run · {revisionRun.id}</h4><p>{revisionStatus(revisionRun.status)} · {revisionStatus(revisionRun.stage || revisionRun.status)} · {revisionRun.progress?.current ?? 0} / {revisionRun.progress?.total ?? revisionRun.question_ids?.length ?? 1}</p>{revisionRun.error && <p className="error-notice">{revisionRun.error}</p>}{revisionRun.status === "interrupted" && <button className="secondary" disabled={revisionBusy} onClick={() => void resume()}>手动继续校验</button>}{revisionRun.status === "preview_ready" && <><h4>草案预览（尚未应用）</h4>{revisionRun.question_ids.map((itemId: string) => { const before = revisionRun.before[itemId], draft = revisionRun.drafts[itemId]; return <div key={itemId} className="review-evidence"><strong>{before.raw?.coverage_slot} · v{revisionRun.version_from?.[itemId] || 1}</strong><p>原题：{before.question}</p><p>新题：{draft.question}</p><p>原答案：{before.reference_answer || "不适用"}</p><p>新答案：{draft.reference_answer || "不适用"}</p><p>变更字段：{(revisionRun.changed_fields?.[itemId] || []).map(displayText).join("、") || "—"}</p><p>原证据：{before.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []).join("、") || "无预设证据"}</p><p>新证据：{draft.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []).join("、") || "无预设证据"}</p>{draft.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []).map((id: string) => { const chunk = chunks.find(item => item.chunk_id === id); return <p className="review-full-text" key={id}>{id} · {chunk?.section_path || "当前索引未匹配"} · P.{chunk?.page_start ?? "—"}：{chunk?.chunk_text || chunk?.text || "当前索引未匹配"}</p>; })}</div>; })}<button className="primary" disabled={revisionBusy} onClick={() => void applyDraft()}>确认应用并运行 Probe / QC</button></>}{revisionRun.status === "completed" && <p>双 Gate 已通过，待人工逐题复审；没有自动批准。</p>}</div>}
+    {revisionRun && <div className="revision-status" role="status">
+      <h4>Revision Run · {revisionRun.id}</h4>
+      <p>{revisionStatus(revisionRun.status)} · {revisionStatus(revisionRun.stage || revisionRun.status)} · {revisionRun.progress?.current ?? 0} / {revisionRun.progress?.total ?? revisionRun.question_ids?.length ?? 1}</p>
+      {revisionRun.error && <p className="error-notice">{revisionRun.error}</p>}
+      {revisionRun.status === "interrupted" && <button className="secondary" disabled={revisionBusy} onClick={() => void resume()}>手动继续校验</button>}
+      {revisionRun.drafts && ["preview_ready", "generating", "validating", "interrupted"].includes(revisionRun.status) && <>
+        <h4>草案预览（尚未应用）</h4>
+        {revisionRun.question_ids.map((itemId: string) => { const before = revisionRun.before[itemId], draft = revisionRun.drafts[itemId]; return <div key={itemId} className="review-evidence"><strong>{before.raw?.coverage_slot} · v{revisionRun.version_from?.[itemId] || 1}</strong><p>原题：{before.question}</p><p>新题：{draft.question}</p><p>原答案：{before.reference_answer || "不适用"}</p><p>新答案：{draft.reference_answer || "不适用"}</p><p>变更字段：{(revisionRun.changed_fields?.[itemId] || []).map(displayText).join("、") || "—"}</p><p>原证据：{before.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []).join("、") || "无预设证据"}</p><p>新证据：{draft.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []).join("、") || "无预设证据"}</p>{draft.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []).map((id: string) => { const chunk = chunks.find(item => item.chunk_id === id); return <p className="review-full-text" key={id}>{id} · {chunk?.section_path || "当前索引未匹配"} · P.{chunk?.page_start ?? "—"}：{chunk?.chunk_text || chunk?.text || "当前索引未匹配"}</p>; })}</div>; })}
+        {revisionRun.status === "preview_ready" && <>
+          <label>选择修订题目 <select aria-label="选择修订题目" value={selectedPreviewIds[0]} onChange={event => { setPreviewTarget(event.target.value); setPreviewBoth(false); }}>{revisionRun.question_ids.map((id: string) => <option key={id} value={id}>{revisionRun.before[id].raw?.coverage_slot || id}</option>)}</select></label>
+          {previewEditing && revisionRun.question_ids.length > 1 && <label><input type="checkbox" checked={previewBoth} onChange={event => setPreviewBoth(event.target.checked)} /> 同时编辑两题</label>}
+          {previewEditing && <div className="revision-form">{selectedPreviewIds.map(id => <div className="revision-question" key={id}><strong>{revisionRun.before[id].raw?.coverage_slot || id}</strong><label>问题<textarea value={previewChanges[id]?.question || ""} onChange={event => previewEdit(id, "question", event.target.value)} /></label>{revisionRun.before[id].test_category !== "negative" && <><label>参考答案<textarea value={previewChanges[id]?.reference_answer || ""} onChange={event => previewEdit(id, "reference_answer", event.target.value)} /></label><fieldset><legend>真实 Chunk（原文档内选择）</legend><div className="revision-chunks">{chunks.map(chunk => { const selected = previewChanges[id]?.source_chunk_ids || []; return <label key={chunk.chunk_id}><input type="checkbox" checked={selected.includes(chunk.chunk_id)} onChange={event => previewEdit(id, "source_chunk_ids", event.target.checked ? [...selected, chunk.chunk_id] : selected.filter((value: string) => value !== chunk.chunk_id))} /> {chunk.chunk_id} · {chunk.section_path} · P.{chunk.page_start}<small>{chunk.chunk_text || chunk.text}</small></label>; })}</div></fieldset></>}</div>)}<div className="header-actions"><button className="primary" disabled={revisionBusy} onClick={() => void savePreviewEdit()}>保存并校验草案</button><button className="secondary" onClick={() => setPreviewEditing(false)}>取消编辑</button></div></div>}
+          <div className="header-actions"><button className="secondary" disabled={revisionBusy} onClick={openPreviewEdit}>编辑草案</button><button className="secondary" disabled={revisionBusy || previewBoth} onClick={() => void regeneratePreview()}>重新生成指定题目</button><button className="secondary" disabled={revisionBusy} onClick={() => void discardPreview()}>放弃草案</button></div>
+          {revisionRun.apply_blocked && <p className="muted">最近一次草案校验失败，已暂停应用；请修改、重新生成或放弃草案。</p>}
+          <button className="primary" disabled={revisionBusy || revisionRun.apply_blocked || previewEditing} onClick={() => void applyDraft()}>确认应用并运行 Probe / QC</button>
+        </>}
+      </>}
+      {revisionRun.status === "cancelled" && <p>本轮草案已放弃。当前 Candidate 和原 Probe/QC 未修改，可重新发起修订。</p>}
+      {revisionRun.status === "completed" && <p>双 Gate 已通过，待人工逐题复审；没有自动批准。</p>}
+      {!!revisionRun.draft_attempts?.length && <details><summary>草案修订尝试 · {revisionRun.draft_attempts.length}</summary>{revisionRun.draft_attempts.map((attempt: Candidate) => <p key={attempt.number}>第 {attempt.number} 次 · {attempt.question_ids.map((id: string) => revisionRun.before[id]?.raw?.coverage_slot || id).join("、")} · {attempt.kind === "regenerate" ? "AI 重生成" : "人工编辑"} · {attempt.status === "passed" ? "校验通过" : attempt.status === "failed" ? "未通过" : "运行中"} · {attempt.completed_at || attempt.started_at}{attempt.error ? ` · ${attempt.error}` : ""}</p>)}</details>}
+    </div>}
     {!!row.revision_history?.length && <details><summary>Revision History · {row.revision_history.length}</summary>{row.revision_history.map((item: Candidate) => <p key={item.id}>{item.id} · {displayText(item.status)} · {item.reason} · {item.created_at}</p>)}</details>}
   </div>;
 }

@@ -96,3 +96,39 @@ it("requires a revision reason and previews a persisted paired draft without app
   expect(document.body.textContent).toContain("确认应用并运行 Probe / QC");
   await act(async () => root.unmount());
 });
+
+it("lets a paired preview regenerate only Q09 and discard without applying", async () => {
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  const questions = Array.from({ length: 20 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: `原题 ${index + 1}`, reference_answer: "正确操作", test_category: index < 8 ? "positive" : "ablation", legacy_question_type: "v1_mini", probe_status: "probe_passed", qc_status: "qc_passed", review_status: index === 0 || index === 8 ? "needs_revision" : "approved", stage: index === 0 || index === 8 ? "candidate" : "golden", evidence: [{ source_chunk_ids: ["C1"] }], evidence_details: [{ chunks: [{ chunk_id: "C1", document_id: "DOC-001" }] }] }));
+  const revision: any = { id: "REV-pair", status: "preview_ready", stage: "preview_ready", question_ids: ["V1-1", "V1-9"], before: { "V1-1": { ...questions[0], raw: { coverage_slot: "Q01" } }, "V1-9": { ...questions[8], raw: { coverage_slot: "Q09" } } }, drafts: { "V1-1": { ...questions[0], question: "新题 1" }, "V1-9": { ...questions[8], question: "新题 9" } }, new_hash: { "V1-1": "hash-one", "V1-9": "hash-nine" }, progress: { current: 2, total: 2 } };
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+    requests.push({ url, init });
+    if (url.endsWith("/edit-draft")) { revision.apply_blocked = true; revision.error = "Q09: Chunk 不存在于当前索引"; }
+    const body = url.includes("/api/governance/revisions/REV-pair") ? revision : url.endsWith("/api/governance/revisions") ? [revision] : url.includes("/api/documents/") ? { chunks: [{ chunk_id: "C1", document_id: "DOC-001", section_path: "操作", page_start: 2, chunk_text: "正确操作" }] } : url.includes("export") ? { questions } : url.endsWith("/api/dataset") ? questions : url.endsWith("/api/governance/generation-runs") ? [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }] : [];
+    return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+  }));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }], dataset: questions }} />));
+  await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
+  expect(document.body.textContent).toContain("编辑草案");
+  expect(document.body.textContent).toContain("重新生成指定题目");
+  expect(document.body.textContent).toContain("放弃草案");
+  const target = document.querySelector<HTMLSelectElement>("[aria-label='选择修订题目']")!;
+  await act(async () => { target.value = "V1-9"; target.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "编辑草案") as HTMLButtonElement).click());
+  expect(document.querySelector<HTMLTextAreaElement>(".revision-status textarea")?.value).toBe("新题 9");
+  expect((document.querySelector<HTMLInputElement>(".revision-status .revision-chunks input[type='checkbox']")?.checked)).toBe(true);
+  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "保存并校验草案") as HTMLButtonElement).click());
+  const editRequest = requests.find(item => item.url.endsWith("/edit-draft"));
+  expect(Object.keys(JSON.parse(editRequest!.init!.body as string).changes)).toEqual(["V1-9"]);
+  expect((([...document.querySelectorAll("button")].find(button => button.textContent === "确认应用并运行 Probe / QC")) as HTMLButtonElement).disabled).toBe(true);
+  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "重新生成指定题目") as HTMLButtonElement).click());
+  const regeneration = requests.find(item => item.url.endsWith("/regenerate-draft"));
+  expect(regeneration).toBeTruthy();
+  expect(JSON.parse(regeneration!.init!.body as string)).toEqual({ question_id: "V1-9", expected_hash: "hash-nine" });
+  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "放弃草案") as HTMLButtonElement).click());
+  expect(requests.some(item => item.url.endsWith("/discard"))).toBe(true);
+  expect(requests.some(item => item.url.endsWith("/apply"))).toBe(false);
+  await act(async () => root.unmount());
+});
