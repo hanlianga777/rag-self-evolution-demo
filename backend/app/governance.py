@@ -301,6 +301,41 @@ class GovernanceStore:
             row = connection.execute("SELECT * FROM golden_generation_runs WHERE id = ?", (run_id,)).fetchone()
         return {**dict(row), "profile": _load(row["profile_json"], {}), "question_ids": _load(row["question_ids_json"], []), "artifacts": self.generation_artifacts(run_id)} if row else None
 
+    def generation_review(self, run_id: str, chunks: list[dict]):
+        run = self.generation_run(run_id)
+        if run is None:
+            raise KeyError(run_id)
+        ids = run["question_ids"]
+        if len(ids) != 20 or len(set(ids)) != 20:
+            raise ValueError("本轮尚未完整入库 20 道 Candidate")
+        marks = ",".join("?" for _ in ids)
+        with self.connection() as connection:
+            rows = {row["id"]: self._row(row) for row in connection.execute(f"SELECT * FROM questions WHERE id IN ({marks})", ids)}
+            if len(rows) != 20 or any(rows[question_id]["raw"].get("generation_run_id") != run_id or rows[question_id]["legacy_question_type"] != "v1_mini" for question_id in ids):
+                raise ValueError("本轮 Candidate 归属或数量不一致")
+            probes = {question_id: [] for question_id in ids}
+            for row in connection.execute(f"SELECT question_id, result_json, created_at FROM probe_results WHERE question_id IN ({marks}) ORDER BY id DESC", ids):
+                probes[row["question_id"]].append({**_load(row["result_json"], {}), "created_at": row["created_at"]})
+            qcs = {question_id: [] for question_id in ids}
+            for row in connection.execute(f"SELECT question_id, status, result_json, created_at FROM qc_results WHERE question_id IN ({marks}) ORDER BY id DESC", ids):
+                qcs[row["question_id"]].append({"status": row["status"], "result": _load(row["result_json"], {}), "created_at": row["created_at"]})
+            reviews = {question_id: [] for question_id in ids}
+            for row in connection.execute(f"SELECT question_id, gate, decision, actor, created_at FROM review_events WHERE question_id IN ({marks}) ORDER BY id DESC", ids):
+                reviews[row["question_id"]].append(dict(row))
+        by_chunk = {chunk["chunk_id"]: chunk for chunk in chunks}
+        questions = []
+        for number, question_id in enumerate(ids, 1):
+            item = rows[question_id]
+            evidence_details = []
+            for evidence in item["evidence"]:
+                matched = []
+                for chunk_id in evidence.get("source_chunk_ids", []):
+                    chunk = by_chunk.get(chunk_id)
+                    matched.append({"chunk_id": chunk_id, "resolution": "matched" if chunk else "missing_current_index", "document_id": chunk.get("document_id") if chunk else None, "document_name": chunk.get("document_name") if chunk else None, "section_path": chunk.get("section_path") if chunk else None, "page_start": chunk.get("page_start") if chunk else None, "page_end": chunk.get("page_end") if chunk else None, "chunk_text": chunk.get("chunk_text", chunk.get("text")) if chunk else None})
+                evidence_details.append({**evidence, "chunks": matched})
+            questions.append({**item, "slot": item["raw"].get("coverage_slot") or f"Q{number:02d}", "evidence_details": evidence_details, "probe": probes[question_id][0] if probes[question_id] else None, "qc": qcs[question_id][0]["result"] if qcs[question_id] else None, "probe_history": probes[question_id], "qc_history": qcs[question_id], "review_history": reviews[question_id]})
+        return {"generation_run_id": run_id, "questions": questions}
+
     def review_question(self, question_id: str, decision: str, actor: str):
         if decision not in {"approved", "rejected", "needs_revision"}:
             raise ValueError("Unsupported review decision")
@@ -449,13 +484,19 @@ class GovernanceStore:
             raise ValueError("Human Review confirmation is required")
         candidates = [self.question(question_id) for question_id in question_ids]
         runs = {item["raw"].get("generation_run_id") for item in candidates}
-        if len(candidates) != 20 or len(runs) != 1 or None in runs or any(item["raw"].get("generation_profile") != "v1-mini-8-4-8" for item in candidates):
+        if len(candidates) != 20 or len(set(question_ids)) != 20 or len(runs) != 1 or None in runs or any(item["raw"].get("generation_profile") != "v1-mini-8-4-8" for item in candidates):
             raise ValueError("Batch review only accepts one complete V1 Mini generation run")
+        if set(question_ids) != set((self.generation_run(next(iter(runs))) or {}).get("question_ids", [])):
+            raise ValueError("Batch review question IDs must match the generation run")
         if any(item["probe_status"] != "probe_passed" or item["qc_status"] != "qc_passed" for item in candidates):
             raise ValueError("All Mini candidates must pass Probe and QC before batch approval")
+        if any((self.review_history(item["id"]) or [{}])[0].get("decision") in {"needs_revision", "rejected"} for item in candidates):
+            raise ValueError("人工需修订或已拒绝的题目不得批量覆盖，请逐题审核")
         now = _now()
         with self.connection() as connection:
             for question_id in question_ids:
+                if next(item for item in candidates if item["id"] == question_id)["stage"] == "golden":
+                    continue
                 connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", ("golden", "approved", now, question_id))
                 connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (question_id, "dataset", "approved", actor, now))
                 connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "approved", actor, now))

@@ -30,7 +30,9 @@ const translations: Record<string, string> = {
   "PDF text parser": "PDF 文本解析器", "512 tokens / 80 overlap": "512 tokens / 80 重叠", "Logical isolation · no containers": "逻辑隔离 · 不使用容器",
   "not_run": "未运行", "not_evaluable": "不可评测", "NOT_EVALUABLE": "不可评测",
   "positive": "正向测试", "ablation": "鲁棒性测试（Ablation）", "negative": "负向 / 边界测试",
-  "probe_pending": "待 Probe", "probe_passed": "Probe 通过", "qc_pending": "待 QC", "qc_passed": "QC 通过", "qc_failed": "QC 未通过", "needs_revision": "待修订", "human_review_pending": "待人工审核", "legacy_unverified": "历史未验证", "pending_human_confirm": "待人工确认",
+  "alias_entity": "实体别名", "colloquial": "口语化表达", "cross_chunk": "跨 Chunk", "weak_keywords": "弱关键词", "weak_clues": "弱线索",
+  "clarify": "需要澄清", "insufficient_evidence": "证据不足", "prompt_injection_resistance": "提示注入抵抗", "safe_rejection": "安全拒答",
+  "probe_pending": "待 Probe", "probe_passed": "Probe 通过", "qc_pending": "待 QC", "qc_passed": "QC 通过", "qc_failed": "QC 未通过", "needs_revision": "待修订", "approved": "已批准", "rejected": "已拒绝", "human_review_pending": "待人工审核", "legacy_unverified": "历史未验证", "pending_human_confirm": "待人工确认",
   "QUALIFIED": "已合格", "NOT_QUALIFIED": "未合格", "RETRIEVAL_INCOHERENT": "检索不一致（保留人工审核）", "EVIDENCE_VALID": "证据有效", "EVIDENCE_INVALID": "证据无效", "NEGATIVE_VALID": "负向边界有效", "FAKE_NEGATIVE_RISK": "疑似伪负向",
   "active": "生产中", "archived": "已归档", "generated": "待沙箱评测", "evaluated": "已完成沙箱评测", "partial": "部分完成",
 };

@@ -1,9 +1,14 @@
+import csv
+import io
+import json
 import os
 import threading
 from pathlib import Path
+from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
@@ -152,6 +157,41 @@ def generation_run_status(run_id: str):
     if result is None:
         raise HTTPException(status_code=404, detail="Generation run not found")
     return result
+
+
+@app.get("/api/governance/generation-runs/{run_id}/export")
+def export_generation_run(run_id: str, format: Literal["json", "csv", "markdown"] = "markdown"):
+    try:
+        review = store.generation_review(run_id, corpus.chunks())
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Generation run not found")
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    extension = {"json": "json", "csv": "csv", "markdown": "md"}[format]
+    headers = {"Content-Disposition": f'attachment; filename="golden_candidate_{run_id}.{extension}"', "Cache-Control": "no-store"}
+    if format == "json":
+        return Response(json.dumps(review, ensure_ascii=False), media_type="application/json; charset=utf-8", headers=headers)
+    if format == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["id", "test_category", "question", "reference_answer", "document", "page", "chunk_ids", "probe_score", "probe_status", "qc_score", "qc_status", "review_status"])
+        for item in review["questions"]:
+            chunks = [chunk for evidence in item["evidence_details"] for chunk in evidence["chunks"]]
+            values = [item["id"], item["test_category"], item["question"], item["reference_answer"], "; ".join(dict.fromkeys(chunk["document_name"] or "当前索引未匹配" for chunk in chunks)), "; ".join(dict.fromkeys(f'{chunk["page_start"]}–{chunk["page_end"]}' for chunk in chunks if chunk["page_start"] is not None)), json.dumps([chunk["chunk_id"] for chunk in chunks], ensure_ascii=False), item["probe"]["score"] if item["probe"] else None, item["probe_status"], item["qc"]["score"] if item["qc"] else None, item["qc_status"], item["review_status"]]
+            writer.writerow(["'" + str(value) if str(value).lstrip().startswith(("=", "+", "-", "@", "\t", "\r")) else value for value in values])
+        return Response("\ufeff" + output.getvalue(), media_type="text/csv; charset=utf-8", headers=headers)
+    lines = [f'# V1 Mini Candidate · {run_id}', ""]
+    for item in review["questions"]:
+        lines += [f'## {item["slot"]}', "", f'ID: {item["id"]}', f'类型: {item["test_category"]}', f'属性 / 负向行为: {item["raw"].get("ablation_attribute") or item["raw"].get("expected_behavior") or "—"}', f'问题: {item["question"]}', "", f'参考答案: {item["reference_answer"] or "不适用（负向题）"}', "", "Evidence:"]
+        if not item["evidence_details"]:
+            lines.append("- 无引用证据（负向边界题）")
+        for evidence in item["evidence_details"]:
+            for chunk in evidence["chunks"]:
+                lines += [f'- Document: {chunk["document_name"] or "当前索引未匹配"}', f'  Section: {chunk["section_path"] or "—"}', f'  Page: {chunk["page_start"] or "—"}–{chunk["page_end"] or "—"}', f'  Chunk ID: {chunk["chunk_id"]}', f'  Evidence Text: {chunk["chunk_text"] or "当前索引未匹配"}']
+            lines.append(f'  Evidence Key Points: {"；".join(evidence.get("evidence_key_points", [])) or "—"}')
+        probe, qc = item["probe"] or {}, item["qc"] or {}
+        lines += ["", "Probe:", f'- Score: {probe.get("score", "未运行")} / {probe.get("threshold", 90)}', f'- Status: {item["probe_status"]}', f'- Classification: {probe.get("probe_details", {}).get("classification", "—")}', f'- Reason: {probe.get("reason", "—")}', "", "QC:", f'- Score: {qc.get("score", "未运行")} / {qc.get("threshold", 85)}', f'- Status: {item["qc_status"]}', f'- Priority: {qc.get("priority", "—")}', f'- Reason: {qc.get("reason", "—")}', f'- Issues: {"；".join(qc.get("issues", [])) or "—"}', "", "Human Review:", f'- Status: {item["review_status"]}', ""]
+    return Response("\n".join(lines), media_type="text/markdown; charset=utf-8", headers=headers)
 
 
 @app.get("/api/governance/snapshots")

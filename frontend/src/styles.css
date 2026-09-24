@@ -111,6 +111,33 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .search input { background: transparent; border: 0; outline: 0; padding: 2px; width: 150px; }
 .dataset-flow { align-items: center; color: var(--muted); display: flex; font-size: 12px; gap: 10px; margin: 0 0 16px; }
 .dataset-flow strong { color: #334861; }
+.governance-page .section-head { margin-bottom: 8px; }
+.run-summary { align-items: center; color: var(--muted); display: flex; font-size: 12px; gap: 12px; margin-bottom: 8px; }
+.review-filters { display: flex; flex: none; gap: 6px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 2px; }
+.review-filters button { background: #f6f8fa; border: 1px solid var(--line); border-radius: 8px; color: #536176; flex: none; font-size: 12px; padding: 5px 8px; white-space: nowrap; }
+.review-filters button.active { background: #e9eef3; border-color: #9baabe; color: #24364d; font-weight: 700; }
+.review-table table { table-layout: fixed; min-width: 760px; }
+.review-table th { background: #fff; padding: 8px; position: sticky; top: 0; z-index: 1; }
+.review-table td { font-size: 12px; height: 54px; padding: 6px 8px; vertical-align: middle; }
+.review-table th:nth-child(1) { width: 7%; }
+.review-table th:nth-child(2) { width: 13%; }
+.review-table th:nth-child(3) { width: 39%; }
+.review-table th:nth-child(4), .review-table th:nth-child(5) { width: 9%; }
+.review-table th:nth-child(6) { width: 13%; }
+.review-table th:nth-child(7) { width: 10%; }
+.review-table .secondary { font-size: 12px; padding: 6px 8px; white-space: nowrap; }
+.review-question { display: -webkit-box; line-clamp: 2; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.review-batch { align-items: center; border-top: 1px solid var(--line-soft); display: flex; flex: none; flex-wrap: wrap; font-size: 12px; gap: 8px; padding-top: 10px; }
+.review-batch .muted { font-size: 12px; }
+.export-menu { position: relative; }
+.export-menu summary { cursor: pointer; list-style: none; white-space: nowrap; }
+.export-menu summary::-webkit-details-marker { display: none; }
+.export-menu > div { background: white; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 28px #10182722; min-width: 170px; padding: 5px; position: absolute; right: 0; top: 100%; z-index: 5; }
+.export-menu a { color: var(--ink); display: block; font-size: 13px; padding: 8px 10px; text-decoration: none; }
+.export-menu a:hover { background: #f3f5f7; }
+.candidate-detail .review-evidence { border: 1px solid var(--line-soft); border-radius: 10px; margin-bottom: 9px; padding: 12px; }
+.candidate-detail .review-evidence p { margin: 6px 0; }
+.review-full-text { overflow-wrap: anywhere; white-space: pre-wrap; }
 
 .drawer { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; box-shadow: -18px 0 38px rgba(16, 24, 39, .08); height: calc(100vh - 24px); overflow: auto; padding: 24px; position: fixed; right: 12px; top: 12px; width: min(1040px, calc(100vw - 24px)); z-index: 20; }
 .overlay { background: rgba(16, 24, 39, .28); inset: 0; position: fixed; z-index: 19; }
@@ -319,7 +346,8 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
   .knowledge-page > .panel, .governance-page > .panel, .evaluation-page > .panel { display: flex; flex-direction: column; }
   .knowledge-page .table-scroll, .governance-page .table-scroll, .evaluation-page .table-scroll { min-height: 0; overflow: auto; }
   .knowledge-page .table-scroll { flex: 1; }
-  .governance-page, .evaluation-page { display: grid; gap: 14px; grid-template-rows: auto auto auto minmax(0, 1fr); }
+  .governance-page { display: grid; gap: 12px; grid-template-rows: auto auto minmax(0, 1fr); }
+  .evaluation-page { display: grid; gap: 14px; grid-template-rows: auto auto auto minmax(0, 1fr); }
   .governance-page > .panel, .evaluation-page > .panel { overflow: auto; }
   .governance-page > .panel .table-scroll, .evaluation-page > .panel .table-scroll { flex: 1; }
   .evolution-page { display: grid; gap: 14px; grid-template-rows: auto auto minmax(0, 1fr); }
