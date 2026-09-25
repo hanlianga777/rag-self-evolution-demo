@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 from app.ai_service import AiService
 from app.policy import DEFAULT_PIPELINE_CONFIG
+from app.providers import ProviderTimeout
 
 
 class LiveProvider:
@@ -44,6 +45,16 @@ class RepairingGoldenProvider(GoldenProvider):
 
 
 class AiServiceTests(unittest.TestCase):
+    def test_transient_provider_timeout_does_not_mark_provider_permanently_unavailable(self):
+        class TimeoutProvider(LiveProvider):
+            def complete(self, *_args, **_kwargs):
+                raise ProviderTimeout("DeepSeek 请求超时，请重试")
+        service = AiService(Mock(), Mock(), TimeoutProvider(), False)
+        result = service.probe()
+        self.assertEqual(result["probe"], "failed")
+        self.assertEqual(result["status"], "Configured (Unverified)")
+        self.assertIn("请求超时", result["last_probe"]["reason"])
+
     def test_answer_runs_frozen_pipeline_and_returns_provider_metrics(self):
         retriever = Mock()
         retriever.retrieve.return_value = [{"chunk_id": "C1", "content": "真实证据", "document": "manual.pdf", "page_start": 1, "page_end": 1, "score": .9}]

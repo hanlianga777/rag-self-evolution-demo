@@ -1,9 +1,11 @@
 import json
 import unittest
+import urllib.error
+from pathlib import Path
 from unittest.mock import patch
 
-from app.config import Settings
-from app.providers import DeepSeekProvider, ProviderUnavailable
+from app.config import Settings, load_settings
+from app.providers import DeepSeekProvider, ProviderAPIError, ProviderNetworkError, ProviderTimeout, ProviderUnavailable
 
 
 class FakeResponse:
@@ -23,6 +25,27 @@ class FakeResponse:
 class ProviderTests(unittest.TestCase):
     def setUp(self):
         self.provider = DeepSeekProvider(Settings("test-key", "https://example.invalid", "test-model"))
+
+    def test_timeout_defaults_to_sixty_seconds_and_env_can_override_it(self):
+        self.assertEqual(self.provider.settings.timeout_seconds, 60)
+        self.assertEqual(load_settings({"DEEPSEEK_TIMEOUT_SECONDS": "45"}, env_file=Path("/nonexistent-env-file")).timeout_seconds, 45)
+        with patch("app.providers.urllib.request.urlopen", side_effect=TimeoutError("The read operation timed out")) as request:
+            with self.assertRaisesRegex(ProviderTimeout, "DeepSeek 请求超时，请重试") as caught:
+                self.provider.complete("system", "question")
+        self.assertEqual(request.call_args.kwargs["timeout"], 60)
+        self.assertIn("The read operation timed out", str(caught.exception.__cause__))
+
+    def test_api_and_network_errors_are_not_classified_as_timeout(self):
+        errors = [(urllib.error.HTTPError("https://example.invalid", 503, "busy", {}, None), ProviderAPIError), (urllib.error.URLError("connection refused"), ProviderNetworkError)]
+        for failure, expected in errors:
+            with self.subTest(failure=failure), patch("app.providers.urllib.request.urlopen", side_effect=failure):
+                with self.assertRaises(expected):
+                    self.provider.complete("system", "question")
+
+    def test_wrapped_network_timeout_is_retryable_but_other_network_errors_are_not(self):
+        with patch("app.providers.urllib.request.urlopen", side_effect=urllib.error.URLError(TimeoutError("timed out"))):
+            with self.assertRaises(ProviderTimeout):
+                self.provider.complete("system", "question")
 
     def test_judge_requires_structured_scores_for_real_evaluation(self):
         content = '{"correctness":4,"completeness":1,"faithfulness":1,"behavior_pass":true,"reason":"证据充分","missing_points":[],"unsupported_claims":[]}'

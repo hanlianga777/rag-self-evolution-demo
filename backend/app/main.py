@@ -3,6 +3,7 @@ import io
 import json
 import os
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -20,7 +21,7 @@ from .evaluation import EvaluationRunner
 from .governance import GovernanceStore
 from .optimization import OptimizationAgent
 from .policy import DEFAULT_PIPELINE_CONFIG, validate_candidate_config
-from .providers import DeepSeekProvider
+from .providers import DeepSeekProvider, ProviderTimeout
 
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
@@ -382,7 +383,8 @@ def _prepare_revision(revision_id, run_store, service, run_corpus):
             run_store.update_revision(revision_id, status="queued", stage="generated")
         run_store.prepare_revision(revision_id, chunks, similarity=service.revision_similarity, generated=generated)
     except Exception as error:
-        run_store.update_revision(revision_id, status="failed", stage="failed", error=str(error))
+        stage = run_store.revision_run(revision_id)["stage"]
+        run_store.update_revision(revision_id, status="failed", stage="failed", failed_stage=stage, error=str(error), error_type=type(error).__name__, error_detail=str(error.__cause__ or error))
 
 
 def _generate_revision_with_weak_keyword_repair(run, run_store, service, chunks, existing=None, on_progress=None):
@@ -398,7 +400,7 @@ def _generate_revision_with_weak_keyword_repair(run, run_store, service, chunks,
             if on_progress:
                 kwargs["on_progress"] = on_progress
             try:
-                generated = service.generate_revision_drafts(prompt_run, chunks, **kwargs)
+                generated = _revision_attempt(run_store, run["id"], "generating", service, lambda: service.generate_revision_drafts(prompt_run, chunks, **{**kwargs, "existing": run_store.revision_run(run["id"]).get("generated_drafts", generated)}))
             except Exception as error:
                 if target:
                     partial = run_store.revision_run(run["id"]).get("generated_drafts", generated)
@@ -487,11 +489,14 @@ def resume_revision(revision_id: str):
         run = store.revision_run(revision_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Revision Run not found") from error
-    if run["status"] != "interrupted":
-        raise HTTPException(status_code=409, detail="仅中断的 Revision Run 可继续")
     if run.get("applied_at"):
-        store.update_revision(revision_id, status="probing", stage="probe")
+        try:
+            store.resume_revision_quality(revision_id)
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         worker = _run_revision_quality
+    elif run["status"] != "interrupted":
+        raise HTTPException(status_code=409, detail="仅中断的 Revision Run 可继续")
     elif run.get("active_draft", {}).get("kind") == "regenerate":
         store.update_revision(revision_id, status="generating", stage="generating")
         worker = _regenerate_revision_draft
@@ -518,14 +523,25 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
     try:
         chunks = run_corpus.chunks()
         run = run_store.revision_run(revision_id)
+        results = dict(run.get("quality_results") or {})
         for index, item_id in enumerate(run["question_ids"], 1):
-            run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index - 1, "total": len(run["question_ids"])}, quality_results=results)
-            run_store.reset_qc_for_rerun(item_id)
-            probe = run_store.run_probe(item_id, service.retriever, chunks, service.answerability_check, fail_on_judge_error=True)
-            results[item_id] = {"probe": probe["status"], "probe_reason": probe.get("reason")}
-            if probe["status"] == "passed":
+            completed = run_store.revision_quality_step(run, item_id)
+            if completed == "done":
+                results[item_id] = {"probe": "passed", "qc": "qc_passed"}
+                run_store.update_revision(revision_id, progress={"current": index, "total": len(run["question_ids"])}, quality_results=results)
+                continue
+            if completed == "qc":
+                run_store.update_revision(revision_id, status="qc", stage="qc", progress={"current": index - 1, "total": len(run["question_ids"])}, quality_results=results)
+            else:
+                run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index - 1, "total": len(run["question_ids"])}, quality_results=results)
+                run_store.reset_qc_for_rerun(item_id)
+                probe = _revision_attempt(run_store, revision_id, "probe", service, lambda: run_store.run_probe(item_id, service.retriever, chunks, service.answerability_check, fail_on_judge_error=True))
+                results[item_id] = {"probe": probe["status"], "probe_reason": probe.get("reason")}
+            if completed == "qc":
+                results[item_id] = {"probe": "passed", "probe_reason": (run.get("quality_results") or {}).get(item_id, {}).get("probe_reason")}
+            if results[item_id]["probe"] == "passed":
                 run_store.update_revision(revision_id, status="qc", stage="qc", quality_results=results)
-                qc = service.quality_check(run_store.question(item_id))
+                qc = _revision_attempt(run_store, revision_id, "qc", service, lambda: service.quality_check(run_store.question(item_id)))
                 saved = run_store.record_qc(item_id, qc, "passed" if qc["score"] >= 85 else "failed")
                 results[item_id].update({"qc": saved["status"], "qc_reason": qc.get("reason")})
             else:
@@ -533,7 +549,24 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
             run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index, "total": len(run["question_ids"])}, quality_results=results)
         run_store.finish_revision_quality(revision_id, results)
     except Exception as error:
-        run_store.finish_revision_quality(revision_id, results, error=str(error))
+        run_store.finish_revision_quality(revision_id, results, error=str(error), error_type=type(error).__name__, error_detail=str(error.__cause__ or error))
+
+
+def _revision_attempt(run_store, revision_id, stage, service, work):
+    for attempt in (1, 2):
+        started = time.perf_counter()
+        error = None
+        try:
+            return work()
+        except Exception as caught:
+            error = caught
+            if not isinstance(caught, ProviderTimeout) or attempt == 2:
+                raise
+        finally:
+            run = run_store.revision_run(revision_id)
+            history = list(run.get("runtime_attempts") or [])
+            history.append({"stage": stage, "attempt": attempt, "error_type": type(error).__name__ if error else None, "error": str(error.__cause__ or error) if error else None, "elapsed_ms": round((time.perf_counter() - started) * 1000), "result": "failed" if error else "passed", "provider": "DeepSeek" if getattr(service, "model", None) else None, "model": getattr(service, "model", None)})
+            run_store.update_revision(revision_id, runtime_attempts=history)
 
 
 @app.post("/api/governance/review-batch", dependencies=[Depends(require_trusted_origin)])

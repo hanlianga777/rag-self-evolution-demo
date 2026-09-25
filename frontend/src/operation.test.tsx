@@ -20,7 +20,7 @@ it("shows an actual pending action and keeps its failure until dismissed", async
   expect(document.querySelector("[role=status]")?.textContent).toContain("运行中");
   await act(async () => reject(new Error("SQLite detail")));
   expect(document.querySelector("[role=alert]")?.textContent).toContain("运行失败");
-  expect(document.body.textContent).not.toContain("SQLite detail");
+  expect(document.body.textContent).toContain("SQLite detail");
   await act(async () => document.querySelector<HTMLButtonElement>("button[aria-label='查看错误详情']")!.click());
   expect(document.body.textContent).toContain("SQLite detail");
   await act(async () => root.unmount());
@@ -127,6 +127,40 @@ it("reopens a dismissed running bar if that operation later fails", async () => 
   expect(document.querySelector(".operation-stack")).toBeNull();
   await act(async () => fail());
   expect(document.querySelector(".operation-console[role=alert]")?.textContent).toContain("运行失败");
+  await act(async () => root.unmount());
+});
+
+it("shows the persisted QC stage for one Revision instead of misleading 1/1 completion", async () => {
+  const run = { id: "REV-q15", status: "qc", stage: "qc", question_ids: ["Q15"], progress: { current: 1, total: 1 } };
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [run] : run), { status: 200 }))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
+  await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
+  const card = document.querySelector(".operation-console")!;
+  expect(card.textContent).toContain("QC");
+  expect(card.textContent).toContain("85%");
+  expect(card.textContent).not.toContain("1 / 1");
+  await act(async () => root.unmount());
+});
+
+it("uses real counts for paired Revision and exposes failed details before removing its card", async () => {
+  let run: any = { id: "REV-pair", status: "qc", stage: "qc", question_ids: ["Q1", "Q9"], progress: { current: 1, total: 2 } };
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [run] : run), { status: 200 }))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
+  await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
+  expect(document.querySelector(".operation-console")?.textContent).toContain("1 / 2");
+  run = { ...run, status: "failed_quality", failed_stage: "qc", error: "DeepSeek 请求超时，请重试", error_detail: "The read operation timed out", runtime_attempts: [{ stage: "qc", attempt: 2, model: "deepseek-test" }] };
+  await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
+  const card = document.querySelector(".operation-console[role=alert]")!;
+  expect(card.textContent).toContain("DeepSeek 请求超时，请重试");
+  const detail = card.querySelector<HTMLButtonElement>("[aria-label='查看错误详情']")!;
+  await act(async () => detail.click());
+  expect(detail.getAttribute("aria-expanded")).toBe("true");
+  expect(card.textContent).toContain("The read operation timed out");
+  expect(card.textContent).toContain("REV-pair");
+  await act(async () => card.querySelector<HTMLButtonElement>("[aria-label='关闭运行状态']")!.click());
+  expect(document.querySelector(".operation-console[role=alert]")).toBeNull();
   await act(async () => root.unmount());
 });
 

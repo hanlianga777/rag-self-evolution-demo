@@ -1,5 +1,6 @@
 import json
 import math
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -8,6 +9,18 @@ from .config import Settings
 
 
 class ProviderUnavailable(RuntimeError):
+    pass
+
+
+class ProviderTimeout(ProviderUnavailable):
+    pass
+
+
+class ProviderAPIError(ProviderUnavailable):
+    pass
+
+
+class ProviderNetworkError(ProviderUnavailable):
     pass
 
 
@@ -60,8 +73,16 @@ class DeepSeekProvider:
                 else:
                     body = json.loads(response.read())
                     ttft_ms = round((time.perf_counter() - started_at) * 1000)
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
-            raise ProviderUnavailable(f"DeepSeek 调用不可用：{error}") from error
+        except urllib.error.HTTPError as error:
+            raise ProviderAPIError(f"DeepSeek API 错误（HTTP {error.code}）") from error
+        except urllib.error.URLError as error:
+            if isinstance(error.reason, (TimeoutError, socket.timeout)):
+                raise ProviderTimeout("DeepSeek 请求超时，请重试") from error
+            raise ProviderNetworkError(f"DeepSeek 网络错误：{error.reason}") from error
+        except (TimeoutError, socket.timeout) as error:
+            raise ProviderTimeout("DeepSeek 请求超时，请重试") from error
+        except json.JSONDecodeError as error:
+            raise ProviderUnavailable("DeepSeek 返回无效 JSON") from error
         try:
             content = body["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as error:

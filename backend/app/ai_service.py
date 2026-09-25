@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 
 from .policy import DEFAULT_PIPELINE_CONFIG
-from .providers import ProviderUnavailable
+from .providers import ProviderTimeout, ProviderUnavailable
 from .retrieval import VectorRetriever
 
 
@@ -32,7 +32,7 @@ class AiService:
         if not self.live_enabled:
             reason = "测试环境强制使用 Mock" if self.force_mock else "未配置 DEEPSEEK_API_KEY"
             return {"mode": "mock", "provider": "DeepSeek", "model": self.provider.settings.model, "status": "Not Configured", "reason": reason, "last_probe": self.last_probe}
-        status = "Configured (Unverified)" if self.last_probe is None else "Ready" if self.last_probe["status"] == "passed" else "Unavailable"
+        status = "Configured (Unverified)" if self.last_probe is None or self.last_probe.get("error_type") == "ProviderTimeout" else "Ready" if self.last_probe["status"] == "passed" else "Unavailable"
         return {"mode": "live", "provider": "DeepSeek", "model": self.provider.settings.model, "status": status, "last_probe": self.last_probe}
 
     def probe(self) -> dict:
@@ -43,7 +43,7 @@ class AiService:
             self.provider.complete("你是连接测试助手。", "只回复：连接成功。")
             self.last_probe = {"status": "passed", "latency_ms": round((time.perf_counter() - started_at) * 1000), "model": self.provider.settings.model}
         except ProviderUnavailable as error:
-            self.last_probe = {"status": "failed", "reason": str(error), "model": self.provider.settings.model}
+            self.last_probe = {"status": "failed", "reason": str(error), "model": self.provider.settings.model, "error_type": type(error).__name__}
         return {**self.readiness(), "probe": self.last_probe["status"]}
 
     def answer(self, question: str, config: dict | None = None) -> dict:

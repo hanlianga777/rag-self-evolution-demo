@@ -400,7 +400,7 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes thinking-dots { to { width: 1.15em; } }
 .operation-stack { bottom: 18px; display: grid; gap: 8px; max-height: calc(100dvh - 36px); overflow: auto; position: fixed; right: 18px; width: min(320px, calc(100vw - 36px)); z-index: 40; }
-.operation-console { background: #0b0f14; border: 1px solid #293341; border-radius: 12px; box-shadow: 0 12px 34px rgba(7, 14, 24, .2); color: #edf1f5; max-height: 240px; overflow: auto; padding: 11px 14px; }
+.operation-console { background: #0b0f14; border: 1px solid #293341; border-radius: 12px; box-shadow: 0 12px 34px rgba(7, 14, 24, .2); color: #edf1f5; padding: 11px 14px; }
 .operation-head { align-items: center; display: flex; justify-content: space-between; gap: 16px; }
 .operation-head strong { font-size: 14px; font-weight: 650; }
 .operation-head button { background: none; border: 0; color: #b6c1cc; font-size: 20px; line-height: 1; }
@@ -412,6 +412,8 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .operation-console progress::-webkit-progress-value { background: #9fb6cd; border-radius: 999px; }
 .operation-console progress:not([value]) { animation: operation-pulse 1.7s ease-in-out infinite; }
 .operation-detail-button { background: transparent; border: 0; color: #c6d6e6; font-size: 12px; margin-top: 12px; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
+.operation-error-summary { color: #f5c6c6 !important; overflow-wrap: anywhere; }
+.operation-details { background: #18212b; border-radius: 9px; color: #e2e8ef; font-size: 11px; line-height: 1.5; margin-top: 12px; overflow-wrap: anywhere; padding: 12px; }
 .operation-console pre { background: #18212b; border-radius: 9px; color: #e2e8ef; font-size: 11px; line-height: 1.5; margin: 12px 0 0; overflow-wrap: anywhere; padding: 12px; white-space: pre-wrap; }
 @keyframes operation-pulse { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .operation-console progress:not([value]) { animation: none; } }

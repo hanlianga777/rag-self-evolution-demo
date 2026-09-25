@@ -8,7 +8,7 @@ class Settings:
     api_key: str
     base_url: str
     model: str
-    timeout_seconds: float = 20.0
+    timeout_seconds: float = 60.0
 
     @property
     def configured(self) -> bool:
@@ -23,8 +23,12 @@ def load_settings(env: dict[str, str] | None = None, env_file: Path | None = Non
             key, separator, value = line.partition("=")
             if separator and key and key not in values:
                 values[key] = value
+    timeout = float(values.get("DEEPSEEK_TIMEOUT_SECONDS", "60"))
+    if not 0 < timeout <= 600:
+        raise ValueError("DEEPSEEK_TIMEOUT_SECONDS must be between 0 and 600")
     return Settings(
         api_key=values.get("DEEPSEEK_API_KEY", "").strip(),
         base_url=values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/"),
         model=values.get("DEEPSEEK_MODEL", "deepseek-v4-flash"),
+        timeout_seconds=timeout,
     )

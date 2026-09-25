@@ -3,8 +3,35 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { GovernancePage } from "./pages/GovernancePage";
+import { CandidateWorkspace } from "./pages/CandidateWorkspace";
 
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { document.body.innerHTML = ""; vi.restoreAllMocks(); });
+
+it("offers QC-only recovery for an already applied Revision runtime failure", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })));
+  const question = { id: "V1-Q15", slot: "Q15", question: "我的 B2 遥控器坏了，应该更换 R1 还是 R3？", test_category: "negative", review_status: "needs_revision", probe_status: "probe_passed", qc_status: "qc_pending", stage: "candidate", evidence: [], raw: { generation_run_id: "GGEN-test", expected_behavior: "clarify" } };
+  const revision = { id: "REV-Q15", status: "failed_quality", applied_at: "2026-09-25T10:54:04Z", failed_stage: "qc", error: "DeepSeek 调用不可用：The read operation timed out", question_ids: [question.id], drafts: { [question.id]: question } };
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<CandidateWorkspace row={question} peers={[question]} revision={revision} busy={false} onRun={() => {}} onReview={async () => false} onRefresh={async () => {}} operation={{ watchRevision: () => {} } as any} />));
+  expect(document.body.textContent).toContain("继续校验");
+  expect(document.body.textContent).toContain("QC");
+  expect(document.querySelector(".review-workspace")?.textContent).toContain("DeepSeek 请求超时，请重试");
+  expect(document.querySelector(".review-workspace")?.textContent).not.toContain("The read operation timed out");
+  await act(async () => root.unmount());
+});
+
+it("shows an applied interrupted Revision as a quality recovery, not an unapplied draft", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })));
+  const question = { id: "V1-Q15", slot: "Q15", question: "Q15", test_category: "negative", review_status: "needs_revision", probe_status: "probe_passed", qc_status: "qc_pending", stage: "candidate", evidence: [] };
+  const revision = { id: "REV-Q15", status: "interrupted", applied_at: "2026-09-25T10:54:04Z", interrupted_stage: "qc", question_ids: [question.id] };
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<CandidateWorkspace row={question} peers={[question]} revision={revision} busy={false} onRun={() => {}} onReview={async () => false} onRefresh={async () => {}} operation={{ watchRevision: () => {} } as any} />));
+  expect(document.querySelector(".review-workspace")).not.toBeNull();
+  expect(document.body.textContent).toContain("继续校验");
+  expect(document.body.textContent).not.toContain("当前有未完成的修订草案");
+  await act(async () => root.unmount());
+});
 
 it("keeps human review actions visible and technical audit out of the default view", async () => {
   const question = { id: "V1-02", slot: "Q02", question: "怎样完成设备检查？", reference_answer: "先检查电源和刷盘。", test_category: "positive", legacy_question_type: "v1_mini", review_status: "human_review_pending", probe_status: "probe_passed", qc_status: "qc_passed", stage: "candidate", evidence: [{ source_chunk_ids: ["C2"], evidence_key_points: ["检查电源和刷盘"] }], evidence_details: [{ chunks: [{ chunk_id: "C2", document_name: "操作说明.pdf", section_path: "检查", page_start: 4, chunk_text: "检查电源和刷盘。\n□\n检查电源和刷盘。" }] }], probe: { score: 96, threshold: 90, probe_details: { top_k: [{ chunk_id: "C2", score: 0.9 }] } }, qc: { score: 93, threshold: 85 } };

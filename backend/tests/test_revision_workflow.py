@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app import main
 from app.ai_service import AiService
 from app.governance import GovernanceStore
+from app.providers import ProviderTimeout
 
 
 def candidates():
@@ -418,6 +419,29 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.assertEqual(result["generation_attempts"][0]["error"], "Provider unavailable")
         self.assertEqual(self.store.question(pair)["question"], "原题 9")
 
+    def test_revision_generation_timeout_retries_once_and_audits_both_attempts(self):
+        first = self.ids[0]
+        run = self.store.start_revision(first, "ai_regenerate", "换个问法", False, {first: {"source_chunk_ids": ["C2"]}}, self.chunks)
+        class Service:
+            model = "fixture"
+            calls = 0
+            def select_revision_material(self, _run, _chunks):
+                return {first: {"chunk_ids": ["C2"], "method": "manual", "scope": "same_document", "reason": "人工指定", "manual": True}}
+            def generate_revision_drafts(self, _run, _chunks, **_kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    raise ProviderTimeout("DeepSeek 请求超时，请重试")
+                return {first: {"question": "启动前怎样确认急停能用？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}
+            def revision_similarity(self, _a, _b):
+                return .1
+        service = Service()
+        main._prepare_revision(run["id"], self.store, service, SimpleNamespace(chunks=lambda: self.chunks))
+        result = self.store.revision_run(run["id"])
+        self.assertEqual(result["status"], "preview_ready")
+        self.assertEqual(service.calls, 2)
+        self.assertEqual([(item["attempt"], item["result"]) for item in result["runtime_attempts"]], [(1, "failed"), (2, "passed")])
+        self.assertEqual(self.store.question(first)["question"], "原题 1")
+
     def test_preview_edit_regenerate_and_discard_preserve_original_until_apply(self):
         first, pair = self.ids[0], self.ids[8]
         run = self.store.start_revision(first, "manual_edit", "改善两题", True, {
@@ -618,6 +642,84 @@ class RevisionWorkflowTests(unittest.TestCase):
             self.store.review_generation_batch(self.ids, "reviewer", confirmed_manual_review=True)
         self.store.review_question(first, "approved", "reviewer")
         self.assertEqual(self.store.question(first)["stage"], "golden")
+
+    def test_qc_timeout_retries_once_then_resumes_without_reapplying_or_reprobing(self):
+        first = self.ids[0]
+        run = self.store.start_revision(first, "manual_edit", "修订操作", False, {first: {"question": "清洁前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
+        self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        self.store.apply_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        before = self.store.question(first)
+        retriever = SimpleNamespace(retrieve=lambda *_args, **_kwargs: [{"chunk_id": "C2", "score": .95}])
+        calls = []
+        def qc(_item):
+            calls.append("qc")
+            if len(calls) <= 2:
+                raise ProviderTimeout("DeepSeek 请求超时，请重试")
+            return {"score": 95, "priority": "P2", "reason": "通过"}
+        service = SimpleNamespace(retriever=retriever, answerability_check=lambda *_args: {}, quality_check=qc, model="fixture")
+        main._run_revision_quality(run["id"], self.store, service, SimpleNamespace(chunks=lambda: self.chunks))
+        failed = self.store.revision_run(run["id"])
+        self.assertEqual(failed["status"], "failed_quality")
+        self.assertEqual(failed["failed_stage"], "qc")
+        self.assertEqual(failed["drafts"][first]["question"], before["question"])
+        self.assertEqual([item["attempt"] for item in failed["runtime_attempts"] if item["stage"] == "qc"], [1, 2])
+        self.assertEqual(self.store.question(first)["qc_status"], "qc_pending")
+        self.assertEqual(self.store.question(first)["question"], before["question"])
+        probe_count = len(self.store.probe_history(first))
+        applied_count = sum(item["decision"] == "revision_applied" for item in self.store.review_history(first))
+        self.store.resume_revision_quality(run["id"])
+        with self.assertRaisesRegex(ValueError, "运行中"):
+            self.store.resume_revision_quality(run["id"])
+        main._run_revision_quality(run["id"], self.store, service, SimpleNamespace(chunks=lambda: self.chunks))
+        self.assertEqual(self.store.revision_run(run["id"])["status"], "completed")
+        self.assertEqual(len(self.store.probe_history(first)), probe_count)
+        self.assertEqual(len(self.store.qc_history(first)), 2)
+        self.assertEqual(sum(item["decision"] == "revision_applied" for item in self.store.review_history(first)), applied_count)
+        self.assertEqual(self.store.question(first)["review_status"], "human_review_pending")
+
+    def test_quality_score_failure_and_changed_candidate_cannot_be_resumed(self):
+        first = self.ids[0]
+        run = self.store.start_revision(first, "manual_edit", "修订操作", False, {first: {"question": "清洁前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
+        self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        self.store.apply_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        self.store.finish_revision_quality(run["id"], {first: {"probe": "passed", "qc": "qc_failed"}})
+        with self.assertRaisesRegex(ValueError, "质量低分"):
+            self.store.resume_revision_quality(run["id"])
+        self.store.update_revision(run["id"], status="failed_quality", error="DeepSeek 请求超时，请重试")
+        with self.store.connection() as connection:
+            connection.execute("UPDATE questions SET question='后来改动过的题目' WHERE id=?", (first,))
+        with self.assertRaisesRegex(ValueError, "已变化"):
+            self.store.resume_revision_quality(run["id"])
+
+    def test_interrupted_after_qc_persistence_does_not_duplicate_successful_checks(self):
+        first = self.ids[0]
+        run = self.store.start_revision(first, "manual_edit", "修订操作", False, {first: {"question": "清洁前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
+        self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        self.store.apply_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        self.store.record_probe_result(first, {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40})
+        self.store.record_qc(first, {"score": 95, "priority": "P2", "reason": "通过"}, "passed")
+        self.store.update_revision(run["id"], status="interrupted", stage="interrupted")
+        probes, qcs = len(self.store.probe_history(first)), len(self.store.qc_history(first))
+        self.store.resume_revision_quality(run["id"])
+        class Service:
+            def quality_check(self, _item):
+                raise AssertionError("已持久化 QC 不应再调用 Provider")
+        main._run_revision_quality(run["id"], self.store, Service(), SimpleNamespace(chunks=lambda: self.chunks))
+        self.assertEqual(self.store.revision_run(run["id"])["status"], "completed")
+        self.assertEqual(len(self.store.probe_history(first)), probes)
+        self.assertEqual(len(self.store.qc_history(first)), qcs)
+
+    def test_resume_api_accepts_applied_runtime_failure_without_reapplying(self):
+        first = self.ids[0]
+        run = self.store.start_revision(first, "manual_edit", "修订操作", False, {first: {"question": "清洁前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
+        self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        self.store.apply_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        self.store.finish_revision_quality(run["id"], {}, error="DeepSeek 请求超时，请重试")
+        with patch.object(main, "store", self.store), patch.object(main, "_run_revision_quality", return_value=None):
+            response = TestClient(main.app).post(f"/api/governance/revisions/{run['id']}/resume", headers={"Origin": "http://localhost:5174"})
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json()["status"], "probing")
+        self.assertEqual(sum(item["decision"] == "revision_applied" for item in self.store.review_history(first)), 1)
 
 
 if __name__ == "__main__":

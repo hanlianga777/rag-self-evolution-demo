@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { errorMessage, getJson, postJson } from "../api";
 import { displayText } from "../display";
-import { useOperation } from "../operation";
+import { shortError, useOperation } from "../operation";
 
 type Candidate = Record<string, any>;
 type View = "review" | "revision" | "draft" | "audit";
@@ -50,13 +50,14 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
   const linked = linkedId ? peers.find(item => item.id === linkedId) : undefined;
   const selectedRows: Candidate[] = row ? linked && paired ? [row, linked].sort((a, b) => a.slot.localeCompare(b.slot)) : [row] : [];
   const activeRevision = !!revisionRun && ["queued", "generating", "validating", "preview_ready", "probing", "qc", "interrupted"].includes(revisionRun.status);
+  const canResumeQuality = !!revisionRun?.applied_at && (revisionRun.status === "interrupted" || revisionRun.status === "failed_quality" && !!revisionRun.error);
 
   useEffect(() => {
     setRevisionRun(revision);
     setPreviewTarget(row?.id || "");
     setPreviewEditing(false);
     setPaired(false);
-    setView(revision && ["queued", "generating", "validating", "preview_ready", "probing", "qc", "interrupted"].includes(revision.status) ? "draft" : "review");
+    setView(revision && !revision.applied_at && ["queued", "generating", "validating", "preview_ready", "interrupted"].includes(revision.status) ? "draft" : "review");
   }, [revision?.id, row?.id]);
   useEffect(() => {
     const documentIds = [...new Set([row, linked].map(item => item?.evidence_details?.[0]?.chunks?.[0]?.document_id).filter(Boolean))];
@@ -225,7 +226,9 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
         {view === "review" && <div className="review-workspace">
           <div className="workspace-badges"><span>{reviewLabel(row)}</span><span>{displayText(row.test_category)}</span>{row.raw?.ablation_attribute && <span>{displayText(row.raw.ablation_attribute)}</span>}{linked && <span>关联 {linked.test_category === "positive" ? "Positive" : "Ablation"}：{linked.slot}</span>}<span>Probe {probeLabel(row.probe_status)}</span><span>QC {qcLabel(row.qc_status)}</span></div>
           {revisionRun?.status === "completed" && ready && <p className="success-notice">✓ 修订已完成 · Probe {numberText(probe.score)} · QC {numberText(qc.score)} · 等待人工复审</p>}
-          {activeRevision && <p className="success-notice">当前有未完成的修订草案。<button className="text-button" onClick={() => setView("draft")}>继续查看草案</button></p>}
+          {canResumeQuality && <p className="error-notice">修订已应用，{revisionRun.failed_stage === "qc" || row.probe_status === "probe_passed" && row.qc_status === "qc_pending" ? "QC" : "Probe"} 运行中断：{revisionRun.error ? shortError(revisionRun.error) : "进程重启后需手动继续"}。<button className="secondary" disabled={revisionBusy} onClick={() => void resume()}>继续校验 / 重试失败步骤</button></p>}
+          {activeRevision && !revisionRun?.applied_at && <p className="success-notice">当前有未完成的修订草案。<button className="text-button" onClick={() => setView("draft")}>继续查看草案</button></p>}
+          {activeRevision && revisionRun?.applied_at && revisionRun.status !== "interrupted" && <p className="success-notice">修订已应用，正在运行 Probe / QC。</p>}
           <section className="candidate-card"><h3>问题</h3><p className="candidate-question">{row.question}</p><small>题型：{displayText(row.test_category)}{row.raw?.ablation_attribute ? ` · 属性：${displayText(row.raw.ablation_attribute)}` : ""}</small></section>
           <section className="candidate-card"><h3>{row.test_category === "negative" ? "预期行为" : "参考答案"}</h3><p className="candidate-answer">{row.test_category === "negative" ? qc.behavior_criteria || negativeBehavior[row.raw?.expected_behavior || row.negative_subtype] || displayText(row.raw?.expected_behavior || row.negative_subtype || "未记录") : row.reference_answer}</p></section>
           <section className="candidate-card"><h3>核心证据</h3>{row.test_category === "negative" ? <p className="muted">此题检验拒答或澄清边界，无预设 Golden Evidence。</p> : <>{evidenceChunks[0] && <p className="candidate-evidence-meta">{evidenceChunks[0].document_name || evidenceChunks[0].document_id || "当前索引未匹配"} · P.{evidenceChunks[0].page_start ?? "—"} · {evidenceChunks[0].section_path || "未标注章节"} · {evidenceChunks[0].chunk_id}</p>}<p className="candidate-evidence-preview">{cleanPreview(summarySource) || "当前索引未匹配，无法展示证据摘要"}</p><details><summary>查看完整证据</summary>{evidence.map((source: Candidate, index: number) => <div className="review-evidence" key={index}>{source.chunks?.map((chunk: Candidate) => <div key={chunk.chunk_id}><strong>{chunk.document_name || chunk.document_id || "当前索引未匹配"}</strong><p>{chunk.section_path || "未标注章节"} · P.{chunk.page_start ?? "—"}–{chunk.page_end ?? "—"} · {chunk.chunk_id}</p><p className="review-full-text">{chunk.chunk_text || "当前索引未匹配，无法展示原文"}</p></div>)}</div>)}</details></>}</section>

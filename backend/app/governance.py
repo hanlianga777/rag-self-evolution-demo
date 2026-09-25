@@ -690,7 +690,7 @@ class GovernanceStore:
             if row["status"] not in {"generating", "validating", "interrupted"} or not audit.get("active_draft"):
                 raise ValueError("草案操作不在运行中")
             audit["draft_attempts"][-1].update({"status": "failed", "completed_at": _now(), "error": error})
-            audit.update({"active_draft": None, "stage": "preview_ready", "apply_blocked": True, "error": error, "last_attempt_validation": {"passed": False, "errors": [error]}})
+            audit.update({"active_draft": None, "stage": "preview_ready", "failed_stage": audit.get("stage"), "apply_blocked": True, "error": error, "last_attempt_validation": {"passed": False, "errors": [error]}})
             connection.execute("UPDATE candidate_revision_runs SET status='preview_ready', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), revision_id))
         return self.revision_run(revision_id)
 
@@ -746,7 +746,41 @@ class GovernanceStore:
             connection.execute("UPDATE candidate_revision_runs SET status='probing', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), revision_id))
         return self.revision_run(revision_id)
 
-    def finish_revision_quality(self, revision_id: str, results: dict, *, error: str | None = None):
+    def revision_quality_step(self, run: dict, question_id: str):
+        applied_at = run.get("applied_at") or ""
+        item = self.question(question_id)
+        qc = self.qc_history(question_id)
+        if item["qc_status"] == "qc_passed" and qc and qc[0]["created_at"] > applied_at:
+            return "done"
+        probe = self.probe_history(question_id)
+        if item["probe_status"] == "probe_passed" and probe and probe[0]["created_at"] > applied_at:
+            return "qc"
+        return "probe"
+
+    def resume_revision_quality(self, revision_id: str):
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT status, audit_json FROM candidate_revision_runs WHERE id=?", (revision_id,)).fetchone()
+            if row is None:
+                raise KeyError(revision_id)
+            audit = _load(row["audit_json"], {})
+            if row["status"] not in {"failed_quality", "interrupted"} or not audit.get("applied_at") or (row["status"] == "failed_quality" and not audit.get("error")):
+                raise ValueError("仅已应用且运行失败的 Revision Run 可继续；运行中或质量低分不可重试")
+            for item_id in audit["question_ids"]:
+                item = self._row(connection.execute("SELECT * FROM questions WHERE id=?", (item_id,)).fetchone())
+                draft = audit["drafts"][item_id]
+                if item["stage"] != "candidate" or any(item[key] != draft[key] for key in ("question", "reference_answer", "evidence", "raw")):
+                    raise ValueError("Candidate 已变化，不能继续过期的质量运行")
+            steps = {item_id: self.revision_quality_step(audit, item_id) for item_id in audit["question_ids"]}
+            stage = "qc" if all(value in {"qc", "done"} for value in steps.values()) else "probe"
+            failures = list(audit.get("failure_history") or [])
+            if audit.get("error"):
+                failures.append({"error": audit["error"], "error_type": audit.get("error_type"), "error_detail": audit.get("error_detail"), "failed_stage": audit.get("failed_stage") or stage, "finished_at": audit.get("finished_at")})
+            audit.update({"stage": stage, "error": None, "error_type": None, "error_detail": None, "finished_at": None, "failure_history": failures})
+            connection.execute("UPDATE candidate_revision_runs SET status=?, audit_json=?, updated_at=? WHERE id=?", ("qc" if stage == "qc" else "probing", _json(audit), _now(), revision_id))
+        return self.revision_run(revision_id)
+
+    def finish_revision_quality(self, revision_id: str, results: dict, *, error: str | None = None, error_type: str | None = None, error_detail: str | None = None):
         run = self.revision_run(revision_id)
         if run["status"] not in {"probing", "qc", "interrupted"}:
             raise ValueError("Revision Run 未进入质量检查")
@@ -760,7 +794,7 @@ class GovernanceStore:
                     if latest is None:
                         connection.execute("UPDATE questions SET review_status='human_review_pending', updated_at=? WHERE id=? AND stage='candidate' AND probe_status='probe_passed' AND qc_status='qc_passed'", (_now(), item_id))
             audit = _load(run["audit_json"], {})
-            audit.update({"stage": status, "quality_results": results, "error": error, "progress": {"current": len(results), "total": len(run["question_ids"])}, "finished_at": _now()})
+            audit.update({"stage": status, "failed_stage": run["stage"] if error else None, "quality_results": results, "error": error, "error_type": error_type, "error_detail": error_detail, "progress": {"current": len(results), "total": len(run["question_ids"])}, "finished_at": _now()})
             connection.execute("UPDATE candidate_revision_runs SET status=?, audit_json=?, updated_at=? WHERE id=?", (status, _json(audit), _now(), revision_id))
         return self.revision_run(revision_id)
 
