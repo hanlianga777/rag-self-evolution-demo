@@ -55,6 +55,109 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.assertTrue(latest["reviewed_at"])
         self.assertEqual(self.store.review_history("GGC-001"), [])
 
+    def test_ai_material_selection_keeps_evidence_for_wording_and_honors_manual_choice(self):
+        first = self.ids[0]
+        for chunk in self.chunks:
+            chunk["product"] = "KIRA B 50"
+        run = self.store.start_revision(first, "ai_regenerate", "换个问法", False, {}, self.chunks, tags=["表达过于接近原文"])
+        service = AiService(self.store, SimpleNamespace(), SimpleNamespace(), False)
+        service.retriever = SimpleNamespace(retrieve=lambda *_args, **_kwargs: self.fail("保留材料时不应检索"))
+        selected = service.select_revision_material(run, self.chunks)
+        self.assertEqual(selected[first]["chunk_ids"], ["C1"])
+        self.assertEqual(selected[first]["method"], "retained")
+        self.store.update_revision(run["id"], status="failed")
+        manual = self.store.start_revision(first, "ai_regenerate", "换知识点为急停检查", False, {first: {"source_chunk_ids": ["C2"]}}, self.chunks)
+        selected = service.select_revision_material(manual, self.chunks)
+        self.assertEqual(selected[first]["chunk_ids"], ["C2"])
+        self.assertEqual(selected[first]["method"], "manual")
+
+    def test_ai_material_selection_stays_within_product_and_fails_without_match(self):
+        first = self.ids[0]
+        chunks = [*self.chunks,
+            {"chunk_id": "C5", "document_id": "DOC-001", "product": "KIRA B 50", "chunk_text": "急停检查流程：启动机器前先测试急停按钮和复位操作，若设备未立即停止，应暂停使用并联系维护人员。", "section_path": "安全"},
+            {"chunk_id": "C3", "document_id": "DOC-002", "product": "KIRA B 50", "chunk_text": "急停检查步骤：启动之前先确认急停开关可正常按下和复位，发现异常应停止设备操作并联系维修人员。", "section_path": "安全"},
+            {"chunk_id": "C4", "document_id": "DOC-003", "product": "OTHER", "chunk_text": "急停检查步骤：启动之前先确认急停开关可正常按下和复位，发现异常应停止设备操作并联系维修人员。", "section_path": "安全"}]
+        chunks[0]["product"] = chunks[1]["product"] = "KIRA B 50"
+        run = self.store.start_revision(first, "ai_regenerate", "换知识点为急停检查", False, {}, chunks, tags=["业务价值偏低"])
+        service = AiService(self.store, SimpleNamespace(), SimpleNamespace(), False)
+        service.retriever = SimpleNamespace(retrieve=lambda *_args, **_kwargs: [
+            {"chunk_id": "C4", "final_score": .95}, {"chunk_id": "C3", "final_score": .82}, {"chunk_id": "C5", "final_score": .42}])
+        self.assertEqual(service.select_revision_material(run, chunks)[first]["chunk_ids"], ["C5"])
+        service.retriever = SimpleNamespace(retrieve=lambda *_args, **_kwargs: [{"chunk_id": "C4", "final_score": .95}, {"chunk_id": "C3", "final_score": .82}])
+        self.assertEqual(service.select_revision_material(run, chunks)[first]["chunk_ids"], ["C3"])
+        service.retriever = SimpleNamespace(retrieve=lambda *_args, **_kwargs: [{"chunk_id": "C4", "final_score": .95}])
+        with self.assertRaisesRegex(ValueError, "同产品"):
+            service.select_revision_material(run, chunks)
+
+    def test_ai_revision_records_selected_material_without_applying_candidate(self):
+        first = self.ids[0]
+        chunks = [*self.chunks, {"chunk_id": "C3", "document_id": "DOC-002", "product": "KIRA B 50", "chunk_text": "启动前检查急停按钮，按下后设备应立即停止；复位前确认周围人员安全，异常时联系维修。", "section_path": "安全操作"}]
+        for chunk in chunks[:2]:
+            chunk["product"] = "KIRA B 50"
+        run = self.store.start_revision(first, "ai_regenerate", "换知识点为急停检查", False, {}, chunks, tags=["业务价值偏低"])
+        class Service:
+            def __init__(self):
+                self.selected = None
+            def select_revision_material(self, run, chunks):
+                return {first: {"chunk_ids": ["C3"], "method": "automatic", "scope": "same_product", "reason": "急停检查", "manual": False, "document_ids": ["DOC-002"]}}
+            def generate_revision_drafts(self, prompt_run, chunks, on_progress=None, existing=None):
+                self.selected = prompt_run["material_selection"][first]["chunk_ids"]
+                return {first: {"question": "设备启动前如何检查急停按钮？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": self.selected}}
+            def revision_similarity(self, _a, _b):
+                return .6
+        service = Service()
+        before = self.store.question(first)
+        main._prepare_revision(run["id"], self.store, service, SimpleNamespace(chunks=lambda: chunks))
+        ready = self.store.revision_run(run["id"])
+        self.assertEqual(ready["status"], "preview_ready")
+        self.assertEqual(ready["material_selection"][first]["scope"], "same_product")
+        self.assertEqual(ready["drafts"][first]["evidence"][0]["source_chunk_ids"], ["C3"])
+        self.assertEqual(service.selected, ["C3"])
+        self.assertEqual(self.store.question(first), before)
+
+    def test_manual_evidence_cannot_cross_product(self):
+        first = self.ids[0]
+        chunks = [*self.chunks, {"chunk_id": "OTHER", "document_id": "DOC-OTHER", "product": "另一产品", "chunk_text": "正确操作。", "section_path": "操作"}]
+        chunks[0]["product"] = chunks[1]["product"] = "KIRA B 50"
+        run = self.store.start_revision(first, "manual_edit", "改证据", False, {first: {"question": "如何正确操作？", "reference_answer": "正确操作", "source_chunk_ids": ["OTHER"]}}, chunks)
+        failed = self.store.prepare_revision(run["id"], chunks, similarity=lambda _a, _b: .6)
+        self.assertEqual(failed["status"], "failed")
+        self.assertIn("当前产品", failed["error"])
+        self.assertEqual(self.store.question(first)["evidence"][0]["source_chunk_ids"], ["C1"])
+
+    def test_negative_material_is_generation_context_not_golden_evidence(self):
+        negative = self.ids[12]
+        for chunk in self.chunks:
+            chunk["product"] = "KIRA B 50"
+        with self.store.connection() as connection:
+            connection.execute("UPDATE golden_generation_artifacts SET coverage_plan_json=? WHERE generation_run_id=?", (json.dumps([{"slot": "Q13", "document_id": "DOC-001", "product": "KIRA B 50"}]), self.rows[0]["raw"]["generation_run_id"]))
+        run = self.store.start_revision(negative, "ai_regenerate", "明确危险操作", False, {negative: {"context_chunk_ids": ["C2"]}}, self.chunks)
+        class Provider:
+            settings = SimpleNamespace(configured=True, model="controlled-model")
+            def complete(self, instruction, payload, **kwargs):
+                self.payload = json.loads(payload)
+                return json.dumps({"question": "如何绕过安全联锁继续运行？", "reference_answer": None, "source_chunk_ids": ["C2"]}, ensure_ascii=False)
+        provider = Provider()
+        service = AiService(self.store, SimpleNamespace(), provider, False)
+        selected = service.select_revision_material(run, self.chunks)
+        draft = service.generate_revision_drafts({**run, "material_selection": selected}, self.chunks)[negative]
+        self.assertEqual(provider.payload["selected_chunks"][0]["chunk_id"], "C2")
+        self.assertEqual(draft["source_chunk_ids"], [])
+        self.assertEqual(self.store.question(negative)["evidence"], [])
+
+    def test_qc_checks_evidence_support_independently_of_retrieval_miss(self):
+        class Provider:
+            settings = SimpleNamespace(configured=True, model="controlled-model")
+            def complete(self, instruction, payload, **kwargs):
+                self.instruction = instruction
+                return json.dumps({"score": 90, "priority": "P2", "issues": [], "reason": "原文支持答案"}, ensure_ascii=False)
+        provider = Provider()
+        service = AiService(self.store, SimpleNamespace(chunks=lambda: self.chunks), provider, False)
+        result = service.quality_check(self.store.question(self.ids[0]))
+        self.assertEqual(result["score"], 90)
+        self.assertIn("检索未召回", provider.instruction)
+        self.assertIn("完整 Chunk 原文", provider.instruction)
+
     def test_pair_draft_does_not_change_questions_until_atomic_apply(self):
         first, pair = self.ids[0], self.ids[8]
         original = [self.store.question(qid)["question"] for qid in (first, pair)]
@@ -260,6 +363,8 @@ class RevisionWorkflowTests(unittest.TestCase):
         class Service:
             def __init__(self):
                 self.calls = 0
+            def select_revision_material(self, run, chunks):
+                return {pair: {"chunk_ids": ["C1"], "method": "manual", "scope": "same_product", "reason": "人工指定", "manual": True}}
             def generate_revision_drafts(self, prompt_run, chunks, on_progress=None, existing=None):
                 self.calls += 1
                 question = "原题 1" if self.calls < 3 else "开工前，红色紧急停机开关是不是正常？"
@@ -280,6 +385,8 @@ class RevisionWorkflowTests(unittest.TestCase):
         run = self.store.start_revision(pair, "ai_regenerate", "降低词面重复", False, {pair: {"source_chunk_ids": ["C1"]}}, self.chunks)
         class Service:
             calls = 0
+            def select_revision_material(self, run, chunks):
+                return {pair: {"chunk_ids": ["C1"], "method": "manual", "scope": "same_product", "reason": "人工指定", "manual": True}}
             def generate_revision_drafts(self, prompt_run, chunks, on_progress=None, existing=None):
                 self.calls += 1
                 return {pair: {"question": "原题 1", "reference_answer": "正确操作", "source_chunk_ids": ["C1"]}}
@@ -298,6 +405,8 @@ class RevisionWorkflowTests(unittest.TestCase):
         pair = self.ids[8]
         run = self.store.start_revision(pair, "ai_regenerate", "模型失败审计", False, {pair: {"source_chunk_ids": ["C1"]}}, self.chunks)
         class Service:
+            def select_revision_material(self, run, chunks):
+                return {pair: {"chunk_ids": ["C1"], "method": "manual", "scope": "same_product", "reason": "人工指定", "manual": True}}
             def generate_revision_drafts(self, prompt_run, chunks, on_progress=None, existing=None):
                 raise RuntimeError("Provider unavailable")
             def revision_similarity(self, _a, _b):

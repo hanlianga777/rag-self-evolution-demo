@@ -184,3 +184,11 @@ Overall Score、Regression、Monitoring Trigger、TTFT、Token Cost、Recall@K�
 
 - ...
 ```
+
+## V1.1 Golden Revision 定向收口
+
+- **Date:** 2026-09-25
+- **Status:** Confirmed
+- Revision AI 草案先基于真实材料决策：保留原 Evidence、同产品范围内定向检索，或人工指定；无可靠材料即停止，不跨产品随机换材。
+- Negative 选材仅作生成上下文，Golden Evidence 始终为空；原有 Probe/QC 阈值、`RETRIEVAL_INCOHERENT` 和人工应用／复审边界不变。
+- 本条仅补充 V1.1 Golden Revision 的实施细则，不新增主流程阶段。

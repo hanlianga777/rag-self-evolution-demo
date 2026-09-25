@@ -371,6 +371,10 @@ def _prepare_revision(revision_id, run_store, service, run_corpus):
         run = run_store.revision_run(revision_id)
         generated = run.get("generated_drafts") if run["mode"] == "ai_regenerate" else None
         if run["mode"] == "ai_regenerate":
+            if not run.get("material_selection"):
+                selection = service.select_revision_material(run, chunks)
+                run_store.update_revision(revision_id, material_selection=selection, stage="material_selected")
+                run = run_store.revision_run(revision_id)
             run_store.update_revision(revision_id, status="generating", stage="generating")
             def progress(index, total, item_id, drafts):
                 run_store.update_revision(revision_id, stage="generating", progress={"current": index, "total": total}, generated_drafts=drafts)
@@ -445,7 +449,10 @@ def _regenerate_revision_draft(revision_id, run_store, service, run_corpus):
         target = active["question_ids"][0]
         existing = {item_id: run_store._draft_change(run["drafts"][item_id]) for item_id in run["question_ids"] if item_id != target}
         selected = run_store._draft_change(run["drafts"][target])["source_chunk_ids"]
-        prompt_run = {**run, "changes": {**run["changes"], target: {"source_chunk_ids": selected}}}
+        material = dict(run.get("material_selection") or {})
+        if target in material and selected:
+            material[target] = {**material[target], "chunk_ids": selected}
+        prompt_run = {**run, "changes": {**run["changes"], target: {"source_chunk_ids": selected}}, "material_selection": material}
         generated = _generate_revision_with_weak_keyword_repair(prompt_run, run_store, service, run_corpus.chunks(), existing)
         run_store.finish_revision_regeneration(revision_id, {target: generated[target]}, run_corpus.chunks(), similarity=service.revision_similarity)
     except Exception as error:

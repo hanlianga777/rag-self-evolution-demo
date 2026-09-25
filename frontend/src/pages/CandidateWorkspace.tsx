@@ -33,9 +33,12 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
   const [paired, setPaired] = useState(false);
   const [changes, setChanges] = useState<Record<string, Candidate>>({});
   const [chunks, setChunks] = useState<Candidate[]>([]);
+  const [documents, setDocuments] = useState<Candidate[]>([]);
+  const [anchorDocumentId, setAnchorDocumentId] = useState("");
   const [chunkSelector, setChunkSelector] = useState<string | null>(null);
   const [chunkSearch, setChunkSearch] = useState("");
   const [chunkSection, setChunkSection] = useState("");
+  const [chunkDocument, setChunkDocument] = useState("");
   const [revisionRun, setRevisionRun] = useState<Candidate | undefined>(revision);
   const [revisionBusy, setRevisionBusy] = useState(false);
   const [revisionError, setRevisionError] = useState("");
@@ -57,9 +60,42 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
   }, [revision?.id, row?.id]);
   useEffect(() => {
     const documentIds = [...new Set([row, linked].map(item => item?.evidence_details?.[0]?.chunks?.[0]?.document_id).filter(Boolean))];
+    setChunks([]);
+    void getJson<Candidate[]>("/api/documents").then(setDocuments).catch(() => setDocuments([]));
     if (!documentIds.length) return;
-    Promise.all(documentIds.map(id => getJson<Candidate>(`/api/documents/${id}`))).then(documents => setChunks(documents.flatMap(document => document.chunks || []))).catch(() => setChunks([]));
+    let cancelled = false;
+    Promise.all(documentIds.map(id => getJson<Candidate>(`/api/documents/${id}`))).then(details => { if (!cancelled) setChunks(details.flatMap(document => document.chunks || [])); }).catch(() => { if (!cancelled) setChunks([]); });
+    return () => { cancelled = true; };
   }, [row?.id, linked?.id]);
+  useEffect(() => {
+    setAnchorDocumentId("");
+    if (row?.test_category !== "negative" || !row.raw?.generation_run_id) return;
+    void getJson<Candidate>(`/api/governance/generation-runs/${row.raw.generation_run_id}`).then(run => {
+      setAnchorDocumentId(run.artifacts?.coverage_plan?.find((entry: Candidate) => entry.slot === row.slot)?.document_id || "");
+    }).catch(() => setAnchorDocumentId(""));
+  }, [row?.id]);
+  useEffect(() => {
+    const selected = Object.values(revisionRun?.material_selection || {}) as Candidate[];
+    const ids = [...new Set([...selected.flatMap(item => item.document_ids || []), ...(row?.test_category === "negative" && anchorDocumentId ? [anchorDocumentId] : [])])];
+    if (!ids.length) return;
+    let cancelled = false;
+    Promise.all(ids.map(id => getJson<Candidate>(`/api/documents/${id}`))).then(details => {
+      if (!cancelled) setChunks(previous => [...new Map([...previous, ...details.flatMap(detail => (detail.chunks || []).map((chunk: Candidate) => ({ ...chunk, document_name: detail.name, product: detail.product })))].map(chunk => [chunk.chunk_id, chunk])).values()]);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [revisionRun?.id, revisionRun?.material_selection, anchorDocumentId, row?.id]);
+  useEffect(() => {
+    if (!chunkSelector || !documents.length) return;
+    const item = selectedRows.find(candidate => candidate.id === chunkSelector) || revisionRun?.before?.[chunkSelector];
+    const anchorId = item?.evidence_details?.[0]?.chunks?.[0]?.document_id || chunks.find(chunk => selectedChunks(chunkSelector, view === "draft").includes(chunk.chunk_id))?.document_id || anchorDocumentId;
+    const product = documents.find(document => document.id === anchorId)?.product;
+    if (!product) return;
+    let cancelled = false;
+    Promise.all(documents.filter(document => document.product === product).map(document => getJson<Candidate>(`/api/documents/${document.id}`))).then(details => {
+      if (!cancelled) setChunks(details.flatMap(detail => (detail.chunks || []).map((chunk: Candidate) => ({ ...chunk, document_name: detail.name, product: detail.product }))));
+    }).catch(error => { if (!cancelled) setRevisionError(errorMessage(error)); });
+    return () => { cancelled = true; };
+  }, [chunkSelector, documents, anchorDocumentId, row?.id]);
   useEffect(() => {
     if (!revisionRun?.id || !["queued", "generating", "validating", "probing", "qc"].includes(revisionRun.status)) return;
     let cancelled = false;
@@ -94,11 +130,11 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
 
   const edit = (id: string, field: string, value: unknown) => setChanges(previous => ({ ...previous, [id]: { ...previous[id], [field]: value } }));
   const previewEdit = (id: string, field: string, value: unknown) => setPreviewChanges(previous => ({ ...previous, [id]: { ...previous[id], [field]: value } }));
-  const selectedChunks = (id: string, draft: boolean) => draft ? previewChanges[id]?.source_chunk_ids || [] : changes[id]?.source_chunk_ids ?? selectedRows.find(item => item.id === id)?.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []) ?? [];
+  const selectedChunks = (id: string, draft: boolean) => draft ? previewChanges[id]?.source_chunk_ids || [] : changes[id]?.source_chunk_ids ?? changes[id]?.context_chunk_ids ?? selectedRows.find(item => item.id === id)?.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []) ?? [];
   const chooseChunk = (id: string, chunkId: string, draft: boolean) => {
     const current = selectedChunks(id, draft);
     const next = current.includes(chunkId) ? current.filter((value: string) => value !== chunkId) : [...current, chunkId];
-    if (draft) previewEdit(id, "source_chunk_ids", next); else edit(id, "source_chunk_ids", next);
+    if (draft) previewEdit(id, "source_chunk_ids", next); else edit(id, selectedRows.find(item => item.id === id)?.test_category === "negative" ? "context_chunk_ids" : "source_chunk_ids", next);
   };
   const openPreviewEdit = () => {
     if (!revisionRun) return;
@@ -142,7 +178,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
     setRevisionBusy(true); setRevisionError("");
     try {
       if (row.review_status === "human_review_pending" && !await onReview(row.id, "needs_revision", reason, tags)) return;
-      const payload = { mode, reason, paired: !!linked && paired, changes: Object.fromEntries(selectedRows.map(item => [item.id, { source_chunk_ids: item.test_category === "negative" ? [] : selectedChunks(item.id, false) }])), tags };
+      const payload = { mode, reason, paired: !!linked && paired, changes: Object.fromEntries(selectedRows.map(item => [item.id, mode === "manual_edit" ? { source_chunk_ids: item.test_category === "negative" ? [] : selectedChunks(item.id, false) } : changes[item.id] || {}])), tags };
       const started = await postJson<{ id: string }>(`/api/governance/questions/${row.id}/revision`, payload);
       setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${started.id}`)); setView("draft"); operation.watchRevision(started.id); await onRefresh();
     } catch (error) { setRevisionError(errorMessage(error)); }
@@ -170,10 +206,12 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
 
   const chunkPicker = chunkSelector && (() => {
     const item = selectedRows.find(candidate => candidate.id === chunkSelector) || revisionRun?.before?.[chunkSelector];
-    const documentId = item?.evidence_details?.[0]?.chunks?.[0]?.document_id || chunks.find(chunk => selectedChunks(chunkSelector, view === "draft").includes(chunk.chunk_id))?.document_id;
-    const options = chunks.filter(chunk => (!documentId || chunk.document_id === documentId) && (!chunkSection || chunk.section_path === chunkSection) && (!chunkSearch || `${chunk.section_path} ${chunk.page_start} ${chunk.chunk_id} ${chunk.chunk_text || chunk.text}`.toLowerCase().includes(chunkSearch.toLowerCase())));
-    const sections = [...new Set(chunks.filter(chunk => !documentId || chunk.document_id === documentId).map(chunk => chunk.section_path).filter(Boolean))];
-    return <div className="chunk-picker"><div className="workspace-row"><strong>选择真实证据 Chunk</strong><button className="secondary" onClick={() => setChunkSelector(null)}>返回修订</button></div><div className="workspace-row"><input aria-label="搜索 Chunk" placeholder="搜索章节、页码或原文" value={chunkSearch} onChange={event => setChunkSearch(event.target.value)} /><select aria-label="筛选章节" value={chunkSection} onChange={event => setChunkSection(event.target.value)}><option value="">全部章节</option>{sections.map(section => <option key={section} value={section}>{section}</option>)}</select></div><div className="chunk-options">{options.map(chunk => <label key={chunk.chunk_id} className="chunk-option"><input type="checkbox" checked={selectedChunks(chunkSelector, view === "draft").includes(chunk.chunk_id)} onChange={() => chooseChunk(chunkSelector, chunk.chunk_id, view === "draft")} /><span><strong>{chunk.section_path || "未标注章节"}</strong> · P.{chunk.page_start ?? "—"} · {chunk.chunk_id}<small>{cleanPreview(chunk.chunk_text || chunk.text || "").slice(0, 180)}</small></span></label>)}{!options.length && <p className="muted">没有匹配的 Chunk。</p>}</div></div>;
+    const documentId = item?.evidence_details?.[0]?.chunks?.[0]?.document_id || chunks.find(chunk => selectedChunks(chunkSelector, view === "draft").includes(chunk.chunk_id))?.document_id || anchorDocumentId;
+    const product = documents.find(document => document.id === documentId)?.product;
+    const available = chunks.filter(chunk => !product || (documents.find(document => document.id === chunk.document_id)?.product === product));
+    const options = available.filter(chunk => (!chunkDocument || chunk.document_id === chunkDocument) && (!chunkSection || chunk.section_path === chunkSection) && (!chunkSearch || `${chunk.document_name} ${chunk.section_path} ${chunk.page_start} ${chunk.chunk_id} ${chunk.chunk_text || chunk.text}`.toLowerCase().includes(chunkSearch.toLowerCase())));
+    const sections = [...new Set(available.filter(chunk => !chunkDocument || chunk.document_id === chunkDocument).map(chunk => chunk.section_path).filter(Boolean))];
+    return <div className="chunk-picker"><div className="workspace-row"><strong>手动选择真实 Chunk</strong><button className="secondary" onClick={() => setChunkSelector(null)}>返回修订</button></div><p className="muted">当前产品共 {available.length} 个 Chunk，筛选后 {options.length} 个；人工勾选优先于 AI 自动选材。</p><div className="workspace-row"><input aria-label="搜索 Chunk" placeholder="搜索文档、章节、页码或原文" value={chunkSearch} onChange={event => setChunkSearch(event.target.value)} /><select aria-label="筛选文档" value={chunkDocument} onChange={event => { setChunkDocument(event.target.value); setChunkSection(""); }}><option value="">同产品全部文档</option>{documents.filter(document => document.product === product).map(document => <option key={document.id} value={document.id}>{document.name} · {document.chunks} 个</option>)}</select><select aria-label="筛选章节" value={chunkSection} onChange={event => setChunkSection(event.target.value)}><option value="">全部章节</option>{sections.map(section => <option key={section} value={section}>{section}</option>)}</select></div><div className="chunk-options">{options.map(chunk => <label key={chunk.chunk_id} className="chunk-option"><input type="checkbox" checked={selectedChunks(chunkSelector, view === "draft").includes(chunk.chunk_id)} onChange={() => chooseChunk(chunkSelector, chunk.chunk_id, view === "draft")} /><span><strong>{chunk.document_name || documents.find(document => document.id === chunk.document_id)?.name || chunk.document_id}</strong> · {chunk.section_path || "未标注章节"} · P.{chunk.page_start ?? "—"} · {chunk.chunk_id}<small>{cleanPreview(chunk.chunk_text || chunk.text || "").slice(0, 240)}</small></span></label>)}{!options.length && <p className="muted">没有匹配的 Chunk。</p>}</div></div>;
   })();
 
   return <div className="candidate-shell">
@@ -182,6 +220,8 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
       {view !== "review" && <button className="text-button workspace-back" onClick={() => { setChunkSelector(null); setView(view === "audit" ? auditReturn : "review"); }}>{view === "audit" && auditReturn === "draft" ? "← 返回修订草案" : "← 返回审核"}</button>}
       {revisionError && <p className="error-notice" role="alert">{revisionError}</p>}
       {chunkPicker || <>
+        {view === "revision" && row.test_category === "negative" && <section className="candidate-card"><h3>负向题生成上下文</h3><p className="muted">所选材料只供生成草案参考，不成为 Golden Evidence。</p><p>{selectedChunks(row.id, false).join("、") || "未手动指定；AI 将按修订意图选材"}</p><button className="secondary" onClick={() => { setChunkSelector(row.id); setChunkSearch(""); setChunkSection(""); setChunkDocument(""); }}>手动选材</button></section>}
+        {view === "draft" && currentDraftId && revisionRun?.material_selection?.[currentDraftId] && <section className="candidate-card"><h3>材料决策</h3><p>{revisionRun.material_selection[currentDraftId].method === "manual" ? "人工指定" : revisionRun.material_selection[currentDraftId].method === "retained" ? "保留原证据" : "系统按修订意图选材"} · {revisionRun.material_selection[currentDraftId].reason}</p><p>{revisionRun.material_selection[currentDraftId].chunk_ids?.map((id: string) => { const chunk = chunks.find(value => value.chunk_id === id); return `${chunk?.document_name || chunk?.document_id || "当前索引未匹配"} · ${chunk?.section_path || "未标注章节"} · P.${chunk?.page_start ?? "—"} · ${id}`; }).join("；")}</p>{currentBefore?.test_category === "negative" && <p className="muted">仅作生成上下文，不写入 Golden Evidence。</p>}</section>}
         {view === "review" && <div className="review-workspace">
           <div className="workspace-badges"><span>{reviewLabel(row)}</span><span>{displayText(row.test_category)}</span>{row.raw?.ablation_attribute && <span>{displayText(row.raw.ablation_attribute)}</span>}{linked && <span>关联 {linked.test_category === "positive" ? "Positive" : "Ablation"}：{linked.slot}</span>}<span>Probe {probeLabel(row.probe_status)}</span><span>QC {qcLabel(row.qc_status)}</span></div>
           {revisionRun?.status === "completed" && ready && <p className="success-notice">✓ 修订已完成 · Probe {numberText(probe.score)} · QC {numberText(qc.score)} · 等待人工复审</p>}
@@ -189,7 +229,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
           <section className="candidate-card"><h3>问题</h3><p className="candidate-question">{row.question}</p><small>题型：{displayText(row.test_category)}{row.raw?.ablation_attribute ? ` · 属性：${displayText(row.raw.ablation_attribute)}` : ""}</small></section>
           <section className="candidate-card"><h3>{row.test_category === "negative" ? "预期行为" : "参考答案"}</h3><p className="candidate-answer">{row.test_category === "negative" ? qc.behavior_criteria || negativeBehavior[row.raw?.expected_behavior || row.negative_subtype] || displayText(row.raw?.expected_behavior || row.negative_subtype || "未记录") : row.reference_answer}</p></section>
           <section className="candidate-card"><h3>核心证据</h3>{row.test_category === "negative" ? <p className="muted">此题检验拒答或澄清边界，无预设 Golden Evidence。</p> : <>{evidenceChunks[0] && <p className="candidate-evidence-meta">{evidenceChunks[0].document_name || evidenceChunks[0].document_id || "当前索引未匹配"} · P.{evidenceChunks[0].page_start ?? "—"} · {evidenceChunks[0].section_path || "未标注章节"} · {evidenceChunks[0].chunk_id}</p>}<p className="candidate-evidence-preview">{cleanPreview(summarySource) || "当前索引未匹配，无法展示证据摘要"}</p><details><summary>查看完整证据</summary>{evidence.map((source: Candidate, index: number) => <div className="review-evidence" key={index}>{source.chunks?.map((chunk: Candidate) => <div key={chunk.chunk_id}><strong>{chunk.document_name || chunk.document_id || "当前索引未匹配"}</strong><p>{chunk.section_path || "未标注章节"} · P.{chunk.page_start ?? "—"}–{chunk.page_end ?? "—"} · {chunk.chunk_id}</p><p className="review-full-text">{chunk.chunk_text || "当前索引未匹配，无法展示原文"}</p></div>)}</div>)}</details></>}</section>
-          <section className="candidate-card"><h3>自动质量检查</h3><div className="quality-grid"><div><strong>Probe · {numberText(probe.score)} / {numberText(probe.threshold || 90)}</strong><span>{probeLabel(row.probe_status)}</span><p>{row.probe_status === "probe_passed" ? (rank >= 0 ? `预期证据命中第 ${rank + 1} 位` : "检索验证通过") : displayText(probe.reason || probe.probe_details?.failure_reason || "未运行")}</p></div><div><strong>QC · {numberText(qc.score)} / {numberText(qc.threshold || 85)}</strong><span>{qcLabel(row.qc_status)}</span><p>{rerunSlot?.qc === "skipped" ? "本次 Probe 未通过，QC 已跳过" : qc.reason || "—"}</p></div></div><div className="workspace-row"><button className="text-button" onClick={() => { setAuditReturn("review"); setAuditTab("probe"); setView("audit"); }}>查看 Probe 技术详情</button><button className="text-button" onClick={() => { setAuditReturn("review"); setAuditTab("qc"); setView("audit"); }}>查看 QC 技术详情</button></div></section>
+          <section className="candidate-card"><h3>自动质量检查</h3><div className="quality-grid"><div><strong>Probe · {numberText(probe.score)} / {numberText(probe.threshold || 90)}</strong><span>{probeLabel(row.probe_status)}</span><p>{probe.probe_details?.classification === "RETRIEVAL_INCOHERENT" || probe.classification === "RETRIEVAL_INCOHERENT" ? "证据有效但检索未召回，可进入人工审核" : row.probe_status === "probe_passed" ? (rank >= 0 ? `预期证据命中第 ${rank + 1} 位` : "检索验证通过") : displayText(probe.reason || probe.probe_details?.failure_reason || "未运行")}</p></div><div><strong>QC · {numberText(qc.score)} / {numberText(qc.threshold || 85)}</strong><span>{qcLabel(row.qc_status)}</span><p>{rerunSlot?.qc === "skipped" ? "本次 Probe 未通过，QC 已跳过" : qc.reason || "—"}</p></div></div><div className="workspace-row"><button className="text-button" onClick={() => { setAuditReturn("review"); setAuditTab("probe"); setView("audit"); }}>查看 Probe 技术详情</button><button className="text-button" onClick={() => { setAuditReturn("review"); setAuditTab("qc"); setView("audit"); }}>查看 QC 技术详情</button></div></section>
           {!!row.revision_history?.length && <details className="revision-summary"><summary>修订历史 · {row.revision_history.length}</summary>{row.revision_history.map((item: Candidate) => <p key={item.id}>{displayText(item.status)} · {item.reason || "未记录原因"} · {item.created_at}</p>)}</details>}
         </div>}
         {view === "revision" && <div className="revision-workspace"><h2>修订 {row.slot || "候选题"}</h2><section className="candidate-card"><h3>为什么需要修订？</h3><div className="revision-tags">{tagOptions.map(tag => <button key={tag} className={tags.includes(tag) ? "active" : "secondary"} aria-pressed={tags.includes(tag)} onClick={() => setTags(current => current.includes(tag) ? current.filter(value => value !== tag) : [...current, tag])}>{tag}</button>)}</div><label>修订说明<textarea value={reason} onChange={event => setReason(event.target.value)} placeholder="请写明需要修改的具体问题" /></label></section><section className="candidate-card"><h3>选择修订方式</h3><div className="revision-modes"><label><input type="radio" checked={mode === "ai_regenerate"} onChange={() => setMode("ai_regenerate")} /> AI 帮我修</label><label><input type="radio" checked={mode === "manual_edit"} onChange={() => setMode("manual_edit")} /> 我自己改</label></div>{linked && <div className="revision-pair"><p>关联 {linked.test_category === "positive" ? "Positive" : "Ablation"}：{linked.slot}</p><label><input type="checkbox" checked={paired} disabled={linked.stage === "golden" || !["needs_revision", "rejected"].includes(linked.review_status)} onChange={event => setPaired(event.target.checked)} /> 同时修订 {linked.slot}</label>{linked.stage === "golden" && <p className="muted">关联题已批准，不可共同修订。</p>}</div>}</section>{selectedRows.filter(item => item.test_category !== "negative").map(item => <section className="candidate-card" key={item.id}><h3>{item.slot} · 当前证据</h3><p>{selectedChunks(item.id, false).map((id: string) => { const chunk = chunks.find(value => value.chunk_id === id); return `${id} · ${chunk?.section_path || "未标注章节"} · P.${chunk?.page_start ?? "—"}`; }).join("；") || "未选择证据"}</p><button className="secondary" onClick={() => { setChunkSelector(item.id); setChunkSearch(""); setChunkSection(""); }}>更换证据</button></section>)}</div>}

@@ -218,6 +218,8 @@ class FinalGovernanceTests(unittest.TestCase):
         result = self.store.run_probe(item["id"], PipelineRetriever(), [{"chunk_id": "C1", "text": "支持证据"}])
         self.assertTrue(result["passed"])
         self.assertEqual(result["classification"], "RETRIEVAL_INCOHERENT")
+        self.store.record_qc(item["id"], {"score": 90, "priority": "P2", "reason": "原文支持"}, "passed")
+        self.assertEqual(self.store.question(item["id"])["review_status"], "human_review_pending")
 
     def test_alias_mapping_uses_only_explicitly_approved_entries(self):
         self.assertEqual(self.store.approved_aliases(), {})

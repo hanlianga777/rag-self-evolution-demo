@@ -89,6 +89,8 @@ Medium / Full 属于未来版本，不是 V1.1 实现或验收要求。
 
 Human Review 仅有批准、需修订、拒绝三个业务决定。需修订题可单独编辑 Question / Reference Answer / 真实 Evidence，或请求 AI 草案；保存后重新 Hard Validation → Probe → QC → 人工复审。Draft、版本哈希和尝试历史是内部事务与审计，不是额外人工审批阶段。Positive–Ablation 关系由 `source_positive_id` 等明确元数据表达，不以 Qxx 题号或共享 Evidence 推断，也不强制成对修订。
 
+AI 局部修订先确定真实材料：表达或答案问题默认保留原 Evidence；业务价值、证据不足、重复或明确换知识点时按修订意图先检索当前文档，再检索同产品文档。无合适材料则停止并提示补充意图或手动选材，不随机指派或自动跨产品。人工指定的真实 Chunk 优先；选材方式、范围、原因及 Chunk ID 进入 Revision 审计。Positive/Ablation 使用选定 Evidence 并重新验证答案锚点与关联关系；Negative 材料仅作生成上下文，其 Golden Evidence 仍为空。旧草案与指定题目重生成沿用已选材料，草案应用和最终批准始终由人确认。
+
 ### 6.1 Hard Validation
 
 Hard Validation 位于 Probe 之前，使用 Deterministic Rules 检查 Question Format、Required Fields、Evidence 是否存在及位置、Answer Anchor、Cross-Chunk Requirement、Duplicate、Forbidden Structure 及其他可明确判断的问题。明显不合法的数据应 Reject / Rewrite，避免浪费后续 LLM Judge / QC。
@@ -98,6 +100,8 @@ Hard Validation 位于 Probe 之前，使用 Deterministic Rules 检查 Question
 Probe 回答“这道题是否真的成立”，用于 Golden Candidate 自身质量检查，不是 RAG Evaluation。总分为 100：Question Quality `30`、Golden Answer Quality `30`、Evidence Support `40`。Probe Pass 的确认门槛为 `Score ≥ 90`；Evidence 明显无法支撑 Golden Answer 时直接 Probe Failed，不允许依赖其他项目分数补偿。Probe Fail 不能进入正式 Approved Golden，必须进入 `needs_revision`，修改后重新 Probe / QC。
 
 - Positive / Ablation：以真实 Question 进入当前 Retrieval Pipeline，检查 Golden Evidence 是否被召回。Evidence 确实存在但未召回时，应标记类似 `RETRIEVAL_INCOHERENT`，而非简单删除；它可能是高价值 Retrieval Bad Case。
+
+QC 应根据完整 Golden Evidence 原文独立判断支持度，不能只因当前检索未召回就认定证据不支持；Fake Negative 风险仍按原规则阻断。
 - Negative：使用 Vector Probe 加 Full-text Probe。后者补足 Table、Exact Number、Model Number、Exact Term 等向量检索盲区；必要时才由 LLM 判断检出的原文是否实际可回答问题。核心目标是避免 Fake Negative。
 
 ### 6.3 QC

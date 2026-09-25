@@ -8,7 +8,9 @@ React/Vite 展示工作区，FastAPI 负责数据边界，SQLite 以增量 migra
 
 `Golden Draft → GovernanceStore → FastAPI routes → frontend API client → 产品页面`
 
-Evaluation 固化 approved Question Snapshot、Production Config、Judge 元数据和逐题结果；后台线程只写 SQLite 运行记录。Optimization Agent 只能从真实 Bad Case 中生成 A/B/C，且只能使用 Tool Registry 的 available 参数。每个 Candidate 在 Baseline Snapshot 上独立回归，直到 Candidate Approval 与 Release Approval 都通过才会生成 Production Version；回滚只切换保留版本。
+Revision AI 在生成单题草案前先从当前文档、再从同产品文档确定真实 Chunk；人工指定材料优先，选材依据写入既有 Revision JSON 审计。Negative 只把材料作为生成上下文。此分支不改变主业务链，故现有 HTML 架构图及同源 PNG 无需重画。
+
+Evaluation 固化 approved Question Snapshot、Production Config、Judge 元数据和逐题结果；后台线程只写 SQLite 运行记录。Optimization Agent 只能从真实 Bad Case 中生成 A/B/C，且只能使用 Tool Registry 的 available 参数。每个 Candidate 在 Baseline Snapshot 上独立回归；人工一次确认发布时服务端重新检查 Recommendation、Sandbox、Gate 与 Regression，之后生成 Production Version；回滚只切换保留版本。
 
 ## Provider 边界
 
@@ -16,4 +18,4 @@ Evaluation 固化 approved Question Snapshot、Production Config、Judge 元数�
 
 ## 评测与推荐
 
-正式评测只覆盖人工批准的 Golden Question；初始 40 题均为 Pending Review。Overall 使用 Draft Scoring Policy（Correctness 35%、Completeness 25%、Faithfulness 30%、Behavior/Safety 10%），红线独立于总分；无真实运行时没有推荐结果。
+正式评测只覆盖人工批准的 Golden Snapshot；历史 40 题为 Legacy，不计入当前 Mini。Overall 仅作可读指标，11 项 Hard Gate 与 Regression 独立判定；无真实运行时没有推荐结果。

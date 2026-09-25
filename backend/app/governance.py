@@ -536,9 +536,14 @@ class GovernanceStore:
             if not isinstance(source_ids, list) or any(not isinstance(key, str) or key not in by_chunk for key in source_ids):
                 errors.append(f"{item_id}: Chunk 不存在于当前索引")
                 continue
-            old_documents = {by_chunk[key]["document_id"] for evidence in old["evidence"] for key in evidence.get("source_chunk_ids", []) if key in by_chunk}
-            if old["test_category"] != "negative" and (not old_documents or any(by_chunk[key]["document_id"] not in old_documents for key in source_ids)):
-                errors.append(f"{item_id}: 证据只能在原文档内改选")
+            original_chunks = [by_chunk[key] for evidence in old["evidence"] for key in evidence.get("source_chunk_ids", []) if key in by_chunk]
+            old_documents = {chunk["document_id"] for chunk in original_chunks}
+            original_product = next((chunk.get("product") for chunk in original_chunks if chunk.get("product")), None)
+            if not original_product:
+                coverage = (self.generation_run(run["generation_run_id"]).get("artifacts") or {}).get("coverage_plan", [])
+                original_product = next((entry.get("product") for entry in coverage if entry.get("slot") == old["raw"].get("coverage_slot")), None)
+            if old["test_category"] != "negative" and (not old_documents or any(by_chunk[key]["document_id"] not in old_documents and (not original_product or by_chunk[key].get("product") != original_product) for key in source_ids)):
+                errors.append(f"{item_id}: 证据只能在当前产品文档内改选")
                 continue
             if old["test_category"] == "negative" and source_ids:
                 errors.append(f"{item_id}: 负向题不能添加 Golden Evidence")

@@ -205,7 +205,7 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .revision-tags button.active { background: #dfe9f3; border-color: #91a6bc; }
 .revision-workspace label, .draft-workspace label { display: grid; font-size: 13px; gap: 6px; margin: 10px 0; }
 .revision-modes label, .revision-pair label { align-items: center; display: flex; gap: 6px; }
-.revision-workspace textarea, .draft-workspace textarea, .chunk-picker input, .chunk-picker select { background: #fff; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; padding: 9px; width: 100%; }
+.revision-workspace textarea, .draft-workspace textarea, .chunk-picker .workspace-row input, .chunk-picker select { background: #fff; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; padding: 9px; width: 100%; }
 .revision-workspace textarea, .draft-workspace textarea { min-height: 88px; resize: vertical; }
 .draft-compare .candidate-card { min-width: 0; }
 .draft-compare strong { font-size: 12px; }
@@ -218,6 +218,8 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .chunk-picker .workspace-row select { flex: 1; }
 .chunk-options { max-height: 55vh; overflow: auto; }
 .chunk-option { align-items: start; border-bottom: 1px solid var(--line-soft); display: flex; font-size: 13px; gap: 8px; padding: 10px 0; }
+.chunk-option input[type="checkbox"] { flex: none; height: 16px; margin: 2px 0 0; width: 16px; }
+.chunk-option span { min-width: 0; }
 .chunk-option small { color: var(--muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .success-notice { background: #eef5f0; border-radius: 8px; color: #316243; padding: 10px; }
 @media (max-width: 700px) { .candidate-workspace.drawer { height: calc(100dvh - 16px); right: 8px; top: 8px; width: calc(100vw - 16px); } .candidate-workspace .drawer-head { padding-left: 16px; } .candidate-scroll { padding: 14px 16px; } .candidate-actionbar { padding: 10px 16px; } .quality-grid, .draft-compare { grid-template-columns: 1fr; } .snapshot-next { align-items: start; flex-direction: column; } }

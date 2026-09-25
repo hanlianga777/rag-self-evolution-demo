@@ -121,13 +121,14 @@ it("shows persisted quality rerun progress and resumes polling after refresh", a
 
 it("shows only Revision Draft while a paired preview is active", async () => {
   const questions = Array.from({ length: 20 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: `原题 ${index + 1}`, reference_answer: index < 12 ? "正确操作" : null, test_category: index < 8 ? "positive" : index < 12 ? "ablation" : "negative", legacy_question_type: "v1_mini", probe_status: "probe_passed", qc_status: "qc_passed", review_status: index === 0 || index === 8 ? "needs_revision" : "approved", stage: index === 0 || index === 8 ? "candidate" : "golden", evidence: index === 0 || index === 8 ? [{ source_chunk_ids: ["C1"] }] : [], evidence_details: index === 0 || index === 8 ? [{ chunks: [{ chunk_id: "C1", document_id: "DOC-001" }] }] : [] }));
-  const revision = { id: "REV-test", status: "preview_ready", stage: "preview_ready", question_ids: ["V1-1", "V1-9"], before: { "V1-1": { ...questions[0], raw: { coverage_slot: "Q01" } }, "V1-9": { ...questions[8], raw: { coverage_slot: "Q09" } } }, drafts: { "V1-1": { ...questions[0], question: "新题 1" }, "V1-9": { ...questions[8], question: "新题 9" } }, progress: { current: 2, total: 2 } };
+  const revision = { id: "REV-test", status: "preview_ready", stage: "preview_ready", question_ids: ["V1-1", "V1-9"], before: { "V1-1": { ...questions[0], raw: { coverage_slot: "Q01" } }, "V1-9": { ...questions[8], raw: { coverage_slot: "Q09" } } }, drafts: { "V1-1": { ...questions[0], question: "新题 1" }, "V1-9": { ...questions[8], question: "新题 9" } }, material_selection: { "V1-1": { method: "automatic", reason: "检索设备安全操作", chunk_ids: ["C1"], document_ids: ["DOC-001"] } }, progress: { current: 2, total: 2 } };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.includes("/api/governance/revisions") ? [revision] : url.includes("/api/documents/") ? { chunks: [{ chunk_id: "C1", section_path: "操作", page_start: 2, chunk_text: "正确操作" }] } : { questions }), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }], dataset: questions }} />));
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
   expect(document.body.textContent).toContain("修订草案");
   expect(document.body.textContent).toContain("新题 1");
+  expect(document.querySelector(".draft-workspace")?.previousElementSibling?.textContent).toContain("系统按修订意图选材");
   expect(document.body.textContent).not.toContain("发起 Candidate 修订");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "生成修订草案")).toBe(false);
   expect(document.querySelector(".candidate-actionbar")?.textContent).toContain("确认应用");
@@ -141,7 +142,7 @@ it("starts Q09 alone by default and includes Q01 only when explicitly checked", 
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
     requests.push({ url, init });
-    const body = url.endsWith("/revision") ? { id: "REV-new" } : url.includes("/api/governance/revisions/REV-new") ? { id: "REV-new", status: "preview_ready", question_ids: ["V1-9"], drafts: {} } : url.endsWith("/api/governance/revisions") ? [] : url.includes("/api/documents/") ? { chunks: [{ chunk_id: "C1", document_id: "DOC-001", section_path: "操作" }, { chunk_id: "C2", document_id: "DOC-001", section_path: "其他操作" }] } : url.includes("export") ? { questions } : [];
+    const body = url.endsWith("/revision") ? { id: "REV-new" } : url.includes("/api/governance/revisions/REV-new") ? { id: "REV-new", status: "preview_ready", question_ids: ["V1-9"], drafts: {} } : url.endsWith("/api/governance/revisions") ? [] : url.endsWith("/api/documents") ? [{ id: "DOC-001", name: "设备说明.pdf", product: "KIRA B 50", chunks: 2 }] : url.includes("/api/documents/") ? { id: "DOC-001", name: "设备说明.pdf", product: "KIRA B 50", chunks: [{ chunk_id: "C1", document_id: "DOC-001", section_path: "操作", page_start: 2, chunk_text: "急停按钮检查步骤，启动前需确认按钮可以正常按下和复位。" }, { chunk_id: "C2", document_id: "DOC-001", section_path: "其他操作", page_start: 3, chunk_text: "打开设备并检查刷盘状态。" }] } : url.includes("export") ? { questions } : [];
     return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
   }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
@@ -158,6 +159,14 @@ it("starts Q09 alone by default and includes Q01 only when explicitly checked", 
   await act(async () => pair.click());
   expect(pair.checked).toBe(false);
   expect([...document.querySelectorAll(".revision-workspace button")].filter(button => button.textContent === "更换证据")).toHaveLength(1);
+  await act(async () => ([...document.querySelectorAll(".revision-workspace button")].find(button => button.textContent === "更换证据") as HTMLButtonElement).click());
+  expect(document.querySelector(".chunk-picker")?.textContent).toContain("设备说明.pdf");
+  expect(document.querySelector(".chunk-picker")?.textContent).toContain("筛选后 2 个");
+  expect(document.querySelectorAll(".chunk-option input[type='checkbox']")).toHaveLength(2);
+  const search = document.querySelector<HTMLInputElement>("input[aria-label='搜索 Chunk']")!;
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "刷盘"); search.dispatchEvent(new Event("input", { bubbles: true })); });
+  expect(document.querySelector(".chunk-picker")?.textContent).toContain("筛选后 1 个");
+  await act(async () => ([...document.querySelectorAll(".chunk-picker button")].find(button => button.textContent === "返回修订") as HTMLButtonElement).click());
   const reason = document.querySelector<HTMLTextAreaElement>(".revision-workspace textarea")!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(reason, "独立修 Q09"); reason.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "生成修订草案") as HTMLButtonElement).click());
@@ -166,6 +175,7 @@ it("starts Q09 alone by default and includes Q01 only when explicitly checked", 
   expect(requests.some(item => item.url.endsWith("/api/governance/questions/V1-9/review"))).toBe(false);
   expect(JSON.parse(started!.init!.body as string).paired).toBe(false);
   expect(Object.keys(JSON.parse(started!.init!.body as string).changes)).toEqual(["V1-9"]);
+  expect(JSON.parse(started!.init!.body as string).changes["V1-9"]).toEqual({});
   await act(async () => root.unmount());
 });
 
