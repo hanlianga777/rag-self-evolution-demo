@@ -25,10 +25,10 @@ function evaluation(run: any): Partial<Operation> {
   return { status: run.status === "running" ? "running" : run.status === "completed" ? "completed" : "failed", stage: run.status === "running" ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败", current: run.cases?.length, total, error: run.error_message };
 }
 
-const revisionStages: Record<string, [string, number]> = {
-  queued: ["等待草案", 10], material_selected: ["材料已选定", 10], generating: ["AI 单题生成", 35], generated: ["草案已生成", 35],
-  validating: ["Hard Validation", 55], hard_validation: ["Hard Validation", 55], probing: ["Probe", 70], probe: ["Probe", 70],
-  qc: ["QC · 正在运行质量审核", 85], preview_ready: ["草案待确认应用", 100], completed: ["待人工复审", 100],
+const revisionStages: Record<string, string> = {
+  queued: "等待草案", material_selected: "材料已选定", generating: "AI 单题生成", generated: "草案已生成",
+  validating: "Hard Validation", hard_validation: "Hard Validation", probing: "Probe", probe: "Probe",
+  qc: "QC · 正在运行质量审核", preview_ready: "草案待确认应用", completed: "待人工复审",
 };
 
 function revision(run: any): Partial<Operation> {
@@ -37,7 +37,7 @@ function revision(run: any): Partial<Operation> {
   const lastAttempt = [...(run.runtime_attempts || [])].reverse().find((attempt: any) => attempt.stage === code);
   return {
     status: failed ? "failed" : ["preview_ready", "completed", "cancelled"].includes(run.status) ? "completed" : "running",
-    stageCode: code, stage: revisionStages[code]?.[0] || (run.status === "interrupted" ? "进程已中断，需手动继续" : code),
+    stageCode: code, stage: revisionStages[code] || (run.status === "interrupted" ? "进程已中断，需手动继续" : code),
     current: run.progress?.current, total: run.progress?.total,
     error: run.error || (run.status === "interrupted" ? "进程重启后 Worker 不会自动恢复" : undefined),
     errorDetail: run.error_detail || run.error, provider: lastAttempt?.provider, model: lastAttempt?.model, attempt: lastAttempt?.attempt,
@@ -117,9 +117,9 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   const console = !!visible.length && <div className="operation-stack" aria-label="运行状态">{visible.map(item => <section className="operation-console" key={item.id} role={item.status === "failed" ? "alert" : "status"}>
       <div className="operation-head"><strong>{item.title}</strong><button aria-label="关闭运行状态" onClick={() => setOperations(current => current.map(row => row.id === item.id && row.status === "running" ? { ...row, dismissed: true } : row).filter(row => row.id !== item.id || row.status === "running"))}>×</button></div>
       <p>{item.status === "failed" ? "运行失败" : item.status === "completed" ? "✓ 完成" : item.restored ? `数据库记录：${item.stage || "运行中"}（Worker 未确认）` : item.stage || "运行中"}{item.startedAt != null && <span> · {Math.max(0, ((item.endedAt ?? now) - item.startedAt) / 1000).toFixed(1)}s</span>}</p>
-      {item.kind === "revision" && item.total === 1 && item.stageCode && revisionStages[item.stageCode] && <><div className="operation-count"><span>{item.stage?.split(" · ")[0]}</span><span>{revisionStages[item.stageCode][1]}%</span></div><progress value={revisionStages[item.stageCode][1]} max={100} /></>}
+      {item.kind === "revision" && item.total === 1 && item.status === "running" && <progress />}
       {!(item.kind === "revision" && item.total === 1) && item.current != null && item.total != null && item.total > 0 && <><div className="operation-count">{item.current} / {item.total}<span>{Math.round(item.current / item.total * 100)}%</span></div><progress value={item.current} max={item.total} /></>}
-      {(item.current == null || item.total == null || item.total <= 0) && item.status === "running" && <progress />}
+      {(item.current == null || item.total == null || item.total <= 0) && item.status === "running" && !(item.kind === "revision" && item.total === 1) && <progress />}
       {item.status === "failed" && <><small className="operation-error-summary">{shortError(item.error)}</small><button className="operation-detail-button" aria-label="查看错误详情" aria-expanded={detailId === item.id} aria-controls={`operation-detail-${item.id}`} onClick={() => setDetailId(current => current === item.id ? null : item.id)}>查看错误详情</button>{detailId === item.id && <div id={`operation-detail-${item.id}`} className="operation-details"><div>阶段：{item.stage || "未记录"}</div><div>耗时：{item.startedAt != null ? `${Math.max(0, ((item.endedAt ?? now) - item.startedAt) / 1000).toFixed(1)}s` : "未记录"}</div><div>错误：{item.errorDetail || item.error || "未记录"}</div><div>Operation ID：{item.id}</div>{item.provider && <div>Provider：{item.provider}</div>}{item.model && <div>Model：{item.model}</div>}{item.attempt != null && <div>Attempt：{item.attempt}</div>}</div>}</>}
     </section>)}</div>;
   return <OperationContext.Provider value={{ start, update, succeed, fail, run, watchEvaluation, watchRevision, registerDialogHost, unregisterDialogHost }}>

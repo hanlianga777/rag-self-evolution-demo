@@ -33,6 +33,8 @@ it("lets an unapplied failed draft reselect material with a new reason without a
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<CandidateWorkspace row={question} peers={[question]} revision={revision} busy={false} onRun={() => {}} onReview={async () => false} onRefresh={async () => {}} operation={{ watchRevision: () => {} } as any} />));
   expect(document.querySelector(".draft-workspace")?.textContent).toContain("旧失败草案");
+  expect(document.querySelector(".draft-workspace")?.textContent).toContain("草案生成失败");
+  expect(document.querySelector(".draft-workspace")?.textContent).not.toContain("0 / 1");
   expect((([...document.querySelectorAll("button")].find(button => button.textContent === "确认应用")) as HTMLButtonElement).disabled).toBe(true);
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "重新选材并生成") as HTMLButtonElement).click());
   const intent = document.querySelector<HTMLTextAreaElement>("textarea[aria-label='更新修订原因']")!;
@@ -40,6 +42,20 @@ it("lets an unapplied failed draft reselect material with a new reason without a
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "确认重新选材并生成") as HTMLButtonElement).click());
   expect(requests.find(item => item.url.endsWith("/regenerate-draft"))?.body).toMatchObject({ question_id: "V1-Q01", expected_hash: "draft-hash", material_mode: "reselect", reason: "改为操作安全知识点" });
   expect(requests.some(item => item.url.endsWith("/apply"))).toBe(false);
+  await act(async () => root.unmount());
+});
+
+it("routes an anchor failure with a material-change intent to reselection first", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })));
+  const question = { id: "V1-A", slot: "Q05", question: "旧题", reference_answer: "旧答案", test_category: "positive", review_status: "needs_revision", probe_status: "probe_passed", qc_status: "qc_passed", stage: "candidate", evidence: [{ source_chunk_ids: ["C1"] }], raw: { generation_run_id: "GGEN-test" } };
+  const revision = { id: "REV-A", status: "failed", stage: "hard_validation", error: "答案锚点未在所选证据原文中找到", reason: "换知识点：安全操作", tags: [], question_ids: [question.id], before: { [question.id]: question }, drafts: { [question.id]: { ...question, question: "草案" } }, new_hash: { [question.id]: "hash" }, material_selection: { [question.id]: { method: "retained", chunk_ids: ["C1"], reason: "保留证据" } } };
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<CandidateWorkspace row={question} peers={[question]} revision={revision} busy={false} onRun={() => {}} onReview={async () => false} onRefresh={async () => {}} operation={{ watchRevision: () => {} } as any} />));
+  expect(document.querySelector(".draft-workspace")?.textContent).toContain("当前材料不能支持草案答案");
+  const actions = [...document.querySelectorAll<HTMLButtonElement>(".candidate-actionbar button")];
+  expect(actions.find(button => button.textContent === "重新选材并生成")?.className).toContain("primary");
+  expect(actions.find(button => button.textContent === "基于当前材料重新生成")?.className).toContain("secondary");
+  expect(document.querySelector(".draft-workspace")?.textContent).toContain("手动选择真实 Chunk");
   await act(async () => root.unmount());
 });
 
@@ -235,7 +251,7 @@ it("lets a paired preview regenerate only Q09 and discard without applying", asy
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
     requests.push({ url, init });
-    if (url.endsWith("/edit-draft")) { revision.apply_blocked = true; revision.error = "Q09: Chunk 不存在于当前索引"; }
+    if (url.endsWith("/edit-draft")) { revision.status = "failed"; revision.apply_blocked = true; revision.error = "Q09: Chunk 不存在于当前索引"; }
     const body = url.includes("/api/governance/revisions/REV-pair") ? revision : url.endsWith("/api/governance/revisions") ? [revision] : url.includes("/api/documents/") ? { chunks: [{ chunk_id: "C1", document_id: "DOC-001", section_path: "操作", page_start: 2, chunk_text: "正确操作" }] } : url.includes("export") ? { questions } : url.endsWith("/api/dataset") ? questions : url.endsWith("/api/governance/generation-runs") ? [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }] : [];
     return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
   }));
@@ -253,6 +269,7 @@ it("lets a paired preview regenerate only Q09 and discard without applying", asy
   const editRequest = requests.find(item => item.url.endsWith("/edit-draft"));
   expect(Object.keys(JSON.parse(editRequest!.init!.body as string).changes)).toEqual(["V1-9"]);
   expect((([...document.querySelectorAll("button")].find(button => button.textContent === "确认应用")) as HTMLButtonElement).disabled).toBe(true);
+  expect((([...document.querySelectorAll("button")].find(button => button.textContent === "编辑草案")) as HTMLButtonElement).disabled).toBe(false);
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "重新生成") as HTMLButtonElement).click());
   const regeneration = requests.find(item => item.url.endsWith("/regenerate-draft"));
   expect(regeneration).toBeTruthy();

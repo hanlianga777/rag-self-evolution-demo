@@ -1,6 +1,9 @@
 import sqlite3
 import tempfile
 import unittest
+import os
+import subprocess
+import sys
 from unittest.mock import patch
 from pathlib import Path
 
@@ -29,6 +32,46 @@ class LegacyGenerationStorageTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name) / "legacy.db"
+
+    def test_restart_marks_generation_interrupted_and_allows_manual_new_run(self):
+        store = GovernanceStore(self.path)
+        run_id = store.start_generation_run("test-model")
+        store.update_generation_run(run_id, status="generating", progress={"stage": "generating", "slot": "Q03", "completed_slots": 2})
+
+        store.interrupt_generation_runs()
+
+        old = store.generation_run(run_id)
+        self.assertEqual(old["status"], "failed")
+        self.assertEqual(old["artifacts"]["hard_validation"]["failed_stage"], "generating")
+        self.assertEqual(old["artifacts"]["hard_validation"]["progress"]["completed_slots"], 2)
+        self.assertEqual(old["question_ids"], [])
+        self.assertNotEqual(store.start_generation_run("test-model"), run_id)
+
+    def test_restart_marks_quality_rerun_interrupted_without_losing_slot_audit(self):
+        store = GovernanceStore(self.path)
+        run_id = store.start_generation_run("test-model")
+        store.save_mini_golden_candidates(mini_candidates(), "test-model", run_id=run_id)
+        store.update_generation_run(run_id, status="completed")
+        store.update_quality_rerun(run_id, {"status": "running", "stage": "qc", "completed": 7, "slots": {"Q01": {"probe": "passed", "qc": "passed"}}}, start=True)
+
+        store.interrupt_generation_runs()
+
+        rerun = store.generation_run(run_id)["artifacts"]["hard_validation"]["quality_rerun"]
+        self.assertEqual(rerun["status"], "failed")
+        self.assertEqual(rerun["failed_stage"], "qc")
+        self.assertEqual(rerun["completed"], 7)
+        self.assertEqual(rerun["slots"]["Q01"]["qc"], "passed")
+
+    def test_api_can_start_with_an_isolated_database_before_import_side_effects(self):
+        isolated = Path(self.directory.name) / "isolated.db"
+        result = subprocess.run(
+            [sys.executable, "-c", "from app.main import store; print(store.database_path)"],
+            env={**os.environ, "PYTHONPATH": "backend", "RAG_DEMO_DB_PATH": str(isolated)},
+            capture_output=True, text=True, check=True,
+        )
+
+        self.assertEqual(Path(result.stdout.strip()), isolated)
+        self.assertTrue(isolated.exists())
 
     def test_draft_seed_uses_named_columns_with_qc_at_end_and_snapshot_already_present(self):
         with sqlite3.connect(self.path) as connection:

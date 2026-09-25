@@ -199,3 +199,11 @@ Overall Score、Regression、Monitoring Trigger、TTFT、Token Cost、Recall@K�
 - **Status:** Confirmed
 - “重新生成”只改写当前材料上的草案；“重新选材并生成”按更新后的修订意图重新选真实 Chunk，失败时保留旧草案并暂停应用。
 - Operation Console 在 Modal Drawer 打开时必须仍可交互；Golden 校验与人工边界不变。
+
+## V1.1 Governance Lifecycle 验收澄清
+
+- **Date:** 2026-09-26
+- **Status:** Confirmed
+- 答案锚点失败继续由 Hard Validation 阻断；恢复操作依最新修订意图区分沿用材料与重新选材，不增加业务阶段。
+- Generation / 质量重跑的进程内 Worker 重启后不自动续跑；保留审计、允许手动重试。单题只显示持久化阶段与耗时，不使用固定百分比。
+- Fixture E2E、隔离库真实 Provider 生命周期及当前用户库的人工状态分别报告，不互相冒充。

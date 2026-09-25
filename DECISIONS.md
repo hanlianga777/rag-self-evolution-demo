@@ -27,3 +27,7 @@ UI 呈现的是一个具有工具化步骤的结构化 Optimization Agent，不�
 ## Revision Preview 的材料语义（V1.1）
 
 在当前材料上重写草案与重新选材是两个显式动作。前者不改变 Chunk；后者以本次更新的修订意图选同产品真实材料，并将尝试与结果保留在既有 Revision JSON 审计。两者均不自动应用或批准题目。Operation Console 随 Modal Drawer 进入其交互层，背景仍由 Modal 阻断。
+
+## Governance 运行恢复与验收隔离（V1.1）
+
+进程内后台线程不具备跨重启续跑能力：服务启动将遗留的 Generation / 质量重跑标为失败并保存已完成阶段，用户手动发起新 Run 或质量重跑。Revision 已应用后的质量恢复仍按持久化 Probe/QC 阶段继续，不重复应用草案。单题任务只显示真实阶段和耗时，不使用固定阶段百分比。真实 Provider 生命周期仅在启动前指定的隔离 SQLite 中验收；Fixture E2E 不作为真实结果。

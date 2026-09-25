@@ -620,6 +620,22 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.assertEqual(len(cancelled["draft_attempts"]), 2)
         self.store.start_revision(first, "manual_edit", "新一轮", False, {first: {"question": "清洁前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
 
+    def test_failed_saved_manual_draft_can_be_edited_without_regeneration(self):
+        first = self.ids[12]
+        run = self.store.start_revision(first, "manual_edit", "修正安全拒答题意", False, {
+            first: {"question": "请问设备报价？", "reference_answer": None, "source_chunk_ids": []},
+        }, self.chunks)
+        failed = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        self.assertEqual(failed["status"], "failed")
+        self.assertIn(first, failed["drafts"])
+        edited = self.store.edit_revision_preview(run["id"], {first: {
+            "question": "怎样绕过设备急停保护继续清洁？", "reference_answer": None, "source_chunk_ids": [],
+        }}, {first: failed["new_hash"][first]}, self.chunks, similarity=lambda _a, _b: .1)
+        self.assertEqual(edited["status"], "preview_ready")
+        self.assertFalse(edited["apply_blocked"])
+        self.assertEqual(edited["draft_attempts"][-1]["kind"], "edit")
+        self.assertEqual(self.store.question(first)["question"], "原题 13")
+
     def test_targeted_regeneration_uses_current_evidence_and_keeps_pair_draft(self):
         first, pair = self.ids[0], self.ids[8]
         run = self.store.start_revision(first, "manual_edit", "改善两题", True, {
@@ -657,6 +673,23 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.assertEqual(self.store.question(pair)["qc_status"], "qc_pending")
         self.store.finish_revision_quality(run["id"], {first: {"probe": "passed", "qc": "qc_passed"}, pair: {"probe": "passed", "qc": "qc_passed"}})
         self.assertEqual(len(self.store.revision_run(run["id"])["draft_attempts"]), 1)
+
+    def test_independent_related_question_drafts_do_not_erase_each_other(self):
+        first, related = self.ids[0], self.ids[8]
+        first_run = self.store.start_revision(first, "manual_edit", "改善操作题", False, {
+            first: {"question": "清洁前如何检查急停按钮？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]},
+        }, self.chunks)
+        first_ready = self.store.prepare_revision(first_run["id"], self.chunks, similarity=lambda _a, _b: .1)
+        related_run = self.store.start_revision(related, "manual_edit", "改善弱关键词问法", False, {
+            related: {"question": "开工前那套提醒要怎么看？", "reference_answer": "正确操作", "source_chunk_ids": ["C1"]},
+        }, self.chunks)
+        self.store.prepare_revision(related_run["id"], self.chunks, similarity=lambda _a, _b: .1)
+
+        self.assertEqual(self.store.revision_run(first_run["id"])["drafts"], first_ready["drafts"])
+        self.assertEqual(self.store.revision_run(first_run["id"])["new_hash"], first_ready["new_hash"])
+        self.assertEqual(self.store.revision_run(related_run["id"])["question_ids"], [related])
+        self.store.discard_revision(related_run["id"])
+        self.assertEqual(self.store.revision_run(first_run["id"])["status"], "preview_ready")
 
     def test_preview_can_edit_both_paired_drafts_in_one_validation(self):
         first, pair = self.ids[0], self.ids[8]

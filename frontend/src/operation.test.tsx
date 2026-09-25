@@ -151,7 +151,7 @@ it("reopens a dismissed running bar if that operation later fails", async () => 
   await act(async () => root.unmount());
 });
 
-it("shows the persisted QC stage for one Revision instead of misleading 1/1 completion", async () => {
+it("shows the persisted QC stage without an invented percentage for one Revision", async () => {
   const run = { id: "REV-q15", status: "qc", stage: "qc", question_ids: ["Q15"], progress: { current: 1, total: 1 } };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [run] : run), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
@@ -159,8 +159,9 @@ it("shows the persisted QC stage for one Revision instead of misleading 1/1 comp
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
   const card = document.querySelector(".operation-console")!;
   expect(card.textContent).toContain("QC");
-  expect(card.textContent).toContain("85%");
+  expect(card.textContent).not.toMatch(/\d+%/);
   expect(card.textContent).not.toContain("1 / 1");
+  expect(card.querySelector("progress:not([value])")).not.toBeNull();
   await act(async () => root.unmount());
 });
 

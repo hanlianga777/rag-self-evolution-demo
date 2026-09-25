@@ -256,6 +256,24 @@ class GovernanceStore:
             connection.execute("UPDATE golden_generation_runs SET status = ? WHERE id = ?", (status, run_id))
             connection.execute("UPDATE golden_generation_artifacts SET coverage_plan_json = ?, hard_validation_json = ? WHERE generation_run_id = ?", (_json(coverage_plan if coverage_plan is not None else _load(row["coverage_plan_json"], [])), _json(audit), run_id))
 
+    def interrupt_generation_runs(self):
+        """A process restart cannot resume daemon workers; preserve their audit and unblock manual retry."""
+        with self.connection() as connection:
+            rows = connection.execute("SELECT r.id, r.status, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id").fetchall()
+            for row in rows:
+                audit = _load(row["hard_validation_json"], {})
+                changed = False
+                if row["status"] in {"queued", "coverage", "generating", "validation", "probing", "qc"}:
+                    audit.update({"failed_stage": audit.get("progress", {}).get("stage") or row["status"], "error": "服务重启后生成 Worker 已中断，请手动重新运行", "interrupted_at": _now()})
+                    connection.execute("UPDATE golden_generation_runs SET status='failed' WHERE id=?", (row["id"],))
+                    changed = True
+                rerun = audit.get("quality_rerun") or {}
+                if rerun.get("status") == "running":
+                    audit["quality_rerun"] = {**rerun, "status": "failed", "failed_stage": rerun.get("stage"), "error": "服务重启后质量 Worker 已中断，请手动重试", "interrupted_at": _now()}
+                    changed = True
+                if changed:
+                    connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), row["id"]))
+
     def save_mini_golden_candidates(self, candidates: list[dict], model_version: str, *, coverage_plan: list[dict] | None = None, hard_validation: dict | None = None, slot_audit: dict | None = None, run_id: str | None = None):
         """Persist the V1 Mini profile only as review-pending candidates, never as Golden."""
         expected = GENERATION_PROFILES["mini"]
@@ -617,7 +635,7 @@ class GovernanceStore:
             row = connection.execute("SELECT status, generation_run_id, audit_json FROM candidate_revision_runs WHERE id=?", (revision_id,)).fetchone()
             if row is None:
                 raise KeyError(revision_id)
-            if row["status"] != "preview_ready" and not (row["status"] == "failed" and kind in {"regenerate", "reselect"}):
+            if row["status"] not in {"preview_ready", "failed"}:
                 raise ValueError("草案操作运行中或状态不允许")
             audit = _load(row["audit_json"], {})
             if audit.get("applied_at") or set(audit.get("drafts") or {}) != set(audit["question_ids"]) or set(audit.get("new_hash") or {}) != set(audit["question_ids"]):

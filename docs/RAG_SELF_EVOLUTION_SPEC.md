@@ -91,6 +91,8 @@ Human Review 仅有批准、需修订、拒绝三个业务决定。需修订题�
 
 AI 局部修订先确定真实材料：表达或答案问题默认保留原 Evidence；业务价值、证据不足、重复或明确换知识点时按修订意图先检索当前文档，再检索同产品文档。无合适材料则停止并提示补充意图或手动选材，不随机指派或自动跨产品。人工指定的真实 Chunk 优先；选材方式、范围、原因及 Chunk ID 进入 Revision 审计。Positive/Ablation 使用选定 Evidence 并重新验证答案锚点与关联关系；Negative 材料仅作生成上下文，其 Golden Evidence 仍为空。草案“重新生成”沿用当前材料；“重新选材并生成”按最新原因与标签重新选材，自动选择须避开原证据和当前草案材料。两者均只更新通过 Hard Validation 的预览，草案应用和最终批准始终由人确认。
 
+运行失败时保留原草案、Candidate 和审计。答案锚点失败不降低校验门槛：按最新修订意图提示基于当前材料重写，或重新选择同产品真实材料；无可靠材料时提示修改意图或人工选 Chunk。后台线程在服务重启后不自动续跑，运行态应记录中断并由用户手动重试。进度只显示已持久化的题目计数；单题多阶段任务只显示阶段与耗时，不将固定阶段映射冒充百分比。
+
 ### 6.1 Hard Validation
 
 Hard Validation 位于 Probe 之前，使用 Deterministic Rules 检查 Question Format、Required Fields、Evidence 是否存在及位置、Answer Anchor、Cross-Chunk Requirement、Duplicate、Forbidden Structure 及其他可明确判断的问题。明显不合法的数据应 Reject / Rewrite，避免浪费后续 LLM Judge / QC。
@@ -392,4 +394,4 @@ V1.1 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语�
 
 ## 14. V1.1 实施与验收边界 `[CONFIRMED]`
 
-保持七个一级页面、FastAPI / SQLite / React、11 Hard Gates、Probe ≥90、QC ≥85、人工 Golden Review 与人工发布。不得自动修改现有 Candidate、应用未确认 Preview、生成真实 Golden、批准 Snapshot 或发布版本。确定性完整 E2E 在隔离数据库中运行；真实 Provider 只做隔离 Live Smoke。Medium / Full、Composite D、新模型、多 Agent、Docker、复杂监控和 UI 重设计均不在本版本范围。
+保持七个一级页面、FastAPI / SQLite / React、11 Hard Gates、Probe ≥90、QC ≥85、人工 Golden Review 与人工发布。不得自动修改用户现有 Candidate、应用未确认 Preview、批准当前库 Snapshot 或发布版本。确定性完整 E2E 与真实 Provider 生命周期验收均须使用隔离数据库，并明确区分 Fixture 与 Real Lifecycle 证据；隔离库中的 Test Human Action 不代表用户实际审核。Medium / Full、Composite D、新模型、多 Agent、Docker、复杂监控和 UI 重设计均不在本版本范围。

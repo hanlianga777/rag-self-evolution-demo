@@ -28,10 +28,11 @@ app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
 app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1] / "documents"), name="documents")
 TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
 app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
-store = GovernanceStore()
+store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None)
 corpus = CorpusStore()
 ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")
 store.interrupt_revision_runs()
+store.interrupt_generation_runs()
 
 
 class PreviewRequest(BaseModel):
