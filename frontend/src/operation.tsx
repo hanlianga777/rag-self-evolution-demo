@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { getJson } from "./api";
 
 type Operation = { id: string; title: string; status: "running" | "completed" | "failed"; kind?: "evaluation" | "revision"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
@@ -10,9 +11,11 @@ type OperationContextValue = {
   run: <T>(title: string, work: () => Promise<T>) => Promise<T>;
   watchEvaluation: (id: string, title: string) => void;
   watchRevision: (id: string) => void;
+  registerDialogHost: (node: HTMLElement) => void;
+  unregisterDialogHost: (node: HTMLElement) => void;
 };
 
-const fallback: OperationContextValue = { start: () => "", update: () => {}, succeed: () => {}, fail: () => {}, run: (_title, work) => work(), watchEvaluation: () => {}, watchRevision: () => {} };
+const fallback: OperationContextValue = { start: () => "", update: () => {}, succeed: () => {}, fail: () => {}, run: (_title, work) => work(), watchEvaluation: () => {}, watchRevision: () => {}, registerDialogHost: () => {}, unregisterDialogHost: () => {} };
 const OperationContext = createContext<OperationContextValue>(fallback);
 export function useOperation() { return useContext(OperationContext); }
 
@@ -48,6 +51,7 @@ export function shortError(error?: string) {
 
 export function OperationProvider({ children, restore = true }: { children: ReactNode; restore?: boolean }) {
   const [operations, setOperations] = useState<Operation[]>([]);
+  const [dialogHosts, setDialogHosts] = useState<HTMLElement[]>([]);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const timers = useRef<Set<number>>(new Set());
@@ -76,6 +80,8 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   }, [start, succeed, fail]);
   const watchEvaluation = useCallback((id: string, title: string) => start(title, { id, kind: "evaluation" }), [start]);
   const watchRevision = useCallback((id: string) => start("局部修订", { id, kind: "revision" }), [start]);
+  const registerDialogHost = useCallback((node: HTMLElement) => setDialogHosts(current => [...current.filter(item => item !== node), node]), []);
+  const unregisterDialogHost = useCallback((node: HTMLElement) => setDialogHosts(current => current.filter(item => item !== node)), []);
 
   useEffect(() => {
     if (!restore) return;
@@ -108,15 +114,16 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   }, [operations, update, succeed, fail]);
 
   const visible = operations.filter(item => !item.dismissed).slice(-3);
-  return <OperationContext.Provider value={{ start, update, succeed, fail, run, watchEvaluation, watchRevision }}>
-    {children}
-    {!!visible.length && <div className="operation-stack" aria-label="运行状态">{visible.map(item => <section className="operation-console" key={item.id} role={item.status === "failed" ? "alert" : "status"}>
+  const console = !!visible.length && <div className="operation-stack" aria-label="运行状态">{visible.map(item => <section className="operation-console" key={item.id} role={item.status === "failed" ? "alert" : "status"}>
       <div className="operation-head"><strong>{item.title}</strong><button aria-label="关闭运行状态" onClick={() => setOperations(current => current.map(row => row.id === item.id && row.status === "running" ? { ...row, dismissed: true } : row).filter(row => row.id !== item.id || row.status === "running"))}>×</button></div>
       <p>{item.status === "failed" ? "运行失败" : item.status === "completed" ? "✓ 完成" : item.restored ? `数据库记录：${item.stage || "运行中"}（Worker 未确认）` : item.stage || "运行中"}{item.startedAt != null && <span> · {Math.max(0, ((item.endedAt ?? now) - item.startedAt) / 1000).toFixed(1)}s</span>}</p>
       {item.kind === "revision" && item.total === 1 && item.stageCode && revisionStages[item.stageCode] && <><div className="operation-count"><span>{item.stage?.split(" · ")[0]}</span><span>{revisionStages[item.stageCode][1]}%</span></div><progress value={revisionStages[item.stageCode][1]} max={100} /></>}
       {!(item.kind === "revision" && item.total === 1) && item.current != null && item.total != null && item.total > 0 && <><div className="operation-count">{item.current} / {item.total}<span>{Math.round(item.current / item.total * 100)}%</span></div><progress value={item.current} max={item.total} /></>}
       {(item.current == null || item.total == null || item.total <= 0) && item.status === "running" && <progress />}
       {item.status === "failed" && <><small className="operation-error-summary">{shortError(item.error)}</small><button className="operation-detail-button" aria-label="查看错误详情" aria-expanded={detailId === item.id} aria-controls={`operation-detail-${item.id}`} onClick={() => setDetailId(current => current === item.id ? null : item.id)}>查看错误详情</button>{detailId === item.id && <div id={`operation-detail-${item.id}`} className="operation-details"><div>阶段：{item.stage || "未记录"}</div><div>耗时：{item.startedAt != null ? `${Math.max(0, ((item.endedAt ?? now) - item.startedAt) / 1000).toFixed(1)}s` : "未记录"}</div><div>错误：{item.errorDetail || item.error || "未记录"}</div><div>Operation ID：{item.id}</div>{item.provider && <div>Provider：{item.provider}</div>}{item.model && <div>Model：{item.model}</div>}{item.attempt != null && <div>Attempt：{item.attempt}</div>}</div>}</>}
-    </section>)}</div>}
+    </section>)}</div>;
+  return <OperationContext.Provider value={{ start, update, succeed, fail, run, watchEvaluation, watchRevision, registerDialogHost, unregisterDialogHost }}>
+    {children}
+    {dialogHosts.length ? createPortal(console, dialogHosts[dialogHosts.length - 1]) : console}
   </OperationContext.Provider>;
 }

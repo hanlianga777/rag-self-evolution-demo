@@ -47,3 +47,4 @@ cd frontend && npm install && npm run dev
 
 将 `.env.example` 复制为 `.env` 并设置 `DEEPSEEK_API_KEY` 后，才可执行真实 Golden Generation、QC、回答、Judge、评测与 Agent。原始 PDF 不上传；显式运行回答、QC、评测或 Agent 时，相关 Chunk 会发送给 DeepSeek。
 DeepSeek 单次请求默认超时 60 秒，可用 `DEEPSEEK_TIMEOUT_SECONDS` 调整；Revision 生成和质量检查遇明确超时仅自动重试一次，应用后的质量运行失败可从已持久化的 Probe/QC 状态手动继续，不会重新应用草案。
+Revision Preview 中“重新生成”保留当前证据；“重新选材并生成”使用最新修订原因重新选择同产品真实材料。两者都不会自动应用 Candidate 或批准 Golden。

@@ -8,6 +8,8 @@
 
 Provider 配置在 `.env`，绝不读取或提交密钥。设置页“验证 Provider”会发起最小模型调用；无 Provider 时展示真实不可用状态。真实模型 Smoke 必须用隔离数据库，确定性 E2E 必须用临时 SQLite 与 Fixture。
 
+Revision Preview 的“重新生成”沿用当前材料；“重新选材并生成”按最新原因／标签重新执行选材，失败时保留未应用草案。**No Pseudo Interaction：** 视觉上可点击的按钮、关闭、展开、菜单、标签和下拉必须有真实状态变化，并在浏览器中可点击；关键交互须有 Interaction Test。Modal 打开时也要检查浮层的指针与焦点交互。
+
 **Impact Check 硬规则：** 修改业务逻辑、页面流程、状态机、API、数据字段、Retrieval、Evaluation、Agent、Release 或 Monitoring 时，逐项检查 SPEC、SPEC ChangeLog、README、PROJECT_CONTEXT、CODEX_HANDOFF、DECISIONS、TODO、架构说明、两张架构图、后端测试、前端测试、E2E 与当前 Demo；记录需更新项和无需更新的理由。禁止只改代码不改文档，也禁止只改 SPEC 不改实现。
 
 交付前运行后端全量测试、前端 Vitest、生产构建、五条业务 E2E、Fresh/Existing DB 验证、HTTP/UI smoke 和 `git diff --check`；推送后确认 `HEAD == origin/main` 与干净工作树。

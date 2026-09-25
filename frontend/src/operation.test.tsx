@@ -3,11 +3,32 @@ import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { OperationProvider, useOperation } from "./operation";
+import { Drawer } from "./components/Dialog";
 import { SettingsPage } from "./pages/SettingsPage";
 
 // React's DOM act() needs this flag when tests dispatch real button clicks.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it("keeps the operation controls inside an open modal drawer", async () => {
+  function Harness() {
+    const operation = useOperation();
+    const [open, setOpen] = useState(false);
+    return <><button onClick={() => setOpen(true)}>打开审核</button><Drawer open={open} onOpenChange={setOpen} title="候选题审核"><button onClick={() => operation.fail(operation.start("局部修订"), new Error("校验失败"))}>触发失败</button></Drawer></>;
+  }
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
+  await act(async () => document.querySelector<HTMLButtonElement>("button")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "触发失败")!.click());
+  const dialog = document.querySelector("[role=dialog]")!;
+  expect(dialog.contains(document.querySelector(".operation-console"))).toBe(true);
+  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='查看错误详情']")!.click());
+  expect(dialog.textContent).toContain("Operation ID");
+  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='关闭运行状态']")!.click());
+  expect(document.querySelector(".operation-console")).toBeNull();
+  expect(document.querySelector("[role=dialog]")).not.toBeNull();
+  await act(async () => root.unmount());
+});
 
 it("shows an actual pending action and keeps its failure until dismissed", async () => {
   let reject!: (reason: Error) => void;

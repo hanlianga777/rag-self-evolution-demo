@@ -183,12 +183,14 @@ class AiService:
                 ids, method, scope, reason = manual, "manual", "same_product", "人工指定真实 Chunk"
             else:
                 tags = set(run.get("tags") or [])
-                reselect = bool(tags & {"业务价值偏低", "证据不足", "与其他题重复"}) or any(word in run["reason"] for word in ("换知识点", "换材料", "换成", "改为"))
+                reselect = bool(run.get("force_reselect")) or bool(tags & {"业务价值偏低", "证据不足", "与其他题重复"}) or any(word in run["reason"] for word in ("换知识点", "换材料", "换成", "改为"))
                 if not reselect and original:
                     ids, method, scope, reason = original, "retained", "original_evidence", "表达或答案修订，保留原 Evidence"
                 else:
-                    intent = re.search(r"(?:换知识点|换材料|换成|改为|围绕)(?:为|成|到|：|:)?\s*(.+)", run["reason"])
-                    if intent:
+                    intent = re.search(r"(?:换知识点|换材料|换成|改为|围绕|重新选择)(?:为|成|到|：|:)?\s*(.+)", run["reason"])
+                    if run.get("force_reselect"):
+                        query = intent.group(1).strip() if intent else run["reason"].strip()
+                    elif intent:
                         query = intent.group(1).strip()
                     elif old["test_category"] == "negative":
                         query = run["reason"] if len(run["reason"].strip()) >= 6 else old["question"]
@@ -201,11 +203,12 @@ class AiService:
                     for hit in hits:
                         key = hit.get("chunk_id")
                         chunk = by_id.get(key)
-                        if not chunk or chunk.get("product") != product or key in original:
+                        if not chunk or chunk.get("product") != product or key in original or key in (run.get("exclude_chunk_ids") or {}).get(item_id, []):
                             continue
                         section = str(chunk.get("section_path") or "")
                         body = str(chunk.get("chunk_text") or chunk.get("text") or "")
-                        if len(body.strip()) < 45 or any(word in section for word in ("封面", "目录", "前言", "一致性声明")):
+                        heading = " ".join((section, str(chunk.get("title") or ""), str(chunk.get("section_title") or "")))
+                        if len(body.strip()) < 45 or any(word in heading for word in ("封面", "目录", "前言", "一致性声明")):
                             continue
                         score = float(hit.get("final_score", hit.get("score", 0)))
                         if score >= .35:

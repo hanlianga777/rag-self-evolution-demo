@@ -89,7 +89,7 @@ Medium / Full 属于未来版本，不是 V1.1 实现或验收要求。
 
 Human Review 仅有批准、需修订、拒绝三个业务决定。需修订题可单独编辑 Question / Reference Answer / 真实 Evidence，或请求 AI 草案；保存后重新 Hard Validation → Probe → QC → 人工复审。Draft、版本哈希和尝试历史是内部事务与审计，不是额外人工审批阶段。Positive–Ablation 关系由 `source_positive_id` 等明确元数据表达，不以 Qxx 题号或共享 Evidence 推断，也不强制成对修订。
 
-AI 局部修订先确定真实材料：表达或答案问题默认保留原 Evidence；业务价值、证据不足、重复或明确换知识点时按修订意图先检索当前文档，再检索同产品文档。无合适材料则停止并提示补充意图或手动选材，不随机指派或自动跨产品。人工指定的真实 Chunk 优先；选材方式、范围、原因及 Chunk ID 进入 Revision 审计。Positive/Ablation 使用选定 Evidence 并重新验证答案锚点与关联关系；Negative 材料仅作生成上下文，其 Golden Evidence 仍为空。旧草案与指定题目重生成沿用已选材料，草案应用和最终批准始终由人确认。
+AI 局部修订先确定真实材料：表达或答案问题默认保留原 Evidence；业务价值、证据不足、重复或明确换知识点时按修订意图先检索当前文档，再检索同产品文档。无合适材料则停止并提示补充意图或手动选材，不随机指派或自动跨产品。人工指定的真实 Chunk 优先；选材方式、范围、原因及 Chunk ID 进入 Revision 审计。Positive/Ablation 使用选定 Evidence 并重新验证答案锚点与关联关系；Negative 材料仅作生成上下文，其 Golden Evidence 仍为空。草案“重新生成”沿用当前材料；“重新选材并生成”按最新原因与标签重新选材，自动选择须避开原证据和当前草案材料。两者均只更新通过 Hard Validation 的预览，草案应用和最终批准始终由人确认。
 
 ### 6.1 Hard Validation
 

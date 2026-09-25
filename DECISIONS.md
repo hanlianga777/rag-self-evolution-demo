@@ -23,3 +23,7 @@ UI 呈现的是一个具有工具化步骤的结构化 Optimization Agent，不�
 ## 单次 Human Release（V1.1）
 
 完整 A/B/C 回合、Sandbox、11 项 Hard Gate、Regression 和 Recommendation 是发布前置条件。操作者只点击一次“确认发布”；服务端原子记录 Human Release 与 Version Snapshot。历史 Candidate / Release Approval 审计保留但不再构成当前审批链。`baseline-v1` 是 Bootstrap 配置，不是假装正式发布的版本。
+
+## Revision Preview 的材料语义（V1.1）
+
+在当前材料上重写草案与重新选材是两个显式动作。前者不改变 Chunk；后者以本次更新的修订意图选同产品真实材料，并将尝试与结果保留在既有 Revision JSON 审计。两者均不自动应用或批准题目。Operation Console 随 Modal Drawer 进入其交互层，背景仍由 Modal 阻断。

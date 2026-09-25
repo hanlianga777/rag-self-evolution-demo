@@ -72,6 +72,10 @@ class RevisionDraftEditRequest(BaseModel):
 class RevisionDraftRegenerateRequest(BaseModel):
     question_id: str
     expected_hash: str
+    material_mode: Literal["retain", "reselect"] = "retain"
+    reason: str | None = Field(default=None, max_length=2000)
+    tags: list[str] | None = Field(default=None, max_length=8)
+    manual_chunk_ids: list[str] | None = None
 
 
 class QuestionUpdateRequest(BaseModel):
@@ -435,7 +439,7 @@ def edit_revision_draft(revision_id: str, payload: RevisionDraftEditRequest):
 @app.post("/api/governance/revisions/{revision_id}/regenerate-draft", status_code=202, dependencies=[Depends(require_trusted_origin)])
 def regenerate_revision_draft(revision_id: str, payload: RevisionDraftRegenerateRequest):
     try:
-        run = store.begin_revision_regeneration(revision_id, payload.question_id, payload.expected_hash)
+        run = store.begin_revision_regeneration(revision_id, payload.question_id, payload.expected_hash, material_mode=payload.material_mode, reason=payload.reason, tags=payload.tags, manual_chunk_ids=payload.manual_chunk_ids)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Revision Run not found") from error
     except ValueError as error:
@@ -452,9 +456,19 @@ def _regenerate_revision_draft(revision_id, run_store, service, run_corpus):
         existing = {item_id: run_store._draft_change(run["drafts"][item_id]) for item_id in run["question_ids"] if item_id != target}
         selected = run_store._draft_change(run["drafts"][target])["source_chunk_ids"]
         material = dict(run.get("material_selection") or {})
-        if target in material and selected:
+        if active["kind"] == "reselect":
+            manual = active.get("manual_chunk_ids")
+            excluded = set(selected) | {key for source in run["before"][target]["evidence"] for key in source.get("source_chunk_ids", [])}
+            prompt_run = {**run, "reason": active["reason"], "tags": active["tags"], "changes": {**run["changes"], target: {"context_chunk_ids" if run["before"][target]["test_category"] == "negative" else "source_chunk_ids": manual} if manual is not None else {}}, "force_reselect": True, "exclude_chunk_ids": {target: sorted(excluded)}}
+            selection = {target: active["material_selection"]} if active.get("material_selection") else service.select_revision_material({**prompt_run, "question_ids": [target]}, run_corpus.chunks())
+            material[target] = selection[target]
+            if not active.get("material_selection"):
+                run_store.update_revision(revision_id, active_draft={**active, "material_selection": selection[target]}, draft_attempts=[*run["draft_attempts"][:-1], {**run["draft_attempts"][-1], "material_selection": selection[target]}], stage="material_selected")
+            selected = selection[target]["chunk_ids"]
+        elif target in material and selected:
             material[target] = {**material[target], "chunk_ids": selected}
-        prompt_run = {**run, "changes": {**run["changes"], target: {"source_chunk_ids": selected}}, "material_selection": material}
+        prompt_run = {**run, "reason": active.get("reason", run["reason"]), "changes": {**run["changes"], target: {"source_chunk_ids": selected}}, "material_selection": material}
+        run_store.update_revision(revision_id, stage="generating")
         generated = _generate_revision_with_weak_keyword_repair(prompt_run, run_store, service, run_corpus.chunks(), existing)
         run_store.finish_revision_regeneration(revision_id, {target: generated[target]}, run_corpus.chunks(), similarity=service.revision_similarity)
     except Exception as error:
@@ -497,7 +511,7 @@ def resume_revision(revision_id: str):
         worker = _run_revision_quality
     elif run["status"] != "interrupted":
         raise HTTPException(status_code=409, detail="仅中断的 Revision Run 可继续")
-    elif run.get("active_draft", {}).get("kind") == "regenerate":
+    elif run.get("active_draft", {}).get("kind") in {"regenerate", "reselect"}:
         store.update_revision(revision_id, status="generating", stage="generating")
         worker = _regenerate_revision_draft
     elif run.get("active_draft", {}).get("kind") == "edit":

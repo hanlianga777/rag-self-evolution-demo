@@ -21,6 +21,28 @@ it("offers QC-only recovery for an already applied Revision runtime failure", as
   await act(async () => root.unmount());
 });
 
+it("lets an unapplied failed draft reselect material with a new reason without applying", async () => {
+  const question = { id: "V1-Q01", slot: "Q01", question: "当前正式题", reference_answer: "旧答案", test_category: "positive", review_status: "needs_revision", probe_status: "probe_passed", qc_status: "qc_passed", stage: "candidate", evidence: [{ source_chunk_ids: ["C1"] }], evidence_details: [{ chunks: [{ chunk_id: "C1", document_id: "DOC-001" }] }], raw: { generation_run_id: "GGEN-test" } };
+  const revision = { id: "REV-Q01", status: "failed", stage: "hard_validation", error: "答案锚点未在所选证据原文中找到", question_ids: [question.id], before: { [question.id]: question }, drafts: { [question.id]: { ...question, question: "旧失败草案" } }, new_hash: { [question.id]: "draft-hash" }, reason: "换个问法", tags: [], material_selection: { [question.id]: { method: "retained", reason: "表达修订", chunk_ids: ["C1"], document_ids: ["DOC-001"] } } };
+  const requests: Array<{ url: string; body: any }> = [];
+  vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+    if (init?.method === "POST") requests.push({ url, body: JSON.parse(init.body as string) });
+    const data = url.endsWith("/api/documents") ? [] : url.includes("/api/governance/revisions/REV-Q01") ? revision : [];
+    return Promise.resolve(new Response(JSON.stringify(data), { status: 200 }));
+  }));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<CandidateWorkspace row={question} peers={[question]} revision={revision} busy={false} onRun={() => {}} onReview={async () => false} onRefresh={async () => {}} operation={{ watchRevision: () => {} } as any} />));
+  expect(document.querySelector(".draft-workspace")?.textContent).toContain("旧失败草案");
+  expect((([...document.querySelectorAll("button")].find(button => button.textContent === "确认应用")) as HTMLButtonElement).disabled).toBe(true);
+  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "重新选材并生成") as HTMLButtonElement).click());
+  const intent = document.querySelector<HTMLTextAreaElement>("textarea[aria-label='更新修订原因']")!;
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(intent, "改为操作安全知识点"); intent.dispatchEvent(new Event("input", { bubbles: true })); });
+  await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "确认重新选材并生成") as HTMLButtonElement).click());
+  expect(requests.find(item => item.url.endsWith("/regenerate-draft"))?.body).toMatchObject({ question_id: "V1-Q01", expected_hash: "draft-hash", material_mode: "reselect", reason: "改为操作安全知识点" });
+  expect(requests.some(item => item.url.endsWith("/apply"))).toBe(false);
+  await act(async () => root.unmount());
+});
+
 it("shows an applied interrupted Revision as a quality recovery, not an unapplied draft", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })));
   const question = { id: "V1-Q15", slot: "Q15", question: "Q15", test_category: "negative", review_status: "needs_revision", probe_status: "probe_passed", qc_status: "qc_pending", stage: "candidate", evidence: [] };
@@ -155,7 +177,7 @@ it("shows only Revision Draft while a paired preview is active", async () => {
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
   expect(document.body.textContent).toContain("修订草案");
   expect(document.body.textContent).toContain("新题 1");
-  expect(document.querySelector(".draft-workspace")?.previousElementSibling?.textContent).toContain("系统按修订意图选材");
+  expect(document.querySelector(".draft-workspace")?.previousElementSibling?.textContent).toContain("重新选材 · 系统按最新修订意图自动选材");
   expect(document.body.textContent).not.toContain("发起 Candidate 修订");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "生成修订草案")).toBe(false);
   expect(document.querySelector(".candidate-actionbar")?.textContent).toContain("确认应用");

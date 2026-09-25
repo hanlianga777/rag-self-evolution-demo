@@ -90,6 +90,149 @@ class RevisionWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "同产品"):
             service.select_revision_material(run, chunks)
 
+    def test_reselection_excludes_old_material_and_uses_latest_intent(self):
+        first = self.ids[0]
+        chunks = [
+            {**self.chunks[0], "product": "KIRA B 50"},
+            {**self.chunks[1], "product": "KIRA B 50", "chunk_text": "启动前检查急停按钮，异常时立即停机并联系维修人员。" * 2},
+            {"chunk_id": "C3", "document_id": "DOC-002", "product": "KIRA B 50", "section_path": "维护", "chunk_text": "每日清洁后检查刷盘，异常时停止使用并联系维护人员。" * 2},
+            {"chunk_id": "C4", "document_id": "DOC-003", "product": "OTHER", "section_path": "维护", "chunk_text": "每日清洁后检查刷盘，异常时停止使用并联系维护人员。" * 2},
+            {"chunk_id": "C5", "document_id": "DOC-001", "product": "KIRA B 50", "section_path": "欧盟一致性声明", "chunk_text": "该设备符合相关声明，其型号与制造商信息如下。" * 2},
+        ]
+        run = self.store.start_revision(first, "ai_regenerate", "换个问法", False, {}, chunks)
+        failed = self.store.prepare_revision(run["id"], chunks, similarity=lambda _a, _b: .1, generated={first: {"question": "新问题", "reference_answer": "无法从旧证据支持", "source_chunk_ids": ["C1"]}})
+        self.assertEqual(failed["status"], "failed")
+        started = self.store.begin_revision_regeneration(run["id"], first, failed["new_hash"][first], material_mode="reselect", reason="当前一致性声明价值低，请重新选择维护知识点", tags=["业务价值偏低"])
+        self.assertEqual(started["active_draft"]["kind"], "reselect")
+        service = AiService(self.store, SimpleNamespace(), SimpleNamespace(), False)
+        queries = []
+        def retrieve(query, _config):
+            queries.append(query)
+            return [
+            {"chunk_id": "C1", "final_score": .99}, {"chunk_id": "C4", "final_score": .98}, {"chunk_id": "C5", "final_score": .97},
+            {"chunk_id": "C3", "final_score": .8}, {"chunk_id": "C2", "final_score": .5},
+            ]
+        service.retriever = SimpleNamespace(retrieve=retrieve)
+        selected = service.select_revision_material({**started, "reason": "当前一致性声明价值低，请重新选择维护知识点", "tags": ["业务价值偏低"], "changes": {first: {}}, "exclude_chunk_ids": {first: ["C1"]}, "force_reselect": True}, chunks)
+        self.assertEqual(selected[first]["chunk_ids"], ["C2"])
+        self.assertEqual(selected[first]["scope"], "current_document")
+        self.assertEqual(queries, ["维护知识点"])
+        manual = service.select_revision_material({**started, "reason": "重新选择维护知识点", "changes": {first: {"source_chunk_ids": ["C3"]}}, "force_reselect": True, "exclude_chunk_ids": {first: ["C1"]}}, chunks)
+        self.assertEqual((manual[first]["method"], manual[first]["chunk_ids"]), ("manual", ["C3"]))
+        self.assertNotEqual(self.store.question(first)["question"], "新问题")
+
+    def test_failed_preview_reselection_preserves_old_draft_until_validated(self):
+        first = self.ids[0]
+        chunks = [{**chunk, "product": "KIRA B 50"} for chunk in self.chunks]
+        chunks[1]["chunk_text"] = "启动前检查急停按钮，确认安全后开始清洁。" * 2
+        run = self.store.start_revision(first, "ai_regenerate", "换个问法", False, {}, chunks)
+        failed = self.store.prepare_revision(run["id"], chunks, similarity=lambda _a, _b: .1, generated={first: {"question": "旧失败草案", "reference_answer": "找不到的答案", "source_chunk_ids": ["C1"]}})
+        before = self.store.question(first)
+        started = self.store.begin_revision_regeneration(run["id"], first, failed["new_hash"][first], material_mode="reselect", reason="改为安全操作", tags=["业务价值偏低"])
+        self.assertEqual(started["drafts"], failed["drafts"])
+        self.assertEqual(started["new_hash"], failed["new_hash"])
+        with self.assertRaisesRegex(ValueError, "运行中"):
+            self.store.begin_revision_regeneration(run["id"], first, failed["new_hash"][first], material_mode="reselect")
+        self.store.fail_revision_regeneration(run["id"], "检索服务失败")
+        blocked = self.store.revision_run(run["id"])
+        self.assertEqual(blocked["status"], "preview_ready")
+        self.assertTrue(blocked["apply_blocked"])
+        self.assertEqual(blocked["drafts"], failed["drafts"])
+        self.assertEqual(blocked["draft_attempts"][-1]["reason"], "改为安全操作")
+        self.assertEqual(self.store.question(first), before)
+
+    def test_reselection_worker_promotes_only_validated_material_and_keeps_candidate(self):
+        first = self.ids[0]
+        chunks = [{**chunk, "product": "KIRA B 50"} for chunk in self.chunks]
+        chunks[1]["chunk_text"] = "启动前检查急停按钮，确认安全后开始清洁。" * 2
+        run = self.store.start_revision(first, "ai_regenerate", "换个问法", False, {}, chunks)
+        failed = self.store.prepare_revision(run["id"], chunks, similarity=lambda _a, _b: .1, generated={first: {"question": "旧失败草案", "reference_answer": "找不到的答案", "source_chunk_ids": ["C1"]}})
+        before = self.store.question(first)
+        self.store.begin_revision_regeneration(run["id"], first, failed["new_hash"][first], material_mode="reselect", reason="改为安全操作", tags=["业务价值偏低"])
+        calls = []
+        class Service:
+            revision_similarity = staticmethod(lambda _a, _b: .1)
+            def select_revision_material(self, prompt_run, _chunks):
+                calls.append(("select", prompt_run["reason"], prompt_run["force_reselect"], prompt_run["changes"][first]))
+                return {first: {"method": "automatic", "scope": "current_document", "reason": "改为安全操作", "chunk_ids": ["C2"], "document_ids": ["DOC-001"], "manual": False}}
+            def generate_revision_drafts(self, prompt_run, _chunks, *, existing):
+                calls.append(("generate", prompt_run["reason"], prompt_run["material_selection"][first]["chunk_ids"]))
+                return {**existing, first: {"question": "启动前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}
+        main._regenerate_revision_draft(run["id"], self.store, Service(), SimpleNamespace(chunks=lambda: chunks))
+        ready = self.store.revision_run(run["id"])
+        self.assertEqual(ready["status"], "preview_ready")
+        self.assertFalse(ready["apply_blocked"])
+        self.assertEqual(ready["material_selection"][first]["chunk_ids"], ["C2"])
+        self.assertEqual(ready["drafts"][first]["evidence"][0]["source_chunk_ids"], ["C2"])
+        self.assertEqual(ready["reason"], "改为安全操作")
+        self.assertEqual(ready["draft_attempts"][-1]["material_selection"]["document_ids"], ["DOC-001"])
+        self.assertEqual(calls, [("select", "改为安全操作", True, {}), ("generate", "改为安全操作", ["C2"])])
+        self.assertEqual(self.store.question(first), before)
+
+    def test_reselection_route_is_origin_guarded_and_rejects_stale_candidate(self):
+        first = self.ids[0]
+        chunks = [{**chunk, "product": "KIRA B 50"} for chunk in self.chunks]
+        run = self.store.start_revision(first, "ai_regenerate", "换个问法", False, {}, chunks)
+        failed = self.store.prepare_revision(run["id"], chunks, similarity=lambda _a, _b: .1, generated={first: {"question": "旧失败草案", "reference_answer": "找不到的答案", "source_chunk_ids": ["C1"]}})
+        path = f"/api/governance/revisions/{run['id']}/regenerate-draft"
+        payload = {"question_id": first, "expected_hash": failed["new_hash"][first], "material_mode": "reselect", "reason": "改为安全操作", "tags": ["业务价值偏低"], "manual_chunk_ids": ["C2"]}
+        with patch.object(main, "store", self.store), patch.object(main, "_regenerate_revision_draft", return_value=None):
+            client = TestClient(main.app)
+            self.assertEqual(client.post(path, json=payload, headers={"Origin": "https://untrusted.example"}).status_code, 403)
+            started = client.post(path, json=payload, headers={"Origin": "http://localhost:5174"})
+        self.assertEqual(started.status_code, 202)
+        self.assertEqual(started.json()["status"], "generating")
+        self.assertEqual(self.store.revision_run(run["id"])["active_draft"]["manual_chunk_ids"], ["C2"])
+        self.store.fail_revision_regeneration(run["id"], "Provider unavailable")
+        with self.store.connection() as connection:
+            connection.execute("UPDATE questions SET question='已被其他操作修改' WHERE id=?", (first,))
+        with self.assertRaisesRegex(ValueError, "原题版本已变化"):
+            self.store.begin_revision_regeneration(run["id"], first, failed["new_hash"][first], material_mode="reselect")
+
+    def test_invalid_reselected_draft_keeps_prior_material_and_audits_attempt(self):
+        first = self.ids[0]
+        chunks = [{**chunk, "product": "KIRA B 50"} for chunk in self.chunks]
+        chunks[1]["chunk_text"] = "启动前检查急停按钮，确认安全后开始清洁。" * 2
+        run = self.store.start_revision(first, "ai_regenerate", "换个问法", False, {}, chunks)
+        old_material = {"method": "retained", "scope": "original_evidence", "reason": "保留原证据", "chunk_ids": ["C1"], "document_ids": ["DOC-001"], "manual": False}
+        self.store.update_revision(run["id"], material_selection={first: old_material})
+        ready = self.store.prepare_revision(run["id"], chunks, similarity=lambda _a, _b: .1, generated={first: {"question": "旧草案", "reference_answer": "正确操作", "source_chunk_ids": ["C1"]}})
+        self.assertEqual(ready["status"], "preview_ready")
+        self.store.begin_revision_regeneration(run["id"], first, ready["new_hash"][first], material_mode="reselect", reason="改为安全操作")
+        class Service:
+            revision_similarity = staticmethod(lambda _a, _b: .1)
+            def select_revision_material(self, _run, _chunks):
+                return {first: {"method": "automatic", "scope": "current_document", "reason": "改为安全操作", "chunk_ids": ["C2"], "document_ids": ["DOC-001"], "manual": False}}
+            def generate_revision_drafts(self, _run, _chunks, *, existing):
+                return {**existing, first: {"question": "无效新草案", "reference_answer": "证据完全没有这个答案", "source_chunk_ids": ["C2"]}}
+        main._regenerate_revision_draft(run["id"], self.store, Service(), SimpleNamespace(chunks=lambda: chunks))
+        blocked = self.store.revision_run(run["id"])
+        self.assertTrue(blocked["apply_blocked"])
+        self.assertEqual(blocked["drafts"], ready["drafts"])
+        self.assertEqual(blocked["new_hash"], ready["new_hash"])
+        self.assertEqual(blocked["material_selection"][first], old_material)
+        self.assertEqual(blocked["draft_attempts"][-1]["material_selection"]["chunk_ids"], ["C2"])
+        self.assertIn("答案锚点", blocked["draft_attempts"][-1]["error"])
+
+    def test_interrupted_reselection_reuses_persisted_material(self):
+        first = self.ids[0]
+        chunks = [{**chunk, "product": "KIRA B 50"} for chunk in self.chunks]
+        chunks[1]["chunk_text"] = "启动前检查急停按钮，确认安全后开始清洁。" * 2
+        run = self.store.start_revision(first, "ai_regenerate", "换个问法", False, {}, chunks)
+        ready = self.store.prepare_revision(run["id"], chunks, similarity=lambda _a, _b: .1, generated={first: {"question": "旧草案", "reference_answer": "正确操作", "source_chunk_ids": ["C1"]}})
+        started = self.store.begin_revision_regeneration(run["id"], first, ready["new_hash"][first], material_mode="reselect", reason="改为安全操作")
+        selected = {"method": "automatic", "scope": "current_document", "reason": "改为安全操作", "chunk_ids": ["C2"], "document_ids": ["DOC-001"], "manual": False}
+        self.store.update_revision(run["id"], active_draft={**started["active_draft"], "material_selection": selected})
+        self.store.interrupt_revision_runs()
+        class Service:
+            revision_similarity = staticmethod(lambda _a, _b: .1)
+            def select_revision_material(self, _run, _chunks):
+                raise AssertionError("已保存材料不应重新选择")
+            def generate_revision_drafts(self, prompt_run, _chunks, *, existing):
+                return {**existing, first: {"question": "启动前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": prompt_run["material_selection"][first]["chunk_ids"]}}
+        main._regenerate_revision_draft(run["id"], self.store, Service(), SimpleNamespace(chunks=lambda: chunks))
+        self.assertEqual(self.store.revision_run(run["id"])["material_selection"][first]["chunk_ids"], ["C2"])
+
     def test_ai_revision_records_selected_material_without_applying_candidate(self):
         first = self.ids[0]
         chunks = [*self.chunks, {"chunk_id": "C3", "document_id": "DOC-002", "product": "KIRA B 50", "chunk_text": "启动前检查急停按钮，按下后设备应立即停止；复位前确认周围人员安全，异常时联系维修。", "section_path": "安全操作"}]

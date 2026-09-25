@@ -611,27 +611,36 @@ class GovernanceStore:
     def _draft_change(draft: dict):
         return {"question": draft["question"], "reference_answer": draft["reference_answer"], "source_chunk_ids": [key for evidence in draft["evidence"] for key in evidence.get("source_chunk_ids", [])], "ablation_metadata": draft["raw"].get("ablation_metadata", {})}
 
-    def _begin_preview_attempt(self, revision_id: str, question_ids: list[str], expected_hashes: dict, kind: str, changes: dict | None = None):
+    def _begin_preview_attempt(self, revision_id: str, question_ids: list[str], expected_hashes: dict, kind: str, changes: dict | None = None, **intent):
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute("SELECT status, audit_json FROM candidate_revision_runs WHERE id=?", (revision_id,)).fetchone()
+            row = connection.execute("SELECT status, generation_run_id, audit_json FROM candidate_revision_runs WHERE id=?", (revision_id,)).fetchone()
             if row is None:
                 raise KeyError(revision_id)
-            if row["status"] != "preview_ready":
+            if row["status"] != "preview_ready" and not (row["status"] == "failed" and kind in {"regenerate", "reselect"}):
                 raise ValueError("草案操作运行中或状态不允许")
             audit = _load(row["audit_json"], {})
+            if audit.get("applied_at") or set(audit.get("drafts") or {}) != set(audit["question_ids"]) or set(audit.get("new_hash") or {}) != set(audit["question_ids"]):
+                raise ValueError("仅未应用且已保存的草案可以重新生成")
             if not question_ids or set(question_ids) - set(audit["question_ids"]) or set(expected_hashes) != set(question_ids):
                 raise ValueError("只能修改当前 Revision Run 的指定题目")
             if any(expected_hashes[item_id] != audit["new_hash"].get(item_id) for item_id in question_ids):
                 raise ValueError("草案版本已过期，请刷新后重试")
-            attempt = {"number": len(audit.get("draft_attempts", [])) + 1, "kind": kind, "question_ids": question_ids, "started_at": _now(), "status": "running", "previous_hash": {item_id: audit["new_hash"][item_id] for item_id in question_ids}, "before_drafts": {item_id: audit["drafts"][item_id] for item_id in question_ids}}
+            for item_id in audit["question_ids"]:
+                current = self._row(connection.execute("SELECT * FROM questions WHERE id=?", (item_id,)).fetchone())
+                if current["stage"] == "golden" or self._revision_hash(current) != audit["previous_hash"][item_id]:
+                    raise ValueError("原题版本已变化，不能继续过期草案")
+            for other in connection.execute("SELECT id, audit_json FROM candidate_revision_runs WHERE generation_run_id=? AND status IN ('queued','generating','validating','preview_ready','probing','qc','interrupted') AND id!=?", (row["generation_run_id"], revision_id)):
+                if set(_load(other["audit_json"], {}).get("question_ids", [])) & set(audit["question_ids"]):
+                    raise ValueError("所选题目已有其他未完成的 Revision Run")
+            attempt = {"number": len(audit.get("draft_attempts", [])) + 1, "kind": kind, "question_ids": question_ids, "started_at": _now(), "status": "running", "previous_hash": {item_id: audit["new_hash"][item_id] for item_id in question_ids}, "before_drafts": {item_id: audit["drafts"][item_id] for item_id in question_ids}, **intent}
             if changes is not None:
                 attempt["changes"] = changes
             audit["draft_attempts"] = [*audit.get("draft_attempts", []), attempt]
-            audit["active_draft"] = {"number": attempt["number"], "kind": kind, "question_ids": question_ids, "changes": changes}
-            audit["stage"] = "generating" if kind == "regenerate" else "hard_validation"
+            audit["active_draft"] = {"number": attempt["number"], "kind": kind, "question_ids": question_ids, "changes": changes, **intent}
+            audit["stage"] = "generating" if kind in {"regenerate", "reselect"} else "hard_validation"
             audit["error"] = None
-            connection.execute("UPDATE candidate_revision_runs SET status=?, audit_json=?, updated_at=? WHERE id=?", ("generating" if kind == "regenerate" else "validating", _json(audit), _now(), revision_id))
+            connection.execute("UPDATE candidate_revision_runs SET status=?, audit_json=?, updated_at=? WHERE id=?", ("generating" if kind in {"regenerate", "reselect"} else "validating", _json(audit), _now(), revision_id))
         return self.revision_run(revision_id)
 
     def edit_revision_preview(self, revision_id: str, changes: dict, expected_hashes: dict, chunks: list[dict], *, similarity):
@@ -644,7 +653,17 @@ class GovernanceStore:
             self.fail_revision_regeneration(revision_id, str(error))
             raise
 
-    def begin_revision_regeneration(self, revision_id: str, question_id: str, expected_hash: str):
+    def begin_revision_regeneration(self, revision_id: str, question_id: str, expected_hash: str, *, material_mode: str = "retain", reason: str | None = None, tags: list[str] | None = None, manual_chunk_ids: list[str] | None = None):
+        if material_mode not in {"retain", "reselect"}:
+            raise ValueError("未知的材料处理方式")
+        if material_mode == "retain" and (reason is not None or tags is not None or manual_chunk_ids is not None):
+            raise ValueError("沿用证据时不能更新选材意图")
+        if material_mode == "reselect":
+            run = self.revision_run(revision_id)
+            latest_reason = (reason if reason is not None else run["reason"]).strip()
+            if not latest_reason or not isinstance(manual_chunk_ids, (list, type(None))) or manual_chunk_ids == []:
+                raise ValueError("请填写重新选材意图，或选择有效的人工 Chunk")
+            return self._begin_preview_attempt(revision_id, [question_id], {question_id: expected_hash}, "reselect", reason=latest_reason, tags=tags if tags is not None else run.get("tags", []), manual_chunk_ids=manual_chunk_ids)
         return self._begin_preview_attempt(revision_id, [question_id], {question_id: expected_hash}, "regenerate")
 
     def finish_revision_regeneration(self, revision_id: str, generated: dict, chunks: list[dict], *, similarity):
@@ -676,6 +695,9 @@ class GovernanceStore:
             audit.update({"active_draft": None, "stage": "preview_ready", "apply_blocked": bool(errors), "error": attempt["error"], "last_attempt_validation": {"passed": not errors, "errors": errors}})
             if not errors:
                 audit.update({"drafts": {**audit["drafts"], **{item_id: drafts[item_id] for item_id in active["question_ids"]}}, "new_hash": {**audit["new_hash"], **{item_id: new_hash[item_id] for item_id in active["question_ids"]}}, "changed_fields": changed_fields, "validation": {"passed": True, "errors": []}})
+                if active["kind"] == "reselect":
+                    target = active["question_ids"][0]
+                    audit.update({"reason": active["reason"], "tags": active["tags"], "material_selection": {**audit.get("material_selection", {}), target: active["material_selection"]}})
             connection.execute("UPDATE candidate_revision_runs SET status='preview_ready', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), revision_id))
         return self.revision_run(revision_id)
 
@@ -701,7 +723,7 @@ class GovernanceStore:
             if row is None:
                 raise KeyError(revision_id)
             audit = _load(row["audit_json"], {})
-            if row["status"] not in {"preview_ready", "interrupted"} or not audit.get("drafts") or audit.get("applied_at") or audit.get("active_draft"):
+            if row["status"] not in {"preview_ready", "interrupted", "failed"} or not audit.get("drafts") or audit.get("applied_at") or audit.get("active_draft"):
                 raise ValueError("仅可放弃未应用且未运行中的草案")
             audit.update({"stage": "discarded", "discarded_at": _now()})
             connection.execute("UPDATE candidate_revision_runs SET status='cancelled', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), revision_id))
