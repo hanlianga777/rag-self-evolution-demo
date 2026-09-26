@@ -7,6 +7,7 @@ import numpy as np
 
 from app import corpus
 from app.ai_service import AiService
+from app.retrieval import VectorRetriever
 
 
 class DynamicCorpusTests(unittest.TestCase):
@@ -31,6 +32,23 @@ class DynamicCorpusTests(unittest.TestCase):
                 store = corpus.CorpusStore(root)
                 self.assertEqual(store.documents()[0]["id"], "manual-Z")
                 self.assertEqual(store.detail("manual-Z")["chunks"][0]["chunk_text"], "fact")
+
+    def test_real_retriever_materializes_minimum_chunk_metadata(self):
+        source = Mock()
+        source.chunks.return_value = [{"document_id": "manual-Z", "chunk_id": "segment-9", "chunk_text": "电压：24V"}]
+        retriever = VectorRetriever(source)
+        retriever._load = Mock(return_value=True)
+        retriever._model = Mock()
+        retriever._model.encode.return_value = np.asarray([[1., 0.]], dtype="float32")
+        retriever._index = Mock()
+        retriever._index.search.return_value = (np.asarray([[.8]], dtype="float32"), np.asarray([[0]]))
+        hit = retriever.vector_candidates("电压", limit=1)[0]
+        self.assertEqual(hit["document_id"], "manual-Z")
+        self.assertEqual(hit["content"], "电压：24V")
+        self.assertEqual(hit["content_preview"], "电压：24V")
+        self.assertIsNone(hit["section_path"])
+        self.assertIsNone(hit["page_start"])
+        self.assertEqual(retriever.retrieve("电压", {"candidate_k": 1, "top_k": 1, "hybrid_search": False, "rerank": False, "min_score": 0})[0]["content"], "电压：24V")
 
 
 class EmbeddingCoverageTests(unittest.TestCase):
@@ -101,6 +119,27 @@ class EmbeddingCoverageTests(unittest.TestCase):
         service = AiService(store, Mock(), Mock(), False)
         run = {"generation_run_id": "run-1", "question_ids": ["item-1"], "before": {"item-1": {"test_category": "positive", "raw": {"coverage_slot": "Q01"}, "evidence": [{"source_chunk_ids": ["segment-1"]}]}}, "changes": {"item-1": {"source_chunk_ids": ["segment-2"]}}, "reason": "人工换材"}
         self.assertEqual(service.select_revision_material(run, chunks)["item-1"]["chunk_ids"], ["segment-2"])
+
+    def test_revision_retains_existing_cross_document_bridge_without_product(self):
+        chunks = [{"document_id": "manual-A", "chunk_id": "segment-A", "chunk_text": "设备A 电压：24V"}, {"document_id": "manual-B", "chunk_id": "segment-B", "chunk_text": "设备A 容量：10Ah"}]
+        store = Mock()
+        store.generation_run.return_value = {"artifacts": {"coverage_plan": [{"slot": "Q01", "document_id": "manual-A"}]}}
+        store.questions.return_value = []
+        service = AiService(store, Mock(), Mock(), False)
+        run = {"generation_run_id": "run-1", "question_ids": ["item-1"], "before": {"item-1": {"test_category": "positive", "raw": {"coverage_slot": "Q01"}, "evidence": [{"source_chunk_ids": ["segment-A", "segment-B"]}]}}, "changes": {}, "reason": "改善问法"}
+        selected = service.select_revision_material(run, chunks)["item-1"]
+        self.assertEqual(selected["chunk_ids"], ["segment-A", "segment-B"])
+        self.assertEqual(selected["document_ids"], ["manual-A", "manual-B"])
+
+    def test_manual_bridge_reuse_records_original_document_scope(self):
+        chunks = [{"document_id": "manual-A", "chunk_id": "segment-A", "chunk_text": "设备A 电压：24V"}, {"document_id": "manual-B", "chunk_id": "segment-B", "chunk_text": "设备A 容量：10Ah"}]
+        store = Mock()
+        store.generation_run.return_value = {"artifacts": {"coverage_plan": []}}
+        store.questions.return_value = []
+        service = AiService(store, Mock(), Mock(), False)
+        run = {"generation_run_id": "run-1", "question_ids": ["item-1"], "before": {"item-1": {"test_category": "positive", "raw": {"coverage_slot": "Q01"}, "evidence": [{"source_chunk_ids": ["segment-A", "segment-B"]}]}}, "changes": {"item-1": {"source_chunk_ids": ["segment-B"]}}, "reason": "人工选材"}
+        selected = service.select_revision_material(run, chunks)["item-1"]
+        self.assertEqual(selected["scope"], "original_document_set")
 
 
 if __name__ == "__main__":

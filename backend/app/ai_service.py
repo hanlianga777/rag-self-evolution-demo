@@ -180,9 +180,14 @@ class AiService:
             product = product or anchor.get("product")
             if not document_id:
                 raise ValueError(f"{slot}: 原文档范围不可确认，请手动选材")
+            allowed_documents = {by_id[key]["document_id"] for key in original if key in by_id} or {document_id}
+
+            def in_scope(chunk: dict) -> bool:
+                return chunk["document_id"] in allowed_documents or bool(product and chunk.get("product") == product)
+
             manual = change.get("context_chunk_ids" if old["test_category"] == "negative" else "source_chunk_ids")
             if manual is not None:
-                ids, method, scope, reason = manual, "manual", "same_product", "人工指定真实 Chunk"
+                ids, method, scope, reason = manual, "manual", "same_product" if product else "original_document_set", "人工指定真实 Chunk"
             else:
                 tags = set(run.get("tags") or [])
                 reselect = bool(run.get("force_reselect")) or bool(tags & {"业务价值偏低", "证据不足", "与其他题重复"}) or any(word in run["reason"] for word in ("换知识点", "换材料", "换成", "改为"))
@@ -205,7 +210,7 @@ class AiService:
                     for hit in hits:
                         key = hit.get("chunk_id")
                         chunk = by_id.get(key)
-                        if not chunk or (chunk.get("document_id") != document_id and (not product or chunk.get("product") != product)) or key in original or key in (run.get("exclude_chunk_ids") or {}).get(item_id, []):
+                        if not chunk or not in_scope(chunk) or key in original or key in (run.get("exclude_chunk_ids") or {}).get(item_id, []):
                             continue
                         section = str(chunk.get("section_path") or "")
                         body = str(chunk.get("chunk_text") or chunk.get("text") or "")
@@ -219,9 +224,11 @@ class AiService:
                         raise ValueError(f"{slot}: 当前文档及同产品文档未找到合适材料，请修改意图或手动选材")
                     eligible.sort()
                     ids = [eligible[0][2]]
-                    method, scope, reason = "automatic", "current_document" if not eligible[0][0] else "same_product", f"根据修订意图检索真实正文：{query}"
-            if not ids or any(key not in by_id or (by_id[key]["document_id"] != document_id and (not product or by_id[key].get("product") != product)) for key in ids):
+                    method, scope, reason = "automatic", "current_document" if not eligible[0][0] else "same_product" if product else "original_document_set", f"根据修订意图检索真实正文：{query}"
+            if not ids or any(key not in by_id or not in_scope(by_id[key]) for key in ids):
                 raise ValueError(f"{slot}: 只能选择当前产品或文档的真实 Chunk")
+            if method != "retained":
+                scope = "current_document" if all(by_id[key]["document_id"] == document_id for key in ids) else "same_product" if product and all(by_id[key].get("product") == product for key in ids) else "original_document_set"
             decisions[item_id] = {"method": method, "scope": scope, "reason": reason, "chunk_ids": ids, "manual": method == "manual", "document_ids": sorted({by_id[key]["document_id"] for key in ids})}
         return decisions
 
