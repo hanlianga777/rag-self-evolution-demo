@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from app import main
 from app.ai_service import AiService
-from app.governance import GovernanceStore
+from app.governance import GovernanceStore, _answer_anchor_supported
 from app.providers import ProviderTimeout
 
 
@@ -27,6 +27,38 @@ def candidates():
             "evidence": [] if category == "negative" else [{"source_chunk_ids": ["C1"], "evidence_key_points": ["正确操作"]}],
         })
     return result
+
+
+class AnswerAnchorTests(unittest.TestCase):
+    def test_ocr_noise_and_split_facts_in_one_chunk(self):
+        answer = "产品：洗地机；类型：1.533-xxx。相关欧盟指令：2006/42/EC (+2009/127/EC)、2014/30/EU、2014/53/EU (TCU)。"
+        evidence = "产品：洗地机\n2 pA WA \n类型：1.533-xxx\n相关的欧盟指令\n2006/42/EC (+2009/127/EC)\n2014/30/EU\n2014/53/EU (TCU)"
+        self.assertTrue(_answer_anchor_supported(answer, [evidence]))
+
+    def test_separate_positions_in_same_chunk(self):
+        answer = "设备需要先检查急停按钮；发现异常应停止使用并联系维修人员。"
+        evidence = "设备需要先检查急停按钮。以下是保养说明。发现异常应停止使用并联系维修人员。"
+        self.assertTrue(_answer_anchor_supported(answer, [evidence]))
+
+    def test_partial_fact_is_not_enough(self):
+        answer = "产品：洗地机；类型：1.533-xxx；制造商：不存在的公司。"
+        evidence = "产品：洗地机。类型：1.533-xxx。制造商：Kärcher。"
+        self.assertFalse(_answer_anchor_supported(answer, [evidence]))
+
+    def test_hallucinated_number_model_and_conclusion_are_rejected(self):
+        evidence = "产品：洗地机。类型：1.533-xxx。相关欧盟指令：2006/42/EC。"
+        for answer in ("产品：洗地机；类型：1.534-xxx。", "相关欧盟指令：2007/42/EC。", "产品：洗地机；免费升级到最新型号。", "产品：洗地机；3。"):
+            with self.subTest(answer=answer):
+                self.assertFalse(_answer_anchor_supported(answer, [evidence]))
+
+    def test_common_words_with_wrong_key_entity_and_cross_chunk_stitching_fail(self):
+        answer = "产品：扫地机；类型：1.533-xxx。"
+        self.assertFalse(_answer_anchor_supported(answer, ["产品：洗地机；类型：1.533-xxx。"]))
+        self.assertFalse(_answer_anchor_supported("类型：1.533-xxx。", ["类型：21.533-xxx。"]))
+        self.assertFalse(_answer_anchor_supported("类型：1.533-xxx。", ["类型：1.533-", "xxx。"]))
+
+    def test_old_unsupported_answer_stays_blocked(self):
+        self.assertFalse(_answer_anchor_supported("证据完全没有这个答案", ["启动前检查急停按钮，确认安全后开始清洁。"]))
 
 
 class RevisionWorkflowTests(unittest.TestCase):

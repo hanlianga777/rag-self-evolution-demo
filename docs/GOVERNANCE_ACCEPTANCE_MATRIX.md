@@ -107,3 +107,17 @@
 | 人审新发现：关联消融不一致 | Q09 `weak_keywords` 指向 Q01，却问不同知识点、给出不同答案；旧 Probe/QC 虽通过，人审未批准 | `test_human` 标记需修订。授权后单题 AI Revision `REV-20260926012207417442` 保留 Q01、同证据及同事实答案，草案未应用；Hard Validation 报“答案锚点未在所选证据原文中找到”。该答案事实分散在唯一的 `KIRA-B50-CHUNK-0177`，其 OCR 杂字符/分行使整段及按句连续匹配均失败；无第二个含全部事实的真实 Chunk。 | **BLOCKED**；原始数据属于 A（关联知识点错误），现有修订恢复阻断属于 E（连续字符串锚点校验对已批准多事实答案的假阴性）。不降低校验、不修改已批准 Q01，等待人工确认通用修复。 |
 
 续跑终态：Mini 20/20 入库（8/4/8）；Probe 20/20 通过；QC 20/20 通过；隔离 `test_human` 批准 19/20，Q09 `needs_revision`；Snapshot 创建请求仍被 409 正确阻断，Baseline Gate 不可用。GOV-29/30/34 保持 `BLOCKED`，GOV-31 与 GOV-16/18 保持 `PARTIAL`，所以验收计数仍为 **25 PASS、9 PARTIAL、3 BLOCKED**，总体 **Governance Lifecycle Not Ready**。未使用第二轮随机重试或直接改库；Q09 的失败草案与审计保留供后续恢复。
+
+## OCR 多事实锚点收口（2026-09-26，基线 8b547f2）
+
+本节仅覆盖本次续跑，不改写前两节的历史验收结论。隔离库 `fresh.db` 在操作前以 SQLite Backup API 备份为 `fresh-before-anchor-recovery.bak`（`integrity_check=ok`）。Revision `REV-20260926012207417442` 的原 Q09 草案、答案和 `KIRA-B50-CHUNK-0177` 未改写；使用原草案哈希通过 `edit-draft` 重新校验，随后仅在隔离库确认应用。Hard Validation 改为逐事实确定性校验，完整原文、逐子句精确命中优先；OCR 容错层要求同一真实 Chunk 内有序、有限间隔、中文二字词组覆盖率 ≥75%，数字、型号与拉丁代码严格匹配。自动化反例覆盖部分事实、虚构数值/型号/结论、仅普通词重合、跨 Chunk 拼接，以及旧 unsupported 答案。
+
+| ID | 当前状态 | 本次真实证据 |
+|---|---|---|
+| GOV-29 | PASS | 原 Run 20/20 最新 Probe/QC 通过；20/20 最新审核事件均由隔离 `test_human` 批准。Q09 与 Q01 的答案及 Evidence 相同，`source_positive_id` 指向 Q01。 |
+| GOV-30 | PASS | 经真实 API 创建 Golden Snapshot `GD-20260926014339`，恰含本 Run 20 题。 |
+| GOV-31 | PASS | 对冻结 Q09 的 API 修改返回 409；Snapshot 前后 SHA-256 均为 `cbb96efa646a0ab1396dc65dc5b8554b6ba52485d158a5ed2f2d2bbde52caf76`。 |
+| GOV-32 | PASS | 在 Snapshot 数据的临时 SQLite 副本调用 Baseline 前置检查成功并创建副本内 Evaluation Run；未启动模型评测，原隔离库无新 Evaluation Run。 |
+| GOV-34 | PASS | 原 Fresh Run 沿真实 Corpus/Index、Retriever、DeepSeek、SQLite 完成 Q09 Revision Hard Validation → Apply → Probe → QC → `test_human` Review → 20/20 → Snapshot；没有重新生成整套题。 |
+
+当前验收计数：**29 PASS、8 PARTIAL、0 BLOCKED**。Generation 20/20、Probe 20/20、QC 20/20、隔离 `test_human` 批准 20/20、Snapshot 已创建、不可变性 PASS、Baseline 入口 Available。此处的 **Governance Lifecycle Ready** 仅指隔离 Fresh DB 的系统能力，不代表真实用户库已经完成审核或创建 Snapshot。其他 PARTIAL 项保留原实测边界，不为凑齐 37/37 添加新操作。

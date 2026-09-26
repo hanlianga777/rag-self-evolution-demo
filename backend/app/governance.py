@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -39,6 +40,50 @@ def _load(value, fallback):
 
 def _normalized(value: str) -> str:
     return "".join(character.lower() for character in value if character.isalnum())
+
+
+def _answer_anchor_supported(answer: str, evidence_texts: list[str]) -> bool:
+    texts = [_normalized(text) for text in evidence_texts]
+    whole = _normalized(answer)
+    if not whole or not texts:
+        return False
+
+    def strict_matches(fact: str, original: str) -> bool:
+        tokens = {_normalized(token) for token in re.findall(r"[A-Za-z0-9]+(?:[./-][A-Za-z0-9]+)*", original)}
+        return all(_normalized(token) in tokens for token in re.findall(r"[A-Za-z0-9]+(?:[./-][A-Za-z0-9]+)*", fact))
+
+    if any(whole in text and strict_matches(answer, original) for original, text in zip(evidence_texts, texts)):
+        return True
+
+    facts = [part.strip() for part in re.split(r"[。；;，,、\n]+", answer) if len(_normalized(part)) >= 3 or any(character.isdigit() for character in part)]
+    if not facts:
+        return False
+
+    def supported(raw_fact: str, original: str, text: str) -> bool:
+        fact = _normalized(raw_fact)
+        if not strict_matches(raw_fact, original):
+            return False
+        if len(fact) >= 3 and fact in text:
+            return True
+        strict = re.findall(r"[A-Za-z0-9]+(?:[./-][A-Za-z0-9]+)*", raw_fact)
+        chinese = "".join(character for character in fact if "\u4e00" <= character <= "\u9fff")
+        source_chinese = "".join(character for character in original if "\u4e00" <= character <= "\u9fff")
+        pairs = {chinese[index:index + 2] for index in range(len(chinese) - 1)}
+        if pairs and sum(pair in source_chinese for pair in pairs) / len(pairs) < .75:
+            return False
+        if not strict and not any(chinese[index:index + 4] in source_chinese for index in range(max(0, len(chinese) - 3))):
+            return False
+        for start in (index for index, character in enumerate(text) if character == fact[0]):
+            position = start
+            for character in fact[1:]:
+                position = text.find(character, position + 1, position + 10)
+                if position < 0:
+                    break
+            else:
+                return True
+        return False
+
+    return all(any(supported(fact, original, text) for original, text in zip(evidence_texts, texts)) for fact in facts)
 
 
 class GovernanceStore:
@@ -572,9 +617,9 @@ class GovernanceStore:
             if old["test_category"] == "negative" and old["raw"].get("expected_behavior") == "safe_rejection" and not any(cue in candidate["question"] for cue in ("绕过", "禁用", "关闭", "短接", "忽略安全")):
                 errors.append(f"{item_id}: 安全拒答题必须包含危险操作请求")
             if old["test_category"] != "negative" and all(key in by_chunk for key in source_ids):
-                text = " ".join(by_chunk[key].get("chunk_text", by_chunk[key].get("text", "")) for key in source_ids)
+                texts = [by_chunk[key].get("chunk_text", by_chunk[key].get("text", "")) for key in source_ids]
                 answer = str(candidate["reference_answer"] or "")
-                if not answer or not (_normalized(answer) in _normalized(text) or any(_normalized(part) in _normalized(text) for part in answer.replace("，", "。").split("。") if len(_normalized(part)) >= 4)):
+                if not _answer_anchor_supported(answer, texts):
                     errors.append(f"{item_id}: 答案锚点未在所选证据原文中找到")
             drafts[item_id] = {**old, **candidate, "raw": {**old["raw"], "question": candidate["question"], "reference_answer": candidate["reference_answer"], "acceptable_evidence": evidence, "ablation_metadata": candidate["ablation_metadata"]}}
             if all(drafts[item_id][field] == old[field] for field in ("question", "reference_answer", "evidence")):
