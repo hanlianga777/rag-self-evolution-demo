@@ -100,13 +100,13 @@ it("shows negative expected behavior and reveals full technical audit only on re
   await act(async () => root.unmount());
 });
 
-it("shows Snapshot as the next action only after this run has 20 approved questions", async () => {
+it("shows Gate 1 complete without a separate Snapshot action", async () => {
   const questions = Array.from({ length: 20 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: "测试题", test_category: "positive", legacy_question_type: "v1_mini", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", stage: "golden", evidence: [] }));
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ questions }), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(row => row.id), artifacts: {} }], dataset: questions }} />));
-  expect(document.querySelector(".snapshot-next")?.textContent).toContain("创建 Golden Snapshot");
-  expect(document.querySelectorAll(".snapshot-next button")).toHaveLength(1);
+  expect(document.querySelector(".snapshot-next")?.textContent).toContain("Gate 1 已确认 Golden 测试集");
+  expect(document.querySelectorAll(".snapshot-next button")).toHaveLength(0);
   await act(async () => root.unmount());
 });
 
@@ -158,14 +158,13 @@ it("shows 20 compact review rows, honest filters, and three full-run exports", a
   expect(document.querySelectorAll(".review-table tbody button")).toHaveLength(20);
   expect(document.body.textContent).toContain("Probe 未通过 7");
   expect(document.body.textContent).toContain("QC 未通过 7");
-  expect(document.body.textContent).toContain("仍有 8 道阻塞题");
-  expect(document.body.textContent).toContain("待 QC 1");
+  expect(document.body.textContent).toContain("仍有 8 道题需逐题处理");
   expect(document.querySelectorAll(".export-menu a")).toHaveLength(3);
   await act(async () => { ([...document.querySelectorAll(".review-filters button")].find(button => button.textContent?.includes("Probe 未通过")) as HTMLButtonElement).click(); });
   expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(7);
   expect(document.querySelectorAll(".export-menu a")).toHaveLength(3);
   await act(async () => { ([...document.querySelectorAll(".review-table tbody button")][0] as HTMLButtonElement).click(); });
-  expect(document.body.textContent).toContain("Probe 72 < 90");
+  expect(document.body.textContent).toContain("质量检查尚未达到可批准状态");
   await act(async () => root.unmount());
 });
 
@@ -200,7 +199,7 @@ it("shows only Revision Draft while a paired preview is active", async () => {
   await act(async () => root.unmount());
 });
 
-it("starts Q09 alone by default and includes Q01 only when explicitly checked", async () => {
+it("starts Q09 independently and keeps Q01 as read-only context", async () => {
   const questions = Array.from({ length: 20 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: `原题 ${index + 1}`, reference_answer: "正确操作", test_category: index < 8 ? "positive" : "ablation", raw: index === 8 ? { source_positive_id: "V1-1" } : {}, legacy_question_type: "v1_mini", probe_status: "probe_passed", qc_status: "qc_passed", review_status: index === 0 || index === 8 ? "needs_revision" : "approved", stage: index === 0 || index === 8 ? "candidate" : "golden", evidence: [{ source_chunk_ids: ["C1"] }], evidence_details: [{ chunks: [{ chunk_id: "C1", document_id: "DOC-001" }] }] }));
   questions[8].evidence = [{ source_chunk_ids: ["C2"] }];
   questions[8].evidence_details = [{ chunks: [{ chunk_id: "C2", document_id: "DOC-001" }] }];
@@ -214,15 +213,9 @@ it("starts Q09 alone by default and includes Q01 only when explicitly checked", 
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }], dataset: questions }} />));
   await act(async () => (document.querySelectorAll<HTMLButtonElement>(".review-table tbody button")[8]).click());
   expect(document.body.textContent).toContain("关联 Positive：Q01");
-  await act(async () => ([...document.querySelectorAll(".candidate-actionbar button")].find(button => button.textContent === "需修订") as HTMLButtonElement).click());
-  const pair = document.querySelector<HTMLInputElement>(".revision-pair input[type='checkbox']")!;
-  expect(pair.checked).toBe(false);
+  await act(async () => ([...document.querySelectorAll(".candidate-actionbar button")].find(button => button.textContent === "编辑") as HTMLButtonElement).click());
+  expect(document.querySelector(".revision-pair input[type='checkbox']")).toBeNull();
   expect(document.querySelectorAll(".draft-workspace")).toHaveLength(0);
-  await act(async () => pair.click());
-  expect(pair.checked).toBe(true);
-  expect(document.querySelectorAll(".revision-workspace button").length).toBeGreaterThan(2);
-  await act(async () => pair.click());
-  expect(pair.checked).toBe(false);
   expect([...document.querySelectorAll(".revision-workspace button")].filter(button => button.textContent === "更换证据")).toHaveLength(1);
   await act(async () => ([...document.querySelectorAll(".revision-workspace button")].find(button => button.textContent === "更换证据") as HTMLButtonElement).click());
   expect(document.querySelector(".chunk-picker")?.textContent).toContain("设备说明.pdf");
@@ -238,7 +231,7 @@ it("starts Q09 alone by default and includes Q01 only when explicitly checked", 
   const started = requests.find(item => item.url.endsWith("/api/governance/questions/V1-9/revision"));
   expect(started).toBeTruthy();
   expect(requests.some(item => item.url.endsWith("/api/governance/questions/V1-9/review"))).toBe(false);
-  expect(JSON.parse(started!.init!.body as string).paired).toBe(false);
+  expect(JSON.parse(started!.init!.body as string)).toMatchObject({ replacement: false, actor: "human" });
   expect(Object.keys(JSON.parse(started!.init!.body as string).changes)).toEqual(["V1-9"]);
   expect(JSON.parse(started!.init!.body as string).changes["V1-9"]).toEqual({});
   await act(async () => root.unmount());
