@@ -95,3 +95,15 @@
 全量结果：Backend 146/146、Vitest 47/47、Fixture E2E-01～05 5/5、TypeScript/生产构建和 `git diff --check` 通过。真实 Fresh Run `GGEN-20260925165201718806`：20 入库，Probe 17 通过/3 未通过，QC 17 通过/3 跳过。Q13 隔离定向 Revision 后真实 Probe/QC 通过，且仅由隔离 Test Human Action 批准；Q18 `NEGATIVE_SUBTYPE_MISMATCH`、Q19 `FAKE_NEGATIVE_RISK` 仍阻断。GOV-29～31/34 不得升级为真实全链 PASS；总体 **Governance Lifecycle Not Ready**。后续修订/人审须由操作者决策，不能以测试替代。
 
 真实用户库验收后只读复核：仍为 18 approved、1 rejected、1 needs_revision，20/20 Probe/QC passed，0 正式 Snapshot；最新 Preview `REV-20260925162824106154` 未应用。按同一查询序列计算的当前 Run 七字段摘要及最新 Revision 原始审计摘要，均与验收前 SQLite 备份逐字节一致；备份 `integrity_check=ok`。本轮所有生成、修订、Test Human Action 与浏览器写操作仅在 `/tmp/rag-governance-live.QECZnW/` 隔离库执行。
+
+## Final Recovery Run（2026-09-26，基线 954bc6a）
+
+本节是后续隔离库续跑证据，不改写上方首次验收的时间点。继续使用 `fresh.db` 中原 Run `GGEN-20260925165201718806`；运行前经 SQLite Backup API 保存 `fresh-before-final-recovery.bak`（`integrity_check=ok`），未重新生成整套题。API 在导入前以 `RAG_DEMO_DB_PATH` 指向隔离库，使用真实 Corpus/Index、Retriever、DeepSeek 和 SQLite，无 Fixture Provider。隔离 Test Human 审核使用 `actor=test_human`；原 Q13 的 `local_user` 批准事件保留，并补记明确的 `test_human` 确认。
+
+| 失败类别 | 原题与原结果 | 通用恢复证据 | 最终结果 |
+|---|---|---|---|
+| `NEGATIVE_SUBTYPE_MISMATCH` | Q18 `safe_rejection` 原题询问 SDK 引脚/协议；Probe 60，QC 跳过 | 单题 AI Revision `REV-20260926011659968254` 使用真实 `B2-MANUAL-CHUNK-0029` 作生成上下文；Hard Validation、应用、真实 Probe/QC 通过；负向 Golden Evidence 仍为空 | **PASS**；`NEGATIVE_VALID`，QC 95，`test_human` 批准；未改 subtype |
+| `FAKE_NEGATIVE_RISK` | Q19 `insufficient_evidence` 原题问 R3 续航，Judge 由手册推得 5h；Probe 60，QC 跳过 | 单题 AI Revision `REV-20260926011831388531` 改问未在四份文档中给出的 R3 保修期；真实 Vector/Full-text/Answerability Probe 与 Provider QC 通过；负向 Golden Evidence 仍为空 | **PASS**；`NEGATIVE_VALID`，QC 94，`test_human` 批准；未改 subtype |
+| 人审新发现：关联消融不一致 | Q09 `weak_keywords` 指向 Q01，却问不同知识点、给出不同答案；旧 Probe/QC 虽通过，人审未批准 | `test_human` 标记需修订。授权后单题 AI Revision `REV-20260926012207417442` 保留 Q01、同证据及同事实答案，草案未应用；Hard Validation 报“答案锚点未在所选证据原文中找到”。该答案事实分散在唯一的 `KIRA-B50-CHUNK-0177`，其 OCR 杂字符/分行使整段及按句连续匹配均失败；无第二个含全部事实的真实 Chunk。 | **BLOCKED**；原始数据属于 A（关联知识点错误），现有修订恢复阻断属于 E（连续字符串锚点校验对已批准多事实答案的假阴性）。不降低校验、不修改已批准 Q01，等待人工确认通用修复。 |
+
+续跑终态：Mini 20/20 入库（8/4/8）；Probe 20/20 通过；QC 20/20 通过；隔离 `test_human` 批准 19/20，Q09 `needs_revision`；Snapshot 创建请求仍被 409 正确阻断，Baseline Gate 不可用。GOV-29/30/34 保持 `BLOCKED`，GOV-31 与 GOV-16/18 保持 `PARTIAL`，所以验收计数仍为 **25 PASS、9 PARTIAL、3 BLOCKED**，总体 **Governance Lifecycle Not Ready**。未使用第二轮随机重试或直接改库；Q09 的失败草案与审计保留供后续恢复。
