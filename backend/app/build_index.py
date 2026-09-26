@@ -12,7 +12,6 @@ from statistics import median
 import numpy as np
 
 from .corpus import (
-    DOCUMENT_CATALOG,
     DOCUMENTS_DIR,
     EMBEDDING_MODEL,
     INDEX_DIR,
@@ -20,6 +19,7 @@ from .corpus import (
     TARGET_TOKENS,
     chunk_sections,
     current_manifest,
+    discover_documents,
     is_current,
     source_fingerprint,
     tokenizer_token_count,
@@ -179,7 +179,7 @@ def build_index(force: bool = False) -> int:
     token_counter = lambda text: tokenizer_token_count(tokenizer, text)
 
     documents, chunks = [], []
-    for catalog in DOCUMENT_CATALOG:
+    for catalog in discover_documents():
         print(f"解析：{catalog['name']}")
         record, parsed_chunks = _parse_document(catalog, ocr, token_counter)
         documents.append(record)

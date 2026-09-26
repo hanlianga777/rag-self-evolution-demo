@@ -56,6 +56,19 @@ DOCUMENT_CATALOG = [
 ]
 
 
+def discover_documents() -> list[dict]:
+    """Discover current PDFs, preserving known document identities and metadata."""
+    known = {entry["name"]: entry for entry in DOCUMENT_CATALOG}
+    records = []
+    for source in sorted(DOCUMENTS_DIR.glob("*.pdf"), key=lambda path: path.name):
+        catalog = known.get(source.name)
+        if catalog is None:
+            identifier = "DOC-" + hashlib.sha256(source.name.encode("utf-8")).hexdigest()[:12]
+            catalog = {"id": identifier, "name": source.name, "chunk_prefix": identifier}
+        records.append(catalog.copy())
+    return records
+
+
 def _read_json(path: Path, fallback):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -158,7 +171,7 @@ def _chunk(document: dict, serial: int, section_path: str, parts: list[dict], to
     page_start = min(part["page"] for part in parts)
     page_end = max(part["page"] for part in parts)
     return {
-        "chunk_id": f"{document['chunk_prefix']}-CHUNK-{serial:04d}",
+        "chunk_id": f"{document.get('chunk_prefix', document['id'])}-CHUNK-{serial:04d}",
         "document_id": document["id"],
         "document_name": document["name"],
         "vendor": document.get("vendor"),
@@ -193,7 +206,7 @@ def current_manifest() -> dict:
         "chunking_strategy_version": "section-aware-v2",
         "target_tokens": TARGET_TOKENS,
         "overlap_tokens": OVERLAP_TOKENS,
-        "sources": {entry["id"]: source_fingerprint(entry) for entry in DOCUMENT_CATALOG},
+        "sources": {entry["id"]: source_fingerprint(entry) for entry in discover_documents()},
     }
 
 
@@ -210,13 +223,16 @@ class CorpusStore:
 
     def documents(self) -> list[dict]:
         persisted = _read_json(self.index_dir / "documents.json", [])
-        by_id = {entry["id"]: entry for entry in persisted}
+        by_id = {entry["id"]: entry for entry in persisted if entry.get("id")}
+        catalog_by_id = {entry["id"]: entry for entry in discover_documents()}
         records = []
-        for catalog in DOCUMENT_CATALOG:
-            stored = by_id.get(catalog["id"], {})
+        for document_id in dict.fromkeys([*by_id, *catalog_by_id]):
+            catalog = catalog_by_id.get(document_id, {})
+            stored = by_id.get(document_id, {})
+            name = stored.get("name") or catalog.get("name")
             records.append(
                 {
-                    **catalog,
+                    **catalog, **stored,
                     "pages": stored.get("pages"),
                     "chunks": stored.get("chunks", 0),
                     "status": stored.get("status", "Needs OCR"),
@@ -224,7 +240,7 @@ class CorpusStore:
                     "ocr": stored.get("ocr", "未执行"),
                     "chunk_strategy": stored.get("chunk_strategy", f"目录/段落切片，{TARGET_TOKENS} tokens，{OVERLAP_TOKENS} overlap"),
                     "updated_at": stored.get("updated_at", "待构建"),
-                    "pdf_url": f"/documents/{catalog['name']}",
+                    "pdf_url": f"/documents/{name}" if name else None,
                     "source_fingerprint": stored.get("source_fingerprint"),
                 }
             )
@@ -232,7 +248,7 @@ class CorpusStore:
 
     def chunks(self, document_id: str | None = None) -> list[dict]:
         chunks = _read_json(self.index_dir / "chunks.json", [])
-        return [item for item in chunks if document_id is None or item["document_id"] == document_id]
+        return [item for item in chunks if document_id is None or item.get("document_id") == document_id]
 
     def detail(self, document_id: str) -> dict | None:
         document = next((item for item in self.documents() if item["id"] == document_id), None)

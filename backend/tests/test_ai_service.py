@@ -2,6 +2,8 @@ import json
 import unittest
 from unittest.mock import Mock
 
+import numpy as np
+
 from app.ai_service import AiService
 from app.policy import DEFAULT_PIPELINE_CONFIG
 from app.providers import ProviderTimeout
@@ -76,37 +78,39 @@ class AiServiceTests(unittest.TestCase):
                 chunks.append({"document_id": f"DOC-{document}", "document_name": f"文档 {document}", "product": f"产品 {document}", "section": f"章节 {chunk}", "section_path": f"文档 {document} / 章节 {chunk}", "page_start": chunk, "chunk_id": f"D{document}-C{chunk}", "chunk_text": "请按照原厂说明书执行操作。"})
         service = AiService(Mock(), Mock(), GoldenProvider(), False)
 
-        generated = service.generate_mini_golden(chunks)
+        generated = service.generate_mini_golden(chunks, embeddings=self._embeddings(chunks))
 
         self.assertEqual(len(generated["candidates"]), 20)
         self.assertEqual({category: sum(candidate["test_category"] == category for candidate in generated["candidates"]) for category in ("positive", "ablation", "negative")}, {"positive": 8, "ablation": 4, "negative": 8})
         self.assertEqual(generated["profile"]["expected_count"], 20)
         self.assertEqual({item["document_id"] for item in generated["coverage_plan"] if item["test_category"] != "negative"}, {"DOC-1", "DOC-2", "DOC-3", "DOC-4"})
-        self.assertTrue(any(item.get("ablation_attribute") == "cross_chunk" and len(item["evidence"][0]["source_chunk_ids"]) == 2 for item in generated["candidates"]))
+        self.assertTrue(all(item.get("source_positive_slot") is None for item in generated["candidates"] if item["test_category"] == "ablation"))
 
     def test_mini_generation_repairs_only_the_failed_slot_and_keeps_audit(self):
-        generated = AiService(Mock(), Mock(), RepairingGoldenProvider(), False).generate_mini_golden(self._chunks())
+        chunks = self._chunks()
+        generated = AiService(Mock(), Mock(), RepairingGoldenProvider(), False).generate_mini_golden(chunks, embeddings=self._embeddings(chunks))
 
         self.assertEqual(generated["status"], "candidate_generated")
         self.assertEqual(len(generated["candidates"]), 20)
         self.assertEqual(len(generated["slot_audit"]["Q01"]), 2)
         self.assertEqual(generated["slot_audit"]["Q01"][0]["validation_error"], "invalid question/category")
 
-    def test_mini_generation_records_failed_run_after_two_repairs(self):
-        generated = AiService(Mock(), Mock(), RepairingGoldenProvider(failures=3), False).generate_mini_golden(self._chunks())
+    def test_mini_generation_records_failed_run_after_one_repair(self):
+        chunks = self._chunks()
+        generated = AiService(Mock(), Mock(), RepairingGoldenProvider(failures=3), False).generate_mini_golden(chunks, embeddings=self._embeddings(chunks))
 
         self.assertEqual(generated["status"], "failed")
         self.assertEqual(generated["failed_slots"], ["Q01"])
-        self.assertEqual(len(generated["slot_audit"]["Q01"]), 3)
+        self.assertEqual(len(generated["slot_audit"]["Q01"]), 2)
 
-    def test_coverage_prefers_representative_body_chunks_when_available(self):
+    def test_coverage_uses_embedding_topics_even_with_sparse_metadata(self):
         chunks = self._chunks()
         chunks[0].update({"section_path": "封面", "chunk_text": "短"})
         chunks[1].update({"section_path": "正文 / 操作", "chunk_text": "有效正文" * 60})
 
-        plan = AiService._mini_coverage_plan(chunks)
+        plan = AiService._mini_coverage_plan(chunks, self._embeddings(chunks))
 
-        self.assertNotIn("D1-C1", [item["evidence_chunk_ids"][0] for item in plan if item["document_id"] == "DOC-1" and item["evidence_chunk_ids"]])
+        self.assertTrue({item["document_id"] for item in plan[:8]} == {"DOC-1", "DOC-2", "DOC-3", "DOC-4"})
         self.assertTrue(all(item.get("selected_reason") for item in plan))
 
     def test_hard_validation_rejects_alias_ablation_without_recorded_alias(self):
@@ -123,6 +127,13 @@ class AiServiceTests(unittest.TestCase):
             for chunk in range(1, 4):
                 chunks.append({"document_id": f"DOC-{document}", "document_name": f"文档 {document}", "product": f"产品 {document}", "section": f"章节 {chunk}", "section_path": f"文档 {document} / 章节 {chunk}", "page_start": chunk, "chunk_id": f"D{document}-C{chunk}", "chunk_text": "请按照原厂说明书执行操作。"})
         return chunks
+
+    @staticmethod
+    def _embeddings(chunks):
+        vectors = np.zeros((len(chunks), 4), dtype="float32")
+        for index, chunk in enumerate(chunks):
+            vectors[index, int(chunk["document_id"].split("-")[-1]) - 1] = 1
+        return vectors
 
 
 if __name__ == "__main__":

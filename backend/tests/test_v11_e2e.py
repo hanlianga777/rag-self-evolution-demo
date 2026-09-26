@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
+
 from app.ai_service import AiService
 from app.evaluation import EvaluationRunner
 from app.governance import GovernanceStore
@@ -82,7 +84,11 @@ class V11BusinessE2E(unittest.TestCase):
         self.ai.retriever = FixtureRetriever(self.store)
 
     def golden(self):
-        generated = self.ai.generate_mini_golden(self.corpus.chunks())
+        chunks = self.corpus.chunks()
+        embeddings = np.zeros((len(chunks), 4), dtype="float32")
+        for index, chunk in enumerate(chunks):
+            embeddings[index, int(chunk["document_id"].split("-")[-1]) - 1] = 1
+        generated = self.ai.generate_mini_golden(chunks, embeddings=embeddings)
         self.assertEqual(generated["status"], "candidate_generated")
         rows = self.store.save_mini_golden_candidates(generated["candidates"], "fixture", coverage_plan=generated["coverage_plan"], hard_validation=generated["hard_validation"], slot_audit=generated["slot_audit"])
         run_id = rows[0]["raw"]["generation_run_id"]
