@@ -9,6 +9,19 @@ import { GovernancePage } from "./pages/GovernancePage";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 
+it("shows null Probe and QC thresholds as advisory in technical audit", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("[]", { status: 200 })));
+  const row = { id: "Q1", slot: "Q01", question: "问题", test_category: "positive", stage: "candidate", probe_status: "probe_passed", qc_status: "qc_passed", probe: { score: 72, threshold: null }, qc: { score: 70, threshold: null }, evidence: [] };
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<CandidateWorkspace row={row} peers={[row]} busy={false} onRun={() => {}} onReview={async () => true} onRefresh={async () => {}} operation={{ watchRevision: () => {} } as any} />));
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-menu button")].find(button => button.textContent === "查看技术审计")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".audit-tabs button")].find(button => button.textContent === "Probe")!.click());
+  expect(document.querySelector(".audit-workspace")?.textContent).toContain("72 / 不作为审批阈值");
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".audit-tabs button")].find(button => button.textContent === "QC")!.click());
+  expect(document.querySelector(".audit-workspace")?.textContent).toContain("70 / 不作为审批阈值");
+  await act(async () => root.unmount());
+});
+
 it("accepts a reviewable QC P0 with a recorded reason even when scores are low", async () => {
   const requests: any[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
