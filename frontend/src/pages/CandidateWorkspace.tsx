@@ -10,7 +10,7 @@ type AuditTab = "evidence" | "probe" | "qc" | "revision" | "raw";
 const probeLabel = (value?: string) => value === "probe_passed" ? "通过" : value === "needs_revision" ? "未通过" : "未运行";
 const qcLabel = (value?: string) => value === "qc_passed" ? "通过" : value === "qc_failed" ? "未通过" : "未运行";
 const numberText = (value: unknown) => typeof value === "number" ? String(value) : "—";
-const thresholdText = (value: unknown) => typeof value === "number" ? String(value) : "不作为审批阈值";
+const thresholdText = (value: unknown) => typeof value === "number" ? String(value) : value === null ? "不作为审批阈值" : "未记录";
 const reviewLabel = (row: Candidate) => displayText(row.review_status || "human_review_pending");
 const tagOptions = ["业务价值偏低", "题型不纯", "表达过于接近原文", "证据不足", "答案不完整", "Subtype 错误", "与其他题重复", "其他"];
 const negativeBehavior: Record<string, string> = {
