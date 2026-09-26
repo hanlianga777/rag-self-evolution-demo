@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 
 from app.governance import GovernanceStore
+from app.ai_service import AiService
+from unittest.mock import Mock
 from test_revision_workflow import candidates
 
 
@@ -39,6 +41,27 @@ class V12GovernanceTests(unittest.TestCase):
         self.quality(item, evidence_failure=True)
         with self.assertRaises(ValueError):
             self.store.review_question(item['id'], 'approved', 'test_human', accept_qc_p0=True, reason='not sufficient')
+
+    def test_rejection_is_not_p0_acceptance(self):
+        item = self.items[0]
+        self.quality(item, 'P0')
+        self.store.review_question(item['id'], 'rejected', 'test_human', accept_qc_p0=True)
+        with self.assertRaisesRegex(ValueError, 'P0'):
+            self.store.review_question(item['id'], 'approved', 'test_human')
+
+    def test_generation_and_probe_block_unsupported_answer_before_qc_override(self):
+        item = self.items[0]
+        chunks = [{'document_id': 'DOC-X', 'chunk_id': 'C1', 'chunk_text': '额定电压为24V，启动前检查急停按钮。'}]
+        draft = {**item['raw'], 'test_category': 'positive', 'question': '额定电压是多少？', 'reference_answer': '额定电压为99V', 'evidence': [{'source_chunk_ids': ['C1']}]}
+        self.assertIn('unsupported answer anchor', AiService._candidate_errors(draft, chunks, set()))
+        self.store.update_question(item['id'], draft['question'], draft['reference_answer'], draft['evidence'], 'test_human')
+        retriever = Mock()
+        retriever.retrieve.return_value = [{'chunk_id': 'C1', 'score': 1}]
+        probe = self.store.run_probe(item['id'], retriever, chunks)
+        self.assertFalse(probe['passed'])
+        self.assertFalse(probe['programmatic']['checks']['answer_anchor'])
+        with self.assertRaises(ValueError):
+            self.store.review_question(item['id'], 'approved', 'test_human', accept_qc_p0=True, reason='不得豁免')
 
     def test_ablation_does_not_require_positive_answer_or_evidence(self):
         item = self.items[8]

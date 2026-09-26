@@ -33,6 +33,7 @@ corpus = CorpusStore()
 ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")
 store.interrupt_revision_runs()
 store.interrupt_generation_runs()
+store.interrupt_evaluation_runs()
 
 
 class PreviewRequest(BaseModel):
@@ -221,7 +222,7 @@ def export_generation_run(run_id: str, format: Literal["json", "csv", "markdown"
                 lines += [f'- Document: {chunk["document_name"] or "当前索引未匹配"}', f'  Section: {chunk["section_path"] or "—"}', f'  Page: {chunk["page_start"] or "—"}–{chunk["page_end"] or "—"}', f'  Chunk ID: {chunk["chunk_id"]}', f'  Evidence Text: {chunk["chunk_text"] or "当前索引未匹配"}']
             lines.append(f'  Evidence Key Points: {"；".join(evidence.get("evidence_key_points", [])) or "—"}')
         probe, qc = item["probe"] or {}, item["qc"] or {}
-        lines += ["", "Probe:", f'- Score: {probe.get("score", "未运行")} / {probe.get("threshold", 90)}', f'- Status: {item["probe_status"]}', f'- Classification: {probe.get("probe_details", {}).get("classification", "—")}', f'- Reason: {probe.get("reason", "—")}', "", "QC:", f'- Score: {qc.get("score", "未运行")} / {qc.get("threshold", 85)}', f'- Status: {item["qc_status"]}', f'- Priority: {qc.get("priority", "—")}', f'- Reason: {qc.get("reason", "—")}', f'- Issues: {"；".join(qc.get("issues", [])) or "—"}', "", "Human Review:", f'- Status: {item["review_status"]}', ""]
+        lines += ["", "Probe:", f'- Score: {probe.get("score", "未运行")} / {probe.get("threshold") if probe.get("threshold") is not None else "不作为审批阈值"}', f'- Status: {item["probe_status"]}', f'- Classification: {probe.get("probe_details", {}).get("classification", "—")}', f'- Reason: {probe.get("reason", "—")}', "", "QC:", f'- Score: {qc.get("score", "未运行")} / {qc.get("threshold") if qc.get("threshold") is not None else "不作为审批阈值"}', f'- Status: {item["qc_status"]}', f'- Priority: {qc.get("priority", "—")}', f'- Reason: {qc.get("reason", "—")}', f'- Issues: {"；".join(qc.get("issues", [])) or "—"}', "", "Human Review:", f'- Status: {item["review_status"]}', ""]
         if item["revision_history"]:
             lines += ["Revision History:"]
             for revision in item["revision_history"]:
@@ -281,7 +282,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus):
             if probe["status"] == "passed":
                 stage = "qc"
                 qc = service.quality_check(run_store.question(candidate["id"]))
-                run_store.record_qc(candidate["id"], qc, "passed" if qc["score"] >= 85 else "failed")
+                run_store.record_qc(candidate["id"], qc, "failed" if qc.get("priority") == "P0" else "passed")
                 qc_completed += 1
             else:
                 qc_skipped += 1
@@ -322,7 +323,7 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
                 if probe["status"] == "passed":
                     run_store.update_quality_rerun(run_id, {**counters, "stage": "qc", "slot": slot, "slots": slots})
                     qc = service.quality_check(run_store.question(question_id))
-                    saved = run_store.record_qc(question_id, qc, "passed" if qc["score"] >= 85 else "failed")
+                    saved = run_store.record_qc(question_id, qc, "failed" if qc.get("priority") == "P0" else "passed")
                     counters["qc_passed" if saved["status"] == "qc_passed" else "qc_failed"] += 1
                     slots[slot]["qc"] = saved["status"]
                     slots[slot]["qc_reason"] = qc["reason"]
@@ -549,7 +550,7 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
             if results[item_id]["probe"] == "passed":
                 run_store.update_revision(revision_id, status="qc", stage="qc", quality_results=results)
                 qc = _revision_attempt(run_store, revision_id, "qc", service, lambda: service.quality_check(run_store.question(item_id)))
-                saved = run_store.record_qc(item_id, qc, "passed" if qc["score"] >= 85 else "failed")
+                saved = run_store.record_qc(item_id, qc, "failed" if qc.get("priority") == "P0" else "passed")
                 results[item_id].update({"qc": saved["status"], "qc_reason": qc.get("reason")})
             else:
                 results[item_id]["qc"] = "skipped"
@@ -623,7 +624,7 @@ def qc_question(question_id: str):
         if item["probe_status"] != "probe_passed":
             raise HTTPException(status_code=409, detail="Probe Passed 后才能运行 QC")
         result = ai_service.quality_check(item)
-        return store.record_qc(question_id, result, "passed" if result["score"] >= 85 else "failed")
+        return store.record_qc(question_id, result, "failed" if result.get("priority") == "P0" else "passed")
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:
@@ -715,7 +716,7 @@ def probe_readiness():
 
 @app.post("/api/experiments/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def run_experiments(payload: ExperimentRequest | None = None):
-    completed = next((item for item in store.evaluation_runs() if item["status"] == "completed"), None)
+    completed = next((item for item in store.evaluation_runs() if item["status"] == "completed" and item['config'].get('run_target') != 'sandbox_candidate'), None)
     if completed is None:
         raise HTTPException(status_code=409, detail="需先完成真实 Baseline Evaluation")
     try:
@@ -726,14 +727,7 @@ def run_experiments(payload: ExperimentRequest | None = None):
 
 @app.post("/api/direct-release", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def start_direct_release(payload: DirectReleaseRequest):
-    baseline = next((item for item in store.evaluation_runs() if item["status"] == "completed"), None)
-    if baseline is None:
-        raise HTTPException(status_code=409, detail="Direct Release 仍需先完成真实 Baseline Evaluation")
-    config = {**DEFAULT_PIPELINE_CONFIG, **payload.config}
-    check = validate_candidate_config(config, prior_configs=[item["config"] for item in store.candidates()], completed_evals=0)
-    if not check["valid"]:
-        raise HTTPException(status_code=409, detail="Direct Release Config 不符合冻结 Search Space：" + "; ".join(check["errors"]))
-    return store.create_direct_release_candidate(baseline["id"], config, payload.actor)
+    raise HTTPException(status_code=409, detail='V1.2 请经过 A/B/C Sandbox、Gate 2 报告确认及 D 决策后发布；历史 Direct Release 仅保留审计')
 
 
 @app.get("/api/experiments/{run_id}")

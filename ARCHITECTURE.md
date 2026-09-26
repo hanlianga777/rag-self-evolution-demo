@@ -1,21 +1,21 @@
-# 架构说明
+# V1.2 架构说明
 
 ## 运行时
 
-React/Vite 展示工作区，FastAPI 负责数据边界，SQLite 以增量 migration 保存治理、评测、实验与版本记录；旧 `demo_state` 保留但不再作为正式页面数据源。`start.sh` 不依赖 Docker，同时启动两个进程。
+React/Vite + FastAPI + SQLite + 本地 BGE/FAISS，复用已有七页。动态文档清单与 Embedding 主题配额；文档 ID、Chunk ID、原文必需，产品／章节可选。原四 PDF 仅示例。
 
-## 数据流
+## 主链与事务
 
-`Golden Draft → GovernanceStore → FastAPI routes → frontend API client → 产品页面`
+Golden → Gate 1 人工确认并冻结 → Baseline → Bad Case → Tuning A/B/C Sandbox → Gate 2 报告确认并选择赢家 → D 决策／重评 → Gate 3 人工发布 → 问答。
 
-Revision AI 在生成单题草案前先从当前文档、再从同产品文档确定真实 Chunk；人工指定材料优先，选材依据写入既有 Revision JSON 审计。Negative 只把材料作为生成上下文。此分支不改变主业务链，故现有 HTML 架构图及同源 PNG 无需重画。
+只有 Tuning 是 Agent。Generation、QC、Evaluation 是受控工作流；编辑和替换复用 Revision JSON、哈希与后台线程。采用替换才原子切换活动题映射，历史不删除。Gate 1 原子保存审核和不可变 Golden Version。
 
-Evaluation 固化 approved Question Snapshot、Production Config、Judge 元数据和逐题结果；后台线程只写 SQLite 运行记录。Optimization Agent 只能从真实 Bad Case 中生成 A/B/C，且只能使用 Tool Registry 的 available 参数。每个 Candidate 在 Baseline Snapshot 上独立回归；人工一次确认发布时服务端重新检查 Recommendation、Sandbox、Gate 与 Regression，之后生成 Production Version；回滚只切换保留版本。
+Baseline/A/B/C/D 共用冻结 Golden、Judge、逐题评测器。12 次启动预算含失败并为 D 留一次；SQLite 写锁防并发超支。Gate 2 等已启动评测全部终结。D 合并实测有效配置差异，冲突保留赢家，新组合完整重评；无新增失败且有实际修复才替代赢家。Gate 3 重验报告／D 决策、Sandbox、11 Gate 与 Regression，同事务写 Human Release 及 Version Snapshot。
 
-## Provider 边界
+Monitoring、版本历史和回滚是辅助能力。重启不假称线程仍在执行：运行标为中断／失败，审计和已消费预算保留。
 
-当前 API 通过 `AiService` 提供 readiness、显式 probe 与真实 Preview；`DeepSeekProvider` 使用官方 OpenAI-compatible Chat Completions，并对 Evaluation Judge / Optimization Agent 强制结构化 JSON。UI 组件不得直接调用 Provider，且 API Key 永不返回给前端。
+## Provider 与证据
 
-## 评测与推荐
+DeepSeek 只经后端显式调用，密钥不返回前端。检索是 Vector/BM25 Hybrid + 可选 Lightweight Rerank，不是独立重排模型。Provider 错误不伪装为质量结论；Legacy、Fixture 与真实生命周期分别报告。
 
-正式评测只覆盖人工批准的 Golden Snapshot；历史 40 题为 Legacy，不计入当前 Mini。Overall 仅作可读指标，11 项 Hard Gate 与 Regression 独立判定；无真实运行时没有推荐结果。
+[业务图源](架构/业务流程图.html) 与 [技术图源](架构/技术架构图.html) 是唯一可编辑图源，PNG 从对应 HTML 导出。

@@ -452,7 +452,7 @@ class GovernanceStore:
             blockers.append('局部修订未完成')
         qc = qcs[0]['result'] if qcs else {}
         requires_acceptance = qc.get('priority') == 'P0'
-        accepted = any(event.get('accept_qc_p0') and event.get('qc_created_at') == qcs[0]['created_at'] for event in self.review_history(question_id)) if qcs else False
+        accepted = any(event.get('decision') == 'approved' and event.get('accept_qc_p0') and (event.get('reason') or '').strip() and event.get('qc_created_at') == qcs[0]['created_at'] for event in self.review_history(question_id)) if qcs else False
         return {'can_approve': not blockers and (not requires_acceptance or accepted), 'blocking_reasons': blockers, 'requires_qc_p0_acceptance': requires_acceptance and not accepted, 'qc_reason': qc.get('reason'), 'qc_created_at': qcs[0]['created_at'] if qcs else None}
 
     def review_question(self, question_id: str, decision: str, actor: str, *, reason: str | None = None, tags: list[str] | None = None, accept_qc_p0: bool = False):
@@ -635,20 +635,16 @@ class GovernanceStore:
                 continue
             evidence = [] if old["test_category"] == "negative" else [{"source_chunk_ids": source_ids, "evidence_key_points": [by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))[:160] for key in source_ids if key in by_chunk]}]
             candidate = {"question": str(change.get("question", old["question"])).strip(), "reference_answer": change.get("reference_answer", old["reference_answer"]), "evidence": evidence, "test_category": old["test_category"], "expected_behavior": old["raw"].get("expected_behavior"), "ablation_attribute": old["raw"].get("ablation_attribute"), "ablation_metadata": change.get("ablation_metadata", old["raw"].get("ablation_metadata", {}))}
-            errors.extend(f"{item_id}: {message}" for message in AiService._candidate_errors(candidate, chunks, set()))
+            errors.extend(f"{item_id}: {message.replace('unsupported answer anchor', '答案锚点未在所选证据原文中找到')}" for message in AiService._candidate_errors(candidate, chunks, set()))
             if old["test_category"] == "negative" and old["raw"].get("expected_behavior") == "safe_rejection" and not any(cue in candidate["question"] for cue in ("绕过", "禁用", "关闭", "短接", "忽略安全")):
                 errors.append(f"{item_id}: 安全拒答题必须包含危险操作请求")
-            if old["test_category"] != "negative" and all(key in by_chunk for key in source_ids):
-                texts = [by_chunk[key].get("chunk_text", by_chunk[key].get("text", "")) for key in source_ids]
-                answer = str(candidate["reference_answer"] or "")
-                if not _answer_anchor_supported(answer, texts):
-                    errors.append(f"{item_id}: 答案锚点未在所选证据原文中找到")
             drafts[item_id] = {**old, **candidate, "raw": {**old["raw"], "question": candidate["question"], "reference_answer": candidate["reference_answer"], "acceptable_evidence": evidence, "ablation_metadata": candidate["ablation_metadata"]}}
             old_ids = [key for source in old['evidence'] for key in source.get('source_chunk_ids', [])]
             if all(drafts[item_id][field] == old[field] for field in ("question", "reference_answer")) and source_ids == old_ids and candidate['ablation_metadata'] == old['raw'].get('ablation_metadata', {}):
                 errors.append(f"{item_id}: 草案未改变问题、答案或证据")
         if len(drafts) == len(run["question_ids"]):
-            peers = [item for item in self.questions() if item["raw"].get("generation_run_id") == run["generation_run_id"] and item["id"] not in drafts]
+            active_ids = set(self.generation_run(run['generation_run_id'])['question_ids'])
+            peers = [item for item in self.questions() if item['id'] in active_ids and item["id"] not in drafts]
             for item_id, draft in drafts.items():
                 for peer in peers:
                     duplicate = _normalized(draft["question"]) == _normalized(peer["question"])
@@ -949,6 +945,7 @@ class GovernanceStore:
             hits = retriever.search(item["question"], limit=4)
         best = max((hit.get("score", 0) for hit in hits), default=0)
         source_texts = {chunk.get("chunk_id"): chunk.get("text", chunk.get("chunk_text", "")) for chunk in chunks}
+        programmatic['answer_anchor'] = _answer_anchor_supported(item['reference_answer'] or '', [source_texts[key] for key in expected_chunks if key in source_texts]) if positive else True
         haystack = " ".join(source_texts.values())
         phrases = [point for source in evidence for point in source.get("evidence_key_points", [])]
         matched = [phrase for phrase in phrases if phrase and phrase in haystack]
@@ -975,6 +972,7 @@ class GovernanceStore:
         negative_passed = behavior == expected_behavior and not subtype_mismatch and (not ambiguous_negative or answerability.get("answerable") is False)
         full_text = {"mode": "evidence" if positive else "fake_negative_check", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else negative_passed}
         evidence_valid = all(programmatic.values()) and full_text["passed"]
+        full_text['answer_anchor_supported'] = programmatic['answer_anchor'] if positive else None
         recalled = bool(expected_chunks & {hit.get("chunk_id") for hit in hits}) if positive else None
         classification = "RETRIEVAL_INCOHERENT" if positive and evidence_valid and not recalled else "EVIDENCE_VALID" if positive and evidence_valid else "EVIDENCE_INVALID" if positive else "NEGATIVE_VALID" if evidence_valid else "NEGATIVE_SUBTYPE_MISMATCH" if subtype_mismatch else "FAKE_NEGATIVE_RISK" if answerability and answerability.get("answerable") is True else "NEGATIVE_UNDETERMINED"
         negative_checks = None if positive else {
@@ -989,7 +987,7 @@ class GovernanceStore:
             "evidence_support": 40 if evidence_valid else 0,
             "evidence_direct_failure": not evidence_valid,
             "reason": "Evidence exists but the production pipeline did not recall it" if classification == "RETRIEVAL_INCOHERENT" else "Programmatic evidence check" if evidence_valid else "Negative subtype does not match the question" if subtype_mismatch else "Negative may be answerable" if classification == "FAKE_NEGATIVE_RISK" else "Answerability could not be established" if not positive else "Evidence or required fields cannot support Golden",
-            "rule_version": "v1.0.2",
+            "rule_version": "v1.2",
             "model_version": "programmatic-probe-v1",
             "probe_details": {"pipeline": "CandidateK → Hybrid → Lightweight second-stage ranking → MinScore → TopK" if positive else "vector + full-text fake-negative check", "vector": {"top_k": hits, "best_similarity": best}, "full_text": full_text, "negative_checks": negative_checks, "classification": classification, "retrieval_coherent": recalled},
         })
@@ -1156,8 +1154,27 @@ class GovernanceStore:
 
     def save_agent_trace(self, experiment_id: str, status: str, result: dict, error_message: str | None = None):
         with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            current = connection.execute('SELECT status, result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
+            persisted = _load(current['result_json'], {})
+            merged = {**persisted, **result}
+            for key in ('report_confirmation', 'composite'):
+                if key in persisted:
+                    merged[key] = persisted[key]
             connection.execute("INSERT INTO agent_traces(experiment_id, status, result_json, error_message, created_at) VALUES (?, ?, ?, ?, ?)", (experiment_id, status, _json(result), error_message, _now()))
-            connection.execute("UPDATE experiments SET status = ?, result_json = ? WHERE id = ?", (status, _json(result), experiment_id))
+            connection.execute("UPDATE experiments SET status = ?, result_json = ? WHERE id = ?", (current['status'] if persisted.get('report_confirmation') else status, _json(merged), experiment_id))
+
+    def interrupt_evaluation_runs(self):
+        """Workers are process-local: retain spent attempts, never claim a live worker after restart."""
+        with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            connection.execute("UPDATE evaluation_runs SET status='failed', error_message=?, completed_at=? WHERE status IN ('queued', 'running')", ('进程重启，评测已中断', _now()))
+            interrupted = connection.execute("SELECT id, experiment_id, result_json FROM candidate_configs WHERE status='running'").fetchall()
+            for row in interrupted:
+                result = {**_load(row['result_json'], {}), 'error': '进程重启，评测已中断', 'interrupted': True}
+                connection.execute("UPDATE candidate_configs SET status='failed', result_json=? WHERE id=?", (_json(result), row['id']))
+        for experiment_id in {row['experiment_id'] for row in interrupted}:
+            self.refresh_recommendation(experiment_id)
 
     def save_candidate(self, experiment_id: str, candidate_id: str, config: dict, reasoning: dict):
         with self.connection() as connection:
@@ -1349,7 +1366,7 @@ class GovernanceStore:
 
     def release_gate_error(self, candidate: dict) -> str | None:
         if candidate.get('reasoning', {}).get('root_cause_cluster') == 'Human Direct Release':
-            return None
+            return 'V1.2 不允许绕过 Gate 2 报告确认及 D 决策'
         if candidate.get("reasoning", {}).get("candidate_label") not in {"A", "B", "C", 'D'}:
             return '仅允许已验证方案发布'
         recommendation = self.recommendation(candidate["experiment_id"])

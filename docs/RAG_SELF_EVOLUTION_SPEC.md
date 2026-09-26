@@ -1,7 +1,7 @@
 # RAG Self-Evolution Platform 产品规格
 
 > **唯一当前规则：V1.2 — Friend-Aligned Simplified Baseline**
-> **Implementation Authorized / In Progress**。本节替代下方完整保留的 V1.1 历史规则；实现和真实验收状态另见实施矩阵，不以规格冒充完成证据。
+> **Implementation Delivered / Real Lifecycle Blocked**。本节替代下方完整保留的 V1.1 历史规则；实现和分层验收见 [V1.2 验证报告](V1_2_VERIFICATION.md)，不以规格或 Fixture 冒充真实闭环。
 
 ## V1.2 冻结规则
 

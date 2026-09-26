@@ -1,14 +1,11 @@
-# 待办（当前 V1.1）
+# 待办（当前 V1.2）
 
-## Completed
+## 本轮验收
 
-- 本地 PDF / Chunk / BGE / FAISS 知识链、FastAPI + SQLite + React Demo、Mini Candidate、Probe/QC、人工治理、正式 Evaluation、A/B/C Sandbox、Monitoring 与版本审计能力。
+- 按 [实施计划](docs/V1_2_IMPLEMENTATION_PLAN.md) 分别完成确定性测试、Fixture 主链、当前库副本兼容、隔离真实链路及浏览器巡检，不相互冒充。
+- 更新 [参考对齐矩阵](docs/FRIEND_LOGIC_ALIGNMENT_MATRIX.md)，未实测项明确标注。
+- 真实用户审核及 Preview 留给用户，不为验收自动推进。
 
-## Current V1.1
+## 范围外
 
-- 用户逐题处理当前 Run 的 4 道需修订 Candidate，完成 Probe/QC 和人工复审；20/20 批准后由用户显式创建 Golden Snapshot。
-- 正式 Baseline、Agent、Sandbox、Recommendation 和 Human Release 只能在真实前置条件满足后由用户触发；当前无正式 Snapshot，不展示虚构结果。
-
-## Future / Out of Scope
-
-- Medium / Full Golden、更大模型或独立 Rerank Model、复杂 Monitoring / Canary、生产部署与多 Agent 均不属于当前版本。
+- 新模型、独立重排服务、队列、多 Agent、生产部署和新一级页面。

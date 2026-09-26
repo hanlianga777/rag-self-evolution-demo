@@ -35,4 +35,4 @@ Full backend/frontend/fixture/build/startup/diff checks, portability, existing D
 | 3 / 4 | report/D/release → UI | server authoritative state and gate reasons |
 | 1–4 / 5 | tests/documents/runtime | no live default-db imports; isolation env before import |
 
-Status: in progress; no implementation or live acceptance claimed yet.
+Status: implementation and deterministic/Fixture verification complete; isolated real lifecycle blocked at Golden quality. See V1_2_VERIFICATION.md for exact evidence and limitations.

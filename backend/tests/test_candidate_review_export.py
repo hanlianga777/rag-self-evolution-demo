@@ -19,7 +19,7 @@ def candidates():
             "test_category": category,
             "coverage_slot": f"Q{number:02d}",
             "question": f"测试问题 {number}",
-            "reference_answer": None if category == "negative" else "有依据的答案",
+            "reference_answer": None if category == "negative" else "必须先确认状态",
             "expected_behavior": "insufficient_evidence" if category == "negative" else None,
             "evidence": [] if category == "negative" else [{"source_chunk_ids": ["C1"], "evidence_key_points": ["必须先确认状态"]}],
         }

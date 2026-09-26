@@ -1,10 +1,12 @@
-# Codex 交接说明（当前 V1.1）
+# Codex 交接说明（当前 V1.2）
+
+当前主链：Golden → Gate 1 确认并冻结 → Baseline → Bad Case → Tuning A/B/C Sandbox → Gate 2 报告确认并选择赢家 → D 决策／复验 → Gate 3 发布 → 问答。只有 Tuning 是 Agent。不得使用旧 numeric Probe/QC、强制 Ablation 配对或 Direct Release 豁免。真实库数量以 API 为准；本轮验收只写隔离库。
 
 开始任何业务改动前先读 [唯一当前产品 SPEC](docs/RAG_SELF_EVOLUTION_SPEC.md)。ChangeLog、旧实施计划和 Seed 只用于历史追溯，不能创造第二套当前规则，也不能冒充真实结果。
 
 执行 `./start.sh` 后打开 `http://127.0.0.1:5174`。真实 PDF 在 `backend/documents/`；索引由 `backend/app/build_index.py` 构建，运行时由 `backend/app/corpus.py` 与 `backend/app/retrieval.py` 读取。Backend 是 FastAPI + SQLite，前端是 React/TypeScript/Vite。检索已实现 Vector/BM25 Hybrid、Query Rewrite、MultiQuery、HyDE、Metadata Filter、Alias Mapping 和轻量二阶段重排；没有独立 Rerank Model。`/api/experiments/*` 使用持久化实验与真实 Sandbox，不是旧文档所述的 seeded replay。
 
-正式链路：Mini Golden → Probe/QC → Human Review → Snapshot → Baseline → Bad Case → Agent A/B/C → Sandbox/Regression → Recommendation → 单次 Human Release → Production/Monitoring。2026-09-26 只读基线为最近 Run 18/20 批准、1 拒绝、1 需修订，尚无正式 Snapshot；执行前重新读取当前状态。不要为测试自动修改用户 Candidate、应用 Preview、人工批准或发布。`baseline-v1` 是 Bootstrap 配置，不是正式发布成果。`seed.py` 只能用于隔离开发/历史展示。
+历史 V1.1 链路（Superseded by V1.2，不用于当前判定）：Mini Golden → Probe/QC → Human Review → Snapshot → Baseline → Bad Case → Agent A/B/C → Sandbox/Regression → Recommendation → 单次 Human Release → Production/Monitoring。2026-09-26 只读基线为最近 Run 18/20 批准、1 拒绝、1 需修订，尚无正式 Snapshot；执行前重新读取当前状态。不要为测试自动修改用户 Candidate、应用 Preview、人工批准或发布。`baseline-v1` 是 Bootstrap 配置，不是正式发布成果。`seed.py` 只能用于隔离开发/历史展示。
 
 Provider 配置在 `.env`，绝不打印或提交密钥。设置页“验证 Provider”会发起最小模型调用；无 Provider 时展示真实不可用状态。Fixture E2E 与使用真实 Provider/索引的隔离生命周期必须分层报告。隔离 API 启动前用 `RAG_DEMO_DB_PATH` 指向临时 SQLite，避免导入时的数据库初始化触碰用户库。
 

@@ -20,7 +20,7 @@ class FakeRetriever:
             "page_start": 2,
             "page_end": 2,
             "score": 0.73,
-            "content": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。",
+            "content": "第一次调试前应完整阅读操作说明书；可在设备显示屏查阅或下载到智能手机，并为后续使用妥善保管说明书。",
         }]
 
 
@@ -46,7 +46,7 @@ class GovernanceStoreTests(unittest.TestCase):
 
         self.store.run_probe("GGC-001", FakeRetriever(), [{
             "chunk_id": "KIRA-B50-CHUNK-0003",
-            "text": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。",
+            "text": "第一次调试前应完整阅读操作说明书；可在设备显示屏查阅或下载到智能手机，并为后续使用妥善保管说明书。",
         }])
         self.store.record_qc("GGC-001", {"score": 90, "priority": "P2", "issues": [], "reason": "证据自洽", "model": "test"}, "passed")
         self.store.review_question("GGC-001", "approved", "local_user")
@@ -58,7 +58,7 @@ class GovernanceStoreTests(unittest.TestCase):
         self.assertEqual(self.store.review_history("GGC-001")[0]["decision"], "approved")
 
     def test_changing_approved_question_evidence_or_answer_invalidates_approval(self):
-        self.store.run_probe("GGC-001", FakeRetriever(), [{"chunk_id": "KIRA-B50-CHUNK-0003", "text": "第一次调试前完整阅读操作说明书。为后续使用妥善保管说明书。"}])
+        self.store.run_probe("GGC-001", FakeRetriever(), [{"chunk_id": "KIRA-B50-CHUNK-0003", "text": "第一次调试前应完整阅读操作说明书；可在设备显示屏查阅或下载到智能手机，并为后续使用妥善保管说明书。"}])
         self.store.record_qc("GGC-001", {"score": 90, "priority": "P2", "issues": [], "reason": "证据自洽", "model": "test"}, "passed")
         approved = self.store.review_question("GGC-001", "approved", "local_user")
         changed = self.store.update_question(approved["id"], approved["question"], "已修改的答案", approved["evidence"], "local_user")
@@ -71,7 +71,7 @@ class GovernanceStoreTests(unittest.TestCase):
     def test_probe_persists_independent_programmatic_vector_and_full_text_signals(self):
         result = self.store.run_probe("GGC-001", FakeRetriever(), [{
             "chunk_id": "KIRA-B50-CHUNK-0003",
-            "text": "在您第一次使用设备之前，请先阅读原厂操作说明书并遵守。为后续使用或者为后续的车主保管好操作说明书。",
+            "text": "第一次调试前应完整阅读操作说明书；可在设备显示屏查阅或下载到智能手机，并为后续使用妥善保管说明书。",
         }])
 
         self.assertTrue(result["programmatic"]["passed"])

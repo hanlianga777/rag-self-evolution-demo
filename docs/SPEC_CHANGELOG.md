@@ -1,6 +1,6 @@
 # RAG Self-Evolution SPEC ChangeLog
 
-本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.1 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
+本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.2 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
 
 ## V0.2 — Core Lifecycle
 
@@ -210,3 +210,7 @@ Overall Score、Regression、Monitoring Trigger、TTFT、Token Cost、Recall@K�
 # V1.2 — Friend-Aligned Simplified Baseline（2026-09-26）
 
 Implementation Authorized / In Progress。按原始参考截图和用户确认恢复三道人审门与 Composite D；解除四文档及 Ablation 配对约束；QC 严重性与显式人工确认替代数值审批门槛。11 评测 Gate 不变。历史 V1.1 条款完整保留但不再作为当前产品判定。真实验收以 FRIEND_LOGIC_ALIGNMENT_MATRIX.md 为准。
+
+## V1.2 交付验收记录（2026-09-27）
+
+实现、确定性／Fixture 与副本保护检查完成；共享答案锚点同时覆盖 Generation、Revision 和 Probe，不能借 QC P0 接受豁免。隔离真实 Run 在 Golden 质量阶段阻塞，未推进 Gate 1，不宣称真实端到端完成。详见 [验证报告](V1_2_VERIFICATION.md)。

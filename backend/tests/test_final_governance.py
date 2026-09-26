@@ -216,7 +216,7 @@ class FinalGovernanceTests(unittest.TestCase):
             def retrieve(self, *_args, **_kwargs):
                 return [{"chunk_id": "OTHER", "score": .8, "final_score": .8}]
 
-        result = self.store.run_probe(item["id"], PipelineRetriever(), [{"chunk_id": "C1", "text": "支持证据"}])
+        result = self.store.run_probe(item["id"], PipelineRetriever(), [{"chunk_id": "C1", "text": "支持证据：证据答案"}])
         self.assertTrue(result["passed"])
         self.assertEqual(result["classification"], "RETRIEVAL_INCOHERENT")
         self.store.record_qc(item["id"], {"score": 90, "priority": "P2", "reason": "原文支持"}, "passed")

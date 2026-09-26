@@ -4,18 +4,20 @@
 
 ## Current Project Stage
 
-- **唯一当前产品规则：** [RAG Self-Evolution SPEC V1.1](docs/RAG_SELF_EVOLUTION_SPEC.md)；[SPEC ChangeLog](docs/SPEC_CHANGELOG.md) 只记录历史。运行状态仍以 SQLite 审计和 API 为准。
-- **当前真实状态：** 最近完整 Mini Run 有 20 道 Candidate（16 已批准、4 需修订）；尚无正式 Golden Snapshot，故 Baseline、Sandbox、Recommendation 与正式发布均为 `Not Run / Not Qualified`。这些数量可能随用户操作变化，请以页面当前记录为准。
+- **唯一当前产品规则：** [RAG Self-Evolution SPEC V1.2](docs/RAG_SELF_EVOLUTION_SPEC.md)；[SPEC ChangeLog](docs/SPEC_CHANGELOG.md) 只记录历史。运行状态仍以 SQLite 审计和 API 为准。
+- **当前真实状态：** 以当前完整 Run 的活动题目及 API 为准；旧 Run、已替换题和 Legacy 不混入当前统计。实施与验收不代用户审核、应用 Preview 或发布。
 - **No fabricated results:** 40 条历史 Candidate 和任何 Demo Seed 不代表已验证 Golden、评测分数、推荐或发布结果。
 
-## 已实现的真实闭环
+## V1.2 主线
 
-`PDF / Chunk → Mini Golden Candidate 8/4/8 → Hard Validation → Probe ≥90 → QC ≥85 → Human Review → Golden Snapshot → Baseline → Bad Case → Agent A/B/C → Sandbox → 11 Gate + Regression → Recommendation → 一次 Human Release → Production / Rollback → Production QA → Human Confirm Trigger → 下一轮优化`
+`知识入库 → Golden 8/4/8 → Gate 1 人工确认并冻结 → Baseline → Bad Case → Tuning Agent A/B/C Sandbox → Gate 2 报告确认并选赢家 → Composite D 决策与复验 → Gate 3 人工发布 → 问答`
+
+只有 Tuning 是 Agent；Generation、QC、Evaluation 是受控工作流。动态文档清单、Embedding 主题配额不依赖四份示例 PDF。Positive/Ablation 检索未命中记为 P1；QC 按 P0/P1/P2 给理由，分数辅助展示。机器 P0 可明确接受并说明，确定性错误与 Fake Negative 不能豁免。Ablation 独立治理。
 
 - SQLite 兼容迁移保存 Coverage / Question Plan、Golden、Probe/QC、评测逐题证据、Gate、Regression、Candidate、Recommendation、Monitoring Trigger、版本快照与审计记录，不删除历史数据库。
-- 检索实际按 `CandidateK → Vector/BM25 normalized Hybrid → optional Lightweight Rerank → MinScore → TopK Context → DeepSeek` 执行；当前重排并非独立 Rerank Model。所有 Candidate 配置受 V1.1 Search Space、依赖、去重和每次 Optimization Run `max_evals=12` 限制。
+- 检索实际按 `CandidateK → Vector/BM25 normalized Hybrid → optional Lightweight Rerank → MinScore → TopK Context → DeepSeek` 执行；当前重排并非独立 Rerank Model。所有配置受冻结 Search Space、依赖和去重约束；A/B/C/D 共用 12 次预算，启动即占用（失败不退），为 D 保留一次。
 - Production 问答先记录为待人工判定的 Monitoring Event；人工标记 Bad Case 后，系统在一个 Safety Critical Bad Case 或最近 20 个有效记录中至少 4 个 Bad Case 时创建 Pending Trigger。流程固定为 `Monitoring → Trigger → Human Confirm → Optimization Run`，不会自动调参或发布。
-- 多个 Qualified Candidate 使用透明 Pareto 比较；多个 Frontier 候选由人明确选择 Recommendation，发布时再由人一次确认。Overall Score 仅作展示，不能替代 Gate。
+- Gate 2 在已启动评测全部终结后确认报告并选合格赢家。D 只合并有实测修复、Regression 通过的配置差异，冲突保留赢家；新组合完整重评且比赢家无新增失败、有实际修复才替代。无有效组合不虚构 D。Overall Score 不能替代 11 Gate。Monitoring、Version History 和 Rollback 是辅助能力。
 - `baseline-v1` 是启动用 Pipeline Bootstrap 配置，不是经过 Sandbox 与人工发布的 Production Version。旧 `seed.py` 只用于历史/开发数据，不进入当前 V1 主流程。
 - DeepSeek 不可用时，页面显示明确状态，不生成模拟回答、分数、推荐或发布记录。可用时记录流式 TTFT、Token Usage；Provider 未返回成本时显示 `Token Usage / Provider Cost unavailable`。
 

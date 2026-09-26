@@ -1,6 +1,6 @@
 # RAG Evolution 平台架构说明
 
-> 当前产品规则以 [RAG Self-Evolution SPEC V1.1](../docs/RAG_SELF_EVOLUTION_SPEC.md) 为唯一依据；本文件只说明可核验的实现。
+> 当前产品规则以 [RAG Self-Evolution SPEC V1.2](../docs/RAG_SELF_EVOLUTION_SPEC.md) 为唯一依据；本文件只说明可核验的实现。
 
 ![RAG Evolution 业务流程图](业务流程图.png)
 
@@ -10,9 +10,11 @@
 
 ## 运行边界
 
+V1.2 当前主链：动态语料 Golden → Gate 1 确认并冻结 → Baseline → Bad Case → Tuning A/B/C Sandbox → Gate 2 报告确认 → D 合并决策／复验 → Gate 3 人工发布 → 问答。Monitoring、版本历史、Rollback 为辅助。12 次执行预算包含失败和 D。只有 Tuning 是 Agent。审批看确定性错误、严格 Negative 与 QC 风险理由，不再使用 Positive/Ablation Probe 90 或 QC 85 阈值。
+
 系统使用本地官方 PDF、BGE/FAISS、SQLite、FastAPI、React 和 DeepSeek。Generation Run 会持久化 Coverage Plan、Question Plan 与 Hard Validation；没有已人工批准的 Positive、Ablation、Negative Golden Snapshot 时，正式 Baseline、Sandbox、Recommendation 与 Release 均保持 `Not Run / Not Qualified`；历史候选题与展示 Seed 绝不作为已验证结果。
 
-## 已实现链路
+## 历史 V1.1 链路（Superseded by V1.2）
 
 `Chunk Pool → Mini Golden Candidate (8/4/8) → Hard Validation → Probe ≥90 → QC ≥85 → Human Review → Golden Snapshot → Baseline Evaluation → Bad Case → Optimization A/B/C → Sandbox → 11 Gate + Regression → Recommendation → 一次 Human Release → Version / Rollback → Production QA → Human Confirm Trigger → 下一轮优化`
 
@@ -22,7 +24,7 @@ Mini Golden 的自动步骤只生成候选与机器检查。Human Review 是唯�
 
 运行时管道为：`Query → CandidateK → Vector/BM25 normalization + Hybrid → optional Lightweight Rerank → MinScore → TopK Context → DeepSeek`。Lightweight Rerank 是现有轻量二阶段重排，不是独立模型。Candidate 配置仅可使用冻结 Search Space；Parser/OCR、Chunk、模型、Temperature、Query Decompose、Retrieval MaxTokens 与 Rerank TopN 不可由 Agent 修改。
 
-逐题结果保存检索排序、证据、Judge、Latency、TTFT、Token Usage / Provider Cost、检索指标、Bad Case 标签和结构化 Root Cause。后端统一计算三组评测、11/11 Hard Gate、Regression、Qualified 与 Recommendation；多个 Pareto Frontier 候选需人选择 Recommendation。Overall Score 只展示九项质量指标等权平均，不是发布 Gate。
+逐题结果保存检索排序、证据、Judge、Latency、TTFT、Token Usage / Provider Cost、检索指标、Bad Case 标签和结构化 Root Cause。后端统一计算三组评测、11/11 Hard Gate、Regression、Qualified 与 Recommendation；多个合格方案在 Gate 2 报告确认中选择赢家，D 无新增失败且实际修复才替代。Overall Score 只展示九项质量指标等权平均，不是发布 Gate。
 
 ## 治理接口
 
@@ -30,7 +32,7 @@ Mini Golden 的自动步骤只生成候选与机器检查。Human Review 是唯�
 | --- | --- |
 | Golden 治理 | `POST /api/governance/generate-mini`、`/probe`、`/qc`、`/review`、`/review-batch` |
 | 评测与优化 | `POST /api/evaluations/run`、`/api/experiments/run`、`/api/candidates/{id}/run` |
-| 发布治理 | `POST /api/candidates/{id}/publish`（单次 Human Release）、`/api/versions/{id}/rollback`；Direct Release 仅为受限内部入口 |
+| 发布治理 | `POST /api/candidates/{id}/publish`（单次 Human Release）、`/api/versions/{id}/rollback`；旧 Direct Release 仅保留历史审计，禁止绕过 Gate 2 |
 | Monitoring | `POST /api/monitoring/events`、`/api/monitoring/triggers/{id}/confirm` |
 
 DeepSeek 不可用时，系统返回明确的不可用状态，不生成模拟回答、评测、推荐或发布记录。Provider 返回用量时持久化 Token Usage；未提供计费时标记 `Token Usage / Provider Cost unavailable`。

@@ -8,6 +8,7 @@ import numpy as np
 from .policy import DEFAULT_PIPELINE_CONFIG
 from .providers import ProviderTimeout, ProviderUnavailable
 from .retrieval import VectorRetriever
+from .governance import _answer_anchor_supported
 
 
 NEGATIVE_EXPECTED_BEHAVIORS = {"clarify", "insufficient_evidence", "safe_rejection", "prompt_injection_resistance"}
@@ -429,6 +430,8 @@ class AiService:
         source_ids = [source_id for source in candidate.get("evidence") or [] for source_id in source.get("source_chunk_ids", [])]
         if not str(candidate.get("reference_answer") or "").strip() or not source_ids or not set(source_ids).issubset(known_chunks):
             errors.append("missing answer or valid evidence")
+        elif not _answer_anchor_supported(candidate['reference_answer'], [chunk.get('chunk_text', chunk.get('text', '')) for chunk in chunks if chunk.get('chunk_id') in source_ids]):
+            errors.append('unsupported answer anchor')
         if category == "ablation" and not candidate.get("ablation_attribute"):
             errors.append("missing ablation attribute")
         if candidate.get("ablation_attribute") == "cross_chunk" and len(source_ids) < 2:

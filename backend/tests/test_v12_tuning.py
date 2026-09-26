@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from app.governance import GovernanceStore
@@ -65,3 +66,48 @@ class TuningV12Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.store.reserve_candidate_evaluation(f'{self.experiment}-0')
         self.assertEqual(self.store.experiment(self.experiment)['evaluation_budget']['used'], 11)
+
+    def test_late_agent_trace_cannot_erase_report(self):
+        winner = self.candidate('A', {'top_k': 6})
+        self.store.confirm_experiment_report(self.experiment, winner, 'test_human')
+        self.store.create_composite(self.experiment)
+        before = self.store.experiment(self.experiment)['result']
+        self.store.save_agent_trace(self.experiment, 'failed', {}, 'late response')
+        after = self.store.experiment(self.experiment)['result']
+        self.assertEqual(after['report_confirmation'], before['report_confirmation'])
+        self.assertEqual(after['composite'], before['composite'])
+
+    def test_restart_terminalizes_reserved_execution_without_refunding_budget(self):
+        self.store.save_candidate(self.experiment, 'A', DEFAULT_PIPELINE_CONFIG, {'candidate_label': 'A'})
+        key = f'{self.experiment}-A'
+        self.store.reserve_candidate_evaluation(key)
+        self.store.interrupt_evaluation_runs()
+        self.assertEqual(self.store.candidate(key)['status'], 'failed')
+        self.assertEqual(self.store.experiment(self.experiment)['evaluation_budget']['used'], 1)
+        self.store.reserve_candidate_evaluation(key)
+        self.assertEqual(self.store.experiment(self.experiment)['evaluation_budget']['used'], 2)
+
+    def test_parallel_reservations_do_not_exceed_abc_allowance(self):
+        for number in range(12):
+            self.store.save_candidate(self.experiment, str(number), DEFAULT_PIPELINE_CONFIG, {'candidate_label': 'A'})
+        def reserve(number):
+            try:
+                self.store.reserve_candidate_evaluation(f'{self.experiment}-{number}')
+                return True
+            except ValueError:
+                return False
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            self.assertEqual(sum(pool.map(reserve, range(12))), 11)
+        self.assertEqual(self.store.experiment(self.experiment)['evaluation_budget']['used'], 11)
+
+    def test_restart_of_d_restores_winner_recommendation(self):
+        winner = self.candidate('A', {'top_k': 6})
+        self.candidate('B', {'candidate_k': 24}, False)
+        self.store.confirm_experiment_report(self.experiment, winner, 'test_human')
+        composite = self.store.create_composite(self.experiment)
+        self.store.reserve_candidate_evaluation(composite['id'])
+        self.store.refresh_recommendation(self.experiment)
+        self.store.interrupt_evaluation_runs()
+        result = self.store.recommendation(self.experiment)['result']
+        self.assertEqual(result['recommended_candidate'], winner)
+        self.assertEqual(result['status'], 'Recommended')

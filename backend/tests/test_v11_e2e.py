@@ -170,6 +170,40 @@ class V11BusinessE2E(unittest.TestCase):
         confirmed = self.store.confirm_optimization_trigger(trigger["id"], "fixture_reviewer")
         self.assertEqual(self.store.experiment(confirmed["optimization_run_id"])["status"], "pending_agent")
 
+    def composite_result(self, regress=False):
+        self.golden()
+        class CompositeRuntime(FixtureEvaluationRuntime):
+            def answer(runtime, question, config):
+                result = super().answer(question, config)
+                item = next(row for row in runtime.store.questions() if row['question'] == question)
+                slot = item['raw']['coverage_slot']
+                if (slot == 'Q03' and config['min_score'] == 0) or (regress and slot == 'Q04' and config['top_k'] == 6 and config['min_score'] == .2):
+                    result['answer'] = '错误答案'
+                return result
+        runner = EvaluationRunner(self.store, CompositeRuntime(self.store))
+        baseline = runner.run_baseline()
+        experiment = OptimizationAgent(self.store, self.provider).generate(baseline['id'])
+        for label in 'ABC':
+            runner.run_candidate(f"{experiment['id']}-R1-{label}")
+        winner = f"{experiment['id']}-R1-A"
+        self.store.confirm_experiment_report(experiment['id'], winner, 'test_human')
+        composite = self.store.create_composite(experiment['id'])
+        self.assertEqual(composite['status'], 'generated')
+        result = runner.run_candidate(composite['id'])
+        self.assertEqual(len(self.store.evaluation_case_results(result['result']['evaluation_run_id'])), 20)
+        self.assertEqual(self.store.experiment(experiment['id'])['evaluation_budget']['used'], 4)
+        return winner, composite['id'], result
+
+    def test_v12_d_full_evaluation_promotes_actual_improvement(self):
+        winner, composite, result = self.composite_result()
+        self.assertTrue(result['result']['winner_comparison']['promote'])
+        self.assertEqual(result['recommendation']['recommended_candidate'], composite)
+
+    def test_v12_d_new_failure_falls_back_to_winner(self):
+        winner, composite, result = self.composite_result(regress=True)
+        self.assertFalse(result['result']['winner_comparison']['promote'])
+        self.assertEqual(result['recommendation']['recommended_candidate'], winner)
+
 
 if __name__ == "__main__":
     unittest.main()
