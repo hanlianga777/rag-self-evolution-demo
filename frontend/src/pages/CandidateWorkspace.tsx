@@ -132,7 +132,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, onRu
   const evidenceChunks = evidence.flatMap((source: Candidate) => source.chunks || []);
   const summarySource = qc.evidence_support_sentences?.join("；") || evidence.flatMap((source: Candidate) => source.evidence_key_points || []).join("；") || evidenceChunks[0]?.chunk_text || "";
   const eligibility = row.approval_eligibility;
-  const ready = eligibility?.can_approve ?? (row.probe_status === "probe_passed" && row.qc_status === "qc_passed");
+  const ready = eligibility ? eligibility.can_approve || (eligibility.requires_qc_p0_acceptance && !eligibility.blocking_reasons?.length) : row.probe_status === "probe_passed" && row.qc_status === "qc_passed";
   const block = eligibility ? (eligibility.blocking_reasons || []).map(displayText).join("；") : !ready ? "质量检查尚未达到可批准状态" : "";
   const topK = probe.probe_details?.vector?.top_k || probe.probe_details?.top_k || [];
   const expected = new Set((row.evidence || []).flatMap((source: Candidate) => source.source_chunk_ids || []));

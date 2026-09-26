@@ -104,7 +104,7 @@ it("shows Gate 1 complete without a separate Snapshot action", async () => {
   const questions = Array.from({ length: 20 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: "测试题", test_category: "positive", legacy_question_type: "v1_mini", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", stage: "golden", evidence: [] }));
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ questions }), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(row => row.id), artifacts: {} }], dataset: questions }} />));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(row => row.id), artifacts: {} }], dataset: questions, snapshots: [{ id: "GD-20", snapshot: { generation_run_id: "GGEN-20", question_ids: questions.map(row => row.id) } }] }} />));
   expect(document.querySelector(".snapshot-next")?.textContent).toContain("Gate 1 已确认 Golden 测试集");
   expect(document.querySelectorAll(".snapshot-next button")).toHaveLength(0);
   await act(async () => root.unmount());
