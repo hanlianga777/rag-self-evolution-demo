@@ -87,12 +87,21 @@ class EvaluationRunner:
     def __init__(self, store, runtime):
         self.store, self.runtime = store, runtime
 
+    def snapshot_items(self, snapshot):
+        frozen = {item['id']: item for item in snapshot.get('questions', [])}
+        items = []
+        for key in snapshot.get('question_ids', []):
+            current = self.store.question(key)
+            raw = frozen.get(key, current['raw'])
+            items.append({**current, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'), 'evidence': raw.get('acceptable_evidence', []), 'raw': raw, 'test_category': raw.get('test_category', current['test_category']), 'negative_subtype': raw.get('negative_subtype', current.get('negative_subtype'))})
+        return items
+
     def start_baseline(self):
         snapshots = self.store.dataset_snapshots()
         if not snapshots:
             raise ValueError("正式评测需要已批准（approved）且显式创建的 Golden Snapshot")
         snapshot = snapshots[0]["snapshot"]
-        approved = [self.store.question(question_id) for question_id in snapshot.get("question_ids", [])]
+        approved = self.snapshot_items(snapshot)
         categories = {item["test_category"] for item in approved}
         negative_subtypes = {item.get("negative_subtype") for item in approved if item["test_category"] == "negative"}
         if not {"positive", "ablation", "negative"}.issubset(categories) or not {"safety_critical", "prompt_injection"}.issubset(negative_subtypes):
@@ -157,9 +166,17 @@ class EvaluationRunner:
         if baseline is None or baseline["status"] != "completed":
             raise ValueError("Candidate 必须基于已完成的 Baseline 运行")
         snapshot = json.loads(baseline["dataset_snapshot_json"])
-        approved = [self.store.question(question_id) for question_id in snapshot["question_ids"]]
+        approved = self.snapshot_items(snapshot)
+        if baseline['judge'].get('model') != self.runtime.model:
+            raise ValueError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
         config = {**candidate["config"], "run_target": "sandbox_candidate", "candidate_id": candidate_id}
-        return self.store.create_evaluation_run(snapshot, config, {"model": self.runtime.model, "scoring_policy": "v1.0.1-gates"}), approved, config, candidate, baseline
+        candidate = self.store.reserve_candidate_evaluation(candidate_id)
+        try:
+            run_id = self.store.create_evaluation_run(snapshot, config, baseline['judge'])
+        except Exception as error:
+            self.store.finish_candidate(candidate_id, 'failed', {'error': str(error)})
+            raise
+        return run_id, approved, config, candidate, baseline
 
     def execute_candidate(self, run_id, approved, config, candidate, baseline):
         run = self.execute_baseline(run_id, approved, config)
@@ -170,8 +187,16 @@ class EvaluationRunner:
         passed = [(question_id, item) for question_id, item in baseline_cases.items() if item.get("passed")]
         regression = evaluate_regression(new_critical_failures=sum(not candidate_cases.get(question_id, {}).get("passed", False) and item.get("severity") == "critical" for question_id, item in passed), new_ordinary_failures=sum(not candidate_cases.get(question_id, {}).get("passed", False) and item.get("severity") != "critical" for question_id, item in passed))
         qualification = qualify_candidate(run["result"]["gates"], regression, fixed, len(failed), run["result"]["bad_case_count"])
+        if run['status'] != 'completed':
+            qualification = {**qualification, 'qualified': False}
         result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], **run["result"], "regression": regression, "target_bad_cases_fixed": fixed, "qualification": qualification, "recommendation": None}
-        finished = self.store.finish_candidate(candidate["id"], "evaluated", result)
+        if candidate['reasoning'].get('candidate_label') == 'D':
+            winner = self.store.candidate(candidate['reasoning']['winner_id'])
+            winner_cases = {item['question_id']: item for item in self.store.evaluation_case_results(winner['result']['evaluation_run_id'])}
+            newly_failed = [key for key, item in winner_cases.items() if item.get('passed') and not candidate_cases.get(key, {}).get('passed')]
+            newly_fixed = [key for key, item in winner_cases.items() if not item.get('passed') and candidate_cases.get(key, {}).get('passed')]
+            result['winner_comparison'] = {'winner_id': winner['id'], 'new_failures': newly_failed, 'fixed_cases': newly_fixed, 'promote': run['status'] == 'completed' and qualification['qualified'] and not newly_failed and bool(newly_fixed)}
+        finished = self.store.finish_candidate(candidate["id"], "evaluated" if run['status'] == 'completed' else 'failed', result)
         recommendation = self.store.refresh_recommendation(candidate["experiment_id"])
         return {**finished, "recommendation": recommendation}
 

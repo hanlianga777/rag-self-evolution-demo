@@ -124,6 +124,10 @@ class V11BusinessE2E(unittest.TestCase):
         runner = EvaluationRunner(self.store, FixtureEvaluationRuntime(self.store))
         for label in "ABC":
             runner.run_candidate(f"{experiment['id']}-R1-{label}")
+        self.store.confirm_experiment_report(experiment["id"], f"{experiment['id']}-R1-A", "test_human")
+        composite = self.store.create_composite(experiment["id"])
+        if composite["status"] == "generated":
+            runner.run_candidate(composite["id"])
         recommendation = self.store.refresh_recommendation(experiment["id"])
         return snapshot, rows, baseline, experiment, recommendation
 
@@ -132,7 +136,7 @@ class V11BusinessE2E(unittest.TestCase):
         self.assertEqual(len(snapshot["question_ids"]), 20)
         self.assertEqual(self.store.dataset_summary()["approved"], 20)
         self.assertEqual(self.store.dataset_snapshots()[0]["snapshot"]["question_ids"], snapshot["question_ids"])
-        self.assertEqual(self.store.related_positive(self.store.question(rows[8]["id"]))["id"], rows[0]["id"])
+        self.assertEqual(self.store.question(rows[8]["id"])["test_category"], "ablation")
 
     def test_e2e_02_baseline_evaluation(self):
         snapshot, rows, baseline = self.baseline()
@@ -143,8 +147,8 @@ class V11BusinessE2E(unittest.TestCase):
 
     def test_e2e_03_optimization(self):
         snapshot, rows, baseline, experiment, recommendation = self.optimized()
-        self.assertEqual(len(self.store.candidates(experiment["id"])), 3)
-        self.assertEqual(self.store.experiment(experiment["id"])["evaluation_budget"]["used"], 3)
+        self.assertIn(len(self.store.candidates(experiment["id"])), (3, 4))
+        self.assertIn(self.store.experiment(experiment["id"])["evaluation_budget"]["used"], (3, 4))
         self.assertEqual(recommendation["status"], "Recommended")
         self.assertEqual(recommendation["recommended_candidate"], f"{experiment['id']}-R1-A")
 

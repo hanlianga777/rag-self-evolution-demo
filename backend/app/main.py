@@ -55,6 +55,7 @@ class ReviewRequest(BaseModel):
     actor: str = Field(default="local_user", min_length=1, max_length=80)
     reason: str | None = Field(default=None, max_length=2000)
     tags: list[str] = Field(default_factory=list, max_length=8)
+    accept_qc_p0: bool = False
 
 
 class RevisionRequest(BaseModel):
@@ -63,6 +64,8 @@ class RevisionRequest(BaseModel):
     paired: bool = False
     changes: dict[str, dict] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list, max_length=8)
+    replacement: bool = False
+    actor: str = Field(default='local_user', min_length=1, max_length=80)
 
 
 class RevisionDraftEditRequest(BaseModel):
@@ -339,7 +342,7 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
 @app.post("/api/governance/questions/{question_id}/review", dependencies=[Depends(require_trusted_origin)])
 def review_question(question_id: str, payload: ReviewRequest):
     try:
-        return store.review_question(question_id, payload.decision, payload.actor, reason=payload.reason, tags=payload.tags)
+        return store.review_question(question_id, payload.decision, payload.actor, reason=payload.reason, tags=payload.tags, accept_qc_p0=payload.accept_qc_p0)
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:
@@ -362,7 +365,7 @@ def revision_status(revision_id: str):
 @app.post("/api/governance/questions/{question_id}/revision", status_code=202, dependencies=[Depends(require_trusted_origin)])
 def create_revision(question_id: str, payload: RevisionRequest):
     try:
-        run = store.start_revision(question_id, payload.mode, payload.reason, payload.paired, payload.changes, corpus.chunks(), tags=payload.tags)
+        run = store.start_revision(question_id, payload.mode, payload.reason, payload.paired, payload.changes, corpus.chunks(), tags=payload.tags, replacement=payload.replacement, actor=payload.actor)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Candidate not found") from error
     except ValueError as error:
@@ -393,36 +396,25 @@ def _prepare_revision(revision_id, run_store, service, run_corpus):
 
 
 def _generate_revision_with_weak_keyword_repair(run, run_store, service, chunks, existing=None, on_progress=None):
+    # Compatibility name for existing callers; V1.2 has no weak-keyword repair gate.
     generated = dict(existing or {})
-    target = next((item_id for item_id in run["question_ids"] if run["before"][item_id]["test_category"] == "ablation" and run["before"][item_id]["raw"].get("ablation_attribute") == "weak_keywords"), None)
     attempts = list(run.get("generation_attempts", []))
     draft_attempt = (run.get("active_draft") or {}).get("number")
-    start_attempt = 1 + sum(item.get("draft_attempt") == draft_attempt and item.get("question_id") == target for item in attempts)
-    for attempt in range(start_attempt, 4):
-        if len(generated) < len(run["question_ids"]):
-            prompt_run = {**run, "repair_error": "ABLATION_TOO_SIMILAR" if attempt > 1 else None}
-            kwargs = {"existing": generated}
-            if on_progress:
-                kwargs["on_progress"] = on_progress
-            try:
-                generated = _revision_attempt(run_store, run["id"], "generating", service, lambda: service.generate_revision_drafts(prompt_run, chunks, **{**kwargs, "existing": run_store.revision_run(run["id"]).get("generated_drafts", generated)}))
-            except Exception as error:
-                if target:
-                    partial = run_store.revision_run(run["id"]).get("generated_drafts", generated)
-                    pending = sorted(run["question_ids"], key=lambda item_id: run["before"][item_id]["test_category"] == "ablation")
-                    failed_id = next((item_id for item_id in pending if item_id not in partial), target)
-                    attempts.append({"question_id": failed_id, "draft_attempt": draft_attempt, "attempt": attempt, "at": datetime.now(timezone.utc).isoformat(), "draft": None, "error": str(error)})
-                    run_store.update_revision(run["id"], generation_attempts=attempts)
-                raise
-        if not target or target not in generated:
-            break
+    for attempt in (1, 2):
+        prompt_run = {**run, 'repair_error': '；'.join(errors) if attempt > 1 else None}
+        try:
+            generated = _revision_attempt(run_store, run['id'], 'generating', service, lambda: service.generate_revision_drafts(prompt_run, chunks, existing=generated, **({'on_progress': on_progress} if on_progress else {})))
+        except Exception as error:
+            attempts.append({'question_ids': run['question_ids'], 'draft_attempt': draft_attempt, 'attempt': attempt, 'error': str(error), 'at': datetime.now(timezone.utc).isoformat()})
+            run_store.update_revision(run['id'], generation_attempts=attempts)
+            raise
         _, errors, _, _ = run_store._validate_revision_drafts(run, chunks, service.revision_similarity, generated)
-        lexical_error = any("ABLATION_TOO_SIMILAR" in error for error in errors)
-        attempts.append({"question_id": target, "draft_attempt": draft_attempt, "attempt": attempt, "at": datetime.now(timezone.utc).isoformat(), "draft": generated[target], "error": "ABLATION_TOO_SIMILAR" if lexical_error else None, "validation_errors": errors})
+        attempts.append({'question_ids': run['question_ids'], 'draft_attempt': draft_attempt, 'attempt': attempt, 'at': datetime.now(timezone.utc).isoformat(), 'drafts': generated, 'validation_errors': errors})
         run_store.update_revision(run["id"], generation_attempts=attempts, generated_drafts=generated)
-        if not lexical_error or attempt == 3:
+        if not errors or attempt == 2:
             break
-        generated = {key: value for key, value in generated.items() if key != target}
+        failed_ids = {key for key in run['question_ids'] if any(error.startswith(key + ':') for error in errors)}
+        generated = {key: value for key, value in generated.items() if key not in failed_ids}
         run_store.update_revision(run["id"], generated_drafts=generated)
     return generated
 
@@ -769,6 +761,14 @@ def select_recommendation(run_id: str, payload: RecommendationRequest):
         raise HTTPException(status_code=404, detail="Experiment not found")
     try:
         return store.select_recommendation(run_id, payload.candidate_id, payload.actor)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post('/api/experiments/{run_id}/composite', dependencies=[Depends(require_trusted_origin)])
+def create_composite(run_id: str):
+    try:
+        return store.create_composite(run_id)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 

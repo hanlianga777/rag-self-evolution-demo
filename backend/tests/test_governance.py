@@ -87,7 +87,7 @@ class GovernanceStoreTests(unittest.TestCase):
         self.assertEqual(self.store.question("GGC-001")["review_status"], "needs_revision")
 
         self.store.run_probe("GGC-033", FakeRetriever(), [])
-        self.store.record_qc("GGC-033", {"score": 0, "priority": "P1", "reason": "题目需改写", "model": "test"}, "failed")
+        self.store.record_qc("GGC-033", {"score": 0, "priority": "P0", "reason": "题目需改写", "model": "test"}, "failed")
         self.assertEqual(self.store.question("GGC-033")["qc_status"], "qc_failed")
         self.assertEqual(self.store.question("GGC-033")["review_status"], "needs_revision")
 

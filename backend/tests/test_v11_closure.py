@@ -45,7 +45,8 @@ class V11ClosureTests(unittest.TestCase):
                 "regression": {"passed": label == "A"},
             })
         candidate_id = f"{experiment_id}-A"
-        self.store.refresh_recommendation(experiment_id)
+        self.store.confirm_experiment_report(experiment_id, candidate_id, "test_human")
+        self.store.create_composite(experiment_id)
         before = len(self.store.production_versions())
         published = self.store.publish_candidate(candidate_id, "human_reviewer")
         self.assertEqual(len(self.store.production_versions()), before + 1)

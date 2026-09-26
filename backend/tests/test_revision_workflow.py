@@ -383,30 +383,33 @@ class RevisionWorkflowTests(unittest.TestCase):
         }, self.chunks)
         self.assertEqual(set(run["question_ids"]), {first, pair})
 
-    def test_weak_keywords_rejects_lexical_overlap_and_inconsistent_answer(self):
+    def test_ablation_keeps_anchor_validation_without_lexical_gate(self):
         first, pair = self.ids[0], self.ids[8]
         with self.store.connection() as connection:
             connection.execute("UPDATE questions SET question='警告、小心、注意分别表示什么危险等级？', reference_answer='正确操作' WHERE id=?", (first,))
         for question, answer, error in (
-            ("不同安全提示词分别代表什么危险程度？", "正确操作", "ABLATION_TOO_SIMILAR"),
+            ("不同安全提示词分别代表什么危险程度？", "正确操作", None),
             ("说明书里那几档安全提醒怎么看？哪个最严重，另外两档大概分别是在提醒什么风险？", "其他答案", "答案"),
         ):
             run = self.store.start_revision(pair, "manual_edit", "弱关键词修订", False, {
                 pair: {"question": question, "reference_answer": answer, "source_chunk_ids": ["C1"]},
             }, self.chunks)
             result = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
-            self.assertIn(error, result["error"])
-            self.assertTrue(result["apply_blocked"])
+            if error:
+                self.assertIn(error, result['error'])
+                self.assertTrue(result['apply_blocked'])
+            else:
+                self.assertTrue(result['validation']['passed'])
             self.store.discard_revision(run["id"])
 
-    def test_weak_keywords_requires_semantic_alignment_and_accepts_indirect_question(self):
+    def test_ablation_semantic_similarity_is_not_a_hard_gate(self):
         first, pair = self.ids[0], self.ids[8]
         with self.store.connection() as connection:
             connection.execute("UPDATE questions SET question='警告、小心、注意分别表示什么危险等级？' WHERE id=?", (first,))
         good = "说明书里那几档安全提醒怎么看？哪个最严重，另外两档大概分别是在提醒什么风险？"
         run = self.store.start_revision(pair, "manual_edit", "弱关键词修订", False, {pair: {"question": good, "reference_answer": "正确操作", "source_chunk_ids": ["C1"]}}, self.chunks)
         blocked = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .27)
-        self.assertIn("知识点不一致", blocked["error"])
+        self.assertTrue(blocked['validation']['passed'])
         self.store.discard_revision(run["id"])
         run = self.store.start_revision(pair, "manual_edit", "弱关键词修订", False, {pair: {"question": good, "reference_answer": "正确操作", "source_chunk_ids": ["C1"]}}, self.chunks)
         accepted = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .65)
@@ -460,12 +463,12 @@ class RevisionWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "逐题"):
             self.store.review_generation_batch(self.ids, "reviewer", confirmed_manual_review=True)
 
-    def test_semantic_duplicate_and_negative_targets_fail_closed(self):
+    def test_normalized_duplicate_and_negative_targets_fail_closed(self):
         first = self.ids[0]
-        run = self.store.start_revision(first, "manual_edit", "重复测试", False, {first: {"question": "与其他题重复", "reference_answer": "正确操作", "source_chunk_ids": ["C1"]}}, self.chunks)
+        run = self.store.start_revision(first, "manual_edit", "重复测试", False, {first: {"question": "原题 2", "reference_answer": "正确操作", "source_chunk_ids": ["C1"]}}, self.chunks)
         rejected = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .95)
         self.assertEqual(rejected["status"], "failed")
-        self.assertIn("近重复", rejected["error"])
+        self.assertIn("重复", rejected["error"])
         for index, question, fragment in ((12, "请问设备报价？", "安全拒答"),):
             question_id = self.ids[index]
             run = self.store.start_revision(question_id, "manual_edit", "修订边界", False, {question_id: {"question": question, "source_chunk_ids": []}}, self.chunks)
@@ -473,12 +476,12 @@ class RevisionWorkflowTests(unittest.TestCase):
             self.assertEqual(rejected["status"], "failed")
             self.assertIn(fragment, rejected["error"])
 
-    def test_model_unavailable_blocks_validation_without_mutating_candidate(self):
+    def test_deterministic_validation_does_not_require_embedding_judge(self):
         first = self.ids[0]
         run = self.store.start_revision(first, "manual_edit", "修订", False, {first: {"question": "如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
         result = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: (_ for _ in ()).throw(RuntimeError("BGE unavailable")))
-        self.assertEqual(result["status"], "failed")
-        self.assertIn("BGE", result["error"])
+        self.assertEqual(result["status"], "preview_ready")
+        self.assertTrue(result['validation']['passed'])
         self.assertIn(first, result["drafts"])
         self.assertEqual(self.store.question(first)["question"], "原题 1")
 
@@ -512,14 +515,14 @@ class RevisionWorkflowTests(unittest.TestCase):
         service = AiService(self.store, SimpleNamespace(), Provider(), False)
         drafts = service.generate_revision_drafts(run, self.chunks)
         self.assertEqual(len(drafts), 2)
-        self.assertEqual(prompts[1][1]["paired_positive"]["question"], drafts[first]["question"])
+        self.assertNotIn('paired_positive', prompts[1][1])
         self.assertEqual(self.store.question(first)["question"], "原题 1")
         resumed = service.generate_revision_drafts(run, self.chunks, existing={first: drafts[first]})
         self.assertEqual(len(resumed), 2)
         self.assertEqual(len(prompts), 3)
-        self.assertEqual(prompts[-1][1]["paired_positive"]["question"], drafts[first]["question"])
+        self.assertEqual(resumed[first], drafts[first])
 
-    def test_q09_only_ai_prompt_has_current_positive_and_weak_keyword_constraints(self):
+    def test_ablation_ai_prompt_is_independent_of_positive(self):
         pair = self.ids[8]
         run = self.store.start_revision(pair, "ai_regenerate", "弱关键词修订", False, {pair: {"source_chunk_ids": ["C1"]}}, self.chunks)
         calls = []
@@ -529,11 +532,10 @@ class RevisionWorkflowTests(unittest.TestCase):
                 calls.append((instruction, json.loads(payload)))
                 return json.dumps({"question": "开工前，红色紧急停机开关是不是正常？", "reference_answer": "正确操作", "source_chunk_ids": ["C1"]}, ensure_ascii=False)
         AiService(self.store, SimpleNamespace(), Provider(), False).generate_revision_drafts(run, self.chunks)
-        self.assertEqual(calls[0][1]["paired_positive"]["id"], self.ids[0])
-        self.assertIn("不能只是同义词替换", calls[0][0])
-        self.assertIn("原文关键词", calls[0][0])
+        self.assertNotIn('paired_positive', calls[0][1])
+        self.assertEqual(len(calls), 1)
 
-    def test_q09_ai_lexical_repair_is_bounded_and_audited(self):
+    def test_single_targeted_duplicate_fix_is_bounded_and_audited(self):
         pair = self.ids[8]
         run = self.store.start_revision(pair, "ai_regenerate", "降低词面重复", False, {pair: {"source_chunk_ids": ["C1"]}}, self.chunks)
         class Service:
@@ -543,20 +545,20 @@ class RevisionWorkflowTests(unittest.TestCase):
                 return {pair: {"chunk_ids": ["C1"], "method": "manual", "scope": "same_product", "reason": "人工指定", "manual": True}}
             def generate_revision_drafts(self, prompt_run, chunks, on_progress=None, existing=None):
                 self.calls += 1
-                question = "原题 1" if self.calls < 3 else "开工前，红色紧急停机开关是不是正常？"
+                question = "原题 1" if self.calls < 2 else "开工前，红色紧急停机开关是不是正常？"
                 return {pair: {"question": question, "reference_answer": "正确操作", "source_chunk_ids": ["C1"]}}
             def revision_similarity(self, _a, _b):
                 return .6
         service = Service()
         main._prepare_revision(run["id"], self.store, service, SimpleNamespace(chunks=lambda: self.chunks))
         result = self.store.revision_run(run["id"])
-        self.assertEqual(service.calls, 3)
+        self.assertEqual(service.calls, 2)
         self.assertEqual(result["status"], "preview_ready")
-        self.assertEqual([item["error"] for item in result["generation_attempts"][:2]], ["ABLATION_TOO_SIMILAR"] * 2)
-        self.assertIsNone(result["generation_attempts"][2]["error"])
+        self.assertTrue(result['generation_attempts'][0]['validation_errors'])
+        self.assertEqual(result['generation_attempts'][1]['validation_errors'], [])
         self.assertEqual(self.store.question(pair)["question"], "原题 9")
 
-    def test_q09_ai_stops_after_three_similar_drafts(self):
+    def test_ai_stops_after_one_unsuccessful_targeted_fix(self):
         pair = self.ids[8]
         run = self.store.start_revision(pair, "ai_regenerate", "降低词面重复", False, {pair: {"source_chunk_ids": ["C1"]}}, self.chunks)
         class Service:
@@ -571,10 +573,10 @@ class RevisionWorkflowTests(unittest.TestCase):
         service = Service()
         main._prepare_revision(run["id"], self.store, service, SimpleNamespace(chunks=lambda: self.chunks))
         result = self.store.revision_run(run["id"])
-        self.assertEqual(service.calls, 3)
+        self.assertEqual(service.calls, 2)
         self.assertEqual(result["status"], "failed")
-        self.assertEqual(len(result["generation_attempts"]), 3)
-        self.assertTrue(all(item["error"] == "ABLATION_TOO_SIMILAR" for item in result["generation_attempts"]))
+        self.assertEqual(len(result['generation_attempts']), 2)
+        self.assertTrue(all(item['validation_errors'] for item in result['generation_attempts']))
         self.assertEqual(self.store.question(pair)["question"], "原题 9")
 
     def test_q09_ai_provider_error_is_audited_without_changing_candidate(self):
@@ -590,7 +592,7 @@ class RevisionWorkflowTests(unittest.TestCase):
         main._prepare_revision(run["id"], self.store, Service(), SimpleNamespace(chunks=lambda: self.chunks))
         result = self.store.revision_run(run["id"])
         self.assertEqual(result["status"], "failed")
-        self.assertEqual(result["generation_attempts"][0]["question_id"], pair)
+        self.assertEqual(result["generation_attempts"][0]["question_ids"], [pair])
         self.assertEqual(result["generation_attempts"][0]["error"], "Provider unavailable")
         self.assertEqual(self.store.question(pair)["question"], "原题 9")
 

@@ -58,15 +58,15 @@ class FinalGovernanceTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertEqual(self.store.question(item["id"])["probe_status"], "needs_revision")
 
-    def test_qc_requires_zero_to_hundred_score_at_least_85_and_priority(self):
+    def test_qc_requires_valid_score_but_priority_drives_review(self):
         self.store.record_probe_result("GGC-001", {
             "question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40,
             "evidence_direct_failure": False, "reason": "supported", "rule_version": "v1.0.1",
         })
         low = self.store.record_qc("GGC-001", {"score": 84, "priority": "P1", "reason": "needs revision", "model": "test"}, "passed")
 
-        self.assertEqual(low["status"], "qc_failed")
-        self.assertEqual(self.store.question("GGC-001")["review_status"], "needs_revision")
+        self.assertEqual(low["status"], "qc_passed")
+        self.assertEqual(self.store.question("GGC-001")["review_status"], "human_review_pending")
 
     def test_human_confirm_creates_a_linked_optimization_run_without_generating_candidates(self):
         event = self.store.record_monitoring_event(question="安全题", answer="错误", bad_case=True, severity="critical", determinable=True)
@@ -137,8 +137,8 @@ class FinalGovernanceTests(unittest.TestCase):
 
         recommendation = self.store.refresh_recommendation(experiment)
 
-        self.assertEqual(recommendation["status"], "WAITING_FOR_ROUND_COMPLETION")
-        self.assertEqual(recommendation["round_completion"], {"evaluated": 1, "total": 3})
+        self.assertEqual(recommendation["status"], "Needs Report Confirmation")
+        self.assertEqual(len(recommendation['comparison']), 3)
 
     def test_round_budget_is_derived_from_evaluated_candidates(self):
         experiment = self.store.create_experiment("EVAL-1")
@@ -147,7 +147,7 @@ class FinalGovernanceTests(unittest.TestCase):
             self.store.save_candidate(experiment, f"R1-{label}", {"top_k": 4}, {"round": 1, "candidate_label": label})
             self.store.finish_candidate(candidate_id, "evaluated", self._qualified_result(False))
 
-        self.assertEqual(self.store.experiment(experiment)["evaluation_budget"], {"used": 3, "max": 12})
+        self.assertEqual(self.store.experiment(experiment)["evaluation_budget"], {"used": 3, "max": 12, 'reserved_for_d': 1})
 
     def test_multiple_pareto_candidates_require_human_recommendation(self):
         experiment = self.store.create_experiment("EVAL-1")
@@ -158,9 +158,10 @@ class FinalGovernanceTests(unittest.TestCase):
 
         recommendation = self.store.refresh_recommendation(experiment)
 
-        self.assertEqual(recommendation["status"], "Needs Human Recommendation")
+        self.assertEqual(recommendation["status"], "Needs Report Confirmation")
         selected = self.store.select_recommendation(experiment, f"{experiment}-R1-A", "reviewer")
-        self.assertEqual(selected["recommended_candidate"], f"{experiment}-R1-A")
+        self.assertEqual(selected['report_confirmation']['winner_id'], f"{experiment}-R1-A")
+        self.assertEqual(selected['status'], 'Needs Composite')
 
     @staticmethod
     def _qualified_result(qualified=True):
@@ -182,11 +183,11 @@ class FinalGovernanceTests(unittest.TestCase):
         for item in generated[:-1]:
             self.store.record_probe_result(item["id"], {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40, "evidence_direct_failure": False, "reason": "test"})
             self.store.record_qc(item["id"], {"score": 90, "priority": "P2", "reason": "test", "model": "test"}, "passed")
-        with self.assertRaisesRegex(ValueError, "All Mini"):
+        with self.assertRaisesRegex(ValueError, "Probe"):
             self.store.review_generation_batch([item["id"] for item in generated], "reviewer", confirmed_manual_review=True)
         self.assertEqual(sum(item["stage"] == "golden" for item in self.store.questions()), 0)
 
-    def test_batch_review_requires_explicit_confirmation_and_snapshot_is_separate(self):
+    def test_batch_review_requires_explicit_confirmation_and_freezes_version(self):
         candidates = []
         for category, count in (("positive", 8), ("ablation", 4), ("negative", 8)):
             for index in range(count):
@@ -199,7 +200,7 @@ class FinalGovernanceTests(unittest.TestCase):
             self.store.review_generation_batch([item["id"] for item in generated], "reviewer", confirmed_manual_review=False)
 
         reviewed = self.store.review_generation_batch([item["id"] for item in generated], "reviewer", confirmed_manual_review=True)
-        self.assertNotIn("snapshot", reviewed)
+        self.assertIn("snapshot", reviewed)
         snapshot = self.store.create_generation_snapshot(generated[0]["raw"]["generation_run_id"])
         self.assertEqual(len(snapshot["question_ids"]), 20)
         self.assertEqual(snapshot["generation_run_id"], generated[0]["raw"]["generation_run_id"])

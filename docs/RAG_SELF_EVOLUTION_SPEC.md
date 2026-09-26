@@ -1,5 +1,28 @@
 # RAG Self-Evolution Platform 产品规格
 
+> **唯一当前规则：V1.2 — Friend-Aligned Simplified Baseline**
+> **Implementation Authorized / In Progress**。本节替代下方完整保留的 V1.1 历史规则；实现和真实验收状态另见实施矩阵，不以规格冒充完成证据。
+
+## V1.2 冻结规则
+
+来源：用户提供的《产品成果参考.zip》《视频截图.zip》原始流程图、黄金测试集流程及产品截图，加上用户明确确认的取舍。截图不是可移植源码；不臆造未展示的 Prompt。
+
+1. 主线：Knowledge → Mini Golden → Hard Validation / Probe / QC → **Gate 1 Human Confirm Golden** → Baseline → Bad Case → **唯一 Tuning Agent** → A/B/C Sandbox → **Gate 2 Human Confirm Report** → Composite D / Regression → **Gate 3 Human Release** → Production Q&A。Monitoring、版本历史、Rollback 是辅助能力，不是主线前置条件。
+2. 保留七个一级页面和现有 FastAPI / SQLite / React / BGE / DeepSeek / FAISS，不增加依赖、数据库表或新 Agent。
+3. Corpus 动态发现，最低字段 document_id / chunk_id / chunk_text；product / section 可选。Mini 配额 8 Positive / 4 Ablation / 8 Negative。Coverage 使用真实 Embedding 主题聚类，按簇分配且优先未用 Chunk，不依赖四份 PDF、题号、固定型号。可靠结构可生成 Aggregation / Bridge / Fact；不足由普通槽位补足，不强造特殊题。
+4. Hard Validation 只做确定性格式、字段、真实证据、答案锚点、结构、重复等校验。保留通用 OCR 多事实答案锚点，不继续扩展单题规则。Ablation 独立有效即可；source_positive_id 仅可选参考，不要求配对、同答案、同证据、BGE 相似区间或 bigram 阈值。
+5. Positive / Ablation 检索未召回为 P1 RETRIEVAL_INCOHERENT，不以 Probe ≥90 阻止人工确认。Negative 保留向量、全文和可回答性检查；Fake Negative 必须阻断。
+6. QC 使用 P0/P1/P2 和理由，分数辅助展示，不以 ≥85 单独阻止审批。机器 QC P0 可以在展示风险后由用户明确接受并记录理由；确定性错误、Fake Negative、类别数量错误不可豁免。Provider 运行错误不能伪装为质量结论或可接受 P0。
+7. 单题自动 Targeted Fix 最多一次。仍失败交给人工 Edit / Replace，不整集重写、不无限重试。旧 Revision、哈希、事务、恢复审计继续作为内部安全机制。替换保持 Slot / Category，确认采用前不改变活动题；旧题历史保留，新题重新质量检查及人工审核。
+8. Gate 1 一次人工确认原子记录审核并冻结 Golden Version；Snapshot 是内部不可变实现，不是另一人工阶段。历史版本不重新解释，正式评测只读取冻结版本。
+9. Baseline / A/B/C / D 共用冻结 Golden、Judge、逐题评测器、指标与 Search Space。11 Hard Gates 保留：Positive correctness/faithfulness/completeness ≥80/80/75；Ablation ≥70/75/65；Safe Rejection / Safety Critical / Injection Resistance 均 ≥95；P50 ≤25s，P99 ≤60s。全部通过，不以 Overall Score 抵消失败。诊断指标仍为 Recall/Precision/MRR/TTFT/Token。
+10. Tuning 观察历史 Sandbox 结果和真实 Bad Case 后调整假设。A/B/C/D 合计最多 12 次 Sandbox，开始时预占额度、失败也计数，为 D 保留一次。所有已启动评测终结且至少一项合格才开放 Gate 2；用户在同一次报告确认中选择合格赢家，不强求三个方案均合格。
+11. D 以赢家为基础，合并经过 Sandbox、确有修复且 Regression 通过的非冲突配置差异；来源方案可整体未达 11 Gate，但必须如实保存失败与有效证据，不推断单参数因果。冲突保留赢家值；记录来源/理由/冲突/最终配置。无新增有效组合不造假 D。有组合则完整重评；只有同时合格、相对赢家无新增失败且实际修复才晋升，否则保留赢家。
+12. Gate 3 一次人工确认，在同一事务重验资格、报告确认及 D 决策后发布，记录 Human Release 和完整版本快照。保留前版本与回滚；不能自动发布。
+13. 所有本轮写入验收仅用隔离 Fresh DB / Existing DB Copy，actor=test_human。真实用户库、Candidate、审核及 Q01/Q09 Preview 不参与修改。先确定性/Fixture/Portability/Copy 测试，后只跑一条真实 Provider 主链；失败诚实停止，不为通过改考卷或 Gate。
+
+## V1.1 历史规格（Superseded by V1.2，不用于当前判定）
+
 > **唯一正式 Source of Truth**
 > **SPEC Version：V1.1 — Simplified & End-to-End Verified Demo Baseline**
 > **Status：Current Product Baseline · Implementation Authorized**

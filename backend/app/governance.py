@@ -437,10 +437,25 @@ class GovernanceStore:
                     chunk = by_chunk.get(chunk_id)
                     matched.append({"chunk_id": chunk_id, "resolution": "matched" if chunk else "missing_current_index", "document_id": chunk.get("document_id") if chunk else None, "document_name": chunk.get("document_name") if chunk else None, "section_path": chunk.get("section_path") if chunk else None, "page_start": chunk.get("page_start") if chunk else None, "page_end": chunk.get("page_end") if chunk else None, "chunk_text": chunk.get("chunk_text", chunk.get("text")) if chunk else None})
                 evidence_details.append({**evidence, "chunks": matched})
-            questions.append({**item, "slot": item["raw"].get("coverage_slot") or f"Q{number:02d}", "evidence_details": evidence_details, "probe": probes[question_id][0] if probes[question_id] and item["probe_status"] != "probe_pending" else None, "qc": qcs[question_id][0]["result"] if qcs[question_id] and item["qc_status"] != "qc_pending" else None, "probe_history": probes[question_id], "qc_history": qcs[question_id], "review_history": reviews[question_id], "revision_history": self.revision_history(question_id)})
+            questions.append({**item, 'approval_eligibility': self.approval_eligibility(question_id), "slot": item["raw"].get("coverage_slot") or f"Q{number:02d}", "evidence_details": evidence_details, "probe": probes[question_id][0] if probes[question_id] and item["probe_status"] != "probe_pending" else None, "qc": qcs[question_id][0]["result"] if qcs[question_id] and item["qc_status"] != "qc_pending" else None, "probe_history": probes[question_id], "qc_history": qcs[question_id], "review_history": reviews[question_id], "revision_history": self.revision_history(question_id)})
         return {"generation_run_id": run_id, "questions": questions}
 
-    def review_question(self, question_id: str, decision: str, actor: str, *, reason: str | None = None, tags: list[str] | None = None):
+    def approval_eligibility(self, question_id: str):
+        item = self.question(question_id)
+        probes, qcs = self.probe_history(question_id), self.qc_history(question_id)
+        blockers = []
+        if item['probe_status'] != 'probe_passed' or not probes or probes[0].get('evidence_direct_failure') or probes[0].get('status') != 'passed':
+            blockers.append('Probe 尚未完成或确定性证据 / Negative 检查未通过')
+        if item['qc_status'] == 'qc_pending' or not qcs:
+            blockers.append('QC 尚未完成')
+        if any(question_id in run.get('question_ids', []) for run in self.revision_runs(item['raw'].get('generation_run_id')) if run['status'] in {'queued', 'generating', 'validating', 'preview_ready', 'probing', 'qc', 'interrupted'}):
+            blockers.append('局部修订未完成')
+        qc = qcs[0]['result'] if qcs else {}
+        requires_acceptance = qc.get('priority') == 'P0'
+        accepted = any(event.get('accept_qc_p0') and event.get('qc_created_at') == qcs[0]['created_at'] for event in self.review_history(question_id)) if qcs else False
+        return {'can_approve': not blockers and (not requires_acceptance or accepted), 'blocking_reasons': blockers, 'requires_qc_p0_acceptance': requires_acceptance and not accepted, 'qc_reason': qc.get('reason'), 'qc_created_at': qcs[0]['created_at'] if qcs else None}
+
+    def review_question(self, question_id: str, decision: str, actor: str, *, reason: str | None = None, tags: list[str] | None = None, accept_qc_p0: bool = False):
         if decision not in {"approved", "rejected", "needs_revision"}:
             raise ValueError("Unsupported review decision")
         current = self.question(question_id)
@@ -450,15 +465,20 @@ class GovernanceStore:
             raise ValueError("需修订时必须填写修订原因")
         if decision == "approved" and any(question_id in run.get("question_ids", []) for run in self.revision_runs(current["raw"].get("generation_run_id")) if run["status"] in {"queued", "generating", "validating", "preview_ready", "probing", "qc", "interrupted"}):
             raise ValueError("局部修订未完成，不能批准")
-        if decision == "approved" and (current["probe_status"] != "probe_passed" or current["qc_status"] != "qc_passed"):
-            raise ValueError("Probe Passed 和 QC Passed 后才能批准 Golden")
         status = "approved" if decision == "approved" else decision
         stage = "golden" if decision == "approved" else "candidate"
         with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
             if not connection.execute("SELECT 1 FROM questions WHERE id = ?", (question_id,)).fetchone():
                 raise KeyError(question_id)
+            eligibility = self.approval_eligibility(question_id)
+            if decision == 'approved':
+                if eligibility['blocking_reasons']:
+                    raise ValueError('；'.join(eligibility['blocking_reasons']))
+                if eligibility['requires_qc_p0_acceptance'] and not (accept_qc_p0 and (reason or '').strip()):
+                    raise ValueError('QC P0 必须明确接受并填写原因')
             connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", (stage, status, _now(), question_id))
-            connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at, metadata_json) VALUES (?, ?, ?, ?, ?, ?)", (question_id, "dataset", decision, actor, _now(), _json({"reason": reason.strip(), "tags": tags or []}) if reason else "{}"))
+            connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at, metadata_json) VALUES (?, ?, ?, ?, ?, ?)", (question_id, "dataset", decision, actor, _now(), _json({'reason': (reason or '').strip(), 'tags': tags or [], 'accept_qc_p0': accept_qc_p0, 'qc_created_at': eligibility['qc_created_at']})))
             connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, decision, actor, _now()))
         return self.question(question_id)
 
@@ -484,7 +504,7 @@ class GovernanceStore:
         return [{**dict(row), **_load(row["audit_json"], {})} for row in rows]
 
     def revision_history(self, question_id: str):
-        return [run for run in self.revision_runs() if question_id in run.get("question_ids", [])]
+        return [run for run in self.revision_runs() if question_id in run.get("question_ids", []) or question_id in run.get('source_question_ids', [])]
 
     def related_positive(self, item: dict):
         if item["test_category"] != "ablation":
@@ -527,19 +547,21 @@ class GovernanceStore:
                 audit = {**_load(row["audit_json"], {}), "interrupted_at": _now(), "interrupted_stage": _load(row["audit_json"], {}).get("stage"), "stage": "interrupted"}
                 connection.execute("UPDATE candidate_revision_runs SET status='interrupted', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), row["id"]))
 
-    def start_revision(self, question_id: str, mode: str, reason: str, paired: bool, changes_by_id: dict, chunks: list[dict], *, tags: list[str] | None = None):
+    def start_revision(self, question_id: str, mode: str, reason: str, paired: bool, changes_by_id: dict, chunks: list[dict], *, tags: list[str] | None = None, replacement: bool = False, actor: str = 'local_user'):
         if mode not in {"manual_edit", "ai_regenerate"} or not reason.strip():
             raise ValueError("请选择修订方式并填写原因")
         current = self.question(question_id)
         if current["stage"] == "golden":
             raise ValueError("已批准题目不能修订")
-        if current["legacy_question_type"] != "v1_mini" or current["review_status"] not in {"needs_revision", "rejected"}:
-            raise ValueError("仅可修订已人工标记的 V1 Mini Candidate")
+        if current["legacy_question_type"] != "v1_mini" or current['stage'] != 'candidate':
+            raise ValueError("仅可编辑或替换活动 V1 Mini Candidate")
         run_id = current["raw"].get("generation_run_id")
         run = self.generation_run(run_id)
         if not run or len(run["question_ids"]) != self._expected_count(run) or question_id not in run["question_ids"]:
             raise ValueError("V1 Mini Run 不完整")
         ids = [question_id]
+        if replacement and paired:
+            raise ValueError('替换只作用于当前 Slot')
         if paired:
             linked = self.related_positive(current) if current["test_category"] == "ablation" else next((item for item_id in run["question_ids"] if (item := self.question(item_id))["test_category"] == "ablation" and (positive := self.related_positive(item)) and positive["id"] == question_id), None)
             if not linked or linked["stage"] == "golden" or linked["review_status"] not in {"needs_revision", "rejected"}:
@@ -553,7 +575,7 @@ class GovernanceStore:
         if any(item["stage"] == "golden" for item in before.values()):
             raise ValueError("已批准题目不能修订")
         revision_id = f"REV-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
-        audit = {"question_ids": ids, "mode": mode, "reason": reason.strip(), "tags": tags or [], "before": before, "previous_hash": {item_id: self._revision_hash(item) for item_id, item in before.items()}, "changes": changes_by_id, "stage": "queued", "progress": {"current": 0, "total": len(ids)}}
+        audit = {"question_ids": ids, "mode": mode, 'replacement': replacement, 'actor': actor, "reason": reason.strip(), "tags": tags or [], "before": before, "previous_hash": {item_id: self._revision_hash(item) for item_id, item in before.items()}, "changes": changes_by_id, "stage": "queued", "progress": {"current": 0, "total": len(ids)}}
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             for row in connection.execute("SELECT audit_json FROM candidate_revision_runs WHERE generation_run_id=? AND status IN ('queued','generating','validating','preview_ready','probing','qc','interrupted')", (run_id,)):
@@ -605,7 +627,7 @@ class GovernanceStore:
             if not original_product:
                 coverage = (self.generation_run(run["generation_run_id"]).get("artifacts") or {}).get("coverage_plan", [])
                 original_product = next((entry.get("product") for entry in coverage if entry.get("slot") == old["raw"].get("coverage_slot")), None)
-            if old["test_category"] != "negative" and (not old_documents or any(by_chunk[key]["document_id"] not in old_documents and (not original_product or by_chunk[key].get("product") != original_product) for key in source_ids)):
+            if old["test_category"] != "negative" and original_product and any(by_chunk[key]["document_id"] not in old_documents and by_chunk[key].get("product") not in {None, original_product} for key in source_ids):
                 errors.append(f"{item_id}: 证据只能在当前产品文档内改选")
                 continue
             if old["test_category"] == "negative" and source_ids:
@@ -622,52 +644,19 @@ class GovernanceStore:
                 if not _answer_anchor_supported(answer, texts):
                     errors.append(f"{item_id}: 答案锚点未在所选证据原文中找到")
             drafts[item_id] = {**old, **candidate, "raw": {**old["raw"], "question": candidate["question"], "reference_answer": candidate["reference_answer"], "acceptable_evidence": evidence, "ablation_metadata": candidate["ablation_metadata"]}}
-            if all(drafts[item_id][field] == old[field] for field in ("question", "reference_answer", "evidence")):
+            old_ids = [key for source in old['evidence'] for key in source.get('source_chunk_ids', [])]
+            if all(drafts[item_id][field] == old[field] for field in ("question", "reference_answer")) and source_ids == old_ids and candidate['ablation_metadata'] == old['raw'].get('ablation_metadata', {}):
                 errors.append(f"{item_id}: 草案未改变问题、答案或证据")
         if len(drafts) == len(run["question_ids"]):
             peers = [item for item in self.questions() if item["raw"].get("generation_run_id") == run["generation_run_id"] and item["id"] not in drafts]
             for item_id, draft in drafts.items():
                 for peer in peers:
-                    try:
-                        duplicate = _normalized(draft["question"]) == _normalized(peer["question"]) or similarity(draft["question"], peer["question"]) >= .90
-                    except Exception as error:
-                        errors.append(f"{item_id}: BGE 近重复校验不可用：{error}")
-                        break
+                    duplicate = _normalized(draft["question"]) == _normalized(peer["question"])
                     if duplicate:
-                        errors.append(f"{item_id}: 与 {peer['id']} 重复或 BGE 近重复")
+                        errors.append(f"{item_id}: 与 {peer['id']} 规范化问题重复")
                         break
         changed_fields = {item_id: [field for field in ("question", "reference_answer", "evidence") if draft[field] != run["before"][item_id][field]] for item_id, draft in drafts.items()}
         new_hash = {item_id: self._revision_hash(draft) for item_id, draft in drafts.items()}
-        for item_id, draft in drafts.items():
-            if draft["test_category"] != "ablation" or draft["raw"].get("ablation_attribute") != "weak_keywords":
-                continue
-            positive = self.revision_positive(run, drafts)
-            if positive is None:
-                errors.append(f"{item_id}: 关联 Positive 不存在")
-                continue
-            if _normalized(str(draft["reference_answer"] or "")) != _normalized(str(positive["reference_answer"] or "")):
-                errors.append(f"{item_id}: Ablation 与 Positive 的参考答案不一致")
-            own_ids = {key for source in draft["evidence"] for key in source["source_chunk_ids"]}
-            positive_ids = {key for source in positive["evidence"] for key in source["source_chunk_ids"]}
-            related = bool(own_ids & positive_ids) or any(by_chunk[a].get("document_id") == by_chunk[b].get("document_id") and by_chunk[a].get("section_path") and by_chunk[a].get("section_path") == by_chunk[b].get("section_path") for a in own_ids for b in positive_ids if a in by_chunk and b in by_chunk)
-            if not related:
-                errors.append(f"{item_id}: Ablation 与 Positive 的证据不一致")
-            try:
-                if similarity(draft["question"], positive["question"]) < .45:
-                    errors.append(f"{item_id}: Ablation 与 Positive 的知识点不一致")
-            except Exception as error:
-                errors.append(f"{item_id}: Ablation 语义校验不可用：{error}")
-            left, right = (_normalized(question) for question in (draft["question"], positive["question"]))
-            first = {left[index:index + 2] for index in range(len(left) - 1)}
-            second = {right[index:index + 2] for index in range(len(right) - 1)}
-            # ponytail: fixed bigram gate for this V1 corpus; calibrate with labeled pairs if false positives appear.
-            if first and second and len(first & second) / len(first | second) >= .12:
-                errors.append(f"{item_id}: ABLATION_TOO_SIMILAR")
-        if len(drafts) == 2:
-            positive = next((item for item in drafts.values() if item["test_category"] == "positive"), None)
-            ablation = next((item for item in drafts.values() if item["test_category"] == "ablation"), None)
-            if not positive or not ablation or ablation["raw"].get("ablation_attribute") != "weak_keywords" or _normalized(positive["question"]) == _normalized(ablation["question"]) or _normalized(positive["reference_answer"] or "") != _normalized(ablation["reference_answer"] or "") or not {key for evidence in positive["evidence"] for key in evidence["source_chunk_ids"]}.intersection({key for evidence in ablation["evidence"] for key in evidence["source_chunk_ids"]}):
-                errors.append("成对题必须共享知识点且保持 weak_keywords")
         return drafts, errors, new_hash, changed_fields
 
     @staticmethod
@@ -812,22 +801,34 @@ class GovernanceStore:
             if any(current[item_id]["stage"] == "golden" or self._revision_hash(current[item_id]) != run["previous_hash"][item_id] for item_id in ids):
                 raise ValueError("原题版本已变化，不能应用过期草案")
             versions = {item_id: 1 + sum(other["status"] in {"probing", "qc", "completed", "failed_quality"} and item_id in other["question_ids"] for other in self.revision_runs(run["generation_run_id"])) for item_id in ids}
-            new_hash, changed_fields = {}, {}
+            new_hash, changed_fields, replacements = {}, {}, {}
             for item_id in ids:
                 draft = run["drafts"][item_id]
-                if draft["test_category"] == "ablation":
-                    positive = self.revision_positive(run, run["drafts"])
-                    if positive:
-                        draft["raw"]["source_positive_id"] = positive["id"]
                 selected_ids = [key for evidence in draft["evidence"] for key in evidence.get("source_chunk_ids", [])]
                 if any(key not in {chunk["chunk_id"] for chunk in chunks} for key in selected_ids):
                     raise ValueError("当前索引已变化，证据 Chunk 不可用")
                 changed_fields[item_id] = [field for field in ("question", "reference_answer", "evidence", "raw") if draft[field] != current[item_id][field]]
                 new_hash[item_id] = self._revision_hash({**draft, "stage": "candidate", "review_status": "needs_revision"})
-                connection.execute("UPDATE questions SET question=?, reference_answer=?, evidence_json=?, raw_json=?, stage='candidate', review_status='needs_revision', probe_status='probe_pending', qc_status='qc_pending', updated_at=? WHERE id=?", (draft["question"], draft["reference_answer"], _json(draft["evidence"]), _json(draft["raw"]), _now(), item_id))
-                connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at, metadata_json) VALUES (?, 'revision', 'revision_applied', 'local_user', ?, ?)", (item_id, _now(), _json({"revision_id": revision_id})))
+                if run.get('replacement'):
+                    new_id = f"{item_id}-R{revision_id[-12:]}"
+                    draft = {**draft, 'id': new_id, 'raw': {**draft['raw'], 'id': new_id, 'replaces_question_id': item_id}}
+                    connection.execute("INSERT INTO questions (id,stage,legacy_question_type,test_category,negative_subtype,review_status,probe_status,qc_status,question,reference_answer,evidence_json,raw_json,created_at,updated_at) VALUES (?, 'candidate', 'v1_mini', ?, ?, 'human_review_pending', 'probe_pending', 'qc_pending', ?, ?, ?, ?, ?, ?)", (new_id, draft['test_category'], draft.get('negative_subtype'), draft['question'], draft['reference_answer'], _json(draft['evidence']), _json(draft['raw']), _now(), _now()))
+                    connection.execute("UPDATE questions SET stage='superseded', updated_at=? WHERE id=?", (_now(), item_id))
+                    replacements[item_id] = new_id
+                    run['drafts'][new_id] = draft
+                    new_hash[new_id] = self._revision_hash(draft)
+                else:
+                    connection.execute("UPDATE questions SET question=?, reference_answer=?, evidence_json=?, raw_json=?, stage='candidate', review_status='needs_revision', probe_status='probe_pending', qc_status='qc_pending', updated_at=? WHERE id=?", (draft["question"], draft["reference_answer"], _json(draft["evidence"]), _json(draft["raw"]), _now(), item_id))
+                connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at, metadata_json) VALUES (?, 'revision', 'revision_applied', ?, ?, ?)", (item_id, run.get('actor', 'local_user'), _now(), _json({"revision_id": revision_id, 'replacement_id': replacements.get(item_id)})))
             audit = {**_load(status_row["audit_json"], {}), "new_hash": new_hash, "changed_fields": changed_fields, "version_from": versions, "version_to": {key: value + 1 for key, value in versions.items()}, "stage": "probe", "progress": {"current": 0, "total": len(ids)}, "applied_at": _now()}
             audit["drafts"] = {**audit["drafts"], **{item_id: run["drafts"][item_id] for item_id in ids}}
+            if replacements:
+                row = connection.execute('SELECT question_ids_json FROM golden_generation_runs WHERE id=?', (run['generation_run_id'],)).fetchone()
+                active = _load(row[0], [])
+                if not set(ids).issubset(active):
+                    raise ValueError('活动 Slot 已变化')
+                connection.execute('UPDATE golden_generation_runs SET question_ids_json=? WHERE id=?', (_json([replacements.get(key, key) for key in active]), run['generation_run_id']))
+                audit.update(source_question_ids=ids, question_ids=[replacements.get(key, key) for key in ids], replacements=replacements, drafts={**audit['drafts'], **run['drafts']})
             connection.execute("UPDATE candidate_revision_runs SET status='probing', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), revision_id))
         return self.revision_run(revision_id)
 
@@ -921,11 +922,12 @@ class GovernanceStore:
         approved = [self.question(question_id) for question_id in question_ids]
         run = self.generation_run(generation_run_id)
         expected = self._expected_count(run)
-        if len(approved) != expected or len(set(question_ids)) != expected or any(item["stage"] != "golden" or item["review_status"] != "approved" or item["probe_status"] != "probe_passed" or item["qc_status"] != "qc_passed" for item in approved):
+        if len(approved) != expected or len(set(question_ids)) != expected or any(item["stage"] != "golden" or item["review_status"] != "approved" or not self.approval_eligibility(item['id'])['can_approve'] for item in approved):
             raise ValueError("同一 V1 Mini Generation Run 的 20 道题必须全部完成人工批准后才能创建 Snapshot")
         if any(set(item["question_ids"]) & set(question_ids) for item in self.revision_runs(generation_run_id) if item["status"] in {"queued", "generating", "validating", "preview_ready", "probing", "qc", "interrupted"}):
             raise ValueError("仍有未完成的局部修订，不能创建 Snapshot")
-        return self.create_dataset_snapshot(approved, generation_run_id)
+        existing = next((item['snapshot'] for item in self.dataset_snapshots() if item['snapshot'].get('generation_run_id') == generation_run_id and item['snapshot'].get('question_ids') == question_ids), None)
+        return existing or self.create_dataset_snapshot(approved, generation_run_id)
 
     def run_probe(self, question_id: str, retriever, chunks: list[dict], answerability_judge=None, *, fail_on_judge_error: bool = False):
         item = self.question(question_id)
@@ -995,7 +997,7 @@ class GovernanceStore:
 
     def record_probe_result(self, question_id: str, result: dict):
         """Persist the frozen 30/30/40 probe; evidence failure is non-compensable."""
-        self.question(question_id)
+        item = self.question(question_id)
         caps = {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40}
         scores = {}
         for field, cap in caps.items():
@@ -1005,10 +1007,10 @@ class GovernanceStore:
             scores[field] = float(value)
         evidence_direct_failure = result.get("evidence_direct_failure") is True
         score = round(sum(scores.values()), 1)
-        passed = score >= 90 and not evidence_direct_failure
+        passed = not evidence_direct_failure and (item['test_category'] != 'negative' or score >= 90)
         stored = {
             "question_id": question_id, **scores, "score": score,
-            "threshold": 90, "evidence_direct_failure": evidence_direct_failure,
+            "threshold": 90 if item['test_category'] == 'negative' else None, "evidence_direct_failure": evidence_direct_failure,
             "status": "passed" if passed else "failed", "reason": str(result.get("reason", "")),
             "rule_version": str(result.get("rule_version", "v1.0.1")),
             "model_version": str(result.get("model_version", "programmatic-probe-v1")),
@@ -1041,19 +1043,31 @@ class GovernanceStore:
             raise ValueError("Batch review only accepts one complete V1 Mini generation run")
         if set(question_ids) != set((self.generation_run(next(iter(runs))) or {}).get("question_ids", [])):
             raise ValueError("Batch review question IDs must match the generation run")
-        if any(item["probe_status"] != "probe_passed" or item["qc_status"] != "qc_passed" for item in candidates):
-            raise ValueError("All Mini candidates must pass Probe and QC before batch approval")
-        if any(item["stage"] != "golden" and any(event["decision"] in {"needs_revision", "rejected"} for event in self.review_history(item["id"])) for item in candidates):
-            raise ValueError("人工需修订或已拒绝的题目不得批量覆盖，请逐题审核")
         now = _now()
         with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            candidates = [self.question(question_id) for question_id in question_ids]
+            if set(self.generation_run(run['id'])['question_ids']) != set(question_ids):
+                raise ValueError('活动题目已变化，请刷新')
+            if any(sum(item['test_category'] == category for item in candidates) != run['profile'][category] for category in ('positive', 'ablation', 'negative')):
+                raise ValueError('Mini 类别数量不符')
+            for item in candidates:
+                eligibility = self.approval_eligibility(item['id'])
+                if not eligibility['can_approve']:
+                    raise ValueError(f"{item['id']}: " + ('；'.join(eligibility['blocking_reasons']) or 'QC P0 请逐题明确接受'))
+                if item['review_status'] in {'needs_revision', 'rejected'}:
+                    raise ValueError('人工需修订或已拒绝的题目不得批量覆盖，请逐题审核')
             for question_id in question_ids:
                 if next(item for item in candidates if item["id"] == question_id)["stage"] == "golden":
                     continue
                 connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", ("golden", "approved", now, question_id))
                 connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (question_id, "dataset", "approved", actor, now))
                 connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "approved", actor, now))
-        return {"reviewed": [self.question(question_id) for question_id in question_ids], "generation_run_id": next(iter(runs))}
+            prior = next((item['snapshot'] for item in self.dataset_snapshots() if item['snapshot'].get('generation_run_id') == run['id'] and item['snapshot'].get('question_ids') == run['question_ids']), None)
+            snapshot = prior or {'id': f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", 'generation_run_id': run['id'], 'question_ids': run['question_ids'], 'questions': [self.question(key)['raw'] for key in run['question_ids']], 'policy_version': 'v1.2'}
+            if not prior:
+                connection.execute('INSERT INTO dataset_versions VALUES (?, ?, ?, ?, ?)', (snapshot['id'], 'approved', 'human_review', _json(snapshot), now))
+        return {"reviewed": [self.question(question_id) for question_id in question_ids], "generation_run_id": run['id'], 'snapshot': snapshot}
 
     def record_qc(self, question_id: str, result: dict, status: str):
         item = self.question(question_id)
@@ -1065,9 +1079,8 @@ class GovernanceStore:
             raise ValueError("QC score must be between 0 and 100")
         if priority not in {"P0", "P1", "P2"}:
             raise ValueError("QC priority must be P0, P1, or P2")
-        ablation_valid = result.get("ablation_valid", True)
-        qc_status = "qc_passed" if status == "passed" and score >= 85 and ablation_valid is True else "qc_failed"
-        result = {**result, "score": float(score), "priority": priority, "threshold": 85, "status": qc_status, "rule_version": result.get("rule_version", "v1.0.1")}
+        qc_status = 'qc_failed' if priority == 'P0' else 'qc_passed'
+        result = {**result, "score": float(score), "priority": priority, "threshold": None, "status": qc_status, "rule_version": 'v1.2'}
         with self.connection() as connection:
             connection.execute("INSERT INTO qc_results(question_id, status, result_json, created_at) VALUES (?, ?, ?, ?)", (question_id, qc_status, _json(result), _now()))
             manual = connection.execute("SELECT 1 FROM review_events WHERE question_id = ? LIMIT 1", (question_id,)).fetchone()
@@ -1148,7 +1161,11 @@ class GovernanceStore:
 
     def save_candidate(self, experiment_id: str, candidate_id: str, config: dict, reasoning: dict):
         with self.connection() as connection:
-            connection.execute("INSERT OR REPLACE INTO candidate_configs VALUES (?, ?, ?, ?, ?, ?, ?)", (f"{experiment_id}-{candidate_id}", experiment_id, "generated", _json(config), _json(reasoning), _json({}), _now()))
+            connection.execute('BEGIN IMMEDIATE')
+            experiment = connection.execute('SELECT result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
+            if experiment and _load(experiment[0], {}).get('report_confirmation'):
+                raise ValueError('报告已确认，不能改写候选配置')
+            connection.execute("INSERT INTO candidate_configs VALUES (?, ?, ?, ?, ?, ?, ?)", (f"{experiment_id}-{candidate_id}", experiment_id, "generated", _json(config), _json(reasoning), _json({}), _now()))
 
     def create_direct_release_candidate(self, baseline_run_id: str, config: dict, actor: str):
         experiment_id = self.create_experiment(baseline_run_id, "direct_release")
@@ -1174,9 +1191,8 @@ class GovernanceStore:
     @staticmethod
     def _round_summary(candidates: list[dict], number: int) -> dict:
         items = [item for item in candidates if item.get("reasoning", {}).get("round") == number]
-        labels = {item.get("reasoning", {}).get("candidate_label") for item in items}
-        evaluated = sum(item["status"] == "evaluated" for item in items)
-        return {"round": number, "candidate_ids": [item["id"] for item in items], "evaluated": evaluated, "total": 3, "complete": labels == {"A", "B", "C"} and evaluated == 3}
+        evaluated = sum(item["status"] in {'evaluated', 'failed'} for item in items)
+        return {"round": number, "candidate_ids": [item["id"] for item in items], "evaluated": evaluated, "total": len(items), "complete": bool(items) and evaluated == len(items)}
 
     def round_completion(self, candidate: dict) -> dict:
         number = candidate.get("reasoning", {}).get("round")
@@ -1189,48 +1205,130 @@ class GovernanceStore:
             connection.execute("UPDATE candidate_configs SET status = ?, result_json = ? WHERE id = ?", (status, _json(result), candidate_id))
         return self.candidate(candidate_id)
 
+    def reserve_candidate_evaluation(self, candidate_id: str):
+        """Reserve a real execution, not a result, under SQLite's writer lock."""
+        with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            candidate = self.candidate(candidate_id)
+            if not candidate or candidate['status'] not in {'generated', 'failed'}:
+                raise ValueError('Candidate 已运行或正在执行')
+            experiment = self.experiment(candidate['experiment_id'])
+            is_d = candidate['reasoning'].get('candidate_label') == 'D'
+            if experiment['result'].get('report_confirmation') and not is_d:
+                raise ValueError('报告已确认，不能改变已确认的实验结果')
+            used = experiment['evaluation_budget']['used']
+            limit = MAX_EVALS if is_d else MAX_EVALS - 1
+            if used >= limit:
+                raise ValueError('Sandbox budget exhausted；D 保留一次额度')
+            if is_d and not experiment['result'].get('report_confirmation'):
+                raise ValueError('D 需要 Gate 2 报告确认')
+            attempts = list(candidate['reasoning'].get('sandbox_attempts', []))
+            attempts.append({'attempt': len(attempts) + 1, 'started_at': _now()})
+            connection.execute("UPDATE candidate_configs SET status='running', reasoning_json=? WHERE id=?", (_json({**candidate['reasoning'], 'sandbox_attempts': attempts}), candidate_id))
+        return self.candidate(candidate_id)
+
+    def confirm_experiment_report(self, experiment_id: str, winner_id: str, actor: str):
+        with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            experiment = self.experiment(experiment_id)
+            if not experiment:
+                raise ValueError('Experiment 不存在')
+            if experiment['result'].get('report_confirmation'):
+                raise ValueError('报告已确认')
+            candidates = experiment['candidates']
+            if any(item['status'] == 'running' for item in candidates):
+                raise ValueError('仍有 Sandbox 运行中')
+            winner = next((item for item in candidates if item['id'] == winner_id and item['reasoning'].get('candidate_label') in {'A', 'B', 'C'}), None)
+            if not winner or winner['status'] != 'evaluated' or not winner['result'].get('qualification', {}).get('qualified'):
+                raise ValueError('至少需要一个合格 A/B/C 赢家')
+            if experiment['evaluation_budget']['used'] >= MAX_EVALS:
+                raise ValueError('缺少 D 评测额度')
+            confirmation = {'winner_id': winner_id, 'actor': actor, 'confirmed_at': _now(), 'candidates': [{'id': item['id'], 'status': item['status'], 'result': item['result'], 'config': item['config']} for item in candidates]}
+            result = {**experiment['result'], 'report_confirmation': confirmation}
+            connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json(result), experiment_id))
+            connection.execute('INSERT INTO approvals(gate,target_id,decision,actor,created_at) VALUES (?,?,?,?,?)', ('experiment_report', experiment_id, 'approved', actor, _now()))
+        self.refresh_recommendation(experiment_id)
+        return confirmation
+
+    def create_composite(self, experiment_id: str):
+        from .policy import validate_candidate_config
+        with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            experiment = self.experiment(experiment_id)
+            confirmation = (experiment or {}).get('result', {}).get('report_confirmation')
+            if not confirmation:
+                raise ValueError('需要 Gate 2 报告确认')
+            if experiment['result'].get('composite'):
+                raise ValueError('本报告已生成 Composite 决策')
+            winner = self.candidate(confirmation['winner_id'])
+            baseline = self.evaluation_run(experiment['baseline_run_id'])
+            base = {**DEFAULT_PIPELINE_CONFIG, **baseline['config']}
+            config = dict(winner['config'])
+            claimed = {key for key in config if config[key] != base.get(key)}
+            sources, conflicts = [], []
+            for item in experiment['candidates']:
+                result = item['result']
+                if item['id'] == winner['id'] or item['status'] != 'evaluated' or not result.get('regression', {}).get('passed') or result.get('target_bad_cases_fixed', 0) < 1:
+                    continue
+                diff = {key: value for key, value in item['config'].items() if value != base.get(key)}
+                conflict = [key for key, value in diff.items() if key in claimed and config[key] != value]
+                if conflict:
+                    conflicts.append({'candidate_id': item['id'], 'parameters': conflict, 'resolution': 'retain_winner_or_prior_bundle'})
+                    continue
+                if not any(config.get(key) != value for key, value in diff.items()):
+                    continue
+                check = validate_candidate_config({**config, **diff})
+                if not check['valid']:
+                    conflicts.append({'candidate_id': item['id'], 'parameters': list(diff), 'resolution': 'incompatible_bundle', 'errors': check['errors']})
+                    continue
+                config.update(diff)
+                claimed.update(diff)
+                sources.append({'candidate_id': item['id'], 'parameter_diff': diff, 'why_merge': 'Observed case fixes and Regression PASS; bundle evidence, not per-parameter causality', 'qualification': result.get('qualification')})
+            decision = {'winner_id': winner['id'], 'sources': sources, 'conflicts': conflicts, 'status': 'generated' if sources else 'no_effective_composite'}
+            if sources:
+                candidate_id = f'{experiment_id}-D'
+                reasoning = {'candidate_label': 'D', 'hypothesis': 'Merge validated non-conflicting bundles', 'winner_id': winner['id'], 'sources': sources, 'conflicts': conflicts, 'changed_parameters': {key: value for key, value in config.items() if value != base.get(key)}}
+                connection.execute('INSERT INTO candidate_configs VALUES (?,?,?,?,?,?,?)', (candidate_id, experiment_id, 'generated', _json(config), _json(reasoning), '{}', _now()))
+                decision['candidate_id'] = candidate_id
+            connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json({**experiment['result'], 'composite': decision}), experiment_id))
+        self.refresh_recommendation(experiment_id)
+        return self.candidate(decision['candidate_id']) if sources else decision
+
     def refresh_recommendation(self, experiment_id: str):
         candidates = self.candidates(experiment_id)
-        numbers = [item.get("reasoning", {}).get("round") for item in candidates if isinstance(item.get("reasoning", {}).get("round"), int)]
-        current_round = max(numbers) if numbers else None
-        state = self._round_summary(candidates, current_round) if current_round else None
-        scoped = [item for item in candidates if current_round is None or item.get("reasoning", {}).get("round") == current_round]
-        completion = {"evaluated": state["evaluated"], "total": state["total"]} if state else None
-        if state and not state["complete"]:
-            result, candidate_id = {"status": "WAITING_FOR_ROUND_COMPLETION", "recommended_candidate": None, "why": f"当前 Round {current_round} 仍有 {state['total'] - state['evaluated']} / {state['total']} Candidates Pending。", "round": current_round, "round_completion": completion, "candidates": [{"id": item["id"], "status": item["status"]} for item in scoped]}, None
-        else:
-            qualified = [item for item in scoped if item["status"] == "evaluated" and item["result"].get("qualification", {}).get("qualified")]
-            if not qualified:
-                result, candidate_id = {"status": "No Qualified Candidate", "recommended_candidate": None, "why": "No Candidate passed 11/11 Hard Gate, Regression and effective-improvement rules.", "round": current_round, "round_completion": completion, "candidates": [{"id": item["id"], "status": item["status"], "qualified": item["result"].get("qualification", {}).get("qualified", False)} for item in scoped]}, None
-            else:
-                higher = ("positive_correctness", "positive_faithfulness", "positive_completeness", "ablation_correctness", "ablation_faithfulness", "ablation_completeness", "safe_rejection_rate", "safety_critical_accuracy", "prompt_injection_resistance", "recall_at_k", "precision_at_k", "mrr")
-                lower = ("ttft_seconds", "token_cost", "parameter_complexity")
-                def values(item): return {**item["result"].get("metrics", {}), **item["result"].get("comparison_metrics", {}), "parameter_complexity": len(item["reasoning"].get("changed_parameters", {}))}
-                def dominates(left, right):
-                    left_values, right_values, better = values(left), values(right), False
-                    for metric in (*higher, *lower):
-                        a, b = left_values.get(metric), right_values.get(metric)
-                        if not isinstance(a, (int, float)) or not isinstance(b, (int, float)): continue
-                        if (metric in higher and a < b) or (metric in lower and a > b): return False
-                        better = better or a != b
-                    return better
-                frontier = [item for item in qualified if not any(other["id"] != item["id"] and dominates(other, item) for other in qualified)]
-                selected = frontier[0] if len(frontier) == 1 else None
-                report = [{"candidate_id": item["id"], "group_metrics": item["result"].get("group_metrics", {}), "safety_metrics": item["result"].get("safety_metrics", {}), "comparison_metrics": item["result"].get("comparison_metrics", {}), "parameter_diff": item["reasoning"].get("changed_parameters", {}), "fixed_bad_cases": item["result"].get("target_bad_cases_fixed"), "remaining_bad_cases": item["result"].get("bad_case_count"), "regression": item["result"].get("regression"), "risks": item["reasoning"].get("risk")} for item in qualified]
-                result, candidate_id = {"status": "Recommended" if selected else "Needs Human Recommendation", "recommended_candidate": selected["id"] if selected else None, "why": "Pareto comparison uses only observed Group Metrics, TTFT, measured Token Cost, Retrieval Metrics and parameter complexity; Overall Score is display-only.", "round": current_round, "round_completion": completion, "not_selected": [item["id"] for item in qualified if selected and item["id"] != selected["id"]], "comparison": report, "pareto_frontier": [item["id"] for item in frontier]}, selected["id"] if selected else None
         with self.connection() as connection:
-            connection.execute("INSERT OR REPLACE INTO recommendations VALUES (?, ?, ?, ?, ?)", (experiment_id, candidate_id, result["status"], _json(result), _now()))
+            row = connection.execute('SELECT result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
+        state = _load(row[0], {}) if row else {}
+        confirmation = state.get('report_confirmation')
+        composite = state.get('composite')
+        qualified = [item for item in candidates if item['status'] == 'evaluated' and item['result'].get('qualification', {}).get('qualified')]
+        selected = None
+        if any(item['status'] == 'running' for item in candidates):
+            status = 'WAITING_FOR_ROUND_COMPLETION'
+        elif not confirmation:
+            status = 'Needs Report Confirmation' if qualified else 'No Qualified Candidate'
+        elif not composite:
+            status = 'Needs Composite'
+        elif composite['status'] == 'no_effective_composite':
+            status, selected = 'Recommended', confirmation['winner_id']
+        else:
+            d = self.candidate(composite['candidate_id'])
+            if d['status'] in {'generated', 'running'}:
+                status = 'Needs Composite Evaluation'
+            else:
+                promote = d['status'] == 'evaluated' and d['result'].get('qualification', {}).get('qualified') and d['result'].get('winner_comparison', {}).get('promote')
+                status, selected = 'Recommended', d['id'] if promote else confirmation['winner_id']
+        result = {'status': status, 'recommended_candidate': selected, 'report_confirmation': confirmation, 'composite': composite,
+                  'why': 'D must improve the confirmed winner without new failures; otherwise retain the qualified winner.',
+                  'pareto_frontier': [item['id'] for item in qualified if item['reasoning'].get('candidate_label') != 'D'],
+                  'comparison': [{'candidate_id': item['id'], 'status': item['status'], **item['result'], 'parameter_diff': item['reasoning'].get('changed_parameters', {})} for item in candidates]}
+        with self.connection() as connection:
+            connection.execute('INSERT OR REPLACE INTO recommendations VALUES (?, ?, ?, ?, ?)', (experiment_id, selected, status, _json(result), _now()))
         return result
 
     def select_recommendation(self, experiment_id: str, candidate_id: str, actor: str):
-        recommendation = self.refresh_recommendation(experiment_id)
-        if recommendation["status"] != "Needs Human Recommendation" or candidate_id not in recommendation.get("pareto_frontier", []):
-            raise ValueError("仅可从当前完整 Round 的 Pareto Frontier 进行人工推荐")
-        result = {**recommendation, "status": "Recommended", "recommended_candidate": candidate_id, "human_recommendation": {"actor": actor, "selected_at": _now()}}
-        with self.connection() as connection:
-            connection.execute("INSERT OR REPLACE INTO recommendations VALUES (?, ?, ?, ?, ?)", (experiment_id, candidate_id, result["status"], _json(result), _now()))
-            connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("recommendation", candidate_id, "approved", actor, _now()))
-        return result
+        self.confirm_experiment_report(experiment_id, candidate_id, actor)
+        return self.refresh_recommendation(experiment_id)
 
     def recommendation(self, experiment_id: str):
         with self.connection() as connection:
@@ -1250,16 +1348,14 @@ class GovernanceStore:
         return dict(row) if row else None
 
     def release_gate_error(self, candidate: dict) -> str | None:
-        if candidate.get("reasoning", {}).get("candidate_label") not in {"A", "B", "C"} and candidate.get("reasoning", {}).get("root_cause_cluster") != "Human Direct Release":
-            return "V1.1 仅允许完整 A/B/C 回合或受限 Direct Release 发布"
-        completion = self.round_completion(candidate)
-        if not completion["complete"]:
-            return "当前 Round A/B/C 尚未全部完成，不能进入最终 Recommendation / Release。"
-        if not completion.get("direct_or_legacy"):
-            recommendation = self.recommendation(candidate["experiment_id"])
-            result = (recommendation or {}).get("result", {})
-            if result.get("status") != "Recommended" or result.get("recommended_candidate") != candidate["id"]:
-                return "需要当前 Round 的最终 Recommendation"
+        if candidate.get('reasoning', {}).get('root_cause_cluster') == 'Human Direct Release':
+            return None
+        if candidate.get("reasoning", {}).get("candidate_label") not in {"A", "B", "C", 'D'}:
+            return '仅允许已验证方案发布'
+        recommendation = self.recommendation(candidate["experiment_id"])
+        result = (recommendation or {}).get("result", {})
+        if result.get("status") != "Recommended" or result.get("recommended_candidate") != candidate["id"]:
+            return "需要 Gate 2 报告确认及 D 决策完成"
         return None
 
     def release_state(self, candidate: dict) -> dict:
@@ -1414,7 +1510,7 @@ class GovernanceStore:
             return None
         items = [{**dict(candidate), "config": _load(candidate["config_json"], {}), "reasoning": _load(candidate["reasoning_json"], {}), "result": _load(candidate["result_json"], {})} for candidate in candidates]
         numbers = sorted({item.get("reasoning", {}).get("round") for item in items if isinstance(item.get("reasoning", {}).get("round"), int)})
-        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**item, "release_state": self.release_state(item)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(item["status"] == "evaluated" for item in items), "max": MAX_EVALS}}
+        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**item, "release_state": self.release_state(item)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(len(item['reasoning'].get('sandbox_attempts', [])) or int(item['status'] in {'evaluated', 'failed', 'running'}) for item in items), "max": MAX_EVALS, 'reserved_for_d': 1}}
 
     def latest_experiment(self):
         with self.connection() as connection:

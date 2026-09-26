@@ -132,7 +132,7 @@ class CandidateReviewExportTests(unittest.TestCase):
         for question_id in ids:
             self.passed_probe(question_id)
             self.store.record_qc(question_id, {"score": 90, "priority": "P2", "reason": "通过"}, "passed")
-        self.store.record_qc(ids[1], {"score": 72, "priority": "P1", "reason": "未通过"}, "failed")
+        self.store.record_qc(ids[1], {"score": 72, "priority": "P0", "reason": "未通过"}, "failed")
 
         with self.assertRaises(ValueError):
             self.store.review_generation_batch(ids, "reviewer", confirmed_manual_review=True)
