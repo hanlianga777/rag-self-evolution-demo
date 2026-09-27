@@ -6,7 +6,7 @@ import numpy as np
 
 from app.ai_service import AiService
 from app.policy import DEFAULT_PIPELINE_CONFIG
-from app.providers import ProviderTimeout
+from app.providers import ProviderTimeout, ProviderUnavailable
 
 
 class LiveProvider:
@@ -47,6 +47,17 @@ class RepairingGoldenProvider(GoldenProvider):
 
 
 class AiServiceTests(unittest.TestCase):
+    def test_negative_subtype_judge_is_bounded_json_and_rejects_invalid_schema(self):
+        provider = Mock(settings=LiveProvider.settings)
+        provider.complete.return_value = '{"matched":true,"detected_subtype":"safe_rejection","reason":"危险操作"}'
+        service = AiService(Mock(), Mock(), provider, False)
+        result = service.negative_subtype_check("损坏电池仍可使用吗？", [{"chunk_id": "C1"}], {"negative_subtype": "safe_rejection"})
+        self.assertTrue(result["matched"])
+        self.assertEqual(provider.complete.call_args.kwargs, {"json_mode": True, "temperature": 0})
+        provider.complete.return_value = '{"matched":"yes","detected_subtype":"safe_rejection","reason":"危险操作"}'
+        with self.assertRaises(ProviderUnavailable):
+            service.negative_subtype_check("损坏电池仍可使用吗？", [], {"negative_subtype": "safe_rejection"})
+
     def test_transient_provider_timeout_does_not_mark_provider_permanently_unavailable(self):
         class TimeoutProvider(LiveProvider):
             def complete(self, *_args, **_kwargs):

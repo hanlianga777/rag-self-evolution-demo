@@ -133,6 +133,71 @@ class PartialGenerationTests(unittest.TestCase):
         self.assertEqual(self.store.generation_run(run_id)["status"], "completed")
         self.assertEqual(self.store.generation_run(run_id)["artifacts"]["slot_audit"]["Q01"][-1]["source_chunk_ids"], ["C02"])
 
+    def test_one_click_refills_only_remaining_slots_for_at_most_three_rounds(self):
+        self.fail = {f"Q{i:02d}" for i in range(1, 11)}
+        run_id = self.store.start_generation_run("mock-provider")
+        _run_mini_generation(run_id, self.store, self.service, self.corpus)
+        fingerprint = self.store.generation_run(run_id)["artifacts"]["hard_validation"]["corpus_fingerprint"]
+        self.store.claim_regeneration(run_id, fingerprint)
+        self.calls.clear()
+        calls_by_slot = {}
+        def complete(_system, payload, **_kwargs):
+            data = json.loads(payload)
+            slot = data["coverage_slot"]
+            calls_by_slot[slot] = calls_by_slot.get(slot, 0) + 1
+            self.calls.append(slot)
+            number = int(slot[1:])
+            answer = "设备可断电维护" if number <= 4 or number <= 7 and calls_by_slot[slot] >= 3 or calls_by_slot[slot] >= 5 else "越界答案"
+            return json.dumps({"question": f"{slot} 如何维护设备？", "reference_answer": answer}, ensure_ascii=False)
+        self.provider.complete.side_effect = complete
+        with patch.object(self.store, "run_probe", return_value={"status": "passed"}), patch.object(self.store, "record_qc"):
+            _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
+        run = self.store.generation_run(run_id)
+        self.assertEqual(run["status"], "completed")
+        self.assertEqual([entry["remaining"] for entry in run["artifacts"]["hard_validation"]["refill_rounds"]], [6, 3, 0])
+        self.assertEqual(set(self.calls), {f"Q{i:02d}" for i in range(1, 11)})
+        self.assertEqual([calls_by_slot[f"Q{i:02d}"] for i in range(1, 11)], [1] * 4 + [3] * 3 + [5] * 3)
+        self.assertEqual([entry["attempt"] for entry in run["artifacts"]["slot_audit"]["Q08"]], list(range(1, 8)))
+        self.assertEqual(len(set(run["question_ids"])), 20)
+
+    def test_auto_refill_stops_after_a_round_without_improvement(self):
+        self.fail = {"Q01"}
+        run_id = self.store.start_generation_run("mock-provider")
+        _run_mini_generation(run_id, self.store, self.service, self.corpus)
+        run = self.store.generation_run(run_id)
+        self.store.claim_regeneration(run_id, run["artifacts"]["hard_validation"]["corpus_fingerprint"])
+        self.calls.clear()
+        _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
+        run = self.store.generation_run(run_id)
+        self.assertEqual(run["status"], "needs_regeneration")
+        self.assertEqual(self.calls, ["Q01", "Q01"])
+        self.assertEqual(run["operation_progress"]["refill_round"], 1)
+        self.assertEqual(run["operation_progress"]["refill_remaining"], 1)
+
+    def test_auto_refill_stops_at_three_rounds_even_when_some_slots_improve(self):
+        self.fail = {"Q01", "Q02", "Q03"}
+        run_id = self.store.start_generation_run("mock-provider")
+        _run_mini_generation(run_id, self.store, self.service, self.corpus)
+        fingerprint = self.store.generation_run(run_id)["artifacts"]["hard_validation"]["corpus_fingerprint"]
+        self.store.claim_regeneration(run_id, fingerprint)
+        self.calls.clear()
+        calls_by_slot = {}
+        def complete(_system, payload, **_kwargs):
+            slot = json.loads(payload)["coverage_slot"]
+            self.calls.append(slot)
+            calls_by_slot[slot] = calls_by_slot.get(slot, 0) + 1
+            answer = "设备可断电维护" if slot == "Q01" or slot == "Q02" and calls_by_slot[slot] >= 3 else "越界答案"
+            return json.dumps({"question": f"{slot} 如何维护设备？", "reference_answer": answer}, ensure_ascii=False)
+        self.provider.complete.side_effect = complete
+        _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
+        run = self.store.generation_run(run_id)
+        self.assertEqual(run["status"], "needs_regeneration")
+        self.assertEqual([item["remaining"] for item in run["artifacts"]["hard_validation"]["refill_rounds"]], [2, 1, 1])
+        self.assertEqual(calls_by_slot, {"Q01": 1, "Q02": 3, "Q03": 6})
+        self.assertEqual(run["operation_progress"]["refill_round"], 3)
+        self.store.claim_regeneration(run_id, fingerprint)
+        self.assertEqual(self.store.generation_run(run_id)["status"], "generating")
+
     def test_progress_uses_persisted_slots_and_processed_quality_units(self):
         run_id = self.store.start_generation_run("mock-provider")
         for index in range(1, 21):

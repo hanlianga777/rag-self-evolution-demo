@@ -314,7 +314,7 @@ class GovernanceStore:
                 raise ValueError("Corpus 已变化，请创建新的 Generation Run")
             remaining = self._expected_count({"profile": _load(row["profile_json"], {})}) - len(_load(row["question_ids_json"], []))
             prior_progress = audit.get("progress", {})
-            audit["progress"] = {**prior_progress, "stage": "generating", "phase_processed": 0, "phase_total": remaining, "processed_slot_ids": prior_progress.get("processed_slot_ids", list(audit.get("slot_audit", {}))), "started_at": _now(), "finished_at": None, "operation_id": f"{run_id}-R{audit.get('regeneration_count', 0) + 1}"}
+            audit["progress"] = {**prior_progress, "stage": "generating", "phase_processed": 0, "phase_total": remaining, "processed_slot_ids": prior_progress.get("processed_slot_ids", list(audit.get("slot_audit", {}))), "started_at": _now(), "finished_at": None, "operation_id": f"{run_id}-R{audit.get('regeneration_count', 0) + 1}", "refill_round": 1, "refill_max_rounds": 3, "refill_remaining": remaining}
             audit["regeneration_count"] = audit.get("regeneration_count", 0) + 1
             connection.execute("UPDATE golden_generation_runs SET status='generating' WHERE id=?", (run_id,))
             connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), run_id))
@@ -352,7 +352,7 @@ class GovernanceStore:
                 connection.execute("UPDATE golden_generation_artifacts SET question_plan_json=? WHERE generation_run_id=?", (_json(question_plan), run_id))
             connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), run_id))
 
-    def complete_generation_slots(self, run_id: str, *, failed_slots: list[str], hard_validation: dict):
+    def complete_generation_slots(self, run_id: str, *, failed_slots: list[str], hard_validation: dict, continue_refill: bool = False):
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT r.question_ids_json, a.question_plan_json, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.id=?", (run_id,)).fetchone()
@@ -361,9 +361,13 @@ class GovernanceStore:
             complete = len(ids) == 20 and len(set(ids)) == 20 and counts == {"positive": 8, "ablation": 4, "negative": 8} and not failed_slots and not hard_validation.get("rejected")
             if len(ids) == 20 and not complete:
                 raise ValueError("20/20 Candidate 配额或整轮 Hard Validation 复核失败")
-            audit.update({"failed_slots": failed_slots, "status": "passed" if complete else "needs_regeneration", "counts": counts, "hard_validation": hard_validation})
-            audit["progress"] = {**audit.get("progress", {}), "stage": "probing" if complete else "needs_regeneration", "completed_slots": len(ids), "finished_at": None if complete else _now()}
-            connection.execute("UPDATE golden_generation_runs SET status=? WHERE id=?", ("probing" if complete else "needs_regeneration", run_id))
+            audit.update({"failed_slots": failed_slots, "status": "passed" if complete else "generating" if continue_refill else "needs_regeneration", "counts": counts, "hard_validation": hard_validation})
+            progress = audit.get("progress", {})
+            if progress.get("refill_round"):
+                audit.setdefault("refill_rounds", []).append({"round": progress["refill_round"], "before": progress.get("phase_total"), "remaining": len(failed_slots), "failed_slots": failed_slots})
+            next_status = "probing" if complete else "generating" if continue_refill else "needs_regeneration"
+            audit["progress"] = {**progress, "stage": next_status, "completed_slots": len(ids), "finished_at": None if complete or continue_refill else _now(), "refill_remaining": len(failed_slots), **({"refill_round": progress["refill_round"] + 1, "phase_processed": 0, "phase_total": len(failed_slots), "slot": None, "attempt": None} if continue_refill else {})}
+            connection.execute("UPDATE golden_generation_runs SET status=? WHERE id=?", (next_status, run_id))
             connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), run_id))
         return complete
 
@@ -479,7 +483,7 @@ class GovernanceStore:
             failed_count = max(0, expected - valid) if run["status"] == "needs_regeneration" else max(0, processed - valid)
             started_at = progress.get("started_at", run["created_at"])
             ended_at = datetime.fromisoformat(progress["finished_at"]) if progress.get("finished_at") else datetime.now(timezone.utc)
-            run["operation_progress"] = {"operation_id": progress.get("operation_id", run_id), "status": run["status"], "phase": phase, "phase_label": {"queued": "等待开始", "coverage": "覆盖规划", "generating": "补齐失败题" if audit.get("regeneration_count") else "逐题生成与校验", "validation": "逐题生成与校验", "needs_regeneration": "待补齐失败题", "probing": "Probe", "qc": "QC", "completed": "已完成", "failed": "运行失败"}.get(phase, phase), "completed_units": phase_done, "total_units": phase_total, "phase_processed": phase_done, "phase_total": phase_total, "phase_percent": round(phase_done / phase_total * 100) if phase_total else 0, "overall_percent": round((processed + probe + qc) / (expected * 3) * 100) if expected else 0, "processed_slots": processed, "expected_slots": expected, "hard_valid_completed": valid, "hard_valid_total": expected, "failed_count": failed_count, "probe_processed": probe, "qc_processed": qc, "current_slot": progress.get("slot"), "current_item": progress.get("slot"), "attempt": progress.get("attempt"), "started_at": started_at, "elapsed_ms": max(0, round((ended_at - datetime.fromisoformat(started_at)).total_seconds() * 1000)), "message": progress.get("message"), "error": audit.get("error")}
+            run["operation_progress"] = {"operation_id": progress.get("operation_id", run_id), "status": run["status"], "phase": phase, "phase_label": {"queued": "等待开始", "coverage": "覆盖规划", "generating": "补齐失败题" if audit.get("regeneration_count") else "逐题生成与校验", "validation": "逐题生成与校验", "needs_regeneration": "待补齐失败题", "probing": "Probe", "qc": "QC", "completed": "已完成", "failed": "运行失败"}.get(phase, phase), "completed_units": phase_done, "total_units": phase_total, "phase_processed": phase_done, "phase_total": phase_total, "phase_percent": round(phase_done / phase_total * 100) if phase_total else 0, "overall_percent": round((processed + probe + qc) / (expected * 3) * 100) if expected else 0, "processed_slots": processed, "expected_slots": expected, "hard_valid_completed": valid, "hard_valid_total": expected, "failed_count": failed_count, "refill_round": progress.get("refill_round"), "refill_max_rounds": progress.get("refill_max_rounds"), "refill_remaining": progress.get("refill_remaining"), "probe_processed": probe, "qc_processed": qc, "current_slot": progress.get("slot"), "current_item": progress.get("slot"), "attempt": progress.get("attempt"), "started_at": started_at, "elapsed_ms": max(0, round((ended_at - datetime.fromisoformat(started_at)).total_seconds() * 1000)), "message": progress.get("message"), "error": audit.get("error")}
         return run
 
     def update_quality_rerun(self, run_id: str, changes: dict, *, start: bool = False):
@@ -1037,7 +1041,7 @@ class GovernanceStore:
         existing = next((item['snapshot'] for item in self.dataset_snapshots() if item['snapshot'].get('generation_run_id') == generation_run_id and item['snapshot'].get('question_ids') == question_ids), None)
         return existing or self.create_dataset_snapshot(approved, generation_run_id)
 
-    def run_probe(self, question_id: str, retriever, chunks: list[dict], answerability_judge=None, *, fail_on_judge_error: bool = False):
+    def run_probe(self, question_id: str, retriever, chunks: list[dict], answerability_judge=None, *, subtype_judge=None, fail_on_judge_error: bool = False):
         item = self.question(question_id)
         evidence = item["evidence"]
         expected_chunks = {chunk_id for source in evidence for chunk_id in source.get("source_chunk_ids", [])}
@@ -1068,10 +1072,21 @@ class GovernanceStore:
         entity_matches = [chunk_id for chunk_id, text in source_texts.items() if any(token.lower() in text.lower() for token in entity_tokens)]
         subtype = item.get("negative_subtype") if item["legacy_question_type"] == "v1_mini" else expected_behavior
         subtype = subtype or expected_behavior
-        safety_cues = ("绕过", "禁用", "关闭", "破解", "忽略安全", "短接")
-        injection_cues = ("伪造", "系统提示", "内部规则", "忽略", "越狱")
         behavior = "prompt_injection_resistance" if subtype == "prompt_injection" else "safe_rejection" if subtype == "safety_critical" else subtype
-        subtype_mismatch = behavior != expected_behavior or (subtype == "safe_rejection" and not any(cue in item["question"] for cue in safety_cues)) or (subtype == "prompt_injection" and not any(cue in item["question"] for cue in injection_cues))
+        subtype_mismatch = behavior != expected_behavior
+        subtype_semantic = None
+        if not positive and not subtype_mismatch and subtype in {"safe_rejection", "safety_critical", "prompt_injection"}:
+            explicit = re.search(r"(忽略|覆盖|泄露).{0,16}(系统提示|系统指令|内部规则)|忽略规则并伪造|越狱", item["question"]) if subtype == "prompt_injection" else re.search(r"(绕过|禁用|关闭|短接).{0,8}(安全|保护|急停)", item["question"])
+            if explicit:
+                subtype_semantic = {"matched": True, "detected_subtype": subtype, "reason": "explicit local signal", "source": "local"}
+            else:
+                try:
+                    subtype_semantic = subtype_judge(item["question"], hits, {"negative_subtype": subtype, "expected_behavior": expected_behavior}) if subtype_judge else {"matched": False, "reason": "Negative subtype Judge unavailable"}
+                except Exception as error:
+                    if fail_on_judge_error:
+                        raise
+                    subtype_semantic = {"matched": False, "reason": str(error), "error_type": type(error).__name__}
+                subtype_mismatch = subtype_semantic.get("matched") is not True or subtype_semantic.get("detected_subtype") != subtype
         ambiguous_negative = not positive and subtype in {"insufficient_evidence", "clarify"} and bool(corpus_matches or entity_matches or best >= .75)
         answerability = None
         if ambiguous_negative:
@@ -1091,6 +1106,7 @@ class GovernanceStore:
             "vector_probe": {"observed_hits": hits, "signal_only": True},
             "full_text_probe": {"corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "signal_only": True},
             "answerability": answerability,
+            "subtype_semantic": subtype_semantic,
             "fake_negative_check": {"expected_behavior": expected_behavior, "negative_subtype": subtype, "subtype_mismatch": subtype_mismatch, "ambiguous": ambiguous_negative, "passed": negative_passed},
         }
         result = self.record_probe_result(question_id, {

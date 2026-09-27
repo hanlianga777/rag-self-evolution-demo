@@ -385,29 +385,37 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
 
     try:
         chunks = run_corpus.chunks()
-        if regenerate:
-            run = run_store.generation_run(run_id)
-            by_id = {chunk["chunk_id"]: chunk for chunk in chunks}
-            passed = [run_store.question(question_id) for question_id in run["question_ids"]]
-            existing = [{"coverage_slot": row["raw"]["coverage_slot"], "test_category": row["test_category"], "question": row["question"], "reference_answer": row["reference_answer"], "evidence": row["evidence"], "expected_behavior": row["raw"].get("expected_behavior"), "negative_subtype": row["negative_subtype"], "ablation_attribute": row["raw"].get("ablation_attribute")} for row in passed]
-            prior_audit = run["artifacts"]["slot_audit"]
-            plan = []
-            for slot in run["artifacts"]["coverage_plan"]:
-                source_ids = slot.get("material_chunk_ids") or slot.get("evidence_chunk_ids") or []
-                if not source_ids or any(chunk_id not in by_id for chunk_id in source_ids):
-                    raise ValueError(f"{slot['slot']} 原始 Coverage 材料不可用")
-                if slot["slot"] in prior_audit and len(prior_audit[slot["slot"]]) > 2 and prior_audit[slot["slot"]][-1]["validation_error"]:
-                    original = by_id[source_ids[0]]
-                    alternatives = [chunk for chunk in chunks if chunk["chunk_id"] not in source_ids and (chunk.get("document_id") == original.get("document_id") or original.get("product") and chunk.get("product") == original.get("product"))]
-                    alternative = next(iter(sorted(alternatives, key=lambda chunk: chunk.get("document_id") != original.get("document_id"))), None)
-                    if alternative:
-                        source_ids = [alternative["chunk_id"]]
-                        slot = {**slot, "material_chunk_ids": source_ids, "evidence_chunk_ids": source_ids if slot["test_category"] != "negative" else [], "selected_reason": "same_product_retry", "structured_type": None}
-                plan.append({**slot, "sources": [by_id[chunk_id] for chunk_id in source_ids]})
-        else:
-            plan = existing = prior_audit = None
-        generated = service.generate_mini_golden(chunks, on_progress=on_progress, plan=plan, existing=existing, prior_audit=prior_audit) if regenerate else service.generate_mini_golden(chunks, on_progress=on_progress)
-        if not run_store.complete_generation_slots(run_id, failed_slots=generated.get("failed_slots", []), hard_validation=generated["hard_validation"]):
+        complete = False
+        for round_number in range(1, 4 if regenerate else 2):
+            if regenerate:
+                run = run_store.generation_run(run_id)
+                remaining_before = len(run["artifacts"]["coverage_plan"]) - len(run["question_ids"])
+                by_id = {chunk["chunk_id"]: chunk for chunk in chunks}
+                passed = [run_store.question(question_id) for question_id in run["question_ids"]]
+                existing = [{"coverage_slot": row["raw"]["coverage_slot"], "test_category": row["test_category"], "question": row["question"], "reference_answer": row["reference_answer"], "evidence": row["evidence"], "expected_behavior": row["raw"].get("expected_behavior"), "negative_subtype": row["negative_subtype"], "ablation_attribute": row["raw"].get("ablation_attribute")} for row in passed]
+                prior_audit = run["artifacts"]["slot_audit"]
+                plan = []
+                for slot in run["artifacts"]["coverage_plan"]:
+                    source_ids = slot.get("material_chunk_ids") or slot.get("evidence_chunk_ids") or []
+                    if not source_ids or any(chunk_id not in by_id for chunk_id in source_ids):
+                        raise ValueError(f"{slot['slot']} 原始 Coverage 材料不可用")
+                    if slot["slot"] in prior_audit and len(prior_audit[slot["slot"]]) > 2 and prior_audit[slot["slot"]][-1]["validation_error"]:
+                        original = by_id[source_ids[0]]
+                        alternatives = [chunk for chunk in chunks if chunk["chunk_id"] not in source_ids and (chunk.get("document_id") == original.get("document_id") or original.get("product") and chunk.get("product") == original.get("product"))]
+                        alternative = next(iter(sorted(alternatives, key=lambda chunk: chunk.get("document_id") != original.get("document_id"))), None)
+                        if alternative:
+                            source_ids = [alternative["chunk_id"]]
+                            slot = {**slot, "material_chunk_ids": source_ids, "evidence_chunk_ids": source_ids if slot["test_category"] != "negative" else [], "selected_reason": "same_product_retry", "structured_type": None}
+                    plan.append({**slot, "sources": [by_id[chunk_id] for chunk_id in source_ids]})
+                generated = service.generate_mini_golden(chunks, on_progress=on_progress, plan=plan, existing=existing, prior_audit=prior_audit)
+            else:
+                generated = service.generate_mini_golden(chunks, on_progress=on_progress)
+            failed_slots = generated.get("failed_slots", [])
+            continue_refill = regenerate and round_number < 3 and 0 < len(failed_slots) < remaining_before
+            complete = run_store.complete_generation_slots(run_id, failed_slots=failed_slots, hard_validation=generated["hard_validation"], continue_refill=continue_refill)
+            if complete or not continue_refill:
+                break
+        if not complete:
             return
         saved = [run_store.question(question_id) for question_id in run_store.generation_run(run_id)["question_ids"]]
         stage = "probing"
@@ -415,7 +423,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
         qc_completed = qc_skipped = 0
         for index, candidate in enumerate(saved, start=1):
             stage = "probing"
-            probe = run_store.run_probe(candidate["id"], service.retriever, run_corpus.chunks(), service.answerability_check)
+            probe = run_store.run_probe(candidate["id"], service.retriever, run_corpus.chunks(), service.answerability_check, subtype_judge=service.negative_subtype_check)
             run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "slot": candidate["raw"].get("coverage_slot"), "probe_completed": index})
             if probe["status"] == "passed":
                 stage = "qc"
@@ -455,7 +463,7 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
             run_store.update_quality_rerun(run_id, {**counters, "stage": "probe", "slot": slot, "slots": slots})
             try:
                 run_store.reset_qc_for_rerun(question_id)
-                probe = run_store.run_probe(question_id, service.retriever, chunks, service.answerability_check, fail_on_judge_error=True)
+                probe = run_store.run_probe(question_id, service.retriever, chunks, service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=True)
                 counters["probe_passed" if probe["status"] == "passed" else "probe_failed"] += 1
                 slots[slot] = {"question_id": question_id, "probe": probe["status"], "classification": probe["classification"], "probe_reason": probe["reason"]}
                 if probe["status"] == "passed":
@@ -683,7 +691,7 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
             else:
                 run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index - 1, "total": len(run["question_ids"])}, quality_results=results)
                 run_store.reset_qc_for_rerun(item_id)
-                probe = _revision_attempt(run_store, revision_id, "probe", service, lambda: run_store.run_probe(item_id, service.retriever, chunks, service.answerability_check, fail_on_judge_error=True))
+                probe = _revision_attempt(run_store, revision_id, "probe", service, lambda: run_store.run_probe(item_id, service.retriever, chunks, service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=True))
                 results[item_id] = {"probe": probe["status"], "probe_reason": probe.get("reason")}
             if completed == "qc":
                 results[item_id] = {"probe": "passed", "probe_reason": (run.get("quality_results") or {}).get(item_id, {}).get("probe_reason")}
@@ -752,7 +760,7 @@ def update_question(question_id: str, payload: QuestionUpdateRequest):
 def probe_question(question_id: str):
     try:
         store.require_generation_ready(question_id)
-        result = store.run_probe(question_id, ai_service.retriever, corpus.chunks(), ai_service.answerability_check)
+        result = store.run_probe(question_id, ai_service.retriever, corpus.chunks(), ai_service.answerability_check, subtype_judge=ai_service.negative_subtype_check)
         return {"status": store.question(question_id)["probe_status"], **result}
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")

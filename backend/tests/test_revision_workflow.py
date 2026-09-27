@@ -887,7 +887,7 @@ class RevisionWorkflowTests(unittest.TestCase):
             if len(calls) <= 2:
                 raise ProviderTimeout("DeepSeek 请求超时，请重试")
             return {"score": 95, "priority": "P2", "reason": "通过"}
-        service = SimpleNamespace(retriever=retriever, answerability_check=lambda *_args: {}, quality_check=qc, model="fixture")
+        service = SimpleNamespace(retriever=retriever, answerability_check=lambda *_args: {}, negative_subtype_check=None, quality_check=qc, model="fixture")
         main._run_revision_quality(run["id"], self.store, service, SimpleNamespace(chunks=lambda: self.chunks))
         failed = self.store.revision_run(run["id"])
         self.assertEqual(failed["status"], "failed_quality")

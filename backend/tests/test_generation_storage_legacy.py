@@ -178,6 +178,7 @@ class LegacyGenerationStorageTests(unittest.TestCase):
             model = "test-model"
             retriever = None
             answerability_check = None
+            negative_subtype_check = None
 
             def generate_mini_golden(self, _chunks, on_progress):
                 candidates = mini_candidates()
