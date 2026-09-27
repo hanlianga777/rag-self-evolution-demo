@@ -214,3 +214,10 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 ## V1.2 交付验收记录（2026-09-27）
 
 实现、确定性／Fixture 与副本保护检查完成；共享答案锚点同时覆盖 Generation、Revision 和 Probe，不能借 QC P0 接受豁免。隔离真实 Run 在 Golden 质量阶段阻塞，未推进 Gate 1，不宣称真实端到端完成。详见 [验证报告](V1_2_VERIFICATION.md)。
+
+## V1.2 Golden Generation 局部补题（2026-09-27）
+
+- 新 Run 逐 Slot 校验并事务写入合格 Candidate、活动 ID 和 attempt 审计；单题失败保留已通过 Slot，进入 `needs_regeneration`。
+- 手动补题仅处理失败或缺失 Slot；每次每题最多两次，先复用 Coverage 材料，持续失败后换同产品真实材料。Corpus 指纹不符时拒绝补题。
+- 20/20 且 8/4/8 复核通过后才运行 Probe / QC，之后开放人工审核与 Gate 1；部分题只读，正式导出仍要求完整 20 题。旧失败 Run 保持历史原状。
+- Run 进度以已持久化 Hard Validation、已处理 Probe、已完成或跳过 QC 计数；整体分母为 60，不显示估算百分比。

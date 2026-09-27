@@ -78,6 +78,8 @@ Golden Dataset 是 Evaluation 测试资产，不是知识库的附属功能，�
 
 `Knowledge Chunk Pool → Embedding / Coverage Clustering → Coverage Planning → Question Planning → Question Generation → Hard Validation → Probe → QC → Human Review → Approved Golden → Golden Snapshot`
 
+V1.2 新 Run 对每个 Slot 最多自动尝试两次；通过单题 Hard Validation 后，在同一 SQLite 事务中写入 Candidate、活动题目 ID 和 attempt 审计。同一 Run / Slot 仅允许一个活动 Candidate。未凑齐 20 题时状态为 `needs_regeneration`，合格题仅可查看；局部补题只调用失败或缺失 Slot，先沿用原 Coverage 材料及失败反馈，后续持续失败再换同产品真实 Corpus 材料。Corpus 指纹变化时必须新建 Run。20/20 且 8/4/8 复核通过后才进入 Probe、QC 与人工审核；系统异常记为 `failed`。旧 Run 不回填、不补题。
+
 生成必须 Coverage-Aware，避免题目集中于少数文档或 Chunk、问题扎堆、简单改写重复、Fake Negative、证据缺失及答案与 Evidence 不一致。
 
 优先由程序完成确定性工作，例如 Structured Fact、Aggregation、Bridge / Cross-Chunk、Entity → Attribute → Value 的 Question Slot；LLM 用于语义生成、表达变化与复杂 Slot 填充，而非承担全部逻辑。
