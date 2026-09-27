@@ -28,8 +28,8 @@ grep -Fq 'while true' "$api_supervisor" || fail "API does not restart after an u
 grep -Fq 'while true' "$web_supervisor" || fail "web does not restart after an unexpected exit"
 grep -Fq 'nohup "$runner"' "$starter" || fail "services are not detached from the Finder terminal"
 grep -Fq 'RAG_RESTART' "$starter" || fail "Finder refresh cannot restart recorded services"
-grep -Fq 'RAG_RESTART=1' "$root/scripts/login_start.command" || fail "login bootstrap does not refresh recorded services"
-if grep -Fq 'start_detached_services.sh' "$root/start_demo.command"; then fail "Finder launcher bypasses the login bootstrap and can race it"; fi
+grep -Fq 'RAG_RESTART=0' "$root/scripts/login_start.command" || fail "login bootstrap does not ensure healthy services"
+grep -Fq 'start_detached_services.sh' "$root/start_demo.command" || fail "Finder launcher does not ensure services"
 grep -Fq 'com.zhanghaohan.rag-evolution.login' "$installer" || fail "login LaunchAgent label is missing"
 grep -Fq '<string>Terminal</string>' "$installer" || fail "login LaunchAgent must retain Documents permission via Terminal"
 grep -Fq '<key>RunAtLoad</key>' "$installer" || fail "LaunchAgents do not start at login"
