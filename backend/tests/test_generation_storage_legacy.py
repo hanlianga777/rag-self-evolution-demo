@@ -41,7 +41,7 @@ class LegacyGenerationStorageTests(unittest.TestCase):
         store.interrupt_generation_runs()
 
         old = store.generation_run(run_id)
-        self.assertEqual(old["status"], "failed")
+        self.assertEqual(old["status"], "needs_regeneration")
         self.assertEqual(old["artifacts"]["hard_validation"]["failed_stage"], "generating")
         self.assertEqual(old["artifacts"]["hard_validation"]["progress"]["completed_slots"], 2)
         self.assertEqual(old["question_ids"], [])
@@ -165,8 +165,7 @@ class LegacyGenerationStorageTests(unittest.TestCase):
         _run_mini_generation(run_id, store, GeneratedService(), EmptyCorpus())
 
         run = store.generation_run(run_id)
-        self.assertEqual(run["status"], "failed")
-        self.assertEqual(run["artifacts"]["hard_validation"]["failed_stage"], "candidate_persistence")
+        self.assertEqual(run["status"], "needs_regeneration")
         self.assertEqual(run["question_ids"], [])
         self.assertEqual([item for item in store.questions() if item["legacy_question_type"] == "v1_mini"], [])
 
@@ -180,7 +179,12 @@ class LegacyGenerationStorageTests(unittest.TestCase):
             answerability_check = None
 
             def generate_mini_golden(self, _chunks, on_progress):
-                return {"status": "passed", "candidates": mini_candidates(), "coverage_plan": [], "hard_validation": {}, "slot_audit": {}}
+                candidates = mini_candidates()
+                on_progress({"stage": "coverage", "coverage_plan": []})
+                for index, candidate in enumerate(candidates, 1):
+                    candidate["coverage_slot"] = f"Q{index:02d}"
+                    on_progress({"stage": "generating", "slot": candidate["coverage_slot"], "attempt": 1, "slot_audit": {candidate["coverage_slot"]: [{"attempt": 1, "validation_error": None}]}, "candidate": candidate})
+                return {"status": "passed", "candidates": candidates, "coverage_plan": [], "hard_validation": {}, "slot_audit": {}}
 
             def quality_check(self, _candidate):
                 return {"score": 90}
@@ -197,7 +201,7 @@ class LegacyGenerationStorageTests(unittest.TestCase):
             _run_mini_generation(run_id, store, GeneratedService(), EmptyCorpus())
 
         run = store.generation_run(run_id)
-        self.assertEqual(run["status"], "completed")
+        self.assertEqual(run["status"], "completed", run["artifacts"]["hard_validation"].get("error"))
         self.assertEqual(run["artifacts"]["hard_validation"]["progress"]["qc_completed"], 19)
         self.assertEqual(run["artifacts"]["hard_validation"]["progress"]["qc_skipped"], 1)
 

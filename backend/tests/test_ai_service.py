@@ -99,7 +99,7 @@ class AiServiceTests(unittest.TestCase):
         chunks = self._chunks()
         generated = AiService(Mock(), Mock(), RepairingGoldenProvider(failures=3), False).generate_mini_golden(chunks, embeddings=self._embeddings(chunks))
 
-        self.assertEqual(generated["status"], "failed")
+        self.assertEqual(generated["status"], "needs_regeneration")
         self.assertEqual(generated["failed_slots"], ["Q01"])
         self.assertEqual(len(generated["slot_audit"]["Q01"]), 2)
 

@@ -350,21 +350,56 @@ def generate_mini_golden():
     return {"run_id": run_id, "status": "queued"}
 
 
-def _run_mini_generation(run_id, run_store, service, run_corpus):
+@app.post("/api/governance/generation-runs/{generation_run_id}/regenerate-failed", status_code=202, dependencies=[Depends(require_trusted_origin)])
+def regenerate_failed(generation_run_id: str):
+    try:
+        store.claim_regeneration(generation_run_id, current_manifest()["sources"])
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Generation run not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    threading.Thread(target=_run_mini_generation, args=(generation_run_id, store, ai_service, corpus), kwargs={"regenerate": True}, daemon=True).start()
+    return {"run_id": generation_run_id, "status": "generating"}
+
+
+def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=False):
     stage = "generation"
 
     def on_progress(event):
         nonlocal stage
         stage = event["stage"]
-        run_store.update_generation_run(run_id, status=stage, coverage_plan=event.get("coverage_plan"), validation={key: event[key] for key in ("slot_audit", "valid_slots", "failed_slots", "hard_validation") if key in event}, progress={key: event[key] for key in ("stage", "slot", "attempt", "completed_slots") if key in event})
+        if stage == "generating":
+            run_store.persist_generation_attempt(run_id, event.get("candidate"), event["slot_audit"], slot=event["slot"], attempt=event["attempt"], model=service.model)
+        else:
+            run_store.update_generation_run(run_id, status=stage, coverage_plan=event.get("coverage_plan"), progress={key: event[key] for key in ("stage", "slot", "attempt", "completed_slots") if key in event})
 
     try:
-        generated = service.generate_mini_golden(run_corpus.chunks(), on_progress=on_progress)
-        if generated["status"] == "failed":
-            run_store.update_generation_run(run_id, status="failed", validation={**generated["hard_validation"], "slot_audit": generated["slot_audit"], "failed_slots": generated["failed_slots"], "failed_stage": stage}, progress={"stage": "failed"})
+        chunks = run_corpus.chunks()
+        if regenerate:
+            run = run_store.generation_run(run_id)
+            by_id = {chunk["chunk_id"]: chunk for chunk in chunks}
+            passed = [run_store.question(question_id) for question_id in run["question_ids"]]
+            existing = [{"coverage_slot": row["raw"]["coverage_slot"], "test_category": row["test_category"], "question": row["question"], "reference_answer": row["reference_answer"], "evidence": row["evidence"], "expected_behavior": row["raw"].get("expected_behavior"), "negative_subtype": row["negative_subtype"], "ablation_attribute": row["raw"].get("ablation_attribute")} for row in passed]
+            prior_audit = run["artifacts"]["slot_audit"]
+            plan = []
+            for slot in run["artifacts"]["coverage_plan"]:
+                source_ids = slot.get("material_chunk_ids") or slot.get("evidence_chunk_ids") or []
+                if not source_ids or any(chunk_id not in by_id for chunk_id in source_ids):
+                    raise ValueError(f"{slot['slot']} 原始 Coverage 材料不可用")
+                if slot["slot"] in prior_audit and len(prior_audit[slot["slot"]]) > 2 and prior_audit[slot["slot"]][-1]["validation_error"]:
+                    original = by_id[source_ids[0]]
+                    alternatives = [chunk for chunk in chunks if chunk["chunk_id"] not in source_ids and (chunk.get("document_id") == original.get("document_id") or original.get("product") and chunk.get("product") == original.get("product"))]
+                    alternative = next(iter(sorted(alternatives, key=lambda chunk: chunk.get("document_id") != original.get("document_id"))), None)
+                    if alternative:
+                        source_ids = [alternative["chunk_id"]]
+                        slot = {**slot, "material_chunk_ids": source_ids, "evidence_chunk_ids": source_ids if slot["test_category"] != "negative" else [], "selected_reason": "same_product_retry", "structured_type": None}
+                plan.append({**slot, "sources": [by_id[chunk_id] for chunk_id in source_ids]})
+        else:
+            plan = existing = prior_audit = None
+        generated = service.generate_mini_golden(chunks, on_progress=on_progress, plan=plan, existing=existing, prior_audit=prior_audit) if regenerate else service.generate_mini_golden(chunks, on_progress=on_progress)
+        if not run_store.complete_generation_slots(run_id, failed_slots=generated.get("failed_slots", []), hard_validation=generated["hard_validation"]):
             return
-        stage = "candidate_persistence"
-        saved = run_store.save_mini_golden_candidates(generated["candidates"], service.model, coverage_plan=generated["coverage_plan"], hard_validation=generated["hard_validation"], slot_audit=generated["slot_audit"], run_id=run_id)
+        saved = [run_store.question(question_id) for question_id in run_store.generation_run(run_id)["question_ids"]]
         stage = "probing"
         run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "probe_completed": 0, "qc_skipped": 0})
         qc_completed = qc_skipped = 0
@@ -706,15 +741,19 @@ def update_question(question_id: str, payload: QuestionUpdateRequest):
 @app.post("/api/governance/questions/{question_id}/probe", dependencies=[Depends(require_trusted_origin)])
 def probe_question(question_id: str):
     try:
+        store.require_generation_ready(question_id)
         result = store.run_probe(question_id, ai_service.retriever, corpus.chunks(), ai_service.answerability_check)
         return {"status": store.question(question_id)["probe_status"], **result}
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.post("/api/governance/questions/{question_id}/qc", dependencies=[Depends(require_trusted_origin)])
 def qc_question(question_id: str):
     try:
+        store.require_generation_ready(question_id)
         item = store.question(question_id)
         if item["probe_status"] != "probe_passed":
             raise HTTPException(status_code=409, detail="Probe Passed 后才能运行 QC")

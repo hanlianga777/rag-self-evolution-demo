@@ -265,35 +265,46 @@ class AiService:
                 on_progress(index, len(ids), item_id, drafts)
         return drafts
 
-    def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None) -> dict:
+    def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None) -> dict:
         """Generate a coverage-planned V1 Mini; approval remains human-only."""
         if not self.live_enabled:
             raise ProviderUnavailable("未配置 DEEPSEEK_API_KEY，无法生成 Golden Candidate")
         if not chunks:
             raise ProviderUnavailable("知识库没有可用于 Golden Generation 的 Chunk")
-        plan, candidates, slot_audit, failed_slots = self._mini_coverage_plan(chunks, embeddings if embeddings is not None else self._indexed_embeddings(chunks)), [], {}, []
-        coverage = [{key: value for key, value in slot.items() if key != "sources"} for slot in plan]
+        plan = plan if plan is not None else self._mini_coverage_plan(chunks, embeddings if embeddings is not None else self._indexed_embeddings(chunks))
+        candidates, slot_audit, failed_slots = list(existing or []), dict(prior_audit or {}), []
+        coverage = [{**{key: value for key, value in slot.items() if key != "sources"}, "material_chunk_ids": [source["chunk_id"] for source in slot["sources"]]} for slot in plan]
         if on_progress:
             on_progress({"stage": "coverage", "coverage_plan": coverage})
         for slot in plan:
-            attempts, candidate = [], None
-            for attempt in range(1, 3):
+            attempts, candidate = list(slot_audit.get(slot["slot"], [])), None
+            if any(item.get("coverage_slot") == slot["slot"] for item in candidates):
+                continue
+            for _ in range(2):
+                attempt = len(attempts) + 1
                 instruction = self._slot_instruction(slot, attempts[-1]["validation_error"] if attempts else None)
                 source_payload = [{"chunk_id": chunk["chunk_id"], "section": chunk.get("section_path"), "source_text": chunk.get("chunk_text", chunk.get("text", ""))} for chunk in slot["sources"]]
-                error = None
+                error = error_type = None
+                response = None
+                generated = {}
                 try:
-                    generated = json.loads(self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload, "prior_questions": [item["question"] for item in candidates]}, ensure_ascii=False), json_mode=True))
+                    response = self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload, "prior_questions": [item["question"] for item in candidates]}, ensure_ascii=False), json_mode=True)
+                    generated = json.loads(response)
+                    if not isinstance(generated, dict):
+                        generated = {}
+                        raise ValueError("invalid JSON object")
                     candidate = self._slot_candidate(slot, generated, instruction)
                     errors = self._candidate_errors(candidate, chunks, {"".join(str(item.get("question") or "").lower().split()) for item in candidates})
                     error = "; ".join(errors) if errors else None
                 except (json.JSONDecodeError, ProviderUnavailable, ValueError) as caught:
                     error = "invalid JSON" if isinstance(caught, json.JSONDecodeError) else str(caught)
-                attempts.append({"slot": slot["slot"], "attempt": attempt, "validation_error": error, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction})
+                    error_type = type(caught).__name__
+                attempts.append({"slot": slot["slot"], "attempt": attempt, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "source_chunk_ids": [source["chunk_id"] for source in slot["sources"]] if slot["test_category"] != "negative" else [], "selected_evidence": [{"chunk_id": source["chunk_id"], "document_id": source.get("document_id"), "document_name": source.get("document_name"), "chunk_text": source.get("chunk_text", source.get("text", ""))} for source in slot["sources"]], "test_category": slot["test_category"], "negative_subtype": slot.get("negative_subtype"), "ablation_attribute": slot.get("ablation_attribute"), "expected_behavior": slot.get("expected_behavior"), "structured_type": slot.get("structured_type"), "source_positive_slot": slot.get("source_positive_slot"), "validation_error": error, "error_type": error_type, "response_preview": response[:500] if error and response and not generated else None, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction})
                 slot_audit[slot["slot"]] = attempts
                 if not error:
                     candidates.append(candidate)
                 if on_progress:
-                    on_progress({"stage": "generating", "slot": slot["slot"], "attempt": attempt, "completed_slots": len(slot_audit) - (1 if error and attempt < 2 else 0), "slot_audit": slot_audit.copy(), "valid_slots": candidates.copy()})
+                    on_progress({"stage": "generating", "slot": slot["slot"], "attempt": attempt, "completed_slots": len(candidates), "slot_audit": slot_audit.copy(), "candidate": candidate if not error else None})
                 if not error:
                     break
             slot_audit[slot["slot"]] = attempts
@@ -301,7 +312,7 @@ class AiService:
                 failed_slots.append(slot["slot"])
         validation = self._hard_validate(candidates, chunks)
         expected_count = len(plan)
-        status = "candidate_generated" if not failed_slots and len(candidates) == expected_count else "failed"
+        status = "candidate_generated" if not failed_slots and len(candidates) == expected_count else "needs_regeneration"
         if on_progress:
             on_progress({"stage": "validation", "completed_slots": expected_count, "slot_audit": slot_audit, "valid_slots": candidates, "failed_slots": failed_slots, "hard_validation": validation})
         return {"status": status, "profile": {"positive": 8, "ablation": 4, "negative": 8, "expected_count": expected_count}, "coverage_plan": coverage, "candidates": candidates if status == "candidate_generated" else [], "valid_slots": candidates, "failed_slots": failed_slots, "slot_audit": slot_audit, "hard_validation": {**validation, "status": "passed" if status == "candidate_generated" else "failed"}}
