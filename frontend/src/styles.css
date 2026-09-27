@@ -162,6 +162,10 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .review-question { display: -webkit-box; line-clamp: 2; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .review-batch { align-items: center; border-top: 1px solid var(--line-soft); display: flex; flex: none; flex-wrap: wrap; font-size: 12px; gap: 8px; padding-top: 10px; }
 .review-batch .muted { font-size: 12px; }
+.gate-one-action .primary { margin-left: auto; }
+.run-details { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+.run-details summary { cursor: pointer; width: fit-content; }
+.run-details .run-summary { margin: 8px 0 0; }
 .export-menu { position: relative; }
 .export-menu summary { cursor: pointer; list-style: none; white-space: nowrap; }
 .export-menu summary::-webkit-details-marker { display: none; }
