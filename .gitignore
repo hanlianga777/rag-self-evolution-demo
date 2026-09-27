@@ -17,6 +17,7 @@ backend/data/archived_documents/
 backend/data/pending_uploads/
 backend/data/corpus_operations/
 backend/data/corpus_state.json
+backend/data/architecture/
 .demo-logs/
 __pycache__/
 *.py[cod]

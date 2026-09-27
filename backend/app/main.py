@@ -10,11 +10,12 @@ from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from .ai_service import AiService
+from . import architecture_assets
 from .corpus import CorpusStore, UPLOADS_DIR, current_manifest
 from .corpus_management import CorpusManager
 from .config import load_settings
@@ -136,6 +137,38 @@ def require_trusted_origin(request: Request):
     origin = request.headers.get("origin")
     if origin is not None and origin not in TRUSTED_ORIGINS:
         raise HTTPException(status_code=403, detail="Untrusted Origin")
+
+
+@app.get("/api/overview/architecture/{slot}")
+def architecture_metadata(slot: Literal["business", "technical"]):
+    path = architecture_assets.asset_path(slot)
+    return {"slot": slot, "image_url": f"/api/overview/architecture/{slot}/image?v={path.stat().st_mtime_ns}" if path else None}
+
+
+@app.get("/api/overview/architecture/{slot}/image")
+def architecture_image(slot: Literal["business", "technical"]):
+    path = architecture_assets.asset_path(slot)
+    if path is None:
+        raise HTTPException(status_code=404, detail="尚未上传架构图")
+    return FileResponse(path, media_type=architecture_assets.FORMATS[path.suffix[1:]])
+
+
+@app.put("/api/overview/architecture/{slot}", dependencies=[Depends(require_trusted_origin)])
+async def architecture_upload(slot: Literal["business", "technical"], request: Request):
+    if request.headers.get("content-length") and int(request.headers["content-length"]) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="图片不能超过 10 MB")
+    data = await request.body()
+    try:
+        architecture_assets.save_asset(slot, data)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return architecture_metadata(slot)
+
+
+@app.delete("/api/overview/architecture/{slot}", dependencies=[Depends(require_trusted_origin)])
+def architecture_delete(slot: Literal["business", "technical"]):
+    architecture_assets.delete_asset(slot)
+    return architecture_metadata(slot)
 
 
 @app.get("/api/overview")

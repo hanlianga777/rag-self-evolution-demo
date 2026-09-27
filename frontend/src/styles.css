@@ -84,7 +84,11 @@ button, a, summary { touch-action: manipulation; }
 .next-action p { color: #455970; line-height: 1.5; margin: 0; }
 .next-action .primary { flex: none; }
 .overview-page > .panel { margin: 0; }
-.overview-page > .panel:last-child { background: transparent; border: 0; padding: 4px 0; }
+.overview-page:not(.architecture-view) > .panel:last-child { background: transparent; border: 0; padding: 4px 0; }
+.architecture-view > .panel { display: flex; flex-direction: column; min-height: 0; }
+.architecture-image-area { align-items: center; display: flex; flex: 1; justify-content: center; min-height: 0; }
+.architecture-image-area img { display: block; max-height: 100%; max-width: 100%; object-fit: contain; }
+.visually-hidden { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
 .production-details { display: grid; gap: 20px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; }
 .production-details div { border-left: 1px solid var(--line); padding-left: 14px; }
 .production-details dt { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
@@ -435,7 +439,9 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
   .page-title, .metrics-grid, .page > .panel, .page > .tabs { margin: 0; }
   .page > .panel { min-height: 0; overflow: auto; }
   .tabs { min-height: 43px; }
-  .overview-page { display: grid; gap: 14px; grid-template-rows: auto auto auto auto minmax(0, 1fr); }
+  .overview-page { display: grid; gap: 14px; grid-template-rows: auto auto auto auto auto minmax(0, 1fr); }
+  .overview-page.architecture-view { grid-template-rows: auto auto minmax(0, 1fr); }
+  .architecture-view > .panel { overflow: hidden; }
   .knowledge-page { display: flex; flex-direction: column; gap: 14px; }
   .knowledge-page > .panel { flex: 1; }
   .knowledge-page > .panel, .governance-page > .panel, .evaluation-page > .panel { display: flex; flex-direction: column; }
