@@ -33,7 +33,7 @@ class LegacyGenerationStorageTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name) / "legacy.db"
 
-    def test_restart_marks_generation_interrupted_and_allows_manual_new_run(self):
+    def test_restart_marks_generation_interrupted_and_blocks_a_new_full_run(self):
         store = GovernanceStore(self.path)
         run_id = store.start_generation_run("test-model")
         store.update_generation_run(run_id, status="generating", progress={"stage": "generating", "slot": "Q03", "completed_slots": 2})
@@ -45,7 +45,8 @@ class LegacyGenerationStorageTests(unittest.TestCase):
         self.assertEqual(old["artifacts"]["hard_validation"]["failed_stage"], "generating")
         self.assertEqual(old["artifacts"]["hard_validation"]["progress"]["completed_slots"], 2)
         self.assertEqual(old["question_ids"], [])
-        self.assertNotEqual(store.start_generation_run("test-model"), run_id)
+        with self.assertRaisesRegex(ValueError, "当前 V1 Mini 尚有失败 Slot 待补齐"):
+            store.start_generation_run("test-model")
 
     def test_restart_marks_quality_rerun_interrupted_without_losing_slot_audit(self):
         store = GovernanceStore(self.path)

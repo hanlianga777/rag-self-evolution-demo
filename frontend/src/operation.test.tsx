@@ -57,6 +57,23 @@ it("restores a persisted Generation operation without inventing progress", async
   await act(async () => root.unmount());
 });
 
+it("restores a recoverable Generation run as a pending action with measured progress", async () => {
+  const run = { id: "GGEN-partial", status: "needs_regeneration", created_at: new Date().toISOString(), operation_progress: { phase: "needs_regeneration", phase_label: "待补齐失败题", hard_valid_completed: 12, probe_processed: 0, qc_processed: 0, overall_percent: 20 } };
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("generation-runs") ? [run] : url.endsWith("evaluations") || url.endsWith("revisions") ? [] : run), { status: 200 }))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
+  await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
+  const card = document.querySelector(".operation-console")!;
+  expect(card.getAttribute("role")).toBe("status");
+  expect(card.textContent).toContain("待补齐失败题 · Hard Valid 12 / 20");
+  expect(card.textContent).toContain("20%");
+  expect(card.textContent).toContain("补齐失败题（8）");
+  expect(card.textContent).not.toContain("运行失败");
+  expect(card.querySelector("progress")?.value).toBe(12);
+  expect(card.querySelector("progress")?.max).toBe(60);
+  await act(async () => root.unmount());
+});
+
 it("uses persisted evaluation cases for progress while short operations complete", async () => {
   const evaluation = { id: "EVAL-1", status: "running", dataset_snapshot_json: JSON.stringify({ question_ids: ["Q1", "Q2", "Q3"] }), cases: [{ question_id: "Q1" }] };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [evaluation] : url.endsWith("EVAL-1") ? evaluation : []), { status: 200 }))));

@@ -75,6 +75,14 @@ class GovernanceApiTests(unittest.TestCase):
         self.assertEqual(self.client.get(f"/api/governance/generation-runs/{run_id}").json()["status"], "needs_regeneration")
         self.assertEqual(self.client.get("/api/dataset").json().__len__(), 40)
 
+    def test_partial_run_blocks_a_new_full_generation(self):
+        run_id = main.store.start_generation_run("mock-provider")
+        main.store.update_generation_run(run_id, status="needs_regeneration", progress={"stage": "needs_regeneration"})
+        response = self.client.post("/api/governance/generate-mini", headers={"Origin": "http://127.0.0.1:5174"})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"], "当前 V1 Mini 尚有失败 Slot 待补齐，请先完成当前 Run。")
+        self.assertEqual(len(main.store.generation_runs()), 1)
+
     def test_monitoring_trigger_is_pending_until_human_confirm(self):
         event = self.client.post("/api/monitoring/events", json={"question": "安全问题", "answer": "错误回答", "bad_case": True, "severity": "critical"}, headers={"Origin": "http://127.0.0.1:5174"})
         self.assertEqual(event.status_code, 201)

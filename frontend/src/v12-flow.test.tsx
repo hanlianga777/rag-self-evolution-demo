@@ -99,6 +99,7 @@ it("shows persisted partial slots, failure details, and only the refill action",
   expect(document.body.textContent).toContain("Hard Validation 12/20 · 60%");
   expect(document.body.textContent).toContain("整体 20%");
   expect(document.body.textContent).toContain("补齐失败题（8）");
+  expect(document.body.textContent).not.toContain("生成 V1 Mini 8 / 4 / 8");
   expect(document.querySelector(".review-batch")).toBeNull();
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-table button")].at(-1)!.click());
   expect(document.body.textContent).toContain("unsupported answer anchor");

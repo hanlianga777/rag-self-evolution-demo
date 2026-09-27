@@ -291,6 +291,8 @@ class GovernanceStore:
         run_id, now = f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", _now()
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status = 'needs_regeneration' LIMIT 1").fetchone():
+                raise ValueError("当前 V1 Mini 尚有失败 Slot 待补齐，请先完成当前 Run。")
             if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status IN ('queued', 'coverage', 'generating', 'validation', 'probing', 'qc') LIMIT 1").fetchone():
                 raise ValueError("已有 V1 Mini Generation Run 正在执行")
             connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(GENERATION_PROFILES["mini"]), model_version, "queued", _json([]), now))
