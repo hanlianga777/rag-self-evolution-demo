@@ -447,12 +447,24 @@ class GovernanceStore:
     def generation_runs(self):
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM golden_generation_runs ORDER BY created_at DESC").fetchall()
-        return [{**dict(row), "profile": _load(row["profile_json"], {}), "question_ids": _load(row["question_ids_json"], []), "artifacts": self.generation_artifacts(row["id"])} for row in rows]
+        return [self.generation_run(row["id"]) for row in rows]
 
     def generation_run(self, run_id: str):
         with self.connection() as connection:
             row = connection.execute("SELECT * FROM golden_generation_runs WHERE id = ?", (run_id,)).fetchone()
-        return {**dict(row), "profile": _load(row["profile_json"], {}), "question_ids": _load(row["question_ids_json"], []), "artifacts": self.generation_artifacts(run_id)} if row else None
+        if not row:
+            return None
+        run = {**dict(row), "profile": _load(row["profile_json"], {}), "question_ids": _load(row["question_ids_json"], []), "artifacts": self.generation_artifacts(run_id)}
+        audit = run["artifacts"]["hard_validation"]
+        if audit.get("slot_persistence_v1"):
+            progress = audit.get("progress", {})
+            valid, probe, qc = len(run["question_ids"]), progress.get("probe_completed", 0), progress.get("qc_completed", 0) + progress.get("qc_skipped", 0)
+            phase = audit.get("failed_stage") if run["status"] == "failed" and audit.get("failed_stage") in {"generating", "validation", "probing", "qc"} else progress.get("stage", run["status"])
+            phase_done = probe if phase == "probing" else qc if phase == "qc" else valid
+            started_at = progress.get("started_at", run["created_at"])
+            ended_at = datetime.fromisoformat(progress["finished_at"]) if progress.get("finished_at") else datetime.now(timezone.utc)
+            run["operation_progress"] = {"operation_id": progress.get("operation_id", run_id), "status": run["status"], "phase": phase, "phase_label": {"queued": "等待开始", "coverage": "覆盖规划", "generating": "Hard Validation", "validation": "Hard Validation", "needs_regeneration": "待补齐失败题", "probing": "Probe", "qc": "QC", "completed": "已完成", "failed": "运行失败"}.get(phase, phase), "completed_units": phase_done, "total_units": 20, "phase_percent": round(phase_done * 5), "overall_percent": round((valid + probe + qc) / 60 * 100), "hard_valid_completed": valid, "probe_processed": probe, "qc_processed": qc, "current_slot": progress.get("slot"), "current_item": progress.get("slot"), "attempt": progress.get("attempt"), "started_at": started_at, "elapsed_ms": max(0, round((ended_at - datetime.fromisoformat(started_at)).total_seconds() * 1000)), "message": progress.get("message"), "error": audit.get("error")}
+        return run
 
     def update_quality_rerun(self, run_id: str, changes: dict, *, start: bool = False):
         with self.connection() as connection:
@@ -476,18 +488,22 @@ class GovernanceStore:
             connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json = ? WHERE generation_run_id = ?", (_json(audit), run_id))
         return ids
 
-    def generation_review(self, run_id: str, chunks: list[dict]):
+    def generation_review(self, run_id: str, chunks: list[dict], *, allow_partial: bool = False):
         run = self.generation_run(run_id)
         if run is None:
             raise KeyError(run_id)
         ids = run["question_ids"]
         expected = self._expected_count(run)
-        if not expected or len(ids) != expected or len(set(ids)) != expected:
+        if not expected or (len(ids) != expected and not allow_partial) or len(set(ids)) != len(ids):
             raise ValueError("本轮尚未完整入库 20 道 Candidate")
+        if allow_partial and len(ids) != expected and not run["artifacts"]["hard_validation"].get("slot_persistence_v1"):
+            raise ValueError("旧 Run 仅支持完整测试集读取")
+        if not ids and allow_partial:
+            return {"generation_run_id": run_id, "questions": []}
         marks = ",".join("?" for _ in ids)
         with self.connection() as connection:
             rows = {row["id"]: self._row(row) for row in connection.execute(f"SELECT * FROM questions WHERE id IN ({marks})", ids)}
-            if len(rows) != expected or any(rows[question_id]["raw"].get("generation_run_id") != run_id or rows[question_id]["legacy_question_type"] != "v1_mini" for question_id in ids):
+            if len(rows) != len(ids) or any(rows[question_id]["raw"].get("generation_run_id") != run_id or rows[question_id]["legacy_question_type"] != "v1_mini" for question_id in ids):
                 raise ValueError("本轮 Candidate 归属或数量不一致")
             probes = {question_id: [] for question_id in ids}
             for row in connection.execute(f"SELECT question_id, result_json, created_at FROM probe_results WHERE question_id IN ({marks}) ORDER BY id DESC", ids):

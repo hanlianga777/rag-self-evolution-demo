@@ -284,6 +284,16 @@ def generation_run_status(run_id: str):
     return result
 
 
+@app.get("/api/governance/generation-runs/{run_id}/questions")
+def generation_run_questions(run_id: str):
+    try:
+        return store.generation_review(run_id, corpus.chunks(), allow_partial=True)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Generation run not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @app.get("/api/governance/generation-runs/{run_id}/export")
 def export_generation_run(run_id: str, format: Literal["json", "csv", "markdown"] = "markdown"):
     try:
