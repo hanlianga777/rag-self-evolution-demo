@@ -137,6 +137,9 @@ class PartialGenerationTests(unittest.TestCase):
             headers = {"Origin": "http://127.0.0.1:5174"}
             self.assertEqual(client.post(f"/api/governance/questions/{question_id}/probe", headers=headers).status_code, 409)
             self.assertEqual(client.post(f"/api/governance/questions/{question_id}/review", json={"decision": "rejected"}, headers=headers).status_code, 409)
+            self.assertEqual(client.put(f"/api/governance/questions/{question_id}", json={"question": "修改题目", "reference_answer": "设备可断电维护", "evidence": [{"source_chunk_ids": ["C01"]}]}, headers=headers).status_code, 409)
+            with self.assertRaisesRegex(ValueError, "不完整"):
+                self.store.start_revision(question_id, "ai_regenerate", "修改问题", False, {}, self.chunks)
             self.assertEqual(client.post(f"/api/governance/generation-runs/{run_id}/regenerate-failed", headers=headers).status_code, 202)
             self.assertEqual(client.post(f"/api/governance/generation-runs/{run_id}/regenerate-failed", headers=headers).status_code, 409)
 

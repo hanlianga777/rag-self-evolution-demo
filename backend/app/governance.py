@@ -651,7 +651,7 @@ class GovernanceStore:
             raise ValueError("仅可编辑或替换活动 V1 Mini Candidate")
         run_id = current["raw"].get("generation_run_id")
         run = self.generation_run(run_id)
-        if not run or len(run["question_ids"]) != self._expected_count(run) or question_id not in run["question_ids"]:
+        if not run or len(run["question_ids"]) != self._expected_count(run) or question_id not in run["question_ids"] or (run["artifacts"]["hard_validation"].get("slot_persistence_v1") and run["status"] != "completed"):
             raise ValueError("V1 Mini Run 不完整")
         ids = [question_id]
         if replacement and paired:
@@ -975,6 +975,7 @@ class GovernanceStore:
         return self.revision_run(revision_id)
 
     def update_question(self, question_id: str, question: str, reference_answer: str | None, evidence: list, actor: str):
+        self.require_generation_ready(question_id)
         current = self.question(question_id)
         if current["legacy_question_type"] == "v1_mini" and (current["stage"] == "golden" or any(event["decision"] in {"needs_revision", "rejected"} for event in self.review_history(question_id))):
             raise ValueError("已批准或待修订题目须走局部修订流程")
