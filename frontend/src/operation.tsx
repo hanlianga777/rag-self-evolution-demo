@@ -26,6 +26,22 @@ function evaluation(run: any): Partial<Operation> {
   return { status: run.status === "running" ? "running" : run.status === "completed" ? "completed" : "failed", stage: run.status === "running" ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败", current: run.cases?.length, total, error: run.error_message };
 }
 
+function generation(run: any): Partial<Operation> {
+  const progress = run.operation_progress;
+  return {
+    status: run.status === "completed" ? "completed" : run.status === "needs_regeneration" ? "needs_action" : run.status === "failed" ? "failed" : "running",
+    stage: progress?.phase_label || run.status,
+    current: progress ? progress.hard_valid_completed + progress.probe_processed + progress.qc_processed : undefined,
+    total: progress ? 60 : undefined,
+    phaseCurrent: progress?.hard_valid_completed,
+    phaseTotal: progress?.total_units,
+    nextAction: run.status === "needs_regeneration" ? `补齐失败题（${(progress?.total_units || 20) - (progress?.hard_valid_completed || 0)}）` : undefined,
+    error: run.status === "failed" ? progress?.error : undefined,
+    attempt: progress?.attempt,
+    endedAt: run.status === "needs_regeneration" ? Date.now() : undefined,
+  };
+}
+
 const revisionStages: Record<string, string> = {
   queued: "等待草案", material_selected: "材料已选定", generating: "AI 单题生成", generated: "草案已生成",
   validating: "Hard Validation", hard_validation: "Hard Validation", probing: "Probe", probe: "Probe",
@@ -98,7 +114,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     }).catch(() => {});
     getJson<any[]>("/api/governance/generation-runs").then(runs => {
       if (cancelled) return;
-      for (const item of runs.filter(item => ["queued", "coverage", "generating", "validation", "probing", "qc", "needs_regeneration"].includes(item.status))) start("Golden Generation", { id: item.id, kind: "generation", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
+      for (const item of runs.filter(item => ["queued", "coverage", "generating", "validation", "probing", "qc", "needs_regeneration"].includes(item.status))) start("Golden Generation", { ...generation(item), id: item.id, kind: "generation", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [restore, start]);
@@ -109,7 +125,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     const timer = window.setInterval(() => {
       for (const item of active) {
         void getJson<any>(item.kind === "revision" ? `/api/governance/revisions/${item.id}` : item.kind === "generation" ? `/api/governance/generation-runs/${item.id}` : `/api/evaluations/${item.id}`).then(result => {
-          const next: Partial<Operation> = item.kind === "revision" ? revision(result) : item.kind === "generation" ? { status: result.status === "completed" ? "completed" : result.status === "needs_regeneration" ? "needs_action" : result.status === "failed" ? "failed" : "running", stage: result.operation_progress?.phase_label || result.status, current: result.operation_progress ? result.operation_progress.hard_valid_completed + result.operation_progress.probe_processed + result.operation_progress.qc_processed : undefined, total: result.operation_progress ? 60 : undefined, phaseCurrent: result.operation_progress?.hard_valid_completed, phaseTotal: result.operation_progress?.total_units, nextAction: result.status === "needs_regeneration" ? `补齐失败题（${(result.operation_progress?.total_units || 20) - (result.operation_progress?.hard_valid_completed || 0)}）` : undefined, error: result.status === "failed" ? result.operation_progress?.error : undefined, attempt: result.operation_progress?.attempt, endedAt: result.status === "needs_regeneration" ? Date.now() : undefined } : evaluation(result);
+          const next: Partial<Operation> = item.kind === "revision" ? revision(result) : item.kind === "generation" ? generation(result) : evaluation(result);
           update(item.id, next);
           if (next.status === "completed") succeed(item.id);
           if (next.status === "failed") fail(item.id, next.error || "评测失败");

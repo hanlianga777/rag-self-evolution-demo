@@ -62,6 +62,7 @@ it("restores a recoverable Generation run as a pending action with measured prog
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("generation-runs") ? [run] : url.endsWith("evaluations") || url.endsWith("revisions") ? [] : run), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
+  expect(document.querySelector(".operation-console")?.textContent).toContain("待补齐失败题 · Hard Valid 12 / 20");
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
   const card = document.querySelector(".operation-console")!;
   expect(card.getAttribute("role")).toBe("status");
