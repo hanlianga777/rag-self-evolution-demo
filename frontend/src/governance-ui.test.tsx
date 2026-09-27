@@ -4,9 +4,99 @@ import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { GovernancePage } from "./pages/GovernancePage";
 import { CandidateWorkspace } from "./pages/CandidateWorkspace";
+import { OperationProvider } from "./operation";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-afterEach(() => { document.body.innerHTML = ""; vi.restoreAllMocks(); });
+afterEach(() => { document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it.each([false, true])("closes the Drawer after %s QC P0 acceptance and updates the table", async requiresQcAcceptance => {
+  const run = { id: "GGEN-approve", status: "completed", profile: { expected_count: 1 }, question_ids: ["V1-Q01"], artifacts: {} };
+  const base = { id: "V1-Q01", slot: "Q01", question: "如何安全操作？", test_category: "positive", legacy_question_type: "v1_mini", review_status: "human_review_pending", probe_status: "probe_passed", qc_status: requiresQcAcceptance ? "qc_failed" : "qc_passed", stage: "candidate", evidence: [], approval_eligibility: requiresQcAcceptance ? { requires_qc_p0_acceptance: true, blocking_reasons: [], qc_reason: "fixture risk" } : { can_approve: true } };
+  let approved = false;
+  const posts: any[] = [];
+  vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+    if (init?.method === "POST") { posts.push(JSON.parse(init.body as string)); approved = true; return Promise.resolve(new Response(JSON.stringify({ status: "approved" }), { status: 200 })); }
+    const row = approved ? { ...base, review_status: "approved", stage: "golden" } : base;
+    const data = url.endsWith("/api/dataset") ? [row] : url.endsWith("/api/governance/generation-runs") ? [run] : url.includes("/export") ? { questions: [row] } : [];
+    return Promise.resolve(new Response(JSON.stringify(data), { status: 200 }));
+  }));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [base] }} />));
+  await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
+  await act(async () => ([...document.querySelectorAll<HTMLButtonElement>(".candidate-actionbar button")].find(button => button.textContent === "批准")!).click());
+  if (requiresQcAcceptance) {
+    const input = document.querySelector<HTMLTextAreaElement>("textarea[aria-label='接受 QC P0 的理由']")!;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, "接受已记录风险"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => ([...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "确认接受并批准")!).click());
+  }
+  expect(posts).toHaveLength(1);
+  expect(!!posts[0].accept_qc_p0).toBe(requiresQcAcceptance);
+  expect(document.querySelector(".candidate-workspace")).toBeNull();
+  expect(document.querySelector(".review-table tbody")?.textContent).toContain("已批准");
+  await act(async () => root.unmount());
+});
+
+it("keeps the Drawer open when approval fails", async () => {
+  const row = { id: "V1-Q01", slot: "Q01", question: "如何操作？", test_category: "positive", legacy_question_type: "v1_mini", review_status: "human_review_pending", probe_status: "probe_passed", qc_status: "qc_passed", stage: "candidate", evidence: [] };
+  const run = { id: "GGEN-approve", status: "completed", profile: { expected_count: 1 }, question_ids: [row.id], artifacts: {} };
+  vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => Promise.resolve(new Response(JSON.stringify(init?.method === "POST" ? { detail: "fixture rejection" } : url.endsWith("/api/dataset") ? [row] : url.endsWith("/api/governance/generation-runs") ? [run] : url.includes("/export") ? { questions: [row] } : []), { status: init?.method === "POST" ? 409 : 200 }))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [row] }} />));
+  await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
+  await act(async () => ([...document.querySelectorAll<HTMLButtonElement>(".candidate-actionbar button")].find(button => button.textContent === "批准")!).click());
+  expect(document.querySelector(".candidate-workspace")).not.toBeNull();
+  expect(document.querySelector(".review-table tbody")?.textContent).toContain("待人工审核");
+  await act(async () => root.unmount());
+});
+
+it("refreshes the open Drawer and table before reporting Revision complete", async () => {
+  const run = { id: "GGEN-sync", status: "completed", profile: { expected_count: 1 }, question_ids: ["V1-Q07"], artifacts: {} };
+  const old = { id: "V1-Q07", slot: "Q07", question: "旧题", test_category: "positive", legacy_question_type: "v1_mini", review_status: "human_review_pending", probe_status: "probe_pending", qc_status: "qc_pending", stage: "candidate", evidence: [] };
+  const updated = { ...old, question: "新题", probe_status: "probe_passed", qc_status: "qc_passed" };
+  const revision = { id: "REV-sync", status: "qc", stage: "qc", question_ids: [old.id], progress: { current: 0, total: 1 } };
+  let finished = false;
+  vi.stubGlobal("fetch", vi.fn((url: string) => {
+    if (url.endsWith("/api/governance/revisions/REV-sync")) { finished = true; return Promise.resolve(new Response(JSON.stringify({ ...revision, status: "completed", stage: "completed", progress: { current: 1, total: 1 } }), { status: 200 })); }
+    const data = url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [revision] : url.endsWith("/api/dataset") ? [finished ? updated : old] : url.endsWith("/api/governance/generation-runs") ? [run] : url.includes("/export") ? { questions: [finished ? updated : old] } : [];
+    return Promise.resolve(new Response(JSON.stringify(data), { status: 200 }));
+  }));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider><GovernancePage data={{ generationRuns: [run], dataset: [old] }} /></OperationProvider>));
+  await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
+  await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
+  expect(document.querySelector(".review-table tbody")?.textContent).toContain("新题");
+  expect(document.querySelector(".review-table tbody")?.textContent).toContain("通过");
+  expect(document.querySelector(".candidate-workspace .workspace-badges")?.textContent).toContain("Probe 通过");
+  expect(document.querySelector(".candidate-workspace .workspace-badges")?.textContent).toContain("QC 通过");
+  expect(document.querySelector(".operation-console")?.textContent).toContain("✓ 完成");
+  await act(async () => root.unmount());
+});
+
+it("refreshes single Probe and QC results in both table and open Drawer", async () => {
+  const run = { id: "GGEN-quality", status: "completed", profile: { expected_count: 1 }, question_ids: ["V1-Q01"], artifacts: {} };
+  const base = { id: "V1-Q01", slot: "Q01", question: "如何检查？", test_category: "positive", legacy_question_type: "v1_mini", review_status: "human_review_pending", probe_status: "probe_pending", qc_status: "qc_pending", stage: "candidate", evidence: [] };
+  let probe = false, qc = false;
+  vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+    if (init?.method === "POST") { if (url.endsWith("/probe")) probe = true; if (url.endsWith("/qc")) qc = true; return Promise.resolve(new Response(JSON.stringify({ status: "passed" }), { status: 200 })); }
+    const row = { ...base, probe_status: probe ? "probe_passed" : "probe_pending", qc_status: qc ? "qc_passed" : "qc_pending" };
+    const data = url.endsWith("/api/dataset") ? [row] : url.endsWith("/api/governance/generation-runs") ? [run] : url.includes("/export") ? { questions: [row] } : [];
+    return Promise.resolve(new Response(JSON.stringify(data), { status: 200 }));
+  }));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [base] }} />));
+  await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
+  await act(async () => ([...document.querySelectorAll<HTMLButtonElement>(".candidate-menu button")].find(button => button.textContent === "查看技术审计")!).click());
+  await act(async () => ([...document.querySelectorAll<HTMLButtonElement>(".audit-tabs button")].find(button => button.textContent === "Probe")!).click());
+  await act(async () => ([...document.querySelectorAll<HTMLButtonElement>(".audit-workspace button")].find(button => button.textContent === "运行 Probe")!).click());
+  expect(document.querySelector(".review-table tbody")?.textContent).toContain("通过");
+  expect(document.querySelector(".candidate-workspace .workspace-badges")?.textContent || document.querySelector(".audit-workspace")?.textContent).toContain("通过");
+  await act(async () => ([...document.querySelectorAll<HTMLButtonElement>(".audit-tabs button")].find(button => button.textContent === "QC")!).click());
+  await act(async () => ([...document.querySelectorAll<HTMLButtonElement>(".audit-workspace button")].find(button => button.textContent === "运行 QC")!).click());
+  expect(qc).toBe(true);
+  expect(document.querySelector(".review-table tbody")?.textContent).toContain("通过通过");
+  expect(document.querySelector(".audit-workspace")?.textContent).toContain("通过");
+  await act(async () => root.unmount());
+});
 
 it("offers QC-only recovery for an already applied Revision runtime failure", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })));
@@ -140,6 +230,15 @@ it("restores a running generation and reads persisted slot progress", async () =
   expect(document.body.textContent).toContain("Q03");
   expect(document.body.textContent).toContain("已处理 2/20 · 10%");
   expect((([...document.querySelectorAll("button")].find(button => button.textContent?.includes("生成 V1 Mini"))) as HTMLButtonElement).disabled).toBe(true);
+  await act(async () => root.unmount());
+});
+
+it("shows the current automatic refill round and remaining slots", async () => {
+  const run = { id: "GGEN-refill", status: "generating", profile: { expected_count: 20 }, question_ids: [], operation_progress: { phase: "generating", phase_label: "补齐失败题", phase_processed: 4, phase_total: 10, phase_percent: 40, hard_valid_completed: 14, hard_valid_total: 20, failed_count: 6, probe_processed: 0, qc_processed: 0, refill_round: 2, refill_max_rounds: 3 }, artifacts: { hard_validation: { slot_persistence_v1: true, progress: {} } } };
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/governance/generation-runs") ? [run] : url.endsWith("/GGEN-refill") ? run : url.endsWith("/api/dataset") || url.endsWith("/api/governance/revisions") || url.endsWith("/api/governance/snapshots") ? [] : { questions: [] }), { status: 200 }))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [] }} />));
+  expect(document.querySelector(".generation-progress")?.textContent).toContain("Round 2/3 · 本轮 10 道 · 剩余 6 道");
   await act(async () => root.unmount());
 });
 

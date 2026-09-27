@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useState } from "react";
+import { act, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { OperationProvider, useOperation } from "./operation";
@@ -88,7 +88,7 @@ it("keeps a running operation visible while navigating without exposing reasonin
   await act(async () => document.querySelectorAll("button")[1].click());
   expect(document.body.textContent).toContain("知识库");
   expect(document.body.textContent).toContain("验证 Provider");
-  expect(document.querySelector(".operation-console progress:not([value])")).not.toBeNull();
+  expect(document.querySelector(".operation-console progress")).toBeNull();
   expect(document.querySelector(".operation-stack")).not.toBeNull();
   expect(document.body.textContent).not.toMatch(/思考过程|推理链|已完成 50%/);
   await act(async () => root.unmount());
@@ -164,7 +164,54 @@ it("shows the persisted QC stage without an invented percentage for one Revision
   expect(card.textContent).toContain("QC");
   expect(card.textContent).not.toMatch(/\d+%/);
   expect(card.textContent).not.toContain("1 / 1");
-  expect(card.querySelector("progress:not([value])")).not.toBeNull();
+  expect(card.querySelector("progress")).toBeNull();
+  await act(async () => root.unmount());
+});
+
+it("marks a completed Revision only after the visible Candidate state refreshes", async () => {
+  const running = { id: "REV-sync", status: "qc", stage: "qc", question_ids: ["Q07"], progress: { current: 0, total: 1 } };
+  const completed = { ...running, status: "completed", stage: "completed", progress: { current: 1, total: 1 } };
+  let finishRefresh!: () => void;
+  const pending = new Promise<void>(resolve => { finishRefresh = resolve; });
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [running] : completed), { status: 200 }))));
+  function Harness() {
+    const operation = useOperation();
+    const [state, setState] = useState("未运行");
+    useEffect(() => {
+      const refresh = async () => { await pending; setState("Probe 通过 · QC 通过 · 待人工审核"); };
+      operation.registerCandidateRefresh(refresh);
+      return () => operation.unregisterCandidateRefresh(refresh);
+    }, [operation.registerCandidateRefresh, operation.unregisterCandidateRefresh]);
+    return <span>{state}</span>;
+  }
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider><Harness /></OperationProvider>));
+  await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
+  expect(document.body.textContent).toContain("正在同步 Candidate 状态");
+  expect(document.body.textContent).not.toContain("✓ 完成");
+  await act(async () => finishRefresh());
+  expect(document.body.textContent).toContain("Probe 通过 · QC 通过 · 待人工审核");
+  expect(document.body.textContent).toContain("✓ 完成");
+  await act(async () => root.unmount());
+});
+
+it("reports a completed Revision as unsynced when Candidate refresh fails", async () => {
+  const running = { id: "REV-unsynced", status: "qc", stage: "qc", progress: { current: 0, total: 1 } };
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [running] : { ...running, status: "completed" }), { status: 200 }))));
+  function Harness() {
+    const operation = useOperation();
+    useEffect(() => {
+      const refresh = async () => { throw new Error("fixture network error"); };
+      operation.registerCandidateRefresh(refresh);
+      return () => operation.unregisterCandidateRefresh(refresh);
+    }, [operation.registerCandidateRefresh, operation.unregisterCandidateRefresh]);
+    return <span>候选题</span>;
+  }
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider><Harness /></OperationProvider>));
+  await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
+  expect(document.querySelector(".operation-console[role=alert]")?.textContent).toContain("后台已完成，但候选题刷新失败");
+  expect(document.body.textContent).not.toContain("✓ 完成");
   await act(async () => root.unmount());
 });
 

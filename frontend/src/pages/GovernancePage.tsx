@@ -66,6 +66,10 @@ export function GovernancePage({ data }: { data: any }) {
     await loadReview(generationRuns[0]);
   };
   useEffect(() => {
+    operation.registerCandidateRefresh(reload);
+    return () => operation.unregisterCandidateRefresh(reload);
+  }, [operation.registerCandidateRefresh, operation.unregisterCandidateRefresh, reload]);
+  useEffect(() => {
     if (!data.generationRuns) void reload().catch(reason => setError(errorMessage(reason)));
     else { void loadReview(data.generationRuns[0]).catch(reason => setError(errorMessage(reason))); if (data.generationRuns[0]?.question_ids?.length === (data.generationRuns[0]?.profile?.expected_count || 20)) void getJson<Candidate[]>("/api/governance/revisions").then(value => setRevisions(Array.isArray(value) ? value : [])).catch(() => {}); }
   }, [data.generationRuns]);
@@ -104,8 +108,9 @@ export function GovernancePage({ data }: { data: any }) {
   const batchReason = current.length !== expectedCount ? `本轮尚未完整入库 ${expectedCount} 道题` : gateBlocked.length || manualBlocked.length ? `仍有 ${new Set([...gateBlocked, ...manualBlocked].map(row => row.id)).size} 道题需逐题处理或接受 QC P0 风险` : gate1Snapshot ? "本轮已确认 Golden 测试集" : !confirmed ? "请先确认已人工审核全部有效 Candidate" : "";
   const action = async (work: () => Promise<unknown>, title: string) => {
     setBusy(true); setError("");
-    try { await operation.run(title, work); return true; } catch (reason) { setError(errorMessage(reason)); return false; }
-    finally { await reload().catch(() => {}); setBusy(false); }
+    try { await operation.run(title, async () => { await work(); try { await reload(); } catch (reason) { throw new Error(`后台已完成，但候选题刷新失败：${errorMessage(reason)}`); } }); return true; }
+    catch (reason) { setError(errorMessage(reason)); return false; }
+    finally { setBusy(false); }
   };
   const createMini = async () => {
     setBusy(true); setError(""); setRunDuration(null);
@@ -136,7 +141,11 @@ export function GovernancePage({ data }: { data: any }) {
     finally { setBusy(false); }
   };
   const questionAction = (id: string, name: "probe" | "qc") => action(() => postJson(`/api/governance/questions/${id}/${name}`), name === "probe" ? "运行单题 Probe" : "运行单题 QC");
-  const reviewAction = (id: string, decision: string, reason?: string, tags?: string[], acceptQcP0?: boolean) => action(() => postJson(`/api/governance/questions/${id}/review`, { decision, reason, tags, ...(acceptQcP0 ? { accept_qc_p0: true } : {}) }), "人工审核 Candidate");
+  const reviewAction = async (id: string, decision: string, reason?: string, tags?: string[], acceptQcP0?: boolean) => {
+    const approved = await action(() => postJson(`/api/governance/questions/${id}/review`, { decision, reason, tags, ...(acceptQcP0 ? { accept_qc_p0: true } : {}) }), "人工审核 Candidate");
+    if (approved && decision === "approved") setSelectedId(null);
+    return approved;
+  };
 
   return <div className={`page governance-page ${!currentRun && tab === "run" ? "is-empty" : ""}`}>
     <div className="page-title"><div><h1>测试集治理</h1><p>生成、验证并逐题审核 Candidate，最后由人确认 Golden 测试集。</p></div><div className="header-actions">{currentRun?.status === "needs_regeneration" && <button className="primary" disabled={busy} onClick={() => void regenerate()}>补齐失败题（{expectedCount - current.length}）</button>}{currentRun?.status !== "needs_regeneration" && <button className="secondary" disabled={busy || running || qualityRunning} onClick={() => void createMini()}>{currentRun?.status === "failed" ? "重新运行 V1 Mini 8 / 4 / 8" : "生成 V1 Mini 8 / 4 / 8"}</button>}</div></div>
@@ -147,7 +156,7 @@ export function GovernancePage({ data }: { data: any }) {
         {gate1Snapshot && <div className="snapshot-next"><span>✓ Gate 1 已确认 Golden 测试集；冻结版本可在历史版本查看。</span></div>}
         <div className="light-stepper" aria-label="测试集治理阶段"><span>生成 {current.length}/{expectedCount}</span><span>Probe {progress?.probe_completed || 0}/{expectedCount}</span><span>QC {(progress?.qc_completed || 0) + (progress?.qc_skipped || 0)}/{expectedCount}</span><span>人工审核 {current.filter(row => row.review_status !== "human_review_pending").length}/{expectedCount}</span><span>Golden {gate1Snapshot ? "已确认" : "待确认"}</span></div>
         <p className="run-summary" role="status">当前阶段：{stageName[currentRun.status] || displayText(currentRun.status)}{running ? ` · 已处理 ${operationProgress?.phase_processed ?? 0}/${operationProgress?.phase_total ?? expectedCount} 个 Slot` : ""}{progress?.qc_skipped ? ` · QC 跳过 ${progress.qc_skipped}` : ""}{elapsed ? ` · 运行耗时 ${elapsed}` : ""}</p>
-        {operationProgress && <div className="generation-progress" role="status"><span>{operationProgress.phase_label} · 已处理 {operationProgress.phase_processed}/{operationProgress.phase_total} · {operationProgress.phase_percent}%{operationProgress.current_slot && running ? ` · 当前 ${operationProgress.current_slot}${operationProgress.attempt ? ` Attempt ${operationProgress.attempt}` : ""}` : ""}</span><span>Hard Valid {operationProgress.hard_valid_completed}/{operationProgress.hard_valid_total} · 待补 {operationProgress.failed_count} · Probe {operationProgress.probe_processed}/{expectedCount} · QC {operationProgress.qc_processed}/{expectedCount}</span><progress value={operationProgress.phase_processed} max={operationProgress.phase_total || expectedCount} /></div>}
+        {operationProgress && <div className="generation-progress" role="status">{operationProgress.refill_round && ["coverage", "generating", "validation"].includes(operationProgress.phase) && <span>自动补齐失败题 · Round {operationProgress.refill_round}/{operationProgress.refill_max_rounds} · 本轮 {operationProgress.phase_total} 道 · 剩余 {operationProgress.failed_count} 道</span>}<span>{operationProgress.phase_label} · 已处理 {operationProgress.phase_processed}/{operationProgress.phase_total} · {operationProgress.phase_percent}%{operationProgress.current_slot && running ? ` · 当前 ${operationProgress.current_slot}${operationProgress.attempt ? ` Attempt ${operationProgress.attempt}` : ""}` : ""}</span><span>Hard Valid {operationProgress.hard_valid_completed}/{operationProgress.hard_valid_total} · 待补 {operationProgress.failed_count} · Probe {operationProgress.probe_processed}/{expectedCount} · QC {operationProgress.qc_processed}/{expectedCount}</span><progress value={operationProgress.phase_processed} max={operationProgress.phase_total || expectedCount} /></div>}
         <details className="run-details"><summary>运行详情</summary><div className="run-summary">Run ID：{currentRun.id} · Slot {operationProgress?.processed_slots ?? 0} / {operationProgress?.expected_slots ?? expectedCount}{progress?.slot ? ` · ${progress.slot}` : ""} · Probe {operationProgress?.probe_processed ?? 0} / {expectedCount} · QC {operationProgress?.qc_processed ?? 0} / {expectedCount}{progress?.qc_skipped ? ` · QC 跳过 ${progress.qc_skipped}` : ""}{elapsed ? ` · 运行耗时 ${elapsed}` : ""}{running ? " · 状态来自数据库（Worker 未验证）" : ""}{currentRun.status === "failed" && <button className="text-button" onClick={() => { setErrorSlot(null); setRunErrorOpen(true); }}>查看错误</button>}</div>
         {qualityRerun && <div className="run-summary" role="status"><span>Probe / QC 重跑：{qualityRerun.status === "running" ? "运行中" : qualityRerun.status === "completed" ? "已完成" : "运行失败"} · {qualityRerun.stage === "qc" ? "质量检查" : qualityRerun.stage === "probe" ? "检索验证" : "—"} {qualityRerun.slot || ""} · {qualityRerun.completed || 0} / {expectedCount} · Probe 通过 {qualityRerun.probe_passed || 0}，失败 {qualityRerun.probe_failed || 0} · QC 通过 {qualityRerun.qc_passed || 0}，失败 {qualityRerun.qc_failed || 0}，跳过 {qualityRerun.qc_skipped || 0}{qualityRunning && qualityRerun.started_at ? ` · 运行耗时 ${((now - Date.parse(qualityRerun.started_at)) / 1000).toFixed(1)}s` : ""}{qualityRunning ? " · 状态来自数据库（Worker 未验证）" : ""}</span>{qualityRerun.status === "failed" && <button className="text-button" onClick={() => { setErrorSlot(null); setRunErrorOpen(true); }}>查看错误</button>}</div>}
         {Object.entries(currentRun.artifacts?.slot_audit || {}).filter(([, attempts]) => (attempts as Candidate[]).some(attempt => attempt.validation_error)).map(([slot, attempts]) => <details className="slot-audit" key={slot}><summary>{slot} · {(attempts as Candidate[]).length} Attempts · {(attempts as Candidate[]).at(-1)?.validation_error ? "Failed" : "Passed after retry"}</summary>{(attempts as Candidate[]).map(attempt => <div key={attempt.attempt}><strong>Attempt {attempt.attempt}</strong><p>问题：{attempt.question || "—"}</p><p>答案：{attempt.reference_answer || "—"}</p><p>Evidence：{attempt.selected_evidence?.map((item: Candidate) => `${item.document_name || item.document_id} · ${item.chunk_id} · ${item.chunk_text}`).join("；") || "—"}</p><pre>{attempt.validation_error || "通过"}</pre></div>)}</details>)}</details>
