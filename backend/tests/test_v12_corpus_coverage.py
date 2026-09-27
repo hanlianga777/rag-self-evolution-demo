@@ -75,6 +75,13 @@ class EmbeddingCoverageTests(unittest.TestCase):
         self.assertTrue(any(value in selected for value in ("segment-0", "segment-1", "segment-2", "segment-3", "segment-4")))
         self.assertTrue(any(value in selected for value in ("segment-5", "segment-6", "segment-7", "segment-8", "segment-9")))
 
+    def test_operational_source_ranks_before_cover_metadata_in_same_cluster(self):
+        chunks = self._chunks(2)
+        chunks[0]["chunk_text"] = "封面。产品声明编号。"
+        chunks[1]["chunk_text"] = "启动前检查电池状态，发生故障时停止使用并按步骤处理。"
+        plan = AiService._mini_coverage_plan(chunks, np.asarray([[1., 0.], [1., 0.]], dtype="float32"))
+        self.assertEqual(plan[0]["sources"][0]["chunk_id"], "segment-1")
+
     def test_single_chunk_does_not_force_cross_chunk_slot(self):
         plan = AiService._mini_coverage_plan(self._chunks(1), np.asarray([[1., 0.]], dtype="float32"))
         self.assertFalse(any(slot.get("ablation_attribute") == "cross_chunk" for slot in plan))

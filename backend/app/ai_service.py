@@ -282,7 +282,7 @@ class AiService:
                 source_payload = [{"chunk_id": chunk["chunk_id"], "section": chunk.get("section_path"), "source_text": chunk.get("chunk_text", chunk.get("text", ""))} for chunk in slot["sources"]]
                 error = None
                 try:
-                    generated = json.loads(self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload}, ensure_ascii=False), json_mode=True))
+                    generated = json.loads(self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload, "prior_questions": [item["question"] for item in candidates]}, ensure_ascii=False), json_mode=True))
                     candidate = self._slot_candidate(slot, generated, instruction)
                     errors = self._candidate_errors(candidate, chunks, {"".join(str(item.get("question") or "").lower().split()) for item in candidates})
                     error = "; ".join(errors) if errors else None
@@ -310,13 +310,14 @@ class AiService:
     def _slot_instruction(slot: dict, repair_reason: str | None) -> str:
         category = slot["test_category"]
         repair = f"上次未通过原因：{repair_reason}。仅重写本 Slot，Coverage Plan 不变。" if repair_reason else ""
+        quality = "问题须自包含、贴近真实用户用法，避开封面、声明编号和单字段抄写；不要重复本轮已有问题。答案简洁，只包含给定证据明确支持的事实。"
         if category == "negative":
-            return f"生成一个 {slot['negative_subtype']} 负向问题。返回 JSON：question。不得把知识库内容伪造成答案。{repair}"
+            return f"生成一个 {slot['negative_subtype']} 负向问题。返回 JSON：question。问题须自包含且贴近真实使用，不重复已有问题；不得把知识库内容伪造成答案。{repair}"
         slot_type = slot.get("structured_type")
         structure = f"证据明确支持 {slot_type} 结构；仅据已给事实出题。" if slot_type else ""
         if category == "ablation":
-            return f"独立生成一个由给定证据支撑的鲁棒性测试题，难度方式为 {slot['ablation_attribute']}。{structure}返回 JSON：question, reference_answer。不得增加证据中不存在的业务事实。{repair}"
-        return f"生成一个可由给定证据支撑的正向评测题。{structure}返回 JSON：question, reference_answer。不得增加证据中不存在的业务事实。{repair}"
+            return f"独立生成一个由给定证据支撑的鲁棒性测试题，难度方式为 {slot['ablation_attribute']}。{structure}{quality}返回 JSON：question, reference_answer。{repair}"
+        return f"生成一个可由给定证据支撑的正向评测题。{structure}{quality}返回 JSON：question, reference_answer。{repair}"
 
     @staticmethod
     def _slot_candidate(slot: dict, generated: dict, instruction: str) -> dict:
@@ -359,7 +360,14 @@ class AiService:
         clusters = {index: [] for index in range(len(centers))}
         for index, label in enumerate(labels):
             clusters[int(label)].append(index)
-        clusters = {key: sorted(indices, key=lambda index: float(vectors[index] @ vectors[centers[key]]), reverse=True) for key, indices in clusters.items() if indices}
+        def business_value(index: int) -> int:
+            chunk = chunks[index]
+            body = f"{chunk.get('section_path') or ''} {chunk.get('chunk_text', chunk.get('text', ''))}"
+            useful = ("操作", "使用", "维护", "故障", "安全", "参数", "充电", "检查", "处理", "步骤")
+            metadata = ("封面", "目录", "声明编号", "一致性声明", "版权", "前言")
+            return sum(word in body for word in useful) - 3 * sum(word in body for word in metadata)
+
+        clusters = {key: sorted(indices, key=lambda index: (business_value(index), float(vectors[index] @ vectors[centers[key]])), reverse=True) for key, indices in clusters.items() if indices}
         used: set[int] = set()
         plan, slot = [], 1
 
