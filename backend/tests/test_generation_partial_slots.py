@@ -52,7 +52,11 @@ class PartialGenerationTests(unittest.TestCase):
                 run = self.store.generation_run(run_id)
                 self.assertEqual(run["status"], "needs_regeneration")
                 self.assertEqual(len(run["question_ids"]), 20 - missing)
-                self.assertEqual(run["operation_progress"]["overall_percent"], round((20 - missing) / 60 * 100))
+                self.assertEqual(run["operation_progress"]["phase_processed"], 20)
+                self.assertEqual(run["operation_progress"]["phase_percent"], 100)
+                self.assertEqual(run["operation_progress"]["processed_slots"], 20)
+                self.assertEqual(run["operation_progress"]["hard_valid_completed"], 20 - missing)
+                self.assertEqual(run["operation_progress"]["failed_count"], missing)
                 self.assertEqual(run["artifacts"]["slot_audit"]["Q01"][0]["validation_error"], "unsupported answer anchor")
                 self.assertEqual(run["artifacts"]["slot_audit"]["Q01"][0]["selected_evidence"][0]["chunk_text"], "设备可断电维护")
                 self.assertEqual(len(self.store.generation_review(run_id, self.chunks, allow_partial=True)["questions"]), 20 - missing)
@@ -61,6 +65,8 @@ class PartialGenerationTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "完整入库"):
                     self.store.generation_review(run_id, self.chunks)
                 self.store.claim_regeneration(run_id, run["artifacts"]["hard_validation"]["corpus_fingerprint"])
+                self.assertEqual(self.store.generation_run(run_id)["operation_progress"]["phase_total"], missing)
+                self.assertEqual(self.store.generation_run(run_id)["operation_progress"]["phase_processed"], 0)
                 with self.assertRaisesRegex(ValueError, "仅待补题"):
                     self.store.claim_regeneration(run_id, run["artifacts"]["hard_validation"]["corpus_fingerprint"])
                 self.fail.clear()
@@ -72,6 +78,44 @@ class PartialGenerationTests(unittest.TestCase):
                 self.assertEqual(len(complete["question_ids"]), 20)
                 self.assertEqual(set(self.calls), {f"Q{i:02d}" for i in range(1, missing + 1)})
                 self.assertEqual(len(set(complete["question_ids"])), 20)
+
+    def test_processed_slots_advance_after_failed_attempts_without_valid_candidates(self):
+        self.fail = {"Q01", "Q02", "Q03", "Q04"}
+        run_id = self.store.start_generation_run("mock-provider")
+        seen = []
+        original = self.store.persist_generation_attempt
+
+        def capture(*args, **kwargs):
+            original(*args, **kwargs)
+            if kwargs["slot"] == "Q03" and kwargs["attempt"] == 1:
+                seen.append(self.store.generation_run(run_id)["operation_progress"])
+            if kwargs["slot"] == "Q12":
+                seen.append(self.store.generation_run(run_id)["operation_progress"])
+
+        with patch.object(self.store, "persist_generation_attempt", side_effect=capture):
+            _run_mini_generation(run_id, self.store, self.service, self.corpus)
+        self.assertEqual((seen[0]["phase_processed"], seen[0]["phase_total"], seen[0]["phase_percent"], seen[0]["hard_valid_completed"]), (2, 20, 10, 0))
+        self.assertEqual((seen[1]["phase_processed"], seen[1]["phase_percent"], seen[1]["hard_valid_completed"]), (12, 60, 8))
+
+    def test_regeneration_phase_counts_only_missing_slots(self):
+        self.fail = {f"Q{i:02d}" for i in range(1, 11)}
+        run_id = self.store.start_generation_run("mock-provider")
+        _run_mini_generation(run_id, self.store, self.service, self.corpus)
+        run = self.store.generation_run(run_id)
+        self.store.claim_regeneration(run_id, run["artifacts"]["hard_validation"]["corpus_fingerprint"])
+        self.fail.clear()
+        seen = []
+        original = self.store.persist_generation_attempt
+
+        def capture(*args, **kwargs):
+            original(*args, **kwargs)
+            if kwargs["slot"] == "Q04":
+                seen.append(self.store.generation_run(run_id)["operation_progress"])
+
+        with patch.object(self.store, "persist_generation_attempt", side_effect=capture), patch.object(self.store, "run_probe", return_value={"status": "passed"}), patch.object(self.store, "record_qc"):
+            _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
+        self.assertEqual((seen[0]["phase_processed"], seen[0]["phase_total"], seen[0]["phase_percent"], seen[0]["hard_valid_completed"]), (4, 10, 40, 14))
+        self.assertEqual(seen[0]["processed_slots"], 20)
 
     def test_second_refill_switches_real_material_after_original_fails_again(self):
         self.fail = {"Q01"}

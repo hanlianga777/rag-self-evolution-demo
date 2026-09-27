@@ -5,6 +5,8 @@ import { afterEach, expect, it, vi } from "vitest";
 import { CandidateWorkspace } from "./pages/CandidateWorkspace";
 import { EvolutionPage } from "./pages/EvolutionPage";
 import { GovernancePage } from "./pages/GovernancePage";
+import { OverviewPage } from "./pages/OverviewPage";
+import { PageErrorBoundary } from "./App";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { document.body.innerHTML = ""; vi.unstubAllGlobals(); });
@@ -91,19 +93,55 @@ it("sends one atomic Gate 1 review request and shows the frozen version after re
 
 it("shows persisted partial slots, failure details, and only the refill action", async () => {
   const rows = Array.from({ length: 12 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: `已通过 ${index + 1}`, test_category: "positive", legacy_question_type: "v1_mini", stage: "candidate", review_status: "human_review_pending" }));
-  const run = { id: "GGEN-NEW", status: "needs_regeneration", question_ids: rows.map(row => row.id), profile: { expected_count: 20 }, operation_progress: { hard_valid_completed: 12, overall_percent: 20 }, artifacts: { coverage_plan: Array.from({ length: 20 }, (_, index) => ({ slot: `Q${String(index + 1).padStart(2, "0")}`, test_category: "positive" })), slot_audit: { Q20: [{ attempt: 2, question: "失败问题", reference_answer: "越界答案", selected_evidence: [{ document_name: "fixture.pdf", chunk_id: "C20", chunk_text: "原文证据" }], validation_error: "unsupported answer anchor" }] }, hard_validation: { slot_persistence_v1: true, progress: { stage: "needs_regeneration", completed_slots: 12 } } } };
+  const run = { id: "GGEN-NEW", status: "needs_regeneration", question_ids: rows.map(row => row.id), profile: { expected_count: 20 }, operation_progress: { phase_label: "待补齐失败题", phase_processed: 20, phase_total: 20, phase_percent: 100, processed_slots: 20, expected_slots: 20, hard_valid_completed: 12, hard_valid_total: 20, failed_count: 8, probe_processed: 0, qc_processed: 0 }, artifacts: { coverage_plan: Array.from({ length: 20 }, (_, index) => ({ slot: `Q${String(index + 1).padStart(2, "0")}`, test_category: "positive" })), slot_audit: { Q20: [{ attempt: 2, question: "失败问题", reference_answer: "越界答案", selected_evidence: [{ document_name: "fixture.pdf", chunk_id: "C20", chunk_text: "原文证据" }], validation_error: "unsupported answer anchor" }] }, hard_validation: { slot_persistence_v1: true, progress: { stage: "needs_regeneration", completed_slots: 12 } } } };
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/questions") ? { questions: rows } : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
   expect(document.body.textContent).toContain("生成 12/20");
-  expect(document.body.textContent).toContain("Hard Validation 12/20 · 60%");
-  expect(document.body.textContent).toContain("整体 20%");
+  expect(document.body.textContent).toContain("已处理 20/20 · 100%");
+  expect(document.body.textContent).toContain("Hard Valid 12/20 · 待补 8");
   expect(document.body.textContent).toContain("补齐失败题（8）");
   expect(document.body.textContent).not.toContain("生成 V1 Mini 8 / 4 / 8");
   expect(document.querySelector(".review-batch")).toBeNull();
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-table button")].at(-1)!.click());
   expect(document.body.textContent).toContain("unsupported answer anchor");
   await act(async () => root.unmount());
+});
+
+for (const count of [10, 12, 19]) {
+  it(`renders a ${count}/20 partial Run before detailed questions load`, async () => {
+    const rows = Array.from({ length: count }, (_, index) => ({ id: `V1-${index + 1}`, question: `题目 ${index + 1}`, test_category: "positive", legacy_question_type: "v1_mini", raw: index === 0 ? {} : { coverage_slot: `Q${String(index + 1).padStart(2, "0")}` } }));
+    const run = { id: "GGEN-partial", status: "needs_regeneration", profile: { expected_count: 20 }, question_ids: rows.map(row => row.id), operation_progress: { phase_label: "待补齐失败题", phase_processed: 20, phase_total: 20, phase_percent: 100, processed_slots: 20, expected_slots: 20, hard_valid_completed: count, hard_valid_total: 20, failed_count: 20 - count, probe_processed: 0, qc_processed: 0 }, artifacts: { question_plan: rows.slice(1).map((row, index) => ({ question_id: row.id, coverage_slot: `Q${String(index + 2).padStart(2, "0")}` })), coverage_plan: Array.from({ length: 20 }, (_, index) => ({ slot: `Q${String(index + 1).padStart(2, "0")}` })), hard_validation: { slot_persistence_v1: true } } };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/questions") ? { questions: rows } : []), { status: 200 })));
+    const root = createRoot(document.body.appendChild(document.createElement("div")));
+    await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: rows, snapshots: [] }} />));
+    expect(document.querySelector(".review-table")?.textContent).toContain(`题目 ${count}`);
+    expect(document.querySelector(".generation-progress")?.textContent).toContain(`Hard Valid ${count}/20`);
+    expect(document.querySelector(".run-details")?.hasAttribute("open")).toBe(false);
+    await act(async () => root.unmount());
+  });
+}
+
+it("keeps the Overview target at 20 and points a partial Run to refill", async () => {
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OverviewPage data={{ overview: { dataset: { total: 10, expected_count: 20, generation_status: "needs_regeneration", approved: 0, pending_review: 10 } }, workspace: {} }} navigate={() => {}} />));
+  expect(document.querySelector(".overview-metrics")?.textContent).toContain("0 / 20");
+  expect(document.querySelector("#next-action-title")?.textContent).toBe("补齐失败题（10）");
+  await act(async () => root.unmount());
+});
+
+it("shows a recoverable page error with the original exception", async () => {
+  const broken = () => { throw new Error("render fixture"); };
+  const Broken = broken;
+  const logger = vi.spyOn(console, "error").mockImplementation(() => {});
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<PageErrorBoundary><Broken /></PageErrorBoundary>));
+  expect(document.querySelector("[role=alert]")?.textContent).toContain("页面加载异常");
+  expect(document.querySelector("[role=alert]")?.textContent).toContain("render fixture");
+  expect(document.querySelector("[role=alert] button")?.textContent).toBe("重新加载");
+  expect(logger).toHaveBeenCalled();
+  await act(async () => root.unmount());
+  logger.mockRestore();
 });
 
 it("toggles a revision reason without changing chip base styling", async () => {

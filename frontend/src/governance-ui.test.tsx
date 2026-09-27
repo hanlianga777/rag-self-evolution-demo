@@ -132,13 +132,13 @@ it("enables Golden approval only after both checks pass", async () => {
 });
 
 it("restores a running generation and reads persisted slot progress", async () => {
-  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "GGEN-live", status: "generating", question_ids: [], artifacts: { hard_validation: { progress: { stage: "generating", slot: "Q03", completed_slots: 2, total_slots: 20 } } } }), { status: 200 }));
+  const fetcher = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ id: "GGEN-live", status: "generating", question_ids: [], operation_progress: { phase_label: "逐题生成与校验", phase_processed: 2, phase_total: 20, phase_percent: 10, hard_valid_completed: 0, hard_valid_total: 20, failed_count: 2, probe_processed: 0, qc_processed: 0, current_slot: "Q03", attempt: 1 }, artifacts: { hard_validation: { progress: { stage: "generating", slot: "Q03", completed_slots: 0, total_slots: 20 } } } }), { status: 200 })));
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-live", status: "queued", question_ids: [], artifacts: {} }], dataset: [] }} />); });
   expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-live"));
   expect(document.body.textContent).toContain("Q03");
-  expect(document.body.textContent).toContain("2 / 20");
+  expect(document.body.textContent).toContain("已处理 2/20 · 10%");
   expect((([...document.querySelectorAll("button")].find(button => button.textContent?.includes("生成 V1 Mini"))) as HTMLButtonElement).disabled).toBe(true);
   await act(async () => root.unmount());
 });

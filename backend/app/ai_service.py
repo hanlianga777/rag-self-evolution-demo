@@ -280,7 +280,7 @@ class AiService:
             attempts, candidate = list(slot_audit.get(slot["slot"], [])), None
             if any(item.get("coverage_slot") == slot["slot"] for item in candidates):
                 continue
-            for _ in range(2):
+            for retry in range(2):
                 attempt = len(attempts) + 1
                 instruction = self._slot_instruction(slot, attempts[-1]["validation_error"] if attempts else None)
                 source_payload = [{"chunk_id": chunk["chunk_id"], "section": chunk.get("section_path"), "source_text": chunk.get("chunk_text", chunk.get("text", ""))} for chunk in slot["sources"]]
@@ -304,7 +304,7 @@ class AiService:
                 if not error:
                     candidates.append(candidate)
                 if on_progress:
-                    on_progress({"stage": "generating", "slot": slot["slot"], "attempt": attempt, "completed_slots": len(candidates), "slot_audit": slot_audit.copy(), "candidate": candidate if not error else None})
+                    on_progress({"stage": "generating", "slot": slot["slot"], "attempt": attempt, "completed_slots": len(candidates), "slot_complete": not error or retry == 1, "slot_audit": slot_audit.copy(), "candidate": candidate if not error else None})
                 if not error:
                     break
             slot_audit[slot["slot"]] = attempts

@@ -47,31 +47,15 @@ it("shows an actual pending action and keeps its failure until dismissed", async
   await act(async () => root.unmount());
 });
 
-it("restores a persisted Generation operation without inventing progress", async () => {
+it("does not restore a Golden Generation toast for a running or recoverable run", async () => {
   const running = { id: "GGEN-1", status: "generating", artifacts: { hard_validation: { progress: { stage: "generating", completed_slots: 8, total_slots: 20, slot: "Q08", attempt: 1 } } } };
-  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("generation-runs") ? [running] : url.endsWith("evaluations") ? [] : running), { status: 200 }))));
+  const pending = { id: "GGEN-partial", status: "needs_regeneration" };
+  const fetcher = vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("generation-runs") ? [running, pending] : []), { status: 200 })));
+  vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<OperationProvider><span>页面</span></OperationProvider>); });
-  expect(document.querySelector(".operation-console")?.textContent).toContain("Golden Generation");
-  expect(document.querySelector(".operation-console progress")?.hasAttribute("value")).toBe(false);
-  await act(async () => root.unmount());
-});
-
-it("restores a recoverable Generation run as a pending action with measured progress", async () => {
-  const run = { id: "GGEN-partial", status: "needs_regeneration", created_at: new Date().toISOString(), operation_progress: { phase: "needs_regeneration", phase_label: "待补齐失败题", hard_valid_completed: 12, probe_processed: 0, qc_processed: 0, overall_percent: 20 } };
-  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("generation-runs") ? [run] : url.endsWith("evaluations") || url.endsWith("revisions") ? [] : run), { status: 200 }))));
-  const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
-  expect(document.querySelector(".operation-console")?.textContent).toContain("待补齐失败题 · Hard Valid 12 / 20");
-  await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
-  const card = document.querySelector(".operation-console")!;
-  expect(card.getAttribute("role")).toBe("status");
-  expect(card.textContent).toContain("待补齐失败题 · Hard Valid 12 / 20");
-  expect(card.textContent).toContain("20%");
-  expect(card.textContent).toContain("补齐失败题（8）");
-  expect(card.textContent).not.toContain("运行失败");
-  expect(card.querySelector("progress")?.value).toBe(12);
-  expect(card.querySelector("progress")?.max).toBe(60);
+  expect(document.querySelector(".operation-console")).toBeNull();
+  expect(fetcher.mock.calls.some(([url]) => url.endsWith("generation-runs"))).toBe(false);
   await act(async () => root.unmount());
 });
 

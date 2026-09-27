@@ -259,6 +259,8 @@ class GovernanceStore:
         return {
             "generation_run_id": current["id"] if current else None,
             "total": len(rows),
+            "expected_count": self._expected_count(current) if current else 0,
+            "generation_status": current["status"] if current else None,
             "positive": sum(row["test_category"] == "positive" for row in rows),
             "negative": sum(row["test_category"] == "negative" for row in rows),
             "ablation": sum(row["test_category"] == "ablation" for row in rows),
@@ -296,13 +298,13 @@ class GovernanceStore:
             if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status IN ('queued', 'coverage', 'generating', 'validation', 'probing', 'qc') LIMIT 1").fetchone():
                 raise ValueError("已有 V1 Mini Generation Run 正在执行")
             connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(GENERATION_PROFILES["mini"]), model_version, "queued", _json([]), now))
-            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json([]), _json([]), _json({"slot_persistence_v1": True, "corpus_fingerprint": current_manifest()["sources"], "progress": {"stage": "queued", "completed_slots": 0, "total_slots": GENERATION_PROFILES["mini"]["expected_count"], "probe_completed": 0, "qc_completed": 0, "started_at": now, "operation_id": run_id}})))
+            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json([]), _json([]), _json({"slot_persistence_v1": True, "corpus_fingerprint": current_manifest()["sources"], "progress": {"stage": "queued", "completed_slots": 0, "total_slots": GENERATION_PROFILES["mini"]["expected_count"], "phase_processed": 0, "phase_total": GENERATION_PROFILES["mini"]["expected_count"], "processed_slot_ids": [], "probe_completed": 0, "qc_completed": 0, "started_at": now, "operation_id": run_id}})))
         return run_id
 
     def claim_regeneration(self, run_id: str, corpus_fingerprint):
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute("SELECT r.status, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.id=?", (run_id,)).fetchone()
+            row = connection.execute("SELECT r.status, r.profile_json, r.question_ids_json, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.id=?", (run_id,)).fetchone()
             if row is None:
                 raise KeyError(run_id)
             audit = _load(row["hard_validation_json"], {})
@@ -310,12 +312,14 @@ class GovernanceStore:
                 raise ValueError("仅待补题的新 Run 可以局部补题")
             if audit.get("corpus_fingerprint") != corpus_fingerprint:
                 raise ValueError("Corpus 已变化，请创建新的 Generation Run")
-            audit["progress"] = {**audit.get("progress", {}), "stage": "generating", "started_at": _now(), "finished_at": None, "operation_id": f"{run_id}-R{audit.get('regeneration_count', 0) + 1}"}
+            remaining = self._expected_count({"profile": _load(row["profile_json"], {})}) - len(_load(row["question_ids_json"], []))
+            prior_progress = audit.get("progress", {})
+            audit["progress"] = {**prior_progress, "stage": "generating", "phase_processed": 0, "phase_total": remaining, "processed_slot_ids": prior_progress.get("processed_slot_ids", list(audit.get("slot_audit", {}))), "started_at": _now(), "finished_at": None, "operation_id": f"{run_id}-R{audit.get('regeneration_count', 0) + 1}"}
             audit["regeneration_count"] = audit.get("regeneration_count", 0) + 1
             connection.execute("UPDATE golden_generation_runs SET status='generating' WHERE id=?", (run_id,))
             connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), run_id))
 
-    def persist_generation_attempt(self, run_id: str, candidate: dict | None, slot_audit: dict, *, slot: str, attempt: int, model: str):
+    def persist_generation_attempt(self, run_id: str, candidate: dict | None, slot_audit: dict, *, slot: str, attempt: int, model: str, slot_complete: bool | None = None):
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT r.question_ids_json, a.hard_validation_json, a.question_plan_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.id=?", (run_id,)).fetchone()
@@ -330,7 +334,12 @@ class GovernanceStore:
             if candidate and any(_load(item["raw_json"], {}).get("coverage_slot") == slot for item in connection.execute("SELECT raw_json FROM questions WHERE legacy_question_type='v1_mini' AND stage!='superseded' AND raw_json LIKE ?", (f'%"generation_run_id": "{run_id}"%',))):
                 raise ValueError(f"{slot} 已有活动 Candidate")
             audit["slot_audit"] = slot_audit
-            audit["progress"] = {**audit.get("progress", {}), "stage": "generating", "slot": slot, "attempt": attempt, "completed_slots": len(ids) + bool(candidate)}
+            progress = audit.get("progress", {})
+            finished = bool(candidate) if slot_complete is None else slot_complete
+            processed_ids = progress.get("processed_slot_ids", [])
+            if finished and slot not in processed_ids:
+                processed_ids = [*processed_ids, slot]
+            audit["progress"] = {**progress, "stage": "generating", "slot": slot, "attempt": attempt, "completed_slots": len(ids) + bool(candidate), "processed_slot_ids": processed_ids, "phase_processed": progress.get("phase_processed", 0) + int(finished), "phase_total": progress.get("phase_total", 20)}
             if candidate:
                 question_id = f"V1G-{run_id[-12:]}-{int(slot[1:]):02d}"
                 now = _now()
@@ -462,10 +471,15 @@ class GovernanceStore:
             progress = audit.get("progress", {})
             valid, probe, qc = len(run["question_ids"]), progress.get("probe_completed", 0), progress.get("qc_completed", 0) + progress.get("qc_skipped", 0)
             phase = audit.get("failed_stage") if run["status"] == "failed" and audit.get("failed_stage") in {"generating", "validation", "probing", "qc"} else progress.get("stage", run["status"])
-            phase_done = probe if phase == "probing" else qc if phase == "qc" else valid
+            expected = self._expected_count(run)
+            processed = len(progress["processed_slot_ids"]) if "processed_slot_ids" in progress else len(audit.get("slot_audit", {})) if run["status"] == "needs_regeneration" else valid
+            generation_done = progress.get("phase_processed", processed)
+            generation_total = progress.get("phase_total", expected)
+            phase_done, phase_total = (probe, expected) if phase == "probing" else (qc, expected) if phase in {"qc", "completed"} else (generation_done, generation_total)
+            failed_count = max(0, expected - valid) if run["status"] == "needs_regeneration" else max(0, processed - valid)
             started_at = progress.get("started_at", run["created_at"])
             ended_at = datetime.fromisoformat(progress["finished_at"]) if progress.get("finished_at") else datetime.now(timezone.utc)
-            run["operation_progress"] = {"operation_id": progress.get("operation_id", run_id), "status": run["status"], "phase": phase, "phase_label": {"queued": "等待开始", "coverage": "覆盖规划", "generating": "Hard Validation", "validation": "Hard Validation", "needs_regeneration": "待补齐失败题", "probing": "Probe", "qc": "QC", "completed": "已完成", "failed": "运行失败"}.get(phase, phase), "completed_units": phase_done, "total_units": 20, "phase_percent": round(phase_done * 5), "overall_percent": round((valid + probe + qc) / 60 * 100), "hard_valid_completed": valid, "probe_processed": probe, "qc_processed": qc, "current_slot": progress.get("slot"), "current_item": progress.get("slot"), "attempt": progress.get("attempt"), "started_at": started_at, "elapsed_ms": max(0, round((ended_at - datetime.fromisoformat(started_at)).total_seconds() * 1000)), "message": progress.get("message"), "error": audit.get("error")}
+            run["operation_progress"] = {"operation_id": progress.get("operation_id", run_id), "status": run["status"], "phase": phase, "phase_label": {"queued": "等待开始", "coverage": "覆盖规划", "generating": "补齐失败题" if audit.get("regeneration_count") else "逐题生成与校验", "validation": "逐题生成与校验", "needs_regeneration": "待补齐失败题", "probing": "Probe", "qc": "QC", "completed": "已完成", "failed": "运行失败"}.get(phase, phase), "completed_units": phase_done, "total_units": phase_total, "phase_processed": phase_done, "phase_total": phase_total, "phase_percent": round(phase_done / phase_total * 100) if phase_total else 0, "overall_percent": round((processed + probe + qc) / (expected * 3) * 100) if expected else 0, "processed_slots": processed, "expected_slots": expected, "hard_valid_completed": valid, "hard_valid_total": expected, "failed_count": failed_count, "probe_processed": probe, "qc_processed": qc, "current_slot": progress.get("slot"), "current_item": progress.get("slot"), "attempt": progress.get("attempt"), "started_at": started_at, "elapsed_ms": max(0, round((ended_at - datetime.fromisoformat(started_at)).total_seconds() * 1000)), "message": progress.get("message"), "error": audit.get("error")}
         return run
 
     def update_quality_rerun(self, run_id: str, changes: dict, *, start: bool = False):

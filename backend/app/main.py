@@ -379,7 +379,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
         nonlocal stage
         stage = event["stage"]
         if stage == "generating":
-            run_store.persist_generation_attempt(run_id, event.get("candidate"), event["slot_audit"], slot=event["slot"], attempt=event["attempt"], model=service.model)
+            run_store.persist_generation_attempt(run_id, event.get("candidate"), event["slot_audit"], slot=event["slot"], attempt=event["attempt"], model=service.model, slot_complete=event.get("slot_complete"))
         else:
             run_store.update_generation_run(run_id, status=stage, coverage_plan=event.get("coverage_plan"), progress={key: event[key] for key in ("stage", "slot", "attempt", "completed_slots") if key in event})
 

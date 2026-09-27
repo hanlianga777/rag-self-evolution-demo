@@ -170,6 +170,7 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .run-details { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
 .run-details summary { cursor: pointer; width: fit-content; }
 .run-details .run-summary { margin: 8px 0 0; }
+.slot-audit { margin: 8px 0; }
 .export-menu { position: relative; }
 .export-menu summary { cursor: pointer; list-style: none; white-space: nowrap; }
 .export-menu summary::-webkit-details-marker { display: none; }
