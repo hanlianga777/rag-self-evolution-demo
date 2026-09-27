@@ -597,7 +597,7 @@ class GovernanceStore:
         self.update_revision(revision_id, status="validating", stage="hard_validation")
         drafts, errors, new_hash, changed_fields = self._validate_revision_drafts(run, chunks, similarity, generated or run["changes"])
         if errors:
-            editable_errors = ("草案未改变", "ABLATION_TOO_SIMILAR", "参考答案不一致", "证据不一致", "知识点不一致", "答案锚点", "成对题必须")
+            editable_errors = ("草案未改变", "答案锚点")
             if run["mode"] == "manual_edit" and len(drafts) == len(run["question_ids"]) and all(any(marker in error for marker in editable_errors) for error in errors):
                 return self.update_revision(revision_id, status="preview_ready", stage="preview_ready", error="；".join(errors), drafts=drafts, new_hash=new_hash, changed_fields=changed_fields, apply_blocked=True, validation={"passed": False, "errors": errors}, progress={"current": len(drafts), "total": len(drafts)})
             return self.update_revision(revision_id, status="failed", stage="hard_validation", error="；".join(errors), drafts=drafts, new_hash=new_hash, changed_fields=changed_fields, validation={"passed": False, "errors": errors})

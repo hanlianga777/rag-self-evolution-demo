@@ -100,6 +100,7 @@ it("starts replacement as one slot draft without first changing a pending review
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<CandidateWorkspace row={row} peers={[row]} busy={false} onRun={() => {}} onReview={async () => { throw Error("review must not run"); }} onRefresh={async () => {}} operation={{ watchRevision: () => {} } as any} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-actionbar button")].find(button => button.textContent === "替换")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".revision-tags button")].find(button => button.textContent === "其他")!.click());
   const reason = document.querySelector<HTMLTextAreaElement>(".revision-workspace textarea")!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(reason, "换成另一知识点"); reason.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-actionbar button")].find(button => button.textContent === "生成修订草案")!.click());

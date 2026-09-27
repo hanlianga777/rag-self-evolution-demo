@@ -301,6 +301,27 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.assertIn("当前产品", failed["error"])
         self.assertEqual(self.store.question(first)["evidence"][0]["source_chunk_ids"], ["C1"])
 
+    def test_ai_replacement_selects_without_explicit_material_intent(self):
+        first = self.ids[0]
+        chunks = [{**chunk, "product": "同一产品", "chunk_text": "设备启动前检查急停按钮和电池状态。" * 3} for chunk in self.chunks]
+        run = self.store.start_revision(first, "ai_regenerate", "当前题目业务价值较低", False, {}, chunks, tags=["业务价值偏低"], replacement=True)
+        service = AiService(self.store, SimpleNamespace(), SimpleNamespace(settings=SimpleNamespace(configured=True, model="fixture")), False)
+        service.retriever = SimpleNamespace(retrieve=lambda *_args, **_kwargs: [
+            {"chunk_id": "C2", "final_score": .8}, {"chunk_id": "C1", "final_score": .6},
+        ])
+        selected = service.select_revision_material(run, chunks)[first]
+        self.assertEqual(selected["method"], "automatic")
+        self.assertEqual(selected["chunk_ids"], ["C2"])
+        self.assertEqual(self.store.question(first)["evidence"][0]["source_chunk_ids"], ["C1"])
+
+    def test_explicit_multi_chunk_override_is_preserved(self):
+        first = self.ids[0]
+        run = self.store.start_revision(first, "ai_regenerate", "修订问题", False, {first: {"source_chunk_ids": ["C1", "C2"]}}, self.chunks)
+        service = AiService(self.store, SimpleNamespace(), SimpleNamespace(settings=SimpleNamespace(configured=True, model="fixture")), False)
+        selected = service.select_revision_material(run, self.chunks)[first]
+        self.assertEqual(selected["method"], "manual")
+        self.assertEqual(selected["chunk_ids"], ["C1", "C2"])
+
     def test_negative_material_is_generation_context_not_golden_evidence(self):
         negative = self.ids[12]
         for chunk in self.chunks:
@@ -492,7 +513,7 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.addCleanup(setattr, main, "store", old_store)
         self.addCleanup(setattr, main, "corpus", old_corpus)
         client = TestClient(main.app)
-        payload = {"mode": "manual_edit", "reason": "修订证据", "changes": {self.ids[0]: {"question": "如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}}
+        payload = {"mode": "manual_edit", "reason": "修订证据", "tags": ["证据不足"], "changes": {self.ids[0]: {"question": "如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}}
         route = f"/api/governance/questions/{self.ids[0]}/revision"
         self.assertEqual(client.post(route, json=payload, headers={"Origin": "https://untrusted.example"}).status_code, 403)
         with patch.object(main.threading, "Thread"):

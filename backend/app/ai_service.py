@@ -203,15 +203,13 @@ class AiService:
                     elif old["test_category"] == "negative":
                         query = run["reason"] if len(run["reason"].strip()) >= 6 else old["question"]
                     else:
-                        query = old["question"] if "证据不足" in tags else ""
-                    if not query:
-                        raise ValueError(f"{slot}: 换材意图不明确，请描述目标知识点或手动选材")
+                        query = old["question"]
                     hits = self.retriever.retrieve(query, {"candidate_k": 64, "top_k": 64, "min_score": 0, "metadata_filter": "OFF", "hybrid_search": True, "rerank": True})
                     eligible = []
                     for hit in hits:
                         key = hit.get("chunk_id")
                         chunk = by_id.get(key)
-                        if not chunk or not in_scope(chunk) or key in original or key in (run.get("exclude_chunk_ids") or {}).get(item_id, []):
+                        if not chunk or not in_scope(chunk) or key in (run.get("exclude_chunk_ids") or {}).get(item_id, []):
                             continue
                         section = str(chunk.get("section_path") or "")
                         body = str(chunk.get("chunk_text") or chunk.get("text") or "")
@@ -225,7 +223,7 @@ class AiService:
                         raise ValueError(f"{slot}: 当前文档及同产品文档未找到合适材料，请修改意图或手动选材")
                     eligible.sort()
                     ids = [eligible[0][2]]
-                    method, scope, reason = "automatic", "current_document" if not eligible[0][0] else "same_product" if product else "original_document_set", f"根据修订意图检索真实正文：{query}"
+                    method, scope, reason = "automatic", "current_document" if not eligible[0][0] else "same_product" if product else "original_document_set", f"根据修订原因检索真实正文：{query}"
             if not ids or any(key not in by_id or not in_scope(by_id[key]) for key in ids):
                 raise ValueError(f"{slot}: 只能选择当前产品或文档的真实 Chunk")
             if method != "retained":

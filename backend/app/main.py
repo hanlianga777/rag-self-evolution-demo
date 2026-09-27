@@ -365,6 +365,8 @@ def revision_status(revision_id: str):
 
 @app.post("/api/governance/questions/{question_id}/revision", status_code=202, dependencies=[Depends(require_trusted_origin)])
 def create_revision(question_id: str, payload: RevisionRequest):
+    if len(payload.tags) != 1 or payload.tags[0] not in {"业务价值偏低", "题型不纯", "表达过于接近原文", "证据不足", "答案不完整", "Subtype 错误", "与其他题重复", "其他"} or not payload.reason.strip():
+        raise HTTPException(status_code=422, detail="请选择一项修订原因并填写说明")
     try:
         run = store.start_revision(question_id, payload.mode, payload.reason, payload.paired, payload.changes, corpus.chunks(), tags=payload.tags, replacement=payload.replacement, actor=payload.actor)
     except KeyError as error:

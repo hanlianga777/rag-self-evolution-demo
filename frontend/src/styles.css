@@ -202,7 +202,8 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .candidate-actionbar button { white-space: nowrap; }
 .action-reason { color: var(--muted); flex: 1; font-size: 12px; line-height: 1.35; min-width: 180px; }
 .workspace-back { margin-bottom: 12px; }
-.revision-tags button.active { background: #dfe9f3; border-color: #91a6bc; }
+.revision-tags button.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+.manual-edit-fields { border-top: 1px solid var(--line-soft); margin-top: 14px; padding-top: 12px; }
 .revision-workspace label, .draft-workspace label { display: grid; font-size: 13px; gap: 6px; margin: 10px 0; }
 .revision-modes label, .revision-pair label { align-items: center; display: flex; gap: 6px; }
 .revision-workspace textarea, .draft-workspace textarea, .chunk-picker .workspace-row input, .chunk-picker select { background: #fff; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; padding: 9px; width: 100%; }
