@@ -15,7 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from .ai_service import AiService
-from .corpus import CorpusStore
+from .corpus import CorpusStore, UPLOADS_DIR, current_manifest
+from .corpus_management import CorpusManager
 from .config import load_settings
 from .evaluation import EvaluationRunner
 from .governance import GovernanceStore
@@ -26,11 +27,13 @@ from .providers import DeepSeekProvider, ProviderTimeout
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
 app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1] / "documents"), name="documents")
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR, check_dir=False), name="uploads")
 TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
 app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None)
 corpus = CorpusStore()
 ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")
+corpus_manager = CorpusManager(ai_service.retriever)
 store.interrupt_revision_runs()
 store.interrupt_generation_runs()
 store.interrupt_evaluation_runs()
@@ -147,12 +150,69 @@ def overview():
 @app.get("/api/workspace")
 def workspace():
     documents = corpus.documents()
-    return {"name": "机器人智能问答评测与优化 Agent", "environment": "Production Baseline", "document_count": len(documents), "chunk_count": sum(item["chunks"] for item in documents), "active_version": (store.active_production() or {}).get("id")}
+    snapshots = store.dataset_snapshots()
+    state = corpus_manager.state()
+    stale = bool(state) and (not snapshots or snapshots[0]["snapshot"].get("corpus_fingerprint") != current_manifest()["sources"])
+    latest_snapshot_id = snapshots[0]["id"] if snapshots and not stale else None
+    current_baseline = next((item for item in store.evaluation_runs() if item["status"] == "completed" and item["dataset_version_id"] == latest_snapshot_id and item["config"].get("run_target") != "sandbox_candidate"), None)
+    return {"name": "机器人智能问答评测与优化 Agent", "environment": "Production Baseline", "document_count": len(documents), "chunk_count": sum(item["chunks"] for item in documents), "active_version": (store.active_production() or {}).get("id"), "corpus_changed_at": state.get("changed_at"), "requires_new_golden": stale, "requires_new_baseline": bool(state) and not stale and current_baseline is None}
+
+
+def require_current_baseline(run_id: str | None = None):
+    if not corpus_manager.state():
+        return
+    snapshots = store.dataset_snapshots()
+    if not snapshots or snapshots[0]["snapshot"].get("corpus_fingerprint") != current_manifest()["sources"]:
+        raise HTTPException(status_code=409, detail="Corpus 已变化；请创建并确认新的 Golden 测试集")
+    run = store.evaluation_run(run_id) if run_id else next((item for item in store.evaluation_runs() if item["status"] == "completed" and item["config"].get("run_target") != "sandbox_candidate"), None)
+    if not run or run["dataset_version_id"] != snapshots[0]["id"]:
+        raise HTTPException(status_code=409, detail="当前 Corpus 需要新的 Baseline；旧实验仅供历史查看")
 
 
 @app.get("/api/documents")
 def documents():
     return corpus.documents()
+
+
+def require_idle_corpus():
+    running_generation = any(item["status"] in {"queued", "coverage", "generating", "validation", "probing", "qc"} for item in store.generation_runs())
+    running_revision = any(item["status"] in {"queued", "generating", "validating", "probing", "qc"} for item in store.revision_runs())
+    running_evaluation = any(item["status"] == "running" for item in store.evaluation_runs())
+    if running_generation or running_revision or running_evaluation:
+        raise HTTPException(status_code=409, detail="当前有 Generation、Revision 或 Evaluation 正在运行，请结束后再修改 Corpus")
+
+
+@app.post("/api/documents", status_code=202, dependencies=[Depends(require_trusted_origin)])
+async def upload_document(request: Request, filename: str):
+    require_idle_corpus()
+    if request.headers.get("content-type", "").split(";")[0] != "application/pdf" or int(request.headers.get("content-length", "0") or 0) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=415, detail="请选择不超过 50 MB 的 PDF")
+    data = await request.body()
+    if not data.startswith(b"%PDF-") or len(data) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=422, detail="PDF 文件无效或超过 50 MB")
+    try:
+        return corpus_manager.start("upload", filename=filename, data=data)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/corpus-operations/{operation_id}")
+def corpus_operation(operation_id: str):
+    result = corpus_manager.operation(operation_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Operation not found")
+    return result
+
+
+@app.delete("/api/documents/{document_id}", status_code=202, dependencies=[Depends(require_trusted_origin)])
+def delete_document(document_id: str):
+    require_idle_corpus()
+    if not any(item["id"] == document_id for item in corpus.documents()):
+        raise HTTPException(status_code=404, detail="Document not found")
+    try:
+        return corpus_manager.start("delete", document_id=document_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.get("/api/documents/{document_id}")
@@ -718,6 +778,7 @@ def probe_readiness():
 
 @app.post("/api/experiments/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def run_experiments(payload: ExperimentRequest | None = None):
+    require_current_baseline()
     completed = next((item for item in store.evaluation_runs() if item["status"] == "completed" and item['config'].get('run_target') != 'sandbox_candidate'), None)
     if completed is None:
         raise HTTPException(status_code=409, detail="需先完成真实 Baseline Evaluation")
@@ -745,6 +806,7 @@ def continue_experiment(run_id: str):
     experiment = store.experiment(run_id)
     if experiment is None:
         raise HTTPException(status_code=404, detail="Experiment not found")
+    require_current_baseline(experiment["baseline_run_id"])
     try:
         return OptimizationAgent(store, ai_service.provider).generate(experiment["baseline_run_id"], experiment_id=run_id)
     except ValueError as error:
@@ -753,8 +815,10 @@ def continue_experiment(run_id: str):
 
 @app.post("/api/experiments/{run_id}/recommendation", dependencies=[Depends(require_trusted_origin)])
 def select_recommendation(run_id: str, payload: RecommendationRequest):
-    if store.experiment(run_id) is None:
+    experiment = store.experiment(run_id)
+    if experiment is None:
         raise HTTPException(status_code=404, detail="Experiment not found")
+    require_current_baseline(experiment["baseline_run_id"])
     try:
         return store.select_recommendation(run_id, payload.candidate_id, payload.actor)
     except ValueError as error:
@@ -763,6 +827,9 @@ def select_recommendation(run_id: str, payload: RecommendationRequest):
 
 @app.post('/api/experiments/{run_id}/composite', dependencies=[Depends(require_trusted_origin)])
 def create_composite(run_id: str):
+    experiment = store.experiment(run_id)
+    if experiment is not None:
+        require_current_baseline(experiment["baseline_run_id"])
     try:
         return store.create_composite(run_id)
     except ValueError as error:
@@ -771,6 +838,11 @@ def create_composite(run_id: str):
 
 @app.post("/api/candidates/{candidate_id}/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def run_candidate(candidate_id: str):
+    candidate = store.candidate(candidate_id)
+    if candidate:
+        experiment = store.experiment(candidate["experiment_id"])
+        if experiment:
+            require_current_baseline(experiment["baseline_run_id"])
     runner = EvaluationRunner(store, ai_service)
     try:
         run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id)
@@ -782,6 +854,11 @@ def run_candidate(candidate_id: str):
 
 @app.post("/api/candidates/{candidate_id}/publish", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def publish_candidate(candidate_id: str, payload: ReviewRequest):
+    candidate = store.candidate(candidate_id)
+    if candidate:
+        experiment = store.experiment(candidate["experiment_id"])
+        if experiment:
+            require_current_baseline(experiment["baseline_run_id"])
     if payload.decision != "approved":
         raise HTTPException(status_code=422, detail="确认发布需要明确批准")
     try:
@@ -823,6 +900,10 @@ def evaluation_run(run_id: str):
 
 @app.post("/api/evaluations/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def start_evaluation():
+    if corpus_manager.state():
+        snapshots = store.dataset_snapshots()
+        if not snapshots or snapshots[0]["snapshot"].get("corpus_fingerprint") != current_manifest()["sources"]:
+            raise HTTPException(status_code=409, detail="Corpus 已变化；请基于当前知识库重新生成并确认 Golden 测试集")
     runner = EvaluationRunner(store, ai_service)
     try:
         run_id, approved, config = runner.start_baseline()

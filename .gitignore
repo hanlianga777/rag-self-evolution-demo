@@ -11,6 +11,12 @@ frontend/.npm-cache/
 backend/data/*.db
 backend/data/*.bak
 backend/data/index/
+backend/data/index_versions/
+backend/data/uploads/
+backend/data/archived_documents/
+backend/data/pending_uploads/
+backend/data/corpus_operations/
+backend/data/corpus_state.json
 .demo-logs/
 __pycache__/
 *.py[cod]

@@ -13,6 +13,7 @@ import numpy as np
 
 from .corpus import (
     DOCUMENTS_DIR,
+    UPLOADS_DIR,
     EMBEDDING_MODEL,
     INDEX_DIR,
     OVERLAP_TOKENS,
@@ -96,9 +97,9 @@ def _ocr_page(ocr, page) -> str:
 def _parse_document(catalog: dict, ocr, token_counter) -> tuple[dict, list[dict]]:
     import pymupdf
 
-    source = DOCUMENTS_DIR / catalog["name"]
+    source = Path(catalog["_source_path"]) if catalog.get("_source_path") else (UPLOADS_DIR if catalog.get("storage") == "uploads" else DOCUMENTS_DIR) / catalog["name"]
     record = {
-        **catalog,
+        **{key: value for key, value in catalog.items() if key != "_source_path"},
         "pages": None,
         "chunks": 0,
         "status": "Parse Failed",
@@ -147,8 +148,8 @@ def _parse_document(catalog: dict, ocr, token_counter) -> tuple[dict, list[dict]
         return record, []
 
 
-def build_index(force: bool = False) -> int:
-    if not force and is_current():
+def build_index(force: bool = False, *, catalog: list[dict] | None = None, index_dir: Path = INDEX_DIR, on_progress=None, strict: bool = False) -> int:
+    if not force and catalog is None and is_current():
         print("索引已是最新状态：PDF 指纹未变化，无需重建。")
         return 0
 
@@ -158,15 +159,19 @@ def build_index(force: bool = False) -> int:
         from transformers import AutoTokenizer
         import faiss
     except ImportError as error:
+        if strict:
+            raise RuntimeError(f"索引依赖不可用：{error}") from error
         print(f"索引依赖不可用：{error}。请运行 python3 -m pip install -r backend/requirements.txt", file=sys.stderr)
         return 1
 
-    INDEX_DIR.mkdir(parents=True, exist_ok=True)
-    (INDEX_DIR / "faiss.index").unlink(missing_ok=True)
+    index_dir.mkdir(parents=True, exist_ok=True)
+    (index_dir / "faiss.index").unlink(missing_ok=True)
     print("正在初始化本地 RapidOCR（PDF 不会上传）。")
     try:
         ocr = RapidOCR()
     except Exception as error:
+        if strict:
+            raise RuntimeError(f"OCR 初始化失败：{error}") from error
         print(f"OCR 初始化失败：{error}", file=sys.stderr)
         return 1
 
@@ -174,17 +179,24 @@ def build_index(force: bool = False) -> int:
         print(f"正在加载 BGE tokenizer：{EMBEDDING_MODEL}")
         tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL)
     except Exception as error:
+        if strict:
+            raise RuntimeError(f"BGE tokenizer 初始化失败：{error}") from error
         print(f"BGE tokenizer 初始化失败：{error}", file=sys.stderr)
         return 1
     token_counter = lambda text: tokenizer_token_count(tokenizer, text)
 
     documents, chunks = [], []
-    for catalog in discover_documents():
-        print(f"解析：{catalog['name']}")
-        record, parsed_chunks = _parse_document(catalog, ocr, token_counter)
+    sources = catalog if catalog is not None else discover_documents()
+    for position, source in enumerate(sources, 1):
+        if on_progress:
+            on_progress("parse", position - 1, len(sources))
+        print(f"解析：{source['name']}")
+        record, parsed_chunks = _parse_document(source, ocr, token_counter)
         documents.append(record)
         chunks.extend(parsed_chunks)
         print(f"  {record['status']}，{record['chunks']} 个真实分块")
+        if on_progress:
+            on_progress("chunk", position, len(sources))
 
     if chunks:
         try:
@@ -192,15 +204,21 @@ def build_index(force: bool = False) -> int:
             model = SentenceTransformer(EMBEDDING_MODEL)
             vectors = model.encode([chunk["chunk_text"] for chunk in chunks], normalize_embeddings=True, show_progress_bar=True)
             vectors = np.asarray(vectors, dtype="float32")
+            if on_progress:
+                on_progress("embedding", 0, len(chunks))
             index = faiss.IndexFlatIP(vectors.shape[1])
             index.add(vectors)
-            faiss.write_index(index, str(INDEX_DIR / "faiss.index"))
+            faiss.write_index(index, str(index_dir / "faiss.index"))
+            if on_progress:
+                on_progress("index", len(chunks), len(chunks))
             for chunk in chunks:
                 chunk["embedding_status"] = "Indexed"
             for document in documents:
                 if document["status"] == "Parsed":
                     document["status"] = "Indexed"
         except Exception as error:
+            if strict:
+                raise RuntimeError(f"Embedding/FAISS 构建失败：{error}") from error
             for document in documents:
                 if document["status"] == "Parsed":
                     document["status"] = "Embedding Failed"
@@ -210,12 +228,15 @@ def build_index(force: bool = False) -> int:
             print(f"Embedding/FAISS 构建失败：{error}", file=sys.stderr)
     else:
         print("没有通过质量检查的可索引文本；文档将显示 Needs OCR / Parse Failed。")
+        if not documents:
+            model = SentenceTransformer(EMBEDDING_MODEL)
+            faiss.write_index(faiss.IndexFlatIP(model.get_sentence_embedding_dimension()), str(index_dir / "faiss.index"))
 
-    _write_json(INDEX_DIR / "documents.json", documents)
-    _write_json(INDEX_DIR / "chunks.json", chunks)
-    _write_json(INDEX_DIR / "manifest.json", current_manifest())
+    _write_json(index_dir / "documents.json", documents)
+    _write_json(index_dir / "chunks.json", chunks)
+    _write_json(index_dir / "manifest.json", current_manifest(sources))
     print(f"索引完成：{sum(item['status'] == 'Indexed' for item in documents)} 份文档，{len(chunks)} 个分块。")
-    return 0
+    return 0 if (chunks or not documents) and all(item["status"] == "Indexed" for item in documents) else 1
 
 
 def main() -> int:

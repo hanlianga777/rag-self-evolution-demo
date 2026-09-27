@@ -15,6 +15,7 @@ OVERLAP_TOKENS = 60
 TOP_K = 4
 INDEX_DIR = Path(__file__).resolve().parents[1] / "data" / "index"
 DOCUMENTS_DIR = Path(__file__).resolve().parents[1] / "documents"
+UPLOADS_DIR = Path(__file__).resolve().parents[1] / "data" / "uploads"
 
 DOCUMENT_CATALOG = [
     {
@@ -56,15 +57,22 @@ DOCUMENT_CATALOG = [
 ]
 
 
-def discover_documents() -> list[dict]:
+def discover_documents(extra: Path | None = None, exclude_id: str | None = None) -> list[dict]:
     """Discover current PDFs, preserving known document identities and metadata."""
     known = {entry["name"]: entry for entry in DOCUMENT_CATALOG}
     records = []
-    for source in sorted(DOCUMENTS_DIR.glob("*.pdf"), key=lambda path: path.name):
+    sources = [*DOCUMENTS_DIR.glob("*.pdf"), *UPLOADS_DIR.glob("*.pdf")]
+    if extra is not None:
+        sources.append(extra)
+    for source in sorted(sources, key=lambda path: path.name):
         catalog = known.get(source.name)
         if catalog is None:
             identifier = "DOC-" + hashlib.sha256(source.name.encode("utf-8")).hexdigest()[:12]
-            catalog = {"id": identifier, "name": source.name, "chunk_prefix": identifier}
+            catalog = {"id": identifier, "name": source.name, "chunk_prefix": identifier, "storage": "uploads"}
+        if catalog["id"] == exclude_id:
+            continue
+        if extra is not None and source == extra:
+            catalog = {**catalog, "_source_path": str(source)}
         records.append(catalog.copy())
     return records
 
@@ -188,7 +196,7 @@ def _chunk(document: dict, serial: int, section_path: str, parts: list[dict], to
 
 
 def source_fingerprint(document: dict) -> str | None:
-    source = DOCUMENTS_DIR / document["name"]
+    source = Path(document["_source_path"]) if document.get("_source_path") else (UPLOADS_DIR if document.get("storage") == "uploads" else DOCUMENTS_DIR) / document["name"]
     if not source.exists():
         return None
     digest = hashlib.sha256()
@@ -198,7 +206,7 @@ def source_fingerprint(document: dict) -> str | None:
     return digest.hexdigest()
 
 
-def current_manifest() -> dict:
+def current_manifest(documents: list[dict] | None = None) -> dict:
     return {
         "schema": 2,
         "embedding_model": EMBEDDING_MODEL,
@@ -206,7 +214,7 @@ def current_manifest() -> dict:
         "chunking_strategy_version": "section-aware-v2",
         "target_tokens": TARGET_TOKENS,
         "overlap_tokens": OVERLAP_TOKENS,
-        "sources": {entry["id"]: source_fingerprint(entry) for entry in discover_documents()},
+        "sources": {entry["id"]: source_fingerprint(entry) for entry in (documents if documents is not None else discover_documents())},
     }
 
 
@@ -240,7 +248,7 @@ class CorpusStore:
                     "ocr": stored.get("ocr", "未执行"),
                     "chunk_strategy": stored.get("chunk_strategy", f"目录/段落切片，{TARGET_TOKENS} tokens，{OVERLAP_TOKENS} overlap"),
                     "updated_at": stored.get("updated_at", "待构建"),
-                    "pdf_url": f"/documents/{name}" if name else None,
+                    "pdf_url": f"/{'uploads' if stored.get('storage') == 'uploads' else 'documents'}/{name}" if name else None,
                     "source_fingerprint": stored.get("source_fingerprint"),
                 }
             )

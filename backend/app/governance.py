@@ -280,13 +280,14 @@ class GovernanceStore:
         return {"alias": alias.strip(), "canonical": canonical.strip(), "status": "approved", "actor": actor}
 
     def start_generation_run(self, model_version: str):
+        from .corpus import current_manifest
         run_id, now = f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", _now()
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status IN ('queued', 'coverage', 'generating', 'validation', 'probing', 'qc') LIMIT 1").fetchone():
                 raise ValueError("已有 V1 Mini Generation Run 正在执行")
             connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(GENERATION_PROFILES["mini"]), model_version, "queued", _json([]), now))
-            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json([]), _json([]), _json({"progress": {"stage": "queued", "completed_slots": 0, "total_slots": GENERATION_PROFILES["mini"]["expected_count"], "probe_completed": 0, "qc_completed": 0}})))
+            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json([]), _json([]), _json({"corpus_fingerprint": current_manifest()["sources"], "progress": {"stage": "queued", "completed_slots": 0, "total_slots": GENERATION_PROFILES["mini"]["expected_count"], "probe_completed": 0, "qc_completed": 0}})))
         return run_id
 
     def update_generation_run(self, run_id: str, *, status: str, progress: dict | None = None, coverage_plan: list[dict] | None = None, validation: dict | None = None):
@@ -896,7 +897,8 @@ class GovernanceStore:
 
     def create_dataset_snapshot(self, approved: list[dict] | None = None, generation_run_id: str | None = None):
         approved = approved if approved is not None else self.questions("golden")
-        snapshot = {"question_ids": [item["id"] for item in approved], "questions": [item["raw"] for item in approved]}
+        from .corpus import current_manifest
+        snapshot = {"question_ids": [item["id"] for item in approved], "questions": [item["raw"] for item in approved], "corpus_fingerprint": current_manifest()["sources"]}
         if generation_run_id:
             snapshot["generation_run_id"] = generation_run_id
         version_id = f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
@@ -1036,6 +1038,10 @@ class GovernanceStore:
         candidates = [self.question(question_id) for question_id in question_ids]
         runs = {item["raw"].get("generation_run_id") for item in candidates}
         run = self.generation_run(next(iter(runs))) if len(runs) == 1 and None not in runs else None
+        from .corpus import current_manifest
+        run_fingerprint = (run.get("artifacts", {}).get("hard_validation", {}) if run else {}).get("corpus_fingerprint")
+        if run_fingerprint is not None and run_fingerprint != current_manifest()["sources"]:
+            raise ValueError("Corpus 已变化；请基于当前知识库创建新的 Generation Run")
         expected = self._expected_count(run) if run else 0
         if not expected or len(candidates) != expected or len(set(question_ids)) != expected or len(runs) != 1 or any(item["raw"].get("generation_profile") != "v1-mini-8-4-8" for item in candidates):
             raise ValueError("Batch review only accepts one complete V1 Mini generation run")
@@ -1062,7 +1068,7 @@ class GovernanceStore:
                 connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (question_id, "dataset", "approved", actor, now))
                 connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "approved", actor, now))
             prior = next((item['snapshot'] for item in self.dataset_snapshots() if item['snapshot'].get('generation_run_id') == run['id'] and item['snapshot'].get('question_ids') == run['question_ids']), None)
-            snapshot = prior or {'id': f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", 'generation_run_id': run['id'], 'question_ids': run['question_ids'], 'questions': [self.question(key)['raw'] for key in run['question_ids']], 'policy_version': 'v1.2'}
+            snapshot = prior or {'id': f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", 'generation_run_id': run['id'], 'question_ids': run['question_ids'], 'questions': [self.question(key)['raw'] for key in run['question_ids']], 'policy_version': 'v1.2', 'corpus_fingerprint': run_fingerprint or current_manifest()['sources']}
             if not prior:
                 connection.execute('INSERT INTO dataset_versions VALUES (?, ?, ?, ?, ?)', (snapshot['id'], 'approved', 'human_review', _json(snapshot), now))
         return {"reviewed": [self.question(question_id) for question_id in question_ids], "generation_run_id": run['id'], 'snapshot': snapshot}

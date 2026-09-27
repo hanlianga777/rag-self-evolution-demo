@@ -419,6 +419,10 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 @keyframes operation-pulse { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .operation-console progress:not([value]) { animation: none; } }
 .mobile-menu, .mobile-navigation { display: none; }
+.light-stepper { align-items: center; color: var(--muted); display: flex; flex-wrap: wrap; font-size: 12px; gap: 8px; margin-bottom: 16px; }
+.light-stepper span { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+.light-stepper span + span { margin-left: 12px; position: relative; }
+.light-stepper span + span::before { color: #94a3b8; content: "→"; left: -17px; position: absolute; }
 
 @media (min-width: 761px) {
   html, body, #root { height: 100%; overflow: hidden; }
@@ -428,7 +432,8 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
   .page > .panel { min-height: 0; overflow: auto; }
   .tabs { min-height: 43px; }
   .overview-page { display: grid; gap: 14px; grid-template-rows: auto auto auto auto minmax(0, 1fr); }
-  .knowledge-page { display: grid; gap: 14px; grid-template-rows: auto auto minmax(0, 1fr); }
+  .knowledge-page { display: flex; flex-direction: column; gap: 14px; }
+  .knowledge-page > .panel { flex: 1; }
   .knowledge-page > .panel, .governance-page > .panel, .evaluation-page > .panel { display: flex; flex-direction: column; }
   .knowledge-page .table-scroll, .governance-page .table-scroll, .evaluation-page .table-scroll { min-height: 0; overflow: auto; }
   .knowledge-page .table-scroll { flex: 1; }
