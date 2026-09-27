@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { createPortal } from "react-dom";
 import { getJson } from "./api";
 
-type Operation = { id: string; title: string; status: "running" | "completed" | "failed"; kind?: "evaluation" | "revision"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
+type Operation = { id: string; title: string; status: "running" | "completed" | "failed"; kind?: "evaluation" | "revision" | "generation"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
 type OperationContextValue = {
   start: (title: string, detail?: Partial<Operation>) => string;
   update: (id: string, detail: Partial<Operation>) => void;
@@ -11,11 +11,12 @@ type OperationContextValue = {
   run: <T>(title: string, work: () => Promise<T>) => Promise<T>;
   watchEvaluation: (id: string, title: string) => void;
   watchRevision: (id: string) => void;
+  watchGeneration: (id: string) => void;
   registerDialogHost: (node: HTMLElement) => void;
   unregisterDialogHost: (node: HTMLElement) => void;
 };
 
-const fallback: OperationContextValue = { start: () => "", update: () => {}, succeed: () => {}, fail: () => {}, run: (_title, work) => work(), watchEvaluation: () => {}, watchRevision: () => {}, registerDialogHost: () => {}, unregisterDialogHost: () => {} };
+const fallback: OperationContextValue = { start: () => "", update: () => {}, succeed: () => {}, fail: () => {}, run: (_title, work) => work(), watchEvaluation: () => {}, watchRevision: () => {}, watchGeneration: () => {}, registerDialogHost: () => {}, unregisterDialogHost: () => {} };
 const OperationContext = createContext<OperationContextValue>(fallback);
 export function useOperation() { return useContext(OperationContext); }
 
@@ -80,6 +81,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   }, [start, succeed, fail]);
   const watchEvaluation = useCallback((id: string, title: string) => start(title, { id, kind: "evaluation" }), [start]);
   const watchRevision = useCallback((id: string) => start("局部修订", { id, kind: "revision" }), [start]);
+  const watchGeneration = useCallback((id: string) => start("Golden Generation", { id, kind: "generation" }), [start]);
   const registerDialogHost = useCallback((node: HTMLElement) => setDialogHosts(current => [...current.filter(item => item !== node), node]), []);
   const unregisterDialogHost = useCallback((node: HTMLElement) => setDialogHosts(current => current.filter(item => item !== node)), []);
 
@@ -94,6 +96,10 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       if (cancelled) return;
       for (const item of revisions.filter(item => ["queued", "generating", "validating", "probing", "qc"].includes(item.status))) start("局部修订", { id: item.id, kind: "revision", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
     }).catch(() => {});
+    getJson<any[]>("/api/governance/generation-runs").then(runs => {
+      if (cancelled) return;
+      for (const item of runs.filter(item => ["queued", "coverage", "generating", "validation", "probing", "qc"].includes(item.status))) start("Golden Generation", { id: item.id, kind: "generation", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [restore, start]);
 
@@ -102,8 +108,8 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     if (!active.length) return;
     const timer = window.setInterval(() => {
       for (const item of active) {
-        void getJson<any>(item.kind === "revision" ? `/api/governance/revisions/${item.id}` : `/api/evaluations/${item.id}`).then(result => {
-          const next: Partial<Operation> = item.kind === "revision" ? revision(result) : evaluation(result);
+        void getJson<any>(item.kind === "revision" ? `/api/governance/revisions/${item.id}` : item.kind === "generation" ? `/api/governance/generation-runs/${item.id}` : `/api/evaluations/${item.id}`).then(result => {
+          const next: Partial<Operation> = item.kind === "revision" ? revision(result) : item.kind === "generation" ? { status: result.status === "completed" ? "completed" : ["needs_regeneration", "failed"].includes(result.status) ? "failed" : "running", stage: result.operation_progress?.phase || result.status, current: result.operation_progress?.hard_valid_completed + result.operation_progress?.probe_processed + result.operation_progress?.qc_processed, total: result.operation_progress ? 60 : undefined, error: result.operation_progress?.error || (result.status === "needs_regeneration" ? "部分 Slot 校验失败，请查看运行详情并补齐失败题" : undefined), attempt: result.operation_progress?.attempt } : evaluation(result);
           update(item.id, next);
           if (next.status === "completed") succeed(item.id);
           if (next.status === "failed") fail(item.id, next.error || "评测失败");
@@ -122,7 +128,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       {(item.current == null || item.total == null || item.total <= 0) && item.status === "running" && !(item.kind === "revision" && item.total === 1) && <progress />}
       {item.status === "failed" && <><small className="operation-error-summary">{shortError(item.error)}</small><button className="operation-detail-button" aria-label="查看错误详情" aria-expanded={detailId === item.id} aria-controls={`operation-detail-${item.id}`} onClick={() => setDetailId(current => current === item.id ? null : item.id)}>查看错误详情</button>{detailId === item.id && <div id={`operation-detail-${item.id}`} className="operation-details"><div>阶段：{item.stage || "未记录"}</div><div>耗时：{item.startedAt != null ? `${Math.max(0, ((item.endedAt ?? now) - item.startedAt) / 1000).toFixed(1)}s` : "未记录"}</div><div>错误：{item.errorDetail || item.error || "未记录"}</div><div>Operation ID：{item.id}</div>{item.provider && <div>Provider：{item.provider}</div>}{item.model && <div>Model：{item.model}</div>}{item.attempt != null && <div>Attempt：{item.attempt}</div>}</div>}</>}
     </section>)}</div>;
-  return <OperationContext.Provider value={{ start, update, succeed, fail, run, watchEvaluation, watchRevision, registerDialogHost, unregisterDialogHost }}>
+  return <OperationContext.Provider value={{ start, update, succeed, fail, run, watchEvaluation, watchRevision, watchGeneration, registerDialogHost, unregisterDialogHost }}>
     {children}
     {dialogHosts.length ? createPortal(console, dialogHosts[dialogHosts.length - 1]) : console}
   </OperationContext.Provider>;

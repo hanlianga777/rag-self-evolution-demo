@@ -47,12 +47,13 @@ it("shows an actual pending action and keeps its failure until dismissed", async
   await act(async () => root.unmount());
 });
 
-it("keeps Generation out of the shared bar while restoring persisted evaluation progress", async () => {
+it("restores a persisted Generation operation without inventing progress", async () => {
   const running = { id: "GGEN-1", status: "generating", artifacts: { hard_validation: { progress: { stage: "generating", completed_slots: 8, total_slots: 20, slot: "Q08", attempt: 1 } } } };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("generation-runs") ? [running] : url.endsWith("evaluations") ? [] : running), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<OperationProvider><span>页面</span></OperationProvider>); });
-  expect(document.querySelector(".operation-console")).toBeNull();
+  expect(document.querySelector(".operation-console")?.textContent).toContain("Golden Generation");
+  expect(document.querySelector(".operation-console progress")?.hasAttribute("value")).toBe(false);
   await act(async () => root.unmount());
 });
 

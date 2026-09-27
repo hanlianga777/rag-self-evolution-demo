@@ -89,6 +89,39 @@ it("sends one atomic Gate 1 review request and shows the frozen version after re
   await act(async () => root.unmount());
 });
 
+it("shows persisted partial slots, failure details, and only the refill action", async () => {
+  const rows = Array.from({ length: 12 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: `已通过 ${index + 1}`, test_category: "positive", legacy_question_type: "v1_mini", stage: "candidate", review_status: "human_review_pending" }));
+  const run = { id: "GGEN-NEW", status: "needs_regeneration", question_ids: rows.map(row => row.id), profile: { expected_count: 20 }, operation_progress: { hard_valid_completed: 12, overall_percent: 20 }, artifacts: { coverage_plan: Array.from({ length: 20 }, (_, index) => ({ slot: `Q${String(index + 1).padStart(2, "0")}`, test_category: "positive" })), slot_audit: { Q20: [{ attempt: 2, question: "失败问题", reference_answer: "越界答案", selected_evidence: [{ document_name: "fixture.pdf", chunk_id: "C20", chunk_text: "原文证据" }], validation_error: "unsupported answer anchor" }] }, hard_validation: { slot_persistence_v1: true, progress: { stage: "needs_regeneration", completed_slots: 12 } } } };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/questions") ? { questions: rows } : []), { status: 200 })));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
+  expect(document.body.textContent).toContain("生成 12/20");
+  expect(document.body.textContent).toContain("Hard Validation 12/20 · 60%");
+  expect(document.body.textContent).toContain("整体 20%");
+  expect(document.body.textContent).toContain("补齐失败题（8）");
+  expect(document.querySelector(".review-batch")).toBeNull();
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-table button")].at(-1)!.click());
+  expect(document.body.textContent).toContain("unsupported answer anchor");
+  await act(async () => root.unmount());
+});
+
+it("toggles a revision reason without changing chip base styling", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("[]", { status: 200 })));
+  const row = { id: "Q1", slot: "Q01", question: "问题", test_category: "positive", stage: "candidate", probe_status: "probe_passed", qc_status: "qc_passed", evidence: [] };
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<CandidateWorkspace row={row} peers={[row]} busy={false} onRun={() => {}} onReview={async () => true} onRefresh={async () => {}} operation={{ watchRevision: () => {} } as any} />));
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-actionbar button")].find(button => button.textContent === "编辑")!.click());
+  const chip = [...document.querySelectorAll<HTMLButtonElement>(".revision-tags button")].find(button => button.textContent === "证据不足")!;
+  expect(chip.classList.contains("secondary")).toBe(true);
+  await act(async () => chip.click());
+  expect(chip.getAttribute("aria-pressed")).toBe("true");
+  expect(chip.classList.contains("secondary")).toBe(true);
+  await act(async () => chip.click());
+  expect(chip.getAttribute("aria-pressed")).toBe("false");
+  expect(document.querySelector<HTMLButtonElement>(".candidate-actionbar .primary")?.disabled).toBe(true);
+  await act(async () => root.unmount());
+});
+
 it("starts replacement as one slot draft without first changing a pending review", async () => {
   const row = { id: "Q9", slot: "Q09", question: "问题", test_category: "positive", review_status: "human_review_pending", stage: "candidate", evidence: [] };
   const requests: Array<{ url: string; body: any }> = [];

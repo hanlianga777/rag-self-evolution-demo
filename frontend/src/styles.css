@@ -211,6 +211,8 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .action-reason { color: var(--muted); flex: 1; font-size: 12px; line-height: 1.35; min-width: 180px; }
 .workspace-back { margin-bottom: 12px; }
 .revision-tags button.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+.generation-progress { align-items: center; color: var(--muted); display: flex; flex-wrap: wrap; font-size: 12px; gap: 10px; margin: 8px 0; }
+.generation-progress progress { flex: 1 1 140px; min-width: 0; }
 .manual-edit-fields { border-top: 1px solid var(--line-soft); margin-top: 14px; padding-top: 12px; }
 .revision-workspace label, .draft-workspace label { display: grid; font-size: 13px; gap: 6px; margin: 10px 0; }
 .revision-modes label, .revision-pair label { align-items: center; display: flex; gap: 6px; }
