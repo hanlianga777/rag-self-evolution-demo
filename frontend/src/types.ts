@@ -29,6 +29,7 @@ export type PipelinePreview = {
   pipeline: "baseline" | "candidate";
   question: string;
   version: string;
+  config?: Record<string, unknown>;
   status?: string;
   answer: string;
   latency_ms: number;

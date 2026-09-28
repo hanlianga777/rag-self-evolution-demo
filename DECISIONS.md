@@ -1,10 +1,12 @@
 # 决策记录
 
-当前产品规则只以 [SPEC V1.2](docs/RAG_SELF_EVOLUTION_SPEC.md) 为准。本文件记录工程选择及历史决策，不覆盖 SPEC。
+V1.3 当前决策：生成 Run 冻结 Mini／Medium／Full Profile；旧 Mini 字段兼容读取。Baseline Gate 贡献题由保存的逐题结果按后端聚合公式计算，历史未采集字段不补造。八个导航保留原 Hash。
+
+当前产品规则只以 [SPEC V1.3](docs/RAG_SELF_EVOLUTION_SPEC.md) 为准。本文件记录工程选择及历史决策，不覆盖 SPEC。
 
 ## 选择独立实现，而非 fork AutoRAG
 
-V1.2 当前决策：Ablation 独立，Positive/Ablation 检索未命中为 P1，QC 分数辅助；机器 P0 明确接受理由，确定性错误和 Fake Negative 不可豁免。Gate 1 一次确认并冻结；Gate 2 一次报告确认并选赢家；Composite D 基于实测有效差异，冲突保留赢家，无有效组合不造 D；Gate 3 原子发布。12 次启动预算含失败，为 D 留一次。旧 Direct Release 停止当前入口。缺产品／章节元数据不阻断动态语料。
+V1.2 历史决策（继承规则以 V1.3 SPEC 为准）：Ablation 独立，Positive/Ablation 检索未命中为 P1，QC 分数辅助；机器 P0 明确接受理由，确定性错误和 Fake Negative 不可豁免。Gate 1 一次确认并冻结；Gate 2 一次报告确认并选赢家；Composite D 基于实测有效差异，冲突保留赢家，无有效组合不造 D；Gate 3 原子发布。12 次启动预算含失败，为 D 留一次。旧 Direct Release 停止当前入口。缺产品／章节元数据不阻断动态语料。
 
 AutoRAG 原始 Python RAG AutoML 能力位于 `legacy/`，而根项目已转向 AutoRAG 2.0。本 Demo 不将两者作为依赖：在真实运行时尚未落地前直接集成，会先引入过重的评测栈。`legacy/` 仅保留为文档化的概念参考。
 

@@ -1,5 +1,11 @@
 # 变更记录
 
+## V1.3 — 评测与实验闭环
+
+- Golden 支持 Mini 20、Medium 49、Full 98，保留旧 Mini 兼容与一次人工 Gate 1。
+- Baseline 使用持久化 Snapshot、配置、逐题结果解释 11 Gate；Tuning 呈现已有候选配置差异和 Sandbox 记录。
+- 八个一级导航沿用原 Hash；启动入口固定 `#overview`。开发验收使用隔离库，不运行真实业务主链。
+
 ## 0.2.2 — 2026-09-14
 
 - 真实 PDF 切片改为“章节 → 连续段落 → BGE tokenizer token 上限”；同章节可跨页，跨章节绝不合并。没有可靠目录或正文短标题的文件明确记录为页级/段落 fallback。

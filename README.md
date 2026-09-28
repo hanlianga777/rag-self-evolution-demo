@@ -4,13 +4,13 @@
 
 ## Current Project Stage
 
-- **唯一当前产品规则：** [RAG Self-Evolution SPEC V1.2](docs/RAG_SELF_EVOLUTION_SPEC.md)；[SPEC ChangeLog](docs/SPEC_CHANGELOG.md) 只记录历史。运行状态仍以 SQLite 审计和 API 为准。
+- **唯一当前产品规则：** [RAG Self-Evolution SPEC V1.3](docs/RAG_SELF_EVOLUTION_SPEC.md)；[SPEC ChangeLog](docs/SPEC_CHANGELOG.md) 只记录历史。运行状态仍以 SQLite 审计和 API 为准。
 - **当前真实状态：** 以当前完整 Run 的活动题目及 API 为准；旧 Run、已替换题和 Legacy 不混入当前统计。实施与验收不代用户审核、应用 Preview 或发布。
 - **No fabricated results:** 40 条历史 Candidate 和任何 Demo Seed 不代表已验证 Golden、评测分数、推荐或发布结果。
 
-## V1.2 主线
+## V1.3 主线
 
-`知识入库 → Golden 8/4/8（逐 Slot 校验与局部补题）→ Gate 1 人工确认并冻结 → Baseline → Bad Case → Tuning Agent A/B/C Sandbox → Gate 2 报告确认并选赢家 → Composite D 决策与复验 → Gate 3 人工发布 → 问答`
+`知识入库 → Golden Mini 8/4/8、Medium 20/9/20 或 Full 40/18/40（逐 Slot 校验与局部补题）→ Gate 1 人工确认并冻结 → Baseline 报告／门禁／逐题诊断 → Tuning Agent A/B/C Sandbox → Gate 2 报告确认并选赢家 → Composite D 决策与复验 → Gate 3 人工发布 → 问答试验`
 
 只有 Tuning 是 Agent；Generation、QC、Evaluation 是受控工作流。动态文档清单、Embedding 主题配额不依赖四份示例 PDF。Positive/Ablation 检索未命中记为 P1；QC 按 P0/P1/P2 给理由，分数辅助展示。机器 P0 可明确接受并说明，确定性错误与 Fake Negative 不能豁免。Ablation 独立治理。
 
@@ -50,4 +50,4 @@ cd frontend && npm install && npm run dev
 将 `.env.example` 复制为 `.env` 并设置 `DEEPSEEK_API_KEY` 后，才可执行真实 Golden Generation、QC、回答、Judge、评测与 Agent。原始 PDF 不上传；显式运行回答、QC、评测或 Agent 时，相关 Chunk 会发送给 DeepSeek。
 DeepSeek 单次请求默认超时 60 秒，可用 `DEEPSEEK_TIMEOUT_SECONDS` 调整；Revision 生成和质量检查遇明确超时仅自动重试一次，应用后的质量运行失败可从已持久化的 Probe/QC 状态手动继续，不会重新应用草案。
 Revision Preview 中“重新生成”保留当前证据；“重新选材并生成”使用最新修订原因重新选择同产品真实材料。两者都不会自动应用 Candidate 或批准 Golden。
-答案锚点失败时，修订界面根据当前意图推荐沿用证据重写或重新选材；无可靠材料会要求修改意图或手选真实 Chunk。新的 Generation Run 逐题保存通过 Hard Validation 的 Candidate；不足 20 题时仅可查看并局部补题，补齐后才执行 Probe / QC 与人工审核。旧 Run 保持历史只读。Generation 进度取自已持久化 Slot 和 Probe / QC 计数；单题修订仍只显示阶段和耗时。服务重启保留审计，新 Generation Run 在生成阶段中断后可手动补题，Probe / QC 中断需手动重试。隔离验收可在启动 API 前设置 `RAG_DEMO_DB_PATH` 指向临时 SQLite；默认仍为 `backend/data/demo.db`。
+答案锚点失败时，修订界面根据当前意图推荐沿用证据重写或重新选材；无可靠材料会要求修改意图或手选真实 Chunk。新的 Generation Run 逐题保存通过 Hard Validation 的 Candidate；未达到所选 Profile 的 20／49／98 题时仅可查看并局部补题，补齐后才执行 Probe / QC 与人工审核。旧 Run 保持历史只读。Baseline 报告读取保存的 Evaluation Snapshot；旧 Run 未采集的字段显示“未采集”或“未记录”。Generation 进度取自已持久化 Slot 和 Probe / QC 计数；单题修订仍只显示阶段和耗时。服务重启保留审计，新 Generation Run 在生成阶段中断后可手动补题，Probe / QC 中断需手动重试。隔离验收可在启动 API 前设置 `RAG_DEMO_DB_PATH` 指向临时 SQLite；默认仍为 `backend/data/demo.db`。

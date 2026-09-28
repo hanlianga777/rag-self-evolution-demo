@@ -2,7 +2,8 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-URL="http://127.0.0.1:5174"
+URL="http://127.0.0.1:5174/#overview"
+HEALTH_URL="http://127.0.0.1:5174"
 
 startup_error=0
 "$PROJECT_DIR/scripts/start_detached_services.sh" || startup_error=1
@@ -11,7 +12,7 @@ if [[ "$startup_error" == 0 ]]; then
 fi
 if [[ "$startup_error" == 0 ]]; then
   for _ in {1..60}; do
-    if curl -fsS --max-time 2 http://127.0.0.1:8010/api/overview >/dev/null 2>&1 && curl -fsS --max-time 2 "$URL" >/dev/null 2>&1; then
+    if curl -fsS --max-time 2 http://127.0.0.1:8010/api/overview >/dev/null 2>&1 && curl -fsS --max-time 2 "$HEALTH_URL" >/dev/null 2>&1; then
       if "$PROJECT_DIR/scripts/start_detached_services.sh"; then open "$URL"; exit 0; fi
       break
     fi

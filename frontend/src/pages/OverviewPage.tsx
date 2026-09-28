@@ -18,16 +18,18 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const run = item.latest_evaluation;
   const recommendation = data.optimization?.recommendation?.result || data.optimization?.recommendation || {};
   const needsReview = data.workspace?.requires_new_golden === true || !expectedCount || summary.approved < expectedCount;
-  const nextTitle = needsRegeneration ? `补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）` : generationPending ? "等待当前 V1 Mini 完成" : generationFailed ? "查看 V1 Mini 运行失败原因" : needsReview ? "推进 Gate 1 · 确认 Golden 测试集" : "运行 Baseline Evaluation";
-  const nextDescription = needsRegeneration ? "当前 Run 已完成本轮逐题处理；请在测试集治理中补齐失败 Slot。" : generationPending ? "在测试集治理中查看当前阶段与真实处理进度。" : generationFailed ? "前往测试集治理查看运行审计，再决定后续操作。" : data.workspace?.requires_new_golden ? "Corpus 已变化。请生成新的 20 题测试集并完成 Gate 1，再运行 Baseline。" : needsReview ? "查看当前 Mini 的 Probe、QC 与人工审核状态；符合条件后一次确认并冻结 Golden 版本。" : "核对冻结 Golden 版本和 Provider 状态后，运行 Baseline Evaluation。";
-  const productionLabel = production?.provenance === "bootstrap" ? "初始基线（未正式发布）" : production?.id || "未发布";
+  const nextTitle = needsRegeneration ? `补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）` : generationPending ? "等待当前测试集完成" : generationFailed ? "查看当前测试集运行失败原因" : needsReview ? "推进 Gate 1 · 确认 Golden 测试集" : "运行 Baseline Evaluation";
+  const nextDescription = needsRegeneration ? "当前 Run 已完成本轮逐题处理；请在黄金测试集中补齐失败 Slot。" : generationPending ? "在黄金测试集中查看当前阶段与真实处理进度。" : generationFailed ? "前往黄金测试集查看运行审计，再决定后续操作。" : data.workspace?.requires_new_golden ? "Corpus 已变化。请生成新的 Golden 测试集并完成 Gate 1，再运行 Baseline。" : needsReview ? "查看当前测试集的 Probe、QC 与人工审核状态；符合条件后一次确认并冻结 Golden 版本。" : "核对冻结 Golden 版本和 Provider 状态后，运行 Baseline Evaluation。";
+  const productionLabel = production?.id || "未发布";
+  const productionTitle = production?.provenance === "bootstrap" ? "当前 Baseline" : "当前 Production";
+  const productionNote = production?.provenance === "bootstrap" ? "初始配置 · 未正式发布" : undefined;
   const nextPage: Page = needsReview ? "governance" : "evaluation";
   const pipeline: [string, string, Page][] = [
     ["知识库", `${data.documents?.length || 0} 文档`, "knowledge"],
     ["Gate 1 · 确认 Golden 测试集", `${summary.approved || 0} 已批准`, "governance"],
-    ["Baseline Evaluation", displayText(run?.status || "not_run"), "evaluation"],
+    ["Baseline", displayText(run?.status || "not_run"), "evaluation"],
     ["Bad Case", `${data.badCases?.length || 0}`, "evaluation"],
-    ["Optimization Agent", displayText(data.optimization?.status || "not_run"), "evolution"],
+    ["Tuning · Optimization Agent", displayText(data.optimization?.status || "not_run"), "evolution"],
     ["Gate 2 · 确认报告", displayText(recommendation.status || "not_run"), "evolution"],
     ["Gate 3 · 确认发布", productionLabel, "versions"],
   ];
@@ -38,11 +40,11 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     {tab !== "project" ? <ArchitecturePanel slot={tab} /> : <>
     <section className="next-action" aria-labelledby="next-action-title">
       <div><span className="next-action-label">当前下一步</span><h2 id="next-action-title">{nextTitle}</h2><p>{nextDescription}</p></div>
-      <a className="primary" href={`#${nextPage}`} onClick={() => navigate(nextPage)}>{needsReview ? "前往测试集治理" : "前往评测"}<ArrowRight size={15} aria-hidden="true" /></a>
+      <a className="primary" href={`#${nextPage}`} onClick={() => navigate(nextPage)}>{needsReview ? "前往黄金测试集" : "前往 Baseline"}<ArrowRight size={15} aria-hidden="true" /></a>
     </section>
-    <div className="metrics-grid overview-metrics"><Metric label="当前 Production" value={productionLabel} /><Metric label="当前 V1 Run 已批准" value={`${summary.approved || 0} / ${expectedCount}`} /><Metric label="当前需修订 / 待人工审核" value={`${summary.needs_revision || 0} / ${summary.pending_review || 0}`} note={`Legacy ${summary.legacy_total || 0} · 历史 V1 ${summary.historical_run_total || 0}，均不计入`} /><Metric label="最近评分" value={run?.result?.overall_score ?? "未运行"} /></div>
+    <div className="metrics-grid overview-metrics"><Metric label={productionTitle} value={productionLabel} note={productionNote} /><Metric label="当前测试集已批准" value={`${summary.approved || 0} / ${expectedCount}`} /><Metric label="当前需修订 / 待人工审核" value={`${summary.needs_revision || 0} / ${summary.pending_review || 0}`} note={`Legacy ${summary.legacy_total || 0} · 历史 V1 ${summary.historical_run_total || 0}，均不计入`} /><Metric label="最近评分" value={run?.result?.overall_score ?? "未运行"} /></div>
     <Section title="自进化流程"><div className="pipeline">{pipeline.map(([label, value, page]) => <a className="pipeline-node" href={`#${page}`} key={label} onClick={() => navigate(page)}><span>{label}</span><strong>{value}</strong><ArrowRight className="pipeline-arrow" size={15} aria-hidden="true" /></a>)}</div></Section>
-    <Section title="当前 Production"><dl className="production-details"><div><dt>版本</dt><dd>{productionLabel}</dd></div><div><dt>配置</dt><dd>TopK {production?.config?.top_k ?? "未提供"}</dd></div><div><dt>评分</dt><dd>{run?.result?.overall_score ?? "未运行"}</dd></div><div><dt>发布资格</dt><dd>{run?.result?.gates?.passed ? "11 / 11 PASS" : run?.id ? "未获得资格" : "未评测"}</dd></div></dl></Section></>}
+    <Section title={productionTitle}><dl className="production-details"><div><dt>版本</dt><dd>{productionLabel}</dd></div><div><dt>配置</dt><dd>TopK {production?.config?.top_k ?? "未提供"}</dd></div><div><dt>评分</dt><dd>{run?.result?.overall_score ?? "未运行"}</dd></div><div><dt>发布资格</dt><dd>{run?.result?.gates?.passed ? "11 / 11 PASS" : run?.id ? "未获得资格" : "未评测"}</dd></div></dl></Section></>}
   </div>;
 }
 

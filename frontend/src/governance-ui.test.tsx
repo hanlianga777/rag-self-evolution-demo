@@ -206,7 +206,7 @@ it("keeps Golden approval disabled until Probe and QC both pass", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-test", status: "candidate_generated", question_ids: ["GGC-001"], artifacts: {} }], dataset: [{ id: "GGC-001", legacy_question_type: "v1_mini", question: "测试题", test_category: "positive", review_status: "human_review_pending", probe_status: "probe_pending", stage: "candidate", evidence: [] }] }} />); });
 
-  expect(document.body.textContent).toContain("测试集治理");
+  expect(document.body.textContent).toContain("黄金测试集");
   await act(async () => { ([...document.querySelectorAll("button")].find(button => button.textContent === "查看详情") as HTMLButtonElement).click(); });
   const approval = [...document.querySelectorAll("button")].find(button => button.textContent === "批准")!;
   expect((approval as HTMLButtonElement).disabled).toBe(true);
@@ -229,7 +229,7 @@ it("restores a running generation and reads persisted slot progress", async () =
   expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-live"));
   expect(document.body.textContent).toContain("Q03");
   expect(document.body.textContent).toContain("已处理 2/20 · 10%");
-  expect((([...document.querySelectorAll("button")].find(button => button.textContent?.includes("生成 V1 Mini"))) as HTMLButtonElement).disabled).toBe(true);
+  expect((([...document.querySelectorAll("button")].find(button => button.textContent === "生成测试集")) as HTMLButtonElement).disabled).toBe(true);
   await act(async () => root.unmount());
 });
 

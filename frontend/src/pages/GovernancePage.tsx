@@ -16,7 +16,9 @@ const reviewLabel = (row: Candidate) => displayText(row.review_status || "human_
 
 export function GovernancePage({ data }: { data: any }) {
   const operation = useOperation();
-  const [tab, setTab] = useState<"run" | "snapshot" | "legacy">("run");
+  const [tab, setTab] = useState<"run" | "snapshot">("run");
+  const [profile, setProfile] = useState<"mini" | "medium" | "full">("mini");
+  const [historyPage, setHistoryPage] = useState(0);
   const [items, setItems] = useState<Candidate[]>(data.dataset || []);
   const [runs, setRuns] = useState<Candidate[]>(data.generationRuns || []);
   const [snapshots, setSnapshots] = useState<Candidate[]>(data.snapshots || []);
@@ -37,8 +39,8 @@ export function GovernancePage({ data }: { data: any }) {
   const gate1Snapshot = snapshots.find(snapshot => snapshot.snapshot?.generation_run_id === currentRun?.id && JSON.stringify(snapshot.snapshot?.question_ids) === JSON.stringify(currentIds));
   const plannedSlots = new Map((currentRun?.artifacts?.question_plan || []).map((row: Candidate) => [row.question_id, row.coverage_slot]));
   const current: Candidate[] = currentIds.map(id => review.find(row => row.id === id) || items.find(row => row.id === id)).filter((row): row is Candidate => !!row).map(row => ({ ...row, slot: row.slot || row.raw?.coverage_slot || plannedSlots.get(row.id) }));
-  const legacy = items.filter(row => row.legacy_question_type !== "v1_mini");
-  const selected = current.find(row => row.id === selectedId) || legacy.find(row => row.id === selectedId);
+  const historical = items.filter(row => !currentIds.includes(row.id) && row.stage !== "golden");
+  const selected = current.find(row => row.id === selectedId) || historical.find(row => row.id === selectedId);
   const running = ["queued", "coverage", "generating", "validation", "probing", "qc"].includes(currentRun?.status);
   const qualityRerun = currentRun?.artifacts?.hard_validation?.quality_rerun;
   const qualityRunning = qualityRerun?.status === "running";
@@ -94,7 +96,7 @@ export function GovernancePage({ data }: { data: any }) {
   const filters = useMemo(() => [
     { key: "all", label: "全部", count: current.length, match: (_row: Candidate) => true },
     { key: "positive", label: "正向", count: current.filter(row => row.test_category === "positive").length, match: (row: Candidate) => row.test_category === "positive" },
-    { key: "ablation", label: "鲁棒性", count: current.filter(row => row.test_category === "ablation").length, match: (row: Candidate) => row.test_category === "ablation" },
+    { key: "ablation", label: "消融题", count: current.filter(row => row.test_category === "ablation").length, match: (row: Candidate) => row.test_category === "ablation" },
     { key: "negative", label: "负向", count: current.filter(row => row.test_category === "negative").length, match: (row: Candidate) => row.test_category === "negative" },
     { key: "probe", label: "Probe 未通过", count: current.filter(row => row.probe_status === "needs_revision").length, match: (row: Candidate) => row.probe_status === "needs_revision" },
     { key: "qc", label: "QC 未通过", count: current.filter(row => row.qc_status === "qc_failed").length, match: (row: Candidate) => row.qc_status === "qc_failed" },
@@ -113,9 +115,10 @@ export function GovernancePage({ data }: { data: any }) {
     finally { setBusy(false); }
   };
   const createMini = async () => {
+    if (snapshots.length && !window.confirm("将创建新的 Generation Run；现有 Golden Snapshot 保留为历史，不会覆盖。")) return;
     setBusy(true); setError(""); setRunDuration(null);
     try {
-      const started: { run_id: string } = await postJson("/api/governance/generate-mini");
+      const started: { run_id: string } = await postJson("/api/governance/generate", { profile });
       const run = await getJson<Candidate>(`/api/governance/generation-runs/${started.run_id}`);
       setRuns(previous => [run, ...previous.filter(row => row.id !== run.id)]);
       setReview([]); setFilter("all");
@@ -148,9 +151,10 @@ export function GovernancePage({ data }: { data: any }) {
   };
 
   return <div className={`page governance-page ${!currentRun && tab === "run" ? "is-empty" : ""}`}>
-    <div className="page-title"><div><h1>测试集治理</h1><p>生成、验证并逐题审核 Candidate，最后由人确认 Golden 测试集。</p></div><div className="header-actions">{currentRun?.status === "needs_regeneration" && <button className="primary" disabled={busy} onClick={() => void regenerate()}>补齐失败题（{expectedCount - current.length}）</button>}{currentRun?.status !== "needs_regeneration" && <button className="secondary" disabled={busy || running || qualityRunning} onClick={() => void createMini()}>{currentRun?.status === "failed" ? "重新运行 V1 Mini 8 / 4 / 8" : "生成 V1 Mini 8 / 4 / 8"}</button>}</div></div>
+    <div className="page-title"><div><h1>黄金测试集</h1><p>生成、验证并人工确认用于正式 Evaluation 的 Golden Dataset。</p></div><div className="header-actions">{currentRun?.status === "needs_regeneration" && <button className="primary" disabled={busy} onClick={() => void regenerate()}>补齐失败题（{expectedCount - current.length}）</button>}{currentRun?.status !== "needs_regeneration" && <><label className="profile-selector">题量 <select aria-label="测试集 Profile" value={profile} onChange={event => setProfile(event.target.value as typeof profile)}><option value="mini">Mini · 20题（8 / 4 / 8）</option><option value="medium">Medium · 49题（20 / 9 / 20）</option><option value="full">Full · 98题（40 / 18 / 40）</option></select></label><button className="secondary" disabled={busy || running || qualityRunning} onClick={() => void createMini()}>生成测试集</button></>}</div></div>
+    {profile !== "mini" && <p className="muted">题量越大，生成、Probe 与 QC 的模型调用和运行时间越高。</p>}
     {error && <p className="error-notice" role="alert">{error}</p>}
-    <div className="tabs"><button aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前 V1 Run</button><button aria-pressed={tab === "snapshot"} className={tab === "snapshot" ? "active" : ""} onClick={() => setTab("snapshot")}>历史版本</button><button aria-pressed={tab === "legacy"} className={tab === "legacy" ? "active" : ""} onClick={() => setTab("legacy")}>Legacy</button></div>
+    <div className="tabs"><button aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前测试集</button><button aria-pressed={tab === "snapshot"} className={tab === "snapshot" ? "active" : ""} onClick={() => setTab("snapshot")}>历史版本</button></div>
     {tab === "run" && <Section title="当前测试集" action={<div className="header-actions">{current.length === expectedCount && currentRun?.status === "completed" && <button className="secondary" disabled={busy || qualityRunning} onClick={() => void rerunQuality()}>重新运行 Probe / QC</button>}{current.length === expectedCount && <details className="export-menu"><summary className="secondary">导出测试集 ▾</summary><div>{(["markdown", "csv", "json"] as const).map(format => <a key={format} href={apiUrl(`/api/governance/generation-runs/${currentRun.id}/export?format=${format}`)} download>导出 {format === "markdown" ? "Markdown" : format.toUpperCase()}</a>)}</div></details>}</div>}>
       {currentRun ? <>
         {gate1Snapshot && <div className="snapshot-next"><span>✓ Gate 1 已确认 Golden 测试集；冻结版本可在历史版本查看。</span></div>}
@@ -162,12 +166,11 @@ export function GovernancePage({ data }: { data: any }) {
         {Object.entries(currentRun.artifacts?.slot_audit || {}).filter(([, attempts]) => (attempts as Candidate[]).some(attempt => attempt.validation_error)).map(([slot, attempts]) => <details className="slot-audit" key={slot}><summary>{slot} · {(attempts as Candidate[]).length} Attempts · {(attempts as Candidate[]).at(-1)?.validation_error ? "Failed" : "Passed after retry"}</summary>{(attempts as Candidate[]).map(attempt => <div key={attempt.attempt}><strong>Attempt {attempt.attempt}</strong><p>问题：{attempt.question || "—"}</p><p>答案：{attempt.reference_answer || "—"}</p><p>Evidence：{attempt.selected_evidence?.map((item: Candidate) => `${item.document_name || item.document_id} · ${item.chunk_id} · ${item.chunk_text}`).join("；") || "—"}</p><pre>{attempt.validation_error || "通过"}</pre></div>)}</details>)}</details>
         <div className="review-filters" aria-label="Candidate 筛选">{filters.map(item => <button key={item.key} aria-pressed={filter === item.key} className={filter === item.key ? "active" : ""} onClick={() => setFilter(item.key)}>{item.label} {item.count}</button>)}</div>
         <QuestionTable rows={filter === "all" ? [...visible, ...failedSlots.filter(slot => !current.some(row => row.slot === slot)).map(slot => ({ id: `missing-${slot}`, slot, test_category: currentRun.artifacts.coverage_plan?.find((item: Candidate) => item.slot === slot)?.test_category, question: "生成失败，待补齐", failed: true }))].sort((a, b) => String(a.slot || "").localeCompare(String(b.slot || ""))) : visible} onDetail={row => row.failed ? (setErrorSlot(row.slot), setRunErrorOpen(true)) : setSelectedId(row.id)} />
-        {current.length === expectedCount && currentRun.status === "completed" && !gate1Snapshot && <div className="review-batch gate-one-action"><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> 我已人工审核本次 V1 Mini 的全部有效 Candidate</label>{batchReason && <span className="muted">{batchReason}</span>}<button className="primary" disabled={busy || !!batchReason} onClick={() => void action(() => postJson("/api/governance/review-batch", { question_ids: currentIds, confirmed_manual_review: true }), "确认 Golden 测试集")}>确认 Golden 测试集</button></div>}
-      </> : <p className="muted">尚未生成当前 V1 Mini。历史题不会计入本轮统计。</p>}
+        {current.length === expectedCount && currentRun.status === "completed" && !gate1Snapshot && <div className="review-batch gate-one-action"><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> 我已人工审核本次测试集的全部有效 Candidate</label>{batchReason && <span className="muted">{batchReason}</span>}<button className="primary" disabled={busy || !!batchReason} onClick={() => void action(() => postJson("/api/governance/review-batch", { question_ids: currentIds, confirmed_manual_review: true }), "确认 Golden 测试集")}>确认 Golden 测试集</button></div>}
+      </> : <p className="muted">尚未生成当前测试集。历史题不会计入本轮统计。</p>}
     </Section>}
-    {tab === "snapshot" && <Section title="Approved Golden Snapshot"><div className="run-list">{snapshots.map(snapshot => <div key={snapshot.id}><strong>{snapshot.id}</strong><span>{snapshot.snapshot?.generation_run_id || "历史快照"} · {snapshot.snapshot?.question_ids?.length || 0} 题</span><Status value={snapshot.status} /></div>)}{!snapshots.length && <p className="muted">尚未创建正式 Golden Snapshot。</p>}</div></Section>}
-    {tab === "legacy" && <Section title="历史 Candidate（Legacy / 未验证）"><details><summary>展开 {legacy.length} 道历史 Candidate</summary><p className="muted">仅供追溯，不参与本轮统计、正式 Baseline 或发布判断。</p><QuestionTable rows={legacy} onDetail={row => setSelectedId(row.id)} /></details></Section>}
-    <Drawer open={!!selected} onOpenChange={open => !open && setSelectedId(null)} title={selected ? `${selected.slot || "历史题"} · ${displayText(selected.test_category)}` : "候选题审核"} className="candidate-workspace"><CandidateWorkspace key={selected?.id} row={selected} peers={current} revision={revisions.find(item => item.question_ids?.includes(selected?.id))} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} readOnly={partial} onRun={questionAction} onReview={reviewAction} onRefresh={reload} operation={operation} /></Drawer>
+    {tab === "snapshot" && <><Section title="Approved Golden Snapshots"><div className="run-list">{snapshots.map(snapshot => <div key={snapshot.id}><strong>{snapshot.id}</strong><span>{snapshot.snapshot?.generation_run_id || "历史快照"} · {snapshot.snapshot?.question_ids?.length || 0} 题</span><Status value={snapshot.status} /></div>)}{!snapshots.length && <p className="muted">尚未创建正式 Golden Snapshot。</p>}</div></Section><Section title="历史 Candidate（Legacy / 未验证）"><details open><summary>{historical.length} 道历史 Candidate</summary><p className="muted">仅供追溯，不参与当前 Golden、Baseline 或发布判断。</p><QuestionTable rows={historical.slice(historyPage * 10, historyPage * 10 + 10)} onDetail={row => setSelectedId(row.id)} /><div className="history-pagination"><button className="secondary" disabled={historyPage === 0} onClick={() => setHistoryPage(page => page - 1)}>上一页</button><span>{historyPage + 1} / {Math.max(1, Math.ceil(historical.length / 10))}</span><button className="secondary" disabled={(historyPage + 1) * 10 >= historical.length} onClick={() => setHistoryPage(page => page + 1)}>下一页</button></div></details></Section></>}
+    <Drawer open={!!selected} onOpenChange={open => !open && setSelectedId(null)} title={selected ? `${selected.slot || "历史题"} · ${displayText(selected.test_category)}` : "候选题审核"} className="candidate-workspace"><CandidateWorkspace key={selected?.id} row={selected} peers={current} revision={revisions.find(item => item.question_ids?.includes(selected?.id))} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} readOnly={partial || !currentIds.includes(selected?.id || "")} onRun={questionAction} onReview={reviewAction} onRefresh={reload} operation={operation} /></Drawer>
     <Drawer open={runErrorOpen} onOpenChange={setRunErrorOpen} title="Run 错误详情"><div className="drawer-body"><p>阶段：{qualityRerun?.status === "failed" ? qualityRerun?.slots?.[qualityRerun?.slot]?.failed_stage || qualityRerun?.stage : stageName[currentRun?.artifacts?.hard_validation?.failed_stage] || stageName[currentRun?.status] || "未知"}</p>{errorSlot && (currentRun?.artifacts?.slot_audit?.[errorSlot] || []).map((attempt: Candidate) => <div key={attempt.attempt}><h3>{errorSlot} · Attempt {attempt.attempt}</h3><p>问题：{attempt.question || "—"}</p><p>答案：{attempt.reference_answer || "—"}</p><p>Evidence：{attempt.selected_evidence?.map((item: Candidate) => `${item.document_name || item.document_id} · ${item.chunk_id} · ${item.chunk_text}`).join("；") || "—"}</p><pre>{attempt.validation_error || "通过"}</pre></div>)}{!errorSlot && <pre>{qualityRerun?.status === "failed" ? qualityRerun.error : currentRun?.artifacts?.hard_validation?.error || "请查看运行详情中的 Slot Audit"}</pre>}</div></Drawer>
   </div>;
 }

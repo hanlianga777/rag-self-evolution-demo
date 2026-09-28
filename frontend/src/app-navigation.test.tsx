@@ -7,7 +7,7 @@ import App from "./App";
 let root: ReturnType<typeof createRoot>;
 afterEach(() => { root?.unmount(); document.body.innerHTML = ""; location.hash = ""; vi.restoreAllMocks(); });
 
-it("opens the overview with the V1.0.1 lifecycle navigation", async () => {
+it("opens the overview with the V1.3 lifecycle navigation", async () => {
   const data: Record<string, unknown> = {
     "/api/workspace": { active_version: "baseline-v1" }, "/api/overview": { dataset: { approved: 0, pending_review: 40 }, monitoring: { pending_triggers: 0 } },
     "/api/documents": [], "/api/dataset": [], "/api/evaluation": { status: "not_run" }, "/api/bad-cases": [],
@@ -19,9 +19,9 @@ it("opens the overview with the V1.0.1 lifecycle navigation", async () => {
   await act(async () => { root.render(<App />); await Promise.resolve(); await Promise.resolve(); });
 
   expect(document.body.textContent).toContain("RAG 自进化概览");
-  expect(document.body.textContent).toContain("测试集治理");
-  expect(document.body.textContent).toContain("问答验证");
-  expect(document.body.textContent).not.toContain("问答试验");
+  expect(document.body.textContent).toContain("黄金测试集");
+  expect(document.body.textContent).toContain("问答试验");
+  expect([...document.querySelectorAll('nav[aria-label="主导航"] a')].map(item => item.textContent)).toEqual(["概览", "知识库", "管线配置", "黄金测试集", "Baseline", "Tuning", "版本与发布", "问答试验"]);
 });
 
 it("opens a deep link and keeps navigation in browser history", async () => {
@@ -37,7 +37,7 @@ it("opens a deep link and keeps navigation in browser history", async () => {
   expect(document.querySelector("h1")?.textContent).toBe("知识库");
   await act(async () => { (document.querySelector('nav[aria-label="主导航"] a[href="#evaluation"]') as HTMLAnchorElement).click(); });
   expect(location.hash).toBe("#evaluation");
-  expect(document.querySelector("h1")?.textContent).toBe("评测");
+  expect(document.querySelector("h1")?.textContent).toBe("Baseline");
   await act(async () => { location.hash = "#knowledge"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
   expect(document.querySelector("h1")?.textContent).toBe("知识库");
 });

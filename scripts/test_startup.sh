@@ -92,7 +92,7 @@ printf '99999|Sun Sep 27 12:25:25 2026\n' > "$TEST_PROJECT/.demo-logs/api.pid"
 "$starter"
 check "$(test -e "$TEST_PROJECT/.demo-logs/api.pid" && echo yes)" yes 'F stale record was unexpectedly removed'
 "$TEST_PROJECT/start_demo.command"
-check "$(cat "$TEST_OPEN")" 'http://127.0.0.1:5174' 'G browser did not open after readiness'
+check "$(cat "$TEST_OPEN")" 'http://127.0.0.1:5174/#overview' 'G browser did not open at canonical overview after readiness'
 "$TEST_PROJECT/start_demo.command"
 check "$(wc -l < "$TEST_STATE/agent-operations" | tr -d ' ')" 1 'G LaunchAgent was bootstrapped twice'
 check "$(wc -l < "$TEST_OPEN" | tr -d ' ')" 2 'G browser was not opened on second click'
