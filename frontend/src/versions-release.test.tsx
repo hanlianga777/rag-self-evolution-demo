@@ -19,3 +19,13 @@ it("offers one human release action after recommendation and no old approvals", 
   expect(document.body.textContent).not.toContain("Release Approval");
   await act(async () => root.unmount());
 });
+
+it("keeps release candidates in A/B/C/D order and never offers an unqualified release action", async () => {
+  const candidates = ["C", "D", "B", "A"].map(label => ({ id: `EXP-${label}`, status: "evaluated", reasoning: { candidate_label: label }, release_state: { sandbox: true, qualified: label === "C", recommended: label === "C", round_complete: true } }));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [], optimization: { candidates } }} /></OperationProvider>));
+  expect([...document.querySelectorAll(".release-row > strong")].map(node => node.textContent)).toEqual(["Candidate A", "Candidate B", "Candidate C", "Composite D"]);
+  expect([...document.querySelectorAll(".release-actions")].map(node => node.textContent)).toEqual(expect.arrayContaining(["Not Qualified"]));
+  expect(document.querySelectorAll(".release-actions button")).toHaveLength(1);
+  await act(async () => root.unmount());
+});

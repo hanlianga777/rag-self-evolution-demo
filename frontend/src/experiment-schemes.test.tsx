@@ -20,10 +20,14 @@ it("compares previous and current production after release and reads saved Bad C
   };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
-  expect((document.querySelector('select[aria-label="Scheme A"]') as HTMLSelectElement).value).toBe("baseline-v1");
-  expect((document.querySelector('select[aria-label="Scheme B"]') as HTMLSelectElement).value).toBe("production-1");
-  await act(async () => (document.querySelector(".fixed-case-control button") as HTMLButtonElement).click());
+  expect(document.querySelector('[role="combobox"][aria-label="Scheme A"]')?.textContent).toContain("Previous Production");
+  expect(document.querySelector('[role="combobox"][aria-label="Scheme B"]')?.textContent).toContain("Current Production");
+  await act(async () => (document.querySelector('[role="combobox"][aria-label="选择真实 Bad Case"]') as HTMLButtonElement).click());
+  await act(async () => (document.querySelector('[role="option"][data-value="BAD-1"]') as HTMLDivElement).click());
+  await act(async () => (document.querySelector(".fixed-case-control button.secondary") as HTMLButtonElement).click());
   expect(document.body.textContent).toContain("已保存答案");
+  expect((document.querySelector(".history-evaluation") as HTMLDetailsElement).open).toBe(false);
+  expect(document.querySelector(".history-evaluation")?.textContent).toContain("查看本题在已保存实验中的评分和证据");
   expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual(expect.arrayContaining([expect.stringContaining("/api/evaluations/EVAL-1"), expect.stringContaining("/api/evaluations/EVAL-C")]));
   await act(async () => root.unmount());
 });
@@ -32,7 +36,27 @@ it("defaults to Baseline and a qualified Candidate before release", async () => 
   const data = { evaluation: { id: "EVAL-1" }, optimization: { candidates: [{ id: "C-1", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } }] }, versions: [{ id: "baseline-v1", status: "active", provenance: "bootstrap" }] };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
-  expect((document.querySelector('select[aria-label="Scheme A"]') as HTMLSelectElement).value).toBe("baseline");
-  expect((document.querySelector('select[aria-label="Scheme B"]') as HTMLSelectElement).value).toBe("C-1");
+  expect(document.querySelector('[role="combobox"][aria-label="Scheme A"]')?.textContent).toContain("Baseline");
+  expect(document.querySelector('[role="combobox"][aria-label="Scheme B"]')?.textContent).toContain("Candidate C");
+  await act(async () => root.unmount());
+});
+
+it("shows parameter differences before readable live answers", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const request = JSON.parse(String(init?.body || "{}"));
+    return new Response(JSON.stringify({ answer: "## 结论\n\n请 **停机**。\n\n- 关闭电源", version: request.scheme_id, config: { prompt_strategy: request.scheme_id === "baseline" ? "Grounded" : "Abstention", top_k: 4 }, latency_ms: 120, evidence: [] }), { status: 200 });
+  }));
+  const data = { evaluation: { id: "EVAL-1" }, optimization: { candidates: [{ id: "C-1", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } }] }, versions: [{ id: "baseline-v1", status: "active", provenance: "bootstrap" }] };
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
+  const textarea = document.querySelector("textarea") as HTMLTextAreaElement;
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+  await act(async () => { setter.call(textarea, "机器人如何操作？"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
+  await act(async () => { (document.querySelector(".query-action button") as HTMLButtonElement).click(); await Promise.resolve(); await Promise.resolve(); });
+  const diff = [...document.querySelectorAll(".section-head h2")].find(node => node.textContent === "方案参数差异")!;
+  const answers = document.querySelector(".experiment-results")!;
+  expect(diff.compareDocumentPosition(answers) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(document.querySelector(".answer-markdown strong")?.textContent).toBe("停机");
+  expect(document.querySelector(".answer-markdown")?.textContent).not.toContain("**");
   await act(async () => root.unmount());
 });

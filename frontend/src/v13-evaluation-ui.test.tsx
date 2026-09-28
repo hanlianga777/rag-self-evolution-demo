@@ -16,7 +16,7 @@ it("filters persisted Baseline cases and opens their diagnostic detail", async (
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(String(input).endsWith("/api/bad-cases") ? [] : run), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Bad Case Diagnosis")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Bad Case 诊断")!.click());
   expect(document.querySelector("tbody")?.textContent).toContain("Q02");
   expect(document.querySelector("tbody")?.textContent).not.toContain("Q01");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "全部")!.click());

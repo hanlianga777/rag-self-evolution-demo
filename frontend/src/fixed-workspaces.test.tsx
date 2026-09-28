@@ -20,9 +20,9 @@ it("keeps only the selected governance workspace visible", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: [], generationRuns: [], snapshots: [] }} />));
   expect(document.body.textContent).toContain("当前测试集");
-  expect(document.body.textContent).not.toContain("历史 Candidate（Legacy / 未验证）");
+  expect(document.body.textContent).not.toContain("历史 Candidate（未验证）");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "历史版本")!.click());
-  expect(document.body.textContent).toContain("历史 Candidate（Legacy / 未验证）");
+  expect(document.body.textContent).toContain("历史 Candidate（未验证）");
   expect(document.querySelector('button[aria-pressed="true"]')?.textContent).toBe("历史版本");
   await act(async () => root.unmount());
 });
@@ -30,11 +30,11 @@ it("keeps only the selected governance workspace visible", async () => {
 it("shows one Evolution stage instead of four stacked cards", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ evaluation: {}, badCases: [] }} />));
-  expect(document.body.textContent).toContain("Failed Gates");
-  expect(document.body.textContent).not.toContain("Sandbox Compare");
+  expect(document.body.textContent).toContain("未通过 Gate");
+  expect(document.body.textContent).not.toContain("Sandbox 对比");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent?.includes("Sandbox"))!.click());
-  expect(document.body.textContent).toContain("Sandbox Compare");
-  expect(document.body.textContent).not.toContain("Failed Gates");
+  expect(document.body.textContent).toContain("Sandbox 对比");
+  expect(document.body.textContent).not.toContain("未通过 Gate");
   await act(async () => root.unmount());
 });
 
@@ -43,7 +43,8 @@ it("shows no effective composite without inventing a D candidate", async () => {
   const optimization = { id: "EXP-1", candidates: [], result: { report_confirmation: { winner_id: "C-1" }, composite: { status: "no_effective_composite" } } };
   await act(async () => root.render(<EvolutionPage data={{ evaluation: {}, badCases: [], optimization }} />));
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "A / B / C / D")!.click());
-  expect(document.body.textContent).toContain("No Effective Composite");
+  expect(document.body.textContent).toContain("保留 Gate 2 Winner");
+  expect(document.body.textContent).toContain("没有有效的 Composite D");
   expect(document.querySelectorAll(".composite-card .candidate-card")).toHaveLength(0);
   await act(async () => root.unmount());
 });

@@ -21,7 +21,7 @@ it("opens the overview with the V1.3 lifecycle navigation", async () => {
   expect(document.body.textContent).toContain("RAG Self-Evolution Lifecycle");
   expect(document.body.textContent).toContain("Golden Dataset");
   expect(document.body.textContent).toContain("QA Playground");
-  expect([...document.querySelectorAll('nav[aria-label="主导航"] a')].map(item => item.textContent)).toEqual(["Overview", "01 Knowledge", "02 Pipeline", "03 Golden Dataset", "04 Baseline", "05 Tuning", "06 Release", "07 QA Playground"]);
+  expect([...document.querySelectorAll('nav[aria-label="主导航"] a')].map(item => item.textContent)).toEqual(["Overview", "Knowledge", "Pipeline", "Golden Dataset", "Baseline", "Tuning", "Release", "QA Playground"]);
 });
 
 it("opens a deep link and keeps navigation in browser history", async () => {
