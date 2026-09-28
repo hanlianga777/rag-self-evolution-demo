@@ -18,7 +18,9 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATABASE = ROOT / "data" / "demo.db"
 GOLDEN_DRAFT = ROOT / "reports" / "golden_dataset_full_draft.json"
 GENERATION_PROFILES = {
-    "mini": {"positive": 8, "ablation": 4, "negative": 8, "expected_count": 20},
+    "mini": {"positive_count": 8, "ablation_count": 4, "negative_count": 8, "expected_count": 20},
+    "medium": {"positive_count": 20, "ablation_count": 9, "negative_count": 20, "expected_count": 49},
+    "full": {"positive_count": 40, "ablation_count": 18, "negative_count": 40, "expected_count": 98},
 }
 NEGATIVE_EXPECTED_BEHAVIORS = {"clarify", "insufficient_evidence", "safe_rejection", "prompt_injection_resistance"}
 
@@ -36,6 +38,11 @@ def _load(value, fallback):
         return json.loads(value) if value else fallback
     except json.JSONDecodeError:
         return fallback
+
+
+def profile_count(profile: dict, category: str) -> int:
+    """Read V1.3 counts while retaining old Mini run metadata."""
+    return profile.get(f"{category}_count", profile.get(category, 0))
 
 
 def _normalized(value: str) -> str:
@@ -249,7 +256,7 @@ class GovernanceStore:
         run_id = item["raw"].get("generation_run_id")
         run = self.generation_run(run_id) if run_id else None
         if run and run["artifacts"]["hard_validation"].get("slot_persistence_v1") and run["status"] != "completed":
-            raise ValueError("本轮 20/20 与 Probe / QC 尚未完成，部分 Candidate 仅可查看")
+            raise ValueError("本轮测试集与 Probe / QC 尚未完成，部分 Candidate 仅可查看")
 
     def dataset_summary(self):
         runs = [run for run in self.generation_runs() if run["artifacts"]["hard_validation"].get("slot_persistence_v1") or run["status"] == "completed" and len(run["question_ids"]) == self._expected_count(run)]
@@ -274,7 +281,7 @@ class GovernanceStore:
     @staticmethod
     def _expected_count(run: dict) -> int:
         profile = run.get("profile") or {}
-        return profile.get("expected_count") or sum(profile.get(category, 0) for category in ("positive", "ablation", "negative"))
+        return profile.get("expected_count") or sum(profile_count(profile, category) for category in ("positive", "ablation", "negative"))
 
     def approved_aliases(self):
         with self.connection() as connection:
@@ -288,17 +295,22 @@ class GovernanceStore:
             connection.execute("INSERT OR REPLACE INTO alias_mappings VALUES (?, ?, ?, ?, ?)", (alias.strip(), canonical.strip(), "approved", actor, _now()))
         return {"alias": alias.strip(), "canonical": canonical.strip(), "status": "approved", "actor": actor}
 
-    def start_generation_run(self, model_version: str):
+    def start_generation_run(self, model_version: str, profile_name: str = "mini"):
         from .corpus import current_manifest
+        if profile_name not in GENERATION_PROFILES:
+            raise ValueError("Unknown Golden profile")
+        profile = {"name": profile_name, **GENERATION_PROFILES[profile_name]}
         run_id, now = f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", _now()
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status = 'needs_regeneration' LIMIT 1").fetchone():
-                raise ValueError("当前 V1 Mini 尚有失败 Slot 待补齐，请先完成当前 Run。")
+            pending = connection.execute("SELECT profile_json FROM golden_generation_runs WHERE status = 'needs_regeneration' LIMIT 1").fetchone()
+            if pending:
+                old_mini = _load(pending["profile_json"], {}).get("name", "mini") == "mini"
+                raise ValueError("当前 V1 Mini 尚有失败 Slot 待补齐，请先完成当前 Run。" if old_mini else "当前测试集尚有失败 Slot 待补齐，请先完成当前 Run。")
             if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status IN ('queued', 'coverage', 'generating', 'validation', 'probing', 'qc') LIMIT 1").fetchone():
-                raise ValueError("已有 V1 Mini Generation Run 正在执行")
-            connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(GENERATION_PROFILES["mini"]), model_version, "queued", _json([]), now))
-            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json([]), _json([]), _json({"slot_persistence_v1": True, "corpus_fingerprint": current_manifest()["sources"], "progress": {"stage": "queued", "completed_slots": 0, "total_slots": GENERATION_PROFILES["mini"]["expected_count"], "phase_processed": 0, "phase_total": GENERATION_PROFILES["mini"]["expected_count"], "processed_slot_ids": [], "probe_completed": 0, "qc_completed": 0, "started_at": now, "operation_id": run_id}})))
+                raise ValueError("已有 Generation Run 正在执行")
+            connection.execute("INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(profile), model_version, "queued", _json([]), now))
+            connection.execute("INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)", (run_id, _json([]), _json([]), _json({"slot_persistence_v1": True, "corpus_fingerprint": current_manifest()["sources"], "progress": {"stage": "queued", "completed_slots": 0, "total_slots": profile["expected_count"], "phase_processed": 0, "phase_total": profile["expected_count"], "processed_slot_ids": [], "probe_completed": 0, "qc_completed": 0, "started_at": now, "operation_id": run_id}})))
         return run_id
 
     def claim_regeneration(self, run_id: str, corpus_fingerprint):
@@ -339,11 +351,12 @@ class GovernanceStore:
             processed_ids = progress.get("processed_slot_ids", [])
             if finished and slot not in processed_ids:
                 processed_ids = [*processed_ids, slot]
-            audit["progress"] = {**progress, "stage": "generating", "slot": slot, "attempt": attempt, "completed_slots": len(ids) + bool(candidate), "processed_slot_ids": processed_ids, "phase_processed": progress.get("phase_processed", 0) + int(finished), "phase_total": progress.get("phase_total", 20)}
+            audit["progress"] = {**progress, "stage": "generating", "slot": slot, "attempt": attempt, "completed_slots": len(ids) + bool(candidate), "processed_slot_ids": processed_ids, "phase_processed": progress.get("phase_processed", 0) + int(finished), "phase_total": progress.get("phase_total", 0)}
             if candidate:
                 question_id = f"V1G-{run_id[-12:]}-{int(slot[1:]):02d}"
                 now = _now()
-                raw = {"id": question_id, "question": candidate["question"], "reference_answer": candidate.get("reference_answer"), "acceptable_evidence": candidate.get("evidence") or [], "expected_behavior": candidate.get("expected_behavior"), "generation_profile": "v1-mini-8-4-8", "generation_run_id": run_id, "generation_model": model, "ablation_attribute": candidate.get("ablation_attribute"), "ablation_metadata": candidate.get("ablation_metadata", {}), "coverage_slot": slot, "generation_instruction": candidate.get("generation_instruction"), "source_positive_id": None}
+                profile = _load(connection.execute("SELECT profile_json FROM golden_generation_runs WHERE id=?", (run_id,)).fetchone()[0], {})
+                raw = {"id": question_id, "question": candidate["question"], "reference_answer": candidate.get("reference_answer"), "acceptable_evidence": candidate.get("evidence") or [], "expected_behavior": candidate.get("expected_behavior"), "generation_profile": "v1-mini-8-4-8" if profile.get("name", "mini") == "mini" else f"v1.3-{profile['name']}", "generation_run_id": run_id, "generation_model": model, "ablation_attribute": candidate.get("ablation_attribute"), "ablation_metadata": candidate.get("ablation_metadata", {}), "coverage_slot": slot, "generation_instruction": candidate.get("generation_instruction"), "source_positive_id": None}
                 connection.execute("INSERT INTO questions (id, stage, legacy_question_type, test_category, negative_subtype, review_status, probe_status, qc_status, question, reference_answer, evidence_json, raw_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, "candidate", "v1_mini", candidate["test_category"], candidate.get("negative_subtype"), "human_review_pending", "probe_pending", "qc_pending", candidate["question"], candidate.get("reference_answer"), _json(candidate.get("evidence") or []), _json(raw), now, now))
                 question_plan.append({"question_id": question_id, "coverage_slot": slot, "test_category": candidate["test_category"], "negative_subtype": candidate.get("negative_subtype"), "ablation_attribute": candidate.get("ablation_attribute")})
                 question_plan.sort(key=lambda item: item["coverage_slot"])
@@ -355,12 +368,14 @@ class GovernanceStore:
     def complete_generation_slots(self, run_id: str, *, failed_slots: list[str], hard_validation: dict, continue_refill: bool = False):
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute("SELECT r.question_ids_json, a.question_plan_json, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.id=?", (run_id,)).fetchone()
+            row = connection.execute("SELECT r.question_ids_json, r.profile_json, a.question_plan_json, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.id=?", (run_id,)).fetchone()
             ids, plan, audit = _load(row["question_ids_json"], []), _load(row["question_plan_json"], []), _load(row["hard_validation_json"], {})
+            profile = _load(row["profile_json"], {})
             counts = {category: sum(item["test_category"] == category for item in plan) for category in ("positive", "ablation", "negative")}
-            complete = len(ids) == 20 and len(set(ids)) == 20 and counts == {"positive": 8, "ablation": 4, "negative": 8} and not failed_slots and not hard_validation.get("rejected")
-            if len(ids) == 20 and not complete:
-                raise ValueError("20/20 Candidate 配额或整轮 Hard Validation 复核失败")
+            expected = self._expected_count({"profile": profile})
+            complete = len(ids) == expected and len(set(ids)) == expected and all(counts[key] == profile_count(profile, key) for key in counts) and not failed_slots and not hard_validation.get("rejected")
+            if len(ids) == expected and not complete:
+                raise ValueError("Candidate 配额或整轮 Hard Validation 复核失败")
             audit.update({"failed_slots": failed_slots, "status": "passed" if complete else "generating" if continue_refill else "needs_regeneration", "counts": counts, "hard_validation": hard_validation})
             progress = audit.get("progress", {})
             if progress.get("refill_round"):
@@ -410,7 +425,7 @@ class GovernanceStore:
         """Persist the V1 Mini profile only as review-pending candidates, never as Golden."""
         expected = GENERATION_PROFILES["mini"]
         actual = {category: sum(item.get("test_category") == category for item in candidates) for category in ("positive", "ablation", "negative")}
-        if any(actual[category] != expected[category] for category in actual) or len(candidates) != expected["expected_count"]:
+        if any(actual[category] != profile_count(expected, category) for category in actual) or len(candidates) != expected["expected_count"]:
             raise ValueError("V1 Mini Golden profile must be Positive 8 / Ablation 4 / Negative 8")
         existing_run = run_id is not None
         run_id = run_id or f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
@@ -545,7 +560,9 @@ class GovernanceStore:
                     chunk = by_chunk.get(chunk_id)
                     matched.append({"chunk_id": chunk_id, "resolution": "matched" if chunk else "missing_current_index", "document_id": chunk.get("document_id") if chunk else None, "document_name": chunk.get("document_name") if chunk else None, "section_path": chunk.get("section_path") if chunk else None, "page_start": chunk.get("page_start") if chunk else None, "page_end": chunk.get("page_end") if chunk else None, "chunk_text": chunk.get("chunk_text", chunk.get("text")) if chunk else None})
                 evidence_details.append({**evidence, "chunks": matched})
-            questions.append({**item, 'approval_eligibility': self.approval_eligibility(question_id), "slot": item["raw"].get("coverage_slot") or f"Q{number:02d}", "evidence_details": evidence_details, "probe": probes[question_id][0] if probes[question_id] and item["probe_status"] != "probe_pending" else None, "qc": qcs[question_id][0]["result"] if qcs[question_id] and item["qc_status"] != "qc_pending" else None, "probe_history": probes[question_id], "qc_history": qcs[question_id], "review_history": reviews[question_id], "revision_history": self.revision_history(question_id)})
+            slot = item["raw"].get("coverage_slot") or f"Q{number:02d}"
+            attempts = run["artifacts"].get("slot_audit", {}).get(slot, [])
+            questions.append({**item, 'approval_eligibility': self.approval_eligibility(question_id), "slot": slot, "hard_validation_checks": attempts[-1].get("hard_validation_checks") if attempts else None, "evidence_details": evidence_details, "probe": probes[question_id][0] if probes[question_id] and item["probe_status"] != "probe_pending" else None, "qc": qcs[question_id][0]["result"] if qcs[question_id] and item["qc_status"] != "qc_pending" else None, "probe_history": probes[question_id], "qc_history": qcs[question_id], "review_history": reviews[question_id], "revision_history": self.revision_history(question_id)})
         return {"generation_run_id": run_id, "questions": questions}
 
     def approval_eligibility(self, question_id: str):
@@ -554,7 +571,7 @@ class GovernanceStore:
         blockers = []
         generation = self.generation_run(item["raw"].get("generation_run_id")) if item["raw"].get("generation_run_id") else None
         if generation and generation["artifacts"]["hard_validation"].get("slot_persistence_v1") and generation["status"] != "completed":
-            blockers.append("本轮 20/20 与 Probe / QC 尚未完成")
+            blockers.append("本轮测试集与 Probe / QC 尚未完成")
         if item['probe_status'] != 'probe_passed' or not probes or probes[0].get('evidence_direct_failure') or probes[0].get('status') != 'passed':
             blockers.append('Probe 尚未完成或确定性证据 / Negative 检查未通过')
         if item['qc_status'] == 'qc_pending' or not qcs:
@@ -572,7 +589,7 @@ class GovernanceStore:
         current = self.question(question_id)
         generation = self.generation_run(current["raw"].get("generation_run_id")) if current["raw"].get("generation_run_id") else None
         if generation and generation["artifacts"]["hard_validation"].get("slot_persistence_v1") and generation["status"] != "completed":
-            raise ValueError("本轮 20/20 与 Probe / QC 尚未完成，不可人工审核")
+            raise ValueError("本轮测试集与 Probe / QC 尚未完成，不可人工审核")
         if current["stage"] == "golden" and decision != "approved":
             raise ValueError("已批准题目已冻结")
         if decision == "needs_revision" and not (reason or "").strip():
@@ -668,11 +685,11 @@ class GovernanceStore:
         if current["stage"] == "golden":
             raise ValueError("已批准题目不能修订")
         if current["legacy_question_type"] != "v1_mini" or current['stage'] != 'candidate':
-            raise ValueError("仅可编辑或替换活动 V1 Mini Candidate")
+            raise ValueError("仅可编辑或替换活动 Golden Candidate")
         run_id = current["raw"].get("generation_run_id")
         run = self.generation_run(run_id)
         if not run or len(run["question_ids"]) != self._expected_count(run) or question_id not in run["question_ids"] or (run["artifacts"]["hard_validation"].get("slot_persistence_v1") and run["status"] != "completed"):
-            raise ValueError("V1 Mini Run 不完整")
+            raise ValueError("当前 Generation Run 不完整")
         ids = [question_id]
         if replacement and paired:
             raise ValueError('替换只作用于当前 Slot')
@@ -1035,7 +1052,7 @@ class GovernanceStore:
         run = self.generation_run(generation_run_id)
         expected = self._expected_count(run)
         if len(approved) != expected or len(set(question_ids)) != expected or any(item["stage"] != "golden" or item["review_status"] != "approved" or not self.approval_eligibility(item['id'])['can_approve'] for item in approved):
-            raise ValueError("同一 V1 Mini Generation Run 的 20 道题必须全部完成人工批准后才能创建 Snapshot")
+            raise ValueError(f"同一 Generation Run 的 {expected} 道题必须全部完成人工批准后才能创建 Snapshot")
         if any(set(item["question_ids"]) & set(question_ids) for item in self.revision_runs(generation_run_id) if item["status"] in {"queued", "generating", "validating", "preview_ready", "probing", "qc", "interrupted"}):
             raise ValueError("仍有未完成的局部修订，不能创建 Snapshot")
         existing = next((item['snapshot'] for item in self.dataset_snapshots() if item['snapshot'].get('generation_run_id') == generation_run_id and item['snapshot'].get('question_ids') == question_ids), None)
@@ -1102,9 +1119,10 @@ class GovernanceStore:
         full_text['answer_anchor_supported'] = programmatic['answer_anchor'] if positive else None
         recalled = bool(expected_chunks & {hit.get("chunk_id") for hit in hits}) if positive else None
         classification = "RETRIEVAL_INCOHERENT" if positive and evidence_valid and not recalled else "EVIDENCE_VALID" if positive and evidence_valid else "EVIDENCE_INVALID" if positive else "NEGATIVE_VALID" if evidence_valid else "NEGATIVE_SUBTYPE_MISMATCH" if subtype_mismatch else "FAKE_NEGATIVE_RISK" if answerability and answerability.get("answerable") is True else "NEGATIVE_UNDETERMINED"
+        exact_matches = [{"chunk_id": chunk_id, "document_id": next((chunk.get("document_id") for chunk in chunks if chunk.get("chunk_id") == chunk_id), None), "matched_terms": [term for term in entity_tokens if term.lower() in source_texts[chunk_id].lower()], "content_preview": source_texts[chunk_id][:240]} for chunk_id in dict.fromkeys(corpus_matches + entity_matches)]
         negative_checks = None if positive else {
             "vector_probe": {"observed_hits": hits, "signal_only": True},
-            "full_text_probe": {"corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "signal_only": True},
+            "full_text_probe": {"corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "matches": exact_matches, "exact_match_count": len(exact_matches), "signal_only": True},
             "answerability": answerability,
             "subtype_semantic": subtype_semantic,
             "fake_negative_check": {"expected_behavior": expected_behavior, "negative_subtype": subtype, "subtype_mismatch": subtype_mismatch, "ambiguous": ambiguous_negative, "passed": negative_passed},
@@ -1169,8 +1187,8 @@ class GovernanceStore:
         if run_fingerprint is not None and run_fingerprint != current_manifest()["sources"]:
             raise ValueError("Corpus 已变化；请基于当前知识库创建新的 Generation Run")
         expected = self._expected_count(run) if run else 0
-        if not expected or len(candidates) != expected or len(set(question_ids)) != expected or len(runs) != 1 or any(item["raw"].get("generation_profile") != "v1-mini-8-4-8" for item in candidates):
-            raise ValueError("Batch review only accepts one complete V1 Mini generation run")
+        if not expected or len(candidates) != expected or len(set(question_ids)) != expected or len(runs) != 1 or any(item["raw"].get("generation_run_id") != run["id"] for item in candidates):
+            raise ValueError("Batch review only accepts one complete generation run")
         if set(question_ids) != set((self.generation_run(next(iter(runs))) or {}).get("question_ids", [])):
             raise ValueError("Batch review question IDs must match the generation run")
         now = _now()
@@ -1179,8 +1197,8 @@ class GovernanceStore:
             candidates = [self.question(question_id) for question_id in question_ids]
             if set(self.generation_run(run['id'])['question_ids']) != set(question_ids):
                 raise ValueError('活动题目已变化，请刷新')
-            if any(sum(item['test_category'] == category for item in candidates) != run['profile'][category] for category in ('positive', 'ablation', 'negative')):
-                raise ValueError('Mini 类别数量不符')
+            if any(sum(item['test_category'] == category for item in candidates) != profile_count(run['profile'], category) for category in ('positive', 'ablation', 'negative')):
+                raise ValueError('Profile 类别数量不符')
             for item in candidates:
                 eligibility = self.approval_eligibility(item['id'])
                 if not eligibility['can_approve']:
@@ -1194,7 +1212,7 @@ class GovernanceStore:
                 connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (question_id, "dataset", "approved", actor, now))
                 connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "approved", actor, now))
             prior = next((item['snapshot'] for item in self.dataset_snapshots() if item['snapshot'].get('generation_run_id') == run['id'] and item['snapshot'].get('question_ids') == run['question_ids']), None)
-            snapshot = prior or {'id': f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", 'generation_run_id': run['id'], 'question_ids': run['question_ids'], 'questions': [self.question(key)['raw'] for key in run['question_ids']], 'policy_version': 'v1.2', 'corpus_fingerprint': run_fingerprint or current_manifest()['sources']}
+            snapshot = prior or {'id': f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", 'generation_run_id': run['id'], 'profile': run['profile'], 'question_ids': run['question_ids'], 'questions': [self.question(key)['raw'] for key in run['question_ids']], 'policy_version': 'v1.3', 'corpus_fingerprint': run_fingerprint or current_manifest()['sources']}
             if not prior:
                 connection.execute('INSERT INTO dataset_versions VALUES (?, ?, ?, ?, ?)', (snapshot['id'], 'approved', 'human_review', _json(snapshot), now))
         return {"reviewed": [self.question(question_id) for question_id in question_ids], "generation_run_id": run['id'], 'snapshot': snapshot}

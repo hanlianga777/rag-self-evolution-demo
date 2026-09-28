@@ -42,6 +42,35 @@ class PartialGenerationTests(unittest.TestCase):
             value["reference_answer"] = "越界答案" if slot in self.fail else "设备可断电维护"
         return json.dumps(value, ensure_ascii=False)
 
+    def test_medium_and_full_refill_use_frozen_profile(self):
+        for name, counts in (("medium", (20, 9, 20)), ("full", (40, 18, 40))):
+            with self.subTest(profile=name):
+                self.store = GovernanceStore(Path(self.folder.name) / f"{name}.db")
+                self.service.store = self.store
+                self.chunks = [{"chunk_id": f"C{i:03d}", "document_id": "D", "document_name": "fixture.pdf", "product": "P", "chunk_text": "设备可断电维护"} for i in range(1, sum(counts) + 1)]
+                self.corpus.chunks.return_value = self.chunks
+                self.service._mini_coverage_plan = lambda chunks, _, profile: [
+                    {"slot": f"Q{i:02d}", "test_category": category, "document_id": "D", "product": "P", "evidence_chunk_ids": [chunks[i - 1]["chunk_id"]] if category != "negative" else [], "ablation_attribute": "weak_keywords" if category == "ablation" else None, "negative_subtype": "safe_rejection" if category == "negative" else None, "expected_behavior": "safe_rejection" if category == "negative" else None, "sources": [chunks[i - 1]]}
+                    for i, category in enumerate(["positive"] * counts[0] + ["ablation"] * counts[1] + ["negative"] * counts[2], 1)
+                ]
+                self.fail = {"Q01"}
+                run_id = self.store.start_generation_run("mock-provider", name)
+                _run_mini_generation(run_id, self.store, self.service, self.corpus)
+                partial = self.store.generation_run(run_id)
+                self.assertEqual(partial["status"], "needs_regeneration")
+                self.assertEqual(len(partial["question_ids"]), sum(counts) - 1)
+                self.assertEqual(partial["operation_progress"]["phase_total"], sum(counts))
+                self.store.claim_regeneration(run_id, partial["artifacts"]["hard_validation"]["corpus_fingerprint"])
+                self.fail.clear()
+                self.calls.clear()
+                with patch.object(self.store, "run_probe", return_value={"status": "passed"}), patch.object(self.store, "record_qc"):
+                    _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
+                complete = self.store.generation_run(run_id)
+                self.assertEqual(complete["status"], "completed")
+                self.assertEqual(len(complete["question_ids"]), sum(counts))
+                self.assertEqual(complete["artifacts"]["hard_validation"]["counts"], dict(zip(("positive", "ablation", "negative"), counts)))
+                self.assertEqual(self.calls, ["Q01"])
+
     def test_partial_slots_persist_and_refill_only_failures(self):
         for missing in (1, 8):
             with self.subTest(missing=missing):

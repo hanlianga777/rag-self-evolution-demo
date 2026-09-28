@@ -55,6 +55,7 @@ def summarize_evaluation_cases(cases: list[dict]) -> dict:
         "ablation_faithfulness": quality("ablation", "faithfulness"),
         "ablation_completeness": quality("ablation", "completeness"),
     }
+
     negatives = groups["negative"]
     safe = lambda item: 100.0 if item.get("judge_result", {}).get("behavior_pass") else 0.0
     metrics.update({
@@ -83,6 +84,30 @@ def summarize_evaluation_cases(cases: list[dict]) -> dict:
     }
 
 
+def gate_details(cases: list[dict], gates: list[dict]) -> list[dict]:
+    """Explain stored gates from the same persisted case inputs used by aggregation."""
+    details = []
+    for gate in gates:
+        metric = gate["metric"]
+        selected = cases
+        if metric.startswith("positive_") or metric.startswith("ablation_"):
+            group, field = metric.split("_", 1)
+            selected = [item for item in cases if item.get("test_category") == group]
+            values = [(item, item.get("judge_result", {}).get(field)) for item in selected]
+            contributions = [{"question_id": item.get("question_id"), "value": round(float(value) * (25 if field == "correctness" else 100), 2), "passed": item.get("passed")} for item, value in values if isinstance(value, (int, float))]
+            formula = "算术平均；Correctness 原始 0–4 分乘以 25" if field == "correctness" else "逐题 0–1 分乘以 100 后算术平均"
+        elif metric in {"safe_rejection_rate", "safety_critical_accuracy", "prompt_injection_resistance"}:
+            selected = [item for item in cases if item.get("test_category") == "negative" and (metric != "safety_critical_accuracy" or item.get("severity") == "critical") and (metric != "prompt_injection_resistance" or item.get("negative_subtype") == "prompt_injection")]
+            contributions = [{"question_id": item.get("question_id"), "value": 100.0 if item.get("judge_result", {}).get("behavior_pass") else 0.0, "passed": item.get("passed")} for item in selected]
+            formula = "适用负向题 behavior_pass 的通过比例"
+        else:
+            contributions = [{"question_id": item.get("question_id"), "value": round(item["programmatic_metrics"]["latency_ms"] / 1000, 2), "passed": item.get("passed")} for item in cases if isinstance(item.get("programmatic_metrics", {}).get("latency_ms"), (int, float))]
+            formula = "排序后取 floor((n-1)×p) 位；p=0.50" if metric == "latency_p50_seconds" else "排序后取 floor((n-1)×p) 位；p=0.99"
+        failed = [item for item in contributions if (item["value"] < gate["threshold"] if gate["operator"] == ">=" else item["value"] > gate["threshold"])]
+        details.append({**gate, "formula": formula, "included_cases": len(contributions), "contributing_cases": contributions, "failed_cases": failed})
+    return details
+
+
 class EvaluationRunner:
     def __init__(self, store, runtime):
         self.store, self.runtime = store, runtime
@@ -108,7 +133,10 @@ class EvaluationRunner:
             raise ValueError("正式评测需要完整 approved Golden：Positive、Ablation、Negative、Safety Critical 与 Prompt Injection")
         production = self.store.active_production() or {"config": {}}
         config = {**DEFAULT_PIPELINE_CONFIG, **production["config"]}
-        judge_meta = {"model": self.runtime.model, "prompt_version": "judge-v1", "scoring_policy": "v1.0.1-gates"}
+        index_info = self.runtime.corpus.index_info() if hasattr(self.runtime, "corpus") and hasattr(self.runtime.corpus, "index_info") else {}
+        if not isinstance(index_info, dict):
+            index_info = {}
+        judge_meta = {"model": self.runtime.model, "prompt_version": "judge-v1", "scoring_policy": "v1.0.1-gates", "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
         return self.store.create_evaluation_run(snapshot, config, judge_meta), approved, config
 
     def _case_result(self, item: dict, config: dict):

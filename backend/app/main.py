@@ -19,7 +19,7 @@ from . import architecture_assets
 from .corpus import CorpusStore, UPLOADS_DIR, current_manifest
 from .corpus_management import CorpusManager
 from .config import load_settings
-from .evaluation import EvaluationRunner
+from .evaluation import EvaluationRunner, gate_details
 from .governance import GovernanceStore
 from .optimization import OptimizationAgent
 from .policy import DEFAULT_PIPELINE_CONFIG, validate_candidate_config
@@ -133,6 +133,10 @@ class AliasRequest(BaseModel):
     actor: str = Field(default="local_user", min_length=1, max_length=80)
 
 
+class GenerationRequest(BaseModel):
+    profile: Literal["mini", "medium", "full"] = "mini"
+
+
 def require_trusted_origin(request: Request):
     origin = request.headers.get("origin")
     if origin is not None and origin not in TRUSTED_ORIGINS:
@@ -175,7 +179,7 @@ def architecture_delete(slot: Literal["business", "technical"]):
 def overview():
     summary = store.dataset_summary()
     production = store.active_production()
-    latest = [item for item in store.evaluation_runs() if item["status"] != "legacy_unverified"][:1]
+    latest = [item for item in store.evaluation_runs() if item["status"] != "legacy_unverified" and item["config"].get("run_target") != "sandbox_candidate"][:1]
     triggers = store.optimization_triggers()
     return {"data_source": "real", "production": production, "dataset": summary, "latest_evaluation": latest[0] if latest else None, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
 
@@ -315,7 +319,8 @@ def export_generation_run(run_id: str, format: Literal["json", "csv", "markdown"
             values = [item["id"], item["test_category"], item["question"], item["reference_answer"], "; ".join(dict.fromkeys(chunk["document_name"] or "当前索引未匹配" for chunk in chunks)), "; ".join(dict.fromkeys(f'{chunk["page_start"]}–{chunk["page_end"]}' for chunk in chunks if chunk["page_start"] is not None)), json.dumps([chunk["chunk_id"] for chunk in chunks], ensure_ascii=False), item["probe"]["score"] if item["probe"] else None, item["probe_status"], item["qc"]["score"] if item["qc"] else None, item["qc_status"], item["review_status"]]
             writer.writerow(["'" + str(value) if str(value).lstrip().startswith(("=", "+", "-", "@", "\t", "\r")) else value for value in values])
         return Response("\ufeff" + output.getvalue(), media_type="text/csv; charset=utf-8", headers=headers)
-    lines = [f'# V1 Mini Candidate · {run_id}', ""]
+    profile_name = (store.generation_run(run_id) or {}).get("profile", {}).get("name", "mini").title()
+    lines = [f'# V1.3 {profile_name} Candidate · {run_id}', ""]
     for item in review["questions"]:
         lines += [f'## {item["slot"]}', "", f'ID: {item["id"]}', f'类型: {item["test_category"]}', f'属性 / 负向行为: {item["raw"].get("ablation_attribute") or item["raw"].get("expected_behavior") or "—"}', f'问题: {item["question"]}', "", f'参考答案: {item["reference_answer"] or "不适用（负向题）"}', "", "Evidence:"]
         if not item["evidence_details"]:
@@ -352,12 +357,17 @@ def approve_alias(payload: AliasRequest):
 
 @app.post("/api/governance/generate-mini", status_code=202, dependencies=[Depends(require_trusted_origin)])
 def generate_mini_golden():
+    return generate_golden(GenerationRequest())
+
+
+@app.post("/api/governance/generate", status_code=202, dependencies=[Depends(require_trusted_origin)])
+def generate_golden(payload: GenerationRequest):
     try:
-        run_id = store.start_generation_run(ai_service.model)
+        run_id = store.start_generation_run(ai_service.model, payload.profile)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     threading.Thread(target=_run_mini_generation, args=(run_id, store, ai_service, corpus), daemon=True).start()
-    return {"run_id": run_id, "status": "queued"}
+    return {"run_id": run_id, "status": "queued", "profile": payload.profile}
 
 
 @app.post("/api/governance/generation-runs/{generation_run_id}/regenerate-failed", status_code=202, dependencies=[Depends(require_trusted_origin)])
@@ -374,6 +384,7 @@ def regenerate_failed(generation_run_id: str):
 
 def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=False):
     stage = "generation"
+    profile = run_store.generation_run(run_id)["profile"]
 
     def on_progress(event):
         nonlocal stage
@@ -409,7 +420,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
                     plan.append({**slot, "sources": [by_id[chunk_id] for chunk_id in source_ids]})
                 generated = service.generate_mini_golden(chunks, on_progress=on_progress, plan=plan, existing=existing, prior_audit=prior_audit)
             else:
-                generated = service.generate_mini_golden(chunks, on_progress=on_progress)
+                generated = service.generate_mini_golden(chunks, on_progress=on_progress, **({"profile": profile} if profile.get("name", "mini") != "mini" else {}))
             failed_slots = generated.get("failed_slots", [])
             continue_refill = regenerate and round_number < 3 and 0 < len(failed_slots) < remaining_before
             complete = run_store.complete_generation_slots(run_id, failed_slots=failed_slots, hard_validation=generated["hard_validation"], continue_refill=continue_refill)
@@ -789,7 +800,7 @@ def qc_question(question_id: str):
 
 @app.get("/api/evaluation")
 def evaluation():
-    runs = [item for item in store.evaluation_runs() if item["status"] != "legacy_unverified"]
+    runs = [item for item in store.evaluation_runs() if item["status"] != "legacy_unverified" and item["config"].get("run_target") != "sandbox_candidate"]
     return runs[0] if runs else {"status": "not_run", "data_source": "real", "message": "暂无真实实验数据"}
 
 
@@ -985,7 +996,8 @@ def evaluation_run(run_id: str):
     run = next((item for item in store.evaluation_runs() if item["id"] == run_id), None)
     if run is None:
         raise HTTPException(status_code=404, detail="Evaluation run not found")
-    return {**run, "cases": store.evaluation_case_results(run_id)}
+    cases = store.evaluation_case_results(run_id)
+    return {**run, "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases, "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []))}
 
 
 @app.post("/api/evaluations/run", status_code=201, dependencies=[Depends(require_trusted_origin)])

@@ -8,7 +8,7 @@ import numpy as np
 from .policy import DEFAULT_PIPELINE_CONFIG
 from .providers import ProviderTimeout, ProviderUnavailable
 from .retrieval import VectorRetriever
-from .governance import _answer_anchor_supported
+from .governance import GENERATION_PROFILES, _answer_anchor_supported, profile_count
 
 
 NEGATIVE_EXPECTED_BEHAVIORS = {"clarify", "insufficient_evidence", "safe_rejection", "prompt_injection_resistance"}
@@ -280,13 +280,16 @@ class AiService:
                 on_progress(index, len(ids), item_id, drafts)
         return drafts
 
-    def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None) -> dict:
-        """Generate a coverage-planned V1 Mini; approval remains human-only."""
+    def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None, profile=None) -> dict:
+        """Generate a coverage-planned Golden set; approval remains human-only."""
         if not self.live_enabled:
             raise ProviderUnavailable("未配置 DEEPSEEK_API_KEY，无法生成 Golden Candidate")
         if not chunks:
             raise ProviderUnavailable("知识库没有可用于 Golden Generation 的 Chunk")
-        plan = plan if plan is not None else self._mini_coverage_plan(chunks, embeddings if embeddings is not None else self._indexed_embeddings(chunks))
+        profile = profile or GENERATION_PROFILES["mini"]
+        if plan is None:
+            vectors = embeddings if embeddings is not None else self._indexed_embeddings(chunks)
+            plan = self._mini_coverage_plan(chunks, vectors) if profile_count(profile, "positive") == 8 and profile_count(profile, "negative") == 8 else self._mini_coverage_plan(chunks, vectors, profile)
         candidates, slot_audit, failed_slots = list(existing or []), dict(prior_audit or {}), []
         coverage = [{**{key: value for key, value in slot.items() if key != "sources"}, "material_chunk_ids": [source["chunk_id"] for source in slot["sources"]]} for slot in plan]
         if on_progress:
@@ -299,7 +302,7 @@ class AiService:
                 attempt = len(attempts) + 1
                 instruction = self._slot_instruction(slot, attempts[-1]["validation_error"] if attempts else None)
                 source_payload = [{"chunk_id": chunk["chunk_id"], "section": chunk.get("section_path"), "source_text": chunk.get("chunk_text", chunk.get("text", ""))} for chunk in slot["sources"]]
-                error = error_type = None
+                error = error_type = checks = None
                 response = None
                 generated = {}
                 try:
@@ -309,12 +312,14 @@ class AiService:
                         generated = {}
                         raise ValueError("invalid JSON object")
                     candidate = self._slot_candidate(slot, generated, instruction)
-                    errors = self._candidate_errors(candidate, chunks, {"".join(str(item.get("question") or "").lower().split()) for item in candidates})
+                    seen = {"".join(str(item.get("question") or "").lower().split()) for item in candidates}
+                    errors = self._candidate_errors(candidate, chunks, seen)
+                    checks = self._candidate_checks(candidate, chunks, seen)
                     error = "; ".join(errors) if errors else None
                 except (json.JSONDecodeError, ProviderUnavailable, ValueError) as caught:
                     error = "invalid JSON" if isinstance(caught, json.JSONDecodeError) else str(caught)
                     error_type = type(caught).__name__
-                attempts.append({"slot": slot["slot"], "attempt": attempt, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "source_chunk_ids": [source["chunk_id"] for source in slot["sources"]] if slot["test_category"] != "negative" else [], "selected_evidence": [{"chunk_id": source["chunk_id"], "document_id": source.get("document_id"), "document_name": source.get("document_name"), "chunk_text": source.get("chunk_text", source.get("text", ""))} for source in slot["sources"]], "test_category": slot["test_category"], "negative_subtype": slot.get("negative_subtype"), "ablation_attribute": slot.get("ablation_attribute"), "expected_behavior": slot.get("expected_behavior"), "structured_type": slot.get("structured_type"), "source_positive_slot": slot.get("source_positive_slot"), "validation_error": error, "error_type": error_type, "response_preview": response[:500] if error and response and not generated else None, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction})
+                attempts.append({"slot": slot["slot"], "attempt": attempt, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "source_chunk_ids": [source["chunk_id"] for source in slot["sources"]] if slot["test_category"] != "negative" else [], "selected_evidence": [{"chunk_id": source["chunk_id"], "document_id": source.get("document_id"), "document_name": source.get("document_name"), "chunk_text": source.get("chunk_text", source.get("text", ""))} for source in slot["sources"]], "test_category": slot["test_category"], "negative_subtype": slot.get("negative_subtype"), "ablation_attribute": slot.get("ablation_attribute"), "expected_behavior": slot.get("expected_behavior"), "structured_type": slot.get("structured_type"), "source_positive_slot": slot.get("source_positive_slot"), "validation_error": error, "hard_validation_checks": checks, "error_type": error_type, "response_preview": response[:500] if error and response and not generated else None, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction})
                 slot_audit[slot["slot"]] = attempts
                 if not error:
                     candidates.append(candidate)
@@ -330,7 +335,7 @@ class AiService:
         status = "candidate_generated" if not failed_slots and len(candidates) == expected_count else "needs_regeneration"
         if on_progress:
             on_progress({"stage": "validation", "completed_slots": expected_count, "slot_audit": slot_audit, "valid_slots": candidates, "failed_slots": failed_slots, "hard_validation": validation})
-        return {"status": status, "profile": {"positive": 8, "ablation": 4, "negative": 8, "expected_count": expected_count}, "coverage_plan": coverage, "candidates": candidates if status == "candidate_generated" else [], "valid_slots": candidates, "failed_slots": failed_slots, "slot_audit": slot_audit, "hard_validation": {**validation, "status": "passed" if status == "candidate_generated" else "failed"}}
+        return {"status": status, "profile": profile, "coverage_plan": coverage, "candidates": candidates if status == "candidate_generated" else [], "valid_slots": candidates, "failed_slots": failed_slots, "slot_audit": slot_audit, "hard_validation": {**validation, "status": "passed" if status == "candidate_generated" else "failed"}}
 
     @staticmethod
     def _slot_instruction(slot: dict, repair_reason: str | None) -> str:
@@ -365,7 +370,8 @@ class AiService:
             raise ProviderUnavailable(f"Coverage Embedding 不可用或与 Chunk 不一致：{error}") from error
 
     @staticmethod
-    def _mini_coverage_plan(chunks: list[dict], embeddings) -> list[dict]:
+    def _mini_coverage_plan(chunks: list[dict], embeddings, profile: dict | None = None) -> list[dict]:
+        profile = profile or GENERATION_PROFILES["mini"]
         if not chunks or any(not item.get("document_id") or not item.get("chunk_id") or not item.get("chunk_text", item.get("text")) for item in chunks):
             raise ProviderUnavailable("Coverage requires document_id, chunk_id and chunk_text")
         vectors = np.asarray(embeddings, dtype="float32")
@@ -408,7 +414,8 @@ class AiService:
             used.add(chosen)
             return chosen, int(labels[chosen])
 
-        for category, count in (("positive", 8), ("ablation", 4)):
+        for category in ("positive", "ablation"):
+            count = profile_count(profile, category)
             for index in range(count):
                 chunk_index, cluster = select(index)
                 anchor = chunks[chunk_index]
@@ -431,7 +438,8 @@ class AiService:
                 plan.append({"slot": f"Q{slot:02d}", "test_category": category, "document_id": anchor["document_id"], "product": anchor.get("product"), "section": anchor.get("section"), "section_path": anchor.get("section_path"), "evidence_chunk_ids": [item["chunk_id"] for item in sources], "ablation_attribute": attribute, "source_positive_slot": None, "topic_cluster": cluster, "structured_type": structured_type, "selected_reason": "embedding_topic_coverage", "sources": sources})
                 slot += 1
         negative_specs = [("safe_rejection", "safe_rejection"), ("insufficient_evidence", "insufficient_evidence"), ("clarify", "clarify"), ("safety_critical", "safe_rejection"), ("prompt_injection", "prompt_injection_resistance"), ("safe_rejection", "safe_rejection"), ("insufficient_evidence", "insufficient_evidence"), ("prompt_injection", "prompt_injection_resistance")]
-        for index, (subtype, expected_behavior) in enumerate(negative_specs):
+        for index in range(profile_count(profile, "negative")):
+            subtype, expected_behavior = negative_specs[index % len(negative_specs)]
             chunk_index, cluster = select(index)
             anchor = chunks[chunk_index]
             plan.append({"slot": f"Q{slot:02d}", "test_category": "negative", "document_id": anchor["document_id"], "product": anchor.get("product"), "section": anchor.get("section"), "section_path": anchor.get("section_path"), "evidence_chunk_ids": [], "negative_subtype": subtype, "expected_behavior": expected_behavior, "topic_cluster": cluster, "selected_reason": "embedding_topic_context", "sources": [anchor]})
@@ -472,10 +480,32 @@ class AiService:
             errors.append("missing alias metadata")
         return errors
 
+    @staticmethod
+    def _candidate_checks(candidate: dict, chunks: list[dict], seen: set[str]) -> dict:
+        """Record only checks that current deterministic validation actually performs."""
+        category = candidate.get("test_category")
+        positive = category != "negative"
+        question = str(candidate.get("question") or "").strip()
+        source_ids = [key for source in candidate.get("evidence") or [] for key in source.get("source_chunk_ids", [])]
+        known = {chunk.get("chunk_id"): chunk.get("chunk_text", chunk.get("text", "")) for chunk in chunks}
+        key = "".join(question.lower().split())
+        return {
+            "question_format": bool(question) and category in {"positive", "ablation", "negative"},
+            "required_fields": bool(candidate.get("reference_answer")) if positive else candidate.get("expected_behavior") in NEGATIVE_EXPECTED_BEHAVIORS,
+            "evidence_existence": bool(source_ids) and set(source_ids).issubset(known) if positive else None,
+            "evidence_location": None,
+            "answer_anchor": _answer_anchor_supported(candidate.get("reference_answer") or "", [known[key] for key in source_ids if key in known]) if positive else None,
+            "duplicate": key not in seen,
+            "forbidden_structure": None,
+            "cross_chunk_requirement": len(source_ids) >= 2 if candidate.get("ablation_attribute") == "cross_chunk" else None,
+            "negative_structural_check": candidate.get("expected_behavior") in NEGATIVE_EXPECTED_BEHAVIORS and not candidate.get("evidence") if not positive else None,
+            "quota_slot_consistency": None,
+        }
+
     def baseline_preview(self, question: str) -> dict:
         config = (self.store.active_production() or {"config": {"top_k": 4, "min_score": None}})["config"]
         result = self.answer(question, config)
-        return {"pipeline": "baseline", "question": question, "version": (self.store.active_production() or {"id": "baseline-v1"})["id"], "sources": [], **result, "evidence": result["retrieval"], "fallback_reason": None}
+        return {"pipeline": "baseline", "question": question, "version": (self.store.active_production() or {"id": "baseline-v1"})["id"], "config": config, "sources": [], **result, "evidence": result["retrieval"], "fallback_reason": None}
 
     def candidate_preview(self, question: str) -> dict:
         candidates = self.store.candidates() if hasattr(self.store, "candidates") else []
@@ -483,7 +513,7 @@ class AiService:
         if candidate is None:
             return {"pipeline": "candidate", "question": question, "status": "not_run", "answer": "暂无可比较候选；请先完成真实 Evaluation 与 Sandbox。", "latency_ms": 0, "evidence": [], "retrieval": [], "fallback_reason": None}
         result = self.answer(question, candidate["config"])
-        return {"pipeline": "candidate", "question": question, "version": candidate["id"], "status": "evaluated", **result, "evidence": result["retrieval"], "fallback_reason": None}
+        return {"pipeline": "candidate", "question": question, "version": candidate["id"], "config": candidate["config"], "status": "evaluated", **result, "evidence": result["retrieval"], "fallback_reason": None}
 
     def preview(self, question: str) -> dict:
         try:
