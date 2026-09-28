@@ -26,7 +26,7 @@ export type Citation = {
 };
 
 export type PipelinePreview = {
-  pipeline: "baseline" | "candidate";
+  pipeline: "baseline" | "candidate" | "production";
   question: string;
   version: string;
   config?: Record<string, unknown>;

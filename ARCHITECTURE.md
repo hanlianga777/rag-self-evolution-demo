@@ -14,6 +14,8 @@ Baseline/A/B/C/D 共用冻结 Golden、Judge、逐题评测器。新 Run 保存 
 
 Monitoring、版本历史和回滚是辅助能力。重启不假称线程仍在执行：运行标为中断／失败，审计和已消费预算保留。
 
+八个现有 Hash 工作区共用只读 Lifecycle 导航。`GET /api/pipeline` 汇总活动版本、最近 Baseline、索引信息和 `policy.py` 冻结 Search Space；`POST /api/preview/scheme` 只按已保存 Baseline、Candidate 或 Production Version ID 解析配置，不接收客户端配置。该预览由人主动触发，历史逐题 Evaluation 仍从保存的 Run 读取。
+
 ## Provider 与证据
 
 DeepSeek 只经后端显式调用，密钥不返回前端。检索是 Vector/BM25 Hybrid + 可选 Lightweight Rerank，不是独立重排模型。Provider 错误不伪装为质量结论；Legacy、Fixture 与真实生命周期分别报告。

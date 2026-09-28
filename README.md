@@ -19,6 +19,7 @@
 - Production 问答先记录为待人工判定的 Monitoring Event；人工标记 Bad Case 后，系统在一个 Safety Critical Bad Case 或最近 20 个有效记录中至少 4 个 Bad Case 时创建 Pending Trigger。流程固定为 `Monitoring → Trigger → Human Confirm → Optimization Run`，不会自动调参或发布。
 - Gate 2 在已启动评测全部终结后确认报告并选合格赢家。D 只合并有实测修复、Regression 通过的配置差异，冲突保留赢家；新组合完整重评且比赢家无新增失败、有实际修复才替代。无有效组合不虚构 D。Overall Score 不能替代 11 Gate。Monitoring、Version History 和 Rollback 是辅助能力。
 - `baseline-v1` 是启动用 Pipeline Bootstrap 配置，不是经过 Sandbox 与人工发布的 Production Version。旧 `seed.py` 只用于历史/开发数据，不进入当前 V1 主流程。
+- 八个 Hash 工作区按七阶段 Lifecycle 展示；`GET /api/pipeline` 只读返回当前配置、索引信息及与 Validator 同源的冻结 Search Space。问答试验的 Before / After 只接受已保存的 Baseline、Candidate 或 Production Version ID；发布后默认比较上一版本和当前版本。历史逐题 Evaluation 与手动触发的实时预览分开标注，实时预览可能调用 Provider。
 - DeepSeek 不可用时，页面显示明确状态，不生成模拟回答、分数、推荐或发布记录。可用时记录流式 TTFT、Token Usage；Provider 未返回成本时显示 `Token Usage / Provider Cost unavailable`。
 
 ## 架构

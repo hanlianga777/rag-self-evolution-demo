@@ -2,13 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { createPortal } from "react-dom";
 import { getJson } from "./api";
 
-type Operation = { id: string; title: string; status: "running" | "completed" | "failed"; kind?: "evaluation" | "revision"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
+type Operation = { id: string; runId?: string; candidateId?: string; title: string; status: "running" | "completed" | "failed"; kind?: "evaluation" | "revision"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
 type OperationContextValue = {
+  operations: Operation[];
   start: (title: string, detail?: Partial<Operation>) => string;
   update: (id: string, detail: Partial<Operation>) => void;
   succeed: (id: string) => void;
   fail: (id: string, reason: unknown) => void;
   run: <T>(title: string, work: () => Promise<T>) => Promise<T>;
+  startEvaluation: (title: string, work: () => Promise<{ id: string }>, candidateId?: string) => Promise<void>;
   watchEvaluation: (id: string, title: string) => void;
   watchRevision: (id: string) => void;
   registerCandidateRefresh: (refresh: () => Promise<void>) => void;
@@ -17,7 +19,7 @@ type OperationContextValue = {
   unregisterDialogHost: (node: HTMLElement) => void;
 };
 
-const fallback: OperationContextValue = { start: () => "", update: () => {}, succeed: () => {}, fail: () => {}, run: (_title, work) => work(), watchEvaluation: () => {}, watchRevision: () => {}, registerCandidateRefresh: () => {}, unregisterCandidateRefresh: () => {}, registerDialogHost: () => {}, unregisterDialogHost: () => {} };
+const fallback: OperationContextValue = { operations: [], start: () => "", update: () => {}, succeed: () => {}, fail: () => {}, run: (_title, work) => work(), startEvaluation: async (_title, work) => { await work(); }, watchEvaluation: () => {}, watchRevision: () => {}, registerCandidateRefresh: () => {}, unregisterCandidateRefresh: () => {}, registerDialogHost: () => {}, unregisterDialogHost: () => {} };
 const OperationContext = createContext<OperationContextValue>(fallback);
 export function useOperation() { return useContext(OperationContext); }
 
@@ -82,6 +84,11 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     try { const result = await work(); succeed(id); return result; }
     catch (reason) { fail(id, reason); throw reason; }
   }, [start, succeed, fail]);
+  const startEvaluation: OperationContextValue["startEvaluation"] = useCallback(async (title, work, candidateId) => {
+    const id = start(title, { candidateId });
+    try { const started = await work(); update(id, { kind: "evaluation", runId: started.id }); }
+    catch (reason) { fail(id, reason); throw reason; }
+  }, [start, update, fail]);
   const watchEvaluation = useCallback((id: string, title: string) => start(title, { id, kind: "evaluation" }), [start]);
   const watchRevision = useCallback((id: string) => start("局部修订", { id, kind: "revision" }), [start]);
   const registerCandidateRefresh = useCallback((refresh: () => Promise<void>) => { candidateRefresh.current = refresh; }, []);
@@ -94,7 +101,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     let cancelled = false;
     getJson<any[]>("/api/evaluations").then(evaluations => {
       if (cancelled) return;
-      for (const item of evaluations.filter(item => item.status === "running")) start(item.config?.candidate_id ? `Candidate ${item.config.candidate_id} Sandbox` : "Baseline Evaluation", { id: item.id, kind: "evaluation", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
+      for (const item of evaluations.filter(item => item.status === "running")) start(item.config?.candidate_id ? `Candidate ${item.config.candidate_id} Sandbox` : "Baseline Evaluation", { id: item.id, runId: item.id, candidateId: item.config?.candidate_id, kind: "evaluation", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
     }).catch(() => {});
     getJson<any[]>("/api/governance/revisions").then(revisions => {
       if (cancelled) return;
@@ -110,7 +117,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       for (const item of active) {
         if (syncing.current.has(item.id)) continue;
         syncing.current.add(item.id);
-        void getJson<any>(item.kind === "revision" ? `/api/governance/revisions/${item.id}` : `/api/evaluations/${item.id}`).then(async result => {
+        void getJson<any>(item.kind === "revision" ? `/api/governance/revisions/${item.id}` : `/api/evaluations/${item.runId || item.id}`).then(async result => {
           const next: Partial<Operation> = item.kind === "revision" ? revision(result) : evaluation(result);
           if (item.kind === "revision" && next.status === "completed" && candidateRefresh.current) {
             update(item.id, { ...next, status: "running", stage: "正在同步 Candidate 状态" });
@@ -133,7 +140,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       {item.current != null && item.total != null && item.total > 1 && <><div className="operation-count">{item.current} / {item.total}<span>{Math.round(item.current / item.total * 100)}%</span></div><progress value={item.current} max={item.total} /></>}
       {item.status === "failed" && <><small className="operation-error-summary">{shortError(item.error)}</small><button className="operation-detail-button" aria-label="查看错误详情" aria-expanded={detailId === item.id} aria-controls={`operation-detail-${item.id}`} onClick={() => setDetailId(current => current === item.id ? null : item.id)}>查看错误详情</button>{detailId === item.id && <div id={`operation-detail-${item.id}`} className="operation-details"><div>阶段：{item.stage || "未记录"}</div><div>耗时：{item.startedAt != null ? `${Math.max(0, ((item.endedAt ?? now) - item.startedAt) / 1000).toFixed(1)}s` : "未记录"}</div><div>错误：{item.errorDetail || item.error || "未记录"}</div><div>Operation ID：{item.id}</div>{item.provider && <div>Provider：{item.provider}</div>}{item.model && <div>Model：{item.model}</div>}{item.attempt != null && <div>Attempt：{item.attempt}</div>}</div>}</>}
     </section>)}</div>;
-  return <OperationContext.Provider value={{ start, update, succeed, fail, run, watchEvaluation, watchRevision, registerCandidateRefresh, unregisterCandidateRefresh, registerDialogHost, unregisterDialogHost }}>
+  return <OperationContext.Provider value={{ operations, start, update, succeed, fail, run, startEvaluation, watchEvaluation, watchRevision, registerCandidateRefresh, unregisterCandidateRefresh, registerDialogHost, unregisterDialogHost }}>
     {children}
     {dialogHosts.length ? createPortal(console, dialogHosts[dialogHosts.length - 1]) : console}
   </OperationContext.Provider>;

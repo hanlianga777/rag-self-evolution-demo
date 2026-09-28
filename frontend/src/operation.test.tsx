@@ -10,6 +10,20 @@ import { SettingsPage } from "./pages/SettingsPage";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it("tracks a Sandbox start and its persisted run in one operation", async () => {
+  function Harness() {
+    const operation = useOperation();
+    return <><button onClick={() => void operation.startEvaluation("Candidate C · Sandbox", async () => ({ id: "EVAL-C" }), "C-1")}>运行</button><span data-testid="operation-count">{operation.operations.length}</span><span data-testid="run-id">{operation.operations[0]?.runId}</span></>;
+  }
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
+  await act(async () => document.querySelector("button")!.click());
+  expect(document.querySelector('[data-testid="operation-count"]')?.textContent).toBe("1");
+  expect(document.querySelector('[data-testid="run-id"]')?.textContent).toBe("EVAL-C");
+  expect(document.querySelectorAll(".operation-console")).toHaveLength(1);
+  await act(async () => root.unmount());
+});
+
 it("keeps the operation controls inside an open modal drawer", async () => {
   function Harness() {
     const operation = useOperation();

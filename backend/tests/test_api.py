@@ -103,6 +103,40 @@ class GovernanceApiTests(unittest.TestCase):
         self.assertEqual(response.json()["status"], "completed")
         self.assertIsNone(response.json()["recommendation"])
 
+    def test_pipeline_contract_uses_frozen_policy(self):
+        from app.policy import search_space_contract
+
+        response = self.client.get("/api/pipeline")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["search_space"], search_space_contract())
+        self.assertEqual(response.json()["index"]["embedding_model"], main.corpus.index_info()["embedding_model"])
+
+    def test_scheme_preview_only_uses_persisted_config(self):
+        old_service = main.ai_service
+
+        class PreviewService:
+            def answer(self, question, config):
+                return {"answer": question, "retrieval": [], "latency_ms": 1, "mode": "local", "model": None, "config_seen": config}
+
+        main.ai_service = PreviewService()
+        self.addCleanup(setattr, main, "ai_service", old_service)
+        headers = {"Origin": "http://127.0.0.1:5174"}
+        invalid = self.client.post("/api/preview/scheme", json={"question": "问题", "scheme_id": "missing"}, headers=headers)
+        self.assertEqual(invalid.status_code, 404)
+        self.assertEqual(self.client.post("/api/preview/scheme", json={"question": "问题", "scheme_id": "baseline"}, headers=headers).status_code, 404)
+        experiment = main.store.create_experiment("EVAL-test")
+        main.store.save_candidate(experiment, "R1-A", {"candidate_k": 24, "top_k": 4}, {"candidate_label": "A"})
+        candidate_id = f"{experiment}-R1-A"
+        candidate = self.client.post("/api/preview/scheme", json={"question": "问题", "scheme_id": candidate_id}, headers=headers)
+        self.assertEqual(candidate.status_code, 200)
+        self.assertEqual(candidate.json()["config_seen"]["candidate_k"], 24)
+        self.assertEqual(candidate.json()["pipeline"], "candidate")
+        self.assertEqual(self.client.post("/api/preview/scheme", json={"question": "问题", "scheme_id": candidate_id, "config": {"candidate_k": 999}}, headers=headers).json()["config_seen"]["candidate_k"], 24)
+        production = self.client.post("/api/preview/scheme", json={"question": "问题", "scheme_id": "baseline-v1"}, headers=headers)
+        self.assertEqual(production.status_code, 200)
+        self.assertEqual(production.json()["pipeline"], "production")
+        self.assertEqual(production.json()["config_seen"]["candidate_k"], 12)
+
     def test_publish_blocks_an_incomplete_a_b_c_round_without_old_approval_routes(self):
         experiment = main.store.create_experiment("EVAL-real")
         candidate_id = f"{experiment}-R1-A"

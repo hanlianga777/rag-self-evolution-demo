@@ -6,6 +6,8 @@
 
 执行 `./start.sh` 后打开 `http://127.0.0.1:5174`。真实 PDF 在 `backend/documents/`；索引由 `backend/app/build_index.py` 构建，运行时由 `backend/app/corpus.py` 与 `backend/app/retrieval.py` 读取。Backend 是 FastAPI + SQLite，前端是 React/TypeScript/Vite。检索已实现 Vector/BM25 Hybrid、Query Rewrite、MultiQuery、HyDE、Metadata Filter、Alias Mapping 和轻量二阶段重排；没有独立 Rerank Model。`/api/experiments/*` 使用持久化实验与真实 Sandbox，不是旧文档所述的 seeded replay。
 
+当前 UI 按七阶段 Lifecycle 组织八个现有 Hash 工作区。Pipeline/Search Space 使用只读 `/api/pipeline`；Before / After 使用已持久化方案 ID 的 `/api/preview/scheme`，发布后默认上一 Production 对当前 Production。`Use Fixed Bad Case` 读取当前 Baseline Bad Case 和已保存逐题 Evaluation；“运行实时对比”才调用 Provider。前端改动部署后需重启 API 才有新增接口。验收时不要点击生成、Sandbox 或发布。
+
 历史 V1.1 链路（Superseded by V1.3，不用于当前判定）：Mini Golden → Probe/QC → Human Review → Snapshot → Baseline → Bad Case → Agent A/B/C → Sandbox/Regression → Recommendation → 单次 Human Release → Production/Monitoring。2026-09-26 只读基线为最近 Run 18/20 批准、1 拒绝、1 需修订，尚无正式 Snapshot；执行前重新读取当前状态。不要为测试自动修改用户 Candidate、应用 Preview、人工批准或发布。`baseline-v1` 是 Bootstrap 配置，不是正式发布成果。`seed.py` 只能用于隔离开发/历史展示。
 
 Provider 配置在 `.env`，绝不打印或提交密钥。设置页“验证 Provider”会发起最小模型调用；无 Provider 时展示真实不可用状态。Fixture E2E 与使用真实 Provider/索引的隔离生命周期必须分层报告。隔离 API 启动前用 `RAG_DEMO_DB_PATH` 指向临时 SQLite，避免导入时的数据库初始化触碰用户库。

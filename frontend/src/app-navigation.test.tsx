@@ -18,10 +18,10 @@ it("opens the overview with the V1.3 lifecycle navigation", async () => {
 
   await act(async () => { root.render(<App />); await Promise.resolve(); await Promise.resolve(); });
 
-  expect(document.body.textContent).toContain("RAG 自进化概览");
-  expect(document.body.textContent).toContain("黄金测试集");
-  expect(document.body.textContent).toContain("问答试验");
-  expect([...document.querySelectorAll('nav[aria-label="主导航"] a')].map(item => item.textContent)).toEqual(["概览", "知识库", "管线配置", "黄金测试集", "Baseline", "Tuning", "版本与发布", "问答试验"]);
+  expect(document.body.textContent).toContain("RAG Self-Evolution Lifecycle");
+  expect(document.body.textContent).toContain("Golden Dataset");
+  expect(document.body.textContent).toContain("QA Playground");
+  expect([...document.querySelectorAll('nav[aria-label="主导航"] a')].map(item => item.textContent)).toEqual(["Overview", "01 Knowledge", "02 Pipeline", "03 Golden Dataset", "04 Baseline", "05 Tuning", "06 Release", "07 QA Playground"]);
 });
 
 it("opens a deep link and keeps navigation in browser history", async () => {
@@ -34,10 +34,10 @@ it("opens a deep link and keeps navigation in browser history", async () => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(data[new URL(String(input)).pathname]), { status: 200 })));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<App />); await Promise.resolve(); await Promise.resolve(); });
-  expect(document.querySelector("h1")?.textContent).toBe("知识库");
+  expect(document.querySelector("h1")?.textContent).toBe("Knowledge Base");
   await act(async () => { (document.querySelector('nav[aria-label="主导航"] a[href="#evaluation"]') as HTMLAnchorElement).click(); });
   expect(location.hash).toBe("#evaluation");
-  expect(document.querySelector("h1")?.textContent).toBe("Baseline");
+  expect(document.querySelector("h1")?.textContent).toContain("Baseline");
   await act(async () => { location.hash = "#knowledge"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
-  expect(document.querySelector("h1")?.textContent).toBe("知识库");
+  expect(document.querySelector("h1")?.textContent).toBe("Knowledge Base");
 });

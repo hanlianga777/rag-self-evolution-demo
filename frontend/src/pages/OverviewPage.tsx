@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { apiUrl, errorMessage, getJson } from "../api";
-import { Metric, Section } from "../components/Primitives";
-import { displayText } from "../display";
+import { Metric, Section, ShortId, Status } from "../components/Primitives";
 import type { Page } from "../types";
 
 export function OverviewPage({ data, navigate }: { data: any; navigate: (page: Page) => void }) {
@@ -16,35 +15,31 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const generationFailed = generationStatus === "failed";
   const expectedCount = summary.expected_count || summary.total || 0;
   const run = item.latest_evaluation;
+  const experiment = data.optimization || {};
+  const candidates: any[] = experiment.candidates || [];
+  const qualified = candidates.filter(candidate => candidate.reasoning?.candidate_label !== "D" && candidate.result?.qualification?.qualified);
   const recommendation = data.optimization?.recommendation?.result || data.optimization?.recommendation || {};
-  const needsReview = data.workspace?.requires_new_golden === true || !expectedCount || summary.approved < expectedCount;
-  const nextTitle = needsRegeneration ? `补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）` : generationPending ? "等待当前测试集完成" : generationFailed ? "查看当前测试集运行失败原因" : needsReview ? "推进 Gate 1 · 确认 Golden 测试集" : "运行 Baseline Evaluation";
-  const nextDescription = needsRegeneration ? "当前 Run 已完成本轮逐题处理；请在黄金测试集中补齐失败 Slot。" : generationPending ? "在黄金测试集中查看当前阶段与真实处理进度。" : generationFailed ? "前往黄金测试集查看运行审计，再决定后续操作。" : data.workspace?.requires_new_golden ? "Corpus 已变化。请生成新的 Golden 测试集并完成 Gate 1，再运行 Baseline。" : needsReview ? "查看当前测试集的 Probe、QC 与人工审核状态；符合条件后一次确认并冻结 Golden 版本。" : "核对冻结 Golden 版本和 Provider 状态后，运行 Baseline Evaluation。";
-  const productionLabel = production?.id || "未发布";
-  const productionTitle = production?.provenance === "bootstrap" ? "当前 Baseline" : "当前 Production";
-  const productionNote = production?.provenance === "bootstrap" ? "初始配置 · 未正式发布" : undefined;
-  const nextPage: Page = needsReview ? "governance" : "evaluation";
-  const pipeline: [string, string, Page][] = [
-    ["知识库", `${data.documents?.length || 0} 文档`, "knowledge"],
-    ["Gate 1 · 确认 Golden 测试集", `${summary.approved || 0} 已批准`, "governance"],
-    ["Baseline", displayText(run?.status || "not_run"), "evaluation"],
-    ["Bad Case", `${data.badCases?.length || 0}`, "evaluation"],
-    ["Tuning · Optimization Agent", displayText(data.optimization?.status || "not_run"), "evolution"],
-    ["Gate 2 · 确认报告", displayText(recommendation.status || "not_run"), "evolution"],
-    ["Gate 3 · 确认发布", productionLabel, "versions"],
+  const frozen = !data.workspace?.requires_new_golden && expectedCount > 0 && summary.approved >= expectedCount;
+  const released = production?.provenance === "published";
+  const next: [string, string, Page] = needsRegeneration ? [`补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）`, "当前 Golden Run 有失败 Slot，补齐后继续 Gate 1。", "governance"] : generationPending || generationFailed || !frozen ? ["确认 Golden Dataset", "完成题目检查与 Gate 1 人工确认。", "governance"] : !run?.id || data.workspace?.requires_new_baseline ? ["运行 Baseline", "使用已冻结的 Golden Dataset 生成正式诊断报告。", "evaluation"] : !experiment?.id || !candidates.length ? ["进入 Tuning", "依据真实 Bad Case 生成 A/B/C 假设。", "evolution"] : recommendation.status !== "Recommended" ? ["完成 Tuning 决策", "查看 Sandbox、Gate 2 与 Composite D 的结果。", "evolution"] : !released ? ["Gate 3 · Human Release", "核对推荐方案后由人确认发布。", "versions"] : ["查看 Before / After", "比较上一版本与当前 Production 的同题回答。", "verification"];
+  const stages: [string, string, Page][] = [
+    ["Knowledge", `${data.documents?.length || 0} Documents`, "knowledge"], ["Pipeline", production?.config ? "Configured" : "Not Run", "settings"],
+    ["Golden Dataset", frozen ? "Golden Frozen" : "Needs Review", "governance"], ["Baseline", run?.result?.gates ? `${run.result.gates.passed_count}/${run.result.gates.total} Hard Gate` : "Not Run", "evaluation"],
+    ["Tuning", qualified.length ? `${qualified.map(row => row.reasoning?.candidate_label).join(" / ")} Qualified` : experiment?.id ? "In Progress" : "Not Run", "evolution"],
+    ["Release", released ? "Production Released" : "Needs Review", "versions"], ["QA Playground", released ? "Ready" : "Pending", "verification"],
   ];
+  const previous = data.versions?.find((version: any) => version.id === production?.previous_version_id);
+  const changes = Object.entries(production?.config || {}).filter(([key, value]) => previous?.config?.[key] !== value);
 
   return <div className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`}>
-    <div className="page-title"><div><h1>RAG 自进化概览</h1><p>真实治理数据，不展示历史 Seed 分数。</p></div></div>
+    <div className="page-title"><div><h1>RAG Self-Evolution Lifecycle</h1><p>从知识库和 Golden Dataset 出发，诊断 Baseline、验证 Candidate，并由人确认 Release。</p></div></div>
     <div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>
     {tab !== "project" ? <ArchitecturePanel slot={tab} /> : <>
-    <section className="next-action" aria-labelledby="next-action-title">
-      <div><span className="next-action-label">当前下一步</span><h2 id="next-action-title">{nextTitle}</h2><p>{nextDescription}</p></div>
-      <a className="primary" href={`#${nextPage}`} onClick={() => navigate(nextPage)}>{needsReview ? "前往黄金测试集" : "前往 Baseline"}<ArrowRight size={15} aria-hidden="true" /></a>
-    </section>
-    <div className="metrics-grid overview-metrics"><Metric label={productionTitle} value={productionLabel} note={productionNote} /><Metric label="当前测试集已批准" value={`${summary.approved || 0} / ${expectedCount}`} /><Metric label="当前需修订 / 待人工审核" value={`${summary.needs_revision || 0} / ${summary.pending_review || 0}`} note={`Legacy ${summary.legacy_total || 0} · 历史 V1 ${summary.historical_run_total || 0}，均不计入`} /><Metric label="最近评分" value={run?.result?.overall_score ?? "未运行"} /></div>
-    <Section title="自进化流程"><div className="pipeline">{pipeline.map(([label, value, page]) => <a className="pipeline-node" href={`#${page}`} key={label} onClick={() => navigate(page)}><span>{label}</span><strong>{value}</strong><ArrowRight className="pipeline-arrow" size={15} aria-hidden="true" /></a>)}</div></Section>
-    <Section title={productionTitle}><dl className="production-details"><div><dt>版本</dt><dd>{productionLabel}</dd></div><div><dt>配置</dt><dd>TopK {production?.config?.top_k ?? "未提供"}</dd></div><div><dt>评分</dt><dd>{run?.result?.overall_score ?? "未运行"}</dd></div><div><dt>发布资格</dt><dd>{run?.result?.gates?.passed ? "11 / 11 PASS" : run?.id ? "未获得资格" : "未评测"}</dd></div></dl></Section></>}
+    <section className="next-action" aria-labelledby="next-action-title"><div><span className="next-action-label">当前下一步</span><h2 id="next-action-title">{next[0]}</h2><p>{next[1]}</p></div><a className="primary" href={`#${next[2]}`} onClick={() => navigate(next[2])}>前往阶段<ArrowRight size={15} aria-hidden="true" /></a></section>
+    <Section title="Lifecycle"><div className="lifecycle-grid">{stages.map(([label, value, page], index) => <a href={`#${page}`} key={label} onClick={() => navigate(page)}><small>{String(index + 1).padStart(2, "0")}</small><strong>{label}</strong><span>{value}</span></a>)}</div></Section>
+    <div className="metrics-grid four overview-metrics"><Metric label="Golden Dataset" value={frozen ? `${expectedCount} Cases` : `${summary.approved || 0} / ${expectedCount || "—"}`} note={`Positive / Ablation / Negative · ${summary.positive ?? "—"} / ${summary.ablation ?? "—"} / ${summary.negative ?? "—"} · 待人工审核 ${summary.pending_review || 0}`} /><Metric label="Baseline" value={run?.result?.gates ? `${run.result.gates.passed_count} / ${run.result.gates.total}` : "Not Run"} note={`${run?.result?.bad_case_count ?? 0} Bad Cases`} /><Metric label="Tuning" value={`${candidates.filter(row => row.reasoning?.candidate_label !== "D").length} Candidates`} note={qualified.length ? `${qualified.map(row => row.reasoning?.candidate_label).join(" / ")} Qualified` : "尚无 Qualified Candidate"} /><Metric label="Production" value={released ? "Released" : "Not Released"} note={production?.id || "未记录"} /></div>
+    <p className="storyline">Baseline 发现问题 → Agent 提出假设 → Sandbox 验证 → Human Gate → Production</p>
+    <Section title={released ? "Current Production" : "当前 Baseline · 初始配置"}><div className="summary-line"><ShortId value={production?.id} /><Status value={released ? "Released" : "Not Run"} />{released && <span>Release Config Diff：{changes.map(([key, value]) => `${key} ${String(previous?.config?.[key] ?? "未采集")} → ${String(value)}`).join("；") || "无差异"}</span>}</div></Section></>}
   </div>;
 }
 

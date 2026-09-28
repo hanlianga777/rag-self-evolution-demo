@@ -22,7 +22,7 @@ from .config import load_settings
 from .evaluation import EvaluationRunner, gate_details
 from .governance import GovernanceStore
 from .optimization import OptimizationAgent
-from .policy import DEFAULT_PIPELINE_CONFIG, validate_candidate_config
+from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
 from .providers import DeepSeekProvider, ProviderTimeout
 
 
@@ -49,6 +49,10 @@ class PreviewRequest(BaseModel):
         if not value.strip():
             raise ValueError("Question is required")
         return value.strip()
+
+
+class SchemePreviewRequest(PreviewRequest):
+    scheme_id: str = Field(strict=True, min_length=1, max_length=120)
 
 
 class EvaluationRequest(BaseModel):
@@ -830,6 +834,21 @@ def versions():
     return store.production_versions()
 
 
+@app.get("/api/pipeline")
+def pipeline():
+    baseline = next((row for row in store.evaluation_runs() if row["status"] == "completed" and row["config"].get("run_target") != "sandbox_candidate"), None)
+    active = store.active_production()
+    return {
+        "active_version_id": active["id"] if active else None,
+        "config": active["config"] if active else DEFAULT_PIPELINE_CONFIG,
+        "baseline_id": baseline["id"] if baseline else None,
+        "baseline_config": baseline["config"] if baseline else None,
+        "search_space": search_space_contract(),
+        "locked_parameters": sorted(EXCLUDED_AUTOMATIC_PARAMETERS),
+        "index": corpus.index_info(),
+    }
+
+
 @app.get("/api/monitoring")
 def monitoring():
     return {"events": store.monitoring_events(), "triggers": store.optimization_triggers()}
@@ -1033,6 +1052,27 @@ def preview_baseline(payload: PreviewRequest):
 @app.post("/api/preview/candidate", dependencies=[Depends(require_trusted_origin)])
 def preview_candidate(payload: PreviewRequest):
     return ai_service.candidate_preview(payload.question)
+
+
+@app.post("/api/preview/scheme", dependencies=[Depends(require_trusted_origin)])
+def preview_scheme(payload: SchemePreviewRequest):
+    scheme_id = payload.scheme_id
+    if scheme_id == "baseline":
+        run = next((row for row in store.evaluation_runs() if row["status"] == "completed" and row["config"].get("run_target") != "sandbox_candidate"), None)
+        if not run:
+            raise HTTPException(status_code=404, detail="Baseline not found")
+        config, version, source = run["config"], run["id"], "baseline"
+    else:
+        candidate = store.candidate(scheme_id)
+        version_row = next((row for row in store.production_versions() if row["id"] == scheme_id), None)
+        if candidate:
+            config, version, source = candidate["config"], candidate["id"], "candidate"
+        elif version_row:
+            config, version, source = version_row["config"], version_row["id"], "production"
+        else:
+            raise HTTPException(status_code=404, detail="Scheme not found")
+    result = ai_service.answer(payload.question, config)
+    return {"pipeline": source, "question": payload.question, "scheme_id": scheme_id, "version": version, "config": config, "status": "completed", **result, "evidence": result["retrieval"], "fallback_reason": None}
 
 
 @app.post("/api/evaluations/live", dependencies=[Depends(require_trusted_origin)])

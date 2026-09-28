@@ -4,6 +4,8 @@
 
 ## V1.3 — Friend-Aligned Evaluation & Experiment UX（2026-09-28）
 
+- 2026-09-28 UI 收口实现：八个现有 Hash 工作区按 Lifecycle 排列；Pipeline 的只读配置与 Search Space 直接读取现有冻结策略；Baseline、Tuning、Release 首屏显示已保存审计结论，长证据保留在详情中。
+- Before / After 仅按已持久化 Baseline、Candidate、Production Version ID 解析配置；发布后默认 Previous Production 对 Current Production，发布前默认 Baseline 对 Qualified Candidate。固定 Bad Case 来自当前 Baseline；历史 Evaluation 与主动实时预览分别标注来源。此条记录实现，不改变 Gate、D 或发布规则。
 - 唯一当前产品规则；V1.2 与 V1.1 均为 Superseded / Historical。
 - Golden Profile 增加 Mini / Medium / Full，配额按冻结 Profile 计算；Hard Validation 与三类 Probe 展示真实诊断记录。
 - Baseline 以冻结配置、11 Gate 和逐题结果组织报告及诊断；Tuning 展示同一条真实 A/B/C → Sandbox → Gate 2 → D → Gate 3 主线。

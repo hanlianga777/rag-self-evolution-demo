@@ -29,9 +29,9 @@ it("shows assistant waiting inline and renders a complete synchronous answer at 
 it("shows Before result without waiting for After and keeps a one-sided failure local", async () => {
   let baseline!: (value: Response) => void;
   let candidate!: (value: Response) => void;
-  vi.stubGlobal("fetch", vi.fn((url: string) => new Promise<Response>(resolve => { if (url.endsWith("/baseline")) baseline = resolve; else candidate = resolve; })));
+  vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise<Response>(resolve => { if (JSON.parse(String(init?.body)).scheme_id === "baseline") baseline = resolve; else candidate = resolve; })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<OperationProvider restore={false}><ExperimentPage onOpenCitation={() => {}} /></OperationProvider>));
+  await act(async () => root.render(<OperationProvider restore={false}><ExperimentPage data={{ optimization: { candidates: [{ id: "EXP-A", reasoning: { candidate_label: "A" }, result: { qualification: { qualified: true } } }] } }} onOpenCitation={() => {}} /></OperationProvider>));
   await act(async () => { const textarea = document.querySelector("textarea")!; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "测试"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => document.querySelector<HTMLButtonElement>(".experiment-query button")!.click());
   expect(document.querySelectorAll(".experiment-answer-card .running")).toHaveLength(2);
