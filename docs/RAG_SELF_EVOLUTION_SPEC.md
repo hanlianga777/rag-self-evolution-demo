@@ -1,7 +1,22 @@
 # RAG Self-Evolution Platform 产品规格
 
-> **唯一当前规则：V1.2 — Friend-Aligned Simplified Baseline**
-> **Implementation Delivered / Real Lifecycle Blocked**。本节替代下方完整保留的 V1.1 历史规则；实现和分层验收见 [V1.2 验证报告](V1_2_VERIFICATION.md)，不以规格或 Fixture 冒充真实闭环。
+> **唯一当前产品规则：V1.3 — Friend-Aligned Evaluation & Experiment UX**
+> 本节覆盖下方 V1.2 / V1.1 历史条款。历史条款仅供追溯，标有 Current / Confirmed 的旧措辞不再生效。运行能力、真实数据及发布状态以持久化审计为准；本版本开发不得修改真实 `demo.db` 或代替用户调用 Provider、重新运行 Baseline、生成实验或执行人工 Gate。
+
+## V1.3 冻结规则
+
+1. 面试主线：知识库 → 黄金测试集（Hard Validation、三类 Probe、QC P0/P1/P2、Gate 1）→ Baseline 报告和逐题诊断 → 唯一 Optimization Agent 的 Hypothesis / A/B/C → Sandbox / Regression → Gate 2 → 条件 Composite D → Gate 3 → 问答试验。版本、监测和回滚保留为辅助能力。
+2. 八个一级导航依次为概览、知识库、管线配置、黄金测试集、Baseline、Tuning、版本与发布、问答试验。旧 Hash route 保留；启动入口固定 `#overview`。正式题型名称仅为 Positive（正向题）、Ablation（消融题）、Negative（负向题）；Faithfulness 中文为“忠实性”。
+3. Golden Profile 为 Mini 8/4/8=20、Medium 20/9/20=49、Full 40/18/40=98。新 Run 冻结 `expected_count`、`positive_count`、`ablation_count`、`negative_count`，生成、局部持久化、补题、Probe、QC、审核、Gate 1、进度和导出均读取该 Profile。旧 Mini 元数据兼容读取，不改写旧 Run 或 Snapshot；历史 40 题仍是未验证 Legacy。大 Profile 仅提示调用量和时间，不虚构 Token 费用。
+4. Hard Validation 逐项记录实际检查结果；未运行或旧记录缺少的检查显示“未记录”，不伪装为通过。Positive / Ablation 的 Retrieval Recall Probe 用当前检索链检查冻结证据在 TopK 的命中和排名；未召回但证据有效时保留为 `RETRIEVAL_INCOHERENT`。Negative 的 Vector 与 Full-text Probe 提供真实候选证据和可回答性风险；存在歧义才调用 Semantic Answerability Judge，并保留 safe_rejection 与 prompt_injection 的语义子类校验。Fake Negative 和确定性错误不可豁免。
+5. QC 判断题目质量，使用 P0 Blocker、P1 Review、P2 Suggestion 与理由；分数仅辅助，不能恢复“QC ≥85”数值审批门槛。Gate 1 仍是一次人工确认并冻结 Snapshot。
+6. Baseline 以冻结 Run 的配置、Golden Snapshot、Judge、指标版本和逐题结果为唯一报告数据。页面按“Baseline 报告 → 质量门禁 → 逐题诊断”组织；报告显示身份、配置、题型组成、失败 Gate、Performance / Retrieval；未采集的历史字段写“未采集”。11 个 Hard Gate 的顺序、阈值、计算和资格继续以当前 `policy.py` 与 `evaluation.py` 为准；Overall 仅供比较。Gate 详情从同一批逐题结果解释贡献题，Bad Case 是逐题诊断的默认筛选，不另建数据源。
+7. Tuning 复用现有 Diagnosis、Agent Trace、Candidate 配置、Sandbox 和 Recommendation 审计，展示 Hypothesis、目标 Bad Case、真实 Config Diff、11 Gate、修复、Regression 及风险。Gate 2 只能确认 Qualified Candidate；D 只合并已验证的有效非冲突修改，无有效组合时记 `no_effective_composite`；Gate 3 人工发布。未发布的 `baseline-v1` 是当前 Baseline / 初始配置，不称 Production。
+8. 质量指标详情保留两位小数，百分比注明单位；P50/P99 是 Hard Gate，Recall@K、Precision@K、MRR、TTFT、Token Cost 是诊断/比较指标。阶段耗时、相似度、成本等仅展示真实采集值。前端沿用紧凑企业工作台样式，不新增框架、Agent、管理平台或假数据。
+
+## V1.2 历史规则（Superseded by V1.3，不用于当前判定）
+
+以下 V1.2 条款保留为历史记录；其中“当前”“必须”等字样只描述当时版本。
 
 ## V1.2 冻结规则
 
@@ -21,7 +36,7 @@
 12. Gate 3 一次人工确认，在同一事务重验资格、报告确认及 D 决策后发布，记录 Human Release 和完整版本快照。保留前版本与回滚；不能自动发布。
 13. 所有本轮写入验收仅用隔离 Fresh DB / Existing DB Copy，actor=test_human。真实用户库、Candidate、审核及 Q01/Q09 Preview 不参与修改。先确定性/Fixture/Portability/Copy 测试，后只跑一条真实 Provider 主链；失败诚实停止，不为通过改考卷或 Gate。
 
-## V1.1 历史规格（Superseded by V1.2，不用于当前判定）
+## V1.1 历史规格（Superseded by V1.3，不用于当前判定）
 
 > **唯一正式 Source of Truth**
 > **SPEC Version：V1.1 — Simplified & End-to-End Verified Demo Baseline**

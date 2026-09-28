@@ -1,6 +1,13 @@
 # RAG Self-Evolution SPEC ChangeLog
 
-本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.2 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
+本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.3 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
+
+## V1.3 — Friend-Aligned Evaluation & Experiment UX（2026-09-28）
+
+- 唯一当前产品规则；V1.2 与 V1.1 均为 Superseded / Historical。
+- Golden Profile 增加 Mini / Medium / Full，配额按冻结 Profile 计算；Hard Validation 与三类 Probe 展示真实诊断记录。
+- Baseline 以冻结配置、11 Gate 和逐题结果组织报告及诊断；Tuning 展示同一条真实 A/B/C → Sandbox → Gate 2 → D → Gate 3 主线。
+- 八页导航和问答试验命名统一；真实 `demo.db` 与 Provider 主链不参与本轮开发验证。
 
 ## V0.2 — Core Lifecycle
 
