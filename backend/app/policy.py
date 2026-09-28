@@ -1,4 +1,4 @@
-"""Frozen V1.0.1 release policy with no storage or provider side effects."""
+"""Frozen V1.3 release policy with no storage or provider side effects."""
 
 from __future__ import annotations
 
@@ -117,33 +117,76 @@ def canonicalize_config(config: dict) -> str:
     return json.dumps(config, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
+def search_space_contract() -> dict:
+    """Expose the validator's allowed values and JSON types to the Agent."""
+    contract = {}
+    for key, allowed in ALLOWED_SEARCH_SPACE.items():
+        kinds = {type(value) for value in allowed}
+        if kinds == {bool, int}:
+            expected = "boolean false or integer"
+        elif kinds == {bool}:
+            expected = "boolean"
+        elif kinds == {int}:
+            expected = "integer"
+        elif kinds <= {int, float}:
+            expected = "number"
+        else:
+            expected = "string"
+        contract[key] = {"type": expected, "allowed": list(allowed)}
+    return contract
+
+
+def _matches_search_value(value, rule: dict) -> bool:
+    expected = rule["type"]
+    if expected == "boolean false or integer":
+        return value is False or (type(value) is int and any(type(option) is int and value == option for option in rule["allowed"]))
+    if expected == "boolean":
+        return type(value) is bool and value in rule["allowed"]
+    if expected == "integer":
+        return type(value) is int and value in rule["allowed"]
+    if expected == "number":
+        return _number(value) and value in rule["allowed"]
+    return type(value) is str and value in rule["allowed"]
+
+
 def validate_candidate_config(config: dict, *, prior_configs=(), completed_evals: int = 0) -> dict:
     errors = []
+    issues = []
+    contract = search_space_contract()
     if not isinstance(config, dict):
-        return {"valid": False, "errors": ["config must be an object"], "canonical_config": None}
+        return {"valid": False, "errors": ["config must be an object"], "issues": [{"field": "config", "actual": config, "expected_type": "object", "allowed_values": None, "error": "config must be an object"}], "canonical_config": None}
     unknown = set(config) - set(ALLOWED_SEARCH_SPACE)
     excluded = unknown & EXCLUDED_AUTOMATIC_PARAMETERS
     if excluded:
         errors.append("excluded automatic parameters: " + ", ".join(sorted(excluded)))
     if unknown - excluded:
         errors.append("unsupported parameters: " + ", ".join(sorted(unknown - excluded)))
-    for key, allowed in ALLOWED_SEARCH_SPACE.items():
+    for key in sorted(unknown):
+        issues.append({"field": key, "actual": config[key], "expected_type": "not allowed", "allowed_values": [], "error": "excluded automatic parameter" if key in excluded else "unsupported parameter"})
+    for key, rule in contract.items():
         if key == "hybrid_alpha" and config.get("hybrid_search") is False:
             continue
         if key not in config:
             errors.append(f"missing required parameter: {key}")
-        elif config[key] not in allowed:
+            issues.append({"field": key, "actual": None, "expected_type": rule["type"], "allowed_values": rule["allowed"], "error": "missing required parameter"})
+        elif not _matches_search_value(config[key], rule):
             errors.append(f"invalid {key}")
+            issues.append({"field": key, "actual": config[key], "expected_type": rule["type"], "allowed_values": rule["allowed"], "error": f"invalid {key}"})
     if config.get("hybrid_search") is False and "hybrid_alpha" in config:
         errors.append("hybrid_alpha requires hybrid_search enabled")
+        issues.append({"field": "hybrid_alpha", "actual": config["hybrid_alpha"], "expected_type": "absent when hybrid_search=false", "allowed_values": [], "error": "hybrid_alpha requires hybrid_search enabled"})
     if _number(config.get("candidate_k")) and _number(config.get("top_k")) and config["candidate_k"] < config["top_k"]:
         errors.append("candidate_k must be greater than or equal to top_k")
+        issues.append({"field": "candidate_k", "actual": config["candidate_k"], "expected_type": "integer >= top_k", "allowed_values": contract["candidate_k"]["allowed"], "error": "candidate_k must be greater than or equal to top_k"})
     if not isinstance(completed_evals, int) or isinstance(completed_evals, bool) or completed_evals < 0:
         errors.append("completed_evals must be a non-negative integer")
+        issues.append({"field": "completed_evals", "actual": completed_evals, "expected_type": "non-negative integer", "allowed_values": None, "error": errors[-1]})
     elif completed_evals >= MAX_EVALS:
         errors.append(f"evaluation budget exhausted: max_evals={MAX_EVALS}")
+        issues.append({"field": "completed_evals", "actual": completed_evals, "expected_type": f"integer < {MAX_EVALS}", "allowed_values": None, "error": errors[-1]})
     canonical = canonicalize_config(config)
     prior = {canonicalize_config(item) for item in prior_configs if isinstance(item, dict)}
     if canonical in prior:
         errors.append("duplicate candidate configuration")
-    return {"valid": not errors, "errors": errors, "canonical_config": canonical}
+        issues.append({"field": "config", "actual": config, "expected_type": "unique configuration", "allowed_values": None, "error": errors[-1]})
+    return {"valid": not errors, "errors": errors, "issues": issues, "canonical_config": canonical}

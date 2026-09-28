@@ -32,7 +32,7 @@ class FixtureProvider:
         if "Golden Dataset 质量审核助手" in system:
             return json.dumps({"score": 95, "priority": "P2", "issues": [], "reason": "固定证据支持", "ablation_valid": True, "ablation_reason": "符合属性"}, ensure_ascii=False)
         if "RAG Optimization Agent" in system:
-            return json.dumps({"root_cause_cluster": "检索覆盖不足", "observed_evidence": ["Baseline 有一题失败"], "candidates": [{"id": "A", "config": {"top_k": 6}, "hypothesis": "扩大上下文", "proposal": "提高 TopK", "risk": "延迟"}, {"id": "B", "config": {"min_score": 0.2}, "hypothesis": "过滤噪声", "proposal": "提高阈值", "risk": "召回"}, {"id": "C", "config": {"min_score": 0.1}, "hypothesis": "平衡阈值", "proposal": "小幅提高阈值", "risk": "漏召回"}]}, ensure_ascii=False)
+            return json.dumps({"root_cause_cluster": "检索覆盖不足", "observed_evidence": ["Baseline 有一题失败"], "candidates": [{"id": "A", "config_diff": {"top_k": 6}, "hypothesis": "扩大上下文", "why": "提高 TopK", "target_bad_cases": ["Baseline 有一题失败"], "risk": "延迟"}, {"id": "B", "config_diff": {"min_score": 0.2}, "hypothesis": "过滤噪声", "why": "提高阈值", "target_bad_cases": ["Baseline 有一题失败"], "risk": "召回"}, {"id": "C", "config_diff": {"min_score": 0.1}, "hypothesis": "平衡阈值", "why": "小幅提高阈值", "target_bad_cases": ["Baseline 有一题失败"], "risk": "漏召回"}]}, ensure_ascii=False)
         payload = json.loads(prompt)
         slot = payload["coverage_slot"]
         subtype = next((name for name in ("safe_rejection", "insufficient_evidence", "clarify", "safety_critical", "prompt_injection") if f"生成一个 {name} 负向问题" in system), None)

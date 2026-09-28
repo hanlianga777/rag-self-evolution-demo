@@ -203,7 +203,7 @@ class EvaluationRunnerTests(unittest.TestCase):
 
 class FakeAgentProvider:
     def complete(self, *_args, **_kwargs):
-        return '{"root_cause_cluster":"检索范围不足","observed_evidence":["召回缺失"],"candidates":[{"id":"A","config":{"top_k":6},"hypothesis":"扩大召回","proposal":"增加上下文","risk":"延迟"},{"id":"B","config":{"min_score":0.2},"hypothesis":"过滤噪声","proposal":"提升过滤","risk":"拒答"},{"id":"C","config":{"min_score":0.1},"hypothesis":"平衡","proposal":"平衡召回","risk":"召回"}]}'
+        return '{"root_cause_cluster":"检索范围不足","observed_evidence":["召回缺失"],"candidates":[{"id":"A","config_diff":{"top_k":6},"hypothesis":"扩大召回","why":"增加上下文","target_bad_cases":["召回缺失"],"risk":"延迟"},{"id":"B","config_diff":{"min_score":0.2},"hypothesis":"过滤噪声","why":"提升过滤","target_bad_cases":["召回缺失"],"risk":"拒答"},{"id":"C","config_diff":{"min_score":0.1},"hypothesis":"平衡","why":"平衡召回","target_bad_cases":["召回缺失"],"risk":"召回"}]}'
 
 
 class OptimizationAgentTests(unittest.TestCase):
