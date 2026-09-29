@@ -12,10 +12,10 @@ import { VersionsPage } from "./pages/VersionsPage";
 import type { AppData, Citation, Page } from "./types";
 
 const navigation: { id: Page; label: string; icon: typeof BarChart3 }[] = [
-  { id: "overview", label: "Overview", icon: BarChart3 }, { id: "knowledge", label: "Knowledge", icon: BookOpen },
-  { id: "settings", label: "Pipeline", icon: Settings }, { id: "governance", label: "Golden Dataset", icon: ClipboardCheck },
-  { id: "evaluation", label: "Baseline", icon: Waypoints }, { id: "evolution", label: "Tuning", icon: FlaskConical },
-  { id: "versions", label: "Release", icon: Sparkles }, { id: "verification", label: "QA Playground", icon: MessageCircle },
+  { id: "overview", label: "项目概览", icon: BarChart3 }, { id: "knowledge", label: "知识库", icon: BookOpen },
+  { id: "settings", label: "RAG Pipeline", icon: Settings }, { id: "governance", label: "Golden Dataset", icon: ClipboardCheck },
+  { id: "evaluation", label: "Baseline", icon: Waypoints }, { id: "evolution", label: "参数调优", icon: FlaskConical },
+  { id: "versions", label: "发布", icon: Sparkles }, { id: "verification", label: "问答验证", icon: MessageCircle },
 ];
 const items = navigation;
 const pageFromHash = (): Page => items.find(item => `#${item.id}` === location.hash)?.id || "overview";

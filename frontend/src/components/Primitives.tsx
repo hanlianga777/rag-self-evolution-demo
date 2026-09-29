@@ -19,7 +19,7 @@ export function Status({ value }: { value: string }) {
   return <Badge tone={tone}>{displayText(value)}</Badge>;
 }
 
-export function TechnicalDetails({ children, label = "Technical Details" }: { children: ReactNode; label?: string }) {
+export function TechnicalDetails({ children, label = "技术详情" }: { children: ReactNode; label?: string }) {
   return <details className="technical-details"><summary>{label}</summary><pre>{children}</pre></details>;
 }
 

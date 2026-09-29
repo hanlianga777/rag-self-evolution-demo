@@ -20,8 +20,8 @@ it("compares previous and current production after release and reads saved Bad C
   };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
-  expect(document.querySelector('[role="combobox"][aria-label="Scheme A"]')?.textContent).toContain("Previous Production");
-  expect(document.querySelector('[role="combobox"][aria-label="Scheme B"]')?.textContent).toContain("Current Production");
+  expect(document.querySelector('[role="combobox"][aria-label="方案 A"]')?.textContent).toContain("上一 Production");
+  expect(document.querySelector('[role="combobox"][aria-label="方案 B"]')?.textContent).toContain("当前 Production");
   await act(async () => (document.querySelector('[role="combobox"][aria-label="选择真实 Bad Case"]') as HTMLButtonElement).click());
   await act(async () => (document.querySelector('[role="option"][data-value="BAD-1"]') as HTMLDivElement).click());
   await act(async () => (document.querySelector(".fixed-case-control button.secondary") as HTMLButtonElement).click());
@@ -36,8 +36,8 @@ it("defaults to Baseline and a qualified Candidate before release", async () => 
   const data = { evaluation: { id: "EVAL-1" }, optimization: { candidates: [{ id: "C-1", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } }] }, versions: [{ id: "baseline-v1", status: "active", provenance: "bootstrap" }] };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
-  expect(document.querySelector('[role="combobox"][aria-label="Scheme A"]')?.textContent).toContain("Baseline");
-  expect(document.querySelector('[role="combobox"][aria-label="Scheme B"]')?.textContent).toContain("Candidate C");
+  expect(document.querySelector('[role="combobox"][aria-label="方案 A"]')?.textContent).toContain("Baseline");
+  expect(document.querySelector('[role="combobox"][aria-label="方案 B"]')?.textContent).toContain("Candidate C");
   await act(async () => root.unmount());
 });
 

@@ -185,7 +185,7 @@ it("shows negative expected behavior and reveals full technical audit only on re
   expect(document.querySelector(".review-workspace")?.textContent).not.toContain("Retrieved TopK");
   await act(async () => ([...document.querySelectorAll(".candidate-menu button")].find(button => button.textContent === "查看技术审计") as HTMLButtonElement).click());
   await act(async () => ([...document.querySelectorAll(".audit-tabs button")].find(button => button.textContent === "Probe") as HTMLButtonElement).click());
-  expect(document.querySelector(".audit-workspace")?.textContent).toContain("Retrieved TopK");
+  expect(document.querySelector(".audit-workspace")?.textContent).toContain("检索 TopK");
   expect(document.querySelector(".audit-workspace")?.textContent).toContain("55 / 90");
   expect(document.querySelector(".audit-workspace")?.textContent).toContain("C4");
   await act(async () => root.unmount());

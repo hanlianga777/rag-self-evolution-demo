@@ -1,9 +1,9 @@
 import { Badge } from "./Primitives";
 
 export const parameterNames: Record<string, string> = {
-  candidate_k: "CandidateK", top_k: "TopK", min_score: "MinScore", hybrid_search: "Hybrid", hybrid_alpha: "Hybrid Alpha",
+  candidate_k: "CandidateK", top_k: "TopK", min_score: "MinScore", hybrid_search: "Hybrid", hybrid_alpha: "Hybrid 权重",
   rerank: "Rerank", query_rewrite: "Query Rewrite", multi_query: "MultiQuery", hyde: "HyDE",
-  metadata_filter: "Metadata Filter", alias_mapping: "Alias Mapping", prompt_strategy: "Prompt Strategy",
+  metadata_filter: "元数据筛选", alias_mapping: "别名映射", prompt_strategy: "Prompt 策略",
 };
 
 const descriptions: Record<string, string> = {
@@ -18,5 +18,5 @@ export function formatValue(value: unknown): string {
 }
 
 export function SearchSpaceTable({ contract, baseline }: { contract: Record<string, { type: string; allowed: unknown[] }>; baseline: Record<string, unknown> }) {
-  return <div className="table-scroll"><table className="search-space-table"><thead><tr><th>Parameter</th><th>Current Baseline</th><th>Type</th><th>Allowed Values</th><th>Dependency</th><th>Agent Tunable</th><th>Explanation</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td>{parameterNames[key] || key}</td><td>{formatValue(baseline[key])}</td><td>{rule.type}</td><td>{rule.allowed.map(formatValue).join(" / ")}</td><td>{key === "top_k" ? "CandidateK ≥ TopK" : key === "hybrid_alpha" ? "Hybrid = ON" : "—"}</td><td><Badge tone="accent">Yes</Badge></td><td>{descriptions[key] || "—"}</td></tr>)}</tbody></table></div>;
+  return <div className="table-scroll"><table className="search-space-table"><thead><tr><th>参数</th><th>当前 Baseline</th><th>类型</th><th>允许值</th><th>依赖关系</th><th>Agent 可调</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td>{parameterNames[key] || key}</td><td>{formatValue(baseline[key])}</td><td>{rule.type}</td><td>{rule.allowed.map(formatValue).join(" / ")}</td><td>{key === "top_k" ? "CandidateK ≥ TopK" : key === "hybrid_alpha" ? "Hybrid = ON" : "—"}</td><td><Badge tone="accent">是</Badge></td><td>{descriptions[key] || "—"}</td></tr>)}</tbody></table></div>;
 }

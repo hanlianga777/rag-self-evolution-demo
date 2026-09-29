@@ -21,7 +21,7 @@ it("filters persisted Baseline cases and opens their diagnostic detail", async (
   expect(document.querySelector("tbody")?.textContent).not.toContain("Q01");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "全部")!.click());
   expect(document.querySelector("tbody")?.textContent).toContain("Q01");
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Retrieval Miss")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "检索未命中")!.click());
   expect(document.querySelector("tbody")?.textContent).toContain("Q02");
   expect(document.querySelector("tbody")?.textContent).not.toContain("Q01");
   await act(async () => (document.querySelector("tbody tr") as HTMLTableRowElement).click());
