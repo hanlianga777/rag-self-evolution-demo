@@ -1,5 +1,14 @@
 # 项目上下文（当前 V1.3）
 
+当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
+
+## Phase 1 当前实现（2026-09-30）
+
+业务导入/AI 候选共用 SQLite questions 与 JSON provenance，Profile 选题创建新 Run 和副本，原治理链不变。未来构造题型、执行阶段和 Usage 进入 JSON，Monitoring 只增加 nullable metrics_json。价格配置默认无值；旧事件无伪回填。
+
+共享 UI 保留当前风格；QA 本页证据、保存参数分组、sessionStorage 恢复；D 失败明确保留 C。当前 Production 的历史事实与本轮 Fixture 验证分层报告。
+
+
 - 唯一规则：[SPEC](docs/RAG_SELF_EVOLUTION_SPEC.md)。原始截图是参考证据，不是隐藏算法说明。
 - 保留 FastAPI、SQLite、React、BGE/FAISS 和 DeepSeek；动态文档清单，最低元数据为文档 ID、Chunk ID、原文，四 PDF 仅为示例。
 - Golden 默认 Mini 8/4/8，可选 Medium 20/9/20、Full 40/18/40；Ablation 独立治理；检索不一致为 P1，QC 分数不作审批阈值。机器 P0 须明确接受理由，确定性错误与 Fake Negative 不可豁免。

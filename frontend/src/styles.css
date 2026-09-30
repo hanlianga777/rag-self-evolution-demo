@@ -755,3 +755,65 @@ td, th { font-variant-numeric: tabular-nums; }
 @media (max-width: 1200px) { .lifecycle-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .stage-stepper.compact { grid-template-columns: repeat(4, minmax(0, 1fr)); } .pipeline-flow { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .candidate-cards, .diagnosis-cards, .failed-gate-grid, .config-groups, .config-summary-grid { grid-template-columns: 1fr; } .stage-stepper { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .lifecycle-grid, .pipeline-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stage-stepper, .stage-stepper.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); } .candidate-cards, .composite-decision { grid-template-columns: 1fr; } .release-row { grid-template-columns: 1fr; } .release-actions { justify-content: flex-start; } .parameter-list > div { grid-template-columns: 1fr auto; } .parameter-list .badge { grid-column: 2; grid-row: 1; } .conclusion-card { align-items: flex-start; flex-direction: column; } .fixed-case-control { align-items: stretch; } }
+
+/* Phase 1: stable business regions and shared detail surfaces. */
+.table-scroll.fixed-table, .baseline-table, .review-table, .evolution-page .table-scroll, .versions-page .table-scroll { height: min(48vh, 480px); max-height: 480px; overflow: auto !important; min-height: 0; }
+.table-scroll { scrollbar-width: thin; }
+.table-scroll td { vertical-align: middle; }
+.truncated-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; line-height: 1.55; }
+.line-clamp-2 { -webkit-line-clamp: 2; }
+.truncated-text:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; border-radius: 3px; }
+.text-tooltip { position: fixed; z-index: 100; width: min(360px, calc(100vw - 16px)); max-height: 200px; overflow: auto; padding: 12px; background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 25px #10203020; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tag-list { display: flex; gap: 4px; flex-wrap: nowrap; max-width: 100%; }
+.tag-list .badge { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-extra { display: none; }
+.text-tooltip .tag-extra { display: block; }
+.disclosure > summary { display: flex; gap: 6px; align-items: center; list-style: none; }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure[open] > summary svg { transform: rotate(180deg); }
+.drawer.drawer { display: flex; flex-direction: column; height: 82dvh; max-height: 82dvh; width: 78vw; max-width: 1280px; right: 11vw; top: 9dvh; padding: 0; overflow: hidden; }
+.drawer.drawer .drawer-head { margin: 0; flex: none; position: relative; min-height: 64px; padding: 16px 24px; }
+.detail-content { flex: 1; min-height: 0; overflow: auto; padding: 0 24px; }
+.detail-content > .drawer-body { overflow: visible !important; }
+.detail-content > .candidate-scroll { overflow: visible; padding: 20px 0; }
+.detail-footer { flex: none; display: flex; justify-content: flex-end; padding: 12px 24px; border-top: 1px solid var(--line); background: #fff; }
+.technical-raw { white-space: pre-wrap; overflow-wrap: anywhere; }
+.candidate-workspace .candidate-actionbar { position: sticky; bottom: 0; z-index: 3; background: #fff; }
+.candidate-evidence-preview, .review-evidence { max-height: 200px; overflow-y: auto; }
+.candidate-cards > .candidate-card { height: 680px; }
+.candidate-card-body { flex: 1; overflow: auto; }
+.candidate-result { flex: none; }
+.hypotheses-table tbody tr, .baseline-table tbody tr, .review-table tbody tr { height: 80px; }
+.experiment-query .query-action { margin-top: 18px; }
+.monitoring-list { max-height: 48vh; overflow-y: auto; }
+@media (max-width: 700px) { .drawer.drawer { width: calc(100vw - 16px); max-width: none; height: calc(100dvh - 16px); max-height: none; right: 8px; top: 8px; } .detail-content { padding: 0 16px; } .candidate-cards > .candidate-card { height: 680px; } .tag-list { flex-wrap: wrap; } }
+.question-provenance { display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.parameter-group h3 { font-size: 12px; margin: 12px 0 6px; }
+.parameter-diff table { width: 100%; table-layout: fixed; }
+.parameter-changed { background: #f2f7f6; }
+.parameter-diff th, .parameter-diff td { overflow-wrap: anywhere; }
+.execution-metrics { border-top: 1px solid #e1e7e6; margin-top: 16px; padding-top: 12px; font-size: 12px; }
+.execution-metrics h3 { font-size: 13px; }
+.release-list { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+.release-list .release-row { display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 270px; gap: 16px; }
+.release-row .release-actions { margin-top: auto; }
+.sandbox-status-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+.sandbox-status-grid article { border: 1px solid #e1e7e6; padding: 14px; border-radius: 8px; }
+.diagnosis-case-list { max-height: 360px; overflow-y: auto; }
+.diagnosis-case-list > div { min-height: 70px; }
+.experiment-results { grid-template-columns: repeat(2, minmax(0,1fr)); align-items: stretch; }
+.experiment-answer-card { min-height: 420px; height: 480px; min-width: 0; display: flex; flex-direction: column; }
+.experiment-answer-card .answer-scroll { min-height: 0; flex: 1; overflow-y: auto; }
+.review-table table { table-layout: fixed; }
+.review-table th:nth-child(1) { width: 8%; }
+.review-table th:nth-child(2) { width: 17%; }
+.review-table th:nth-child(3) { width: 32%; }
+.technical-raw { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media(max-width: 900px) { .release-list, .sandbox-status-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media(max-width: 640px) { .release-list, .sandbox-status-grid, .experiment-results { grid-template-columns: minmax(0,1fr); } .header-actions input[type=file] { max-width: 100%; } .text-tooltip { max-width: calc(100vw - 16px); } }
+.parameter-diff .table-scroll { height: auto; max-height: none; overflow-y: visible !important; }
+.parameter-diff table { min-width: 0 !important; }
+.candidate-config-diff .parameter-diff td, .candidate-config-diff .parameter-diff th { white-space: normal; overflow-wrap: anywhere; }
+.candidate-card-body { grid-template-rows: 84px 84px 84px 152px 42px 84px; align-content: start; }
+.candidate-card-field { min-height: 0; overflow: auto; }
+.candidate-card-field .truncated-text { overflow: hidden; }

@@ -1,4 +1,6 @@
-import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Drawer } from "./Dialog";
 import { ChevronDown } from "lucide-react";
 import { displayText } from "../display";
 
@@ -20,15 +22,42 @@ export function Status({ value }: { value: string }) {
 }
 
 export function TechnicalDetails({ children, label = "技术详情" }: { children: ReactNode; label?: string }) {
-  return <details className="technical-details"><summary>{label}</summary><pre>{children}</pre></details>;
+  const [open, setOpen] = useState(false);
+  return <><button type="button" className="text-button technical-details-trigger" onClick={event => { event.currentTarget.focus(); setOpen(true); }}>{label}</button><Drawer open={open} onOpenChange={setOpen} title={label}><div className="drawer-body"><pre className="technical-raw">{children}</pre></div></Drawer></>;
 }
+
+export function TruncatedText({ children, lines = 3 }: { children: ReactNode; lines?: 2 | 3 }) {
+  const id = useId(), ref = useRef<HTMLSpanElement>(null);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const show = () => { const box = ref.current?.getBoundingClientRect(); if (box) setPosition({ left: Math.max(8, Math.min(box.left, window.innerWidth - 368)), top: Math.max(8, Math.min(box.bottom + 6, window.innerHeight - 210)) }); };
+  return <><span ref={ref} tabIndex={0} className={`truncated-text line-clamp-${lines}`} aria-describedby={position ? id : undefined} onMouseEnter={show} onMouseLeave={() => setPosition(null)} onFocus={show} onBlur={() => setPosition(null)} onKeyDown={event => { if (event.key === "Escape") setPosition(null); }}>{children}</span>{position && createPortal(<div id={id} role="tooltip" className="text-tooltip" style={position}>{children}</div>, document.body)}</>;
+}
+
+export function TagList({ tags }: { tags: string[] }) {
+  const id = useId(), button = useRef<HTMLButtonElement>(null), popup = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  useEffect(() => { if (!position) return; const close = (event: PointerEvent) => { if (!button.current?.contains(event.target as Node) && !popup.current?.contains(event.target as Node)) setPosition(null); }; const escape = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") setPosition(null); }; document.addEventListener("pointerdown", close); document.addEventListener("keydown", escape); return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", escape); }; }, [position]);
+  return <div className="tag-list">{tags.slice(0, 2).map(tag => <Badge key={tag} tone="warning">{tag}</Badge>)}{tags.length > 2 && <button ref={button} className="badge neutral" aria-expanded={!!position} aria-controls={position ? id : undefined} aria-label={`${tags.length - 2} 个其他标签`} onClick={event => { event.stopPropagation(); const box = button.current?.getBoundingClientRect(); setPosition(position || !box ? null : { left: Math.max(8, Math.min(box.left, window.innerWidth - 368)), top: Math.min(box.bottom + 6, window.innerHeight - 160) }); }}>+{tags.length - 2}</button>}{position && createPortal(<div id={id} ref={popup} role="group" aria-label="其他标签" className="text-tooltip tag-popover" style={position}>{tags.slice(2).map(tag => <p key={tag}>{tag}</p>)}</div>, document.body)}</div>;
+}
+
+export function FixedTableCard({ children }: { children: ReactNode }) { return <div className="table-scroll fixed-table">{children}</div>; }
+
+export function Disclosure({ label, children }: { label: string; children: ReactNode }) { return <details className="disclosure"><summary><ChevronDown size={14} aria-hidden="true" />{label}</summary>{children}</details>; }
 
 export type SelectOption = { value: string; label: string; description?: string; title?: string };
 
 export function CustomSelect({ ariaLabel, value, options, onChange, disabled = false, placeholder }: { ariaLabel: string; value: string; options: SelectOption[]; onChange: (value: string) => void; disabled?: boolean; placeholder?: string }) {
   const id = useId();
+  const host = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(Math.max(0, options.findIndex(option => option.value === value)));
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => { if (!host.current?.contains(event.target as Node)) setOpen(false); };
+    const close = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", outside); document.addEventListener("keydown", close);
+    return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", close); };
+  }, [open]);
   const selected = options.find(option => option.value === value);
   const move = (index: number) => setActive(Math.max(0, Math.min(options.length - 1, index)));
   const choose = (option: SelectOption) => { onChange(option.value); setOpen(false); };
@@ -42,8 +71,8 @@ export function CustomSelect({ ariaLabel, value, options, onChange, disabled = f
     else if ((event.key === "Enter" || event.key === " ") && open) { event.preventDefault(); if (options[active]) choose(options[active]); }
     else if (event.key === "Escape" && open) { event.preventDefault(); setOpen(false); }
   };
-  return <div className={`custom-select${open ? " open" : ""}`} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
-    <button type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-listbox`} aria-activedescendant={open ? `${id}-option-${active}` : undefined} disabled={disabled} className="custom-select-trigger" onClick={() => setOpen(current => !current)} onKeyDown={onKeyDown}>
+  return <div ref={host} className={`custom-select${open ? " open" : ""}`} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
+    <button type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-listbox`} aria-activedescendant={open ? `${id}-option-${active}` : undefined} disabled={disabled} className="custom-select-trigger" onClick={() => { setActive(Math.max(0, options.findIndex(option => option.value === value))); setOpen(current => !current); }} onKeyDown={onKeyDown}>
       <span title={selected?.title || selected?.label}>{selected?.label || placeholder || "请选择"}</span><ChevronDown size={15} aria-hidden="true" />
     </button>
     {open && <div role="listbox" id={`${id}-listbox`} aria-label={ariaLabel} className="custom-select-listbox">{options.map((option, index) => <div id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value === value} data-value={option.value} className={index === active ? "active" : ""} title={option.title || option.label} onMouseEnter={() => move(index)} onMouseDown={event => event.preventDefault()} onClick={() => choose(option)}><span>{option.label}</span>{option.description && <small>{option.description}</small>}</div>)}</div>}
@@ -63,9 +92,9 @@ export function ConclusionCard({ title, children, status, tone = "good" }: { tit
   return <section className={`conclusion-card ${tone}`}><div><h2>{title}</h2>{children && <p>{children}</p>}</div>{status}</section>;
 }
 
-export function ExpandableText({ label, children }: { label: string; children?: ReactNode }) {
+export function ExpandableText({ children }: { label: string; children?: ReactNode }) {
   if (!children) return <span className="muted">未记录</span>;
-  return <div className="expandable-text"><p className="line-clamp-3">{children}</p><details><summary>查看完整{label}</summary><p>{children}</p></details></div>;
+  return <TruncatedText>{children}</TruncatedText>;
 }
 
 export function ShortId({ value }: { value?: string | null }) {

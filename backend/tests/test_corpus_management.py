@@ -12,7 +12,7 @@ import numpy as np
 import pymupdf
 
 from app import corpus
-from app import main
+from api_fixture import main
 from app.corpus_management import CorpusManager
 from app.build_index import build_index
 

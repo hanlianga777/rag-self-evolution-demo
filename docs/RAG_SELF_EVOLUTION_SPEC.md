@@ -435,3 +435,14 @@ V1.1 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语�
 ## 14. V1.1 实施与验收边界 `[CONFIRMED]`
 
 保持七个一级页面、FastAPI / SQLite / React、11 Hard Gates、Probe ≥90、QC ≥85、人工 Golden Review 与人工发布。不得自动修改用户现有 Candidate、应用未确认 Preview、批准当前库 Snapshot 或发布版本。确定性完整 E2E 与真实 Provider 生命周期验收均须使用隔离数据库，并明确区分 Fixture 与 Real Lifecycle 证据；隔离库中的 Test Human Action 不代表用户实际审核。Medium / Full、Composite D、新模型、多 Agent、Docker、复杂监控和 UI 重设计均不在本版本范围。
+
+## Phase 1 收口补充（2026-09-30，SPEC V1.3）
+
+- 当前事实以 [Current Demo Truth](CURRENT_DEMO_TRUTH.md) 为准；2026-09-26 的阻塞结果为 Historical / Legacy。本轮不重新执行真实 Golden、Baseline、A/B/C/D、人工 Gate 或发布。
+- AI 生成与 CSV/XLSX 业务导入进入同一 `questions` 候选池；显式 Evaluation Group 与独立构造题型分开。模板、逐行预览、当前 Corpus 原文定位与重复检查通过后才能确认导入。导入不调用 Provider。
+- Mixed Pool 只接受 Mini 8/4/8、Medium 20/9/20、Full 40/18/40。选题复制到新 Run，保留 `source_reference`，清空质量及审批状态；重新完成原有 Probe、QC、人工审核、Gate 1。旧题、审批与 Snapshot 不变。
+- Fact 仅采用显式实体属性值；Aggregation 必须有完整材料和穷举答案；Bridge 需共享实体与两段共同支持。可靠事实/聚合正向题确定性构造；不足则普通槽位，不强贴题型。只影响未来候选，历史不回填。
+- UI 复用 Radix Dialog、CustomSelect、StageStepper、内部滚动表格、两至三行文字浮层和 `+N` 标签 Popover。执行完成与 Gate 通过分开。QA 保存配置差异可直接查看，版本化 sessionStorage 恢复时不发模型请求；Bootstrap 标 Baseline，Candidate 与其同配置发布版禁止自比。
+- 实际执行以单调时钟记录 UTC 起止和阶段耗时。检索子阶段归属 Retrieval，不重复求和；回答与 Judge 分开。P50/P99 Gate 口径和资格规则不变。未来保存完整 Provider Usage，历史无记录显示未采集。
+- `RAG_PRICE_CONFIG` 指向集中 JSON 单价配置；默认无价格。必需 model/currency/source/effective_date/cache_billing 和 input_per_million/cached_input_per_million/output_per_million。仅完整 Usage（含 cache-hit）且模型匹配时估算当前调用，保留计价依据，不回算历史。
+- 唯一迁移为可空 `monitoring_events.metrics_json` 与迁移登记；旧事件为空，不伪造。人工 Monitoring 阈值和 Trigger 确认规则不变，确认不自动调参或发布。

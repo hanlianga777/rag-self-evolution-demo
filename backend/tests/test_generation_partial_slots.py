@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 
 from app.ai_service import AiService
 from app.governance import GovernanceStore
-from app import main
-from app.main import _run_mini_generation
+from api_fixture import main
+_run_mini_generation = main._run_mini_generation
 
 
 class PartialGenerationTests(unittest.TestCase):

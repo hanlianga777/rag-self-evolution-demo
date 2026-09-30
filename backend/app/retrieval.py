@@ -3,6 +3,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from .telemetry import measure
 from .corpus import EMBEDDING_MODEL, INDEX_DIR, TOP_K
 
 
@@ -143,7 +144,7 @@ class VectorRetriever:
         selected = [chunk for chunk in chunks if normalized & (_terms(str(chunk.get("product", ""))) | _terms(str(chunk.get("vendor", ""))) | _terms(str(chunk.get("document_name", ""))))]
         return selected if selected or mode == "STRICT" else chunks
 
-    def retrieve(self, question: str, config: dict, *, aliases: dict[str, str] | None = None, queries: list[str] | None = None) -> list[dict]:
+    def retrieve(self, question: str, config: dict, *, aliases: dict[str, str] | None = None, queries: list[str] | None = None, stages: list | None = None) -> list[dict]:
         """V1.0.1 pipeline: CandidateK → normalized Hybrid → Rerank → MinScore → TopK."""
         aliases = aliases or {}
         rewritten = question
@@ -155,30 +156,36 @@ class VectorRetriever:
         by_id = {chunk["chunk_id"]: chunk for chunk in chunks}
         vector_scores, bm25_scores = {}, {}
         for query in query_list:
-            for hit in self.vector_candidates(query, candidate_k):
-                if hit["chunk_id"] in by_id:
-                    vector_scores[hit["chunk_id"]] = max(vector_scores.get(hit["chunk_id"], float("-inf")), float(hit["score"]))
-            for chunk_id, score in sorted(self._bm25(query).items(), key=lambda item: item[1], reverse=True)[:candidate_k]:
-                if chunk_id in by_id:
-                    bm25_scores[chunk_id] = max(bm25_scores.get(chunk_id, float("-inf")), score)
-        candidate_ids = set(vector_scores) | set(bm25_scores)
-        vector_normalized = self._normalize({key: vector_scores.get(key, 0.0) for key in candidate_ids})
-        bm25_normalized = self._normalize({key: bm25_scores.get(key, 0.0) for key in candidate_ids})
-        alpha = float(config.get("hybrid_alpha", .5))
-        ranked = []
-        for chunk_id in candidate_ids:
-            vector_score, bm25_score = vector_normalized.get(chunk_id, 0.0), bm25_normalized.get(chunk_id, 0.0)
-            combined = alpha * vector_score + (1 - alpha) * bm25_score if config.get("hybrid_search", True) else vector_score
-            ranked.append({"chunk_id": chunk_id, "vector_score": vector_score, "bm25_score": bm25_score, "combined": combined})
-        # CandidateK caps the shared recall pool before the optional second stage.
-        ranked = sorted(ranked, key=lambda item: item["combined"], reverse=True)[:candidate_k]
+            with measure(stages, "vector_search", "retrieval"):
+                for hit in self.vector_candidates(query, candidate_k):
+                    if hit["chunk_id"] in by_id:
+                        vector_scores[hit["chunk_id"]] = max(vector_scores.get(hit["chunk_id"], float("-inf")), float(hit["score"]))
+            with measure(stages, "bm25", "retrieval"):
+                for chunk_id, score in sorted(self._bm25(query).items(), key=lambda item: item[1], reverse=True)[:candidate_k]:
+                    if chunk_id in by_id:
+                        bm25_scores[chunk_id] = max(bm25_scores.get(chunk_id, float("-inf")), score)
+        with measure(stages, "hybrid_fusion" if config.get("hybrid_search", True) else "candidate_selection", "retrieval"):
+            candidate_ids = set(vector_scores) | set(bm25_scores)
+            vector_normalized = self._normalize({key: vector_scores.get(key, 0.0) for key in candidate_ids})
+            bm25_normalized = self._normalize({key: bm25_scores.get(key, 0.0) for key in candidate_ids})
+            alpha = float(config.get("hybrid_alpha", .5))
+            ranked = []
+            for chunk_id in candidate_ids:
+                vector_score, bm25_score = vector_normalized.get(chunk_id, 0.0), bm25_normalized.get(chunk_id, 0.0)
+                combined = alpha * vector_score + (1 - alpha) * bm25_score if config.get("hybrid_search", True) else vector_score
+                ranked.append({"chunk_id": chunk_id, "vector_score": vector_score, "bm25_score": bm25_score, "combined": combined})
+            # CandidateK caps the shared recall pool before the optional second stage.
+            ranked = sorted(ranked, key=lambda item: item["combined"], reverse=True)[:candidate_k]
         output = []
         query_terms = _terms(" ".join(query_list))
         for item in ranked:
             chunk = by_id[item["chunk_id"]]
             lexical_coverage = len(query_terms & _terms(chunk.get("chunk_text", chunk.get("text", "")))) / max(1, len(query_terms))
             # Keep the fused score in the rerank signal: Alpha must remain observable when rerank is enabled.
-            rerank_score = (0.8 * item["combined"] + 0.2 * lexical_coverage) if config.get("rerank", True) else None
+            rerank_score = None
+            if config.get("rerank", True):
+                with measure(stages, "rerank", "retrieval"):
+                    rerank_score = 0.8 * item["combined"] + 0.2 * lexical_coverage
             final_score = rerank_score if rerank_score is not None else item["combined"]
             output.append({**self._materialize(chunk, final_score), "vector_normalized": round(item["vector_score"], 4), "bm25_normalized": round(item["bm25_score"], 4), "hybrid_score": round(item["combined"], 4), "rerank_score": round(rerank_score, 4) if rerank_score is not None else None, "final_score": round(final_score, 4)})
         minimum = float(config.get("min_score", 0))

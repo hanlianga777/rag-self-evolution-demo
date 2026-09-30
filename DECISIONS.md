@@ -1,5 +1,12 @@
 # 决策记录
 
+当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
+
+## 2026-09-30 · Phase 1 决策
+
+采用明确 Evaluation Group；构造题型与 Positive/Ablation/Negative 独立。业务证据必须定位原文，不能仅有文件名。混合候选不继承审批，复制新 Run 重走质量链。仅新增 openpyxl 依赖、nullable Monitoring 指标列；其他新字段进入既有 JSON。价格默认不配，不以当前单价回算历史。朋友截图只提供产品参考，不推断源码与模型迁移。
+
+
 V1.3 当前决策：生成 Run 冻结 Mini／Medium／Full Profile；旧 Mini 字段兼容读取。Baseline Gate 贡献题由保存的逐题结果按后端聚合公式计算，历史未采集字段不补造。八个导航保留原 Hash。
 
 当前产品规则只以 [SPEC V1.3](docs/RAG_SELF_EVOLUTION_SPEC.md) 为准。本文件记录工程选择及历史决策，不覆盖 SPEC。

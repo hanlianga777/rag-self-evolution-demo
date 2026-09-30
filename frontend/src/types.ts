@@ -53,6 +53,7 @@ export type ChatMessage = {
   sources?: string[];
   evidence?: Citation[];
   improvementClue?: ImprovementClue;
+  metrics?: Record<string, unknown>;
 };
 
 export type Conversation = { id: string; title: string; updatedAt: string; messages: ChatMessage[] };

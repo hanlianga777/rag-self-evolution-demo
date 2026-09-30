@@ -45,8 +45,9 @@ it("formats Baseline time locally and shortens the run ID", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
   expect(document.body.textContent).toContain("2026-09-27 22:04:23");
-  expect(document.querySelector("details")?.textContent).toContain(run.created_at);
-  expect(document.querySelector("details")?.hasAttribute("open")).toBe(false);
+  const audit = [...document.querySelectorAll("button")].find(button => button.textContent === "查看原始时间")!;
+  await act(async () => audit.click());
+  expect(document.querySelector("[role=dialog]")?.textContent).toContain(run.created_at);
   expect(document.querySelector(".short-id")?.textContent).not.toBe(run.id);
 });
 

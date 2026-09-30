@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { ExperimentPage } from "./pages/ExperimentPage";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-afterEach(() => { document.body.innerHTML = ""; vi.unstubAllGlobals(); });
+afterEach(() => { document.body.innerHTML = ""; sessionStorage.clear(); vi.unstubAllGlobals(); });
 
 it("compares previous and current production after release and reads saved Bad Case evidence", async () => {
   const fetcher = vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify({ cases: [{ question_id: "Q-1", model_answer: "已保存答案" }] }), { status: 200 }));
@@ -20,7 +20,7 @@ it("compares previous and current production after release and reads saved Bad C
   };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
-  expect(document.querySelector('[role="combobox"][aria-label="方案 A"]')?.textContent).toContain("上一 Production");
+  expect(document.querySelector('[role="combobox"][aria-label="方案 A"]')?.textContent).toContain("Baseline · 初始配置");
   expect(document.querySelector('[role="combobox"][aria-label="方案 B"]')?.textContent).toContain("当前 Production");
   await act(async () => (document.querySelector('[role="combobox"][aria-label="选择真实 Bad Case"]') as HTMLButtonElement).click());
   await act(async () => (document.querySelector('[role="option"][data-value="BAD-1"]') as HTMLDivElement).click());

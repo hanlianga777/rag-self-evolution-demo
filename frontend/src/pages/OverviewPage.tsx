@@ -25,7 +25,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const stages: [string, string, Page][] = [
     ["知识库", `${data.documents?.length || 0} 份文档`, "knowledge"], ["RAG Pipeline", production?.config ? "已配置" : "未运行", "settings"],
     ["Golden Dataset", frozen ? "已冻结" : "待确认", "governance"], ["Baseline", run?.result?.gates ? `${run.result.gates.passed_count}/${run.result.gates.total} Hard Gate` : "未运行", "evaluation"],
-    ["参数调优", qualified.length ? `${qualified.map(row => row.reasoning?.candidate_label).join(" / ")} 个 Candidate 通过 Gate` : experiment?.id ? "进行中" : "未运行", "evolution"],
+    ["参数调优", qualified.length ? `${qualified.length} 个 Candidate 通过 Gate · ${qualified.map(row => row.reasoning?.candidate_label).join(" / ")}` : experiment?.id ? "进行中" : "未运行", "evolution"],
     ["发布", released ? "Production 已发布" : "待确认", "versions"], ["问答验证", released ? "可用" : "待发布", "verification"],
   ];
   const currentStage = stages.findIndex(([, , route]) => route === next[2]);
@@ -36,7 +36,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     {tab !== "project" ? <ArchitecturePanel slot={tab} /> : <>
     <section className="next-action" aria-labelledby="next-action-title"><div><span className="next-action-label">当前下一步</span><h2 id="next-action-title">{next[0]}</h2><p>{next[1]}</p></div><a className="primary" href={`#${next[2]}`} onClick={() => navigate(next[2])}>前往阶段<ArrowRight size={15} aria-hidden="true" /></a></section>
     <Section title="全链路阶段"><StageStepper ariaLabel="全链路阶段" compact steps={stages.map(([label, detail, page], index) => ({ label, detail, href: `#${page}`, state: index < currentStage ? "completed" : index === currentStage ? "current" : "pending" }))} /></Section>
-    <div className="metrics-grid four overview-metrics"><Metric label="Golden Dataset" value={frozen ? `${expectedCount} 题` : `${summary.approved || 0} / ${expectedCount || "—"}`} note={`正向 ${summary.positive ?? "—"} / 消融 ${summary.ablation ?? "—"} / 负向 ${summary.negative ?? "—"} · 待人工审核 ${summary.pending_review || 0}`} /><Metric label="Baseline" value={run?.result?.gates ? `${run.result.gates.passed_count} / ${run.result.gates.total}` : "未运行"} note={`${run?.result?.bad_case_count ?? 0} 个 Bad Case`} /><Metric label="参数调优" value={`${candidates.filter(row => row.reasoning?.candidate_label !== "D").length} 个 Candidate`} note={qualified.length ? `${qualified.map(row => row.reasoning?.candidate_label).join(" / ")} 个 Candidate 通过 Gate` : "尚无通过 Gate 的 Candidate"} /><Metric label="Production" value={released ? "已发布" : "未发布"} note={released ? "当前正式版本" : "等待 Gate 3 确认"} /></div></>}
+    <div className="metrics-grid four overview-metrics"><Metric label="Golden Dataset" value={frozen ? `${expectedCount} 题` : `${summary.approved || 0} / ${expectedCount || "—"}`} note={`正向 ${summary.positive ?? "—"} / 消融 ${summary.ablation ?? "—"} / 负向 ${summary.negative ?? "—"} · 待人工审核 ${summary.pending_review || 0}`} /><Metric label="Baseline" value={run?.result?.gates ? `${run.result.gates.passed_count} / ${run.result.gates.total}` : "未运行"} note={`${run?.result?.bad_case_count ?? 0} 个 Bad Case`} /><Metric label="参数调优" value={`${candidates.filter(row => row.reasoning?.candidate_label !== "D").length} 个 Candidate`} note={qualified.length ? `${qualified.length} 个 Candidate 通过 Gate · ${qualified.map(row => row.reasoning?.candidate_label).join(" / ")}` : "尚无通过 Gate 的 Candidate"} /><Metric label="Production" value={released ? "已发布" : "未发布"} note={released ? "当前正式版本" : "等待 Gate 3 确认"} /></div></>}
   </div>;
 }
 

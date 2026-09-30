@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 
+from .telemetry import measure, collect_usage, estimate_cost
 from .policy import DEFAULT_PIPELINE_CONFIG
 from .providers import ProviderTimeout, ProviderUnavailable
 from .retrieval import VectorRetriever
@@ -52,9 +53,12 @@ class AiService:
     def answer(self, question: str, config: dict | None = None) -> dict:
         config = {**DEFAULT_PIPELINE_CONFIG, **(config or {})}
         started_at = time.perf_counter()
-        queries = self._retrieval_queries(question, config)
+        stages = []
+        with measure(stages, "query_processing"), collect_usage() as auxiliary_usage:
+            queries = self._retrieval_queries(question, config)
         aliases = self.store.approved_aliases() if hasattr(self.store, "approved_aliases") and config["alias_mapping"] else {}
-        evidence = self.retriever.retrieve(question, config, aliases=aliases, queries=queries)
+        with measure(stages, "retrieval"):
+            evidence = self.retriever.retrieve(question, config, aliases=aliases, queries=queries, stages=stages)
         citations = [{key: value for key, value in item.items() if key != "content"} for item in evidence]
         if not evidence:
             return {
@@ -65,8 +69,10 @@ class AiService:
                 "retrieval": [],
                 "input_tokens": None,
                 "output_tokens": None,
+                "stages": stages, "token_usage": {"auxiliary_queries": auxiliary_usage, "generation": None}, "estimated_cost": estimate_cost(self.model, auxiliary_usage),
             }
-        context = "\n".join(f"- {item['content']}" for item in evidence)
+        with measure(stages, "context_build"):
+            context = "\n".join(f"- {item['content']}" for item in evidence)
         if not self.live_enabled:
             raise ProviderUnavailable("未配置 DEEPSEEK_API_KEY")
         strategy = {
@@ -74,12 +80,13 @@ class AiService:
             "Completeness": "在不超出证据的前提下覆盖用户问题的所有必要步骤；证据不足时明确说明。",
             "Abstention": "证据不足、风险不明或问题应拒答时，明确拒答或要求澄清；不得补造事实。",
         }[config["prompt_strategy"]]
-        response = self.provider.complete_with_metrics(
-            f"你是机器人官方 PDF 知识助手。{strategy}回答使用中文，简洁、可执行。",
-            f"问题：{question}\n证据：\n{context}",
-            stream=True,
-        )
-        return {"answer": response["content"], "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000), "ttft_ms": response["ttft_ms"], "retrieval": citations, "input_tokens": response["input_tokens"], "output_tokens": response["output_tokens"]}
+        with measure(stages, "generation"):
+            response = self.provider.complete_with_metrics(
+                f"你是机器人官方 PDF 知识助手。{strategy}回答使用中文，简洁、可执行。",
+                f"问题：{question}\n证据：\n{context}",
+                stream=True,
+            )
+        return {"answer": response["content"], "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000), "ttft_ms": response["ttft_ms"], "retrieval": citations, "input_tokens": response["input_tokens"], "output_tokens": response["output_tokens"], "stages": stages, "token_usage": {"auxiliary_queries": auxiliary_usage, "generation": response.get("usage", {})}, "estimated_cost": estimate_cost(self.model, [*auxiliary_usage, response.get("usage", {})])}
 
     def _retrieval_queries(self, question: str, config: dict) -> list[str]:
         """Only enabled search-space features may create auxiliary retrieval queries."""
@@ -96,7 +103,10 @@ class AiService:
         return queries
 
     def judge(self, question: str, expected: str, answer: str, category: str) -> dict:
-        return self.provider.judge(question, expected, answer)
+        stages = []
+        with measure(stages, "judge"), collect_usage() as usage:
+            result = self.provider.judge(question, expected, answer)
+        return {**result, "stages": stages, "token_usage": usage, "estimated_cost": estimate_cost(self.model, usage)}
 
     def quality_check(self, item: dict) -> dict:
         if not self.live_enabled:
@@ -306,8 +316,11 @@ class AiService:
                 response = None
                 generated = {}
                 try:
-                    response = self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload, "prior_questions": [item["question"] for item in candidates]}, ensure_ascii=False), json_mode=True)
-                    generated = json.loads(response)
+                    generated = self._deterministic_slot(slot, candidates) or {}
+                    if not generated:
+                        response = self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload, "prior_questions": [item["question"] for item in candidates]}, ensure_ascii=False), json_mode=True)
+                        generated = json.loads(response)
+                        if isinstance(generated, dict): generated["generation_method"] = "provider"
                     if not isinstance(generated, dict):
                         generated = {}
                         raise ValueError("invalid JSON object")
@@ -319,7 +332,7 @@ class AiService:
                 except (json.JSONDecodeError, ProviderUnavailable, ValueError) as caught:
                     error = "invalid JSON" if isinstance(caught, json.JSONDecodeError) else str(caught)
                     error_type = type(caught).__name__
-                attempts.append({"slot": slot["slot"], "attempt": attempt, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "source_chunk_ids": [source["chunk_id"] for source in slot["sources"]] if slot["test_category"] != "negative" else [], "selected_evidence": [{"chunk_id": source["chunk_id"], "document_id": source.get("document_id"), "document_name": source.get("document_name"), "chunk_text": source.get("chunk_text", source.get("text", ""))} for source in slot["sources"]], "test_category": slot["test_category"], "negative_subtype": slot.get("negative_subtype"), "ablation_attribute": slot.get("ablation_attribute"), "expected_behavior": slot.get("expected_behavior"), "structured_type": slot.get("structured_type"), "source_positive_slot": slot.get("source_positive_slot"), "validation_error": error, "hard_validation_checks": checks, "error_type": error_type, "response_preview": response[:500] if error and response and not generated else None, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction})
+                attempts.append({"slot": slot["slot"], "attempt": attempt, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "source_chunk_ids": [source["chunk_id"] for source in slot["sources"]] if slot["test_category"] != "negative" else [], "selected_evidence": [{"chunk_id": source["chunk_id"], "document_id": source.get("document_id"), "document_name": source.get("document_name"), "chunk_text": source.get("chunk_text", source.get("text", ""))} for source in slot["sources"]], "test_category": slot["test_category"], "negative_subtype": slot.get("negative_subtype"), "ablation_attribute": slot.get("ablation_attribute"), "expected_behavior": slot.get("expected_behavior"), "structured_type": slot.get("structured_type"), "source_positive_slot": slot.get("source_positive_slot"), "validation_error": error, "hard_validation_checks": checks, "error_type": error_type, "response_preview": response[:500] if error and response and not generated else None, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction, "source": "ai_generated", "construction_type": candidate.get("construction_type") if candidate else None, "generation_method": generated.get("generation_method", "provider")})
                 slot_audit[slot["slot"]] = attempts
                 if not error:
                     candidates.append(candidate)
@@ -351,11 +364,36 @@ class AiService:
         return f"生成一个可由给定证据支撑的正向评测题。{structure}{quality}返回 JSON：question, reference_answer。{repair}"
 
     @staticmethod
+    def _deterministic_slot(slot, candidates):
+        # Only explicit entity/property lines yield deterministic positive questions.
+        if slot['test_category'] != 'positive' or slot.get('structured_type') not in {'Fact', 'Aggregation'}:
+            return None
+        text = slot['sources'][0].get('chunk_text', slot['sources'][0].get('text', ''))
+        facts = re.findall(r'(?m)^\s*([^：:\n]{2,30})[：:]\s*([^。；\n]{2,100})', text)
+        all_facts = facts
+        facts = [(key.strip(), value.strip()) for key, value in facts if re.search(r'[A-Za-z]+\d+|设备|机器人', key)]
+        if not facts:
+            return None
+        if slot['structured_type'] == 'Fact':
+            key, value = facts[0]
+            result = {'question': f'{key}是多少？', 'reference_answer': value}
+        else:
+            if len(facts) < 2 or len(facts) != len(all_facts):
+                return None
+            result = {'question': f"请列出{slot['sources'][0].get('section_path') or facts[0][0]}材料中的全部属性及值。", 'reference_answer': '；'.join(f'{key}：{value}' for key, value in facts)}
+        result['generation_method'] = 'deterministic'
+        return None if any(item['question'] == result['question'] for item in candidates) else result
+
+    @staticmethod
     def _slot_candidate(slot: dict, generated: dict, instruction: str) -> dict:
         category, sources = slot["test_category"], slot["sources"]
         evidence = [] if category == "negative" else [{"source_chunk_ids": [chunk["chunk_id"] for chunk in sources], "evidence_key_points": [chunk.get("chunk_text", chunk.get("text", ""))[:160] for chunk in sources]}]
+        from .business_import import construction_errors
+        kind = slot.get("structured_type")
+        if construction_errors(kind, generated.get("reference_answer") or "", sources):
+            kind = None  # Unsupported special structure returns to the ordinary slot.
         ablation = {key: generated.get(key) for key in ("original_entity", "alias_expression") if generated.get(key)}
-        return {"test_category": category, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "expected_behavior": slot.get("expected_behavior") if category == "negative" else None, "negative_subtype": slot.get("negative_subtype"), "evidence": evidence, "ablation_attribute": slot.get("ablation_attribute"), "ablation_metadata": ablation, "coverage_slot": slot["slot"], "source_positive_slot": slot.get("source_positive_slot"), "generation_instruction": instruction}
+        return {"test_category": category, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "expected_behavior": slot.get("expected_behavior") if category == "negative" else None, "negative_subtype": slot.get("negative_subtype"), "evidence": evidence, "ablation_attribute": slot.get("ablation_attribute"), "ablation_metadata": ablation, "coverage_slot": slot["slot"], "source_positive_slot": slot.get("source_positive_slot"), "generation_instruction": instruction, "source": "ai_generated", "construction_type": kind, "generation_method": generated.get("generation_method", "provider")}
 
     def _indexed_embeddings(self, chunks: list[dict]) -> np.ndarray:
         """Use persisted FAISS vectors aligned with the persisted chunk order."""
@@ -522,7 +560,7 @@ class AiService:
             baseline = {"pipeline": "baseline", "question": question, "version": "baseline-v1", "answer": "生成服务不可用；请先在设置中验证 Provider。", "mode": "unavailable", "model": None, "latency_ms": 0, "fallback_reason": str(error), "retrieval": [], "sources": [], "evidence": []}
         return {
             "question": question,
-            "baseline": {key: baseline[key] for key in ("version", "answer", "sources", "evidence")},
+            "baseline": {key: baseline[key] for key in ("version", "answer", "sources", "evidence", "stages", "token_usage", "estimated_cost", "latency_ms", "input_tokens", "output_tokens") if key in baseline},
             "mode": baseline["mode"],
             "model": baseline["model"],
             "latency_ms": baseline["latency_ms"],

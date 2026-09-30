@@ -6,6 +6,7 @@ import urllib.error
 import urllib.request
 
 from .config import Settings
+from .telemetry import record_usage
 
 
 class ProviderUnavailable(RuntimeError):
@@ -90,7 +91,8 @@ class DeepSeekProvider:
         if not isinstance(content, str) or not content.strip():
             raise ProviderUnavailable("DeepSeek 返回的内容必须是非空字符串")
         usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
-        return {"content": content, "input_tokens": usage.get("prompt_tokens") if isinstance(usage.get("prompt_tokens"), int) else None, "output_tokens": usage.get("completion_tokens") if isinstance(usage.get("completion_tokens"), int) else None, "ttft_ms": ttft_ms}
+        record_usage(usage)
+        return {"usage": usage, "content": content, "input_tokens": usage.get("prompt_tokens") if isinstance(usage.get("prompt_tokens"), int) else None, "output_tokens": usage.get("completion_tokens") if isinstance(usage.get("completion_tokens"), int) else None, "ttft_ms": ttft_ms}
 
     def complete(self, system: str, user: str, json_mode: bool = False, *, temperature: float = 0.2) -> str:
         return self.complete_with_metrics(system, user, json_mode, temperature=temperature)["content"]

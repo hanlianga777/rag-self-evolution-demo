@@ -8,7 +8,7 @@ function isMessage(value: unknown): value is ChatMessage {
   return typeof message.id === "string" && (message.role === "user" || message.role === "assistant") && typeof message.content === "string" && typeof message.createdAt === "string";
 }
 
-function isConversation(value: unknown): value is Conversation {
+export function isConversation(value: unknown): value is Conversation {
   if (!value || typeof value !== "object") return false;
   const conversation = value as Record<string, unknown>;
   return typeof conversation.id === "string" && typeof conversation.title === "string" && typeof conversation.updatedAt === "string" && Array.isArray(conversation.messages) && conversation.messages.every(isMessage) && conversation.messages.every(message => message.role !== "assistant" || !(message.sources || []).some(source => !/^(卡赫_|宇树_)/.test(source)));

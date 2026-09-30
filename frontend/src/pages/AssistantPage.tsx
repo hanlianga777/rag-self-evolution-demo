@@ -1,7 +1,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageCirclePlus, Send, Trash2 } from "lucide-react";
+import { readSession, writeSession } from "../session";
+import { ExecutionMetrics } from "../components/PipelineFields";
 import { postJson } from "../api";
-import { loadConversations, saveConversations } from "../conversations";
+import { isConversation, loadConversations, saveConversations } from "../conversations";
 import type { ChatMessage, Citation, Conversation } from "../types";
 
 const suggestedQuestions = ["清洁机器人 KIRA B 50 首次使用前应该做什么？", "巡检机器人 B2 遥控器低电量时如何充电？", "巡检机器人 B2 电池首次使用前有什么要求？"];
@@ -12,10 +14,12 @@ function newConversation(): Conversation { return { id: id("chat"), title: "新�
 function matchBadCase(question: string, badCases: any[]) { return badCases.find(item => item.question.trim() === question.trim()); }
 
 export function AssistantPage({ productionVersion, isReleased = false, badCases, onOpenBadCase, onOpenCitation, onOpenDocument }: { productionVersion?: string; isReleased?: boolean; badCases: any[]; onOpenBadCase: (caseId: string) => void; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void }) {
-  const [conversations, setConversations] = useState<Conversation[]>(loadConversations);
+  const [saved] = useState(() => readSession("rag-qa-assistant", { activeId: undefined as string | undefined, draft: "", conversations: null as Conversation[] | null }));
+  const [conversations, setConversations] = useState<Conversation[]>(() => Array.isArray(saved.conversations) && saved.conversations.every(isConversation) ? saved.conversations : loadConversations());
   const [blankConversation, setBlankConversation] = useState(newConversation);
-  const [activeId, setActiveId] = useState<string | undefined>();
-  const [draft, setDraft] = useState("");
+  const [activeId, setActiveId] = useState<string | undefined>(typeof saved.activeId === "string" ? saved.activeId : undefined);
+  const [draft, setDraft] = useState(typeof saved.draft === "string" ? saved.draft : "");
+  useEffect(() => writeSession("rag-qa-assistant", { activeId, draft, conversations }), [activeId, draft, conversations]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -49,7 +53,7 @@ export function AssistantPage({ productionVersion, isReleased = false, badCases,
     setDraft("");
     try {
       const result: any = await postJson("/api/preview", { question });
-      const assistant: ChatMessage = { id: id("assistant"), role: "assistant", content: result.baseline.answer, question, createdAt: now(), mode: result.mode, model: result.model, latencyMs: typeof result.latency_ms === "number" ? result.latency_ms : Date.now() - requestStartedAt, fallbackReason: result.fallback_reason, sources: result.baseline.sources, evidence: result.baseline.evidence };
+      const assistant: ChatMessage = { id: id("assistant"), role: "assistant", content: result.baseline.answer, question, createdAt: now(), mode: result.mode, model: result.model, latencyMs: typeof result.latency_ms === "number" ? result.latency_ms : Date.now() - requestStartedAt, fallbackReason: result.fallback_reason, sources: result.baseline.sources, evidence: result.baseline.evidence, metrics: result.baseline };
       updateConversation(started.id, conversation => ({ ...conversation, updatedAt: assistant.createdAt, messages: [...conversation.messages, assistant] }));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "请求失败，请重试"); }
     finally { setBusy(false); setThinkingStartedAt(undefined); }
@@ -75,5 +79,5 @@ function Thinking({ startedAt }: { startedAt: number }) {
 function Message({ message, onOpenCitation, onOpenDocument, onSubmitClue }: { message: ChatMessage; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void; onSubmitClue: (message: ChatMessage) => void }) {
   if (message.role === "user") return <article className="chat-message user"><p>{message.content}</p></article>;
   const historicalDocuments = [...new Set((message.sources || []).map(source => source.split(" · ")[0]))];
-  return <article className="chat-message assistant"><div className="message-label"><span>AI助手</span></div><p>{message.content}</p><div className="message-meta">模型：{message.model || "未返回有效模型回答"} · 生成耗时：{message.latencyMs == null ? "未测量" : `${(message.latencyMs / 1000).toFixed(1)}s`}</div>{message.fallbackReason && <div className="message-meta">处理说明：{message.fallbackReason}</div>}{message.evidence?.length ? <div className="message-sources"><span>可追溯引用</span>{message.evidence.map(citation => <button className="document-link" key={citation.chunk_id} onClick={() => onOpenCitation(citation)}>{citation.document} · P.{citation.page_start} · {citation.chunk_id} · {citation.score.toFixed(2)}</button>)}</div> : historicalDocuments.length ? <div className="message-sources"><span>历史来源（无页码/分数）</span>{historicalDocuments.map(name => <button className="document-link" key={name} onClick={() => onOpenDocument(name)}>{name}</button>)}</div> : null}{message.improvementClue ? <p className="clue-confirmation">{message.improvementClue.badCaseId ? "已打开预置问题案例证据。" : "已提交本机优化线索，等待人工标注。"}</p> : <button className="text-button clue-button" onClick={() => onSubmitClue(message)}>提交优化线索</button>}</article>;
+  return <article className="chat-message assistant"><div className="message-label"><span>AI助手</span></div><p>{message.content}</p><ExecutionMetrics metrics={message.metrics} /><div className="message-meta">模型：{message.model || "未返回有效模型回答"} · 生成耗时：{message.latencyMs == null ? "未测量" : `${(message.latencyMs / 1000).toFixed(1)}s`}</div>{message.fallbackReason && <div className="message-meta">处理说明：{message.fallbackReason}</div>}{message.evidence?.length ? <div className="message-sources"><span>可追溯引用</span>{message.evidence.map(citation => <button className="document-link" key={citation.chunk_id} onClick={() => onOpenCitation(citation)}>{citation.document} · P.{citation.page_start} · {citation.chunk_id} · {citation.score.toFixed(2)}</button>)}</div> : historicalDocuments.length ? <div className="message-sources"><span>历史来源（无页码/分数）</span>{historicalDocuments.map(name => <button className="document-link" key={name} onClick={() => onOpenDocument(name)}>{name}</button>)}</div> : null}{message.improvementClue ? <p className="clue-confirmation">{message.improvementClue.badCaseId ? "已打开预置问题案例证据。" : "已提交本机优化线索，等待人工标注。"}</p> : <button className="text-button clue-button" onClick={() => onSubmitClue(message)}>提交优化线索</button>}</article>;
 }

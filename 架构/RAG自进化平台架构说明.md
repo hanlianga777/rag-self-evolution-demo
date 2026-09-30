@@ -36,3 +36,7 @@ Mini Golden 的自动步骤只生成候选与机器检查。Human Review 是唯�
 | Monitoring | `POST /api/monitoring/events`、`/api/monitoring/triggers/{id}/confirm` |
 
 DeepSeek 不可用时，系统返回明确的不可用状态，不生成模拟回答、评测、推荐或发布记录。Provider 返回用量时持久化 Token Usage；未提供计费时标记 `Token Usage / Provider Cost unavailable`。
+
+## Phase 1（2026-09-30）
+
+CSV 标准库 / XLSX openpyxl → 当前 Corpus 证据预览 → 业务候选与 AI 候选共用 questions/raw_json → Profile 精确选题复制 → 原治理链。Stage telemetry、完整 Usage 和价格依据进入既有 JSON；Monitoring 仅新增 nullable metrics_json。价格默认未配；回答 Gate 延迟口径不变。QA sessionStorage 只恢复状态，不触发 Provider。当前事实见 ../docs/CURRENT_DEMO_TRUTH.md。

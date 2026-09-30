@@ -219,6 +219,9 @@ class GovernanceStore:
                 connection.execute("UPDATE evaluation_runs SET status = 'legacy_unverified' WHERE result_json NOT LIKE '%\"gates\"%'")
                 connection.execute("UPDATE production_versions SET config_json = ? WHERE id = 'baseline-v1'", (_json(DEFAULT_PIPELINE_CONFIG),))
                 connection.execute("INSERT INTO schema_migrations VALUES (?, ?)", ("v101-provenance-boundary", _now()))
+            if "metrics_json" not in {row[1] for row in connection.execute("PRAGMA table_info(monitoring_events)")}:
+                connection.execute("ALTER TABLE monitoring_events ADD COLUMN metrics_json TEXT")
+            connection.execute("INSERT OR IGNORE INTO schema_migrations VALUES (?, ?)", ("phase1-monitoring-metrics", _now()))
             for name, availability, description in (
                 ("top_k", "available", "调整向量检索返回条数"),
                 ("min_score", "available", "过滤低相关度向量结果"),
@@ -250,6 +253,66 @@ class GovernanceStore:
         if row is None:
             raise KeyError(question_id)
         return self._row(row)
+
+    def save_business_candidates(self, candidates: list[dict], filename: str, file_hash: str):
+        now, ids = _now(), []
+        prefix = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = {_normalized(row[0]) for row in connection.execute("SELECT question FROM questions")}
+            for index, candidate in enumerate(candidates):
+                key = _normalized(candidate['question'])
+                if key in existing:
+                    raise ValueError('重复题目，请重新预览')
+                existing.add(key)
+                question_id = f"BUS-{prefix}-{index:03d}"
+                raw = {**candidate, 'id': question_id, 'source': 'business_import', 'import_audit': {'filename': filename, 'sha256': file_hash, 'row': candidate['import_row'], 'imported_at': now}}
+                connection.execute("INSERT INTO questions (id, stage, legacy_question_type, test_category, negative_subtype, review_status, probe_status, qc_status, question, reference_answer, evidence_json, raw_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, 'candidate', 'v1_mini', candidate['test_category'], candidate.get('negative_subtype'), 'human_review_pending', 'probe_pending', 'qc_pending', candidate['question'], candidate.get('reference_answer'), _json(candidate.get('evidence', [])), _json(raw), now, now))
+                ids.append(question_id)
+        return ids
+
+    def create_pool_run(self, profile_name: str, question_ids: list[str], chunks: list[dict]):
+        from .ai_service import AiService
+        from .business_import import construction_errors
+        from .corpus import current_manifest
+        if profile_name not in GENERATION_PROFILES:
+            raise ValueError('不支持的 Profile')
+        profile = {'name': profile_name, **GENERATION_PROFILES[profile_name]}
+        if len(question_ids) != profile['expected_count'] or len(set(question_ids)) != len(question_ids):
+            raise ValueError('需选择完整配额，且不可重复选择')
+        run_id, now = f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", _now()
+        clones, plan, seen = [], [], set()
+        known = {item['chunk_id']: item for item in chunks}
+        with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status IN ('queued','coverage','generating','validation','probing','qc')").fetchone():
+                raise ValueError('已有 Run 正在执行')
+            originals = []
+            for question_id in question_ids:
+                row = connection.execute('SELECT * FROM questions WHERE id=?', (question_id,)).fetchone()
+                if row is None or row['stage'] == 'superseded':
+                    raise ValueError('候选题不存在或已被替代')
+                originals.append(self._row(row))
+            counts = {group: sum(item['test_category'] == group for item in originals) for group in ('positive', 'ablation', 'negative')}
+            if any(counts[group] != profile_count(profile, group) for group in counts):
+                raise ValueError('Evaluation Group 配额不匹配')
+            for index, item in enumerate(originals, 1):
+                candidate = {**item['raw'], **item}
+                errors = AiService._candidate_errors(candidate, chunks, seen)
+                source_ids = {key for evidence in item['evidence'] for key in evidence.get('source_chunk_ids', [])}
+                errors += construction_errors(item['raw'].get('construction_type'), item['reference_answer'] or '', [known[key] for key in source_ids if key in known])
+                if errors:
+                    raise ValueError(f"{item['id']}: {'; '.join(errors)}")
+                seen.add(''.join(item['question'].lower().split()))
+                new_id, slot = f"V1G-{run_id[-12:]}-{index:02d}", f"Q{index:02d}"
+                raw = {**item['raw'], 'id': new_id, 'source': item['raw'].get('source', 'ai_generated'), 'source_reference': {'question_id': item['id'], 'generation_run_id': item['raw'].get('generation_run_id')}, 'generation_run_id': run_id, 'generation_profile': 'v1-mini-8-4-8' if profile_name == 'mini' else f'v1.3-{profile_name}', 'coverage_slot': slot}
+                connection.execute("INSERT INTO questions (id, stage, legacy_question_type, test_category, negative_subtype, review_status, probe_status, qc_status, question, reference_answer, evidence_json, raw_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (new_id, 'candidate', 'v1_mini', item['test_category'], item['negative_subtype'], 'human_review_pending', 'probe_pending', 'qc_pending', item['question'], item['reference_answer'], _json(item['evidence']), _json(raw), now, now))
+                clones.append(new_id)
+                plan.append({'question_id': new_id, 'coverage_slot': slot, 'test_category': item['test_category'], 'negative_subtype': item['negative_subtype'], 'ablation_attribute': raw.get('ablation_attribute')})
+            connection.execute('INSERT INTO golden_generation_runs VALUES (?, ?, ?, ?, ?, ?)', (run_id, _json(profile), 'pool_selection', 'completed', _json(clones), now))
+            audit = {'slot_persistence_v1': True, 'source': 'mixed_pool', 'corpus_fingerprint': current_manifest()['sources'], 'status': 'passed', 'counts': counts, 'hard_validation': {'status': 'passed', 'rejected': []}, 'progress': {'stage': 'quality_not_run', 'completed_slots': len(clones), 'total_slots': len(clones), 'probe_completed': 0, 'qc_completed': 0}, 'source_question_ids': question_ids}
+            connection.execute('INSERT INTO golden_generation_artifacts VALUES (?, ?, ?, ?)', (run_id, _json([]), _json(plan), _json(audit)))
+        return self.generation_run(run_id)
 
     def require_generation_ready(self, question_id: str):
         item = self.question(question_id)
@@ -356,7 +419,7 @@ class GovernanceStore:
                 question_id = f"V1G-{run_id[-12:]}-{int(slot[1:]):02d}"
                 now = _now()
                 profile = _load(connection.execute("SELECT profile_json FROM golden_generation_runs WHERE id=?", (run_id,)).fetchone()[0], {})
-                raw = {"id": question_id, "question": candidate["question"], "reference_answer": candidate.get("reference_answer"), "acceptable_evidence": candidate.get("evidence") or [], "expected_behavior": candidate.get("expected_behavior"), "generation_profile": "v1-mini-8-4-8" if profile.get("name", "mini") == "mini" else f"v1.3-{profile['name']}", "generation_run_id": run_id, "generation_model": model, "ablation_attribute": candidate.get("ablation_attribute"), "ablation_metadata": candidate.get("ablation_metadata", {}), "coverage_slot": slot, "generation_instruction": candidate.get("generation_instruction"), "source_positive_id": None}
+                raw = {"id": question_id, "question": candidate["question"], "reference_answer": candidate.get("reference_answer"), "acceptable_evidence": candidate.get("evidence") or [], "expected_behavior": candidate.get("expected_behavior"), "generation_profile": "v1-mini-8-4-8" if profile.get("name", "mini") == "mini" else f"v1.3-{profile['name']}", "generation_run_id": run_id, "generation_model": model, "ablation_attribute": candidate.get("ablation_attribute"), "ablation_metadata": candidate.get("ablation_metadata", {}), "coverage_slot": slot, "generation_instruction": candidate.get("generation_instruction"), "source_positive_id": None, "source": "ai_generated", "construction_type": candidate.get("construction_type"), "generation_method": candidate.get("generation_method", "provider")}
                 connection.execute("INSERT INTO questions (id, stage, legacy_question_type, test_category, negative_subtype, review_status, probe_status, qc_status, question, reference_answer, evidence_json, raw_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, "candidate", "v1_mini", candidate["test_category"], candidate.get("negative_subtype"), "human_review_pending", "probe_pending", "qc_pending", candidate["question"], candidate.get("reference_answer"), _json(candidate.get("evidence") or []), _json(raw), now, now))
                 question_plan.append({"question_id": question_id, "coverage_slot": slot, "test_category": candidate["test_category"], "negative_subtype": candidate.get("negative_subtype"), "ablation_attribute": candidate.get("ablation_attribute")})
                 question_plan.sort(key=lambda item: item["coverage_slot"])
@@ -443,7 +506,7 @@ class GovernanceStore:
                 source_positive_id = candidate.get("source_positive_id")
                 if not source_positive_id and candidate.get("source_positive_slot"):
                     source_positive_id = next((saved_id for saved_id, prior in zip(question_ids, candidates[:serial - 1]) if prior.get("coverage_slot") == candidate["source_positive_slot"] and prior.get("test_category") == "positive"), None)
-                raw = {"id": question_id, "question": question, "reference_answer": answer, "acceptable_evidence": evidence, "expected_behavior": expected_behavior, "generation_profile": "v1-mini-8-4-8", "generation_run_id": run_id, "generation_model": model_version, "ablation_attribute": candidate.get("ablation_attribute"), "ablation_metadata": candidate.get("ablation_metadata", {}), "coverage_slot": candidate.get("coverage_slot"), "generation_instruction": candidate.get("generation_instruction"), "source_positive_id": source_positive_id}
+                raw = {"id": question_id, "question": question, "reference_answer": answer, "acceptable_evidence": evidence, "expected_behavior": expected_behavior, "generation_profile": "v1-mini-8-4-8", "generation_run_id": run_id, "generation_model": model_version, "ablation_attribute": candidate.get("ablation_attribute"), "ablation_metadata": candidate.get("ablation_metadata", {}), "coverage_slot": candidate.get("coverage_slot"), "generation_instruction": candidate.get("generation_instruction"), "source_positive_id": source_positive_id, "source": "ai_generated", "construction_type": candidate.get("construction_type"), "generation_method": candidate.get("generation_method", "provider")}
                 connection.execute("INSERT INTO questions (id, stage, legacy_question_type, test_category, negative_subtype, review_status, probe_status, qc_status, question, reference_answer, evidence_json, raw_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, "candidate", "v1_mini", category, candidate.get("negative_subtype"), "human_review_pending", "probe_pending", "qc_pending", question, answer, _json(evidence), _json(raw), now, now))
                 question_ids.append(question_id)
             if existing_run:
@@ -1584,7 +1647,7 @@ class GovernanceStore:
                 connection.execute("INSERT INTO rollback_history(from_version_id, to_version_id, actor, created_at) VALUES (?, ?, ?, ?)", (previous["id"], version_id, actor, _now()))
         return self.active_production()
 
-    def record_monitoring_event(self, *, question: str, answer: str, bad_case: bool, severity: str, determinable: bool):
+    def record_monitoring_event(self, *, question: str, answer: str, bad_case: bool, severity: str, determinable: bool, metrics: dict | None = None):
         if severity not in {"ordinary", "critical"}:
             raise ValueError("Unsupported monitoring severity")
         if not question.strip() or not answer.strip():
@@ -1592,8 +1655,8 @@ class GovernanceStore:
         event_id = f"MON-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         with self.connection() as connection:
             connection.execute(
-                "INSERT INTO monitoring_events VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (event_id, question.strip(), answer.strip(), int(bool(bad_case)), severity, int(bool(determinable)), _now()),
+                "INSERT INTO monitoring_events (id, question, answer, bad_case, severity, determinable, created_at, metrics_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (event_id, question.strip(), answer.strip(), int(bool(bad_case)), severity, int(bool(determinable)), _now(), _json(metrics) if metrics is not None else None),
             )
         event = {"id": event_id, "question": question.strip(), "answer": answer.strip(), "bad_case": bool(bad_case), "severity": severity, "determinable": bool(determinable)}
         self._create_monitoring_trigger_if_needed(event)
@@ -1602,7 +1665,7 @@ class GovernanceStore:
     def monitoring_events(self):
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM monitoring_events ORDER BY created_at DESC").fetchall()
-        return [{**dict(row), "bad_case": bool(row["bad_case"]), "determinable": bool(row["determinable"])} for row in rows]
+        return [{**dict(row), "bad_case": bool(row["bad_case"]), "determinable": bool(row["determinable"]), "metrics": _load(row["metrics_json"], None)} for row in rows]
 
     def assess_monitoring_event(self, event_id: str, *, bad_case: bool, severity: str):
         if severity not in {"ordinary", "critical"}:

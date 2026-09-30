@@ -1,5 +1,16 @@
 # RAG Evolution
 
+当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
+
+## Phase 1（2026-09-30）
+
+Golden 新增“业务导入 / 候选池”：下载 CSV/XLSX 模板 → 填写显式 Evaluation Group 和当前 Corpus 证据原文 → 预览逐行错误 → 确认导入 → 按 Mini/Medium/Full 配额复制新 Run → 原 Probe/QC/人工审核/Gate 1。导入和选题不调用模型。
+
+QA 参数差异直接读取配置；会话恢复不请求 Provider，同来源同配置禁止自比。实际回答/Judge 的阶段和完整 Usage 只记录未来调用，历史不回填。默认无费用；`RAG_PRICE_CONFIG` 配置格式见 SPEC 补充。
+
+验证：`cd backend && python3 -m unittest discover -s tests`；`cd frontend && npm test && npm run build`；浏览器脚本 `scripts/test_phase1_ui.mjs` 仅连接隔离 :5180/:8011（`RAG_PLAYWRIGHT_MODULE` 可指定已安装 Playwright）。禁止把它指向真实 API。
+
+
 > 机器人官方 PDF 知识问答的可审计 RAG 自进化 Demo。
 
 ## Current Project Stage

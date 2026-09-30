@@ -7,7 +7,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app import architecture_assets, main
+from app import architecture_assets
+from api_fixture import main
 
 
 class ArchitectureAssetTests(unittest.TestCase):

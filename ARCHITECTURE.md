@@ -1,5 +1,14 @@
 # V1.3 架构说明
 
+当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
+
+## Phase 1 增量架构（2026-09-30）
+
+业务文件 → 标准库 CSV / openpyxl XLSX → 当前 Corpus 原文定位 → questions/raw_json → Profile 复制新 Run → 既有 Hard Validation / Probe / QC / Gate 1。无第二套 Golden 系统。
+
+perf_counter 测量实际 Query、Retrieval 子阶段、Context、Generation 与 Judge；保留 UTC 时间、原回答 Gate 延迟和完整 Provider Usage。价格仅集中配置；Monitoring additive nullable JSON。React 复用 Radix Dialog / 原组件，不增加框架或状态库。架构 HTML 与 PNG 同步。
+
+
 ## 运行时
 
 React/Vite + FastAPI + SQLite + 本地 BGE/FAISS，复用已有八个一级工作区。动态文档清单与 Embedding 主题配额；文档 ID、Chunk ID、原文必需，产品／章节可选。原四 PDF 仅示例。

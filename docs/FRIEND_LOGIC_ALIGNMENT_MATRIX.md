@@ -1,6 +1,8 @@
 # Friend Logic Alignment Matrix — V1.2
 
-Status: implementation delivered; Real Main Lifecycle BLOCKED. PASS below names its verification layer, never substitutes Fixture for live evidence. See [verification report](V1_2_VERIFICATION.md).
+Historical V1.2 audit (2026-09-26), superseded for current state by [Current Demo Truth](CURRENT_DEMO_TRUTH.md).
+
+Historical status: implementation delivered; Real Main Lifecycle BLOCKED. PASS below names its verification layer, never substitutes Fixture for live evidence. See [verification report](V1_2_VERIFICATION.md).
 
 | Item | Disposition | Original evidence | Implementation / verification |
 |---|---|---|---|
@@ -21,3 +23,7 @@ Status: implementation delivered; Real Main Lifecycle BLOCKED. PASS below names 
 | Monitoring / Versions auxiliary | REMOVED/HIDDEN | 流程1–5 main path | PASS（UI/图）— Overview主链不依赖Monitoring，辅助能力保留 |
 
 Reference filenames abbreviated above are ScreenShot_2026-09-07_<suffix>.png inside the user-provided 产品成果参考.zip. These are screenshots, not source code. Existing BGE/DeepSeek/FAISS and 11 gates are explicit project adaptations, not claims about the friend's exact implementation.
+
+## 2026-09-30 Phase 1 对齐
+
+采用截图证实的 Coverage → 构造 → Hard Validation → Probe → QC → 人工 Gate、并列 Candidate、D 失败保留赢家、同题双答案表达。CSV/XLSX 导入和混合配额来自本轮用户批准的计划，不归因于朋友截图。没有从截图推断 Prompt、源码、精确阈值或技术栈；不迁移解析器、模型或索引。

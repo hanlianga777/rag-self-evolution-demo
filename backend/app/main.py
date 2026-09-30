@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from .ai_service import AiService
-from . import architecture_assets
+from . import architecture_assets, business_import
 from .corpus import CorpusStore, UPLOADS_DIR, current_manifest
 from .corpus_management import CorpusManager
 from .config import load_settings
@@ -23,6 +23,7 @@ from .evaluation import EvaluationRunner, gate_details
 from .governance import GovernanceStore
 from .optimization import OptimizationAgent
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
+from .telemetry import price_config
 from .providers import DeepSeekProvider, ProviderTimeout
 
 
@@ -277,6 +278,44 @@ def governance_summary():
 @app.get("/api/governance/questions")
 def governance_questions(stage: str | None = None):
     return store.questions(stage)
+
+
+class PoolRunRequest(BaseModel):
+    profile: Literal['mini', 'medium', 'full']
+    question_ids: list[str] = Field(min_length=1, max_length=98)
+
+
+@app.get('/api/governance/import-template')
+def import_template(format: Literal['csv', 'xlsx'] = 'csv'):
+    content, media_type = business_import.template(format)
+    return Response(content, media_type=media_type, headers={'Content-Disposition': f'attachment; filename="golden-business-template.{format}"'})
+
+
+@app.post('/api/governance/imports', dependencies=[Depends(require_trusted_origin)])
+async def import_candidates(request: Request, filename: str, confirm: bool = False):
+    try:
+        data = bytearray()
+        async for part in request.stream():
+            data.extend(part)
+            if len(data) > 10 * 1024 * 1024:
+                raise ValueError("文件超过 10 MB")
+        content = bytes(data)
+        result = business_import.parse_import(content, Path(filename).name, corpus.chunks(), store.questions())
+        if confirm:
+            if result['error_count'] or not result['valid_rows']:
+                raise ValueError('请先修正全部错误，再确认导入')
+            result['question_ids'] = store.save_business_candidates(result['valid_rows'], Path(filename).name, result['file_hash'])
+        return result
+    except (ValueError, UnicodeError, OSError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post('/api/governance/generation-runs/from-pool', dependencies=[Depends(require_trusted_origin)], status_code=201)
+def create_pool_run(payload: PoolRunRequest):
+    try:
+        return store.create_pool_run(payload.profile, payload.question_ids, corpus.chunks())
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.get("/api/governance/generation-runs")
@@ -846,6 +885,8 @@ def pipeline():
         "search_space": search_space_contract(),
         "locked_parameters": sorted(EXCLUDED_AUTOMATIC_PARAMETERS),
         "index": corpus.index_info(),
+        "pricing": price_config(),
+        "last_execution_metrics": next((row.get("metrics") for row in store.monitoring_events() if row.get("metrics", {}) and row["metrics"].get("stages")), None),
     }
 
 
@@ -1039,7 +1080,7 @@ def preview(payload: PreviewRequest):
     result = ai_service.preview(payload.question)
     baseline = result.get("baseline", {})
     if result.get("mode") in {"live", "local"} and not result.get("fallback_reason"):
-        event = store.record_monitoring_event(question=payload.question, answer=baseline.get("answer", ""), bad_case=False, severity="ordinary", determinable=False)
+        event = store.record_monitoring_event(question=payload.question, answer=baseline.get("answer", ""), bad_case=False, severity="ordinary", determinable=False, metrics={key: baseline.get(key) for key in ("stages", "token_usage", "estimated_cost", "latency_ms", "input_tokens", "output_tokens")})
         result["monitoring_event_id"] = event["id"]
     return result
 

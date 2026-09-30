@@ -1,0 +1,154 @@
+{
+  "before": {
+    "sha256": "beffe1162803bd1c1760abab052616c4ddf582e24dd4378423f8a8ee639ad6a9",
+    "size": 6037504,
+    "mtime_ns": 1790734204922758611
+  },
+  "after": {
+    "sha256": "f4e3dc728c95620bb060dedfbd77e0edc3e094a08f6ea73e5b40a8ba2694a5df",
+    "size": 6037504,
+    "mtime_ns": 1790739072037335448
+  },
+  "tables": {
+    "agent_traces": {
+      "before_count": 4,
+      "after_count": 4,
+      "original_records_equal": true
+    },
+    "alias_mappings": {
+      "before_count": 0,
+      "after_count": 0,
+      "original_records_equal": true
+    },
+    "approvals": {
+      "before_count": 52,
+      "after_count": 52,
+      "original_records_equal": true
+    },
+    "bad_cases": {
+      "before_count": 33,
+      "after_count": 33,
+      "original_records_equal": true
+    },
+    "candidate_configs": {
+      "before_count": 4,
+      "after_count": 4,
+      "original_records_equal": true
+    },
+    "candidate_revision_runs": {
+      "before_count": 37,
+      "after_count": 37,
+      "original_records_equal": true
+    },
+    "dataset_versions": {
+      "before_count": 4,
+      "after_count": 4,
+      "original_records_equal": true
+    },
+    "demo_state": {
+      "before_count": 2,
+      "after_count": 2,
+      "original_records_equal": true
+    },
+    "evaluation_case_results": {
+      "before_count": 101,
+      "after_count": 101,
+      "original_records_equal": true
+    },
+    "evaluation_runs": {
+      "before_count": 7,
+      "after_count": 7,
+      "original_records_equal": true
+    },
+    "experiments": {
+      "before_count": 4,
+      "after_count": 4,
+      "original_records_equal": true
+    },
+    "golden_generation_artifacts": {
+      "before_count": 13,
+      "after_count": 13,
+      "original_records_equal": true
+    },
+    "golden_generation_runs": {
+      "before_count": 13,
+      "after_count": 13,
+      "original_records_equal": true
+    },
+    "monitoring_events": {
+      "before_count": 4,
+      "after_count": 4,
+      "original_records_equal": true
+    },
+    "optimization_triggers": {
+      "before_count": 0,
+      "after_count": 0,
+      "original_records_equal": true
+    },
+    "probe_results": {
+      "before_count": 176,
+      "after_count": 176,
+      "original_records_equal": true
+    },
+    "production_versions": {
+      "before_count": 2,
+      "after_count": 2,
+      "original_records_equal": true
+    },
+    "qc_results": {
+      "before_count": 143,
+      "after_count": 143,
+      "original_records_equal": true
+    },
+    "questions": {
+      "before_count": 212,
+      "after_count": 212,
+      "original_records_equal": true
+    },
+    "recommendations": {
+      "before_count": 1,
+      "after_count": 1,
+      "original_records_equal": true
+    },
+    "review_events": {
+      "before_count": 66,
+      "after_count": 66,
+      "original_records_equal": true
+    },
+    "rollback_history": {
+      "before_count": 0,
+      "after_count": 0,
+      "original_records_equal": true
+    },
+    "schema_migrations": {
+      "before_count": 4,
+      "after_count": 5,
+      "original_records_equal": true
+    },
+    "tool_calls": {
+      "before_count": 0,
+      "after_count": 0,
+      "original_records_equal": true
+    },
+    "tool_registry": {
+      "before_count": 5,
+      "after_count": 5,
+      "original_records_equal": true
+    }
+  },
+  "passed": true,
+  "index_files": {
+    "backend/data/index/documents.json": "beb8a69cd66e6f9f3771aacf9828db3a08a63f8b216395b211c5445e4832a0a7",
+    "backend/data/index/manifest.json": "fec999b4647a93837d8d27b0cf1e7646e0d7a448702acb46a905e89e7923eb27",
+    "backend/data/index/chunks.json": "1198c2dd8c4788df473fc240ebef578778f8f74bc81c789c55a9be075e90082c",
+    "backend/data/index/faiss.index": "5dfc392e12a94d2c7968b08c9140eee0260006d055723ef52a27368a25c35872"
+  },
+  "original_database_before": {
+    "sha256": "7dee55b5eca5779c6b07f85a5256a4f53f9fd39f95fc87112d5f0ae9a99e6784",
+    "size": 6037504,
+    "mtime_ns": 1790582718511204144
+  },
+  "before_note": "before is the consistent SQLite backup fingerprint; original_database_before is the original file fingerprint",
+  "migration": "nullable monitoring_events.metrics_json + one schema_migrations registration; no business record writes",
+  "collection_note": "Existing test module imported app.main at collection time; its initialization applied the authorized additive migration earlier than the explicit migration step. Final comparison proves every original business field unchanged. Collection import now uses a temporary database."
+}

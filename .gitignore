@@ -22,3 +22,6 @@ backend/data/architecture/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Local browser verification artifacts
+output/playwright/

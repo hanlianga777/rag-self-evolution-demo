@@ -97,7 +97,7 @@ it("shows persisted partial slots, failure details, and only the refill action",
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/questions") ? { questions: rows } : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
-  expect(document.body.textContent).toContain("生成 12/20");
+  expect(document.body.textContent).toContain("候选构造12/20");
   expect(document.body.textContent).toContain("已处理 20/20 · 100%");
   expect(document.body.textContent).toContain("Hard Valid 12/20 · 待补 8");
   expect(document.body.textContent).toContain("补齐失败题（8）");

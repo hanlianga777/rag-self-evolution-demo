@@ -8,7 +8,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-from app import main
+from api_fixture import main
 from app.ai_service import AiService
 from app.governance import GovernanceStore
 

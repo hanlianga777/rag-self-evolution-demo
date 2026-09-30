@@ -1,5 +1,17 @@
 # 变更记录
 
+当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
+
+## 2026-09-30 · Phase 1 / V1.3
+
+- CSV/XLSX 预览、原文定位、业务候选池及混合 Profile Run，旧审批不继承。
+- 独立构造题型与可靠事实/聚合确定性生成，普通题 fallback。
+- Select、文字浮层、标签 Popover、表格、Radix 详情和流程统一。
+- Baseline Gate/案例、Tuning/D、发布状态、QA 保存配置差异与会话恢复。
+- 实际阶段、完整 Usage、未配置价格与 nullable Monitoring 指标迁移。
+- 验证层与真实历史分开，业务数据逐字段保全。
+
+
 ## V1.3 — 评测与实验闭环
 
 - Golden 支持 Mini 20、Medium 49、Full 98，保留旧 Mini 兼容与一次人工 Gate 1。

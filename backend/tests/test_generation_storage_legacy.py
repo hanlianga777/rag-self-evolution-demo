@@ -161,7 +161,8 @@ class LegacyGenerationStorageTests(unittest.TestCase):
                 return []
 
         with patch.object(governance, "DEFAULT_DATABASE", Path(self.directory.name) / "import.db"):
-            from app.main import _run_mini_generation
+            from api_fixture import main
+            _run_mini_generation = main._run_mini_generation
 
         _run_mini_generation(run_id, store, GeneratedService(), EmptyCorpus())
 
@@ -196,7 +197,8 @@ class LegacyGenerationStorageTests(unittest.TestCase):
                 return []
 
         with patch.object(governance, "DEFAULT_DATABASE", Path(self.directory.name) / "import.db"):
-            from app.main import _run_mini_generation
+            from api_fixture import main
+            _run_mini_generation = main._run_mini_generation
 
         probe_results = [{"status": "failed"}] + [{"status": "passed"}] * 19
         with patch.object(store, "run_probe", side_effect=probe_results), patch.object(store, "record_qc"):
