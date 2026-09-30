@@ -12,7 +12,6 @@ import numpy as np
 PLANNER_VERSION = 'golden-planner-v2.1'
 VALIDATOR_VERSION = 'golden-validator-v2.1'
 PARAMETERS = {'target_cluster_size': 40, 'min_cluster_size': 3, 'seed': 42, 'n_init': 10, 'max_iter': 100, 'distance': 'squared_euclidean_on_l2_normalized_vectors'}
-DUPLICATE_SIMILARITY_THRESHOLD = 0.92
 SPECIAL_LIMITS = {'mini': 2, 'medium': 4, 'full': 8}
 GROUPS = ('positive', 'ablation', 'negative')
 KINDS = ('Fact', 'Aggregation', 'Bridge', 'Ordinary')
@@ -45,7 +44,7 @@ def bridge_material(first, second):
             for other, other_value in destination:
                 target = other.split()
                 if len(parts) >= 2 and len(target) >= 2 and normalize(value) == normalize(target[0]) and parts[0] != target[0]:
-                    return {'entity': parts[0], 'bridge_entity': target[0], 'target_attribute': ''.join(target[1:]), 'facts': [f'{key}：{value}', f'{other}：{other_value}'], 'relation': 'entity_reference', 'direction': direction}
+                    return {'entity': parts[0], 'origin_attribute': ''.join(parts[1:]), 'bridge_entity': target[0], 'target_attribute': ''.join(target[1:]), 'facts': [f'{key}：{value}', f'{other}：{other_value}'], 'relation': 'entity_reference', 'direction': direction}
     # Explicit shared entity + different attributes only; no guessed semantic relation.
     for key, value in left:
         parts = key.split()
@@ -185,21 +184,27 @@ def construction_checks(kind, answer, sources, candidate):
         # Remove redundant sources from the proof before inspecting relationships.
         # Otherwise an unrelated extra node can lend a relationship to a different answer.
         needed = sorted(sources, key=lambda c: c['chunk_id'])
-        chain = None
+        chain, scope_checks = None, []
         question = normalize(candidate.get('question') or '')
         for i, left in enumerate(needed):
             for right in needed[i + 1:]:
                 relation = bridge_material(left, right)
                 if relation and relation['relation'] == 'entity_reference':
                     origin, target = (left, right) if relation['direction'] == 'forward' else (right, left)
-                    if normalize(relation['entity']) in question and normalize(relation['bridge_entity']) not in question and normalize(relation['target_attribute']) in question and answer_supported(answer, [target]) and not answer_supported(answer, [origin]):
+                    # Accept only an explicit full relation span; a generic battery
+                    # link cannot prove a question about an unrecorded backup battery.
+                    scope_pattern = '的?'.join(re.escape(normalize(relation[field])) for field in ('entity', 'origin_attribute', 'target_attribute'))
+                    scope_matches = bool(re.search(scope_pattern, question))
+                    scope_checks.append({key: relation[key] for key in ('entity', 'origin_attribute', 'target_attribute')} | {'matched': scope_matches})
+                    if scope_matches and normalize(relation['bridge_entity']) not in question and answer_supported(answer, [target]) and not answer_supported(answer, [origin]):
                         chain = [origin, target]
                         break
             if chain:
                 break
+        checks['scope_checks'] = scope_checks
         checks['necessity_basis'] = 'question_entity_reference_and_answer' if chain else 'joint_answer_facts'
         if chain:
-            checks['question_scope'] = {'entity': relation['entity'], 'bridge_entity': relation['bridge_entity'], 'target_attribute': relation['target_attribute']}
+            checks['question_scope'] = {'entity': relation['entity'], 'origin_attribute': relation['origin_attribute'], 'bridge_entity': relation['bridge_entity'], 'target_attribute': relation['target_attribute']}
             needed = chain
         for node in [] if chain else list(needed):
             remaining = [other for other in needed if other['chunk_id'] != node['chunk_id']]
@@ -225,7 +230,9 @@ def construction_checks(kind, answer, sources, candidate):
         checks['relations'] = relations
         checks['necessary'] = len(needed) >= 2 and answer_supported(answer, needed)
         checks['connected'] = bool(adjacency) and connected == set(adjacency)
-        if not checks['necessary']:
+        if scope_checks and not chain:
+            checks.update(status='needs_review', reason='Bridge 问题的完整实体/来源关系属性/目标属性未被证据证明，需复核')
+        elif not checks['necessary']:
             checks.update(status='failed', reason='Bridge 需联合证据；单 Chunk 可答或联合证据仍不足')
         elif not checks['connected']:
             checks.update(status='needs_review', reason='Bridge 必要答案节点之间缺少可验证关联路径，需复核')
@@ -249,13 +256,22 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
     if 'user_query' in c and c['user_query'] != question:
         errors.append('question/user_query mismatch')
     peers = sorted(set(context.get('seen', [])))
-    if normalize(question) in {normalize(s) for s in peers}:
+    duplicate_checks = {'normalized_exact_duplicate': normalize(question) in {normalize(s) for s in peers}, 'semantic_similarity': {'status': 'not_run', 'compared_count': 0, 'max_score': None, 'decision': 'observation_only', 'calibrated_duplicate_threshold': None}}
+    if duplicate_checks['normalized_exact_duplicate']:
         errors.append('duplicate question')
     elif peers and context.get('similarity'):
+        observation = duplicate_checks['semantic_similarity']
         try:
-            if any(context['similarity'](question, peer) >= DUPLICATE_SIMILARITY_THRESHOLD for peer in peers):
-                errors.append('near duplicate question')
+            for peer in peers:
+                score = float(context['similarity'](question, peer))
+                if not math.isfinite(score):
+                    raise ValueError('invalid similarity score')
+                observation['compared_count'] += 1
+                observation['max_score'] = score if observation['max_score'] is None else max(score, observation['max_score'])
+            observation['status'] = 'observed'
+            warnings.append('语义相似度仅为复核线索，不证明实体、事实或否定范围等价，不据此阻断')
         except (OSError, ValueError, RuntimeError) as error:
+            observation['status'] = 'unavailable'
             warnings.append('近重复语义校验未完成，需复核：' + str(error))
     elif peers:
         warnings.append('近重复语义校验未执行；已执行规范化精确去重')
@@ -377,7 +393,7 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
                 return False
             if requirements.get('aggregation_items') and not all(normalize(item.split('：')[-1]) in normalize(answer) for item in requirements['aggregation_items']):
                 return False
-            if requirements.get('bridge') and (not set(slot['related_clusters']).issubset(topics) or not any(relation['entity'] == requirements['bridge']['entity'] for relation in construction.get('relations', []))):
+            if requirements.get('bridge') and (not set(slot['related_clusters']).issubset(topics) or not any(all(relation.get(field) == requirements['bridge'][field] for field in ('entity', 'origin_attribute', 'bridge_entity', 'target_attribute', 'relation') if requirements['bridge'].get(field)) for relation in construction.get('relations', []))):
                 return False
             return True
         eligible = [s['slot_id'] for s in coverage_plan['slots'] if compatible(s)]
@@ -389,7 +405,7 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
         if requested in context.get('occupied_slots', []):
             errors.append('Coverage Slot 已占用')
     normalized = {**c, 'question': question, 'test_category': group, 'evaluation_group': group, 'construction_type': kind, 'evidence': resolved_evidence, 'source_chunk_ids': source_ids, 'evidence_locations': locations, 'coverage_match': coverage}
-    return {'valid': not errors, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION}
+    return {'valid': not errors, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'duplicate_checks': duplicate_checks, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION}
 
 
 def match_pool(plan, validations):

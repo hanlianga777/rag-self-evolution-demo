@@ -225,6 +225,43 @@ class GoldenV2Tests(unittest.TestCase):
         planned = build_plan(chain, [[1., 0.], [1., 0.]], self.profile)
         self.assertEqual(planned['slots'][0]['requirements']['bridge']['relation'], 'entity_reference')
 
+    def test_review2_chain_requires_full_origin_relation_scope(self):
+        chunks = [{'chunk_id': 'origin', 'document_id': 'D', 'chunk_text': 'ModelA 主电池：PACK-X'}, {'chunk_id': 'target', 'document_id': 'D', 'chunk_text': 'PACK-X 电压：48V'}]
+        candidate = {'question': 'ModelA的主电池电压是多少？', 'reference_answer': '48V', 'test_category': 'positive', 'construction_type': 'Bridge', 'evidence': [{'source_chunk_ids': ['origin', 'target']}]}
+        matched = validate_golden_candidate(candidate, chunks)
+        self.assertTrue(matched['valid'], matched['blocking_errors'])
+        self.assertEqual(matched['construction_checks']['question_scope']['origin_attribute'], '主电池')
+        for question in ('ModelA的备用电池电压是多少？', 'ModelA的电池电压是多少？', 'ModelA的主电池充电电压是多少？'):
+            mismatch = validate_golden_candidate({**candidate, 'question': question}, chunks)
+            self.assertFalse(mismatch['valid'])
+            self.assertEqual(mismatch['construction_checks']['status'], 'needs_review')
+        generic = [dict(chunks[0], chunk_text='ModelA 电池：PACK-X'), chunks[1]]
+        self.assertFalse(validate_golden_candidate({**candidate, 'question': 'ModelA的备用电池电压是多少？'}, generic)['valid'])
+
+    def test_review2_similarity_never_overrides_entity_fact_negation_or_group_scope(self):
+        chunks = [{'chunk_id': 'A', 'document_id': 'D', 'product': '设备A', 'chunk_text': '设备A 额定电压：24V'}, {'chunk_id': 'B', 'document_id': 'D', 'product': '设备B', 'chunk_text': '设备B 额定电压：48V'}]
+        cases = [
+            ('设备B的额定电压是多少？', '48V', 'B', 'positive', None, .9717229604721069),
+            ('设备A额定电压到底是多少呀？', '24V', 'A', 'positive', None, .99),
+            ('设备A额定电压到底是多少呀？', '24V', 'A', 'ablation', 'colloquial', .99),
+            ('设备A的额定电压不是24V吗？', '24V', 'A', 'positive', None, .9868583679199219),
+        ]
+        for question, answer, key, group, attribute, score in cases:
+            candidate = {'question': question, 'reference_answer': answer, 'test_category': group, 'ablation_attribute': attribute, 'evidence': [{'source_chunk_ids': [key]}]}
+            context = {'seen': ['设备A的额定电压是多少？'], 'similarity': lambda a, b: score}
+            result = validate_golden_candidate(candidate, chunks, validation_context=context)
+            self.assertTrue(result['valid'], result['blocking_errors'])
+            observation = result['duplicate_checks']['semantic_similarity']
+            self.assertEqual(observation['max_score'], score)
+            self.assertIsNone(observation['calibrated_duplicate_threshold'])
+            self.assertEqual(observation['decision'], 'observation_only')
+            self.assertTrue(result['warnings'])
+        exact = {'question': '设备A 的额定电压是多少!', 'reference_answer': '24V', 'test_category': 'positive', 'evidence': [{'source_chunk_ids': ['A']}]}
+        result = validate_golden_candidate(exact, chunks, validation_context={'seen': ['设备A的额定电压是多少？'], 'similarity': lambda a, b: .01})
+        self.assertFalse(result['valid'])
+        self.assertIn('duplicate question', result['blocking_errors'])
+        self.assertEqual(result['duplicate_checks']['semantic_similarity']['compared_count'], 0)
+
     def test_review_declared_import_scope_preview_confirm_and_normalized_metadata(self):
         chunks = [{'chunk_id': 'C1', 'document_id': 'D', 'document_name': 'manual.pdf', 'product': 'ModelA', 'version': 'v1', 'chunk_text': 'ModelA 电压：24V'}]
         def csv_data(product, version):
@@ -271,9 +308,10 @@ class GoldenV2Tests(unittest.TestCase):
         calls = []
         def similar(a, b):
             calls.append((a, b)); return .99
-        with self.assertRaisesRegex(ValueError, 'near duplicate'):
-            self.store.update_question(second, '如何维护设备A呢？', candidates[1]['reference_answer'], candidates[1]['evidence'], 'fixture', chunks=chunks, similarity=similar)
-        self.assertEqual(len(calls), 1)
+        observed = self.store.update_question(second, '如何维护设备A呢？', candidates[1]['reference_answer'], candidates[1]['evidence'], 'fixture', chunks=chunks, similarity=similar)
+        self.assertTrue(observed['raw']['validation']['valid'])
+        self.assertEqual(observed['raw']['validation']['duplicate_checks']['semantic_similarity']['max_score'], .99)
+        self.assertEqual(observed['raw']['validation']['duplicate_checks']['semantic_similarity']['compared_count'], len(calls))
         updated = self.store.update_question(second, '断电后保养有哪些注意事项？', candidates[1]['reference_answer'], candidates[1]['evidence'], 'fixture', chunks=chunks, similarity=lambda a, b: .1)
         self.assertEqual((updated['probe_status'], updated['qc_status'], updated['review_status']), ('probe_pending', 'qc_pending', 'human_review_pending'))
         self.assertTrue(updated['raw']['validation']['valid'])

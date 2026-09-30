@@ -916,6 +916,7 @@ class GovernanceStore:
                 audit = draft['raw']['validation']
                 audit['blocking_errors'] = list(dict.fromkeys([*audit['blocking_errors'], *duplicates]))
                 audit['warnings'] = list(dict.fromkeys([*audit['warnings'], *validation['warnings']]))
+                audit['duplicate_checks'] = validation['duplicate_checks']
                 audit['valid'] = not audit['blocking_errors']
         changed_fields = {item_id: [field for field in ("question", "reference_answer", "evidence") if draft[field] != run["before"][item_id][field]] for item_id, draft in drafts.items()}
         new_hash = {item_id: self._revision_hash(draft) for item_id, draft in drafts.items()}
