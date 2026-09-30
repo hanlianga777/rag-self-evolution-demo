@@ -7,7 +7,8 @@ from itertools import islice
 from zipfile import BadZipFile
 from openpyxl.utils.exceptions import InvalidFileException
 from xml.etree.ElementTree import ParseError
-from .governance import _answer_anchor_supported, _normalized
+from .governance import _normalized
+from .golden_v2 import normalize
 
 COLUMNS = ['Question', 'Reference Answer', 'Evidence', 'Document', 'Question Type', 'Product', 'Version', 'Notes', 'Evaluation Group', 'Expected Behavior', 'Negative Subtype', 'Ablation Attribute', 'Original Entity', 'Alias Expression']
 GROUPS = {'positive', 'ablation', 'negative'}
@@ -15,18 +16,9 @@ BEHAVIORS = {'clarify', 'insufficient_evidence', 'safe_rejection', 'prompt_injec
 SUBTYPES = {'clarify', 'insufficient_evidence', 'safe_rejection', 'safety_critical', 'prompt_injection'}
 
 def construction_errors(kind, answer, sources):
-    if not kind:
-        return []
-    texts = [item.get('chunk_text', item.get('text', '')) for item in sources]
-    facts = [part.strip() for text in texts for part in text.splitlines() if re.search(r'[^：:]+[：:]\s*\S+', part)]
-    if kind == 'Fact':
-        return [] if any(_answer_anchor_supported(answer, [fact]) for fact in facts) else ['Fact 需要可定位的实体属性值']
-    if kind == 'Aggregation':
-        return [] if len(facts) >= 2 and all(_answer_anchor_supported(fact, [answer]) for fact in facts) else ['Aggregation 需要完整属性材料及穷举答案']
-    if kind == 'Bridge':
-        entities = [set(re.findall(r'[A-Za-z]+\d+|[\u4e00-\u9fffA-Za-z]+[A-Za-z0-9]+', text)) for text in texts]
-        return [] if len(texts) >= 2 and set.intersection(*entities) and all(_answer_anchor_supported(answer, [text]) is False for text in texts) and _answer_anchor_supported(answer, texts) else ['Bridge 需要共享实体与两段共同支撑的证据']
-    return ['Question Type 仅支持空值、Fact、Aggregation、Bridge']
+    from .golden_v2 import construction_checks
+    result = construction_checks(kind or 'Ordinary', answer, sources, {})
+    return [] if result['status'] == 'passed' else [result['reason']]
 
 def template(format):
     if format == 'csv':
@@ -44,7 +36,7 @@ def template(format):
         return output.getvalue(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     raise ValueError('仅支持 CSV / XLSX')
 
-def parse_import(data, filename, chunks, existing):
+def parse_import(data, filename, chunks, existing, coverage_plan=None, question_embedder=None):
     if len(data) > 10 * 1024 * 1024:
         raise ValueError('文件超过 10 MB')
     if filename.lower().endswith('.csv'):
@@ -93,13 +85,11 @@ def parse_import(data, filename, chunks, existing):
         sources = []
         if group in {'positive', 'ablation'}:
             for fragment in quote.splitlines():
-                matches = [chunk for chunk in chunks if fragment.strip() and fragment.strip() in chunk.get('chunk_text', chunk.get('text', '')) and (chunk.get('document_id') in documents or chunk.get('document_name') in documents)]
+                matches = [chunk for chunk in chunks if fragment.strip() and normalize(fragment) in normalize(chunk.get('chunk_text', chunk.get('text', ''))) and (not any(documents) or chunk.get('document_id') in documents or chunk.get('document_name') in documents)]
                 if not matches: errors.append('Evidence 无法定位到指定的当前文档原文')
                 sources.extend(matches)
             sources = list({item['chunk_id']: item for item in sources}.values())
             if not answer or len(answer) > 4000 or not sources: errors.append('正向/消融需要答案与可定位证据；文档名称不能替代证据')
-            elif not _answer_anchor_supported(answer, [item.get('chunk_text', item.get('text', '')) for item in sources]): errors.append('答案缺少原文支持')
-            errors.extend(construction_errors(fields.get('Question Type'), answer, sources))
         if group == 'negative':
             if fields.get('Expected Behavior') not in BEHAVIORS or fields.get('Negative Subtype') not in SUBTYPES: errors.append('Negative 需要有效 Expected Behavior / Negative Subtype')
             if answer or quote or fields.get('Question Type'): errors.append('Negative 不填写普通答案、证据或构造题型')
@@ -109,6 +99,16 @@ def parse_import(data, filename, chunks, existing):
             if attribute == 'cross_chunk' and len(sources) < 2: errors.append('跨段题需要至少两段证据')
             if attribute == 'alias_entity' and not all(fields.get(name) for name in ('Original Entity', 'Alias Expression')): errors.append('别名题需要原始实体与别名')
         candidate = {'question': question, 'reference_answer': answer or None, 'test_category': group, 'negative_subtype': fields.get('Negative Subtype') or None, 'expected_behavior': fields.get('Expected Behavior') or None, 'construction_type': fields.get('Question Type') or None, 'ablation_attribute': attribute or None, 'ablation_metadata': {'original_entity': fields.get('Original Entity'), 'alias_expression': fields.get('Alias Expression')}, 'evidence': [{'source_chunk_ids': [item['chunk_id'] for item in sources], 'evidence_key_points': quote.splitlines()}] if sources else [], 'import_fields': fields, 'import_row': index}
-        previews.append({'row': index, 'fields': fields, 'errors': errors})
+        from .golden_v2 import validate_golden_candidate
+        context = {}
+        if group == 'negative' and question_embedder:
+            try:
+                context['question_embedding'] = question_embedder(question)
+            except (ValueError, OSError, RuntimeError):
+                pass
+        validation = validate_golden_candidate(candidate, chunks, coverage_plan, context)
+        errors.extend(validation['blocking_errors'])
+        candidate = {**validation['normalized_candidate'], 'validation': {k: v for k, v in validation.items() if k != 'normalized_candidate'}}
+        previews.append({'row': index, 'fields': fields, 'errors': list(dict.fromkeys(errors)), 'validation': validation})
         if not errors: valid.append(candidate)
     return {'fields': headers, 'rows': previews, 'valid_rows': valid, 'valid_count': len(valid), 'error_count': sum(bool(row['errors']) for row in previews), 'file_hash': hashlib.sha256(data).hexdigest()}

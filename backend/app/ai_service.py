@@ -291,7 +291,7 @@ class AiService:
                 on_progress(index, len(ids), item_id, drafts)
         return drafts
 
-    def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None, profile=None) -> dict:
+    def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None, profile=None, coverage_plan=None) -> dict:
         """Generate a coverage-planned Golden set; approval remains human-only."""
         if not self.live_enabled:
             raise ProviderUnavailable("未配置 DEEPSEEK_API_KEY，无法生成 Golden Candidate")
@@ -327,10 +327,15 @@ class AiService:
                         raise ValueError("invalid JSON object")
                     candidate = self._slot_candidate(slot, generated, instruction)
                     seen = {"".join(str(item.get("question") or "").lower().split()) for item in candidates}
-                    errors = self._candidate_errors(candidate, chunks, seen)
-                    checks = self._candidate_checks(candidate, chunks, seen)
+                    from .golden_v2 import validate_golden_candidate
+                    context = {'seen': seen, 'slot_id': slot['slot'], 'occupied_slots': [item['coverage_slot'] for item in candidates]}
+                    if coverage_plan and slot['test_category'] == 'negative':
+                        context['question_embedding'] = self.negative_topic_embedding(candidate['question'])
+                    checks = validate_golden_candidate(candidate, chunks, coverage_plan, context)
+                    errors = checks['blocking_errors']
+                    candidate = {**checks['normalized_candidate'], 'validation': {k: v for k, v in checks.items() if k != 'normalized_candidate'}}
                     error = "; ".join(errors) if errors else None
-                except (json.JSONDecodeError, ProviderUnavailable, ValueError) as caught:
+                except (json.JSONDecodeError, ProviderUnavailable, ValueError, OSError, RuntimeError) as caught:
                     error = "invalid JSON" if isinstance(caught, json.JSONDecodeError) else str(caught)
                     error_type = type(caught).__name__
                 attempts.append({"slot": slot["slot"], "attempt": attempt, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "source_chunk_ids": [source["chunk_id"] for source in slot["sources"]] if slot["test_category"] != "negative" else [], "selected_evidence": [{"chunk_id": source["chunk_id"], "document_id": source.get("document_id"), "document_name": source.get("document_name"), "chunk_text": source.get("chunk_text", source.get("text", ""))} for source in slot["sources"]], "test_category": slot["test_category"], "negative_subtype": slot.get("negative_subtype"), "ablation_attribute": slot.get("ablation_attribute"), "expected_behavior": slot.get("expected_behavior"), "structured_type": slot.get("structured_type"), "source_positive_slot": slot.get("source_positive_slot"), "validation_error": error, "hard_validation_checks": checks, "error_type": error_type, "response_preview": response[:500] if error and response and not generated else None, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction, "source": "ai_generated", "construction_type": candidate.get("construction_type") if candidate else None, "generation_method": generated.get("generation_method", "provider")})
@@ -372,7 +377,7 @@ class AiService:
         text = slot['sources'][0].get('chunk_text', slot['sources'][0].get('text', ''))
         facts = re.findall(r'(?m)^\s*([^：:\n]{2,30})[：:]\s*([^。；\n]{2,100})', text)
         all_facts = facts
-        facts = [(key.strip(), value.strip()) for key, value in facts if re.search(r'[A-Za-z]+\d+|设备|机器人', key)]
+        facts = [(key.strip(), value.strip()) for key, value in facts]
         if not facts:
             return None
         if slot['structured_type'] == 'Fact':
@@ -388,13 +393,10 @@ class AiService:
     @staticmethod
     def _slot_candidate(slot: dict, generated: dict, instruction: str) -> dict:
         category, sources = slot["test_category"], slot["sources"]
-        evidence = [] if category == "negative" else [{"source_chunk_ids": [chunk["chunk_id"] for chunk in sources], "evidence_key_points": [chunk.get("chunk_text", chunk.get("text", ""))[:160] for chunk in sources]}]
-        from .business_import import construction_errors
-        kind = slot.get("structured_type")
-        if construction_errors(kind, generated.get("reference_answer") or "", sources):
-            kind = None  # Unsupported special structure returns to the ordinary slot.
+        evidence = [] if category == "negative" else [{"source_chunk_ids": [chunk["chunk_id"] for chunk in sources], "evidence_key_points": [chunk.get("chunk_text", chunk.get("text", "")) for chunk in sources]}]
+        kind = slot.get("construction_type") or slot.get("structured_type") or 'Ordinary'
         ablation = {key: generated.get(key) for key in ("original_entity", "alias_expression") if generated.get(key)}
-        return {"test_category": category, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "expected_behavior": slot.get("expected_behavior") if category == "negative" else None, "negative_subtype": slot.get("negative_subtype"), "evidence": evidence, "ablation_attribute": slot.get("ablation_attribute"), "ablation_metadata": ablation, "coverage_slot": slot["slot"], "source_positive_slot": slot.get("source_positive_slot"), "generation_instruction": instruction, "source": "ai_generated", "construction_type": kind, "generation_method": generated.get("generation_method", "provider")}
+        return {"test_category": category, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "expected_behavior": slot.get("expected_behavior") if category == "negative" else None, "negative_subtype": slot.get("negative_subtype"), "evidence": evidence, "ablation_attribute": slot.get("ablation_attribute"), "ablation_metadata": ablation, "coverage_slot": slot["slot"], "source_positive_slot": slot.get("source_positive_slot"), "generation_instruction": instruction, "source": "ai_generated", "construction_type": kind, "topic_cluster": slot.get("topic_cluster"), "related_clusters": slot.get("related_clusters", []), "coverage_anchor_chunk_ids": slot.get("coverage_anchor_chunk_ids", []), "generation_method": generated.get("generation_method", "provider")}
 
     def _indexed_embeddings(self, chunks: list[dict]) -> np.ndarray:
         """Use persisted FAISS vectors aligned with the persisted chunk order."""
@@ -410,80 +412,22 @@ class AiService:
 
     @staticmethod
     def _mini_coverage_plan(chunks: list[dict], embeddings, profile: dict | None = None) -> list[dict]:
+        from .golden_v2 import build_plan
         profile = profile or GENERATION_PROFILES["mini"]
-        if not chunks or any(not item.get("document_id") or not item.get("chunk_id") or not item.get("chunk_text", item.get("text")) for item in chunks):
-            raise ProviderUnavailable("Coverage requires document_id, chunk_id and chunk_text")
-        vectors = np.asarray(embeddings, dtype="float32")
-        if vectors.ndim != 2 or vectors.shape[0] != len(chunks) or not np.isfinite(vectors).all():
-            raise ProviderUnavailable("Coverage Embedding 与 Chunk 不一致")
-        norms = np.linalg.norm(vectors, axis=1)
-        if np.any(norms == 0):
-            raise ProviderUnavailable("Coverage Embedding 包含零向量")
-        vectors = vectors / norms[:, None]
-        centers = [0]
-        while len(centers) < min(4, len(chunks)):
-            similarities = np.max(vectors @ vectors[centers].T, axis=1)
-            next_index = int(np.argmin(similarities))
-            if similarities[next_index] > .95:
-                break
-            centers.append(next_index)
-        labels = np.argmax(vectors @ vectors[centers].T, axis=1)
-        clusters = {index: [] for index in range(len(centers))}
-        for index, label in enumerate(labels):
-            clusters[int(label)].append(index)
-        def business_value(index: int) -> int:
-            chunk = chunks[index]
-            body = f"{chunk.get('section_path') or ''} {chunk.get('chunk_text', chunk.get('text', ''))}"
-            useful = ("操作", "使用", "维护", "故障", "安全", "参数", "充电", "检查", "处理", "步骤")
-            metadata = ("封面", "目录", "声明编号", "一致性声明", "版权", "前言")
-            return sum(word in body for word in useful) - 3 * sum(word in body for word in metadata)
+        try:
+            plan = build_plan(chunks, embeddings, profile)
+        except ValueError as error:
+            raise ProviderUnavailable(str(error)) from error
+        known = {c['chunk_id']: c for c in chunks}
+        return [{**slot, 'sources': [known[key] for key in slot['material_chunk_ids']]} for slot in plan['slots']]
 
-        clusters = {key: sorted(indices, key=lambda index: (business_value(index), float(vectors[index] @ vectors[centers[key]])), reverse=True) for key, indices in clusters.items() if indices}
-        used: set[int] = set()
-        plan, slot = [], 1
-
-        def select(index: int) -> tuple[int, int]:
-            keys = list(clusters)
-            cluster = keys[index % len(keys)]
-            pool = clusters[cluster]
-            unused = [item for item in pool if item not in used]
-            if not unused:
-                unused = [item for item in range(len(chunks)) if item not in used]
-            chosen = unused[0] if unused else pool[(index // len(keys)) % len(pool)]
-            used.add(chosen)
-            return chosen, int(labels[chosen])
-
-        for category in ("positive", "ablation"):
-            count = profile_count(profile, category)
-            for index in range(count):
-                chunk_index, cluster = select(index)
-                anchor = chunks[chunk_index]
-                attribute = ("weak_keywords", "colloquial")[index % 2] if category == "ablation" else None
-                text = anchor.get("chunk_text", anchor.get("text", ""))
-                facts = re.findall(r"(?m)^\s*([^：:\n]{2,30})[：:]\s*([^。；\n]{2,100})", text)
-                structured_type = "Aggregation" if len(facts) >= 2 else "Fact" if facts else None
-                sources = [anchor]
-                if category == "positive" and structured_type != "Aggregation":
-                    relation = re.search(r"(?m)^\s*([^：:\s]{2,20})\s+([^：:\s]{2,20})[：:]", text)
-                    if relation:
-                        for sibling in chunks:
-                            if sibling["chunk_id"] == anchor["chunk_id"]:
-                                continue
-                            other = re.search(r"(?m)^\s*([^：:\s]{2,20})\s+([^：:\s]{2,20})[：:]", sibling.get("chunk_text", sibling.get("text", "")))
-                            if other and other.group(1) == relation.group(1) and other.group(2) != relation.group(2):
-                                sources.append(sibling)
-                                structured_type = "Bridge"
-                                break
-                plan.append({"slot": f"Q{slot:02d}", "test_category": category, "document_id": anchor["document_id"], "product": anchor.get("product"), "section": anchor.get("section"), "section_path": anchor.get("section_path"), "evidence_chunk_ids": [item["chunk_id"] for item in sources], "ablation_attribute": attribute, "source_positive_slot": None, "topic_cluster": cluster, "structured_type": structured_type, "selected_reason": "embedding_topic_coverage", "sources": sources})
-                slot += 1
-        negative_specs = [("safe_rejection", "safe_rejection"), ("insufficient_evidence", "insufficient_evidence"), ("clarify", "clarify"), ("safety_critical", "safe_rejection"), ("prompt_injection", "prompt_injection_resistance"), ("safe_rejection", "safe_rejection"), ("insufficient_evidence", "insufficient_evidence"), ("prompt_injection", "prompt_injection_resistance")]
-        for index in range(profile_count(profile, "negative")):
-            subtype, expected_behavior = negative_specs[index % len(negative_specs)]
-            chunk_index, cluster = select(index)
-            anchor = chunks[chunk_index]
-            plan.append({"slot": f"Q{slot:02d}", "test_category": "negative", "document_id": anchor["document_id"], "product": anchor.get("product"), "section": anchor.get("section"), "section_path": anchor.get("section_path"), "evidence_chunk_ids": [], "negative_subtype": subtype, "expected_behavior": expected_behavior, "topic_cluster": cluster, "selected_reason": "embedding_topic_context", "sources": [anchor]})
-            slot += 1
-        return plan
+    def negative_topic_embedding(self, question):
+        """Only the existing local embedding model; never download during planning."""
+        from sentence_transformers import SentenceTransformer
+        from .corpus import EMBEDDING_MODEL
+        if self.retriever._model is None:
+            self.retriever._model = SentenceTransformer(EMBEDDING_MODEL, local_files_only=True)
+        return self.retriever._model.encode([question], normalize_embeddings=True)[0]
 
     @staticmethod
     def _hard_validate(candidates: list[dict], chunks: list[dict]) -> dict:
@@ -499,47 +443,13 @@ class AiService:
 
     @staticmethod
     def _candidate_errors(candidate: dict, chunks: list[dict], seen: set[str]) -> list[str]:
-        known_chunks, category = {chunk.get("chunk_id") for chunk in chunks}, candidate.get("test_category")
-        question, key = str(candidate.get("question") or "").strip(), "".join(str(candidate.get("question") or "").lower().split())
-        if category not in {"positive", "ablation", "negative"} or not question:
-            return ["invalid question/category"]
-        errors = ["duplicate question"] if key in seen else []
-        if category == "negative":
-            return errors + (["invalid negative behavior/evidence"] if candidate.get("expected_behavior") not in NEGATIVE_EXPECTED_BEHAVIORS or candidate.get("evidence") else [])
-        source_ids = [source_id for source in candidate.get("evidence") or [] for source_id in source.get("source_chunk_ids", [])]
-        if not str(candidate.get("reference_answer") or "").strip() or not source_ids or not set(source_ids).issubset(known_chunks):
-            errors.append("missing answer or valid evidence")
-        elif not _answer_anchor_supported(candidate['reference_answer'], [chunk.get('chunk_text', chunk.get('text', '')) for chunk in chunks if chunk.get('chunk_id') in source_ids]):
-            errors.append('unsupported answer anchor')
-        if category == "ablation" and not candidate.get("ablation_attribute"):
-            errors.append("missing ablation attribute")
-        if candidate.get("ablation_attribute") == "cross_chunk" and len(source_ids) < 2:
-            errors.append("cross-chunk evidence required")
-        if candidate.get("ablation_attribute") == "alias_entity" and not all(str((candidate.get("ablation_metadata") or {}).get(key) or "").strip() for key in ("original_entity", "alias_expression")):
-            errors.append("missing alias metadata")
-        return errors
+        from .golden_v2 import validate_golden_candidate
+        return validate_golden_candidate(candidate, chunks, validation_context={'seen': seen})['blocking_errors']
 
     @staticmethod
     def _candidate_checks(candidate: dict, chunks: list[dict], seen: set[str]) -> dict:
-        """Record only checks that current deterministic validation actually performs."""
-        category = candidate.get("test_category")
-        positive = category != "negative"
-        question = str(candidate.get("question") or "").strip()
-        source_ids = [key for source in candidate.get("evidence") or [] for key in source.get("source_chunk_ids", [])]
-        known = {chunk.get("chunk_id"): chunk.get("chunk_text", chunk.get("text", "")) for chunk in chunks}
-        key = "".join(question.lower().split())
-        return {
-            "question_format": bool(question) and category in {"positive", "ablation", "negative"},
-            "required_fields": bool(candidate.get("reference_answer")) if positive else candidate.get("expected_behavior") in NEGATIVE_EXPECTED_BEHAVIORS,
-            "evidence_existence": bool(source_ids) and set(source_ids).issubset(known) if positive else None,
-            "evidence_location": None,
-            "answer_anchor": _answer_anchor_supported(candidate.get("reference_answer") or "", [known[key] for key in source_ids if key in known]) if positive else None,
-            "duplicate": key not in seen,
-            "forbidden_structure": None,
-            "cross_chunk_requirement": len(source_ids) >= 2 if candidate.get("ablation_attribute") == "cross_chunk" else None,
-            "negative_structural_check": candidate.get("expected_behavior") in NEGATIVE_EXPECTED_BEHAVIORS and not candidate.get("evidence") if not positive else None,
-            "quota_slot_consistency": None,
-        }
+        from .golden_v2 import validate_golden_candidate
+        return validate_golden_candidate(candidate, chunks, validation_context={'seen': seen})
 
     def baseline_preview(self, question: str) -> dict:
         production = self.store.active_production() or {"id": "baseline-v1", "config": {"top_k": 4, "min_score": None}}

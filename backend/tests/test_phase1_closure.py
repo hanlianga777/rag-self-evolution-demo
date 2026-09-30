@@ -25,13 +25,13 @@ class Phase1Tests(unittest.TestCase):
             self.assertEqual(store.questions(), initial)
             ids = store.save_business_candidates(preview["valid_rows"], "cases.csv", preview["file_hash"])
             before = store.questions()
-            run = store.create_pool_run("mini", ids, chunks)
+            run = store.create_pool_run("mini", ids, chunks, embeddings=[[1., 0.]], question_embedder=lambda _: [1., 0.])
             self.assertEqual(len(run["question_ids"]), 20)
             self.assertTrue(set(ids).isdisjoint(run["question_ids"]))
             self.assertEqual([store.question(item["id"]) for item in before], before)
             self.assertTrue(all(store.question(key)["stage"] == "candidate" for key in run["question_ids"]))
             self.assertEqual(store.dataset_summary()["approved"], 0)
-            with self.assertRaises(ValueError): store.create_pool_run("mini", ids[:19], chunks)
+            with self.assertRaises(ValueError): store.create_pool_run("mini", ids[:19], chunks, embeddings=[[1., 0.]], question_embedder=lambda _: [1., 0.])
 
     def test_existing_column_order_import_and_clone_keep_fields_and_gate(self):
         chunks = [{"chunk_id": "c1", "document_id": "d1", "chunk_text": "设备A 电压：24V"}]
@@ -50,11 +50,11 @@ class Phase1Tests(unittest.TestCase):
             for group, count in [('positive', 8), ('ablation', 4), ('negative', 8)]:
                 for index in range(count):
                     negative = group == 'negative'
-                    candidates.append({'question': f'Fixture {group} {index}', 'reference_answer': None if negative else '24V', 'test_category': group, 'negative_subtype': 'insufficient_evidence' if negative else None, 'expected_behavior': 'insufficient_evidence' if negative else None, 'ablation_attribute': 'colloquial' if group == 'ablation' else None, 'evidence': [] if negative else [{'source_chunk_ids': ['c1']}], 'import_row': index + 2})
+                    candidates.append({'question': f'Fixture {group} {index}', 'construction_type': None if negative else 'Fact', 'reference_answer': None if negative else '24V', 'test_category': group, 'negative_subtype': 'insufficient_evidence' if negative else None, 'expected_behavior': 'insufficient_evidence' if negative else None, 'ablation_attribute': 'colloquial' if group == 'ablation' else None, 'evidence': [] if negative else [{'source_chunk_ids': ['c1']}], 'import_row': index + 2})
             ids = store.save_business_candidates(candidates, 'fixture.csv', 'fixture_hash')
             self.assertEqual(store.question(ids[0])['question'], 'Fixture positive 0')
             self.assertEqual(store.question(ids[0])['reference_answer'], '24V')
-            run = store.create_pool_run('mini', ids, chunks)
+            run = store.create_pool_run('mini', ids, chunks, embeddings=[[1., 0.]], question_embedder=lambda _: [1., 0.])
             self.assertEqual(store.question(run['question_ids'][0])['qc_status'], 'qc_pending')
             self.assertFalse(store.approval_eligibility(run['question_ids'][0])['can_approve'])
             with self.assertRaises(ValueError):

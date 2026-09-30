@@ -24,7 +24,7 @@ from .governance import GovernanceStore
 from .optimization import OptimizationAgent
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
 from .telemetry import price_config
-from .providers import DeepSeekProvider, ProviderTimeout
+from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
 
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
@@ -140,6 +140,7 @@ class AliasRequest(BaseModel):
 
 
 class GenerationRequest(BaseModel):
+    plan_id: str | None = None
     profile: Literal["mini", "medium", "full"] = "mini"
 
 
@@ -277,8 +278,32 @@ def governance_questions(stage: str | None = None):
 
 
 class PoolRunRequest(BaseModel):
+    plan_id: str | None = None
     profile: Literal['mini', 'medium', 'full']
     question_ids: list[str] = Field(min_length=1, max_length=98)
+
+
+@app.post('/api/governance/coverage-preview', dependencies=[Depends(require_trusted_origin)])
+def coverage_preview(payload: GenerationRequest):
+    try:
+        chunks = corpus.chunks()
+        return store.coverage_preview(payload.profile, chunks, ai_service._indexed_embeddings(chunks))
+    except (ValueError, ProviderUnavailable) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+def current_coverage_plan(profile, plan_id):
+    chunks = corpus.chunks()
+    return store.resolve_coverage_plan(profile, chunks, plan_id, ai_service._indexed_embeddings(chunks))
+
+
+@app.post('/api/governance/generation-runs/from-pool/preview', dependencies=[Depends(require_trusted_origin)])
+def preview_pool_run(payload: PoolRunRequest):
+    try:
+        plan = current_coverage_plan(payload.profile, payload.plan_id)
+        return store.preview_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'], question_embedder=ai_service.negative_topic_embedding)
+    except (ValueError, KeyError, ProviderUnavailable) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.get('/api/governance/import-template')
@@ -296,22 +321,24 @@ async def import_candidates(request: Request, filename: str, confirm: bool = Fal
             if len(data) > 10 * 1024 * 1024:
                 raise ValueError("文件超过 10 MB")
         content = bytes(data)
-        result = business_import.parse_import(content, Path(filename).name, corpus.chunks(), store.questions())
+        plan = current_coverage_plan('mini', None)
+        result = business_import.parse_import(content, Path(filename).name, corpus.chunks(), store.questions(), plan, ai_service.negative_topic_embedding)
         if confirm:
             if result['error_count'] or not result['valid_rows']:
                 raise ValueError('请先修正全部错误，再确认导入')
             result['question_ids'] = store.save_business_candidates(result['valid_rows'], Path(filename).name, result['file_hash'])
         return result
-    except (ValueError, UnicodeError, OSError) as error:
+    except (ValueError, UnicodeError, OSError, ProviderUnavailable) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.post('/api/governance/generation-runs/from-pool', dependencies=[Depends(require_trusted_origin)], status_code=201)
 def create_pool_run(payload: PoolRunRequest):
     try:
-        return store.create_pool_run(payload.profile, payload.question_ids, corpus.chunks())
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
+        plan = current_coverage_plan(payload.profile, payload.plan_id)
+        return store.create_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'], question_embedder=ai_service.negative_topic_embedding)
+    except (ValueError, KeyError, ProviderUnavailable) as error:
+        raise HTTPException(status_code=422, detail=json.loads(str(error)) if str(error).startswith('{') else str(error)) from error
 
 
 @app.get("/api/governance/generation-runs")
@@ -402,8 +429,9 @@ def generate_mini_golden():
 @app.post("/api/governance/generate", status_code=202, dependencies=[Depends(require_trusted_origin)])
 def generate_golden(payload: GenerationRequest):
     try:
-        run_id = store.start_generation_run(ai_service.model, payload.profile)
-    except ValueError as error:
+        plan = current_coverage_plan(payload.profile, payload.plan_id)
+        run_id = store.start_generation_run(ai_service.model, payload.profile, coverage_plan=plan)
+    except (ValueError, ProviderUnavailable) as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     threading.Thread(target=_run_mini_generation, args=(run_id, store, ai_service, corpus), daemon=True).start()
     return {"run_id": run_id, "status": "queued", "profile": payload.profile}
@@ -435,6 +463,11 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
 
     try:
         chunks = run_corpus.chunks()
+        frozen = run_store.generation_run(run_id)['artifacts']['hard_validation'].get('frozen_plan')
+        if frozen:
+            from .golden_v2 import digest
+            if frozen['corpus_fingerprint'] != current_manifest()['sources'] or frozen['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
+                raise ValueError('Coverage Plan 已失效：Corpus 已变化')
         complete = False
         for round_number in range(1, 4 if regenerate else 2):
             if regenerate:
@@ -449,7 +482,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
                     source_ids = slot.get("material_chunk_ids") or slot.get("evidence_chunk_ids") or []
                     if not source_ids or any(chunk_id not in by_id for chunk_id in source_ids):
                         raise ValueError(f"{slot['slot']} 原始 Coverage 材料不可用")
-                    if slot["slot"] in prior_audit and len(prior_audit[slot["slot"]]) > 2 and prior_audit[slot["slot"]][-1]["validation_error"]:
+                    if not run['artifacts']['hard_validation'].get('frozen_plan') and slot["slot"] in prior_audit and len(prior_audit[slot["slot"]]) > 2 and prior_audit[slot["slot"]][-1]["validation_error"]:
                         original = by_id[source_ids[0]]
                         alternatives = [chunk for chunk in chunks if chunk["chunk_id"] not in source_ids and (chunk.get("document_id") == original.get("document_id") or original.get("product") and chunk.get("product") == original.get("product"))]
                         alternative = next(iter(sorted(alternatives, key=lambda chunk: chunk.get("document_id") != original.get("document_id"))), None)
@@ -457,9 +490,20 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
                             source_ids = [alternative["chunk_id"]]
                             slot = {**slot, "material_chunk_ids": source_ids, "evidence_chunk_ids": source_ids if slot["test_category"] != "negative" else [], "selected_reason": "same_product_retry", "structured_type": None}
                     plan.append({**slot, "sources": [by_id[chunk_id] for chunk_id in source_ids]})
-                generated = service.generate_mini_golden(chunks, on_progress=on_progress, plan=plan, existing=existing, prior_audit=prior_audit)
+                generated = service.generate_mini_golden(chunks, on_progress=on_progress, plan=plan, existing=existing, prior_audit=prior_audit, profile=profile, coverage_plan=run['artifacts']['hard_validation'].get('frozen_plan'))
             else:
-                generated = service.generate_mini_golden(chunks, on_progress=on_progress, **({"profile": profile} if profile.get("name", "mini") != "mini" else {}))
+                frozen = run_store.generation_run(run_id)['artifacts']['hard_validation'].get('frozen_plan')
+                kwargs = {'profile': profile}
+                if frozen:
+                    from .golden_v2 import digest
+                    if frozen['corpus_fingerprint'] != current_manifest()['sources'] or frozen['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
+                        raise ValueError('Coverage Plan 已失效：Corpus 已变化')
+                    known = {c['chunk_id']: c for c in chunks}
+                    kwargs['coverage_plan'] = frozen
+                    kwargs['plan'] = [{**slot, 'sources': [known[key] for key in slot['material_chunk_ids']]} for slot in frozen['slots']]
+                elif profile.get('name', 'mini') == 'mini':
+                    kwargs = {}
+                generated = service.generate_mini_golden(chunks, on_progress=on_progress, **kwargs)
             failed_slots = generated.get("failed_slots", [])
             continue_refill = regenerate and round_number < 3 and 0 < len(failed_slots) < remaining_before
             complete = run_store.complete_generation_slots(run_id, failed_slots=failed_slots, hard_validation=generated["hard_validation"], continue_refill=continue_refill)
@@ -799,7 +843,7 @@ def create_generation_snapshot(generation_run_id: str):
 @app.put("/api/governance/questions/{question_id}", dependencies=[Depends(require_trusted_origin)])
 def update_question(question_id: str, payload: QuestionUpdateRequest):
     try:
-        return store.update_question(question_id, payload.question.strip(), payload.reference_answer, payload.evidence, payload.actor)
+        return store.update_question(question_id, payload.question.strip(), payload.reference_answer, payload.evidence, payload.actor, chunks=corpus.chunks())
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:

@@ -50,7 +50,11 @@ class GovernanceApiTests(unittest.TestCase):
         class SlowService:
             model = "test-model"
 
-            def generate_mini_golden(self, chunks, on_progress=None):
+            def _indexed_embeddings(self, chunks):
+                import numpy as np
+                return np.ones((len(chunks), 2), dtype="float32")
+
+            def generate_mini_golden(self, chunks, on_progress=None, **kwargs):
                 on_progress({"stage": "coverage", "coverage_plan": [{"slot": "Q01"}]})
                 on_progress({"stage": "generating", "slot": "Q01", "attempt": 1, "completed_slots": 0, "slot_audit": {"Q01": [{"attempt": 1, "validation_error": "invalid question/category"}]}, "candidate": None})
                 entered.set()

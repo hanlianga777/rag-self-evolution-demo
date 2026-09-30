@@ -104,7 +104,7 @@ class AiServiceTests(unittest.TestCase):
         self.assertEqual(generated["status"], "candidate_generated")
         self.assertEqual(len(generated["candidates"]), 20)
         self.assertEqual(len(generated["slot_audit"]["Q01"]), 2)
-        self.assertEqual(generated["slot_audit"]["Q01"][0]["validation_error"], "invalid question/category")
+        self.assertIn("invalid question/category", generated["slot_audit"]["Q01"][0]["validation_error"])
 
     def test_mini_generation_records_failed_run_after_one_repair(self):
         chunks = self._chunks()
