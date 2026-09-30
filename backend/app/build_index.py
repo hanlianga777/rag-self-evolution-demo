@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from .full_text import checksum, write_full_text, validate_bundle
 import json
 import sys
 from datetime import datetime, timezone
@@ -94,7 +95,7 @@ def _ocr_page(ocr, page) -> str:
     return "\n".join(str(item).strip() for item in texts if str(item).strip())
 
 
-def _parse_document(catalog: dict, ocr, token_counter) -> tuple[dict, list[dict]]:
+def _parse_document(catalog: dict, ocr, token_counter, *, full_text_pages=None) -> tuple[dict, list[dict]]:
     import pymupdf
 
     source = Path(catalog["_source_path"]) if catalog.get("_source_path") else (UPLOADS_DIR if catalog.get("storage") == "uploads" else DOCUMENTS_DIR) / catalog["name"]
@@ -120,6 +121,10 @@ def _parse_document(catalog: dict, ocr, token_counter) -> tuple[dict, list[dict]
             if not text:
                 used_ocr = True
                 text = _ocr_page(ocr, page)
+            if full_text_pages is not None:
+                full_text_pages.append({"document_id": catalog["id"], "document_name": catalog["name"], "page": offset, "text": text,
+                                        "text_checksum": checksum(text.encode()), "source_fingerprint": record["source_fingerprint"],
+                                        "parser": "RapidOCR" if not page.get_text("text").strip() else "PyMuPDF"})
             if text:
                 raw_pages.append({"page": offset, "text": text, "headings": _heading_lines(page) if not used_ocr else set()})
         non_whitespace = sum(len("".join(item["text"].split())) for item in raw_pages)
@@ -185,13 +190,13 @@ def build_index(force: bool = False, *, catalog: list[dict] | None = None, index
         return 1
     token_counter = lambda text: tokenizer_token_count(tokenizer, text)
 
-    documents, chunks = [], []
+    documents, chunks, full_text_pages = [], [], []
     sources = catalog if catalog is not None else discover_documents()
     for position, source in enumerate(sources, 1):
         if on_progress:
             on_progress("parse", position - 1, len(sources))
         print(f"解析：{source['name']}")
-        record, parsed_chunks = _parse_document(source, ocr, token_counter)
+        record, parsed_chunks = _parse_document(source, ocr, token_counter, full_text_pages=full_text_pages)
         documents.append(record)
         chunks.extend(parsed_chunks)
         print(f"  {record['status']}，{record['chunks']} 个真实分块")
@@ -235,6 +240,9 @@ def build_index(force: bool = False, *, catalog: list[dict] | None = None, index
     _write_json(index_dir / "documents.json", documents)
     _write_json(index_dir / "chunks.json", chunks)
     _write_json(index_dir / "manifest.json", current_manifest(sources))
+    if (index_dir / "faiss.index").exists():
+        write_full_text(index_dir, current_manifest(sources), documents, full_text_pages)
+        validate_bundle(index_dir, require_full_text=True)
     print(f"索引完成：{sum(item['status'] == 'Indexed' for item in documents)} 份文档，{len(chunks)} 个分块。")
     return 0 if (chunks or not documents) and all(item["status"] == "Indexed" for item in documents) else 1
 

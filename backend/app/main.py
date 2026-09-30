@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from .ai_service import AiService
 from . import architecture_assets, business_import
 from .corpus import CorpusStore, UPLOADS_DIR, current_manifest
+from .full_text import CORPUS_LOCK
 from .corpus_management import CorpusManager
 from .config import load_settings
 from .evaluation import EvaluationRunner, gate_details
@@ -286,22 +287,25 @@ class PoolRunRequest(BaseModel):
 @app.post('/api/governance/coverage-preview', dependencies=[Depends(require_trusted_origin)])
 def coverage_preview(payload: GenerationRequest):
     try:
-        chunks = corpus.chunks()
-        return store.coverage_preview(payload.profile, chunks, ai_service._indexed_embeddings(chunks))
+        with CORPUS_LOCK:
+            chunks = corpus.chunks()
+            return store.coverage_preview(payload.profile, chunks, ai_service._indexed_embeddings(chunks))
     except (ValueError, ProviderUnavailable) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 def current_coverage_plan(profile, plan_id):
-    chunks = corpus.chunks()
-    return store.resolve_coverage_plan(profile, chunks, plan_id, ai_service._indexed_embeddings(chunks))
+    with CORPUS_LOCK:
+        chunks = corpus.chunks()
+        return store.resolve_coverage_plan(profile, chunks, plan_id, ai_service._indexed_embeddings(chunks))
 
 
 @app.post('/api/governance/generation-runs/from-pool/preview', dependencies=[Depends(require_trusted_origin)])
 def preview_pool_run(payload: PoolRunRequest):
     try:
-        plan = current_coverage_plan(payload.profile, payload.plan_id)
-        return store.preview_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'], question_embedder=ai_service.negative_topic_embedding)
+        with CORPUS_LOCK:
+            plan = current_coverage_plan(payload.profile, payload.plan_id)
+            return store.preview_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'], question_embedder=ai_service.negative_topic_embedding)
     except (ValueError, KeyError, ProviderUnavailable) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -321,12 +325,13 @@ async def import_candidates(request: Request, filename: str, confirm: bool = Fal
             if len(data) > 10 * 1024 * 1024:
                 raise ValueError("文件超过 10 MB")
         content = bytes(data)
-        plan = current_coverage_plan('mini', None)
-        result = business_import.parse_import(content, Path(filename).name, corpus.chunks(), store.questions(), plan, ai_service.negative_topic_embedding)
-        if confirm:
-            if result['error_count'] or not result['valid_rows']:
-                raise ValueError('请先修正全部错误，再确认导入')
-            result['question_ids'] = store.save_business_candidates(result['valid_rows'], Path(filename).name, result['file_hash'])
+        with CORPUS_LOCK:
+            plan = current_coverage_plan('mini', None)
+            result = business_import.parse_import(content, Path(filename).name, corpus.chunks(), store.questions(), plan, ai_service.negative_topic_embedding)
+            if confirm:
+                if result['error_count'] or not result['valid_rows']:
+                    raise ValueError('请先修正全部错误，再确认导入')
+                result['question_ids'] = store.save_business_candidates(result['valid_rows'], Path(filename).name, result['file_hash'])
         return result
     except (ValueError, UnicodeError, OSError, ProviderUnavailable) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
@@ -335,8 +340,9 @@ async def import_candidates(request: Request, filename: str, confirm: bool = Fal
 @app.post('/api/governance/generation-runs/from-pool', dependencies=[Depends(require_trusted_origin)], status_code=201)
 def create_pool_run(payload: PoolRunRequest):
     try:
-        plan = current_coverage_plan(payload.profile, payload.plan_id)
-        return store.create_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'], question_embedder=ai_service.negative_topic_embedding)
+        with CORPUS_LOCK:
+            plan = current_coverage_plan(payload.profile, payload.plan_id)
+            return store.create_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'], question_embedder=ai_service.negative_topic_embedding)
     except (ValueError, KeyError, ProviderUnavailable) as error:
         raise HTTPException(status_code=422, detail=json.loads(str(error)) if str(error).startswith('{') else str(error)) from error
 
@@ -429,8 +435,9 @@ def generate_mini_golden():
 @app.post("/api/governance/generate", status_code=202, dependencies=[Depends(require_trusted_origin)])
 def generate_golden(payload: GenerationRequest):
     try:
-        plan = current_coverage_plan(payload.profile, payload.plan_id)
-        run_id = store.start_generation_run(ai_service.model, payload.profile, coverage_plan=plan)
+        with CORPUS_LOCK:
+            plan = current_coverage_plan(payload.profile, payload.plan_id)
+            run_id = store.start_generation_run(ai_service.model, payload.profile, coverage_plan=plan)
     except (ValueError, ProviderUnavailable) as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     threading.Thread(target=_run_mini_generation, args=(run_id, store, ai_service, corpus), daemon=True).start()
@@ -1121,7 +1128,7 @@ def preview(payload: PreviewRequest):
     result = ai_service.preview(payload.question)
     baseline = result.get("baseline", {})
     if result.get("mode") in {"live", "local"} and not result.get("fallback_reason"):
-        event = store.record_monitoring_event(question=payload.question, answer=baseline.get("answer", ""), bad_case=False, severity="ordinary", determinable=False, source={"production_version_id": baseline["version"], "production_config": baseline["config"], "corpus_fingerprint": baseline.get("corpus_fingerprint")} if baseline.get("version") and baseline.get("config") else None, metrics={key: baseline.get(key) for key in ("stages", "token_usage", "estimated_cost", "latency_ms", "input_tokens", "output_tokens")})
+        event = store.record_monitoring_event(question=payload.question, answer=baseline.get("answer", ""), bad_case=False, severity="ordinary", determinable=False, source={"production_version_id": baseline["version"], "production_config": baseline["config"], "corpus_fingerprint": baseline.get("corpus_fingerprint")} if baseline.get("version") and baseline.get("config") else None, metrics={key: baseline.get(key) for key in ("stages", "token_usage", "estimated_cost", "cost_estimation", "ttft_ms", "retrieval_trace", "latency_ms", "input_tokens", "output_tokens")})
         result["monitoring_event_id"] = event["id"]
     return result
 

@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 import math
 import socket
 import time
@@ -52,6 +53,7 @@ class DeepSeekProvider:
         """Return provider usage and measured first-content latency when streaming is enabled."""
         request = self._request(system, user, json_mode, stream, temperature)
         started_at = time.perf_counter()
+        call_started_at = datetime.now(timezone.utc).isoformat()
         try:
             with urllib.request.urlopen(request, timeout=self.settings.timeout_seconds) as response:
                 if stream:
@@ -70,10 +72,10 @@ class DeepSeekProvider:
                         if isinstance(event.get("usage"), dict):
                             usage = event["usage"]
                     body = {"choices": [{"message": {"content": "".join(content)}}], "usage": usage}
-                    ttft_ms = round(((ttft_started or time.perf_counter()) - started_at) * 1000)
+                    ttft_ms = round((ttft_started - started_at) * 1000) if ttft_started is not None else None
                 else:
                     body = json.loads(response.read())
-                    ttft_ms = round((time.perf_counter() - started_at) * 1000)
+                    ttft_ms = None
         except urllib.error.HTTPError as error:
             raise ProviderAPIError(f"DeepSeek API 错误（HTTP {error.code}）") from error
         except urllib.error.URLError as error:
@@ -91,8 +93,9 @@ class DeepSeekProvider:
         if not isinstance(content, str) or not content.strip():
             raise ProviderUnavailable("DeepSeek 返回的内容必须是非空字符串")
         usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
+        usage = {**usage, "requested_model": self.settings.model, "call_started_at": call_started_at}
         record_usage(usage)
-        return {"usage": usage, "content": content, "input_tokens": usage.get("prompt_tokens") if isinstance(usage.get("prompt_tokens"), int) else None, "output_tokens": usage.get("completion_tokens") if isinstance(usage.get("completion_tokens"), int) else None, "ttft_ms": ttft_ms}
+        return {"usage": usage, "content": content, "input_tokens": usage.get("prompt_tokens") if type(usage.get("prompt_tokens")) is int and usage["prompt_tokens"] >= 0 else None, "output_tokens": usage.get("completion_tokens") if type(usage.get("completion_tokens")) is int and usage["completion_tokens"] >= 0 else None, "ttft_ms": ttft_ms, "timing_unit": "ms", "generation_ms": round((time.perf_counter() - started_at) * 1000)}
 
     def complete(self, system: str, user: str, json_mode: bool = False, *, temperature: float = 0.2) -> str:
         return self.complete_with_metrics(system, user, json_mode, temperature=temperature)["content"]

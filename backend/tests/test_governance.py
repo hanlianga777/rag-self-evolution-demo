@@ -1,3 +1,4 @@
+from fulltext_fixture import FullTextFixture
 import json
 import tempfile
 import unittest
@@ -12,7 +13,7 @@ from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
 
 
-class FakeRetriever:
+class FakeRetriever(FullTextFixture):
     def search(self, question, limit=4, min_score=None):
         return [{
             "document_id": "DOC-001",

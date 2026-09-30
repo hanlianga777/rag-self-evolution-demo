@@ -194,7 +194,7 @@ class CurrentIdentityTests(unittest.TestCase):
                 with store.connection() as connection:
                     connection.execute("UPDATE production_versions SET config_json=? WHERE status='active'", (json.dumps({'top_k': 6}),))
                     connection.execute("UPDATE production_versions SET id='production-after-answer' WHERE status='active'")
-                return {'answer': '原生产配置生成的回答', 'retrieval': [], 'sources': [], 'mode': 'local', 'model': 'stub', 'latency_ms': 1}
+                return {'corpus_fingerprint': previous_fingerprint, 'answer': '原生产配置生成的回答', 'retrieval': [], 'sources': [], 'mode': 'local', 'model': 'stub', 'latency_ms': 1}
         service = SwitchingQaService(self.store, main.corpus, FixedProvider('{}'), True)
         old_service = main.ai_service
         main.ai_service = service

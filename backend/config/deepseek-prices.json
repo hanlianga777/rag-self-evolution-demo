@@ -1,0 +1,44 @@
+{
+  "provider": "DeepSeek",
+  "model": "deepseek-flash",
+  "aliases": [
+    "deepseek-v4-flash"
+  ],
+  "currency": "USD",
+  "unit": 1000000,
+  "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+  "checked_at": "2026-09-30",
+  "effective_date": "2026-09-30",
+  "billing_mode": "provider_hit_counter",
+  "price_config_version": "deepseek-flash-2026-09-30",
+  "periods": {
+    "peak": {
+      "input_per_million": 0.3,
+      "cached_input_per_million": 0.006,
+      "output_per_million": 1.2
+    },
+    "off_peak": {
+      "input_per_million": 0.15,
+      "cached_input_per_million": 0.003,
+      "output_per_million": 0.6
+    }
+  },
+  "peak_hours_utc": [
+    [
+      1,
+      4
+    ],
+    [
+      6,
+      10
+    ]
+  ],
+  "peak_weekdays": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous."
+}

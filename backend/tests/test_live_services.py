@@ -75,7 +75,7 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(result["content"], "回答")
         self.assertEqual(result["input_tokens"], 12)
         self.assertEqual(result["output_tokens"], 8)
-        self.assertIsInstance(result["ttft_ms"], int)
+        self.assertIsNone(result["ttft_ms"])
 
     def test_judge_uses_zero_temperature_for_stable_governance(self):
         content = '{"correctness":4,"completeness":1,"faithfulness":1,"behavior_pass":true,"reason":"证据充分","missing_points":[],"unsupported_claims":[]}'

@@ -1190,9 +1190,19 @@ class GovernanceStore:
         return self.question(question_id)
 
     def create_dataset_snapshot(self, approved: list[dict] | None = None, generation_run_id: str | None = None):
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK:
+            return self._create_dataset_snapshot(approved, generation_run_id)
+
+    def _create_dataset_snapshot(self, approved=None, generation_run_id=None):
         approved = approved if approved is not None else self.questions("golden")
         from .corpus import current_manifest
-        snapshot = {"question_ids": [item["id"] for item in approved], "questions": [item["raw"] for item in approved], "corpus_fingerprint": current_manifest()["sources"]}
+        fingerprint = current_manifest()['sources']
+        run = self.generation_run(generation_run_id) if generation_run_id else None
+        run_fingerprint = (run or {}).get('artifacts', {}).get('hard_validation', {}).get('corpus_fingerprint')
+        if run_fingerprint is not None and run_fingerprint != fingerprint:
+            raise ValueError('Corpus 已变化；不能将旧 Run 冻结为当前 Corpus Snapshot')
+        snapshot = {"question_ids": [item["id"] for item in approved], "questions": [item["raw"] for item in approved], "corpus_fingerprint": run_fingerprint if run_fingerprint is not None else fingerprint}
         if generation_run_id:
             snapshot["generation_run_id"] = generation_run_id
             snapshot['coverage_plan'] = self.generation_run(generation_run_id)['artifacts']['hard_validation'].get('frozen_plan')
@@ -1207,6 +1217,11 @@ class GovernanceStore:
         return [{**dict(row), "snapshot": {"id": row["id"], **_load(row["snapshot_json"], {})}} for row in rows]
 
     def create_generation_snapshot(self, generation_run_id: str):
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK:
+            return self._create_generation_snapshot(generation_run_id)
+
+    def _create_generation_snapshot(self, generation_run_id):
         with self.connection() as connection:
             row = connection.execute("SELECT * FROM golden_generation_runs WHERE id = ?", (generation_run_id,)).fetchone()
         if row is None:
@@ -1223,6 +1238,20 @@ class GovernanceStore:
         return existing or self.create_dataset_snapshot(approved, generation_run_id)
 
     def run_probe(self, question_id: str, retriever, chunks: list[dict], answerability_judge=None, *, subtype_judge=None, fail_on_judge_error: bool = False):
+        from .retrieval import VectorRetriever
+        observation = None
+        if isinstance(retriever, VectorRetriever):
+            with retriever.snapshot() as bundle:
+                question = self.question(question_id)['question']
+                trace = {}
+                hits = retriever.retrieve(question, DEFAULT_PIPELINE_CONFIG, trace=trace)
+                observation = (hits, trace, retriever.full_text_probe(question))
+                chunks = bundle['chunks'] if bundle else chunks
+        return self._run_probe(question_id, retriever, chunks, answerability_judge, subtype_judge=subtype_judge, fail_on_judge_error=fail_on_judge_error, observation=observation)
+
+    def _run_probe(self, question_id, retriever, chunks, answerability_judge, *, subtype_judge=None, fail_on_judge_error=False, observation=None):
+        from .retrieval import evidence_coverage
+        from .full_text import search_full_text
         item = self.question(question_id)
         evidence = item["evidence"]
         expected_chunks = {chunk_id for source in evidence for chunk_id in source.get("source_chunk_ids", [])}
@@ -1236,11 +1265,21 @@ class GovernanceStore:
             "evidence": bool(evidence) if positive else True,
             "source_chunks": expected_chunks.issubset(available_chunks) if positive else True,
         }
-        if positive and hasattr(retriever, "retrieve"):
+        trace = {}
+        if observation is not None:
+            hits, trace, raw_full_text = observation
+        elif positive and hasattr(retriever, "retrieve"):
             hits = retriever.retrieve(item["question"], DEFAULT_PIPELINE_CONFIG)
         else:
             hits = retriever.search(item["question"], limit=4)
+        if not trace:
+            trace = {'status': 'not_collected', 'candidates': None, 'final': hits, 'corpus_fingerprint': None}
+        coverage = evidence_coverage(trace, expected_chunks)
+        if observation is None:
+            raw_full_text = retriever.full_text_probe(item['question']) if callable(getattr(type(retriever), 'full_text_probe', None)) else search_full_text(item['question'], None)
         best = max((hit.get("score", 0) for hit in hits), default=0)
+        if not positive and trace.get('candidates') is not None:
+            best = max((hit['vector_raw'] for hit in trace['candidates'] if hit.get('vector_raw') is not None), default=0)
         source_texts = {chunk.get("chunk_id"): chunk.get("text", chunk.get("chunk_text", "")) for chunk in chunks}
         programmatic['answer_anchor'] = _answer_anchor_supported(item['reference_answer'] or '', [source_texts[key] for key in expected_chunks if key in source_texts]) if positive else True
         haystack = " ".join(source_texts.values())
@@ -1262,31 +1301,34 @@ class GovernanceStore:
                 subtype_semantic = {"matched": True, "detected_subtype": subtype, "reason": "explicit local signal", "source": "local"}
             else:
                 try:
-                    subtype_semantic = subtype_judge(item["question"], hits, {"negative_subtype": subtype, "expected_behavior": expected_behavior}) if subtype_judge else {"matched": False, "reason": "Negative subtype Judge unavailable"}
+                    subtype_semantic = subtype_judge(item["question"], hits, {"negative_subtype": subtype, "expected_behavior": expected_behavior}) if subtype_judge else {"matched": None, "reason": "Negative subtype Judge unavailable"}
                 except Exception as error:
-                    if fail_on_judge_error:
-                        raise
-                    subtype_semantic = {"matched": False, "reason": str(error), "error_type": type(error).__name__}
+                    subtype_semantic = {"matched": None, "reason": str(error), "error_type": type(error).__name__}
+                if not isinstance(subtype_semantic, dict) or type(subtype_semantic.get('matched')) is not bool:
+                    subtype_semantic = {'matched': None, 'reason': 'Subtype Judge unavailable or malformed', 'error_type': subtype_semantic.get('error_type') if isinstance(subtype_semantic, dict) else 'invalid_response'}
                 subtype_mismatch = subtype_semantic.get("matched") is not True or subtype_semantic.get("detected_subtype") != subtype
-        ambiguous_negative = not positive and subtype in {"insufficient_evidence", "clarify"} and bool(corpus_matches or entity_matches or best >= .75)
+        ambiguous_negative = not positive and subtype in {"insufficient_evidence", "clarify"} and bool(raw_full_text["matches"] or corpus_matches or entity_matches or best >= .75)
         answerability = None
         if ambiguous_negative:
             try:
-                answerability = answerability_judge(item["question"], hits, {"negative_subtype": subtype, "vector_best_similarity": best, "full_text_hits": corpus_matches, "entity_hits": entity_matches, "clarify_requires_unique_answer": subtype == "clarify"}) if answerability_judge else {"answerable": None, "reason": "Answerability Judge unavailable"}
+                answerability = answerability_judge(item["question"], hits, {"negative_subtype": subtype, "vector_best_similarity": best, "full_text_hits": raw_full_text["matches"], "parse_coverage": raw_full_text["coverage"], "entity_hits": entity_matches, "clarify_requires_unique_answer": subtype == "clarify"}) if answerability_judge else {"answerable": None, "reason": "Answerability Judge unavailable"}
+                if not isinstance(answerability, dict) or type(answerability.get('answerable')) is not bool or not isinstance(answerability.get('reason'), str) or not answerability['reason'].strip():
+                    answerability = {**(answerability if isinstance(answerability, dict) else {}), 'answerable': None, 'reason': str(answerability.get('reason') or 'Answerability Judge malformed or insufficient evidence') if isinstance(answerability, dict) else 'Answerability Judge malformed'}
             except Exception as error:
-                if fail_on_judge_error:
-                    raise
-                answerability = {"answerable": None, "reason": str(error)}
-        negative_passed = behavior == expected_behavior and not subtype_mismatch and (not ambiguous_negative or answerability.get("answerable") is False)
+                answerability = {"answerable": None, "reason": str(error), "error_type": type(error).__name__}
+        parse_complete = (raw_full_text.get('coverage') or {}).get('status') == 'complete'
+        uncertain = not positive and ((subtype_semantic is not None and subtype_semantic.get('matched') is None) or (ambiguous_negative and answerability.get('answerable') is None) or (subtype in {'insufficient_evidence', 'clarify'} and not parse_complete))
+        negative_passed = behavior == expected_behavior and not subtype_mismatch and not uncertain and (not ambiguous_negative or answerability.get("answerable") is False)
         full_text = {"mode": "evidence" if positive else "fake_negative_check", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else negative_passed}
         evidence_valid = all(programmatic.values()) and full_text["passed"]
         full_text['answer_anchor_supported'] = programmatic['answer_anchor'] if positive else None
-        recalled = bool(expected_chunks & {hit.get("chunk_id") for hit in hits}) if positive else None
+        recalled = coverage["final_context"]["all_hit"] if positive else None
         classification = "RETRIEVAL_INCOHERENT" if positive and evidence_valid and not recalled else "EVIDENCE_VALID" if positive and evidence_valid else "EVIDENCE_INVALID" if positive else "NEGATIVE_VALID" if evidence_valid else "NEGATIVE_SUBTYPE_MISMATCH" if subtype_mismatch else "FAKE_NEGATIVE_RISK" if answerability and answerability.get("answerable") is True else "NEGATIVE_UNDETERMINED"
         exact_matches = [{"chunk_id": chunk_id, "document_id": next((chunk.get("document_id") for chunk in chunks if chunk.get("chunk_id") == chunk_id), None), "matched_terms": [term for term in entity_tokens if term.lower() in source_texts[chunk_id].lower()], "content_preview": source_texts[chunk_id][:240]} for chunk_id in dict.fromkeys(corpus_matches + entity_matches)]
         negative_checks = None if positive else {
             "vector_probe": {"observed_hits": hits, "signal_only": True},
-            "full_text_probe": {"corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "matches": exact_matches, "exact_match_count": len(exact_matches), "signal_only": True},
+            "full_text_probe": raw_full_text,
+            "legacy_chunk_signals": {"matches": exact_matches, "signal_only": True},
             "answerability": answerability,
             "subtype_semantic": subtype_semantic,
             "fake_negative_check": {"expected_behavior": expected_behavior, "negative_subtype": subtype, "subtype_mismatch": subtype_mismatch, "ambiguous": ambiguous_negative, "passed": negative_passed},
@@ -1299,7 +1341,7 @@ class GovernanceStore:
             "reason": "Evidence exists but the production pipeline did not recall it" if classification == "RETRIEVAL_INCOHERENT" else "Programmatic evidence check" if evidence_valid else "Negative subtype does not match the question" if subtype_mismatch else "Negative may be answerable" if classification == "FAKE_NEGATIVE_RISK" else "Answerability could not be established" if not positive else "Evidence or required fields cannot support Golden",
             "rule_version": "v1.2",
             "model_version": "programmatic-probe-v1",
-            "probe_details": {"pipeline": "CandidateK → Hybrid → Lightweight second-stage ranking → MinScore → TopK" if positive else "vector + full-text fake-negative check", "vector": {"top_k": hits, "best_similarity": best}, "full_text": full_text, "negative_checks": negative_checks, "classification": classification, "retrieval_coherent": recalled},
+            "probe_details": {"probe_execution_status": "uncertain" if uncertain else "completed", "question_validity": "needs_review" if uncertain else "valid" if evidence_valid else "invalid", "risk": "P1" if classification == 'RETRIEVAL_INCOHERENT' else None, "retrieval_trace": trace, "evidence_coverage": coverage, "pipeline": "CandidateK → Hybrid → Lightweight second-stage ranking → MinScore → TopK" if positive else "vector + full-text fake-negative check", "vector": {"top_k": hits, "best_similarity": best}, "full_text": full_text, "negative_checks": negative_checks, "classification": classification, "retrieval_coherent": recalled},
         })
         return {**result, "classification": classification, "programmatic": {"checks": programmatic, "passed": all(programmatic.values())}, "vector": {"top_k": hits, "best_similarity": best, "signal": "observed_only"}, "full_text": full_text, "passed": result["status"] == "passed"}
 
@@ -1341,6 +1383,11 @@ class GovernanceStore:
         return [{**_load(row["result_json"], {}), "created_at": row["created_at"]} for row in rows]
 
     def review_generation_batch(self, question_ids: list[str], actor: str, *, confirmed_manual_review: bool = False):
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK:
+            return self._review_generation_batch(question_ids, actor, confirmed_manual_review=confirmed_manual_review)
+
+    def _review_generation_batch(self, question_ids, actor, *, confirmed_manual_review=False):
         if not confirmed_manual_review:
             raise ValueError("Human Review confirmation is required")
         candidates = [self.question(question_id) for question_id in question_ids]
@@ -1358,6 +1405,9 @@ class GovernanceStore:
         now = _now()
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
+            current_run_fingerprint = self.generation_run(run['id'])['artifacts']['hard_validation'].get('corpus_fingerprint')
+            if current_run_fingerprint is not None and current_run_fingerprint != current_manifest()['sources']:
+                raise ValueError('Corpus 已变化；请重新冻结当前知识库')
             candidates = [self.question(question_id) for question_id in question_ids]
             if set(self.generation_run(run['id'])['question_ids']) != set(question_ids):
                 raise ValueError('活动题目已变化，请刷新')

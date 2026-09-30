@@ -146,6 +146,9 @@ class EvaluationRunner:
         expected_chunks = {chunk_id for evidence in item["evidence"] for chunk_id in evidence.get("source_chunk_ids", [])}
         retrieved = [entry.get("chunk_id") for entry in execution["retrieval"]]
         matching = [index + 1 for index, chunk_id in enumerate(retrieved) if chunk_id in expected_chunks]
+        from .retrieval import evidence_coverage
+        trace = execution.get('retrieval_trace') or {}
+        coverage = evidence_coverage({**trace, 'final': trace.get('final', execution['retrieval'])}, expected_chunks)
         hit = bool(matching) if expected_chunks else None
         precision = len(matching) / len(retrieved) * 100 if expected_chunks and retrieved else None
         redline = (not judge["behavior_pass"]) or bool(judge.get("unsupported_claims"))
@@ -157,10 +160,11 @@ class EvaluationRunner:
                 failure_tags.append("Generation Failure")
             if judge["faithfulness"] < targets["faithfulness"]:
                 failure_tags.append("Evidence / Citation Failure")
-            if expected_chunks and not hit:
-                failure_tags.append("Retrieval Failure")
-            elif any(entry.get("chunk_id") in expected_chunks for entry in execution.get("retrieval_candidates", [])) and not matching:
-                failure_tags.append("Ranking Failure")
+            if expected_chunks and coverage['final_context']['all_hit'] is False:
+                if coverage['candidate_recall']['all_hit'] is True:
+                    failure_tags.append('Ranking Failure')
+                elif coverage['candidate_recall']['all_hit'] is False:
+                    failure_tags.append('Retrieval Failure')
         if not judge["behavior_pass"]:
             failure_tags.extend(["Unsafe Answer", "Safety Failure"])
         if judge.get("unsupported_claims"):
@@ -170,7 +174,7 @@ class EvaluationRunner:
         failure_tags = list(dict.fromkeys(failure_tags))
         severity = "critical" if item["raw"].get("criticality") == "high" or item.get("negative_subtype") == "safety_critical" else "ordinary"
         primary, secondary = root_cause_layers(failure_tags)
-        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "programmatic_metrics": {"retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit}, "passed": not failure_tags, "redline_pass": not redline}
+        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "programmatic_metrics": {"retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit}, "passed": not failure_tags, "redline_pass": not redline}
 
     def execute_baseline(self, run_id, approved, config):
         cases = []

@@ -220,7 +220,7 @@ def current_manifest(documents: list[dict] | None = None) -> dict:
 
 def is_current() -> bool:
     existing = _read_json(INDEX_DIR / "manifest.json", {})
-    return bool(existing) and existing == current_manifest() and (INDEX_DIR / "faiss.index").exists()
+    return bool(existing) and all(existing.get(key) == value for key, value in current_manifest().items()) and (INDEX_DIR / "faiss.index").exists()
 
 
 class CorpusStore:
@@ -265,8 +265,21 @@ class CorpusStore:
         return {**document, "chunk_count": document["chunks"], "index": self.index_info(), "chunks": self.chunks(document_id)}
 
     def index_info(self) -> dict:
-        manifest = _read_json(self.index_dir / "manifest.json", {})
+        from .full_text import CORPUS_LOCK, validate_bundle
+        with CORPUS_LOCK:
+            path = self.index_dir.resolve()
+            manifest = _read_json(path / "manifest.json", {})
+            full_text = {'supported': True, 'status': 'not_collected', 'coverage': None, 'reason': 'raw_full_text_unavailable'}
+            if (path / 'full_text.json').exists() or manifest.get('artifact_schema_version', 0) >= 3:
+                try:
+                    value = validate_bundle(path, require_full_text=True)['full_text']
+                    full_text = {'supported': True, 'status': 'ready', 'coverage': value['coverage'], 'artifact_schema_version': value['artifact_schema_version'], 'reason': None}
+                except (OSError, ValueError, RuntimeError, KeyError) as error:
+                    full_text = {**full_text, 'status': 'invalid', 'reason': str(error)}
         return {
+            "full_text": full_text,
+            "corpus_fingerprint": manifest.get('sources'),
+            "artifact_schema_version": manifest.get('artifact_schema_version'),
             "status": "Current" if is_current() else "Needs rebuild",
             "embedding_model": manifest.get("embedding_model", EMBEDDING_MODEL),
             "tokenizer_model": manifest.get("tokenizer_model", EMBEDDING_MODEL),

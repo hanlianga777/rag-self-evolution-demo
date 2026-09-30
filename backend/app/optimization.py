@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timezone
 from collections import Counter
 
+from .telemetry import collect_usage, measure, cost_fields
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, MAX_EVALS, search_space_contract, validate_candidate_config
 
 
@@ -67,10 +68,15 @@ class OptimizationAgent:
             "rule": f"当前为 Round {round_number}。返回 {','.join(labels)} 并列、可解释 Candidate。One Candidate = One Hypothesis + Minimum Necessary Parameters。target_bad_cases 必须是 target_reference_map 中的实际标识符，禁止描述文本或未知 ID。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。根据 prior_sandbox_results 调整假设，不能重复已失败配置。",
         }
         try:
-            content = self.provider.complete(
-                "你是 RAG Optimization Agent。只返回 JSON：{\"root_cause_cluster\":\"...\",\"observed_evidence\":[\"...\"],\"candidates\":[{\"id\":\"A\",\"hypothesis\":\"...\",\"why\":\"...\",\"target_bad_cases\":[\"...\"],\"config_diff\":{},\"risk\":\"...\"}]}。A/B/C 均按此格式；严格遵守用户消息中的 allowed_parameter_values 类型和值，不得输出隐藏推理或测试答案。",
-                json.dumps(prompt, ensure_ascii=False), json_mode=True,
-            )
+            stages = []
+            with collect_usage() as usage, measure(stages, 'optimization_agent'):
+                try:
+                    content = self.provider.complete(
+                        "你是 RAG Optimization Agent。只返回 JSON：{\"root_cause_cluster\":\"...\",\"observed_evidence\":[\"...\"],\"candidates\":[{\"id\":\"A\",\"hypothesis\":\"...\",\"why\":\"...\",\"target_bad_cases\":[\"...\"],\"config_diff\":{},\"risk\":\"...\"}]}。A/B/C 均按此格式；严格遵守用户消息中的 allowed_parameter_values 类型和值，不得输出隐藏推理或测试答案。",
+                        json.dumps(prompt, ensure_ascii=False), json_mode=True,
+                    )
+                finally:
+                    audit.update(token_usage=usage, stages=stages, **cost_fields(getattr(getattr(self.provider, 'settings', None), 'model', None), usage))
             audit["provider_raw_text"] = content
             audit["validation_stage"] = "json_parse"
             result = json.loads(content)

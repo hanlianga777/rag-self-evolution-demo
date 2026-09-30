@@ -1,3 +1,4 @@
+from fulltext_fixture import FullTextFixture
 """Deterministic business E2E. Every stage uses disposable SQLite and a fixed provider."""
 
 import json
@@ -44,7 +45,7 @@ class FixtureProvider:
         return json.dumps({"question": f"请说明操作要求 {slot}？", "reference_answer": "请按照原厂说明书执行操作。", "original_entity": "产品", "alias_expression": "这台设备"}, ensure_ascii=False)
 
 
-class FixtureRetriever:
+class FixtureRetriever(FullTextFixture):
     def __init__(self, store):
         self.store = store
 

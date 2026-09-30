@@ -15,6 +15,7 @@ from app import corpus
 from api_fixture import main
 from app.corpus_management import CorpusManager
 from app.build_index import build_index
+from app.full_text import checksum, write_full_text
 
 
 class CorpusManagementTests(unittest.TestCase):
@@ -52,10 +53,16 @@ class CorpusManagementTests(unittest.TestCase):
         on_progress("parse", 0, len(catalog))
         on_progress("chunk", len(catalog), len(catalog))
         on_progress("embedding", 0, len(catalog))
-        (index_dir / "documents.json").write_text(json.dumps([{**{key: value for key, value in item.items() if key != "_source_path"}, "status": "Indexed", "chunks": 1} for item in catalog]))
+        (index_dir / "documents.json").write_text(json.dumps([{**{key: value for key, value in item.items() if key != "_source_path"}, "status": "Indexed", "chunks": 1, "pages": 1, "source_fingerprint": corpus.source_fingerprint(item)} for item in catalog]))
         (index_dir / "chunks.json").write_text(json.dumps([{"document_id": item["id"], "chunk_id": f"{item['id']}-1", "chunk_text": "fixture"} for item in catalog]))
         (index_dir / "manifest.json").write_text(json.dumps(corpus.current_manifest(catalog)))
-        (index_dir / "faiss.index").write_bytes(b"fixture index")
+        import faiss
+        index = faiss.IndexFlatIP(2)
+        index.add(np.asarray([[1., 0.]] * len(catalog), dtype='float32').reshape(-1, 2))
+        faiss.write_index(index, str(index_dir / 'faiss.index'))
+        documents = json.loads((index_dir / 'documents.json').read_text())
+        pages = [{'document_id': doc['id'], 'page': 1, 'text': 'fixture', 'parser': 'fixture', 'text_checksum': checksum(b'fixture'), 'source_fingerprint': doc['source_fingerprint']} for doc in documents]
+        write_full_text(index_dir, corpus.current_manifest(catalog), documents, pages)
         on_progress("index", len(catalog), len(catalog))
         return 0
 
@@ -119,6 +126,11 @@ class CorpusManagementTests(unittest.TestCase):
         self.assertEqual(json.loads((staged / "documents.json").read_text())[0]["status"], "Indexed")
         self.assertTrue(json.loads((staged / "chunks.json").read_text()))
         self.assertTrue((staged / "faiss.index").exists())
+        full_text = json.loads((staged / 'full_text.json').read_text())
+        self.assertEqual(full_text['pages'][0]['text'], pymupdf.open(source)[0].get_text('text').strip())
+        self.assertEqual(full_text['coverage']['status'], 'complete')
+        self.assertEqual(full_text['pages'][0]['page'], 1)
+        self.assertEqual(full_text['pages'][0]['parser'], 'PyMuPDF')
 
     def test_http_upload_and_delete_dispatch_user_actions(self):
         from fastapi.testclient import TestClient
