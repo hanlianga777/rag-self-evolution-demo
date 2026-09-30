@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from api_fixture import main
 from app.evaluation import EvaluationRunner
+from identity_fixture import completed_baseline
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
 
@@ -210,6 +211,7 @@ class OptimizationAgentTests(unittest.TestCase):
     def test_agent_only_persists_valid_a_b_c_configs_from_the_available_tools(self):
         with tempfile.TemporaryDirectory() as directory:
             store = GovernanceStore(Path(directory) / "demo.db")
+            completed_baseline(store, run_id="EVAL-1")
             store.record_bad_case("EVAL-1", "GGC-001", "Generation", "medium", {"reason": "answer failed"})
             experiment = OptimizationAgent(store, FakeAgentProvider()).generate("EVAL-1")
 

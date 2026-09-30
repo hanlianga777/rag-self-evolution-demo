@@ -1,9 +1,11 @@
 """V1.1 contracts: current-run provenance and one human release action."""
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
+from identity_fixture import completed_baseline
 from app.governance import GovernanceStore
 from app.policy import DEFAULT_PIPELINE_CONFIG
 
@@ -34,9 +36,10 @@ class V11ClosureTests(unittest.TestCase):
         self.assertEqual(summary["legacy_total"], 40)
 
     def test_publish_is_the_only_human_release_action_and_is_atomic(self):
-        run_id = self.store.create_evaluation_run({"id": "GD-fixture"}, DEFAULT_PIPELINE_CONFIG, {"model": "fixture"})
+        baseline = completed_baseline(self.store)
+        run_id = self.store.create_evaluation_run(json.loads(self.store.evaluation_run(baseline)["dataset_snapshot_json"]), {**DEFAULT_PIPELINE_CONFIG, "run_target": "sandbox_candidate"}, {"model": "fixture"})
         self.store.finish_evaluation_run(run_id, "completed", {"gates": {"passed": True}})
-        experiment_id = self.store.create_experiment(run_id)
+        experiment_id = self.store.create_experiment(baseline)
         for label in "ABC":
             self.store.save_candidate(experiment_id, label, DEFAULT_PIPELINE_CONFIG, {"round": 1, "candidate_label": label})
             self.store.finish_candidate(f"{experiment_id}-{label}", "evaluated", {

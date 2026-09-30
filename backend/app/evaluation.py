@@ -132,7 +132,7 @@ class EvaluationRunner:
         if not {"positive", "ablation", "negative"}.issubset(categories) or not {"safety_critical", "prompt_injection"}.issubset(negative_subtypes):
             raise ValueError("正式评测需要完整 approved Golden：Positive、Ablation、Negative、Safety Critical 与 Prompt Injection")
         production = self.store.active_production() or {"config": {}}
-        config = {**DEFAULT_PIPELINE_CONFIG, **production["config"]}
+        config = {**DEFAULT_PIPELINE_CONFIG, **production["config"], "run_target": "baseline"}
         index_info = self.runtime.corpus.index_info() if hasattr(self.runtime, "corpus") and hasattr(self.runtime.corpus, "index_info") else {}
         if not isinstance(index_info, dict):
             index_info = {}

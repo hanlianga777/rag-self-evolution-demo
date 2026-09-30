@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from collections import Counter
 
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, MAX_EVALS, search_space_contract, validate_candidate_config
-from .providers import ProviderUnavailable
 
 
 class OptimizationAgent:
@@ -15,39 +15,19 @@ class OptimizationAgent:
         self.provider = provider
 
     def generate(self, baseline_run_id: str, trigger_id: str | None = None, experiment_id: str | None = None):
-        if trigger_id and not self.store.trigger_is_confirmed(trigger_id):
-            raise ValueError("Monitoring Trigger 必须经 Human Confirm 才能启动 Agent")
+        # Check identity before budget reads; the short claim serializes duplicate starts.
+        self.store.require_current_baseline(baseline_run_id)
         bad_cases = [item for item in self.store.bad_case_rows() if item["run_id"] == baseline_run_id]
         if not bad_cases:
             raise ValueError("该 Baseline 没有真实 Bad Case，无法生成 Candidate")
         baseline = self.store.evaluation_run(baseline_run_id)
-        base_config = {**DEFAULT_PIPELINE_CONFIG, **(baseline or {}).get("config", {})}
-        existing_experiment = experiment_id or ((self.store.optimization_trigger(trigger_id) or {}).get("optimization_run_id") if trigger_id else None)
-        prior = [item['config'] for item in self.store.candidates(existing_experiment)] if existing_experiment else []
-        completed = self.store.experiment(existing_experiment)['evaluation_budget']['used'] if existing_experiment else 0
-        if completed >= MAX_EVALS - 1:
-            raise ValueError(f"evaluation budget exhausted: max_evals={MAX_EVALS}")
-        prior_candidates = []
-        if existing_experiment:
-            existing = self.store.experiment(existing_experiment)
-            if existing is None or existing["baseline_run_id"] != baseline_run_id:
-                raise ValueError("Optimization Run 不属于该 Baseline")
-            prior_candidates = self.store.candidates(existing_experiment)
-            round_numbers = [item.get("reasoning", {}).get("round") for item in prior_candidates if isinstance(item.get("reasoning", {}).get("round"), int)]
-            current_round = max(round_numbers) if round_numbers else 0
-            current = [item for item in prior_candidates if item.get("reasoning", {}).get("round") == current_round]
-            if existing['result'].get('report_confirmation'):
-                raise ValueError('报告已确认，不能继续改变实验')
-            if current_round == 0 or not current or any(item["status"] not in {'evaluated', 'failed'} for item in current):
-                raise ValueError("上一轮 A/B/C 必须全部完成 Sandbox 后才能继续优化")
-            if any(item["result"].get("qualification", {}).get("qualified") for item in current):
-                raise ValueError("已有合格 Candidate，无需继续生成下一轮")
-            round_number = current_round + 1
-        else:
-            round_number = 1
-        experiment_id = existing_experiment or self.store.create_experiment(baseline_run_id)
+        base_config = {**DEFAULT_PIPELINE_CONFIG, **baseline["config"]}
+        base_config.pop("run_target", None)
+        experiment_id, prior_candidates, round_number, completed = self.store.claim_agent_generation(baseline_run_id, trigger_id, experiment_id)
+        prior = [item["config"] for item in prior_candidates]
+        trigger_id = trigger_id or self.store.experiment(experiment_id)["result"].get("trigger_id")
         labels = ['A', 'B', 'C'][:min(3, MAX_EVALS - 1 - completed)]
-        audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": []}
+        audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "root_cause_counts": dict(Counter(item.get("category") or "Unknown" for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases]}
         prompt = {
             "bad_cases": bad_cases,
             "baseline_configuration": base_config,
@@ -110,14 +90,16 @@ class OptimizationAgent:
                 staged.append((candidate, config))
             audit["validation_stage"] = "completed"
             audit["failed_candidate_id"] = None
+            batch = []
             for candidate, config in staged:
-                self.store.save_candidate(experiment_id, f"R{round_number}-{candidate['id']}", config, {
+                batch.append((f"R{round_number}-{candidate['id']}", config, {
                     "root_cause_cluster": result.get("root_cause_cluster", "待人工复核"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
                     "changed_parameters": {key: value for key, value in config.items() if value != base_config.get(key)}, "source_trigger_id": trigger_id, "round": round_number, "candidate_label": candidate["id"],
-                })
-            self.store.save_agent_trace(experiment_id, "completed", {**result, **audit, "round": round_number, "evaluation_budget": {"used": completed, "max": MAX_EVALS}})
+                }))
+            audit["validation_stage"] = "persistence"
+            self.store.save_agent_round(experiment_id, batch, {**result, **audit, "validation_stage": "completed", "round": round_number, "evaluation_budget": {"used": completed, "max": MAX_EVALS}})
             return self.store.experiment(experiment_id)
-        except (ProviderUnavailable, ValueError) as error:
+        except Exception as error:
             audit["validation_error"] = str(error)
             self.store.save_agent_trace(experiment_id, "failed", audit, str(error))
             raise ValueError(str(error)) from error

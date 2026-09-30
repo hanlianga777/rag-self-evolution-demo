@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .policy import DEFAULT_PIPELINE_CONFIG, MAX_EVALS
-from .corpus import EMBEDDING_MODEL
+from .corpus import EMBEDDING_MODEL, current_manifest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -222,6 +222,8 @@ class GovernanceStore:
             if "metrics_json" not in {row[1] for row in connection.execute("PRAGMA table_info(monitoring_events)")}:
                 connection.execute("ALTER TABLE monitoring_events ADD COLUMN metrics_json TEXT")
             connection.execute("INSERT OR IGNORE INTO schema_migrations VALUES (?, ?)", ("phase1-monitoring-metrics", _now()))
+            if "source_json" not in {row[1] for row in connection.execute("PRAGMA table_info(monitoring_events)")}:
+                connection.execute("ALTER TABLE monitoring_events ADD COLUMN source_json TEXT")
             for name, availability, description in (
                 ("top_k", "available", "调整向量检索返回条数"),
                 ("min_score", "available", "过滤低相关度向量结果"),
@@ -1320,6 +1322,48 @@ class GovernanceStore:
     def evaluation_run(self, run_id: str):
         return next((item for item in self.evaluation_runs() if item["id"] == run_id), None)
 
+    def current_baseline_identity(self, connection=None):
+        """One resolver for current APIs and transactional mutation guards."""
+        if connection is None:
+            with self.connection() as connection:
+                return self.current_baseline_identity(connection)
+        fingerprint = current_manifest()["sources"]
+        golden = connection.execute("SELECT * FROM dataset_versions WHERE status='approved' ORDER BY created_at DESC, rowid DESC LIMIT 1").fetchone()
+        identity = {"current_baseline_id": None, "current_experiment_id": None, "current_golden_id": golden["id"] if golden else None, "current_corpus_fingerprint": fingerprint, "baseline_unavailable_reason": None, "requires_new_golden": True}
+        if golden is None:
+            return {**identity, "baseline_unavailable_reason": "需要当前有效 Baseline：请先创建已批准（approved）的 Golden Snapshot"}
+        snapshot = _load(golden["snapshot_json"], {})
+        if snapshot.get("corpus_fingerprint") != fingerprint:
+            return {**identity, "baseline_unavailable_reason": "Corpus 已变化；请创建并确认新的 Golden 测试集及 Baseline"}
+        identity["requires_new_golden"] = False
+        # Missing run_target is classified by persisted execution evidence, never by NULL alone.
+        rows = connection.execute("SELECT * FROM evaluation_runs WHERE status='completed' AND run_mode='real' AND data_source='real' AND dataset_version_id=? ORDER BY created_at DESC, rowid DESC", (golden["id"],)).fetchall()
+        for row in rows:
+            config, judge, result = _load(row["config_json"], {}), _load(row["judge_json"], {}), _load(row["result_json"], {})
+            frozen = _load(row["dataset_snapshot_json"], {})
+            if config.get("run_target") not in (None, "baseline") or config.get("candidate_id") or result.get("invalidated") or config.get("invalidated"):
+                continue
+            if connection.execute("SELECT 1 FROM candidate_configs WHERE json_extract(result_json, '$.evaluation_run_id')=? LIMIT 1", (row["id"],)).fetchone():
+                continue
+            if not config or not judge.get("model") or not judge.get("prompt_version") or not judge.get("scoring_policy") or "gates" not in result or row["error_message"] or not row["completed_at"]:
+                continue
+            if frozen.get("corpus_fingerprint") != fingerprint or not snapshot.get("question_ids") or any(frozen.get(key) != snapshot.get(key) for key in ("question_ids", "questions")):
+                continue
+            cases = connection.execute("SELECT question_id FROM evaluation_case_results WHERE run_id=?", (row["id"],)).fetchall()
+            if sorted(case["question_id"] for case in cases) != sorted(snapshot["question_ids"]):
+                continue
+            experiment = connection.execute("SELECT id FROM experiments WHERE baseline_run_id=? AND status!='direct_release' ORDER BY created_at DESC, rowid DESC LIMIT 1", (row["id"],)).fetchone()
+            return {**identity, "current_baseline_id": row["id"], "current_experiment_id": experiment["id"] if experiment else None}
+        return {**identity, "baseline_unavailable_reason": "当前 Golden/Corpus 需要新的有效 Baseline；旧实验仅供历史查看"}
+
+    def require_current_baseline(self, run_id=None, connection=None):
+        identity = self.current_baseline_identity(connection)
+        if identity["current_baseline_id"] is None:
+            raise ValueError(identity["baseline_unavailable_reason"])
+        if run_id and run_id != identity["current_baseline_id"]:
+            raise ValueError("Optimization Run 不属于当前 Baseline；旧实验仅供历史查看")
+        return self.evaluation_run(identity["current_baseline_id"])
+
     def bad_case_rows(self):
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM bad_cases ORDER BY created_at DESC").fetchall()
@@ -1365,6 +1409,61 @@ class GovernanceStore:
             connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline_run_id, status, _json({}), _now()))
         return experiment_id
 
+    def claim_agent_generation(self, baseline_run_id, trigger_id=None, experiment_id=None):
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self.require_current_baseline(baseline_run_id, connection)
+            if trigger_id:
+                trigger = connection.execute("SELECT * FROM optimization_triggers WHERE id=?", (trigger_id,)).fetchone()
+                if trigger is None or trigger["status"] != "human_confirmed":
+                    raise ValueError("Monitoring Trigger 必须经 Human Confirm 才能启动 Agent")
+                if experiment_id and experiment_id != trigger["optimization_run_id"]:
+                    raise ValueError("Optimization Run 不属于该 Monitoring Trigger")
+                experiment_id = trigger["optimization_run_id"]
+            if not experiment_id:
+                row = connection.execute("SELECT id FROM experiments WHERE baseline_run_id=? AND status!='direct_release' ORDER BY created_at DESC, rowid DESC LIMIT 1", (baseline_run_id,)).fetchone()
+                experiment_id = row["id"] if row else None
+            existing = self.experiment(experiment_id) if experiment_id else None
+            if experiment_id and (existing is None or existing["baseline_run_id"] != baseline_run_id):
+                raise ValueError("Optimization Run 不存在或不属于该 Baseline")
+            if existing and existing["status"] == "generating":
+                raise ValueError("Optimization Agent 正在生成中，请等待当前请求完成")
+            if existing and existing["result"].get("report_confirmation"):
+                raise ValueError("报告已确认，不能继续改变实验")
+            candidates = existing["candidates"] if existing else []
+            rounds = [item["reasoning"]["round"] for item in candidates if type(item["reasoning"].get("round")) is int and item["reasoning"]["round"] >= 1]
+            if candidates and not rounds:
+                raise ValueError("历史 Candidate 缺少有效 Round，无法继续优化")
+            current_round = max(rounds, default=0)
+            current = [item for item in candidates if item["reasoning"].get("round") == current_round]
+            if current and any(item["status"] not in {"evaluated", "failed"} for item in current):
+                raise ValueError("上一轮 A/B/C 必须全部完成 Sandbox 后才能继续优化")
+            if any(item["result"].get("qualification", {}).get("qualified") for item in current):
+                raise ValueError("已有合格 Candidate，无需继续生成下一轮")
+            used = existing["evaluation_budget"]["used"] if existing else 0
+            if used >= MAX_EVALS - 1:
+                raise ValueError(f"evaluation budget exhausted: max_evals={MAX_EVALS}")
+            if not experiment_id:
+                experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+                connection.execute("INSERT INTO experiments VALUES (?, ?, 'generating', '{}', ?)", (experiment_id, baseline_run_id, _now()))
+            else:
+                connection.execute("UPDATE experiments SET status='generating' WHERE id=?", (experiment_id,))
+        return experiment_id, candidates, current_round + 1, used
+
+    def save_agent_round(self, experiment_id, candidates, result):
+        """Validated A/B/C and completed trace become visible together or not at all."""
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT * FROM experiments WHERE id=?", (experiment_id,)).fetchone()
+            self.require_current_baseline(row["baseline_run_id"], connection)
+            persisted = _load(row["result_json"], {})
+            if row["status"] != "generating" or persisted.get("report_confirmation"):
+                raise ValueError("Optimization Context 已变化，不能保存本轮候选")
+            for candidate_id, config, reasoning in candidates:
+                connection.execute("INSERT INTO candidate_configs VALUES (?, ?, 'generated', ?, ?, '{}', ?)", (f"{experiment_id}-{candidate_id}", experiment_id, _json(config), _json(reasoning), _now()))
+            connection.execute("INSERT INTO agent_traces(experiment_id, status, result_json, created_at) VALUES (?, 'completed', ?, ?)", (experiment_id, _json(result), _now()))
+            connection.execute("UPDATE experiments SET status='completed', result_json=? WHERE id=?", (_json({**persisted, **result}), experiment_id))
+
     def save_agent_trace(self, experiment_id: str, status: str, result: dict, error_message: str | None = None):
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
@@ -1376,6 +1475,10 @@ class GovernanceStore:
                     merged[key] = persisted[key]
             connection.execute("INSERT INTO agent_traces(experiment_id, status, result_json, error_message, created_at) VALUES (?, ?, ?, ?, ?)", (experiment_id, status, _json(result), error_message, _now()))
             connection.execute("UPDATE experiments SET status = ?, result_json = ? WHERE id = ?", (current['status'] if persisted.get('report_confirmation') else status, _json(merged), experiment_id))
+
+    def interrupt_agent_generations(self):
+        with self.connection() as connection:
+            connection.execute("UPDATE experiments SET status='failed' WHERE status='generating'")
 
     def interrupt_evaluation_runs(self):
         """Workers are process-local: retain spent attempts, never claim a live worker after restart."""
@@ -1608,6 +1711,8 @@ class GovernanceStore:
         version_id = f"production-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            experiment = connection.execute("SELECT baseline_run_id FROM experiments WHERE id=?", (candidate["experiment_id"],)).fetchone()
+            self.require_current_baseline(experiment["baseline_run_id"], connection)
             if connection.execute("SELECT 1 FROM production_versions WHERE json_extract(snapshot_json, '$.candidate_id') = ?", (candidate_id,)).fetchone():
                 raise ValueError("Candidate 已发布")
             row = connection.execute("SELECT status, result_json FROM candidate_configs WHERE id = ?", (candidate_id,)).fetchone()
@@ -1647,25 +1752,27 @@ class GovernanceStore:
                 connection.execute("INSERT INTO rollback_history(from_version_id, to_version_id, actor, created_at) VALUES (?, ?, ?, ?)", (previous["id"], version_id, actor, _now()))
         return self.active_production()
 
-    def record_monitoring_event(self, *, question: str, answer: str, bad_case: bool, severity: str, determinable: bool, metrics: dict | None = None):
+    def record_monitoring_event(self, *, question: str, answer: str, bad_case: bool, severity: str, determinable: bool, metrics: dict | None = None, source: dict | None = None):
         if severity not in {"ordinary", "critical"}:
             raise ValueError("Unsupported monitoring severity")
         if not question.strip() or not answer.strip():
             raise ValueError("Monitoring requires a complete question and answer")
+        production = self.active_production()
+        provenance = source or {"production_version_id": production["id"] if production else None, "production_config": production["config"] if production else None, "corpus_fingerprint": current_manifest()["sources"]}
         event_id = f"MON-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         with self.connection() as connection:
             connection.execute(
-                "INSERT INTO monitoring_events (id, question, answer, bad_case, severity, determinable, created_at, metrics_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (event_id, question.strip(), answer.strip(), int(bool(bad_case)), severity, int(bool(determinable)), _now(), _json(metrics) if metrics is not None else None),
+                "INSERT INTO monitoring_events (id, question, answer, bad_case, severity, determinable, created_at, metrics_json, source_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (event_id, question.strip(), answer.strip(), int(bool(bad_case)), severity, int(bool(determinable)), _now(), _json(metrics) if metrics is not None else None, _json(provenance)),
             )
-        event = {"id": event_id, "question": question.strip(), "answer": answer.strip(), "bad_case": bool(bad_case), "severity": severity, "determinable": bool(determinable)}
+        event = {"id": event_id, "question": question.strip(), "answer": answer.strip(), "bad_case": bool(bad_case), "severity": severity, "determinable": bool(determinable), "metrics": metrics, "source": provenance}
         self._create_monitoring_trigger_if_needed(event)
         return event
 
     def monitoring_events(self):
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM monitoring_events ORDER BY created_at DESC").fetchall()
-        return [{**dict(row), "bad_case": bool(row["bad_case"]), "determinable": bool(row["determinable"]), "metrics": _load(row["metrics_json"], None)} for row in rows]
+        return [{**dict(row), "bad_case": bool(row["bad_case"]), "determinable": bool(row["determinable"]), "metrics": _load(row["metrics_json"], None), "source": _load(row["source_json"], {})} for row in rows]
 
     def assess_monitoring_event(self, event_id: str, *, bad_case: bool, severity: str):
         if severity not in {"ordinary", "critical"}:
@@ -1717,14 +1824,19 @@ class GovernanceStore:
 
     def confirm_optimization_trigger(self, trigger_id: str, actor: str):
         with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT * FROM optimization_triggers WHERE id = ?", (trigger_id,)).fetchone()
             if row is None:
                 raise KeyError(trigger_id)
+            if row["status"] == "human_confirmed" and row["optimization_run_id"]:
+                return dict(row)
             if row["status"] != "pending_human_confirm":
                 raise ValueError("Trigger is not pending human confirmation")
-            baseline = connection.execute("SELECT id FROM evaluation_runs WHERE status = 'completed' ORDER BY completed_at DESC LIMIT 1").fetchone()
+            baseline = self.require_current_baseline(connection=connection)
             experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
-            connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline["id"] if baseline else f"MONITORING-{trigger_id}", "pending_agent", _json({"trigger_id": trigger_id}), _now()))
+            event = connection.execute("SELECT * FROM monitoring_events WHERE id=?", (row["event_id"],)).fetchone()
+            context = {"trigger_id": trigger_id, "round": 0, "baseline_id": baseline["id"], "golden_id": baseline["dataset_version_id"], "corpus_fingerprint": _load(baseline["dataset_snapshot_json"], {}).get("corpus_fingerprint"), "baseline_config": baseline["config"], "monitoring_event": {**dict(event), "source": _load(event["source_json"], {}), "metrics": _load(event["metrics_json"], None)} if event else None}
+            connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline["id"], "pending_agent", _json(context), _now()))
             connection.execute("UPDATE optimization_triggers SET status = ?, actor = ?, confirmed_at = ?, optimization_run_id = ? WHERE id = ?", ("human_confirmed", actor, _now(), experiment_id, trigger_id))
             connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("monitoring_trigger", trigger_id, "approved", actor, _now()))
         return self.optimization_trigger(trigger_id)

@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from identity_fixture import completed_baseline
 from app.governance import GovernanceStore
 from app.evaluation import summarize_evaluation_cases
 
@@ -11,6 +12,7 @@ class FinalGovernanceTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / "demo.db")
+        completed_baseline(self.store)
 
     def test_monitoring_trigger_requires_human_confirmation(self):
         event = self.store.record_monitoring_event(

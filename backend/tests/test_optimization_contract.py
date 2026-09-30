@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from identity_fixture import completed_baseline
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
 from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
@@ -35,9 +36,13 @@ class OptimizationContractTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / "demo.db")
+        completed_baseline(self.store, run_id="EVAL-test")
         self.store.record_bad_case("EVAL-test", "Q1", "Generation", "medium", {"reason": "failed"})
 
     def run_drafts(self, result):
+        # Each response is an independent first round; incomplete real rounds remain blocked.
+        self.store = GovernanceStore(Path(self.directory.name) / f"contract-{len(list(Path(self.directory.name).glob('*.db')))}.db")
+        completed_baseline(self.store, run_id="EVAL-test")
         raw = json.dumps(result, ensure_ascii=False)
         provider = FixedProvider(raw)
         try:

@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from api_fixture import main
+from identity_fixture import completed_baseline
 from app.governance import GovernanceStore
 
 
@@ -84,6 +85,7 @@ class GovernanceApiTests(unittest.TestCase):
         self.assertEqual(len(main.store.generation_runs()), 1)
 
     def test_monitoring_trigger_is_pending_until_human_confirm(self):
+        completed_baseline(main.store)
         event = self.client.post("/api/monitoring/events", json={"question": "安全问题", "answer": "错误回答", "bad_case": True, "severity": "critical"}, headers={"Origin": "http://127.0.0.1:5174"})
         self.assertEqual(event.status_code, 201)
         trigger = event.json()["trigger"]
@@ -93,6 +95,7 @@ class GovernanceApiTests(unittest.TestCase):
         self.assertEqual(confirmed.json()["status"], "human_confirmed")
 
     def test_optimization_returns_the_latest_persisted_experiment(self):
+        completed_baseline(main.store, run_id="EVAL-real")
         experiment_id = main.store.create_experiment("EVAL-real")
         main.store.save_agent_trace(experiment_id, "completed", {"root_cause_cluster": "Retrieval Miss"})
 

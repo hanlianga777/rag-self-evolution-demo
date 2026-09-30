@@ -39,6 +39,7 @@ corpus_manager = CorpusManager(ai_service.retriever)
 store.interrupt_revision_runs()
 store.interrupt_generation_runs()
 store.interrupt_evaluation_runs()
+store.interrupt_agent_generations()
 
 
 class PreviewRequest(BaseModel):
@@ -184,31 +185,26 @@ def architecture_delete(slot: Literal["business", "technical"]):
 def overview():
     summary = store.dataset_summary()
     production = store.active_production()
-    latest = [item for item in store.evaluation_runs() if item["status"] != "legacy_unverified" and item["config"].get("run_target") != "sandbox_candidate"][:1]
+    identity = store.current_baseline_identity()
+    baseline = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
     triggers = store.optimization_triggers()
-    return {"data_source": "real", "production": production, "dataset": summary, "latest_evaluation": latest[0] if latest else None, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
+    return {"data_source": "real", "production": production, "dataset": summary, "latest_evaluation": baseline, **identity, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
 
 
 @app.get("/api/workspace")
 def workspace():
     documents = corpus.documents()
-    snapshots = store.dataset_snapshots()
     state = corpus_manager.state()
-    stale = bool(state) and (not snapshots or snapshots[0]["snapshot"].get("corpus_fingerprint") != current_manifest()["sources"])
-    latest_snapshot_id = snapshots[0]["id"] if snapshots and not stale else None
-    current_baseline = next((item for item in store.evaluation_runs() if item["status"] == "completed" and item["dataset_version_id"] == latest_snapshot_id and item["config"].get("run_target") != "sandbox_candidate"), None)
-    return {"name": "机器人智能问答评测与优化 Agent", "environment": "Production Baseline", "document_count": len(documents), "chunk_count": sum(item["chunks"] for item in documents), "active_version": (store.active_production() or {}).get("id"), "corpus_changed_at": state.get("changed_at"), "requires_new_golden": stale, "requires_new_baseline": bool(state) and not stale and current_baseline is None}
+    identity = store.current_baseline_identity()
+    stale = identity["requires_new_golden"]
+    return {"name": "机器人智能问答评测与优化 Agent", "environment": "Production Baseline", "document_count": len(documents), "chunk_count": sum(item["chunks"] for item in documents), "active_version": (store.active_production() or {}).get("id"), "corpus_changed_at": state.get("changed_at"), "requires_new_golden": stale, "requires_new_baseline": not stale and identity["current_baseline_id"] is None, **identity}
 
 
 def require_current_baseline(run_id: str | None = None):
-    if not corpus_manager.state():
-        return
-    snapshots = store.dataset_snapshots()
-    if not snapshots or snapshots[0]["snapshot"].get("corpus_fingerprint") != current_manifest()["sources"]:
-        raise HTTPException(status_code=409, detail="Corpus 已变化；请创建并确认新的 Golden 测试集")
-    run = store.evaluation_run(run_id) if run_id else next((item for item in store.evaluation_runs() if item["status"] == "completed" and item["config"].get("run_target") != "sandbox_candidate"), None)
-    if not run or run["dataset_version_id"] != snapshots[0]["id"]:
-        raise HTTPException(status_code=409, detail="当前 Corpus 需要新的 Baseline；旧实验仅供历史查看")
+    try:
+        return store.require_current_baseline(run_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.get("/api/documents")
@@ -843,8 +839,9 @@ def qc_question(question_id: str):
 
 @app.get("/api/evaluation")
 def evaluation():
-    runs = [item for item in store.evaluation_runs() if item["status"] != "legacy_unverified" and item["config"].get("run_target") != "sandbox_candidate"]
-    return runs[0] if runs else {"status": "not_run", "data_source": "real", "message": "暂无真实实验数据"}
+    identity = store.current_baseline_identity()
+    run = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
+    return {**(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity}
 
 
 @app.get("/api/bad-cases")
@@ -862,10 +859,11 @@ def bad_case(case_id: str):
 
 @app.get("/api/optimization")
 def optimization():
-    experiment = store.latest_experiment()
+    identity = store.current_baseline_identity()
+    experiment = store.experiment(identity["current_experiment_id"]) if identity["current_experiment_id"] else None
     if experiment is None:
-        return {"status": "not_run", "data_source": "real", "message": "需先完成真实 Baseline Evaluation"}
-    return {**experiment, "data_source": "real", "recommendation": store.recommendation(experiment["id"])}
+        return {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"] or "当前 Baseline 尚未运行 Optimization Agent", **identity}
+    return {**experiment, "data_source": "real", "recommendation": store.recommendation(experiment["id"]), **identity}
 
 
 @app.get("/api/versions")
@@ -875,9 +873,11 @@ def versions():
 
 @app.get("/api/pipeline")
 def pipeline():
-    baseline = next((row for row in store.evaluation_runs() if row["status"] == "completed" and row["config"].get("run_target") != "sandbox_candidate"), None)
+    identity = store.current_baseline_identity()
+    baseline = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
     active = store.active_production()
     return {
+        **identity,
         "active_version_id": active["id"] if active else None,
         "config": active["config"] if active else DEFAULT_PIPELINE_CONFIG,
         "baseline_id": baseline["id"] if baseline else None,
@@ -892,7 +892,7 @@ def pipeline():
 
 @app.get("/api/monitoring")
 def monitoring():
-    return {"events": store.monitoring_events(), "triggers": store.optimization_triggers()}
+    return {"events": store.monitoring_events(), "triggers": store.optimization_triggers(), **store.current_baseline_identity()}
 
 
 @app.post("/api/monitoring/events", status_code=201, dependencies=[Depends(require_trusted_origin)])
@@ -939,10 +939,7 @@ def probe_readiness():
 
 @app.post("/api/experiments/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def run_experiments(payload: ExperimentRequest | None = None):
-    require_current_baseline()
-    completed = next((item for item in store.evaluation_runs() if item["status"] == "completed" and item['config'].get('run_target') != 'sandbox_candidate'), None)
-    if completed is None:
-        raise HTTPException(status_code=409, detail="需先完成真实 Baseline Evaluation")
+    completed = require_current_baseline()
     try:
         return OptimizationAgent(store, ai_service.provider).generate(completed["id"], payload.trigger_id if payload else None)
     except ValueError as error:
@@ -1080,7 +1077,7 @@ def preview(payload: PreviewRequest):
     result = ai_service.preview(payload.question)
     baseline = result.get("baseline", {})
     if result.get("mode") in {"live", "local"} and not result.get("fallback_reason"):
-        event = store.record_monitoring_event(question=payload.question, answer=baseline.get("answer", ""), bad_case=False, severity="ordinary", determinable=False, metrics={key: baseline.get(key) for key in ("stages", "token_usage", "estimated_cost", "latency_ms", "input_tokens", "output_tokens")})
+        event = store.record_monitoring_event(question=payload.question, answer=baseline.get("answer", ""), bad_case=False, severity="ordinary", determinable=False, source={"production_version_id": baseline["version"], "production_config": baseline["config"], "corpus_fingerprint": baseline.get("corpus_fingerprint")} if baseline.get("version") and baseline.get("config") else None, metrics={key: baseline.get(key) for key in ("stages", "token_usage", "estimated_cost", "latency_ms", "input_tokens", "output_tokens")})
         result["monitoring_event_id"] = event["id"]
     return result
 
@@ -1099,7 +1096,8 @@ def preview_candidate(payload: PreviewRequest):
 def preview_scheme(payload: SchemePreviewRequest):
     scheme_id = payload.scheme_id
     if scheme_id == "baseline":
-        run = next((row for row in store.evaluation_runs() if row["status"] == "completed" and row["config"].get("run_target") != "sandbox_candidate"), None)
+        identity = store.current_baseline_identity()
+        run = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
         if not run:
             raise HTTPException(status_code=404, detail="Baseline not found")
         config, version, source = run["config"], run["id"], "baseline"

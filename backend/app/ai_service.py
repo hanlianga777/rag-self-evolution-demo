@@ -9,6 +9,7 @@ from .telemetry import measure, collect_usage, estimate_cost
 from .policy import DEFAULT_PIPELINE_CONFIG
 from .providers import ProviderTimeout, ProviderUnavailable
 from .retrieval import VectorRetriever
+from .corpus import current_manifest
 from .governance import GENERATION_PROFILES, _answer_anchor_supported, profile_count
 
 
@@ -541,17 +542,20 @@ class AiService:
         }
 
     def baseline_preview(self, question: str) -> dict:
-        config = (self.store.active_production() or {"config": {"top_k": 4, "min_score": None}})["config"]
+        production = self.store.active_production() or {"id": "baseline-v1", "config": {"top_k": 4, "min_score": None}}
+        config = production["config"]
+        fingerprint = current_manifest()["sources"]
         result = self.answer(question, config)
-        return {"pipeline": "baseline", "question": question, "version": (self.store.active_production() or {"id": "baseline-v1"})["id"], "config": config, "sources": [], **result, "evidence": result["retrieval"], "fallback_reason": None}
+        return {"pipeline": "baseline", "source": "production", "question": question, "version": production["id"], "corpus_fingerprint": fingerprint, "config": config, "sources": [], **result, "evidence": result["retrieval"], "fallback_reason": None}
 
     def candidate_preview(self, question: str) -> dict:
-        candidates = self.store.candidates() if hasattr(self.store, "candidates") else []
+        identity = self.store.current_baseline_identity()
+        candidates = self.store.candidates(identity["current_experiment_id"]) if identity["current_experiment_id"] else []
         candidate = next((item for item in reversed(candidates) if item["status"] == "evaluated" and item["result"].get("qualification", {}).get("qualified")), None)
         if candidate is None:
-            return {"pipeline": "candidate", "question": question, "status": "not_run", "answer": "暂无可比较候选；请先完成真实 Evaluation 与 Sandbox。", "latency_ms": 0, "evidence": [], "retrieval": [], "fallback_reason": None}
+            return {"pipeline": "candidate", "question": question, "status": "not_run", **identity, "answer": "暂无可比较候选；请先完成当前 Baseline 的真实 Evaluation 与 Sandbox。", "latency_ms": 0, "evidence": [], "retrieval": [], "fallback_reason": None}
         result = self.answer(question, candidate["config"])
-        return {"pipeline": "candidate", "question": question, "version": candidate["id"], "config": candidate["config"], "status": "evaluated", **result, "evidence": result["retrieval"], "fallback_reason": None}
+        return {"pipeline": "candidate", "source": "candidate", **identity, "question": question, "version": candidate["id"], "config": candidate["config"], "status": "evaluated", **result, "evidence": result["retrieval"], "fallback_reason": None}
 
     def preview(self, question: str) -> dict:
         try:
