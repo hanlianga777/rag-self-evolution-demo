@@ -18,26 +18,36 @@ class OptimizationAgent:
         # Check identity before budget reads; the short claim serializes duplicate starts.
         self.store.require_current_baseline(baseline_run_id)
         bad_cases = [item for item in self.store.bad_case_rows() if item["run_id"] == baseline_run_id]
-        if not bad_cases:
-            raise ValueError("该 Baseline 没有真实 Bad Case，无法生成 Candidate")
+        trigger = self.store.optimization_trigger(trigger_id) if trigger_id else None
+        existing_id = experiment_id or (trigger or {}).get("optimization_run_id") or self.store.current_baseline_identity()["current_experiment_id"]
+        existing = self.store.experiment(existing_id) if existing_id else None
+        confirmed_context = (existing or {}).get("result", {})
+        trigger = trigger or self.store.optimization_trigger(confirmed_context.get("trigger_id"))
+        event = None
+        if existing and existing["baseline_run_id"] == baseline_run_id and trigger and trigger["status"] == "human_confirmed" and trigger["optimization_run_id"] == existing_id:
+            event = next((item for item in self.store.monitoring_events() if item["id"] == trigger["event_id"] and item["bad_case"] and item["determinable"]), None)
+        if not bad_cases and event is None:
+            raise ValueError("该 Baseline 没有真实 Bad Case，且无已确认、已判定的 Monitoring Bad Case，无法生成 Candidate")
         baseline = self.store.evaluation_run(baseline_run_id)
         base_config = {**DEFAULT_PIPELINE_CONFIG, **baseline["config"]}
         base_config.pop("run_target", None)
-        experiment_id, prior_candidates, round_number, completed = self.store.claim_agent_generation(baseline_run_id, trigger_id, experiment_id)
+        experiment_id, prior_candidates, round_number, completed = self.store.claim_agent_generation(baseline_run_id, trigger_id, existing_id)
         prior = [item["config"] for item in prior_candidates]
         context = self.store.experiment(experiment_id)["result"]
         trigger_id = trigger_id or context.get("trigger_id")
-        monitoring_context = {"trigger": self.store.optimization_trigger(trigger_id), "event": context.get("monitoring_event"), "confirmed_baseline_id": context.get("baseline_id"), "golden_id": context.get("golden_id"), "corpus_fingerprint": context.get("corpus_fingerprint")} if trigger_id else None
+        monitoring_context = {"trigger": self.store.optimization_trigger(trigger_id), "event": event or context.get("monitoring_event"), "confirmed_baseline_id": context.get("baseline_id"), "golden_id": context.get("golden_id"), "corpus_fingerprint": context.get("corpus_fingerprint")} if trigger_id else None
+        monitoring_target_event_ids = [event["id"]] if event else []
         labels = ['A', 'B', 'C'][:min(3, MAX_EVALS - 1 - completed)]
-        audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "root_cause_counts": dict(Counter(item.get("category") or "Unknown" for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases], "monitoring_context": monitoring_context}
+        audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "root_cause_counts": dict(Counter(item.get("category") or "Unknown" for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases], "monitoring_context": monitoring_context, "monitoring_target_event_ids": monitoring_target_event_ids}
         prompt = {
             "bad_cases": bad_cases,
             "monitoring_context": monitoring_context,
+            "monitoring_target_event_ids": monitoring_target_event_ids,
             "baseline_configuration": base_config,
             'prior_sandbox_results': [{'id': item['id'], 'hypothesis': item['reasoning'].get('hypothesis'), 'configuration': item['config'], 'result': item['result'], 'status': item['status']} for item in prior_candidates],
             "allowed_parameter_values": search_space_contract(),
             "excluded_automatic_parameters": sorted(EXCLUDED_AUTOMATIC_PARAMETERS),
-            "rule": f"当前为 Round {round_number}。返回 {','.join(labels)} 并列、可解释 Candidate。One Candidate = One Hypothesis + Minimum Necessary Parameters。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。根据 prior_sandbox_results 调整假设，不能重复已失败配置。",
+            "rule": f"当前为 Round {round_number}。返回 {','.join(labels)} 并列、可解释 Candidate。One Candidate = One Hypothesis + Minimum Necessary Parameters。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。根据 prior_sandbox_results 调整假设，不能重复已失败配置。",
         }
         try:
             content = self.provider.complete(
@@ -97,7 +107,7 @@ class OptimizationAgent:
             for candidate, config in staged:
                 batch.append((f"R{round_number}-{candidate['id']}", config, {
                     "root_cause_cluster": result.get("root_cause_cluster", "待人工复核"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
-                    "changed_parameters": {key: value for key, value in config.items() if value != base_config.get(key)}, "source_trigger_id": trigger_id, "round": round_number, "candidate_label": candidate["id"],
+                    "changed_parameters": {key: value for key, value in config.items() if value != base_config.get(key)}, "source_trigger_id": trigger_id, "monitoring_target_event_ids": monitoring_target_event_ids, "round": round_number, "candidate_label": candidate["id"],
                 }))
             audit["validation_stage"] = "persistence"
             self.store.save_agent_round(experiment_id, batch, {**result, **audit, "validation_stage": "completed", "round": round_number, "evaluation_budget": {"used": completed, "max": MAX_EVALS}})

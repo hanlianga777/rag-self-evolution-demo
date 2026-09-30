@@ -131,6 +131,42 @@ class CurrentIdentityTests(unittest.TestCase):
         with self.store.connection() as connection:
             self.assertEqual(connection.execute('SELECT count(*) FROM experiments').fetchone()[0], 1)
 
+    def test_confirmed_assessed_monitoring_event_starts_without_baseline_bad_cases(self):
+        with self.store.connection() as connection:
+            connection.execute('DELETE FROM bad_cases WHERE run_id=?', (self.baseline,))
+            connection.execute('UPDATE evaluation_case_results SET result_json=? WHERE run_id=?', (json.dumps({'passed': True}), self.baseline))
+        self.store.finish_evaluation_run(self.baseline, 'completed', {'gates': {'passed': True}})
+        frozen_baseline = self.store.evaluation_run(self.baseline)
+        provider = FixedProvider(json.dumps(drafts()))
+        with self.assertRaisesRegex(ValueError, '没有真实 Bad Case'):
+            OptimizationAgent(self.store, provider).generate(self.baseline)
+        self.assertIsNone(provider.prompt)
+        self.assertIsNone(self.store.latest_experiment())
+        event = self.store.record_monitoring_event(question='生产安全问题', answer='生产错误', bad_case=False, severity='ordinary', determinable=False)
+        self.store.assess_monitoring_event(event['id'], bad_case=True, severity='critical')
+        trigger = self.store.optimization_trigger_for_event(event['id'])
+        with self.assertRaisesRegex(ValueError, '已确认、已判定'):
+            OptimizationAgent(self.store, provider).generate(self.baseline, trigger_id=trigger['id'])
+        self.assertIsNone(self.store.latest_experiment())
+        context = self.store.confirm_optimization_trigger(trigger['id'], 'reviewer')['optimization_run_id']
+        response = drafts()
+        for candidate in response['candidates']:
+            candidate['target_bad_cases'] = [event['id']]
+        provider = FixedProvider(json.dumps(response))
+        generated = OptimizationAgent(self.store, provider).generate(self.baseline, experiment_id=context)
+        self.assertEqual(generated['id'], context)
+        self.assertEqual({row['reasoning']['round'] for row in generated['candidates']}, {1})
+        self.assertEqual(len(generated['candidates']), 3)
+        self.assertEqual(provider.prompt['bad_cases'], [])
+        self.assertEqual(provider.prompt['monitoring_target_event_ids'], [event['id']])
+        self.assertEqual(provider.prompt['monitoring_context']['event']['id'], event['id'])
+        self.assertEqual(generated['result']['source_bad_case_ids'], [])
+        self.assertEqual(generated['result']['monitoring_target_event_ids'], [event['id']])
+        self.assertTrue(all(row['reasoning']['monitoring_target_event_ids'] == [event['id']] for row in generated['candidates']))
+        self.assertEqual(self.store.bad_case_rows(), [])
+        self.assertEqual(self.store.evaluation_case_results(self.baseline), [{'question_id': 'Q1', 'passed': True}])
+        self.assertEqual(self.store.evaluation_run(self.baseline), frozen_baseline)
+
     def test_provider_failure_and_stale_baseline_result_leave_no_candidates(self):
         trigger = self.trigger()
         context = self.store.confirm_optimization_trigger(trigger, 'reviewer')['optimization_run_id']
