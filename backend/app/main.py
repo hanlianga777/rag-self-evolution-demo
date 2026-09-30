@@ -843,7 +843,7 @@ def create_generation_snapshot(generation_run_id: str):
 @app.put("/api/governance/questions/{question_id}", dependencies=[Depends(require_trusted_origin)])
 def update_question(question_id: str, payload: QuestionUpdateRequest):
     try:
-        return store.update_question(question_id, payload.question.strip(), payload.reference_answer, payload.evidence, payload.actor, chunks=corpus.chunks())
+        return store.update_question(question_id, payload.question.strip(), payload.reference_answer, payload.evidence, payload.actor, chunks=corpus.chunks(), similarity=ai_service.revision_similarity)
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:

@@ -909,11 +909,14 @@ class GovernanceStore:
             active_ids = set(self.generation_run(run['generation_run_id'])['question_ids'])
             peers = [item for item in self.questions() if item['id'] in active_ids and item["id"] not in drafts]
             for item_id, draft in drafts.items():
-                for peer in peers:
-                    duplicate = _normalized(draft["question"]) == _normalized(peer["question"])
-                    if duplicate:
-                        errors.append(f"{item_id}: 与 {peer['id']} 规范化问题重复")
-                        break
+                seen = [peer['question'] for peer in peers] + [other['question'] for key, other in drafts.items() if key != item_id]
+                validation = validate_golden_candidate(draft, chunks, validation_context={'seen': seen, 'similarity': similarity})
+                duplicates = [error for error in validation['blocking_errors'] if 'duplicate question' in error]
+                errors.extend(f"{item_id}: 重复校验：{error}" for error in duplicates)
+                audit = draft['raw']['validation']
+                audit['blocking_errors'] = list(dict.fromkeys([*audit['blocking_errors'], *duplicates]))
+                audit['warnings'] = list(dict.fromkeys([*audit['warnings'], *validation['warnings']]))
+                audit['valid'] = not audit['blocking_errors']
         changed_fields = {item_id: [field for field in ("question", "reference_answer", "evidence") if draft[field] != run["before"][item_id][field]] for item_id, draft in drafts.items()}
         new_hash = {item_id: self._revision_hash(draft) for item_id, draft in drafts.items()}
         return drafts, errors, new_hash, changed_fields
@@ -1143,7 +1146,7 @@ class GovernanceStore:
             connection.execute("UPDATE candidate_revision_runs SET status=?, audit_json=?, updated_at=? WHERE id=?", (status, _json(audit), _now(), revision_id))
         return self.revision_run(revision_id)
 
-    def update_question(self, question_id: str, question: str, reference_answer: str | None, evidence: list, actor: str, *, chunks=None):
+    def update_question(self, question_id: str, question: str, reference_answer: str | None, evidence: list, actor: str, *, chunks=None, similarity=None):
         self.require_generation_ready(question_id)
         current = self.question(question_id)
         if current["legacy_question_type"] == "v1_mini" and (current["stage"] == "golden" or any(event["decision"] in {"needs_revision", "rejected"} for event in self.review_history(question_id))):
@@ -1151,12 +1154,17 @@ class GovernanceStore:
         changed = (question != current["question"] or reference_answer != current["reference_answer"] or evidence != current["evidence"])
         if not changed:
             return current
+        def peer_scope(items):
+            parent = current['raw'].get('source_reference', {}).get('question_id')
+            run_id = current['raw'].get('generation_run_id')
+            return sorted((item['id'], item['question']) for item in items if item['stage'] != 'superseded' and item['id'] not in {question_id, parent} and (not run_id or item['raw'].get('generation_run_id') == run_id))
+        peers = peer_scope(self.questions())
         validation = None
         if chunks is not None:
             from .golden_v2 import validate_golden_candidate
             run = self.generation_run(current['raw']['generation_run_id']) if current['raw'].get('generation_run_id') else None
             frozen = (run or {}).get('artifacts', {}).get('hard_validation', {}).get('frozen_plan')
-            context = {'slot_id': current['raw'].get('coverage_slot'), 'corpus_fingerprint': current_manifest()['sources']}
+            context = {'seen': [peer[1] for peer in peers], 'similarity': similarity, 'slot_id': current['raw'].get('coverage_slot'), 'corpus_fingerprint': current_manifest()['sources']}
             if frozen and current['test_category'] == 'negative':
                 from .ai_service import AiService
                 try:
@@ -1168,6 +1176,13 @@ class GovernanceStore:
                 raise ValueError('; '.join(validation['blocking_errors']))
         raw = {**current["raw"], "question": question, "reference_answer": reference_answer, "acceptable_evidence": evidence, "evidence": evidence, "validation": validation}
         with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            latest = connection.execute('SELECT updated_at FROM questions WHERE id=?', (question_id,)).fetchone()
+            current_peers = peer_scope([self._row(row) for row in connection.execute('SELECT * FROM questions')])
+            if latest['updated_at'] != current['updated_at'] or current_peers != peers:
+                raise ValueError('题目或同轮候选已变化，请重新验证后提交')
+            if any(_normalized(question) == _normalized(peer[1]) for peer in current_peers):
+                raise ValueError('duplicate question')
             connection.execute("UPDATE questions SET stage = ?, review_status = ?, probe_status = ?, qc_status = ?, question = ?, reference_answer = ?, evidence_json = ?, raw_json = ?, updated_at = ? WHERE id = ?", ("candidate", "human_review_pending", "probe_pending", "qc_pending", question, reference_answer, _json(evidence), _json(raw), _now(), question_id))
             connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (question_id, "dataset", "invalidated", actor, _now()))
             connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "invalidated", actor, _now()))

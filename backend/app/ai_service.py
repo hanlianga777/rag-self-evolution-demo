@@ -180,10 +180,10 @@ class AiService:
             raise ProviderUnavailable("DeepSeek Negative Subtype 未返回有效 JSON") from error
 
     def revision_similarity(self, first: str, second: str) -> float:
-        if not self.retriever._load() or self.retriever._model is None:
-            raise ProviderUnavailable("BGE 模型不可用，不能放行近重复校验")
-        vectors = self.retriever._model.encode([first, second], normalize_embeddings=True)
-        return float(vectors[0] @ vectors[1])
+        # Reuse the cached local model without permitting a download for validation.
+        first_vector = self.negative_topic_embedding(first)
+        second_vector = self.negative_topic_embedding(second)
+        return float(first_vector @ second_vector)
 
     def select_revision_material(self, run: dict, chunks: list[dict]) -> dict:
         """Resolve real, product-scoped source material before asking the model to draft."""

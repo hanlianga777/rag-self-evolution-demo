@@ -207,6 +207,88 @@ class GoldenV2Tests(unittest.TestCase):
         wrong = {**candidate, 'question': 'ModelB电压是多少？', 'reference_answer': '24V', 'evidence': [{'source_chunk_ids': ['L']}]}
         self.assertFalse(validate_golden_candidate(wrong, chunks)['valid'])
 
+    def test_review_bridge_proof_uses_necessary_connected_answer_nodes(self):
+        chunks = [{'chunk_id': 'C1', 'document_id': 'D', 'chunk_text': '设备A 电压：24V'}, {'chunk_id': 'C2', 'document_id': 'D', 'chunk_text': '设备A 容量：10Ah'}, {'chunk_id': 'C3', 'document_id': 'D', 'chunk_text': '设备B 重量：20kg'}]
+        candidate = {'question': '设备A电压和设备B重量是多少？', 'reference_answer': '24V；20kg', 'test_category': 'positive', 'construction_type': 'Bridge', 'evidence': [{'source_chunk_ids': ['C1', 'C2', 'C3']}]}
+        result = validate_golden_candidate(candidate, chunks)
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['construction_checks']['supporting_nodes'], ['C1', 'C3'])
+        self.assertFalse(result['construction_checks']['connected'])
+        valid = {**candidate, 'question': '设备A电压和容量分别多少？', 'reference_answer': '24V；10Ah', 'evidence': [{'source_chunk_ids': ['C1', 'C2']}]}
+        self.assertTrue(validate_golden_candidate(valid, chunks)['valid'])
+        self.assertFalse(validate_golden_candidate({**valid, 'evidence': candidate['evidence']}, chunks)['valid'])
+        chain = [{'chunk_id': 'origin', 'document_id': 'D', 'chunk_text': 'ModelA 电池：PACK-X'}, {'chunk_id': 'target', 'document_id': 'D', 'chunk_text': 'PACK-X 电压：48V'}]
+        linked = {'question': 'ModelA的电池电压是多少？', 'reference_answer': '48V', 'test_category': 'positive', 'construction_type': 'Bridge', 'evidence': [{'source_chunk_ids': ['origin', 'target']}]}
+        result = validate_golden_candidate(linked, chain)
+        self.assertTrue(result['valid'], result['blocking_errors'])
+        self.assertEqual(result['construction_checks']['relations'][0]['relation'], 'entity_reference')
+        planned = build_plan(chain, [[1., 0.], [1., 0.]], self.profile)
+        self.assertEqual(planned['slots'][0]['requirements']['bridge']['relation'], 'entity_reference')
+
+    def test_review_declared_import_scope_preview_confirm_and_normalized_metadata(self):
+        chunks = [{'chunk_id': 'C1', 'document_id': 'D', 'document_name': 'manual.pdf', 'product': 'ModelA', 'version': 'v1', 'chunk_text': 'ModelA 电压：24V'}]
+        def csv_data(product, version):
+            output = io.StringIO(); writer = csv.DictWriter(output, fieldnames=COLUMNS); writer.writeheader()
+            writer.writerow({'Question': '电压是多少？', 'Reference Answer': '24V', 'Evaluation Group': 'positive', 'Evidence': 'ModelA 电压：24V', 'Document': 'manual.pdf', 'Product': product, 'Version': version})
+            return output.getvalue().encode()
+        with patch.object(main, 'store', self.store), patch.object(main.corpus, 'chunks', return_value=chunks), patch.object(main.ai_service, '_indexed_embeddings', return_value=np.ones((1, 2))), patch.object(main.ai_service.provider, 'complete', side_effect=AssertionError('Provider forbidden')):
+            client = TestClient(main.app); headers = {'Origin': 'http://127.0.0.1:5174'}
+            before = len(self.store.questions())
+            for product, version in [('ModelB', 'v1'), ('ModelA', 'v2')]:
+                preview = client.post('/api/governance/imports?filename=scope.csv', content=csv_data(product, version), headers=headers)
+                self.assertEqual(preview.json()['valid_count'], 0)
+                self.assertIn('scope mismatch', str(preview.json()['rows'][0]['errors']))
+                confirm = client.post('/api/governance/imports?filename=scope.csv&confirm=true', content=csv_data(product, version), headers=headers)
+                self.assertEqual(confirm.status_code, 422)
+                self.assertEqual(len(self.store.questions()), before)
+            preview = client.post('/api/governance/imports?filename=scope.csv', content=csv_data('ModelA', 'v1'), headers=headers)
+            self.assertEqual(preview.json()['valid_count'], 1)
+            confirm = client.post('/api/governance/imports?filename=scope.csv&confirm=true', content=csv_data('ModelA', 'v1'), headers=headers)
+            self.assertEqual(confirm.status_code, 200)
+            saved = self.store.question(confirm.json()['question_ids'][0])
+            self.assertEqual((saved['raw']['product'], saved['raw']['version']), ('ModelA', 'v1'))
+            self.assertTrue(validate_golden_candidate(saved, chunks)['valid'])
+
+    def test_similarity_reuses_local_embedding_without_download(self):
+        from types import SimpleNamespace
+        model = Mock(); model.encode.return_value = np.array([[1., 0.]])
+        factory = Mock(return_value=model)
+        service = AiService(self.store, Mock(), Mock(), True)
+        with patch.dict('sys.modules', {'sentence_transformers': SimpleNamespace(SentenceTransformer=factory)}):
+            self.assertEqual(service.revision_similarity('问题A', '问题B'), 1.)
+        self.assertEqual(factory.call_count, 1)
+        self.assertTrue(factory.call_args.kwargs['local_files_only'])
+        self.assertEqual(model.encode.call_count, 2)
+
+    def test_review_direct_edit_duplicate_semantic_policy_and_peer_race(self):
+        chunks = self.chunks[:1]
+        candidates = [{'question': question, 'test_category': 'positive', 'reference_answer': '断电后维护设备。', 'evidence': [{'source_chunk_ids': ['C000']}], 'import_row': index} for index, question in enumerate(('设备A如何维护？', '设备B要怎样保养？'))]
+        first, second = self.store.save_business_candidates(candidates, 'duplicates.csv', 'hash')
+        original = self.store.question(second)
+        with self.assertRaisesRegex(ValueError, 'duplicate'):
+            self.store.update_question(second, candidates[0]['question'], candidates[1]['reference_answer'], candidates[1]['evidence'], 'fixture', chunks=chunks)
+        self.assertEqual(self.store.question(second), original)
+        calls = []
+        def similar(a, b):
+            calls.append((a, b)); return .99
+        with self.assertRaisesRegex(ValueError, 'near duplicate'):
+            self.store.update_question(second, '如何维护设备A呢？', candidates[1]['reference_answer'], candidates[1]['evidence'], 'fixture', chunks=chunks, similarity=similar)
+        self.assertEqual(len(calls), 1)
+        updated = self.store.update_question(second, '断电后保养有哪些注意事项？', candidates[1]['reference_answer'], candidates[1]['evidence'], 'fixture', chunks=chunks, similarity=lambda a, b: .1)
+        self.assertEqual((updated['probe_status'], updated['qc_status'], updated['review_status']), ('probe_pending', 'qc_pending', 'human_review_pending'))
+        self.assertTrue(updated['raw']['validation']['valid'])
+        raced = False
+        def mutate_peer(a, b):
+            nonlocal raced
+            if not raced:
+                raced = True
+                with self.store.connection() as conn:
+                    conn.execute('UPDATE questions SET question=? WHERE id=?', ('维护步骤已更改', first))
+            return .1
+        with self.assertRaisesRegex(ValueError, '已变化'):
+            self.store.update_question(second, '保养前如何准备？', candidates[1]['reference_answer'], candidates[1]['evidence'], 'fixture', chunks=chunks, similarity=mutate_peer)
+        self.assertEqual(self.store.question(second)['question'], updated['question'])
+
     def test_ds01_03_migration_legacy_adapter_and_preview_no_mutation(self):
         with self.store.connection() as conn:
             before = [tuple(row) for row in conn.execute('SELECT * FROM dataset_versions')]

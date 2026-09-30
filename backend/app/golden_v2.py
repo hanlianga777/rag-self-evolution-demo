@@ -12,6 +12,7 @@ import numpy as np
 PLANNER_VERSION = 'golden-planner-v2.1'
 VALIDATOR_VERSION = 'golden-validator-v2.1'
 PARAMETERS = {'target_cluster_size': 40, 'min_cluster_size': 3, 'seed': 42, 'n_init': 10, 'max_iter': 100, 'distance': 'squared_euclidean_on_l2_normalized_vectors'}
+DUPLICATE_SIMILARITY_THRESHOLD = 0.92
 SPECIAL_LIMITS = {'mini': 2, 'medium': 4, 'full': 8}
 GROUPS = ('positive', 'ablation', 'negative')
 KINDS = ('Fact', 'Aggregation', 'Bridge', 'Ordinary')
@@ -38,6 +39,13 @@ def bridge_material(first, second):
     if first.get('product') and second.get('product') and first['product'] != second['product']:
         return None
     left, right = facts(first), facts(second)
+    for origin, destination, direction in ((left, right, 'forward'), (right, left, 'reverse')):
+        for key, value in origin:
+            parts = key.split()
+            for other, other_value in destination:
+                target = other.split()
+                if len(parts) >= 2 and len(target) >= 2 and normalize(value) == normalize(target[0]) and parts[0] != target[0]:
+                    return {'entity': parts[0], 'bridge_entity': target[0], 'target_attribute': ''.join(target[1:]), 'facts': [f'{key}：{value}', f'{other}：{other_value}'], 'relation': 'entity_reference', 'direction': direction}
     # Explicit shared entity + different attributes only; no guessed semantic relation.
     for key, value in left:
         parts = key.split()
@@ -59,7 +67,7 @@ def largest_remainder(total, sizes):
 
 def cluster_vectors(vectors, k):
     from sklearn.cluster import KMeans
-    labels = KMeans(n_clusters=k, random_state=PARAMETERS['seed'], n_init=PARAMETERS['n_init'], max_iter=PARAMETERS['max_iter']).fit_predict(vectors)
+    labels = KMeans(n_clusters=min(k, len(np.unique(vectors, axis=0))), random_state=PARAMETERS['seed'], n_init=PARAMETERS['n_init'], max_iter=PARAMETERS['max_iter']).fit_predict(vectors)
     groups = {int(i): np.where(labels == i)[0].tolist() for i in sorted(set(labels))}
     merges = []
     while len(groups) > 1:
@@ -174,13 +182,55 @@ def construction_checks(kind, answer, sources, candidate):
         if len(items) < 2 or not all(item['supported'] and item['included'] for item in checks['items']):
             checks.update(status='failed', reason='Aggregation 缺少逐项支持或答案未覆盖范围内全部条目')
     if kind == 'Bridge':
-        relations = [bridge_material(a, b) for i, a in enumerate(sources) for b in sources[i + 1:]]
-        checks['relations'] = [r for r in relations if r]
-        checks['necessary'] = len(sources) >= 2 and answer_supported(answer, sources) and not any(answer_supported(answer, [c]) for c in sources)
+        # Remove redundant sources from the proof before inspecting relationships.
+        # Otherwise an unrelated extra node can lend a relationship to a different answer.
+        needed = sorted(sources, key=lambda c: c['chunk_id'])
+        chain = None
+        question = normalize(candidate.get('question') or '')
+        for i, left in enumerate(needed):
+            for right in needed[i + 1:]:
+                relation = bridge_material(left, right)
+                if relation and relation['relation'] == 'entity_reference':
+                    origin, target = (left, right) if relation['direction'] == 'forward' else (right, left)
+                    if normalize(relation['entity']) in question and normalize(relation['bridge_entity']) not in question and normalize(relation['target_attribute']) in question and answer_supported(answer, [target]) and not answer_supported(answer, [origin]):
+                        chain = [origin, target]
+                        break
+            if chain:
+                break
+        checks['necessity_basis'] = 'question_entity_reference_and_answer' if chain else 'joint_answer_facts'
+        if chain:
+            checks['question_scope'] = {'entity': relation['entity'], 'bridge_entity': relation['bridge_entity'], 'target_attribute': relation['target_attribute']}
+            needed = chain
+        for node in [] if chain else list(needed):
+            remaining = [other for other in needed if other['chunk_id'] != node['chunk_id']]
+            if answer_supported(answer, remaining):
+                needed = remaining
+        checks['supporting_nodes'] = [c['chunk_id'] for c in needed]
+        checks['redundant_nodes'] = sorted(set(checks['nodes']) - set(checks['supporting_nodes']))
+        relations = []
+        adjacency = {c['chunk_id']: set() for c in needed}
+        for i, left in enumerate(needed):
+            for right in needed[i + 1:]:
+                relation = bridge_material(left, right)
+                if relation:
+                    relations.append({**relation, 'nodes': [left['chunk_id'], right['chunk_id']]})
+                    adjacency[left['chunk_id']].add(right['chunk_id'])
+                    adjacency[right['chunk_id']].add(left['chunk_id'])
+        connected, pending = set(), list(adjacency)[:1]
+        while pending:
+            node = pending.pop()
+            if node not in connected:
+                connected.add(node)
+                pending.extend(adjacency[node] - connected)
+        checks['relations'] = relations
+        checks['necessary'] = len(needed) >= 2 and answer_supported(answer, needed)
+        checks['connected'] = bool(adjacency) and connected == set(adjacency)
         if not checks['necessary']:
             checks.update(status='failed', reason='Bridge 需联合证据；单 Chunk 可答或联合证据仍不足')
-        elif not checks['relations']:
-            checks.update(status='needs_review', reason='Bridge 共同实体/关系无法确定，需复核')
+        elif not checks['connected']:
+            checks.update(status='needs_review', reason='Bridge 必要答案节点之间缺少可验证关联路径，需复核')
+        elif checks['redundant_nodes']:
+            checks.update(status='needs_review', reason='Bridge 含不必要证据节点，请移除后复核：' + ', '.join(checks['redundant_nodes']))
     return checks
 
 
@@ -198,8 +248,17 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
         errors.append('invalid construction_type')
     if 'user_query' in c and c['user_query'] != question:
         errors.append('question/user_query mismatch')
-    if normalize(question) in {normalize(s) for s in context.get('seen', [])}:
+    peers = sorted(set(context.get('seen', [])))
+    if normalize(question) in {normalize(s) for s in peers}:
         errors.append('duplicate question')
+    elif peers and context.get('similarity'):
+        try:
+            if any(context['similarity'](question, peer) >= DUPLICATE_SIMILARITY_THRESHOLD for peer in peers):
+                errors.append('near duplicate question')
+        except (OSError, ValueError, RuntimeError) as error:
+            warnings.append('近重复语义校验未完成，需复核：' + str(error))
+    elif peers:
+        warnings.append('近重复语义校验未执行；已执行规范化精确去重')
     if re.search(r'^(上文|上述|图中|表中|它)(?:的|中|是|怎么|如何|能|有)', question):
         errors.append('问题缺少独立实体上下文')
     if re.search(r'(第几页|多少页|页码|目录有几|章节有几)', question):
@@ -257,6 +316,13 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
             errors.append('missing answer or valid evidence')
         elif not answer_supported(answer, sources):
             errors.append('unsupported answer anchor')
+        for field in ('product', 'version'):
+            declared = c.get(field) or (c.get('import_fields') or {}).get(field.title())
+            if declared:
+                c[field] = declared
+                mismatches = [source['chunk_id'] for source in sources if normalize(str(source.get(field) or '')) != normalize(str(declared))]
+                if mismatches:
+                    errors.append(f'Declared {field} scope mismatch: {declared}; Evidence ' + ', '.join(mismatches))
         products = {s['product'] for s in sources if s.get('product')}
         versions = {s['version'] for s in sources if s.get('version')}
         for field in ('product', 'version', 'entity', 'model'):
