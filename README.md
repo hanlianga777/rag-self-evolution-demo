@@ -1,57 +1,49 @@
 # RAG Evolution
 
-当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
+面向企业知识问答的评测驱动 RAG 质量运营与版本决策 Demo。
 
-## Phase 1（2026-09-30）
+**唯一当前目标规格：[SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md)**（2026-09-30）。本次交付为规格与架构同步，V1.4 业务代码未在本次升级或验收。[SPEC ChangeLog](docs/SPEC_CHANGELOG.md) 记录历史；已保存 Demo 来源见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md)，既有实现验收见 [Phase 1 报告](docs/PHASE1_VERIFICATION.md)。这些历史证据不能替代 V1.4 验收。
 
-Golden 新增“业务导入 / 候选池”：下载 CSV/XLSX 模板 → 填写显式 Evaluation Group 和当前 Corpus 证据原文 → 预览逐行错误 → 确认导入 → 按 Mini/Medium/Full 配额复制新 Run → 原 Probe/QC/人工审核/Gate 1。导入和选题不调用模型。
+## 产品闭环
 
-QA 参数差异直接读取配置；会话恢复不请求 Provider，同来源同配置禁止自比。实际回答/Judge 的阶段和完整 Usage 只记录未来调用，历史不回填。默认无费用；`RAG_PRICE_CONFIG` 配置格式见 SPEC 补充。
+`知识库 → Golden 规划与治理 → Gate 1 → Baseline / Bad Case → Optimization Agent → A/B/C → Sandbox / Regression → Gate 2 → 条件 D → Gate 3 人工发布 → Production → 问答验证 / Monitoring → 人工确认 Trigger → 下一轮优化`
 
-验证：`cd backend && python3 -m unittest discover -s tests`；`cd frontend && npm test && npm run build`；浏览器脚本 `scripts/test_phase1_ui.mjs` 仅连接隔离 :5180/:8011（`RAG_PLAYWRIGHT_MODULE` 可指定已安装 Playwright）。禁止把它指向真实 API。
+只有 Optimization Agent 是主 Agent。Hard Gate 与 Regression 决定资格，Overall 仅用于比较；D 未通过或未优于 Winner 时保留 Winner。不自动改知识、调参、发布或回滚。
 
+目标一级模块顺序：RAG 自进化项目概览、知识库、Pipeline 配置、Golden Dataset、Baseline、Agent 工作台、发布、问答验证。Monitoring 为问答验证二级 Tab；保留现有 Hash/兼容入口，目标名称与 H1 一致。
 
-> 机器人官方 PDF 知识问答的可审计 RAG 自进化 Demo。
+## 当前实现与 V1.4 目标
 
-## Current Project Stage
+| 已有源码机制（历史验证见 Phase 1） | V1.4 目标增量（尚未在本次实施/验收） |
+| --- | --- |
+| 动态 Corpus、逐 Slot 保存/补题、Mini/Medium/Full Profile、业务 CSV/XLSX 候选池 | Dynamic K-means、小簇合并、主题厚度 Slot、AI/导入/Pool 共用 Plan 匹配 |
+| Hard Validation、Probe/QC、人审与冻结快照 | 统一校验规则、Group × Construction、候选召回/Final Context 双层 trace、原解析全文 Negative Probe |
+| Baseline、A/B/C、Sandbox、Regression、条件 D、人工发布与版本回退 | Current Baseline resolver、Experiment 强绑定、Monitoring Pending Context / 首轮 / 幂等 |
+| 共享 UI、问答来源对比、实际阶段/Usage、可选集中价格配置 | 全局及逐页信息架构、成本缺失原因与价格版本、V1.4 全部离线验收 |
 
-- **唯一当前产品规则：** [RAG Self-Evolution SPEC V1.3](docs/RAG_SELF_EVOLUTION_SPEC.md)；[SPEC ChangeLog](docs/SPEC_CHANGELOG.md) 只记录历史。运行状态仍以 SQLite 审计和 API 为准。
-- **当前真实状态：** 以当前完整 Run 的活动题目及 API 为准；旧 Run、已替换题和 Legacy 不混入当前统计。实施与验收不代用户审核、应用 Preview 或发布。
-- **No fabricated results:** 40 条历史 Candidate 和任何 Demo Seed 不代表已验证 Golden、评测分数、推荐或发布结果。
+源码证据和需求 ID 对照见 [SPEC 第 3 节](docs/RAG_SELF_EVOLUTION_SPEC.md#3-需求追踪与当前实现证据)。当前冻结 Golden 不能因为文档更新而称为 V2 生成；历史未采集字段不回填。Snapshot、Baseline、Candidate 与 Production 分别保留自己的来源。
 
-## V1.3 主线
+## 目标架构（V1.4）
 
-`知识入库 → Golden Mini 8/4/8、Medium 20/9/20 或 Full 40/18/40（逐 Slot 校验与局部补题）→ Gate 1 人工确认并冻结 → Baseline 报告／门禁／逐题诊断 → Tuning Agent A/B/C Sandbox → Gate 2 报告确认并选赢家 → Composite D 决策与复验 → Gate 3 人工发布 → 问答试验`
+两张图依据最新设计从头生成，表达目标职责与数据流，不证明当前 Demo 已具备全部新能力。
 
-只有 Tuning 是 Agent；Generation、QC、Evaluation 是受控工作流。动态文档清单、Embedding 主题配额不依赖四份示例 PDF。Positive/Ablation 检索未命中记为 P1；QC 按 P0/P1/P2 给理由，分数辅助展示。机器 P0 可明确接受并说明，确定性错误与 Fake Negative 不能豁免。Ablation 独立治理。
+![V1.4 RAG Evolution 业务架构图](架构/业务流程图.png)
 
-- SQLite 兼容迁移保存 Coverage / Question Plan、Golden、Probe/QC、评测逐题证据、Gate、Regression、Candidate、Recommendation、Monitoring Trigger、版本快照与审计记录，不删除历史数据库。
-- 检索实际按 `CandidateK → Vector/BM25 normalized Hybrid → optional Lightweight Rerank → MinScore → TopK Context → DeepSeek` 执行；当前重排并非独立 Rerank Model。所有配置受冻结 Search Space、依赖和去重约束；A/B/C/D 共用 12 次预算，启动即占用（失败不退），为 D 保留一次。
-- Production 问答先记录为待人工判定的 Monitoring Event；人工标记 Bad Case 后，系统在一个 Safety Critical Bad Case 或最近 20 个有效记录中至少 4 个 Bad Case 时创建 Pending Trigger。流程固定为 `Monitoring → Trigger → Human Confirm → Optimization Run`，不会自动调参或发布。
-- Gate 2 在已启动评测全部终结后确认报告并选合格赢家。D 只合并有实测修复、Regression 通过的配置差异，冲突保留赢家；新组合完整重评且比赢家无新增失败、有实际修复才替代。无有效组合不虚构 D。Overall Score 不能替代 11 Gate。Monitoring、Version History 和 Rollback 是辅助能力。
-- `baseline-v1` 是启动用 Pipeline Bootstrap 配置，不是经过 Sandbox 与人工发布的 Production Version。旧 `seed.py` 只用于历史/开发数据，不进入当前 V1 主流程。
-- 八个 Hash 工作区按七阶段 Lifecycle 展示；`GET /api/pipeline` 只读返回当前配置、索引信息及与 Validator 同源的冻结 Search Space。问答试验的 Before / After 只接受已保存的 Baseline、Candidate 或 Production Version ID；发布后默认比较上一版本和当前版本。历史逐题 Evaluation 与手动触发的实时预览分开标注，实时预览可能调用 Provider。
-- DeepSeek 不可用时，页面显示明确状态，不生成模拟回答、分数、推荐或发布记录。可用时记录流式 TTFT、Token Usage；Provider 未返回成本时显示 `Token Usage / Provider Cost unavailable`。
+![V1.4 RAG Evolution 技术架构图](架构/技术架构图.png)
 
-## 架构
+可编辑图源：[业务架构 HTML](架构/业务流程图.html) · [技术架构 HTML](架构/技术架构图.html)。模块边界及现有/目标差异见 [平台架构说明](架构/RAG自进化平台架构说明.md)。PNG 为 2560×1440；HTML 内嵌 SVG，可独立浏览。
 
-![RAG Evolution 业务流程图](架构/业务流程图.png)
+## 本地启动与恢复
 
-![RAG Evolution 技术架构图](架构/技术架构图.png)
-
-可编辑图源：[业务流程图 HTML](架构/业务流程图.html) · [技术架构图 HTML](架构/技术架构图.html)。详细模块边界见 [平台架构说明](架构/RAG自进化平台架构说明.md)。
-
-## 本地启动
-
-前置条件：Python 3.10+、Node.js 20+、npm。
+前置条件：Python 3.10+、Node.js 20+、npm。保留现有启动入口：
 
 ```bash
 ./start.sh
 ```
 
-打开 [http://127.0.0.1:5174](http://127.0.0.1:5174)，API 文档位于 [http://127.0.0.1:8010/docs](http://127.0.0.1:8010/docs)。
+前端：[http://127.0.0.1:5174](http://127.0.0.1:5174)；API 文档：[http://127.0.0.1:8010/docs](http://127.0.0.1:8010/docs)。已有后台服务重启后先检查端口/PID/目录，避免另开重复进程；本次不启动或重启服务。
 
-手动启动：
+手动启动方式仍为：
 
 ```bash
 python3 -m pip install -r backend/requirements.txt
@@ -59,7 +51,24 @@ PYTHONPATH=backend python3 -m uvicorn app.main:app --port 8010
 cd frontend && npm install && npm run dev
 ```
 
-将 `.env.example` 复制为 `.env` 并设置 `DEEPSEEK_API_KEY` 后，才可执行真实 Golden Generation、QC、回答、Judge、评测与 Agent。原始 PDF 不上传；显式运行回答、QC、评测或 Agent 时，相关 Chunk 会发送给 DeepSeek。
-DeepSeek 单次请求默认超时 60 秒，可用 `DEEPSEEK_TIMEOUT_SECONDS` 调整；Revision 生成和质量检查遇明确超时仅自动重试一次，应用后的质量运行失败可从已持久化的 Probe/QC 状态手动继续，不会重新应用草案。
-Revision Preview 中“重新生成”保留当前证据；“重新选材并生成”使用最新修订原因重新选择同产品真实材料。两者都不会自动应用 Candidate 或批准 Golden。
-答案锚点失败时，修订界面根据当前意图推荐沿用证据重写或重新选材；无可靠材料会要求修改意图或手选真实 Chunk。新的 Generation Run 逐题保存通过 Hard Validation 的 Candidate；未达到所选 Profile 的 20／49／98 题时仅可查看并局部补题，补齐后才执行 Probe / QC 与人工审核。旧 Run 保持历史只读。Baseline 报告读取保存的 Evaluation Snapshot；旧 Run 未采集的字段显示“未采集”或“未记录”。Generation 进度取自已持久化 Slot 和 Probe / QC 计数；单题修订仍只显示阶段和耗时。服务重启保留审计，新 Generation Run 在生成阶段中断后可手动补题，Probe / QC 中断需手动重试。隔离验收可在启动 API 前设置 `RAG_DEMO_DB_PATH` 指向临时 SQLite；默认仍为 `backend/data/demo.db`。
+真实调用前在本地 `.env` 配置 `DEEPSEEK_API_KEY`。Key、真实 DB、备份和索引产物不提交 GitHub。Provider 不可用时返回明确状态，不创建模拟回答、评测或发布结果。相关 Chunk 会随显式回答/QC/Judge/Agent 请求发送给 Provider。
+
+Golden 失败时保留已合格 Slot，使用现有补失败题入口；Probe/QC 中断使用现有重试入口，不重做已应用修订、不自动批准。历史 Snapshot 只读；当前界面已有历史入口，移到统一 Drawer 是 V1.4 UI 目标。
+
+## Preview 与真实验证边界
+
+**V1.4 Planner Preview 是待实施能力**：目标入口为 Golden 的 Coverage 规划，使用当前已存向量，展示动态 K、merge、Slot、材料与缺口；不调用生成/Judge/QC，不改变当前 Golden/Baseline/Production。不在当前界面承诺已可使用的 V2 Preview 路由。
+
+以下三项是 V1.4 实施及离线验收后的手动验证清单，本次未执行：
+
+1. 手动运行一次 Baseline vs Production 实时问答对比，查看真实回答、证据、Usage、Latency 与成本缺失原因。
+2. Production QA → 人工判 Bad Case → Confirm Trigger → 手动启动首轮 Agent；可能创建实验并耗用 Provider/预算，不自动 Sandbox 或发布。
+3. 运行 V2 Planner Preview，核对动态 K、小簇合并与 Slot，不接着自动生成 Golden。
+
+若要将当前演示数据称为 V2，需要另行生成、人工审核并冻结 V2 Golden，然后在同一新 Snapshot 上执行 Baseline/实验与验证。历史 Seed、Legacy、Fixture 或离线 Stub 均不是正式真实 Provider 结果。
+
+## 验证入口
+
+现有业务测试：`cd backend && python3 -m unittest discover -s tests`；`cd frontend && npm test && npm run build`。测试必须使用隔离 DB/Stub，不消耗真实 Provider 配额；`scripts/test_phase1_ui.mjs` 仅允许隔离 :5180/:8011。
+
+本次文档/图检查与数据保护结果见 [V1.4 同步验收](docs/V1_4_DOCS_SYNC_VERIFICATION.md)。没有将既有测试数字重新记为 V1.4 业务通过。

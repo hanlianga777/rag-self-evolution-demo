@@ -1,4 +1,8 @@
-# V1.3 架构说明
+# 架构说明（V1.4 目标 / Phase 1 实现边界）
+
+> **2026-09-30 文档同步边界：** 唯一当前目标规格为 [SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md)，两张架构图已按最新设计重绘为目标架构。本次没有业务代码、数据库或索引升级，没有 Provider 或发布重跑；下方 Phase 1 / V1.3 内容保留为现有实现及历史证据，不能表示 V1.4 全部已完成。需求状态和未决项以 SPEC 第 3–4 节为准。
+
+完整 V1.4 模块与数据流见 [平台架构说明](架构/RAG自进化平台架构说明.md)；下方是升级前底座说明，新的 Dynamic K-means、Pool Slot 匹配、resolver 与原解析全文不能据此宣称已实现。
 
 当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
 

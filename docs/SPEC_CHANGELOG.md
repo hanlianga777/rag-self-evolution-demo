@@ -1,6 +1,14 @@
 # RAG Self-Evolution SPEC ChangeLog
 
-本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.3 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
+本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.4 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
+
+## V1.4 — Golden Engine V2 & Identity-Bound Evolution（2026-09-30）
+
+- 来源：`RAG_SELF_EVOLUTION_CODEX_MASTER_PROMPT_20260930.md` 及用户确认的文档同步范围；唯一目标规格升为 V1.4，旧规则在 SPEC 文末标为 Superseded。
+- 纳入 P0-01–04、GV2-01–05、COST-01、UI-01、SAFE-01、QA-01：当前对象绑定、Monitoring 首轮、动态 Coverage/Slot、双维度构造、统一校验、双层 Probe、原解析全文与原子 bundle、Usage/Cost、逐页 UI、兼容及离线验收矩阵。
+- Search Space、11 Hard Gates、固定 Regression、12 次 Sandbox 预算、条件 D 和 Gate 1/2/3 人工边界未变；QC P0 接受范围的材料冲突记录为 `[OPEN-QC-P0]`，本次不改变现有行为。
+- README、平台架构说明同步；业务架构与技术架构从头重绘为 V1.4 目标架构，重新生成 HTML/内嵌 SVG 与 PNG，不复用旧布局。
+- **交付类型：仅文档与图。** 没有业务代码、API、数据或索引迁移，没有真实 Provider/Golden/Baseline/Agent/Sandbox/发布重跑。目标规格同步不代表 V1.4 已实现或已验收；当前静态差异记录于 SPEC 第 3 节，Phase 1 报告保留历史事实。
 
 ## V1.3 — Friend-Aligned Evaluation & Experiment UX（2026-09-28）
 

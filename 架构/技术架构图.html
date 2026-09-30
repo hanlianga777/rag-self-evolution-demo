@@ -1,10 +1,119 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>V1.3 RAG 自进化技术架构图</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#f7f5f0;color:#2d3142;font:15px Arial,"Microsoft YaHei",sans-serif}.canvas{width:1280px;height:720px;padding:36px 42px}h1{font-size:25px;margin:0 0 7px}p{margin:0;color:#5e697a}.columns{display:grid;grid-template-columns:215px 370px 355px 185px;gap:14px;margin-top:32px}.group{background:#fffdf9;border:1px solid #c9c7c0;border-radius:14px;padding:18px;min-height:470px}.group h2{font-size:13px;letter-spacing:2px;color:#c85b30;margin:0 0 16px}.node{border:1px solid #afb4bc;background:white;border-radius:10px;padding:13px 12px;margin:12px 0;line-height:1.45}.node strong{display:block;font-size:15px;margin-bottom:3px}.node small{font-size:12px;color:#596578}.focus{background:#fff0e8;border-color:#eb6c36}.footer{margin-top:28px;background:#fff0e8;border-radius:10px;padding:17px;font-size:13px;color:#4f5d75}
-</style></head><body><main class="canvas"><h1>RAG Self-Evolution · V1.3 技术架构</h1><p>单体 FastAPI + SQLite + 本地索引；所有业务写入均经过服务端策略与人工边界。</p><div class="columns">
-<section class="group"><h2>INTERACTION</h2><div class="node"><strong>React / TypeScript / Vite</strong><small>八个一级工作区</small></div><div class="node focus"><strong>Human Actions</strong><small>Gate 1 Golden · Gate 2 报告与赢家 · Gate 3 发布；辅助 Trigger / Rollback</small></div></section>
-<section class="group"><h2>FASTAPI SERVICES</h2><div class="node focus"><strong>Policy Boundary</strong><small>Origin · 确定性证据 / Negative · QC 风险理由 · 11 Hard Gates · Regression</small></div><div class="node"><strong>Governance / Evaluation</strong><small>CSV 标准库 / XLSX openpyxl · 原文预览 · 统一候选池复制 · 原 Probe / QC / Gate</small></div><div class="node"><strong>Optimization Agent</strong><small>唯一 Agent：历史 / 假设 → A/B/C → 报告确认 → D 合并复验；总预算 12</small></div><div class="node"><strong>Release / Version / Monitoring</strong><small>一次 Human Release · Version Snapshot · Rollback · Human Confirm Trigger</small></div></section>
-<section class="group"><h2>DATA & RETRIEVAL</h2><div class="node"><strong>PDF → Parsed Chunks</strong><small>动态清单 + Embedding 主题配额；产品 / 章节可选</small></div><div class="node"><strong>BGE Embedding + FAISS</strong><small>真实本地向量索引</small></div><div class="node"><strong>Vector / BM25 Hybrid</strong><small>CandidateK → 归一化融合 → 可选 Lightweight Rerank → MinScore → TopK</small></div><div class="node focus"><strong>SQLite Audit</strong><small>Candidate JSON：来源 / 题型 / Usage / 阶段；Monitoring nullable metrics_json；历史不回填</small></div></section>
-<section class="group"><h2>MODEL</h2><div class="node"><strong>DeepSeek Provider / Usage</strong><small>显式调用回答、Golden 生成 / QC、Judge、Agent</small></div><div class="node"><strong>Fail Closed</strong><small>不可用时不伪造答案、分数、赢家或发布</small></div></section>
-</div><div class="footer">数据流：Frontend → FastAPI → SQLite / PDF / BGE-FAISS / BM25 / DeepSeek。轻量重排不是独立 Rerank Model；Sandbox 仅保存候选配置与评测，不变更 Production。</div></main></body></html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>离线治理、在线问答与数据支撑的职责边界 · V1.4 目标架构</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#f5f7f8;font-family:"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",Arial,sans-serif}main{max-width:1280px;margin:auto}svg{display:block;width:100%;height:auto}@media print{main{max-width:none}}</style>
+</head>
+<body>
+<main>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-labelledby="rag-technical-v14-title rag-technical-v14-desc">
+<title id="rag-technical-v14-title">离线治理、在线问答与数据支撑的职责边界</title>
+<desc id="rag-technical-v14-desc">V1.4 目标技术架构区分接入、离线 Golden 与评测优化、在线检索问答以及 Corpus 和 SQLite 支撑，显示显式 Provider 调用、原子产物、双层检索 trace 与真实遥测。</desc>
+<defs>
+<marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+<path d="M0 0 L8 3 L0 6 Z" fill="#536474"/>
+</marker>
+<marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+<path d="M0 0 L8 3 L0 6 Z" fill="#ba5e35"/>
+</marker>
+<marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+<path d="M0 0 L8 3 L0 6 Z" fill="#426b88"/>
+</marker>
+</defs>
+<rect x="0" y="0" width="1280" height="720" rx="0" fill="#f5f7f8" stroke="none" class=""/>
+<text x="40" y="40" font-size="12" fill="#536474" font-weight="600" text-anchor="start" class="">RAG EVOLUTION  /  V1.4 目标架构  /  2026-09-30</text>
+<text x="40" y="84" font-size="32" fill="#263647" font-weight="600" text-anchor="start" class="">离线治理、在线问答与数据支撑的职责边界</text>
+<text x="40" y="116" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="">单体 FastAPI + SQLite；保留 Parser / Chunk / BGE / FAISS / DeepSeek，新增能力均为 V1.4 目标。</text>
+<rect x="40" y="240" width="784" height="284" rx="8" fill="#edf1f3" stroke="#dce3e7" class=""/>
+<text x="56" y="268" font-size="16" fill="#536474" font-weight="600" text-anchor="start" class="">离线治理与版本决策 · 与在线问答分开</text>
+<rect x="864" y="240" width="376" height="284" rx="8" fill="#edf1f3" stroke="#dce3e7" class=""/>
+<text x="880" y="268" font-size="16" fill="#536474" font-weight="600" text-anchor="start" class="">在线问答 Runtime</text>
+<rect x="40" y="548" width="1200" height="140" rx="8" fill="#edf1f3" stroke="#dce3e7" class=""/>
+<text x="56" y="576" font-size="16" fill="#536474" font-weight="600" text-anchor="start" class="">数据与审计支撑 · 同一 Corpus 身份 / 不可变历史</text>
+<path d="M432 216 V292" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M816 216 V276 Q816 284 824 284 H1044 Q1052 284 1052 292" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M548 292 V252 Q548 244 556 244 H808 a8 8 0 0 1 16 0 H896 Q904 244 904 236 V216" fill="none" stroke="#426b88" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arrow-link)"/>
+<rect x="568" y="220" width="220" height="16" rx="4" fill="#f5f7f8" stroke="none" class=""/>
+<text x="576" y="232" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="">受控生成 / QC / Judge / Agent</text>
+<path d="M1168 292 V216" fill="none" stroke="#426b88" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+<path d="M292 388 H316" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M552 388 H576" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M488 600 V552 Q488 544 480 544 H272 Q264 544 264 536 V496" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="292" y="520" width="176" height="16" rx="4" fill="#f5f7f8" stroke="none" class=""/>
+<text x="300" y="532" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="">复用向量 / 原文 / Plan</text>
+<path d="M480 680 Q480 688 488 688 H1240 Q1248 688 1248 680 V432 Q1248 424 1240 424 H1224" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M440 496 V528 Q440 536 448 536 H692 Q700 536 700 544 V600" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M748 496 V520 Q748 528 756 528 H848 Q856 528 856 536 V600" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M1100 496 V600" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M1216 216 V236 Q1216 244 1224 244 Q1232 244 1232 252 V576 Q1232 584 1224 584 Q1216 584 1216 592 V600" fill="none" stroke="#536474" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<g class="node">
+<rect x="40" y="156" width="784" height="60" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="56" y="184" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">React / TypeScript / Vite → FastAPI</text>
+<text x="56" y="204" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">八个工作区 · 当前对象 ID / 异步身份绑定 · 人工动作由服务端重验</text>
+</g>
+<g class="node">
+<rect x="864" y="156" width="376" height="60" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="880" y="184" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">DeepSeek Provider</text>
+<text x="880" y="204" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">显式回答 / Generation / QC / Judge / Agent</text>
+</g>
+<g class="node">
+<rect x="56" y="292" width="236" height="204" rx="8" fill="#fcf3ed" stroke="#ba5e35" class="node-box"/>
+<text x="72" y="320" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Golden V2 治理</text>
+<text x="72" y="352" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Coverage Plan / Slot</text>
+<text x="72" y="380" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">动态 K / merge / 厚度</text>
+<text x="72" y="408" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">双维度构造 / Pool 匹配</text>
+<text x="72" y="436" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">统一 Hard Validation</text>
+<text x="72" y="464" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Probe / QC → Gate 1</text>
+</g>
+<g class="node">
+<rect x="316" y="292" width="236" height="204" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="332" y="320" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Evaluation / Agent</text>
+<text x="332" y="352" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Current Baseline</text>
+<text x="332" y="380" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">身份解析 / 冻结测量尺</text>
+<text x="332" y="408" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Bad Case → 唯一 Agent</text>
+<text x="332" y="436" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">A/B/C → Sandbox</text>
+<text x="332" y="464" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">11 Gates + Regression</text>
+</g>
+<g class="node">
+<rect x="576" y="292" width="232" height="204" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="592" y="320" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Release / Monitoring</text>
+<text x="592" y="352" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Gate 2 / D / Gate 3</text>
+<text x="592" y="380" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">事务重验 / Version</text>
+<text x="592" y="408" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">QA Event → 人工判定</text>
+<text x="592" y="436" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Confirm → 待优化上下文</text>
+<text x="592" y="464" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">首轮 / 幂等 / 历史身份</text>
+</g>
+<g class="node">
+<rect x="880" y="292" width="344" height="204" rx="8" fill="#fcf3ed" stroke="#ba5e35" class="node-box"/>
+<text x="896" y="320" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">检索 → Context → Generation</text>
+<text x="896" y="352" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Query Processing → CandidateK</text>
+<text x="896" y="380" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Vector / BM25 → Hybrid</text>
+<text x="896" y="408" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">候选召回 → 可选 Rerank / MinScore</text>
+<text x="896" y="436" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Final TopK Context → DeepSeek</text>
+<text x="896" y="464" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">同 Corpus · Candidate / Final 双层 trace</text>
+</g>
+<g class="node">
+<rect x="56" y="600" width="456" height="80" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="72" y="628" font-size="16" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Corpus 产物 · Staging → 校验 → 原子 Activate</text>
+<text x="72" y="648" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">PyMuPDF / OCR / Section-aware Chunk · BGE / FAISS / BM25</text>
+<text x="72" y="668" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Raw Parsed Full-text + Chunk / 向量 / manifest 同身份；失败不切换</text>
+</g>
+<g class="node">
+<rect x="552" y="600" width="328" height="80" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="568" y="628" font-size="16" fill="#263647" font-weight="600" text-anchor="start" class="node-title">SQLite · Snapshot / 审计</text>
+<text x="568" y="648" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Golden / Plan / Eval / Candidate / Version</text>
+<text x="568" y="668" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">人审 / 失败 / Trigger；旧 JSON 不重写</text>
+</g>
+<g class="node">
+<rect x="920" y="600" width="304" height="80" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="936" y="628" font-size="16" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Usage / Timing / Price Config</text>
+<text x="936" y="648" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">真实 Token / TTFT / 阶段 / 版本化价格</text>
+<text x="936" y="668" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">缺 Usage / 模型 / 价格 → 未知，不当 0</text>
+</g>
+<text x="40" y="704" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="">实线：请求 / 产物 / 审计    虚线：受控 Provider 调用 / 用量    聚类与 Evaluation 不属于每次 Production QA Runtime</text>
+</svg>
+</main>
+</body>
+</html>

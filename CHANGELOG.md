@@ -1,5 +1,12 @@
 # 变更记录
 
+## 2026-09-30 · V1.4 目标规格与架构重绘
+
+- 唯一 SPEC 更新为 V1.4，完整保留需求 ID、当前源码差异与离线验收要求；V1.3 及更早规则标为历史。
+- 两张架构图从头生成自包含 HTML/内嵌 SVG 与 2560×1440 PNG，表达可信测量、优化、人工发布反馈和离线/在线/数据支撑边界。
+- README、架构说明及项目入口文档同步版本边界；QC P0 冲突作为明确未决项保留。
+- 仅文档与图交付，没有业务代码/数据/索引迁移或真实 Provider/发布调用。验收见 [同步报告](docs/V1_4_DOCS_SYNC_VERIFICATION.md)。
+
 当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
 
 ## 2026-09-30 · Phase 1 / V1.3

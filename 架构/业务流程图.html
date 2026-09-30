@@ -1,10 +1,111 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>V1.3 RAG 自进化业务流程图</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#f7f5f0;color:#2d3142;font:15px Arial,"Microsoft YaHei",sans-serif}.canvas{width:1280px;height:720px;padding:36px 42px}h1{font-size:25px;margin:0 0 7px}p{margin:0;color:#5e697a}.phase{margin-top:29px}.phase h2{font-size:13px;letter-spacing:2px;color:#c85b30;margin:0 0 12px}.flow{display:flex;align-items:stretch;gap:5px}.node{flex:1;min-width:0;background:#fffdf9;border:1px solid #c9c7c0;border-radius:10px;min-height:70px;padding:14px 8px;text-align:center;font-weight:700;display:flex;align-items:center;justify-content:center}.human{background:#fff0e8;border-color:#eb6c36}.arrow{align-self:center;color:#7a8494;font-size:20px}.bridge{font-size:12px;color:#5e697a;margin:8px 0 0;text-align:right}.legend{margin-top:27px;padding:14px 18px;border-radius:10px;background:#fff0e8;color:#4f5d75;font-size:13px}
-</style></head><body><main class="canvas"><h1>RAG Self-Evolution · V1.3 业务主链</h1><p>仅 Tuning 是 Agent；三道人为确认；Monitoring、版本与回滚不作为主线前置。</p>
-<section class="phase"><h2>01 KNOWLEDGE & GOLDEN GOVERNANCE</h2><div class="flow"><div class="node">Knowledge</div><span class="arrow">→</span><div class="node">AI / 业务候选池<br>Profile 20 / 49 / 98</div><span class="arrow">→</span><div class="node">Hard Validation</div><span class="arrow">→</span><div class="node">Probe 检查</div><span class="arrow">→</span><div class="node">QC P0/P1/P2</div><span class="arrow">→</span><div class="node human">Gate 1<br>人工确认</div><span class="arrow">→</span><div class="node">Approved Golden<br>Snapshot</div></div><p class="bridge">↓ 只有人工批准的 Snapshot 可进入正式评测</p></section>
-<section class="phase"><h2>02 EVALUATION & OPTIMIZATION</h2><div class="flow"><div class="node">Baseline<br>Evaluation</div><span class="arrow">→</span><div class="node">逐题诊断<br>Bad Case</div><span class="arrow">→</span><div class="node">Optimization<br>Agent</div><span class="arrow">→</span><div class="node">A / B / C</div><span class="arrow">→</span><div class="node">Sandbox</div><span class="arrow">→</span><div class="node">11 Gates +<br>Regression</div><span class="arrow">→</span><div class="node">Gate 2<br>报告确认</div></div><p class="bridge">↓ Agent 不主动找 Bad Case；仅从 Evaluation 或已确认 Trigger 开始</p></section>
-<section class="phase"><h2>03 RELEASE & NEXT EVOLUTION</h2><div class="flow"><div class="node">Composite D<br>合并／复验／回退</div><span class="arrow">→</span><div class="node human">Gate 3<br>人工发布</div><span class="arrow">→</span><div class="node">Production<br>Version</div><span class="arrow">→</span><div class="node">Production QA</div></div></section>
-<div class="legend">业务导入：CSV / XLSX → 字段及原文证据预览 → 统一候选池 → 按配额复制新 Run，不自动调用模型。<br>生成局部补题：每题 Hard Validation 通过即保存；失败只回到当前 Slot，达到 20/49/98 题后进入 Probe → QC。<br>辅助能力：Monitoring / Trigger 人工确认 / Version History / Rollback，不是主线前置。<br>边界：Sandbox 不修改 Production；任一 Gate / Regression 失败不发布；Rollback 由人触发。历史 Seed、Legacy 和测试 Fixture 不进入正式 V1.3 指标。</div>
-</main></body></html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>可信测量 → 可解释优化 → 人工发布与反馈 · V1.4 目标架构</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#f5f7f8;font-family:"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",Arial,sans-serif}main{max-width:1280px;margin:auto}svg{display:block;width:100%;height:auto}@media print{main{max-width:none}}</style>
+</head>
+<body>
+<main>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-labelledby="rag-business-v14-title rag-business-v14-desc">
+<title id="rag-business-v14-title">可信测量 → 可解释优化 → 人工发布与反馈</title>
+<desc id="rag-business-v14-desc">V1.4 目标业务架构展示 Golden V2 测量治理、当前 Baseline 驱动的实验、三个人工 Gate、条件 D 和生产 Monitoring 返回首轮 Agent 的闭环。</desc>
+<defs>
+<marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+<path d="M0 0 L8 3 L0 6 Z" fill="#536474"/>
+</marker>
+<marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+<path d="M0 0 L8 3 L0 6 Z" fill="#ba5e35"/>
+</marker>
+<marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+<path d="M0 0 L8 3 L0 6 Z" fill="#426b88"/>
+</marker>
+</defs>
+<rect x="0" y="0" width="1280" height="720" rx="0" fill="#f5f7f8" stroke="none" class=""/>
+<text x="40" y="40" font-size="12" fill="#536474" font-weight="600" text-anchor="start" class="">RAG EVOLUTION  /  V1.4 目标架构  /  2026-09-30</text>
+<text x="40" y="84" font-size="32" fill="#263647" font-weight="600" text-anchor="start" class="">可信测量 → 可解释优化 → 人工发布与反馈</text>
+<text x="40" y="116" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="">Golden 定义测量尺，实验解释改进，生产反馈经过人工确认再进入优化。</text>
+<rect x="40" y="152" width="1200" height="196" rx="8" fill="#edf1f3" stroke="#dce3e7" class=""/>
+<text x="56" y="180" font-size="16" fill="#536474" font-weight="600" text-anchor="start" class="">01  可信测量 · 从知识材料到冻结 Golden</text>
+<rect x="40" y="356" width="1200" height="184" rx="8" fill="#edf1f3" stroke="#dce3e7" class=""/>
+<text x="56" y="384" font-size="16" fill="#536474" font-weight="600" text-anchor="start" class="">02  可解释优化 · 当前 Baseline 驱动 Experiment</text>
+<rect x="40" y="560" width="1200" height="120" rx="8" fill="#edf1f3" stroke="#dce3e7" class=""/>
+<text x="56" y="588" font-size="16" fill="#536474" font-weight="600" text-anchor="start" class="">03  人工发布与反馈 · Production 独立保留来源</text>
+<path d="M272 268 H308" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M892 268 H944" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M1084 332 V352 Q1084 360 1076 360 H56 Q48 360 48 368 V424 Q48 432 56 432" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="640" y="336" width="300" height="16" rx="4" fill="#f5f7f8" stroke="none" class=""/>
+<text x="648" y="348" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="">同尺：Golden / Corpus / Judge / Gate</text>
+<path d="M328 466 H380" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M668 466 H720" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M1176 524 V540 Q1176 548 1168 548 H56 Q48 548 48 556 V616 Q48 624 56 624" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="648" y="524" width="264" height="16" rx="4" fill="#f5f7f8" stroke="none" class=""/>
+<text x="656" y="536" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="">合格 Winner；D 失败 / 无改进保留</text>
+<path d="M328 632 H380" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M668 632 H720" fill="none" stroke="#536474" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M1224 644 H1228 Q1236 644 1236 636 V408 Q1236 400 1228 400 H532 Q524 400 524 408" fill="none" stroke="#536474" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<rect x="768" y="376" width="232" height="16" rx="4" fill="#f5f7f8" stroke="none" class=""/>
+<text x="776" y="388" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="">人工确认 → Pending Context → Round 1</text>
+<g class="node">
+<rect x="56" y="208" width="216" height="124" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="72" y="236" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">知识资产与候选入口</text>
+<text x="72" y="264" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">PDF → 解析 / Chunk</text>
+<text x="72" y="288" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">已有 BGE / FAISS</text>
+<text x="72" y="312" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">AI + CSV / XLSX 候选</text>
+</g>
+<g class="node">
+<rect x="308" y="208" width="584" height="124" rx="8" fill="#fcf3ed" stroke="#ba5e35" class="node-box"/>
+<text x="324" y="236" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Golden V2 · 规划 / 构造 / 合法性与风险</text>
+<text x="324" y="264" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Dynamic K-means → 小簇合并 → 主题厚度 Slot / Coverage Plan</text>
+<text x="324" y="288" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Positive / Ablation / Negative × Fact / Aggregation / Bridge / Ordinary</text>
+<text x="324" y="312" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Pool Slot 匹配 → Hard Validation → 双层 / 负向 Probe → QC</text>
+</g>
+<g class="node">
+<rect x="944" y="208" width="280" height="124" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="960" y="236" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Gate 1 · 人工确认</text>
+<text x="960" y="264" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Approved Golden Snapshot</text>
+<text x="960" y="288" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">冻结题 / Plan / Corpus 来源</text>
+<text x="960" y="312" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">不改写旧 V1 / Legacy 快照</text>
+</g>
+<g class="node">
+<rect x="56" y="408" width="272" height="116" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="72" y="436" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Baseline / Bad Case</text>
+<text x="72" y="464" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">有效 Baseline；排除 Sandbox</text>
+<text x="72" y="488" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Failed Gate + 逐题证据</text>
+<text x="72" y="512" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">新 Baseline 无实验 → 等待</text>
+</g>
+<g class="node">
+<rect x="380" y="408" width="288" height="116" rx="8" fill="#fcf3ed" stroke="#ba5e35" class="node-box"/>
+<text x="396" y="436" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Optimization Agent</text>
+<text x="396" y="464" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">唯一 Agent · 证据 → Hypothesis</text>
+<text x="396" y="488" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">最小必要 Config Diff → A/B/C</text>
+<text x="396" y="512" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Experiment 强绑定 Baseline</text>
+</g>
+<g class="node">
+<rect x="720" y="408" width="504" height="116" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="736" y="436" font-size="20" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Sandbox / Regression → Gate 2 → 条件 D</text>
+<text x="736" y="464" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">11 Hard Gates + 固定 Regression；资格先于 Overall</text>
+<text x="736" y="488" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Gate 2 人工确认报告与合格 Winner；D 有证据才组合</text>
+<text x="736" y="512" font-size="16" fill="#536474" font-weight="400" text-anchor="start" class="node-body">D 完整复验；无组合可跳过；失败 / 无改进保留 Winner</text>
+</g>
+<g class="node">
+<rect x="56" y="600" width="272" height="64" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="72" y="628" font-size="16" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Gate 3 → Production</text>
+<text x="72" y="652" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">事务重验 · 人工发布 / 版本 / 回滚</text>
+</g>
+<g class="node">
+<rect x="380" y="600" width="288" height="64" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="396" y="628" font-size="16" fill="#263647" font-weight="600" text-anchor="start" class="node-title">真实 QA / 方案对比</text>
+<text x="396" y="652" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">Answer / Evidence / Latency / Usage / Cost</text>
+</g>
+<g class="node">
+<rect x="720" y="600" width="504" height="64" rx="8" fill="white" stroke="#c4ced4" class="node-box"/>
+<text x="736" y="628" font-size="16" fill="#263647" font-weight="600" text-anchor="start" class="node-title">Monitoring → 人工判定 → Trigger Confirm</text>
+<text x="736" y="652" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="node-body">有效 Baseline → Pending Context → 手动 Agent 首轮；不自动调参 / 发布</text>
+</g>
+<text x="40" y="704" font-size="12" fill="#536474" font-weight="400" text-anchor="start" class="">实线：业务推进    虚线：经人工确认的反馈    目标规格同步 ≠ V1.4 已实现 / 已验收</text>
+</svg>
+</main>
+</body>
+</html>

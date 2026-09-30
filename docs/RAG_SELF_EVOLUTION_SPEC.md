@@ -1,5 +1,848 @@
 # RAG Self-Evolution Platform 产品规格
 
+> **唯一当前目标规格：V1.4 — Golden Engine V2 & Identity-Bound Evolution**
+> 冻结日期：2026-09-30（Asia/Shanghai）。状态：**目标规格已同步；业务实现未在本轮升级或验收**。
+> V1.4 是 Golden 工艺、对象身份、Monitoring 与信息架构升级，保留现有技术栈和治理底座。新图是目标架构，不是当前 Demo 已具备全部能力的证明。
+
+## 1. 文档地位、依据与本次交付边界
+
+本文件是唯一目标规则源；[SPEC ChangeLog](SPEC_CHANGELOG.md) 仅保留追加式历史。V1.3 及更早内容归入文末历史存档，旧文中的“当前”“唯一”“Implementation Authorized”只代表当时口径，不覆盖本节及 V1.4 要求。
+
+依据：用户提供的 `RAG_SELF_EVOLUTION_CODEX_MASTER_PROMPT_20260930.md`（2026-09-30），以及用户明确选择“文档与架构同步、两图从头重绘”的范围。任务书是需求输入，其中要求完整实施的指令不扩大本次授权。本轮不修改业务代码、数据库、索引、Golden、实验或 Production，不调用真实 Provider，不执行人工 Gate。
+
+正文第 5–16 节保留任务书对应章节的需求语义；第 17–18 节保留其离线验收及手动验证要求。文中的实施动作是后续业务开发要求，不是本次执行记录。源码级判断以第 3 节证据为限；本文不把任务书中的故障线索视为已复现 Bug，也不声称已查看其引用的 ZIP、朋友截图或 20 张截图。
+
+优先级：本轮明确用户决策 → V1.4 明确变更 → 未被替代的冻结规则 → 实际持久化配置与规则源 → 朋友资料工艺参考 → 历史截图数字。冲突不得靠改门槛、改数据或猜测消解，具体未决项见第 4 节。
+
+## 2. 产品主线与保留规则
+
+面向企业知识问答的评测驱动 RAG 质量运营与版本决策 Demo。主线应在 3–5 分钟清楚表达：可信 Golden 如何测量问题、Baseline 如何暴露 Bad Case、Agent 如何提出可解释实验、资格与 Regression 如何约束人工发布，以及问答反馈如何回到优化。
+
+`知识库 → Golden V2 规划 / 构造 / 校验 / Probe / QC → Gate 1 冻结 → Baseline → Bad Case → Optimization Agent → A/B/C → Sandbox / Regression → Gate 2 报告与赢家 → 条件 D → Gate 3 人工发布 → Production → 问答对比 → Monitoring 人工确认 → 下一轮 Agent`
+
+只有 Optimization Agent 是主 Agent。Generation、Probe、QC、Judge 是受控工作流；不自动寻找所有错误、修改知识、调参或上线。Monitoring 位于问答验证二级 Tab，不新增第九个一级模块。
+
+### 2.1 保留的技术与资产边界
+
+保留 React / TypeScript / Vite、FastAPI、SQLite、已有 DeepSeek Provider、`BAAI/bge-small-zh-v1.5`、FAISS IP / BM25、PyMuPDF / 页级 OCR 回退、Section-aware Chunk、现有启动方式和端口。Golden 离线规划复用已有向量，不属于每次 Production 在线检索。
+
+保留 Corpus 原子更新、逐 Slot 保存、失败占位与局部补题、固定 Regression 集、Sandbox 隔离、Gate 1/2/3、D 失败保留 Winner、人工发布、版本与回滚、真实问答、CSV/XLSX 业务导入。旧 Frozen Snapshot、Evaluation 配置/Judge/Gate、Candidate 配置及发布版本不改写；新增语义采用兼容字段/JSON/审计和最小 additive migration。
+
+不迁移模型、Embedding、Parser 或 Chunk 策略，不新增 E/F、多 Agent、Docker/Kubernetes、灰度发布、自动发布/回滚、APM/QPS 或复杂全自动搜索。未采集显示 `— / 未采集`，历史 Snapshot 保留真实 Legacy/V1 来源，不因 UI 或规格升级被标成 V2。
+
+### 2.2 治理门槛与预算（本次未变）
+
+以下为检查基线 `f6ea03d` 的 `backend/app/policy.py` 冻结定义；实际历史判定仍读取当次 Evaluation 快照。
+
+| Hard Gate | 门槛 |
+| --- | --- |
+| Positive correctness / faithfulness / completeness | ≥80% / ≥80% / ≥75% |
+| Ablation correctness / faithfulness / completeness | ≥70% / ≥75% / ≥65% |
+| Safe Rejection / Safety Critical / Injection Resistance | 各 ≥95% |
+| 回答延迟 P50 / P99 | ≤25s / ≤60s |
+
+共 11 项，全部通过才满足 Hard Gate；Overall 是九项质量指标等权展示，不能抵消任一失败。Recall@K、Precision@K、MRR、TTFT、Token Cost 是诊断/比较项，不增加新 Gate。Baseline 可以未合格但仍是有效诊断起点。
+
+Search Space 的键、类型、枚举、依赖和展示数量取自真实 `ALLOWED_SEARCH_SPACE` / Validator；不从截图硬编码数量。Rerank 保持现有开关与 Lightweight Rerank，不把它画成独立 Rerank Model。Parser/OCR、Chunk、模型、Temperature、Query Decompose、Retrieval MaxTokens、Rerank TopN 继续不进入 Agent 自动调参范围。
+
+A/B/C/D 累计最多 12 次 Sandbox，开始即占用、失败不退、为 D 留一次。固定 Regression 的 Safety/Critical 不允许新增失败，普通题最多新增 1 个失败；Qualified 继续要求全部 Hard Gate 与 Regression 通过、至少修复 1 个目标 Bad Case 且总 Bad Case 至少减少 1 个，并满足现有身份/发布约束。D 只有合格、相对 Winner 无新增失败且实际修复才晋升。
+
+Monitoring：1 个 Safety Critical Bad Case，或最近 20 个完整可判定 QA 中至少 4 个 Bad Case，仅创建 Pending Trigger；需要人工判定和 Human Confirm。Gate 1 批准冻结 Golden；Gate 2 确认报告并选择合格 Winner；Gate 3 在事务重验后人工发布。
+
+## 3. 需求追踪与当前实现证据
+
+检查基线：`f6ea03d`。以下是静态源码核对，不是新增测试通过或真实生命周期完成的结论。历史实测记录见 [Phase 1 验收](PHASE1_VERIFICATION.md) 与 [已保存 Demo 事实](CURRENT_DEMO_TRUTH.md)，其日期、Run 和 Provider 边界保持原样；本次不刷新真实运行结果。
+
+| 需求 ID | V1.4 目标 | 当前源码证据 / 实施状态 | 目标章节 |
+| --- | --- | --- | --- |
+| P0-01 | Current Baseline ↔ Experiment 强绑定 | `main.py` 当前 optimization 读取 `latest_experiment()`；尚未看到按当前 Baseline 统一解析，待实现/回归 | 5 |
+| P0-02 | Monitoring Confirm 后首轮 Round 1 | `governance.py` Confirm 创建 `pending_agent` 空实验；首轮成功及失败重试未在本次运行验收 | 5.3 |
+| P0-03 | Monitoring 复用 resolver，排除 Sandbox | Confirm SQL 读取最新 completed Evaluation，未排除 Sandbox；目标 resolver 尚未统一 | 5.1 / 5.4 |
+| P0-04 | Pool 建 Run 必须 Coverage / Slot 匹配 | `create_pool_run()` 已检查 Profile、证据和构造，但保存空 Coverage Plan；V2 匹配待实现 | 9 |
+| GV2-01 | Dynamic K-means / 小簇合并 / 厚度配额 | `AiService._mini_coverage_plan()` 当前最多选 4 个代表中心，并轮转抽样；不是目标动态 K-means 工艺 | 6 |
+| GV2-02 | Group × Construction 双维度 | 已有 `test_category`、`construction_type` / `structured_type`；统一 V2 计划与历史 adapter 待验收 | 7 |
+| GV2-03 | Unified Hard Validation | AI / Pool 已复用部分 `_candidate_errors`，Import 有构造检查；完整单一规则接口与 Slot 约束待实现/核对 | 8 |
+| GV2-04 | Candidate Recall 与 Final Context Probe | Probe 已保存 TopK 和检查信息；完整双层 trace、Any/All 必要证据覆盖待实现/验收 | 10 |
+| GV2-05 | 原解析全文 Probe + 原子产物 | 已有 Corpus staging / 原子管理；当前 Probe 基于 Chunk 文本，原解析全文 sidecar 未在现有 bundle 确认 | 10–11 |
+| COST-01 | 集中价格、真实 Usage/Timing、版本与缺失原因 | `telemetry.py` 已有可选 `RAG_PRICE_CONFIG`、缺 Usage 不估价；版本身份与 V1.4 语义待核对 | 13 |
+| UI-01 | 全局与全部指定页面信息架构 | Phase 1 已有共享组件与 UI 历史验收；第 14–15 节新增 V1.4 要求未在本次实施/验收 | 14–15 |
+| SAFE-01 | 不可变旧快照、兼容迁移 | 已有 SQLite / JSON / 历史审计机制；本次无迁移，业务实施仍需副本验证 | 16 |
+| QA-01 | 离线状态流、迁移与 UI 验收 | 第 17 节为待执行目标矩阵；既有 Phase 1 测试数字不是 V1.4 验收结果 | 17 |
+
+## 4. 接口约束与明确未决项
+
+### 4.1 既有接口与目标语义
+
+本次不修改 API、schema 或类型。已有路由包括 `GET /api/evaluation`、`GET /api/optimization`、`GET /api/pipeline`、`POST /api/governance/generation-runs/from-pool`、`POST /api/monitoring/triggers/{trigger_id}/confirm`、`POST /api/experiments/run`、`POST /api/candidates/{candidate_id}/run` 与人工发布/回滚接口。
+
+后续最小接口增量承载当前 Baseline/Experiment 身份、冻结 Planner/Slot、Candidate/Final trace、风险与价格版本；优先扩展既有字段/JSON，不在本文虚构已存在的新 URL。第 8 节 Validator 签名是语义示意，不是当前可调用公共接口。Preview 保持无生成/Judge/QC调用、无人工批准和无 Production 变更。
+
+### 4.2 `[OPEN-QC-P0]`：机器 QC P0 与确定性 Blocker 的边界
+
+任务书第 10.2 节写“P0/证据不成立/伪负向阻断”，同时要求复用 Friend-aligned 人审风险确认；旧 V1.3 承接的 V1.2 明确允许机器 QC P0 经展示风险、人工理由后接受，确定性错误与 Fake Negative 不可豁免。新材料尚未明确是否撤销机器 QC P0 接受能力。
+
+本次只记录冲突，不更改 Validator 或既有人审规则。V1.4 实施前需要明确第 10.2 节 P0 是否仅指不可豁免 Blocker，还是包括全部机器 QC P0；未解决前不得宣称该项已经冻结实现或通过验收。合法但检索未命中的 P1 与执行失败继续分别记录，不能混为可豁免质量错误。
+
+---
+
+## 5. 当前对象身份与 P0 后端规则
+
+### 5.1 单一 Current Baseline resolver
+
+统一封装当前 Baseline 判定供 Evaluation、Optimization、Monitoring、Release 校验和 Overview 使用，禁止各处独立写“最新 completed”。
+
+当前可用于新优化的 Baseline 至少应满足：真实 completed、属于正式 Baseline 而非 `sandbox_candidate`、对应当前有效 Golden 和 Corpus、配置/评测标识可追踪、未被显式失效。
+
+字段名遵循现有数据模型。要核实 run_target 缺失的旧数据分类，不能因为 NULL 直接把所有旧记录误认 Candidate 或 Baseline。证据不足显示历史未验证。
+
+当前 Golden 尚未重新冻结或 Corpus 已变化时，不把另一套试卷的旧 Run 当当前有效 Baseline；提供历史报告入口和失效原因。
+
+### 5.2 Experiment 必须绑定 Baseline
+
+当前 Experiment 只能是满足 `experiment.baseline_run_id == current_baseline.id` 的当前选定实验。存在多个实验时遵循现有明确选择/最新有效规则，并显示 Round 和来源。
+
+未找到时显示“当前 Baseline 尚未运行 Optimization Agent”，不借用上一轮 Diagnosis、Hypothesis、A/B/C、Target Cases、Config Diff、Sandbox Recommendation。
+
+Root Cause 分类根据当次 Bad Case 数据汇总。无证据不能自称确定根因。支持 Query/Retrieval/Ranking/Generation/Safety/Performance/Unknown 等真实出现的类别，显示非零类别，不固定三张卡。
+
+历史 Experiment 可在现有历史详情入口只读查看，并显著显示其 Baseline；不新建复杂实验管理系统。
+
+异步 UI 请求必须包含对象 ID。切换 Baseline 或刷新当前身份后，旧请求返回不能覆盖新视图；清除关联 Drawer、选中 Candidate 和对比结果的旧状态。
+
+### 5.3 Monitoring Pending Context 与 Round 1
+
+Human Confirm 的语义是确认需要优化，创建/复用 Pending Optimization Context，并保存 Trigger ID、事件证据、有效 Baseline ID、Golden/Corpus/配置来源，不等于 Agent 已完成。
+
+允许两种最小实现：复用现有空 Experiment 加明确 `pending/round=0`；或复用现有 Pending Context 表/字段。不要另造平行状态机。
+
+判断“上一轮必须完成”的前提是已经成功生成真实 Candidate 的有效 Round≥1。无 Candidates 的 Round 0、生成失败且无有效候选、仅已 Confirm 的上下文，不适用上一轮 Sandbox 阻塞。
+
+首轮生成成功后持久化 Round 1 A/B/C；模型格式错误/Provider 异常不能留下“已生成”状态。重试复用同一 Pending Context，避免重复 Experiment/Trigger。
+
+真实 Previous Round 有部分 Candidate 未完成 Sandbox 时保持现有阻断和明确说明，不为修 Round 0 放宽所有轮次规则。
+
+### 5.4 Monitoring 的 Baseline 与 Production 来源
+
+必须排除最近完成的 Sandbox Evaluation。没有有效 Baseline时，保留 Pending Trigger 并解释“需要当前有效 Baseline”，禁止随手拿 Candidate 报告替代。
+
+Monitoring Event 记录对应 QA 的 Production Version/Config/Corpus/Question/Answer/反馈。当前比较 Baseline 可能早于 Production，来源关系必须可解释；不偷偷把事件配置视为已评测 Baseline。不一致时沿用当前 SPEC 的兼容/失效判断，不创建无评测的假 Baseline。
+
+连续双击确认、刷新、重复请求不应重复创建上下文。调用 API 的状态检查与 UI 禁用必须一致，已有事务/幂等机制优先复用。
+
+### 5.5 新 Baseline 不得覆盖旧 Production
+
+新 Baseline B1 + 无 Experiment 的合法显示：Baseline 页面是 B1；Agent 是等待；Release 可显示当前仍在运行的旧 Production 及来源；Overview 不将旧 C 标为 B1 的候选。问答对比明确左右配置身份。
+
+## 6. Golden Engine V2：Coverage Planning
+
+### 6.1 目标、边界、输入
+
+所有新 Golden Run（AI 自动生成、候选池选择、业务导入混合组卷）必须有当前 Corpus 的 Coverage Plan。老 Frozen Snapshot 不要求补造 Plan。
+
+输入是同一 Corpus 下有效 Chunk、现有 Embedding、文档/产品/版本/章节 Metadata，以及选择的 Profile；不重算另一套 Embedding、不引入 LLM Topic 标签依赖。
+
+Profile 保持：Mini 20=8 Positive/4 Ablation/8 Negative；Medium 49=20/9/20；Full 98=40/18/40。从 Profile 配置读取，不散落 hardcode 20。默认展示当前选定 Profile。
+
+### 6.2 Dynamic K-means 工艺
+
+朋友原始截图说明 `TARGET_CLUSTER_SIZE=40`、`MIN_CLUSTER_SIZE=3`，按 Chunk 数自动估计 K，结合约 √n 的上界，合并小簇，按主题厚薄分题。这些是工艺参考，不是对旧快照的描述。
+
+V1.4 实施合理实现约定：
+
+1. n 为有效可聚类 Chunk 数。n=0 返回明确无法规划；n=1 使用单簇，n 很小时不要触发非法 K。
+2. 默认 target_cluster_size=40、min_cluster_size=3，集中配置。估计 K 可用 `max(2, min(floor(n/40), floor(sqrt(n))+1))` 后再 clamp 至 `[1,n]`；边界和舍入在代码/审计记录固定，实际图示模糊处不要装作已有唯一数学口径。
+3. 复用当前有效向量，按现有归一化约定处理；随机 seed 和 n_init 固定，确保同版本相同输入可复现。算法距离约定写入 metadata，不悄悄切换线上检索。
+4. 小于 min_cluster_size 的簇按最近有效中心合并，固定 tie-break 和迭代顺序。全是小簇时仍得到可用规划或明确不足原因，不死循环。
+5. 合并后重新计算中心/规模，并稳定排序/编号。Cluster ID 只在 plan/corpus 内有意义，不是永久业务主题 ID。
+6. 不按产品预先硬切簇代替语义聚类；但代表文档/章节与产品范围作为可解释 Metadata 展示。
+7. Topic 名称优先从代表章节/文档派生为展示标签；历史没采集显示“未采集”，不调用 LLM 造标签。
+
+上述工程约定须在 V2 SPEC 写明。若仓库已经有经过验证的等价动态实现，复用并记录，不重复安装重型依赖。
+
+### 6.3 主题配额与 Slot 分配
+
+按合并后的 Cluster 厚度分配 Slot，用明确整数分配方法（如最大余数法）确保总数和各组 Profile 配额精确一致，固定 tie-break，避免独立四舍五入总量错误。
+
+规划必须区分全部题的 Coverage Anchor 与 Positive/Ablation 的证据覆盖。8 个 Negative Anchor 不等于 8 个主题得到正确答案验证。
+
+每个 Slot 保存：slot_id、evaluation_group、construction_type、topic_cluster、要求的 Evidence/Bridge/主体范围、材料来源、抽样优先级、满足/缺口状态。
+
+大主题多题，小主题通过合并避免无意义配额。总题数少于 Topic 数或某主题没有可构造材料时，记录实际覆盖不足；不要假称全覆盖，也不要强行生成无法成立的 Bridge。
+
+优先使用V1.4 实施尚未使用 Chunk；其次再使用历史较少使用 Chunk。题量大于材料量可复用，但记录 reused，而非随机重复。事实题的合法证据可能被专项算法重复利用，不能因 reuse 本身否定合法题。
+
+### 6.4 可查看、可复现的 Planner Preview
+
+Preview 不调用生成模型/Probe Judge/QC，不创建新 Approved Snapshot，不改变 current Golden/Baseline/Production。可缓存并持久化审计 Preview，但要标记 Preview。
+
+Plan 至少记录 planner_version、corpus_fingerprint、embedding identity、seed、参数、初始/最终 K、merge mapping、Cluster 规模、Topic 配额、Slot 表、代表 Chunk、复用统计、缺口、生成时间。
+
+Run 使用的 Plan 为冻结副本或稳定引用，不随下一次 Preview 刷新而改变。Corpus 变化后旧 Preview 失效并解释原因。
+
+## 7. Evaluation Group × Construction Type
+
+### 7.1 两个维度分别存储、展示、校验
+
+| 维度 | 允许概念 | 用途 |
+|---|---|---|
+| Evaluation Group | Positive / Ablation / Negative | 8/4/8 配额、评测分组、Gate |
+| Construction Type | Fact / Aggregation / Bridge / Ordinary | 题怎么造、结构与 Evidence 是否成立 |
+
+不把 Fact 当 Positive 的同义词，不把多 Chunk 当 Bridge 的充分条件，不把 Ablation 标签写两遍。
+
+Ablation 的能力边界是保持可答知识点、扰动问法；必须仍能独立理解。可以保存来源题/知识点的可选关系，但不强制 Q09→Q01、不用题号绑定、不要求每道 Ablation 都有一对一当前 Positive 配对。
+
+Negative 原则上用 Ordinary 和已有 negative subtype/expected_behavior（clarify/abstain/refuse 等），不能捏造 Golden Evidence。Coverage Anchor 与 Evidence 分字段保存。
+
+### 7.2 专项出题工艺
+
+朋友截图支持优先 Aggregation → Bridge → Fact → 剩余 Ordinary。程序识别材料，模板构造 Fact/Aggregation，Bridge 可由受控模型表达并由程序确认结构。
+
+- Fact：明确实体/属性/值，Reference Answer 的关键事实能在原文定位。
+- Aggregation：材料具备真实可聚合条目/范围，答案项逐项有支持，不能仅凑多个随机 Chunk。
+- Bridge：至少两个材料节点有可核实的共同实体/关联，需联合才能得到目标答案；单个 Chunk 已能完整回答时不能标 Bridge。
+- Ordinary：普通问答或边界题，不能因此绕过证据、去重或自包含校验。
+
+专项只占符合条件的 Positive/Ablation 配额，不占用 Negative 配额。无合适材料时减少专项，剩余归 Ordinary，并在 Plan Audit 解释，不为凑类型让模型编证据。
+
+朋友专项上限线索为 Mini 2/Medium 4/Full 8 且不超过当时剩余正向材料的一半；它不是V1.4 实施新增“必须每卷含2道Bridge”的硬门槛。工程采用的专项 quota/fallback 要集中定义，记录计划与实际，避免 UI 固定承诺一定包含所有类型。
+
+### 7.3 历史字段兼容
+
+旧 construction_type 未存的显示“未采集”；可根据旧持久化结构确定性映射的写 adapter 和 provenance，不能从题面猜测后把猜测当历史事实。不修改 Frozen Snapshot JSON。
+
+## 8. Unified Hard Validation
+
+### 8.1 单一规则源
+
+抽取统一接口，示意：`validate_golden_candidate(candidate, corpus, coverage_plan, validation_context)`。AI 生成后、Business Import Preview/Confirm、Pool 建 Run、人工修订后的再验证使用同一规则源。上下文可不同但基础约束一致。
+
+返回结构包含 valid/blocking_errors/warnings/normalized_candidate/evidence_locations/construction_checks/coverage_match/validator_version。保持可读错误与审计，不只返回 false。
+
+Hard Validation 是确定性合法性检查，不等同于 LLM QC，不把当前检索未命中写成“题面非法”。无需泄露模型思维链；保存公开结构化诊断与允许的原始响应即可。
+
+### 8.2 检查项
+
+| 检查 | 必须行为 |
+|---|---|
+| Schema/Normalize | 必填、类型、枚举、列表规范化、question 与实际 user_query 一致 |
+| Self-contained | 正常用户可独立理解，悬空“上文/图中/它”没有实体上下文时阻断；不误杀合法口语 |
+| Entity Scope | 必要产品/版本/实体限定明确，跨产品事实不能混用 |
+| Forbidden Structure | 阻断只问页码/目录/结构等无业务意义的题，不误杀正常章节内容问题 |
+| Evidence Location | Positive/Ablation 的证据在当前 Corpus 原文可逐字定位，保存文档/页/字符范围或等价定位 |
+| Answer Anchor | 答案关键事实有证据，不强制整句 Reference Answer 与原文逐字相同 |
+| Duplicate | 规范化 exact duplicate 与已存在的相似检查；阈值集中配置，不加题号黑名单 |
+| Construction | Fact/聚合项/真实 Bridge 必要性一致，无支持时不能伪装专项 |
+| Negative Shape | 禁止伪造证据和库内答案；保留 subtype/expected_behavior，进一步真伪由 Probe/QC |
+| Coverage Slot | 当前 Plan/Cluster/Group/Construction 匹配，Slot 不重占，Corpus 身份一致 |
+| Quota | 按 Profile 严格计数，未齐不进入冻结；不特殊允许 19/20 凑合 |
+
+数字、单位、标点、空白可有限规范化后定位，保存规范化规则。不要因为同义表述不在词典就报 `unsupported answer anchor`。无法确定实体/事实时给出具体修订原因，不人工写产品关键词补丁。
+
+Bridge 验证保存引用节点、关系和必要性检查；不能声称纯字符串规则可以完全判定任意自然语言语义。确定性证据不足时为待复核，而非捏造“已证实”。
+
+### 8.3 状态、修复、失败持久化
+
+每个 Slot 持久化状态、Attempt、错误、材料来源。默认保留已有每 Slot 最多两次生成尝试、失败占位和 regenerate-failed 路由，不额外加入无限循环。
+
+QC 自动修复最多一轮，生成重试与 QC 修复是不同计数。人工修改可以再次验证，但每次有版本/审计，不自动循环烧 Token。
+
+不足 Profile 或存在 blocking Slot 时 `needs_regeneration`，系统异常 `failed`；保留已合格题，不回滚为零。凑齐且配额/Plan一致后才能进入后续批次阶段。
+
+关键 Question/Answer/Evidence/Group/Construction 改动使相关 Probe/QC/Review 失效；不沿用旧 Passed。
+
+## 9. Candidate Pool 与 Business Import
+
+### 9.1 UI 工作流
+
+Golden 二级 Tab 为“当前测试集”“候选池”。候选池顶部“导入业务用例”打开 Drawer，支持 CSV Template/XLSX Template/Upload/Preview/Confirm Import。导入操作不生成 Approved Golden，不绕过治理。
+
+CSV/XLSX 使用已有字段契约，不要求用户手填 cluster ID、coverage slot、复杂 Metadata。模板与后端校验字段一致。
+
+### 9.2 自动 Topic 归类
+
+Positive/Ablation：根据已校验 Evidence Chunk 的 Cluster 归类。多 Cluster 证据保存涉及集合，按 Slot Requirement 选择主锚点，Bridge 保留关联簇，不丢掉第二跳。
+
+Negative：Question 使用现有 Embedding 计算最近 Topic Cluster，仅为 Coverage Anchor；保存方法/距离/低置信度警告，不当 Golden Evidence，也不靠最近簇证明题是可答/不可答。
+
+若导入只有文本证据而没有 Chunk ID，先用统一 Evidence Location 在当前 Corpus 定位。找不到是未合格候选，不自动随意绑定最相似 Chunk。
+
+### 9.3 Pool→新 Golden 的必要条件
+
+当前 Corpus → V2 Plan → Slot Requirements → 校验选题 → 匹配 Slot → 给出缺口 → 满足后创建 Run。
+
+8/4/8 数量正确只是第一层；Coverage/Construction Slot 满足才允许创建。采用稳定匹配/分配，保存映射审计，避免 UI 顺序改变导致随机结果。不要为了20题集中在两个主题而重新规划一份迎合所选题的 Plan。
+
+不满足时显示缺少哪个 Topic/Group/Construction、可用候选数/缺口，不只“创建失败”。提供继续选择/导入以及已有生成能力的“补缺口”入口；补题调用仍由用户点击，默认不自动调用真实 Provider。
+
+Pool 建新 Run 必须复制为新候选版本，重新经过当前 Corpus/Plan 的验证与必要 Probe/QC/人审；旧批准状态不自动继承为新 Snapshot 批准。
+
+创建 Golden 的 API 也检查同样条件；隐藏按钮不是后端治理。
+
+## 10. Probe：题真实性与 RAG 能力分开
+
+### 10.1 Positive/Ablation 两层记录
+
+在同一次 Retrieval Pipeline 中保存真实候选召回列表和最终 Context 列表。CandidateK/TopK 使用当次配置，不硬编码只许12/24和4；截图常见配置是 CandidateK12/24、TopK4。
+
+明确候选集合的位置：按实际 pipeline 获取进入 Rerank/最终 TopK 选择前的候选集合，记录 filtering/fusion/threshold 的结果来源；不把 Vector/BM25 原始堆叠无限列表当 CandidateK。
+
+保存：Candidate IDs、排名/分数/来源、Final IDs、Golden Evidence 交集、所需证据集合、Any/All hit、必要时各证据覆盖率、Pipeline Config Snapshot、Corpus、timings。
+
+| 观测 | 可支持的初步诊断 |
+|---|---|
+| 正确证据未进入候选集合 | Retrieval Failure，具体原因仍需证据 |
+| 已在候选集合，最终 Context 缺必要证据 | Ranking/Context Selection Failure |
+| 最终 Context 已具必要支持但回答错误 | Generation Failure 的重要依据 |
+| 历史没有候选集合 | “未采集”，不能反推命中 |
+
+Any hit 不等于多跳题全部 Evidence 可用；检索 trace 本身也不证明生成一定正确。Query、过滤、上下文预算等因素需保留定位来源。
+
+### 10.2 不把检索不命中直接当坏题
+
+Hard Validation 已确认真实证据，但当前 Baseline 没召回时，记录 `RETRIEVAL_INCOHERENT` 或等价 P1 能力风险，供 Gate 1 看见；不得为了让 Probe 好看删除所有检索难题。
+
+区分 `probe_execution_status`（是否运行成功）、`candidate_recall/final_hit`（系统表现）、`question_validity/risk`（题是否成立）。上层 Passed 文案不能掩盖未命中。
+
+复用当前 Friend-aligned SPEC 的人审风险确认边界：P0/证据不成立/伪负向阻断；合法但检索不连贯的 P1 由已支持的人审理由确认。不因此偷偷变更旧数值门槛或删除治理。真实 unresolved 语义冲突必须记录。
+
+### 10.3 Negative 三层 Probe
+
+Vector Probe → Raw Parsed Full-text Probe → 有可疑材料且无法确定时 Answerability Judge。
+
+全文 Probe 搜索原解析文本，包括未成为 Chunk 的段落/表格/数字；不能仅对 Chunk 拼接文本循环搜索后称全文。
+
+提取一般实体/短语/数字单位等检索 Anchor，返回文档/页/上下文/命中方法/Corpus。参考朋友6～8字符短语、上限约24个的工艺可集中配置；不能加某产品/题号专用规则。
+
+字面命中仅表示相关，不等于能回答。Answerability Judge 要区分直接可答、组合可答、仅实体相关、缺失必要细节、信息不足。对注入/安全边界题，知识里相关事实存在并不自动取消“需要拒绝危险操作”的预期；按 Negative subtype 判断。
+
+真实 Provider Judge 只有在用户触发真实 Probe 时运行，离线验收用 Stub。返回 malformed/超时/证据不足标 uncertain/needs_review，不当自动通过。
+
+全文未命中也不能在解析覆盖不足时宣称“确定没有”。显示解析覆盖与可信边界。Unknown 不能当0或Pass。
+
+## 11. Full-text 索引与 Corpus 原子性
+
+### 11.1 保留当前 Corpus 更新机制
+
+新增/删除文档 → Staging 构建全部产物 → 完整校验 → 原子 Activate；任一失败不改变 active pointer，保留失败审计与清理策略。复用现有实现。
+
+新增 full_text 等价产物并纳入 manifest。示意：documents.json、chunks.json、full_text.json、faiss.index、manifest.json，遵循现有命名，不强制目录重构。
+
+full_text 保存原解析文本及文档/页定位、parser identity、文本 checksum、产物 schema version；Corpus Fingerprint 与其他产物一致，不能新FAISS配旧Full Text。
+
+### 11.2 旧 Corpus 的安全补充
+
+用户已确认补全文产物及必要索引产物构建，但未授权改文档内容、模型和 Chunk。优先使用保存的解析原文；没有时用现有 Parser 重新解析至 Staging，比较旧文档、Chunk、向量、内容身份。
+
+区分 Corpus 内容身份与 artifact_schema_version。仅增加全文 sidecar 且内容/Chunk 身份没变时，不应无故让全部旧评测失效；若现有 fingerprint 机制不能区分，按原实现一致性处理并明确影响，不能改历史 fingerprint 伪造匹配。
+
+如重新解析实际产生不同 Chunk/文本、缺模型权重、耗时异常或旧产物无法核实，不静默覆盖 active Corpus。保留 Staging 与明确阻塞，历史演示继续可用。索引引擎支持与 active 产物是否就绪分别报告。
+
+不自动下载巨大新模型、不调用付费 OCR。产物扩展如无需变换 Chunk/vector，可只构建新增产物并完整校验后原子激活兼容 bundle。
+
+### 11.3 历史与失效提示
+
+旧 Snapshot 标 `Coverage Planner：Legacy/V1` 或历史实际采集版本；未采集 Cluster 详情显示未采集。不能在升级前端后把旧20题标成 Dynamic K-means。
+
+文档内容真实变化后显示“知识库已变化，当前 Golden/Baseline 为旧 Corpus 结果；新 Evaluation 前需重新冻结 Golden”。旧 Production 不自动下线，运行来源及检索 Corpus 兼容状态须诚实展示，不能假称仍是当时冻结环境。
+
+## 12. Baseline、Agent、Sandbox、Regression 与发布
+
+### 12.1 保持一把尺
+
+Baseline 和同一 Experiment 的 A/B/C/D 使用同一冻结 Golden、Corpus、Judge/Gate 定义和可比较配置边界。Evaluation 保存实际配置，不从 current config 反向填历史报告。
+
+总体得分 Overall 只用于比较，11项 Hard Gate 的当前定义/门槛来自当次冻结配置。TTFT、Token Cost、Recall@K、Precision@K、MRR 是比较/诊断项，是否属于 Hard Gate 必须看现有 SPEC，不因V1.4 实施排版改变其资格。
+
+Gate 评测执行失败、Judge 缺失、题目分母不足、部分处理不能显示 11/11 或 completed qualified。旧报告历史缺失不得补算未保存数据。
+
+### 12.2 Agent 的输入输出与搜索空间
+
+输入至少包含当前 Baseline identity、Failed Gate、Bad Case 与 Evidence、Root Cause、Config Snapshot、冻结 Search Space、上一轮合法结果与预算（如果存在）。
+
+输出真实保存 Agent Diagnosis、每个 A/B/C 的独立 Hypothesis、Target Bad Cases、最小必要参数变更、Why/Risk、Config Diff、Round/Experiment identity。
+
+A/B/C 是并列可解释假设，每个假设可包含实现该能力所需的最少联动参数；不把“最小变更”误实现成绝对只能改1个字段。也不能借一个宽泛假设一次改一大串不相关参数。
+
+Agent Prompt、schema 和 Validator 共享当前规则源，包括类型、枚举、范围、依赖与参数名称。典型 `CandidateK >= TopK` 等必须验证。Boolean false、integer0、字符串OFF按照真实 schema 处理，不能宽松强转导致配置语义变化。
+
+保留现有有限格式修复/重试预算，失败不部分写入假候选。保存解析错误路径、允许保留的 Provider 原始输出和 attempt审计；UI 技术详情折叠。不要输出敏感信息或模型隐藏思维链。
+
+Agent 生成计划不执行 Sandbox、不发布。连续点击期间幂等/锁定，异步状态与后台真实记录同步。
+
+### 12.3 Sandbox/Regression
+
+Sandbox 使用隔离 Candidate Config，不修改全局 Production Config。可执行完整 Golden 和固定 Regression 验证，保留当前正确后端逻辑。
+
+Regression PASS 必须来自真实固定回归集/既定方法，不能用“Hard Gate 通过”替代。Fixed Bad Case 必须有基准问题与同尺结果对应，不把当前所有高分题算修复。
+
+Candidate 资格优先：Hard Gate + Regression + 新失败/红线 + 有效身份 + 当前已冻结发布约束。不得因 A Overall 比 C高而自动推荐 A。
+
+### 12.4 Gate 2 与条件性 D
+
+保留 Gate 2 人工确认报告/Recommendation。Qualified Candidate 才可按现有规则进入选择，不用 UI 排序覆盖后端 Winner。
+
+D 是经证据确认有效且可组合的改动组合验证，说明来源 Candidate/有效能力/Config Diff/兼容关系。允许来源 Candidate 整体 Gate 未过但其局部能力有证据有效，前提是当前已支持规则，不按名字随机拼参数。
+
+无可组合能力时沿用现有显式 skip D/retain Winner 规则并记录理由；不为满足 UI 强行造 D。已有 D 生成则完整 Sandbox+Regression，不能只抽查 Bad Case。
+
+D 未通过或没有按当前规则改进 Winner，保持 Winner。例：C11/11、D10/11 → 保留 C；只是例子，所有结果读取真实数据。
+
+### 12.5 Gate 3 与发布：不重构正确底座
+
+保留并回归验证发布前：Sandbox Evaluated、Qualified、当前全部 Hard Gate、Regression PASS、Gate 2 Recommendation、D Decision 完成或合法跳过、Human Release、Evaluation 有效、同 Golden/Corpus/实验来源。
+
+发布事务内再次校验身份/资格，防过期 UI 提交。API 直接请求也不能绕过。Production Version 保存 Config、Candidate、Experiment、Baseline、Golden/Corpus、评测与人工决策来源。
+
+发布后 Baseline 比较起点不是无条件改成新 Production；其更新遵循当前 SPEC。Production、新的默认配置、历史 Baseline 是不同概念。
+
+保留回滚确认、版本记录与现有能力。V1.4 实施禁止自动发布、自动回滚，也不在真实库为了验收按发布按钮。
+
+## 13. Token Usage、Latency 与 Price Config
+
+### 13.1 复用已有采集
+
+检查现有 prompt_tokens/completion_tokens/prompt_cache_hit_tokens、miss tokens、stage timings、estimate_cost()、price env 配置。已有字段复用，避免另建重复 Token 系统。
+
+QA Pipeline 调用与 Judge/QC/Agent 调用分开统计；同一问题对比的成本来自实际两侧调用，不把整个评测成本塞进单答案卡。
+
+### 13.2 集中价格配置
+
+当前实际使用的模型/Provider，官方价格一次核对后存集中配置：provider、实际 model ID/可识别别名、currency、unit（如每百万Token）、uncached_input、cached_input、output、source_url、checked_at/effective_date、billing_mode、price_config_version。
+
+不在每次问答时爬官网；不在前端散落硬编码价格；不按“DeepSeek最新”推测当前 model名称。无法访问官方来源就留未配置状态/完整样例，交付指出阻塞，禁止编价格。
+
+真实运行记录当次价格配置版本或计算快照，后续更新价格不能静默改历史费用。Estimated Cost 是估算，不能称账单费用。
+
+### 13.3 计算和缺失值
+
+在总输入含缓存命中、缓存拆分完整时：`estimated_cost = ((input - cache_hit)*uncached_price + cache_hit*cached_price + output*output_price) / unit`；若 Provider 分别给 miss/hit，则按其实际语义算，校验总数一致。
+
+缺 cache Usage 且存在不同缓存费率时不能把 missing当0而显示精确费用。显示“无法精确估价/Usage不完整”；确有全部输入统一计费的 billing_mode 则可按其真实规则估算。Price缺失、model未知、Usage缺失都有 reason。
+
+数值0表示已采集且确为0；`—`表示未采集。旧记录不把null改0。Token 计数必须是 Provider真实返回，除非另列明确标注的本地估算。
+
+### 13.4 Timing 定义
+
+统一 ms存储、s展示，记录单位。TTFT为请求到首个实际输出Token的时间，非流式未采集时显示未采集，不用total替代。
+
+Retrieval、Generation、Total使用现有真实计时点；并行阶段不简单求和。Generation如包含TTFT则说明嵌套；Judge延迟单独展示。Flow记录体现query processing、embedding/search、fusion/filter/rerank/context、generate等实际存在阶段，不造不存在的组件。
+
+不用Gate2、发布审核等待时长冒充RAG latency，不把浏览器思考秒表当后端Pipeline耗时。
+
+## 14. 全局 UI 设计系统与交互
+
+### 14.1 一级导航和二级结构
+
+| 一级导航/H1 | 二级结构 | 主问题 |
+|---|---|---|
+| RAG 自进化项目概览 | 项目概览；已有业务/技术架构入口按需保留 | 整个闭环是什么 |
+| 知识库 | 文档列表 + 详情 Drawer | 知识如何进入系统 |
+| Pipeline 配置 | 分阶段配置卡 | 一条问答怎么走、哪些可调 |
+| Golden Dataset | 当前测试集 / 候选池 | 试卷如何可信 |
+| Baseline | 报告 / Hard Gate / Bad Case，保留有效入口 | 当前哪里失败 |
+| Agent 工作台 | 诊断 / Optimization Agent / A/B/C/D / Sandbox | 为什么失败、怎么实验、谁合格 |
+| 发布 | 发布状态 / Production变化 / 版本记录 | 最终发布了什么 |
+| 问答验证 | 问答验证 / 方案对比 / Monitoring | 用户体验变了吗、如何闭环 |
+
+一级名称与H1一致，不用左边“参数调优”右边“实验工作台”造成同一模块两种叫法；二级页可用局部标题但不重复巨大Hero。
+
+复用现有路由/Hash，提供必要旧路由alias，不破坏旧书签。移除一级01/02/03编号和页面自己实现的鼠标悬停导航状态文字；浏览器原生链接状态无需hack屏蔽。
+
+### 14.2 视觉与尺寸
+
+保持当前浅灰主内容背景、白色圆角Card、细描边和深色侧栏体系。不要迁移朋友全深色界面，不加入毛玻璃、渐变、发光、装饰插图或大图标。
+
+复用现有token并集中统一字号/字重/行高/圆角/间距/颜色。建议落实8px间距体系，标题与正文层级清楚；不要把建议像素值写死到所有内容导致溢出。
+
+内容Card等宽且同一行对齐；A/B/C、双答案分别等高。桌面内容区流式宽度/合理max-width，不能固定像素大Card造成小屏横向页面溢出。“固定尺寸”指同类卡统一布局和可控列表高度，不是拒绝响应式。
+
+列表表格有合理高度/max-height、内部滚动、sticky Header；页面允许正常纵向滚动，不把所有长文本一次撑到几屏，也不强制无滚动屏幕导致文字被切掉。
+
+### 14.3 颜色与状态
+
+- 浅绿、低饱和：Confirmed/Passed/Qualified/Published 等明确成功状态；参考截图顶部浅绿Stage，不用大块深绿。
+- 红色：确定Fail/Blocked/错误，仅失败行或小区域，不整页红。
+- 黄/琥珀：Warning/Review/Pending风险提醒；pending执行本身可用中性色。
+- 中性：未运行、缺数据、历史、不适用。
+- 不只靠颜色；同时有状态文字和图标/Badge。
+
+流程完成与业务结果分开。例如Baseline“已评测” + “Gate9/11 · 未通过”；不要只写“已完成”并绿色。Stage完成可表示操作做完，但必须显示其失败结果。
+
+### 14.4 Drawer、确认框、详情
+
+所有普通详情采用统一右Drawer：Document、Chunk、Evidence、Bad Case、Candidate Report、Coverage、Snapshot History、Config、Search Space。
+
+标准Drawer统一宽度/外边距/标题区/关闭按钮/正文滚动/Footer；Search Space可用wide变体。宽度用响应式上限，例如标准约640～760px、宽约900～1100px且不超过视口；以实际样式校验为准。
+
+支持Esc、关闭按钮、合理点遮罩关闭、焦点进入/归还、focus trap、键盘操作、body scroll lock。不支持native模拟交互。存在未保存编辑时复用统一保存/放弃提醒，不静默丢数据。
+
+删除、发布、回滚等高风险用居中确认Dialog。查看详情不用居中大弹窗。打开其他详情更换Drawer内容或明确层级，避免Drawer套Drawer堆叠挡住关闭按钮。
+
+完整JSON/RunID/RawOutput/技术Trace在Drawer底部折叠，能打开、复制、关闭。公开主页不堆内部ID，但审计详情仍可查。
+
+### 14.5 Select、Chip、表格长文本
+
+统一CustomSelect：选中关闭、外部关闭、Esc关闭、键盘方向/Enter、当前值显示、定位不裁切、Safari可用；单选不常驻多选下拉。组件只建一份，查全站原生/旧Select适用入口。
+
+Chip选中/取消样式一致、重复点击可取消。原因必选；选“其他”时说明必填；后端同样校验。不能按钮看似可点却不生效。
+
+Question列表最多2行，其他长文本2～3行。Hover/focus可看全文且不改变行高，手机/触控和键盘用户可通过行详情查看，不依赖Hover唯一入口。FailureTag最多2个+N，展开能看到全部。
+
+### 14.6 异步状态、进度与错误
+
+保留已有Global Operation机制，Baseline/Sandbox等每个任务只有一个追踪源，刷新后能恢复；不能同时弹多个相互矛盾的进度。
+
+QA不弹全局黑色任务框：回答窗口内显示真实思考/请求等待秒表与阶段状态，有停止能力则复用；不用虚构生成百分比。
+
+Golden进度基于真实Slot/Probe/QC记录。在六段Stage升级后不要把旧60单位公式当新六阶段统一分母。沿用已验证阶段进度或明确定义已处理/合格两种统计，缺数据未知时不编百分比。
+
+“已处理20”不等于“合格20”。失败占位、补题中、QC跳过、人工待审清楚显示。不回到0/100跳变。错误详情和关闭必须可交互，关闭前端提示不删除后台Run。
+
+禁用操作要说明前置条件，loading/error/empty/stale各有正常界面。按钮风格点击前后稳定，不在完成后突然变另一种大块颜色。
+
+### 14.7 中文与术语
+
+业务动作、说明、标题中文。保留RAG、LLM、Chunk、Embedding、Rerank、TopK、CandidateK、Baseline、Golden Dataset、Bad Case、Gate、Agent、Sandbox、Regression、Production、Prompt、Hybrid、Query Rewrite、MultiQuery、HyDE、Recall@K、Precision@K、MRR、TTFT、Monitoring等技术词。
+
+Experiment Summary→实验概览、View Details→查看详情、Config Diff→配置变化等。禁止“按所选配额创建Run”等主界面工程文案；改“创建新的Golden测试集”。报错提供原因+下一步，不展示整段Python traceback。
+
+## 15. 逐页实施规范
+
+### 15.1 RAG 自进化项目概览
+
+顺序：H1/一句话说明→当前下一步→全链路Stage→Golden/Baseline/Agent/Production四个紧凑Summary。保留已有架构说明入口，避免和主概览重复。
+
+Baseline显示已评测和Gate结果；Agent显示实验完成/失败/等待以及真实Qualified情况；Production显示当前Version与来源。四个Summary不用内部RunID当主要信息。
+
+下一步从状态推导，存在新Baseline未Agent时“运行Optimization Agent”，旧Production已发布不意味着下一步永远方案对比。非法/stale状态优先提醒正确前置条件，不自行触发任务。
+
+### 15.2 知识库
+
+统一ProcessStrip：文档→解析/OCR→Chunk→Embedding→Index。这里不展示Golden Topic Clustering；后者是Golden离线Coverage Planning，复用数据但不是每次在线检索阶段。
+
+Summary：文档数、Chunk数、Parser、Embedding/Index。文档表：文档/产品/版本/页数/Chunk/解析状态/索引状态/更新时间/操作。未知版本显示未记录，不显式造版本。
+
+表格Card加高、完整对齐、内部滚动。点击文档整行或详情打开Drawer：Document Metadata、真实解析/索引状态、Chunk列表、单Chunk原文与Metadata、来源定位；主页面不展开大量Chunk。
+
+保留/完善已授权新增文档、删除文档入口，复用现有原子Corpus更新；删除确认说明影响Golden/Baseline，但不在V1.4 实施自动执行真实删文档。
+
+### 15.3 Pipeline 配置
+
+删除顶部重复LLM/Parser/Embedding/Rerank Badge、product_xxxxx内部ID、“最近实际问答阶段”和重复小模块。保留必要Provider健康/配置状态在真实配置或Drawer，不删除接口能力。
+
+顶部两个过程区：Knowledge Preparation（Parse→Chunk→Embedding→Index）；Online QA（Query Processing→Retrieval→Rerank & Context→Generation）。
+
+下方宏观阶段Card：Document Processing、Embedding & Index、Query Processing、Retrieval & Ranking、Generation、Evaluation Configuration。
+
+分别放真实Parser/OCR/Chunk；Embedding/Index；Rewrite/MultiQuery/HyDE/Alias；CandidateK/Hybrid/MinScore/Rerank/TopK/Metadata Filter；Model/Prompt Strategy/Temperature；Judge/Golden Snapshot/Hard Gate。
+
+Evaluation Card明确“Evaluation不属于每次Production问答Runtime”。在线流程不把Judge画成必经环节。
+
+固定项Badge `Frozen`，真实可调项 `Agent可调`，来自规则源。Pipeline页表达当前配置/权限，不自动开放手改所有项。保存配置如已有能力，沿用SPEC授权范围；UI整理不悄悄改变Production。
+
+### 15.4 Golden Dataset：总体
+
+顶部统一六段Stage：Coverage Planning→Question Construction→Hard Validation→Probe→QC→Gate1。Stage显示当前Run真实状态，旧记录缺Coverage阶段细节写历史未采集，不自动改成已完成V2。
+
+主区有“当前测试集”“候选池”两Tab；历史Snapshot移到当前测试集右上按钮→Drawer，取消独立历史Tab。
+
+当前集信息顺序：V1.4 实施结果→需要人工关注（仅有异常时）→Coverage Planning摘要→完整题目表。Stage在标题下固定位置。必要Coverage摘要可放结果旁边，不能先用大型技术审计表淹没结果。
+
+### 15.5 Golden：Coverage与当前结果
+
+V2摘要：当前N Chunks→实际K Topic Clusters→Profile Slot总数→实际Construction分布→Candidate完成数。数字全部动态，Legacy不渲染新算法流程为历史事实。
+
+三项说明：Topic Planning（Embedding+DynamicK-means）、Sampling（按主题厚薄/小簇合并/未使用材料优先）、Profile（当前8/4/8或其他Profile）。按钮“查看Coverage规划”→Drawer。
+
+Drawer表：Cluster/Chunk数/Slot配额/代表文档/章节/Chunk/Construction；展开有merge/抽样/缺口审计，正常主页面不展示原始JSON。
+
+V1.4 实施结果分别显示总Slot、合法Candidate、HardValidation、Probe执行/风险、QC、HumanApproval的真实计数。不要全写“Passed”省掉数量和异常。
+
+异常区按P0/P1/伪负向风险/检索不连贯/需修订等真实类型汇总，可点击筛选列表。无异常显示简洁成功状态，不堆空异常卡。
+
+完整题表：Question/EvaluationGroup/ConstructionType/Probe/QC/HumanReview/操作。点击Drawer能查看ReferenceAnswer、ExpectedBehavior、Evidence、材料来源、Slot/Cluster、Validation/Probe/QC/Review审计、Attempts。
+
+人工批准/修订/AI帮我修/替换证据复用现有能力。多选Evidence/取消/保存真实有效，不把“AI帮我修”实现成自动改Corpus或换整个Chunk策略。关键修订重新校验，并保留修改前版本。
+
+### 15.6 Golden：Snapshot History
+
+Drawer列SnapshotID/Profile/题数/冻结时间/CorpusFingerprint/来源GenerationRun/PlannerVersion。内部ID在历史审计合理保留，首页不突出。Snapshot选中后只读详情，不能点击查看就改变current Golden。
+
+如果提供“选择用于后续评测”等已有操作，明确其影响并按现有规则执行，不能普通历史浏览自动切换。Legacy大批候选折叠，不占主页面。
+
+### 15.7 Golden：候选池与导入
+
+顶部“导入业务用例”；来源筛选全部/AIGenerated/BusinessImport；Group筛选Positive/Ablation/Negative，必要Construction筛选。表Question/Group/Construction/Source/ReviewState/选择。
+
+选题区显示Profile进度和Coverage缺口，不只计8/4/8。按钮“创建新的Golden测试集”，仅数量和Slot满足时可用；不满足有具体说明。不要用Native样式Select和现有统一UI混杂。
+
+导入Drawer支持模板下载、文件预览、每行错误、Confirm。批次原子/逐行处理按已有明确契约，不能显示全部成功而部分丢失。来源字段永远保留。
+
+### 15.8 Baseline首页
+
+标题说明→当前评测Stage→紧凑Hero（HardGate/FailedGate/BadCase/Overall）→FailedGate突出→EvaluationIdentity→ConfigSnapshot→Diagnostics。
+
+Overall加“仅用于方案比较”，不是发布资格。FailedGate每条指标/实际值/阈值/Fail，如截图Ablation68.75/70、SafeRejection87.50/95，但实际值从报告读。
+
+Identity包含Golden/Profile/Judge/评测时间/有效状态，内部ID可在详情。Config按Query/Retrieval/Rerank/Generation，完整配置Drawer。
+
+Diagnostics含Recall/Precision/MRR/TTFT/Usage/Cost、真实阶段延迟，降到辅助层。历史结果缺采集显示—/未采集，不让用户看到一堆重复“未采集”日志；简洁概述后详情。
+
+Baseline报告/HardGate/BadCase已有Tabs可保留，但首页本身要先说明未过哪几项，不要只有点进HardGate才发现问题。不新增独立逐题一级模块。
+
+### 15.9 Hard Gate
+
+保留表格，不做11张大卡。上方X/YPassed·ZFailed，按当次配置分Positive/Ablation/NegativeSafety/Performance，字段指标/实际/阈值/判定。失败行浅红，内部滚动，stickyHeader。
+
+无PerformanceGate时不能虚构，非Gate比较指标放Diagnostics。展示冻结门槛版本和单项解释入口，禁止前端擅自改变判定。
+
+### 15.10 Bad Case
+
+主列表Question（2行）、PrimaryRootCause、MainFailureMetric、FailureTag（2个+N），可按真实分组筛选。删除大量“未关联Gate”文案，无法证明直接贡献写“主要失败指标”，Unknown明确。
+
+点整行→Drawer：Question、ReferenceAnswer/ExpectedBehavior、GoldenEvidence、CandidateRecall与FinalTopK、ModelAnswer、Judge结果、RootCause依据、配置/Timing/Usage/RawJSON技术详情。
+
+历史没有CandidateRecall列表显示未采集，不能拿Top4列表充当Top12。Evidence真实引用位置可查看，无伪按钮。
+
+### 15.11 Agent工作台：诊断
+
+去掉重复BaselineRun/Overall/HardGate/BadCase四大指标。只保留小型当前Baseline来源与FailedGate提醒。
+
+核心RootCauseDiagnosis为动态非零类别卡，数量/影响/依据摘要。当前例可为Generation6、Safety1，未来Ranking3/Query2会变；禁止固定三卡和固定解释。
+
+主页面删除长Evidence清单。每类别“查看Cases & Evidence”→Drawer。根因来自持久化诊断，LLM解释来自当前Agent输出；Agent尚未运行时只显示机器已知诊断，不冒充Agent结论。
+
+### 15.12 Agent工作台：Optimization Agent
+
+实验概览：Round/预算/BadCases/状态，加紧凑来源标识和SearchSpace入口。无需全局RunID大Hero。
+
+主体：AgentDiagnosis（当前真实输出）→ExperimentPlan三轻量卡A/B/C（Target/Hypothesis/ChangedParameters）。删旧“优化假设”大表，不重复放Why/Risk/完整Case/完整Diff。
+
+这些详细字段转下一TabCandidate报告Drawer。生成中/失败/无Experiment分别显示真实状态和可行操作，不用上次成功结果兜底。
+
+### 15.13 Search Space
+
+不单独Tab；按钮“Search Space · N”→WideDrawer。N动态来自Validator。
+
+列Parameter/Baseline/Type/AllowedValues/Dependency/AgentEditable/Meaning，Baseline读取当前ConfigSnapshot，AllowedValues读取规则源，长说明可折行/展开。表headersticky，避免整行只显示省略号。
+
+V1.4 实施只整理排版和统一数据源，不修改数值、范围、固定参数授权。完整注册字段数量与12的截图不同也必须诚实显示。
+
+### 15.14 A/B/C/D
+
+桌面A/B/C三张等宽等高Card，内容多内部滚动，按钮Footer对齐。每卡：CandidateName+资格；Hypothesis；TargetBadCase数；只变化ConfigDiff；HardGate/FixedBadCase/Regression；Risk一行；查看完整报告。
+
+详情Drawer保存Why/Risk/TargetCases/完整Config/评测表/失败/Regression/Agent输出来源等。未运行显示未运行，Failed不是NotQualified同义词。
+
+D独立在下，呈现组合来源/ConfigDiff/完整验证结果/最终Decision。文案“D为有效能力组合验证”。当前D失败保留C时清楚显示，不能自动把D当推荐。
+
+### 15.15 Sandbox
+
+顶部A/B/C/D四个紧凑状态卡，无D显示未生成/已跳过及理由；中间Recommendation结论用浅绿，未合格用中性或Warning，不推荐无资格最高分。
+
+比较表顺序：HardGate→Regression→FixedBadCase→BadCase→Positive→Ablation→Safety→Overall→TTFT→TokenCost→Recall/Precision/MRR。
+
+每个综合行来自已定义计算规则；不凭空平均不同指标。Baseline不适用Regression时N/A，不记FAIL或0。价格未知显示—并可查原因。
+
+表冻结Metric列，必要横向表内滚动，不使页面无限宽。Gate2操作与Recommendation证据可见但不重复做审批入口。
+
+### 15.16 发布
+
+标题下Stage：Sandbox完成→Gate2→Gate3，每个仍区分执行和资格。已发布时首页焦点是“最终发布什么”，删除重复巨型推荐Hero；未发布状态仍保留必要推荐来源和审核动作，不能删掉可发布入口。
+
+CandidateReleaseState四列紧凑，显示真实GateFailed/Eligible/Published/NotGenerated等状态。已发布C可显示，不能新Baseline时把它当新实验C。
+
+ProductionChange只列变化，如PromptStrategyGrounded→Abstention；“1项变化·11项未变化”数量由规范化配置Diff计算。完整配置和未变项Drawer，不默认展开11个未变参数。
+
+版本记录保留，详情/报告Drawer，高风险发布/回滚居中确认。发布事务后重取Production，失败原因可查，按钮不得伪成功。
+
+### 15.17 问答验证
+
+删除二级“机器人知识库问答/当前Production”Hero，H1后直接Tab与Chat。Production身份仍在紧凑会话Header/详情可识别，不删除运行来源信息。
+
+左SessionHistory保留，空态问题建议可直接填入/发起按现有设计明确实现。等待时回答区域显示实时等待秒数，不出黑色全局QA进度框。
+
+回答内容、Evidence、Timing/Usage/Cost分开，证据Drawer。长答案卡内可滚动，不挤压输入区。失败重试/停止如已有能力继续有效，不从历史回答冒充实时输出。
+
+### 15.18 方案对比
+
+Tab选中后直接Baseline vs CurrentProduction紧凑Header，删除重复“方案对比/同一问题比较…”Hero。
+
+问题区：“从BaselineBadCase选择”统一Select，选中立即填框，删除“使用该问题”额外按钮；手动输入仍可编辑，右下“运行实时对比”。来源清楚且不触发自动Provider。
+
+参数差异只显示变化，未变N项→Drawer。左右配置是请求启动时冻结的具体版本，运行中Production变了也不混改标签。
+
+双答案桌面50/50等高，每张三段固定：Header（方案+状态+真实总耗时）、Answer（仅回答正文，内部滚动）、MetricsFooter（TTFT/Retrieval/Generation/TotalLatency/InputTokens/OutputTokens/EstimatedCost固定位置）。下方Evidence·N→Drawer。
+
+流式过程中已有字段立即填，未知—，秒表不是最终总耗时。单侧失败保留另一侧成功结果/明确失败，不能整个对比覆盖为无意义报错。两侧结果绑定相同Question和comparisonID，旧请求不能写入新问题。
+
+对比不调用额外Judge来给实时答案自动评分，除非现有明确能力与用户触发；V1.4 实施只展示真实回答和已采集指标。
+
+小屏堆叠但身份清楚，仍保持同字段位置和完整内容；无需为追求50/50导致不可读。
+
+### 15.19 Monitoring
+
+名称固定Monitoring，位于问答验证Tab。顶部ProductionSignals→HumanReview→Trigger→OptimizationAgent，显示实际状态。
+
+RecentProductionQA表：Question/FeedbackSignal/SafetySignal/Latency/HumanStatus；详情可看QA与版本来源。操作正常/BadCase/安全问题复用真实审计；不能把点踩直接判安全违规。
+
+人工确认BadCase后PendingOptimizationTrigger；再Confirm创建/复用PendingContext，由明确按钮启动Agent。没有人工授权不能自动调参/自动发布。
+
+不要默认每条QA调用LLM判别或新增实时监听后台任务。轻量系统用已有反馈/规则/人工标记，安全信号未采集显示—。
+
+Trigger无有效Baseline时有原因，已确认未运行Agent时pending，Agent首次正常Round1。重复标记/撤销如已有功能记录历史而非删审计。详见P0规则。
+
+## 16. 数据模型、Migration 与兼容策略
+
+### 16.1 新字段/对象只作为语义建议
+
+按实际Schema最小扩展，字段名可沿用仓库，不强制建立所有新表。需要承载的语义有：Planner版本与冻结Plan、Cluster/Slot、Group/Construction、Evidence位置、Candidate/Final retrieval trace、Full-text产物schema、Validation/Probe风险、PendingContext状态、Usage完整性、Price版本、对象来源ID。
+
+旧字段null保留，Adapter显示未采集。新增字段默认不能把旧记录变成V2Passed。旧approved不因新增nullable字段全部变unapproved，但不能因此被展示为V2工艺。
+
+### 16.2 SQLite写入与事务
+
+所有INSERT显式列名，禁止依赖表列顺序。Negative可为空ReferenceAnswer/Evidence与必填审计字段语义区分，不允许NULL错位写入EvidenceJSON造成NOTNULL失败。
+
+迁移可重复执行不破坏数据，有migration版本/验证；在旧Schema副本执行两次验证幂等性。保持已有外键/唯一性/JSON约束，兼容SQLite实际版本。
+
+新Golden/Candidate状态与审计写入事务保持一致；Provider调用不要占数据库写事务几十秒。失败Record保留；DB错误提供结构化可定位原因。
+
+### 16.3 Frozen对象不可变
+
+ApprovedSnapshot、当次EvalConfig/Judge/Gates、已生成CandidateConfig、发布Version保留不可变内容。可附加新审计/显示Adapter，不覆盖原JSON。
+
+不因更改当前Price/Validator/Planner而反向重写历史。外部重新生成采用新Run/新Snapshot，用户手动触发。
+
+### 16.4 可比性与失效
+
+所有结果绑定Golden/Corpus/Config/Judge/Gate/Experiment来源。若不可比，明确历史/失效，不将分数放一表冒充同尺结论。CurrentResolver用相同规则。
+
+新PlanPreview不触发任何历史失效；真实Corpus变更按既有规则失效相应Golden/Baseline。仅UI重排不造成业务状态改变。
+
+### 16.5 错误审计
+
+记录阶段、attempt、对象ID、错误类型、公开简短原因、允许保留的RawOutput/ValidationPath。旧Run仅有error没有raw时显示历史未保存，不虚构响应。
+
+HTTP接口失败码与UI状态一致。未生成Candidate时不得数据库显示成功；取消客户端弹窗不等于取消后端任务；后台终止能力存在才展示终止按钮。
+
+## 17. 必须覆盖的离线验收矩阵
+
+以下均使用隔离测试库、临时Corpus、合成Fixture或Stub，禁止污染真实Demo数据。优先拓展已有测试；不要为普通文字/间距写大量镜像测试，把测试预算用在数据与流程边界。
+
+### 17.1 P0与身份
+
+| Test ID | 场景 | 通过标准 |
+|---|---|---|
+| ID-01 | B0有E0；新B1无Experiment | B1Agent等待，E0只在历史，Production仍旧版本 |
+| ID-02 | 最新completed是CandidateSandbox | resolver/Monitoring仍选有效Baseline |
+| ID-03 | PendingRound0无Candidates | 首次Generate正常Round1 A/B/C |
+| ID-04 | 真Round1有候选未Sandbox | 下一轮保持原阻断，不因Round0修复放宽 |
+| ID-05 | Trigger重复Confirm/双击 | 一个上下文、一份审计关系，无重复实验 |
+| ID-06 | 首次Agent malformed/Provider error | Failed可重试，不假完成，不创建半套ABC |
+| ID-07 | Corpus/Golden已失效，无当前Baseline | Trigger保留pending，有可读前置条件 |
+| ID-08 | 切换Baseline后旧异步响应到达 | 不覆盖新视图，Drawer/Candidate已清旧身份 |
+
+### 17.2 Coverage与组卷
+
+| Test ID | 场景 | 通过标准 |
+|---|---|---|
+| GV-01 | n=0/1/2/小语料 | 明确边界，无非法K、不崩溃 |
+| GV-02 | 同Corpus/seed/参数重复Preview | 相同分配，Audit可复现 |
+| GV-03 | 存在多个小簇/全小簇 | 稳定合并、无死循环、总量守恒 |
+| GV-04 | Mini/Medium/Full | 总数20/49/98与8/4/8、20/9/20、40/18/40一致 |
+| GV-05 | Topic数多于可用Slot | 真实缺口，不虚称全覆盖 |
+| GV-06 | 优先未使用Chunk | 可追踪采样与reuse，不按产品题号写分支 |
+| GV-07 | 无表格/无桥接材料 | 不造Aggregation/Bridge，合法fallback并记录 |
+| GV-08 | Pool20题8/4/8但集中2Topic | 阻断Coverage不足，显示缺口 |
+| GV-09 | Pool选题满足Slot | 新Run保存匹配与Plan，不继承旧Approved |
+| GV-10 | Negative自动Topic归类 | 只CoverageAnchor，无伪Evidence |
+| GV-11 | MultiCluster Evidence | 保存关联，匹配稳定，不丢Bridge第二跳 |
+| GV-12 | Preview后Corpus变化 | Preview失效，不使用旧Plan创建Run |
+
+### 17.3 HardValidation/Probe/QC
+
+| Test ID | 场景 | 通过标准 |
+|---|---|---|
+| VP-01 | AI/Import/Pool输入同类候选 | 同基础Validator输出，无三套规则 |
+| VP-02 | 答案同义表述但关键事实有原文 | 不强制整句字面相等、不误报Anchor |
+| VP-03 | Evidence在错误Corpus/伪造页码 | 阻断，并给出位置错误 |
+| VP-04 | 两Chunk但单Chunk即可回答 | 不假称Bridge通过 |
+| VP-05 | Aggregation缺项/超出范围 | 阻断或具体风险，不能Pass |
+| VP-06 | 口语Ablation自包含 | 可通过，无强制Q01/Q09关系 |
+| VP-07 | 候选召回命中但TopK落掉 | 保存两层，初步RankingFailure |
+| VP-08 | 候选召回也未命中 | RetrievalFailure，合法题不因而直接非法 |
+| VP-09 | 多跳AnyHit而AllHit失败 | 不显示充分Evidence命中 |
+| VP-10 | Final充分Evidence但生成失败 | 诊断有Generation依据，非仅标签 |
+| VP-11 | 假Negative答案只在未切块原文/表数字 | RawFullText能发现可疑材料；StubJudge可阻断 |
+| VP-12 | 字面相关但不足回答 | 不把字面命中直接判FakeNegative |
+| VP-13 | 注入/安全题有相关原文 | 根据expected_behavior，不误取消边界题 |
+| VP-14 | Judge超时/非法JSON/文本解析不足 | uncertain/review，不默认Pass |
+| VP-15 | 人工改Question/Answer/Evidence | 相关Probe/QC/Review重置并留审计 |
+| VP-16 | 19/20或失败Slot | 保留19合法题与失败占位，不冻结20题Snapshot |
+| VP-17 | 生成失败重试、QC修一次 | 预算分开且有限，不无限自动修复 |
+
+### 17.4 数据、索引、成本、发布
+
+| Test ID | 场景 | 通过标准 |
+|---|---|---|
+| DS-01 | 旧Schema迁移、重复迁移 | 数据语义无损、幂等、显式列INSERT |
+| DS-02 | Negative可空答案与EvidenceJSON | 不出现列错位/NOTNULL异常 |
+| DS-03 | 旧FrozenSnapshot/已发布Version | 原内容不改，V1/Legacy而非伪V2 |
+| DS-04 | FullText构建中失败 | activeCorpus不变，旧产物仍可用 |
+| DS-05 | Manifest指向混合Fingerprint | 拒绝Activate/Probe，不读半版本 |
+| DS-06 | 只新增兼容FullText产物 | 记录schema升级，不伪改旧内容/身份 |
+| DS-07 | 实际解析/Chunk变化 | 不无声覆盖，按Corpus变化提示失效 |
+| CT-01 | CacheHit/Miss/Output齐全 | 单位/币种/模型价格正确，无重复计算 |
+| CT-02 | Cache拆分缺失、不同费率 | 显示不可精确估价，missing非0 |
+| CT-03 | Price/model/Usage未知 | 原因明确，不编价/编Token |
+| CT-04 | 真实采集0 vs历史null | 分别0和—，版本化价格不改旧估价 |
+| CT-05 | 并行/嵌套Timing | 不误相加、TTFT未采集不填Total |
+| RL-01 | Overall最高但Gate未过 | 不推荐/发布，资格优先 |
+| RL-02 | D未过而Winner合格 | 保留Winner，Ddecision完整 |
+| RL-03 | RegressionFAIL/未跑/Gate2未确认 | UI/API/事务均阻断发布 |
+| RL-04 | Preview/新实验/升级UI | 不改真实Production、Baseline和旧Snapshot |
+| RL-05 | 旧UI资格在提交前失效 | 事务拒绝过期发布，不假成功 |
+
+### 17.5 前端与Browser/E2E
+
+离线Provider Stub驱动至少一个完整测试生命周期：Legacy数据加载→V2Preview→Slot候选构造与校验→Probe→QC→Gate1→Baseline→AgentRound1→ABC→Sandbox/Regression→Gate2→条件D失败保留Winner→Gate3在测试库发布→QA对比→MonitoringConfirm→新PendingContext/Agent启动。
+
+这个测试生命周期可以批量模拟Provider结果，但每个状态与接口真实推进；不能把固定UI截图渲染当E2E状态流。覆盖未运行/失败/未合格/Qualified/Published/Legacy/Stale。
+
+检查以下交互：Select选择/外部/Esc/键盘关闭；原因Chip取消与其他必填；列表整行Drawer；所有详情/Evidence/错误/关闭按钮；stickyHeader与内部滚动；QA不出全局进度框；同问题选择立即填入；双答案字段固定；异步刷新身份不串台；真实缺值清楚；空态正常。
+
+桌面三尺寸建议1440×900、1280×800、1024×768，重点对应MacBook屏幕空间。小屏Drawer不超屏，主页面不横向溢出。Chromium与WebKit/Safari验证（能用WebKit则运行；不可用不能宣称Safari已实测）。保留截图证据与检查表。
+
+截图目测检查标题/表头/行距/字重/对齐/按钮Footer/遮挡/截断/卷内计数。一页页检查全部8个一级模块与关键二级页，不只首页截图。
+
+若E2E可能访问真实Provider，强制测试环境注入Stub/禁止外部Provider网络；先核实测试配置再运行，不能“测试顺便烧一次”。
+
+## 18. 最少量真实验证：作为用户操作清单，不自动执行
+
+代码和离线验收通过后，交付三条可复现手动步骤：
+
+1. 一次Baseline vs Production实时问答对比：验证真实Answer、Usage、Latency、Cost配置与缺失原因。默认只需现有问题，不自动Judge整卷。
+2. 一次ProductionQA事件→人工标BadCase→ConfirmTrigger→手动启动Agent：验证P0首轮真实生命周期。必须说明真实Agent可能创建新实验并使用预算，用户选择何时跑，不自动跑Sandbox/发布。
+3. V2PlannerPreview：确认动态K/小簇合并/Slot分配，Preview使用已存向量无需付费模型；不紧接着自动生成20题。
+
+如果面试要声称“当前Golden是V2生成”，必须以后另行运行/审核/冻结新V2Golden，并在同一新Snapshot上重新Baseline/实验/验证。当前仅升级Engine且保留V1演示时，要讲“V2引擎已实现，当前演示快照来自V1”，不能误导。
+
+不为了用户可能将来演示而现在自动重跑Mini20。完整真实Lifecycle重跑需要单独指令。
+
+
+需求输入 SHA-256：`e576e62794e7dcf1a26399a6de0b7ca2a5152d8ed2142edf0e6c6f1a6aec80bc`。此校验值仅用于追踪需求来源，不代表代码或真实数据完成验证。
+
+## 19. 历史存档（Superseded，不用于当前目标判定）
+
+<details>
+<summary>展开 V1.3 及其包含的 V1.2 / V1.1 历史内容（截至 2026-09-30）</summary>
+
+以下为升级前文本原样存档，其中的“当前”“唯一”和实施授权均属于历史，不覆盖 V1.4。未被 V1.4 替代的数值与安全底座已在第 2 节明确继承；未决冲突以第 4 节为准。
+
+# RAG Self-Evolution Platform 产品规格
+
 > **唯一当前产品规则：V1.3 — Friend-Aligned Evaluation & Experiment UX**
 > 本节覆盖下方 V1.2 / V1.1 历史条款。历史条款仅供追溯，标有 Current / Confirmed 的旧措辞不再生效。运行能力、真实数据及发布状态以持久化审计为准；本版本开发不得修改真实 `demo.db` 或代替用户调用 Provider、重新运行 Baseline、生成实验或执行人工 Gate。
 
@@ -446,3 +1289,5 @@ V1.1 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语�
 - 实际执行以单调时钟记录 UTC 起止和阶段耗时。检索子阶段归属 Retrieval，不重复求和；回答与 Judge 分开。P50/P99 Gate 口径和资格规则不变。未来保存完整 Provider Usage，历史无记录显示未采集。
 - `RAG_PRICE_CONFIG` 指向集中 JSON 单价配置；默认无价格。必需 model/currency/source/effective_date/cache_billing 和 input_per_million/cached_input_per_million/output_per_million。仅完整 Usage（含 cache-hit）且模型匹配时估算当前调用，保留计价依据，不回算历史。
 - 唯一迁移为可空 `monitoring_events.metrics_json` 与迁移登记；旧事件为空，不伪造。人工 Monitoring 阈值和 Trigger 确认规则不变，确认不自动调参或发布。
+
+</details>

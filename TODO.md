@@ -1,4 +1,8 @@
-# 待办（当前 V1.3）
+# 待办（V1.4 目标 / Phase 1 历史记录）
+
+> **2026-09-30 文档同步边界：** 唯一当前目标规格为 [SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md)，两张架构图已按最新设计重绘为目标架构。本次没有业务代码、数据库或索引升级，没有 Provider 或发布重跑；下方 Phase 1 / V1.3 内容保留为现有实现及历史证据，不能表示 V1.4 全部已完成。需求状态和未决项以 SPEC 第 3–4 节为准。
+
+V1.4 的 P0-01–04、GV2-01–05、COST-01、UI-01、SAFE-01、QA-01 按 SPEC 需求追踪及离线验收矩阵继续实施；本次仅完成文档与图交付。旧勾选状态不代表这些目标已完成。
 
 当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
 

@@ -1,5 +1,9 @@
 # 决策记录
 
+> **2026-09-30 文档同步边界：** 唯一当前目标规格为 [SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md)，两张架构图已按最新设计重绘为目标架构。本次没有业务代码、数据库或索引升级，没有 Provider 或发布重跑；下方 Phase 1 / V1.3 内容保留为现有实现及历史证据，不能表示 V1.4 全部已完成。需求状态和未决项以 SPEC 第 3–4 节为准。
+
+V1.4 决策：仅同步目标规格与从头重绘两图，保留技术栈、治理数值和历史数据；QC P0 的材料冲突记录为 `[OPEN-QC-P0]`，本次不更改实现。
+
 当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
 
 ## 2026-09-30 · Phase 1 决策
@@ -7,13 +11,13 @@
 采用明确 Evaluation Group；构造题型与 Positive/Ablation/Negative 独立。业务证据必须定位原文，不能仅有文件名。混合候选不继承审批，复制新 Run 重走质量链。仅新增 openpyxl 依赖、nullable Monitoring 指标列；其他新字段进入既有 JSON。价格默认不配，不以当前单价回算历史。朋友截图只提供产品参考，不推断源码与模型迁移。
 
 
-V1.3 当前决策：生成 Run 冻结 Mini／Medium／Full Profile；旧 Mini 字段兼容读取。Baseline Gate 贡献题由保存的逐题结果按后端聚合公式计算，历史未采集字段不补造。八个导航保留原 Hash。
+V1.3 历史决策：生成 Run 冻结 Mini／Medium／Full Profile；旧 Mini 字段兼容读取。Baseline Gate 贡献题由保存的逐题结果按后端聚合公式计算，历史未采集字段不补造。八个导航保留原 Hash。
 
-当前产品规则只以 [SPEC V1.3](docs/RAG_SELF_EVOLUTION_SPEC.md) 为准。本文件记录工程选择及历史决策，不覆盖 SPEC。
+当前产品规则只以 [SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md) 为准。本文件记录工程选择及历史决策，不覆盖 SPEC。
 
 ## 选择独立实现，而非 fork AutoRAG
 
-V1.2 历史决策（继承规则以 V1.3 SPEC 为准）：Ablation 独立，Positive/Ablation 检索未命中为 P1，QC 分数辅助；机器 P0 明确接受理由，确定性错误和 Fake Negative 不可豁免。Gate 1 一次确认并冻结；Gate 2 一次报告确认并选赢家；Composite D 基于实测有效差异，冲突保留赢家，无有效组合不造 D；Gate 3 原子发布。12 次启动预算含失败，为 D 留一次。旧 Direct Release 停止当前入口。缺产品／章节元数据不阻断动态语料。
+V1.2 历史决策（继承规则以 V1.4 SPEC 为准）：Ablation 独立，Positive/Ablation 检索未命中为 P1，QC 分数辅助；机器 P0 明确接受理由，确定性错误和 Fake Negative 不可豁免。Gate 1 一次确认并冻结；Gate 2 一次报告确认并选赢家；Composite D 基于实测有效差异，冲突保留赢家，无有效组合不造 D；Gate 3 原子发布。12 次启动预算含失败，为 D 留一次。旧 Direct Release 停止当前入口。缺产品／章节元数据不阻断动态语料。
 
 AutoRAG 原始 Python RAG AutoML 能力位于 `legacy/`，而根项目已转向 AutoRAG 2.0。本 Demo 不将两者作为依赖：在真实运行时尚未落地前直接集成，会先引入过重的评测栈。`legacy/` 仅保留为文档化的概念参考。
 
