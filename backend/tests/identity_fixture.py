@@ -22,4 +22,3 @@ def completed_baseline(store, target='baseline', snapshot=None, run_id=None):
     store.finish_evaluation_run(run_id, 'completed', {'gates': {'passed': False}})
     store.record_bad_case(run_id, 'Q1', 'Retrieval', 'ordinary', {'reason': 'test'})
     return run_id
-

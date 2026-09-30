@@ -64,7 +64,12 @@ class CurrentIdentityTests(unittest.TestCase):
         self.assertEqual(results[0]['optimization_run_id'], results[1]['optimization_run_id'])
         context = results[0]['optimization_run_id']
         self.assertEqual(self.store.experiment(context)['result']['round'], 0)
-        generated = OptimizationAgent(self.store, FixedProvider(json.dumps(drafts()))).generate(self.baseline, trigger)
+        provider = FixedProvider(json.dumps(drafts()))
+        generated = OptimizationAgent(self.store, provider).generate(self.baseline, trigger)
+        self.assertEqual(provider.prompt["monitoring_context"]["trigger"]["id"], trigger)
+        self.assertEqual(provider.prompt["monitoring_context"]["event"]["question"], "安全问题")
+        self.assertEqual(provider.prompt["monitoring_context"]["event"]["source"]["production_version_id"], "baseline-v1")
+        self.assertEqual(generated["result"]["monitoring_context"], provider.prompt["monitoring_context"])
         self.assertEqual(generated['id'], context)
         self.assertEqual({row['reasoning']['round'] for row in generated['candidates']}, {1})
         with self.store.connection() as connection:
