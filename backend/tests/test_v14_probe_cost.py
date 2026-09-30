@@ -18,7 +18,7 @@ from app.corpus_management import CorpusManager
 from app.full_text import checksum, write_full_text, validate_bundle, search_full_text
 from app.governance import GovernanceStore
 from app.providers import DeepSeekProvider
-from app.retrieval import VectorRetriever, evidence_coverage
+from app.retrieval import VectorRetriever, RetrievalUnavailable, evidence_coverage
 from app.telemetry import cost_report, estimate_cost, price_config, measure
 from test_candidate_review_export import candidates
 
@@ -126,7 +126,7 @@ class ProbeCostTests(unittest.TestCase):
         manifest = json.loads((active / 'manifest.json').read_text())
         manifest['artifacts']['full_text.json'] = checksum((active / 'full_text.json').read_bytes())
         (active / 'manifest.json').write_text(json.dumps(manifest))
-        with self.assertRaisesRegex(ValueError, 'fingerprint'):
+        with self.assertRaises(RetrievalUnavailable):
             VectorRetriever(CorpusStore(active)).full_text_probe('query')
 
     def test_ds04_atomic_activation_and_failed_post_switch_restore_complete_bundle(self):
@@ -390,3 +390,92 @@ class ProbeCostTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'Corpus 已变化'):
                     store.review_generation_batch([row['id'] for row in rows], 'fixture reviewer', confirmed_manual_review=True)
             self.assertEqual(store.dataset_snapshots(), before)
+
+    def test_r1_model_load_and_encoder_failure_persist_failed_probe_and_block_quality_api(self):
+        import sys
+        from fastapi.testclient import TestClient
+        from api_fixture import main
+        store, rows = self.store()
+        run_id = rows[0]['raw']['generation_run_id']
+        active = self.root / 'index'; bundle(active)
+        corpus = CorpusStore(active)
+        provider = Mock(settings=SimpleNamespace(configured=True, model='fixture'))
+        service = AiService(store, corpus, provider, False)
+        client = TestClient(main.app)
+        with store.connection() as connection:
+            connection.execute("UPDATE golden_generation_runs SET status='completed' WHERE id=?", (run_id,))
+            connection.execute('UPDATE questions SET question=? WHERE id=?', ('未备案专利费用？', rows[12]['id']))
+        for category, row in [('negative', rows[12]), ('positive', rows[0])]:
+            for failure_stage in ('load', 'encode'):
+                with self.subTest(category=category, failure_stage=failure_stage):
+                    model = SimpleNamespace(encode=Mock(side_effect=RuntimeError('fixture encoder failure')))
+                    constructor = Mock(side_effect=RuntimeError('fixture missing local embedding model')) if failure_stage == 'load' else Mock(return_value=model)
+                    service.retriever.invalidate()
+                    with patch.dict(sys.modules, {'sentence_transformers': SimpleNamespace(SentenceTransformer=constructor)}), patch.object(main, 'store', store), patch.object(main, 'corpus', corpus), patch.object(main, 'ai_service', service):
+                        response = client.post(f"/api/governance/questions/{row['id']}/probe")
+                        self.assertEqual(response.status_code, 200)
+                        result = response.json()
+                        self.assertFalse(result['passed'])
+                        self.assertEqual(result['classification'], 'RETRIEVAL_EXECUTION_FAILED')
+                        self.assertEqual(result['probe_details']['probe_execution_status'], 'failed')
+                        self.assertEqual(result['probe_details']['question_validity'], 'needs_review')
+                        trace = result['probe_details']['retrieval_trace']
+                        self.assertEqual(trace['status'], 'failed')
+                        self.assertIsNone(trace['candidates'])
+                        self.assertIsNone(trace['final'])
+                        self.assertEqual(trace['error']['error_type'], 'RuntimeError')
+                        self.assertEqual(store.probe_history(row['id'])[0]['probe_details'], result['probe_details'])
+                        self.assertEqual(client.post(f"/api/governance/questions/{row['id']}/qc").status_code, 409)
+                        self.assertFalse(store.approval_eligibility(row['id'])['can_approve'])
+                        with self.assertRaises(ValueError):
+                            store.review_question(row['id'], 'approved', 'fixture', accept_qc_p0=True, reason='must not waive execution failure')
+                        qa = client.post('/api/preview/baseline', json={'question': '未备案专利费用？'})
+                        self.assertEqual(qa.status_code, 503)
+                        self.assertEqual(qa.json()['detail']['code'], 'RETRIEVAL_EXECUTION_FAILED')
+                    constructor.assert_called_with('BAAI/bge-small-zh-v1.5', local_files_only=True)
+        provider.complete.assert_not_called()
+        provider.complete_with_metrics.assert_not_called()
+
+    def test_r1_successful_zero_hit_remains_completed_and_distinct_from_failure(self):
+        import sys
+        from app.policy import DEFAULT_PIPELINE_CONFIG
+        store, rows = self.store()
+        active = self.root / 'index'; bundle(active)
+        corpus = CorpusStore(active)
+        retriever = VectorRetriever(corpus)
+        with store.connection() as connection:
+            connection.execute('UPDATE questions SET question=? WHERE id=?', ('未备案专利费用？', rows[12]['id']))
+        encode = Mock(return_value=np.asarray([[0., 1.]], dtype='float32'))
+        with patch.dict(sys.modules, {'sentence_transformers': SimpleNamespace(SentenceTransformer=lambda *_args, **_kwargs: SimpleNamespace(encode=encode))}), patch('app.governance.DEFAULT_PIPELINE_CONFIG', {**DEFAULT_PIPELINE_CONFIG, 'metadata_filter': 'STRICT'}):
+            result = store.run_probe(rows[12]['id'], retriever, corpus.chunks())
+        self.assertGreater(encode.call_count, 0)
+        self.assertTrue(result['passed'])
+        self.assertEqual(result['classification'], 'NEGATIVE_VALID')
+        self.assertEqual(result['probe_details']['probe_execution_status'], 'completed')
+        self.assertEqual(result['probe_details']['retrieval_trace']['status'], 'collected')
+        self.assertEqual(result['probe_details']['retrieval_trace']['final'], [])
+
+    def test_r1_bm25_execution_failure_blocks_probe_and_evaluation_without_judge(self):
+        import sys
+        from app.evaluation import EvaluationRunner
+        store, rows = self.store()
+        active = self.root / 'index'; bundle(active)
+        corpus = CorpusStore(active)
+        provider = Mock(settings=SimpleNamespace(configured=True, model='fixture'))
+        service = AiService(store, corpus, provider, False)
+        service.judge = Mock(side_effect=AssertionError('Judge must not run after retrieval failure'))
+        model = SimpleNamespace(encode=lambda *_args, **_kwargs: np.asarray([[1., 0.]], dtype='float32'))
+        with patch.dict(sys.modules, {'sentence_transformers': SimpleNamespace(SentenceTransformer=lambda *_args, **_kwargs: model)}), patch.object(service.retriever, '_bm25', side_effect=RuntimeError('fixture lexical index failure')):
+            probe = store.run_probe(rows[0]['id'], service.retriever, corpus.chunks())
+            self.assertFalse(probe['passed'])
+            trace = probe['probe_details']['retrieval_trace']
+            self.assertEqual(trace['error']['stage'], 'retrieval_pipeline')
+            self.assertEqual(trace['corpus_fingerprint'], {'D': 'old'})
+            self.assertTrue(any(stage['stage_name'] == 'bm25' for stage in trace['timings']))
+            evaluation_store = Mock()
+            EvaluationRunner(evaluation_store, service).execute_baseline('fixture-run', [store.question(rows[0]['id'])], {})
+            self.assertEqual(evaluation_store.finish_evaluation_run.call_args.args[1], 'failed')
+            evaluation_store.record_evaluation_case.assert_not_called()
+            evaluation_store.record_bad_case.assert_not_called()
+            service.judge.assert_not_called()
+        provider.complete_with_metrics.assert_not_called()

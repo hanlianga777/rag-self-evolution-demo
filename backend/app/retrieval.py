@@ -10,6 +10,14 @@ from .corpus import EMBEDDING_MODEL, INDEX_DIR, TOP_K, CorpusStore
 from .full_text import CORPUS_LOCK, validate_bundle, search_full_text
 
 
+class RetrievalUnavailable(RuntimeError):
+    """An unexecuted/failed stage is never an empty retrieval observation."""
+    def __init__(self, stage, error):
+        self.detail = {'code': 'RETRIEVAL_EXECUTION_FAILED', 'stage': stage, 'error_type': type(error).__name__}
+        self.trace = {'status': 'failed', 'candidates': None, 'final': None, 'error': self.detail}
+        super().__init__(f"本地检索执行失败（{stage}/{type(error).__name__}）；请检查索引与本地模型")
+
+
 def _terms(text: str) -> set[str]:
     return set(re.findall(r"[A-Za-z0-9]+|[\u4e00-\u9fff]", text.lower()))
 
@@ -52,7 +60,10 @@ class VectorRetriever:
                 yield self._bundle
                 return
             path = self.index_dir.resolve()
-            bundle = validate_bundle(path) if (path / 'manifest.json').exists() else None
+            try:
+                bundle = validate_bundle(path)
+            except Exception as error:
+                raise RetrievalUnavailable('corpus_bundle', error) from error
             if self._loaded_path != path:
                 self._index = None
                 self._loaded_path = path
@@ -79,7 +90,7 @@ class VectorRetriever:
             return True
         index_file = (self._bundle["path"] if self._bundle else self.index_dir) / "faiss.index"
         if not index_file.exists():
-            return False
+            raise RetrievalUnavailable('vector_load', FileNotFoundError('FAISS index missing'))
         try:
             import faiss
             from sentence_transformers import SentenceTransformer
@@ -87,19 +98,24 @@ class VectorRetriever:
             self._index = faiss.read_index(str(index_file))
             self._model = SentenceTransformer(EMBEDDING_MODEL, local_files_only=True)
             return True
-        except Exception:
+        except Exception as error:
             self._index = None
             self._model = None
-            return False
+            raise RetrievalUnavailable('vector_load', error) from error
 
     def vector_candidates(self, question: str, limit: int = TOP_K, *, stages=None) -> list[dict]:
-        with self.snapshot():
-            return self._vector_candidates(question, limit, stages=stages)
+        try:
+            with self.snapshot():
+                return self._vector_candidates(question, limit, stages=stages)
+        except RetrievalUnavailable:
+            raise
+        except Exception as error:
+            raise RetrievalUnavailable('vector_search', error) from error
 
     def _vector_candidates(self, question: str, limit: int = TOP_K, *, stages=None) -> list[dict]:
         """Initial BGE/FAISS recall. Filtering belongs to the pipeline, never here."""
         if not self._load():
-            return []
+            raise RetrievalUnavailable('vector_load', RuntimeError('Vector stage unavailable'))
         chunks = self._chunks()
         if not chunks:
             return []
@@ -185,8 +201,22 @@ class VectorRetriever:
         return selected if selected or mode == "STRICT" else chunks
 
     def retrieve(self, question: str, config: dict, *, aliases: dict[str, str] | None = None, queries: list[str] | None = None, stages: list | None = None, trace: dict | None = None) -> list[dict]:
-        with self.snapshot():
-            return self._retrieve(question, config, aliases=aliases, queries=queries, stages=stages, trace=trace)
+        stages = stages if stages is not None else []
+        try:
+            with self.snapshot() as bundle:
+                if trace is not None:
+                    trace.update(status='running', corpus_fingerprint=deepcopy(bundle['manifest'].get('sources')) if bundle else None)
+                return self._retrieve(question, config, aliases=aliases, queries=queries, stages=stages, trace=trace)
+        except Exception as error:
+            failure = error if isinstance(error, RetrievalUnavailable) else RetrievalUnavailable('retrieval_pipeline', error)
+            failed_trace = {**(trace or {}), **failure.trace, 'config': deepcopy(config), 'question': question, 'timings': deepcopy(stages) if stages is not None else None, 'timing_unit': 'ms'}
+            if trace is not None:
+                trace.clear()
+                trace.update(failed_trace)
+            failure.trace = failed_trace
+            if failure is error:
+                raise
+            raise failure from error
 
     def _retrieve(self, question, config, *, aliases=None, queries=None, stages=None, trace=None):
         """V1.0.1 pipeline: CandidateK → normalized Hybrid → Rerank → MinScore → TopK."""

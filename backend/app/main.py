@@ -10,7 +10,7 @@ from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
@@ -26,6 +26,7 @@ from .optimization import OptimizationAgent
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
 from .telemetry import price_config
 from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
+from .retrieval import RetrievalUnavailable
 
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
@@ -41,6 +42,11 @@ store.interrupt_revision_runs()
 store.interrupt_generation_runs()
 store.interrupt_evaluation_runs()
 store.interrupt_agent_generations()
+
+
+@app.exception_handler(RetrievalUnavailable)
+async def retrieval_unavailable(_request: Request, error: RetrievalUnavailable):
+    return JSONResponse(status_code=503, content={'detail': {**error.detail, 'message': str(error)}})
 
 
 class PreviewRequest(BaseModel):

@@ -1238,6 +1238,21 @@ class GovernanceStore:
         return existing or self.create_dataset_snapshot(approved, generation_run_id)
 
     def run_probe(self, question_id: str, retriever, chunks: list[dict], answerability_judge=None, *, subtype_judge=None, fail_on_judge_error: bool = False):
+        from .retrieval import RetrievalUnavailable, evidence_coverage
+        try:
+            return self._probe_with_retrieval(question_id, retriever, chunks, answerability_judge, subtype_judge=subtype_judge, fail_on_judge_error=fail_on_judge_error)
+        except RetrievalUnavailable as error:
+            required = {key for entry in self.question(question_id)['evidence'] for key in entry.get('source_chunk_ids', [])}
+            details = {'probe_execution_status': 'failed', 'question_validity': 'needs_review', 'classification': 'RETRIEVAL_EXECUTION_FAILED',
+                       'retrieval_trace': error.trace, 'evidence_coverage': evidence_coverage(error.trace, required), 'execution_error': error.detail,
+                       'retrieval_coherent': None, 'risk': None}
+            result = self.record_probe_result(question_id, {'question_quality': 0, 'golden_answer_quality': 0, 'evidence_support': 0,
+                                                          'evidence_direct_failure': True, 'reason': str(error), 'rule_version': 'v1.4',
+                                                          'model_version': 'programmatic-probe-v2', 'probe_details': details})
+            return {**result, 'classification': 'RETRIEVAL_EXECUTION_FAILED', 'passed': False,
+                    'programmatic': {'checks': {}, 'passed': False}, 'vector': {'top_k': None, 'best_similarity': None, 'signal': 'not_collected'}, 'full_text': None}
+
+    def _probe_with_retrieval(self, question_id, retriever, chunks, answerability_judge=None, *, subtype_judge=None, fail_on_judge_error=False):
         from .retrieval import VectorRetriever
         observation = None
         if isinstance(retriever, VectorRetriever):
