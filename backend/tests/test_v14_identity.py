@@ -167,6 +167,49 @@ class CurrentIdentityTests(unittest.TestCase):
         self.assertEqual(self.store.evaluation_case_results(self.baseline), [{'question_id': 'Q1', 'passed': True}])
         self.assertEqual(self.store.evaluation_run(self.baseline), frozen_baseline)
 
+    def test_monitoring_only_rejects_invented_or_baseline_target(self):
+        with self.store.connection() as connection:
+            connection.execute('DELETE FROM bad_cases WHERE run_id=?', (self.baseline,))
+        trigger = self.trigger()
+        context = self.store.confirm_optimization_trigger(trigger, 'reviewer')['optimization_run_id']
+        event_id = self.store.optimization_trigger(trigger)['event_id']
+        for target in ('invented-MON-id', 'Q1', 'BC-other-run-Q1'):
+            response = drafts()
+            for candidate in response['candidates']:
+                candidate['target_bad_cases'] = [event_id]
+            response['candidates'][1]['target_bad_cases'] = [target]
+            with self.assertRaisesRegex(ValueError, 'target_bad_cases'):
+                OptimizationAgent(self.store, FixedProvider(json.dumps(response))).generate(self.baseline, trigger)
+            self.assertEqual(self.store.experiment(context)['candidates'], [])
+            self.assertEqual(self.store.experiment(context)['result']['allowed_values'], [event_id])
+        self.assertEqual(self.store.bad_case_rows(), [])
+
+    def test_preview_endpoint_preserves_production_source_across_answer_switch(self):
+        from app.ai_service import AiService
+        previous_production = self.store.active_production()
+        previous_fingerprint = current_manifest()['sources']
+        store = self.store
+        class SwitchingQaService(AiService):
+            def answer(self, question, config):
+                with store.connection() as connection:
+                    connection.execute("UPDATE production_versions SET config_json=? WHERE status='active'", (json.dumps({'top_k': 6}),))
+                    connection.execute("UPDATE production_versions SET id='production-after-answer' WHERE status='active'")
+                return {'answer': '原生产配置生成的回答', 'retrieval': [], 'sources': [], 'mode': 'local', 'model': 'stub', 'latency_ms': 1}
+        service = SwitchingQaService(self.store, main.corpus, FixedProvider('{}'), True)
+        old_service = main.ai_service
+        main.ai_service = service
+        self.addCleanup(setattr, main, 'ai_service', old_service)
+        response = self.client.post('/api/preview', json={'question': '生产问题'})
+        self.assertEqual(response.status_code, 200)
+        qa = response.json()['baseline']
+        self.assertEqual(qa['version'], previous_production['id'])
+        self.assertEqual(qa['config'], previous_production['config'])
+        self.assertEqual(qa['corpus_fingerprint'], previous_fingerprint)
+        event = self.store.monitoring_events()[0]
+        self.assertEqual(event['source'], {'production_version_id': previous_production['id'], 'production_config': previous_production['config'], 'corpus_fingerprint': previous_fingerprint})
+        self.assertEqual(event['answer'], '原生产配置生成的回答')
+        self.assertEqual(self.store.active_production()['id'], 'production-after-answer')
+
     def test_provider_failure_and_stale_baseline_result_leave_no_candidates(self):
         trigger = self.trigger()
         context = self.store.confirm_optimization_trigger(trigger, 'reviewer')['optimization_run_id']

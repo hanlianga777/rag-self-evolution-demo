@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -203,8 +204,13 @@ class EvaluationRunnerTests(unittest.TestCase):
 
 
 class FakeAgentProvider:
-    def complete(self, *_args, **_kwargs):
-        return '{"root_cause_cluster":"检索范围不足","observed_evidence":["召回缺失"],"candidates":[{"id":"A","config_diff":{"top_k":6},"hypothesis":"扩大召回","why":"增加上下文","target_bad_cases":["召回缺失"],"risk":"延迟"},{"id":"B","config_diff":{"min_score":0.2},"hypothesis":"过滤噪声","why":"提升过滤","target_bad_cases":["召回缺失"],"risk":"拒答"},{"id":"C","config_diff":{"min_score":0.1},"hypothesis":"平衡","why":"平衡召回","target_bad_cases":["召回缺失"],"risk":"召回"}]}'
+    def complete(self, _system, prompt, **_kwargs):
+        result = json.loads('{"root_cause_cluster":"检索范围不足","observed_evidence":["召回缺失"],"candidates":[{"id":"A","config_diff":{"top_k":6},"hypothesis":"扩大召回","why":"增加上下文","target_bad_cases":["召回缺失"],"risk":"延迟"},{"id":"B","config_diff":{"min_score":0.2},"hypothesis":"过滤噪声","why":"提升过滤","target_bad_cases":["召回缺失"],"risk":"拒答"},{"id":"C","config_diff":{"min_score":0.1},"hypothesis":"平衡","why":"平衡召回","target_bad_cases":["召回缺失"],"risk":"召回"}]}')
+        targets = [item['id'] for item in json.loads(prompt)['bad_cases']]
+        result['observed_evidence'] = targets
+        for candidate in result['candidates']:
+            candidate['target_bad_cases'] = targets
+        return json.dumps(result)
 
 
 class OptimizationAgentTests(unittest.TestCase):

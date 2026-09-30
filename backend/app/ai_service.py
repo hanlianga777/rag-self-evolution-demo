@@ -564,7 +564,7 @@ class AiService:
             baseline = {"pipeline": "baseline", "question": question, "version": "baseline-v1", "answer": "生成服务不可用；请先在设置中验证 Provider。", "mode": "unavailable", "model": None, "latency_ms": 0, "fallback_reason": str(error), "retrieval": [], "sources": [], "evidence": []}
         return {
             "question": question,
-            "baseline": {key: baseline[key] for key in ("version", "answer", "sources", "evidence", "stages", "token_usage", "estimated_cost", "latency_ms", "input_tokens", "output_tokens") if key in baseline},
+            "baseline": {key: baseline[key] for key in ("version", "source", "config", "corpus_fingerprint", "answer", "sources", "evidence", "stages", "token_usage", "estimated_cost", "latency_ms", "input_tokens", "output_tokens") if key in baseline},
             "mode": baseline["mode"],
             "model": baseline["model"],
             "latency_ms": baseline["latency_ms"],

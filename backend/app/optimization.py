@@ -37,9 +37,26 @@ class OptimizationAgent:
         trigger_id = trigger_id or context.get("trigger_id")
         monitoring_context = {"trigger": self.store.optimization_trigger(trigger_id), "event": event or context.get("monitoring_event"), "confirmed_baseline_id": context.get("baseline_id"), "golden_id": context.get("golden_id"), "corpus_fingerprint": context.get("corpus_fingerprint")} if trigger_id else None
         monitoring_target_event_ids = [event["id"]] if event else []
+        target_reference_map = {}
+        for item in bad_cases:
+            reference = {"source": "baseline_bad_case", "baseline_id": baseline_run_id, "bad_case_id": item["id"], "question_id": item["question_id"]}
+            target_reference_map[item["id"]] = reference
+            target_reference_map[item["question_id"]] = reference
+        if event:
+            target_reference_map[event["id"]] = {"source": "monitoring_event", "event_id": event["id"], "trigger_id": trigger_id}
+        evaluation_budget = {"used": completed, "max": MAX_EVALS, "reserved_for_d": 1}
+        gate_results = baseline["result"].get("gates")
+        persisted_gates = (gate_results or {}).get("gates")
+        failed_gates = [gate for gate in persisted_gates if gate.get("passed") is False] if isinstance(persisted_gates, list) else None
         labels = ['A', 'B', 'C'][:min(3, MAX_EVALS - 1 - completed)]
-        audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "root_cause_counts": dict(Counter(item.get("category") or "Unknown" for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases], "monitoring_context": monitoring_context, "monitoring_target_event_ids": monitoring_target_event_ids}
+        audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "root_cause_counts": dict(Counter(item.get("category") or "Unknown" for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases], "monitoring_context": monitoring_context, "monitoring_target_event_ids": monitoring_target_event_ids, "target_reference_map": target_reference_map, "evaluation_budget": evaluation_budget, "baseline_gate_results": gate_results, "failed_gates": failed_gates}
         prompt = {
+            "baseline_id": baseline_run_id,
+            "experiment_id": experiment_id,
+            "baseline_gate_results": gate_results,
+            "failed_gates": failed_gates,
+            "evaluation_budget": evaluation_budget,
+            "target_reference_map": target_reference_map,
             "bad_cases": bad_cases,
             "monitoring_context": monitoring_context,
             "monitoring_target_event_ids": monitoring_target_event_ids,
@@ -47,7 +64,7 @@ class OptimizationAgent:
             'prior_sandbox_results': [{'id': item['id'], 'hypothesis': item['reasoning'].get('hypothesis'), 'configuration': item['config'], 'result': item['result'], 'status': item['status']} for item in prior_candidates],
             "allowed_parameter_values": search_space_contract(),
             "excluded_automatic_parameters": sorted(EXCLUDED_AUTOMATIC_PARAMETERS),
-            "rule": f"当前为 Round {round_number}。返回 {','.join(labels)} 并列、可解释 Candidate。One Candidate = One Hypothesis + Minimum Necessary Parameters。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。根据 prior_sandbox_results 调整假设，不能重复已失败配置。",
+            "rule": f"当前为 Round {round_number}。返回 {','.join(labels)} 并列、可解释 Candidate。One Candidate = One Hypothesis + Minimum Necessary Parameters。target_bad_cases 必须是 target_reference_map 中的实际标识符，禁止描述文本或未知 ID。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。根据 prior_sandbox_results 调整假设，不能重复已失败配置。",
         }
         try:
             content = self.provider.complete(
@@ -77,13 +94,17 @@ class OptimizationAgent:
                         valid = isinstance(value, str) and bool(value.strip())
                     elif field == "target_bad_cases":
                         expected = "array of non-empty strings"
-                        valid = isinstance(value, list) and all(isinstance(item, str) and item.strip() for item in value)
+                        valid = isinstance(value, list) and bool(value) and all(isinstance(item, str) and item.strip() for item in value)
                     else:
                         expected = "object"
                         valid = isinstance(value, dict)
                     if not valid:
                         audit.update(failed_field=field, actual_value=value, expected_type=expected, allowed_values=None)
                         raise ValueError(f"Agent Candidate {candidate['id']} 缺少有效 {field}")
+                unknown_targets = [value for value in candidate["target_bad_cases"] if value not in target_reference_map]
+                if unknown_targets:
+                    audit.update(failed_field="target_bad_cases", actual_value=candidate["target_bad_cases"], expected_type="identifiers from current persisted evidence", allowed_values=sorted(target_reference_map))
+                    raise ValueError(f"Agent Candidate {candidate['id']} target_bad_cases 引用了不存在的当前证据：" + ", ".join(unknown_targets))
                 if candidate["hypothesis"].strip() in {item.get("reasoning", {}).get("hypothesis", "").strip() for item in prior_candidates}:
                     audit.update(failed_field="hypothesis", actual_value=candidate["hypothesis"], expected_type="new hypothesis", allowed_values=None)
                     raise ValueError("下一轮必须提出新的 Hypothesis")
@@ -110,7 +131,7 @@ class OptimizationAgent:
                     "changed_parameters": {key: value for key, value in config.items() if value != base_config.get(key)}, "source_trigger_id": trigger_id, "monitoring_target_event_ids": monitoring_target_event_ids, "round": round_number, "candidate_label": candidate["id"],
                 }))
             audit["validation_stage"] = "persistence"
-            self.store.save_agent_round(experiment_id, batch, {**result, **audit, "validation_stage": "completed", "round": round_number, "evaluation_budget": {"used": completed, "max": MAX_EVALS}})
+            self.store.save_agent_round(experiment_id, batch, {**result, **audit, "validation_stage": "completed", "round": round_number, "evaluation_budget": evaluation_budget})
             return self.store.experiment(experiment_id)
         except Exception as error:
             audit["validation_error"] = str(error)

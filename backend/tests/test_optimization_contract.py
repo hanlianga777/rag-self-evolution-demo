@@ -12,10 +12,10 @@ from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, EXCLUDED_A
 
 
 def drafts():
-    return {"root_cause_cluster": "coverage", "observed_evidence": ["case-1"], "candidates": [
-        {"id": "A", "hypothesis": "depth", "why": "more evidence", "target_bad_cases": ["case-1"], "config_diff": {"top_k": 6}, "risk": "latency"},
-        {"id": "B", "hypothesis": "noise", "why": "filter", "target_bad_cases": ["case-1"], "config_diff": {"min_score": 0.1}, "risk": "recall"},
-        {"id": "C", "hypothesis": "coverage", "why": "more candidates", "target_bad_cases": ["case-1"], "config_diff": {"candidate_k": 24}, "risk": "latency"},
+    return {"root_cause_cluster": "coverage", "observed_evidence": ["Q1"], "candidates": [
+        {"id": "A", "hypothesis": "depth", "why": "more evidence", "target_bad_cases": ["Q1"], "config_diff": {"top_k": 6}, "risk": "latency"},
+        {"id": "B", "hypothesis": "noise", "why": "filter", "target_bad_cases": ["Q1"], "config_diff": {"min_score": 0.1}, "risk": "recall"},
+        {"id": "C", "hypothesis": "coverage", "why": "more candidates", "target_bad_cases": ["Q1"], "config_diff": {"candidate_k": 24}, "risk": "latency"},
     ]}
 
 
@@ -58,12 +58,50 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(trace["status"], "completed")
         self.assertEqual(len(experiment["candidates"]), 3)
         self.assertEqual(experiment["candidates"][0]["reasoning"]["proposal"], "more evidence")
-        self.assertEqual(experiment["candidates"][0]["reasoning"]["observed_evidence"], ["case-1"])
+        self.assertEqual(experiment["candidates"][0]["reasoning"]["observed_evidence"], ["Q1"])
         self.assertEqual(audit["provider_raw_text"], raw)
+        self.assertIsNone(provider.prompt["failed_gates"])
+        self.assertEqual(provider.prompt["baseline_gate_results"], {"passed": False})
         self.assertEqual(provider.prompt["allowed_parameter_values"], search_space_contract())
         self.assertEqual(set(provider.prompt["allowed_parameter_values"]), set(ALLOWED_SEARCH_SPACE))
         self.assertEqual(provider.prompt["excluded_automatic_parameters"], sorted(EXCLUDED_AUTOMATIC_PARAMETERS))
         self.assertEqual(provider.prompt["allowed_parameter_values"]["multi_query"], {"type": "boolean false or integer", "allowed": [False, 2, 4, 6]})
+
+    def test_targets_require_current_persisted_ids_and_audit_unknown_references(self):
+        for target in ('invented-case-id', 'Baseline 有一题失败', 'Q-other-run'):
+            result = drafts()
+            result['candidates'][1]['target_bad_cases'] = [target]
+            experiment, trace, audit, _, _ = self.run_drafts(result)
+            self.assertEqual(trace['status'], 'failed')
+            self.assertEqual(experiment['candidates'], [])
+            self.assertEqual(audit['failed_candidate_id'], 'B')
+            self.assertEqual(audit['failed_field'], 'target_bad_cases')
+            self.assertEqual(audit['actual_value'], [target])
+            self.assertEqual(set(audit['allowed_values']), {'Q1', 'BC-EVAL-test-Q1'})
+        result = drafts()
+        result['candidates'][0]['target_bad_cases'] = ['BC-EVAL-test-Q1']
+        experiment, trace, _, _, _ = self.run_drafts(result)
+        self.assertEqual(trace['status'], 'completed')
+        self.assertEqual(experiment['candidates'][0]['reasoning']['observed_evidence'], ['BC-EVAL-test-Q1'])
+
+    def test_prompt_forwards_persisted_gate_and_budget_context_with_identity(self):
+        gates = {'passed': False, 'gates': [{'id': 'latency_p99_seconds', 'actual': 12, 'threshold': 10, 'status': 'FAIL', 'passed': False}, {'id': 'positive_correctness', 'actual': 95, 'threshold': 90, 'status': 'PASS', 'passed': True}]}
+        self.store.finish_evaluation_run('EVAL-test', 'completed', {'gates': gates})
+        provider = FixedProvider(json.dumps(drafts()))
+        generated = OptimizationAgent(self.store, provider).generate('EVAL-test')
+        self.assertEqual(provider.prompt['baseline_id'], 'EVAL-test')
+        self.assertEqual(provider.prompt['experiment_id'], generated['id'])
+        self.assertEqual(provider.prompt['baseline_gate_results'], gates)
+        self.assertEqual(provider.prompt['failed_gates'], [gates['gates'][0]])
+        self.assertEqual(provider.prompt['evaluation_budget'], {'used': 0, 'max': 12, 'reserved_for_d': 1})
+        self.assertEqual(provider.prompt['target_reference_map']['Q1']['bad_case_id'], 'BC-EVAL-test-Q1')
+        for candidate in generated['candidates']:
+            self.store.finish_candidate(candidate['id'], 'failed', {})
+        retry = FixedProvider('{bad')
+        with self.assertRaises(ValueError):
+            OptimizationAgent(self.store, retry).generate('EVAL-test', experiment_id=generated['id'])
+        self.assertEqual(retry.prompt['evaluation_budget'], {'used': 3, 'max': 12, 'reserved_for_d': 1})
+        self.assertEqual(retry.prompt['failed_gates'], [gates['gates'][0]])
 
     def test_bad_candidate_k_preserves_full_failed_trace_without_partial_candidates(self):
         result = drafts()
