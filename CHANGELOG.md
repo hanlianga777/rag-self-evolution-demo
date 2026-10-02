@@ -1,5 +1,11 @@
 # 变更记录
 
+## 2026-10-02 · V1.4 最终代码与离线验收
+
+- 最终集成修复 `8c674c6`：质量内容/Corpus/Probe 依赖防陈旧写入，Corpus→SQLite 提交锁，共享事实判定，当前 Corpus 手动 Preview 与真实 Why。
+- 296 后端、121 前端、构建、Chromium 208 检查 / 149 截图通过，最终审查无未解决 Critical/Important。保留一个草案换材重新生成后关闭误提示 Minor，影响与恢复入口见 [实施验收](docs/V1_4_IMPLEMENTATION_VERIFICATION.md)。
+- 真实 25 表与四个 active 索引 SHA 不变，真实 Provider/发布未重跑，全文备份 Staging 与 active 未升级分开记录。下方为历史检查点。
+
 ## 2026-10-02 · V1.4 完整实施（整合验收中）
 
 - 实施 Current Baseline/Experiment 绑定、Monitoring 首轮与幂等、Golden V2 规划、统一 Validator/Pool 匹配、双层 Probe/原解析全文和版本化成本。

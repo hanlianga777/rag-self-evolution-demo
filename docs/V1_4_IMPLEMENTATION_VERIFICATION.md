@@ -16,12 +16,12 @@
 | 阶段 | 当前状态 | 恢复入口 |
 | --- | --- | --- |
 | 0 数据清点与备份 | 已完成备份完整性和实施前身份记录 | 本地 data-before.json / SQLite backup |
-| 1 P0 resolver / Monitoring / Agent | 定向回归与代码复审通过；整合全量验收待最后运行 | P0-01..03 / ID-01..08（ID-08 前端待实施） |
+| 1 P0 resolver / Monitoring / Agent | 专项与最终 296 后端/身份前端及复审通过 | P0-01..03 / ID-01..08 |
 | 2 Golden V2 / Validator / Pool | 263 项隔离后端测试与定向代码复审通过 | GV2-01..03 / P0-04 |
 | 3 Probe / FullText / Usage | 阶段 284 项/复审通过；真实全文 4 PDF/157 页 Staging 兼容通过；未切 active | GV2-04..05 / COST-01 |
-| 4 全部 UI | 105 项前端/构建通过，四 Important 修复复审通过 | UI-01 / 任务书 14–15 |
-| 5 离线生命周期与浏览器 | 286 项后端、真实隔离 HTTP 状态流、54 ID 具名映射、Chromium 四尺寸通过 | QA-01 / ID/GV/VP/DS/CT/RL |
-| 6 文档、图一致性、Git | 待最终核验 | SAFE-01 / SPEC / README |
+| 4 全部 UI | 最终 121 项前端/构建与复审通过，保留 M3 提示 Minor | UI-01 / 任务书 14–15 |
+| 5 离线生命周期与浏览器 | 最终 296 后端、真实隔离 HTTP 状态流、54 ID、Chromium 208 检查通过 | QA-01 / ID/GV/VP/DS/CT/RL |
+| 6 文档、图一致性、Git | 文档/图/数据最终核验通过；正常 main 提交/同步，SHA 以 Git 与交付回执为准 | SAFE-01 / SPEC / README |
 
 此记录随每阶段的真实证据更新。历史文档与图验收见 `V1_4_DOCS_SYNC_VERIFICATION.md`，不能代替本次业务验收。
 
@@ -31,7 +31,7 @@
 
 Agent 仅接受真实当前失败案例/题目或明确确认的 Monitoring 事件引用，输入携带已保存 Failed Gate、来源和预算。Monitoring-only 可以生成首轮，但事件不会成为伪造的 Golden/Baseline 失败题，不能据此声称满足 Sandbox 改善分母或发布资格。QA API 保留请求时冻结的 Production/Config/Corpus，覆盖“回答期间 Production 切换”回归。
 
-验证：初始 240 项全量离线通过；后续小修采用覆盖测试，最终 61 项定向通过。全量验证将在所有模块整合后新运行，不把初始数量当作最终结果。ASTRA 代码审查发现并修复来源丢失、虚构目标 ID、Gate/预算输入缺失，复审三项均通过。测试默认库均为临时库，外部 TCP 被 runner 阻止。既有 Starlette/httpx 弃用提示未涉及依赖改动。
+验证：初始 240 项全量离线通过；后续小修采用覆盖测试，最终 61 项定向通过。全量验证已在最终整合后新运行，见文末；初始数量不是最终结果。ASTRA 代码审查发现并修复来源丢失、虚构目标 ID、Gate/预算输入缺失，复审三项均通过。测试默认库均为临时库，外部 TCP 被 runner 阻止。既有 Starlette/httpx 弃用提示未涉及依赖改动。
 
 真实数据库副本 resolver 返回 `EVAL-20260927140423956071` / `EXP-20260928071127593062`，证明既有正式来源未被误判成 Sandbox。源数据库未迁移、未写入；仅 `monitoring_events.source_json` 幂等 additive migration 在临时库验证，真实服务下次手动启动时才应用。
 
@@ -71,6 +71,8 @@ AI、Import Preview/Confirm、Pool、直接编辑、Revision 共用 Validator。
 4. 真实确认的 Monitoring 事件可支撑 Agent 首轮，即使 Baseline 无失败题；不伪造题目或放宽资格，若该证据不应适用，需重新生成对应候选。
 5. 高语义相似不是已验证重复，不覆盖不同实体/事实范围；若判断过宽，增加人审去重成本，避免静默丢失有效覆盖。
 6. 旧 :8010 进程运行时只在备份 Staging 全文，不在其锁外切 active；代价是全文 active 就绪推迟至受控重启和激活，现有 Demo 保留。
+7. 所有 Positive/Ablation 共用关键事实支持判定；完整 V2 构造校验只用于已确认 V2 或显式新构造，Legacy 保留原有证据检查而不因缺新字段一律失败。若适配边界错误，须补人工再校验或修正 V2 构造证明，不能自动批准；对照回归保留。
+8. 最终一次修复上限后保留 M3 换材重新生成的错误 dirty 基线提示，限定复审确认仅多一次关闭确认、没有 discard API 或已存数据丢失。若误判，用户仍遭误提示与信任损耗，需要后续局部 UI clean 基线修复与场景测试；真实未保存输入继续受保护。
 
 ## 数据核验口径与索引基线
 
@@ -107,7 +109,7 @@ AI、Import Preview/Confirm、Pool、直接编辑、Revision 共用 Validator。
 
 核对保留 11 Gate、Regression、12 次预算和 Overall 不替代资格。机器 QC P0 理由接受属于细则，架构没有把 QC 画成可替代确定性校验或人审。
 
-## Phase 4：UI 与隔离 API 生命周期检查点（待代码复审）
+## Phase 4：UI 与隔离 API 生命周期历史检查点
 
 隔离 FastAPI 测试实际执行 Legacy → V2 Preview → 生成 / Probe / QC → Gate 1 → Baseline → Agent A/B/C → Sandbox/Regression → Gate 2 → 条件 D 失败并保留 Winner → 测试库 Gate 3 发布 → 同题正式 Baseline/明确 Production 比较 → Production QA / 人工判定 → Trigger 幂等 Confirm → 同上下文 Round 0 首轮 A/B/C。SQLite 与 Corpus 均为测试夹具，Provider 为 Stub，不是新真实业务结果。全套后端阶段 286 项通过；最终命令及完整 ID 映射在阶段报告完成后归档。
 
@@ -158,8 +160,43 @@ Task 4 至 `2d3bdb2` 的独立 SOL 复审发现四项 Important：资格/Gate �
 
 阶段 Task 1–3 经 ASTRA 专项复审通过；Task 4/最终复审采用可执行的 SOL（此前 ASTRA 配额拒绝至 10 月 7 日）。既有 Starlette/httpx 弃用警告、测试 Parser 日志中的“下载/真实”夹具文字没有代表外部下载或真实结果；没有为去除既有提示增加新依赖。Drawer draft guard 与浏览器必需详情控件检查作为 Minor 留给最终审查，不静默删除发现。
 
-Task 4 修复轮 1 提交 `5ef7f7b`：四项分别补具名断言，最终前端 17 文件/105 项、构建与 Chromium 四尺寸 187 检查/147 截图通过；错误/未收集接口/页面溢出均为 0。真实 Runner 产生的 D 在 Sandbox/报告区分别展示 Gate 11/11 PASS、Regression FAIL 和发布资格不合格；新实验等待 Gate 3 不受旧 Production 干扰。Golden 风险按持久化字段计算非零类别与同谓词筛选，Monitoring 按具体 Trigger/context 拉取与手动执行，历史 Baseline 上下文只读。逐项复审进行中，具名新增断言见验收映射。
+Task 4 修复轮 1 提交 `5ef7f7b`：四项分别补具名断言，最终前端 17 文件/105 项、构建与 Chromium 四尺寸 187 检查/147 截图通过；错误/未收集接口/页面溢出均为 0。真实 Runner 产生的 D 在 Sandbox/报告区分别展示 Gate 11/11 PASS、Regression FAIL 和发布资格不合格；新实验等待 Gate 3 不受旧 Production 干扰。Golden 风险按持久化字段计算非零类别与同谓词筛选，Monitoring 按具体 Trigger/context 拉取与手动执行，历史 Baseline 上下文只读。这四项随后经逐项复审通过，具名新增断言见验收映射。
 
 修复轮 1 独立复审：四项 Important 全部 ADDRESSED，Spec/Quality Approved；没有新增 Critical/Important。非阻断记录保留：Draft guard 复位、浏览器必需详情按钮断言、既有依赖/夹具日志提示，以及 R1 脚本把等高 ABC 检查放到 Sandbox 后导致该断言跳过。后者没有改坏产品布局，原阶段检查与截图证明等高，但最终整体审查须处理脚本覆盖问题。没有静默抹掉发现或用重复测试替代审查。
 
-Root 最终版本新运行：`python3 scripts/test_v14_offline.py` 286 项，55.258s，退出 0（代码此后仅 UI 修复）；前端最终 `npm test` 17 文件/105 项与 `npm run build` 均退出 0。完整日志保存在本轮 `/tmp/.../backend-final.log`、`frontend-final.log`、`build-final.log`。真实 Provider 未重跑，正式 Golden/Baseline/Candidate/Production 仍是既有结果。
+Root 整合修复前版本新运行：`python3 scripts/test_v14_offline.py` 286 项，55.258s，退出 0（代码此后仅 UI 修复）；前端最终 `npm test` 17 文件/105 项与 `npm run build` 均退出 0。完整日志保存在本轮 `/tmp/.../backend-final.log`、`frontend-final.log`、`build-final.log`。真实 Provider 未重跑，正式 Golden/Baseline/Candidate/Production 仍是既有结果。
+
+
+## 最终整体审查与一次完整修复（2026-10-02）
+
+整体审查范围 `3a44f2f..44c4720`，发现 5 个 Important 和 7 个 Minor，无 Critical。同一修复波次提交 `8c674c6e3a278b854c3ed1a0fcb52938b12d6d34`；限定范围复审已完成：五项 Important、六项 Minor ADDRESSED；M3 部分残留且非阻断，Spec Approved / Quality Approved with documented Minor，无未解决 Critical/Important，不把 12 项写成全闭。
+
+| 发现 | 修复与具名证据 |
+| --- | --- |
+| Validator → Probe 判定差异 | Positive/Ablation 共用关键事实 `answer_supported`，合法释义通过实际 Probe→QC；Legacy/V2 对照保留，未召回仍是 P1，额外无依据事实/错页/实体/新构造阻断。见 `test_v14_final_fix.py::test_i1_shared_normalized_boundaries_reach_probe_qc_and_reject_extra_facts` 与 Legacy 对照测试 |
+| 旧 Probe/QC 覆盖新题 | 每次执行捕获内容/来源/Corpus 及 QC 的精确 Probe ID，短事务保存重验；生成、重试、修订、单题成功/失败均覆盖，过期结果不改变当前状态。延迟成功/失败、edit→新 Probe/QC、Corpus/revision 变化有回归 |
+| Corpus 最终提交竞态 | Publish、Confirm、Agent claim/save 按 Corpus→SQLite 顺序锁住最终身份检查至 commit；Provider 在锁外。barrier 验证 activation-first 拒绝无部分状态、guard 后 activation 等待四入口 commit |
+| 当前 Corpus Preview 缺 UI | 旧 Run/无 Run 均有手动「预览当前 Corpus Coverage」，三 Profile、错误和 Profile/Corpus 迟到响应有测试；与 Run 冻结 Plan 分开，实际 Preview 前后冻结业务对象不变 |
+| Why 字段错配 | 展示已有 `reasoning.proposal`，兼容 `why`；A/B/C 真实隔离持久化字段断言，缺失仍未记录，不合成解释 |
+
+七项 Minor 同波次处理：必需详情入口默认强制存在；ABC 在正确 Tab 强制三卡/等宽等高/按钮对齐，修正 1024px 首卡 padding；Drawer 对实际编辑差异维护 clean/dirty；费用区分 Provider 账单 0/非 0/未采集；DS-07 关联真实备份 Staging；新 Agent/Confirm INSERT 指定列；同身份方案对比恢复 session、不同身份丢弃旧状态。没有增加依赖或重构无关代码。初始测试失败、Strict browser 暴露的夹具选择/布局/等待问题均修复后重新验证，不计为通过。
+
+### 最终修复后的新运行证据
+
+- 控制器独立执行 `python3 scripts/test_v14_offline.py`：**296 tests / 188.748s / OK / exit 0**，临时数据库、Stub、外部 TCP 禁止；日志 `backend-delivery.log`。实施代理同状态完整运行 296 / 187.086s 也通过，原 286 是修复前阶段数字。
+- 控制器独立执行 `npm test -- --run`：**17 files / 121 tests / PASS**；`npm run build`：tsc + Vite 通过。日志 `frontend-delivery.log`、`build-delivery.log`；真实后端未启动新代码。
+- Chromium 153：**208 检查 / 149 截图**；1440×900、1280×800、1024×768、390×844，errors/blocked/unexpected writes/横向溢出均 0。52 required Drawer、0 optional skip、三组桌面 ABC 对齐、四次实际 persisted Why、两个 native stale Preview；12 次安全手动 Preview POST 单独记录，其他业务写禁止。Legacy/no Run/risk 场景标为隔离数据的 synthetic view，不当作真实结果。
+- 控制器核对浏览器结构化结果、PNG 像素尺寸与实际脚本视口，并检查新增 Preview 桌面空态/390px 图像。1024/390 full-page PNG 高度可超过 viewport，不代表改变测试视口。实施报告初版视口高度笔误已更正；实际脚本和通过运行始终使用要求尺寸，没有追加空变更或虚构复跑。
+- 两图继续保留自包含 HTML / 2560×1440 PNG 与 README 链接；字体、边界、连线及图源/PNG 像素一致的独立检查通过。54 ID / 19 页面映射完整，SPEC 历史正文与 `3a44f2f` 相同，本地文档链接均存在。
+- 修复后真实 **25 张表完整排序内容（含 Frozen JSON）**与 **4 个 active 文件 SHA**再次一致；SQLite Backup API 备份可读。旧 :8010 PID 8323 未重启，隔离 :5180 已停止。未切 active、未执行真实 Provider/Golden/Baseline/Candidate/发布。
+
+覆盖测试入口与具体断言见 [验收映射](V1_4_ACCEPTANCE_MATRIX.md)。本地审计报告/日志归档至 `/Users/zhanghaohan/.codex/backups/rag-v14-20260930-3a44f2f/implementation-evidence/`；仅文档与源码进入 Git，备份/索引/数据库/密钥不进入提交。WebKit 缺可执行文件而未验证。三个真实手动步骤及受控服务前置保持上述边界。
+
+
+### 唯一限定复审结论与残留
+
+复审覆盖 `44c4720..8c674c6`，I1–I5 全部 ADDRESSED，M1/M2/M4/M5/M6/M7 ADDRESSED；**M3 NOT ADDRESSED（partial，Minor）**。没有未解决 Critical/Important；Spec Approved，Quality Approved with one documented Minor。
+
+M3 精确触发：同一 Revision Q1 draft 证据 C1，人工选 C2 后 regenerate 已保存 C2，但 clean 基线用旧 render 的 C1 diff 计算；新 C2 draft 到达后实际 diff 变空，dirty 可能变 true。关闭/Esc 会多一次「放弃未保存修改？」确认。确认仅 `onOpenChange(false)`，没有任何 API、没有 revisions/discard、不丢已保存 draft/换材审计或改原题；重新打开可恢复 clean。后续最小修复应仅消费已提交的 preview intent/同步保存基线，不能抹掉等待期间真正的新输入，并增加实际 CandidateWorkspace C1→C2→regenerate→close 与新输入对照测试。本轮已达到一次最终修复上限，明确延期，不能用常规 save→close 测试宣称该场景通过。
+
+最终数据保护、文档和图核验均通过；Scoped evidence 已保存本地恢复目录。GitHub 同步使用用户明确授权的正常 main 提交/推送，不强推；具体远端 SHA 与本地 HEAD 的比较在实际推送后交付回执记录，文档不预先虚构远端成功。

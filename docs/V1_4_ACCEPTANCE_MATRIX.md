@@ -1,6 +1,6 @@
 # V1.4 离线验收映射
 
-唯一规范为 [SPEC V1.4](RAG_SELF_EVOLUTION_SPEC.md)，本文件仅记录测试证据，不制定第二套规则。实施版本 `d14e953` / `2d3bdb2` / `5ef7f7b`；完整状态见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)。测试使用隔离 SQLite/临时 Corpus/Stub；浏览器渲染实际隔离 API 响应。真实 Provider、Golden 与 Production 没有重跑，WebKit 缺失未验证。各阶段阻断问题已修复并经复审通过，最终整体审查中。
+唯一规范为 [SPEC V1.4](RAG_SELF_EVOLUTION_SPEC.md)，本文件仅记录测试证据，不制定第二套规则。阶段版本 `d14e953` / `2d3bdb2` / `5ef7f7b`；最终集成修复 `8c674c6`；完整状态见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)。测试使用隔离 SQLite/临时 Corpus/Stub；浏览器渲染实际隔离 API 响应。真实 Provider、Golden 与 Production 没有重跑，WebKit 缺失未验证。最终整体审查及一次修复后的限定复审通过：五项 Important 全闭，无未解决 Critical/Important；M3 换材料重新生成后错误 dirty 提示仍为非阻断 Minor，未宣称全闭。最终 296 后端 / 121 前端 / Chromium 208 检查通过。
 
 ## 19 个页面需求检查点
 
@@ -100,3 +100,8 @@ Paths below are relative to `backend/tests/`, except F=`frontend/src/v14-ui-cont
 | Monitoring 借用旧 A/B/C 进度 | `review R4 pending Trigger ignores prior ABC and explicitly starts its same Round0 context`；`review R4 selected historical Monitoring context is identified and cannot start under a new Baseline`；四尺寸 Pending Trigger 不借旧 A/B/C |
 
 前端 `frontend/src/v14-ui-contract.test.tsx`，最终 105 项前端测试和构建通过；Chromium 187 检查/147 截图。新测试是离线边界断言，不代表真实 QC、Provider 或 Trigger 实测。
+
+
+## 最终复审保留项
+
+M3 局部未关闭：同一 Revision 的人工 C1→C2 换材、重新生成并保存新 draft 后，clean 基线仍可能保留旧 diff，关闭误提示未保存。确认只关闭 Drawer，不调用 discard API，不损失已存 draft/audit 或改原题。常规保存、恢复原值、新题身份和外部关闭测试通过，不能把它们当此特定场景已验收；后续须补真实 CandidateWorkspace 再生成场景断言。其他十一个发现经限定复审 ADDRESSED。

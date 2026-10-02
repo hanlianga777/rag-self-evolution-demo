@@ -1,7 +1,7 @@
 # RAG Self-Evolution Platform 产品规格
 
 > **唯一当前目标规格：V1.4 — Golden Engine V2 & Identity-Bound Evolution**
-> 冻结日期：2026-09-30（Asia/Shanghai）。状态：**V1.4 分阶段业务实施中；P0、Golden V2、Probe / FullText 引擎与遥测已通过隔离后端回归与代码复审，UI 与完整隔离生命周期已通过测试和浏览器检查，阶段复审已通过，最终整体审查中，不以历史结果替代**。
+> 冻结日期：2026-09-30（Asia/Shanghai）。状态：**V1.4 代码实施与离线验收完成；最终 296 后端 / 121 前端 / Chromium 208 检查通过，整体审查和一次修复后的限定复审通过，保留一个非阻断 Drawer 提示 Minor；真实 Provider 未重跑、active 全文未激活，不以历史结果替代**。
 > V1.4 是 Golden 工艺、对象身份、Monitoring 与信息架构升级，保留现有技术栈和治理底座。新图是目标架构，不是当前 Demo 已具备全部能力的证明。
 
 ## 1. 文档地位、依据与本次交付边界
@@ -51,23 +51,23 @@ Monitoring：1 个 Safety Critical Bad Case，或最近 20 个完整可判定 QA
 
 ## 3. 需求追踪与当前实现证据
 
-检查起点：`3a44f2f`；后端阶段至 `cd551e0`，UI 与整合实施至 `5ef7f7b`。下表区分代码与离线证据，不代表重新执行了真实 Provider 生命周期。历史实测记录见 [Phase 1 验收](PHASE1_VERIFICATION.md) 与 [已保存 Demo 事实](CURRENT_DEMO_TRUTH.md)，其日期、Run 和 Provider 边界保持原样；本次不刷新真实运行结果。
+检查起点：`3a44f2f`；后端阶段至 `cd551e0`，UI 与最终集成修复至 `8c674c6`。下表区分代码与离线证据，不代表重新执行了真实 Provider 生命周期。历史实测记录见 [Phase 1 验收](PHASE1_VERIFICATION.md) 与 [已保存 Demo 事实](CURRENT_DEMO_TRUTH.md)，其日期、Run 和 Provider 边界保持原样；本次不刷新真实运行结果。
 
 | 需求 ID | V1.4 目标 | 当前源码证据 / 实施状态 | 目标章节 |
 | --- | --- | --- | --- |
 | P0-01 | Current Baseline ↔ Experiment 强绑定 | `GovernanceStore.current_baseline_identity()` 统一解析；当前对象 API 共用 identity、实验按 Baseline 查询；ID-01/02 后端回归通过 | 5 |
-| P0-02 | Monitoring Confirm 后首轮 Round 1 | Confirm 幂等、短事务 claim、全批原子保存；Round 0 / 失败重试 / 真未完成轮次回归通过，真实 Monitoring-only 证据不伪造 Baseline Case | 5.3 |
+| P0-02 | Monitoring Confirm 后首轮 Round 1 | Confirm 幂等、Corpus→SQLite 短事务 claim/保存/发布身份重验、全批原子保存；Round 0 / 失败重试 / 真未完成轮次回归通过，真实 Monitoring-only 证据不伪造 Baseline Case | 5.3 |
 | P0-03 | Monitoring 复用 resolver，排除 Sandbox | Confirm 共用 resolver；QA 配置/Corpus 来源贯穿实际 API，不重读回答后 Production 伪造归属；ID-02/05/07 后端回归通过 | 5.1 / 5.4 |
 | P0-04 | Pool 建 Run 必须 Coverage / Slot 匹配 | 独立当前 Plan + 稳定最大二分匹配，保存 Slot 缺口/匹配；成功复制新候选，不继承审核；263 项离线回归及复审通过 | 9 |
 | GV2-01 | Dynamic K-means / 小簇合并 / 厚度配额 | `golden_v2.build_plan()` 复用 FAISS 向量与 K-means，稳定合并/编号、协调最大余数配额；固定参数与输入审计冻结，Preview 无生成模型 | 6 |
 | GV2-02 | Group × Construction 双维度 | Group / Construction 分存；真实可用材料专项优先并记录 fallback，旧字段只作 Legacy adapter，不改历史冻结 JSON | 7 |
 | GV2-03 | Unified Hard Validation | AI / Import / Pool / Edit / Revision 共用 `validate_golden_candidate()`；证据定位、声明 Product/Version、Bridge 必要关系范围、Quota/Slot 与精确去重回归通过；未知语义待复核 | 8 |
-| GV2-04 | Candidate Recall 与 Final Context Probe | 同次检索保存真实 CandidateK / Final、分层 Any/All、原解析全文信号与受控 Judge；284 项离线回归和复审通过；执行失败持久化 failed Probe，阻断 QC/批准，不伪装成零召回 | 10 |
+| GV2-04 | Candidate Recall 与 Final Context Probe | 同次检索保存真实 CandidateK / Final、分层 Any/All、原解析全文信号与受控 Judge；284 项离线回归和复审通过；执行失败持久化 failed Probe，阻断 QC/批准，不伪装成零召回；内容/Corpus/精确 Probe 依赖捕获与短事务重验阻止旧质量覆盖新题 | 10 |
 | GV2-05 | 原解析全文 Probe + 原子产物 | 原 Parser 页级全文 + schema/checksum、完整 bundle 校验/原子激活/回滚和兼容补充工具已实施；原后端进程仍在运行，真实 4 PDF/157 页在备份 Staging 完整校验通过，原 252 Chunk/FAISS 字节不变；未切 active sidecar。引擎支持与 active 就绪分开 | 10–11 |
 | COST-01 | 集中价格、真实 Usage/Timing、版本与缺失原因 | `cost_report()` 版本化静态价格、冻结计费快照、缓存/模型/Usage/时间缺失原因；真实首输出 TTFT，无非流式 Total 替代；专项 CT 与全套 284 项离线回归及阶段复审通过 | 13 |
-| UI-01 | 全局与全部指定页面信息架构 | 八模块 H1/hash、Drawer/Dialog/Select、等高 A/B/C 与独立 D、50/50 问答及过期响应隔离已实施；105 项前端测试、构建与四尺寸 Chromium 187 检查通过，阶段复审已通过，最终整体审查中 | 14–15 |
-| SAFE-01 | 不可变旧快照、兼容迁移 | 兼容迁移、旧快照无改写、索引失败/混合身份拒绝在临时库/Corpus 验证；真实 25 张表阶段只读比较不变，最终整合后再次核验 | 16 |
-| QA-01 | 离线状态流、迁移与 UI 验收 | 54 个 Test ID 逐项具名断言；实际 FastAPI 隔离生命周期覆盖 V2→Gate 1→Baseline→A/B/C→D 失败保留赢家→测试发布→Monitoring 首轮，286 项后端测试通过；WebKit 缺失未验证，真实 Provider 未重跑 | 17 |
+| UI-01 | 全局与全部指定页面信息架构 | 八模块 H1/hash、Drawer/Dialog/Select、等高 A/B/C 与独立 D、50/50 问答及过期响应隔离已实施；121 项前端测试、构建与四尺寸 Chromium 208 检查通过；实际手动当前 Preview / persisted Why 和必需 Drawer 具名验证，最终复审通过，保留换材重新生成后多一次关闭提示 Minor | 14–15 |
+| SAFE-01 | 不可变旧快照、兼容迁移 | 兼容迁移、旧快照无改写、索引失败/混合身份拒绝在临时库/Corpus 验证；真实 25 张表完整内容与四个 active 文件 SHA 在最终整合后再次核验不变 | 16 |
+| QA-01 | 离线状态流、迁移与 UI 验收 | 54 个 Test ID 逐项具名断言；实际 FastAPI 隔离生命周期覆盖 V2→Gate 1→Baseline→A/B/C→D 失败保留赢家→测试发布→Monitoring 首轮，296 项后端测试通过；最终复审无未解决 Critical/Important，一个 UI 提示 Minor 保留；WebKit 缺失未验证，真实 Provider 未重跑 | 17 |
 
 ## 4. 接口约束与明确未决项
 

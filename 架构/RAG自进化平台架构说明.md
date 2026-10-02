@@ -55,9 +55,9 @@ DeepSeek 是既有 Provider，显式服务于回答、生成、QC、Judge、Agen
 ## 实现与运行证据的边界
 
 - Current Baseline resolver、Experiment 强绑定、Monitoring Confirm 幂等 / Round 0 首轮和 A/B/C 原子保存已通过隔离回归及代码复审。Production 独立保留来源。
-- V2 Dynamic K-means、小簇合并、主题 Slot、统一 Validator 和最大二分匹配已实施；Preview 复用既有 FAISS 向量。旧 Frozen Snapshot 仍为 Legacy/V1，不补造 Plan。
+- V2 Dynamic K-means、小簇合并、主题 Slot、统一 Validator 和最大二分匹配已实施；Preview 复用既有 FAISS 向量，Golden 显式手动预览当前 Corpus，与 Run 冻结 Plan 分开。旧 Frozen Snapshot 仍为 Legacy/V1，不补造 Plan。
 - Candidate Recall 与 Final Context、Raw Parsed Full-text 引擎与完整 bundle 校验已实施。检索执行错误不可当零召回，未知负向结论不可当通过。真实旧后端进程仍运行，真实 4 PDF/157 页备份 Staging 已完成兼容校验，原 252 Chunk/FAISS 字节不变；本轮尚未激活到真实 Corpus。
 - 价格/Usage/Timing 版本化与明确缺失原因已实施，真实 TTFT 无采集不以 Total 代替；没有验证节假日数据时不能对工作日高峰精确估价。
-- 全部 V1.4 UI 和完整隔离 HTTP 生命周期已实施，105 项前端、286 项后端、构建与 Chromium 四尺寸 187 检查通过，阶段复审已通过，最终整体审查中。54 ID 具名断言与最终结论见实施报告，历史 Phase 1 数字不能转记为本轮通过。
+- 全部 V1.4 UI 和完整隔离 HTTP 生命周期已实施，121 项前端、296 项后端、构建与 Chromium 四尺寸 208 检查通过，最终整体审查及一次限定复审通过，保留换材重新生成后的关闭提示 Minor。54 ID 具名断言与最终结论见实施报告，历史 Phase 1 数字不能转记为本轮通过。
 
 两图保持“V1.4 目标架构”标注，完整流程与职责没有因静态重绘升级历史数据。本轮保留图源和 PNG，已验证字体、边界、连线、尺寸与图源/PNG 像素一致；最终代码职责核对见实施验收。用户手动上传到 Demo 的架构图片为独立运行资产，未替换。

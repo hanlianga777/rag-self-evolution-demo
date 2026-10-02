@@ -2,6 +2,13 @@
 
 本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.4 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
 
+## V1.4 最终集成闭环追加记录（2026-10-02）
+
+- 一次完整修复 `8c674c6` 关闭整体审查五项 Important：事实 Validator→Probe 判定、质量晚到结果身份保存、Corpus 最终提交锁、实际当前 Preview UI、persisted Why 字段。限定复审 Spec Approved / Quality Approved with Minor，无未解决 Critical/Important。
+- 新运行 296 后端、121 前端、构建通过；Chromium 四个要求尺寸 208 检查 / 149 截图，52 必需 Drawer、ABC/footer/Why/迟到 Preview 具名断言。54 Test ID、需求 ID、唯一 SPEC 历史存档保持。
+- 保留 M3 局部提示：同一修订草案换材重新生成成功后关闭可能多一次误提示，仅关闭 UI，不丢已存草案或改原题；不写成所有发现全闭。
+- 25 张真实表完整内容与四个 active SHA 不变；备份可读。4 PDF/157 页的备份全文 Staging 已验证，未切 active、未重启旧服务、未执行真实 Provider/Gate/发布。详细证据与三条手动验证见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)。下面检查点数字和当时状态作为历史保留。
+
 ## V1.4 实施追加记录（2026-10-02）
 
 - 用户在文档/图交付后明确批准完整业务代码实施，原桌面任务书作为输入依据而非改写对象；需求 ID 与 54 个 Test ID 保留，原 V1.3 历史正文不改。
