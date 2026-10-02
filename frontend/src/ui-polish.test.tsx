@@ -27,7 +27,7 @@ it("uses the stage flow on Overview without redundant numbered storyline", async
   await act(async () => root!.render(<OverviewPage data={data} navigate={() => {}} />));
   expect(document.querySelector('ol[aria-label="全链路阶段"].stage-stepper')).not.toBeNull();
   expect(document.body.textContent).not.toContain("Baseline 发现问题 → Agent 提出假设");
-  expect(document.body.textContent).not.toContain("production-long-id");
+  expect(document.body.textContent).toContain("production-long-id");
   expect(document.body.textContent).not.toContain("01");
 });
 
@@ -57,7 +57,7 @@ it("keeps the Baseline Bad Case table compact and detail ready", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["题目", "问题", "根因", "关联 Gate", "证据"]);
+  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["题目", "问题", "根因", "主要失败指标", "证据"]);
   expect(document.querySelector("tbody")?.textContent).toContain("+1");
   expect(document.querySelector("tbody")?.textContent).not.toContain("Not Passed");
 });

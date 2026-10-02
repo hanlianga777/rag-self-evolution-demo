@@ -170,6 +170,27 @@ class ProbeCostTests(unittest.TestCase):
             self.assertEqual(active.resolve(), old_target)
             self.assertTrue(list((self.root / 'index_versions').glob('*-building')))
 
+    def test_ds06_supplement_accepts_reordered_ids_but_rejects_duplicate_missing_and_content_changes(self):
+        active = self.root / 'index'
+        original = bundle(active, texts=['first', 'second'])
+        preserved = {name: (active / name).read_bytes() for name in ('documents.json', 'chunks.json', 'faiss.index')}
+        manager = CorpusManager(VectorRetriever(CorpusStore(active)), index_dir=active)
+        returned = list(reversed(original['chunks']))
+        def parser(*_args, full_text_pages, **_kwargs):
+            full_text_pages.extend(raw_pages(fingerprint={'D': 'old'})['pages'])
+            return {**original['documents'][0], 'status': 'Parsed'}, copy.deepcopy(returned)
+        with patch('app.corpus_management.discover_documents', return_value=[{'id': 'D'}]), patch('app.corpus_management.current_manifest', return_value={'sources': {'D': 'old'}}):
+            result = manager.supplement_full_text(parser=parser, activate=True)
+            self.assertTrue(result['result']['content_compatible'])
+            current = active.resolve()
+            for name, value in preserved.items(): self.assertEqual((active / name).read_bytes(), value)
+            for invalid in ([original['chunks'][0]] * 2, original['chunks'][:1], [{**row, 'chunk_id': None} for row in original['chunks']], [{**row, 'chunk_text': 'changed'} for row in original['chunks']]):
+                returned = invalid
+                with self.assertRaisesRegex(ValueError, 'Chunk identity'):
+                    manager.supplement_full_text(parser=parser, activate=True)
+                self.assertEqual(active.resolve(), current)
+                for name, value in preserved.items(): self.assertEqual((active / name).read_bytes(), value)
+
     def test_supplement_audit_failure_rolls_back_and_preserves_previous_bundle(self):
         active = self.root / 'index'; original = bundle(active)
         manager = CorpusManager(VectorRetriever(CorpusStore(active)), index_dir=active)

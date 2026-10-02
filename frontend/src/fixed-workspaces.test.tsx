@@ -21,20 +21,20 @@ it("keeps only the selected governance workspace visible", async () => {
   await act(async () => root.render(<GovernancePage data={{ dataset: [], generationRuns: [], snapshots: [] }} />));
   expect(document.body.textContent).toContain("当前测试集");
   expect(document.body.textContent).not.toContain("历史 Candidate（未验证）");
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "历史版本")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "历史 Snapshot")!.click());
   expect(document.body.textContent).toContain("历史 Candidate（未验证）");
-  expect(document.querySelector('button[aria-pressed="true"]')?.textContent).toBe("历史版本");
+  expect(document.querySelector('button[aria-pressed="true"]')?.textContent).toBe("当前测试集");
   await act(async () => root.unmount());
 });
 
 it("shows one Evolution stage instead of four stacked cards", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ evaluation: {}, badCases: [] }} />));
-  expect(document.body.textContent).toContain("未通过 Gate");
+  expect(document.body.textContent).toContain("Root Cause Diagnosis");
   expect(document.body.textContent).not.toContain("Sandbox 对比");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent?.includes("Sandbox"))!.click());
   expect(document.body.textContent).toContain("Sandbox 对比");
-  expect(document.body.textContent).not.toContain("未通过 Gate");
+  expect(document.body.textContent).not.toContain("Root Cause Diagnosis");
   await act(async () => root.unmount());
 });
 

@@ -817,3 +817,34 @@ td, th { font-variant-numeric: tabular-nums; }
 .candidate-card-body { grid-template-rows: 84px 84px 84px 152px 42px 84px; align-content: start; }
 .candidate-card-field { min-height: 0; overflow: auto; }
 .candidate-card-field .truncated-text { overflow: hidden; }
+/* V1.4 keeps dense tables bounded and separates answer prose from telemetry. */
+.page, .panel, .section, .table-scroll, .report-grid > div { min-width: 0; }
+.knowledge-page .table-scroll { max-height: 560px; overflow: auto; }
+.table-scroll thead th { position: sticky; top: 0; background: #f5f7f8; z-index: 1; }
+.evolution-page .table-scroll { max-height: 480px; }
+.evolution-page .table-scroll td:first-child, .evolution-page .table-scroll th:first-child { position: sticky; left: 0; background: #f5f7f8; }
+.gate-failed { background: #fff2f1; color: #903b36; }
+.failed-gate-grid .text-button { padding: 12px; text-align: left; border-radius: 5px; }
+.search-space-drawer .table-scroll { max-height: 55vh; }
+.search-space-table td, .search-space-table th { white-space: normal; overflow-wrap: anywhere; }
+.candidate-card-body { display: flex; flex-direction: column; gap: 16px; }
+.candidate-card-body .candidate-card-field { flex: none; overflow: visible; }
+.candidate-card-body .candidate-card-field:last-of-type .truncated-text { -webkit-line-clamp: 1; }
+.evolution-page .candidate-cards > .candidate-card { height: 570px; }
+.evolution-page .candidate-cards > .candidate-card:has(> h3) { height: auto; min-height: 180px; }
+.retrieval-evidence > section { border-top: 1px solid var(--line); padding: 10px 0; }
+.retrieval-evidence details { margin: 6px 0; overflow-wrap: anywhere; }
+.answer-metrics-footer { flex: none; border-top: 1px solid var(--line); padding: 12px 16px; font-size: 11px; }
+.answer-metrics-footer dl { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin: 0 0 8px; }
+.answer-metrics-footer dt { color: var(--text-muted); }
+.answer-metrics-footer dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+.answer-metrics-footer .technical-raw { max-height: 180px; overflow: auto; }
+.experiment-answer-card { height: 570px; }
+.experiment-answer-card .answer-scroll { padding: 16px; }
+.comparison-source { font-size: 12px; color: var(--text-muted); }
+.chat-message.assistant > p { max-height: 360px; overflow: auto; }
+.monitoring-table { max-height: 480px; }
+.header-actions { flex-wrap: wrap; }
+@media (max-width: 700px) { .answer-metrics-footer dl { grid-template-columns: repeat(2, minmax(0,1fr)); } .evolution-page .candidate-cards > .candidate-card { height: 570px; } .scheme-selectors { min-width: 0; } .custom-select { max-width: 100%; } }
+
+.confirm-dialog{position:fixed;z-index:101;left:50%;top:50%;transform:translate(-50%,-50%);width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;background:#fff;border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:0 12px 48px #172b4d26}.confirm-dialog h2{font-size:18px;margin:0 0 16px}.confirm-dialog .header-actions{justify-content:flex-end;margin-top:24px}

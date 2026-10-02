@@ -18,10 +18,10 @@ it("opens the overview with the V1.3 lifecycle navigation", async () => {
 
   await act(async () => { root.render(<App />); await Promise.resolve(); await Promise.resolve(); });
 
-  expect(document.body.textContent).toContain("RAG 自进化全流程");
+  expect(document.body.textContent).toContain("RAG 自进化项目概览");
   expect(document.body.textContent).toContain("Golden Dataset");
   expect(document.body.textContent).toContain("问答验证");
-  expect([...document.querySelectorAll('nav[aria-label="主导航"] a')].map(item => item.textContent)).toEqual(["项目概览", "知识库", "RAG Pipeline", "Golden Dataset", "Baseline", "参数调优", "发布", "问答验证"]);
+  expect([...document.querySelectorAll('nav[aria-label="主导航"] a')].map(item => item.textContent)).toEqual(["RAG 自进化项目概览", "知识库", "Pipeline 配置", "Golden Dataset", "Baseline", "Agent 工作台", "发布", "问答验证"]);
 });
 
 it("opens a deep link and keeps navigation in browser history", async () => {

@@ -1,6 +1,6 @@
-import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
+import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { BarChart3, BookOpen, Bot, ClipboardCheck, FlaskConical, LoaderCircle, Menu, MessageCircle, Settings, Sparkles, Waypoints } from "lucide-react";
-import { loadAppData } from "./api";
+import { identityKey, loadAppData } from "./api";
 import { EvaluationPage } from "./pages/EvaluationPage";
 import { EvolutionPage } from "./pages/EvolutionPage";
 import { GovernancePage } from "./pages/GovernancePage";
@@ -9,12 +9,13 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { VerificationPage } from "./pages/VerificationPage";
 import { VersionsPage } from "./pages/VersionsPage";
+import { useOperation } from "./operation";
 import type { AppData, Citation, Page } from "./types";
 
 const navigation: { id: Page; label: string; icon: typeof BarChart3 }[] = [
-  { id: "overview", label: "项目概览", icon: BarChart3 }, { id: "knowledge", label: "知识库", icon: BookOpen },
-  { id: "settings", label: "RAG Pipeline", icon: Settings }, { id: "governance", label: "Golden Dataset", icon: ClipboardCheck },
-  { id: "evaluation", label: "Baseline", icon: Waypoints }, { id: "evolution", label: "参数调优", icon: FlaskConical },
+  { id: "overview", label: "RAG 自进化项目概览", icon: BarChart3 }, { id: "knowledge", label: "知识库", icon: BookOpen },
+  { id: "settings", label: "Pipeline 配置", icon: Settings }, { id: "governance", label: "Golden Dataset", icon: ClipboardCheck },
+  { id: "evaluation", label: "Baseline", icon: Waypoints }, { id: "evolution", label: "Agent 工作台", icon: FlaskConical },
   { id: "versions", label: "发布", icon: Sparkles }, { id: "verification", label: "问答验证", icon: MessageCircle },
 ];
 const items = navigation;
@@ -23,14 +24,18 @@ const pageFromHash = (): Page => items.find(item => `#${item.id}` === location.h
 export default function App() {
   const [data, setData] = useState<AppData | null>(null); const [error, setError] = useState(""); const [page, setPage] = useState<Page>(pageFromHash);
   const [openedDocument, setOpenedDocument] = useState<{ name?: string; citation?: Citation }>(); const [menuOpen, setMenuOpen] = useState(false);
-  useEffect(() => { loadAppData().then(setData).catch((reason: Error) => setError(reason.message)); }, []);
+  const requests = useRef(0); const completed = useRef(new Set<string>()); const operation = useOperation();
+  const refresh = useCallback(async () => { const request = ++requests.current; try { const next = await loadAppData(); if (request === requests.current) { setData(next); setError(""); } } catch (reason) { if (request === requests.current) setError((reason as Error).message); } }, []);
+  useEffect(() => { void refresh(); }, [page, refresh]);
+  useEffect(() => { if (operation.operations.some(item => item.status !== "running" && !completed.current.has(item.id) && (completed.current.add(item.id), true))) void refresh(); }, [operation.operations, refresh]);
+  useEffect(() => () => { requests.current++; }, []);
   useEffect(() => { const syncPage = () => { if (location.hash !== "#main-content") setPage(pageFromHash()); }; window.addEventListener("hashchange", syncPage); return () => window.removeEventListener("hashchange", syncPage); }, []);
   const navigate = (next: Page) => { if (location.hash !== `#${next}`) location.hash = next; setPage(next); setMenuOpen(false); };
-  if (error) return <main className="state"><h1>无法加载 RAG Evolution</h1><p>{error}</p><button className="primary" onClick={() => location.reload()}>重试</button></main>;
+  if (error && !data) return <main className="state"><h1>无法加载 RAG Evolution</h1><p>{error}</p><button className="primary" onClick={() => location.reload()}>重试</button></main>;
   if (!data) return <main className="state" role="status"><LoaderCircle className="spin" size={28} /><h1>正在加载工作区</h1><p>正在连接本地服务。</p></main>;
   const openCitation = (citation: Citation) => { setOpenedDocument({ citation }); navigate("knowledge"); };
-  const content = page === "overview" ? <OverviewPage data={data} navigate={navigate} /> : page === "knowledge" ? <KnowledgePage data={data} onChanged={() => loadAppData().then(setData)} openedDocument={openedDocument} onOpenedDocument={() => setOpenedDocument(undefined)} /> : page === "governance" ? <GovernancePage data={data} /> : page === "evaluation" ? <EvaluationPage data={data} navigate={navigate} /> : page === "evolution" ? <EvolutionPage data={data} /> : page === "versions" ? <VersionsPage data={data} /> : page === "verification" ? <VerificationPage data={data} onOpenCitation={openCitation} onOpenDocument={name => { setOpenedDocument({ name }); navigate("knowledge"); }} /> : <SettingsPage data={data} />;
-  return <div className="app-shell"><a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>跳转到主内容</a><aside><div className="brand"><Bot size={21} aria-hidden="true" /><span>RAG Evolution</span></div><nav aria-label="主导航">{navigation.map(item => <NavigationLink key={item.id} item={item} page={page} navigate={navigate} />)}</nav></aside><main id="main-content" className="main" tabIndex={-1}><button className="secondary mobile-menu" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} aria-hidden="true" />菜单</button>{data.workspace?.requires_new_golden === true && <div className="error-notice" role="status">当前 Corpus 已变化，旧 Golden 和实验结果仅供历史查看。请在黄金测试集中新建并确认 Golden 后再运行 Baseline。</div>}{data.workspace?.requires_new_baseline === true && <div className="error-notice" role="status">当前 Corpus 的 Golden 已确认，需重新运行 Baseline；此前实验仅供历史查看。</div>}{menuOpen && <nav id="mobile-navigation" className="mobile-navigation" aria-label="移动导航">{items.map(item => <a key={item.id} href={`#${item.id}`} aria-current={page === item.id ? "page" : undefined} onClick={() => navigate(item.id)}>{item.label}</a>)}</nav>}<PageErrorBoundary key={page}>{content}</PageErrorBoundary></main></div>;
+  const content = page === "overview" ? <OverviewPage data={data} navigate={navigate} /> : page === "knowledge" ? <KnowledgePage data={data} onChanged={refresh} openedDocument={openedDocument} onOpenedDocument={() => setOpenedDocument(undefined)} /> : page === "governance" ? <GovernancePage data={data} /> : page === "evaluation" ? <EvaluationPage data={data} navigate={navigate} /> : page === "evolution" ? <EvolutionPage data={data} /> : page === "versions" ? <VersionsPage data={data} /> : page === "verification" ? <VerificationPage data={data} onOpenCitation={openCitation} onOpenDocument={name => { setOpenedDocument({ name }); navigate("knowledge"); }} /> : <SettingsPage data={data} />;
+  return <div className="app-shell"><a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>跳转到主内容</a><aside><div className="brand"><Bot size={21} aria-hidden="true" /><span>RAG Evolution</span></div><nav aria-label="主导航">{navigation.map(item => <NavigationLink key={item.id} item={item} page={page} navigate={navigate} />)}</nav></aside><main id="main-content" className="main" tabIndex={-1}><button className="secondary mobile-menu" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} aria-hidden="true" />菜单</button>{data.workspace?.requires_new_golden === true && <div className="error-notice" role="status">当前 Corpus 已变化，旧 Golden 和实验结果仅供历史查看。请在黄金测试集中新建并确认 Golden 后再运行 Baseline。</div>}{data.workspace?.requires_new_baseline === true && <div className="error-notice" role="status">当前 Corpus 的 Golden 已确认，需重新运行 Baseline；此前实验仅供历史查看。</div>}{menuOpen && <nav id="mobile-navigation" className="mobile-navigation" aria-label="移动导航">{items.map(item => <a key={item.id} href={`#${item.id}`} aria-current={page === item.id ? "page" : undefined} onClick={() => navigate(item.id)}>{item.label}</a>)}</nav>}{error && <p className="error-notice" role="alert">{error}</p>}<PageErrorBoundary key={`${page}:${identityKey(data.workspace)}`}>{content}</PageErrorBoundary></main></div>;
 }
 
 export class PageErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

@@ -14,14 +14,14 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const needsRegeneration = generationStatus === "needs_regeneration";
   const generationFailed = generationStatus === "failed";
   const expectedCount = summary.expected_count || summary.total || 0;
-  const run = item.latest_evaluation;
-  const experiment = data.optimization || {};
+  const run = data.evaluation || item.latest_evaluation;
+  const experiment = data.optimization?.baseline_run_id && data.optimization.baseline_run_id !== run?.id ? {} : data.optimization || {};
   const candidates: any[] = experiment.candidates || [];
   const qualified = candidates.filter(candidate => candidate.reasoning?.candidate_label !== "D" && candidate.result?.qualification?.qualified);
   const recommendation = data.optimization?.recommendation?.result || data.optimization?.recommendation || {};
   const frozen = !data.workspace?.requires_new_golden && expectedCount > 0 && summary.approved >= expectedCount;
   const released = production?.provenance === "published";
-  const next: [string, string, Page] = needsRegeneration ? [`补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）`, "当前 Golden Run 有失败题目，补齐后继续 Gate 1。", "governance"] : generationPending || generationFailed || !frozen ? ["确认 Golden Dataset", "完成题目检查与 Gate 1 人工确认。", "governance"] : !run?.id || data.workspace?.requires_new_baseline ? ["运行 Baseline", "使用已冻结的 Golden Dataset 生成正式诊断报告。", "evaluation"] : !experiment?.id || !candidates.length ? ["进入参数调优", "依据真实 Bad Case 生成 A/B/C 假设。", "evolution"] : recommendation.status !== "Recommended" ? ["完成调优决策", "查看 Sandbox、Gate 2 与 Composite D 的结果。", "evolution"] : !released ? ["Gate 3 · 人工确认发布", "核对推荐方案后由人确认发布。", "versions"] : ["查看方案对比", "比较上一版本与当前 Production 的同题回答。", "verification"];
+  const next: [string, string, Page] = needsRegeneration ? [`补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）`, "当前 Golden Run 有失败题目，补齐后继续 Gate 1。", "governance"] : generationPending || generationFailed || !frozen ? ["确认 Golden Dataset", "完成题目检查与 Gate 1 人工确认。", "governance"] : !run?.id || data.workspace?.requires_new_baseline ? ["运行 Baseline", "使用已冻结的 Golden Dataset 生成正式诊断报告。", "evaluation"] : !experiment?.id || !candidates.length ? ["运行 Optimization Agent", "依据真实 Bad Case 生成 A/B/C 假设。", "evolution"] : recommendation.status !== "Recommended" ? ["完成调优决策", "查看 Sandbox、Gate 2 与 Composite D 的结果。", "evolution"] : !released ? ["Gate 3 · 人工确认发布", "核对推荐方案后由人确认发布。", "versions"] : ["查看方案对比", "比较上一版本与当前 Production 的同题回答。", "verification"];
   const stages: [string, string, Page][] = [
     ["知识库", `${data.documents?.length || 0} 份文档`, "knowledge"], ["RAG Pipeline", production?.config ? "已配置" : "未运行", "settings"],
     ["Golden Dataset", frozen ? "已冻结" : "待确认", "governance"], ["Baseline", run?.result?.gates ? `${run.result.gates.passed_count}/${run.result.gates.total} Hard Gate` : "未运行", "evaluation"],
@@ -31,12 +31,12 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const currentStage = stages.findIndex(([, , route]) => route === next[2]);
 
   return <div className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`}>
-    <div className="page-title"><div><h1>RAG 自进化全流程</h1><p>从知识库和 Golden Dataset 出发，诊断 Baseline、验证 Candidate，并由人确认发布。</p></div></div>
+    <div className="page-title"><div><h1>RAG 自进化项目概览</h1><p>从知识库和 Golden Dataset 出发，诊断 Baseline、验证 Candidate，并由人确认发布。</p></div></div>
     <div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>
     {tab !== "project" ? <ArchitecturePanel slot={tab} /> : <>
     <section className="next-action" aria-labelledby="next-action-title"><div><span className="next-action-label">当前下一步</span><h2 id="next-action-title">{next[0]}</h2><p>{next[1]}</p></div><a className="primary" href={`#${next[2]}`} onClick={() => navigate(next[2])}>前往阶段<ArrowRight size={15} aria-hidden="true" /></a></section>
     <Section title="全链路阶段"><StageStepper ariaLabel="全链路阶段" compact steps={stages.map(([label, detail, page], index) => ({ label, detail, href: `#${page}`, state: index < currentStage ? "completed" : index === currentStage ? "current" : "pending" }))} /></Section>
-    <div className="metrics-grid four overview-metrics"><Metric label="Golden Dataset" value={frozen ? `${expectedCount} 题` : `${summary.approved || 0} / ${expectedCount || "—"}`} note={`正向 ${summary.positive ?? "—"} / 消融 ${summary.ablation ?? "—"} / 负向 ${summary.negative ?? "—"} · 待人工审核 ${summary.pending_review || 0}`} /><Metric label="Baseline" value={run?.result?.gates ? `${run.result.gates.passed_count} / ${run.result.gates.total}` : "未运行"} note={`${run?.result?.bad_case_count ?? 0} 个 Bad Case`} /><Metric label="参数调优" value={`${candidates.filter(row => row.reasoning?.candidate_label !== "D").length} 个 Candidate`} note={qualified.length ? `${qualified.length} 个 Candidate 通过 Gate · ${qualified.map(row => row.reasoning?.candidate_label).join(" / ")}` : "尚无通过 Gate 的 Candidate"} /><Metric label="Production" value={released ? "已发布" : "未发布"} note={released ? "当前正式版本" : "等待 Gate 3 确认"} /></div></>}
+    <div className="metrics-grid four overview-metrics"><Metric label="Golden Dataset" value={frozen ? `${expectedCount} 题` : `${summary.approved || 0} / ${expectedCount || "—"}`} note={`正向 ${summary.positive ?? "—"} / 消融 ${summary.ablation ?? "—"} / 负向 ${summary.negative ?? "—"} · 待人工审核 ${summary.pending_review || 0}`} /><Metric label="Baseline" value={run?.result?.gates ? `${run.result.gates.passed_count} / ${run.result.gates.total}` : "未运行"} note={`${run?.result?.bad_case_count ?? 0} 个 Bad Case`} /><Metric label="参数调优" value={`${candidates.filter(row => row.reasoning?.candidate_label !== "D").length} 个 Candidate`} note={qualified.length ? `${qualified.length} 个 Candidate 通过 Gate · ${qualified.map(row => row.reasoning?.candidate_label).join(" / ")}` : "尚无通过 Gate 的 Candidate"} /><Metric label="Production" value={released ? "已发布" : "未发布"} note={released ? `${production?.id || "—"} · ${production?.snapshot?.candidate_id || production?.provenance}` : "等待 Gate 3 确认"} /></div></>}
   </div>;
 }
 

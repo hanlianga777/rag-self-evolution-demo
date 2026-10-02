@@ -206,7 +206,7 @@ it("keeps Golden approval disabled until Probe and QC both pass", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-test", status: "candidate_generated", question_ids: ["GGC-001"], artifacts: {} }], dataset: [{ id: "GGC-001", legacy_question_type: "v1_mini", question: "测试题", test_category: "positive", review_status: "human_review_pending", probe_status: "probe_pending", stage: "candidate", evidence: [] }] }} />); });
 
-  expect(document.body.textContent).toContain("黄金测试集");
+  expect(document.body.textContent).toContain("Golden Dataset");
   await act(async () => { ([...document.querySelectorAll("button")].find(button => button.textContent === "查看详情") as HTMLButtonElement).click(); });
   const approval = [...document.querySelectorAll("button")].find(button => button.textContent === "批准")!;
   expect((approval as HTMLButtonElement).disabled).toBe(true);
@@ -370,6 +370,7 @@ it("lets a paired preview regenerate only Q09 and discard without applying", asy
   expect(regeneration).toBeTruthy();
   expect(JSON.parse(regeneration!.init!.body as string)).toEqual({ question_id: "V1-9", expected_hash: "hash-nine" });
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "放弃") as HTMLButtonElement).click());
+  await act(async () => document.querySelector<HTMLButtonElement>(".confirm-dialog button.primary")!.click());
   expect(requests.some(item => item.url.endsWith("/discard"))).toBe(true);
   expect(requests.some(item => item.url.endsWith("/apply"))).toBe(false);
   await act(async () => root.unmount());

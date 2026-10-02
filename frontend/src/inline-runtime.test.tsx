@@ -31,14 +31,14 @@ it("shows Before result without waiting for After and keeps a one-sided failure 
   let candidate!: (value: Response) => void;
   vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise<Response>(resolve => { if (JSON.parse(String(init?.body)).scheme_id === "baseline") baseline = resolve; else candidate = resolve; })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<OperationProvider restore={false}><ExperimentPage data={{ optimization: { candidates: [{ id: "EXP-A", reasoning: { candidate_label: "A" }, result: { qualification: { qualified: true } } }] } }} onOpenCitation={() => {}} /></OperationProvider>));
+  await act(async () => root.render(<OperationProvider restore={false}><ExperimentPage data={{ evaluation: { id: "EVAL-1" }, optimization: { candidates: [{ id: "EXP-A", reasoning: { candidate_label: "A" }, result: { qualification: { qualified: true } } }] } }} onOpenCitation={() => {}} /></OperationProvider>));
   await act(async () => { const textarea = document.querySelector("textarea")!; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "测试"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => document.querySelector<HTMLButtonElement>(".experiment-query button")!.click());
   expect(document.querySelectorAll(".experiment-answer-card .running")).toHaveLength(2);
   expect(document.querySelector(".operation-console")).toBeNull();
-  await act(async () => baseline(new Response(JSON.stringify({ answer: "生产答案", version: "v1", latency_ms: 100, evidence: [] }), { status: 200 })));
-  expect(document.querySelectorAll(".experiment-answer-card")[0].textContent).toContain("生产答案");
-  expect(document.querySelectorAll(".experiment-answer-card")[1].textContent).not.toContain("生产答案");
+  await act(async () => baseline(new Response(JSON.stringify({ answer: "Baseline 答案", version: "EVAL-1", latency_ms: 100, evidence: [] }), { status: 200 })));
+  expect(document.querySelectorAll(".experiment-answer-card")[0].textContent).toContain("Baseline 答案");
+  expect(document.querySelectorAll(".experiment-answer-card")[1].textContent).not.toContain("Baseline 答案");
   await act(async () => candidate(new Response(JSON.stringify({ detail: "候选不可用" }), { status: 503 })));
   expect(document.querySelectorAll(".experiment-answer-card")[0].textContent).not.toContain("预览失败");
   expect(document.querySelectorAll(".experiment-answer-card")[1].textContent).toContain("候选不可用");

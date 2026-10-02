@@ -197,7 +197,12 @@ class CorpusManager:
                     raise ValueError(f"Parser failed for {source['id']}: {record.get('error') or record['status']}")
                 records.append(record)
                 regenerated.extend(chunks)
-            stable = lambda chunks: [{key: value for key, value in chunk.items() if key != 'embedding_status'} for chunk in chunks]
+            def stable(chunks):
+                # Parser traversal may differ; copied chunks and vectors keep their original order.
+                by_id = {chunk.get('chunk_id'): {key: value for key, value in chunk.items() if key != 'embedding_status'} for chunk in chunks}
+                if None in by_id or len(by_id) != len(chunks):
+                    raise ValueError('Regenerated Chunk identity contains missing or duplicate IDs; original active Corpus preserved')
+                return by_id
             if stable(regenerated) != stable(original['chunks']):
                 raise ValueError('Regenerated Chunk identity/content differs; original active Corpus preserved')
             old_docs = {doc['id']: doc for doc in original['documents']}
