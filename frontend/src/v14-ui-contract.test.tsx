@@ -9,6 +9,8 @@ import { GovernancePage } from "./pages/GovernancePage";
 import { VerificationPage } from "./pages/VerificationPage";
 import { VersionsPage } from "./pages/VersionsPage";
 import { EvolutionPage } from "./pages/EvolutionPage";
+import { CurrentCoveragePreview } from "./pages/BusinessImportPanel";
+import { CandidateWorkspace } from "./pages/CandidateWorkspace";
 import { ExecutionMetrics } from "./components/PipelineFields";
 import { RetrievalEvidence } from "./components/RetrievalEvidence";
 import { getJson, loadAppData } from "./api";
@@ -20,6 +22,120 @@ const render = async (node: ReactNode) => { root = createRoot(document.body.appe
 const identity = (baseline: string, experiment?: string) => ({ current_baseline_id: baseline, current_experiment_id: experiment, current_golden_id: "GD-fixture", current_corpus_fingerprint: { D: "fixture" } });
 const data = (baseline = "B0") => ({ workspace: identity(baseline), evaluation: { id: baseline }, versions: [{ id: "P0", status: "active", provenance: "published", config: { top_k: 6 } }] });
 const fill = async (question: string) => act(async () => { const input = document.querySelector("textarea")!; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, question); input.dispatchEvent(new Event("input", { bubbles: true })); });
+
+const clickText = async (label: string) => act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === label)!.click());
+const previewPlan = (profile = "mini", corpus = { D: "fixture" }) => ({ plan_id: `PLAN-${profile}`, planner_version: "fixture-v2", profile: { name: profile }, corpus_fingerprint: corpus, chunk_clusters: { C1: 0 }, initial_k: 2, final_k: 1, merge_mapping: [{ from: 1, to: 0 }], clusters: [{ cluster_id: 0, size: 1, anchor_quota: 20, quotas: { positive: 8, ablation: 4, negative: 8 }, representative_chunk_ids: ["C1"] }], slots: [{ slot_id: "Q01", topic_cluster: 0, document_id: "D", material_chunk_ids: ["C1"], construction_type: "Fact" }], reuse_statistics: { reused_slots: 0 }, gaps: [] });
+
+it.each([true, false])("I4 manual current Preview is available with legacy Run=%s and preserves saved objects", async legacy => {
+  const run = { id: "legacy", status: "completed", profile: { expected_count: 20 }, artifacts: {}, question_ids: [] };
+  const input = { ...data("B1"), dataset: [], generationRuns: legacy ? [run] : [], snapshots: [] };
+  const frozen = JSON.stringify(input), posts: any[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") { posts.push({ url, body: JSON.parse(init.body as string) }); return new Response(JSON.stringify(previewPlan())); } return new Response(JSON.stringify([])); }));
+  await render(<GovernancePage data={input} />);
+  expect(posts).toHaveLength(0);
+  await clickText("预览当前 Corpus Coverage");
+  expect(posts).toEqual([{ url: expect.stringContaining("/api/governance/coverage-preview"), body: { profile: "mini" } }]);
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("当前 Corpus · V2 Coverage Preview");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("初始 K 2 → 最终 K 1");
+  expect(JSON.stringify(input)).toBe(frozen);
+});
+
+it.each(["profile", "corpus"])("I4 suppresses delayed Preview after %s changes", async change => {
+  const replies: ((reply: Response) => void)[] = [];
+  vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => replies.push(resolve))));
+  await render(<CurrentCoveragePreview profile="mini" corpusFingerprint={{ D: "fixture" }} documents={[]} />);
+  await clickText("预览当前 Corpus Coverage");
+  await act(async () => root.render(<CurrentCoveragePreview profile={change === "profile" ? "full" : "mini"} corpusFingerprint={{ D: change === "corpus" ? "new" : "fixture" }} documents={[]} />));
+  await act(async () => replies[0](new Response(JSON.stringify(previewPlan()))));
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.body.textContent).toContain("尚无当前 Preview");
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it.each(["mini", "medium", "full"])("I4 Preview carries selected %s Profile and reports server failure", async profile => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail: "Fixture planner unavailable" }), { status: 422 })));
+  await render(<CurrentCoveragePreview profile={profile} documents={[]} />);
+  await clickText("预览当前 Corpus Coverage");
+  expect(JSON.parse((fetch as any).mock.calls[0][1].body)).toEqual({ profile });
+  expect(document.body.textContent).toContain("Preview 失败：Fixture planner unavailable");
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it.each([{ proposal: "实际持久化 proposal" }, { why: "兼容 Why 字段" }, {}])("I5 candidate report renders persisted rationale %j", async reasoning => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
+  const candidate = { id: "E1-A", status: "generated", config: {}, reasoning: { candidate_label: "A", hypothesis: "假设", risk: "风险", observed_evidence: [], ...reasoning }, result: {} };
+  await render(<EvolutionPage data={{ ...data("B1"), optimization: { id: "E1", candidates: [candidate] } }} />);
+  await clickText("A / B / C / D"); await clickText("查看方案与完整报告");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(`Why：${(reasoning as any).proposal || (reasoning as any).why || "未记录"}`);
+});
+
+it.each([0, 1.25, null])("M4 Sandbox and release keep provider cost %s and source-backed missing reason", async cost => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
+  const candidate = { id: "E1-A", status: "evaluated", config: {}, reasoning: { candidate_label: "A" }, result: { comparison_metrics: { token_cost: cost, token_cost_status: "Token Usage / Provider Cost unavailable" } } };
+  const input = { ...data("B1"), optimization: { id: "E1", candidates: [candidate] } };
+  await render(<EvolutionPage data={input} />); await clickText("Sandbox");
+  const expected = cost == null ? "费用未采集 · Token Usage / Provider Cost unavailable" : `${cost}（Provider 账单费用）`;
+  expect(document.querySelector(".table-scroll")?.textContent).toContain(expected);
+  expect(document.body.textContent).not.toContain("暂未配置单价");
+  await act(async () => root.render(<VersionsPage data={input} />)); await clickText("查看 Candidate 评测报告");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
+  expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("暂未配置单价");
+});
+
+it("M7 restores completed comparison on same-identity remount and rejects a different identity", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify({ answer: JSON.parse(init?.body as string).scheme_id === "baseline" ? "保留 Baseline 回答" : "保留 Production 回答", version: "B1", evidence: [] }))));
+  await render(<ExperimentPage data={data("B1")} onOpenCitation={() => {}} />);
+  await fill("保留同一个问题"); await act(async () => document.querySelector<HTMLButtonElement>(".query-action button")!.click());
+  expect(document.body.textContent).toContain("保留 Baseline 回答");
+  await act(async () => root.unmount());
+  await render(<ExperimentPage data={data("B1")} onOpenCitation={() => {}} />);
+  expect(document.body.textContent).toContain("保留 Baseline 回答");
+  expect(document.body.textContent).toContain("保留 Production 回答");
+  expect(fetch).toHaveBeenCalledTimes(2);
+  await act(async () => root.unmount());
+  await render(<ExperimentPage data={data("B2")} onOpenCitation={() => {}} />);
+  expect(document.body.textContent).not.toContain("保留 Baseline 回答");
+  expect(document.body.textContent).not.toContain("保留 Production 回答");
+});
+
+it("M3 clean/save, cancel, content replacement and external close reset the Drawer contract", async () => {
+  const change = vi.fn();
+  const drawer = (dirty: boolean, key: string, open = true) => <Drawer open={open} guardEdits editDirty={dirty} contentKey={key} title="Fixture 编辑" onOpenChange={change}><input defaultValue="草稿" /></Drawer>;
+  await render(drawer(true, "Q1"));
+  await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());
+  await clickText("取消");
+  expect(change).not.toHaveBeenCalled(); expect(document.querySelector<HTMLInputElement>("input")?.value).toBe("草稿");
+  await act(async () => root.render(drawer(false, "Q1")));
+  await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());
+  expect(change).toHaveBeenCalledWith(false); expect(document.querySelector(".confirm-dialog")).toBeNull();
+  await act(async () => root.render(drawer(true, "Q1")));
+  await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());
+  await act(async () => root.render(drawer(false, "Q2")));
+  expect(document.querySelector(".confirm-dialog")).toBeNull();
+  await act(async () => root.render(drawer(true, "Q2")));
+  await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());
+  await act(async () => root.render(drawer(false, "Q2", false)));
+  await act(async () => root.render(drawer(false, "Q2")));
+  expect(document.querySelector(".confirm-dialog")).toBeNull();
+});
+
+it("M3 saved Candidate draft becomes clean and returning an edit to saved content is clean", async () => {
+  const question = { id: "Q1", question: "原问题", reference_answer: "原答案", test_category: "positive", evidence: [{ source_chunk_ids: ["C1"] }], raw: {} };
+  let revision: any = { id: "REV1", status: "preview_ready", question_ids: ["Q1"], drafts: { Q1: question }, new_hash: { Q1: "old" }, before: { Q1: question }, reason: "已有原因", tags: [] };
+  vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => { if (init?.method === "POST") { const payload = JSON.parse(init.body as string); revision = { ...revision, drafts: { Q1: { ...question, ...payload.changes.Q1 } }, new_hash: { Q1: "new" } }; } return new Response(JSON.stringify(init?.method === "POST" ? revision : [])); }));
+  const dirty = vi.fn();
+  await render(<CandidateWorkspace row={question} peers={[question]} revision={revision} busy={false} onRun={() => {}} onReview={async () => false} onRefresh={async () => {}} operation={{ watchRevision: () => {} } as any} onDirtyChange={dirty} />);
+  expect(dirty).toHaveBeenLastCalledWith(false);
+  await clickText("编辑草案");
+  expect(dirty).toHaveBeenLastCalledWith(false);
+  const input = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="草案问题"]') || document.querySelector<HTMLTextAreaElement>(".draft-workspace textarea");
+  expect(input).not.toBeNull();
+  const edit = async (value: string) => act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, value); input!.dispatchEvent(new Event("input", { bubbles: true })); });
+  await edit("已编辑的问题"); expect(dirty).toHaveBeenLastCalledWith(true);
+  await edit("原问题"); expect(dirty).toHaveBeenLastCalledWith(false);
+  await edit("已编辑的问题"); await clickText("保存并校验草案");
+  expect(dirty).toHaveBeenLastCalledWith(false);
+});
 
 it("ID-08 ignores an old same-question comparison after Baseline changes", async () => {
   const replies: ((reply: Response) => void)[] = [];

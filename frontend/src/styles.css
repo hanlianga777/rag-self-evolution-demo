@@ -831,7 +831,7 @@ td, th { font-variant-numeric: tabular-nums; }
 .candidate-card-body { display: flex; flex-direction: column; gap: 16px; }
 .candidate-card-body .candidate-card-field { flex: none; overflow: visible; }
 .candidate-card-body .candidate-card-field:last-of-type .truncated-text { -webkit-line-clamp: 1; }
-.evolution-page .candidate-cards > .candidate-card { height: 570px; }
+.evolution-page .candidate-cards > .candidate-card { height: 570px; padding: 14px; }
 .evolution-page .candidate-cards > .candidate-card:has(> h3) { height: auto; min-height: 180px; }
 .retrieval-evidence > section { border-top: 1px solid var(--line); padding: 10px 0; }
 .retrieval-evidence details { margin: 6px 0; overflow-wrap: anywhere; }

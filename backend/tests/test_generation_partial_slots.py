@@ -33,6 +33,9 @@ class PartialGenerationTests(unittest.TestCase):
         ]
         self.service.quality_check = Mock(return_value={"priority": "P2", "reason": "fixture"})
 
+    def passed_probe(self, question_id, *_args, **_kwargs):
+        return self.store.record_probe_result(question_id, {'question_quality': 30, 'golden_answer_quality': 30, 'evidence_support': 40})
+
     def complete(self, _system, payload, **_kwargs):
         data = json.loads(payload)
         slot = data["coverage_slot"]
@@ -63,7 +66,7 @@ class PartialGenerationTests(unittest.TestCase):
                 self.store.claim_regeneration(run_id, partial["artifacts"]["hard_validation"]["corpus_fingerprint"])
                 self.fail.clear()
                 self.calls.clear()
-                with patch.object(self.store, "run_probe", return_value={"status": "passed"}), patch.object(self.store, "record_qc"):
+                with patch.object(self.store, "run_probe", side_effect=self.passed_probe), patch.object(self.store, "record_qc"):
                     _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
                 complete = self.store.generation_run(run_id)
                 self.assertEqual(complete["status"], "completed")
@@ -100,7 +103,7 @@ class PartialGenerationTests(unittest.TestCase):
                     self.store.claim_regeneration(run_id, run["artifacts"]["hard_validation"]["corpus_fingerprint"])
                 self.fail.clear()
                 self.calls.clear()
-                with patch.object(self.store, "run_probe", return_value={"status": "passed"}), patch.object(self.store, "record_qc"):
+                with patch.object(self.store, "run_probe", side_effect=self.passed_probe), patch.object(self.store, "record_qc"):
                     _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
                 complete = self.store.generation_run(run_id)
                 self.assertEqual(complete["status"], "completed")
@@ -141,7 +144,7 @@ class PartialGenerationTests(unittest.TestCase):
             if kwargs["slot"] == "Q04":
                 seen.append(self.store.generation_run(run_id)["operation_progress"])
 
-        with patch.object(self.store, "persist_generation_attempt", side_effect=capture), patch.object(self.store, "run_probe", return_value={"status": "passed"}), patch.object(self.store, "record_qc"):
+        with patch.object(self.store, "persist_generation_attempt", side_effect=capture), patch.object(self.store, "run_probe", side_effect=self.passed_probe), patch.object(self.store, "record_qc"):
             _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
         self.assertEqual((seen[0]["phase_processed"], seen[0]["phase_total"], seen[0]["phase_percent"], seen[0]["hard_valid_completed"]), (4, 10, 40, 14))
         self.assertEqual(seen[0]["processed_slots"], 20)
@@ -157,7 +160,7 @@ class PartialGenerationTests(unittest.TestCase):
         self.assertEqual([item["attempt"] for item in self.store.generation_run(run_id)["artifacts"]["slot_audit"]["Q01"]], [1, 2, 3, 4])
         self.fail.clear()
         self.store.claim_regeneration(run_id, fingerprint)
-        with patch.object(self.store, "run_probe", return_value={"status": "passed"}), patch.object(self.store, "record_qc"):
+        with patch.object(self.store, "run_probe", side_effect=self.passed_probe), patch.object(self.store, "record_qc"):
             _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
         self.assertEqual(self.store.generation_run(run_id)["status"], "completed")
         self.assertEqual(self.store.generation_run(run_id)["artifacts"]["slot_audit"]["Q01"][-1]["source_chunk_ids"], ["C02"])
@@ -179,7 +182,7 @@ class PartialGenerationTests(unittest.TestCase):
             answer = "设备可断电维护" if number <= 4 or number <= 7 and calls_by_slot[slot] >= 3 or calls_by_slot[slot] >= 5 else "越界答案"
             return json.dumps({"question": f"{slot} 如何维护设备？", "reference_answer": answer}, ensure_ascii=False)
         self.provider.complete.side_effect = complete
-        with patch.object(self.store, "run_probe", return_value={"status": "passed"}), patch.object(self.store, "record_qc"):
+        with patch.object(self.store, "run_probe", side_effect=self.passed_probe), patch.object(self.store, "record_qc"):
             _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
         run = self.store.generation_run(run_id)
         self.assertEqual(run["status"], "completed")
@@ -255,7 +258,7 @@ class PartialGenerationTests(unittest.TestCase):
 
         self.provider.complete.side_effect = malformed
         run_id = self.store.start_generation_run("mock-provider")
-        with patch.object(self.store, "run_probe", return_value={"status": "passed"}), patch.object(self.store, "record_qc"):
+        with patch.object(self.store, "run_probe", side_effect=self.passed_probe), patch.object(self.store, "record_qc"):
             _run_mini_generation(run_id, self.store, self.service, self.corpus)
         first = self.store.generation_run(run_id)["artifacts"]["slot_audit"]["Q01"][0]
         self.assertEqual(first["error_type"], "JSONDecodeError")

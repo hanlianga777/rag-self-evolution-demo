@@ -140,7 +140,7 @@ PYCODE
 
 1. **Baseline / Production 同题问答**：在问答验证 → 方案对比，选择正式 Baseline 与当前明确的 Production Version，选一条真实失败题并手动运行。核对同一问题、两侧版本/Corpus/证据、实际 Usage/Latency、真实或未采集 TTFT，以及成本版本/缺失原因；一侧失败须保留另一侧。
 2. **Monitoring → Agent 首轮**：Production 问答后人工判定一条真实 Bad Case，确认生成的 Pending Trigger；人工 Confirm 后打开同一个 pending Agent 上下文，手动生成首轮 A/B/C。核对 Round 0→1、Baseline 绑定、同一实验 ID 和重复 Confirm；此步骤可能消耗 Provider/预算，不继续自动 Sandbox 或发布。
-3. **V2 Planner Preview**：Golden → 查看 Coverage 规划 / Preview，核对当前 Corpus、实际 K、小簇合并、Profile 配额、Slot/材料/复用与缺口。仅 Preview 不调用生成/Judge/QC，不随后自动生成测试集；旧 Golden 不因 Preview 成为 V2。
+3. **V2 Planner Preview**：Golden 顶部选择 Mini / Medium / Full Profile → 点击「预览当前 Corpus Coverage」→「当前 Corpus · V2 Coverage Preview」。Legacy / 无 Run 页面均可使用。核对 N、初始/最终 K、小簇合并、配额、Cluster、Slot/材料/章节、复用、缺口和来源；「查看 Coverage 规划」仍只显示已保存 Run 的冻结计划。切换 Profile / Corpus 后旧 Preview 清除、迟到响应丢弃；失败显示「Preview 失败」。仅手动 Preview 不调用生成/Judge/QC/Agent，不随后自动创建 Run；旧 Golden 不因 Preview 成为 V2。
 
 ## 真实全文备份 Staging 最终结果（2026-10-02）
 

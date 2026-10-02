@@ -39,6 +39,39 @@ export function CoverageSummary({ run, questions, documents }: { run: any; quest
   const slots = plan?.slots || run?.artifacts?.coverage_plan || [];
   return <Section title="Coverage Planning" action={<button className="secondary" onClick={() => setOpen(true)}>查看 Coverage 规划</button>}>
     {plan?.planner_version ? <><p>{Object.keys(plan.chunk_clusters || {}).length} Chunks → {plan.final_k} Topic Clusters → {slots.length} Profile Slots → {questions.length} Candidates</p><p>Topic Planning：Embedding + Dynamic K-means · Sampling：按主题厚薄、小簇合并、未使用材料优先 · Profile：{plan.profile?.name}（{["positive", "ablation", "negative"].map(key => plan.profile?.[`${key}_count`] ?? "—").join(" / ")}）</p><p>实际 Construction：{Object.entries(questions.reduce((counts: Record<string, number>, row) => { const type = row.construction_type || row.raw?.construction_type || "未采集"; counts[type] = (counts[type] || 0) + 1; return counts; }, {})).map(([key, count]) => `${key} ${count}`).join(" · ") || "尚未构造"} · Coverage 缺口 {plan.gaps?.length ?? "未采集"}</p></> : <p>Legacy · 历史未采集 V2 Topic Planning，保留原始 Slot 审计。</p>}
-    <Drawer open={open} onOpenChange={setOpen} title="Coverage 规划与 Slot 审计" className="search-space-drawer"><div className="drawer-body"><p>Planner {plan?.planner_version || "Legacy / 未采集"}</p><FixedTableCard><table><thead><tr><th>Cluster</th><th>Chunks</th><th>Slot 配额</th><th>代表文档 / Chunk</th><th>Construction</th></tr></thead><tbody>{(plan?.clusters || []).map((cluster: any) => <tr key={cluster.cluster_id}><td>{cluster.cluster_id}</td><td>{cluster.size}</td><td>{cluster.anchor_quota} · {JSON.stringify(cluster.quotas)}</td><td>{cluster.label} · {cluster.representative_chunk_ids?.join("、")}</td><td>{slots.filter((slot: any) => slot.topic_cluster === cluster.cluster_id).map((slot: any) => `${slot.slot_id || slot.slot}: ${slot.construction_type}`).join("；")}</td></tr>)}</tbody></table></FixedTableCard><details><summary>Slot / 材料来源 / 章节</summary><FixedTableCard><table><thead><tr><th>Slot</th><th>Group / Topic</th><th>材料 / 章节</th><th>抽样理由</th></tr></thead><tbody>{slots.map((slot: any, index: number) => <tr key={slot.slot_id || slot.slot || index}><td>{slot.slot_id || slot.slot}</td><td>{slot.evaluation_group || slot.test_category} / {slot.topic_cluster ?? "未记录"}</td><td>{documents.find(doc => doc.id === slot.document_id)?.name || slot.document_id || "未记录"} / {slot.section_path || "未记录"} · {slot.material_chunk_ids?.join("、")}</td><td>{slot.selected_reason || slot.sampling_priority || "未记录"}</td></tr>)}</tbody></table></FixedTableCard></details><TechnicalDetails label="合并 / 抽样 / 缺口 / Attempts 审计">{JSON.stringify({ merge: plan?.merge_mapping, reuse: plan?.reuse_statistics, construction: plan?.construction_audit, gaps: plan?.gaps, attempts: run?.artifacts?.slot_audit }, null, 2)}</TechnicalDetails></div></Drawer>
+    <Drawer open={open} onOpenChange={setOpen} title="Coverage 规划与 Slot 审计" className="search-space-drawer"><CoveragePlanDetails plan={plan} slots={slots} documents={documents} attempts={run?.artifacts?.slot_audit} /></Drawer>
   </Section>;
+}
+
+export function CurrentCoveragePreview({ profile, corpusFingerprint, documents }: { profile: string; corpusFingerprint?: unknown; documents: any[] }) {
+  const [preview, setPreview] = useState<any>(null), [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const source = JSON.stringify([profile, corpusFingerprint ?? documents.map(doc => [doc.id, doc.source_fingerprint])]);
+  const request = useRef(0), currentSource = useRef(source); currentSource.current = source;
+  useEffect(() => { request.current++; setPreview(null); setBusy(false); setError(""); setOpen(false); return () => { request.current++; }; }, [source]);
+  const runPreview = async () => {
+    const ticket = ++request.current, captured = source;
+    setBusy(true); setPreview(null); setError("");
+    try {
+      const result: any = await postJson("/api/governance/coverage-preview", { profile });
+      if (ticket !== request.current || captured !== currentSource.current) return;
+      if (result.profile?.name !== profile || corpusFingerprint != null && JSON.stringify(result.corpus_fingerprint) !== JSON.stringify(corpusFingerprint)) throw new Error("Preview 已过期：Profile 或 Corpus 已变化，请刷新后重新预览");
+      setPreview(result); setOpen(true);
+    } catch (reason) { if (ticket === request.current && captured === currentSource.current) setError(errorMessage(reason)); }
+    finally { if (ticket === request.current && captured === currentSource.current) setBusy(false); }
+  };
+  return <Section title="当前 Corpus · V2 Planner Preview" action={<div className="header-actions"><button className="secondary" disabled={busy} onClick={() => void runPreview()}>{busy ? "正在 Preview…" : "预览当前 Corpus Coverage"}</button>{preview && <button className="text-button" onClick={() => setOpen(true)}>查看当前 Preview</button>}</div>}>
+    <p>选择 Profile：{profile.toUpperCase()} · 手动 Preview 仅规划材料与配额，不生成题目。Profile 或 Corpus 改变后须重新预览。</p>
+    {error && <p className="error-notice" role="alert">Preview 失败：{error}</p>}
+    {!preview && !busy && <p className="muted">尚无当前 Preview；已保存 Run 的冻结规划可单独查看。</p>}
+    <Drawer open={open} onOpenChange={setOpen} title="当前 Corpus · V2 Coverage Preview" className="search-space-drawer"><CoveragePlanDetails plan={preview} slots={preview?.slots || []} documents={documents} /></Drawer>
+  </Section>;
+}
+
+function CoveragePlanDetails({ plan, slots, documents, attempts }: { plan: any; slots: any[]; documents: any[]; attempts?: unknown }) {
+  return <div className="drawer-body"><p>Planner {plan?.planner_version || "Legacy / 未采集"} · Profile {plan?.profile?.name || "未采集"}</p>
+    {plan && <><p>N {Object.keys(plan.chunk_clusters || {}).length} · 初始 K {plan.initial_k ?? "未采集"} → 最终 K {plan.final_k ?? "未采集"} · Slots {slots.length}</p><p>复用 Slots {plan.reuse_statistics?.reused_slots ?? "未采集"} · Coverage 缺口 {plan.gaps?.length ?? "未采集"}</p><p>合并：{JSON.stringify(plan.merge_mapping || [])}</p></>}
+    <FixedTableCard><table><thead><tr><th>Cluster</th><th>Chunks</th><th>Slot 配额</th><th>代表文档 / Chunk</th><th>Construction</th></tr></thead><tbody>{(plan?.clusters || []).map((cluster: any) => <tr key={cluster.cluster_id}><td>{cluster.cluster_id}</td><td>{cluster.size}</td><td>{cluster.anchor_quota} · {JSON.stringify(cluster.quotas)}</td><td>{cluster.label} · {cluster.representative_chunk_ids?.join("、")}</td><td>{slots.filter((slot: any) => slot.topic_cluster === cluster.cluster_id).map((slot: any) => `${slot.slot_id || slot.slot}: ${slot.construction_type}`).join("；")}</td></tr>)}</tbody></table></FixedTableCard>
+    <details><summary>Slot / 材料来源 / 章节</summary><FixedTableCard><table><thead><tr><th>Slot</th><th>Group / Topic</th><th>材料 / 章节</th><th>抽样 / 复用</th></tr></thead><tbody>{slots.map((slot: any, index: number) => <tr key={slot.slot_id || slot.slot || index}><td>{slot.slot_id || slot.slot}</td><td>{slot.evaluation_group || slot.test_category} / {slot.topic_cluster ?? "未记录"}</td><td>{documents.find(doc => doc.id === slot.document_id)?.name || slot.document_id || "未记录"} / {slot.section_path || "未记录"} · {slot.material_chunk_ids?.join("、")}</td><td>{slot.selected_reason || slot.sampling_priority || "未记录"} · {slot.reused == null ? "未采集" : slot.reused ? "复用" : "未使用材料"}</td></tr>)}</tbody></table></FixedTableCard></details>
+    <TechnicalDetails label="规划来源 / 合并 / 抽样 / 缺口 / Attempts 审计">{JSON.stringify({ plan_id: plan?.plan_id, created_at: plan?.created_at, corpus_fingerprint: plan?.corpus_fingerprint, chunk_fingerprint: plan?.chunk_fingerprint, embedding_identity: plan?.embedding_identity, embedding_fingerprint: plan?.embedding_fingerprint, seed: plan?.seed, parameters: plan?.parameters, merge: plan?.merge_mapping, reuse: plan?.reuse_statistics, construction: plan?.construction_audit, gaps: plan?.gaps, attempts }, null, 2)}</TechnicalDetails>
+  </div>;
 }

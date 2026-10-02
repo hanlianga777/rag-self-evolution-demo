@@ -11,7 +11,7 @@ assert urlsplit(URL).port == 5180, 'Refuse real frontend/API ports'
 PAYLOADS = json.loads((OUTPUT / 'payloads.json').read_text())
 ROUTES = [('overview', 'RAG 自进化项目概览'), ('knowledge', '知识库'), ('settings', 'Pipeline 配置'), ('governance', 'Golden Dataset'), ('evaluation', 'Baseline'), ('evolution', 'Agent 工作台'), ('versions', '发布'), ('verification', '问答验证')]
 TABS = {'overview': ['业务架构', '技术架构', '项目概览'], 'governance': ['候选池', '当前测试集'], 'evaluation': ['Hard Gate', 'Bad Case 诊断', 'Baseline 报告'], 'evolution': ['优化 Agent', 'A / B / C / D', 'Sandbox', '诊断'], 'verification': ['Monitoring', '方案对比', '问答验证']}
-checks, errors, denied, screenshots = [], [], [], []
+checks, errors, denied, screenshots, safe_previews, unexpected_writes = [], [], [], [], [], []
 
 
 def route_handler(route):
@@ -21,6 +21,12 @@ def route_handler(route):
     if parsed.port == 5180:
         route.continue_(); return
     if route.request.method != 'GET':
+        if route.request.method == 'POST' and parsed.path == '/api/governance/coverage-preview':
+            profile = route.request.post_data_json.get('profile')
+            assert profile in ('mini', 'medium', 'full'), profile
+            safe_previews.append({'profile': profile, 'path': parsed.path, 'provenance': 'explicit manual click; captured disposable API Preview, zero Provider calls'})
+            route.fulfill(status=200, json=PAYLOADS[parsed.path][profile]); return
+        unexpected_writes.append({'method': route.request.method, 'path': parsed.path})
         route.fulfill(status=503, json={'detail': 'Browser fixture is read-only; lifecycle mutations run through the isolated FastAPI test.'}); return
     value = PAYLOADS.get(parsed.path)
     if value is None:
@@ -40,9 +46,12 @@ def capture(page, name):
     checks.append({'name': name, 'page_overflow': False, 'h1': page.locator('h1').inner_text()})
 
 
-def detail_check(page, selector, name):
+def detail_check(page, selector, name, *, optional_reason=None):
     element = page.locator(selector).first
-    if not element.count() or not element.is_visible(): return
+    if not element.count() or not element.is_visible():
+        if optional_reason:
+            checks.append({'name': name, 'optional_not_applicable': optional_reason}); return
+        raise AssertionError(f'Required detail control missing/hidden: {name} ({selector})')
     element.focus()
     if element.evaluate('(node) => node.tagName') == 'TR': page.keyboard.press('Enter')
     else: element.click()
@@ -79,9 +88,17 @@ with sync_playwright() as p:
             if route == 'knowledge':
                 detail_check(page, 'tbody .detail-button', f'{width}-document-drawer')
             if route == 'governance':
+                count = len(safe_previews)
+                page.get_by_role('button', name='预览当前 Corpus Coverage', exact=True).click()
+                dialog = page.get_by_role('dialog'); dialog.wait_for()
+                assert '当前 Corpus · V2 Coverage Preview' in dialog.inner_text()
+                assert '初始 K' in dialog.inner_text() and '最终 K' in dialog.inner_text()
+                page.keyboard.press('Escape'); dialog.wait_for(state='hidden')
+                assert len(safe_previews) == count + 1
+                checks.append({'name': f'{width}-manual-current-preview', 'manual_safe_post_only': True, 'profile': 'mini'})
                 detail_check(page, 'button:has-text("查看 Coverage 规划")', f'{width}-coverage-drawer')
                 detail_check(page, 'button:has-text("历史 Snapshot")', f'{width}-snapshot-drawer')
-                detail_check(page, '.review-table tbody button', f'{width}-question-drawer')
+                detail_check(page, '.review-table tbody tr', f'{width}-question-drawer')
                 page.get_by_role('button', name='候选池', exact=True).click()
                 detail_check(page, 'button:has-text("导入业务用例")', f'{width}-import-drawer')
                 combo = page.get_by_role('combobox', name='候选来源')
@@ -100,19 +117,29 @@ with sync_playwright() as p:
                 page.get_by_role('button', name='优化 Agent', exact=True).click()
                 detail_check(page, 'button:has-text("Search Space")', f'{width}-searchspace-drawer')
                 page.get_by_role('button', name='A / B / C / D', exact=True).click()
+                cards = page.locator('.candidate-cards').first.locator('.candidate-card')
+                assert cards.count() == 3, f'{width}: required A/B/C cards disappeared'
+                if width >= 1024:
+                    boxes = [item.bounding_box() for item in cards.all()]
+                    footers = [item.locator('.candidate-card-action').bounding_box() for item in cards.all()]
+                    assert max(b['width'] for b in boxes) - min(b['width'] for b in boxes) < 2
+                    assert max(b['height'] for b in boxes) - min(b['height'] for b in boxes) < 2
+                    assert max(b['y'] + b['height'] for b in footers) - min(b['y'] + b['height'] for b in footers) < 2
+                    checks.append({'name': f'{width}-equal-abc', 'three_required_cards': True, 'equal_width_height_footer_alignment': True})
                 detail_check(page, 'button:has-text("查看方案与完整报告")', f'{width}-candidate-drawer')
+                candidate = next(row for row in PAYLOADS['/api/optimization']['candidates'] if row['reasoning'].get('candidate_label') == 'A')
+                why = candidate.get('reasoning', {}).get('proposal') or candidate.get('reasoning', {}).get('why')
+                assert why, 'Fixture must exercise actual persisted Why'
+                page.get_by_role('button', name='查看方案与完整报告', exact=True).first.click()
+                assert f'Why：{why}' in page.get_by_role('dialog').inner_text()
+                page.keyboard.press('Escape'); page.get_by_role('dialog').wait_for(state='hidden')
+                checks.append({'name': f'{width}-persisted-why', 'backend_proposal_displayed': True})
                 detail_check(page, 'button:has-text("查看 D 完整报告与 Decision")', f'{width}-d-report-drawer')
                 page.get_by_role('button', name='Sandbox', exact=True).click()
                 d_card = page.locator('.sandbox-status-grid article').filter(has_text='Candidate D')
                 assert '不合格' in d_card.inner_text() and 'Hard Gate 11/11' in d_card.inner_text()
                 assert 'Gate 未通过' not in d_card.inner_text()
                 checks.append({'name': f'{width}-sandbox-regression-qualification', 'gate_pass_distinct_from_unqualified': True})
-                cards = page.locator('.candidate-cards').first.locator('.candidate-card')
-                if width >= 1024 and cards.count() == 3:
-                    boxes = [item.bounding_box() for item in cards.all()]
-                    assert max(b['width'] for b in boxes) - min(b['width'] for b in boxes) < 2
-                    assert max(b['height'] for b in boxes) - min(b['height'] for b in boxes) < 2
-                    checks.append({'name': f'{width}-equal-abc', 'equal_width_height': True})
             if route == 'versions':
                 detail_check(page, 'button:has-text("查看 Candidate 评测报告")', f'{width}-release-drawer')
                 rollback = page.get_by_role('button', name='回滚至此版本', exact=True).first
@@ -139,6 +166,60 @@ with sync_playwright() as p:
                 assert not page.locator('.operation-console').count()
                 checks.append({'name': f'{width}-compare-layout', 'fixed_footers': True, 'no_global_qa_console': True})
         context.close()
+    # Manual current Preview remains available with legacy or absent Run.
+    original_payloads = PAYLOADS
+    for state in ('legacy', 'no-run'):
+        PAYLOADS = json.loads(json.dumps(original_payloads))
+        runs = PAYLOADS['/api/governance/generation-runs']
+        if state == 'legacy':
+            for run in runs: run['artifacts']['hard_validation'].pop('frozen_plan', None)
+        else: PAYLOADS['/api/governance/generation-runs'] = []
+        frozen = json.dumps(PAYLOADS, sort_keys=True)
+        context = browser.new_context(viewport={'width': 1280, 'height': 800}); context.route('**/*', route_handler)
+        page = context.new_page(); page.on('pageerror', lambda error: errors.append(str(error)))
+        page.goto(URL + '/#governance'); page.wait_for_load_state('networkidle')
+        for index, profile in enumerate(('mini', 'medium', 'full')):
+            combo = page.get_by_role('combobox', name='测试集 Profile'); combo.click(); page.get_by_role('option').nth(index).click()
+            count = len(safe_previews)
+            page.get_by_role('button', name='预览当前 Corpus Coverage', exact=True).click(); page.get_by_role('dialog').wait_for()
+            assert safe_previews[-1]['profile'] == profile and len(safe_previews) == count + 1
+            assert f'Profile {profile}' in page.get_by_role('dialog').inner_text()
+            page.keyboard.press('Escape'); page.get_by_role('dialog').wait_for(state='hidden')
+            assert json.dumps(PAYLOADS, sort_keys=True) == frozen
+            checks.append({'name': f'1280-{state}-manual-preview-{profile}', 'safe_manual_preview': True, 'frozen_business_objects_unchanged': True, 'provenance': 'synthetic legacy/no-Run view of captured isolated API fixture'})
+        capture(page, f'1280-{state}-manual-preview'); context.close()
+    PAYLOADS = original_payloads
+    # Native delayed Preview identity regressions for profile and Corpus changes.
+    for change in ('profile', 'corpus'):
+        PAYLOADS = json.loads(json.dumps(original_payloads))
+        pending_preview = []
+        def delayed_preview(route):
+            if route.request.method == 'POST' and urlsplit(route.request.url).path == '/api/governance/coverage-preview':
+                pending_preview.append(route)
+                safe_previews.append({'profile': route.request.post_data_json['profile'], 'path': '/api/governance/coverage-preview', 'provenance': f'explicit delayed manual Preview for {change} identity; captured disposable API fixture, zero Provider calls'})
+            else: route_handler(route)
+        context = browser.new_context(viewport={'width': 1280, 'height': 800}); context.route('**/*', delayed_preview)
+        page = context.new_page(); page.on('pageerror', lambda error: errors.append(str(error)))
+        page.goto(URL + '/#governance'); page.wait_for_load_state('networkidle')
+        page.get_by_role('button', name='预览当前 Corpus Coverage', exact=True).click()
+        page.wait_for_function("[...document.querySelectorAll('button')].some(button => button.textContent === '正在 Preview…')")
+        assert len(pending_preview) == 1
+        if change == 'profile':
+            page.get_by_role('combobox', name='测试集 Profile').click(); page.get_by_role('option').nth(2).click()
+            page.get_by_role('button', name='预览当前 Corpus Coverage', exact=True).wait_for()
+        else:
+            for value in PAYLOADS.values():
+                if isinstance(value, dict) and 'current_corpus_fingerprint' in value: value['current_corpus_fingerprint'] = {'DOC-fixture': 'changed'}
+            page.get_by_role('link', name='知识库', exact=True).click(); page.get_by_role('heading', level=1, name='知识库', exact=True).wait_for()
+            page.get_by_role('link', name='Golden Dataset', exact=True).click(); page.get_by_role('heading', level=1, name='Golden Dataset', exact=True).wait_for()
+        pending_preview[0].fulfill(status=200, json=original_payloads['/api/governance/coverage-preview']['mini'])
+        page.wait_for_load_state('networkidle')
+        page.get_by_text('尚无当前 Preview；已保存 Run 的冻结规划可单独查看。', exact=True).wait_for()
+        assert not page.get_by_role('dialog').count()
+        assert '尚无当前 Preview' in page.locator('body').inner_text()
+        checks.append({'name': f'1280-native-stale-preview-{change}', 'late_preview_discarded': True, 'new_run_created': False})
+        context.close()
+    PAYLOADS = original_payloads
     # Explicit synthetic persisted-field boundaries complement the actual HTTP snapshots.
     original_payloads = PAYLOADS
     PAYLOADS = json.loads(json.dumps(PAYLOADS))
@@ -202,5 +283,6 @@ with sync_playwright() as p:
     browser.close()
 assert not errors, errors
 assert not denied, denied
-(OUTPUT / 'browser-checks.json').write_text(json.dumps({'provenance': 'rendered frozen actual offline lifecycle responses; mutations in separate HTTP test', 'checks': checks, 'screenshots': screenshots, 'page_errors': errors, 'blocked_requests': denied, 'webkit': webkit_status}, ensure_ascii=False, indent=2))
+assert not unexpected_writes, unexpected_writes
+(OUTPUT / 'browser-checks.json').write_text(json.dumps({'provenance': 'captured actual offline lifecycle responses; only explicit manual current Preview POST is allowed by generic router', 'checks': checks, 'screenshots': screenshots, 'safe_manual_previews': safe_previews, 'page_errors': errors, 'blocked_requests': denied, 'unexpected_writes': unexpected_writes, 'webkit': webkit_status}, ensure_ascii=False, indent=2))
 print(f'{len(checks)} checks; {len(screenshots)} screenshots; no page errors/overflow; {webkit_status}')

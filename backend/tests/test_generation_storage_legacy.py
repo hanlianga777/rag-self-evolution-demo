@@ -201,7 +201,11 @@ class LegacyGenerationStorageTests(unittest.TestCase):
             _run_mini_generation = main._run_mini_generation
 
         probe_results = [{"status": "failed"}] + [{"status": "passed"}] * 19
-        with patch.object(store, "run_probe", side_effect=probe_results), patch.object(store, "record_qc"):
+        def probe_stub(question_id, *_args, **_kwargs):
+            result = probe_results.pop(0)
+            store.record_probe_result(question_id, {'question_quality': 30, 'golden_answer_quality': 30, 'evidence_support': 40, 'evidence_direct_failure': result['status'] == 'failed'})
+            return result
+        with patch.object(store, "run_probe", side_effect=probe_stub), patch.object(store, "record_qc"):
             _run_mini_generation(run_id, store, GeneratedService(), EmptyCorpus())
 
         run = store.generation_run(run_id)

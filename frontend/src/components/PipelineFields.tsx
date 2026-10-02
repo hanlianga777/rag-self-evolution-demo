@@ -45,3 +45,9 @@ export function costReason(reason?: string): string {
   const reasons: Record<string, string> = { price_unavailable: "当前模型价格未配置", model_mismatch: "请求模型与价格配置不匹配", usage_missing: "Usage 未采集", call_timestamp_missing: "调用时间未采集", cache_usage_missing_or_invalid: "缓存 Token 拆分缺失，无法精确估价", usage_missing_or_invalid: "Usage 缺失或无效", cache_usage_inconsistent: "缓存 Token 与总量不一致", billing_period_ambiguous: "计费时段或节假日日历未确认", model_price_not_configured: "当前模型价格未配置", model_not_configured: "模型未记录", price_config_invalid: "价格配置无效", usage_not_collected: "Usage 未采集" };
   return reason ? reasons[reason] || `无法估价：${reason}` : "— · 历史费用未采集";
 }
+
+export function billedCostText(metrics?: any): string {
+  if (metrics?.token_cost != null) return `${metrics.token_cost}（Provider 账单费用）`;
+  const reason = metrics?.token_cost_reason || metrics?.token_cost_status;
+  return reason && reason !== "MEASURED" ? `费用未采集 · ${reason}` : "费用未采集";
+}

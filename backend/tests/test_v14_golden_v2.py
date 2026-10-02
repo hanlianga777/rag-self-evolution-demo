@@ -180,7 +180,9 @@ class GoldenV2Tests(unittest.TestCase):
         ids = list(partial['question_ids'])
         failing.clear(); calls.clear()
         self.store.claim_regeneration(run_id, plan['corpus_fingerprint'])
-        with patch.object(self.store, 'run_probe', return_value={'status': 'passed'}), patch.object(self.store, 'record_qc'):
+        def probe_stub(question_id, *_args, **_kwargs):
+            return self.store.record_probe_result(question_id, {'question_quality': 30, 'golden_answer_quality': 30, 'evidence_support': 40})
+        with patch.object(self.store, 'run_probe', side_effect=probe_stub), patch.object(self.store, 'record_qc'):
             main._run_mini_generation(run_id, self.store, service, corpus, regenerate=True)
         run = self.store.generation_run(run_id)
         self.assertEqual(run['status'], 'completed')

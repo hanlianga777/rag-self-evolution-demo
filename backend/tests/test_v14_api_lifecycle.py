@@ -201,5 +201,8 @@ class ApiLifecycleTests(unittest.TestCase):
         paths += ['governance/generation-runs/' + run['id']]
         payloads = {'/api/' + path: self.client.get('/api/' + path).json() for path in paths}
         payloads['/api/governance/generation-runs/' + run['id'] + '/export'] = self.client.get('/api/governance/generation-runs/' + run['id'] + '/export?format=json').json()
+        frozen = [self.store.generation_runs(), self.store.dataset_snapshots(), self.store.evaluation_runs(), self.store.production_versions()]
+        payloads['/api/governance/coverage-preview'] = {profile: self.post('governance/coverage-preview', {'profile': profile}) for profile in ('mini', 'medium', 'full')}
+        self.assertEqual([self.store.generation_runs(), self.store.dataset_snapshots(), self.store.evaluation_runs(), self.store.production_versions()], frozen)
         (target / 'payloads.json').write_text(json.dumps(payloads, ensure_ascii=False))
         (target / 'lifecycle.json').write_text(json.dumps({'provenance': 'synthetic fixture FastAPI transitions before Monitoring Confirm', 'baseline': baseline['id'], 'experiment': current['id'], 'winner': winner, 'd': composite['id'], 'production': version['id']}, ensure_ascii=False))

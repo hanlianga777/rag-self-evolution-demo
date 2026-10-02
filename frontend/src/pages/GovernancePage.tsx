@@ -4,7 +4,7 @@ import { Badge, CustomSelect, Section, ShortId, Status, TechnicalDetails, StageS
 import { Drawer } from "../components/Dialog";
 import { displayText } from "../display";
 import { useOperation } from "../operation";
-import { BusinessImportPanel, CoverageSummary } from "./BusinessImportPanel";
+import { BusinessImportPanel, CoverageSummary, CurrentCoveragePreview } from "./BusinessImportPanel";
 import { CandidateWorkspace } from "./CandidateWorkspace";
 
 type Candidate = Record<string, any>;
@@ -28,6 +28,7 @@ export function GovernancePage({ data }: { data: any }) {
   const [review, setReview] = useState<Candidate[]>([]);
   const [revisions, setRevisions] = useState<Candidate[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
+  const [candidateDirty, setCandidateDirty] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -44,6 +45,7 @@ export function GovernancePage({ data }: { data: any }) {
   const current: Candidate[] = currentIds.map(id => review.find(row => row.id === id) || items.find(row => row.id === id)).filter((row): row is Candidate => !!row).map(row => ({ ...row, slot: row.slot || row.raw?.coverage_slot || plannedSlots.get(row.id) }));
   const historical = items.filter(row => !currentIds.includes(row.id) && row.stage !== "golden");
   const selected = current.find(row => row.id === selectedId) || historical.find(row => row.id === selectedId);
+  const candidateContentKey = JSON.stringify([selected?.id, selected?.question, selected?.reference_answer, selected?.evidence, selected?.raw?.revision_version]);
   const running = ["queued", "coverage", "generating", "validation", "probing", "qc"].includes(currentRun?.status);
   const qualityRerun = currentRun?.artifacts?.hard_validation?.quality_rerun;
   const qualityRunning = qualityRerun?.status === "running";
@@ -178,6 +180,7 @@ export function GovernancePage({ data }: { data: any }) {
       { label: "QC", state: current.length > 0 && current.every(row => row.qc_status && row.qc_status !== "qc_pending") ? "completed" : "pending", detail: current.some(row => row.qc_status === "qc_failed") ? "存在风险，需人工审核" : undefined },
       { label: "人工审核 / Gate 1", state: gate1Snapshot ? "completed" : "pending", detail: gate1Snapshot ? "已冻结" : "待人工确认" }
     ]} />
+    <CurrentCoveragePreview profile={profile} corpusFingerprint={data.workspace?.current_corpus_fingerprint} documents={data.documents || []} />
     <div className="tabs"><button aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前测试集</button><button aria-pressed={tab === "import"} className={tab === "import" ? "active" : ""} onClick={() => setTab("import")}>候选池</button></div>
     {tab === "run" && <Section title="当前测试集" action={<div className="header-actions"><button className="secondary" onClick={() => setHistoryOpen(true)}>历史 Snapshot</button>{current.length === expectedCount && currentRun?.status === "completed" && <button className="secondary" disabled={busy || qualityRunning} onClick={() => void rerunQuality()}>重新运行 Probe / QC</button>}{current.length === expectedCount && <details className="export-menu"><summary className="secondary">导出测试集 ▾</summary><div>{(["markdown", "csv", "json"] as const).map(format => <a key={format} href={apiUrl(`/api/governance/generation-runs/${currentRun.id}/export?format=${format}`)} download>导出 {format === "markdown" ? "Markdown" : format.toUpperCase()}</a>)}</div></details>}</div>}>
       {currentRun ? <>
@@ -198,7 +201,7 @@ export function GovernancePage({ data }: { data: any }) {
     </Section>}
     {tab === "import" && <BusinessImportPanel items={items} onCreated={reload} />}
     <Drawer open={historyOpen} onOpenChange={setHistoryOpen} title="Golden Snapshot 历史"><div className="drawer-body snapshot-history"><Section title="已确认 Golden Snapshots"><div className="run-list">{snapshots.map(snapshot => <div key={snapshot.id}><strong><ShortId value={snapshot.id} /></strong><span>{snapshot.snapshot?.profile?.name || "Legacy"} · {snapshot.snapshot?.question_ids?.length || 0} 题 · {snapshot.created_at || "冻结时间未记录"}</span><Status value={snapshot.status} /><TechnicalDetails label="查看 Snapshot 技术信息">{JSON.stringify({ id: snapshot.id, corpus_fingerprint: snapshot.snapshot?.corpus_fingerprint, generation_run_id: snapshot.snapshot?.generation_run_id, planner_version: snapshot.snapshot?.planner_version || snapshot.snapshot?.coverage_plan?.planner_version || "Legacy / 未采集", snapshot: snapshot.snapshot }, null, 2)}</TechnicalDetails></div>)}{!snapshots.length && <p className="muted">尚未创建正式 Golden Snapshot。</p>}</div></Section><Section title="历史 Candidate（未验证）"><details><summary>{historical.length} 道历史 Candidate</summary><p className="muted">仅供追溯，不参与当前 Golden、Baseline 或发布判断。</p><QuestionTable rows={historical.slice(historyPage * 10, historyPage * 10 + 10)} onDetail={row => setSelectedId(row.id)} /><div className="history-pagination"><button className="secondary" disabled={historyPage === 0} onClick={() => setHistoryPage(page => page - 1)}>上一页</button><span>{historyPage + 1} / {Math.max(1, Math.ceil(historical.length / 10))}</span><button className="secondary" disabled={(historyPage + 1) * 10 >= historical.length} onClick={() => setHistoryPage(page => page + 1)}>下一页</button></div></details></Section></div></Drawer>
-    <Drawer guardEdits open={!!selected} onOpenChange={open => !open && setSelectedId(null)} title={selected ? `${selected.slot || "历史题"} · ${displayText(selected.test_category)}` : "候选题审核"} className="candidate-workspace"><CandidateWorkspace key={selected?.id} row={selected} peers={current} revision={revisions.find(item => item.question_ids?.includes(selected?.id))} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} readOnly={partial || !currentIds.includes(selected?.id || "")} onRun={questionAction} onReview={reviewAction} onRefresh={reload} operation={operation} /></Drawer>
+    <Drawer guardEdits editDirty={candidateDirty} contentKey={candidateContentKey} open={!!selected} onOpenChange={open => !open && setSelectedId(null)} title={selected ? `${selected.slot || "历史题"} · ${displayText(selected.test_category)}` : "候选题审核"} className="candidate-workspace"><CandidateWorkspace key={candidateContentKey} row={selected} peers={current} revision={revisions.find(item => item.question_ids?.includes(selected?.id))} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} readOnly={partial || !currentIds.includes(selected?.id || "")} onRun={questionAction} onReview={reviewAction} onRefresh={reload} operation={operation} onDirtyChange={setCandidateDirty} /></Drawer>
     <Drawer open={runErrorOpen} onOpenChange={setRunErrorOpen} title="Run 错误详情"><div className="drawer-body"><p>阶段：{qualityRerun?.status === "failed" ? qualityRerun?.slots?.[qualityRerun?.slot]?.failed_stage || qualityRerun?.stage : stageName[currentRun?.artifacts?.hard_validation?.failed_stage] || stageName[currentRun?.status] || "未知"}</p>{errorSlot && (currentRun?.artifacts?.slot_audit?.[errorSlot] || []).map((attempt: Candidate) => <div key={attempt.attempt}><h3>{errorSlot} · 第 {attempt.attempt} 次尝试</h3><p>问题：{attempt.question || "—"}</p><p>答案：{attempt.reference_answer || "—"}</p><p>证据：{attempt.selected_evidence?.map((item: Candidate) => `${item.document_name || item.document_id} · ${item.chunk_id} · ${item.chunk_text}`).join("；") || "—"}</p><pre>{attempt.validation_error || "通过"}</pre></div>)}{!errorSlot && <pre>{qualityRerun?.status === "failed" ? qualityRerun.error : currentRun?.artifacts?.hard_validation?.error || "请查看运行详情中的 Slot Audit"}</pre>}</div></Drawer>
   </div>;
 }

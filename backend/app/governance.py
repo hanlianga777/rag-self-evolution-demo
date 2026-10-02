@@ -1239,35 +1239,40 @@ class GovernanceStore:
 
     def run_probe(self, question_id: str, retriever, chunks: list[dict], answerability_judge=None, *, subtype_judge=None, fail_on_judge_error: bool = False):
         from .retrieval import RetrievalUnavailable, evidence_coverage
+        item, execution = self.capture_quality(question_id)
         try:
-            return self._probe_with_retrieval(question_id, retriever, chunks, answerability_judge, subtype_judge=subtype_judge, fail_on_judge_error=fail_on_judge_error)
+            return self._probe_with_retrieval(question_id, retriever, chunks, answerability_judge, subtype_judge=subtype_judge, fail_on_judge_error=fail_on_judge_error, item=item, execution=execution)
         except RetrievalUnavailable as error:
-            required = {key for entry in self.question(question_id)['evidence'] for key in entry.get('source_chunk_ids', [])}
+            required = {key for entry in item['evidence'] for key in entry.get('source_chunk_ids', [])}
             details = {'probe_execution_status': 'failed', 'question_validity': 'needs_review', 'classification': 'RETRIEVAL_EXECUTION_FAILED',
                        'retrieval_trace': error.trace, 'evidence_coverage': evidence_coverage(error.trace, required), 'execution_error': error.detail,
                        'retrieval_coherent': None, 'risk': None}
             result = self.record_probe_result(question_id, {'question_quality': 0, 'golden_answer_quality': 0, 'evidence_support': 0,
                                                           'evidence_direct_failure': True, 'reason': str(error), 'rule_version': 'v1.4',
-                                                          'model_version': 'programmatic-probe-v2', 'probe_details': details})
+                                                          'model_version': 'programmatic-probe-v2', 'probe_details': details}, execution=execution)
             return {**result, 'classification': 'RETRIEVAL_EXECUTION_FAILED', 'passed': False,
                     'programmatic': {'checks': {}, 'passed': False}, 'vector': {'top_k': None, 'best_similarity': None, 'signal': 'not_collected'}, 'full_text': None}
 
-    def _probe_with_retrieval(self, question_id, retriever, chunks, answerability_judge=None, *, subtype_judge=None, fail_on_judge_error=False):
+    def _probe_with_retrieval(self, question_id, retriever, chunks, answerability_judge=None, *, subtype_judge=None, fail_on_judge_error=False, item=None, execution=None):
         from .retrieval import VectorRetriever
+        if item is None:
+            item, execution = self.capture_quality(question_id)
         observation = None
         if isinstance(retriever, VectorRetriever):
             with retriever.snapshot() as bundle:
-                question = self.question(question_id)['question']
+                question = item['question']
                 trace = {}
                 hits = retriever.retrieve(question, DEFAULT_PIPELINE_CONFIG, trace=trace)
                 observation = (hits, trace, retriever.full_text_probe(question))
                 chunks = bundle['chunks'] if bundle else chunks
-        return self._run_probe(question_id, retriever, chunks, answerability_judge, subtype_judge=subtype_judge, fail_on_judge_error=fail_on_judge_error, observation=observation)
+        return self._run_probe(question_id, retriever, chunks, answerability_judge, subtype_judge=subtype_judge, fail_on_judge_error=fail_on_judge_error, observation=observation, item=item, execution=execution)
 
-    def _run_probe(self, question_id, retriever, chunks, answerability_judge, *, subtype_judge=None, fail_on_judge_error=False, observation=None):
+    def _run_probe(self, question_id, retriever, chunks, answerability_judge, *, subtype_judge=None, fail_on_judge_error=False, observation=None, item=None, execution=None):
         from .retrieval import evidence_coverage
         from .full_text import search_full_text
-        item = self.question(question_id)
+        from .golden_v2 import answer_supported, validate_golden_candidate
+        if item is None:
+            item, execution = self.capture_quality(question_id)
         evidence = item["evidence"]
         expected_chunks = {chunk_id for source in evidence for chunk_id in source.get("source_chunk_ids", [])}
         available_chunks = {chunk.get("chunk_id") for chunk in chunks}
@@ -1296,7 +1301,9 @@ class GovernanceStore:
         if not positive and trace.get('candidates') is not None:
             best = max((hit['vector_raw'] for hit in trace['candidates'] if hit.get('vector_raw') is not None), default=0)
         source_texts = {chunk.get("chunk_id"): chunk.get("text", chunk.get("chunk_text", "")) for chunk in chunks}
-        programmatic['answer_anchor'] = _answer_anchor_supported(item['reference_answer'] or '', [source_texts[key] for key in expected_chunks if key in source_texts]) if positive else True
+        programmatic['answer_anchor'] = answer_supported(item['reference_answer'] or '', [chunk for chunk in chunks if chunk.get('chunk_id') in expected_chunks]) if positive else True
+        if positive and (item.get('planner_version') or item['raw'].get('construction_type')):
+            programmatic['candidate_legality'] = validate_golden_candidate(item, chunks)['valid']
         haystack = " ".join(source_texts.values())
         phrases = [point for source in evidence for point in source.get("evidence_key_points", [])]
         matched = [phrase for phrase in phrases if phrase and phrase in haystack]
@@ -1357,12 +1364,45 @@ class GovernanceStore:
             "rule_version": "v1.2",
             "model_version": "programmatic-probe-v1",
             "probe_details": {"probe_execution_status": "uncertain" if uncertain else "completed", "question_validity": "needs_review" if uncertain else "valid" if evidence_valid else "invalid", "risk": "P1" if classification == 'RETRIEVAL_INCOHERENT' else None, "retrieval_trace": trace, "evidence_coverage": coverage, "pipeline": "CandidateK → Hybrid → Lightweight second-stage ranking → MinScore → TopK" if positive else "vector + full-text fake-negative check", "vector": {"top_k": hits, "best_similarity": best}, "full_text": full_text, "negative_checks": negative_checks, "classification": classification, "retrieval_coherent": recalled},
-        })
+        }, execution=execution)
         return {**result, "classification": classification, "programmatic": {"checks": programmatic, "passed": all(programmatic.values())}, "vector": {"top_k": hits, "best_similarity": best, "signal": "observed_only"}, "full_text": full_text, "passed": result["status"] == "passed"}
 
-    def record_probe_result(self, question_id: str, result: dict):
+    @staticmethod
+    def _quality_content(item):
+        # Review/stage/timestamps can change without changing the evaluated content.
+        fields = ('question', 'reference_answer', 'evidence', 'test_category', 'negative_subtype', 'legacy_question_type', 'raw')
+        return hashlib.sha256(_json({key: item.get(key) for key in fields}).encode()).hexdigest()
+
+    def _quality_identity(self, item, connection):
+        probe = connection.execute('SELECT id FROM probe_results WHERE question_id=? ORDER BY id DESC LIMIT 1', (item['id'],)).fetchone()
+        return {'content_hash': self._quality_content(item), 'active_candidate': item.get('stage') != 'superseded', 'corpus_fingerprint': current_manifest()['sources'],
+                'probe_id': probe['id'] if probe else None}
+
+    def capture_quality(self, question_id, *, qc=False):
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK, self.connection() as connection:
+            row = connection.execute('SELECT * FROM questions WHERE id=?', (question_id,)).fetchone()
+            if row is None:
+                raise KeyError(question_id)
+            item = self._row(row)
+            if qc and item['probe_status'] != 'probe_passed':
+                raise ValueError('Probe Passed 后才能运行 QC')
+            return item, self._quality_identity(item, connection)
+
+    def _require_quality_current(self, question_id, execution, connection):
+        row = connection.execute('SELECT * FROM questions WHERE id=?', (question_id,)).fetchone()
+        if row is None:
+            raise KeyError(question_id)
+        item = self._row(row)
+        if self._quality_identity(item, connection) != execution:
+            raise ValueError('质量结果已过期：题目、Corpus 或来源 Probe 已变化，请重新运行')
+        return item
+
+    def record_probe_result(self, question_id: str, result: dict, *, execution=None):
         """Persist the frozen 30/30/40 probe; evidence failure is non-compensable."""
-        item = self.question(question_id)
+        from .full_text import CORPUS_LOCK
+        item, captured = self.capture_quality(question_id)
+        execution = execution if execution is not None else captured
         caps = {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40}
         scores = {}
         for field, cap in caps.items():
@@ -1380,11 +1420,14 @@ class GovernanceStore:
             "rule_version": str(result.get("rule_version", "v1.0.1")),
             "model_version": str(result.get("model_version", "programmatic-probe-v1")),
             "probe_details": result.get("probe_details", {}),
+            "execution_identity": execution,
         }
-        with self.connection() as connection:
+        with CORPUS_LOCK, self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            item = self._require_quality_current(question_id, execution, connection)
             connection.execute("INSERT INTO probe_results(question_id, result_json, created_at) VALUES (?, ?, ?)", (question_id, _json(stored), _now()))
             manual = connection.execute("SELECT 1 FROM review_events WHERE question_id = ? LIMIT 1", (question_id,)).fetchone()
-            review_status = self.question(question_id)["review_status"] if manual else "human_review_pending" if passed else "needs_revision"
+            review_status = item["review_status"] if manual else "human_review_pending" if passed else "needs_revision"
             connection.execute("UPDATE questions SET probe_status = ?, review_status = ?, updated_at = ? WHERE id = ?", ("probe_passed" if passed else "needs_revision", review_status, _now(), question_id))
         return stored
 
@@ -1446,10 +1489,10 @@ class GovernanceStore:
                 connection.execute('INSERT INTO dataset_versions (id, status, source, snapshot_json, created_at) VALUES (?, ?, ?, ?, ?)', (snapshot['id'], 'approved', 'human_review', _json(snapshot), now))
         return {"reviewed": [self.question(question_id) for question_id in question_ids], "generation_run_id": run['id'], 'snapshot': snapshot}
 
-    def record_qc(self, question_id: str, result: dict, status: str):
-        item = self.question(question_id)
-        if item["probe_status"] != "probe_passed":
-            raise ValueError("Probe Passed 后才能运行 QC")
+    def record_qc(self, question_id: str, result: dict, status: str, *, execution=None):
+        from .full_text import CORPUS_LOCK
+        if execution is None:
+            _, execution = self.capture_quality(question_id, qc=True)
         score = result.get("score")
         priority = result.get("priority")
         if not isinstance(score, (int, float)) or isinstance(score, bool) or not 0 <= score <= 100:
@@ -1457,8 +1500,12 @@ class GovernanceStore:
         if priority not in {"P0", "P1", "P2"}:
             raise ValueError("QC priority must be P0, P1, or P2")
         qc_status = 'qc_failed' if priority == 'P0' else 'qc_passed'
-        result = {**result, "score": float(score), "priority": priority, "threshold": None, "status": qc_status, "rule_version": 'v1.2'}
-        with self.connection() as connection:
+        result = {**result, "score": float(score), "priority": priority, "threshold": None, "status": qc_status, "rule_version": 'v1.2', "execution_identity": execution}
+        with CORPUS_LOCK, self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            item = self._require_quality_current(question_id, execution, connection)
+            if item['probe_status'] != 'probe_passed':
+                raise ValueError('Probe Passed 后才能运行 QC')
             connection.execute("INSERT INTO qc_results(question_id, status, result_json, created_at) VALUES (?, ?, ?, ?)", (question_id, qc_status, _json(result), _now()))
             manual = connection.execute("SELECT 1 FROM review_events WHERE question_id = ? LIMIT 1", (question_id,)).fetchone()
             review_status = item["review_status"] if manual else "human_review_pending" if qc_status == "qc_passed" else "needs_revision"
@@ -1574,7 +1621,8 @@ class GovernanceStore:
         return experiment_id
 
     def claim_agent_generation(self, baseline_run_id, trigger_id=None, experiment_id=None):
-        with self.connection() as connection:
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK, self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             self.require_current_baseline(baseline_run_id, connection)
             if trigger_id:
@@ -1609,14 +1657,15 @@ class GovernanceStore:
                 raise ValueError(f"evaluation budget exhausted: max_evals={MAX_EVALS}")
             if not experiment_id:
                 experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
-                connection.execute("INSERT INTO experiments VALUES (?, ?, 'generating', '{}', ?)", (experiment_id, baseline_run_id, _now()))
+                connection.execute("INSERT INTO experiments (id, baseline_run_id, status, result_json, created_at) VALUES (?, ?, 'generating', '{}', ?)", (experiment_id, baseline_run_id, _now()))
             else:
                 connection.execute("UPDATE experiments SET status='generating' WHERE id=?", (experiment_id,))
         return experiment_id, candidates, current_round + 1, used
 
     def save_agent_round(self, experiment_id, candidates, result):
         """Validated A/B/C and completed trace become visible together or not at all."""
-        with self.connection() as connection:
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK, self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT * FROM experiments WHERE id=?", (experiment_id,)).fetchone()
             self.require_current_baseline(row["baseline_run_id"], connection)
@@ -1624,7 +1673,7 @@ class GovernanceStore:
             if row["status"] != "generating" or persisted.get("report_confirmation"):
                 raise ValueError("Optimization Context 已变化，不能保存本轮候选")
             for candidate_id, config, reasoning in candidates:
-                connection.execute("INSERT INTO candidate_configs VALUES (?, ?, 'generated', ?, ?, '{}', ?)", (f"{experiment_id}-{candidate_id}", experiment_id, _json(config), _json(reasoning), _now()))
+                connection.execute("INSERT INTO candidate_configs (id, experiment_id, status, config_json, reasoning_json, result_json, created_at) VALUES (?, ?, 'generated', ?, ?, '{}', ?)", (f"{experiment_id}-{candidate_id}", experiment_id, _json(config), _json(reasoning), _now()))
             connection.execute("INSERT INTO agent_traces(experiment_id, status, result_json, created_at) VALUES (?, 'completed', ?, ?)", (experiment_id, _json(result), _now()))
             connection.execute("UPDATE experiments SET status='completed', result_json=? WHERE id=?", (_json({**persisted, **result}), experiment_id))
 
@@ -1873,7 +1922,8 @@ class GovernanceStore:
         if run is None or run["status"] != "completed":
             raise ValueError("Candidate Evaluation 未完成")
         version_id = f"production-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-        with self.connection() as connection:
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK, self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             experiment = connection.execute("SELECT baseline_run_id FROM experiments WHERE id=?", (candidate["experiment_id"],)).fetchone()
             self.require_current_baseline(experiment["baseline_run_id"], connection)
@@ -1987,7 +2037,8 @@ class GovernanceStore:
         return dict(row) if row else None
 
     def confirm_optimization_trigger(self, trigger_id: str, actor: str):
-        with self.connection() as connection:
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK, self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT * FROM optimization_triggers WHERE id = ?", (trigger_id,)).fetchone()
             if row is None:
@@ -2000,7 +2051,7 @@ class GovernanceStore:
             experiment_id = f"EXP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
             event = connection.execute("SELECT * FROM monitoring_events WHERE id=?", (row["event_id"],)).fetchone()
             context = {"trigger_id": trigger_id, "round": 0, "baseline_id": baseline["id"], "golden_id": baseline["dataset_version_id"], "corpus_fingerprint": _load(baseline["dataset_snapshot_json"], {}).get("corpus_fingerprint"), "baseline_config": baseline["config"], "monitoring_event": {**dict(event), "source": _load(event["source_json"], {}), "metrics": _load(event["metrics_json"], None)} if event else None}
-            connection.execute("INSERT INTO experiments VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline["id"], "pending_agent", _json(context), _now()))
+            connection.execute("INSERT INTO experiments (id, baseline_run_id, status, result_json, created_at) VALUES (?, ?, ?, ?, ?)", (experiment_id, baseline["id"], "pending_agent", _json(context), _now()))
             connection.execute("UPDATE optimization_triggers SET status = ?, actor = ?, confirmed_at = ?, optimization_run_id = ? WHERE id = ?", ("human_confirmed", actor, _now(), experiment_id, trigger_id))
             connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("monitoring_trigger", trigger_id, "approved", actor, _now()))
         return self.optimization_trigger(trigger_id)

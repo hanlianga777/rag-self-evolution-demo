@@ -534,8 +534,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
             run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "slot": candidate["raw"].get("coverage_slot"), "probe_completed": index})
             if probe["status"] == "passed":
                 stage = "qc"
-                qc = service.quality_check(run_store.question(candidate["id"]))
-                run_store.record_qc(candidate["id"], qc, "failed" if qc.get("priority") == "P0" else "passed")
+                _quality_check(run_store, service, candidate["id"])
                 qc_completed += 1
             else:
                 qc_skipped += 1
@@ -560,6 +559,12 @@ def rerun_generation_quality(generation_run_id: str):
     return {"run_id": generation_run_id, "status": "running"}
 
 
+def _quality_check(run_store, service, question_id):
+    item, execution = run_store.capture_quality(question_id, qc=True)
+    qc = service.quality_check(item)
+    return qc, run_store.record_qc(question_id, qc, "failed" if qc.get("priority") == "P0" else "passed", execution=execution)
+
+
 def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
     counters = {"completed": 0, "probe_passed": 0, "probe_failed": 0, "qc_passed": 0, "qc_failed": 0, "qc_skipped": 0}
     slots = {}
@@ -575,8 +580,7 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
                 slots[slot] = {"question_id": question_id, "probe": probe["status"], "classification": probe["classification"], "probe_reason": probe["reason"]}
                 if probe["status"] == "passed":
                     run_store.update_quality_rerun(run_id, {**counters, "stage": "qc", "slot": slot, "slots": slots})
-                    qc = service.quality_check(run_store.question(question_id))
-                    saved = run_store.record_qc(question_id, qc, "failed" if qc.get("priority") == "P0" else "passed")
+                    qc, saved = _quality_check(run_store, service, question_id)
                     counters["qc_passed" if saved["status"] == "qc_passed" else "qc_failed"] += 1
                     slots[slot]["qc"] = saved["status"]
                     slots[slot]["qc_reason"] = qc["reason"]
@@ -804,8 +808,7 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
                 results[item_id] = {"probe": "passed", "probe_reason": (run.get("quality_results") or {}).get(item_id, {}).get("probe_reason")}
             if results[item_id]["probe"] == "passed":
                 run_store.update_revision(revision_id, status="qc", stage="qc", quality_results=results)
-                qc = _revision_attempt(run_store, revision_id, "qc", service, lambda: service.quality_check(run_store.question(item_id)))
-                saved = run_store.record_qc(item_id, qc, "failed" if qc.get("priority") == "P0" else "passed")
+                qc, saved = _revision_attempt(run_store, revision_id, "qc", service, lambda: _quality_check(run_store, service, item_id))
                 results[item_id].update({"qc": saved["status"], "qc_reason": qc.get("reason")})
             else:
                 results[item_id]["qc"] = "skipped"
@@ -879,11 +882,8 @@ def probe_question(question_id: str):
 def qc_question(question_id: str):
     try:
         store.require_generation_ready(question_id)
-        item = store.question(question_id)
-        if item["probe_status"] != "probe_passed":
-            raise HTTPException(status_code=409, detail="Probe Passed 后才能运行 QC")
-        result = ai_service.quality_check(item)
-        return store.record_qc(question_id, result, "failed" if result.get("priority") == "P0" else "passed")
+        _, saved = _quality_check(store, ai_service, question_id)
+        return saved
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:

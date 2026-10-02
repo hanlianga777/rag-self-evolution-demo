@@ -55,7 +55,7 @@ function ProbeDetails({ row, probe, topK, rank }: { row: Candidate; probe: Candi
   </div>;
 }
 
-export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, readOnly = false, onRun, onReview, onRefresh, operation }: { row?: Candidate; peers: Candidate[]; revision?: Candidate; rerunSlot?: Candidate; busy: boolean; readOnly?: boolean; onRun: (id: string, name: "probe" | "qc") => void; onReview: (id: string, decision: string, reason?: string, tags?: string[], acceptQcP0?: boolean) => Promise<boolean>; onRefresh: () => Promise<void>; operation: ReturnType<typeof useOperation> }) {
+export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, readOnly = false, onRun, onReview, onRefresh, operation, onDirtyChange }: { row?: Candidate; peers: Candidate[]; revision?: Candidate; rerunSlot?: Candidate; busy: boolean; readOnly?: boolean; onRun: (id: string, name: "probe" | "qc") => void; onReview: (id: string, decision: string, reason?: string, tags?: string[], acceptQcP0?: boolean) => Promise<boolean>; onRefresh: () => Promise<void>; operation: ReturnType<typeof useOperation>; onDirtyChange?: (dirty: boolean) => void }) {
   const [view, setView] = useState<View>("review");
   const [auditTab, setAuditTab] = useState<AuditTab>("evidence");
   const [auditReturn, setAuditReturn] = useState<View>("review");
@@ -83,6 +83,16 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
   const [previewEditing, setPreviewEditing] = useState(false);
   const [previewChanges, setPreviewChanges] = useState<Record<string, Candidate>>({});
   const [reselecting, setReselecting] = useState(false);
+  const changedFields = (values: Record<string, Candidate>, drafts = false) => Object.fromEntries(Object.entries(values).map(([id, fields]) => {
+    const item = drafts ? revisionRun?.drafts?.[id] : peers.find(item => item.id === id) || (row?.id === id ? row : undefined);
+    return [id, Object.fromEntries(Object.entries(fields).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(key === "source_chunk_ids" ? item?.evidence?.flatMap((source: Candidate) => source.source_chunk_ids || []) || [] : item?.[key])))];
+  }).filter(([, fields]) => Object.keys(fields).length));
+  const editState = { reason, tags, mode, replacement, changes: changedFields(changes), previewChanges: changedFields(previewChanges, true), qcAcceptanceReason };
+  const edits = JSON.stringify(editState);
+  const [savedEdits, setSavedEdits] = useState(edits);
+  const markClean = (clearPreview = false) => setSavedEdits(JSON.stringify({ ...editState, ...(clearPreview ? { previewChanges: {} } : {}) }));
+  useEffect(() => { onDirtyChange?.(edits !== savedEdits); }, [edits, savedEdits, onDirtyChange]);
+
 
   const linkedId = row && (row.raw?.source_positive_id || row.raw?.paired_question_id || peers.find(item => item.raw?.source_positive_id === row.id || item.raw?.paired_question_id === row.id)?.id || (revision?.question_ids?.includes(row.id) && revision.question_ids.length === 2 ? revision.question_ids.find((id: string) => id !== row.id) : undefined));
   const linked = linkedId ? peers.find(item => item.id === linkedId) : undefined;
@@ -95,6 +105,9 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
   const canResumeQuality = !!revisionRun?.applied_at && (revisionRun.status === "interrupted" || revisionRun.status === "failed_quality" && !!revisionRun.error);
 
   useEffect(() => {
+    setChanges({}); setPreviewChanges({}); setQcAcceptanceReason("");
+    setSavedEdits(JSON.stringify({ reason: revision?.reason || "", tags: revision?.tags || [], mode: "ai_regenerate", replacement: false, changes: {}, previewChanges: {}, qcAcceptanceReason: "" }));
+    setMode("ai_regenerate");
     setRevisionRun(revision);
     setPreviewTarget(row?.id || "");
     setPreviewEditing(false);
@@ -203,7 +216,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
     setRevisionBusy(true); setRevisionError("");
     try {
       const updated = await postJson<Candidate>(`/api/governance/revisions/${revisionRun.id}/edit-draft`, { changes: Object.fromEntries(changedIds.map((id: string) => [id, previewChanges[id]])), expected_hashes: Object.fromEntries(changedIds.map((id: string) => [id, revisionRun.new_hash[id]])) });
-      setRevisionRun(updated); setPreviewEditing(false); await onRefresh();
+      setRevisionRun(updated); setPreviewEditing(false); setPreviewChanges({}); markClean(true); await onRefresh();
     } catch (error) { setRevisionError(errorMessage(error)); }
     finally { setRevisionBusy(false); }
   };
@@ -214,14 +227,14 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
     try {
       const manual = previewChanges[currentDraftId]?.source_chunk_ids;
       await postJson(`/api/governance/revisions/${revisionRun.id}/regenerate-draft`, { question_id: currentDraftId, expected_hash: revisionRun.new_hash[currentDraftId], ...(materialMode === "reselect" ? { material_mode: "reselect", reason: reason.trim(), tags, ...(manual?.length ? { manual_chunk_ids: manual } : {}) } : {}) });
-      setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); setReselecting(false); operation.watchRevision(revisionRun.id); await onRefresh();
+      setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); setReselecting(false); markClean(); operation.watchRevision(revisionRun.id); await onRefresh();
     } catch (error) { setRevisionError(errorMessage(error)); }
     finally { setRevisionBusy(false); }
   };
   const discardPreview = async () => {
     if (!revisionRun) return;
     setRevisionBusy(true); setRevisionError("");
-    try { setRevisionRun(await postJson<Candidate>(`/api/governance/revisions/${revisionRun.id}/discard`)); setPreviewEditing(false); setView("review"); await onRefresh(); setConfirmation(null); }
+    try { setRevisionRun(await postJson<Candidate>(`/api/governance/revisions/${revisionRun.id}/discard`)); setPreviewEditing(false); setPreviewChanges({}); markClean(true); setView("review"); await onRefresh(); setConfirmation(null); }
     catch (error) { setRevisionError(errorMessage(error)); }
     finally { setRevisionBusy(false); }
   };
@@ -231,21 +244,21 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
     try {
       const payload = { mode, reason, replacement, actor: "human", changes: Object.fromEntries(selectedRows.map(item => [item.id, mode === "manual_edit" ? { ...changes[item.id], ...(item.test_category === "negative" ? {} : changes[item.id]?.source_chunk_ids === undefined ? {} : { source_chunk_ids: changes[item.id].source_chunk_ids }) } : changes[item.id] || {}])), tags };
       const started = await postJson<{ id: string }>(`/api/governance/questions/${row.id}/revision`, payload);
-      setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${started.id}`)); setView("draft"); operation.watchRevision(started.id); await onRefresh();
+      setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${started.id}`)); setView("draft"); markClean(); operation.watchRevision(started.id); await onRefresh();
     } catch (error) { setRevisionError(errorMessage(error)); }
     finally { setRevisionBusy(false); }
   };
   const applyDraft = async () => {
     if (!revisionRun) return;
     setRevisionBusy(true); setRevisionError("");
-    try { await postJson(`/api/governance/revisions/${revisionRun.id}/apply`); setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); operation.watchRevision(revisionRun.id); await onRefresh(); setConfirmation(null); }
+    try { await postJson(`/api/governance/revisions/${revisionRun.id}/apply`); setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); markClean(); operation.watchRevision(revisionRun.id); await onRefresh(); setConfirmation(null); }
     catch (error) { setRevisionError(errorMessage(error)); }
     finally { setRevisionBusy(false); }
   };
   const resume = async () => {
     if (!revisionRun) return;
     setRevisionBusy(true); setRevisionError("");
-    try { await postJson(`/api/governance/revisions/${revisionRun.id}/resume`); setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); operation.watchRevision(revisionRun.id); }
+    try { await postJson(`/api/governance/revisions/${revisionRun.id}/resume`); setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); markClean(); operation.watchRevision(revisionRun.id); }
     catch (error) { setRevisionError(errorMessage(error)); }
     finally { setRevisionBusy(false); }
   };

@@ -19,7 +19,8 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
   const qualified = candidates.find(candidate => candidate.result?.qualification?.qualified && candidate.reasoning?.candidate_label !== "D");
   const baseline = data.evaluation || {};
   const schemes: Scheme[] = [{ id: "baseline", label: "Baseline", evaluationId: baseline.id, config: baseline.config, sourceId: baseline.id }, ...candidates.filter(candidate => candidate.reasoning?.candidate_label !== "D").map(candidate => ({ id: candidate.id, label: `Candidate ${candidate.reasoning?.candidate_label}`, evaluationId: candidate.result?.evaluation_run_id, config: candidate.config, sourceId: candidate.id })), ...versions.map(version => ({ id: version.id, label: version.id === active?.id ? version.provenance === "published" ? "当前 Production" : "当前 Baseline" : version.provenance === "bootstrap" ? "Baseline · 初始配置" : version.id === previous?.id ? "上一 Production" : version.id, evaluationId: version.evaluation_run_id || (version.provenance === "bootstrap" ? baseline.id : undefined), config: version.config, sourceId: version.snapshot?.candidate_id || version.snapshot?.source_candidate_id || version.id }))];
-  const [saved] = useState(() => readSession("rag-qa-compare", { leftId: "baseline", rightId: active?.provenance === "published" ? active.id : qualified?.id || "", question: "", selectedCase: "", left: {} as Run, right: {} as Run, history: null as { left?: any; right?: any } | null }));
+  const identity = identityKey(data.workspace || data.evaluation);
+  const [saved] = useState(() => { const state = readSession("rag-qa-compare", { leftId: "baseline", rightId: active?.provenance === "published" ? active.id : qualified?.id || "", question: "", selectedCase: "", left: {} as Run, right: {} as Run, history: null as { left?: any; right?: any } | null, identity: "" }); return state.identity === identity ? state : { ...state, leftId: "baseline", rightId: active?.provenance === "published" ? active.id : qualified?.id || "", left: {}, right: {}, history: null, selectedCase: "" }; });
   const [leftId, setLeftId] = useState(typeof saved.leftId === "string" ? saved.leftId : "baseline");
   const [rightId, setRightId] = useState(typeof saved.rightId === "string" ? saved.rightId : "");
   const [question, setQuestion] = useState(typeof saved.question === "string" ? saved.question : "");
@@ -28,16 +29,16 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
   const [right, setRight] = useState<Run>(validRun(saved.right) ? saved.right : {});
   const [history, setHistory] = useState(saved.history && [saved.history.left, saved.history.right].every(item => !item || typeof item.model_answer === "string") ? saved.history : null);
   const [busy, setBusy] = useState(false);
-  const identity = identityKey(data.workspace || data.evaluation);
   const requests = useRef(0); const currentIdentity = useRef(identity); currentIdentity.current = identity;
-  useEffect(() => { requests.current++; setLeft({}); setRight({}); setHistory(null); setBusy(false); setLeftId("baseline"); setRightId(active?.provenance === "published" ? active.id : qualified?.id || ""); }, [identity]);
+  const previousIdentity = useRef(identity);
+  useEffect(() => { if (previousIdentity.current === identity) return; previousIdentity.current = identity; requests.current++; setLeft({}); setRight({}); setHistory(null); setBusy(false); setLeftId("baseline"); setRightId(active?.provenance === "published" ? active.id : qualified?.id || ""); }, [identity]);
   useEffect(() => () => { requests.current++; }, []);
   const badCases = (data.badCases || []).filter((item: any) => item.run_id === baseline.id);
   const leftScheme = schemes.find(item => item.id === leftId);
   const rightScheme = schemes.find(item => item.id === rightId);
   const fixedCase = badCases.find((row: any) => row.id === selectedCase);
   const sameSource = leftId === rightId || !!leftScheme?.sourceId && leftScheme.sourceId === rightScheme?.sourceId && Object.values(parameterGroups).flat().every(key => leftScheme.config?.[key] === rightScheme.config?.[key]);
-  useEffect(() => writeSession("rag-qa-compare", { leftId, rightId, question, selectedCase, left, right, history }), [leftId, rightId, question, selectedCase, left, right, history]);
+  useEffect(() => writeSession("rag-qa-compare", { identity, leftId, rightId, question, selectedCase, left, right, history }), [identity, leftId, rightId, question, selectedCase, left, right, history]);
   const chooseLeft = (id: string) => { requests.current++; setBusy(false); setLeftId(id); setLeft({}); setRight({}); setHistory(null); };
   const chooseRight = (id: string) => { requests.current++; setBusy(false); setRightId(id); setLeft({}); setRight({}); setHistory(null); };
 
