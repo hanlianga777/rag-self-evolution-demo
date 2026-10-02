@@ -1,10 +1,18 @@
 # 决策记录
 
-> **2026-09-30 文档同步边界：** 唯一当前目标规格为 [SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md)，两张架构图已按最新设计重绘为目标架构。本次没有业务代码、数据库或索引升级，没有 Provider 或发布重跑；下方 Phase 1 / V1.3 内容保留为现有实现及历史证据，不能表示 V1.4 全部已完成。需求状态和未决项以 SPEC 第 3–4 节为准。
+> **历史：2026-09-30 文档同步边界：** 唯一当前目标规格为 [SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md)，两张架构图已按最新设计重绘为目标架构。本次没有业务代码、数据库或索引升级，没有 Provider 或发布重跑；下方 Phase 1 / V1.3 内容保留为现有实现及历史证据，不能表示 V1.4 全部已完成。需求状态和未决项以 SPEC 第 3–4 节为准。
 
-V1.4 决策：仅同步目标规格与从头重绘两图，保留技术栈、治理数值和历史数据；QC P0 的材料冲突记录为 `[OPEN-QC-P0]`，本次不更改实现。
+历史 V1.4 文档交付决策：仅同步目标规格与从头重绘两图，保留技术栈、治理数值和历史数据；QC P0 的材料冲突记录为 `[OPEN-QC-P0]`，本次不更改实现。
 
 当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
+
+## 2026-10-02 · V1.4 完整实施决策
+
+用户已批准完整代码实施和正常推送 main。保留现有 FastAPI/SQLite/React、检索与共享组件，不增加依赖或平台；真实数据与 Frozen JSON 不改写，全部业务验证使用隔离库、临时 Corpus 和禁止外部 Provider 的 Stub。
+
+此前 `[OPEN-QC-P0]` 已关闭：机器 QC P0 允许明确人工理由接受；证据错误、Fake Negative、数量错误与执行失败不可豁免。语义相似分数未校准时仅提供复核提示，不以统一阈值排除主体不同的有效题目。Current Baseline 与 Experiment 强绑定，Production 保持独立冻结来源；真实 Monitoring 事件可作为首轮证据，不伪造 Baseline 失败题。
+
+价格采用官方版本化配置并冻结每次快照；模型别名不修改已配置模型 ID。缺 Usage、缓存 Token 或节假日计费依据时明确不可精确估价。旧 :8010 进程没有重启，全文只在备份 Staging 验证，不通过进程外切换破坏一致性。结果与恢复入口见 [实施验收](docs/V1_4_IMPLEMENTATION_VERIFICATION.md)。
 
 ## 2026-09-30 · Phase 1 决策
 

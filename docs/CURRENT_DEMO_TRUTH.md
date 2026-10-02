@@ -1,6 +1,6 @@
 # Current Demo Truth
 
-审计日期：2026-09-30（Asia/Shanghai）。依据：本轮修改前真实 SQLite 备份及只读界面/API；不是 Fixture，也不是本轮重新执行的 Provider 验收。
+历史真实结果审计日期：2026-09-30（Asia/Shanghai）。依据：本轮修改前真实 SQLite 备份及只读界面/API；不是 Fixture，也不是本轮重新执行的 Provider 验收。
 
 | 对象 | 当前已保存事实 |
 |---|---|
@@ -21,8 +21,12 @@
 | C | 15758 | 21356 |
 | D | 14729 | 22438 |
 
-历史阶段耗时、完整调用 Usage、Judge 费用和计价依据未采集；不回填。历史总回答延迟/TTFT 仍按原记录展示。默认未配置单价。设置页的 Provider 状态仅是 Configured (Unverified)，不代表本轮已验证 DeepSeek。
+历史阶段耗时、完整调用 Usage、Judge 费用和计价依据未采集；不回填。历史总回答延迟/TTFT 仍按原记录展示。该次历史运行默认未配置单价。V1.4 新代码已提供版本化价格配置，但不回算这些历史结果。设置页的 Provider 状态仅是 Configured (Unverified)，不代表本轮已验证 DeepSeek。
 
 真实 DB 修改前：SHA-256 `7dee55b5eca5779c6b07f85a5256a4f53f9fd39f95fc87112d5f0ae9a99e6784`，6037504 bytes，mtime_ns `1790582718511204144`。独立备份：`/tmp/rag-phase1-20260930/before.db`。本轮只允许 additive metrics migration；最终字段比对见 [验收报告](PHASE1_VERIFICATION.md)。
 
 2026-09-26 的 V1.2 REAL BLOCKED 记录保留为 Historical；它描述当时的隔离运行，不覆盖以上当前已保存状态。本轮 Fixture E2E 只证明代码与 UI 交互，不替代真实 Provider 生命周期。
+
+## V1.4 实施保护检查（2026-10-02）
+
+上述真实业务身份、成绩和冻结内容保持原样，不能称为本轮 V2/Provider 实测。实施前 SQLite Backup API 备份及索引副本位于 `/Users/zhanghaohan/.codex/backups/rag-v14-20260930-3a44f2f/`，完整性为 `ok`。阶段只读比较 25 张业务表排序内容与四个 active 索引文件 SHA-256 均不变；最终比较见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)。全文备份 Staging 与代码支持分开记录，未切真实 active。旧后台服务没有自动重启，默认库未由本次代码导入或迁移。

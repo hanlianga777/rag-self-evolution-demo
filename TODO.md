@@ -1,10 +1,10 @@
 # 待办（V1.4 目标 / Phase 1 历史记录）
 
-> **2026-09-30 文档同步边界：** 唯一当前目标规格为 [SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md)，两张架构图已按最新设计重绘为目标架构。本次没有业务代码、数据库或索引升级，没有 Provider 或发布重跑；下方 Phase 1 / V1.3 内容保留为现有实现及历史证据，不能表示 V1.4 全部已完成。需求状态和未决项以 SPEC 第 3–4 节为准。
+> **V1.4 业务实施（2026-10-02）：** 用户已批准完整代码实施与 GitHub 同步。唯一规则源为 [SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md)，阶段证据见 [实施与验收记录](docs/V1_4_IMPLEMENTATION_VERIFICATION.md)。P0、Golden V2、Probe / FullText 引擎与成本已通过隔离后端回归和代码复审；UI/整合的 286 项后端、105 项前端、构建和四尺寸 Chromium 检查通过，阶段复审已通过，最终整体审查中；其他运行边界按 SPEC 第 3 节记录。真实 Provider、评测与发布不自动执行；下方 Phase 1 / V1.3 为历史记录，不能替代 V1.4 验收。
 
-V1.4 的 P0-01–04、GV2-01–05、COST-01、UI-01、SAFE-01、QA-01 按 SPEC 需求追踪及离线验收矩阵继续实施；本次仅完成文档与图交付。旧勾选状态不代表这些目标已完成。
+V1.4 的 P0-01–04、GV2-01–05、COST-01、UI-01、SAFE-01、QA-01 按 SPEC 需求追踪及离线验收矩阵实施。旧勾选状态不代表新目标已完成；阶段状态与恢复入口见实施验收记录。
 
-当前状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。本轮规则与历史边界如下。
+历史阶段状态（2026-09-30）：见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md) 与 [Phase 1 验收](docs/PHASE1_VERIFICATION.md)。以下保留该历史阶段的规则与验收边界。
 
 ## Phase 1 验收状态（2026-09-30）
 

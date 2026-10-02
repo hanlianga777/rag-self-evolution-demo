@@ -1,6 +1,6 @@
 # RAG Evolution 平台架构说明
 
-> **V1.4 目标架构 · 2026-09-30**。唯一目标规则见 [SPEC](../docs/RAG_SELF_EVOLUTION_SPEC.md)。本次仅同步文档并从头重绘两图，没有升级业务代码或运行真实 Provider。当前实现差异见 SPEC 第 3 节；既有数据来源见 [Current Demo Truth](../docs/CURRENT_DEMO_TRUTH.md)。
+> **V1.4 目标架构 · 2026-09-30**。唯一目标规则见 [SPEC](../docs/RAG_SELF_EVOLUTION_SPEC.md)。本轮按用户批准的完整计划实施业务代码；分阶段证据见 [实施验收](../docs/V1_4_IMPLEMENTATION_VERIFICATION.md)，真实 Provider 未重跑。代码、active 产物与真实数据验收分开；既有数据来源见 [Current Demo Truth](../docs/CURRENT_DEMO_TRUTH.md)。
 
 ![V1.4 业务架构图](业务流程图.png)
 
@@ -48,16 +48,16 @@ DeepSeek 是既有 Provider，显式服务于回答、生成、QC、Judge、Agen
 
 ## 不变的治理约束与现有接口
 
-11 Hard Gates、固定 Regression、12 次 Sandbox 总预算、Gate 1/2/3、条件 D、人审发布/回滚与失效判断沿用 SPEC。Search Space 读取当前注册表，不抄朋友数字；Lightweight Rerank 不称独立模型。机器 QC P0 的材料冲突见 SPEC `[OPEN-QC-P0]`，本次不改既有行为。
+11 Hard Gates、固定 Regression、12 次 Sandbox 总预算、Gate 1/2/3、条件 D、人审发布/回滚与失效判断沿用 SPEC。Search Space 读取当前注册表，不抄朋友数字；Lightweight Rerank 不称独立模型。机器 QC P0 按用户决定可经明确人工理由接受；确定性证据错误、Fake Negative、数量错误、执行失败不可豁免，见 SPEC 4.2。
 
-现有接口包括 `/api/evaluation`、`/api/optimization`、`/api/pipeline`、`/api/governance/generation-runs/from-pool`、`/api/monitoring/triggers/{trigger_id}/confirm`、`/api/experiments/run`、Candidate Sandbox/发布与版本回滚。V2 Preview、双层 trace、Plan 匹配和价格版本是目标语义，本图不承诺已存在的新 URL。
+现有接口包括 `/api/evaluation`、`/api/optimization`、`/api/pipeline`、`/api/governance/generation-runs/from-pool`、`/api/monitoring/triggers/{trigger_id}/confirm`、`/api/experiments/run`、Candidate Sandbox/发布与版本回滚。新增 `POST /api/governance/coverage-preview` 与 `POST /api/governance/generation-runs/from-pool/preview` 已注册并在隔离测试验证；生成/Pool 提交可选 plan_id，省略也须建立当前 Plan。双层 trace、校验与价格版本为兼容追加字段，详见实施验收契约。
 
-## 当前实现与目标的差异
+## 实现与运行证据的边界
 
-- 当前 Coverage 最多选 4 个代表中心；V2 动态 K、小簇合并和按厚度 Slot 是待实施目标。
-- 当前 Pool Run 检查 Profile/证据/构造，Coverage Plan 为空；V2 Slot Matching 待实施。
-- 当前 optimization 取最新实验，Monitoring Confirm 取最新 completed Evaluation；强绑定 resolver、排除 Sandbox 和首轮/幂等行为待实施或回归。
-- 现有 Probe 保存检索/检查信息；双层召回 trace 和原解析全文 bundle 尚未在本次实现/验收。旧图中的 Chunk 文本检查不能等同 Raw Parsed Full-text。
-- 现有 Usage、Timing、可选价格与共享 UI 有 Phase 1 历史证据；V1.4 的全部字段、页面和离线矩阵没有在本次验收。
+- Current Baseline resolver、Experiment 强绑定、Monitoring Confirm 幂等 / Round 0 首轮和 A/B/C 原子保存已通过隔离回归及代码复审。Production 独立保留来源。
+- V2 Dynamic K-means、小簇合并、主题 Slot、统一 Validator 和最大二分匹配已实施；Preview 复用既有 FAISS 向量。旧 Frozen Snapshot 仍为 Legacy/V1，不补造 Plan。
+- Candidate Recall 与 Final Context、Raw Parsed Full-text 引擎与完整 bundle 校验已实施。检索执行错误不可当零召回，未知负向结论不可当通过。真实旧后端进程仍运行，真实 4 PDF/157 页备份 Staging 已完成兼容校验，原 252 Chunk/FAISS 字节不变；本轮尚未激活到真实 Corpus。
+- 价格/Usage/Timing 版本化与明确缺失原因已实施，真实 TTFT 无采集不以 Total 代替；没有验证节假日数据时不能对工作日高峰精确估价。
+- 全部 V1.4 UI 和完整隔离 HTTP 生命周期已实施，105 项前端、286 项后端、构建与 Chromium 四尺寸 187 检查通过，阶段复审已通过，最终整体审查中。54 ID 具名断言与最终结论见实施报告，历史 Phase 1 数字不能转记为本轮通过。
 
-这两张图表示目标系统如何协作。当前演示 Snapshot 仍保留自己的 V1/Legacy 来源，不因重绘升级成 V2 生成；本次也未改动用户手动上传到 Demo 的独立架构图片。
+两图保持“V1.4 目标架构”标注，完整流程与职责没有因静态重绘升级历史数据。本轮保留图源和 PNG，已验证字体、边界、连线、尺寸与图源/PNG 像素一致；最终代码职责核对见实施验收。用户手动上传到 Demo 的架构图片为独立运行资产，未替换。

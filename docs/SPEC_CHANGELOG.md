@@ -2,6 +2,15 @@
 
 本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.4 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
 
+## V1.4 实施追加记录（2026-10-02）
+
+- 用户在文档/图交付后明确批准完整业务代码实施，原桌面任务书作为输入依据而非改写对象；需求 ID 与 54 个 Test ID 保留，原 V1.3 历史正文不改。
+- P0 统一对象身份、Monitoring 幂等 Confirm/首轮、A/B/C 全批原子保存；Golden V2 Planner、Group × Construction、统一 Validator、独立 Plan/Slot 最大匹配已实施。
+- 双层 Probe、原解析页全文 bundle、失败与零召回区分、版本化价格和真实 TTFT 已实施；截至本检查点 284 项阶段隔离后端测试及阶段复审通过。UI 与整合生命周期已通过 286 项隔离后端、105 项前端、构建和 Chromium 四尺寸 187 检查，阶段复审已通过，最终整体审查中；54 ID 具名断言和最终证据见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)。
+- 用户已关闭 `[OPEN-QC-P0]`：机器 QC P0 可明确人工理由接受，确定性证据错误、Fake Negative、数量错误及执行失败不可豁免。旧条目保留当时未决状态。
+- 新增 Preview 路由已注册，旧客户端省略 plan_id 由服务端创建当前 Plan，不跳过校验。保留既有 API、Gate、Regression、12 次预算、D 失败保留赢家及 Production 独立来源。
+- 真实业务表和冻结内容不改，全文只在备份 Staging 验证，旧服务没有重启；不运行真实 Provider/Golden/Evaluation/发布。保留两张 V1.4 目标图及 HTML/PNG 路径，不把离线通过称为真实数据重跑。
+
 ## V1.4 — Golden Engine V2 & Identity-Bound Evolution（2026-09-30）
 
 - 来源：`RAG_SELF_EVOLUTION_CODEX_MASTER_PROMPT_20260930.md` 及用户确认的文档同步范围；唯一目标规格升为 V1.4，旧规则在 SPEC 文末标为 Superseded。

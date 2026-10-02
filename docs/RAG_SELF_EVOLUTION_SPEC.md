@@ -1,16 +1,16 @@
 # RAG Self-Evolution Platform 产品规格
 
 > **唯一当前目标规格：V1.4 — Golden Engine V2 & Identity-Bound Evolution**
-> 冻结日期：2026-09-30（Asia/Shanghai）。状态：**目标规格已同步；业务实现未在本轮升级或验收**。
+> 冻结日期：2026-09-30（Asia/Shanghai）。状态：**V1.4 分阶段业务实施中；P0、Golden V2、Probe / FullText 引擎与遥测已通过隔离后端回归与代码复审，UI 与完整隔离生命周期已通过测试和浏览器检查，阶段复审已通过，最终整体审查中，不以历史结果替代**。
 > V1.4 是 Golden 工艺、对象身份、Monitoring 与信息架构升级，保留现有技术栈和治理底座。新图是目标架构，不是当前 Demo 已具备全部能力的证明。
 
 ## 1. 文档地位、依据与本次交付边界
 
 本文件是唯一目标规则源；[SPEC ChangeLog](SPEC_CHANGELOG.md) 仅保留追加式历史。V1.3 及更早内容归入文末历史存档，旧文中的“当前”“唯一”“Implementation Authorized”只代表当时口径，不覆盖本节及 V1.4 要求。
 
-依据：用户提供的 `RAG_SELF_EVOLUTION_CODEX_MASTER_PROMPT_20260930.md`（2026-09-30），以及用户明确选择“文档与架构同步、两图从头重绘”的范围。任务书是需求输入，其中要求完整实施的指令不扩大本次授权。本轮不修改业务代码、数据库、索引、Golden、实验或 Production，不调用真实 Provider，不执行人工 Gate。
+依据：用户提供的 `RAG_SELF_EVOLUTION_CODEX_MASTER_PROMPT_20260930.md`（2026-09-30），以及用户先完成文档与两图同步、后明确批准 V1.4 完整代码实施的范围。任务书是需求输入，本轮代码实施依据用户明确批准的计划。保留真实 Golden、Baseline、Candidate、Production 和冻结 JSON；兼容迁移先在副本验证，全文产物只允许完整校验后的兼容补充。不自动调用真实 Provider、重跑付费流程或执行真实人工 Gate。
 
-正文第 5–16 节保留任务书对应章节的需求语义；第 17–18 节保留其离线验收及手动验证要求。文中的实施动作是后续业务开发要求，不是本次执行记录。源码级判断以第 3 节证据为限；本文不把任务书中的故障线索视为已复现 Bug，也不声称已查看其引用的 ZIP、朋友截图或 20 张截图。
+正文第 5–16 节保留任务书对应章节的需求语义；第 17–18 节保留其离线验收及手动验证要求。文中的规则是目标要求，实现和运行证据分别记录在第 3 节与 [V1.4 实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)；本文不把任务书中的故障线索视为已复现 Bug，也不声称已查看其引用的 ZIP、朋友截图或 20 张截图。
 
 优先级：本轮明确用户决策 → V1.4 明确变更 → 未被替代的冻结规则 → 实际持久化配置与规则源 → 朋友资料工艺参考 → 历史截图数字。冲突不得靠改门槛、改数据或猜测消解，具体未决项见第 4 节。
 
@@ -51,37 +51,37 @@ Monitoring：1 个 Safety Critical Bad Case，或最近 20 个完整可判定 QA
 
 ## 3. 需求追踪与当前实现证据
 
-检查基线：`f6ea03d`。以下是静态源码核对，不是新增测试通过或真实生命周期完成的结论。历史实测记录见 [Phase 1 验收](PHASE1_VERIFICATION.md) 与 [已保存 Demo 事实](CURRENT_DEMO_TRUTH.md)，其日期、Run 和 Provider 边界保持原样；本次不刷新真实运行结果。
+检查起点：`3a44f2f`；后端阶段至 `cd551e0`，UI 与整合实施至 `5ef7f7b`。下表区分代码与离线证据，不代表重新执行了真实 Provider 生命周期。历史实测记录见 [Phase 1 验收](PHASE1_VERIFICATION.md) 与 [已保存 Demo 事实](CURRENT_DEMO_TRUTH.md)，其日期、Run 和 Provider 边界保持原样；本次不刷新真实运行结果。
 
 | 需求 ID | V1.4 目标 | 当前源码证据 / 实施状态 | 目标章节 |
 | --- | --- | --- | --- |
-| P0-01 | Current Baseline ↔ Experiment 强绑定 | `main.py` 当前 optimization 读取 `latest_experiment()`；尚未看到按当前 Baseline 统一解析，待实现/回归 | 5 |
-| P0-02 | Monitoring Confirm 后首轮 Round 1 | `governance.py` Confirm 创建 `pending_agent` 空实验；首轮成功及失败重试未在本次运行验收 | 5.3 |
-| P0-03 | Monitoring 复用 resolver，排除 Sandbox | Confirm SQL 读取最新 completed Evaluation，未排除 Sandbox；目标 resolver 尚未统一 | 5.1 / 5.4 |
-| P0-04 | Pool 建 Run 必须 Coverage / Slot 匹配 | `create_pool_run()` 已检查 Profile、证据和构造，但保存空 Coverage Plan；V2 匹配待实现 | 9 |
-| GV2-01 | Dynamic K-means / 小簇合并 / 厚度配额 | `AiService._mini_coverage_plan()` 当前最多选 4 个代表中心，并轮转抽样；不是目标动态 K-means 工艺 | 6 |
-| GV2-02 | Group × Construction 双维度 | 已有 `test_category`、`construction_type` / `structured_type`；统一 V2 计划与历史 adapter 待验收 | 7 |
-| GV2-03 | Unified Hard Validation | AI / Pool 已复用部分 `_candidate_errors`，Import 有构造检查；完整单一规则接口与 Slot 约束待实现/核对 | 8 |
-| GV2-04 | Candidate Recall 与 Final Context Probe | Probe 已保存 TopK 和检查信息；完整双层 trace、Any/All 必要证据覆盖待实现/验收 | 10 |
-| GV2-05 | 原解析全文 Probe + 原子产物 | 已有 Corpus staging / 原子管理；当前 Probe 基于 Chunk 文本，原解析全文 sidecar 未在现有 bundle 确认 | 10–11 |
-| COST-01 | 集中价格、真实 Usage/Timing、版本与缺失原因 | `telemetry.py` 已有可选 `RAG_PRICE_CONFIG`、缺 Usage 不估价；版本身份与 V1.4 语义待核对 | 13 |
-| UI-01 | 全局与全部指定页面信息架构 | Phase 1 已有共享组件与 UI 历史验收；第 14–15 节新增 V1.4 要求未在本次实施/验收 | 14–15 |
-| SAFE-01 | 不可变旧快照、兼容迁移 | 已有 SQLite / JSON / 历史审计机制；本次无迁移，业务实施仍需副本验证 | 16 |
-| QA-01 | 离线状态流、迁移与 UI 验收 | 第 17 节为待执行目标矩阵；既有 Phase 1 测试数字不是 V1.4 验收结果 | 17 |
+| P0-01 | Current Baseline ↔ Experiment 强绑定 | `GovernanceStore.current_baseline_identity()` 统一解析；当前对象 API 共用 identity、实验按 Baseline 查询；ID-01/02 后端回归通过 | 5 |
+| P0-02 | Monitoring Confirm 后首轮 Round 1 | Confirm 幂等、短事务 claim、全批原子保存；Round 0 / 失败重试 / 真未完成轮次回归通过，真实 Monitoring-only 证据不伪造 Baseline Case | 5.3 |
+| P0-03 | Monitoring 复用 resolver，排除 Sandbox | Confirm 共用 resolver；QA 配置/Corpus 来源贯穿实际 API，不重读回答后 Production 伪造归属；ID-02/05/07 后端回归通过 | 5.1 / 5.4 |
+| P0-04 | Pool 建 Run 必须 Coverage / Slot 匹配 | 独立当前 Plan + 稳定最大二分匹配，保存 Slot 缺口/匹配；成功复制新候选，不继承审核；263 项离线回归及复审通过 | 9 |
+| GV2-01 | Dynamic K-means / 小簇合并 / 厚度配额 | `golden_v2.build_plan()` 复用 FAISS 向量与 K-means，稳定合并/编号、协调最大余数配额；固定参数与输入审计冻结，Preview 无生成模型 | 6 |
+| GV2-02 | Group × Construction 双维度 | Group / Construction 分存；真实可用材料专项优先并记录 fallback，旧字段只作 Legacy adapter，不改历史冻结 JSON | 7 |
+| GV2-03 | Unified Hard Validation | AI / Import / Pool / Edit / Revision 共用 `validate_golden_candidate()`；证据定位、声明 Product/Version、Bridge 必要关系范围、Quota/Slot 与精确去重回归通过；未知语义待复核 | 8 |
+| GV2-04 | Candidate Recall 与 Final Context Probe | 同次检索保存真实 CandidateK / Final、分层 Any/All、原解析全文信号与受控 Judge；284 项离线回归和复审通过；执行失败持久化 failed Probe，阻断 QC/批准，不伪装成零召回 | 10 |
+| GV2-05 | 原解析全文 Probe + 原子产物 | 原 Parser 页级全文 + schema/checksum、完整 bundle 校验/原子激活/回滚和兼容补充工具已实施；原后端进程仍在运行，真实 4 PDF/157 页在备份 Staging 完整校验通过，原 252 Chunk/FAISS 字节不变；未切 active sidecar。引擎支持与 active 就绪分开 | 10–11 |
+| COST-01 | 集中价格、真实 Usage/Timing、版本与缺失原因 | `cost_report()` 版本化静态价格、冻结计费快照、缓存/模型/Usage/时间缺失原因；真实首输出 TTFT，无非流式 Total 替代；专项 CT 与全套 284 项离线回归及阶段复审通过 | 13 |
+| UI-01 | 全局与全部指定页面信息架构 | 八模块 H1/hash、Drawer/Dialog/Select、等高 A/B/C 与独立 D、50/50 问答及过期响应隔离已实施；105 项前端测试、构建与四尺寸 Chromium 187 检查通过，阶段复审已通过，最终整体审查中 | 14–15 |
+| SAFE-01 | 不可变旧快照、兼容迁移 | 兼容迁移、旧快照无改写、索引失败/混合身份拒绝在临时库/Corpus 验证；真实 25 张表阶段只读比较不变，最终整合后再次核验 | 16 |
+| QA-01 | 离线状态流、迁移与 UI 验收 | 54 个 Test ID 逐项具名断言；实际 FastAPI 隔离生命周期覆盖 V2→Gate 1→Baseline→A/B/C→D 失败保留赢家→测试发布→Monitoring 首轮，286 项后端测试通过；WebKit 缺失未验证，真实 Provider 未重跑 | 17 |
 
 ## 4. 接口约束与明确未决项
 
 ### 4.1 既有接口与目标语义
 
-本次不修改 API、schema 或类型。已有路由包括 `GET /api/evaluation`、`GET /api/optimization`、`GET /api/pipeline`、`POST /api/governance/generation-runs/from-pool`、`POST /api/monitoring/triggers/{trigger_id}/confirm`、`POST /api/experiments/run`、`POST /api/candidates/{candidate_id}/run` 与人工发布/回滚接口。
+既有 API 路由和字段兼容保留，新增身份、计划、校验及遥测语义按实施验收记录。已有路由包括 `GET /api/evaluation`、`GET /api/optimization`、`GET /api/pipeline`、`POST /api/governance/generation-runs/from-pool`、`POST /api/monitoring/triggers/{trigger_id}/confirm`、`POST /api/experiments/run`、`POST /api/candidates/{candidate_id}/run` 与人工发布/回滚接口。
 
-后续最小接口增量承载当前 Baseline/Experiment 身份、冻结 Planner/Slot、Candidate/Final trace、风险与价格版本；优先扩展既有字段/JSON，不在本文虚构已存在的新 URL。第 8 节 Validator 签名是语义示意，不是当前可调用公共接口。Preview 保持无生成/Judge/QC调用、无人工批准和无 Production 变更。
+已注册 `POST /api/governance/coverage-preview` 与 `POST /api/governance/generation-runs/from-pool/preview`。生成和 Pool 创建支持可选 `plan_id`，省略时服务端建立当前 Plan；提交再次校验 Corpus 身份。后续双层 trace、风险与价格版本继续追加既有 JSON，阶段证据见实施验收。第 8 节 Validator 签名是语义示意，不是当前可调用公共接口。Preview 保持无生成/Judge/QC调用、无人工批准和无 Production 变更。
 
-### 4.2 `[OPEN-QC-P0]`：机器 QC P0 与确定性 Blocker 的边界
+### 4.2 QC P0 边界（用户已确认）
 
-任务书第 10.2 节写“P0/证据不成立/伪负向阻断”，同时要求复用 Friend-aligned 人审风险确认；旧 V1.3 承接的 V1.2 明确允许机器 QC P0 经展示风险、人工理由后接受，确定性错误与 Fake Negative 不可豁免。新材料尚未明确是否撤销机器 QC P0 接受能力。
+2026-09-30 用户明确选择保留 Friend-aligned 人工风险接受：机器 QC P0 必须展示风险、由用户明确填写理由后才能接受；确定性证据错误、Fake Negative、类别数量错误不可豁免。Provider/执行失败不是可接受的质量结论，不能用人工理由变成 Passed。
 
-本次只记录冲突，不更改 Validator 或既有人审规则。V1.4 实施前需要明确第 10.2 节 P0 是否仅指不可豁免 Blocker，还是包括全部机器 QC P0；未解决前不得宣称该项已经冻结实现或通过验收。合法但检索未命中的 P1 与执行失败继续分别记录，不能混为可豁免质量错误。
+第 10.2 节的 P0 阻断指不可豁免确定性 Blocker，不撤销机器 QC 风险接受。合法但检索未命中的 P1 与执行失败分别记录。此确认关闭此前 `[OPEN-QC-P0]`；历史存档与原任务书冲突原文仅保留为历史依据。
 
 ---
 
@@ -304,7 +304,7 @@ Hard Validation 已确认真实证据，但当前 Baseline 没召回时，记录
 
 区分 `probe_execution_status`（是否运行成功）、`candidate_recall/final_hit`（系统表现）、`question_validity/risk`（题是否成立）。上层 Passed 文案不能掩盖未命中。
 
-复用当前 Friend-aligned SPEC 的人审风险确认边界：P0/证据不成立/伪负向阻断；合法但检索不连贯的 P1 由已支持的人审理由确认。不因此偷偷变更旧数值门槛或删除治理。真实 unresolved 语义冲突必须记录。
+复用 Friend-aligned 人审风险边界（见 4.2）：确定性 P0 Blocker、证据不成立、Fake Negative、数量错误不可豁免；机器 QC P0 与合法但检索不连贯的 P1 可展示风险并经明确人工理由确认。Provider/执行失败不能豁免，不变更旧数值门槛。
 
 ### 10.3 Negative 三层 Probe
 
