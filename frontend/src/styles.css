@@ -183,6 +183,7 @@ td svg { color: #6e7d90; margin-right: 5px; vertical-align: middle; }
 .governance-page .section-head { margin-bottom: 8px; }
 .run-summary { align-items: center; color: var(--muted); display: flex; flex-wrap: wrap; font-size: 12px; gap: 12px; margin-bottom: 8px; }
 .review-filters { display: flex; flex: none; gap: 6px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 2px; }
+.quality-risk-filters { flex-wrap: wrap; overflow: visible; }
 .review-filters button { background: #f6f8fa; border: 1px solid var(--line); border-radius: 8px; color: #536176; flex: none; font-size: 12px; padding: 5px 8px; white-space: nowrap; }
 .review-filters button.active { background: #e9eef3; border-color: #9baabe; color: #24364d; font-weight: 700; }
 .review-filters button:focus-visible, .export-menu summary:focus-visible, .export-menu a:focus-visible { outline: 2px solid #526782; outline-offset: 2px; }

@@ -8,7 +8,7 @@ import { BusinessImportPanel, CoverageSummary } from "./BusinessImportPanel";
 import { CandidateWorkspace } from "./CandidateWorkspace";
 
 type Candidate = Record<string, any>;
-type Filter = "all" | "positive" | "ablation" | "negative" | "probe" | "qc" | "pending" | "approved" | "revision";
+type Filter = string;
 
 const stageName: Record<string, string> = { queued: "排队中", coverage: "规划覆盖", generating: "逐题生成与修复", validation: "硬校验", needs_regeneration: "待补齐失败题", probing: "检索验证", qc: "质量检查", completed: "已完成", failed: "运行失败" };
 const probeLabel = (value?: string) => value === "probe_passed" ? "通过" : value === "needs_revision" ? "未通过" : "未运行";
@@ -111,7 +111,17 @@ export function GovernancePage({ data }: { data: any }) {
     { key: "approved", label: "已批准", count: current.filter(row => row.stage === "golden").length, match: (row: Candidate) => row.stage === "golden" },
     { key: "revision", label: "需修订 / 已拒绝", count: current.filter(row => ["needs_revision", "rejected"].includes(row.review_status)).length, match: (row: Candidate) => ["needs_revision", "rejected"].includes(row.review_status) },
   ] as const, [current]);
-  const visible = current.filter(filters.find(item => item.key === filter)?.match || (() => true));
+  const riskFilters = [
+    { key: "p0", label: "QC P0", match: (row: Candidate) => row.qc?.priority === "P0" },
+    { key: "p1", label: "QC P1", match: (row: Candidate) => row.qc?.priority === "P1" },
+    { key: "p0-acceptance", label: "QC P0 待人工接受", match: (row: Candidate) => row.approval_eligibility?.requires_qc_p0_acceptance && row.approval_eligibility?.blocking_reasons?.length === 0 },
+    { key: "fake-negative", label: "疑似伪负向", match: (row: Candidate) => row.probe?.probe_details?.classification === "FAKE_NEGATIVE_RISK" },
+    { key: "retrieval-incoherent", label: "检索不连贯", match: (row: Candidate) => row.probe?.probe_details?.classification === "RETRIEVAL_INCOHERENT" },
+    { key: "execution-failed", label: "检索执行失败", match: (row: Candidate) => row.probe?.probe_details?.probe_execution_status === "failed" || row.probe?.probe_details?.classification === "RETRIEVAL_EXECUTION_FAILED" },
+    { key: "approval-blocked", label: "审批阻断", match: (row: Candidate) => row.approval_eligibility?.blocking_reasons?.length > 0 },
+    { key: "revision-risk", label: "需修订 / 已拒绝", match: (row: Candidate) => ["needs_revision", "rejected"].includes(row.review_status) },
+  ].map(item => ({ ...item, count: current.filter(item.match).length })).filter(item => item.count > 0);
+  const visible = current.filter([...filters, ...riskFilters].find(item => item.key === filter)?.match || (() => true));
   const gateBlocked = current.filter(row => row.stage !== "golden" && !(row.approval_eligibility?.can_approve ?? (row.probe_status === "probe_passed" && row.qc_status === "qc_passed")));
   const manualBlocked = current.filter(row => ["needs_revision", "rejected"].includes(row.review_status) || row.approval_eligibility?.requires_qc_p0_acceptance);
   const batchReason = current.length !== expectedCount ? `本轮尚未完整入库 ${expectedCount} 道题` : gateBlocked.length || manualBlocked.length ? `仍有 ${new Set([...gateBlocked, ...manualBlocked].map(row => row.id)).size} 道题需逐题处理或接受 QC P0 风险` : gate1Snapshot ? "本轮已确认 Golden 测试集" : !confirmed ? "请先确认已人工审核全部有效 Candidate" : "";
@@ -179,7 +189,7 @@ export function GovernancePage({ data }: { data: any }) {
         {qualityRerun && <div className="run-summary" role="status"><span>Probe / QC 重跑：{qualityRerun.status === "running" ? "运行中" : qualityRerun.status === "completed" ? "已完成" : "运行失败"} · {qualityRerun.stage === "qc" ? "质量检查" : qualityRerun.stage === "probe" ? "检索验证" : "—"} {qualityRerun.slot || ""} · {qualityRerun.completed || 0} / {expectedCount} · Probe 通过 {qualityRerun.probe_passed || 0}，失败 {qualityRerun.probe_failed || 0} · QC 通过 {qualityRerun.qc_passed || 0}，失败 {qualityRerun.qc_failed || 0}，跳过 {qualityRerun.qc_skipped || 0}{qualityRunning && qualityRerun.started_at ? ` · 运行耗时 ${((now - Date.parse(qualityRerun.started_at)) / 1000).toFixed(1)}s` : ""}{qualityRunning ? " · 状态来自数据库（Worker 未验证）" : ""}</span>{qualityRerun.status === "failed" && <button className="text-button" onClick={() => { setErrorSlot(null); setRunErrorOpen(true); }}>查看错误</button>}</div>}
         {Object.entries(currentRun.artifacts?.slot_audit || {}).filter(([, attempts]) => (attempts as Candidate[]).some(attempt => attempt.validation_error)).map(([slot, attempts]) => <details className="slot-audit" key={slot}><summary>{slot} · {(attempts as Candidate[]).length} 次尝试 · {(attempts as Candidate[]).at(-1)?.validation_error ? "未通过" : "重试后通过"}</summary>{(attempts as Candidate[]).map(attempt => <div key={attempt.attempt}><strong>第 {attempt.attempt} 次尝试</strong><p>问题：{attempt.question || "—"}</p><p>答案：{attempt.reference_answer || "—"}</p><p>证据：{attempt.selected_evidence?.map((item: Candidate) => `${item.document_name || item.document_id} · ${item.chunk_id} · ${item.chunk_text}`).join("；") || "—"}</p><pre>{attempt.validation_error || "通过"}</pre></div>)}</details>)}</details>
         <div className="run-summary">总 Slot {expectedCount} · 合法 Candidate {current.length} · Hard Validation {currentRun?.artifacts?.hard_validation?.status || "未采集"} · Probe 已执行 {current.filter(row => row.probe_status && row.probe_status !== "probe_pending").length} / 风险 {current.filter(row => row.probe_status === "needs_revision").length} · QC 已执行 {current.filter(row => row.qc_status && row.qc_status !== "qc_pending").length} · Human Approval {current.filter(row => row.stage === "golden").length}</div>
-        {current.some(row => row.probe_status === "needs_revision" || row.qc_status === "qc_failed") ? <p className="error-notice">需要人工关注：请按 Probe、QC 或修订状态筛选；执行失败不可豁免，QC P0 需明确理由。</p> : <p className="muted">当前未记录质量异常。</p>}
+        {riskFilters.length > 0 && <div className="exception-summary"><strong>需要人工关注</strong><div className="review-filters quality-risk-filters" aria-label="质量风险筛选">{riskFilters.map(item => <button key={item.key} className={filter === item.key ? "active" : ""} aria-pressed={filter === item.key} onClick={() => setFilter(item.key)}>{item.label} · {item.count}</button>)}</div><p className="muted">类别来自已记录的 Probe、QC 与审批条件，可重叠。QC P0 风险须人工明确接受；审批阻断不能因此豁免。</p></div>}{riskFilters.length === 0 && <p className="muted">当前未记录质量异常。</p>}
         <CoverageSummary run={currentRun} questions={current} documents={data.documents || []} />
         <div className="review-filters" aria-label="Candidate 筛选">{filters.map(item => <button key={item.key} aria-pressed={filter === item.key} className={filter === item.key ? "active" : ""} onClick={() => setFilter(item.key)}>{item.label} {item.count}</button>)}</div>
         <QuestionTable rows={filter === "all" ? [...visible, ...failedSlots.filter(slot => !current.some(row => row.slot === slot)).map(slot => ({ id: `missing-${slot}`, slot, test_category: currentRun.artifacts.coverage_plan?.find((item: Candidate) => item.slot === slot)?.test_category, question: "生成失败，待补齐", failed: true }))].sort((a, b) => String(a.slot || "").localeCompare(String(b.slot || ""))) : visible} onDetail={row => row.failed ? (setErrorSlot(row.slot), setRunErrorOpen(true)) : setSelectedId(row.id)} />

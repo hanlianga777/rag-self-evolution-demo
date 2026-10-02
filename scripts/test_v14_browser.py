@@ -101,6 +101,12 @@ with sync_playwright() as p:
                 detail_check(page, 'button:has-text("Search Space")', f'{width}-searchspace-drawer')
                 page.get_by_role('button', name='A / B / C / D', exact=True).click()
                 detail_check(page, 'button:has-text("查看方案与完整报告")', f'{width}-candidate-drawer')
+                detail_check(page, 'button:has-text("查看 D 完整报告与 Decision")', f'{width}-d-report-drawer')
+                page.get_by_role('button', name='Sandbox', exact=True).click()
+                d_card = page.locator('.sandbox-status-grid article').filter(has_text='Candidate D')
+                assert '不合格' in d_card.inner_text() and 'Hard Gate 11/11' in d_card.inner_text()
+                assert 'Gate 未通过' not in d_card.inner_text()
+                checks.append({'name': f'{width}-sandbox-regression-qualification', 'gate_pass_distinct_from_unqualified': True})
                 cards = page.locator('.candidate-cards').first.locator('.candidate-card')
                 if width >= 1024 and cards.count() == 3:
                     boxes = [item.bounding_box() for item in cards.all()]
@@ -116,6 +122,8 @@ with sync_playwright() as p:
                     checks.append({'name': f'{width}-rollback-confirm', 'centered_confirmation': True})
             if route == 'verification':
                 page.get_by_role('button', name='Monitoring', exact=True).click()
+                assert page.locator('[aria-label=监控阶段] li').last.get_attribute('class') == 'pending', 'Prior ABC must not complete pending Monitoring Trigger'
+                checks.append({'name': f'{width}-monitoring-linked-context', 'prior_abc_ignored_for_pending_trigger': True})
                 detail_check(page, '.monitoring-table .text-button', f'{width}-monitoring-drawer')
                 page.get_by_role('button', name='方案对比', exact=True).click()
                 combo = page.get_by_role('combobox', name='选择真实 Bad Case')
@@ -131,6 +139,37 @@ with sync_playwright() as p:
                 assert not page.locator('.operation-console').count()
                 checks.append({'name': f'{width}-compare-layout', 'fixed_footers': True, 'no_global_qa_console': True})
         context.close()
+    # Explicit synthetic persisted-field boundaries complement the actual HTTP snapshots.
+    original_payloads = PAYLOADS
+    PAYLOADS = json.loads(json.dumps(PAYLOADS))
+    export_path = next(path for path in PAYLOADS if path.endswith('/export'))
+    risk_rows = PAYLOADS[export_path]['questions']
+    for index, row in enumerate(risk_rows[:5]):
+        row.update(question=f'Fixture risk Q{index + 1}', stage='candidate', review_status='human_review_pending')
+        row['approval_eligibility'] = {'blocking_reasons': [], 'requires_qc_p0_acceptance': False}
+    for row in risk_rows[:2]: row['qc']['priority'] = 'P0'; row['approval_eligibility']['requires_qc_p0_acceptance'] = True
+    risk_rows[1]['approval_eligibility']['blocking_reasons'] = ['Fixture deterministic blocker']
+    risk_rows[2]['qc']['priority'] = 'P1'
+    for index, category in ((2, 'RETRIEVAL_INCOHERENT'), (3, 'FAKE_NEGATIVE_RISK'), (4, 'RETRIEVAL_EXECUTION_FAILED')):
+        risk_rows[index]['probe']['probe_details']['classification'] = category
+    risk_rows[3]['test_category'] = 'negative'
+    risk_rows[4]['probe']['probe_details']['probe_execution_status'] = 'failed'
+    risk_rows[4]['review_status'] = 'needs_revision'
+    for width, height in ((1280, 800), (390, 844)):
+        context = browser.new_context(viewport={'width': width, 'height': height}); context.route('**/*', route_handler)
+        page = context.new_page(); page.on('pageerror', lambda error: errors.append(str(error)))
+        page.goto(URL + '/#governance'); page.wait_for_load_state('networkidle')
+        summary = page.locator('.exception-summary')
+        for label, questions in [('QC P0 · 2', ['Fixture risk Q1', 'Fixture risk Q2']), ('QC P0 待人工接受 · 1', ['Fixture risk Q1']), ('QC P1 · 1', ['Fixture risk Q3']), ('疑似伪负向 · 1', ['Fixture risk Q4']), ('检索不连贯 · 1', ['Fixture risk Q3']), ('检索执行失败 · 1', ['Fixture risk Q5']), ('审批阻断 · 1', ['Fixture risk Q2']), ('需修订 / 已拒绝 · 1', ['Fixture risk Q5'])]:
+            summary.get_by_role('button', name=label, exact=True).click()
+            table = page.locator('.review-table tbody')
+            assert table.locator('tr').count() == len(questions)
+            assert all(question in table.inner_text() for question in questions)
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+            checks.append({'name': f'{width}-synthetic-risk-{label}', 'exact_filter_rows': questions, 'provenance': 'synthetic persisted-field boundary fixture, not real QC'})
+        capture(page, f'{width}-synthetic-risk-revision')
+        context.close()
+    PAYLOADS = original_payloads
     # Native browser request-identity regression complements the real HTTP lifecycle.
     context = browser.new_context(viewport={'width': 1280, 'height': 800})
     pending = []

@@ -12,7 +12,7 @@ afterEach(() => { document.body.innerHTML = ""; });
 it("colors Not Qualified as a failed state", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<Status value="Not Qualified" />));
-  expect(document.querySelector(".badge.bad")?.textContent).toBe("Gate 未通过");
+  expect(document.querySelector(".badge.bad")?.textContent).toBe("不合格");
   await act(async () => root.unmount());
 });
 

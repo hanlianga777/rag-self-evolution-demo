@@ -8,8 +8,8 @@ describe("displayText", () => {
     expect(displayText("Candidate B")).toBe("Candidate B");
     expect(displayText("Baseline")).toBe("Baseline");
     expect(displayText("Production")).toBe("Production");
-    expect(displayText("Qualified")).toBe("Gate 通过");
-    expect(displayText("Not Qualified")).toBe("Gate 未通过");
+    expect(displayText("Qualified")).toBe("合格");
+    expect(displayText("Not Qualified")).toBe("不合格");
     expect(displayText("Generated")).toBe("已生成");
     expect(displayText("Evaluated")).toBe("已评测");
     expect(displayText("Released")).toBe("已发布");
