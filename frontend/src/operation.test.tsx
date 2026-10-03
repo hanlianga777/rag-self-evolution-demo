@@ -254,8 +254,9 @@ it("does not report a failed Provider probe as a successful operation", async ()
   vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify({ mode: "live", status: "Unavailable", probe: "failed", last_probe: { reason: "连接失败" } }), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><SettingsPage data={{ readiness: { mode: "live", status: "Configured (Unverified)" } }} /></OperationProvider>));
-  await act(async () => document.querySelector<HTMLButtonElement>(".settings-page button.secondary")!.click());
+  await act(async () => document.querySelector<HTMLButtonElement>(".provider-status-row button")!.click());
   expect(document.querySelector(".operation-console[role=alert]")?.textContent).toContain("运行失败");
-  expect(document.body.textContent).toContain("验证失败：连接失败");
+  expect(document.querySelector(".settings-page .error-notice")?.textContent).toContain("请求失败：连接失败");
+  expect(document.body.textContent).not.toContain("✓ 完成");
   await act(async () => root.unmount());
 });

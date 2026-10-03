@@ -269,6 +269,13 @@ class CorpusStore:
         with CORPUS_LOCK:
             path = self.index_dir.resolve()
             manifest = _read_json(path / "manifest.json", {})
+            dimension = indexed_count = None
+            try:
+                import faiss
+                index = faiss.read_index(str(path / "faiss.index"))
+                dimension, indexed_count = int(index.d), int(index.ntotal)
+            except (ImportError, OSError, RuntimeError):
+                pass
             full_text = {'supported': True, 'status': 'not_collected', 'coverage': None, 'reason': 'raw_full_text_unavailable'}
             if (path / 'full_text.json').exists() or manifest.get('artifact_schema_version', 0) >= 3:
                 try:
@@ -277,6 +284,8 @@ class CorpusStore:
                 except (OSError, ValueError, RuntimeError, KeyError) as error:
                     full_text = {**full_text, 'status': 'invalid', 'reason': str(error)}
         return {
+            "dimension": dimension,
+            "indexed_count": indexed_count,
             "full_text": full_text,
             "corpus_fingerprint": manifest.get('sources'),
             "artifact_schema_version": manifest.get('artifact_schema_version'),

@@ -23,7 +23,7 @@ export function Status({ value }: { value: string }) {
 
 export function TechnicalDetails({ children, label = "技术详情" }: { children: ReactNode; label?: string }) {
   const [open, setOpen] = useState(false);
-  return <><button type="button" className="text-button technical-details-trigger" onClick={event => { event.currentTarget.focus(); setOpen(true); }}>{label}</button><Drawer open={open} onOpenChange={setOpen} title={label}><div className="drawer-body"><pre className="technical-raw">{children}</pre></div></Drawer></>;
+  return <><button type="button" className="text-button technical-details-trigger" onClick={event => { event.currentTarget.focus(); setOpen(true); }}>{label}</button><Drawer open={open} onOpenChange={setOpen} title={label}><div className="drawer-body"><div className="technical-content">{typeof children === "string" ? <pre className="technical-raw">{children}</pre> : children}</div></div></Drawer></>;
 }
 
 export function TruncatedText({ children, lines = 3 }: { children: ReactNode; lines?: 2 | 3 }) {

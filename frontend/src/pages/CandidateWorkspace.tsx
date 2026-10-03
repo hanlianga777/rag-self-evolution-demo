@@ -224,10 +224,23 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
     if (!revisionRun || !currentDraftId) return;
     if (materialMode === "reselect" && !reason.trim()) { setRevisionError("请填写重新选材意图"); return; }
     setRevisionBusy(true); setRevisionError("");
+    const submittedReason = reason, submittedTags = tags;
+    const targetId = String(currentDraftId);
+    const manual = previewChanges[targetId]?.source_chunk_ids;
     try {
-      const manual = previewChanges[currentDraftId]?.source_chunk_ids;
       await postJson(`/api/governance/revisions/${revisionRun.id}/regenerate-draft`, { question_id: currentDraftId, expected_hash: revisionRun.new_hash[currentDraftId], ...(materialMode === "reselect" ? { material_mode: "reselect", reason: reason.trim(), tags, ...(manual?.length ? { manual_chunk_ids: manual } : {}) } : {}) });
-      setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); setReselecting(false); markClean(); operation.watchRevision(revisionRun.id); await onRefresh();
+      setRevisionRun(await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`)); setReselecting(false);
+      if (materialMode === "reselect") {
+        setPreviewChanges(previous => {
+          if (JSON.stringify(previous[targetId]?.source_chunk_ids) !== JSON.stringify(manual)) return previous;
+          const { source_chunk_ids: _submitted, ...remaining } = previous[targetId] || {};
+          const next: Record<string, Candidate> = { ...previous, [targetId]: remaining };
+          if (!Object.keys(remaining).length) delete next[targetId];
+          return next;
+        });
+        setSavedEdits(previous => JSON.stringify({ ...JSON.parse(previous), reason: submittedReason, tags: submittedTags }));
+      }
+      operation.watchRevision(revisionRun.id); await onRefresh();
     } catch (error) { setRevisionError(errorMessage(error)); }
     finally { setRevisionBusy(false); }
   };

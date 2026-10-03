@@ -258,3 +258,15 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 ## 2026-09-30 · Phase 1 closure under V1.3
 
 业务导入与统一候选池、真实构造题型、共享 UI、QA 状态、实际阶段/完整 Usage、集中价格默认未配、Monitoring nullable migration。当前真实数据见 CURRENT_DEMO_TRUTH；本轮不执行真实业务链。
+
+
+## V1.4 Interview Demo UI 修订（2026-10-03）
+
+- **Status:** Confirmed；实施验收结果见 [Interview Demo 验收](INTERVIEW_DEMO_VERIFICATION.md)。
+- 依据桌面 `RAG_SELF_EVOLUTION_CODEX_INTERVIEW_DEMO_MASTER_PROMPT.md` 与用户批准的取舍，唯一 V1.4 SPEC 第 14–15 节原位替换旧 UI 要求，不创建第二份 SPEC 或 V1.5/V2 业务流程，原输入与历史业务验收保持原样。
+- 面向 20–30 分钟面试：概览为唯一全局闭环；其他页删除重复 Stepper/流程、大 KPI 与发布流水线。Pipeline 四类 Frozen/Agent 可调配置，Golden 紧凑 Preview/正式 Snapshot/风险，Baseline 三 Tab，Agent WHY/CHANGE/RESULT 与独立 D，Sandbox 四核心指标，发布聚焦当前人工决策。
+- 全站详情右 Drawer 标准 560px/wide 800px、贴右满高/移动全宽；统一 Select 自动收起、卡片/表格滚动、字体/成功色/紧凑空态。真实 0/false 保留，费用仅完整 Usage + 冻结价格币种（当前 USD），Judge 不借 Generation Model 兜底。
+- 方案对比固定当前正式 Baseline vs 实际 active、人工已发布 Production，删除 Qualified Candidate fallback、任意方案选择器及历史评测 UI/GET/缓存；Sandbox 保留历史实验对比，用户主动运行才产生实时同题回答。
+- Primary Root Cause 保留每题一个真实原值；Secondary Signals 可多个，保留实际 Query/Metadata/Performance/Unknown 等，不强制五类映射、不改变诊断规则。当前已保存 Generation 6 / Safety 1 只作真实来源说明。
+- 唯一后端补充：现有 `GET /api/pipeline.index.dimension/indexed_count` 只读实际 FAISS `d/ntotal`、未知 null；不改模型/索引/DB/业务规则。保护正式 20 题 8/4/8、Baseline 9/11、A 10/11、B 7/11 Regression FAIL、C 11/11 已发布、D 10/11 保留 C。
+- 本轮禁止真实 Provider/Golden/Baseline/A/B/C/D/人工 Gate/发布重跑；仅隔离 Stub/前端与真实只读 GET 验收。Runbook 修正过时“尚无正式 Snapshot”口径，保留两张 V1.4 目标架构链接；历史报告日期与测试数字不作为本次证据。

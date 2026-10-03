@@ -97,12 +97,21 @@ it("shows persisted partial slots, failure details, and only the refill action",
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/questions") ? { questions: rows } : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
-  expect(document.body.textContent).toContain("Question Construction12/20");
+  expect(document.querySelector(".generation-progress")?.textContent).toContain("Hard Valid 12/20");
   expect(document.body.textContent).toContain("已处理 20/20 · 100%");
   expect(document.body.textContent).toContain("Hard Valid 12/20 · 待补 8");
   expect(document.body.textContent).toContain("补齐失败题（8）");
   expect(document.body.textContent).not.toContain("生成 V1 Mini 8 / 4 / 8");
   expect(document.querySelector(".review-batch")).toBeNull();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行详情")!.click());
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-NEW");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Slot 20 / 20");
+  await act(async () => document.querySelector<HTMLDetailsElement>(".slot-audit summary")!.click());
+  expect(document.querySelector<HTMLDetailsElement>(".slot-audit")?.open).toBe(true);
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("原文证据");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("unsupported answer anchor");
+  await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-table button")].at(-1)!.click());
   expect(document.body.textContent).toContain("unsupported answer anchor");
   await act(async () => root.unmount());
@@ -117,7 +126,10 @@ for (const count of [10, 12, 19]) {
     await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: rows, snapshots: [] }} />));
     expect(document.querySelector(".review-table")?.textContent).toContain(`题目 ${count}`);
     expect(document.querySelector(".generation-progress")?.textContent).toContain(`Hard Valid ${count}/20`);
-    expect(document.querySelector(".run-details")?.hasAttribute("open")).toBe(false);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行详情")!.click());
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-partial");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Slot 20 / 20");
     await act(async () => root.unmount());
   });
 }

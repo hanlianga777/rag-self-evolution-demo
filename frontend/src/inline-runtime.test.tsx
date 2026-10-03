@@ -8,7 +8,7 @@ import { GovernancePage } from "./pages/GovernancePage";
 import { OperationProvider } from "./operation";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-afterEach(() => { document.body.innerHTML = ""; localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { document.body.innerHTML = ""; localStorage.clear(); sessionStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("shows assistant waiting inline and renders a complete synchronous answer at once", async () => {
   let respond!: (value: Response) => void;
@@ -16,13 +16,14 @@ it("shows assistant waiting inline and renders a complete synchronous answer at 
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><AssistantPage badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} /></OperationProvider>));
   await act(async () => document.querySelector<HTMLButtonElement>(".empty-chat button")!.click());
-  expect(document.querySelector(".thinking-message")?.textContent).toContain("DeepSeek 思考中");
+  expect(document.querySelector(".thinking-message")?.textContent).toContain("正在检索与生成回答");
   expect(document.querySelector(".operation-console")).toBeNull();
   await act(async () => respond(new Response(JSON.stringify({ baseline: { answer: "完整回答内容", sources: [], evidence: [] }, model: "DeepSeek", mode: "live" }), { status: 200 })));
   expect(document.querySelector(".thinking-message")).toBeNull();
   expect(document.body.textContent).toContain("完整回答内容");
   expect(document.querySelector(".typing-cursor")).toBeNull();
-  expect(document.body.textContent).toContain("生成耗时");
+  expect(document.querySelector(".message-list")?.textContent).not.toContain("未采集");
+  expect(document.querySelector(".message-list")?.textContent).toContain("查看回答审计");
   await act(async () => root.unmount());
 });
 
@@ -31,9 +32,9 @@ it("shows Before result without waiting for After and keeps a one-sided failure 
   let candidate!: (value: Response) => void;
   vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise<Response>(resolve => { if (JSON.parse(String(init?.body)).scheme_id === "baseline") baseline = resolve; else candidate = resolve; })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<OperationProvider restore={false}><ExperimentPage data={{ evaluation: { id: "EVAL-1" }, optimization: { candidates: [{ id: "EXP-A", reasoning: { candidate_label: "A" }, result: { qualification: { qualified: true } } }] } }} onOpenCitation={() => {}} /></OperationProvider>));
+  await act(async () => root.render(<OperationProvider restore={false}><ExperimentPage data={{ workspace: { current_baseline_id: "EVAL-1" }, evaluation: { id: "EVAL-1" }, versions: [{ id: "PROD-C", status: "active", provenance: "published", snapshot: { candidate_id: "EXP-R1-C", human_release: { decision: "approved" } } }] }} onOpenCitation={() => {}} /></OperationProvider>));
   await act(async () => { const textarea = document.querySelector("textarea")!; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "测试"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
-  await act(async () => document.querySelector<HTMLButtonElement>(".experiment-query button")!.click());
+  await act(async () => document.querySelector<HTMLButtonElement>(".query-action button")!.click());
   expect(document.querySelectorAll(".experiment-answer-card .running")).toHaveLength(2);
   expect(document.querySelector(".operation-console")).toBeNull();
   await act(async () => baseline(new Response(JSON.stringify({ answer: "Baseline 答案", version: "EVAL-1", latency_ms: 100, evidence: [] }), { status: 200 })));

@@ -27,8 +27,10 @@ it("uses the stage flow on Overview without redundant numbered storyline", async
   await act(async () => root!.render(<OverviewPage data={data} navigate={() => {}} />));
   expect(document.querySelector('ol[aria-label="全链路阶段"].stage-stepper')).not.toBeNull();
   expect(document.body.textContent).not.toContain("Baseline 发现问题 → Agent 提出假设");
-  expect(document.body.textContent).toContain("production-long-id");
   expect(document.body.textContent).not.toContain("01");
+  expect(document.body.textContent).not.toContain("production-long-id");
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Production 发布来源")!.click());
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("production-long-id");
 });
 
 it("marks completed and current lifecycle stages accessibly", async () => {
@@ -44,10 +46,13 @@ it("formats Baseline time locally and shortens the run ID", async () => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(String(input).endsWith("/api/bad-cases") ? [] : run), { status: 200 })));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
-  expect(document.body.textContent).toContain("2026-09-27 22:04:23");
+  expect(document.body.textContent).not.toContain("2026-09-27 22:04:23");
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "查看技术详情")!.click());
+  expect(document.querySelector("[role=dialog]")?.textContent).toContain("2026-09-27 22:04:23");
+  expect(document.querySelector(".short-id")?.textContent).not.toBe(run.id);
   const audit = [...document.querySelectorAll("button")].find(button => button.textContent === "查看原始时间")!;
   await act(async () => audit.click());
-  expect(document.querySelector("[role=dialog]")?.textContent).toContain(run.created_at);
+  expect([...document.querySelectorAll("[role=dialog]")].at(-1)?.textContent).toContain(run.created_at);
   expect(document.querySelector(".short-id")?.textContent).not.toBe(run.id);
 });
 
@@ -57,7 +62,7 @@ it("keeps the Baseline Bad Case table compact and detail ready", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["题目", "问题", "根因", "主要失败指标", "证据"]);
+  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["题目", "问题", "Primary Root Cause", "主要失败指标", "Secondary Signals / Evidence", "操作"]);
   expect(document.querySelector("tbody")?.textContent).toContain("+1");
   expect(document.querySelector("tbody")?.textContent).not.toContain("Not Passed");
 });
