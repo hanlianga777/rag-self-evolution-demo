@@ -136,6 +136,12 @@ class EvaluationRunner:
         index_info = self.runtime.corpus.index_info() if hasattr(self.runtime, "corpus") and hasattr(self.runtime.corpus, "index_info") else {}
         if not isinstance(index_info, dict):
             index_info = {}
+        if index_info.get('knowledge_identity'):
+            if snapshot.get('corpus_fingerprint') != index_info['knowledge_identity']:
+                raise ValueError('Golden Snapshot does not belong to active Knowledge Pipeline')
+            config['knowledge_identity'] = index_info['knowledge_identity']
+            config['candidate_k'] = index_info['knowledge_config']['candidate_k']
+            config['top_k'] = index_info['knowledge_config']['top_k']
         judge_meta = {"model": self.runtime.model, "prompt_version": "judge-v1", "scoring_policy": "v1.0.1-gates", "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
         return self.store.create_evaluation_run(snapshot, config, judge_meta), approved, config
 
@@ -144,7 +150,7 @@ class EvaluationRunner:
         execution = self.runtime.answer(item["question"], config)
         judge = self.runtime.judge(item["question"], expected, execution["answer"], item["test_category"])
         expected_chunks = {chunk_id for evidence in item["evidence"] for chunk_id in evidence.get("source_chunk_ids", [])}
-        retrieved = [entry.get("chunk_id") for entry in execution["retrieval"]]
+        retrieved = [key for entry in execution["retrieval"] for key in entry.get("matched_child_ids", [entry.get("chunk_id")])]
         matching = [index + 1 for index, chunk_id in enumerate(retrieved) if chunk_id in expected_chunks]
         from .retrieval import evidence_coverage
         trace = execution.get('retrieval_trace') or {}
@@ -201,7 +207,7 @@ class EvaluationRunner:
         approved = self.snapshot_items(snapshot)
         if baseline['judge'].get('model') != self.runtime.model:
             raise ValueError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
-        config = {**candidate["config"], "run_target": "sandbox_candidate", "candidate_id": candidate_id}
+        config = {**candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
         candidate = self.store.reserve_candidate_evaluation(candidate_id)
         try:
             run_id = self.store.create_evaluation_run(snapshot, config, baseline['judge'])

@@ -64,9 +64,10 @@ def largest_remainder(total, sizes):
     return quotas
 
 
-def cluster_vectors(vectors, k):
+def cluster_vectors(vectors, k, initial_membership=None):
     from sklearn.cluster import KMeans
     labels = KMeans(n_clusters=min(k, len(np.unique(vectors, axis=0))), random_state=PARAMETERS['seed'], n_init=PARAMETERS['n_init'], max_iter=PARAMETERS['max_iter']).fit_predict(vectors)
+    if initial_membership is not None: initial_membership.update({index: int(label) for index, label in enumerate(labels)})
     groups = {int(i): np.where(labels == i)[0].tolist() for i in sorted(set(labels))}
     merges = []
     while len(groups) > 1:
@@ -95,7 +96,8 @@ def build_plan(chunks, embeddings, profile, corpus_fingerprint=None, embedding_i
     vectors = vectors / np.linalg.norm(vectors, axis=1)[:, None]
     n = len(chunks)
     k = min(n, max(1, max(2, min(n // PARAMETERS['target_cluster_size'], math.isqrt(n) + 1))))
-    groups, merges = cluster_vectors(vectors, k)
+    initial_membership = {}
+    groups, merges = cluster_vectors(vectors, k, initial_membership)
     used, history = Counter(), Counter(usage or {})
     clusters, slots, gaps = [], [], []
     anchor_quotas = largest_remainder(sum(profile_count(profile, g) for g in GROUPS), [len(ids) for ids in groups])
@@ -108,7 +110,7 @@ def build_plan(chunks, embeddings, profile, corpus_fingerprint=None, embedding_i
     for index, ids in enumerate(groups):
         representative = chunks[ids[0]]
         cluster_id = f'T{index + 1:03d}'
-        clusters.append({'cluster_id': cluster_id, 'size': len(ids), 'center': vectors[ids].mean(axis=0).tolist(), 'chunk_ids': [chunks[i]['chunk_id'] for i in ids], 'representative_chunk_ids': [representative['chunk_id']], 'label': representative.get('section_path') or representative.get('section') or representative.get('document_name') or '未采集', 'products': sorted({chunks[i]['product'] for i in ids if chunks[i].get('product')}), 'anchor_quota': anchor_quotas[index], 'quotas': {g: quotas[g][index] for g in GROUPS}})
+        clusters.append({'cluster_id': cluster_id, 'size': len(ids), 'center': vectors[ids].mean(axis=0).tolist(), 'chunk_ids': [chunks[i]['chunk_id'] for i in ids], 'representative_chunk_ids': [representative['chunk_id']], 'label': representative.get('section_path') or representative.get('section') or representative.get('document_name') or '未采集', 'initial_cluster_ids': sorted({initial_membership[i] for i in ids}), 'small_cluster_merged': any(m['from'] in {initial_membership[i] for i in ids} for m in merges), 'products': sorted({chunks[i]['product'] for i in ids if chunks[i].get('product')}), 'anchor_quota': anchor_quotas[index], 'quotas': {g: quotas[g][index] for g in GROUPS}})
         if not anchor_quotas[index]:
             gaps.append({'topic_cluster': cluster_id, 'reason': 'no_anchor_slots', 'size': len(ids)})
         if not quotas['positive'][index] + quotas['ablation'][index]:

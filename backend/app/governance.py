@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .policy import DEFAULT_PIPELINE_CONFIG, MAX_EVALS
-from .corpus import EMBEDDING_MODEL, current_manifest
+from .corpus import EMBEDDING_MODEL, CorpusStore, current_manifest, manifest_identity
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -287,7 +287,7 @@ class GovernanceStore:
             for evidence in question['evidence']:
                 for key in evidence.get('source_chunk_ids', []):
                     usage[key] = usage.get(key, 0) + 1
-        plan = build_plan(chunks, embeddings, {'name': profile_name, **GENERATION_PROFILES[profile_name]}, current_manifest()['sources'], embedding_identity or EMBEDDING_MODEL, usage)
+        plan = build_plan(chunks, embeddings, {'name': profile_name, **GENERATION_PROFILES[profile_name]}, manifest_identity(current_manifest()), embedding_identity or EMBEDDING_MODEL, usage)
         with self.connection() as connection:
             connection.execute('INSERT OR IGNORE INTO coverage_plan_previews (id, plan_json, created_at) VALUES (?, ?, ?)', (plan['plan_id'], _json(plan), plan['created_at']))
             saved = connection.execute('SELECT plan_json FROM coverage_plan_previews WHERE id=?', (plan['plan_id'],)).fetchone()
@@ -301,7 +301,7 @@ class GovernanceStore:
             if row is None:
                 raise ValueError('Coverage Preview 不存在，请重新预览')
             plan = _load(row['plan_json'], {})
-            if plan['corpus_fingerprint'] != current_manifest()['sources'] or plan['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
+            if plan['corpus_fingerprint'] != manifest_identity(current_manifest()) or plan['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
                 raise ValueError('Coverage Preview 已失效：Corpus 已变化')
             if embeddings is not None:
                 import numpy as np
@@ -329,7 +329,7 @@ class GovernanceStore:
         validations, seen = {}, set()
         for key in sorted(question_ids):
             item = self.question(key)
-            context = {'seen': seen, 'corpus_fingerprint': current_manifest()['sources']}
+            context = {'seen': seen, 'corpus_fingerprint': manifest_identity(current_manifest())}
             if item['test_category'] == 'negative' and question_embedder:
                 try:
                     context['question_embedding'] = question_embedder(item['question'])
@@ -351,7 +351,7 @@ class GovernanceStore:
         clones, question_plan = [], []
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
-            if plan['corpus_fingerprint'] != current_manifest()['sources']:
+            if plan['corpus_fingerprint'] != manifest_identity(current_manifest()):
                 raise ValueError('Coverage Preview 已失效：Corpus 已变化')
             if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status IN ('queued','coverage','generating','validation','probing','qc')").fetchone():
                 raise ValueError('已有 Run 正在执行')
@@ -385,6 +385,7 @@ class GovernanceStore:
         all_questions = self.questions()
         return {
             "generation_run_id": current["id"] if current else None,
+            "corpus_fingerprint": current["artifacts"]["hard_validation"].get("corpus_fingerprint") if current else None,
             "total": len(rows),
             "expected_count": self._expected_count(current) if current else 0,
             "generation_status": current["status"] if current else None,
@@ -423,14 +424,14 @@ class GovernanceStore:
         run_id, now = f"GGEN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", _now()
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            pending = connection.execute("SELECT profile_json FROM golden_generation_runs WHERE status = 'needs_regeneration' LIMIT 1").fetchone()
+            pending = next((row for row in connection.execute("SELECT r.profile_json, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.status='needs_regeneration'") if _load(row['hard_validation_json'], {}).get('corpus_fingerprint') == manifest_identity(current_manifest())), None)
             if pending:
                 old_mini = _load(pending["profile_json"], {}).get("name", "mini") == "mini"
                 raise ValueError("当前 V1 Mini 尚有失败 Slot 待补齐，请先完成当前 Run。" if old_mini else "当前测试集尚有失败 Slot 待补齐，请先完成当前 Run。")
             if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status IN ('queued', 'coverage', 'generating', 'validation', 'probing', 'qc') LIMIT 1").fetchone():
                 raise ValueError("已有 Generation Run 正在执行")
             connection.execute("INSERT INTO golden_generation_runs (id, profile_json, model_version, status, question_ids_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(profile), model_version, "queued", _json([]), now))
-            connection.execute("INSERT INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)", (run_id, _json(coverage_plan["slots"] if coverage_plan else []), _json([]), _json({"slot_persistence_v1": True, "frozen_plan": coverage_plan, "corpus_fingerprint": current_manifest()["sources"], "progress": {"stage": "queued", "completed_slots": 0, "total_slots": profile["expected_count"], "phase_processed": 0, "phase_total": profile["expected_count"], "processed_slot_ids": [], "probe_completed": 0, "qc_completed": 0, "started_at": now, "operation_id": run_id}})))
+            connection.execute("INSERT INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)", (run_id, _json(coverage_plan["slots"] if coverage_plan else []), _json([]), _json({"slot_persistence_v1": True, "frozen_plan": coverage_plan, "corpus_fingerprint": manifest_identity(current_manifest()), "progress": {"stage": "queued", "completed_slots": 0, "total_slots": profile["expected_count"], "phase_processed": 0, "phase_total": profile["expected_count"], "processed_slot_ids": [], "probe_completed": 0, "qc_completed": 0, "started_at": now, "operation_id": run_id}})))
         return run_id
 
     def claim_regeneration(self, run_id: str, corpus_fingerprint):
@@ -890,10 +891,10 @@ class GovernanceStore:
             candidate = {**old["raw"], "question": str(change.get("question", old["question"])).strip(), "reference_answer": change.get("reference_answer", old["reference_answer"]), "evidence": evidence, "test_category": old["test_category"], "expected_behavior": old["raw"].get("expected_behavior"), "ablation_attribute": old["raw"].get("ablation_attribute"), "ablation_metadata": change.get("ablation_metadata", old["raw"].get("ablation_metadata", {}))}
             from .golden_v2 import validate_golden_candidate
             frozen = (self.generation_run(run['generation_run_id']).get('artifacts') or {}).get('hard_validation', {}).get('frozen_plan')
-            context = {'slot_id': old['raw'].get('coverage_slot'), 'corpus_fingerprint': current_manifest()['sources']}
+            context = {'slot_id': old['raw'].get('coverage_slot'), 'corpus_fingerprint': manifest_identity(current_manifest())}
             if frozen and old['test_category'] == 'negative':
                 try:
-                    context['question_embedding'] = AiService(self, None, None, True).negative_topic_embedding(candidate['question'])
+                    context['question_embedding'] = AiService(self, CorpusStore(), None, True).negative_topic_embedding(candidate['question'])
                 except (OSError, ValueError, RuntimeError):
                     pass
             validation = validate_golden_candidate(candidate, chunks, frozen, context)
@@ -1165,11 +1166,11 @@ class GovernanceStore:
             from .golden_v2 import validate_golden_candidate
             run = self.generation_run(current['raw']['generation_run_id']) if current['raw'].get('generation_run_id') else None
             frozen = (run or {}).get('artifacts', {}).get('hard_validation', {}).get('frozen_plan')
-            context = {'seen': [peer[1] for peer in peers], 'similarity': similarity, 'slot_id': current['raw'].get('coverage_slot'), 'corpus_fingerprint': current_manifest()['sources']}
+            context = {'seen': [peer[1] for peer in peers], 'similarity': similarity, 'slot_id': current['raw'].get('coverage_slot'), 'corpus_fingerprint': manifest_identity(current_manifest())}
             if frozen and current['test_category'] == 'negative':
                 from .ai_service import AiService
                 try:
-                    context['question_embedding'] = AiService(self, None, None, True).negative_topic_embedding(question)
+                    context['question_embedding'] = AiService(self, CorpusStore(), None, True).negative_topic_embedding(question)
                 except (OSError, ValueError, RuntimeError):
                     pass
             validation = validate_golden_candidate({**current['raw'], **current, 'question': question, 'reference_answer': reference_answer, 'evidence': evidence}, chunks, frozen, context)
@@ -1197,7 +1198,7 @@ class GovernanceStore:
     def _create_dataset_snapshot(self, approved=None, generation_run_id=None):
         approved = approved if approved is not None else self.questions("golden")
         from .corpus import current_manifest
-        fingerprint = current_manifest()['sources']
+        fingerprint = manifest_identity(current_manifest())
         run = self.generation_run(generation_run_id) if generation_run_id else None
         run_fingerprint = (run or {}).get('artifacts', {}).get('hard_validation', {}).get('corpus_fingerprint')
         if run_fingerprint is not None and run_fingerprint != fingerprint:
@@ -1375,7 +1376,7 @@ class GovernanceStore:
 
     def _quality_identity(self, item, connection):
         probe = connection.execute('SELECT id FROM probe_results WHERE question_id=? ORDER BY id DESC LIMIT 1', (item['id'],)).fetchone()
-        return {'content_hash': self._quality_content(item), 'active_candidate': item.get('stage') != 'superseded', 'corpus_fingerprint': current_manifest()['sources'],
+        return {'content_hash': self._quality_content(item), 'active_candidate': item.get('stage') != 'superseded', 'corpus_fingerprint': manifest_identity(current_manifest()),
                 'probe_id': probe['id'] if probe else None}
 
     def capture_quality(self, question_id, *, qc=False):
@@ -1453,7 +1454,7 @@ class GovernanceStore:
         run = self.generation_run(next(iter(runs))) if len(runs) == 1 and None not in runs else None
         from .corpus import current_manifest
         run_fingerprint = (run.get("artifacts", {}).get("hard_validation", {}) if run else {}).get("corpus_fingerprint")
-        if run_fingerprint is not None and run_fingerprint != current_manifest()["sources"]:
+        if run_fingerprint is not None and run_fingerprint != manifest_identity(current_manifest()):
             raise ValueError("Corpus 已变化；请基于当前知识库创建新的 Generation Run")
         expected = self._expected_count(run) if run else 0
         if not expected or len(candidates) != expected or len(set(question_ids)) != expected or len(runs) != 1 or any(item["raw"].get("generation_run_id") != run["id"] for item in candidates):
@@ -1464,7 +1465,7 @@ class GovernanceStore:
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             current_run_fingerprint = self.generation_run(run['id'])['artifacts']['hard_validation'].get('corpus_fingerprint')
-            if current_run_fingerprint is not None and current_run_fingerprint != current_manifest()['sources']:
+            if current_run_fingerprint is not None and current_run_fingerprint != manifest_identity(current_manifest()):
                 raise ValueError('Corpus 已变化；请重新冻结当前知识库')
             candidates = [self.question(question_id) for question_id in question_ids]
             if set(self.generation_run(run['id'])['question_ids']) != set(question_ids):
@@ -1484,7 +1485,7 @@ class GovernanceStore:
                 connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", (question_id, "dataset", "approved", actor, now))
                 connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "approved", actor, now))
             prior = next((item['snapshot'] for item in self.dataset_snapshots() if item['snapshot'].get('generation_run_id') == run['id'] and item['snapshot'].get('question_ids') == run['question_ids']), None)
-            snapshot = prior or {'id': f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", 'generation_run_id': run['id'], 'profile': run['profile'], 'question_ids': run['question_ids'], 'questions': [self.question(key)['raw'] for key in run['question_ids']], 'policy_version': 'v1.4' if run['artifacts']['hard_validation'].get('frozen_plan') else 'v1.3', 'coverage_plan': run['artifacts']['hard_validation'].get('frozen_plan'), 'corpus_fingerprint': run_fingerprint or current_manifest()['sources']}
+            snapshot = prior or {'id': f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", 'generation_run_id': run['id'], 'profile': run['profile'], 'question_ids': run['question_ids'], 'questions': [self.question(key)['raw'] for key in run['question_ids']], 'policy_version': 'v1.4' if run['artifacts']['hard_validation'].get('frozen_plan') else 'v1.3', 'coverage_plan': run['artifacts']['hard_validation'].get('frozen_plan'), 'corpus_fingerprint': run_fingerprint or manifest_identity(current_manifest())}
             if not prior:
                 connection.execute('INSERT INTO dataset_versions (id, status, source, snapshot_json, created_at) VALUES (?, ?, ?, ?, ?)', (snapshot['id'], 'approved', 'human_review', _json(snapshot), now))
         return {"reviewed": [self.question(question_id) for question_id in question_ids], "generation_run_id": run['id'], 'snapshot': snapshot}
@@ -1538,7 +1539,7 @@ class GovernanceStore:
         if connection is None:
             with self.connection() as connection:
                 return self.current_baseline_identity(connection)
-        fingerprint = current_manifest()["sources"]
+        fingerprint = manifest_identity(current_manifest())
         golden = connection.execute("SELECT * FROM dataset_versions WHERE status='approved' ORDER BY created_at DESC, rowid DESC LIMIT 1").fetchone()
         identity = {"current_baseline_id": None, "current_experiment_id": None, "current_golden_id": golden["id"] if golden else None, "current_corpus_fingerprint": fingerprint, "baseline_unavailable_reason": None, "requires_new_golden": True}
         if golden is None:
@@ -1950,7 +1951,7 @@ class GovernanceStore:
             release["id"] = approval.lastrowid
             if previous:
                 connection.execute("UPDATE production_versions SET status = 'archived' WHERE id = ?", (previous["id"],))
-            snapshot = {"version": version_id, "candidate_id": candidate_id, "pipeline_config": candidate["config"], "candidate_configuration": candidate["config"], "prompt_strategy": candidate["config"].get("prompt_strategy"), "prompt_version": "grounded-prompt-v1", "generation_model": run["judge"].get("model"), "model_version": run["judge"].get("model"), "rerank_mode": "lightweight_second_stage" if candidate["config"].get("rerank") else "disabled", "embedding_model": EMBEDDING_MODEL, "golden_snapshot": run["dataset_version_id"], "dataset_snapshot_version": run["dataset_version_id"], "evaluation_run": run["id"], "evaluation_result": candidate["result"], "hard_gate_results": candidate["result"].get("gates"), "comparison_metrics": candidate["result"].get("comparison_metrics"), "bad_case_count": candidate["result"].get("bad_case_count"), "regression": candidate["result"].get("regression"), "recommendation": self.recommendation(candidate["experiment_id"]), "recommendation_reason": (self.recommendation(candidate["experiment_id"]) or {}).get("result", {}).get("why"), "human_release": release, "release_operator": release.get("actor"), "release_time": _now(), "previous_version": previous["id"] if previous else None, "timestamp": _now()}
+            snapshot = {"version": version_id, "candidate_id": candidate_id, "pipeline_config": candidate["config"], "candidate_configuration": candidate["config"], "prompt_strategy": candidate["config"].get("prompt_strategy"), "prompt_version": "grounded-prompt-v1", "generation_model": run["judge"].get("model"), "model_version": run["judge"].get("model"), "rerank_mode": ("qwen3-rerank" if run["config"].get("knowledge_identity") else "lightweight_second_stage") if candidate["config"].get("rerank") else "disabled", "embedding_model": run["judge"].get("execution_snapshot", {}).get("embedding_model", EMBEDDING_MODEL), "knowledge_identity": run["config"].get("knowledge_identity"), "golden_snapshot": run["dataset_version_id"], "dataset_snapshot_version": run["dataset_version_id"], "evaluation_run": run["id"], "evaluation_result": candidate["result"], "hard_gate_results": candidate["result"].get("gates"), "comparison_metrics": candidate["result"].get("comparison_metrics"), "bad_case_count": candidate["result"].get("bad_case_count"), "regression": candidate["result"].get("regression"), "recommendation": self.recommendation(candidate["experiment_id"]), "recommendation_reason": (self.recommendation(candidate["experiment_id"]) or {}).get("result", {}).get("why"), "human_release": release, "release_operator": release.get("actor"), "release_time": _now(), "previous_version": previous["id"] if previous else None, "timestamp": _now()}
             connection.execute("INSERT INTO production_versions (id, status, config_json, evaluation_run_id, dataset_version_id, approval_id, previous_version_id, created_at, snapshot_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (version_id, "active", _json(candidate["config"]), run["id"], run["dataset_version_id"], release["id"], previous["id"] if previous else None, _now(), _json(snapshot)))
         return self.active_production()
 
@@ -1972,7 +1973,7 @@ class GovernanceStore:
         if not question.strip() or not answer.strip():
             raise ValueError("Monitoring requires a complete question and answer")
         production = self.active_production()
-        provenance = source or {"production_version_id": production["id"] if production else None, "production_config": production["config"] if production else None, "corpus_fingerprint": current_manifest()["sources"]}
+        provenance = source or {"production_version_id": production["id"] if production else None, "production_config": production["config"] if production else None, "corpus_fingerprint": manifest_identity(current_manifest())}
         event_id = f"MON-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         with self.connection() as connection:
             connection.execute(

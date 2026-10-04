@@ -14,8 +14,8 @@ const render = async (data: any) => { vi.stubGlobal("fetch", vi.fn()); root = cr
 it.each(["generating", "needs_regeneration", "failed"])("keeps the frozen Golden and Agent next step when a different work Run is %s", async status => {
   const data = input(status), before = JSON.stringify(data);
   await render(data);
-  expect(document.querySelector(".overview-metrics .metric")?.textContent).toContain("3 题");
-  expect(document.querySelector(".overview-metrics .metric")?.textContent).toContain("正向 1 / 消融 1 / 负向 1");
+  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("3 题");
+  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("正向 1 / 消融 1 / 负向 1");
   expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("Golden Dataset已冻结");
   expect(document.querySelector(".next-action h2")?.textContent).toBe("运行 Optimization Agent");
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#evolution");
@@ -31,13 +31,13 @@ it("keeps the current recommendation at human release despite an unfinished new 
   await render(data);
   expect(document.querySelector(".next-action h2")?.textContent).toBe("Gate 3 · 人工确认发布");
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#versions");
-  expect(document.querySelector(".overview-metrics .metric")?.textContent).toContain("3 题");
+  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("3 题");
 });
 
 it("uses the same-identity Baseline frozen Snapshot when the snapshot list is absent", async () => {
   const data: any = input("generating"); delete data.snapshots;
   await render(data);
-  expect(document.querySelector(".overview-metrics .metric")?.textContent).toContain("3 题");
+  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("3 题");
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#evolution");
 });
 

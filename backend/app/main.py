@@ -1,3 +1,4 @@
+from .corpus import manifest_identity
 import csv
 import io
 import json
@@ -37,7 +38,7 @@ app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=
 store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None)
 corpus = CorpusStore()
 ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")
-corpus_manager = CorpusManager(ai_service.retriever)
+corpus_manager = CorpusManager(ai_service.retriever, knowledge_pipeline=True, on_knowledge_activated=lambda: start_knowledge_golden())
 store.interrupt_revision_runs()
 store.interrupt_generation_runs()
 store.interrupt_evaluation_runs()
@@ -196,7 +197,7 @@ def overview():
     identity = store.current_baseline_identity()
     baseline = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
     triggers = store.optimization_triggers()
-    return {"data_source": "real", "production": production, "dataset": summary, "latest_evaluation": baseline, **identity, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
+    return {"data_source": "real", "production": production, "dataset": summary, "latest_evaluation": baseline, "knowledge": knowledge(), **identity, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
 
 
 @app.get("/api/workspace")
@@ -213,6 +214,74 @@ def require_current_baseline(run_id: str | None = None):
         return store.require_current_baseline(run_id)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get('/api/knowledge')
+def knowledge():
+    with CORPUS_LOCK:
+        from .knowledge_pipeline import CONFIG, provider_status
+        index = corpus.index_info()
+        manifest_path = corpus.index_dir/'manifest.json'
+        manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+        coverage = index.get('coverage')
+        fresh = manifest.get('sources') == current_manifest()['sources']
+        operations = [corpus_manager.operation(p.stem) for p in (corpus_manager.data_dir/'corpus_operations').glob('*.json')]
+        operation = next(iter(sorted((o for o in operations if o), key=lambda o: o['id'].rsplit('-', 1)[-1], reverse=True)), None)
+        updating = bool(operation and operation['status'] == 'running')
+        if updating or not fresh: coverage = None
+        documents = corpus.documents()
+        return {'target_config': index.get('knowledge_config') or CONFIG, 'providers': provider_status(), 'index': index,
+                'identity': index.get('knowledge_identity'), 'legacy': not bool(index.get('knowledge_identity')),
+                'documents': len(documents), 'pages': sum(d.get('pages') or 0 for d in documents),
+                'coverage': coverage, 'coverage_status': 'calculating' if updating else 'ready' if coverage else 'pending',
+                'operation': operation, 'sample_children': corpus.chunks()[:3] if index.get('knowledge_identity') else []}
+
+
+@app.get('/api/knowledge/clusters/{cluster_id}')
+def knowledge_cluster(cluster_id: str):
+    with CORPUS_LOCK:
+        state = knowledge(); plan = state['coverage']
+        if not plan: raise HTTPException(status_code=409, detail='知识主题覆盖待更新')
+        cluster = next((c for c in plan['clusters'] if c['cluster_id'] == cluster_id), None)
+        if cluster is None: raise HTTPException(status_code=404, detail='Cluster not found')
+        chunks = {c['chunk_id']: c for c in corpus.chunks()}
+        return {**cluster, 'identity': state['identity'], 'initial_k': plan['initial_k'], 'merge_mapping': plan['merge_mapping'],
+                'source_documents': sorted({chunks[key]['document_name'] for key in cluster['chunk_ids']}),
+                'representative_children': [chunks[key] for key in cluster['representative_chunk_ids']],
+                'slots': [s for s in plan['slots'] if s['topic_cluster'] == cluster_id]}
+
+
+@app.get('/api/knowledge/slots/{slot_id}')
+def knowledge_slot(slot_id: str):
+    with CORPUS_LOCK:
+        state = knowledge(); plan = state['coverage']
+        if not plan: raise HTTPException(status_code=409, detail='知识主题覆盖待更新')
+        slot = next((s for s in plan['slots'] if s['slot_id'] == slot_id), None)
+        if slot is None: raise HTTPException(status_code=404, detail='Slot not found')
+        chunks = {c['chunk_id']: c for c in corpus.chunks()}
+        return {**slot, 'identity': state['identity'], 'material_children': [chunks[key] for key in slot['material_chunk_ids']]}
+
+
+def start_knowledge_golden():
+    """Continue real Full construction only; the existing workflow ends at Human Gate 1."""
+    if not ai_service.live_enabled: raise ProviderUnavailable('DeepSeek missing; Corpus preserved, Golden not run')
+    with CORPUS_LOCK:
+        state = knowledge()
+        plan = state['coverage']
+        if not plan: raise ValueError('Current Knowledge Coverage unavailable')
+        from .governance import _json
+        with store.connection() as connection:
+            connection.execute('INSERT OR IGNORE INTO coverage_plan_previews (id, plan_json, created_at) VALUES (?, ?, ?)', (plan['plan_id'], _json(plan), plan['created_at']))
+        run_id = store.start_generation_run(ai_service.model, 'full', coverage_plan=plan)
+    threading.Thread(target=_run_mini_generation, args=(run_id, store, ai_service, corpus), daemon=True).start()
+    return run_id
+
+
+@app.post('/api/knowledge/rebuild', status_code=202, dependencies=[Depends(require_trusted_origin)])
+def rebuild_knowledge():
+    require_idle_corpus()
+    try: return corpus_manager.start('rebuild')
+    except ValueError as error: raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.get("/api/documents")
@@ -263,7 +332,8 @@ def delete_document(document_id: str):
 
 @app.get("/api/documents/{document_id}")
 def document_detail(document_id: str):
-    result = corpus.detail(document_id)
+    with CORPUS_LOCK:
+        result = corpus.detail(document_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Document not found")
     return result
@@ -453,7 +523,7 @@ def generate_golden(payload: GenerationRequest):
 @app.post("/api/governance/generation-runs/{generation_run_id}/regenerate-failed", status_code=202, dependencies=[Depends(require_trusted_origin)])
 def regenerate_failed(generation_run_id: str):
     try:
-        store.claim_regeneration(generation_run_id, current_manifest()["sources"])
+        store.claim_regeneration(generation_run_id, manifest_identity(current_manifest()))
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Generation run not found") from error
     except ValueError as error:
@@ -479,7 +549,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
         frozen = run_store.generation_run(run_id)['artifacts']['hard_validation'].get('frozen_plan')
         if frozen:
             from .golden_v2 import digest
-            if frozen['corpus_fingerprint'] != current_manifest()['sources'] or frozen['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
+            if frozen['corpus_fingerprint'] != manifest_identity(current_manifest()) or frozen['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
                 raise ValueError('Coverage Plan 已失效：Corpus 已变化')
         complete = False
         for round_number in range(1, 4 if regenerate else 2):
@@ -509,7 +579,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
                 kwargs = {'profile': profile}
                 if frozen:
                     from .golden_v2 import digest
-                    if frozen['corpus_fingerprint'] != current_manifest()['sources'] or frozen['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
+                    if frozen['corpus_fingerprint'] != manifest_identity(current_manifest()) or frozen['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
                         raise ValueError('Coverage Plan 已失效：Corpus 已变化')
                     known = {c['chunk_id']: c for c in chunks}
                     kwargs['coverage_plan'] = frozen
@@ -942,6 +1012,7 @@ def pipeline():
         "search_space": search_space_contract(),
         "locked_parameters": sorted(EXCLUDED_AUTOMATIC_PARAMETERS),
         "index": corpus.index_info(),
+        "knowledge": knowledge(),
         "pricing": price_config(),
         "last_execution_metrics": next((row.get("metrics") for row in store.monitoring_events() if row.get("metrics", {}) and row["metrics"].get("stages")), None),
     }
@@ -1118,7 +1189,7 @@ def evaluation_run(run_id: str):
 def start_evaluation():
     if corpus_manager.state():
         snapshots = store.dataset_snapshots()
-        if not snapshots or snapshots[0]["snapshot"].get("corpus_fingerprint") != current_manifest()["sources"]:
+        if not snapshots or snapshots[0]["snapshot"].get("corpus_fingerprint") != manifest_identity(current_manifest()):
             raise HTTPException(status_code=409, detail="Corpus 已变化；请基于当前知识库重新生成并确认 Golden 测试集")
     runner = EvaluationRunner(store, ai_service)
     try:
@@ -1167,7 +1238,12 @@ def preview_scheme(payload: SchemePreviewRequest):
             config, version, source = version_row["config"], version_row["id"], "production"
         else:
             raise HTTPException(status_code=404, detail="Scheme not found")
-    result = ai_service.answer(payload.question, config)
+    if source == 'candidate':
+        execution = store.evaluation_run(candidate.get('result', {}).get('evaluation_run_id'))
+        bound = (execution or {}).get('config', {}).get('knowledge_identity')
+    elif source == 'production': bound = version_row.get('snapshot', {}).get('knowledge_identity')
+    else: bound = config.get('knowledge_identity')
+    result = ai_service.answer(payload.question, {**config, **({'knowledge_identity': bound} if bound else {})})
     return {"pipeline": source, "question": payload.question, "scheme_id": scheme_id, "version": version, "config": config, "status": "completed", **result, "evidence": result["retrieval"], "fallback_reason": None}
 
 

@@ -6,7 +6,7 @@ from collections import Counter
 from pathlib import Path
 
 from .telemetry import measure
-from .corpus import EMBEDDING_MODEL, INDEX_DIR, TOP_K, CorpusStore
+from .corpus import EMBEDDING_MODEL, INDEX_DIR, TOP_K, CorpusStore, manifest_identity
 from .full_text import CORPUS_LOCK, validate_bundle, search_full_text
 
 
@@ -96,7 +96,8 @@ class VectorRetriever:
             from sentence_transformers import SentenceTransformer
 
             self._index = faiss.read_index(str(index_file))
-            self._model = SentenceTransformer(EMBEDDING_MODEL, local_files_only=True)
+            if not (self._bundle or {}).get('manifest', {}).get('knowledge_identity'):
+                self._model = SentenceTransformer(EMBEDDING_MODEL, local_files_only=True)
             return True
         except Exception as error:
             self._index = None
@@ -120,7 +121,11 @@ class VectorRetriever:
         if not chunks:
             return []
         with measure(stages, 'query_embedding', 'vector_search'):
-            vector = self._model.encode([question], normalize_embeddings=True)
+            if (self._bundle or {}).get('manifest', {}).get('knowledge_identity'):
+                from .knowledge_pipeline import AlibabaProvider
+                vector = AlibabaProvider().embed([question], self._index.d)
+            else:
+                vector = self._model.encode([question], normalize_embeddings=True)
         with measure(stages, 'faiss_search', 'vector_search'):
             scores, positions = self._index.search(vector, limit)
         evidence = []
@@ -186,6 +191,7 @@ class VectorRetriever:
     @staticmethod
     def _materialize(chunk: dict, score: float) -> dict:
         return {
+            "parent_chunk_id": chunk.get("parent_chunk_id"),
             "document_id": chunk["document_id"], "document": chunk.get("document_name") or chunk.get("document") or chunk["document_id"],
             "product": chunk.get("product"), "vendor": chunk.get("vendor"), "chunk_id": chunk["chunk_id"],
             "section": chunk.get("section"), "section_path": chunk.get("section_path"),
@@ -222,6 +228,8 @@ class VectorRetriever:
         """V1.0.1 pipeline: CandidateK → normalized Hybrid → Rerank → MinScore → TopK."""
         stages = stages if stages is not None else []
         stage_start = len(stages)
+        if config.get('knowledge_identity') and config['knowledge_identity'] != (self._bundle or {}).get('manifest', {}).get('knowledge_identity'):
+            raise ValueError('Retrieval configuration belongs to another Knowledge Pipeline')
         aliases = aliases or {}
         rewritten = question
         for alias, canonical in aliases.items():
@@ -256,13 +264,26 @@ class VectorRetriever:
         if trace is not None:
             trace.update({'status': 'collected', 'candidate_stage': 'post_metadata_filter_fusion_candidate_cap_pre_rerank',
                           'config': deepcopy(config), 'question': question, 'queries': query_list, 'aliases': deepcopy(aliases),
-                          'corpus_fingerprint': deepcopy(self._bundle['manifest'].get('sources')) if self._bundle else None,
+                          'corpus_fingerprint': deepcopy(manifest_identity(self._bundle['manifest'])) if self._bundle else None,
                           'artifact_schema_version': self._bundle['manifest'].get('artifact_schema_version') if self._bundle else None,
                           'candidates': [{**self._materialize(by_id[item['chunk_id']], item['combined']), 'rank': rank,
                                           'vector_raw': vector_scores.get(item['chunk_id']), 'bm25_raw': bm25_scores.get(item['chunk_id']),
                                           'vector_normalized': item['vector_score'], 'bm25_normalized': item['bm25_score'], 'fusion_score': item['combined'],
                                           'sources': [name for name, scores in [('vector', vector_scores), ('bm25', bm25_scores)] if item['chunk_id'] in scores]}
                                          for rank, item in enumerate(ranked, 1)]})
+        if (self._bundle or {}).get('manifest', {}).get('knowledge_identity'):
+            from .knowledge_pipeline import AlibabaProvider, expand_parents
+            import json
+            hits = [self._materialize(by_id[item['chunk_id']], item['combined']) for item in ranked]
+            with measure(stages, 'rerank', 'retrieval'):
+                reranked = AlibabaProvider().rerank(question, hits) if config.get('rerank', True) else hits
+            minimum = config.get('min_score')
+            if minimum is not None: reranked = [h for h in reranked if h['score'] >= minimum]
+            with measure(stages, 'parent_expand', 'retrieval'):
+                parents = json.loads((self._bundle['path']/'parents.json').read_text())
+                final = expand_parents(reranked, parents, int(config.get('top_k', 4)))
+            if trace is not None: trace.update(status='completed', reranked=reranked, final=final, parent_expand=True)
+            return final
         output = []
         query_terms = _terms(" ".join(query_list))
         for item in ranked:
@@ -291,7 +312,7 @@ def evidence_coverage(trace, required_ids):
     result = {'required_chunk_ids': required}
     for field, key in (('candidate_recall', 'candidates'), ('final_context', 'final')):
         entries = trace.get(key) if trace else None
-        intersection = sorted(set(required) & {entry['chunk_id'] for entry in entries}) if entries is not None else None
+        intersection = sorted(set(required) & {key for entry in entries for key in entry.get('matched_child_ids', [entry['chunk_id']])}) if entries is not None else None
         result[field] = {'status': 'collected' if entries is not None else 'not_collected', 'matched_chunk_ids': intersection,
                          'any_hit': bool(intersection) if intersection is not None and required else None,
                          'all_hit': len(intersection) == len(required) if intersection is not None and required else None,

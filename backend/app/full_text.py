@@ -62,6 +62,30 @@ def validate_bundle(index_dir, *, require_full_text=False):
         coverage = full_text.get('coverage', {})
         if coverage.get('total_pages') != total or coverage.get('parsed_pages') != parsed or (coverage.get('status') == 'complete' and (len(seen) != total or parsed != total)):
             raise ValueError('Full-text coverage mismatch')
+    if manifest.get('knowledge_identity'):
+        import numpy as np
+        hashes = manifest.get('artifacts', {})
+        required = {'parents.json', 'embeddings.npy', 'coverage.json', *ARTIFACTS}
+        if not required.issubset(hashes) or any(not (index_dir/name).is_file() or checksum((index_dir/name).read_bytes()) != value for name, value in hashes.items()):
+            raise ValueError('Knowledge artifact checksum mismatch')
+        parents = json.loads((index_dir/'parents.json').read_text())
+        by_parent = {p['chunk_id']: p for p in parents}
+        if len(by_parent) != len(parents) or len({c['chunk_id'] for c in chunks}) != len(chunks):
+            raise ValueError('Duplicate Parent/Child identity')
+        config = manifest['knowledge_config']
+        vectors = np.load(index_dir/'embeddings.npy', allow_pickle=False)
+        index = faiss.read_index(str(index_dir/'faiss.index'))
+        if vectors.shape != (len(chunks), config['dimension']) or index.d != config['dimension'] or not np.isfinite(vectors).all() or np.any(np.linalg.norm(vectors, axis=1) == 0):
+            raise ValueError('Knowledge embedding dimension/value mismatch')
+        if not np.allclose(index.reconstruct_n(0, index.ntotal), vectors):
+            raise ValueError('FAISS differs from Embedding artifact')
+        for chunk in chunks:
+            parent = by_parent.get(chunk.get('parent_chunk_id'))
+            if not parent or chunk['document_id'] != parent['document_id'] or not parent['page_start'] <= chunk['page_start'] <= chunk['page_end'] <= parent['page_end'] or chunk['chunk_text'] not in parent['chunk_text']:
+                raise ValueError('Invalid Child to Parent traceability')
+        plan = json.loads((index_dir/'coverage.json').read_text())
+        if plan['corpus_fingerprint'] != manifest['knowledge_identity'] or plan['plan_id'] != manifest['coverage_plan_id'] or set(plan['chunk_clusters']) != {c['chunk_id'] for c in chunks}:
+            raise ValueError('Coverage does not belong to Knowledge bundle')
     return {'path': index_dir, 'manifest': manifest, 'chunks': chunks, 'documents': documents, 'full_text': full_text}
 
 

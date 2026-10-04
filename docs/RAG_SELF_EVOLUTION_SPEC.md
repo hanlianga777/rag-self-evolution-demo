@@ -1,8 +1,22 @@
 # RAG Self-Evolution Platform 产品规格
 
-> **唯一当前目标规格：V1.4 — Golden Engine V2 & Identity-Bound Evolution**
+> **唯一当前目标规格：V1.4 + Phase 1 Knowledge Pipeline（2026-10-05）**
 > 业务规格冻结日期：2026-09-30（Asia/Shanghai）；Interview Demo UI 修订：2026-10-03。V1.4 业务代码的历史验收见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)；本轮 UI 实施与验证结果单独见 [Interview Demo 验收](INTERVIEW_DEMO_VERIFICATION.md)，不沿用历史测试数字作为本次证据。
 > V1.4 是 Golden 工艺、对象身份、Monitoring 与信息架构升级，保留现有技术栈和治理底座。新图是目标架构，不是当前 Demo 已具备全部能力的证明。
+
+## Phase 1 当前覆盖要求（2026-10-05）
+
+用户已批准真实 Knowledge Pipeline 升级及“项目概览 / 知识库”两个入口重构。本节覆盖下文历史口径中的“不迁移 Parser / Embedding / Chunk”“仅 UI / 不调用 Provider”“Lightweight Rerank”限制；这些旧说明保留作为历史，其他六页布局、Search Space、Gate、Regression、预算及人工发布规则保持。真实调用获授权，但缺少凭据时必须报告阻塞，不能用旧能力或 fixture 冒充新版本成功。
+
+- 处理链：MinerU 官方精准 API（独立 `MINERU_API_KEY`、文件上传、异步轮询、`model_version=vlm`）→ 项目 Table KV Normalize → Parent 1400 / Child 400 / Overlap 80 → text-embedding-v4（请求 1024 维并验证响应）→ FAISS。保留原始 Block、表格 HTML、阅读顺序、位置和 PDF 页码；KV 不是 MinerU 原生能力。BGE tokenizer 仅用于确定性 Token 计数，身份冻结。
+- 检索链：现有 Query Processing → Vector / BM25 → CandidateK 12 → qwen3-rerank → 按排名展开 Parent、保留全部命中 Child、去重 → TopK 4 → DeepSeek。参数存于版本 Manifest；Agent 已授权的参数调整仍由现有 Validator 约束。阿里服务根地址通过 `DASHSCOPE_BASE_URL` 配置，必须与 Key 的业务空间匹配。
+- Knowledge Pipeline Version 绑定 Corpus Snapshot、处理配置及 Chunk / Embedding / Index 摘要。独立 staging 构建、完整校验、原子激活；失败保留诊断并继续旧有效版本。Legacy Production 使用其 Legacy 索引，激活新知识库不迁移 Production，不改写历史 Golden / Evaluation / Candidate / Release 快照。
+- Coverage 复用 Dynamic K、小簇合并、最大余数配额与 Golden Slot，输入为新 Child 真实向量。保存初始簇、合并映射、完整 Cluster / Slot / 材料证据；知识库只读展示。Corpus 更新后标为待更新，后台阶段有持久化操作记录，迟到结果不能替换新身份。
+- 激活后以 Full Profile 运行现有 Construction / Validation / Probe / QC，逐 Slot 留存成功与失败。停在首个真实 Human Gate，Gate 1 批准前不跑正式 Baseline，不自动批准 Gate 2/3 或发布。新版本缺结果显示 Golden / Baseline / Agent 待运行及 Production 仍属 Legacy。
+- 概览保留三个 Tab、一个生命周期、流程状态与质量状态分列、Baseline → Winner → Production。知识资产顺序为实际总览、三张策略卡、Parent-Child、主题覆盖、文档列表；Cluster / 文档全部记录固定高度内部滚动，Drawer 追溯 Child→Parent→PDF、Cluster→Slot→Group / Type / 材料。
+- 图使用上传 diagram-design，内联 SVG、独立可访问性 ID、正交连线、Provider 边界。浅绿色 / 深绿色 / 圆润节点覆盖默认橙色；复杂图拆成总览与细节，不生成独立演示文件、不推测朋友截图。
+
+实施与隔离测试、真实运行及未完成项分别记录在 [Phase 1 验收](PHASE1_KNOWLEDGE_VERIFICATION.md)。本 SPEC 是目标要求，不把实现代码或 fixture 通过等同于真实 Provider / Golden / Gate 完成。
 
 ## 1. 文档地位、依据与本次交付边界
 

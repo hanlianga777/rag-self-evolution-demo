@@ -15,7 +15,7 @@ class Settings:
         return bool(self.api_key)
 
 
-def load_settings(env: dict[str, str] | None = None, env_file: Path | None = None) -> Settings:
+def load_values(env: dict[str, str] | None = None, env_file: Path | None = None) -> dict:
     values = dict(os.environ if env is None else env)
     file_path = env_file or Path(__file__).resolve().parents[2] / ".env"
     if file_path.exists():
@@ -23,6 +23,11 @@ def load_settings(env: dict[str, str] | None = None, env_file: Path | None = Non
             key, separator, value = line.partition("=")
             if separator and key and key not in values:
                 values[key] = value
+    return values
+
+
+def load_settings(env: dict[str, str] | None = None, env_file: Path | None = None) -> Settings:
+    values = load_values(env, env_file)
     timeout = float(values.get("DEEPSEEK_TIMEOUT_SECONDS", "60"))
     if not 0 < timeout <= 600:
         raise ValueError("DEEPSEEK_TIMEOUT_SECONDS must be between 0 and 600")

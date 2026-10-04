@@ -10,17 +10,18 @@ import { BusinessImportPanel } from "./pages/BusinessImportPanel";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it("uses persisted corpus totals and actual index dimensions in four knowledge strategy cards", async () => {
+it("uses persisted corpus totals and actual index dimensions in six asset cards and three strategy cards", async () => {
   const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: 384, indexed_count: 6 } }), { status: 200 }));
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<KnowledgePage data={{ documents: [{ id: "DOC-1", name: "说明.pdf", pages: 9, chunks: 7, parser: "PyMuPDF", chunk_strategy: "页级/段落 fallback", status: "Indexed" }] }} />));
   expect(document.querySelector(".light-stepper")).toBeNull();
   expect(document.querySelector(".metrics-grid")).toBeNull();
-  expect(document.querySelectorAll(".knowledge-strategy-card")).toHaveLength(4);
-  expect(document.querySelector(".knowledge-strategies")?.textContent).toContain("384 维");
-  expect(document.querySelector(".knowledge-strategies")?.textContent).toContain("页级/段落 fallback");
-  expect(document.querySelector(".corpus-summary")?.textContent).toBe("1 Documents · 9 Pages · 7 Chunks · 6 Indexed");
+  expect(document.querySelectorAll(".knowledge-strategy-card")).toHaveLength(3);
+  expect(document.querySelector(".asset-summary")?.textContent).toContain("384d");
+  expect(document.querySelector(".knowledge-notice")?.textContent).toContain("Legacy");
+  expect(document.querySelector(".asset-summary")?.textContent).toContain("9 Pages");
+  expect(document.querySelector(".asset-summary")?.textContent).toContain("Index6Legacy");
   expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["文档名", "页数", "Chunk 数", "解析状态", "索引状态", "操作"]);
   expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
   await act(async () => root.unmount());
@@ -30,7 +31,7 @@ it("hides missing index measurements instead of deriving them from chunks", asyn
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: null, indexed_count: null } }), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<KnowledgePage data={{ documents: [{ id: "DOC-1", name: "说明.pdf", pages: 9, chunks: 7, parser: "PyMuPDF", status: "Indexed" }] }} />));
-  expect(document.querySelector(".corpus-summary")?.textContent).toBe("1 Documents · 9 Pages · 7 Chunks");
+  expect(document.querySelector(".asset-summary")?.textContent).toContain("IndexUnavailable");
   expect(document.querySelector(".knowledge-strategies")?.textContent).not.toContain("512");
   expect(document.querySelector(".knowledge-strategies")?.textContent).not.toContain("未采集");
   await act(async () => root.unmount());

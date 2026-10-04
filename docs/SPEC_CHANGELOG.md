@@ -2,6 +2,12 @@
 
 本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.4 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
 
+## Phase 1 Knowledge Pipeline（2026-10-05）
+
+- 用户批准真实 MinerU VLM / Parent-Child / text-embedding-v4 / qwen3-rerank 升级，以及项目概览、知识库两个入口重构；旧技术限制由唯一 SPEC 新 Phase 1 节覆盖，保留原历史正文。
+- 复用现有索引激活、Coverage、Golden、治理流程及 SQLite JSON 字段。新增版本身份、产物校验、Legacy 索引绑定、只读 Cluster / Slot API；其他六页与人工 Gate 规则保持。
+- 真实 Provider 配置、测试结果和仍阻塞的运行阶段见 [Phase 1 验收](PHASE1_KNOWLEDGE_VERIFICATION.md)，不沿用历史测试数量。
+
 ## V1.4 最终集成闭环追加记录（2026-10-02）
 
 - 一次完整修复 `8c674c6` 关闭整体审查五项 Important：事实 Validator→Probe 判定、质量晚到结果身份保存、Corpus 最终提交锁、实际当前 Preview UI、persisted Why 字段。限定复审 Spec Approved / Quality Approved with Minor，无未解决 Critical/Important。

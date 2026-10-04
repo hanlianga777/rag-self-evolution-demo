@@ -207,7 +207,9 @@ def source_fingerprint(document: dict) -> str | None:
 
 
 def current_manifest(documents: list[dict] | None = None) -> dict:
+    active = _read_json(INDEX_DIR / "manifest.json", {})
     return {
+        **({"knowledge_identity": active["knowledge_identity"]} if active.get("knowledge_identity") else {}),
         "schema": 2,
         "embedding_model": EMBEDDING_MODEL,
         "tokenizer_model": EMBEDDING_MODEL,
@@ -220,7 +222,14 @@ def current_manifest(documents: list[dict] | None = None) -> dict:
 
 def is_current() -> bool:
     existing = _read_json(INDEX_DIR / "manifest.json", {})
+    if existing.get('knowledge_identity'):
+        return existing.get('sources') == current_manifest()['sources'] and (INDEX_DIR/'faiss.index').exists()
     return bool(existing) and all(existing.get(key) == value for key, value in current_manifest().items()) and (INDEX_DIR / "faiss.index").exists()
+
+
+def manifest_identity(manifest):
+    identity = manifest.get('knowledge_identity')
+    return {**identity, 'sources': manifest['sources']} if identity else manifest['sources']
 
 
 class CorpusStore:
@@ -262,7 +271,8 @@ class CorpusStore:
         document = next((item for item in self.documents() if item["id"] == document_id), None)
         if document is None:
             return None
-        return {**document, "chunk_count": document["chunks"], "index": self.index_info(), "chunks": self.chunks(document_id)}
+        return {**document, "chunk_count": document["chunks"], "index": self.index_info(), "chunks": self.chunks(document_id),
+                "parents": [p for p in _read_json(self.index_dir/'parents.json', []) if p['document_id'] == document_id]}
 
     def index_info(self) -> dict:
         from .full_text import CORPUS_LOCK, validate_bundle
@@ -284,6 +294,11 @@ class CorpusStore:
                 except (OSError, ValueError, RuntimeError, KeyError) as error:
                     full_text = {**full_text, 'status': 'invalid', 'reason': str(error)}
         return {
+            "knowledge_identity": manifest.get('knowledge_identity'),
+            "knowledge_config": manifest.get('knowledge_config'),
+            "parent_count": len(_read_json(path/'parents.json', [])) if manifest.get('knowledge_identity') else None,
+            "child_count": len(_read_json(path/'chunks.json', [])) if manifest.get('knowledge_identity') else None,
+            "coverage": _read_json(path/'coverage.json', None),
             "dimension": dimension,
             "indexed_count": indexed_count,
             "full_text": full_text,

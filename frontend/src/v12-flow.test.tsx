@@ -137,7 +137,7 @@ for (const count of [10, 12, 19]) {
 it("keeps the Overview target at 20 and points a partial Run to refill", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OverviewPage data={{ overview: { dataset: { total: 10, expected_count: 20, generation_status: "needs_regeneration", approved: 0, pending_review: 10 } }, workspace: {} }} navigate={() => {}} />));
-  expect(document.querySelector(".overview-metrics")?.textContent).toContain("0 / 20");
+  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("0 / 20");
   expect(document.querySelector("#next-action-title")?.textContent).toBe("补齐失败题（10）");
   await act(async () => root.unmount());
 });

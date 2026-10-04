@@ -32,6 +32,7 @@ class OptimizationAgent:
         baseline = self.store.evaluation_run(baseline_run_id)
         base_config = {**DEFAULT_PIPELINE_CONFIG, **baseline["config"]}
         base_config.pop("run_target", None)
+        base_config.pop("knowledge_identity", None)
         experiment_id, prior_candidates, round_number, completed = self.store.claim_agent_generation(baseline_run_id, trigger_id, existing_id)
         prior = [item["config"] for item in prior_candidates]
         context = self.store.experiment(experiment_id)["result"]

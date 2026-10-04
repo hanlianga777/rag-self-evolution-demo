@@ -20,6 +20,7 @@ it("keeps independent architecture images across a remount", async () => {
   const show = () => <OverviewPage data={{}} navigate={() => {}} />;
   await act(async () => root.render(show()));
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "业务架构")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "已保存参考图")!.click());
   const file = new File(["\x89PNG"], "business.png", { type: "image/png" });
   const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
   Object.defineProperty(input, "files", { value: [file], configurable: true });
@@ -29,8 +30,9 @@ it("keeps independent architecture images across a remount", async () => {
   root = createRoot(container);
   await act(async () => root.render(show()));
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "业务架构")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "已保存参考图")!.click());
   expect(document.querySelector(".architecture-image-area img")).not.toBeNull();
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "技术架构")!.click());
-  expect(document.querySelector(".architecture-image-area img")).toBeNull();
+  expect(document.querySelector('svg[role="img"]')).not.toBeNull();
   await act(async () => root.unmount());
 });

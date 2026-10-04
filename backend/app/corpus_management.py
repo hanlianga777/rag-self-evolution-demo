@@ -16,7 +16,9 @@ from .corpus import DOCUMENTS_DIR, INDEX_DIR, UPLOADS_DIR, current_manifest, dis
 
 
 class CorpusManager:
-    def __init__(self, retriever, *, index_dir=INDEX_DIR, documents_dir=DOCUMENTS_DIR, uploads_dir=UPLOADS_DIR):
+    def __init__(self, retriever, *, index_dir=INDEX_DIR, documents_dir=DOCUMENTS_DIR, uploads_dir=UPLOADS_DIR, knowledge_pipeline=False, on_knowledge_activated=None):
+        self.on_knowledge_activated = on_knowledge_activated
+        self.knowledge_pipeline = knowledge_pipeline
         self.retriever = retriever
         self.index_dir = Path(index_dir)
         self.documents_dir = Path(documents_dir)
@@ -84,35 +86,47 @@ class CorpusManager:
                 sources = [item for item in sources if item["id"] != document_id]
                 moved_from = (self.uploads_dir if source.get("storage") == "uploads" else self.documents_dir) / source["name"]
                 moved_to = self.data_dir / "archived_documents" / f"{operation_id}-{source['name']}"
-            else:
+            elif kind != "rebuild":
                 raise ValueError("未知 Corpus 操作")
             stage = "build"
             self._update(operation_id, stage=stage)
-            result = build_index(force=True, catalog=sources, index_dir=staging, strict=True, on_progress=lambda step, completed, total: self._update(operation_id, stage=step, completed=completed, total=total))
-            if result:
-                records = json.loads((staging / "documents.json").read_text()) if (staging / "documents.json").exists() else []
-                failed = [f"{item['name']}: {item.get('error') or item['status']}" for item in records if item["status"] != "Indexed"]
-                if failed:
-                    self._update(operation_id, stage="embedding" if any(item["status"] == "Embedding Failed" for item in records) else "parse")
-                raise ValueError("；".join(failed) or "索引构建失败")
+            new_pipeline = self.knowledge_pipeline or kind == 'rebuild'
+            if new_pipeline:
+                from .knowledge_pipeline import KnowledgePipeline
+                pipeline = KnowledgePipeline(self.index_dir, self.retriever)
+                staging, bundle_id = pipeline.build(sources, progress=lambda step, completed, total: self._update(operation_id, stage=step, completed=completed, total=total))
+            else:
+                result = build_index(force=True, catalog=sources, index_dir=staging, strict=True, on_progress=lambda step, completed, total: self._update(operation_id, stage=step, completed=completed, total=total))
+                if result:
+                    records = json.loads((staging / "documents.json").read_text()) if (staging / "documents.json").exists() else []
+                    failed = [f"{item['name']}: {item.get('error') or item['status']}" for item in records if item["status"] != "Indexed"]
+                    raise ValueError("；".join(failed) or "索引构建失败")
             stage = "activate"
             self._update(operation_id, stage=stage)
             validate_bundle(staging, require_full_text=True)
             with CORPUS_LOCK:
-                moved_to.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(moved_from, moved_to)
+                if moved_to:
+                    moved_to.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(moved_from, moved_to)
                 def finish():
-                    state = {"changed_at": datetime.now(timezone.utc).isoformat(), "fingerprint": current_manifest()["sources"]}
+                    state = {"changed_at": datetime.now(timezone.utc).isoformat(), "fingerprint": current_manifest()["sources"], "knowledge_identity": json.loads((self.index_dir/"manifest.json").read_text()).get("knowledge_identity")}
                     (self.data_dir / "corpus_state.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
                     self._update(operation_id, status="completed", stage="completed", completed=1, total=1)
-                self.activate_bundle(staging, operation_id, after_activate=finish)
+                if new_pipeline: pipeline.activate(staging, bundle_id, after_activate=finish)
+                else: self.activate_bundle(staging, operation_id, after_activate=finish)
+            if new_pipeline and self.on_knowledge_activated:
+                try:
+                    run_id = self.on_knowledge_activated()
+                    self._update(operation_id, golden_generation_run_id=run_id)
+                except Exception as error:
+                    self._update(operation_id, golden_error=str(error))
         except Exception as error:
             if stage == "activate" and moved_from and moved_to and moved_to.exists() and not moved_from.exists():
                 moved_from.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(moved_to, moved_from)
             self._update(operation_id, status="failed", stage=self._operations[operation_id]["stage"] if stage == "build" else stage, error=str(error))
         finally:
-            shutil.rmtree(staging, ignore_errors=True)
+            if not self.knowledge_pipeline and kind != 'rebuild': shutil.rmtree(staging, ignore_errors=True)
             shutil.rmtree(pending, ignore_errors=True)
             self._lock.release()
 

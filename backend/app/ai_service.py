@@ -1,3 +1,4 @@
+from .corpus import manifest_identity
 import time
 import json
 import re
@@ -59,8 +60,16 @@ class AiService:
         with measure(stages, "query_processing"), collect_usage() as auxiliary_usage:
             queries = self._retrieval_queries(question, config)
         aliases = self.store.approved_aliases() if hasattr(self.store, "approved_aliases") and config["alias_mapping"] else {}
+        retriever = self.retriever
+        if isinstance(retriever, VectorRetriever) and isinstance(self.corpus, CorpusStore) and self.corpus.index_info().get('knowledge_identity'):
+            from .knowledge_pipeline import index_for_config
+            try:
+                path = index_for_config(self.corpus.index_dir, config)
+            except ValueError as error:
+                raise ProviderUnavailable(str(error)) from error
+            if path.resolve() != self.corpus.index_dir.resolve(): retriever = VectorRetriever(CorpusStore(path))
         with measure(stages, "retrieval"):
-            evidence = self.retriever.retrieve(question, config, aliases=aliases, queries=queries, stages=stages, **({"trace": trace} if isinstance(self.retriever, VectorRetriever) else {}))
+            evidence = retriever.retrieve(question, config, aliases=aliases, queries=queries, stages=stages, **({"trace": trace} if isinstance(retriever, VectorRetriever) else {}))
         retrieval_fields = {"retrieval_trace": trace or {"status": "not_collected"}, "corpus_fingerprint": trace.get("corpus_fingerprint"), "timing_unit": "ms", "timing_semantics": {"generation_includes_ttft": True, "stages_are_nested_not_additive": True, "ttft": "request_to_first_content"}}
         citations = [{key: value for key, value in item.items() if key != "content"} for item in evidence]
         if not evidence:
@@ -437,7 +446,7 @@ class AiService:
                 path = self.corpus.index_dir.resolve()
                 if isinstance(self.corpus, CorpusStore):
                     bundle = validate_bundle(path)
-                    if bundle['chunks'] != chunks or bundle['manifest']['sources'] != current_manifest()['sources']:
+                    if bundle['chunks'] != chunks or manifest_identity(bundle['manifest']) != manifest_identity(current_manifest()):
                         raise ValueError('Persisted Chunk/Corpus identity changed; reload Coverage Preview')
                 index = faiss.read_index(str(path / "faiss.index"))
                 if index.ntotal != len(chunks):
@@ -458,7 +467,10 @@ class AiService:
         return [{**slot, 'sources': [known[key] for key in slot['material_chunk_ids']]} for slot in plan['slots']]
 
     def negative_topic_embedding(self, question):
-        """Only the existing local embedding model; never download during planning."""
+        """Use the active frozen embedding space; never download a local model during planning."""
+        if isinstance(self.corpus, CorpusStore) and self.corpus.index_info().get('knowledge_identity'):
+            from .knowledge_pipeline import AlibabaProvider
+            return AlibabaProvider().embed([question], self.corpus.index_info()['dimension'])[0]
         from sentence_transformers import SentenceTransformer
         from .corpus import EMBEDDING_MODEL
         if self.retriever._model is None:
@@ -489,7 +501,7 @@ class AiService:
 
     def baseline_preview(self, question: str) -> dict:
         production = self.store.active_production() or {"id": "baseline-v1", "config": {"top_k": 4, "min_score": None}}
-        config = production["config"]
+        config = {**production["config"], **({"knowledge_identity": production.get("snapshot", {})["knowledge_identity"]} if production.get("snapshot", {}).get("knowledge_identity") else {})}
         result = self.answer(question, config)
         fingerprint = result.get("corpus_fingerprint")
         return {"pipeline": "baseline", "source": "production", "question": question, "version": production["id"], "corpus_fingerprint": fingerprint, "config": config, "sources": [], **result, "evidence": result["retrieval"], "fallback_reason": None}
@@ -500,7 +512,9 @@ class AiService:
         candidate = next((item for item in reversed(candidates) if item["status"] == "evaluated" and item["result"].get("qualification", {}).get("qualified")), None)
         if candidate is None:
             return {"pipeline": "candidate", "question": question, "status": "not_run", **identity, "answer": "暂无可比较候选；请先完成当前 Baseline 的真实 Evaluation 与 Sandbox。", "latency_ms": 0, "evidence": [], "retrieval": [], "fallback_reason": None}
-        result = self.answer(question, candidate["config"])
+        execution = self.store.evaluation_run(candidate.get('result', {}).get('evaluation_run_id'))
+        bound = (execution or {}).get('config', {}).get('knowledge_identity')
+        result = self.answer(question, {**candidate['config'], **({'knowledge_identity': bound} if bound else {})})
         return {"pipeline": "candidate", "source": "candidate", **identity, "question": question, "version": candidate["id"], "config": candidate["config"], "status": "evaluated", **result, "evidence": result["retrieval"], "fallback_reason": None}
 
     def preview(self, question: str) -> dict:
