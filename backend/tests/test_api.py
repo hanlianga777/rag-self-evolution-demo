@@ -19,6 +19,13 @@ class GovernanceApiTests(unittest.TestCase):
         self.addCleanup(setattr, main, "store", self.previous_store)
         self.client = TestClient(main.app)
 
+    def test_full_pool_request_uses_current_profile_capacity(self):
+        from pydantic import ValidationError
+        ids = [str(i) for i in range(100)]
+        self.assertEqual(len(main.PoolRunRequest(profile='full', question_ids=ids).question_ids), 100)
+        with self.assertRaises(ValidationError):
+            main.PoolRunRequest(profile='full', question_ids=ids + ['overflow'])
+
     def test_dataset_exposes_audited_candidates_not_seeded_scores(self):
         response = self.client.get("/api/dataset")
 

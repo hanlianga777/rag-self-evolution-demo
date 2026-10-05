@@ -144,7 +144,7 @@ class PartialGenerationTests(unittest.TestCase):
         return json.dumps(value, ensure_ascii=False)
 
     def test_medium_and_full_refill_use_frozen_profile(self):
-        for name, counts in (("medium", (20, 9, 20)), ("full", (40, 18, 40))):
+        for name, counts in (("medium", (20, 10, 20)), ("full", (40, 20, 40))):
             with self.subTest(profile=name):
                 self.store = GovernanceStore(Path(self.folder.name) / f"{name}.db")
                 self.service.store = self.store

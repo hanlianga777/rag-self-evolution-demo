@@ -22,7 +22,7 @@ from .full_text import CORPUS_LOCK
 from .corpus_management import CorpusManager
 from .config import load_settings
 from .evaluation import EvaluationRunner, gate_details
-from .governance import GovernanceStore
+from .governance import GovernanceStore, GENERATION_PROFILES
 from .optimization import OptimizationAgent
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
 from .telemetry import price_config
@@ -197,7 +197,7 @@ def overview():
     identity = store.current_baseline_identity()
     baseline = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
     triggers = store.optimization_triggers()
-    return {"data_source": "real", "production": production, "dataset": summary, "latest_evaluation": baseline, "knowledge": knowledge(), **identity, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
+    return {"generation_profiles": GENERATION_PROFILES, "data_source": "real", "production": production, "dataset": summary, "latest_evaluation": baseline, "knowledge": knowledge(), **identity, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
 
 
 @app.get("/api/workspace")
@@ -224,6 +224,15 @@ def knowledge():
         manifest_path = corpus.index_dir/'manifest.json'
         manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
         coverage = index.get('coverage')
+        # Profile plans are versioned separately; immutable index artifacts remain unchanged.
+        with store.connection() as connection:
+            previews = connection.execute('SELECT plan_json FROM coverage_plan_previews ORDER BY created_at DESC').fetchall()
+        for preview in previews:
+            plan = json.loads(preview['plan_json'])
+            if plan['corpus_fingerprint'] == index.get('knowledge_identity') and plan['profile'] == {'name': 'full', **GENERATION_PROFILES['full']}:
+                coverage = plan
+                break
+        index['coverage'] = coverage
         fresh = manifest.get('sources') == current_manifest()['sources']
         operations = [corpus_manager.operation(p.stem) for p in (corpus_manager.data_dir/'corpus_operations').glob('*.json')]
         operation = next(iter(sorted((o for o in operations if o), key=lambda o: o['id'].rsplit('-', 1)[-1], reverse=True)), None)
@@ -233,7 +242,7 @@ def knowledge():
         return {'target_config': index.get('knowledge_config') or CONFIG, 'providers': provider_status(), 'index': index,
                 'identity': index.get('knowledge_identity'), 'legacy': not bool(index.get('knowledge_identity')),
                 'documents': len(documents), 'pages': sum(d.get('pages') or 0 for d in documents),
-                'coverage': coverage, 'coverage_status': 'calculating' if updating else 'ready' if coverage else 'pending',
+                'coverage': coverage, 'coverage_plan_id': coverage.get('plan_id') if coverage else None, 'coverage_status': 'calculating' if updating else 'ready' if coverage else 'pending',
                 'operation': operation, 'sample_children': corpus.chunks()[:3] if index.get('knowledge_identity') else []}
 
 
@@ -245,7 +254,7 @@ def knowledge_cluster(cluster_id: str):
         cluster = next((c for c in plan['clusters'] if c['cluster_id'] == cluster_id), None)
         if cluster is None: raise HTTPException(status_code=404, detail='Cluster not found')
         chunks = {c['chunk_id']: c for c in corpus.chunks()}
-        return {**cluster, 'identity': state['identity'], 'initial_k': plan['initial_k'], 'merge_mapping': plan['merge_mapping'],
+        return {**cluster, 'identity': state['identity'], 'coverage_plan_id': plan['plan_id'], 'initial_k': plan['initial_k'], 'merge_mapping': plan['merge_mapping'],
                 'source_documents': sorted({chunks[key]['document_name'] for key in cluster['chunk_ids']}),
                 'representative_children': [chunks[key] for key in cluster['representative_chunk_ids']],
                 'slots': [s for s in plan['slots'] if s['topic_cluster'] == cluster_id]}
@@ -259,7 +268,7 @@ def knowledge_slot(slot_id: str):
         slot = next((s for s in plan['slots'] if s['slot_id'] == slot_id), None)
         if slot is None: raise HTTPException(status_code=404, detail='Slot not found')
         chunks = {c['chunk_id']: c for c in corpus.chunks()}
-        return {**slot, 'identity': state['identity'], 'material_children': [chunks[key] for key in slot['material_chunk_ids']], 'golden_candidates': [{key: q.get(key) for key in ('id', 'question', 'reference_answer', 'evidence', 'probe_status', 'qc_status', 'review_status')} for q in store.questions() if q.get('raw', {}).get('plan_id') == plan['plan_id'] and q.get('raw', {}).get('coverage_slot') == slot_id]}
+        return {**slot, 'identity': state['identity'], 'coverage_plan_id': plan['plan_id'], 'material_children': [chunks[key] for key in slot['material_chunk_ids']], 'golden_candidates': [{key: q.get(key) for key in ('id', 'question', 'reference_answer', 'evidence', 'probe_status', 'qc_status', 'review_status')} for q in store.questions() if q.get('raw', {}).get('plan_id') == plan['plan_id'] and q.get('raw', {}).get('coverage_slot') == slot_id]}
 
 
 def start_knowledge_golden():
@@ -357,7 +366,7 @@ def governance_questions(stage: str | None = None):
 class PoolRunRequest(BaseModel):
     plan_id: str | None = None
     profile: Literal['mini', 'medium', 'full']
-    question_ids: list[str] = Field(min_length=1, max_length=98)
+    question_ids: list[str] = Field(min_length=1, max_length=max(profile['expected_count'] for profile in GENERATION_PROFILES.values()))
 
 
 @app.post('/api/governance/coverage-preview', dependencies=[Depends(require_trusted_origin)])
@@ -612,7 +621,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
         qc_completed = qc_skipped = 0
         for index, candidate in enumerate(saved, start=1):
             stage = "probing"
-            prior_probe = run_store.probe_history(candidate["id"])[0] if resume_quality and candidate["probe_status"] == "probe_passed" else None
+            prior_probe = run_store.probe_history(candidate["id"])[0] if (resume_quality or regenerate) and candidate["probe_status"] == "probe_passed" else None
             _, identity = run_store.capture_quality(candidate["id"])
             reusable = prior_probe and all(prior_probe.get("execution_identity", {}).get(key) == identity[key] for key in ('content_hash', 'active_candidate', 'corpus_fingerprint'))
             prior_qc = run_store.qc_history(candidate["id"])
@@ -1019,6 +1028,7 @@ def versions():
 
 @app.get("/api/pipeline")
 def pipeline():
+    knowledge_state = knowledge()
     identity = store.current_baseline_identity()
     baseline = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
     active = store.active_production()
@@ -1030,8 +1040,8 @@ def pipeline():
         "baseline_config": baseline["config"] if baseline else None,
         "search_space": search_space_contract(),
         "locked_parameters": sorted(EXCLUDED_AUTOMATIC_PARAMETERS),
-        "index": corpus.index_info(),
-        "knowledge": knowledge(),
+        "index": knowledge_state["index"],
+        "knowledge": knowledge_state,
         "pricing": price_config(),
         "last_execution_metrics": next((row.get("metrics") for row in store.monitoring_events() if row.get("metrics", {}) and row["metrics"].get("stages")), None),
     }

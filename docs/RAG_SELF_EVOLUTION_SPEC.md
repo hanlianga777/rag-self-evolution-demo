@@ -1,3 +1,16 @@
+# Phase 1 Final Polish — 当前优先合同（2026-10-05）
+
+以下规则覆盖后文旧版 20/49/98 和拆分架构图说明；历史 Run、Snapshot 与产物不改写。
+
+- 唯一 Golden Profile 源为 backend/app/governance.py GENERATION_PROFILES：Mini 8/4/8=20、Medium 20/10/20=50、Full 40/20/40=100，比例 2:1:2。前端读取后端配置，不另存配额。旧 98 Candidate 在当前 Corpus 下重新硬校验并匹配 100 Slot；只复用身份、证据、Cluster、Group、Construction 和质量结果仍有效的项，保存来源审计，不改写旧题。失败/P0 和真实缺口独立处理，模型和内容修复预算不扩张。
+- 仅收口概览与知识库。删除全站 Corpus/Golden/Baseline Banner；概览永久移除“本轮优化结果”，当前六阶段链与中性的 Legacy Production 分离，Pipeline 主屏名称 Knowledge Pipeline V2，真实身份保留详情。
+- 三个架构入口各一张完整内联 SVG：业务闭环、平台级技术架构、Knowledge Pipeline。Diagram 语法遵循上传 diagram-design，字体/密度继承 Demo Token（标题12/700、正文11、辅助10），浅绿只用于完成/稳定；橙色只强调 Agent 等关键节点。业务图 Frozen Golden 同时连接 Baseline 和 Sandbox，明确 Same Golden / Same Judge / Same Gate；Human Gate 1 不是评测尺。仅 Optimization Agent 为 Main Agent，输出 Hypothesis / Config Diff，保持三个人工 Gate 和监控确认反馈闭环。
+- 知识库合并为“知识处理及选型策略”六卡，1440/1280 六列、1024 三列。Parent-Child 为状态 Flow，Parent 内嵌 Child 示意，真实 ID 只在 Drawer。主题覆盖桌面六列、固定高度内部滚动，显示真实 P/A/N 配额与 Slot；Semantic Label 是当前真实成员的业务摘要，不改变 K-means membership/阈值。
+- 碎片保护阈值 <3 Child；真实无合并显示“本轮无需合并”。文档表分 Parent/Child 两列；Drawer 保留原 Table→KV→Child 的真实案例，原表 HTML 作为受限 iframe 内容展示。
+- Parent 1400/Child400/Overlap80 保持；报告真实分布并检查章节/Block、派生与页码，不为了数字改参数。按章节形成的短 Parent 可只有一个 Child，长 Parent 必须正常拆 Child。真实流程停在 Human Gate 1，不批准、冻结、运行 Baseline/Agent/Sandbox 或发布。
+
+---
+
 # RAG Self-Evolution Platform 产品规格
 
 > **唯一当前目标规格：V1.4 + Phase 1 Knowledge Pipeline（2026-10-05）**

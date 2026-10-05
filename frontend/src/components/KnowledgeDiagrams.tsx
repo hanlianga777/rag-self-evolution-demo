@@ -1,66 +1,38 @@
-import { useId } from 'react';
-
-type Node = [string, string, string];
-const business: Node[] = [
-  ['知识资产', '原始文档与证据', 'ASSET'], ['Golden Dataset', 'Generation / Validation', 'WORKFLOW'],
-  ['稳定评测尺', 'Probe / QC / Human Gate 1', 'HUMAN'], ['Baseline Evaluation', 'Hard Gate / Bad Case', 'EVALUATION'],
-  ['Optimization Agent', 'Root Cause → A / B / C', 'MAIN AGENT'], ['Sandbox / Regression', 'Decision / Human Gate 2', 'WORKFLOW'],
-  ['Winner / Production', 'Human Gate 3 · 人工发布', 'HUMAN'], ['QA / Monitoring', '反馈 → 下一轮', 'FEEDBACK'],
-];
-const processing: Node[] = [
-  ['PDF / Manual / SOP', '企业原始知识文档', 'SOURCE'], ['MinerU VLM', '结构化 Block / 页面位置', 'MINERU API'],
-  ['Table KV Normalize', '项目规范化 · 保留原表结构', 'LOCAL'], ['Parent-Child', '1400 / 400 · Overlap 80', 'LOCAL'],
-  ['Child Embedding', 'text-embedding-v4 / 1024d', 'ALIBABA API'], ['FAISS IndexFlatIP', 'Child 向量索引 · 维度校验', 'LOCAL'],
-];
-const retrieval: Node[] = [
-  ['Query Processing', '查询处理与检索配置', 'LOCAL'], ['Vector + BM25', 'Child 向量 / BM25', 'LOCAL'],
-  ['CandidateK', '持久化配置 · 默认 12', 'LOCAL'], ['qwen3-rerank', '真实模型排序', 'ALIBABA API'],
-  ['Parent Expand', '合并 Parent · 保留 Child 证据', 'LOCAL'], ['TopK', '持久化配置 · 默认 4', 'LOCAL'],
-  ['DeepSeek', 'Generation / Judge / Agent', 'DEEPSEEK API'],
-];
-const coverage: Node[] = [
-  ['Child Embedding', '新版本真实向量', 'INPUT'], ['Dynamic K', '根据资产规模选择 K', 'LOCAL'],
-  ['K-means', '确定性聚类', 'LOCAL'], ['Small Cluster Merge', '保存初始簇与合并映射', 'LOCAL'],
-  ['Coverage Planner', '最大余数配额', 'LOCAL'], ['Golden Slot', '材料 / 分组 / 构造类型', 'OUTPUT'],
-];
-const evidence: Node[] = [
-  ['Full Text / Metadata', '原文 / Section / 页码', 'SOURCE'], ['Evidence / Probe', '受控证据校验', 'WORKFLOW'],
-  ['Child', '精准命中与证据', 'TRACE'], ['Parent', '完整上下文', 'TRACE'], ['PDF Page', '原始文档定位', 'SOURCE'],
-];
-
-function Figure({ name, nodes, focal, note }: { name: string; nodes: Node[]; focal: number; note: string }) {
-  const id = `knowledge-${useId().replace(/:/g, '')}`;
-  const columns = Math.min(nodes.length, 4);
-  const rows = Math.ceil(nodes.length / columns);
-  const width = columns * 240 + 40;
-  const height = rows * 196 + 28;
-  const x = (i: number) => 24 + (i % columns) * 240;
-  const y = (i: number) => 80 + Math.floor(i / columns) * 196;
-  return <figure className="knowledge-diagram"><figcaption>{name}</figcaption><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${id}-title ${id}-desc`}>
-    <title id={`${id}-title`}>{name}</title><desc id={`${id}-desc`}>{nodes.map(node => node[0]).join(' → ')}。{note}</desc>
-    <defs><marker id={`${id}-arrow`} markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="var(--diagram-soft)" /></marker></defs>
-    <text x="24" y="24" className="diagram-eyebrow">{note}</text>
-    {nodes.map(([, , tag], i) => tag.endsWith('API') && <g key={`boundary-${i}`}><rect x={x(i)-8} y={y(i)-40} width="224" height="136" rx="8" fill="none" stroke="var(--diagram-rule)" strokeDasharray="4 4"/><text x={x(i)} y={y(i)-20} className="diagram-tag">{tag} · PROVIDER</text></g>)}
-    {nodes.slice(1).map((_, i) => <path key={i} d={(i+1)%columns === 0 ? `M${x(i)+208} ${y(i)+40} H${width-24} V${y(i)+104} H8 V${y(i+1)+40} H${x(i+1)}` : `M${x(i)+208} ${y(i)+40} H${x(i+1)}`} fill="none" stroke="var(--diagram-soft)" strokeWidth="1.2" markerEnd={`url(#${id}-arrow)`} />)}
-    {nodes.map(([title, subtitle, tag], i) => <g key={title} className={i === focal ? 'diagram-node focal' : 'diagram-node'}>
-      <rect x={x(i)} y={y(i)} width="208" height="80" rx="8" fill={i === focal ? 'var(--diagram-accent-tint)' : 'var(--diagram-paper-2)'} stroke={i === focal ? 'var(--diagram-accent)' : 'var(--diagram-rule)'} />
-      <text x={x(i)+12} y={y(i)+20} className="diagram-tag">{tag}</text>
-      <text x={x(i)+12} y={y(i)+44} className="diagram-title">{title}</text>
-      <text x={x(i)+12} y={y(i)+64} className="diagram-sub">{subtitle}</text>
-    </g>)}
-    <line x1="24" y1={height-36} x2={width-24} y2={height-36} stroke="var(--diagram-rule)" />
-    <text x="24" y={height-12} className="diagram-sub">{nodes.map(node => node[0]).join(' → ')}</text>
-  </svg></figure>;
+import { useId, type ReactNode } from 'react';
+type Node = { name: string; lines: string[]; x: number; y: number; w: number; h: number; tone?: string };
+type Edge = { points?: number[][]; path?: string; dashed?: boolean };
+const row = (items: [string,string,string?][], y: number): Node[] => items.map(([name,detail,tone],i)=>({name,lines:detail.split('|'),x:20+i*168,y,w:148,h:72,tone}));
+function route(points:number[][]) {
+  let path=`M${points[0].join(' ')}`;
+  for(let i=1;i<points.length-1;i++) {
+    const [x,y]=points[i],a=points[i-1],b=points[i+1];
+    const r=Math.min(8,(Math.abs(x-a[0])+Math.abs(y-a[1]))/2,(Math.abs(x-b[0])+Math.abs(y-b[1]))/2);
+    path+=` L${x+Math.sign(a[0]-x)*r} ${y+Math.sign(a[1]-y)*r} Q${x} ${y} ${x+Math.sign(b[0]-x)*r} ${y+Math.sign(b[1]-y)*r}`;
+  }
+  return path+` L${points.at(-1)!.join(' ')}`;
 }
-
-export function KnowledgeDiagrams({ kind, active = false }: { kind: 'business' | 'technical' | 'knowledge'; active?: boolean }) {
-  return <div className="knowledge-diagrams">
-    {kind !== 'business' && <p className="diagram-state">{active ? '当前 Knowledge Pipeline 技术架构' : '目标架构 · 当前资产仍属于 Legacy，等待新版本真实激活'}</p>}
-    {kind === 'business' ? <><Figure name="业务架构 01 · 建立稳定评测尺" nodes={business.slice(0, 4)} focal={2} note="Baseline 输出 Bad Case → 业务架构 02；Generation / Probe / QC / Judge 为受控 Workflow" /><Figure name="业务架构 02 · 优化、发布与反馈" nodes={[...business.slice(4), ["下一轮", "回到知识资产与评测闭环", "NEXT"]]} focal={0} note="输入来自业务架构 01 的 Baseline；只有 Optimization Agent 是 Main Agent" /></> : <>
-      <Figure name="01 · 知识处理链" nodes={processing} focal={3} note="FAISS 输出 → 02 Vector + BM25；Child Embedding 同时进入 03 Coverage 支路" />
-      <Figure name="02 · Retrieval 与 Generation" nodes={retrieval} focal={4} note="小块负责找得准，大块负责答得全。DeepSeek 承担 QA / Golden Generation、Judge 与 Optimization Agent" />
-      <Figure name="03 · Coverage Planning" nodes={coverage} focal={4} note="Child Embedding 来自 01；Golden Slot 进入受控 Generation / Validation / Probe / QC" />
-      <Figure name="04 · Evidence Traceability" nodes={evidence} focal={1} note="Full Text / Metadata 来自 01 原始解析；按 Child → Parent → PDF Page 穿透" />
-    </>}
-  </div>;
+const sequence=(nodes:Node[]):Edge[]=>nodes.slice(1).map((t,i)=>{const s=nodes[i];return {points:s.y===t.y?[[s.x+s.w,s.y+36],[t.x,t.y+36]]:[[s.x+s.w,s.y+36],[1020,s.y+36],[1020,s.y+(s.y===48?88:104)],[8,s.y+(s.y===48?88:104)],[8,t.y+36],[t.x,t.y+36]]};});
+function Figure({name,nodes,edges,height,children}:{name:string;nodes:Node[];edges:Edge[];height:number;children?:ReactNode}) {
+ const id=`architecture-${useId().replace(/:/g,'')}`;
+ return <figure className="knowledge-diagram"><figcaption>{name}</figcaption><svg viewBox={`0 0 1072 ${height}`} role="img" aria-labelledby={`${id}-title ${id}-desc`}><title id={`${id}-title`}>{name}</title><desc id={`${id}-desc`}>{nodes.map(n=>n.name).join('、')}；实线为主流程，虚线为受控支路或人工确认反馈。</desc><defs><marker id={`${id}-arrow`} markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="var(--diagram-soft)"/></marker></defs>
+ {edges.map((e,i)=><path key={i} className="diagram-connector" d={e.path||route(e.points!)} fill="none" stroke="var(--diagram-soft)" strokeWidth="1.2" strokeDasharray={e.dashed?'4 4':undefined} markerEnd={`url(#${id}-arrow)`}/>)}
+ {nodes.map(n=><g key={n.name} className={`diagram-node ${n.tone||''}`} data-node={n.name}><rect x={n.x} y={n.y} width={n.w} height={n.h} rx="8" fill={n.tone==='stable'?'var(--card-good-bg)':'var(--diagram-paper-2)'} stroke={n.tone==='focal'?'var(--diagram-accent)':'var(--diagram-rule)'}/><text className="diagram-title" x={n.x+12} y={n.y+24}>{n.name}</text>{n.lines.map((line,i)=><text className="diagram-sub" key={i} x={n.x+12} y={n.y+44+i*16}>{line}</text>)}</g>)}{children}<text className="diagram-sub" x="20" y={height-12}>实线 · 主流程　虚线 · 支路 / 人工确认反馈　橙色 · 关键决策　浅绿 · 完成或稳定资产</text></svg></figure>;
 }
+function Business() {
+ const nodes=[...row([['知识资产','文档 / 可追溯证据'],['Coverage Planning','K-means / Golden Slot'],['Golden 生产线','Generation / 业务导入'],['Hard Validation','同一验证规则'],['Probe','真实检索 / 证据核查'],['QC / Fix','有限修复预算']],48),...row([['Human Gate 1','人工审核 / 不自动批准'],['Frozen Golden','Dataset · 稳定评测尺','stable'],['Baseline Evaluation','Same Golden / Judge|Same Gate'],['Hard Gate / Bad Case','11 Hard Gate / 错误证据'],['Root Cause Diagnosis','原因 / 受控调优空间'],['Optimization Agent','全系统唯一 Main Agent','focal']],160),...row([['Hypothesis / Diff','Config Diff · 受控配置'],['A / B / C','Candidate 配置'],['Sandbox / Regression','同尺评测 / 回归'],['Human Gate 2','人审实验与组合条件'],['Composite D','Conditional · 满足条件组合'],['Winner Qualification','同一 Gate / 发布资格']],272),...row([['Human Gate 3','人工批准发布'],['Production','发布 / 可回滚'],['QA / Monitoring','真实问答 / 监测'],['Human Confirm','Trigger · 人工确认优化触发'],['下一轮 Optimization','回到 Optimization Agent']],384)];
+ const edges=sequence(nodes);
+ edges.push({path:'M262 232 V240 Q262 248 270 248 H422 Q430 248 430 256 a8 8 0 0 0 0 16',dashed:true},{points:[[766,344],[766,360],[430,360],[430,344]],dashed:true},{points:[[840,420],[1052,420],[1052,140],[934,140],[934,160]],dashed:true});
+ return <Figure name="业务架构 · 稳定评测尺驱动的完整闭环" nodes={nodes} edges={edges} height={496}>{[[20,24,'① 数据准备与黄金集生产线'],[20,148,'② 冻结评测尺与诊断'],[20,260,'③ 单 Agent 调优与实验'],[20,372,'④ 人工发布与下一轮反馈']].map(([x,y,label])=><text key={label} x={x} y={y} className="diagram-eyebrow">{label}</text>)}<rect x="276" y="228" width="252" height="16" fill="var(--diagram-paper)"/><text x="284" y="240" className="diagram-sub">Same Golden · Same Judge · Same Gate</text></Figure>;
+}
+function Platform() {
+ const nodes:Node[]=[{name:'数据源层',lines:['PDF / Manual / SOP　·　Business CSV / XLSX → Golden Business Import'],x:20,y:32,w:988,h:56},{name:'知识处理与索引层',lines:['MinerU VLM → Table KV Normalize → Parent-Child（1400 / 400 / Overlap 80）','text-embedding-v4 · 1024d → FAISS + BM25','Full Text / Metadata / Evidence Traceability'],x:20,y:120,w:652,h:104},{name:'Coverage Planning',lines:['Child Embedding → K-means / Dynamic K','Small Cluster Protection → Coverage Planner','P / A / N Quota → Golden Slot'],x:708,y:120,w:300,h:104},{name:'在线 RAG Retrieval',lines:['Query Processing → Vector + BM25 → CandidateK → qwen3-rerank','Parent Expand → TopK → DeepSeek Generation','小块负责找得准，大块负责答得全'],x:20,y:264,w:652,h:104},{name:'Golden / Evaluation Governance',lines:['Golden Engine → Hard Validation → Probe / QC','DeepSeek Judge → 11 Hard Gate / Bad Case','Human Gate 1 → Frozen Golden Dataset'],x:708,y:264,w:300,h:104},{name:'Self-Evolution / Release',lines:['Root Cause → Optimization Agent（唯一 Main Agent）→ Hypothesis / Config Diff → Search Space → A / B / C / Conditional D','Sandbox / Regression → Human Gate 2 / 3 → Release / Rollback → Monitoring / Human Confirm Trigger'],x:20,y:408,w:988,h:88,tone:'focal'},{name:'底座 / Governance',lines:['SQLite · Corpus Snapshot · Golden Snapshot · Pipeline Version · Experiment Version · Audit','Provider Usage · Latency · Token / Cost'],x:20,y:536,w:988,h:88}];
+ const edges:Edge[]=[{points:[[346,88],[346,120]]},{points:[[672,172],[708,172]]},{points:[[346,224],[346,264]]},{points:[[858,224],[858,264]]},{points:[[672,316],[708,316]],dashed:true},{points:[[346,368],[346,408]]},{points:[[858,368],[858,408]]},{points:[[514,496],[514,536]],dashed:true}];
+ return <Figure name="项目技术架构 · RAG Self-Evolution Platform" nodes={nodes} edges={edges} height={720}>{[[20,'MinerU','VLM Parser'],[356,'Alibaba','text-embedding-v4 / qwen3-rerank'],[692,'DeepSeek','Generation / Judge / Optimization Agent']].map(([x,name,roles])=><g key={name}><rect x={x} y="648" width="316" height="48" rx="8" fill="none" stroke="var(--diagram-rule)" strokeDasharray="4 4"/><text x={Number(x)+12} y="668" className="diagram-title">{name} Provider</text><text x={Number(x)+12} y="684" className="diagram-sub">{roles}</text></g>)}</Figure>;
+}
+function Knowledge() {
+ const nodes=[...row([['PDF / Manual / SOP','原始知识文档'],['MinerU VLM','Block / 页码 / 阅读顺序'],['Table KV Normalize','原始 Table → 业务 KV'],['Parent-Child','Parent 1400 / Child 400|Overlap 80','focal'],['Child Embedding','text-embedding-v4|实际 1024d'],['FAISS + BM25','真实向量 / 关键词索引']],48),...row([['Query Processing','查询处理'],['Vector + BM25','Hybrid Retrieval'],['CandidateK','持久化配置 · 默认 12'],['qwen3-rerank','Alibaba · 真实排序'],['Parent Expand','保留全部命中 Child'],['RAG Generation','TopK 4 → DeepSeek']],192),...row([['K-means','真实 Child Embedding'],['Dynamic K','随知识规模选择 K'],['小簇保护','Small Cluster Protection|<3 Child → 最近主题簇'],['Coverage Planner','最大余数配额'],['Golden Slot','Positive / Ablation|Negative'],['Evidence Traceability','Full Text / Metadata','stable']],336)];
+ const edges:Edge[]=[];for(const start of [0,6,12]) for(let i=start;i<start+(start===12?4:5);i++) edges.push({points:[[nodes[i].x+148,nodes[i].y+36],[nodes[i+1].x,nodes[i+1].y+36]]});
+ edges.push({points:[[262,48],[262,34],[1048,34],[1048,392],[1008,392]],dashed:true},{points:[[934,120],[934,152],[262,152],[262,192]]},{points:[[766,120],[766,136],[8,136],[8,372],[20,372]],dashed:true},{points:[[1008,228],[1036,228],[1036,372],[1008,372]],dashed:true});
+ return <Figure name="知识库技术架构 · Knowledge Pipeline" nodes={nodes} edges={edges} height={488}><text x="20" y="24" className="diagram-eyebrow">知识处理 → 精准 Child 检索 → 完整 Parent 回答 ／ 主题覆盖与证据支路</text><text x="20" y="176" className="diagram-sub">小块负责找得准，大块负责答得全 · Parent 保留来源 Block / Section / PDF 页</text><text x="20" y="320" className="diagram-sub">Child Embedding → K-means → Cluster → Coverage → Golden Slot；原解析 Full Text / Metadata 支撑 Child → Parent → PDF</text>{[[180,32,164,104],[684,32,164,104],[516,176,164,104],[852,176,164,104]].map(([x,y,w,h])=><rect key={x} x={x} y={y} width={w} height={h} rx="8" fill="none" stroke="var(--diagram-rule)" strokeDasharray="4 4"/>)}<text x="20" y="444" className="diagram-sub">Alibaba：Embedding / Rerank · MinerU：VLM · DeepSeek：Generation</text></Figure>;
+}
+export function KnowledgeDiagrams({kind}:{kind:'business'|'technical'|'knowledge';active?:boolean}) {return <div className="knowledge-diagrams">{kind==='business'?<Business/>:kind==='technical'?<Platform/>:<Knowledge/>}</div>;}

@@ -28,7 +28,7 @@ it("uses the stage flow on Overview without redundant numbered storyline", async
   expect(document.querySelector('ol[aria-label="全链路阶段"].stage-stepper')).not.toBeNull();
   expect(document.body.textContent).not.toContain("Baseline 发现问题 → Agent 提出假设");
   expect(document.body.textContent).not.toContain("01");
-  expect(document.querySelector(".optimization-results")?.textContent).toContain("production-long-id");
+  expect(document.querySelector(".optimization-results")).toBeNull();
   expect(document.body.textContent).not.toContain("Production 发布来源");
 });
 

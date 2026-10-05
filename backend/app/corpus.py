@@ -271,7 +271,9 @@ class CorpusStore:
         document = next((item for item in self.documents() if item["id"] == document_id), None)
         if document is None:
             return None
-        return {**document, "chunk_count": document["chunks"], "index": self.index_info(), "chunks": self.chunks(document_id),
+        children = self.chunks(document_id)
+        tables = [{'block_id': block['block_id'], 'page': block['page'], 'original_html': block['raw'].get('table_body', ''), 'normalized_text': block['text'], 'child_ids': [c['chunk_id'] for c in children if block['block_id'] in c.get('block_ids', [])]} for block in _read_json(self.index_dir/f'{document_id}-blocks.json', []) if block.get('raw', {}).get('type') == 'table']
+        return {**document, "table_examples": tables, "chunk_count": document["chunks"], "index": self.index_info(), "chunks": children,
                 "parents": [p for p in _read_json(self.index_dir/'parents.json', []) if p['document_id'] == document_id]}
 
     def index_info(self) -> dict:

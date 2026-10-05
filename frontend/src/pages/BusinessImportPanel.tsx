@@ -2,17 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { apiUrl, errorMessage, postJson, requestError } from "../api";
 import { CustomSelect, FixedTableCard, Section, Status, TruncatedText } from "../components/Primitives";
 import { Drawer } from "../components/Dialog";
-const quotas: Record<string, number[]> = { mini: [8, 4, 8], medium: [20, 9, 20], full: [40, 18, 40] };
 
-export function BusinessImportPanel({ items, onCreated }: { items: any[]; onCreated: () => Promise<void> }) {
+export function BusinessImportPanel({ items, onCreated, profiles = {} }: { items: any[]; onCreated: () => Promise<void>; profiles?: Record<string, any> }) {
+  const quotas = Object.fromEntries(Object.entries(profiles).map(([name, counts]) => [name, [counts.positive_count, counts.ablation_count, counts.negative_count]]));
   const [file, setFile] = useState<File | null>(null), [preview, setPreview] = useState<any>(null), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [selected, setSelected] = useState<string[]>([]), [profile, setProfile] = useState("mini"), [source, setSource] = useState("all"), [group, setGroup] = useState("all"), [construction, setConstruction] = useState("all");
+  const target = quotas[profile] || [];
   const [query, setQuery] = useState("");
   const [importOpen, setImportOpen] = useState(false), [matching, setMatching] = useState<any>(null), [checking, setChecking] = useState(false), [detail, setDetail] = useState<any>(null);
   const request = useRef(0);
   const pool = items.filter(row => row.stage !== "superseded" && (row.raw?.source === "business_import" || row.raw?.generation_run_id));
   const counts = ["positive", "ablation", "negative"].map(category => pool.filter(row => selected.includes(row.id) && row.test_category === category).length);
-  const exact = counts.every((count, index) => count === quotas[profile][index]);
+  const exact = target.length === 3 && counts.every((count, index) => count === target[index]);
   useEffect(() => {
     const ticket = ++request.current; setMatching(null); setError("");
     if (!selected.length) { setChecking(false); return; }
@@ -25,7 +26,7 @@ export function BusinessImportPanel({ items, onCreated }: { items: any[]; onCrea
   return <><Section title="候选池">
     {error && <p className="error-notice" role="alert">{error}</p>}
     <div className="candidate-pool-toolbar"><CustomSelect ariaLabel="候选池 Profile" value={profile} onChange={setProfile} options={Object.keys(quotas).map(value => ({ value, label: `${value.toUpperCase()} · ${quotas[value].join(" / ")}` }))} /><CustomSelect ariaLabel="候选来源" value={source} onChange={setSource} options={[{ value: "all", label: "全部来源" }, { value: "ai_generated", label: "AI 生成" }, { value: "business_import", label: "业务导入" }]} /><CustomSelect ariaLabel="Evaluation Group" value={group} onChange={setGroup} options={["all", "positive", "ablation", "negative"].map(value => ({ value, label: value === "all" ? "全部评测组" : value }))} /><CustomSelect ariaLabel="Construction Type" value={construction} onChange={setConstruction} options={["all", ...new Set<string>(pool.map(row => row.construction_type || row.raw?.construction_type).filter(Boolean))].map(value => ({ value, label: value === "all" ? "全部构造题型" : value }))} /><input aria-label="搜索候选题" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索候选题" /><button className="secondary" disabled={busy} onClick={() => setImportOpen(true)}>导入业务用例</button><button className="primary" disabled={busy || checking || !exact || !matching?.valid} onClick={() => void create()}>创建新的 Golden 测试集</button></div>
-    <p>Profile 进度 · 正向 / 消融 / 负向：{counts.join(" / ")}，目标 {quotas[profile].join(" / ")}</p><p role="status">{checking ? "正在检查 Coverage Slot…" : matching?.valid ? "数量与全部 Coverage Slot 均满足" : !exact ? "所选题目数量未满足 Profile，需继续选题并满足 Coverage Slot。" : `Coverage 未满足：${matching?.gaps?.length ?? "未采集"} 个 Slot 缺口`}</p>
+    <p>Profile 进度 · 正向 / 消融 / 负向：{counts.join(" / ")}，目标 {target.join(" / ") || "加载中"}</p><p role="status">{checking ? "正在检查 Coverage Slot…" : matching?.valid ? "数量与全部 Coverage Slot 均满足" : !exact ? "所选题目数量未满足 Profile，需继续选题并满足 Coverage Slot。" : `Coverage 未满足：${matching?.gaps?.length ?? "未采集"} 个 Slot 缺口`}</p>
     {matching?.gaps?.length > 0 && <details><summary>查看 Coverage 缺口 · {matching.gaps.length}</summary><FixedTableCard><table><thead><tr><th>Slot</th><th>Topic</th><th>Group / Construction</th><th>缺口</th></tr></thead><tbody>{matching.gaps.map((gap: any) => <tr key={gap.slot_id}><td>{gap.slot_id}</td><td>{gap.topic_cluster}</td><td>{gap.evaluation_group} / {gap.construction_type}</td><td>{gap.deficit}</td></tr>)}</tbody></table></FixedTableCard></details>}
     <p className="muted">AI 生成题与业务导入题统一治理；新建题目副本保留来源，须重新完成 Probe、QC 与人工审核。</p>
     <FixedTableCard><table><thead><tr><th>选择</th><th>问题</th><th>类型</th><th>来源</th><th>人工审核</th><th>操作</th></tr></thead><tbody>{pool.filter(row => (source === "all" || (row.raw?.source || "ai_generated") === source) && (group === "all" || row.test_category === group) && (construction === "all" || (row.construction_type || row.raw?.construction_type) === construction) && String(row.question || "").toLowerCase().includes(query.toLowerCase())).map(row => <tr key={row.id} data-question-id={row.id}><td><input aria-label={`选择 ${row.question}`} type="checkbox" checked={selected.includes(row.id)} onChange={event => setSelected(ids => event.target.checked ? [...ids, row.id] : ids.filter(id => id !== row.id))} /></td><td><TruncatedText lines={2}>{row.question}</TruncatedText></td><td>{row.test_category}{(row.construction_type || row.raw?.construction_type) && <small className="question-provenance">{row.construction_type || row.raw?.construction_type}</small>}</td><td>{row.raw?.source === "business_import" ? "业务导入" : "AI 生成"}</td><td><Status value={row.review_status} /></td><td><button className="text-button" onClick={() => setDetail(row)}>查看详情</button></td></tr>)}</tbody></table></FixedTableCard>

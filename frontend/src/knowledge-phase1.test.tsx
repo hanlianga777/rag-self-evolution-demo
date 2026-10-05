@@ -10,8 +10,9 @@ afterEach(() => { vi.unstubAllGlobals(); document.body.innerHTML = ''; });
 it('keeps Legacy Production separate when the active Knowledge lifecycle has no Baseline', async () => {
   const root = createRoot(document.body.appendChild(document.createElement('div')));
   await act(async () => root.render(<OverviewPage navigate={() => {}} data={{ overview: { knowledge: { legacy: false, identity: { pipeline_version_id: 'KP-new' }, index: { child_count: 30 }, target_config: {} } }, workspace: { requires_new_golden: true }, versions: [{ status: 'active', provenance: 'published', snapshot: { candidate_id: 'C-old' } }] }} />));
-  expect(document.body.textContent).toContain('Production 仍属于 Legacy');
-  expect(document.querySelector('.optimization-results')?.textContent).toContain('待评测');
+  expect(document.body.textContent).toContain('Legacy Production · 当前线上旧版本');
+  expect(document.querySelector('.optimization-results')).toBeNull();
+  expect(document.querySelector('.legacy-production')?.className).not.toContain('completed');
   expect(document.querySelector('.next-action h2')?.textContent).toContain('Golden');
   await act(async () => root.unmount());
 });

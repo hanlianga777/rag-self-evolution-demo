@@ -1031,3 +1031,31 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .knowledge-diagram .diagram-tag, .knowledge-diagram .diagram-eyebrow { fill: var(--diagram-muted); font-size: 12px; font-family: 'Geist Mono', monospace; }
 .knowledge-diagram .diagram-sub { fill: var(--diagram-muted); font-size: 12px; font-family: 'Geist', sans-serif; }
 @media (max-width: 700px) { .page.page-shell { padding: 12px 12px 0; } .page-shell-header .page-title { gap: 8px; } .page-shell-header h1 { font-size: 22px; } .page-shell-header .tabs { overflow-x: auto; flex-wrap: nowrap; } }
+
+/* Final Polish: Overview and Knowledge only. */
+.legacy-production { display:flex; gap:12px; align-items:center; padding:12px; background:var(--surface); border:1px solid var(--line); border-radius:var(--card-radius); font-size:var(--card-body); }
+.legacy-production a { margin-left:auto; }
+.knowledge-page .asset-summary, .knowledge-page .parent-child-flow, .knowledge-page .cluster-scroll { grid-template-columns:repeat(6,minmax(0,1fr)); }
+.knowledge-page .page-content .asset-card { display:flex; flex-direction:column; height:104px; min-height:104px; overflow:hidden; }
+.knowledge-page .asset-card > strong { font-size:16px; overflow-wrap:anywhere; line-height:1.25; }
+.knowledge-page .flow-step { text-align:left; font:inherit; }
+.knowledge-page .flow-step.failed { background:var(--card-bad-bg); color:var(--card-bad-ink); }
+.knowledge-page .flow-step.pending { background:var(--surface); color:var(--muted); }
+.parent-mini { border:1px solid var(--card-good-border); border-radius:5px; padding:4px; }
+.parent-mini > span { font-size:10px; }
+.parent-mini > div { display:flex; gap:4px; }
+.parent-mini small { border:1px solid var(--card-good-border); background:var(--card-bg); border-radius:3px; padding:2px; }
+.knowledge-page .page-content .cluster-card { background:var(--card-good-bg); border-color:var(--card-good-border); text-align:left; }
+.cluster-quota { display:block; }
+.coverage-status { display:flex; flex-wrap:wrap; gap:16px; font-size:var(--card-body); color:var(--muted); margin:8px 0; }
+.table-normalize-example { border-top:1px solid var(--line); padding:12px 0; }
+.table-normalize-example iframe { width:100%; height:200px; border:1px solid var(--line); }
+.table-normalize-example pre { white-space:pre-wrap; overflow-wrap:anywhere; font:11px system-ui; }
+.knowledge-diagram { background:var(--diagram-paper); padding:8px; margin:8px 0; }
+.knowledge-diagram figcaption { font-size:12px; font-weight:700; }
+.knowledge-diagram svg { width:100%; min-width:960px; }
+.knowledge-diagram .diagram-title { font-family:inherit; font-size:12px; font-weight:700; }
+.knowledge-diagram .diagram-sub { font-family:inherit; font-size:10px; }
+.knowledge-diagram .diagram-eyebrow { font-family:inherit; font-size:11px; font-weight:700; }
+@media(max-width:1100px) { .knowledge-page .asset-summary, .knowledge-page .parent-child-flow, .knowledge-page .cluster-scroll { grid-template-columns:repeat(3,minmax(0,1fr)); } .knowledge-page .flow-step:nth-child(3)::after { display:none; } }
+@media(max-width:700px) { .knowledge-page .asset-summary, .knowledge-page .parent-child-flow, .knowledge-page .cluster-scroll { grid-template-columns:repeat(2,minmax(0,1fr)); } .legacy-production { flex-wrap:wrap; } }

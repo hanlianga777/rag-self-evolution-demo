@@ -19,8 +19,8 @@ DEFAULT_DATABASE = ROOT / "data" / "demo.db"
 GOLDEN_DRAFT = ROOT / "reports" / "golden_dataset_full_draft.json"
 GENERATION_PROFILES = {
     "mini": {"positive_count": 8, "ablation_count": 4, "negative_count": 8, "expected_count": 20},
-    "medium": {"positive_count": 20, "ablation_count": 9, "negative_count": 20, "expected_count": 49},
-    "full": {"positive_count": 40, "ablation_count": 18, "negative_count": 40, "expected_count": 98},
+    "medium": {"positive_count": 20, "ablation_count": 10, "negative_count": 20, "expected_count": 50},
+    "full": {"positive_count": 40, "ablation_count": 20, "negative_count": 40, "expected_count": 100},
 }
 NEGATIVE_EXPECTED_BEHAVIORS = {"clarify", "insufficient_evidence", "safe_rejection", "prompt_injection_resistance"}
 
@@ -369,6 +369,54 @@ class GovernanceStore:
             connection.execute('INSERT INTO golden_generation_runs (id, profile_json, model_version, status, question_ids_json, created_at) VALUES (?, ?, ?, ?, ?, ?)', (run_id, _json(profile), 'pool_selection', 'completed', _json(clones), now))
             audit = {'slot_persistence_v1': True, 'source': 'mixed_pool', 'corpus_fingerprint': plan['corpus_fingerprint'], 'frozen_plan': plan, 'pool_matching': preview['matching'], 'status': 'passed', 'counts': preview['counts'], 'hard_validation': {'status': 'passed', 'rejected': []}, 'progress': {'stage': 'quality_not_run', 'completed_slots': len(clones), 'total_slots': len(clones), 'probe_completed': 0, 'qc_completed': 0}, 'source_question_ids': question_ids}
             connection.execute('INSERT INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)', (run_id, _json(plan['slots']), _json(question_plan), _json(audit)))
+        return self.generation_run(run_id)
+
+    def rematch_profile_run(self, source_run_id, profile_name, chunks, plan, *, question_embedder=None):
+        """Migrate a working profile by copying only current, validated quality evidence."""
+        from .golden_v2 import match_pool
+        source = self.generation_run(source_run_id)
+        if not source or source['artifacts']['hard_validation'].get('corpus_fingerprint') != plan['corpus_fingerprint']:
+            raise ValueError('Source Corpus identity does not match current plan')
+        if plan['profile'] != {'name': profile_name, **GENERATION_PROFILES[profile_name]}:
+            raise ValueError('Plan does not match current Profile')
+        eligible, quality, excluded = [], {}, {}
+        for key in source['question_ids']:
+            item, identity = self.capture_quality(key)
+            probe, qc = self.probe_history(key), self.qc_history(key)
+            if item['probe_status'] != 'probe_passed' or item['qc_status'] != 'qc_passed' or not probe or not qc or any(probe[0].get('execution_identity', {}).get(field) != identity[field] for field in ('content_hash', 'active_candidate', 'corpus_fingerprint')) or qc[0]['result'].get('execution_identity') != identity:
+                excluded[key] = 'Failed/P0 or stale quality identity'
+                continue
+            eligible.append(key)
+            quality[key] = (probe[0], qc[0], identity)
+        preview = self.preview_pool_run(profile_name, eligible, chunks, plan['plan_id'], question_embedder=question_embedder)
+        previous_plan = source['artifacts']['hard_validation'].get('frozen_plan', {})
+        same_space = previous_plan.get('chunk_clusters') == plan.get('chunk_clusters') and previous_plan.get('embedding_fingerprint') == plan.get('embedding_fingerprint') and [(c['cluster_id'], c['center']) for c in previous_plan.get('clusters', [])] == [(c['cluster_id'], c['center']) for c in plan.get('clusters', [])]
+        slots = {slot['slot_id']: slot for slot in plan['slots']}
+        for key, result in preview['validations'].items():
+            item = self.question(key)
+            if item['test_category'] == 'negative' and question_embedder is None and same_space:
+                prior = item['raw'].get('validation', {}).get('coverage_match') or item['raw'].get('coverage_match', {})
+                anchor = prior.get('anchor') or {}
+                if anchor.get('topic_cluster') in plan.get('chunk_clusters', {}).values() and anchor.get('method') == 'local_embedding_nearest_center':
+                    result['coverage_match'] = {**prior, 'method': 'reused_current_embedding_anchor', 'eligible_slot_ids': [slot['slot_id'] for slot in plan['slots'] if slot['topic_cluster'] == anchor['topic_cluster'] and slot['evaluation_group'] == 'negative']}
+            result['coverage_match']['eligible_slot_ids'] = [slot for slot in result['coverage_match']['eligible_slot_ids'] if slots[slot]['construction_type'] == result['normalized_candidate']['construction_type'] and (item['test_category'] != 'negative' or slots[slot]['negative_subtype'] == item['negative_subtype'])]
+        matching = match_pool(plan, preview['validations'])
+        run_id = self.start_generation_run(source['model_version'], profile_name, coverage_plan=plan)
+        slot_audit, provenance = {}, {}
+        for slot, key in matching['matching'].items():
+            validation = preview['validations'][key]
+            candidate = {**validation['normalized_candidate'], 'coverage_slot': slot, 'source_reference': {'question_id': key, 'generation_run_id': source_run_id}, 'profile_rematch': {'source_slot': self.question(key)['raw']['coverage_slot'], 'target_slot': slot, 'validator_version': validation['validator_version'], 'checks': validation}}
+            slot_audit[slot] = [{'attempt': 0, 'validation_error': None, 'source_question_id': key, 'generation_method': 'validated_reuse'}]
+            self.persist_generation_attempt(run_id, candidate, slot_audit, slot=slot, attempt=0, model=source['model_version'])
+            new_key = next(key for key in self.generation_run(run_id)['question_ids'] if self.question(key)['raw']['coverage_slot'] == slot)
+            old_probe, old_qc, identity = quality[key]
+            reuse = {'source_question_id': key, 'source_run_id': source_run_id, 'source_execution_identity': identity, 'content_unchanged': True, 'slot': slot}
+            self.record_probe_result(new_key, {**old_probe, 'probe_details': {**old_probe.get('probe_details', {}), 'quality_reuse': reuse}})
+            self.record_qc(new_key, {**old_qc['result'], 'quality_reuse': reuse}, 'passed')
+            provenance[slot] = reuse
+        gaps = [gap['slot_id'] for gap in matching['gaps']]
+        self.complete_generation_slots(run_id, failed_slots=gaps, hard_validation={'status': 'passed' if not gaps else 'partial', 'rejected': []})
+        self.update_generation_run(run_id, status='needs_regeneration' if gaps else 'completed', validation={'profile_migration': {'source_run_id': source_run_id, 'matching': provenance, 'excluded': excluded, 'unmatched': matching['unmatched_question_ids'], 'validations': preview['validations'], 'gap_slot_ids': gaps}})
         return self.generation_run(run_id)
 
     def require_generation_ready(self, question_id: str):

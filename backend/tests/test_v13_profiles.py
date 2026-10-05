@@ -14,7 +14,7 @@ from app.governance import GENERATION_PROFILES, GovernanceStore
 class ProfileTests(unittest.TestCase):
     def test_run_counts_and_invalid_profile(self):
         with tempfile.TemporaryDirectory() as folder, patch("app.corpus.current_manifest", return_value={"sources": {}}):
-            for name, counts in (("mini", (8, 4, 8, 20)), ("medium", (20, 9, 20, 49)), ("full", (40, 18, 40, 98))):
+            for name, counts in (("mini", (8, 4, 8, 20)), ("medium", (20, 10, 20, 50)), ("full", (40, 20, 40, 100))):
                 with self.subTest(name=name):
                     store = GovernanceStore(Path(folder) / f"{name}.db")
                     run = store.generation_run(store.start_generation_run("fixture", name))

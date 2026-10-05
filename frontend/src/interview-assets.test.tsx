@@ -17,12 +17,12 @@ it("uses persisted corpus totals and actual index dimensions in six asset cards 
   await act(async () => root.render(<KnowledgePage data={{ documents: [{ id: "DOC-1", name: "说明.pdf", pages: 9, chunks: 7, parser: "PyMuPDF", chunk_strategy: "页级/段落 fallback", status: "Indexed" }] }} />));
   expect(document.querySelector(".light-stepper")).toBeNull();
   expect(document.querySelector(".metrics-grid")).toBeNull();
-  expect(document.querySelectorAll(".knowledge-strategy-card")).toHaveLength(3);
+  expect(document.querySelectorAll(".knowledge-strategy-card")).toHaveLength(0);
   expect(document.querySelector(".asset-summary")?.textContent).toContain("384d");
   expect(document.querySelector(".knowledge-notice")?.textContent).toContain("Legacy");
   expect(document.querySelector(".asset-summary")?.textContent).toContain("9 Pages");
-  expect(document.querySelector(".asset-summary")?.textContent).toContain("Index6Legacy");
-  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["文档名", "页数", "Chunk 数", "解析状态", "索引状态", "操作"]);
+  expect(document.querySelector(".asset-summary")?.textContent).toContain("检索索引6 Indexed");
+  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["文档名", "页数", "Parent Chunks", "Child Chunks", "解析状态", "索引状态", "操作"]);
   expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
   await act(async () => root.unmount());
 });
@@ -31,9 +31,9 @@ it("hides missing index measurements instead of deriving them from chunks", asyn
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: null, indexed_count: null } }), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<KnowledgePage data={{ documents: [{ id: "DOC-1", name: "说明.pdf", pages: 9, chunks: 7, parser: "PyMuPDF", status: "Indexed" }] }} />));
-  expect(document.querySelector(".asset-summary")?.textContent).toContain("IndexUnavailable");
-  expect(document.querySelector(".knowledge-strategies")?.textContent).not.toContain("512");
-  expect(document.querySelector(".knowledge-strategies")?.textContent).not.toContain("未采集");
+  expect(document.querySelector(".asset-summary")?.textContent).toContain("检索索引— Indexed");
+  expect(document.querySelector(".asset-summary")?.textContent).not.toContain("512");
+  expect(document.querySelector(".asset-summary")?.textContent).toContain("维度未采集");
   await act(async () => root.unmount());
 });
 
@@ -82,7 +82,7 @@ it("keeps candidate filters, search and explicit actions in a single toolbar", a
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   const rows = [{ id: "pool-1", question: "刷盘检查", stage: "candidate", test_category: "positive", review_status: "human_review_pending", raw: { source: "business_import" } }, { id: "pool-2", question: "电池维护", stage: "candidate", test_category: "negative", review_status: "human_review_pending", raw: { source: "business_import" } }];
   const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
-  await act(async () => root.render(<BusinessImportPanel items={rows} onCreated={async () => {}} />));
+  await act(async () => root.render(<BusinessImportPanel profiles={{mini:{positive_count:8,ablation_count:4,negative_count:8}}} items={rows} onCreated={async () => {}} />));
   const toolbar = document.querySelector(".candidate-pool-toolbar")!;
   expect(toolbar.querySelectorAll('[role="combobox"]')).toHaveLength(4);
   expect(toolbar.querySelector('input[type="search"]')).not.toBeNull();

@@ -62,6 +62,34 @@ class Phase1Tests(unittest.TestCase):
             store.migrate()
             self.assertEqual(store.question(ids[0])['question'], 'Fixture positive 0')
 
+    def test_profile_rematch_reuses_current_quality_and_preserves_source(self):
+        from unittest.mock import patch
+        from app.governance import GENERATION_PROFILES
+        from app.golden_v2 import digest
+        chunks = [{'chunk_id': 'C1', 'document_id': 'D', 'chunk_text': '设备可断电维护'}]
+        identity = {'D': 'fixture-current'}
+        plan = {'plan_id': 'PLAN-fixture', 'profile': {'name': 'mini', **GENERATION_PROFILES['mini']}, 'planner_version': 'fixture', 'corpus_fingerprint': identity, 'chunk_fingerprint': digest(chunks), 'slots': [{'slot_id': 'Q01', 'construction_type': 'Ordinary'}]}
+        with tempfile.TemporaryDirectory() as root, patch('app.governance.current_manifest', return_value={'sources': identity}), patch('app.corpus.current_manifest', return_value={'sources': identity}):
+            store = GovernanceStore(Path(root)/'test.db')
+            source = store.start_generation_run('fixture', coverage_plan=plan)
+            store.persist_generation_attempt(source, {'question': '设备如何维护？', 'reference_answer': '设备可断电维护', 'evidence': [{'source_chunk_ids':['C1']}], 'test_category':'positive', 'construction_type':'Ordinary'}, {'Q01':[]}, slot='Q01', attempt=1, model='fixture')
+            key=store.generation_run(source)['question_ids'][0]
+            store.record_probe_result(key, {'question_quality':30,'golden_answer_quality':30,'evidence_support':40})
+            store.record_qc(key, {'score':95,'priority':'P2','issues':[],'reason':'fixture'}, 'passed')
+            store.update_generation_run(source,status='completed')
+            before=store.question(key)
+            validation={'valid':True,'normalized_candidate':{**before['raw'],**before},'coverage_match':{'eligible_slot_ids':['Q01']},'validator_version':'fixture'}
+            with patch.object(store,'preview_pool_run',return_value={'validations':{key:validation}}), patch.object(store,'complete_generation_slots'):
+                migrated=store.rematch_profile_run(source,'mini',chunks,plan)
+            newkey=migrated['question_ids'][0]
+            self.assertNotEqual(newkey,key)
+            self.assertEqual(store.question(key),before)
+            self.assertEqual(store.question(newkey)['qc_status'],'qc_passed')
+            self.assertEqual(store.question(newkey)['stage'],'candidate')
+            self.assertEqual(store.qc_history(newkey)[0]['result']['quality_reuse']['source_question_id'],key)
+            with self.assertRaisesRegex(ValueError,'Corpus identity'):
+                store.rematch_profile_run(source,'mini',chunks,{**plan,'corpus_fingerprint':{'D':'other'}})
+
     def test_import_field_evidence_duplicate_and_xlsx_errors(self):
         from app import business_import
         chunks = [{"chunk_id": "c1", "document_id": "d1", "document_name": "manual.pdf", "chunk_text": "设备A 电压：24V"}]

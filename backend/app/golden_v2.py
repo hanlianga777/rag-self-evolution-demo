@@ -115,7 +115,7 @@ def build_plan(chunks, embeddings, profile, corpus_fingerprint=None, embedding_i
             gaps.append({'topic_cluster': cluster_id, 'reason': 'no_anchor_slots', 'size': len(ids)})
         if not quotas['positive'][index] + quotas['ablation'][index]:
             gaps.append({'topic_cluster': cluster_id, 'reason': 'no_answerable_evidence_slots', 'size': len(ids)})
-    profile_name = profile.get('name') or next((name for name, limit in [('mini', 20), ('medium', 49), ('full', 98)] if profile.get('expected_count') == limit), 'mini')
+    profile_name = profile.get('name') or next((name for name, limit in [('mini', 20), ('medium', 50), ('full', 100)] if profile.get('expected_count') == limit), 'mini')
     special_limit = min(SPECIAL_LIMITS[profile_name], (profile_count(profile, 'positive') + profile_count(profile, 'ablation')) // 2)
     specials = 0
     for group in GROUPS:
