@@ -29,8 +29,7 @@ it("uses the stage flow on Overview without redundant numbered storyline", async
   expect(document.body.textContent).not.toContain("Baseline 发现问题 → Agent 提出假设");
   expect(document.body.textContent).not.toContain("01");
   expect(document.querySelector(".optimization-results")?.textContent).toContain("production-long-id");
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Production 发布来源")!.click());
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("production-long-id");
+  expect(document.body.textContent).not.toContain("Production 发布来源");
 });
 
 it("marks completed and current lifecycle stages accessibly", async () => {
@@ -47,13 +46,11 @@ it("formats Baseline time locally and shortens the run ID", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
   expect(document.body.textContent).not.toContain("2026-09-27 22:04:23");
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "查看技术详情")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "查看评测依据")!.click());
   expect(document.querySelector("[role=dialog]")?.textContent).toContain("2026-09-27 22:04:23");
   expect(document.querySelector(".short-id")?.textContent).not.toBe(run.id);
-  const audit = [...document.querySelectorAll("button")].find(button => button.textContent === "查看原始时间")!;
-  await act(async () => audit.click());
-  expect([...document.querySelectorAll("[role=dialog]")].at(-1)?.textContent).toContain(run.created_at);
-  expect(document.querySelector(".short-id")?.textContent).not.toBe(run.id);
+  expect(document.body.textContent).not.toContain("查看原始时间");
+
 });
 
 it("keeps the Baseline Bad Case table compact and detail ready", async () => {

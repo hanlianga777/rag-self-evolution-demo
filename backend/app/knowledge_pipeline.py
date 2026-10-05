@@ -5,6 +5,11 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 from io import BytesIO
 import json
+import http.client
+import ipaddress
+import socket
+import ssl
+import urllib.parse
 import os
 from pathlib import Path
 import time
@@ -177,6 +182,34 @@ class AlibabaProvider:
                 for r in sorted(rows, key=lambda r: (-r['relevance_score'], r['index']))]
 
 
+def download_mineru_result(url):
+    try:
+        with urllib.request.urlopen(url, timeout=120) as response:
+            return response.read()
+    except urllib.error.URLError as error:
+        target = urllib.parse.urlsplit(url)
+        if not isinstance(error.reason, ssl.SSLEOFError) or target.scheme != 'https' or target.hostname != 'cdn-mineru.openxlab.org.cn':
+            raise
+    # ponytail: only this official CDN's observed VPN DNS/TLS failure uses a public DNS lookup.
+    # The resolver receives the public hostname only; signed paths stay on the verified CDN connection.
+    with urllib.request.urlopen('https://dns.alidns.com/resolve?name=cdn-mineru.openxlab.org.cn&type=A', timeout=15) as response:
+        addresses = [row['data'] for row in json.load(response).get('Answer', []) if row['type'] == 1]
+    for address in addresses[:3]:
+        ipaddress.ip_address(address)
+        connection = http.client.HTTPSConnection(target.hostname, timeout=120)
+        try:
+            connection.sock = ssl.create_default_context().wrap_socket(socket.create_connection((address, 443), timeout=120), server_hostname=target.hostname)
+            connection.request('GET', target.path + ('?' + target.query if target.query else ''))
+            response = connection.getresponse()
+            if response.status == 200:
+                return response.read()
+        except (OSError, http.client.HTTPException):
+            pass
+        finally:
+            connection.close()
+    raise ProviderUnavailable('MinerU result CDN connection failed')
+
+
 class MinerUProvider:
     def __init__(self, values=None): self.values = settings() if values is None else values
 
@@ -194,7 +227,8 @@ class MinerUProvider:
 
     def parse(self, path, document_id):
         task = self._request('file-urls/batch', {'files': [{'name': path.name, 'data_id': document_id}], 'model_version': 'vlm', 'enable_table': True, 'enable_formula': True})
-        request = urllib.request.Request(task['file_urls'][0], data=path.read_bytes(), method='PUT')
+        # Signed upload expects an empty Content-Type; urllib otherwise inserts form-urlencoded.
+        request = urllib.request.Request(task['file_urls'][0], data=path.read_bytes(), headers={'Content-Type': ''}, method='PUT')
         try:
             with urllib.request.urlopen(request, timeout=120): pass
             deadline = time.monotonic() + 1200
@@ -203,7 +237,7 @@ class MinerUProvider:
                 item = batch['extract_result'][0]
                 if item['state'] == 'failed': raise ProviderUnavailable('MinerU VLM parsing failed')
                 if item['state'] == 'done':
-                    with urllib.request.urlopen(item['full_zip_url'], timeout=120) as response: archive = response.read()
+                    archive = download_mineru_result(item['full_zip_url'])
                     with zipfile.ZipFile(BytesIO(archive)) as bundle:
                         names = [n for n in bundle.namelist() if n.endswith('_content_list.json') or n.endswith('/content_list.json') or n == 'content_list.json']
                         if len(names) != 1: raise ValueError('MinerU structured content list missing/ambiguous')

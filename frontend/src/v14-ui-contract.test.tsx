@@ -312,7 +312,7 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
   expect([...document.querySelectorAll("button")].some(button => button.textContent?.includes("启动此上下文"))).toBe(false);
   await clickText("查看 Trigger 上下文");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联实验：E-monitor");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('"round": 1');
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Round 1");
   expect(document.querySelector('a[href="#evolution"]')).toBeNull();
 });
 

@@ -16,7 +16,7 @@ it("shows null Probe and QC thresholds as advisory in technical audit", async ()
   const row = { id: "Q1", slot: "Q01", question: "问题", test_category: "positive", stage: "candidate", probe_status: "probe_passed", qc_status: "qc_passed", probe: { score: 72, threshold: null }, qc: { score: 70, threshold: null }, evidence: [] };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<CandidateWorkspace row={row} peers={[row]} busy={false} onRun={() => {}} onReview={async () => true} onRefresh={async () => {}} operation={{ watchRevision: () => {} } as any} />));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-menu button")].find(button => button.textContent === "查看技术审计")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-menu button")].find(button => button.textContent === "查看证据与质量记录")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".audit-tabs button")].find(button => button.textContent === "Probe")!.click());
   expect(document.querySelector(".audit-workspace")?.textContent).toContain("72 / 不作为审批阈值");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".audit-tabs button")].find(button => button.textContent === "QC")!.click());

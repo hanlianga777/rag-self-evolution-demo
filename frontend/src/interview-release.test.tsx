@@ -35,7 +35,7 @@ it("shows only changed parameters on the release main screen and opens full conf
   expect(document.querySelector(".release-decision details")).toBeNull();
   await click("查看完整配置");
   expect(document.querySelector(".drawer")?.textContent).toContain("Rerank");
-  expect(document.querySelector(".drawer")?.textContent).toContain("fixture-reviewer");
+  expect(document.querySelector(".drawer pre")).toBeNull();
 });
 
 it("does not invent manual publication evidence for incomplete historical snapshots", async () => {

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { PageShell } from "../components/PageShell";
+import { useState } from "react";
 import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
 import { ArrowRight } from "lucide-react";
-import { apiUrl, errorMessage, getJson } from "../api";
-import { Metric, Section, StageStepper, TechnicalDetails } from "../components/Primitives";
+import { Metric, Section, StageStepper } from "../components/Primitives";
 import type { Page } from "../types";
 
 export function OverviewPage({ data, navigate }: { data: any; navigate: (page: Page) => void }) {
@@ -46,9 +46,9 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   ];
   const currentStage = stages.findIndex(([, , route]) => route === next[2]);
 
-  return <div className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`}>
-    <div className="page-title"><div><h1>RAG 自进化项目概览</h1><p>评测驱动的 RAG 持续优化与版本决策系统</p><p className="overview-intro">稳定 Golden Dataset 评测 Baseline，Optimization Agent 基于 Bad Case 生成受控实验，通过 Sandbox / Regression 后人工发布。</p></div></div>
-    <div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>
+  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1>RAG 自进化项目概览</h1><p>评测驱动的 RAG 持续优化与版本决策系统</p><p className="overview-intro">稳定 Golden Dataset 评测 Baseline，Optimization Agent 基于 Bad Case 生成受控实验，通过 Sandbox / Regression 后人工发布。</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
+
+
     {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} /> : <>
     <section className="next-action" aria-labelledby="next-action-title"><div><span className="next-action-label">{currentReleased ? "当前推荐演示 · Baseline vs Production" : "当前下一步"}</span><h2 id="next-action-title">{next[0]}</h2><p>{next[1]}</p></div><a className="primary" href={`#${next[2]}`} onClick={() => navigate(next[2])}>{currentReleased ? "开始方案对比" : next[0]}<ArrowRight size={15} aria-hidden="true" /></a></section>
     {formal && workSummary.generation_run_id && workSummary.generation_run_id !== formal.generation_run_id && <p className="muted overview-work-run">工作 Run：{workSummary.generation_status || "未记录状态"} · {workSummary.total ?? 0} / {workSummary.expected_count ?? "—"}；不替代当前正式 Golden。</p>}
@@ -57,42 +57,10 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
       <Metric label="Baseline" value={run?.result?.gates ? `${run.result.gates.passed_count} / ${run.result.gates.total} Hard Gate` : "待评测"} note={run?.result?.bad_case_count != null ? `${run.result.bad_case_count} Bad Case` : "当前 Knowledge Pipeline 尚无评测结果"} />
       <span aria-hidden="true">→</span><Metric label="Winner Candidate" value={recommendation.recommended_candidate || "待运行 / 决策"} note={recommendation.recommended_candidate ? "来源：真实评测与人工 Gate 2" : "等待 Sandbox / Regression"} />
       <span aria-hidden="true">→</span><Metric label="Production" value={productionLegacy ? "Production 仍属于 Legacy" : production?.id || "待发布"} note={currentReleased ? "当前 Winner 已通过人工 Gate 3" : "当前推荐尚未发布；保留原 Production"} />
-    </div></Section>{released && <TechnicalDetails label="Production 发布来源">{JSON.stringify(production, null, 2)}</TechnicalDetails>}</>}
-  </div>;
+    </div></Section></>}
+  </PageShell>;
 }
 
 function ArchitecturePanel({ slot, active }: { slot: "business" | "technical"; active: boolean }) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const input = useRef<HTMLInputElement>(null);
-  const label = slot === "business" ? "业务架构" : "技术架构";
-  const path = `/api/overview/architecture/${slot}`;
-  useEffect(() => { setImageUrl(null); setError(""); void getJson<{ image_url: string | null }>(path).then(value => setImageUrl(value.image_url)).catch(reason => setError(errorMessage(reason))); }, [slot]);
-  const upload = async (file?: File) => {
-    if (!file) return;
-    setBusy(true); setError("");
-    try {
-      if (!(["image/png", "image/jpeg", "image/webp"].includes(file.type)) || file.size > 10 * 1024 * 1024) throw new Error("仅支持不超过 10 MB 的 PNG、JPG 或 WebP 图片");
-      const response = await fetch(apiUrl(path), { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.detail || `上传失败（${response.status}）`);
-      setImageUrl(result.image_url);
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setBusy(false); if (input.current) input.current.value = ""; }
-  };
-  const remove = async () => {
-    setBusy(true); setError("");
-    try {
-      const response = await fetch(apiUrl(path), { method: "DELETE" });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.detail || `删除失败（${response.status}）`);
-      setImageUrl(null);
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setBusy(false); }
-  };
-  return <><KnowledgeDiagrams kind={slot} active={active} /><TechnicalDetails label="已保存参考图"><Section title={label} action={<div className="header-actions"><button className="secondary" disabled={busy} onClick={() => input.current?.click()}>{imageUrl ? "更换图片" : "上传图片"}</button>{imageUrl && <button className="secondary" disabled={busy} onClick={() => void remove()}>删除图片</button>}<input ref={input} className="visually-hidden" aria-label={`上传${label}图片`} type="file" accept="image/png,image/jpeg,image/webp" onChange={event => void upload(event.target.files?.[0])} /></div>}>
-    {error && <p className="error-notice" role="alert">{error}</p>}
-    <div className="architecture-image-area">{imageUrl ? <img src={apiUrl(imageUrl)} alt={label} /> : <p className="muted">尚未上传{label}图片。支持 PNG、JPG、WebP，最大 10 MB。</p>}</div>
-  </Section></TechnicalDetails></>;
+  return <KnowledgeDiagrams kind={slot} active={active} />;
 }

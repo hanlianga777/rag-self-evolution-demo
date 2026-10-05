@@ -46,7 +46,7 @@ it("uses saved generation evidence only and keeps technical identity in its Draw
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/api/bad-cases") ? [bad] : run))));
   await render(<EvaluationPage data={{ evaluation: run, badCases: [bad] }} />);
   expect(document.querySelector(".config-summary-grid")?.textContent).not.toContain("judge-only-model");
-  await click("查看技术详情");
+  await click("查看评测依据");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("judge-only-model");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("EVAL-stored");
 });

@@ -10,7 +10,7 @@ frontend/.npm-cache/
 .npm-cache/
 backend/data/*.db
 backend/data/*.bak
-backend/data/index/
+backend/data/index
 backend/data/index_versions/
 backend/data/uploads/
 backend/data/archived_documents/
@@ -25,3 +25,5 @@ __pycache__/
 
 # Local browser verification artifacts
 output/playwright/
+
+backend/data/legacy_index.json

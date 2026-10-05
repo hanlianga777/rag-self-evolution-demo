@@ -33,6 +33,104 @@ class PartialGenerationTests(unittest.TestCase):
         ]
         self.service.quality_check = Mock(return_value={"priority": "P2", "reason": "fixture"})
 
+    def test_completed_run_is_not_gate_ready_without_real_quality_records(self):
+        run_id = self.store.start_generation_run('mock-provider', 'mini')
+        generated = self.service.generate_mini_golden(self.chunks)
+        self.store.save_mini_golden_candidates(generated['valid_slots'], 'mock-provider', coverage_plan=generated['coverage_plan'], hard_validation=generated['hard_validation'], run_id=run_id)
+        self.store.update_generation_run(run_id, status='completed')
+        run = self.store.generation_run(run_id)
+        self.assertEqual(run['human_gate']['status'], 'pending')
+        for question_id in run['question_ids']:
+            self.passed_probe(question_id)
+            self.store.record_qc(question_id, {'score': 95, 'priority': 'P2', 'reason': 'fixture quality'}, 'passed')
+        gate = self.store.generation_run(run_id)['human_gate']
+        self.assertEqual(gate['status'], 'ready')
+        self.assertEqual(gate['human_review_pending'], 20)
+        self.assertEqual(gate['approved'], 0)
+
+    def test_quality_resume_keeps_current_passes_and_retries_only_missing_qc(self):
+        run_id = self.store.start_generation_run('mock-provider', 'mini')
+        generated = self.service.generate_mini_golden(self.chunks)
+        self.store.save_mini_golden_candidates(generated['valid_slots'], 'mock-provider', coverage_plan=generated['coverage_plan'], hard_validation=generated['hard_validation'], run_id=run_id)
+        ids = self.store.generation_run(run_id)['question_ids']
+        for question_id in ids:
+            self.passed_probe(question_id)
+        for question_id in ids[:-1]:
+            self.store.record_qc(question_id, {'score': 95, 'priority': 'P2', 'reason': 'fixture'}, 'passed')
+        self.store.update_generation_run(run_id, status='failed', validation={'error': 'connection interrupted', 'failed_stage': 'qc'})
+        fingerprint = self.store.generation_run(run_id)['artifacts']['hard_validation']['corpus_fingerprint']
+        with self.assertRaisesRegex(ValueError, 'Corpus'):
+            self.store.claim_quality_resume(run_id, 'another-version')
+        self.store.claim_quality_resume(run_id, fingerprint)
+        with self.assertRaisesRegex(ValueError, '恢复'):
+            self.store.claim_quality_resume(run_id, fingerprint)
+        self.service.quality_check.return_value = {'score': 95, 'priority': 'P2', 'reason': 'resumed fixture'}
+        with patch.object(self.store, 'run_probe') as probe:
+            _run_mini_generation(run_id, self.store, self.service, self.corpus, resume_quality=True)
+        probe.assert_not_called()
+        self.service.quality_check.assert_called_once()
+        self.assertTrue(all(len(self.store.qc_history(qid)) == 1 for qid in ids))
+        run = self.store.generation_run(run_id)
+        self.assertEqual(run['human_gate']['status'], 'ready')
+        self.assertEqual(run['human_gate']['approved'], 0)
+        self.assertEqual(run['artifacts']['hard_validation']['quality_recovery_count'], 1)
+
+    def test_generated_quality_repair_has_one_budget_and_never_approves(self):
+        run_id = self.store.start_generation_run('mock-provider', 'mini')
+        generated = self.service.generate_mini_golden(self.chunks)
+        self.store.save_mini_golden_candidates(generated['valid_slots'], 'mock-provider', coverage_plan=generated['coverage_plan'], hard_validation=generated['hard_validation'], run_id=run_id)
+        self.store.update_generation_run(run_id, status='completed')
+        question_id = self.store.generation_run(run_id)['question_ids'][0]
+        self.store.record_probe_result(question_id, {'question_quality': 0, 'golden_answer_quality': 0, 'evidence_support': 0, 'evidence_direct_failure': True})
+        row = self.store.question(question_id)
+        with self.assertRaisesRegex(ValueError, '完整 Corpus'):
+            self.store.update_question(question_id, 'Q01 应如何正确断电维护设备？', row['reference_answer'], row['evidence'], 'auto-fixture', auto_repair=True)
+        changed = self.store.update_question(question_id, 'Q01 应如何正确断电维护设备？', row['reference_answer'], row['evidence'], 'auto-fixture', chunks=self.chunks, auto_repair=True)
+        self.assertEqual(changed['raw']['quality_repair_count'], 1)
+        self.assertEqual(changed['raw']['revision_version'], 2)
+        self.assertEqual(changed['stage'], 'candidate')
+        self.assertEqual(changed['review_status'], 'human_review_pending')
+        self.store.record_probe_result(question_id, {'question_quality': 0, 'golden_answer_quality': 0, 'evidence_support': 0, 'evidence_direct_failure': True})
+        with self.assertRaisesRegex(ValueError, '最多一轮'):
+            self.store.update_question(question_id, 'Q01 再次断电维护？', row['reference_answer'], row['evidence'], 'auto-fixture', chunks=self.chunks, auto_repair=True)
+
+    def test_qc_response_retry_is_bounded_and_does_not_retry_other_provider_errors(self):
+        from app.providers import ProviderUnavailable
+        self.service._quality_check = Mock(side_effect=[ProviderUnavailable('DeepSeek QC 未返回有效 JSON'), {'score': 95, 'priority': 'P2', 'reason': 'fixture'}])
+        result = AiService.quality_check(self.service, {})
+        self.assertEqual(result['response_retries'], 1)
+        self.assertEqual(self.service._quality_check.call_count, 2)
+        self.service._quality_check = Mock(side_effect=ProviderUnavailable('DeepSeek QC 未返回有效 JSON'))
+        with self.assertRaises(ProviderUnavailable):
+            AiService.quality_check(self.service, {})
+        self.assertEqual(self.service._quality_check.call_count, 2)
+        self.service._quality_check = Mock(side_effect=ProviderUnavailable('HTTP 401'))
+        with self.assertRaises(ProviderUnavailable):
+            AiService.quality_check(self.service, {})
+        self.assertEqual(self.service._quality_check.call_count, 1)
+
+    def test_completed_generation_with_missing_quality_can_resume(self):
+        run_id = self.store.start_generation_run('mock-provider', 'mini')
+        generated = self.service.generate_mini_golden(self.chunks)
+        self.store.save_mini_golden_candidates(generated['valid_slots'], 'mock-provider', coverage_plan=generated['coverage_plan'], hard_validation=generated['hard_validation'], run_id=run_id)
+        self.store.update_generation_run(run_id, status='completed')
+        run = self.store.generation_run(run_id)
+        self.store.claim_quality_resume(run_id, run['artifacts']['hard_validation']['corpus_fingerprint'])
+        self.assertEqual(self.store.generation_run(run_id)['status'], 'probing')
+        self.assertEqual(self.store.generation_run(run_id)['question_ids'], run['question_ids'])
+
+    def test_answerability_uses_a_valid_json_example_and_typed_citation_allowlists(self):
+        self.provider.complete.side_effect = None
+        self.provider.complete.return_value = json.dumps({'answerable': False, 'confidence': .9, 'category': 'missing_details', 'reason': 'fixture missing details', 'supporting_chunk_ids': [], 'supporting_pages': []})
+        result = self.service._answerability_check('fixture question', [{'chunk_id': 'C1', 'parent_chunk_id': 'P1'}], {'full_text_hits': [{'document_id': 'D', 'page': 1}]})
+        self.assertIs(result['answerable'], False)
+        system, payload = self.provider.complete.call_args.args
+        example = json.loads(system.split('只返回 JSON：', 1)[1].removesuffix('。'))
+        self.assertEqual(example['category'], 'missing_details')
+        data = json.loads(payload)
+        self.assertEqual(data['allowed_supporting_chunk_ids'], ['C1'])
+        self.assertEqual(data['allowed_supporting_pages'], [{'document_id': 'D', 'page': 1}])
+
     def passed_probe(self, question_id, *_args, **_kwargs):
         return self.store.record_probe_result(question_id, {'question_quality': 30, 'golden_answer_quality': 30, 'evidence_support': 40})
 

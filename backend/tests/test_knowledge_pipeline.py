@@ -9,6 +9,42 @@ from app import knowledge_pipeline as kp
 
 
 class KnowledgePipelineTests(unittest.TestCase):
+    def test_cdn_recovery_keeps_official_tls_identity_and_rejects_other_hosts(self):
+        from io import BytesIO
+        from unittest.mock import Mock
+        failure = kp.urllib.error.URLError(kp.ssl.SSLEOFError('VPN DNS handshake'))
+        connection = Mock(); connection.getresponse.return_value.status = 200; connection.getresponse.return_value.read.return_value = b'zip'
+        context = Mock(); raw_socket = Mock()
+        with patch.object(kp.urllib.request, 'urlopen', side_effect=[failure, BytesIO(b'{"Answer":[{"type":1,"data":"1.2.3.4"}]}')]), patch.object(kp.http.client, 'HTTPSConnection', return_value=connection), patch.object(kp.socket, 'create_connection', return_value=raw_socket), patch.object(kp.ssl, 'create_default_context', return_value=context):
+            self.assertEqual(kp.download_mineru_result('https://cdn-mineru.openxlab.org.cn/result.zip?signature=private'), b'zip')
+        context.wrap_socket.assert_called_once_with(raw_socket, server_hostname='cdn-mineru.openxlab.org.cn')
+        connection.request.assert_called_once_with('GET', '/result.zip?signature=private')
+        connection.close.assert_called_once()
+        with patch.object(kp.urllib.request, 'urlopen', side_effect=failure) as request:
+            with self.assertRaises(kp.urllib.error.URLError):
+                kp.download_mineru_result('https://untrusted.invalid/result.zip')
+        self.assertEqual(request.call_count, 1)
+
+    def test_mineru_upload_does_not_inject_unsigned_content_type(self):
+        from io import BytesIO
+        import zipfile
+        archive = BytesIO()
+        with zipfile.ZipFile(archive, 'w') as bundle:
+            bundle.writestr('content_list.json', json.dumps([{'type': 'text', 'text': 'source'}]))
+        calls = []
+        def transfer(request, **kwargs):
+            calls.append(request)
+            return BytesIO(archive.getvalue() if isinstance(request, str) else b'')
+        provider = kp.MinerUProvider({'MINERU_API_KEY': 'fixture'})
+        with tempfile.TemporaryDirectory() as directory:
+            pdf = Path(directory)/'manual.pdf'; pdf.write_bytes(b'%PDF-source')
+            with patch.object(provider, '_request', side_effect=[{'batch_id': 'batch', 'file_urls': ['https://upload.invalid/file']}, {'extract_result': [{'state': 'done', 'full_zip_url': 'https://result.invalid/file'}]}]), patch.object(kp.urllib.request, 'urlopen', side_effect=transfer):
+                blocks, result = provider.parse(pdf, 'D')
+        self.assertEqual(calls[0].get_method(), 'PUT')
+        self.assertEqual(calls[0].get_header('Content-type'), '')
+        self.assertEqual(blocks[0]['text'], 'source')
+        self.assertEqual(result, archive.getvalue())
+
     def test_parent_child_reconstructs_pages_and_preserves_table(self):
         document = {'id': 'D', 'name': 'manual.pdf', 'product': 'B2'}
         blocks = [{'type': 'text', 'text': 'abcdefghijklmno', 'page_idx': 0, 'bbox': [0, 0, 10, 10]},

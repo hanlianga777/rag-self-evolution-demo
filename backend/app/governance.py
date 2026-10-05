@@ -452,6 +452,26 @@ class GovernanceStore:
             connection.execute("UPDATE golden_generation_runs SET status='generating' WHERE id=?", (run_id,))
             connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), run_id))
 
+    def claim_quality_resume(self, run_id, corpus_fingerprint):
+        with self.connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT r.*, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id WHERE r.id=?", (run_id,)).fetchone()
+            if row is None:
+                raise KeyError(run_id)
+            audit = _load(row['hard_validation_json'], {})
+            expected = self._expected_count({'profile': _load(row['profile_json'], {})})
+            ids = _load(row['question_ids_json'], [])
+            pending = connection.execute(f"SELECT 1 FROM questions WHERE id IN ({','.join('?' for _ in ids)}) AND (probe_status!='probe_passed' OR qc_status NOT IN ('qc_passed','qc_failed')) LIMIT 1", ids).fetchone() if ids else None
+            interrupted = row['status'] == 'failed' and audit.get('failed_stage') in {'qc', 'probing'}
+            if not (interrupted or row['status'] == 'completed' and pending) or len(ids) != expected or not expected:
+                raise ValueError('仅完整入库且质量中断或仍有未完成质量项的 Run 可以恢复')
+            if audit.get('corpus_fingerprint') != corpus_fingerprint:
+                raise ValueError('Corpus 已变化，不能复用旧质量结果')
+            audit.setdefault('quality_recovery_history', []).append({'error': audit.get('error') if interrupted else '仍有未完成质量项', 'stage': audit.get('failed_stage') if interrupted else 'quality_pending', 'at': _now()})
+            audit['quality_recovery_count'] = audit.get('quality_recovery_count', 0) + 1
+            connection.execute("UPDATE golden_generation_runs SET status='probing' WHERE id=?", (run_id,))
+            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), run_id))
+
     def persist_generation_attempt(self, run_id: str, candidate: dict | None, slot_audit: dict, *, slot: str, attempt: int, model: str, slot_complete: bool | None = None):
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -467,6 +487,7 @@ class GovernanceStore:
             if candidate and any(_load(item["raw_json"], {}).get("coverage_slot") == slot for item in connection.execute("SELECT raw_json FROM questions WHERE legacy_question_type='v1_mini' AND stage!='superseded' AND raw_json LIKE ?", (f'%"generation_run_id": "{run_id}"%',))):
                 raise ValueError(f"{slot} 已有活动 Candidate")
             audit["slot_audit"] = slot_audit
+            connection.execute("UPDATE golden_generation_runs SET status='generating' WHERE id=?", (run_id,))
             progress = audit.get("progress", {})
             finished = bool(candidate) if slot_complete is None else slot_complete
             processed_ids = progress.get("processed_slot_ids", [])
@@ -609,6 +630,14 @@ class GovernanceStore:
             return None
         run = {**dict(row), "profile": _load(row["profile_json"], {}), "question_ids": _load(row["question_ids_json"], []), "artifacts": self.generation_artifacts(run_id)}
         audit = run["artifacts"]["hard_validation"]
+        ids = run['question_ids']
+        with self.connection() as connection:
+            quality = connection.execute(f"SELECT q.*, EXISTS(SELECT 1 FROM probe_results p WHERE p.question_id=q.id) AS has_probe, EXISTS(SELECT 1 FROM qc_results c WHERE c.question_id=q.id) AS has_qc FROM questions q WHERE q.id IN ({','.join('?' for _ in ids)})", ids).fetchall() if ids else []
+        expected = self._expected_count(run)
+        probe_passed = sum(q['probe_status'] == 'probe_passed' and q['has_probe'] for q in quality)
+        qc_completed = sum(q['qc_status'] in {'qc_passed', 'qc_failed'} and q['has_qc'] for q in quality)
+        ready = expected > 0 and len(quality) == expected and run['status'] == 'completed' and probe_passed == expected and qc_completed == expected
+        run['human_gate'] = {'gate': 1, 'status': 'ready' if ready else 'pending', 'expected': expected, 'generated': len(quality), 'probe_passed': probe_passed, 'qc_completed': qc_completed, 'qc_passed': sum(q['qc_status'] == 'qc_passed' and q['has_qc'] for q in quality), 'human_review_pending': sum(q['review_status'] == 'human_review_pending' for q in quality), 'approved': sum(q['stage'] == 'golden' for q in quality)}
         if audit.get("slot_persistence_v1"):
             progress = audit.get("progress", {})
             valid, probe, qc = len(run["question_ids"]), progress.get("probe_completed", 0), progress.get("qc_completed", 0) + progress.get("qc_skipped", 0)
@@ -1148,11 +1177,15 @@ class GovernanceStore:
             connection.execute("UPDATE candidate_revision_runs SET status=?, audit_json=?, updated_at=? WHERE id=?", (status, _json(audit), _now(), revision_id))
         return self.revision_run(revision_id)
 
-    def update_question(self, question_id: str, question: str, reference_answer: str | None, evidence: list, actor: str, *, chunks=None, similarity=None):
+    def update_question(self, question_id: str, question: str, reference_answer: str | None, evidence: list, actor: str, *, chunks=None, similarity=None, auto_repair=False):
         self.require_generation_ready(question_id)
         current = self.question(question_id)
         if current["legacy_question_type"] == "v1_mini" and (current["stage"] == "golden" or any(event["decision"] in {"needs_revision", "rejected"} for event in self.review_history(question_id))):
             raise ValueError("已批准或待修订题目须走局部修订流程")
+        if auto_repair and (current['stage'] != 'candidate' or current['raw'].get('source') != 'ai_generated' or current['raw'].get('quality_repair_count', 0) >= 1 or current['probe_status'] != 'needs_revision' and current['qc_status'] != 'qc_failed'):
+            raise ValueError('自动质量修复仅限未批准的失败 AI Candidate，最多一轮')
+        if auto_repair and chunks is None:
+            raise ValueError('自动质量修复必须使用完整 Corpus 硬校验')
         changed = (question != current["question"] or reference_answer != current["reference_answer"] or evidence != current["evidence"])
         if not changed:
             return current
@@ -1177,6 +1210,8 @@ class GovernanceStore:
             if not validation['valid']:
                 raise ValueError('; '.join(validation['blocking_errors']))
         raw = {**current["raw"], "question": question, "reference_answer": reference_answer, "acceptable_evidence": evidence, "evidence": evidence, "validation": validation}
+        if auto_repair:
+            raw.update({'quality_repair_count': 1, 'revision_version': current['raw'].get('revision_version', 1) + 1, 'quality_repair': {'actor': actor, 'at': _now(), 'before': {'question': current['question'], 'reference_answer': current['reference_answer'], 'evidence': current['evidence']}, 'trigger': {'probe_status': current['probe_status'], 'qc_status': current['qc_status']}}})
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             latest = connection.execute('SELECT updated_at FROM questions WHERE id=?', (question_id,)).fetchone()

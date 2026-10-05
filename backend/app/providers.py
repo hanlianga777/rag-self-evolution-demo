@@ -1,4 +1,5 @@
 import json
+import http.client
 from datetime import datetime, timezone
 import math
 import socket
@@ -81,9 +82,11 @@ class DeepSeekProvider:
         except urllib.error.URLError as error:
             if isinstance(error.reason, (TimeoutError, socket.timeout)):
                 raise ProviderTimeout("DeepSeek 请求超时，请重试") from error
-            raise ProviderNetworkError(f"DeepSeek 网络错误：{error.reason}") from error
+            raise ProviderNetworkError(f"DeepSeek 网络错误（{type(error.reason).__name__}）") from error
         except (TimeoutError, socket.timeout) as error:
             raise ProviderTimeout("DeepSeek 请求超时，请重试") from error
+        except (http.client.HTTPException, ConnectionError) as error:
+            raise ProviderNetworkError(f"DeepSeek 连接中断（{type(error).__name__}）") from error
         except json.JSONDecodeError as error:
             raise ProviderUnavailable("DeepSeek 返回无效 JSON") from error
         try:

@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Drawer } from "./Dialog";
 import { ChevronDown } from "lucide-react";
 import { displayText } from "../display";
 
@@ -19,11 +18,6 @@ export function Section({ title, action, children }: { title: string; action?: R
 export function Status({ value }: { value: string }) {
   const tone = /fail|rejected|not[\s_-]*qualified|needs_revision/i.test(value) ? "bad" : /pass|completed|indexed|active|recommended|released|reviewed|qualified|evaluated/i.test(value) ? "good" : /running|evaluating|queued/i.test(value) ? "accent" : /pending|human_review|not_run|not_evaluable|legacy/i.test(value) ? "warning" : "neutral";
   return <Badge tone={tone}>{displayText(value)}</Badge>;
-}
-
-export function TechnicalDetails({ children, label = "技术详情" }: { children: ReactNode; label?: string }) {
-  const [open, setOpen] = useState(false);
-  return <><button type="button" className="text-button technical-details-trigger" onClick={event => { event.currentTarget.focus(); setOpen(true); }}>{label}</button><Drawer open={open} onOpenChange={setOpen} title={label}><div className="drawer-body"><div className="technical-content">{typeof children === "string" ? <pre className="technical-raw">{children}</pre> : children}</div></div></Drawer></>;
 }
 
 export function TruncatedText({ children, lines = 3 }: { children: ReactNode; lines?: 2 | 3 }) {

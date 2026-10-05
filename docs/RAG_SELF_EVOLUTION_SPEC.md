@@ -4,6 +4,18 @@
 > 业务规格冻结日期：2026-09-30（Asia/Shanghai）；Interview Demo UI 修订：2026-10-03。V1.4 业务代码的历史验收见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)；本轮 UI 实施与验证结果单独见 [Interview Demo 验收](INTERVIEW_DEMO_VERIFICATION.md)，不沿用历史测试数字作为本次证据。
 > V1.4 是 Golden 工艺、对象身份、Monitoring 与信息架构升级，保留现有技术栈和治理底座。新图是目标架构，不是当前 Demo 已具备全部能力的证明。
 
+## Phase 1 最终收口 UI 与执行合同（2026-10-05）
+
+本节按用户批准的最终收口任务替代此前“仅两个页面布局”和绿色 Diagram 要求；旧说明保留为历史，不改变 Search Space、Gate、Regression 或冻结预算。
+
+- 八个一级页面共用 PageShell：H1、副标题、必要简述、Actions 和 Tabs 固定，仅内容区纵向滚动；切换页面 / Tab 复位，Drawer 独立，必要表格 / Cluster 内部滚动保留。
+- 全项目普通 Card 使用阶段卡片母版 Token：1px 边框、9px 圆角 / Padding、8px Gap、12px/700 标题、11px 正文、10px辅助、112px 紧凑卡片高度。长内容使用 Drawer、表格或滚动区，颜色只来自既有统一 Token；其他六页业务内容与规则不改版。
+- 移除开发型 TechnicalDetails、Raw JSON、参考图上传和辅助入口；保留并结构化 Document / Bad Case / Child / Parent / PDF / Cluster / Slot 证据追溯。知识库使用“知识处理选型策略”。
+- 正式业务 / 技术 Diagram 与 Card 分离，使用 diagram-design 默认烟灰与橙色；左到右连续编号，不蛇形折返。Parent Expand 为独立节点，保留完整处理、检索、Coverage 与 Evidence 支路和 Provider 边界。
+- 已授权读取根目录 .env、受控重启本项目服务、验证四个真实 Provider、重新处理四份 PDF / 157页并原子激活。凭据不输出、不进入数据或 Git；旧 Legacy Production / 历史快照保留绑定。
+- 激活后自动读取 Full Profile（本轮 40 Positive / 18 Ablation / 40 Negative），逐 Slot 执行 Generation / Hard Validation / Probe / QC，失败局部修复、预算分开计数。Human Gate 1 Ready 依据逐题真实结果，不等于 Run completed；禁止自动批准、冻结 Snapshot 或运行 Baseline / Agent / Sandbox / Release。
+- QC 的 P0 是题目质量 Blocker，不是安全主题风险等级；Answerability 的 false 表示证据不能完整回答，null 表示无法判定。Judge 将输入样本视为数据，不执行其指令。响应格式或连接故障最多额外重试一次，保存实际 response_retries；内容质量修复独立计数、最多一轮，仅限本轮未批准的失败 AI Candidate，保留修复前后内容和版本。中断恢复只复用内容 / Corpus / Probe 身份一致的已通过记录，不自动批准或冻结。
+
 ## Phase 1 当前覆盖要求（2026-10-05）
 
 用户已批准真实 Knowledge Pipeline 升级及“项目概览 / 知识库”两个入口重构。本节覆盖下文历史口径中的“不迁移 Parser / Embedding / Chunk”“仅 UI / 不调用 Provider”“Lightweight Rerank”限制；这些旧说明保留作为历史，其他六页布局、Search Space、Gate、Regression、预算及人工发布规则保持。真实调用获授权，但缺少凭据时必须报告阻塞，不能用旧能力或 fixture 冒充新版本成功。

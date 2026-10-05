@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { errorMessage, identityKey, postJson } from "../api";
-import { Badge, CustomSelect, TechnicalDetails } from "../components/Primitives";
+import { Badge, CustomSelect } from "../components/Primitives";
 import { readSession, writeSession } from "../session";
 import { ExecutionMetrics, formatValue, parameterNames } from "../components/PipelineFields";
 import type { Citation, PipelinePreview } from "../types";
@@ -76,13 +76,13 @@ function AnswerCard({ scheme, keys, run, onOpenCitation }: { scheme: Scheme; key
     <div className="answer-config">{keys.filter(key => config[key] != null).map(key => <span key={key}>{parameterNames[key]}: <strong>{formatValue(config[key])}</strong></span>)}</div>
     <div className="answer-scroll">{run.error ? <p className="error-notice" role="alert">回答失败：{run.error}</p> : result ? <MarkdownAnswer text={result.answer} /> : <p className="muted">点击运行后显示实际回答。</p>}</div>
     <div className="answer-evidence">{result?.evidence?.length ? result.evidence.map((item: Citation) => <button className="document-link" key={item.chunk_id} onClick={() => onOpenCitation(item)}>{item.document} · P.{item.page_start}</button>) : result ? <span className="muted">本次回答未返回可定位 Evidence。</span> : null}</div>
-    <footer className="answer-metrics-footer"><ExecutionMetrics compact metrics={result} /><TechnicalDetails label="请求身份与指标审计">{JSON.stringify({ comparisonId: run.comparisonId, question: run.question, sourceId: run.sourceId, actual_version: result?.version, config }, null, 2)}{result && <ExecutionMetrics metrics={result} />}</TechnicalDetails></footer>
+    <footer className="answer-metrics-footer"><ExecutionMetrics compact metrics={result} /></footer>
   </article>;
 }
 
 function MarkdownAnswer({ text }: { text: string }) {
   const inline = (value: string) => value.split(/(\*\*[^*]+\*\*)/g).map((part, index) => part.startsWith("**") && part.endsWith("**") ? <strong key={index}>{part.slice(2, -2)}</strong> : part);
-  return <div className="answer-markdown">{text.split(/\n{2,}/).map((block, index) => {
+  return <div className="answer-markdown">{text.split(/\n{2 }/).map((block, index) => {
     const lines = block.split("\n");
     if (lines.every(line => /^\s*[-*]\s+/.test(line))) return <ul key={index}>{lines.map((line, lineIndex) => <li key={lineIndex}>{inline(line.replace(/^\s*[-*]\s+/, ""))}</li>)}</ul>;
     const heading = block.match(/^#{1,3}\s+(.+)$/);

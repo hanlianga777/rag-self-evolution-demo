@@ -75,7 +75,7 @@ start_service() {
       return 1
     fi
     for _ in {1..3}; do
-      if healthy "$name" "$port"; then
+      if [[ "$restart" != 1 ]] && healthy "$name" "$port"; then
         echo "[$name] current project service already healthy on port $port; reusing"
         return 0
       fi

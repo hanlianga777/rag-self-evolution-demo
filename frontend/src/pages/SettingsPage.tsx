@@ -1,3 +1,4 @@
+import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { errorMessage, getJson, postJson } from "../api";
 import { Badge, Section, Status } from "../components/Primitives";
@@ -11,7 +12,6 @@ export function SettingsPage({ data }: { data: any }) {
   const [pipeline, setPipeline] = useState<any>(null);
   const [probe, setProbe] = useState<any>(null);
   const [checking, setChecking] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [spaceOpen, setSpaceOpen] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => { let cancelled = false; void getJson("/api/pipeline").then(value => { if (!cancelled) setPipeline(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, []);
@@ -37,13 +37,13 @@ export function SettingsPage({ data }: { data: any }) {
     catch (reason) { setError(errorMessage(reason)); }
     finally { setChecking(false); }
   };
-  return <div className="page settings-page">
-    <div className="page-title"><div><h1>Pipeline 配置</h1><p>说明当前 RAG 的关键策略，以及 Frozen 与 Agent 可调的参数边界。</p></div><div className="header-actions"><button className="secondary" onClick={() => setSpaceOpen(true)}>Search Space · {Object.keys(pipeline?.search_space || {}).length}</button><button className="text-button" onClick={() => setDetailsOpen(true)}>技术详情</button></div></div>
+  return <PageShell className="page settings-page" header={<div className="page-title"><div><h1>Pipeline 配置</h1><p>说明当前 RAG 的关键策略，以及 Frozen 与 Agent 可调的参数边界。</p></div><div className="header-actions"><button className="secondary" onClick={() => setSpaceOpen(true)}>Search Space · {Object.keys(pipeline?.search_space || {}).length}</button></div></div>}>
+
     <p className="muted pipeline-boundary">Agent 仅在受控 Search Space 内调优；固定知识处理、模型与评测规则。</p>
     {error && <p className="error-notice" role="alert">请求失败：{error}</p>}
     <div className="config-groups">{groups.map(group => <div className="pipeline-group" key={group.title}><Section title={group.title}><div className="parameter-list">{group.rows.filter(([, , value]) => available(value)).map(([key, name, value]) => { const allowed = Object.prototype.hasOwnProperty.call(pipeline?.search_space || {}, key); return <div key={key} data-parameter={key}><span>{name}</span><strong>{formatValue(value)}</strong>{pipeline?.search_space && <Badge tone={allowed ? "accent" : "neutral"}>{allowed ? "Agent 可调" : "Frozen"}</Badge>}</div>; })}</div></Section></div>)}</div>
     <div className="provider-status-row"><span>Provider 配置：<Status value={r.status || "not_run"} />{r.model && ` · ${r.model}`}</span><button className="secondary" onClick={() => void verify()} disabled={checking}>{checking ? "正在验证…" : "验证服务连接"}</button>{r.last_probe && <span className="muted">最后验证：{displayText(r.last_probe.status)}{r.last_probe.latency_ms != null ? ` · ${r.last_probe.latency_ms} ms` : ""}</span>}<small className="muted">手动验证会调用 DeepSeek。</small></div>
     <Drawer open={spaceOpen} onOpenChange={setSpaceOpen} title="Search Space" className="search-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={pipeline?.search_space || {}} baseline={pipeline?.baseline_config || config} /></div></Drawer>
-    <Drawer open={detailsOpen} onOpenChange={setDetailsOpen} title="Pipeline 技术详情"><div className="drawer-body"><p>主页面仅展示已保存的值。未实现的父 / 子 Chunk、未保存的 Generation Temperature / Max Tokens 不补造；Judge 的 Temperature 不作为 Generation 配置。</p><p>生成模型优先来自当前发布 Snapshot；温度仅采用对应模型的明确生成执行快照。Provider 配置状态不等于当前发布模型。</p><pre className="technical-raw">{JSON.stringify({ pipeline, production_snapshot: active?.snapshot, generation_execution_snapshot: execution.generation_model ? execution : null, hidden_fields: groups.map(group => ({ group: group.title, fields: group.rows.filter(([, , value]) => !available(value)).map(([, label]) => label) })) }, null, 2)}</pre></div></Drawer>
-  </div>;
+
+  </PageShell>;
 }

@@ -259,7 +259,7 @@ def knowledge_slot(slot_id: str):
         slot = next((s for s in plan['slots'] if s['slot_id'] == slot_id), None)
         if slot is None: raise HTTPException(status_code=404, detail='Slot not found')
         chunks = {c['chunk_id']: c for c in corpus.chunks()}
-        return {**slot, 'identity': state['identity'], 'material_children': [chunks[key] for key in slot['material_chunk_ids']]}
+        return {**slot, 'identity': state['identity'], 'material_children': [chunks[key] for key in slot['material_chunk_ids']], 'golden_candidates': [{key: q.get(key) for key in ('id', 'question', 'reference_answer', 'evidence', 'probe_status', 'qc_status', 'review_status')} for q in store.questions() if q.get('raw', {}).get('plan_id') == plan['plan_id'] and q.get('raw', {}).get('coverage_slot') == slot_id]}
 
 
 def start_knowledge_golden():
@@ -532,7 +532,19 @@ def regenerate_failed(generation_run_id: str):
     return {"run_id": generation_run_id, "status": "generating"}
 
 
-def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=False):
+@app.post("/api/governance/generation-runs/{generation_run_id}/resume-quality", status_code=202, dependencies=[Depends(require_trusted_origin)])
+def resume_generation_quality(generation_run_id: str):
+    try:
+        store.claim_quality_resume(generation_run_id, manifest_identity(current_manifest()))
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Generation run not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    threading.Thread(target=_run_mini_generation, args=(generation_run_id, store, ai_service, corpus), kwargs={"resume_quality": True}, daemon=True).start()
+    return {"run_id": generation_run_id, "status": "probing"}
+
+
+def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=False, resume_quality=False):
     stage = "generation"
     profile = run_store.generation_run(run_id)["profile"]
 
@@ -551,8 +563,8 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
             from .golden_v2 import digest
             if frozen['corpus_fingerprint'] != manifest_identity(current_manifest()) or frozen['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
                 raise ValueError('Coverage Plan 已失效：Corpus 已变化')
-        complete = False
-        for round_number in range(1, 4 if regenerate else 2):
+        complete = resume_quality
+        for round_number in ([] if resume_quality else range(1, 4 if regenerate else 2)):
             if regenerate:
                 run = run_store.generation_run(run_id)
                 remaining_before = len(run["artifacts"]["coverage_plan"]) - len(run["question_ids"])
@@ -600,7 +612,14 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
         qc_completed = qc_skipped = 0
         for index, candidate in enumerate(saved, start=1):
             stage = "probing"
-            probe = run_store.run_probe(candidate["id"], service.retriever, run_corpus.chunks(), service.answerability_check, subtype_judge=service.negative_subtype_check)
+            prior_probe = run_store.probe_history(candidate["id"])[0] if resume_quality and candidate["probe_status"] == "probe_passed" else None
+            _, identity = run_store.capture_quality(candidate["id"])
+            reusable = prior_probe and all(prior_probe.get("execution_identity", {}).get(key) == identity[key] for key in ('content_hash', 'active_candidate', 'corpus_fingerprint'))
+            prior_qc = run_store.qc_history(candidate["id"])
+            if reusable and prior_qc and prior_qc[0]["result"].get("execution_identity") == identity and candidate["qc_status"] == "qc_passed":
+                qc_completed += 1
+                continue
+            probe = {"status": "passed"} if reusable else run_store.run_probe(candidate["id"], service.retriever, run_corpus.chunks(), service.answerability_check, subtype_judge=service.negative_subtype_check)
             run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "slot": candidate["raw"].get("coverage_slot"), "probe_completed": index})
             if probe["status"] == "passed":
                 stage = "qc"
