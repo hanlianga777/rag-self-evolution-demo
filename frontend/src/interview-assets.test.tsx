@@ -46,7 +46,7 @@ it("groups pipeline configuration by purpose and marks parameters by their contr
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={{ documents: [{ parser: "PyMuPDF", chunk_strategy: "Section-aware" }], versions: [{ status: "active", snapshot: { generation_model: "generation-model" } }], readiness: { status: "ready", model: "provider-model" }, evaluation: { judge: { model: "judge-model", temperature: 0.9, execution_snapshot: { generation_model: "generation-model", temperature: 0.2 } } } }} />));
   expect(document.querySelector(".light-stepper")).toBeNull();
-  expect([...document.querySelectorAll(".settings-page h2")].map(item => item.textContent)).toEqual(["Frozen 技术基座", "Agent Search Space", "当前 Baseline Strategy"]);
+  expect([...document.querySelectorAll(".settings-page h2")].map(item => item.textContent)).toEqual(["Frozen 技术基座", "Agent Search Space"]);
   expect(document.querySelector('[data-parameter="top_k"]')?.textContent).not.toContain("Baseline 未采集");
   expect(document.body.textContent).toContain("Baseline 待评测");
   expect(document.querySelector(".provider-status-row")).toBeNull();
@@ -79,7 +79,7 @@ it("keeps current frozen Golden separate from the latest work Run and hides an e
 it("keeps candidate filters, search and explicit actions in a single toolbar", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   const rows = [{ id: "pool-1", question: "刷盘检查", stage: "candidate", test_category: "positive", review_status: "human_review_pending", raw: { source: "business_import" } }, { id: "pool-2", question: "电池维护", stage: "candidate", test_category: "negative", review_status: "human_review_pending", raw: { source: "business_import" } }];
-  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  const fetcher = vi.fn(async (url: string, _init?: RequestInit) => new Response(JSON.stringify(goldenFixture(url, rows.filter(row => row.question.includes(new URL(url).searchParams.get("search") || "")))))); vi.stubGlobal("fetch", fetcher);
   await act(async () => root.render(<BusinessImportPanel profiles={{mini:{positive_count:8,ablation_count:4,negative_count:8}}} items={rows} onCreated={async () => {}} />));
   const toolbar = document.querySelector(".candidate-pool-toolbar")!;
   expect(toolbar.querySelectorAll('[role="combobox"]')).toHaveLength(4);

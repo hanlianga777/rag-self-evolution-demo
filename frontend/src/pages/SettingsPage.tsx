@@ -1,14 +1,19 @@
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
-import { errorMessage, getJson, postJson } from "../api";
+import { errorMessage, postJson } from "../api";
 import { Badge, CustomSelect, Section } from "../components/Primitives";
+import { pipelineCached, pipelineFetch, pipelineIdentity, invalidatePipeline } from "../pipelineCache";
 import { Drawer } from "../components/Dialog";
 import { descriptions, formatValue, parameterGroups, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
 
 export function SettingsPage({ data }: { data: any }) {
-  const [pipeline, setPipeline] = useState<any>(null), [draft, setDraft] = useState<Record<string, any>>({});
+  const identity = pipelineIdentity(data);
+  const startDraft = (value: any) => { const start = value?.draft_stale ? value.baseline_config || value.config : value?.config_draft?.config || value?.baseline_config || value?.config; return Object.fromEntries(Object.keys(value?.search_space || {}).filter(key => start?.[key] !== undefined).map(key => [key, start[key]])); };
+  const [record, setRecord] = useState<any>(() => ({ identity, value: pipelineCached(identity) }));
+  const pipeline = record.identity === identity ? record.value : pipelineCached(identity);
+  const [draft, setDraft] = useState<Record<string, any>>(() => startDraft(pipeline));
   const [spaceOpen, setSpaceOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
-  useEffect(() => { let cancelled = false; void getJson<any>("/api/pipeline").then(value => { if (!cancelled) { setPipeline(value); const start = value.draft_stale ? value.baseline_config || value.config : value.config_draft?.config || value.baseline_config || value.config; setDraft(Object.fromEntries(Object.keys(value.search_space || {}).filter(key => start?.[key] !== undefined).map(key => [key, start[key]]))); } }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, []);
+  useEffect(() => { let cancelled = false; const cached = pipelineCached(identity); setRecord({ identity, value: cached }); setDraft(startDraft(cached)); void pipelineFetch(identity).then(value => { if (!cancelled && (!cached || cached.data_version !== value.data_version)) { setRecord({ identity, value }); setDraft(startDraft(value)); } }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [identity]);
   const baseline = pipeline?.baseline_config || {};
   const base = pipeline?.baseline_config || pipeline?.config || {};
   const contract = pipeline?.search_space || {};
@@ -28,7 +33,7 @@ export function SettingsPage({ data }: { data: any }) {
   });
   const save = async (discard = false) => {
     setBusy(true); setError("");
-    try { const result: any = await postJson("/api/pipeline/draft", { config: discard ? null : draft, identity: pipeline.draft_identity }); setPipeline({ ...pipeline, config_draft: result.config_draft, draft_stale: false }); if (discard) setDraft(base); }
+    try { await postJson("/api/pipeline/draft", { config: discard ? null : draft, identity: pipeline.draft_identity }); invalidatePipeline(); const value = await pipelineFetch(identity); setRecord({ identity, value }); setDraft(startDraft(value)); }
     catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); }
   };
   return <PageShell className="page settings-page" header={<div className="page-title"><div><h1>Pipeline 配置</h1><p>固定知识处理与评测规则，让 Agent 在有限 Search Space 内优化。</p></div><button className="secondary" onClick={() => setSpaceOpen(true)}>查看 Search Space</button></div>}>
@@ -46,7 +51,7 @@ export function SettingsPage({ data }: { data: any }) {
       <div className="pipeline-draft-actions"><span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · Config Draft 已保存" : ""}</span><button className="secondary" disabled={busy || !changed.length && !pipeline?.config_draft} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length} onClick={() => void save()}>保存 Config Draft</button></div>
       {(changed.length > 0 || pipeline?.config_draft) && <p className="muted">Pipeline 配置已变化，需要重新运行 Baseline 后才能成为新的评测基线。</p>}
     </Section>
-    <Section title="当前 Baseline Strategy"><p>{pipeline?.baseline_config ? "当前评测基线" : "Baseline 待评测 · 当前 Production 参考策略"}</p><dl className="baseline-strategy">{["query_rewrite", "multi_query", "candidate_k", "hybrid_search", "rerank", "top_k", "prompt_strategy"].map(key => <div key={key}><dt>{parameterNames[key]}</dt><dd>{formatValue(base[key])}</dd></div>)}</dl></Section>
-    <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="Search Space" className="search-space-drawer parameter-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={contract} baseline={baseline} /></div></Drawer>
+    {pipeline?.baseline_config && <Section title={pipeline.config_draft ? "Baseline → Draft Diff" : "Frozen Baseline Snapshot"}><dl className="baseline-strategy">{["query_rewrite", "multi_query", "candidate_k", "top_k", "hybrid_search", "rerank", "prompt_strategy"].filter(key => !pipeline.config_draft || pipeline.config_draft.config[key] !== baseline[key]).map(key => <div key={key}><dt>{parameterNames[key]}</dt><dd>{formatValue(baseline[key])}{pipeline.config_draft && ` → ${formatValue(pipeline.config_draft.config[key])}`}</dd></div>)}</dl>{pipeline.config_draft && !changed.length && <p className="muted">草稿与 Frozen Baseline 参数一致。</p>}</Section>}
+    <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="Search Space" variant="wide" className="parameter-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={contract} baseline={baseline} /></div></Drawer>
   </PageShell>;
 }

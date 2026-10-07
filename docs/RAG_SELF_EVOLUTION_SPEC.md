@@ -1257,3 +1257,14 @@ UI Contract：Search Space 卡片复用现有浅绿色 Token，Segments 使用�
 加载合同：初始 Run 使用轻量投影，候选列表服务端分页 30 条，Evidence/Probe/QC/Revision 单题详情懒加载，运行审计按需加载。内存 Cache 包含 Corpus、Run、Profile 和数据版本，Tab 返回复用已有行并后台校验，Mutation 主动失效，迟到响应不得覆盖新版本；不采用永久 localStorage。
 
 Golden 原始表格证据合同：Hard Validation、Probe、QC 统一读取所选 Child 的真实 Block 与原始 HTML；简单二列表格按真实字段/值对核对，错误字段配对和未知值不得通过。复杂合并表格不从二维行猜测字段映射。此处只补全检查的来源证据，不改写 Corpus、KV、Embedding 或 Index，工程重验保留诊断且不增加内容修复预算。
+
+### Pipeline / Golden 冻结前最后收口（2026-10-07）
+
+本节替代上文的显式分页、Baseline Strategy 常驻及 Drawer 尺寸约定，保留历史说明。
+
+- Pipeline 使用既有版本化内存缓存：Corpus / Golden / Baseline / Production 身份隔离，服务端 `data_version` 覆盖草稿内容及更新时间。返回页面先显示已验证缓存，再后台重验；保存或放弃草稿使缓存失效。无真实 Current Baseline 时不显示 Strategy Section，仅保留 Production 参考起点说明。有真实评测后显示 Frozen Baseline Snapshot；草稿存在时只显示 Baseline → Draft 差异，来源必须是实际 Evaluation Config。
+- Shared Drawer 固定 top/right=0、height=100dvh。Standard=800px，Wide=1080px；小屏100vw。Header固定、Body独立滚动、Action Footer固定。Search Space与Coverage使用Wide；单对象详情使用Standard。参数表12行不设内部纵向或横向滚动，极小视口只由Drawer Body兜底。
+- Current Golden和Candidate Pool复用 ScrollablePagedTable，保留服务端30条分页，滚动近底部自动加载；Filter改变复位，行ID去重，不混合不同data_version。只加载列表行，单题详情仍懒加载。历史列表分页不变。
+- Candidate顶部只展示治理状态与题型；Probe/QC状态统一在质量区，两卡等高，按钮margin-top:auto。Coverage主路径仅展示Topics/Slots/Gap/Merge及来源清晰的Topic行；Planner、K与Merge细节下沉技术审计。
+- 候选池仅保留互斥来源/资格汇总与Profile已选P/A/N/Topic匹配，无重复Missing Slots。人工异常以A业务判断、B确定性检查、C证据修正、D改写、E检索P1、F QC风险分类，类别仅帮助解释，不构成自动批准。
+- 本轮仅允许Q68/Q97/Q100的必要定向处理；其他97题不改写。成功新版本仍需真实Hard Validation、Probe、QC、去重及质量审计；失败保留原题与审计，不挪动冻结Topic/配额，不强行通过。任何Ready状态仍须用户最终确认，禁止自动冻结、Baseline或Agent推进。

@@ -446,7 +446,7 @@ def candidate_list(run_id: str | None = None, offset: int = Query(0, ge=0), limi
         'needs_processing':sum(row['qualification_status']=='needs_human_review' and row['probe_status']!='probe_pending' and row['qc_status']!='qc_pending' for row in rows),
         'pending_checks':sum(row['qualification_status']=='needs_human_review' and (row['probe_status']=='probe_pending' or row['qc_status']=='qc_pending') for row in rows)}
     types = sorted({row['construction_type'] for row in rows if row['construction_type']})
-    candidate_index = [{key:row[key] for key in ('id','stage','review_status','probe_status','qc_status','test_category','raw','slot','topic_cluster','qualification_status','qualification_source','attention_reasons','probe','qc')} for row in rows] if run else []
+    candidate_index = [{key:row[key] for key in ('id','stage','review_status','probe_status','qc_status','test_category','raw','slot','topic_cluster','qualification_status','qualification_source','attention_reasons','attention_categories','probe','qc')} for row in rows] if run else []
     version_rows = rows
     risks = any(row['qualification_status']=='needs_human_review' for row in rows)
     rows = [row for row in rows if (status=='all' or status=='attention' and (row['qualification_status']=='needs_human_review' or not risks) or status=='machine' and row['qualification_status']=='machine_qualified') and (source=='all' or (row['raw'].get('source') or 'ai_generated')==source) and (group=='all' or row['test_category']==group) and (construction=='all' or row['construction_type']==construction) and search.lower() in row['question'].lower()]
@@ -1089,6 +1089,7 @@ def pipeline():
     return {
         **identity,
         "config_draft": draft,
+        "data_version": hashlib.sha256(json.dumps([identity, draft, active["id"] if active else None, knowledge_state["identity"], knowledge_state["coverage_status"]], sort_keys=True).encode()).hexdigest(),
         "draft_identity": identity,
         "frozen_models": {"generation": ai_service.provider.settings.model, "judge": ai_service.provider.settings.model},
         "draft_stale": bool(draft and draft["identity"] != identity),

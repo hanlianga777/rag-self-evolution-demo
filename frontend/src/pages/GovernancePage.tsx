@@ -9,6 +9,7 @@ import { BusinessImportPanel, CoverageSummary, CurrentCoveragePreview } from "./
 import { CandidateWorkspace } from "./CandidateWorkspace";
 
 import { goldenCached, goldenFetch, invalidateGolden } from "../goldenCache";
+import { ScrollablePagedTable, usePagedCandidates } from "../components/ScrollablePagedTable";
 
 type Candidate = Record<string, any>;
 type Filter = string;
@@ -21,22 +22,20 @@ const reviewLabel = (row: Candidate) => displayText(row.review_status || "human_
 export function GovernancePage({ data }: { data: any }) {
   const operation = useOperation();
   const cacheIdentity = JSON.stringify(data.workspace?.current_corpus_fingerprint);
-  const [syncing, setSyncing] = useState(false), [listing, setListing] = useState(false), [newRunConfirm, setNewRunConfirm] = useState(false);
+  const [syncing, setSyncing] = useState(false), [newRunConfirm, setNewRunConfirm] = useState(false);
   const [tab, setTab] = useState<"run" | "import">("run");
   const [historyOpen, setHistoryOpen] = useState(false);
-  const refreshTicket = useRef(0), reviewRequest = useRef(0);
+  const refreshTicket = useRef(0);
   const [profile, setProfile] = useState<"mini" | "medium" | "full">("mini");
   const [historyPage, setHistoryPage] = useState(0);
   const [items, setItems] = useState<Candidate[]>(data.dataset || []);
   const [runs, setRuns] = useState<Candidate[]>(goldenCached<Candidate[]>(cacheIdentity, "/api/governance/generation-runs?light=true") || data.generationRuns || []);
   const [snapshots, setSnapshots] = useState<Candidate[]>(data.snapshots || []);
-  const cachedRun = goldenCached<Candidate[]>(cacheIdentity, "/api/governance/generation-runs?light=true")?.[0];
-  const [review, setReview] = useState<Candidate[]>(cachedRun ? goldenCached<any>(JSON.stringify([cacheIdentity, cachedRun.id, cachedRun.profile?.name]), `/api/governance/candidates?run_id=${cachedRun.id}&limit=30&offset=0&status=attention&group=all`)?.rows || [] : []);
-  const [currentIndex, setCurrentIndex] = useState<Candidate[]>(cachedRun ? goldenCached<any>(JSON.stringify([cacheIdentity, cachedRun.id, cachedRun.profile?.name]), `/api/governance/candidates?run_id=${cachedRun.id}&limit=30&offset=0&status=attention&group=all`)?.candidate_index || [] : []), [currentPage, setCurrentPage] = useState(0), [filteredTotal, setFilteredTotal] = useState(0);
   const [revisions, setRevisions] = useState<Candidate[]>([]);
   const [filter, setFilter] = useState<Filter>("attention");
   const [rerunConfirm, setRerunConfirm] = useState(false);
   const [poolDetail, setPoolDetail] = useState<Candidate | null>(null);
+  const [detailStatus, setDetailStatus] = useState("");
   const poolTicket = useRef(0);
   const [candidateDirty, setCandidateDirty] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -49,6 +48,10 @@ export function GovernancePage({ data }: { data: any }) {
   const [now, setNow] = useState(Date.now());
   const [runDuration, setRunDuration] = useState<{ id: string; ms: number } | null>(null);
   const workRun = runs[0];
+  const listPath = `/api/governance/candidates?run_id=${workRun?.id}&status=${filter === "attention" ? "attention" : filter === "pending" ? "machine" : "all"}&group=${["positive","ablation","negative"].includes(filter) ? filter : "all"}`;
+  const paged = usePagedCandidates(JSON.stringify([cacheIdentity, workRun?.id, workRun?.profile?.name]), listPath, !!(workRun?.question_ids?.length || workRun?.artifacts?.hard_validation?.slot_persistence_v1));
+  const latestReview = useRef(paged.refresh); latestReview.current = paged.refresh;
+  const review: Candidate[] = paged.rows, currentIndex: Candidate[] = paged.candidate_index || [], listing = paged.loading;
   const currentGolden = snapshots.find(snapshot => snapshot.id === data.workspace?.current_golden_id);
   const goldenQuestions: Candidate[] = currentGolden?.snapshot?.questions || (currentGolden?.snapshot?.question_ids || []).map((id: string) => items.find(row => row.id === id)).filter(Boolean);
   const goldenCount = currentGolden?.snapshot?.question_ids?.length ?? goldenQuestions.length;
@@ -79,23 +82,7 @@ export function GovernancePage({ data }: { data: any }) {
   useEffect(() => { setConfirmed(false); if (workRun?.profile?.name) setProfile(workRun.profile.name); }, [workRun?.id]);
   useEffect(() => { if (!running && !qualityRunning) return; const timer = window.setInterval(() => setNow(Date.now()), 100); return () => window.clearInterval(timer); }, [running, qualityRunning]);
 
-  const loadReview = async (run: Candidate | undefined, ticket = refreshTicket.current) => {
-    const listTicket = ++reviewRequest.current;
-    setListing(true);
-    try {
-    const count = run?.profile?.expected_count || 20;
-    if (run && (run.question_ids?.length || run.artifacts?.hard_validation?.slot_persistence_v1)) {
-      const path = `/api/governance/candidates?run_id=${run.id}&limit=30&offset=${currentPage * 30}&status=${filter === "attention" ? "attention" : filter === "pending" ? "machine" : "all"}&group=${["positive","ablation","negative"].includes(filter) ? filter : "all"}`;
-      const identity = JSON.stringify([cacheIdentity, run.id, run.profile?.name]);
-      const cached = goldenCached<any>(identity, path);
-      if (cached && ticket === refreshTicket.current) { setReview(cached.rows); setCurrentIndex(cached.candidate_index || []); setFilteredTotal(cached.total); }
-      const result = await goldenFetch<any>(identity, path);
-      if (ticket !== refreshTicket.current || listTicket !== reviewRequest.current) return;
-      if (!cached || cached.data_version !== result.data_version) { setReview(Array.isArray(result.rows) ? result.rows : []); setCurrentIndex(result.candidate_index || []); setFilteredTotal(result.total || 0); }
-
-    } else setReview([]);
-    } finally { if (listTicket === reviewRequest.current) setListing(false); }
-  };
+  const loadReview = async (run: Candidate | undefined, _ticket = refreshTicket.current) => { if (run?.id === workRun?.id) await latestReview.current(); };
   const reload = async () => {
     const ticket = ++refreshTicket.current;
     setSyncing(true);
@@ -137,8 +124,6 @@ export function GovernancePage({ data }: { data: any }) {
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [workRun?.id, workRun?.status, qualityRunning]);
 
-  useEffect(() => { setCurrentPage(0); }, [filter]);
-  useEffect(() => { if (workRun) void loadReview(workRun).catch(reason => setError(errorMessage(reason))); }, [filter, currentPage, workRun?.id]);
 
   const needsAttention = (row: Candidate) => row.qualification_status ? row.qualification_status === "needs_human_review" : row.stage !== "golden" && (row.probe_status !== "probe_passed" || row.qc_status !== "qc_passed") || ["P0", "P1"].includes(row.qc?.priority) || ["FAKE_NEGATIVE_RISK", "RETRIEVAL_INCOHERENT", "RETRIEVAL_EXECUTION_FAILED"].includes(row.probe?.probe_details?.classification) || ["needs_revision", "rejected"].includes(row.review_status) || row.approval_eligibility?.blocking_reasons?.length > 0 || row.approval_eligibility?.requires_qc_p0_acceptance;
   const anomalies = current.filter(row => row.stage !== "golden" && (row.probe_status !== "probe_passed" || row.qc_status !== "qc_passed"));
@@ -182,7 +167,7 @@ export function GovernancePage({ data }: { data: any }) {
       invalidateGolden();
       const run = await getJson<Candidate>(`/api/governance/generation-runs/${started.run_id}`);
       setRuns(previous => [run, ...previous.filter(row => row.id !== run.id)]);
-      setReview([]); setFilter("attention");
+      setFilter("attention");
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusy(false); }
   };
@@ -220,16 +205,16 @@ export function GovernancePage({ data }: { data: any }) {
   };
   const openPoolDetail = async (row: Candidate) => {
     const ticket = ++poolTicket.current;
-    setPoolDetail(row); setSelectedId(row.id);
-    try { const result = await getJson<Candidate>(`/api/governance/questions/${row.id}`); if (ticket === poolTicket.current) { setPoolDetail(result); setRevisions(result.revision_history || []); } }
-    catch (reason) { if (ticket === poolTicket.current) setError(errorMessage(reason)); }
+    setPoolDetail(row); setSelectedId(row.id); setDetailStatus("正在读取候选题详情…");
+    try { const result = await getJson<Candidate>(`/api/governance/questions/${row.id}`); if (ticket === poolTicket.current) { setPoolDetail(result); setRevisions(result.revision_history || []); setDetailStatus(""); } }
+    catch (reason) { if (ticket === poolTicket.current) setDetailStatus(errorMessage(reason)); }
 
   };
   return <PageShell className={`page governance-page ${!workRun && tab === "run" ? "is-empty" : ""}`} header={<div className="page-title"><div><h1>Golden Dataset</h1><p>机器批量治理，人工处理异常，最终确认冻结。</p></div><div className="header-actions">{tab === "run" && <>{workRun?.status === "needs_regeneration" && <button className="primary" disabled={busy} onClick={() => void regenerate()}>补齐失败题（{expectedCount - current.length}）</button>}{workRun?.status !== "needs_regeneration" && <><label className="profile-selector"><CustomSelect ariaLabel="测试集 Profile" value={profile} onChange={value => setProfile(value as typeof profile)} options={Object.entries(data.overview?.generation_profiles || {}).map(([value, counts]: [string, any]) => ({ value, label: `${value.toUpperCase()} · ${counts.expected_count}题（${counts.positive_count} / ${counts.ablation_count} / ${counts.negative_count}）` }))} /></label><>{workRun ? <details className="export-menu"><summary className="secondary" aria-label="新建测试集菜单">⋯</summary><div><button disabled={busy || running || qualityRunning} onClick={() => setNewRunConfirm(true)}>新建测试集</button></div></details> : <button className="secondary" disabled={busy} onClick={() => void createMini()}>生成测试集</button>}</></>}</>}</div></div>} tabs={<div className="tabs"><button aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前测试集</button><button aria-pressed={tab === "import"} className={tab === "import" ? "active" : ""} onClick={() => setTab("import")}>候选池</button></div>} resetKey={tab}>
 
     {error && <p className="error-notice" role="alert">{error}</p>}
     {tab === "run" && <div className="golden-workspace">
-      <div className="golden-summary-strip" role="status"><strong>{workRun?.profile?.name?.toUpperCase() || "未生成"} · {current.length} / {expectedCount} Slot</strong><span>{["positive", "ablation", "negative"].map(group => `${group === "positive" ? "正向" : group === "ablation" ? "消融" : "负向"} ${current.filter(row => row.test_category === group).length} / ${workRun?.profile?.[`${group}_count`] ?? workRun?.profile?.[group] ?? "—"}`).join(" · ")}</span><span>自动校验通过 {current.filter(row => row.probe_status === "probe_passed" && row.qc_status === "qc_passed").length} · 机器合格 {current.filter(row => row.qualification_status === "machine_qualified").length} · 重点复核 {attention.length}</span><Badge tone="warning">Human Gate 1 · {gate1Snapshot ? "已人工确认" : workRun?.human_gate?.status === "ready" ? "Ready · 待确认" : "Pending"}</Badge><CoverageSummary run={workRun} questions={current} documents={data.documents || []} /></div>
+      <div className="golden-summary-strip" role="status"><strong>{workRun?.profile?.name?.toUpperCase() || "未生成"} · {current.length} / {expectedCount} Slot</strong><span>{["positive", "ablation", "negative"].map(group => `${group === "positive" ? "正向" : group === "ablation" ? "消融" : "负向"} ${current.filter(row => row.test_category === group).length} / ${workRun?.profile?.[`${group}_count`] ?? workRun?.profile?.[group] ?? "—"}`).join(" · ")}</span><span>自动校验通过 {current.filter(row => row.probe_status === "probe_passed" && row.qc_status === "qc_passed").length} · 机器合格 {current.filter(row => row.qualification_status === "machine_qualified").length} · 重点复核 {attention.length}</span><Badge tone="warning">Human Gate 1 · {gate1Snapshot ? "已人工确认" : workRun?.human_gate?.status === "ready" ? "Ready · 待确认" : "Pending"}</Badge><CoverageSummary run={workRun} questions={current} documents={data.documents || []} persistedPlan={data.overview?.knowledge?.coverage} /></div>
       <StageStepper compact ariaLabel="Golden 治理阶段" steps={[
         { label: "Coverage", state: workRun?.artifacts?.coverage_plan?.length ? "completed" : "current" },
         { label: "Generation", state: current.length === expectedCount ? "completed" : running ? "current" : "pending" },
@@ -241,8 +226,8 @@ export function GovernancePage({ data }: { data: any }) {
       {workRun ? <Section title="Candidate 审核" action={<div className="header-actions"><Badge tone={attention.length ? "warning" : "good"}>{attention.length ? "需要关注" : current.length === expectedCount ? "机器检查完成" : "待补齐"}</Badge><button className="secondary" disabled={busy || qualityRunning || !anomalies.length || workRun.status !== "completed"} onClick={() => setRerunConfirm(true)}>批量重跑异常项</button><details className="export-menu"><summary className="secondary" aria-label="运行更多操作">⋯</summary><div><button onClick={() => void openRunAudit()}>运行审计</button><button onClick={() => setHistoryOpen(true)}>历史 Snapshot</button>{current.length === expectedCount && (["markdown", "csv", "json"] as const).map(format => <a key={format} href={apiUrl(`/api/governance/generation-runs/${workRun.id}/export?format=${format}`)} download>导出 {format.toUpperCase()}</a>)}</div></details></div>}>
         <div className="review-filters" aria-label="Candidate 筛选">{filters.map(item => <button key={item.key} aria-pressed={filter === item.key} className={filter === item.key ? "active" : ""} onClick={() => setFilter(item.key)}>{item.label} {item.count}</button>)}        <small className="muted golden-review-role" role="status">{syncing || listing ? "正在同步…" : filter === "attention" && !attention.length ? "无异常，展示机器合格题" : ""}</small></div>
 
-        {(syncing || listing) && !listRows.length ? <div className="golden-skeleton" role="status" aria-label="正在读取候选题">{[1,2,3,4].map(index => <span key={index} aria-hidden="true" />)}</div> : <QuestionTable rows={["all", "attention"].includes(filter) ? [...visible, ...failedSlots.map(slot => ({ id: `missing-${slot}`, slot, question: "生成失败，待补齐", failed: true }))].sort((a, b) => String(a.slot || "").localeCompare(String(b.slot || ""))) : visible} onDetail={row => row.failed ? (setErrorSlot(row.slot), setRunErrorOpen(true)) : void openPoolDetail(row)} />}
-        <div className="history-pagination"><button className="secondary" disabled={!currentPage} onClick={() => setCurrentPage(value => value - 1)}>上一页</button><span>{currentPage + 1} / {Math.max(1, Math.ceil(filteredTotal / 30))}</span><button className="secondary" disabled={(currentPage + 1) * 30 >= filteredTotal} onClick={() => setCurrentPage(value => value + 1)}>下一页</button></div>
+        {(syncing || listing) && !listRows.length ? <div className="golden-skeleton" role="status" aria-label="正在读取候选题">{[1,2,3,4].map(index => <span key={index} aria-hidden="true" />)}</div> : <QuestionTable rows={["all", "attention"].includes(filter) ? [...visible, ...failedSlots.map(slot => ({ id: `missing-${slot}`, slot, question: "生成失败，待补齐", failed: true }))].sort((a, b) => String(a.slot || "").localeCompare(String(b.slot || ""))) : visible} onDetail={row => row.failed ? (setErrorSlot(row.slot), setRunErrorOpen(true)) : void openPoolDetail(row)} paging={paged} resetKey={listPath} />}
+        {paged.error && <p role="alert" className="error-notice">{paged.error}</p>}
         {current.length === expectedCount && workRun.status === "completed" && !gate1Snapshot && <div className="review-batch gate-one-action"><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> 我确认异常已关闭，并冻结当前 Golden Dataset</label><button className="primary" title={batchReason} disabled={busy || !!batchReason} onClick={() => void action(() => postJson("/api/governance/review-batch", { question_ids: currentIds, confirmed_manual_review: true }), "确认 Golden 测试集")}>确认并冻结 Golden Dataset</button></div>}
       </Section> : <Section title="Candidate 审核" action={<button className="secondary" onClick={() => setHistoryOpen(true)}>历史 Snapshot</button>}><p className="muted">尚未生成工作 Run，可生成题目或从候选池创建测试集。</p><CurrentCoveragePreview profile={profile} corpusFingerprint={data.workspace?.current_corpus_fingerprint} documents={data.documents || []} /></Section>}
     </div>}
@@ -253,11 +238,11 @@ export function GovernancePage({ data }: { data: any }) {
         <CurrentCoveragePreview profile={profile} corpusFingerprint={data.workspace?.current_corpus_fingerprint} documents={data.documents || []} /><div className="generation-progress" role="status">{operationProgress && <span>{operationProgress.phase_label} · 已处理 {operationProgress.phase_processed}/{operationProgress.phase_total} · {operationProgress.phase_percent}% · Round {operationProgress.refill_round}/{operationProgress.refill_max_rounds} · 剩余 {operationProgress.failed_count} 道 · Hard Valid {operationProgress.hard_valid_completed}/{operationProgress.hard_valid_total} · Probe {operationProgress.probe_processed}/{expectedCount} · QC {operationProgress.qc_processed}/{expectedCount}</span>}</div><div className="run-summary">当前 Golden：{currentGolden ? `${goldenCount} 题 · ${goldenV2 ? "V2" : "Legacy"} · Frozen` : "尚未冻结"} · {goldenCategoriesComplete ? "分类完整" : "分类需核对"}</div>{qualityRerun && <p>质量重跑：{displayText(qualityRerun.status)} · {qualityRerun.completed || 0} / {qualityRerun.total || expectedCount} · {qualityRerun.error || ""}</p>}{riskFilters.map(item => <p key={item.key}>{item.label} · {item.count}</p>)}
         {Object.entries(auditRun?.artifacts?.slot_audit || workRun.artifacts?.slot_audit || {}).filter(([, attempts]) => (attempts as Candidate[]).some(attempt => attempt.validation_error)).map(([slot, attempts]) => <details className="slot-audit" key={slot}><summary>{slot} · {(attempts as Candidate[]).length} 次尝试 · {(attempts as Candidate[]).at(-1)?.validation_error ? "未通过" : "重试后通过"}</summary>{(attempts as Candidate[]).map(attempt => <div key={attempt.attempt}><strong>第 {attempt.attempt} 次尝试</strong><p>问题：{attempt.question || "—"}</p><p>答案：{attempt.reference_answer || "—"}</p><p>证据：{attempt.selected_evidence?.map((item: Candidate) => `${item.document_name || item.document_id} · ${item.chunk_id} · ${item.chunk_text}`).join("；") || "—"}</p><pre>{attempt.validation_error || "通过"}</pre></div>)}</details>)}</>}</div></Drawer>
     <Drawer showCloseFooter={false} open={historyOpen} onOpenChange={setHistoryOpen} title="Golden Snapshot 历史"><div className="drawer-body snapshot-history"><Section title="已确认 Golden Snapshots"><div className="run-list">{snapshots.map(snapshot => <div key={snapshot.id}><strong><ShortId value={snapshot.id} /></strong><span>{snapshot.snapshot?.profile?.name || "Legacy"} · {snapshot.snapshot?.question_ids?.length || 0} 题 · {snapshot.created_at || "冻结时间未记录"}</span><Status value={snapshot.status} /></div>)}{!snapshots.length && <p className="muted">尚未创建正式 Golden Snapshot。</p>}</div></Section><Section title="历史 Candidate（未验证）"><details><summary>{historical.length} 道历史 Candidate</summary><p className="muted">仅供追溯，不参与当前 Golden、Baseline 或发布判断。</p><QuestionTable rows={historical.slice(historyPage * 10, historyPage * 10 + 10)} onDetail={row => setSelectedId(row.id)} /><div className="history-pagination"><button className="secondary" disabled={historyPage === 0} onClick={() => setHistoryPage(page => page - 1)}>上一页</button><span>{historyPage + 1} / {Math.max(1, Math.ceil(historical.length / 10))}</span><button className="secondary" disabled={(historyPage + 1) * 10 >= historical.length} onClick={() => setHistoryPage(page => page + 1)}>下一页</button></div></details></Section></div></Drawer>
-    <Drawer showCloseFooter={false} guardEdits editDirty={candidateDirty} contentKey={candidateContentKey} open={!!selected} onOpenChange={open => { if (!open) { poolTicket.current++; setSelectedId(null); } }} title={selected ? `${selected.slot || "历史题"} · ${displayText(selected.test_category)}` : "候选题审核"} className="candidate-workspace"><CandidateWorkspace key={candidateContentKey} row={selected} peers={current} revision={revisions.find(item => item.question_ids?.includes(selected?.id))} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} readOnly={partial || !currentIds.includes(selected?.id || "")} readOnlyReason={!currentIds.includes(selected?.id || "") ? "来源候选题只读；匹配 Profile 与 Coverage Slot 后创建待审核副本。" : undefined} onRun={questionAction} onReview={reviewAction} onRefresh={refreshAfterMutation} operation={operation} onDirtyChange={setCandidateDirty} /></Drawer>
+    <Drawer showCloseFooter={false} guardEdits editDirty={candidateDirty} contentKey={candidateContentKey} open={!!selected} onOpenChange={open => { if (!open) { poolTicket.current++; setSelectedId(null); } }} title={selected ? `${selected.slot || "历史题"} · ${displayText(selected.test_category)}` : "候选题审核"} className="candidate-workspace">{detailStatus ? <p className="drawer-body" role="status">{detailStatus}</p> : <CandidateWorkspace key={candidateContentKey} row={selected} peers={current} revision={revisions.find(item => item.question_ids?.includes(selected?.id))} rerunSlot={qualityRerun?.slots?.[selected?.slot]} busy={busy} readOnly={partial || !currentIds.includes(selected?.id || "")} readOnlyReason={!currentIds.includes(selected?.id || "") ? "来源候选题只读；匹配 Profile 与 Coverage Slot 后创建待审核副本。" : undefined} onRun={questionAction} onReview={reviewAction} onRefresh={refreshAfterMutation} operation={operation} onDirtyChange={setCandidateDirty} />}</Drawer>
     <Drawer showCloseFooter={false} open={runErrorOpen} onOpenChange={setRunErrorOpen} title="Run 错误详情"><div className="drawer-body"><p>阶段：{qualityRerun?.status === "failed" ? qualityRerun?.slots?.[qualityRerun?.slot]?.failed_stage || qualityRerun?.stage : stageName[workRun?.artifacts?.hard_validation?.failed_stage] || stageName[workRun?.status] || "未知"}</p>{errorSlot && (workRun?.artifacts?.slot_audit?.[errorSlot] || []).map((attempt: Candidate) => <div key={attempt.attempt}><h3>{errorSlot} · 第 {attempt.attempt} 次尝试</h3><p>问题：{attempt.question || "—"}</p><p>答案：{attempt.reference_answer || "—"}</p><p>证据：{attempt.selected_evidence?.map((item: Candidate) => `${item.document_name || item.document_id} · ${item.chunk_id} · ${item.chunk_text}`).join("；") || "—"}</p><pre>{attempt.validation_error || "通过"}</pre></div>)}{!errorSlot && <pre>{qualityRerun?.status === "failed" ? qualityRerun.error : workRun?.artifacts?.hard_validation?.error || "请查看运行详情中的 Slot Audit"}</pre>}</div></Drawer>
   </PageShell>;
 }
 
-function QuestionTable({ rows, onDetail }: { rows: Candidate[]; onDetail: (row: Candidate) => void }) {
-  return <div className="table-scroll review-table"><table><thead><tr><th>#</th><th>类型</th><th>问题</th><th>Probe</th><th>QC</th><th>资格 / 关注原因</th><th>操作</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} tabIndex={0} onClick={() => onDetail(row)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); onDetail(row); } }}><td>{row.slot || row.id}</td><td><Badge tone={row.test_category === "negative" ? "warning" : "neutral"}>{row.test_category ? displayText(row.test_category) : "未记录"}</Badge><small className="question-provenance">{(row.construction_type || row.raw?.construction_type) && `${row.construction_type || row.raw?.construction_type} · `}{row.raw?.source === "business_import" ? "业务导入" : row.raw?.generation_run_id ? "AI 生成" : "历史来源"}</small></td><td><TruncatedText lines={2}>{row.question}</TruncatedText></td><td>{probeLabel(row.probe_status)}</td><td>{qcLabel(row.qc_status)}{row.qc?.priority === "P1" ? " · P1" : ""}</td><td>{row.qualification_status === "machine_qualified" ? "机器合格" : row.qualification_status === "human_approved" ? "人工通过" : row.attention_reasons?.[0] || reviewLabel(row)}</td><td><button className="secondary" onClick={() => onDetail(row)}>{row.failed ? "查看错误" : "查看详情"}</button></td></tr>)}{!rows.length && <tr><td colSpan={7} className="empty-state">暂无对应数据。</td></tr>}</tbody></table></div>;
+function QuestionTable({ rows, onDetail, paging, resetKey }: { rows: Candidate[]; onDetail: (row: Candidate) => void; paging?: any; resetKey?: string }) {
+  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><table><thead><tr><th>#</th><th>类型</th><th>问题</th><th>Probe</th><th>QC</th><th>资格 / 关注原因</th><th>操作</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} tabIndex={0} onClick={() => onDetail(row)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); onDetail(row); } }}><td>{row.slot || row.id}</td><td><Badge tone={row.test_category === "negative" ? "warning" : "neutral"}>{row.test_category ? displayText(row.test_category) : "未记录"}</Badge><small className="question-provenance">{(row.construction_type || row.raw?.construction_type) && `${row.construction_type || row.raw?.construction_type} · `}{row.raw?.source === "business_import" ? "业务导入" : row.raw?.generation_run_id ? "AI 生成" : "历史来源"}</small></td><td><TruncatedText lines={2}>{row.question}</TruncatedText></td><td>{probeLabel(row.probe_status)}</td><td>{qcLabel(row.qc_status)}{row.qc?.priority === "P1" ? " · P1" : ""}</td><td>{row.qualification_status === "machine_qualified" ? "机器合格" : row.qualification_status === "human_approved" ? "人工通过" : row.attention_reasons?.[0] || reviewLabel(row)}</td><td><button className="secondary" onClick={() => onDetail(row)}>{row.failed ? "查看错误" : "查看详情"}</button></td></tr>)}{!rows.length && <tr><td colSpan={7} className="empty-state">暂无对应数据。</td></tr>}</tbody></table></ScrollablePagedTable>;
 }

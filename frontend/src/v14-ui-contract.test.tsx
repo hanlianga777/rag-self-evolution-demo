@@ -39,7 +39,7 @@ it.each([true, false])("I4 manual current Preview is available with legacy Run=%
   await clickText("预览当前 Corpus Coverage");
   expect(posts).toEqual([{ url: expect.stringContaining("/api/governance/coverage-preview"), body: { profile: "mini" } }]);
   expect(document.body.textContent).toContain("当前 Corpus · V2 Coverage Preview");
-  expect(document.body.textContent).toContain("初始 K 2 → 最终 K 1");
+  expect(document.body.textContent).toContain("1 Topics · 1 Slots · Gap 0 · Merge 1");
   expect(JSON.stringify(input)).toBe(frozen);
 });
 

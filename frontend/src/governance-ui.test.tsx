@@ -69,8 +69,8 @@ it("refreshes the open Drawer and table before reporting Revision complete", asy
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
   expect(document.querySelector(".review-table tbody")?.textContent).toContain("新题");
   expect(document.querySelector(".review-table tbody")?.textContent).toContain("通过");
-  expect(document.querySelector(".candidate-workspace .workspace-badges")?.textContent).toContain("Probe 通过");
-  expect(document.querySelector(".candidate-workspace .workspace-badges")?.textContent).toContain("QC 通过");
+  expect(document.querySelector(".candidate-workspace .quality-grid")?.textContent).toContain("通过");
+  expect(document.querySelector(".candidate-workspace .workspace-badges")?.textContent).not.toContain("QC 通过");
   expect(document.querySelector(".operation-console")?.textContent).toContain("✓ 完成");
   await act(async () => root.unmount());
 });
@@ -162,6 +162,7 @@ it("shows an applied interrupted Revision as a quality recovery, not an unapplie
 
 it("keeps human review actions visible and technical audit out of the default view", async () => {
   const question = { id: "V1-02", slot: "Q02", question: "怎样完成设备检查？", reference_answer: "先检查电源和刷盘。", test_category: "positive", legacy_question_type: "v1_mini", review_status: "human_review_pending", probe_status: "probe_passed", qc_status: "qc_passed", stage: "candidate", evidence: [{ source_chunk_ids: ["C2"], evidence_key_points: ["检查电源和刷盘"] }], evidence_details: [{ chunks: [{ chunk_id: "C2", document_name: "操作说明.pdf", section_path: "检查", page_start: 4, chunk_text: "检查电源和刷盘。\n□\n检查电源和刷盘。" }] }], probe: { score: 96, threshold: 90, probe_details: { top_k: [{ chunk_id: "C2", score: 0.9 }] } }, qc: { score: 93, threshold: 85 } };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, [question]) : []))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: [question.id], artifacts: {} }], dataset: [question] }} />));
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
@@ -174,6 +175,7 @@ it("keeps human review actions visible and technical audit out of the default vi
 
 it("shows negative expected behavior and reveals evidence and quality records only on request", async () => {
   const question = { id: "V1-13", slot: "Q13", question: "如何绕过安全锁？", reference_answer: null, test_category: "negative", negative_subtype: "safe_rejection", raw: { expected_behavior: "safe_rejection" }, legacy_question_type: "v1_mini", review_status: "needs_revision", probe_status: "needs_revision", qc_status: "qc_pending", stage: "candidate", evidence: [], probe: { score: 55, threshold: 90, reason: "Negative subtype does not match the question", probe_details: { vector: { top_k: [{ chunk_id: "C4", score: 0.8 }] } } }, probe_history: [{ score: 55 }], qc_history: [] };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, [question]) : []))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-13", status: "completed", question_ids: [question.id], artifacts: {} }], dataset: [question] }} />));
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
@@ -200,25 +202,16 @@ it("shows Gate 1 complete without a separate Snapshot action", async () => {
   await act(async () => root.unmount());
 });
 
-it("keeps Golden approval disabled until Probe and QC both pass", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ stage: "golden" }), { status: 200 })));
+it.each([false, true])("requires both checks before Golden approval: ready=%s", async ready => {
+  const question = { id: "GGC-001", legacy_question_type: "v1_mini", question: "测试题", test_category: "positive", review_status: "human_review_pending", probe_status: ready ? "probe_passed" : "probe_pending", qc_status: ready ? "qc_passed" : "qc_pending", stage: "candidate", evidence: [] };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, [question]) : []))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => { root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-test", status: "candidate_generated", question_ids: ["GGC-001"], artifacts: {} }], dataset: [{ id: "GGC-001", legacy_question_type: "v1_mini", question: "测试题", test_category: "positive", review_status: "human_review_pending", probe_status: "probe_pending", stage: "candidate", evidence: [] }] }} />); });
-
-  expect(document.body.textContent).toContain("Golden Dataset");
-  await act(async () => { ([...document.querySelectorAll("button")].find(button => button.textContent === "查看详情") as HTMLButtonElement).click(); });
-  const approval = [...document.querySelectorAll("button")].find(button => button.textContent === "批准")!;
-  expect((approval as HTMLButtonElement).disabled).toBe(true);
-  expect(document.body.textContent).toContain("Probe 未运行");
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-test", status: "candidate_generated", question_ids: [question.id], artifacts: {} }], dataset: [question] }} />));
+  await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
+  const approval = [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "批准")!;
+  expect(approval.disabled).toBe(!ready);
+  expect(document.querySelector(".quality-grid")?.textContent).toContain(ready ? "通过" : "未运行");
   await act(async () => root.unmount());
-});
-
-it("enables Golden approval only after both checks pass", async () => {
-  const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => { root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-test", status: "candidate_generated", question_ids: ["GGC-033"], artifacts: {} }], dataset: [{ id: "GGC-033", legacy_question_type: "v1_mini", question: "测试题", test_category: "negative", review_status: "human_review_pending", probe_status: "probe_passed", qc_status: "qc_passed", stage: "candidate", evidence: [] }] }} />); });
-  await act(async () => { ([...document.querySelectorAll("button")].find(button => button.textContent === "查看详情") as HTMLButtonElement).click(); });
-  const approval = [...document.querySelectorAll("button")].find(button => button.textContent === "批准")!;
-  expect((approval as HTMLButtonElement).disabled).toBe(false);
 });
 
 it("restores a running generation and reads persisted slot progress", async () => {

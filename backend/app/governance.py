@@ -274,6 +274,26 @@ class GovernanceStore:
         with self.connection() as connection:
             connection.execute("INSERT INTO question_quality_audits(question_id,content_hash,audit_json,created_at) VALUES (?,?,?,?)", (question_id, self._quality_content(item), _json(audit), _now()))
 
+    @staticmethod
+    def attention_categories(reasons):
+        categories = []
+        for reason in reasons:
+            if reason.startswith('QC P'):
+                code, label, action = 'F', 'QC 风险复核', '核对 QC 依据与预期行为，人工决定是否接受'
+            elif reason == '检索不连贯':
+                code, label, action = 'E', 'Retrieval P1', '对照 Golden Evidence 与召回结果，人工接受风险或要求修订'
+            elif reason in {'题目质量需修订', '提问口吻需优化'}:
+                code, label, action = 'D', '题目改写', '按原 Slot 与材料自然改写后重验，不直接标记通过'
+            elif reason == 'Hard Validation 未通过':
+                code, label, action = 'C', 'Evidence 修正', '核对原文与答案锚点，修正后执行单题检查'
+            elif reason in {'质量记录已过期', '题目质量审计待更新', '题目质量审计待执行', 'Corpus 身份已变化'}:
+                code, label, action = 'B', '确定性检查', '先核对内容与版本身份，再补齐当前检查，不沿用过期结果'
+            else:
+                code, label, action = 'A', '业务人工判断', '核对完整证据与判定边界后作出人工决定'
+            if code not in [item['code'] for item in categories]:
+                categories.append({'code': code, 'label': label, 'action': action})
+        return categories
+
     def candidate_rows(self, ids=None):
         # Lists read only latest quality signals, never evidence or retrieval traces.
         where, args = (f"WHERE q.id IN ({','.join('?' for _ in ids)})", ids) if ids else ("", [])
@@ -343,7 +363,7 @@ class GovernanceStore:
                 'slot':item['raw'].get('coverage_slot'), 'topic_cluster':item['raw'].get('topic_cluster'),
                 'probe':{'probe_details':{'classification':item['classification']}}, 'qc':{'priority':item['priority'],'score':item['qc_score']},
                 'qualification_status':status,'qualification_source':'human' if human else 'machine' if status=='machine_qualified' else None,
-                'attention_reasons':reasons, 'quality_audit':audit})
+                'attention_reasons':reasons, 'attention_categories':self.attention_categories(reasons), 'quality_audit':audit})
         return result
 
     @staticmethod
@@ -890,7 +910,7 @@ class GovernanceStore:
             attempts = run["artifacts"].get("slot_audit", {}).get(slot, [])
             questions.append({**item, 'approval_eligibility': self.approval_eligibility(question_id), "slot": slot, "hard_validation_checks": attempts[-1].get("hard_validation_checks") if attempts else None, "evidence_details": evidence_details, "probe": probes[question_id][0] if probes[question_id] and item["probe_status"] != "probe_pending" else None, "qc": qcs[question_id][0]["result"] if qcs[question_id] and item["qc_status"] != "qc_pending" else None, "probe_history": probes[question_id], "qc_history": qcs[question_id], "review_history": reviews[question_id], "revision_history": self.revision_history(question_id)})
         qualifications = {row["id"]:row for row in self.candidate_rows(ids)}
-        questions = [{**item, **{key:qualifications[item["id"]][key] for key in ("qualification_status","qualification_source","attention_reasons","quality_audit")}} for item in questions]
+        questions = [{**item, **{key:qualifications[item["id"]][key] for key in ("qualification_status","qualification_source","attention_reasons","attention_categories","quality_audit")}} for item in questions]
         return {"generation_run_id": run_id, "questions": questions}
 
     def approval_eligibility(self, question_id: str):
