@@ -43,18 +43,22 @@ export type SelectOption = { value: string; label: string; description?: string;
 export function CustomSelect({ ariaLabel, value, options, onChange, disabled = false, placeholder }: { ariaLabel: string; value: string; options: SelectOption[]; onChange: (value: string) => void; disabled?: boolean; placeholder?: string }) {
   const id = useId();
   const host = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(Math.max(0, options.findIndex(option => option.value === value)));
   useEffect(() => {
     if (!open) return;
     const outside = (event: PointerEvent) => { if (!host.current?.contains(event.target as Node)) setOpen(false); };
-    const close = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    const close = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); } };
+    const another = (event: Event) => { if ((event as CustomEvent).detail !== id) setOpen(false); };
+    document.dispatchEvent(new CustomEvent("custom-select-open", { detail: id }));
+    document.addEventListener("custom-select-open", another);
     document.addEventListener("pointerdown", outside); document.addEventListener("keydown", close);
-    return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", close); };
-  }, [open]);
+    return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", close); document.removeEventListener("custom-select-open", another); };
+  }, [open, id]);
   const selected = options.find(option => option.value === value);
   const move = (index: number) => setActive(Math.max(0, Math.min(options.length - 1, index)));
-  const choose = (option: SelectOption) => { onChange(option.value); setOpen(false); };
+  const choose = (option: SelectOption) => { setOpen(false); trigger.current?.focus(); onChange(option.value); };
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
@@ -66,10 +70,10 @@ export function CustomSelect({ ariaLabel, value, options, onChange, disabled = f
     else if (event.key === "Escape" && open) { event.preventDefault(); setOpen(false); }
   };
   return <div ref={host} className={`custom-select${open ? " open" : ""}`} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
-    <button type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-listbox`} aria-activedescendant={open ? `${id}-option-${active}` : undefined} disabled={disabled} className="custom-select-trigger" onClick={() => { setActive(Math.max(0, options.findIndex(option => option.value === value))); setOpen(current => !current); }} onKeyDown={onKeyDown}>
+    <button ref={trigger} type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-listbox`} aria-activedescendant={open ? `${id}-option-${active}` : undefined} disabled={disabled} className="custom-select-trigger" onClick={() => { setActive(Math.max(0, options.findIndex(option => option.value === value))); setOpen(current => !current); }} onKeyDown={onKeyDown}>
       <span title={selected?.title || selected?.label}>{selected?.label || placeholder || "请选择"}</span><ChevronDown size={15} aria-hidden="true" />
     </button>
-    {open && <div role="listbox" id={`${id}-listbox`} aria-label={ariaLabel} className="custom-select-listbox">{options.map((option, index) => <div id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value === value} data-value={option.value} className={index === active ? "active" : ""} title={option.title || option.label} onMouseEnter={() => move(index)} onMouseDown={event => event.preventDefault()} onClick={() => choose(option)}><span>{option.label}</span>{option.description && <small>{option.description}</small>}</div>)}</div>}
+    {open && <div role="listbox" id={`${id}-listbox`} aria-label={ariaLabel} className="custom-select-listbox">{options.map((option, index) => <div id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value === value} data-value={option.value} className={index === active ? "active" : ""} title={option.title || option.label} onMouseEnter={() => move(index)} onMouseDown={event => event.preventDefault()} onClick={event => { event.preventDefault(); event.stopPropagation(); choose(option); }}><span>{option.label}</span>{option.description && <small>{option.description}</small>}</div>)}</div>}
   </div>;
 }
 

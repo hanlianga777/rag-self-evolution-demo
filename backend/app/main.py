@@ -644,11 +644,11 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
 
 
 @app.post("/api/governance/generation-runs/{generation_run_id}/rerun-quality", status_code=202, dependencies=[Depends(require_trusted_origin)])
-def rerun_generation_quality(generation_run_id: str):
+def rerun_generation_quality(generation_run_id: str, anomalies_only: bool = False):
     try:
         run = store.generation_run(generation_run_id)
         expected = store._expected_count(run) if run else 0
-        ids = store.update_quality_rerun(generation_run_id, {"status": "running", "stage": "probe", "completed": 0, "total": expected, "probe_passed": 0, "probe_failed": 0, "qc_passed": 0, "qc_failed": 0, "qc_skipped": 0, "slots": {}, "started_at": datetime.now(timezone.utc).isoformat()}, start=True)
+        ids = store.update_quality_rerun(generation_run_id, {"status": "running", "stage": "probe", "completed": 0, "total": expected, "probe_passed": 0, "probe_failed": 0, "qc_passed": 0, "qc_failed": 0, "qc_skipped": 0, "slots": {}, "started_at": datetime.now(timezone.utc).isoformat()}, start=True, anomalies_only=anomalies_only)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Generation run not found") from error
     except ValueError as error:
@@ -669,11 +669,16 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
     try:
         chunks = run_corpus.chunks()
         for index, question_id in enumerate(ids, 1):
-            slot = f"Q{index:02d}"
+            slot = run_store.question(question_id).get("raw", {}).get("coverage_slot") or f"Q{index:02d}"
             run_store.update_quality_rerun(run_id, {**counters, "stage": "probe", "slot": slot, "slots": slots})
             try:
+                item = run_store.question(question_id)
+                anomaly_run = run_store.generation_run(run_id)["artifacts"]["hard_validation"].get("quality_rerun", {}).get("scope") == "anomalies"
                 run_store.reset_qc_for_rerun(question_id)
-                probe = run_store.run_probe(question_id, service.retriever, chunks, service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=True)
+                prior_probe = run_store.probe_history(question_id)
+                _, identity = run_store.capture_quality(question_id)
+                reusable = anomaly_run and item["probe_status"] == "probe_passed" and prior_probe and all(prior_probe[0].get("execution_identity", {}).get(key) == identity[key] for key in ("content_hash", "active_candidate", "corpus_fingerprint"))
+                probe = {**prior_probe[0], "status": "passed", "classification": prior_probe[0].get("classification") or prior_probe[0].get("probe_details", {}).get("classification", "not_recorded")} if reusable else run_store.run_probe(question_id, service.retriever, chunks, service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=True)
                 counters["probe_passed" if probe["status"] == "passed" else "probe_failed"] += 1
                 slots[slot] = {"question_id": question_id, "probe": probe["status"], "classification": probe["classification"], "probe_reason": probe["reason"]}
                 if probe["status"] == "passed":
@@ -1032,8 +1037,13 @@ def pipeline():
     identity = store.current_baseline_identity()
     baseline = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
     active = store.active_production()
+    draft = store.pipeline_draft()
     return {
         **identity,
+        "config_draft": draft,
+        "draft_identity": identity,
+        "frozen_models": {"generation": ai_service.provider.settings.model, "judge": ai_service.provider.settings.model},
+        "draft_stale": bool(draft and draft["identity"] != identity),
         "active_version_id": active["id"] if active else None,
         "config": active["config"] if active else DEFAULT_PIPELINE_CONFIG,
         "baseline_id": baseline["id"] if baseline else None,
@@ -1045,6 +1055,24 @@ def pipeline():
         "pricing": price_config(),
         "last_execution_metrics": next((row.get("metrics") for row in store.monitoring_events() if row.get("metrics", {}) and row["metrics"].get("stages")), None),
     }
+
+
+class PipelineDraftRequest(BaseModel):
+    config: dict | None = None
+    identity: dict
+
+
+@app.post("/api/pipeline/draft", dependencies=[Depends(require_trusted_origin)])
+def save_pipeline_draft(payload: PipelineDraftRequest):
+    identity = store.current_baseline_identity()
+    if payload.identity != identity:
+        raise HTTPException(status_code=409, detail="配置基准已变化，请刷新后保存草稿")
+    if payload.config is not None:
+        validation = validate_candidate_config(payload.config)
+        if not validation["valid"]:
+            raise HTTPException(status_code=422, detail="；".join(validation["errors"]))
+    draft = store.save_pipeline_draft({"config": payload.config, "identity": identity} if payload.config is not None else None)
+    return {"config_draft": draft, "identity": identity}
 
 
 @app.get("/api/monitoring")

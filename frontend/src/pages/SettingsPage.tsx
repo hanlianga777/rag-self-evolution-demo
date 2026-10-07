@@ -1,49 +1,52 @@
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { errorMessage, getJson, postJson } from "../api";
-import { Badge, Section, Status } from "../components/Primitives";
+import { Badge, CustomSelect, Section } from "../components/Primitives";
 import { Drawer } from "../components/Dialog";
-import { formatValue, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
-import { displayText } from "../display";
-import { useOperation } from "../operation";
+import { descriptions, formatValue, parameterGroups, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
 
 export function SettingsPage({ data }: { data: any }) {
-  const operation = useOperation();
-  const [pipeline, setPipeline] = useState<any>(null);
-  const [probe, setProbe] = useState<any>(null);
-  const [checking, setChecking] = useState(false);
-  const [spaceOpen, setSpaceOpen] = useState(false);
-  const [error, setError] = useState("");
-  useEffect(() => { let cancelled = false; void getJson("/api/pipeline").then(value => { if (!cancelled) setPipeline(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, []);
-  const r = probe || data.readiness || {};
-  const active = data.versions?.find((version: any) => version.status === "active");
-  const config = pipeline?.config || active?.config || data.evaluation?.config || {};
-  const index = pipeline?.index || {};
-  const docs = data.documents || [];
-  const unique = (key: string) => [...new Set(docs.map((doc: any) => doc[key]).filter(Boolean))].join("；");
-  const execution = data.evaluation?.judge?.execution_snapshot || {};
-  const generationModel = active?.snapshot?.generation_model || execution.generation_model;
-  const generationTemperature = active?.snapshot?.temperature ?? (execution.generation_model && execution.generation_model === generationModel ? execution.temperature : undefined);
-  const available = (value: unknown) => value != null && value !== "" && !["未采集", "未实现", "未配置", "未记录", "待解析", "待构建"].includes(String(value));
-  const groups: { title: string; rows: [string, string, unknown][] }[] = [
-    { title: "知识处理配置", rows: [["parser", "解析器", unique("parser")], ["ocr", "OCR Fallback", unique("ocr")], ["chunk_method", "Chunk 策略", unique("chunk_strategy")], ["chunk_size", "Chunk 目标长度", index.chunk_target_tokens], ["chunk_overlap", "重叠长度", index.chunk_overlap_tokens], ["embedding_model", "Embedding 模型", index.embedding_model], ["dimension", "向量维度", index.dimension], ["vector_index", "索引类型", index.vector_index], ["metadata", "Metadata", "section_path · page_start / page_end"]] },
-    { title: "检索策略", rows: ["query_rewrite", "multi_query", "hyde", "alias_mapping", "candidate_k", "top_k", "min_score", "hybrid_search", "hybrid_alpha", "metadata_filter", "rerank"].map(key => [key, parameterNames[key] || key, config[key]]) },
-    { title: "生成策略", rows: [["prompt_strategy", "Prompt 策略", config.prompt_strategy], ["generation_model", "Generation Model", generationModel], ["temperature", "Temperature", generationTemperature], ["max_tokens", "Max Tokens", active?.snapshot?.max_tokens ?? (execution.generation_model === generationModel ? execution.max_tokens : undefined)]] },
-    { title: "评测配置", rows: [["golden_dataset", "Golden Dataset", data.workspace?.current_golden_id || data.evaluation?.dataset_version_id], ["judge", "Judge 模型", data.evaluation?.judge?.model], ["metrics_version", "指标版本", data.evaluation?.judge?.scoring_policy], ["hard_gate", "Hard Gate 数", data.evaluation?.result?.gates?.total], ["regression", "Regression", data.evaluation?.result?.regression?.status]] },
+  const [pipeline, setPipeline] = useState<any>(null), [draft, setDraft] = useState<Record<string, any>>({});
+  const [spaceOpen, setSpaceOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  useEffect(() => { let cancelled = false; void getJson<any>("/api/pipeline").then(value => { if (!cancelled) { setPipeline(value); const start = value.draft_stale ? value.baseline_config || value.config : value.config_draft?.config || value.baseline_config || value.config; setDraft(Object.fromEntries(Object.keys(value.search_space || {}).filter(key => start?.[key] !== undefined).map(key => [key, start[key]]))); } }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, []);
+  const baseline = pipeline?.baseline_config || {};
+  const base = pipeline?.baseline_config || pipeline?.config || {};
+  const contract = pipeline?.search_space || {};
+  const changed = Object.keys(contract).filter(key => draft[key] !== base[key]);
+  const index = pipeline?.index || {}, knowledge = index.knowledge_config || {};
+  const facts = [
+    ["解析", knowledge.parser ? `${knowledge.parser} ${knowledge.parser_mode || ""}` : data.documents?.[0]?.parser],
+    ["分块", knowledge.chunk_strategy ? `${knowledge.chunk_strategy} · Parent ${knowledge.parent_tokens} / Child ${knowledge.child_tokens} / Overlap ${knowledge.overlap_tokens}` : data.documents?.[0]?.chunk_strategy],
+    ["Embedding", knowledge.embedding_model || index.embedding_model], ["实际维度", index.dimension],
+    ["索引", index.vector_index], ["Rerank 模型", knowledge.rerank_model],
+    ["Generation", pipeline?.frozen_models?.generation], ["Judge", pipeline?.frozen_models?.judge], ["评测与治理", "Judge + Gate Frozen"],
   ];
-  const verify = async () => {
-    setChecking(true); setError(""); setProbe(null);
-    try { setProbe(await operation.run("验证 DeepSeek Provider", async () => { const result: any = await postJson("/api/ai-readiness/probe"); if (result.probe === "failed") throw new Error(result.last_probe?.reason || "Provider 连接失败"); return result; })); }
-    catch (reason) { setError(errorMessage(reason)); }
-    finally { setChecking(false); }
+  const change = (key: string, value: any) => setDraft(previous => {
+    const next = { ...previous, [key]: value };
+    if (key === "hybrid_search") { if (!value) delete next.hybrid_alpha; else next.hybrid_alpha = base.hybrid_alpha ?? contract.hybrid_alpha?.allowed[0]; }
+    return next;
+  });
+  const save = async (discard = false) => {
+    setBusy(true); setError("");
+    try { const result: any = await postJson("/api/pipeline/draft", { config: discard ? null : draft, identity: pipeline.draft_identity }); setPipeline({ ...pipeline, config_draft: result.config_draft, draft_stale: false }); if (discard) setDraft(base); }
+    catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); }
   };
-  return <PageShell className="page settings-page" header={<div className="page-title"><div><h1>Pipeline 配置</h1><p>说明当前 RAG 的关键策略，以及 Frozen 与 Agent 可调的参数边界。</p></div><div className="header-actions"><button className="secondary" onClick={() => setSpaceOpen(true)}>Search Space · {Object.keys(pipeline?.search_space || {}).length}</button></div></div>}>
-
-    <p className="muted pipeline-boundary">Agent 仅在受控 Search Space 内调优；固定知识处理、模型与评测规则。</p>
-    {error && <p className="error-notice" role="alert">请求失败：{error}</p>}
-    <div className="config-groups">{groups.map(group => <div className="pipeline-group" key={group.title}><Section title={group.title}><div className="parameter-list">{group.rows.filter(([, , value]) => available(value)).map(([key, name, value]) => { const allowed = Object.prototype.hasOwnProperty.call(pipeline?.search_space || {}, key); return <div key={key} data-parameter={key}><span>{name}</span><strong>{formatValue(value)}</strong>{pipeline?.search_space && <Badge tone={allowed ? "accent" : "neutral"}>{allowed ? "Agent 可调" : "Frozen"}</Badge>}</div>; })}</div></Section></div>)}</div>
-    <div className="provider-status-row"><span>Provider 配置：<Status value={r.status || "not_run"} />{r.model && ` · ${r.model}`}</span><button className="secondary" onClick={() => void verify()} disabled={checking}>{checking ? "正在验证…" : "验证服务连接"}</button>{r.last_probe && <span className="muted">最后验证：{displayText(r.last_probe.status)}{r.last_probe.latency_ms != null ? ` · ${r.last_probe.latency_ms} ms` : ""}</span>}<small className="muted">手动验证会调用 DeepSeek。</small></div>
-    <Drawer open={spaceOpen} onOpenChange={setSpaceOpen} title="Search Space" className="search-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={pipeline?.search_space || {}} baseline={pipeline?.baseline_config || config} /></div></Drawer>
-
+  return <PageShell className="page settings-page" header={<div className="page-title"><div><h1>Pipeline 配置</h1><p>固定知识处理与评测规则，让 Agent 在有限 Search Space 内优化。</p></div><button className="secondary" onClick={() => setSpaceOpen(true)}>查看 Search Space</button></div>}>
+    {error && <p className="error-notice" role="alert">{error}</p>}
+    <Section title="Frozen 技术基座" action={<Badge>Frozen</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd>{String(value)}</dd></div>)}</dl></Section>
+    <Section title="Agent Search Space" action={<Badge tone="accent">{Object.keys(contract).length} 项受控参数</Badge>}>
+      {!pipeline?.baseline_config && <p className="muted">新版本 Baseline 待评测；草稿起点采用当前 Production 配置。</p>}
+      {pipeline?.draft_stale && <p className="error-notice">已保存草稿的基准已变化，请重新核对并保存。</p>}
+      <div className="search-space-groups">{Object.entries(parameterGroups).map(([group, keys]) => <section key={group}><h3>{group}</h3><div className="search-space-controls">{keys.filter(key => contract[key]).map(key => {
+        const allowed: any[] = contract[key].allowed;
+        const disabled = busy || key === "hybrid_alpha" && !draft.hybrid_search;
+        const dependency = key === "top_k" ? "CandidateK ≥ TopK" : key === "hybrid_alpha" ? "仅 Hybrid ON 时生效" : "";
+        return <div className="search-space-control" key={key} data-parameter={key}><div><strong>{parameterNames[key]}</strong><small>Baseline {formatValue(baseline[key])}</small></div>{allowed.length <= 4 ? <div className="parameter-options" role="group" aria-label={parameterNames[key]}>{allowed.map(value => <button key={JSON.stringify(value)} className={`secondary${draft[key] === value ? " active" : ""}`} aria-pressed={draft[key] === value} disabled={disabled || key === "top_k" && value > draft.candidate_k} onClick={() => change(key, value)}>{formatValue(value)}</button>)}</div> : <CustomSelect ariaLabel={parameterNames[key]} value={JSON.stringify(draft[key])} options={allowed.map(value => ({ value: JSON.stringify(value), label: formatValue(value) }))} disabled={disabled} onChange={value => change(key, JSON.parse(value))} />}<small>{dependency || descriptions[key]}</small></div>;
+      })}</div></section>)}</div>
+      <div className="pipeline-draft-actions"><span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · Config Draft 已保存" : ""}</span><button className="secondary" disabled={busy || !changed.length && !pipeline?.config_draft} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length} onClick={() => void save()}>保存 Config Draft</button></div>
+      {(changed.length > 0 || pipeline?.config_draft) && <p className="muted">Pipeline 配置已变化，需要重新运行 Baseline 后才能成为新的评测基线。</p>}
+    </Section>
+    <Section title="当前 Baseline Strategy"><p>{pipeline?.baseline_config ? "当前评测基线" : "Baseline 待评测 · 当前 Production 参考策略"}</p><dl className="baseline-strategy">{["query_rewrite", "multi_query", "candidate_k", "hybrid_search", "rerank", "top_k", "prompt_strategy"].map(key => <div key={key}><dt>{parameterNames[key]}</dt><dd>{formatValue(base[key])}</dd></div>)}</dl></Section>
+    <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="Search Space" className="search-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={contract} baseline={baseline} /></div></Drawer>
   </PageShell>;
 }

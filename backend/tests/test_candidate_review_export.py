@@ -258,6 +258,45 @@ class CandidateReviewExportTests(unittest.TestCase):
             if subtype == "insufficient_evidence":
                 self.assertEqual(result["classification"], "FAKE_NEGATIVE_RISK")
 
+    def test_anomaly_rerun_excludes_passed_and_frozen_candidates(self):
+        ids = [row["id"] for row in self.rows]
+        with self.store.connection() as connection:
+            connection.execute("UPDATE golden_generation_runs SET status='completed' WHERE id=?", (self.run_id,))
+            connection.execute("UPDATE questions SET probe_status='probe_passed', qc_status='qc_passed' WHERE id IN (%s)" % ','.join('?' for _ in ids), ids)
+            connection.execute("UPDATE questions SET qc_status='qc_pending' WHERE id=?", (ids[4],))
+            connection.execute("UPDATE questions SET qc_status='qc_failed' WHERE id=?", (ids[8],))
+            connection.execute("UPDATE questions SET stage='golden', qc_status='qc_failed' WHERE id=?", (ids[0],))
+        selected = self.store.update_quality_rerun(self.run_id, {"status": "running"}, start=True, anomalies_only=True)
+        self.assertEqual(selected, [ids[4], ids[8]])
+        audit = self.store.generation_run(self.run_id)["artifacts"]["hard_validation"]["quality_rerun"]
+        self.assertEqual(audit['total'], 2)
+        self.assertEqual(audit['question_ids'], selected)
+        self.store.update_quality_rerun(self.run_id, {"status": "completed"})
+        with self.store.connection() as connection:
+            connection.execute("UPDATE questions SET qc_status='qc_passed' WHERE id IN (?, ?)", selected)
+        with self.assertRaisesRegex(ValueError, "没有需要重跑"):
+            self.store.update_quality_rerun(self.run_id, {"status": "running"}, start=True, anomalies_only=True)
+
+    def test_anomaly_rerun_reuses_current_passed_probe_for_failed_qc(self):
+        from unittest.mock import patch
+        ids = [row["id"] for row in self.rows]
+        with self.store.connection() as connection:
+            connection.execute("UPDATE golden_generation_runs SET status='completed' WHERE id=?", (self.run_id,))
+            connection.execute("UPDATE questions SET probe_status='probe_passed', qc_status='qc_passed' WHERE id IN (%s)" % ','.join('?' for _ in ids), ids)
+        target = ids[8]
+        self.passed_probe(target)
+        self.store.record_qc(target, {"score": 50, "priority": "P0", "reason": "fixture"}, "failed")
+        before = self.store.probe_history(target)
+        selected = self.store.update_quality_rerun(self.run_id, {"status": "running"}, start=True, anomalies_only=True)
+        self.assertEqual(selected, [target])
+        with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')), patch.object(main, '_quality_check', return_value=({'reason': 'passed'}, {'status': 'qc_passed'})) as qc:
+            main._run_quality_rerun(self.run_id, selected, self.store, SimpleNamespace(), main.corpus)
+        qc.assert_called_once()
+        self.assertEqual(self.store.probe_history(target), before)
+        audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
+        self.assertEqual(audit['status'], 'completed')
+        self.assertEqual(audit['slots']['Q09']['question_id'], target)
+
     def test_quality_rerun_validates_run_and_blocks_duplicate_start(self):
         with self.store.connection() as connection:
             connection.execute("UPDATE golden_generation_runs SET status = 'completed' WHERE id = ?", (self.run_id,))

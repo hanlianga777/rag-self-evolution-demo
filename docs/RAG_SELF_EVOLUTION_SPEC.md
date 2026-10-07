@@ -1226,3 +1226,17 @@ V1.1 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语�
 - 唯一迁移为可空 `monitoring_events.metrics_json` 与迁移登记；旧事件为空，不伪造。人工 Monitoring 阈值和 Trigger 确认规则不变，确认不自动调参或发布。
 
 </details>
+
+
+## 2026-10-07 Pipeline / Golden 产品收口 UI Contract `[CONFIRMED]`
+
+本节替代 15.13 等历史章节中两个入口的展示约定；保留原文供历史追溯。知识库、概览及其余页面业务规则不变。
+
+- Pipeline 只保留 Frozen 技术基座、Agent Search Space、当前 Baseline Strategy。允许值由 `/api/pipeline.search_space` 唯一提供；沿用既有 Validator，Hybrid OFF 不携带 Alpha，CandidateK ≥ TopK。没有当前 Baseline 时明确显示待评测及 Production 参考起点。
+- 参数编辑保存独立 SQLite Config Draft，绑定当前 Corpus / Golden / Baseline 身份。保存和放弃草稿不写 Production、Baseline、Evaluation 或 Golden。身份变化拒绝保存旧请求，并标识已保存草稿过期。Draft 必须经过新的真实 Baseline 评测后才有资格成为评测基准；本次 UI 收口不运行任何评测。
+- Golden 当前测试集为摘要条、六阶段 GovernanceStepper、内部滚动 Candidate 表格。默认需要人工关注；没有异常时明确提示并展示待人工审核题。Ready 表示机器检查，不等于人工批准。Coverage 展示持久化 Topic / Slot / Gap / Merge，Drawer 每个 Topic 一行，展开后读取构造分布、证据与 Slot。
+- 运行计数、Run ID、耗时与错误移入“更多 → 运行审计”。Candidate Drawer 采用既有字体与 Card Token，保留问题、答案或预期行为、核心证据、自动质量检查、人工修订与批准。Probe / QC 单题按钮位于并排质量模块，QC 要求 Probe 已通过；深层历史仅由“更多 → 质量审计记录”访问。
+- “批量重跑异常项”确认实际异常题数，通过 `anomalies_only=true` 只处理非冻结题中失败或中断的质量步骤。已通过题不进入该范围；当前身份匹配的通过 Probe 可复用，只重跑失败 QC。原直接 API 模式保留兼容，不增加自动 Provider 调用。
+- Candidate Pool 统一 AI 与业务来源，展示 Profile 动态配额、Topic 匹配与 Missing Slots；沿用已有 Hard Validation / Coverage Matching / Clone / Probe / QC / Human Gate 流程，不降低正式 Golden 要求。
+- Shared CustomSelect 阻止外层 label 的默认二次激活；选择当前值同样关闭；单实例互斥打开、外部点击、Escape、失焦关闭；选择和 Escape 恢复触发按钮焦点。外部点击和失焦保留用户目标焦点。不存在依赖页面的修补分支。
+- 沿用唯一 Shared Card Token，紧凑普通卡 112px；Golden 六阶段专用紧凑流程条 48px。PageShell Header / Tabs 固定，当前表格与 Drawer 正文独立滚动，Candidate Drawer 不重复关闭按钮。禁止新增皮肤或更改 Profile 8/4/8、20/10/20、40/20/40。

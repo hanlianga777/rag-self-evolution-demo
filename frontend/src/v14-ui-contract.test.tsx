@@ -33,10 +33,11 @@ it.each([true, false])("I4 manual current Preview is available with legacy Run=%
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") { posts.push({ url, body: JSON.parse(init.body as string) }); return new Response(JSON.stringify(previewPlan())); } return new Response(JSON.stringify([])); }));
   await render(<GovernancePage data={input} />);
   expect(posts).toHaveLength(0);
+  if (legacy) await clickText("运行审计");
   await clickText("预览当前 Corpus Coverage");
   expect(posts).toEqual([{ url: expect.stringContaining("/api/governance/coverage-preview"), body: { profile: "mini" } }]);
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("当前 Corpus · V2 Coverage Preview");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("初始 K 2 → 最终 K 1");
+  expect(document.body.textContent).toContain("当前 Corpus · V2 Coverage Preview");
+  expect(document.body.textContent).toContain("初始 K 2 → 最终 K 1");
   expect(JSON.stringify(input)).toBe(frozen);
 });
 
@@ -270,12 +271,12 @@ it("review R3 persisted Golden risks count and filter exact rows without changin
   const run = { id: "G1", status: "completed", question_ids: rows.map(x => x.id), profile: { expected_count: 6 }, artifacts: {} };
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/export") ? { questions: rows } : url.endsWith("generation-runs") ? [run] : url.endsWith("/dataset") ? rows : []))));
   await render(<GovernancePage data={{ dataset: rows, generationRuns: [run] }} />);
-  const cases: [string, string[]][] = [["QC P0 · 2", ["P0 可接受", "P0 确定性阻断"]], ["QC P0 待人工接受 · 1", ["P0 可接受"]], ["QC P1 · 1", ["P1 检索不连贯"]], ["疑似伪负向 · 1", ["伪负向风险"]], ["检索不连贯 · 1", ["P1 检索不连贯"]], ["检索执行失败 · 1", ["执行失败需修订"]], ["审批阻断 · 1", ["P0 确定性阻断"]], ["需修订 / 已拒绝 · 1", ["执行失败需修订"]]];
-  for (const [label, expected] of cases) {
-    await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".exception-summary button")].find(x => x.textContent === label)!.click());
-    expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(expected.length);
-    for (const question of expected) expect(document.querySelector(".review-table tbody")?.textContent).toContain(question);
-  }
+  expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(5);
+  expect(document.querySelector(".review-table tbody")?.textContent).toContain("P0 确定性阻断");
+  expect(document.querySelector(".exception-summary")).toBeNull();
+  await clickText("运行审计");
+  expect(document.querySelector(".drawer-body")?.textContent).toContain("QC P0 · 2");
+  expect(document.querySelector(".drawer-body")?.textContent).toContain("疑似伪负向 · 1");
   expect(rows[1].approval_eligibility?.blocking_reasons).toEqual(["证据错误"]);
   expect(fetch).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ method: "POST" }));
 });

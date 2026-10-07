@@ -115,6 +115,7 @@ class GovernanceStore:
         with self.connection() as connection:
             connection.executescript(
                 """
+                CREATE TABLE IF NOT EXISTS pipeline_config_draft (id INTEGER PRIMARY KEY CHECK(id=1), draft_json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS coverage_plan_previews (id TEXT PRIMARY KEY, plan_json TEXT NOT NULL, created_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS dataset_versions (id TEXT PRIMARY KEY, status TEXT NOT NULL, source TEXT NOT NULL, snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL);
@@ -701,7 +702,20 @@ class GovernanceStore:
             run["operation_progress"] = {"operation_id": progress.get("operation_id", run_id), "status": run["status"], "phase": phase, "phase_label": {"queued": "等待开始", "coverage": "覆盖规划", "generating": "补齐失败题" if audit.get("regeneration_count") else "逐题生成与校验", "validation": "逐题生成与校验", "needs_regeneration": "待补齐失败题", "probing": "Probe", "qc": "QC", "completed": "已完成", "failed": "运行失败"}.get(phase, phase), "completed_units": phase_done, "total_units": phase_total, "phase_processed": phase_done, "phase_total": phase_total, "phase_percent": round(phase_done / phase_total * 100) if phase_total else 0, "overall_percent": round((processed + probe + qc) / (expected * 3) * 100) if expected else 0, "processed_slots": processed, "expected_slots": expected, "hard_valid_completed": valid, "hard_valid_total": expected, "failed_count": failed_count, "refill_round": progress.get("refill_round"), "refill_max_rounds": progress.get("refill_max_rounds"), "refill_remaining": progress.get("refill_remaining"), "probe_processed": probe, "qc_processed": qc, "current_slot": progress.get("slot"), "current_item": progress.get("slot"), "attempt": progress.get("attempt"), "started_at": started_at, "elapsed_ms": max(0, round((ended_at - datetime.fromisoformat(started_at)).total_seconds() * 1000)), "message": progress.get("message"), "error": audit.get("error")}
         return run
 
-    def update_quality_rerun(self, run_id: str, changes: dict, *, start: bool = False):
+    def pipeline_draft(self):
+        with self.connection() as connection:
+            row = connection.execute("SELECT draft_json FROM pipeline_config_draft WHERE id=1").fetchone()
+        return _load(row[0], None) if row else None
+
+    def save_pipeline_draft(self, draft):
+        with self.connection() as connection:
+            if draft is None:
+                connection.execute("DELETE FROM pipeline_config_draft WHERE id=1")
+            else:
+                connection.execute("INSERT OR REPLACE INTO pipeline_config_draft VALUES (1, ?)", (_json({**draft, "updated_at": _now()}),))
+        return self.pipeline_draft()
+
+    def update_quality_rerun(self, run_id: str, changes: dict, *, start: bool = False, anomalies_only: bool = False):
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT r.status, r.profile_json, r.question_ids_json, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id = r.id WHERE r.id = ?", (run_id,)).fetchone()
@@ -712,13 +726,19 @@ class GovernanceStore:
             if not expected or len(ids) != expected or len(set(ids)) != expected or row["status"] != "completed":
                 raise ValueError("本轮尚未完整入库 20 道 Candidate")
             marks = ",".join("?" for _ in ids)
-            candidates = connection.execute(f"SELECT id, legacy_question_type, raw_json FROM questions WHERE id IN ({marks})", ids).fetchall()
+            candidates = connection.execute(f"SELECT id, legacy_question_type, raw_json, stage, probe_status, qc_status FROM questions WHERE id IN ({marks})", ids).fetchall()
             if len(candidates) != expected or any(item["legacy_question_type"] != "v1_mini" or _load(item["raw_json"], {}).get("generation_run_id") != run_id for item in candidates):
                 raise ValueError("本轮 Candidate 归属或数量不一致")
             audit = _load(row["hard_validation_json"], {})
             previous = audit.get("quality_rerun", {})
             if start and previous.get("status") == "running":
                 raise ValueError("本轮 Probe / QC 已在运行")
+            if start and anomalies_only:
+                eligible = {item["id"] for item in candidates if item["stage"] != "golden" and (item["probe_status"] != "probe_passed" or item["qc_status"] != "qc_passed")}
+                ids = [question_id for question_id in ids if question_id in eligible]
+                if not ids:
+                    raise ValueError("没有需要重跑的异常项")
+                changes = {**changes, "total": len(ids), "question_ids": ids, "scope": "anomalies"}
             audit["quality_rerun"] = {**({} if start else previous), **changes}
             connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json = ? WHERE generation_run_id = ?", (_json(audit), run_id))
         return ids
