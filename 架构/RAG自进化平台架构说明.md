@@ -12,7 +12,7 @@
 
 ### 可信测量
 
-知识库准备文档、解析/OCR、Chunk 与现有向量。Golden V2 在离线侧复用向量进行 Dynamic K-means、小簇合并、按厚度分配 Slot 与材料复用审计。Profile 是 Mini 20=8/4/8、Medium 49=20/9/20、Full 98=40/18/40；Evaluation Group 是 Positive/Ablation/Negative，Construction Type 是 Fact/Aggregation/Bridge/Ordinary，两个维度不互相替代。
+知识库准备文档、解析/OCR、Chunk 与现有向量。Golden V2 在离线侧复用向量进行 Dynamic K-means、小簇合并、按厚度分配 Slot 与材料复用审计。Profile 是 Mini 20=8/4/8、Medium 50=20/10/20、Full 100=40/20/40；Evaluation Group 是 Positive/Ablation/Negative，Construction Type 是 Fact/Aggregation/Bridge/Ordinary，两个维度不互相替代。
 
 AI 生成与 CSV/XLSX 业务导入进入统一候选池。Pool 组卷必须匹配已有 Coverage Plan/Slot，不能只满足题数，不能临时改 Plan 迎合所选题。Hard Validation 确认合法性；Probe 观察真实召回、Final Context 与负向可回答性风险；QC 判断质量；Gate 1 人工确认后冻结 Snapshot。Negative Coverage Anchor 不等于 Golden Evidence；检索难题不能仅因未命中被删掉。
 

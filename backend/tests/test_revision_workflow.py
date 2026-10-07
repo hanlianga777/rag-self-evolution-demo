@@ -481,7 +481,7 @@ class RevisionWorkflowTests(unittest.TestCase):
             self.store.update_question(self.ids[0], "绕过审计", "正确操作", self.store.question(self.ids[0])["evidence"], "reviewer")
         with self.assertRaisesRegex(ValueError, "20"):
             self.store.create_generation_snapshot(self.rows[0]["raw"]["generation_run_id"])
-        with self.assertRaisesRegex(ValueError, "逐题"):
+        with self.assertRaisesRegex(ValueError, "人工异常"):
             self.store.review_generation_batch(self.ids, "reviewer", confirmed_manual_review=True)
 
     def test_normalized_duplicate_and_negative_targets_fail_closed(self):
@@ -869,7 +869,7 @@ class RevisionWorkflowTests(unittest.TestCase):
         finished = self.store.finish_revision_quality(run["id"], {first: {"probe": "passed", "qc": "qc_passed"}})
         self.assertEqual(finished["status"], "completed")
         self.assertEqual(self.store.question(first)["review_status"], "human_review_pending")
-        with self.assertRaisesRegex(ValueError, "逐题"):
+        with self.assertRaisesRegex(ValueError, "人工异常"):
             self.store.review_generation_batch(self.ids, "reviewer", confirmed_manual_review=True)
         self.store.review_question(first, "approved", "reviewer")
         self.assertEqual(self.store.question(first)["stage"], "golden")

@@ -158,7 +158,9 @@ class CandidateReviewExportTests(unittest.TestCase):
         first = self.rows[0]["id"]
         self.passed_probe(first)
         full = "前段。" * 60 + "数传模块和蓝牙模块均可用。"
-        corpus = type("Corpus", (), {"chunks": lambda _self: [{"chunk_id": "C1", "chunk_text": full}]})()
+        table = {"block_id":"B1", "page":3, "original_html":"<table><tr><td>墙距</td><td>10cm</td></tr></table>", "child_ids":["C1"]}
+        unrelated = {**table, "block_id":"B2", "child_ids":["C2"]}
+        corpus = type("Corpus", (), {"chunks": lambda _self: [{"chunk_id":"C1", "document_id":"D1", "block_ids":["B1"], "chunk_text":full}], "original_tables":lambda _self,selected:{chunk["chunk_id"]:[{key:table[key] for key in ("block_id","page","original_html")}] for chunk in selected}})()
         class Provider:
             settings = SimpleNamespace(configured=True, model="test-model")
             payload = None
@@ -171,6 +173,8 @@ class CandidateReviewExportTests(unittest.TestCase):
         result = AiService(self.store, corpus, provider, False).quality_check(item)
         self.assertEqual(provider.payload["evidence"][0]["chunk_text"], full)
         self.assertEqual(result["qc_input_evidence"][0]["chunk_text"], full)
+        self.assertEqual([row["block_id"] for row in provider.payload["evidence"][0]["original_tables"]], ["B1"])
+        self.assertEqual(result["qc_input_evidence"][0]["original_tables"][0]["original_html"], table["original_html"])
         self.assertIn("数传模块和蓝牙模块均可用", result["evidence_support_sentences"])
         self.assertIn("参考答案须由完整", result["behavior_criteria"])
         with self.assertRaisesRegex(ValueError, "MISSING_EVIDENCE_CHUNK"):

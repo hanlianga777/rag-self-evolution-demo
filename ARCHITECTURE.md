@@ -19,7 +19,7 @@ React/Vite + FastAPI + SQLite + 本地 BGE/FAISS，复用已有八个一级工�
 
 ## 主链与事务
 
-Golden（Mini 20／Medium 49／Full 98）→ Gate 1 人工确认并冻结 → Baseline 报告／门禁／逐题诊断 → Tuning A/B/C Sandbox → Gate 2 报告确认并选择赢家 → D 决策／重评 → Gate 3 人工发布 → 问答试验。
+Golden（Mini 20／Medium 50／Full 100）→ Gate 1 人工确认并冻结 → Baseline 报告／门禁／逐题诊断 → Tuning A/B/C Sandbox → Gate 2 报告确认并选择赢家 → D 决策／重评 → Gate 3 人工发布 → 问答试验。
 
 只有 Tuning 是 Agent。Generation、QC、Evaluation 是受控工作流；编辑和替换复用 Revision JSON、哈希与后台线程。采用替换才原子切换活动题映射，历史不删除。Gate 1 原子保存审核和不可变 Golden Version。
 

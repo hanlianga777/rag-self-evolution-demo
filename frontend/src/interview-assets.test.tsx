@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { goldenFixture } from "./golden-test-fixture";
+import { invalidateGolden } from "./goldenCache";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
@@ -8,7 +10,7 @@ import { GovernancePage } from "./pages/GovernancePage";
 import { BusinessImportPanel } from "./pages/BusinessImportPanel";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-afterEach(() => { document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("uses persisted corpus totals and actual index dimensions in six asset cards and three strategy cards", async () => {
   const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: 384, indexed_count: 6 } }), { status: 200 }));
@@ -45,7 +47,7 @@ it("groups pipeline configuration by purpose and marks parameters by their contr
   await act(async () => root.render(<SettingsPage data={{ documents: [{ parser: "PyMuPDF", chunk_strategy: "Section-aware" }], versions: [{ status: "active", snapshot: { generation_model: "generation-model" } }], readiness: { status: "ready", model: "provider-model" }, evaluation: { judge: { model: "judge-model", temperature: 0.9, execution_snapshot: { generation_model: "generation-model", temperature: 0.2 } } } }} />));
   expect(document.querySelector(".light-stepper")).toBeNull();
   expect([...document.querySelectorAll(".settings-page h2")].map(item => item.textContent)).toEqual(["Frozen 技术基座", "Agent Search Space", "当前 Baseline Strategy"]);
-  expect(document.querySelector('[data-parameter="top_k"]')?.textContent).toContain("Baseline 未采集");
+  expect(document.querySelector('[data-parameter="top_k"]')?.textContent).not.toContain("Baseline 未采集");
   expect(document.body.textContent).toContain("Baseline 待评测");
   expect(document.querySelector(".provider-status-row")).toBeNull();
   expect(fetcher.mock.calls).toHaveLength(1);
@@ -56,7 +58,7 @@ it("keeps current frozen Golden separate from the latest work Run and hides an e
   const row = { id: "new-Q01", slot: "Q01", question: "待审核的新题", test_category: "positive", stage: "candidate", probe_status: "probe_passed", qc_status: "qc_passed", review_status: "human_review_pending", evidence: [] };
   const workRun = { id: "GGEN-new", status: "completed", profile: { expected_count: 1 }, question_ids: [row.id], artifacts: {} };
   const snapshots = [{ id: "GD-other", status: "approved", snapshot: { questions: [{ id: "other", test_category: "positive" }], question_ids: ["other"] } }, { id: "GD-current", status: "approved", snapshot: { questions: [{ id: "old-1", test_category: "positive" }, { id: "old-2", test_category: "ablation" }, { id: "old-3", test_category: "negative" }], question_ids: ["old-1", "old-2", "old-3"] } }];
-  const fetcher = vi.fn((url: string, _init?: RequestInit) => Promise.resolve(new Response(JSON.stringify(url.includes("/export") ? { questions: [row] } : []), { status: 200 })));
+  const fetcher = vi.fn((url: string, _init?: RequestInit) => Promise.resolve(new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, [row]) : []), { status: 200 })));
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: "GD-current" }, generationRuns: [workRun], snapshots, dataset: [row], documents: [] }} />));
@@ -87,7 +89,7 @@ it("keeps candidate filters, search and explicit actions in a single toolbar", a
   const search = toolbar.querySelector<HTMLInputElement>('input[type="search"]')!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "刷盘"); search.dispatchEvent(new Event("input", { bubbles: true })); });
   expect(document.querySelectorAll("tbody tr")).toHaveLength(1);
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
   await act(async () => root.unmount());
 });
 

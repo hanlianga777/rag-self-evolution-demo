@@ -45,7 +45,8 @@ class PartialGenerationTests(unittest.TestCase):
             self.store.record_qc(question_id, {'score': 95, 'priority': 'P2', 'reason': 'fixture quality'}, 'passed')
         gate = self.store.generation_run(run_id)['human_gate']
         self.assertEqual(gate['status'], 'ready')
-        self.assertEqual(gate['human_review_pending'], 20)
+        self.assertEqual(gate['human_review_pending'], 0)
+        self.assertEqual(gate['machine_qualified'], 20)
         self.assertEqual(gate['approved'], 0)
 
     def test_quality_resume_keeps_current_passes_and_retries_only_missing_qc(self):

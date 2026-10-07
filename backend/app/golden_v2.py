@@ -157,6 +157,16 @@ def answer_supported(answer, sources):
     from .governance import _answer_anchor_supported
     if _answer_anchor_supported(answer, [text(c) for c in sources]):
         return True
+    table_pairs = []
+    from .knowledge_pipeline import TableReader
+    for chunk in sources:
+        for table in chunk.get('original_tables', []):
+            reader = TableReader(); reader.feed(table['original_html'])
+            if not reader.complex:
+                table_pairs.extend((normalize(row[0]), normalize(row[1])) for row in reader.rows if len(row)==2)
+    claims = [normalize(part) for part in re.split(r'[。；;\n]+', answer) if normalize(part)]
+    if table_pairs and claims and all(any(re.sub(r'为|是|等于', '', claim)==key+value for key,value in table_pairs) for claim in claims):
+        return True
     # Explicit attribute/value anchors accept grammatical paraphrase only.
     # Unknown semantic paraphrases require review rather than inventing proof.
     normalized_answer = normalize(answer)
@@ -320,6 +330,7 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
             errors.append('Evidence 原文无法逐字定位')
     source_ids = list(dict.fromkeys(source_ids))
     sources = [known[i] for i in source_ids if i in known]
+    sources = [{**source, 'original_tables':context.get('original_tables', {}).get(source['chunk_id'], [])} for source in sources]
     answer = c.get('reference_answer') or ''
     if not isinstance(answer, str):
         errors.append('invalid reference_answer')
@@ -407,7 +418,7 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
         if requested in context.get('occupied_slots', []):
             errors.append('Coverage Slot 已占用')
     normalized = {**c, 'question': question, 'test_category': group, 'evaluation_group': group, 'construction_type': kind, 'evidence': resolved_evidence, 'source_chunk_ids': source_ids, 'evidence_locations': locations, 'coverage_match': coverage}
-    return {'valid': not errors, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'duplicate_checks': duplicate_checks, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION}
+    return {'valid': not errors, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'duplicate_checks': duplicate_checks, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION, 'original_table_evidence': context.get('original_tables', {})}
 
 
 def match_pool(plan, validations):

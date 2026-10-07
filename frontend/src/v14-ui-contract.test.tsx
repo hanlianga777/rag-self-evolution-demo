@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { goldenFixture } from "./golden-test-fixture";
+import { invalidateGolden } from "./goldenCache";
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
@@ -17,7 +19,7 @@ import { getJson, loadAppData } from "./api";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let root: ReturnType<typeof createRoot>;
-afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML = ""; sessionStorage.clear(); vi.unstubAllGlobals(); });
+afterEach(() => { invalidateGolden(); if (root) act(() => root.unmount()); document.body.innerHTML = ""; sessionStorage.clear(); vi.unstubAllGlobals(); });
 const render = async (node: ReactNode) => { root = createRoot(document.body.appendChild(document.createElement("div"))); await act(async () => root.render(node)); };
 const identity = (baseline: string, experiment?: string) => ({ current_baseline_id: baseline, current_experiment_id: experiment, current_golden_id: "GD-fixture", current_corpus_fingerprint: { D: "fixture" } });
 const data = (baseline = "B0") => ({ workspace: identity(baseline), evaluation: { id: baseline }, versions: [{ id: "P0", status: "active", provenance: "published", config: { top_k: 6 } }] });
@@ -269,7 +271,7 @@ it("review R3 persisted Golden risks count and filter exact rows without changin
     { ...base, id: "Q6", question: "未分类历史" },
   ];
   const run = { id: "G1", status: "completed", question_ids: rows.map(x => x.id), profile: { expected_count: 6 }, artifacts: {} };
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/export") ? { questions: rows } : url.endsWith("generation-runs") ? [run] : url.endsWith("/dataset") ? rows : []))));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : url.replace("?light=true", "").endsWith("generation-runs") ? [run] : url.endsWith("/dataset") ? rows : []))));
   await render(<GovernancePage data={{ dataset: rows, generationRuns: [run] }} />);
   expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(5);
   expect(document.querySelector(".review-table tbody")?.textContent).toContain("P0 确定性阻断");

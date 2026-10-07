@@ -267,6 +267,10 @@ class CorpusStore:
         chunks = _read_json(self.index_dir / "chunks.json", [])
         return [item for item in chunks if document_id is None or item.get("document_id") == document_id]
 
+    def original_tables(self, chunks):
+        blocks = {document_id:_read_json(self.index_dir/f'{document_id}-blocks.json', []) for document_id in {chunk['document_id'] for chunk in chunks}}
+        return {chunk['chunk_id']:[{'block_id':block['block_id'], 'page':block['page'], 'original_html':block['raw']['table_body']} for block in blocks[chunk['document_id']] if block['block_id'] in chunk.get('block_ids', []) and block.get('raw', {}).get('type')=='table'] for chunk in chunks}
+
     def detail(self, document_id: str) -> dict | None:
         document = next((item for item in self.documents() if item["id"] == document_id), None)
         if document is None:

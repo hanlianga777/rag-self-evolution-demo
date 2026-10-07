@@ -1,6 +1,7 @@
 from .corpus import manifest_identity
 import csv
 import io
+import hashlib
 import json
 import os
 import threading
@@ -9,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Query, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -349,8 +350,8 @@ def document_detail(document_id: str):
 
 
 @app.get("/api/dataset")
-def dataset():
-    return store.questions()
+def dataset(light: bool = False):
+    return [{key:value for key,value in row.items() if key not in {'quality_audit','question'}} for row in store.candidate_rows()] if light else store.questions()
 
 
 @app.get("/api/governance/summary")
@@ -432,9 +433,56 @@ def create_pool_run(payload: PoolRunRequest):
         raise HTTPException(status_code=422, detail=json.loads(str(error)) if str(error).startswith('{') else str(error)) from error
 
 
+@app.get("/api/governance/candidates")
+def candidate_list(run_id: str | None = None, offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100), source: str = "all", group: str = "all", construction: str = "all", search: str = "", status: str = "all"):
+    run = store.generation_run(run_id, qualification=False) if run_id else None
+    if run_id and run is None:
+        raise HTTPException(status_code=404, detail="Generation run not found")
+    rows = store.candidate_rows(run['question_ids'] if run else None)
+    if not run:
+        rows = [row for row in rows if row['stage']!='superseded' and (row['raw'].get('generation_run_id') or row['raw'].get('source')=='business_import')]
+    summary = {'total':len(rows), 'ai':sum(row['raw'].get('source')!='business_import' for row in rows), 'business':sum(row['raw'].get('source')=='business_import' for row in rows),
+        'machine_qualified':sum(row['qualification_status'] in {'machine_qualified','human_approved'} for row in rows),
+        'needs_processing':sum(row['qualification_status']=='needs_human_review' and row['probe_status']!='probe_pending' and row['qc_status']!='qc_pending' for row in rows),
+        'pending_checks':sum(row['qualification_status']=='needs_human_review' and (row['probe_status']=='probe_pending' or row['qc_status']=='qc_pending') for row in rows)}
+    types = sorted({row['construction_type'] for row in rows if row['construction_type']})
+    candidate_index = [{key:row[key] for key in ('id','stage','review_status','probe_status','qc_status','test_category','raw','slot','topic_cluster','qualification_status','qualification_source','attention_reasons','probe','qc')} for row in rows] if run else []
+    version_rows = rows
+    risks = any(row['qualification_status']=='needs_human_review' for row in rows)
+    rows = [row for row in rows if (status=='all' or status=='attention' and (row['qualification_status']=='needs_human_review' or not risks) or status=='machine' and row['qualification_status']=='machine_qualified') and (source=='all' or (row['raw'].get('source') or 'ai_generated')==source) and (group=='all' or row['test_category']==group) and (construction=='all' or row['construction_type']==construction) and search.lower() in row['question'].lower()]
+    version = hashlib.sha256(json.dumps([(row['id'],row['updated_at'],row['qualification_status'],row['attention_reasons'],row['quality_audit']) for row in version_rows],sort_keys=True).encode()).hexdigest()
+    return {'rows':[{key:value for key,value in row.items() if key!='quality_audit'} for row in rows[offset:offset+limit]], 'candidate_index':candidate_index, 'total':len(rows), 'summary':summary, 'construction_types':types, 'data_version':version, 'corpus_fingerprint':manifest_identity(current_manifest()), 'generation_run_id':run_id, 'profile':run['profile'] if run else None}
+
+
+@app.get("/api/governance/questions/{question_id}")
+def candidate_detail(question_id: str):
+    try:
+        item = store.question(question_id)
+        run_id = item['raw'].get('generation_run_id')
+        if run_id and question_id in (store.generation_run(run_id, qualification=False) or {}).get('question_ids', []):
+            return store.generation_review(run_id, corpus.chunks(), allow_partial=True, question_id=question_id)['questions'][0]
+        return {**item,'probe_history':store.probe_history(question_id),'qc_history':store.qc_history(question_id),'revision_history':store.revision_history(question_id)}
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Candidate not found") from error
+
+
 @app.get("/api/governance/generation-runs")
-def generation_runs():
-    return store.generation_runs()
+def generation_runs(light: bool = False):
+    if not light:
+        return store.generation_runs()
+    with store.connection() as connection:
+        latest = connection.execute("SELECT id FROM golden_generation_runs ORDER BY created_at DESC LIMIT 1").fetchone()
+    runs = [store.generation_run(latest[0])] if latest else []
+    result = []
+    for run in runs[:1]:
+        audit = run['artifacts']['hard_validation']
+        frozen = audit.get('frozen_plan')
+        if frozen:
+            frozen = {**frozen, 'clusters':[{key:value for key,value in cluster.items() if key not in {'centroid','center','embedding'}} for cluster in frozen['clusters']]}
+        result.append({**{key:run[key] for key in ('id','status','profile','question_ids','created_at','human_gate')}, 'operation_progress':run.get('operation_progress'),
+            'artifacts':{'slot_audit':{}, 'question_plan':[], 'coverage_plan':[{'slot':slot.get('slot')} for slot in run['artifacts'].get('coverage_plan',[])],
+                'hard_validation':{**{key:value for key,value in audit.items() if key in {'corpus_fingerprint','slot_persistence_v1','progress','quality_rerun'}}, 'frozen_plan':frozen}}})
+    return result
 
 
 @app.get("/api/governance/generation-runs/{run_id}")

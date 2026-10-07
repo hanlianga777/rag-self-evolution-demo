@@ -39,7 +39,7 @@ export const identityKey = (value: any) => JSON.stringify([value?.current_baseli
 
 export async function loadAppData(retry = true): Promise<AppData> {
   const [workspace, overview, documents, dataset, evaluation, badCases, optimization, versions, readiness, monitoring] = await Promise.all([
-    getJson("/api/workspace"), getJson("/api/overview"), getJson("/api/documents"), getJson("/api/dataset"), getJson("/api/evaluation"), getJson("/api/bad-cases"), getJson("/api/optimization"), getJson("/api/versions"), getJson("/api/readiness"), getJson("/api/monitoring"),
+    getJson("/api/workspace"), getJson("/api/overview"), getJson("/api/documents"), getJson("/api/dataset?light=true"), getJson("/api/evaluation"), getJson("/api/bad-cases"), getJson("/api/optimization"), getJson("/api/versions"), getJson("/api/readiness"), getJson("/api/monitoring"),
   ]);
   const identities = [workspace, overview, evaluation, optimization, monitoring].filter((value: any) => value && "current_baseline_id" in value);
   if (new Set(identities.map(identityKey)).size > 1) {

@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { goldenFixture } from "./golden-test-fixture";
+import { invalidateGolden } from "./goldenCache";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
@@ -35,7 +37,7 @@ it("confirms the actual anomaly count and requests only the anomaly scope", asyn
   const rows = [{ ...base, id: "pass", question: "Passed" }, { ...base, id: "fail", question: "Failed", qc_status: "qc_failed" }];
   const run = { id: "G1", status: "completed", profile: { expected_count: 2 }, question_ids: rows.map(row => row.id), artifacts: {} };
   const posts: string[] = [];
-  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") posts.push(url); return new Response(JSON.stringify(url.includes('/export') ? { questions: rows } : url.endsWith('/G1') ? run : [])); }));
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") posts.push(url); return new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : url.endsWith('/G1') ? run : [])); }));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "批量重跑异常项")!.click());

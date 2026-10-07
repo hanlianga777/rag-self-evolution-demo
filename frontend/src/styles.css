@@ -1072,7 +1072,7 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .search-space-groups h3 { display:none; }
 .search-space-groups h3 { font-size:var(--card-title); font-weight:700; margin:0 0 6px; }
 
-.search-space-control { border:1px solid var(--card-border); border-radius:var(--card-radius); padding:var(--card-padding); height:var(--card-height); box-sizing:border-box; font-size:var(--card-body); display:flex; flex-direction:column; justify-content:space-between; gap:4px; min-width:0; }
+.search-space-control { background:var(--card-good-bg); border:1px solid var(--card-good-border); border-radius:var(--card-radius); padding:var(--card-padding); height:var(--card-height); box-sizing:border-box; font-size:var(--card-body); display:flex; flex-direction:column; justify-content:space-between; gap:4px; min-width:0; }
 .search-space-control > div:first-child { display:flex; justify-content:space-between; gap:4px; }
 .search-space-control strong { font-size:var(--card-title); font-weight:700; }
 .parameter-options { display:flex; gap:4px; }
@@ -1084,7 +1084,7 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .golden-summary-strip,.pool-summary-strip,.pool-profile-match { display:flex; gap:var(--card-gap); align-items:center; flex-wrap:wrap; padding:var(--card-padding); border:1px solid var(--card-border); border-radius:var(--card-radius); font-size:var(--card-body); }
 .golden-summary-strip { flex:none; }
 .governance-page .page-content .golden-workspace .stage-stepper { flex:none; margin:0; grid-template-columns:repeat(6,minmax(0,1fr)); }
-.governance-page .page-content .golden-workspace .stage-stepper li { height:48px; min-height:48px; padding:var(--card-padding); }
+.governance-page .page-content .golden-workspace .stage-stepper li { height:76px; min-height:76px; padding:var(--card-padding); }
 .golden-workspace > .panel,.governance-page .page-content > .panel { flex:1; min-height:0; margin:0; padding:var(--card-padding); display:flex; flex-direction:column; gap:var(--card-gap); overflow:hidden; }
 .golden-workspace .section-head { margin:0; flex:none; }
 .golden-workspace .coverage-summary,.golden-workspace .review-filters,.golden-workspace .golden-review-role { flex:none; margin:0; }
@@ -1125,3 +1125,26 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .candidate-pool-table td { padding:6px 8px; height:60px; vertical-align:middle; }
 .candidate-pool-table th:not(:nth-child(2)),.candidate-pool-table td:nth-child(5),.candidate-pool-table button { white-space:nowrap; }
 .candidate-pool-table td:nth-child(3) small { display:block; }
+
+/* The two closing pages reuse shared tokens, including idle input and segmented states. */
+.parameter-options .secondary { background:var(--card-bg); }
+.parameter-options .secondary.active { background:var(--card-active-bg); }
+.drawer.drawer.parameter-space-drawer { width:min(1080px,calc(100vw - 24px)); height:auto; max-height:calc(100dvh - 24px); }
+.parameter-space-drawer .drawer-body { padding:var(--card-padding); }
+.parameter-space-drawer .table-scroll { max-height:none; overflow:visible; }
+.parameter-space-drawer .search-space-table { min-width:0 !important; width:100%; table-layout:fixed; }
+.parameter-space-drawer td,.parameter-space-drawer th { padding:8px; font-size:var(--card-body); }
+.parameter-space-drawer th:first-child { width:15%; }
+.parameter-space-drawer th:nth-last-child(3) { width:27%; }
+.parameter-space-drawer th:nth-last-child(2) { width:20%; }
+.profile-selector .custom-select,.pool-profile-selector .custom-select { width:250px; max-width:250px; flex:none; }
+.candidate-pool-toolbar input[type=search] { border:1px solid var(--line); background:var(--card-bg); border-radius:var(--card-radius); padding:8px; }
+.candidate-pool-toolbar input[type=search]:hover { border-color:var(--card-active-border); }
+.golden-skeleton { flex:1; min-height:0; display:grid; gap:var(--card-gap); padding:var(--card-padding); }
+.golden-skeleton > span { min-height:24px; border-radius:var(--card-radius); background:var(--line); opacity:.35; }
+@media(max-height:600px) { .parameter-space-drawer .drawer-body { overflow:auto; } }
+.golden-workspace .history-pagination { flex:none; padding-top:0; font-size:var(--card-body); }
+.golden-workspace .history-pagination button { padding:4px 8px; }
+.golden-workspace .golden-summary-strip .coverage-summary > span { display:none; }
+
+.pool-profile-match .coverage-summary > span { display:none; }

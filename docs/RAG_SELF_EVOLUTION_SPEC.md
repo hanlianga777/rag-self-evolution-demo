@@ -1,3 +1,5 @@
+> 当前 Pipeline / Golden 优先合同：以文末 2026-10-07「最终小收口」为准；此前页面范围、48px Stepper 与逐题审批为历史说明。本轮不执行人工确认、冻结或 Baseline。
+
 # Phase 1 Final Polish — 当前优先合同（2026-10-05）
 
 以下规则覆盖后文旧版 20/49/98 和拆分架构图说明；历史 Run、Snapshot 与产物不改写。
@@ -1240,3 +1242,18 @@ V1.1 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语�
 - Candidate Pool 统一 AI 与业务来源，展示 Profile 动态配额、Topic 匹配与 Missing Slots；沿用已有 Hard Validation / Coverage Matching / Clone / Probe / QC / Human Gate 流程，不降低正式 Golden 要求。
 - Shared CustomSelect 阻止外层 label 的默认二次激活；选择当前值同样关闭；单实例互斥打开、外部点击、Escape、失焦关闭；选择和 Escape 恢复触发按钮焦点。外部点击和失焦保留用户目标焦点。不存在依赖页面的修补分支。
 - 沿用唯一 Shared Card Token，紧凑普通卡 112px；Golden 六阶段专用紧凑流程条 48px。PageShell Header / Tabs 固定，当前表格与 Drawer 正文独立滚动，Candidate Drawer 不重复关闭按钮。禁止新增皮肤或更改 Profile 8/4/8、20/10/20、40/20/40。
+
+
+### Pipeline / Golden 最终小收口（2026-10-07，替代旧逐题批准约束）
+
+当前正式 Profile 为 Mini 8/4/8（20）、Medium 20/10/20（50）、Full 40/20/40（100）。旧 Full 40/18/40（98）仅属于历史 Run，不改写历史数据。
+
+Golden 资格互斥为 Machine Qualified、Needs Human Review、Human Approved。机器合格要求当前内容的 Hard Validation、Probe、QC 和十维质量审计安全通过；P0/P1、伪负向、检索不连贯、旧版本检查、未关闭修订、题目自然度等异常进入人工队列。最终 Gate 必须核对完整 Profile、Slot/Topic 配额、当前 Corpus 和全部资格。机器合格不等于人工批准；一次显式数据集确认才冻结 Snapshot，记录每题机器或人工资格来源。禁止自动确认、自动冻结及自动 Baseline。历史逐题审批说明继续作为历史合同保留。
+
+十维审计包括自然度、业务价值、意图、Evidence、独立性、抄写、去重、题型、Coverage、多样性。只定向替换未通过 Slot，保留 Before/After 和来源追溯；新内容重跑 Hard Validation、Probe、QC 和审计，未修改题复用既有结果。
+
+UI Contract：Search Space 卡片复用现有浅绿色 Token，Segments 使用烟灰/白色；Baseline 待评测仅提示一次。参数 Drawer 12 行无内部表格滚动。Golden 六阶段 Stepper 为76px，容纳标题和说明；Profile 固定 250px，候选池搜索 Idle 边框可见。当前 Run 存在时，新建入口置于更多菜单且须确认。主表不显示十项分数，QC P1 明确为通过但需复核。
+
+加载合同：初始 Run 使用轻量投影，候选列表服务端分页 30 条，Evidence/Probe/QC/Revision 单题详情懒加载，运行审计按需加载。内存 Cache 包含 Corpus、Run、Profile 和数据版本，Tab 返回复用已有行并后台校验，Mutation 主动失效，迟到响应不得覆盖新版本；不采用永久 localStorage。
+
+Golden 原始表格证据合同：Hard Validation、Probe、QC 统一读取所选 Child 的真实 Block 与原始 HTML；简单二列表格按真实字段/值对核对，错误字段配对和未知值不得通过。复杂合并表格不从二维行猜测字段映射。此处只补全检查的来源证据，不改写 Corpus、KV、Embedding 或 Index，工程重验保留诊断且不增加内容修复预算。

@@ -353,3 +353,24 @@ class GoldenV2Tests(unittest.TestCase):
             self.assertEqual(result.status_code, 200)
             self.assertFalse(result.json()['valid'])
             self.assertTrue(result.json()['gaps'])
+
+
+class OriginalTableSupportTests(unittest.TestCase):
+    def test_original_two_column_rows_support_values_without_swapping_fields(self):
+        from app.golden_v2 import answer_supported
+        table='<table><tr><td>墙壁距离</td><td>10cm</td></tr><tr><td>最小通道宽度</td><td>1.05m</td></tr></table>'
+        sources=[{'chunk_id':'C1','chunk_text':'墙壁距离=最小通道宽度；10cm=1.05m','original_tables':[{'original_html':table}]}]
+        self.assertTrue(answer_supported('墙壁距离为10cm；最小通道宽度为1.05m。', sources))
+        self.assertFalse(answer_supported('墙壁距离为1.05m；最小通道宽度为10cm。', sources))
+        self.assertFalse(answer_supported('墙壁距离为10cm；最小通道宽度为2m。', sources))
+
+    def test_only_tables_bound_to_requested_child_are_returned(self):
+        import tempfile,json
+        from pathlib import Path
+        from app.corpus import CorpusStore
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            blocks=[{'block_id':key,'page':2,'raw':{'type':'table','table_body':'<table><tr><td>x</td><td>1</td></tr></table>'}} for key in ('B1','B2')]
+            (root/'D1-blocks.json').write_text(json.dumps(blocks))
+            result=CorpusStore(root).original_tables([{'chunk_id':'C1','document_id':'D1','block_ids':['B1']}])
+            self.assertEqual([row['block_id'] for row in result['C1']], ['B1'])

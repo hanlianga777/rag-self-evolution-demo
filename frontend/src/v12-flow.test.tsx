@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { goldenFixture } from "./golden-test-fixture";
+import { invalidateGolden } from "./goldenCache";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
@@ -9,7 +11,7 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { PageErrorBoundary } from "./App";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-afterEach(() => { document.body.innerHTML = ""; vi.unstubAllGlobals(); });
+afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 
 it("shows null Probe and QC thresholds as advisory in technical audit", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response("[]", { status: 200 })));
@@ -48,10 +50,10 @@ it("accepts a reviewable QC P0 with a recorded reason even when scores are low",
 it("uses one Gate 1 confirmation and never offers a separate Snapshot action", async () => {
   const rows = Array.from({ length: 20 }, (_, index) => ({ id: `Q${index}`, slot: `Q${index}`, question: "问题", test_category: "positive", review_status: "human_review_pending", stage: "candidate", approval_eligibility: { can_approve: true, blocking_reasons: [] } }));
   const requests: string[] = [];
-  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") requests.push(url); return new Response(JSON.stringify(url.includes("export") ? { questions: rows } : []), { status: 200 }); }));
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") requests.push(url); return new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : []), { status: 200 }); }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [{ id: "G1", status: "completed", question_ids: rows.map(row => row.id), profile: { expected_count: 20 }, artifacts: {} }], snapshots: [] }} />));
-  expect(document.body.textContent).toContain("确认 Golden 测试集");
+  expect(document.body.textContent).toContain("确认并冻结 Golden Dataset");
   expect(document.body.textContent).not.toContain("创建 Golden Snapshot");
   await act(async () => root.unmount());
   expect(requests).not.toContain(expect.stringContaining("/snapshot"));
@@ -60,11 +62,11 @@ it("uses one Gate 1 confirmation and never offers a separate Snapshot action", a
 it("keeps Gate 1 available when every question is approved but the current run has no matching snapshot", async () => {
   const rows = Array.from({ length: 20 }, (_, index) => ({ id: `Q${index}`, slot: `Q${index}`, question: "问题", test_category: "positive", review_status: "approved", stage: "golden", approval_eligibility: { can_approve: true, blocking_reasons: [] } }));
   const run = { id: "G1", status: "completed", question_ids: rows.map(row => row.id), profile: { expected_count: 20 }, artifacts: {} };
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("export") ? { questions: rows } : []), { status: 200 })));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [{ id: "OLD", snapshot: { generation_run_id: "G1", question_ids: ["old-question"] } }] }} />));
-  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("待人工审核");
-  const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "确认 Golden 测试集")!;
+  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("Human Gate 1");
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "确认并冻结 Golden Dataset")!;
   expect(confirm).toBeTruthy();
   await act(async () => document.querySelector<HTMLInputElement>(".review-batch input")!.click());
   expect(confirm.disabled).toBe(false);
@@ -78,13 +80,13 @@ it("sends one atomic Gate 1 review request and shows the frozen version after re
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === "POST") requests.push({ url, body: JSON.parse(init.body as string) });
     const reviewed = rows.map(row => ({ ...row, review_status: "approved", stage: "golden" }));
-    const body = url.includes("export") ? { questions: requests.length ? reviewed : rows } : url.endsWith("/api/dataset") ? reviewed : url.endsWith("/api/governance/generation-runs") ? [run] : url.endsWith("/api/governance/snapshots") ? [{ id: "GOLDEN-v1", snapshot: { generation_run_id: "G1", question_ids: run.question_ids } }] : [];
+    const body = (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, requests.length ? reviewed : rows) : url.endsWith("/api/dataset") ? reviewed : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : url.endsWith("/api/governance/snapshots") ? [{ id: "GOLDEN-v1", snapshot: { generation_run_id: "G1", question_ids: run.question_ids } }] : [];
     return new Response(JSON.stringify(body), { status: 200 });
   }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
   await act(async () => document.querySelector<HTMLInputElement>(".review-batch input")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "确认 Golden 测试集")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "确认并冻结 Golden Dataset")!.click());
   expect(requests).toEqual([{ url: expect.stringContaining("/api/governance/review-batch"), body: { question_ids: rows.map(row => row.id), confirmed_manual_review: true } }]);
   expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("已人工确认");
   expect(document.querySelector(".review-batch")).toBeNull();
@@ -94,7 +96,7 @@ it("sends one atomic Gate 1 review request and shows the frozen version after re
 it("shows persisted partial slots, failure details, and only the refill action", async () => {
   const rows = Array.from({ length: 12 }, (_, index) => ({ id: `V1-${index + 1}`, slot: `Q${String(index + 1).padStart(2, "0")}`, question: `已通过 ${index + 1}`, test_category: "positive", legacy_question_type: "v1_mini", stage: "candidate", review_status: "human_review_pending" }));
   const run = { id: "GGEN-NEW", status: "needs_regeneration", question_ids: rows.map(row => row.id), profile: { expected_count: 20 }, operation_progress: { phase_label: "待补齐失败题", phase_processed: 20, phase_total: 20, phase_percent: 100, processed_slots: 20, expected_slots: 20, hard_valid_completed: 12, hard_valid_total: 20, failed_count: 8, probe_processed: 0, qc_processed: 0 }, artifacts: { coverage_plan: Array.from({ length: 20 }, (_, index) => ({ slot: `Q${String(index + 1).padStart(2, "0")}`, test_category: "positive" })), slot_audit: { Q20: [{ attempt: 2, question: "失败问题", reference_answer: "越界答案", selected_evidence: [{ document_name: "fixture.pdf", chunk_id: "C20", chunk_text: "原文证据" }], validation_error: "unsupported answer anchor" }] }, hard_validation: { slot_persistence_v1: true, progress: { stage: "needs_regeneration", completed_slots: 12 } } } };
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/questions") ? { questions: rows } : []), { status: 200 })));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/questions") || url.includes("/candidates?")) ? goldenFixture(url, rows) : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
@@ -125,7 +127,7 @@ for (const count of [10, 12, 19]) {
   it(`renders a ${count}/20 partial Run before detailed questions load`, async () => {
     const rows = Array.from({ length: count }, (_, index) => ({ id: `V1-${index + 1}`, question: `题目 ${index + 1}`, test_category: "positive", legacy_question_type: "v1_mini", raw: index === 0 ? {} : { coverage_slot: `Q${String(index + 1).padStart(2, "0")}` } }));
     const run = { id: "GGEN-partial", status: "needs_regeneration", profile: { expected_count: 20 }, question_ids: rows.map(row => row.id), operation_progress: { phase_label: "待补齐失败题", phase_processed: 20, phase_total: 20, phase_percent: 100, processed_slots: 20, expected_slots: 20, hard_valid_completed: count, hard_valid_total: 20, failed_count: 20 - count, probe_processed: 0, qc_processed: 0 }, artifacts: { question_plan: rows.slice(1).map((row, index) => ({ question_id: row.id, coverage_slot: `Q${String(index + 2).padStart(2, "0")}` })), coverage_plan: Array.from({ length: 20 }, (_, index) => ({ slot: `Q${String(index + 1).padStart(2, "0")}` })), hard_validation: { slot_persistence_v1: true } } };
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/questions") ? { questions: rows } : []), { status: 200 })));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/questions") || url.includes("/candidates?")) ? goldenFixture(url, rows) : []), { status: 200 })));
     const root = createRoot(document.body.appendChild(document.createElement("div")));
     await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: rows, snapshots: [] }} />));
     expect(document.querySelector(".review-table")?.textContent).toContain(`题目 ${count}`);
