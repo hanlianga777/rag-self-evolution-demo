@@ -1,12 +1,14 @@
 # RAG Evolution 平台架构说明
 
-> **V1.4 目标架构 · 2026-09-30**。唯一目标规则见 [SPEC](../docs/RAG_SELF_EVOLUTION_SPEC.md)。本轮按用户批准的完整计划实施业务代码；分阶段证据见 [实施验收](../docs/V1_4_IMPLEMENTATION_VERIFICATION.md)，真实 Provider 未重跑。代码、active 产物与真实数据验收分开；既有数据来源见 [Current Demo Truth](../docs/CURRENT_DEMO_TRUTH.md)。
+> 当前正式架构同源于概览页面，2026-10-08同步；唯一规则见[SPEC当前合同](../docs/RAG_SELF_EVOLUTION_SPEC.md)。图表达流程设计，不表达当前阶段已执行；实际Golden仍待Human Gate，Legacy Production独立。
 
-![V1.4 业务架构图](业务流程图.png)
+![当前业务架构](业务流程图.svg)
 
-![V1.4 技术架构图](技术架构图.png)
+![当前技术架构](技术架构图.svg)
 
-图源：[业务架构 HTML](业务流程图.html) · [技术架构 HTML](技术架构图.html)。两者均为内嵌 SVG 的自包含 HTML；PNG 为 2560×1440。文件名保留用于兼容 README，图的内容、结构、布局和连线依据最新需求重新生成。
+唯一源：`frontend/src/components/KnowledgeDiagrams.tsx` + Shared CSS；运行 `python3 scripts/export_architecture.py` 从实际页面SVG/Computed Style导出16:9 SVG和2560×1440 PNG，源与产物摘要记录在architecture-manifest.json。旧业务/技术HTML是Historical，不能作为当前正式引用。
+
+处理链为MinerU VLM→Table KV→Parent/Child 1400/400/80→text-embedding-v4 1024d→FAISS；检索链为Query Processing→Vector/BM25→CandidateK→qwen3-rerank→Parent Expand→TopK→DeepSeek。覆盖与Evidence支路保留。只有Optimization Agent是Main Agent。
 
 ## 业务架构：可信测量 → 可解释优化 → 人工发布与反馈
 

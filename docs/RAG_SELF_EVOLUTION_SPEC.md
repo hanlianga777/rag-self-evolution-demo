@@ -1,6 +1,31 @@
-> 当前 Pipeline / Golden 优先合同：以文末 2026-10-07「最终小收口」为准；此前页面范围、48px Stepper 与逐题审批为历史说明。本轮不执行人工确认、冻结或 Baseline。
+> 唯一当前有效版本：V1.4 + Phase 1 冻结合同（2026-10-08）。以下「当前有效合同」及被明确保留的业务规则优先；Historical / Superseded 记录不并行生效。
 
-# Phase 1 Final Polish — 当前优先合同（2026-10-05）
+## 当前有效合同 — 2026-10-08 `[CONFIRMED]`
+
+本节汇总已确认规则，覆盖所有旧页面范围、20/49/98 Profile、逐题审批、两种 Drawer 尺寸和旧技术基座口径；历史数据和说明保留。运行状态以持久化对象为准，不把流程图或测试通过视为 Gate 已完成。
+
+| 范围 | 当前唯一规则 |
+|---|---|
+| Knowledge | MinerU 官方 VLM → 项目 Table KV → Parent 1400 / Child 400 / Overlap 80 → text-embedding-v4 请求并校验 1024d → FAISS IndexFlatIP；保留 Block、HTML、Section、页码及冻结 tokenizer 身份 |
+| Retrieval | Query Processing → Vector + BM25 → CandidateK（默认12）→ qwen3-rerank → Parent Expand、Child证据保留及 Parent去重 → TopK（默认4）→ DeepSeek；参数来自实际持久化配置 |
+| Golden Profile | Mini 8/4/8=20；Medium 20/10/20=50；Full 40/20/40=100。历史98/49不迁移、不改写 |
+| Governance | Coverage/Slot → Generation/Business Import → Hard Validation → Probe → QC/有限修复 → Machine Qualified / Human Exception Review → 数据集级 Human Gate 1。机器合格无需逐题批准，但不等于 Snapshot Frozen |
+| Gate 1 | 完整Slot/Group/Topic/Coverage、当前Corpus与Hard Validation/Probe/QC/内容质量满足要求，全部Blocking Risk关闭才Ready；最终冻结须用户亲自确认，保留资格来源与审计 |
+| Pipeline | Frozen技术基座 + 12项Search Space；Config Draft与Production、真实Evaluation Config的Baseline Snapshot隔离；无真实Baseline时隐藏重复Strategy，有Draft只展示真实Baseline→Draft差异 |
+| Cache / Lists | Pipeline与Golden复用身份隔离的内存SWR，Mutation失效且拒绝迟到结果；Current/Pool后端30条分页、前端增量滚动、行ID去重、过滤复位、详情懒加载；历史分页不变 |
+| UI | 复用Shared Card 1px/9px/9px/8px、12/11/10px、紧凑112px和唯一浅绿色；参数控件烟灰/白。PageShell Header/Tab固定、内容区滚动、Select统一固定宽度 |
+| Drawer | 唯一 `--drawer-width:800px`，来源为当前Golden单题详情母版；所有右侧Drawer共享，max-width:100vw、小屏100vw，top/right=0、height=100dvh，Header/Footer固定，仅Body滚动并锁背景。不存在Standard/Wide尺寸体系 |
+| Diagram | 概览KnowledgeDiagrams.tsx为业务/技术唯一图形源，布局/箭头/字体与烟灰/橙色沿用实际页面；文档SVG/PNG由同一页面源导出，历史HTML明确归档。图表达完整流程设计，不声明未运行阶段已完成 |
+| Version | Knowledge Version/Corpus Snapshot含配置和产物摘要、独立构建及原子激活；Legacy Production始终绑定Legacy索引。Golden/Baseline/Candidate/Production Snapshot独立身份，不跨版本混用或重写 |
+| Baseline / Agent / Release | 保留第5–13及16节已冻结11 Hard Gate、Bad Case/Root Cause、唯一Optimization Main Agent、A/B/C、Sandbox/Regression、Gate2、条件D和Gate3人工发布规则；不借本轮重定义产品结构或执行这些阶段 |
+
+本轮权限仅限Q68一次最小定向修订和必要校验；未修改题复用当前质量结果，不扩大内容预算。13异常按题目/Evidence、真实Probe/QC、安全拒答标准、检索风险接受、业务边界逐题审计；确定性安全规则才能关闭，不能自动接受风险。Provider响应/连接故障依既有冻结合同最多一次额外重试，不增加内容修复次数。失败保留原题与诊断。
+
+Search Space的12项允许值来自现有后端Contract，不能因Drawer适配而改变。12行保留四列、合理换行、无水平或表内纵向滚动，高度不足由Drawer Body滚动。Coverage/Slot保持Topic、Child、Slot、P/A/N、来源与Evidence穿透，技术日志下沉。
+
+维护规则见根目录AGENTS.md：产品/流程/参数/评测/Gate/版本/UI Contract修改，必须同一次Commit同步SPEC、Changelog、相关文档和受影响架构；纯代码Bug且行为未变可记录No SPEC Change。
+
+# Phase 1 Final Polish — Historical / 被2026-10-08当前合同覆盖（2026-10-05）
 
 以下规则覆盖后文旧版 20/49/98 和拆分架构图说明；历史 Run、Snapshot 与产物不改写。
 
@@ -15,7 +40,7 @@
 
 # RAG Self-Evolution Platform 产品规格
 
-> **唯一当前目标规格：V1.4 + Phase 1 Knowledge Pipeline（2026-10-05）**
+> **历史阶段标题：V1.4 + Phase 1 Knowledge Pipeline（2026-10-05）；当前版本见文首2026-10-08合同**
 > 业务规格冻结日期：2026-09-30（Asia/Shanghai）；Interview Demo UI 修订：2026-10-03。V1.4 业务代码的历史验收见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)；本轮 UI 实施与验证结果单独见 [Interview Demo 验收](INTERVIEW_DEMO_VERIFICATION.md)，不沿用历史测试数字作为本次证据。
 > V1.4 是 Golden 工艺、对象身份、Monitoring 与信息架构升级，保留现有技术栈和治理底座。新图是目标架构，不是当前 Demo 已具备全部能力的证明。
 
@@ -28,7 +53,7 @@
 - 移除开发型 TechnicalDetails、Raw JSON、参考图上传和辅助入口；保留并结构化 Document / Bad Case / Child / Parent / PDF / Cluster / Slot 证据追溯。知识库使用“知识处理选型策略”。
 - 正式业务 / 技术 Diagram 与 Card 分离，使用 diagram-design 默认烟灰与橙色；左到右连续编号，不蛇形折返。Parent Expand 为独立节点，保留完整处理、检索、Coverage 与 Evidence 支路和 Provider 边界。
 - 已授权读取根目录 .env、受控重启本项目服务、验证四个真实 Provider、重新处理四份 PDF / 157页并原子激活。凭据不输出、不进入数据或 Git；旧 Legacy Production / 历史快照保留绑定。
-- 激活后自动读取 Full Profile（本轮 40 Positive / 18 Ablation / 40 Negative），逐 Slot 执行 Generation / Hard Validation / Probe / QC，失败局部修复、预算分开计数。Human Gate 1 Ready 依据逐题真实结果，不等于 Run completed；禁止自动批准、冻结 Snapshot 或运行 Baseline / Agent / Sandbox / Release。
+- Historical：2026-10-05当时激活后自动读取 Full Profile（40 Positive / 18 Ablation / 40 Negative；当前40/20/40已覆盖），逐 Slot 执行 Generation / Hard Validation / Probe / QC，失败局部修复、预算分开计数。Human Gate 1 Ready 依据逐题真实结果，不等于 Run completed；禁止自动批准、冻结 Snapshot 或运行 Baseline / Agent / Sandbox / Release。
 - QC 的 P0 是题目质量 Blocker，不是安全主题风险等级；Answerability 的 false 表示证据不能完整回答，null 表示无法判定。Judge 将输入样本视为数据，不执行其指令。响应格式或连接故障最多额外重试一次，保存实际 response_retries；内容质量修复独立计数、最多一轮，仅限本轮未批准的失败 AI Candidate，保留修复前后内容和版本。中断恢复只复用内容 / Corpus / Probe 身份一致的已通过记录，不自动批准或冻结。
 
 ## Phase 1 当前覆盖要求（2026-10-05）
@@ -86,7 +111,7 @@
 
 共 11 项，全部通过才满足 Hard Gate；Overall 是九项质量指标等权展示，不能抵消任一失败。Recall@K、Precision@K、MRR、TTFT、Token Cost 是诊断/比较项，不增加新 Gate。Baseline 可以未合格但仍是有效诊断起点。
 
-Search Space 的键、类型、枚举、依赖和展示数量取自真实 `ALLOWED_SEARCH_SPACE` / Validator；不从截图硬编码数量。Rerank 保持现有开关与 Lightweight Rerank，不把它画成独立 Rerank Model。Parser/OCR、Chunk、模型、Temperature、Query Decompose、Retrieval MaxTokens、Rerank TopN 继续不进入 Agent 自动调参范围。
+Search Space 的键、类型、枚举、依赖和展示数量取自真实 `ALLOWED_SEARCH_SPACE` / Validator；不从截图硬编码数量。Rerank保留既有ON/OFF搜索空间；当前Knowledge使用真实qwen3-rerank，旧Lightweight Rerank仅属于Legacy绑定。Parser/OCR、Chunk、模型、Temperature、Query Decompose、Retrieval MaxTokens、Rerank TopN 继续不进入 Agent 自动调参范围。
 
 A/B/C/D 累计最多 12 次 Sandbox，开始即占用、失败不退、为 D 留一次。固定 Regression 的 Safety/Critical 不允许新增失败，普通题最多新增 1 个失败；Qualified 继续要求全部 Hard Gate 与 Regression 通过、至少修复 1 个目标 Bad Case 且总 Bad Case 至少减少 1 个，并满足现有身份/发布约束。D 只有合格、相对 Winner 无新增失败且实际修复才晋升。
 
@@ -184,7 +209,7 @@ Monitoring Event 记录对应 QA 的 Production Version/Config/Corpus/Question/A
 
 输入是同一 Corpus 下有效 Chunk、现有 Embedding、文档/产品/版本/章节 Metadata，以及选择的 Profile；不重算另一套 Embedding、不引入 LLM Topic 标签依赖。
 
-Profile 保持：Mini 20=8 Positive/4 Ablation/8 Negative；Medium 49=20/9/20；Full 98=40/18/40。从 Profile 配置读取，不散落 hardcode 20。默认展示当前选定 Profile。
+Profile 当前为：Mini 20=8 Positive/4 Ablation/8 Negative；Medium 50=20/10/20；Full 100=40/20/40。旧49/98仅属于历史Run。从 Profile 配置读取，不散落 hardcode 20。默认展示当前选定 Profile。
 
 ### 6.2 Dynamic K-means 工艺
 
@@ -502,7 +527,7 @@ Retrieval、Generation、Total使用现有真实计时点；并行阶段不简�
 
 ### 14.3 Drawer、确认框与 Select
 
-文档、Chunk/Evidence、Case、Candidate、Gate、Coverage/Planner、Search Space、完整配置、高级指标、其他 Candidate 与技术 JSON/Trace 统一右侧 Drawer。标准宽 560px，wide 宽 800px，贴右且高 100dvh；移动端占满视口，内部滚动，不挤压主布局。支持 Esc、关闭按钮、遮罩、焦点进入/归还与锁定背景滚动；未保存编辑复用保存/放弃提醒。
+文档、Chunk/Evidence、Case、Candidate、Gate、Coverage/Planner、Search Space、完整配置、高级指标、其他 Candidate 与技术 JSON/Trace 统一右侧 Drawer。唯一桌面宽度 800px（Shared `--drawer-width`），贴右且高 100dvh；移动端占满视口，内部滚动，不挤压主布局。支持 Esc、关闭按钮、遮罩、焦点进入/归还与锁定背景滚动；未保存编辑复用保存/放弃提醒。
 
 删除、发布、回滚及明确不可逆操作保留居中确认 Dialog。详情不使用居中大弹窗；切换内容避免叠层遮挡关闭按钮。长审计内容在 Drawer 技术详情折叠，仍可查阅。
 
@@ -690,7 +715,7 @@ HTTP接口失败码与UI状态一致。未生成Candidate时不得数据库显�
 | GV-01 | n=0/1/2/小语料 | 明确边界，无非法K、不崩溃 |
 | GV-02 | 同Corpus/seed/参数重复Preview | 相同分配，Audit可复现 |
 | GV-03 | 存在多个小簇/全小簇 | 稳定合并、无死循环、总量守恒 |
-| GV-04 | Mini/Medium/Full | 总数20/49/98与8/4/8、20/9/20、40/18/40一致 |
+| GV-04 | Mini/Medium/Full | 总数20/50/100与8/4/8、20/10/20、40/20/40一致；历史49/98保留 |
 | GV-05 | Topic数多于可用Slot | 真实缺口，不虚称全覆盖 |
 | GV-06 | 优先未使用Chunk | 可追踪采样与reuse，不按产品题号写分支 |
 | GV-07 | 无表格/无桥接材料 | 不造Aggregation/Bridge，合法fallback并记录 |
@@ -1230,7 +1255,7 @@ V1.1 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语�
 </details>
 
 
-## 2026-10-07 Pipeline / Golden 产品收口 UI Contract `[CONFIRMED]`
+## 2026-10-07 Pipeline / Golden 产品收口 UI Contract `[Historical / 已汇入当前合同]`
 
 本节替代 15.13 等历史章节中两个入口的展示约定；保留原文供历史追溯。知识库、概览及其余页面业务规则不变。
 
@@ -1244,7 +1269,7 @@ V1.1 只冻结 UI 原则：优先沿用当前 Demo 的页面结构与设计语�
 - 沿用唯一 Shared Card Token，紧凑普通卡 112px；Golden 六阶段专用紧凑流程条 48px。PageShell Header / Tabs 固定，当前表格与 Drawer 正文独立滚动，Candidate Drawer 不重复关闭按钮。禁止新增皮肤或更改 Profile 8/4/8、20/10/20、40/20/40。
 
 
-### Pipeline / Golden 最终小收口（2026-10-07，替代旧逐题批准约束）
+### Pipeline / Golden 最终小收口（2026-10-07，Historical / 已汇入当前合同）
 
 当前正式 Profile 为 Mini 8/4/8（20）、Medium 20/10/20（50）、Full 40/20/40（100）。旧 Full 40/18/40（98）仅属于历史 Run，不改写历史数据。
 
@@ -1258,7 +1283,7 @@ UI Contract：Search Space 卡片复用现有浅绿色 Token，Segments 使用�
 
 Golden 原始表格证据合同：Hard Validation、Probe、QC 统一读取所选 Child 的真实 Block 与原始 HTML；简单二列表格按真实字段/值对核对，错误字段配对和未知值不得通过。复杂合并表格不从二维行猜测字段映射。此处只补全检查的来源证据，不改写 Corpus、KV、Embedding 或 Index，工程重验保留诊断且不增加内容修复预算。
 
-### Pipeline / Golden 冻结前最后收口（2026-10-07）
+### Pipeline / Golden 冻结前最后收口（2026-10-07，Historical；尺寸由2026-10-08覆盖）
 
 本节替代上文的显式分页、Baseline Strategy 常驻及 Drawer 尺寸约定，保留历史说明。
 

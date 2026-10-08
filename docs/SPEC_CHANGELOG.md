@@ -2,6 +2,14 @@
 
 本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.4 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
 
+## Phase 1 最终冻结合同同步（2026-10-08）
+
+- 唯一Drawer宽度来自当前Golden单题详情800px，删除Standard/Wide尺寸体系；Search Space/Coverage适配共享宽度，保持全高及正文滚动。
+- SPEC文首明确当前有效合同，纠正当前正文20/49/98和旧Drawer冲突；历史Run、Snapshot和旧说明保留Historical身份。
+- README/Current Demo Truth/平台架构说明同步真实Current与Legacy边界；业务/技术图从概览同一SVG及Computed Style导出，旧HTML标记Historical。
+- 新增AGENTS.md，要求涉及产品合同的代码、SPEC、Changelog、相关文档及架构同Commit同步；纯Bug允许No SPEC Change。
+- Q68仅一次自然改写及冻结预算内校验，失败不应用；实际运行结果见本轮验收。其他题不改写，未执行人工Gate、冻结、Baseline、Agent或发布。
+
 ## Phase 1 Knowledge Pipeline（2026-10-05）
 
 - 用户批准真实 MinerU VLM / Parent-Child / text-embedding-v4 / qwen3-rerank 升级，以及项目概览、知识库两个入口重构；旧技术限制由唯一 SPEC 新 Phase 1 节覆盖，保留原历史正文。

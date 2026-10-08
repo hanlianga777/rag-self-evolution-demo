@@ -1,6 +1,6 @@
 # Demo Readiness
 
-当前真实保存结果见 [Current Demo Truth](CURRENT_DEMO_TRUTH.md)，V1.4 代码与离线验收见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)。真实 V2 Golden / Provider 生命周期本轮未重跑，全文 active 未升级；不能以离线通过宣称真实 V1.4 生命周期就绪。
+当前真实保存结果见 [Current Demo Truth](CURRENT_DEMO_TRUTH.md)，V1.4 代码与离线验收见 [实施验收](V1_4_IMPLEMENTATION_VERIFICATION.md)。旧“全文active未升级/Provider未运行”属于Historical。当前新Knowledge已真实激活，Full100 Slot完整，但质量99/100、机器合格87/人工13，Gate1 Pending；未冻结新Snapshot或运行新Baseline/Agent。最新结果见[最终收口验收](FINAL_CLOSURE_VERIFICATION.md)，离线通过不代表Gate就绪。
 
 以下 V1.1 记录为历史，保留原始日期阶段语义，不再描述当前库。
 

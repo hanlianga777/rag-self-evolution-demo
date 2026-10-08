@@ -2,7 +2,11 @@
 
 面向企业知识问答的评测驱动 RAG 质量运营与版本决策 Demo。
 
-**唯一当前目标规格：[SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md)**（业务规则冻结 2026-09-30；Interview Demo UI 修订 2026-10-03）。本轮按 20–30 分钟 AI 解决方案 / AI 产品经理面试重排八个页面，验证与剩余问题见 [Interview Demo 验收](docs/INTERVIEW_DEMO_VERIFICATION.md)，演示路径见 [面试 Runbook](docs/INTERVIEW_DEMO_RUNBOOK.md)。[SPEC ChangeLog](docs/SPEC_CHANGELOG.md) 记录历史；真实已保存来源见 [Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md)。前轮 [V1.4 业务实施验收](docs/V1_4_IMPLEMENTATION_VERIFICATION.md) 和 [Phase 1 报告](docs/PHASE1_VERIFICATION.md) 保留其日期与运行边界，不能替代本轮 UI 验收。
+**唯一当前有效规格：[V1.4 + Phase 1 冻结合同（2026-10-08）](docs/RAG_SELF_EVOLUTION_SPEC.md)**。当前合同以SPEC文首为准；[ChangeLog](docs/SPEC_CHANGELOG.md)追加历史，[Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md)区分真实Current与Legacy。历史验收只代表其日期的运行状态。
+
+当前真实Knowledge已激活：4 PDF / 157页、349 Parent / 368 Child、text-embedding-v4 1024d、368 Indexed、9 Topics；Full为40/20/40=100。Golden尚处Human Gate 1 Pending，不能把完整100 Slot称为已冻结或已完成Baseline。真实逐题状态见[本轮验收](docs/FINAL_CLOSURE_VERIFICATION.md)。
+
+Pipeline与Golden采用身份隔离的内存Cache/SWR；Current/Pool保留后端30条分页、前端滚动增量加载及详情懒加载。所有右侧Drawer共享单题详情母版 `--drawer-width:800px`，全高100dvh，小屏100vw。长期SPEC/图源同步规则见[AGENTS.md](AGENTS.md)。
 
 ## 产品闭环
 
@@ -24,25 +28,25 @@
 
 源码证据和需求 ID 对照见 [SPEC 第 3 节](docs/RAG_SELF_EVOLUTION_SPEC.md#3-需求追踪与当前实现证据)。当前冻结 Golden 不能因为文档更新而称为 V2 生成；历史未采集字段不回填。Snapshot、Baseline、Candidate 与 Production 分别保留自己的来源。
 
-## Interview Demo 产品叙事（2026-10-03）
+## Interview Demo 产品叙事（2026-10-03，Historical）
 
 每个页面只回答当前阶段的问题：知识库技术选型 → Pipeline 的 Frozen / Agent Search Space → Golden 稳定评测基准 → Baseline 的 Hard Gate / Bad Case → 根因与受控 A/B/C 实验 → Sandbox / Regression 与条件 D → 人工发布 → 同题真实问答差异 → Monitoring 下一轮。只有概览保留全局闭环；其他页面删除重复 Stepper、流程图、大 KPI 与发布流水线。
 
-主结论优先，文档/Evidence/Case/Search Space/完整配置/高级指标进入统一右侧 Drawer（标准 560px、wide 800px，移动端全宽）。Sandbox 主表聚焦 Hard Gate、Bad Case、Regression、Qualification；A/B/C 统一 WHY / CHANGE / RESULT，D 独立说明组合失败为何保留 Winner。当前真实根因为 Generation 6 / Safety 1，不借示例虚构 Retrieval 失败。
+主结论优先，文档/Evidence/Case/Search Space/完整配置/高级指标进入统一右侧 Drawer（当时标准560px/wide800px；已被当前唯一800px合同覆盖）。Sandbox 主表聚焦 Hard Gate、Bad Case、Regression、Qualification；A/B/C 统一 WHY / CHANGE / RESULT，D 独立说明组合失败为何保留 Winner。当前真实根因为 Generation 6 / Safety 1，不借示例虚构 Retrieval 失败。
 
 方案对比固定正式 Baseline 对实际 active、人工已发布 Production，不提供任意方案选择器或 Qualified Candidate fallback，删除历史评测 UI/GET/缓存。Bad Case 选择后填入可编辑问题，只有主动点击才运行实时对比；答案双栏为重点。问答验证 Tab 顺序为问答验证 → 方案对比 → Monitoring。Input/Output Tokens 与费用分开；真实 0/false 保留，估算只使用完整 Usage 与冻结价格币种（当前 USD），缺历史计费依据不回算。
 
 本轮业务与真实数据保护边界不变；唯一后端补充为现有 `GET /api/pipeline` 的实际索引 `dimension/indexed_count` 可空只读字段，不重建 FAISS、不调用真实 Provider。20–30 分钟完整讲解及现场手动调用边界见 [Runbook](docs/INTERVIEW_DEMO_RUNBOOK.md)。
 
-## 目标架构（V1.4）
+## 当前正式架构（同源于项目概览）
 
-两张图依据最新设计从头生成，表达目标职责与数据流，不证明当前 Demo 已具备全部新能力。
+以下图表达完整流程设计，当前运行结果仍由应用持久化对象决定；不代表Gate已批准或Baseline/Agent已运行。
 
-![V1.4 RAG Evolution 业务架构图](架构/业务流程图.png)
+![当前业务架构](架构/业务流程图.svg)
 
-![V1.4 RAG Evolution 技术架构图](架构/技术架构图.png)
+![当前技术架构](架构/技术架构图.svg)
 
-可编辑图源：[业务架构 HTML](架构/业务流程图.html) · [技术架构 HTML](架构/技术架构图.html)。模块边界及现有/目标差异见 [平台架构说明](架构/RAG自进化平台架构说明.md)。PNG 为 2560×1440；HTML 内嵌 SVG，可独立浏览。
+唯一图源：[KnowledgeDiagrams.tsx](frontend/src/components/KnowledgeDiagrams.tsx) + [Shared CSS](frontend/src/styles.css)；[导出脚本](scripts/export_architecture.py)读取实际页面SVG和Computed Style，生成16:9 SVG/2560×1440 PNG与[校验Manifest](架构/architecture-manifest.json)。[平台说明](架构/RAG自进化平台架构说明.md)。旧HTML为Historical归档，不作为当前正式图。
 
 ## 本地启动与恢复
 
@@ -52,7 +56,7 @@
 ./start.sh
 ```
 
-前端：[http://127.0.0.1:5174](http://127.0.0.1:5174)；API 文档：[http://127.0.0.1:8010/docs](http://127.0.0.1:8010/docs)。已有后台服务重启后先检查端口/PID/目录，避免另开重复进程；本次不启动或重启服务。
+前端：[http://127.0.0.1:5174](http://127.0.0.1:5174)；API 文档：[http://127.0.0.1:8010/docs](http://127.0.0.1:8010/docs)。已有后台服务重启后先检查端口/PID/目录，避免另开重复进程。
 
 手动启动方式仍为：
 
@@ -70,7 +74,7 @@ Golden 失败时保留已合格 Slot，使用现有补失败题入口；Probe/QC
 
 **V1.4 Planner Preview 已实施**：Golden 当前测试集紧凑 Coverage 入口选择 Profile 后点击「预览当前 Corpus Coverage」，Legacy / 无 Run 页面也可使用；保存 Run 的冻结规划单独查看。`POST /api/governance/coverage-preview` 使用当前已存向量，返回动态 K、merge、Slot、材料与缺口；不调用生成/Judge/QC，不改变当前 Golden/Baseline/Production。Pool Preview 为 `POST /api/governance/generation-runs/from-pool/preview`。旧后台服务没有自动重启，使用新代码前须手动受控重启。
 
-以下三项是 V1.4 实施及离线验收后的手动验证清单，本次未执行：
+以下为Historical V1.4阶段手动验证清单，不能视为当前阶段授权；Baseline/Agent须后续单独授权：
 
 1. 手动运行一次 Baseline vs Production 实时问答对比，查看真实回答、证据、Usage、Latency 与成本缺失原因。
 2. Production QA → 人工判 Bad Case → Confirm Trigger → 手动启动首轮 Agent；可能创建实验并耗用 Provider/预算，不自动 Sandbox 或发布。

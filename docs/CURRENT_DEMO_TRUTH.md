@@ -1,5 +1,11 @@
 # Current Demo Truth
 
+## 当前真实状态（2026-10-08）
+
+Knowledge已激活4份PDF/157页，349 Parent/368 Child、text-embedding-v4 1024d/368 Indexed、9 Topics。当前Full 100/100、40/20/40、Gap0；质量99/100、机器合格87、人工复核13、Human Gate1 Pending（本轮最终数据核验见[验收](FINAL_CLOSURE_VERIFICATION.md)）。当前未冻结新Golden或运行新Baseline/Agent；Production仍绑定Legacy。
+
+下面2026-09-30/10-03表格均为Historical / Legacy实测，不代表新Knowledge当前结果。
+
 历史真实结果审计日期：2026-09-30（Asia/Shanghai）；2026-10-02 保护检查仍保留原日期。本轮 Interview Demo 的最新只读复核见文末 2026-10-03 小节。下列结果来自真实已保存 SQLite 与界面/API，不是 Fixture，也不是 UI 重构期间重新执行的 Provider 验收。
 
 | 对象 | 当前已保存事实 |

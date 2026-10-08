@@ -1,0 +1,15 @@
+{
+  "source": [
+    "frontend/src/components/KnowledgeDiagrams.tsx",
+    "frontend/src/styles.css"
+  ],
+  "source_hashes": {
+    "frontend/src/components/KnowledgeDiagrams.tsx": "d392aeaf484ec7265ed70d8f2df02017d84059b8c8573d5ec08be45f35a2a95c",
+    "frontend/src/styles.css": "71ec3adc710747415fe44bcd725e4688ee7111a1745bbb583d9f76344130c736"
+  },
+  "kind": "流程设计，不代表当前 Gate 或运行结果",
+  "exports": {
+    "业务流程图.svg": "8241b603706af0c7077f01a3aeec3966e96f4f47359af7d0b1a875d38800557f",
+    "技术架构图.svg": "891cdee9d826d323e7057a58f32fac8a680bb0ccd8f8a96e26bfb7a98dabe24e"
+  }
+}

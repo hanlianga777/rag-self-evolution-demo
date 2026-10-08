@@ -52,6 +52,6 @@ export function SettingsPage({ data }: { data: any }) {
       {(changed.length > 0 || pipeline?.config_draft) && <p className="muted">Pipeline 配置已变化，需要重新运行 Baseline 后才能成为新的评测基线。</p>}
     </Section>
     {pipeline?.baseline_config && <Section title={pipeline.config_draft ? "Baseline → Draft Diff" : "Frozen Baseline Snapshot"}><dl className="baseline-strategy">{["query_rewrite", "multi_query", "candidate_k", "top_k", "hybrid_search", "rerank", "prompt_strategy"].filter(key => !pipeline.config_draft || pipeline.config_draft.config[key] !== baseline[key]).map(key => <div key={key}><dt>{parameterNames[key]}</dt><dd>{formatValue(baseline[key])}{pipeline.config_draft && ` → ${formatValue(pipeline.config_draft.config[key])}`}</dd></div>)}</dl>{pipeline.config_draft && !changed.length && <p className="muted">草稿与 Frozen Baseline 参数一致。</p>}</Section>}
-    <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="Search Space" variant="wide" className="parameter-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={contract} baseline={baseline} /></div></Drawer>
+    <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="Search Space" className="parameter-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={contract} baseline={baseline} /></div></Drawer>
   </PageShell>;
 }

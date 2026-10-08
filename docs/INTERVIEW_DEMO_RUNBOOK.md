@@ -1,3 +1,5 @@
+> 当前合同见SPEC文首2026-10-08版本；下文Legacy演示成绩不是新Knowledge结果。新Golden仍待Human Gate 1。
+
 # 20–30 分钟 Interview Demo 演示路径
 
 截至 2026-10-03，演示使用真实已保存的正式 Legacy Golden：20 题、8 Positive / 4 Ablation / 8 Negative，已批准并冻结，匹配当前 Corpus；Baseline 9/11、7 Bad Case，C 11/11 已人工发布，D 10/11 不合格并保留 C。Legacy 是生成工艺来源，不代表题目未经批准。详细身份见 [Current Demo Truth](CURRENT_DEMO_TRUTH.md)，产品规则只见 [V1.4 SPEC](RAG_SELF_EVOLUTION_SPEC.md)。
@@ -15,7 +17,7 @@
 | 7. 发布 | 2 分钟 | 为什么发布当前 C？看 Hard Gate、Regression、Gate 2 与 Gate 3 人工决策、真实参数变化 `Grounded → Abstention` 和当前 Production 来源；完整配置、其他 Candidate 与版本/Rollback 降为详情。只浏览，不重复发布或回滚。 |
 | 8. 问答验证 | 4 分钟 | Tab 顺序：问答验证 → 方案对比 → Monitoring。对比为高潮：选真实 Baseline Bad Case，问题自动填入且可编辑；左正式 Baseline、右实际已发布 Production，说明答案/Evidence/Latency/Input/Output Tokens。最后用 30–60 秒说明新 Production QA → 人工 Bad Case → Confirm Trigger → 下一轮 Agent。 |
 
-所有页面的普通详情从右侧 Drawer 打开：标准 560px、wide 800px，移动端全宽；Select 选中即收起。同组 A/B/C、双答案卡等高，长内容内部滚动。主页面先讲结论，审计 ID/Trace/完整配置在详情穿透。
+所有页面的普通详情从右侧 Drawer 打开：唯一桌面宽800px（Shared --drawer-width）、全高100dvh，移动端全宽；Select 选中即收起。同组 A/B/C、双答案卡等高，长内容内部滚动。主页面先讲结论，审计 ID/Trace/完整配置在详情穿透。
 
 ## 历史结果与现场实时操作
 
