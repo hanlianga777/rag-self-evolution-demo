@@ -1716,8 +1716,10 @@ class GovernanceStore:
             if any(sum(item['test_category'] == category for item in candidates) != profile_count(run['profile'], category) for category in ('positive', 'ablation', 'negative')):
                 raise ValueError('Profile 类别数量不符')
             qualified = self.candidate_rows(question_ids)
-            if self.gate_summary(run, qualified)['status'] != 'ready':
-                raise ValueError('人工异常、Probe / QC、Profile 或 Coverage 尚未完成，Gate 1 Pending')
+            gate = self.gate_summary(run, qualified)
+            if gate['status'] != 'ready':
+                blockers = [f"{row['id']}: {'、'.join(row['attention_reasons'])}" for row in qualified if row['qualification_status'] not in {'machine_qualified', 'human_approved'}]
+                raise ValueError(f"人工异常、Probe / QC、Profile 或 Coverage 尚未完成，Gate 1 Pending：{gate['generated']}/{gate['expected']}题，Profile {'完整' if gate['profile_complete'] else '不完整'}，Coverage {'完整' if gate['coverage_complete'] else '不完整'}；" + '；'.join(blockers or ['Generation Run 尚未完成']))
             sources = {row['id']:row['qualification_source'] for row in qualified}
             for question_id in question_ids:
                 if next(item for item in candidates if item["id"] == question_id)["stage"] == "golden":
@@ -1725,8 +1727,11 @@ class GovernanceStore:
                 connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", ("golden", "approved", now, question_id))
                 connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at,metadata_json) VALUES (?, ?, ?, ?, ?, ?)", (question_id, "dataset", "dataset_confirmed", actor, now, _json({"qualification_source":sources[question_id]})))
                 connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "confirmed", actor, now))
-            prior = next((item['snapshot'] for item in self.dataset_snapshots() if item['snapshot'].get('generation_run_id') == run['id'] and item['snapshot'].get('question_ids') == run['question_ids']), None)
-            snapshot = prior or {'id': f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", 'generation_run_id': run['id'], 'profile': run['profile'], 'question_ids': run['question_ids'], 'questions': [self.question(key)['raw'] for key in run['question_ids']], 'qualification_sources': sources, 'policy_version': 'v1.4' if run['artifacts']['hard_validation'].get('frozen_plan') else 'v1.3', 'coverage_plan': run['artifacts']['hard_validation'].get('frozen_plan'), 'corpus_fingerprint': run_fingerprint or manifest_identity(current_manifest())}
+            # Keep reads on the writer connection: SQLite cache spill can lock out other connections.
+            snapshots = [_load(row['snapshot_json'], {}) | {'id': row['id']} for row in connection.execute("SELECT id, snapshot_json FROM dataset_versions WHERE status='approved' ORDER BY created_at DESC")]
+            prior = next((item for item in snapshots if item.get('generation_run_id') == run['id'] and item.get('question_ids') == run['question_ids']), None)
+            raw_questions = {item['id']: item['raw'] for item in candidates}
+            snapshot = prior or {'id': f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", 'generation_run_id': run['id'], 'profile': run['profile'], 'question_ids': run['question_ids'], 'questions': [raw_questions[key] for key in run['question_ids']], 'qualification_sources': sources, 'policy_version': 'v1.4' if run['artifacts']['hard_validation'].get('frozen_plan') else 'v1.3', 'coverage_plan': run['artifacts']['hard_validation'].get('frozen_plan'), 'corpus_fingerprint': run_fingerprint or manifest_identity(current_manifest())}
             if not prior:
                 connection.execute('INSERT INTO dataset_versions (id, status, source, snapshot_json, created_at) VALUES (?, ?, ?, ?, ?)', (snapshot['id'], 'approved', 'human_review', _json(snapshot), now))
         return {"reviewed": [self.question(question_id) for question_id in question_ids], "generation_run_id": run['id'], 'snapshot': snapshot}

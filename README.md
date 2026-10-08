@@ -4,7 +4,7 @@
 
 **唯一当前有效规格：[V1.4 + Phase 1 冻结合同（2026-10-08）](docs/RAG_SELF_EVOLUTION_SPEC.md)**。当前合同以SPEC文首为准；[ChangeLog](docs/SPEC_CHANGELOG.md)追加历史，[Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md)区分真实Current与Legacy。历史验收只代表其日期的运行状态。
 
-当前真实Knowledge已激活：4 PDF / 157页、349 Parent / 368 Child、text-embedding-v4 1024d、368 Indexed、9 Topics；Full为40/20/40=100。Golden尚处Human Gate 1 Pending，不能把完整100 Slot称为已冻结或已完成Baseline。真实逐题状态见[本轮验收](docs/FINAL_CLOSURE_VERIFICATION.md)。
+当前真实Knowledge已激活：4 PDF / 157页、349 Parent / 368 Child、text-embedding-v4 1024d、368 Indexed、9 Topics；Full为40/20/40=100。当前后端Human Gate 1 Ready：机器合格87、用户人工批准13、待关注0；当前Run尚无Golden Snapshot，Baseline前置条件仍缺用户最终冻结。冻结接口锁故障已修复，复核与操作边界见[冻结修复验收](docs/GOLDEN_FREEZE_FIX_VERIFICATION.md)。前轮逐题状态作为历史保留于[前轮验收](docs/FINAL_CLOSURE_VERIFICATION.md)。
 
 Pipeline与Golden采用身份隔离的内存Cache/SWR；Current/Pool保留后端30条分页、前端滚动增量加载及详情懒加载。所有右侧Drawer共享单题详情母版 `--drawer-width:800px`，全高100dvh，小屏100vw。长期SPEC/图源同步规则见[AGENTS.md](AGENTS.md)。
 

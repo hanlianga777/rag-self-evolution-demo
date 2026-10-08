@@ -4,6 +4,8 @@ import io
 import hashlib
 import json
 import os
+import sqlite3
+import logging
 import threading
 import time
 from datetime import datetime, timezone
@@ -995,6 +997,9 @@ def review_mini_batch(payload: BatchReviewRequest):
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+    except sqlite3.Error as error:
+        logging.getLogger(__name__).exception("Golden freeze database request failed")
+        raise HTTPException(status_code=503, detail="Golden 冻结数据库请求失败，请刷新核对 Snapshot 后重试") from error
 
 
 @app.post("/api/governance/generation-runs/{generation_run_id}/snapshot", status_code=201, dependencies=[Depends(require_trusted_origin)])

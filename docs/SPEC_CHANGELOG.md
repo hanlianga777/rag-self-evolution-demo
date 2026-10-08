@@ -2,6 +2,12 @@
 
 本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.4 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
 
+## Golden Dataset 冻结阻塞修复（2026-10-08）
+
+- 修复Full批次SQLite缓存溢写后，冻结写事务另开连接读取Snapshot/题目导致的自锁；所有写入后读取复用事务连接/已读取题目，保留原事务回滚与Run级幂等。
+- Pending返回具体题目与条件，数据库失败返回带CORS的503结构化错误；前端同步防重复点击，继续刷新真实Snapshot，区分提交失败与已完成但刷新失败。
+- 本轮只读核对当前100题与用户已保存13题批准；不执行正式确认、冻结、Provider、Baseline或Agent。隔离测试与真实数据库状态见[冻结修复验收](GOLDEN_FREEZE_FIX_VERIFICATION.md)。Profile、质量标准与Gate业务规则不变。
+
 ## Phase 1 最终冻结合同同步（2026-10-08）
 
 - 唯一Drawer宽度来自当前Golden单题详情800px，删除Standard/Wide尺寸体系；Search Space/Coverage适配共享宽度，保持全高及正文滚动。

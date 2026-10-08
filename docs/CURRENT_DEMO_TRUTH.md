@@ -2,7 +2,7 @@
 
 ## 当前真实状态（2026-10-08）
 
-Knowledge已激活4份PDF/157页，349 Parent/368 Child、text-embedding-v4 1024d/368 Indexed、9 Topics。当前Full 100/100、40/20/40、Gap0；质量99/100、机器合格87、人工复核13、Human Gate1 Pending（本轮最终数据核验见[验收](FINAL_CLOSURE_VERIFICATION.md)）。当前未冻结新Golden或运行新Baseline/Agent；Production仍绑定Legacy。
+Knowledge已激活4份PDF/157页，349 Parent/368 Child、text-embedding-v4 1024d/368 Indexed、9 Topics。当前Full 100/100、40/20/40、Gap0；机器合格87、用户人工批准13、待关注0、Probe/QC各100已通过，后端Human Gate1 Ready（本轮只读核验与冻结故障修复见[验收](GOLDEN_FREEZE_FIX_VERIFICATION.md)，前轮Pending记录保留为Historical）。当前未冻结新Golden或运行新Baseline/Agent；Production仍绑定Legacy。
 
 下面2026-09-30/10-03表格均为Historical / Legacy实测，不代表新Knowledge当前结果。
 

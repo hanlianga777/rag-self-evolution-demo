@@ -41,6 +41,7 @@ export function GovernancePage({ data }: { data: any }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const actionPending = useRef(false);
   const [error, setError] = useState("");
   const [runErrorOpen, setRunErrorOpen] = useState(false);
   const [runDetailsOpen, setRunDetailsOpen] = useState(false), [auditRun, setAuditRun] = useState<Candidate | null>(null);
@@ -154,10 +155,11 @@ export function GovernancePage({ data }: { data: any }) {
   const manualBlocked = current.filter(row => ["needs_revision", "rejected"].includes(row.review_status) || row.approval_eligibility?.requires_qc_p0_acceptance);
   const batchReason = current.length !== expectedCount ? `本轮尚未完整入库 ${expectedCount} 道题` : gateBlocked.length || manualBlocked.length ? `仍有 ${new Set([...gateBlocked, ...manualBlocked].map(row => row.id)).size} 道异常尚未处理（含 QC P0 风险）` : gate1Snapshot ? "本轮已确认 Golden 测试集" : !confirmed ? "请确认冻结当前完整且异常已关闭的数据集" : "";
   const action = async (work: () => Promise<unknown>, title: string) => {
-    setBusy(true); setError("");
+    if (actionPending.current) return false;
+    actionPending.current = true; setBusy(true); setError("");
     try { await operation.run(title, async () => { await work(); invalidateGolden(); try { await reload(); } catch (reason) { throw new Error(`后台已完成，但候选题刷新失败：${errorMessage(reason)}`); } }); return true; }
     catch (reason) { setError(errorMessage(reason)); return false; }
-    finally { setBusy(false); }
+    finally { actionPending.current = false; setBusy(false); }
   };
   const refreshAfterMutation = async () => { invalidateGolden(); await reload(); };
   const createMini = async () => {

@@ -19,7 +19,9 @@
 | Version | Knowledge Version/Corpus Snapshot含配置和产物摘要、独立构建及原子激活；Legacy Production始终绑定Legacy索引。Golden/Baseline/Candidate/Production Snapshot独立身份，不跨版本混用或重写 |
 | Baseline / Agent / Release | 保留第5–13及16节已冻结11 Hard Gate、Bad Case/Root Cause、唯一Optimization Main Agent、A/B/C、Sandbox/Regression、Gate2、条件D和Gate3人工发布规则；不借本轮重定义产品结构或执行这些阶段 |
 
-本轮权限仅限Q68一次最小定向修订和必要校验；未修改题复用当前质量结果，不扩大内容预算。13异常按题目/Evidence、真实Probe/QC、安全拒答标准、检索风险接受、业务边界逐题审计；确定性安全规则才能关闭，不能自动接受风险。Provider响应/连接故障依既有冻结合同最多一次额外重试，不增加内容修复次数。失败保留原题与诊断。
+冻结接口修复范围：不修改题目、质量结果、Profile或人工决定，不调用Provider，不代行最终确认。Gate Ready时，用户确认触发的题目晋升、资格来源审计和Snapshot创建必须在同一SQLite事务完成；事务内写入后读取复用同一连接及已读取题目，避免缓存溢写导致跨连接自锁。失败全部回滚，重复确认同一Run及同一题目集合复用原Snapshot。Pending返回具体未满足条件与题目阻塞原因；数据库异常保留可读HTTP响应，前端同步阻止重复点击，成功后失效Cache并刷新持久化Snapshot。最终冻结仍须用户亲自点击；当前Ready不等于Frozen，也不等于Baseline已运行。
+
+历史授权记录（2026-10-08前轮）：仅限Q68一次最小定向修订和必要校验；未修改题复用当前质量结果，不扩大内容预算。13异常按题目/Evidence、真实Probe/QC、安全拒答标准、检索风险接受、业务边界逐题审计；确定性安全规则才能关闭，不能自动接受风险。Provider响应/连接故障依既有冻结合同最多一次额外重试，不增加内容修复次数。失败保留原题与诊断。
 
 Search Space的12项允许值来自现有后端Contract，不能因Drawer适配而改变。12行保留四列、合理换行、无水平或表内纵向滚动，高度不足由Drawer Body滚动。Coverage/Slot保持Topic、Child、Slot、P/A/N、来源与Evidence穿透，技术日志下沉。
 

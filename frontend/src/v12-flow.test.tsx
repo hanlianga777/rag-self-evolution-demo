@@ -86,7 +86,7 @@ it("sends one atomic Gate 1 review request and shows the frozen version after re
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
   await act(async () => document.querySelector<HTMLInputElement>(".review-batch input")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "确认并冻结 Golden Dataset")!.click());
+  await act(async () => { const button = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "确认并冻结 Golden Dataset")!; button.click(); button.click(); });
   expect(requests).toEqual([{ url: expect.stringContaining("/api/governance/review-batch"), body: { question_ids: rows.map(row => row.id), confirmed_manual_review: true } }]);
   expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("已人工确认");
   expect(document.querySelector(".review-batch")).toBeNull();

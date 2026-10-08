@@ -1,5 +1,7 @@
 """Offline dataset confirmation, risk classification and audit identity checks."""
 import json
+import sqlite3
+from unittest.mock import patch
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,7 +17,7 @@ class MachineGateTests(unittest.TestCase):
         for number in range(100):
             category = 'positive' if number<40 else 'ablation' if number<60 else 'negative'
             slot = f'Q{number+1:02d}'
-            candidate = {'coverage_slot':slot,'test_category':category,'question':f'设备{number}如何使用？','reference_answer':None if category=='negative' else '先断电', 'evidence':[] if category=='negative' else [{'source_chunk_ids':['C1']}], 'expected_behavior':'insufficient_evidence' if category=='negative' else None}
+            candidate = {'coverage_slot':slot,'test_category':category,'question':f'设备{number}如何使用？','reference_answer':None if category=='negative' else '先断电', 'evidence':[] if category=='negative' else [{'source_chunk_ids':['C1']}], 'negative_subtype':'safety_critical' if number==60 else 'prompt_injection' if number==61 else None, 'expected_behavior':'insufficient_evidence' if category=='negative' else None}
             self.store.persist_generation_attempt(self.run, candidate, {}, slot=slot, attempt=1, model='fixture')
         self.store.update_generation_run(self.run,status='completed')
         self.ids=self.store.generation_run(self.run)['question_ids']
@@ -64,6 +66,84 @@ class MachineGateTests(unittest.TestCase):
         with self.store.connection() as c:c.execute("UPDATE questions SET test_category='negative' WHERE id=?",(self.ids[0],))
         self.assertFalse(self.gate()['profile_complete'])
         with self.assertRaises(ValueError):self.store.review_generation_batch(self.ids,'fixture',confirmed_manual_review=True)
+
+    def test_full_freeze_with_sqlite_cache_spill_is_atomic_and_idempotent(self):
+        # Small page cache deterministically reproduces the real 100-question lock.
+        connect = sqlite3.connect
+        def limited_cache(*args, **kwargs):
+            connection = connect(*args, **kwargs)
+            connection.execute('PRAGMA cache_size=10')
+            connection.execute('PRAGMA busy_timeout=100')
+            return connection
+        with patch('app.governance.sqlite3.connect', side_effect=limited_cache):
+            first = self.store.review_generation_batch(self.ids, 'fixture', confirmed_manual_review=True)
+            second = self.store.review_generation_batch(self.ids, 'fixture', confirmed_manual_review=True)
+        self.assertEqual(first['snapshot'], second['snapshot'])
+        self.assertEqual(len(first['snapshot']['questions']), 100)
+        self.assertEqual(len(self.store.dataset_snapshots()), 1)
+        with self.store.connection() as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM approvals WHERE gate='dataset'").fetchone()[0], 100)
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM review_events WHERE decision='dataset_confirmed'").fetchone()[0], 100)
+        self.assertFalse(self.store.current_baseline_identity()['requires_new_golden'])
+        self.assertIsNone(self.store.current_baseline_identity()['current_baseline_id'])
+
+    def test_freeze_api_ready_pending_and_database_error_are_readable(self):
+        from api_fixture import main
+        from fastapi.testclient import TestClient
+        with patch.object(main, 'store', self.store):
+            client = TestClient(main.app, raise_server_exceptions=False)
+            payload = {'question_ids': self.ids, 'confirmed_manual_review': True}
+            headers = {'Origin': 'http://localhost:5174'}
+            self.store.record_qc(self.ids[0], {'score':75, 'priority':'P1'}, 'passed')
+            pending = client.post('/api/governance/review-batch', json=payload, headers=headers)
+            self.assertEqual(pending.status_code, 409)
+            self.assertIn(self.ids[0], pending.json()['detail'])
+            self.assertEqual(self.store.dataset_snapshots(), [])
+            self.store.review_question(self.ids[0], 'approved', 'fixture human', reason='reviewed evidence')
+            with patch.object(self.store, 'review_generation_batch', side_effect=sqlite3.OperationalError('fixture database failure')):
+                failed = client.post('/api/governance/review-batch', json=payload, headers=headers)
+            self.assertEqual(failed.status_code, 503)
+            self.assertEqual(failed.headers['access-control-allow-origin'], headers['Origin'])
+            self.assertIn('Snapshot', failed.json()['detail'])
+            ready = client.post('/api/governance/review-batch', json=payload, headers=headers)
+            self.assertEqual(ready.status_code, 200)
+            repeated = client.post('/api/governance/review-batch', json=payload, headers=headers)
+            self.assertEqual(ready.json()['snapshot'], repeated.json()['snapshot'])
+            self.assertEqual(len(client.get('/api/governance/snapshots').json()), 1)
+
+    def test_baseline_requires_frozen_snapshot_with_current_corpus_identity(self):
+        from app.evaluation import EvaluationRunner
+        from app.corpus import current_manifest, manifest_identity
+        from types import SimpleNamespace
+        identity = manifest_identity(current_manifest())
+        runtime = SimpleNamespace(model='fixture', corpus=SimpleNamespace(index_info=lambda: {'knowledge_identity':identity, 'knowledge_config':{'candidate_k':12, 'top_k':4}}))
+        runner = EvaluationRunner(self.store, runtime)
+        with self.assertRaisesRegex(ValueError, 'Snapshot'):
+            runner.start_baseline()
+        frozen = self.store.review_generation_batch(self.ids, 'fixture', confirmed_manual_review=True)['snapshot']
+        evaluation_id, approved, config = runner.start_baseline()
+        self.assertEqual(len(approved), 100)
+        self.assertEqual(self.store.evaluation_run(evaluation_id)['dataset_version_id'], frozen['id'])
+        self.assertEqual(config['knowledge_identity'], identity)
+        runtime.corpus.index_info = lambda: {'knowledge_identity':{'version':'other'}, 'knowledge_config':{'candidate_k':12, 'top_k':4}}
+        with self.assertRaisesRegex(ValueError, 'does not belong'):
+            runner.start_baseline()
+        self.assertEqual(len(self.store.evaluation_runs()), 1)
+
+    def test_snapshot_insert_failure_rolls_back_question_and_approval_updates(self):
+        before = self.store.candidate_rows(self.ids)
+        with self.store.connection() as connection:
+            connection.execute("CREATE TRIGGER fail_snapshot BEFORE INSERT ON dataset_versions BEGIN SELECT RAISE(ABORT, 'fixture snapshot failure'); END")
+            approvals = connection.execute('SELECT COUNT(*) FROM approvals').fetchone()[0]
+            reviews = connection.execute('SELECT COUNT(*) FROM review_events').fetchone()[0]
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.review_generation_batch(self.ids, 'fixture', confirmed_manual_review=True)
+        self.assertEqual(self.store.dataset_snapshots(), [])
+        self.assertEqual(self.store.candidate_rows(self.ids), before)
+        with self.store.connection() as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM approvals').fetchone()[0], approvals)
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM review_events').fetchone()[0], reviews)
+        self.assertTrue(self.store.current_baseline_identity()['requires_new_golden'])
 
     def test_paginated_list_keeps_summary_and_lazy_detail_contract(self):
         from unittest.mock import patch
