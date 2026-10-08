@@ -154,9 +154,15 @@ class AlibabaProvider:
         base = self.values.get('DASHSCOPE_BASE_URL', '').rstrip('/')
         if not key or not base: raise ProviderUnavailable('Alibaba Key / business-space endpoint missing')
         request = urllib.request.Request(base + path, data=json.dumps(payload).encode(), headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'}, method='POST')
+        from .telemetry import record_usage
+        started = time.perf_counter()
+        call_started_at = datetime.now(timezone.utc).isoformat()
         try:
-            with urllib.request.urlopen(request, timeout=60) as response: return json.load(response)
+            with urllib.request.urlopen(request, timeout=60) as response: body = json.load(response)
+            record_usage({**body.get('usage', {}), 'provider':'Alibaba', 'requested_model':payload['model'], 'call_started_at':call_started_at, 'status':'ok', 'latency_ms':round((time.perf_counter()-started)*1000)})
+            return body
         except (urllib.error.URLError, TimeoutError) as error:
+            record_usage({'provider':'Alibaba','requested_model':payload['model'],'call_started_at':call_started_at,'status':'failed','latency_ms':round((time.perf_counter()-started)*1000)})
             raise ProviderUnavailable(f'Alibaba request failed ({type(error).__name__})') from None
 
     def embed(self, texts, dimension):

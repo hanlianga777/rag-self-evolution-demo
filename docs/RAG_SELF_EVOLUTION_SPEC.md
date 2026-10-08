@@ -19,7 +19,15 @@
 | Version | Knowledge Version/Corpus Snapshot含配置和产物摘要、独立构建及原子激活；Legacy Production始终绑定Legacy索引。Golden/Baseline/Candidate/Production Snapshot独立身份，不跨版本混用或重写 |
 | Baseline / Agent / Release | 保留第5–13及16节已冻结11 Hard Gate、Bad Case/Root Cause、唯一Optimization Main Agent、A/B/C、Sandbox/Regression、Gate2、条件D和Gate3人工发布规则；不借本轮重定义产品结构或执行这些阶段 |
 
-冻结接口修复范围：不修改题目、质量结果、Profile或人工决定，不调用Provider，不代行最终确认。Gate Ready时，用户确认触发的题目晋升、资格来源审计和Snapshot创建必须在同一SQLite事务完成；事务内写入后读取复用同一连接及已读取题目，避免缓存溢写导致跨连接自锁。失败全部回滚，重复确认同一Run及同一题目集合复用原Snapshot。Pending返回具体未满足条件与题目阻塞原因；数据库异常保留可读HTTP响应，前端同步阻止重复点击，成功后失效Cache并刷新持久化Snapshot。最终冻结仍须用户亲自点击；当前Ready不等于Frozen，也不等于Baseline已运行。
+本轮Medium Golden V2（2026-10-08）：独立Run/Plan/Candidate，50题20/10/20，复用现有9 Topic membership/center与已存向量、最大余数配额；不改Knowledge、不复用旧Full题目。角色以售后/现场运维为主，难度目标10基础/25中等/15复杂，实际质量由独立Judge判定。由Child关键证据→Parent完整语境→业务场景/角色/意图→自然问题→真实答案/预期行为构造，保留页码、Child/Parent与Slot。
+
+业务负向6无答案+5条件不足+5产品/版本混淆+2范围外+2安全/权限，兼容映射为8 insufficient_evidence、10 clarify、1 safety_critical、1 prompt_injection；安全及权限各1，预期行为仍按现有合同。负向无答案证据不能伪造：Topic由本Slot已存真实材料Child绑定，另存Query Embedding nearest-center观察，不把语义最近Topic当作答案证据或强迫引用完整材料；独立Business Audit核对场景与Topic，Probe继续执行真实向量/全文/文档边界判断，阈值与安全规则不降低。
+
+业务质量复用现有十维审计持久化与候选资格：自然度、业务价值、意图、Grounding、自包含、非机械搬运、重复、题型/可答/负向有效性、Topic匹配及难度/多样性。business_v2缺失或失败审计不得机器合格；阶段卡区分未开始、执行中、通过与已执行待处理，展示真实Probe/QC通过数量；QC/Probe异常保留，确定性修复及失败Slot定向修订遵守有限预算。初次每Slot最多2次构造；仅失败Slot允许一次定向补齐批次；内容质量修复最多1轮，响应/网络故障最多额外1次重试；业务修订漏场景/意图时仅从原问题补齐元数据一次，不改问题/答案/Evidence，内容身份变化后只重验该题，实际调用/Token/耗时持久化，缺失Usage明确未采集。仅新Medium可调用Provider；Full100/审批/Snapshot与Legacy对象原样保留。最终Human Gate仍由用户确认，不自动Snapshot/Baseline/Agent。
+
+Candidate Pool两种状态：默认浏览仅候选/可用/待治理摘要（来源/互斥状态由后端计算），搜索/来源/组别/质量筛选与详情；创建Golden时才展示Profile、已选P/A/N及真实Topic匹配，取消返回浏览并清空临时选择。复用30条增量分页、懒详情、SWR及Shared UI/800px Drawer。正式Full Snapshot与新Medium工作集明确分开。
+
+历史范围（冻结接口故障修复轮）：冻结接口修复范围：不修改题目、质量结果、Profile或人工决定，不调用Provider，不代行最终确认。Gate Ready时，用户确认触发的题目晋升、资格来源审计和Snapshot创建必须在同一SQLite事务完成；事务内写入后读取复用同一连接及已读取题目，避免缓存溢写导致跨连接自锁。失败全部回滚，重复确认同一Run及同一题目集合复用原Snapshot。Pending返回具体未满足条件与题目阻塞原因；数据库异常保留可读HTTP响应，前端同步阻止重复点击，成功后失效Cache并刷新持久化Snapshot。最终冻结仍须用户亲自点击；当前Ready不等于Frozen，也不等于Baseline已运行。
 
 历史授权记录（2026-10-08前轮）：仅限Q68一次最小定向修订和必要校验；未修改题复用当前质量结果，不扩大内容预算。13异常按题目/Evidence、真实Probe/QC、安全拒答标准、检索风险接受、业务边界逐题审计；确定性安全规则才能关闭，不能自动接受风险。Provider响应/连接故障依既有冻结合同最多一次额外重试，不增加内容修复次数。失败保留原题与诊断。
 

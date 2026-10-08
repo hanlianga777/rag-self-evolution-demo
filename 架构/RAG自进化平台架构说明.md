@@ -1,6 +1,6 @@
 # RAG Evolution 平台架构说明
 
-> 当前正式架构同源于概览页面，2026-10-08同步；唯一规则见[SPEC当前合同](../docs/RAG_SELF_EVOLUTION_SPEC.md)。图表达流程设计，不表达当前阶段已执行；实际Golden仍待Human Gate，Legacy Production独立。
+> 当前正式架构同源于概览页面，2026-10-08同步；唯一规则见[SPEC当前合同](../docs/RAG_SELF_EVOLUTION_SPEC.md)。图表达流程设计，不表达当前阶段已执行；实际Full由用户冻结，新Medium业务V2独立停在人工治理，Legacy Production独立。
 
 ![当前业务架构](业务流程图.svg)
 
@@ -16,7 +16,9 @@
 
 知识库准备文档、解析/OCR、Chunk 与现有向量。Golden V2 在离线侧复用向量进行 Dynamic K-means、小簇合并、按厚度分配 Slot 与材料复用审计。Profile 是 Mini 20=8/4/8、Medium 50=20/10/20、Full 100=40/20/40；Evaluation Group 是 Positive/Ablation/Negative，Construction Type 是 Fact/Aggregation/Bridge/Ordinary，两个维度不互相替代。
 
-AI 生成与 CSV/XLSX 业务导入进入统一候选池。Pool 组卷必须匹配已有 Coverage Plan/Slot，不能只满足题数，不能临时改 Plan 迎合所选题。Hard Validation 确认合法性；Probe 观察真实召回、Final Context 与负向可回答性风险；QC 判断质量；Gate 1 人工确认后冻结 Snapshot。Negative Coverage Anchor 不等于 Golden Evidence；检索难题不能仅因未命中被删掉。
+Medium business_v2复用当前九Topic与Child材料，先识别用户角色、现场场景和意图，再构造自然业务题；十维Business Quality Audit参与机器资格，缺失/失败不得通过。材料Anchor与真实查询Embedding观察分开，负向Anchor不是Evidence，仍需全文Probe与QC。失败Slot只做有限版本化Revision，最终人工确认不自动执行。
+
+AI 生成与 CSV/XLSX 业务导入进入统一候选池。浏览状态只展示候选/可用/待治理、来源/评测组/质量/搜索及五列题目列表；创建Golden才进入Profile配额与Slot匹配组建状态。Pool 组卷必须匹配已有 Coverage Plan/Slot，不能只满足题数，不能临时改 Plan 迎合所选题。Hard Validation 确认合法性；Probe 观察真实召回、Final Context 与负向可回答性风险；QC 判断质量；Gate 1 人工确认后冻结 Snapshot。Negative Coverage Anchor 不等于 Golden Evidence；检索难题不能仅因未命中被删掉。
 
 ### 可解释优化
 

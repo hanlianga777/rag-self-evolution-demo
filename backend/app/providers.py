@@ -96,12 +96,18 @@ class DeepSeekProvider:
         if not isinstance(content, str) or not content.strip():
             raise ProviderUnavailable("DeepSeek 返回的内容必须是非空字符串")
         usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
-        usage = {**usage, "requested_model": self.settings.model, "call_started_at": call_started_at}
+        elapsed_ms = round((time.perf_counter() - started_at) * 1000)
+        usage = {**usage, "requested_model": self.settings.model, "call_started_at": call_started_at, "provider":"DeepSeek", "status":"ok", "latency_ms":elapsed_ms}
         record_usage(usage)
-        return {"usage": usage, "content": content, "input_tokens": usage.get("prompt_tokens") if type(usage.get("prompt_tokens")) is int and usage["prompt_tokens"] >= 0 else None, "output_tokens": usage.get("completion_tokens") if type(usage.get("completion_tokens")) is int and usage["completion_tokens"] >= 0 else None, "ttft_ms": ttft_ms, "timing_unit": "ms", "generation_ms": round((time.perf_counter() - started_at) * 1000)}
+        return {"usage": usage, "content": content, "input_tokens": usage.get("prompt_tokens") if type(usage.get("prompt_tokens")) is int and usage["prompt_tokens"] >= 0 else None, "output_tokens": usage.get("completion_tokens") if type(usage.get("completion_tokens")) is int and usage["completion_tokens"] >= 0 else None, "ttft_ms": ttft_ms, "timing_unit": "ms", "generation_ms": elapsed_ms}
 
     def complete(self, system: str, user: str, json_mode: bool = False, *, temperature: float = 0.2) -> str:
-        return self.complete_with_metrics(system, user, json_mode, temperature=temperature)["content"]
+        started = time.perf_counter()
+        try:
+            return self.complete_with_metrics(system, user, json_mode, temperature=temperature)["content"]
+        except ProviderUnavailable:
+            record_usage({'provider':'DeepSeek','requested_model':self.settings.model,'status':'failed','latency_ms':round((time.perf_counter()-started)*1000), 'call_started_at':datetime.now(timezone.utc).isoformat()})
+            raise
 
     def judge(self, question: str, expected: str, answer: str) -> dict:
         content = self.complete(

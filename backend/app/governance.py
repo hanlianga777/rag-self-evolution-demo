@@ -344,7 +344,7 @@ class GovernanceStore:
                 reasons.append(audit.get('attention_reason') or '题目质量需修订')
             if item['audit_hash'] and not audit:
                 reasons.append('题目质量审计待更新')
-            elif not audit and item['raw'].get('replaces_question_id'):
+            elif not audit and (item['raw'].get('replaces_question_id') or item['raw'].get('generation_strategy') == 'business_v2'):
                 reasons.append('题目质量审计待执行')
             if item['probe_corpus'] and _load(item['probe_corpus'], None) != fingerprint:
                 reasons.append('Corpus 身份已变化')
@@ -1096,6 +1096,8 @@ class GovernanceStore:
                 errors.append(f"{item_id}: 草案格式错误")
                 continue
             allowed = {"question", "reference_answer", "source_chunk_ids", "ablation_metadata"}
+            business_fields = ('business_scenario', 'user_intent') if old['raw'].get('generation_strategy') == 'business_v2' else ()
+            allowed.update(business_fields)
             if set(change) - allowed:
                 errors.append(f"{item_id}: 包含不可修改字段")
                 continue
@@ -1117,6 +1119,7 @@ class GovernanceStore:
                 continue
             evidence = [] if old["test_category"] == "negative" else [{"source_chunk_ids": source_ids, "evidence_key_points": [by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))[:160] for key in source_ids if key in by_chunk]}]
             candidate = {**old["raw"], "question": str(change.get("question", old["question"])).strip(), "reference_answer": change.get("reference_answer", old["reference_answer"]), "evidence": evidence, "test_category": old["test_category"], "expected_behavior": old["raw"].get("expected_behavior"), "ablation_attribute": old["raw"].get("ablation_attribute"), "ablation_metadata": change.get("ablation_metadata", old["raw"].get("ablation_metadata", {}))}
+            candidate.update({key: change.get(key, old['raw'].get(key)) for key in business_fields})
             from .golden_v2 import validate_golden_candidate
             frozen = (self.generation_run(run['generation_run_id'], qualification=False).get('artifacts') or {}).get('hard_validation', {}).get('frozen_plan')
             context = {'slot_id': old['raw'].get('coverage_slot'), 'corpus_fingerprint': manifest_identity(current_manifest())}
@@ -1134,6 +1137,7 @@ class GovernanceStore:
             if old["test_category"] == "negative" and old["raw"].get("expected_behavior") == "safe_rejection" and not any(cue in candidate["question"] for cue in ("绕过", "禁用", "关闭", "短接", "忽略安全")):
                 errors.append(f"{item_id}: 安全拒答题必须包含危险操作请求")
             drafts[item_id] = {**old, **candidate, "raw": {**old["raw"], "question": candidate["question"], "reference_answer": candidate["reference_answer"], "acceptable_evidence": evidence, "evidence": evidence, "validation": candidate["validation"], "ablation_metadata": candidate["ablation_metadata"]}}
+            drafts[item_id]['raw'].update({key:candidate[key] for key in business_fields})
             old_ids = [key for source in old['evidence'] for key in source.get('source_chunk_ids', [])]
             if all(drafts[item_id][field] == old[field] for field in ("question", "reference_answer")) and source_ids == old_ids and candidate['ablation_metadata'] == old['raw'].get('ablation_metadata', {}):
                 errors.append(f"{item_id}: 草案未改变问题、答案或证据")
@@ -1159,7 +1163,8 @@ class GovernanceStore:
 
     @staticmethod
     def _draft_change(draft: dict):
-        return {"question": draft["question"], "reference_answer": draft["reference_answer"], "source_chunk_ids": [key for evidence in draft["evidence"] for key in evidence.get("source_chunk_ids", [])], "ablation_metadata": draft["raw"].get("ablation_metadata", {})}
+        business = {key:draft['raw'].get(key) for key in ('business_scenario','user_intent')} if draft['raw'].get('generation_strategy') == 'business_v2' else {}
+        return {**business, "question": draft["question"], "reference_answer": draft["reference_answer"], "source_chunk_ids": [key for evidence in draft["evidence"] for key in evidence.get("source_chunk_ids", [])], "ablation_metadata": draft["raw"].get("ablation_metadata", {})}
 
     def _begin_preview_attempt(self, revision_id: str, question_ids: list[str], expected_hashes: dict, kind: str, changes: dict | None = None, **intent):
         with self.connection() as connection:

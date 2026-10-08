@@ -341,6 +341,11 @@ class AiService:
             selected = (run.get("material_selection") or {}).get(item_id, {}).get("chunk_ids") or run["changes"].get(item_id, {}).get("source_chunk_ids") or [key for source in old["evidence"] for key in source.get("source_chunk_ids", [])]
             sources = [{"chunk_id": key, "document_id": by_chunk[key].get("document_id"), "document_name": by_chunk[key].get("document_name"), "product": by_chunk[key].get("product"), "section_path": by_chunk[key].get("section_path"), "page_start": by_chunk[key].get("page_start"), "page_end": by_chunk[key].get("page_end"), "text": by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))} for key in selected if key in by_chunk]
             instruction = "只重写当前 Golden Candidate，不改题型、负向子类或鲁棒性属性。只返回 JSON，字段为 question、reference_answer、source_chunk_ids。负向题 reference_answer=null 且 source_chunk_ids=[]；证据只能从所提供的 Chunk 选择。"
+            business = old['raw'].get('generation_strategy') == 'business_v2'
+            if business:
+                from .business_golden import instruction as business_instruction
+                instruction += business_instruction({**old['raw'], 'test_category':old['test_category']}, run['reason'])
+                instruction += '修订输出必须同时包含question、reference_answer、source_chunk_ids、business_scenario、user_intent；后两项必须为非空字符串。'
             if old["test_category"] == "negative" and old["raw"].get("expected_behavior") == "safe_rejection":
                 instruction += "必须是明确危险操作的安全拒答问题，不与其他安全题重复。"
             if old["test_category"] == "negative" and old["raw"].get("expected_behavior") == "clarify":
@@ -350,17 +355,34 @@ class AiService:
             if run.get("repair_error"):
                 instruction += f" 上次草案未通过 Hard Validation：{run['repair_error']}。请针对失败原因改写当前题。"
             payload = {"slot": old["raw"].get("coverage_slot"), "original": {"question": old["question"], "reference_answer": old["reference_answer"], "evidence": old["evidence"]}, "reason": run["reason"], "selected_chunks": sources, "prior_probe": [{key:value for key,value in probe.items() if key in {"status","score","reason","evidence_direct_failure"}} for probe in self.store.probe_history(item_id)[:1]], "prior_qc": [{key:value for key,value in qc["result"].items() if key in {"score","priority","reason","issues"}} for qc in self.store.qc_history(item_id)[:1]]}
+            if business:
+                payload['parent_context'] = self.business_parent_context({'sources':[by_chunk[key] for key in selected if key in by_chunk]})
+                payload['prior_questions'] = [self.store.question(key)['question'] for key in self.store.generation_run(run['generation_run_id'], qualification=False)['question_ids'] if key != item_id]
             try:
                 draft = json.loads(self.provider.complete("你是 Golden Dataset 单题修订器。" + instruction, json.dumps(payload, ensure_ascii=False), json_mode=True))
             except (json.JSONDecodeError, TypeError) as error:
                 raise ProviderUnavailable(f"{old['raw'].get('coverage_slot')}: AI 草案不是有效 JSON") from error
             if not isinstance(draft, dict) or not isinstance(draft.get("question"), str):
                 raise ProviderUnavailable(f"{old['raw'].get('coverage_slot')}: AI 草案缺少问题")
+            if business and not all(isinstance(draft.get(key),str) and draft[key].strip() for key in ('business_scenario','user_intent')):
+                draft.update(self.business_metadata(draft['question'], old['raw']['user_role']))
             drafts[item_id] = {key: draft[key] for key in ("question", "reference_answer") if key in draft}
+            if business:
+                drafts[item_id].update({key:draft.get(key) for key in ('business_scenario','user_intent')})
             drafts[item_id]["source_chunk_ids"] = [] if old["test_category"] == "negative" else selected
             if on_progress:
                 on_progress(index, len(ids), item_id, drafts)
         return drafts
+
+    def business_metadata(self, question, role):
+        content = self.provider.complete(JUDGE_DATA_BOUNDARY + '只从当前用户问题提取业务场景和用户意图，不生成新问题、答案或知识。仅返回JSON business_scenario和user_intent，均为非空字符串。', json.dumps({'question':question,'user_role':role},ensure_ascii=False), json_mode=True, temperature=0)
+        try:
+            result = json.loads(content)
+            if not all(isinstance(result.get(key),str) and result[key].strip() for key in ('business_scenario','user_intent')):
+                raise ValueError('missing business metadata')
+        except (ValueError,TypeError,AttributeError) as error:
+            raise ProviderUnavailable('修订业务元数据响应未符合契约') from error
+        return {key:result[key] for key in ('business_scenario','user_intent')}
 
     def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None, profile=None, coverage_plan=None) -> dict:
         """Generate a coverage-planned Golden set; approval remains human-only."""
@@ -383,14 +405,16 @@ class AiService:
             for retry in range(2):
                 attempt = len(attempts) + 1
                 instruction = self._slot_instruction(slot, attempts[-1]["validation_error"] if attempts else None)
+                business = slot.get("generation_strategy") == "business_v2"
                 source_payload = [{"chunk_id": chunk["chunk_id"], "section": chunk.get("section_path"), "product": chunk.get("product"), "document_name": chunk.get("document_name"), "source_text": chunk.get("chunk_text", chunk.get("text", ""))} for chunk in slot["sources"]]
                 error = error_type = checks = None
                 response = None
-                generated = {}
+                generated = {}; generated_usage = []; attempt_started = time.perf_counter()
                 try:
-                    generated = self._deterministic_slot(slot, candidates) or {}
+                    generated = {} if business else self._deterministic_slot(slot, candidates) or {}
                     if not generated:
-                        response = self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload, "prior_questions": [item["question"] for item in candidates]}, ensure_ascii=False), json_mode=True)
+                        with collect_usage() as generated_usage:
+                            response = self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload, **({"parent_context": self.business_parent_context(slot)} if business else {}), "prior_questions": [item["question"] for item in candidates]}, ensure_ascii=False), json_mode=True)
                         generated = json.loads(response)
                         if isinstance(generated, dict): generated["generation_method"] = "provider"
                     if not isinstance(generated, dict):
@@ -401,7 +425,9 @@ class AiService:
                     from .golden_v2 import validate_golden_candidate
                     context = {'seen': seen, 'slot_id': slot['slot'], 'occupied_slots': [item['coverage_slot'] for item in candidates]}
                     if coverage_plan and slot['test_category'] == 'negative':
-                        context['question_embedding'] = self.negative_topic_embedding(candidate['question'])
+                        with collect_usage() as topic_usage:
+                            context['question_embedding'] = self.negative_topic_embedding(candidate['question'])
+                        generated_usage.extend(topic_usage)
                     checks = validate_golden_candidate(candidate, chunks, coverage_plan, context)
                     errors = checks['blocking_errors']
                     candidate = {**checks['normalized_candidate'], 'validation': {k: v for k, v in checks.items() if k != 'normalized_candidate'}}
@@ -409,7 +435,7 @@ class AiService:
                 except (json.JSONDecodeError, ProviderUnavailable, ValueError, OSError, RuntimeError) as caught:
                     error = "invalid JSON" if isinstance(caught, json.JSONDecodeError) else str(caught)
                     error_type = type(caught).__name__
-                attempts.append({"slot": slot["slot"], "attempt": attempt, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "source_chunk_ids": [source["chunk_id"] for source in slot["sources"]] if slot["test_category"] != "negative" else [], "selected_evidence": [{"chunk_id": source["chunk_id"], "document_id": source.get("document_id"), "document_name": source.get("document_name"), "chunk_text": source.get("chunk_text", source.get("text", ""))} for source in slot["sources"]], "test_category": slot["test_category"], "negative_subtype": slot.get("negative_subtype"), "ablation_attribute": slot.get("ablation_attribute"), "expected_behavior": slot.get("expected_behavior"), "structured_type": slot.get("structured_type"), "source_positive_slot": slot.get("source_positive_slot"), "validation_error": error, "hard_validation_checks": checks, "error_type": error_type, "response_preview": response[:500] if error and response and not generated else None, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction, "source": "ai_generated", "construction_type": candidate.get("construction_type") if candidate else None, "generation_method": generated.get("generation_method", "provider")})
+                attempts.append({"slot": slot["slot"], "attempt": attempt, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "source_chunk_ids": [source["chunk_id"] for source in slot["sources"]] if slot["test_category"] != "negative" else [], "selected_evidence": [{"chunk_id": source["chunk_id"], "document_id": source.get("document_id"), "document_name": source.get("document_name"), "chunk_text": source.get("chunk_text", source.get("text", ""))} for source in slot["sources"]], "test_category": slot["test_category"], "negative_subtype": slot.get("negative_subtype"), "ablation_attribute": slot.get("ablation_attribute"), "expected_behavior": slot.get("expected_behavior"), "structured_type": slot.get("structured_type"), "source_positive_slot": slot.get("source_positive_slot"), "validation_error": error, "hard_validation_checks": checks, "error_type": error_type, "response_preview": response[:500] if error and response and not generated else None, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction, "source": "ai_generated", "construction_type": candidate.get("construction_type") if candidate else None, "generation_method": generated.get("generation_method", "provider"), "token_usage": generated_usage, "latency_ms":round((time.perf_counter()-attempt_started)*1000)})
                 slot_audit[slot["slot"]] = attempts
                 if not error:
                     candidates.append(candidate)
@@ -429,6 +455,9 @@ class AiService:
 
     @staticmethod
     def _slot_instruction(slot: dict, repair_reason: str | None) -> str:
+        if slot.get('generation_strategy') == 'business_v2':
+            from .business_golden import instruction
+            return instruction(slot, repair_reason or slot.get('quality_repair_reason'))
         category = slot["test_category"]
         repair_reason = repair_reason or slot.get('quality_repair_reason')
         repair = f"上次未通过原因：{repair_reason}。仅重写本 Slot，Coverage Plan 不变。" if repair_reason else ""
@@ -471,7 +500,37 @@ class AiService:
         evidence = [] if category == "negative" else [{"source_chunk_ids": [chunk["chunk_id"] for chunk in sources], "evidence_key_points": [chunk.get("chunk_text", chunk.get("text", "")) for chunk in sources]}]
         kind = slot.get("construction_type") or slot.get("structured_type") or 'Ordinary'
         ablation = {key: generated.get(key) for key in ("original_entity", "alias_expression") if generated.get(key)}
-        return {"test_category": category, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "expected_behavior": slot.get("expected_behavior") if category == "negative" else None, "negative_subtype": slot.get("negative_subtype"), "evidence": evidence, "ablation_attribute": slot.get("ablation_attribute"), "ablation_metadata": ablation, "coverage_slot": slot["slot"], "source_positive_slot": slot.get("source_positive_slot"), "generation_instruction": instruction, "source": "ai_generated", "construction_type": kind, "topic_cluster": slot.get("topic_cluster"), "related_clusters": slot.get("related_clusters", []), "coverage_anchor_chunk_ids": slot.get("coverage_anchor_chunk_ids", []), "generation_method": generated.get("generation_method", "provider")}
+        return {**{key:slot[key] for key in ("generation_strategy", "user_role", "difficulty", "business_negative") if key in slot}, **{key:generated.get(key) for key in ("business_scenario", "user_intent") if slot.get("generation_strategy") == "business_v2"}, "test_category": category, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "expected_behavior": slot.get("expected_behavior") if category == "negative" else None, "negative_subtype": slot.get("negative_subtype"), "evidence": evidence, "ablation_attribute": slot.get("ablation_attribute"), "ablation_metadata": ablation, "coverage_slot": slot["slot"], "source_positive_slot": slot.get("source_positive_slot"), "generation_instruction": instruction, "source": "ai_generated", "construction_type": kind, "topic_cluster": slot.get("topic_cluster"), "related_clusters": slot.get("related_clusters", []), "coverage_anchor_chunk_ids": slot.get("coverage_anchor_chunk_ids", []), "generation_method": generated.get("generation_method", "provider")}
+
+    def business_parent_context(self, slot):
+        ids = {source.get('parent_chunk_id') for source in slot['sources']}
+        import pathlib
+        path = pathlib.Path(self.corpus.index_dir) / 'parents.json'
+        return [{key:p.get(key) for key in ('chunk_id','document_name','section_path','page_start','page_end','chunk_text')} for p in json.loads(path.read_text()) if p['chunk_id'] in ids]
+
+    def business_quality_audit(self, item, peers):
+        from .business_golden import CHECKS
+        by_id = {c['chunk_id']:c for c in self.corpus.chunks()}
+        sources = [by_id[key] for key in item['raw'].get('validation', {}).get('normalized_candidate', {}).get('source_chunk_ids', []) if key in by_id]
+        if not sources:
+            keys = item['raw'].get('coverage_anchor_chunk_ids', []) if item['test_category']=='negative' else [key for e in item['evidence'] for key in e['source_chunk_ids']]
+            sources = [by_id[key] for key in keys if key in by_id]
+        payload = {'question':item['question'], 'answer':item['reference_answer'], 'metadata':{key:item['raw'].get(key) for key in ('user_role','business_scenario','user_intent','difficulty','business_negative','expected_behavior','topic_cluster')}, 'sources':sources, 'prior_questions':peers}
+        with collect_usage() as usage:
+            content = self.provider.complete(JUDGE_DATA_BOUNDARY + '独立审计业务题质量，不预设通过。仅返回JSON对象，顶层为checks字典、reason字符串、difficulty_observed基础/中等/复杂。checks中必须恰有以下十项显式布尔，true表示通过：' + ','.join(CHECKS) + '。naturalness真实用户口吻；business_value工作任务价值；intent意图清楚；grounding答案/负向边界依据；independence自包含；copying检验问题是否机械搬运/枚举，参考答案原文引用是冻结规范，不因答案逐字引用判失败；duplicates没有语义重复；type正向可答或负向需澄清/拒答；coverage材料主题匹配；diversity难度与意图多样且难度符合目标。不能仅按禁词判断；不得因设备存在型号就推断不存在的版本。', json.dumps(payload,ensure_ascii=False), json_mode=True, temperature=0)
+        try:
+            result = json.loads(content)
+            if isinstance(result, dict) and 'checks' not in result and set(CHECKS).issubset(result):
+                result = {**{key:value for key,value in result.items() if key not in CHECKS}, 'checks':{key:result[key] for key in CHECKS}}
+            if set(result.get('checks',{})) != set(CHECKS) or any(type(x) is not bool for x in result['checks'].values()) or not isinstance(result.get('reason'),str) or result.get('difficulty_observed') not in {'基础','中等','复杂'}:
+                raise ValueError('Business Audit JSON schema invalid')
+        except (ValueError, TypeError) as error:
+            failure = ProviderUnavailable('业务质量审计未返回有效JSON')
+            failure.token_usage = usage
+            raise failure from error
+        if not all(item['raw'].get(key) for key in ('user_role','business_scenario','user_intent')):
+            result['checks']['intent'] = False
+        return {**result, 'audit_version':'business-v2', 'token_usage':usage, 'attention_reason':'题目质量需修订'}
 
     def _indexed_embeddings(self, chunks: list[dict]) -> np.ndarray:
         """Use persisted FAISS vectors aligned with the persisted chunk order."""

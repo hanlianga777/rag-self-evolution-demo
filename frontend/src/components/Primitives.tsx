@@ -77,12 +77,12 @@ export function CustomSelect({ ariaLabel, value, options, onChange, disabled = f
   </div>;
 }
 
-export type Stage = { label: string; state: "completed" | "current" | "pending"; detail?: string; href?: string };
+export type Stage = { label: string; state: "completed" | "current" | "pending" | "blocked"; detail?: string; href?: string };
 
 export function StageStepper({ ariaLabel, steps, compact = false }: { ariaLabel: string; steps: Stage[]; compact?: boolean }) {
   return <ol className={`stage-stepper${compact ? " compact" : ""}`} aria-label={ariaLabel}>{steps.map(step => <li key={step.label} className={step.state} aria-current={step.state === "current" ? "step" : undefined}>
     {step.href ? <a href={step.href}><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</a> : <div><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</div>}
-    <small>{step.state === "completed" ? "已完成" : step.state === "current" ? "当前阶段" : "待开始"}</small>
+    <small>{step.state === "completed" ? "已完成" : step.state === "current" ? "当前阶段" : step.state === "blocked" ? "待处理" : "待开始"}</small>
   </li>)}</ol>;
 }
 

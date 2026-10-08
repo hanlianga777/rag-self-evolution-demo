@@ -153,6 +153,7 @@ class AliasRequest(BaseModel):
 class GenerationRequest(BaseModel):
     plan_id: str | None = None
     profile: Literal["mini", "medium", "full"] = "mini"
+    strategy: Literal["evidence_v1", "business_v2"] = "evidence_v1"
 
 
 def require_trusted_origin(request: Request):
@@ -451,7 +452,7 @@ def candidate_list(run_id: str | None = None, offset: int = Query(0, ge=0), limi
     candidate_index = [{key:row[key] for key in ('id','stage','review_status','probe_status','qc_status','test_category','raw','slot','topic_cluster','qualification_status','qualification_source','attention_reasons','attention_categories','probe','qc')} for row in rows] if run else []
     version_rows = rows
     risks = any(row['qualification_status']=='needs_human_review' for row in rows)
-    rows = [row for row in rows if (status=='all' or status=='attention' and (row['qualification_status']=='needs_human_review' or not risks) or status=='machine' and row['qualification_status']=='machine_qualified') and (source=='all' or (row['raw'].get('source') or 'ai_generated')==source) and (group=='all' or row['test_category']==group) and (construction=='all' or row['construction_type']==construction) and search.lower() in row['question'].lower()]
+    rows = [row for row in rows if (status=='all' or status=='attention' and (row['qualification_status']=='needs_human_review' or not risks) or status=='machine' and row['qualification_status']=='machine_qualified' or status=='usable' and row['qualification_status'] in {'machine_qualified','human_approved'} or status=='govern' and row['qualification_status']=='needs_human_review') and (source=='all' or (row['raw'].get('source') or 'ai_generated')==source) and (group=='all' or row['test_category']==group) and (construction=='all' or row['construction_type']==construction) and search.lower() in row['question'].lower()]
     version = hashlib.sha256(json.dumps([(row['id'],row['updated_at'],row['qualification_status'],row['attention_reasons'],row['quality_audit']) for row in version_rows],sort_keys=True).encode()).hexdigest()
     return {'rows':[{key:value for key,value in row.items() if key!='quality_audit'} for row in rows[offset:offset+limit]], 'candidate_index':candidate_index, 'total':len(rows), 'summary':summary, 'construction_types':types, 'data_version':version, 'corpus_fingerprint':manifest_identity(current_manifest()), 'generation_run_id':run_id, 'profile':run['profile'] if run else None}
 
@@ -571,7 +572,16 @@ def generate_mini_golden():
 def generate_golden(payload: GenerationRequest):
     try:
         with CORPUS_LOCK:
-            plan = current_coverage_plan(payload.profile, payload.plan_id)
+            if payload.strategy == 'business_v2':
+                from .business_golden import medium_plan
+                base = json.loads((corpus.index_dir / 'coverage.json').read_text())
+                if base['corpus_fingerprint'] != manifest_identity(current_manifest()):
+                    raise ValueError('Topic Plan 已过期')
+                plan = medium_plan(base, corpus.chunks(), {'name':payload.profile, **GENERATION_PROFILES[payload.profile]})
+                with store.connection() as connection:
+                    connection.execute('INSERT OR IGNORE INTO coverage_plan_previews VALUES (?,?,?)', (plan['plan_id'], json.dumps(plan, ensure_ascii=False), plan['created_at']))
+            else:
+                plan = current_coverage_plan(payload.profile, payload.plan_id)
             run_id = store.start_generation_run(ai_service.model, payload.profile, coverage_plan=plan)
     except (ValueError, ProviderUnavailable) as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
@@ -623,7 +633,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
             if frozen['corpus_fingerprint'] != manifest_identity(current_manifest()) or frozen['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
                 raise ValueError('Coverage Plan 已失效：Corpus 已变化')
         complete = resume_quality
-        for round_number in ([] if resume_quality else range(1, 4 if regenerate else 2)):
+        for round_number in ([] if resume_quality else range(1, 4 if regenerate and not (frozen and frozen.get('generation_strategy') == 'business_v2') else 2)):
             if regenerate:
                 run = run_store.generation_run(run_id)
                 remaining_before = len(run["artifacts"]["coverage_plan"]) - len(run["question_ids"])
@@ -659,7 +669,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
                     kwargs = {}
                 generated = service.generate_mini_golden(chunks, on_progress=on_progress, **kwargs)
             failed_slots = generated.get("failed_slots", [])
-            continue_refill = regenerate and round_number < 3 and 0 < len(failed_slots) < remaining_before
+            continue_refill = regenerate and not (frozen and frozen.get('generation_strategy') == 'business_v2') and round_number < 3 and 0 < len(failed_slots) < remaining_before
             complete = run_store.complete_generation_slots(run_id, failed_slots=failed_slots, hard_validation=generated["hard_validation"], continue_refill=continue_refill)
             if complete or not continue_refill:
                 break
@@ -669,7 +679,29 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
         stage = "probing"
         run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "probe_completed": 0, "qc_skipped": 0})
         qc_completed = qc_skipped = 0
+        probe_completed = 0
+        business_run = bool(frozen and frozen.get('generation_strategy') == 'business_v2')
+        quality_state = run_store.generation_run(run_id, qualification=False)['artifacts']['hard_validation']
+        quality_errors = dict(quality_state.get('business_quality_errors', {}))
+        business_usage = dict(quality_state.get('business_provider_usage', {}))
         for index, candidate in enumerate(saved, start=1):
+            if business_run:
+                try:
+                    from .telemetry import collect_usage
+                    with collect_usage() as calls:
+                        _business_quality_step(run_store, service, run_corpus, candidate, saved)
+                    quality_errors.pop(candidate['id'], None)
+                except Exception as error:
+                    quality_errors[candidate['id']] = str(error)
+                    calls.extend(getattr(error, 'token_usage', []))
+                finally:
+                    business_usage[candidate['id']] = [*business_usage.get(candidate['id'], []), *calls]
+                checked = run_store.question(candidate['id'])
+                probe_completed += checked['probe_status'] != 'probe_pending'
+                qc_completed += checked['qc_status'] in {'qc_passed','qc_failed'}
+                qc_skipped += checked['probe_status'] not in {'probe_pending','probe_passed'}
+                run_store.update_generation_run(run_id, status='qc', progress={'stage':'qc','probe_completed':probe_completed,'qc_completed':qc_completed,'qc_skipped':qc_skipped,'quality_processed':index,'slot':candidate['raw']['coverage_slot']}, validation={'business_quality_errors':quality_errors,'business_provider_usage':business_usage})
+                continue
             stage = "probing"
             prior_probe = run_store.probe_history(candidate["id"])[0] if (resume_quality or regenerate) and candidate["probe_status"] == "probe_passed" else None
             _, identity = run_store.capture_quality(candidate["id"])
@@ -705,6 +737,19 @@ def rerun_generation_quality(generation_run_id: str, anomalies_only: bool = Fals
         raise HTTPException(status_code=409, detail=str(error)) from error
     threading.Thread(target=_run_quality_rerun, args=(generation_run_id, ids, store, ai_service, corpus), daemon=True).start()
     return {"run_id": generation_run_id, "status": "running"}
+
+
+def _business_quality_step(run_store, service, run_corpus, candidate, peers):
+    row = run_store.candidate_rows([candidate['id']])[0]
+    if not row['quality_audit']:
+        audit = service.business_quality_audit(candidate, [item['question'] for item in peers if item['id'] != candidate['id']])
+        run_store.save_quality_audit(candidate['id'], audit)
+    if candidate['probe_status'] != 'probe_passed':
+        probe = run_store.run_probe(candidate['id'], service.retriever, run_corpus.chunks(), service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=True)
+        if probe['status'] != 'passed':
+            return
+    if candidate['qc_status'] not in {'qc_passed','qc_failed'}:
+        _quality_check(run_store, service, candidate['id'])
 
 
 def _quality_check(run_store, service, question_id):
@@ -945,6 +990,11 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
         run = run_store.revision_run(revision_id)
         results = dict(run.get("quality_results") or {})
         for index, item_id in enumerate(run["question_ids"], 1):
+            candidate = run_store.question(item_id)
+            if candidate['raw'].get('generation_strategy') == 'business_v2' and not run_store.candidate_rows([item_id])[0]['quality_audit']:
+                peers = [run_store.question(key)['question'] for key in run_store.generation_run(run['generation_run_id'], qualification=False)['question_ids'] if key != item_id]
+                audit = _revision_attempt(run_store, revision_id, 'business_audit', service, lambda: service.business_quality_audit(candidate, peers))
+                run_store.save_quality_audit(item_id, audit)
             completed = run_store.revision_quality_step(run, item_id)
             if completed == "done":
                 results[item_id] = {"probe": "passed", "qc": "qc_passed"}
@@ -976,7 +1026,9 @@ def _revision_attempt(run_store, revision_id, stage, service, work):
         started = time.perf_counter()
         error = None
         try:
-            return work()
+            from .telemetry import collect_usage
+            with collect_usage() as usage:
+                return work()
         except Exception as caught:
             error = caught
             if not isinstance(caught, ProviderTimeout) or attempt == 2:
@@ -984,7 +1036,7 @@ def _revision_attempt(run_store, revision_id, stage, service, work):
         finally:
             run = run_store.revision_run(revision_id)
             history = list(run.get("runtime_attempts") or [])
-            history.append({"stage": stage, "attempt": attempt, "error_type": type(error).__name__ if error else None, "error": str(error.__cause__ or error) if error else None, "elapsed_ms": round((time.perf_counter() - started) * 1000), "result": "failed" if error else "passed", "provider": "DeepSeek" if getattr(service, "model", None) else None, "model": getattr(service, "model", None)})
+            history.append({"stage": stage, "attempt": attempt, "error_type": type(error).__name__ if error else None, "error": str(error.__cause__ or error) if error else None, "elapsed_ms": round((time.perf_counter() - started) * 1000), "result": "failed" if error else "passed", "provider": "DeepSeek" if getattr(service, "model", None) else None, "model": getattr(service, "model", None), "token_usage":usage})
             run_store.update_revision(revision_id, runtime_attempts=history)
 
 

@@ -2,6 +2,14 @@
 
 本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.4 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
 
+## Golden Dataset V2 Medium 业务题与候选池（2026-10-08）
+
+- 新增独立business_v2策略，复用现有Knowledge九Topic材料与身份，Medium保持20/10/20；角色、业务场景、用户意图与难度目标持久化，不回填Full历史记录。
+- Negative业务分类映射到既有Subtype/Expected Behavior；持久化材料Anchor用于Coverage，真实查询Embedding结果作为观察，Anchor不是答案Evidence。现有Hard Validation、Probe全文检查、QC与人工Gate不降低。
+- 新业务工作集必须通过十维Business Quality Audit才能机器合格；缺失、失败、过期审计均阻断。失败Slot沿用版本化Revision，保留业务元数据，并仅重跑该Slot；修订漏场景/意图时只从当前问题补齐元数据一次，按新内容身份重验该题，不生成新问题；有限预算与实际Provider Usage记录见当前SPEC和本轮验收。
+- Candidate Pool默认浏览：候选/可用/待治理摘要，来源/评测组/质量/搜索，五列列表；点击创建Golden才进入Profile配额和Slot匹配组建模式。保留30条分页、SWR、懒加载、导入、详情及800px Drawer；机器合格、人工通过与待治理分别标识，不把机器检查显示为人工批准；已执行未过的Probe/QC显示通过计数及待处理。
+- 本轮真实运行、逐题审阅、保护核验与未解风险见[Medium V2验收](MEDIUM_V2_VERIFICATION.md)及[完整审阅](../backend/reports/golden_dataset_v2_medium_review.md)。不自动批准、冻结、Baseline或Agent。
+
 ## Golden Dataset 冻结阻塞修复（2026-10-08）
 
 - 修复Full批次SQLite缓存溢写后，冻结写事务另开连接读取Snapshot/题目导致的自锁；所有写入后读取复用事务连接/已读取题目，保留原事务回滚与Run级幂等。

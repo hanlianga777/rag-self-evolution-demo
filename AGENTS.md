@@ -8,3 +8,5 @@
 - 后端测试必须在导入app前使用隔离 `RAG_DEMO_DB_PATH`，同时隔离Corpus/索引和.env；既有Legacy索引fixture只能用于明确标注的离线测试，不混入当前Knowledge或冒充真实Provider验收；真实写入前SQLite Backup API及产物备份。凭据不回显、不入日志/数据库/Git。
 - 人工批准、Snapshot冻结、Gate和发布不得自动代行；Provider调用严格遵守本轮用户授权范围及冻结预算。
 - 最小精准修改；验证源码、接口、数据与页面一致后提交范围内文件、push origin/main并确认干净同步。
+
+- Business Golden V2复用既有Topic及资格审计，角色/场景/意图/难度与Child/Parent来源必须持久化；负向Topic材料Anchor不是答案Evidence，真实Probe仍校验整个Corpus边界。已有Full与Snapshot只读保护，新工作集不自动冻结。

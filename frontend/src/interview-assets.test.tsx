@@ -78,14 +78,23 @@ it("keeps current frozen Golden separate from the latest work Run and hides an e
 
 it("keeps candidate filters, search and explicit actions in a single toolbar", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
-  const rows = [{ id: "pool-1", question: "刷盘检查", stage: "candidate", test_category: "positive", review_status: "human_review_pending", raw: { source: "business_import" } }, { id: "pool-2", question: "电池维护", stage: "candidate", test_category: "negative", review_status: "human_review_pending", raw: { source: "business_import" } }];
+  const rows = [{ id: "pool-1", question: "刷盘检查", stage: "candidate", test_category: "positive", qualification_status: "machine_qualified", review_status: "human_review_pending", raw: { source: "business_import" } }, { id: "pool-2", question: "电池维护", stage: "candidate", test_category: "negative", review_status: "human_review_pending", raw: { source: "business_import" } }];
   const fetcher = vi.fn(async (url: string, _init?: RequestInit) => new Response(JSON.stringify(goldenFixture(url, rows.filter(row => row.question.includes(new URL(url).searchParams.get("search") || "")))))); vi.stubGlobal("fetch", fetcher);
   await act(async () => root.render(<BusinessImportPanel profiles={{mini:{positive_count:8,ablation_count:4,negative_count:8}}} items={rows} onCreated={async () => {}} />));
   const toolbar = document.querySelector(".candidate-pool-toolbar")!;
-  expect(toolbar.querySelectorAll('[role="combobox"]')).toHaveLength(4);
+  expect(toolbar.querySelectorAll('[role="combobox"]')).toHaveLength(3);
   expect(toolbar.querySelector('input[type="search"]')).not.toBeNull();
   expect(toolbar.textContent).toContain("导入业务用例");
-  expect(toolbar.textContent).toContain("创建待审核测试集");
+  expect(toolbar.textContent).toContain("创建 Golden");
+  expect(document.querySelector(".pool-profile-match")).toBeNull();
+  expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("机器合格");
+  expect(document.querySelector(".candidate-pool-table")?.textContent).not.toContain("已批准");
+  expect(document.querySelector('input[type="checkbox"]')).toBeNull();
+  await act(async () => [...toolbar.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="创建 Golden")!.click());
+  expect(document.querySelector(".pool-profile-match")?.textContent).toContain("已选 0 / 20");
+  expect(document.querySelector('input[type="checkbox"]')).not.toBeNull();
+  await act(async () => [...toolbar.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="返回浏览")!.click());
+  expect(document.querySelector(".pool-profile-match")).toBeNull();
   const search = toolbar.querySelector<HTMLInputElement>('input[type="search"]')!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "刷盘"); search.dispatchEvent(new Event("input", { bubbles: true })); });
   expect(document.querySelectorAll("tbody tr")).toHaveLength(1);
@@ -101,5 +110,18 @@ it("joins legacy Frozen question IDs to persisted categories without replacing f
   await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: frozen.id }, snapshots: [frozen], generationRuns: [], dataset: ["positive", "ablation", "negative"].map((test_category, i) => ({ id: `Q${i + 1}`, test_category })) }} />));
   expect(document.querySelector(".golden-summary-strip")).not.toBeNull();
   expect(JSON.stringify(frozen)).toBe(before);
+  await act(async () => root.unmount());
+});
+
+it("shows a completed failed Probe as pending action rather than not started", async () => {
+  const row = { id:"failed-slot", slot:"Q01", question:"待修订的问题", test_category:"positive", stage:"candidate", probe_status:"needs_revision", qc_status:"qc_pending", review_status:"needs_revision", evidence:[] };
+  const run = { id:"failed-run", status:"completed", profile:{expected_count:1}, question_ids:[row.id], artifacts:{} };
+  vi.stubGlobal("fetch", vi.fn(async (url:string) => new Response(JSON.stringify(goldenFixture(url,[row])))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{generationRuns:[run], snapshots:[], dataset:[row], documents:[]}} />));
+  const probe = [...document.querySelectorAll(".stage-stepper li")].find(item=>item.querySelector("strong")?.textContent==="Probe")!;
+  expect(probe.textContent).toContain("0 / 1 通过");
+  expect(probe.textContent).toContain("待处理");
+  expect(probe.textContent).not.toContain("待开始");
   await act(async () => root.unmount());
 });

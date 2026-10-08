@@ -1120,7 +1120,7 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .candidate-workspace .candidate-card h3,.candidate-workspace .candidate-card p { margin:4px 0; }
 .candidate-workspace .candidate-scroll { padding:var(--card-padding); }
 .candidate-workspace .workspace-badges { padding-right:44px; }
-.candidate-pool-table { table-layout:fixed; min-width:1040px !important; }
+.candidate-pool-table { table-layout:fixed; min-width:620px !important; }
 .candidate-pool-table td { padding:6px 8px; height:60px; vertical-align:middle; }
 .candidate-pool-table th:not(:nth-child(2)),.candidate-pool-table td:nth-child(5),.candidate-pool-table button { white-space:nowrap; }
 .candidate-pool-table td:nth-child(3) small { display:block; }

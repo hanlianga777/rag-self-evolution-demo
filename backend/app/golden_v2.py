@@ -396,6 +396,15 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
                     anchor = {'topic_cluster': topics[0], 'method': 'local_embedding_nearest_center', 'distance': float(distances[selected]), 'is_evidence': False}
                     if distances[selected] > 1:
                         warnings.append('Negative Topic 低置信度，仅为 Coverage Anchor')
+        if group == 'negative' and c.get('generation_strategy') == 'business_v2':
+            keys = c.get('coverage_anchor_chunk_ids', [])
+            requested_slot = next((slot for slot in coverage_plan['slots'] if slot['slot_id'] == context.get('slot_id')), None)
+            if not keys or any(key not in labels for key in keys) or context.get('slot_id') and (not requested_slot or keys != requested_slot['coverage_anchor_chunk_ids']):
+                errors.append('Business Negative requires its persisted material anchor')
+            else:
+                semantic = anchor
+                topics = sorted({labels[key] for key in keys})
+                anchor = {'method':'persisted_material_anchor', 'topic_cluster':topics[0], 'child_ids':keys, 'semantic_observation':semantic, 'is_evidence':False}
         def compatible(slot):
             requirements = slot['requirements']
             if slot['evaluation_group'] != group or slot['topic_cluster'] not in topics:
