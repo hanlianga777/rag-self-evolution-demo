@@ -65,3 +65,7 @@ DeepSeek 是既有 Provider，显式服务于回答、生成、QC、Judge、Agen
 - 全部 V1.4 UI 和完整隔离 HTTP 生命周期已实施，121 项前端、296 项后端、构建与 Chromium 四尺寸 208 检查通过，最终整体审查及一次限定复审通过，保留换材重新生成后的关闭提示 Minor。54 ID 具名断言与最终结论见实施报告，历史 Phase 1 数字不能转记为本轮通过。
 
 两图保持“V1.4 目标架构”标注，完整流程与职责没有因静态重绘升级历史数据。本轮保留图源和 PNG，已验证字体、边界、连线、尺寸与图源/PNG 像素一致；最终代码职责核对见实施验收。用户手动上传到 Demo 的架构图片为独立运行资产，未替换。
+
+## 2026-10-08 Medium V2集中收口
+
+本轮39题受控Revision与只读数据集诊断复用已有Candidate→Hard Validation→Probe→QC→人工Gate关系。自然度诊断是高级审计建议，不是新增Gate；用户确认、Snapshot、Baseline、Agent、Production边界不变。唯一KnowledgeDiagrams.tsx图形源和导出SVG/PNG关系无变化，不重新导出。实际结果见[集中收口验收](../docs/MEDIUM_V2_POLISH_VERIFICATION.md)。

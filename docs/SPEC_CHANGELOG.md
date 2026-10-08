@@ -2,6 +2,14 @@
 
 本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.4 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。
 
+## Medium V2 集中质量与UI收口（2026-10-08）
+
+- 全50题先审查，再执行用户明确授权的39题一轮版本化Revision；11题复用，保留Evidence、20/10/20、九Topic、Full/Legacy及人工Gate。真实检查不通过仍待处理，不自动接受风险。
+- 修复业务Revision应用重校验丢失difficulty/expected_response导致预览身份不一致；校验业务难度和预期回复类型。QC可读取预期回复作为样本数据，不覆盖冻结行为标准。
+- 增加只读本地数据集自然度/多样性诊断，结合已有业务审计展示原因、建议、前后差异，不新增硬Gate或页面Provider调用。
+- Golden删除旧Full提示及两个动作菜单：新建为次级按钮；历史版本内保留运行审计和导出。候选池改三质量Chip/五列正常字重；剩余动作菜单使用原生Popover，Coverage技术审计下沉折叠区。
+- 真实结果、调用计量限制、保护校验、截图和测试见[集中收口验收](MEDIUM_V2_POLISH_VERIFICATION.md)。架构关系未改变，唯一图源及导出文件不重画。
+
 ## Golden Dataset V2 Medium 业务题与候选池（2026-10-08）
 
 - 新增独立business_v2策略，复用现有Knowledge九Topic材料与身份，Medium保持20/10/20；角色、业务场景、用户意图与难度目标持久化，不回填Full历史记录。

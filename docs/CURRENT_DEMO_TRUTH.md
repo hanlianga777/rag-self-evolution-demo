@@ -2,7 +2,7 @@
 
 ## 当前真实状态（2026-10-08）
 
-Knowledge已激活4份PDF/157页，349 Parent/368 Child、text-embedding-v4 1024d/368 Indexed、9 Topics。Full 100/100、40/20/40、Gap0、机器合格87/用户人工批准13，已由用户冻结GD-20261008024214127995；本轮保留其全部题目、审批和质量记录。新Medium业务V2独立Run GGEN-20261008050011728151，50题20/10/20，使用现有九Topic与Corpus。真实质量、修订、人工待处理项见[Medium V2验收](MEDIUM_V2_VERIFICATION.md)及[逐题审阅](../backend/reports/golden_dataset_v2_medium_review.md)。本轮未批准或冻结Medium，未运行Baseline/Agent；Production仍绑定Legacy。
+Knowledge已激活4份PDF/157页，349 Parent/368 Child、text-embedding-v4 1024d/368 Indexed、9 Topics。Full 100/100、40/20/40、Gap0、机器合格87/用户人工批准13，已由用户冻结GD-20261008024214127995；本轮保留其全部题目、审批和质量记录。新Medium业务V2独立Run GGEN-20261008050011728151，50题20/10/20，使用现有九Topic与Corpus。真实质量、修订、人工待处理项见[Medium V2验收](MEDIUM_V2_POLISH_VERIFICATION.md)及[逐题审阅](../backend/reports/medium_v2_polish_review.md)。本轮未批准或冻结Medium，未运行Baseline/Agent；Production仍绑定Legacy。
 
 下面2026-09-30/10-03表格均为Historical / Legacy实测，不代表新Knowledge当前结果。
 

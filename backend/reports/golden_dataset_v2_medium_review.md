@@ -1,3 +1,5 @@
+> Historical：以下为初次生成验收，当前39题集中修订及真实质量见[最新审阅](medium_v2_polish_review.md)。保留原始审阅内容。
+
 # Golden Dataset V2 · Medium 50 逐题审阅
 
 Run：`GGEN-20261008050011728151`；独立候选工作集，未批准、未冻结。

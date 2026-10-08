@@ -51,6 +51,7 @@ it("restores Generation counters inline without creating partial candidates", as
   vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify(run), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><GovernancePage data={{ generationRuns: [run], dataset: [] }} /></OperationProvider>));
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.querySelector(".run-summary")?.textContent).toContain("QC 跳过 7");
   expect(document.querySelector(".run-summary")?.textContent).toContain("运行耗时");

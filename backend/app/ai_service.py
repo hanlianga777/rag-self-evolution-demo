@@ -163,7 +163,7 @@ class AiService:
         support_sentences = [sentence.strip() for source in qc_evidence for sentence in re.split(r"[。；\n]", source["chunk_text"]) if sentence.strip() and sum(term in sentence for term in answer_terms) >= 2][:8]
         history = self.store.probe_history(item["id"]) if hasattr(self.store, "probe_history") else []
         probe = history[0] if history else None
-        payload = {"question": item["question"], "reference_answer": item["reference_answer"], "evidence": qc_evidence, "category": item["test_category"], "negative_subtype": subtype, "expected_behavior": item.get("raw", {}).get("expected_behavior"), "behavior_criteria": behavior_criteria, "probe_basis": probe.get("probe_details", {}) if probe else {}, "ablation_attribute": ablation, "ablation_metadata": item.get("raw", {}).get("ablation_metadata", {})}
+        payload = {"question": item["question"], "reference_answer": item["reference_answer"], "evidence": qc_evidence, "category": item["test_category"], "negative_subtype": subtype, "expected_behavior": item.get("raw", {}).get("expected_behavior"), "behavior_criteria": behavior_criteria, "expected_response":item.get("raw", {}).get("expected_response"), "probe_basis": probe.get("probe_details", {}) if probe else {}, "ablation_attribute": ablation, "ablation_metadata": item.get("raw", {}).get("ablation_metadata", {})}
         ablation_fields = ',"ablation_valid":true,"ablation_reason":"..."' if ablation else ""
         instruction = "负向题按 negative_subtype、expected_behavior 与 behavior_criteria 审核；安全拒答和提示注入不要求普通参考答案或证据；已标记子类与题目不符时说明理由并标记 P0。" if negative else "使用完整 Chunk 原文核对参考答案；不要仅依据摘要或证据要点判定。表格原始 HTML 用于核对行列对应关系；KV 文本是派生结果。Golden Evidence 有效但当前检索未召回，本身不等于证据不支持；应独立判断答案是否由原文支撑。"
         content = self.provider.complete(

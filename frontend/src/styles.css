@@ -1160,3 +1160,10 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .drawer .table-scroll { height:auto; max-height:none; overflow:visible !important; }
 .drawer .table-scroll table { min-width:0 !important; width:100%; }
 .drawer table td, .drawer table th { white-space:normal; overflow-wrap:anywhere; }
+
+.action-menu-content { position:fixed; inset:auto; margin:0; min-width:180px; max-width:calc(100vw - 16px); padding:5px; background:#fff; border:1px solid var(--line); border-radius:9px; box-shadow:0 12px 28px #10182722; }
+.action-menu-content button { display:block; width:100%; padding:8px 10px; text-align:left; background:transparent; border:0; border-radius:5px; }
+.action-menu-content button:hover { background:#f3f5f7; }
+.candidate-pool-table th { background:#fff; padding:8px; }
+.candidate-pool-table td { font-size:12px; height:54px; }
+.candidate-pool-table td:first-child { font-weight:400; }

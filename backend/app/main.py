@@ -436,6 +436,17 @@ def create_pool_run(payload: PoolRunRequest):
         raise HTTPException(status_code=422, detail=json.loads(str(error)) if str(error).startswith('{') else str(error)) from error
 
 
+@app.get("/api/governance/generation-runs/{run_id}/naturalness-audit")
+def naturalness_audit(run_id: str):
+    run = store.generation_run(run_id, qualification=False)
+    if not run:
+        raise HTTPException(status_code=404, detail="Generation run not found")
+    from .business_golden import dataset_quality_audit
+    rows = [{**row, 'raw':store.question(row['id']).get('raw', row['raw'])} for row in store.candidate_rows(run['question_ids'])]
+    before = [store.question(row['raw']['replaces_question_id']) for row in rows if row['raw'].get('replaces_question_id')]
+    return dataset_quality_audit(rows, before)
+
+
 @app.get("/api/governance/candidates")
 def candidate_list(run_id: str | None = None, offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100), source: str = "all", group: str = "all", construction: str = "all", search: str = "", status: str = "all"):
     run = store.generation_run(run_id, qualification=False) if run_id else None

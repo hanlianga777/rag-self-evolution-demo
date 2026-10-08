@@ -62,6 +62,7 @@ it("keeps current frozen Golden separate from the latest work Run and hides an e
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: "GD-current" }, generationRuns: [workRun], snapshots, dataset: [row], documents: [] }} />));
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   const summary = document.querySelector(".drawer-body")!;
   expect(summary.textContent).toContain("3 题");
@@ -82,10 +83,12 @@ it("keeps candidate filters, search and explicit actions in a single toolbar", a
   const fetcher = vi.fn(async (url: string, _init?: RequestInit) => new Response(JSON.stringify(goldenFixture(url, rows.filter(row => row.question.includes(new URL(url).searchParams.get("search") || "")))))); vi.stubGlobal("fetch", fetcher);
   await act(async () => root.render(<BusinessImportPanel profiles={{mini:{positive_count:8,ablation_count:4,negative_count:8}}} items={rows} onCreated={async () => {}} />));
   const toolbar = document.querySelector(".candidate-pool-toolbar")!;
-  expect(toolbar.querySelectorAll('[role="combobox"]')).toHaveLength(3);
+  expect(toolbar.querySelectorAll('[role="combobox"]')).toHaveLength(2);
   expect(toolbar.querySelector('input[type="search"]')).not.toBeNull();
   expect(toolbar.textContent).toContain("导入业务用例");
   expect(toolbar.textContent).toContain("创建 Golden");
+  expect(document.querySelector('[aria-label="候选质量筛选"]')).not.toBeNull();
+  expect(document.querySelector('[aria-label="候选质量"]')).toBeNull();
   expect(document.querySelector(".pool-profile-match")).toBeNull();
   expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("机器合格");
   expect(document.querySelector(".candidate-pool-table")?.textContent).not.toContain("已批准");

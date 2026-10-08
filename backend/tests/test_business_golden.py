@@ -125,3 +125,44 @@ class BusinessAuditTests(unittest.TestCase):
         self.assertEqual(drafts['Q']['question'],'客户现场如何确认设置？')
         self.assertEqual(drafts['Q']['business_scenario'],'现场设置确认')
         self.assertEqual(service.provider.complete.call_count,2)
+
+class DatasetNaturalnessTests(unittest.TestCase):
+    def test_frequency_is_advisory_and_does_not_change_candidates(self):
+        from app.business_golden import dataset_quality_audit
+        rows=[{'id':str(i),'question':f'师傅，客户现场设备{i}应怎样操作？','raw':{'coverage_slot':f'Q{i}'}} for i in range(10)]
+        original=json.dumps(rows,sort_keys=True)
+        result=dataset_quality_audit(rows)
+        self.assertEqual(result['frequencies']['师傅'],10)
+        self.assertTrue(result['advisory_only'])
+        self.assertEqual(len(result['questions']),10)
+        self.assertEqual(json.dumps(rows,sort_keys=True),original)
+        self.assertTrue(all(r['findings'] for r in result['questions']))
+        revised={'id':'new','question':'设备怎样操作？','raw':{'replaces_question_id':'0'}}
+        self.assertTrue(dataset_quality_audit([revised],rows)['questions'][0]['changed'])
+
+    def test_business_draft_fields_survive_apply_revalidation(self):
+        from app.governance import GovernanceStore
+        draft={'question':'新问题','reference_answer':None,'evidence':[],'raw':{'generation_strategy':'business_v2','business_scenario':'现场','user_intent':'先确认条件','difficulty':'中等','expected_response':'条件不清时不能继续操作'}}
+        change=GovernanceStore._draft_change(draft)
+        self.assertEqual(change['difficulty'],'中等')
+        self.assertEqual(change['expected_response'],'条件不清时不能继续操作')
+        self.assertNotIn('user_role',change)
+
+    def test_readonly_dataset_audit_never_starts_provider_or_mutation(self):
+        from api_fixture import main
+        from fastapi.testclient import TestClient
+        from unittest.mock import Mock, patch
+        store=Mock()
+        store.generation_run.return_value={'question_ids':['new']}
+        store.candidate_rows.return_value=[{'id':'new','question':'怎样安全操作？','raw':{'replaces_question_id':'old'}}]
+        store.question.return_value={'id':'old','question':'师傅，客户现场怎样操作？'}
+        with patch.object(main,'store',store), patch.object(main,'ai_service') as service:
+            result=TestClient(main.app).get('/api/governance/generation-runs/fixture/naturalness-audit')
+            self.assertEqual(result.status_code,200)
+            self.assertTrue(result.json()['advisory_only'])
+            self.assertTrue(result.json()['questions'][0]['changed'])
+            service.business_quality_audit.assert_not_called()
+            store.save_quality_audit.assert_not_called()
+            store.update_question.assert_not_called()
+            store.generation_run.return_value=None
+            self.assertEqual(TestClient(main.app).get('/api/governance/generation-runs/missing/naturalness-audit').status_code,404)

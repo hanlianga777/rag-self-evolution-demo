@@ -99,9 +99,11 @@ it("shows persisted partial slots, failure details, and only the refill action",
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/questions") || url.includes("/candidates?")) ? goldenFixture(url, rows) : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.querySelector(".generation-progress")?.textContent).toContain("Hard Valid 12/20");
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.body.textContent).toContain("已处理 20/20 · 100%");
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
@@ -110,6 +112,7 @@ it("shows persisted partial slots, failure details, and only the refill action",
   expect(document.body.textContent).not.toContain("生成 V1 Mini 8 / 4 / 8");
   expect(document.querySelector(".review-batch")).toBeNull();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-NEW");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Slot 20 / 20");
@@ -131,11 +134,13 @@ for (const count of [10, 12, 19]) {
     const root = createRoot(document.body.appendChild(document.createElement("div")));
     await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: rows, snapshots: [] }} />));
     expect(document.querySelector(".review-table")?.textContent).toContain(`题目 ${count}`);
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
     expect(document.querySelector(".generation-progress")?.textContent).toContain(`Hard Valid ${count}/20`);
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-partial");
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Slot 20 / 20");
     await act(async () => root.unmount());

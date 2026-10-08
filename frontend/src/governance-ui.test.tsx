@@ -220,6 +220,7 @@ it("restores a running generation and reads persisted slot progress", async () =
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-live", status: "queued", question_ids: [], artifacts: {} }], dataset: [] }} />); });
   expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-live"));
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.body.textContent).toContain("Q03");
   expect(document.body.textContent).toContain("已处理 2/20 · 10%");
@@ -232,6 +233,7 @@ it("shows the current automatic refill round and remaining slots", async () => {
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : url.endsWith("/GGEN-refill") ? run : url.endsWith("/api/dataset") || url.endsWith("/api/governance/revisions") || url.endsWith("/api/governance/snapshots") ? [] : goldenFixture(url, [])), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [] }} />));
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.querySelector(".generation-progress")?.textContent).toContain("Round 2/3 · 剩余 6 道");
   await act(async () => root.unmount());
@@ -255,10 +257,14 @@ it("shows 20 compact review rows, honest filters, and three full-run exports", a
   expect(document.body.textContent).toContain("需要人工关注 8");
   expect(document.querySelector(".review-filters")?.textContent).not.toContain("QC 未通过");
   expect(document.querySelector<HTMLButtonElement>(".gate-one-action .primary")?.disabled).toBe(true);
-  expect(document.querySelectorAll(".export-menu a")).toHaveLength(3);
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  expect(document.querySelectorAll('.snapshot-history a[download]')).toHaveLength(3);
+  await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
   await act(async () => { ([...document.querySelectorAll(".review-filters button")].find(button => button.textContent?.includes("需要人工关注")) as HTMLButtonElement).click(); });
   expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(8);
-  expect(document.querySelectorAll(".export-menu a")).toHaveLength(3);
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  expect(document.querySelectorAll('.snapshot-history a[download]')).toHaveLength(3);
+  await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
   await act(async () => { ([...document.querySelectorAll(".review-table tbody button")][0] as HTMLButtonElement).click(); });
   expect(document.body.textContent).toContain("质量检查尚未达到可批准状态");
   await act(async () => root.unmount());
@@ -270,6 +276,7 @@ it("shows persisted quality rerun progress and resumes polling after refresh", a
   vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, questions) : run), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [run], dataset: questions }} />); });
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.body.textContent).toContain("4 / 20");
   expect(document.body.textContent).toContain("运行中");

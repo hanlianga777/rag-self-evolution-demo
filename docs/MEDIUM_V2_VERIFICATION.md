@@ -1,3 +1,5 @@
+> Historical：本页保留初次生成结果；当前集中修订结果见[最新收口验收](MEDIUM_V2_POLISH_VERIFICATION.md)。
+
 # Medium Golden V2 实施与真实验收（2026-10-08）
 
 独立Run `GGEN-20261008050011728151`，Plan `PLAN-5bc41ca6f943757baa34de61`，Knowledge `KNOW-20261005060656904283`。实施基线与origin/main均为 `cdce03549cd5694c09c391ef6680f8d74258fc1c`。

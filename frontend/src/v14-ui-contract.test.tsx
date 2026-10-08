@@ -35,7 +35,7 @@ it.each([true, false])("I4 manual current Preview is available with legacy Run=%
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") { posts.push({ url, body: JSON.parse(init.body as string) }); return new Response(JSON.stringify(previewPlan())); } return new Response(JSON.stringify([])); }));
   await render(<GovernancePage data={input} />);
   expect(posts).toHaveLength(0);
-  if (legacy) await clickText("运行审计");
+  if (legacy) { await clickText("历史版本"); await clickText("运行审计"); }
   await clickText("预览当前 Corpus Coverage");
   expect(posts).toEqual([{ url: expect.stringContaining("/api/governance/coverage-preview"), body: { profile: "mini" } }]);
   expect(document.body.textContent).toContain("当前 Corpus · V2 Coverage Preview");
@@ -276,6 +276,7 @@ it("review R3 persisted Golden risks count and filter exact rows without changin
   expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(5);
   expect(document.querySelector(".review-table tbody")?.textContent).toContain("P0 确定性阻断");
   expect(document.querySelector(".exception-summary")).toBeNull();
+  await clickText("历史版本");
   await clickText("运行审计");
   expect(document.querySelector(".drawer-body")?.textContent).toContain("QC P0 · 2");
   expect(document.querySelector(".drawer-body")?.textContent).toContain("疑似伪负向 · 1");

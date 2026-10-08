@@ -77,3 +77,35 @@ def instruction(slot, repair=None):
             + ('clarify必须存在妨碍唯一回答的真实缺失条件或产品歧义，先识别缺失的关键条件，并在用户问题中保留缺失；不能把条件明确且手册直接给出步骤的普通操作题标为澄清题。' if slot.get('negative_subtype') == 'clarify' else '')
             + ('消融严格采用colloquial语义，用真实口语替换专业表达，意图与证据保持一致，不靠错字凑难度。' if category == 'ablation' else '')
             + (f'上次失败：{repair}。只修本Slot。' if repair else ''))
+
+
+def dataset_quality_audit(rows, before=None):
+    """Local advisory only: repeated phrases do not create a freeze gate."""
+    from difflib import SequenceMatcher
+    before = {row['id']:row for row in (before or [])}
+    frequencies = {phrase:sum(phrase in row['question'] for row in rows) for phrase in ('师傅', '客户现场', '你帮我', '我在客户')}
+    findings = []
+    for row in rows:
+        question = row['question']; reasons = []
+        for phrase, count in frequencies.items():
+            if phrase in question and count >= max(5, len(rows) * .2):
+                reasons.append({'type':'高频表达', 'reason':f'“{phrase}”出现在{count}/{len(rows)}题；结合角色与必要条件复核，不单独判失败', 'action':'删除无意义称谓或背景，保留影响答案的条件'})
+        if len(re.findall(r'[？?]', question)) >= 4:
+            reasons.append({'type':'多意图复核', 'reason':'至少四个问句；需区分同一任务的必要步骤与无关意图堆叠', 'action':'按实际工作任务收敛，不机械限制字数'})
+        if re.search(r'连续[四4]条|章节.*原文|全部.*属性', question):
+            reasons.append({'type':'抽取式提问', 'reason':'依赖文档顺序或枚举结构，需核对真实业务动机', 'action':'改为故障或操作任务，保留真实证据'})
+        audit = row.get('quality_audit') or {}
+        for check, passed in audit.get('checks', {}).items():
+            if not passed:
+                reasons.append({'type':'已有业务审计', 'reason':f'{check}: {audit.get("reason", "未记录")}', 'action':'只修订该题，按新内容身份重验'})
+        source = row.get('raw', {}).get('replaces_question_id', row['id']);original = before.get(source)
+        findings.append({'question_id':row['id'], 'slot':row.get('raw',{}).get('coverage_slot'), 'findings':reasons, 'before':original['question'] if original else question, 'after':question, 'changed':bool(original and original['question'] != question)})
+    duplicates = []
+    for index, row in enumerate(rows):
+        for other in rows[index+1:]:
+            # ponytail: O(n²) shortlist is 1,225 pairs at Medium50; reuse vectors for large pools.
+            a,b = [re.sub(r'[\s，。！？、“”]', '', value) for value in (row['question'],other['question'])]
+            similarity = SequenceMatcher(None,a,b,autojunk=False).ratio()
+            if min(len(a),len(b)) >= 16 and similarity >= .8:
+                duplicates.append({'question_ids':[row['id'],other['id']], 'similarity':round(similarity,3), 'method':'local_lexical_shortlist', 'action':'结合意图和已有语义审计复核，不自动判重复'})
+    return {'audit_version':'dataset-naturalness-v1', 'advisory_only':True, 'question_count':len(rows), 'frequencies':frequencies, 'questions':findings, 'duplicate_shortlist':duplicates}

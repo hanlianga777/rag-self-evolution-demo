@@ -82,6 +82,27 @@ class RevisionWorkflowTests(unittest.TestCase):
             self.store.record_qc(question_id, {"score": 90, "priority": "P2", "reason": "通过"}, "passed")
             self.store.review_question(question_id, "needs_revision" if index in {0, 8, 12, 14} else "approved", "reviewer", reason="业务价值低" if index == 0 else "人工判定" if index in {8, 12, 14} else None)
 
+    def test_business_difficulty_and_expected_response_survive_preview_apply(self):
+        key = self.ids[0]
+        old = self.store.question(key)
+        with self.store.connection() as connection:
+            connection.execute("UPDATE questions SET raw_json=? WHERE id=?", (json.dumps({**old['raw'], 'generation_strategy':'business_v2', 'business_scenario':'设备现场检查', 'user_intent':'确认操作', 'difficulty':'基础'}), key))
+        invalid = self.store.start_revision(key, 'manual_edit', '无效预期回复', False, {key:{'question':'启动前如何检查？', 'expected_response':[]}}, self.chunks)
+        rejected = self.store.prepare_revision(invalid['id'], self.chunks, similarity=lambda _a,_b:.6)
+        self.assertEqual(rejected['status'], 'failed')
+        self.assertIn('预期回复必须为非空文本', rejected['error'])
+        self.assertEqual(self.store.question(key)['question'], old['question'])
+        revision = self.store.start_revision(key, 'manual_edit', '业务意图收敛', False, {key:{'question':'启动前如何检查急停按钮？', 'reference_answer':'启动前检查急停按钮', 'source_chunk_ids':['C2'], 'difficulty':'中等', 'expected_response':'确认安全后开始清洁'}}, self.chunks)
+        ready = self.store.prepare_revision(revision['id'], self.chunks, similarity=lambda _a,_b:.6)
+        self.assertEqual(ready['status'], 'preview_ready', ready.get('error'))
+        applied = self.store.apply_revision(revision['id'], self.chunks, similarity=lambda _a,_b:.6)
+        current = self.store.question(applied['question_ids'][0])
+        self.assertEqual(current['raw']['difficulty'], '中等')
+        self.assertEqual(current['raw']['expected_response'], '确认安全后开始清洁')
+        self.assertEqual(current['probe_status'], 'probe_pending')
+        self.assertEqual(current['qc_status'], 'qc_pending')
+        self.assertEqual(self.store.dataset_snapshots(), [])
+
     def test_review_reason_is_saved_without_inventing_older_event_reason(self):
         latest = self.store.review_history(self.ids[0])[0]
         self.assertEqual(latest["reason"], "业务价值低")

@@ -10,3 +10,5 @@
 - 最小精准修改；验证源码、接口、数据与页面一致后提交范围内文件、push origin/main并确认干净同步。
 
 - Business Golden V2复用既有Topic及资格审计，角色/场景/意图/难度与Child/Parent来源必须持久化；负向Topic材料Anchor不是答案Evidence，真实Probe仍校验整个Corpus边界。已有Full与Snapshot只读保护，新工作集不自动冻结。
+
+- 数据集自然度/多样性诊断只作建议；内容修订保留Revision History并按新身份检查，不用词面规则或旧审计自动关闭风险。
