@@ -117,6 +117,7 @@ class GovernanceStore:
                 """
                 CREATE TABLE IF NOT EXISTS question_quality_audits (id INTEGER PRIMARY KEY, question_id TEXT NOT NULL, content_hash TEXT NOT NULL, audit_json TEXT NOT NULL, created_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS pipeline_config_draft (id INTEGER PRIMARY KEY CHECK(id=1), draft_json TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS business_import_batches (sha256 TEXT PRIMARY KEY, result_json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS coverage_plan_previews (id TEXT PRIMARY KEY, plan_json TEXT NOT NULL, created_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS dataset_versions (id TEXT PRIMARY KEY, status TEXT NOT NULL, source TEXT NOT NULL, snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL);
@@ -358,13 +359,33 @@ class GovernanceStore:
             human = item['stage'] == 'golden' and item['review_status'] == 'approved' and (manual.get(item['id'])!='dataset_confirmed' or provenance.get(item['id'])=='human') and item['probe_status']=='probe_passed' and item['qc_id'] is not None and not any(reason in reasons for reason in ('质量记录已过期','Corpus 身份已变化','局部修订未完成','Hard Validation 未通过')) and (not decisions.get(item['id'], {}).get('qc_created_at') or decisions[item['id']]['qc_created_at']==item['qc_created_at'])
             status = 'human_approved' if human else 'needs_human_review' if reasons else 'machine_qualified'
             # Historical safe rows retain their completed machine evidence; audit failures block current rows.
-            result.append({**{key:item.get(key) for key in ('id','stage','review_status','probe_status','qc_status','question','test_category','negative_subtype','construction_type','updated_at')},
-                'raw': {key:item['raw'].get(key) for key in ('generation_run_id','coverage_slot','topic_cluster','source','source_positive_id')},
+            result.append({**{key:item.get(key) for key in ('id','stage','review_status','probe_status','qc_status','question','test_category','negative_subtype','construction_type','created_at','updated_at')},
+                'raw': {key:item['raw'].get(key) for key in ('generation_run_id','coverage_slot','topic_cluster','source','source_positive_id','source_reference','replaces_question_id','classification_status')},
                 'slot':item['raw'].get('coverage_slot'), 'topic_cluster':item['raw'].get('topic_cluster'),
                 'probe':{'probe_details':{'classification':item['classification']}}, 'qc':{'priority':item['priority'],'score':item['qc_score']},
                 'qualification_status':status,'qualification_source':'human' if human else 'machine' if status=='machine_qualified' else None,
                 'attention_reasons':reasons, 'attention_categories':self.attention_categories(reasons), 'quality_audit':audit})
         return result
+
+    def active_pool_rows(self):
+        rows = self.candidate_rows()
+        parents = {row['id']: row['raw'].get('replaces_question_id') or (row['raw'].get('source_reference') or {}).get('question_id') for row in rows}
+        current = {}
+        for row in rows:
+            if row['stage'] == 'superseded' or not (row['raw'].get('generation_run_id') or row['raw'].get('source') == 'business_import'):
+                continue
+            root, visited = row['id'], set()
+            while parents.get(root) and root not in visited:
+                visited.add(root); root = parents[root]
+            key = (root, row['test_category'])
+            if key not in current or (row['created_at'], row['id']) > (current[key]['created_at'], current[key]['id']):
+                current[key] = row
+        return sorted(current.values(), key=lambda row: row['id'])
+
+    def business_import_receipt(self, file_hash):
+        with self.connection() as connection:
+            row = connection.execute('SELECT result_json FROM business_import_batches WHERE sha256=?', (file_hash,)).fetchone()
+        return _load(row[0], {}) if row else None
 
     @staticmethod
     def gate_summary(run, rows):
@@ -384,11 +405,13 @@ class GovernanceStore:
         return {'gate':1,'status':'ready' if ready else 'pending','expected':expected,'generated':len(rows),'machine_qualified':machine,'needs_human_review':len(rows)-machine-human,'human_approved':human,'approved':human,'human_review_pending':len(rows)-machine-human,'profile_complete':counts_ok,'coverage_complete':coverage_ok,
             'probe_passed':sum(row['probe_status']=='probe_passed' for row in rows),'qc_completed':sum(row['qc_status'] in {'qc_passed','qc_failed'} for row in rows),'qc_passed':sum(row['qc_status']=='qc_passed' for row in rows)}
 
-    def save_business_candidates(self, candidates: list[dict], filename: str, file_hash: str):
+    def save_business_candidates(self, candidates: list[dict], filename: str, file_hash: str, errors=None):
         now, ids = _now(), []
         prefix = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            receipt = connection.execute('SELECT result_json FROM business_import_batches WHERE sha256=?', (file_hash,)).fetchone()
+            if receipt: return _load(receipt[0], {})['question_ids']
             existing = {_normalized(row[0]) for row in connection.execute("SELECT question FROM questions")}
             for index, candidate in enumerate(candidates):
                 key = _normalized(candidate['question'])
@@ -399,6 +422,7 @@ class GovernanceStore:
                 raw = {**candidate, 'id': question_id, 'source': 'business_import', 'import_audit': {'filename': filename, 'sha256': file_hash, 'row': candidate['import_row'], 'imported_at': now}}
                 connection.execute("INSERT INTO questions (id, stage, legacy_question_type, test_category, negative_subtype, review_status, probe_status, qc_status, question, reference_answer, evidence_json, raw_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (question_id, 'candidate', 'v1_mini', candidate['test_category'], candidate.get('negative_subtype'), 'human_review_pending', 'probe_pending', 'qc_pending', candidate['question'], candidate.get('reference_answer'), _json(candidate.get('evidence', [])), _json(raw), now, now))
                 ids.append(question_id)
+            connection.execute('INSERT INTO business_import_batches VALUES (?,?)', (file_hash, _json({'question_ids': ids, 'imported_count': len(ids), 'filename': filename, 'accepted_rows': [candidate['import_row'] for candidate in candidates], 'errors': errors or []})))
         return ids
 
     def coverage_preview(self, profile_name, chunks, embeddings, embedding_identity=None):
@@ -444,13 +468,13 @@ class GovernanceStore:
             embeddings = AiService(self, CorpusStore(), None, True)._indexed_embeddings(chunks)
         return self.coverage_preview(profile_name, chunks, embeddings)
 
-    def preview_pool_run(self, profile_name, question_ids, chunks, plan_id=None, *, embeddings=None, question_embedder=None):
+    def preview_pool_run(self, profile_name, question_ids, chunks, plan_id=None, *, embeddings=None, question_embedder=None, preferred_ids=()):
         from .golden_v2 import validate_golden_candidate, match_pool
         plan = self.resolve_coverage_plan(profile_name, chunks, plan_id, embeddings)
         if len(set(question_ids)) != len(question_ids):
             raise ValueError('不可重复选择')
-        validations, seen = {}, set()
-        for key in sorted(question_ids):
+        validations, seen, source_plans = {}, set(), {}
+        for key in sorted(question_ids, key=lambda key: (key not in preferred_ids, key)):
             item = self.question(key)
             context = {'seen': seen, 'corpus_fingerprint': manifest_identity(current_manifest())}
             if item['test_category'] == 'negative' and question_embedder:
@@ -459,11 +483,33 @@ class GovernanceStore:
                 except (OSError, ValueError, RuntimeError):
                     pass
             validations[key] = validate_golden_candidate({**item['raw'], **item}, chunks, plan, context)
+            if item['test_category'] == 'negative' and not question_embedder:
+                raw = item['raw']; anchor = ((raw.get('validation') or {}).get('coverage_match') or raw.get('coverage_match') or {}).get('anchor') or {}
+                run_id = raw.get('generation_run_id')
+                if run_id and run_id not in source_plans:
+                    source_plans[run_id] = (self.generation_run(run_id, qualification=False) or {}).get('artifacts', {}).get('hard_validation', {}).get('frozen_plan') or {}
+                old = source_plans.get(run_id, {})
+                same_space = old.get('corpus_fingerprint') == plan['corpus_fingerprint'] and old.get('chunk_clusters') == plan['chunk_clusters'] and old.get('embedding_fingerprint') == plan['embedding_fingerprint'] and [(c['cluster_id'], c.get('center')) for c in old.get('clusters', [])] == [(c['cluster_id'], c.get('center')) for c in plan['clusters']]
+                if same_space and anchor.get('method') == 'local_embedding_nearest_center':
+                    topic = anchor.get('topic_cluster')
+                    slots = [slot['slot_id'] for slot in plan['slots'] if slot['evaluation_group'] == 'negative' and slot['topic_cluster'] == topic]
+                    validations[key]['coverage_match'] = {**validations[key]['coverage_match'], 'status': 'matched' if slots else 'gap', 'related_clusters': [topic], 'anchor': {**anchor, 'reused_plan_id': old['plan_id']}, 'eligible_slot_ids': slots}
+                    validations[key]['normalized_candidate']['coverage_match'] = validations[key]['coverage_match']
             if item['stage'] == 'superseded':
                 validations[key]['valid'] = False
                 validations[key]['blocking_errors'].append('候选题已被替代')
             seen.add(item['question'])
         return {**match_pool(plan, validations), 'coverage_plan': plan}
+
+    def autofill_pool_run(self, profile_name, selected, chunks, plan_id=None, *, embeddings=None):
+        from .golden_v2 import match_pool
+        rows = self.active_pool_rows()
+        eligible = [row['id'] for row in rows if row['qualification_status'] in {'machine_qualified', 'human_approved'} and row['id'] not in selected]
+        preview = self.preview_pool_run(profile_name, selected + eligible, chunks, plan_id, embeddings=embeddings, preferred_ids=selected)
+        matching = match_pool(preview['coverage_plan'], preview['validations'], preferred_ids=selected)
+        ids = list(dict.fromkeys(selected + list(matching['matching'].values())))[:max(len(selected), len(preview['coverage_plan']['slots']))]
+        final = self.preview_pool_run(profile_name, ids, chunks, preview['plan_id'])
+        return {**final, 'question_ids': ids, 'added_count': len(ids) - len(selected), 'rows': self.candidate_rows(ids)}
 
     def create_pool_run(self, profile_name, question_ids, chunks, plan_id=None, *, embeddings=None, question_embedder=None):
         preview = self.preview_pool_run(profile_name, question_ids, chunks, plan_id, embeddings=embeddings, question_embedder=question_embedder)

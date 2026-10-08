@@ -430,7 +430,7 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
     return {'valid': not errors, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'duplicate_checks': duplicate_checks, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION, 'original_table_evidence': context.get('original_tables', {})}
 
 
-def match_pool(plan, validations):
+def match_pool(plan, validations, preferred_ids=()):
     """Stable augmenting paths produce maximum matching, independent of UI order."""
     by_id = {key: result for key, result in validations.items() if result['valid']}
     edges = {key: sorted(value['coverage_match']['eligible_slot_ids']) for key, value in sorted(by_id.items())}
@@ -444,7 +444,7 @@ def match_pool(plan, validations):
                 owners[slot] = key
                 return True
         return False
-    for key in edges:
+    for key in sorted(edges, key=lambda key: (key not in preferred_ids, key)):
         assign(key, set())
     gaps = [{'slot_id': s['slot_id'], 'topic_cluster': s['topic_cluster'], 'evaluation_group': s['evaluation_group'], 'construction_type': s['construction_type'], 'available_candidates': sum(s['slot_id'] in options for options in edges.values()), 'deficit': 1} for s in plan['slots'] if s['slot_id'] not in owners]
     counts = Counter(value['normalized_candidate']['test_category'] for value in validations.values())

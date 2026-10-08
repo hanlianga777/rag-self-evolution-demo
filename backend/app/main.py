@@ -394,19 +394,29 @@ def preview_pool_run(payload: PoolRunRequest):
     try:
         with CORPUS_LOCK:
             plan = current_coverage_plan(payload.profile, payload.plan_id)
-            return store.preview_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'], question_embedder=ai_service.negative_topic_embedding)
+            return store.preview_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'])
     except (ValueError, KeyError, ProviderUnavailable) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
+@app.post('/api/governance/generation-runs/from-pool/autofill', dependencies=[Depends(require_trusted_origin)])
+def autofill_pool_run(payload: PoolRunRequest):
+    try:
+        with CORPUS_LOCK:
+            plan = current_coverage_plan(payload.profile, payload.plan_id)
+            return store.autofill_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'])
+    except (ValueError, KeyError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @app.get('/api/governance/import-template')
-def import_template(format: Literal['csv', 'xlsx'] = 'csv'):
+def import_template(format: Literal['csv', 'xlsx'] = 'xlsx'):
     content, media_type = business_import.template(format)
     return Response(content, media_type=media_type, headers={'Content-Disposition': f'attachment; filename="golden-business-template.{format}"'})
 
 
 @app.post('/api/governance/imports', dependencies=[Depends(require_trusted_origin)])
-async def import_candidates(request: Request, filename: str, confirm: bool = False):
+async def import_candidates(request: Request, filename: str, confirm: bool = False, allow_partial: bool = False, preview_hash: str | None = None):
     try:
         data = bytearray()
         async for part in request.stream():
@@ -414,13 +424,22 @@ async def import_candidates(request: Request, filename: str, confirm: bool = Fal
             if len(data) > 10 * 1024 * 1024:
                 raise ValueError("文件超过 10 MB")
         content = bytes(data)
+        file_hash = hashlib.sha256(content).hexdigest()
+        if confirm and preview_hash and preview_hash != file_hash:
+            raise ValueError('文件已变化，请重新预览')
+        receipt = store.business_import_receipt(file_hash) if confirm else None
+        if receipt: return {**receipt, 'replayed': True, 'created_count': 0}
         with CORPUS_LOCK:
+            receipt = store.business_import_receipt(file_hash) if confirm else None
+            if receipt: return {**receipt, 'replayed': True, 'created_count': 0}
             plan = current_coverage_plan('mini', None)
-            result = business_import.parse_import(content, Path(filename).name, corpus.chunks(), store.questions(), plan, ai_service.negative_topic_embedding)
+            result = business_import.parse_import(content, Path(filename).name, corpus.chunks(), store.questions(), plan)
             if confirm:
-                if result['error_count'] or not result['valid_rows']:
+                if result['error_count'] and not allow_partial or not result['valid_rows']:
                     raise ValueError('请先修正全部错误，再确认导入')
-                result['question_ids'] = store.save_business_candidates(result['valid_rows'], Path(filename).name, result['file_hash'])
+                result['question_ids'] = store.save_business_candidates(result['valid_rows'], Path(filename).name, result['file_hash'], [row for row in result['rows'] if row['errors']])
+                result['imported_count'] = len(result['question_ids'])
+                result['created_count'] = result['imported_count']
         return result
     except (ValueError, UnicodeError, OSError, ProviderUnavailable) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
@@ -431,7 +450,7 @@ def create_pool_run(payload: PoolRunRequest):
     try:
         with CORPUS_LOCK:
             plan = current_coverage_plan(payload.profile, payload.plan_id)
-            return store.create_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'], question_embedder=ai_service.negative_topic_embedding)
+            return store.create_pool_run(payload.profile, payload.question_ids, corpus.chunks(), plan['plan_id'])
     except (ValueError, KeyError, ProviderUnavailable) as error:
         raise HTTPException(status_code=422, detail=json.loads(str(error)) if str(error).startswith('{') else str(error)) from error
 
@@ -452,9 +471,7 @@ def candidate_list(run_id: str | None = None, offset: int = Query(0, ge=0), limi
     run = store.generation_run(run_id, qualification=False) if run_id else None
     if run_id and run is None:
         raise HTTPException(status_code=404, detail="Generation run not found")
-    rows = store.candidate_rows(run['question_ids'] if run else None)
-    if not run:
-        rows = [row for row in rows if row['stage']!='superseded' and (row['raw'].get('generation_run_id') or row['raw'].get('source')=='business_import')]
+    rows = store.candidate_rows(run['question_ids']) if run else store.active_pool_rows()
     summary = {'total':len(rows), 'ai':sum(row['raw'].get('source')!='business_import' for row in rows), 'business':sum(row['raw'].get('source')=='business_import' for row in rows),
         'machine_qualified':sum(row['qualification_status'] in {'machine_qualified','human_approved'} for row in rows),
         'needs_processing':sum(row['qualification_status']=='needs_human_review' and row['probe_status']!='probe_pending' and row['qc_status']!='qc_pending' for row in rows),

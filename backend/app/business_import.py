@@ -11,6 +11,7 @@ from .governance import _normalized
 from .golden_v2 import normalize
 
 COLUMNS = ['Question', 'Reference Answer', 'Evidence', 'Document', 'Question Type', 'Product', 'Version', 'Notes', 'Evaluation Group', 'Expected Behavior', 'Negative Subtype', 'Ablation Attribute', 'Original Entity', 'Alias Expression']
+BUSINESS_COLUMNS = ['业务问题（必填）', '产品/型号（选填）', '业务场景（选填）', '参考答案/处理经验（选填）']
 GROUPS = {'positive', 'ablation', 'negative'}
 BEHAVIORS = {'clarify', 'insufficient_evidence', 'safe_rejection', 'prompt_injection_resistance'}
 SUBTYPES = {'clarify', 'insufficient_evidence', 'safe_rejection', 'safety_critical', 'prompt_injection'}
@@ -26,12 +27,27 @@ def template(format):
         return ('\ufeff' + output.getvalue()).encode('utf-8'), 'text/csv'
     if format == 'xlsx':
         from openpyxl import Workbook
-        workbook = Workbook(); workbook.active.append(COLUMNS)
-        workbook.active.freeze_panes = 'A2'
+        from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+        workbook = Workbook(); sheet = workbook.active; sheet.title = '业务问题'
+        sheet.append(BUSINESS_COLUMNS)
+        examples = workbook.create_sheet('填写示例'); examples.append(BUSINESS_COLUMNS)
+        examples.append(['机器人急停解除后仍无法启动，应该检查什么？', 'CR 系列', '生产现场恢复运行', '先核对报警和安全回路，具体步骤待文档核验。'])
+        examples.append(['更换夹具后抓取位置偏移，如何排查？', '', '售后调试', ''])
+        examples.append(['控制柜提示温度报警，现场应如何处理？', '', '', '记录报警和环境条件，由售后确认处理步骤。'])
         guide = workbook.create_sheet('填写说明')
-        guide.append(['正向/消融：Evidence 填当前 Corpus 的逐字原文，多个证据用换行分隔；Document 填文档名或 ID，多个用分号分隔。'])
-        guide.append(['Evaluation Group 必填 positive/ablation/negative；构造题型可留空。消融题填写 Ablation Attribute。'])
-        guide.append(['Negative 填 Expected Behavior 与 Negative Subtype，留空答案和证据。导入不会执行模型或审批。'])
+        for text in ('每行填写一个实际遇到的问题。', '设备型号和业务场景可以留空。', '有处理经验可以填写，没有可以留空。', '上传后进入候选池，不会直接成为正式 Golden。'):
+            guide.append([text])
+        for sheet in workbook:
+            sheet.freeze_panes = 'A2'
+            for column, width in zip('ABCD', (48, 24, 36, 56)):
+                sheet.column_dimensions[column].width = width
+            if sheet == guide: sheet.column_dimensions['A'].width = 80
+            for row in sheet:
+                for cell in row:
+                    cell.font = Font(name='微软雅黑', size=11, bold=cell.row == 1 and sheet != guide)
+                    cell.alignment = Alignment(vertical='top', wrap_text=True)
+                    cell.border = Border(bottom=Side(style='thin', color='DDDDDD'))
+                    if cell.row == 1 and sheet != guide: cell.fill = PatternFill('solid', fgColor='EEEEEE')
         output = io.BytesIO(); workbook.save(output)
         return output.getvalue(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     raise ValueError('仅支持 CSV / XLSX')
@@ -55,7 +71,7 @@ def parse_import(data, filename, chunks, existing, coverage_plan=None, question_
         except (BadZipFile, InvalidFileException, ParseError, KeyError) as error:
             raise ValueError('XLSX 格式无效') from error
         try:
-            rows = list(islice(workbook.active.iter_rows(values_only=True), 1002))
+            rows = list(islice((workbook['业务问题'] if '业务问题' in workbook.sheetnames else workbook.active).iter_rows(values_only=True), 1002))
         finally:
             workbook.close()
     else:
@@ -63,8 +79,9 @@ def parse_import(data, filename, chunks, existing, coverage_plan=None, question_
     if not rows or len(rows) > 1001:
         raise ValueError('需要表头，且最多 1000 行')
     headers = [str(value or '').strip() for value in rows[0]]
-    if len(headers) != len(set(headers)) or not {'Question', 'Evaluation Group'}.issubset(headers):
-        raise ValueError('表头重复或缺少 Question / Evaluation Group')
+    chinese = BUSINESS_COLUMNS[0] in headers
+    if len(headers) != len(set(headers)) or (not chinese and not {'Question', 'Evaluation Group'}.issubset(headers)) or (chinese and any(header not in BUSINESS_COLUMNS for header in headers)):
+        raise ValueError('表头重复或缺少业务问题；旧模板需 Question / Evaluation Group')
     seen = {_normalized(item['question']) for item in existing}
     previews, valid = [], []
     for index, row in enumerate(rows[1:], 2):
@@ -74,6 +91,17 @@ def parse_import(data, filename, chunks, existing, coverage_plan=None, question_
         errors = []
         if any(value.startswith('=') for value in fields.values()): errors.append('不接受公式单元格')
         if len(row) > len(headers): errors.append('数据列数超过表头')
+        if chinese:
+            question = fields.get(BUSINESS_COLUMNS[0], '')
+            if not question or len(question) > 1000: errors.append('业务问题必填且最多 1000 字')
+            if _normalized(question) in seen: errors.append('重复题目')
+            seen.add(_normalized(question))
+            for name, limit in zip(BUSINESS_COLUMNS[1:], (200, 2000, 4000)):
+                if len(fields.get(name, '')) > limit: errors.append(f'{name}最多 {limit} 字')
+            candidate = {'question': question, 'product': fields.get(BUSINESS_COLUMNS[1]) or None, 'test_category': 'unclassified', 'reference_answer': None, 'evidence': [], 'classification_status': 'pending', 'import_context': {'scenario': fields.get(BUSINESS_COLUMNS[2], ''), 'provided_reference': fields.get(BUSINESS_COLUMNS[3], '')}, 'import_fields': fields, 'import_row': index, 'validation': {'valid': False, 'blocking_errors': ['待分类、待校验；Evidence 尚未匹配']}}
+            previews.append({'row': index, 'fields': fields, 'errors': list(dict.fromkeys(errors)), 'validation': candidate['validation']})
+            if not errors: valid.append(candidate)
+            continue
         question, group = fields.get('Question', ''), fields.get('Evaluation Group', '').lower()
         key = _normalized(question)
         if not question or len(question) > 1000: errors.append('Question 必填且最多 1000 字')
@@ -111,4 +139,4 @@ def parse_import(data, filename, chunks, existing, coverage_plan=None, question_
         candidate = {**validation['normalized_candidate'], 'validation': {k: v for k, v in validation.items() if k != 'normalized_candidate'}}
         previews.append({'row': index, 'fields': fields, 'errors': list(dict.fromkeys(errors)), 'validation': validation})
         if not errors: valid.append(candidate)
-    return {'fields': headers, 'rows': previews, 'valid_rows': valid, 'valid_count': len(valid), 'error_count': sum(bool(row['errors']) for row in previews), 'file_hash': hashlib.sha256(data).hexdigest()}
+    return {'format': 'business_zh' if chinese else 'legacy', 'recognized_count': len(previews), 'fields': headers, 'rows': previews, 'valid_rows': valid, 'valid_count': len(valid), 'error_count': sum(bool(row['errors']) for row in previews), 'file_hash': hashlib.sha256(data).hexdigest()}

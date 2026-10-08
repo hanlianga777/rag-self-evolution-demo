@@ -1,4 +1,5 @@
 const translations: Record<string, string> = {
+  "unclassified": "待分类",
   "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
   "completed": "已完成", "running": "运行中", "queued": "排队中", "evaluating": "评测中",
   "live": "服务回答", "mock": "本地响应", "Ready": "已验证可用", "Configured (Unverified)": "已配置（未验证）", "Unavailable": "不可用", "passed": "通过", "failed": "未通过", "skipped": "未执行",

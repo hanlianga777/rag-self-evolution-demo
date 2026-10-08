@@ -8,6 +8,8 @@
 
 Pipeline与Golden采用身份隔离的内存Cache/SWR；Current/Pool保留后端30条分页、前端滚动增量加载及详情懒加载。所有右侧Drawer共享单题详情母版 `--drawer-width:800px`，全高100dvh，小屏100vw。长期SPEC/图源同步规则见[AGENTS.md](AGENTS.md)。
 
+候选池默认一行质量筛选与业务用例菜单；下载中文四列Excel，上传后在紧凑窗口预览并明确确认有效行。旧CSV/XLSX继续兼容，处理经验保留为待核验材料，不直接充当Golden答案。选题按Corpus会话暂存；智能补齐只复用现有候选，不调用模型，缺口保持真实。完整工作集仍受Profile、Evidence、Coverage及人工Gate约束。[本轮验收与真实统计](docs/CANDIDATE_POOL_IMPORT_VERIFICATION.md)。业务/技术架构关系及唯一图源不变。
+
 ## 产品闭环
 
 `知识库 → Golden 规划与治理 → Gate 1 → Baseline / Bad Case → Optimization Agent → A/B/C → Sandbox / Regression → Gate 2 → 条件 D → Gate 3 人工发布 → Production → 问答验证 / Monitoring → 人工确认 Trigger → 下一轮优化`

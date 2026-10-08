@@ -100,7 +100,7 @@ export function ShortId({ value }: { value?: string | null }) {
   return <button type="button" className="short-id" title={`${value} · 点击复制`} aria-label={`复制 ID ${value}`} onClick={() => void navigator.clipboard?.writeText(value)}>{value.length > 24 ? `${value.slice(0, 7)}…${value.slice(-7)}` : value}</button>;
 }
 
-export function ActionMenu({ label, children }: { label:string; children:ReactNode }) {
+export function ActionMenu({ label, children, triggerText = "⋯" }: { label:string; children:ReactNode; triggerText?: string }) {
   const id=useId(), trigger=useRef<HTMLButtonElement>(null), menu=useRef<HTMLDivElement>(null), [open,setOpen]=useState(false);
   useEffect(()=>{
     const node=menu.current;
@@ -116,5 +116,5 @@ export function ActionMenu({ label, children }: { label:string; children:ReactNo
     node?.addEventListener("toggle",position);
     return ()=>node?.removeEventListener("toggle",position);
   },[]);
-  return <><button ref={trigger} type="button" className="secondary" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={id} {...{popovertarget:id}}>⋯</button><div ref={menu} id={id} {...{popover:"auto"}} role="menu" aria-label={label} className="action-menu-content" onClick={event=>{if ((event.target as HTMLElement).closest("button,a")) menu.current?.hidePopover?.();}}>{children}</div></>;
+  return <><button ref={trigger} type="button" className="secondary" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={id} {...{popovertarget:id}}>{triggerText}</button><div ref={menu} id={id} {...{popover:"auto"}} role="menu" aria-label={label} className="action-menu-content" onClick={event=>{if ((event.target as HTMLElement).closest("button,a")) menu.current?.hidePopover?.();}}>{children}</div></>;
 }

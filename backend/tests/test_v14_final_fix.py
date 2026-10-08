@@ -128,7 +128,7 @@ class FinalQualityTests(unittest.TestCase):
     def test_i2_negative_judge_does_not_attach_old_a_judgment_to_new_b(self):
         candidate = {'question': '设备A额定电压是多少？', 'test_category': 'negative', 'construction_type': 'Ordinary',
                      'negative_subtype': 'insufficient_evidence', 'expected_behavior': 'insufficient_evidence', 'evidence': [], 'import_row': 2}
-        key = self.store.save_business_candidates([candidate], 'fixture.csv', 'fixture')[0]
+        key = self.store.save_business_candidates([candidate], 'fixture.csv', 'negative-fixture')[0]
         started, finish = threading.Event(), threading.Event()
         stub = type('Stub', (), {'search': lambda *_a, **_k: [], 'full_text_probe': lambda *_: {'coverage': {'status': 'complete'}, 'matches': [{'content': '设备B 额定电压：48V'}]}})()
         def judge(question, *_args):

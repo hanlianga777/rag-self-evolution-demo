@@ -77,32 +77,32 @@ it("keeps current frozen Golden separate from the latest work Run and hides an e
   await act(async () => root.unmount());
 });
 
-it("keeps candidate filters, search and explicit actions in a single toolbar", async () => {
+it("keeps compact pool toolbar and stashes selections across browse mode", async () => {
+  sessionStorage.clear();
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   const rows = [{ id: "pool-1", question: "刷盘检查", stage: "candidate", test_category: "positive", qualification_status: "machine_qualified", review_status: "human_review_pending", raw: { source: "business_import" } }, { id: "pool-2", question: "电池维护", stage: "candidate", test_category: "negative", review_status: "human_review_pending", raw: { source: "business_import" } }];
-  const fetcher = vi.fn(async (url: string, _init?: RequestInit) => new Response(JSON.stringify(goldenFixture(url, rows.filter(row => row.question.includes(new URL(url).searchParams.get("search") || "")))))); vi.stubGlobal("fetch", fetcher);
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => new Response(JSON.stringify(init?.method === "POST" ? {valid:false,gaps:[]} : goldenFixture(url, rows)))); vi.stubGlobal("fetch", fetcher);
   await act(async () => root.render(<BusinessImportPanel profiles={{mini:{positive_count:8,ablation_count:4,negative_count:8}}} items={rows} onCreated={async () => {}} />));
   const toolbar = document.querySelector(".candidate-pool-toolbar")!;
-  expect(toolbar.querySelectorAll('[role="combobox"]')).toHaveLength(2);
-  expect(toolbar.querySelector('input[type="search"]')).not.toBeNull();
-  expect(toolbar.textContent).toContain("导入业务用例");
-  expect(toolbar.textContent).toContain("创建 Golden");
-  expect(document.querySelector('[aria-label="候选质量筛选"]')).not.toBeNull();
-  expect(document.querySelector('[aria-label="候选质量"]')).toBeNull();
-  expect(document.querySelector(".pool-profile-match")).toBeNull();
+  expect(toolbar.querySelectorAll('[role="combobox"]')).toHaveLength(0);
+  expect(toolbar.querySelector('input[type="search"]')).toBeNull();
+  expect(toolbar.textContent).toContain("业务用例 ▾");
+  expect(toolbar.textContent).toContain("创建Golden");
+  expect(toolbar.querySelector('[aria-label="候选质量筛选"]')).not.toBeNull();
   expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("机器合格");
-  expect(document.querySelector(".candidate-pool-table")?.textContent).not.toContain("已批准");
   expect(document.querySelector('input[type="checkbox"]')).toBeNull();
-  await act(async () => [...toolbar.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="创建 Golden")!.click());
-  expect(document.querySelector(".pool-profile-match")?.textContent).toContain("已选 0 / 20");
-  expect(document.querySelector('input[type="checkbox"]')).not.toBeNull();
-  await act(async () => [...toolbar.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="返回浏览")!.click());
-  expect(document.querySelector(".pool-profile-match")).toBeNull();
-  const search = toolbar.querySelector<HTMLInputElement>('input[type="search"]')!;
-  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "刷盘"); search.dispatchEvent(new Event("input", { bubbles: true })); });
-  expect(document.querySelectorAll("tbody tr")).toHaveLength(1);
-  expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
-  await act(async () => root.unmount());
+  const click = async (text:string) => act(async () => { [...toolbar.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent===text)!.click(); });
+  await click("创建Golden");
+  expect(toolbar.textContent).toContain("已选0/20");
+  await act(async () => { document.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); });
+  expect(toolbar.textContent).toContain("已选1/20");
+  expect(document.querySelector(".pool-selection-status")?.textContent).toContain("还差19题");
+  expect([...toolbar.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent==="创建待审核测试集")!.disabled).toBe(true);
+  await click("返回浏览"); await click("创建Golden");
+  expect(toolbar.textContent).toContain("已选1/20");
+  expect(document.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(true);
+  expect(fetcher.mock.calls.every(([url]) => !url.includes("source=") && !url.includes("search="))).toBe(true);
+  await act(async () => root.unmount()); sessionStorage.clear();
 });
 
 it("joins legacy Frozen question IDs to persisted categories without replacing frozen content", async () => {

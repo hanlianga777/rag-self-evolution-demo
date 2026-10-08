@@ -1167,3 +1167,16 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .candidate-pool-table th { background:#fff; padding:8px; }
 .candidate-pool-table td { font-size:12px; height:54px; }
 .candidate-pool-table td:first-child { font-weight:400; }
+
+/* Candidate pool: one toolbar; import uses a compact confirmation dialog. */
+.candidate-pool-toolbar { margin:0 0 8px; }
+.candidate-pool-toolbar .review-filters { margin:0; }
+.pool-toolbar-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-left:auto; }
+.pool-profile-selector { width:250px; flex:none; }
+.pool-selection-status { display:flex; flex-wrap:wrap; gap:8px; align-items:baseline; margin-bottom:8px; font-size:11px; }
+.pool-selection-status details { margin-left:auto; }
+.pool-selection-status details[open] { flex-basis:100%; margin-left:0; }
+.business-import-errors { max-height:220px; overflow:auto; }
+.action-menu-content a { display:block; color:inherit; text-decoration:none; padding:8px 10px; font-size:11px; border-radius:4px; }
+.action-menu-content a:hover, .action-menu-content a:focus-visible { background:#f3f5f7; }
+@media (max-width:1100px) { .candidate-pool-toolbar > strong { font-size:11px; } .pool-toolbar-actions { gap:4px; } }
