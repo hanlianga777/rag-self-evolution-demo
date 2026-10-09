@@ -45,7 +45,7 @@ it("formats Baseline time locally and shortens the run ID", async () => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(String(input).endsWith("/api/bad-cases") ? [] : run), { status: 200 })));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
-  expect(document.body.textContent).not.toContain("2026-09-27 22:04:23");
+  expect(document.querySelector(".baseline-run-summary")?.textContent).toContain("2026-09-27 22:04:23");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "查看评测依据")!.click());
   expect(document.querySelector("[role=dialog]")?.textContent).toContain("2026-09-27 22:04:23");
   expect(document.querySelector(".short-id")?.textContent).not.toBe(run.id);
@@ -59,7 +59,9 @@ it("keeps the Baseline Bad Case table compact and detail ready", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["题目", "问题", "Primary Root Cause", "主要失败指标", "Secondary Signals / Evidence", "操作"]);
-  expect(document.querySelector("tbody")?.textContent).toContain("+1");
+  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["问题", "初步类型", "失败观察", "关键指标", "详情"]);
+  expect(document.querySelector("tbody")?.textContent).toContain("回答包含无依据内容");
+  expect(document.querySelector("tbody")?.textContent).not.toContain("Hallucination");
+  expect(document.querySelector("tbody")?.textContent).toContain("发生故障后如何恢复运行？");
   expect(document.querySelector("tbody")?.textContent).not.toContain("Not Passed");
 });

@@ -9,6 +9,8 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
+from test_v14_offline import isolated_corpus
 import socket
 import sys
 import tempfile
@@ -54,13 +56,20 @@ def main():
     responses = {}
     with tempfile.TemporaryDirectory(prefix='rag-interview-capture-', dir='/private/tmp') as temp:
         copy = Path(temp) / 'demo-copy.db'
-        shutil.copy2(args.backup, copy)
-        environment = {'RAG_DEMO_DB_PATH': str(copy), 'RAG_FORCE_MOCK': '1', 'DEEPSEEK_API_KEY': '', 'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1'}
+        with sqlite3.connect(args.backup.resolve().as_uri() + '?mode=ro', uri=True) as source, sqlite3.connect(copy) as destination:
+            source.backup(destination)
+        environment = {'RAG_DEMO_DB_PATH': str(copy), 'RAG_FORCE_MOCK': '1', 'DEEPSEEK_API_KEY': '', 'DASHSCOPE_API_KEY': '', 'MINERU_API_KEY': '', 'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1'}
         sys.path.insert(0, str(ROOT / 'backend'))
-        with patch.dict(os.environ, environment), patch.object(socket.socket, 'connect', block_tcp), patch.object(socket.socket, 'connect_ex', block_tcp_ex):
+        with patch.dict(os.environ, environment), patch.object(socket.socket, 'connect', block_tcp), patch.object(socket.socket, 'connect_ex', block_tcp_ex), isolated_corpus(temp) as isolated_paths:
             assert os.environ['RAG_DEMO_DB_PATH'] == str(copy) and copy.is_file()
             from fastapi.testclient import TestClient
             from app import main as api
+            for route in api.app.routes:
+                if getattr(route, 'path', None) == '/documents':
+                    route.app.directory = str(isolated_paths['DOCUMENTS_DIR'])
+                    route.app.all_directories = [str(isolated_paths['DOCUMENTS_DIR'])]
+            assert api.corpus.index_dir == isolated_paths['INDEX_DIR']
+            assert api.corpus_manager.index_dir == isolated_paths['INDEX_DIR']
             assert api.store.database_path == copy, 'Import must bind only the disposable DB'
             assert not api.ai_service.provider.settings.api_key
             client = TestClient(api.app)  # Deliberately no context manager/lifespan/startup.
@@ -78,7 +87,7 @@ def main():
                 file.write_bytes(response.content)
                 responses[path] = {'kind': 'file', 'file': str(file.relative_to(args.output)), 'content_type': content_type, 'sha256': hashlib.sha256(response.content).hexdigest()}
 
-            for path in ['/api/workspace', '/api/overview', '/api/documents', '/api/dataset', '/api/evaluation', '/api/bad-cases', '/api/optimization', '/api/versions', '/api/readiness', '/api/monitoring', '/api/pipeline', '/api/governance/generation-runs', '/api/governance/snapshots', '/api/governance/revisions', '/api/evaluations']:
+            for path in ['/api/workspace', '/api/overview', '/api/documents', '/api/dataset?light=true', '/api/governance/candidates', '/api/evaluation', '/api/bad-cases', '/api/optimization', '/api/versions', '/api/readiness', '/api/monitoring', '/api/pipeline', '/api/governance/generation-runs', '/api/governance/snapshots', '/api/governance/revisions', '/api/evaluations']:
                 capture(path)
             documents = responses['/api/documents']['body']
             for doc in documents:

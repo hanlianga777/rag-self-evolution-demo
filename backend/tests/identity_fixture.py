@@ -1,12 +1,12 @@
 """Disposable, auditable baseline fixtures for identity guard regressions."""
 import json
-from app.corpus import current_manifest
+from app.corpus import current_manifest, manifest_identity
 from app.policy import DEFAULT_PIPELINE_CONFIG
 
 
 def completed_baseline(store, target='baseline', snapshot=None, run_id=None):
     if snapshot is None:
-        snapshot = {'id': 'GD-current', 'question_ids': ['Q1'], 'questions': [{'id': 'Q1', 'question': '测试'}], 'corpus_fingerprint': current_manifest()['sources']}
+        snapshot = {'id': 'GD-current', 'question_ids': ['Q1'], 'questions': [{'id': 'Q1', 'question': '测试'}], 'corpus_fingerprint': manifest_identity(current_manifest())}
         with store.connection() as connection:
             connection.execute("INSERT OR IGNORE INTO dataset_versions VALUES (?, 'approved', 'human_review', ?, '2026-09-30')", (snapshot['id'], json.dumps(snapshot)))
     config = {**DEFAULT_PIPELINE_CONFIG}

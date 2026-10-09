@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { getJson } from "./api";
+import { getJson, postJson, identityKey } from "./api";
 
 type Operation = { id: string; runId?: string; candidateId?: string; title: string; status: "running" | "completed" | "failed"; kind?: "evaluation" | "revision"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
+type BatchRequest = { experimentId: string; baselineId: string; round: number; candidateIds: string[]; identity?: string };
 type OperationContextValue = {
+  runCandidateBatch: (request: BatchRequest) => Promise<void>;
   operations: Operation[];
   start: (title: string, detail?: Partial<Operation>) => string;
   update: (id: string, detail: Partial<Operation>) => void;
@@ -19,14 +21,14 @@ type OperationContextValue = {
   unregisterDialogHost: (node: HTMLElement) => void;
 };
 
-const fallback: OperationContextValue = { operations: [], start: () => "", update: () => {}, succeed: () => {}, fail: () => {}, run: (_title, work) => work(), startEvaluation: async (_title, work) => { await work(); }, watchEvaluation: () => {}, watchRevision: () => {}, registerCandidateRefresh: () => {}, unregisterCandidateRefresh: () => {}, registerDialogHost: () => {}, unregisterDialogHost: () => {} };
+const fallback: OperationContextValue = { runCandidateBatch: async () => { throw new Error("运行实验需要共享 Operation 上下文"); }, operations: [], start: () => "", update: () => {}, succeed: () => {}, fail: () => {}, run: (_title, work) => work(), startEvaluation: async (_title, work) => { await work(); }, watchEvaluation: () => {}, watchRevision: () => {}, registerCandidateRefresh: () => {}, unregisterCandidateRefresh: () => {}, registerDialogHost: () => {}, unregisterDialogHost: () => {} };
 const OperationContext = createContext<OperationContextValue>(fallback);
 export function useOperation() { return useContext(OperationContext); }
 
 function evaluation(run: any): Partial<Operation> {
   let total: number | undefined;
   try { total = JSON.parse(run.dataset_snapshot_json || "{}").question_ids?.length; } catch { /* old run has no readable snapshot */ }
-  return { status: run.status === "running" ? "running" : run.status === "completed" ? "completed" : "failed", stage: run.status === "running" ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败", current: run.cases?.length, total, error: run.error_message };
+  return { status: ["queued", "running"].includes(run.status) ? "running" : run.status === "completed" ? "completed" : "failed", stage: ["queued", "running"].includes(run.status) ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败", current: run.cases?.length, total, error: run.error_message };
 }
 
 const revisionStages: Record<string, string> = {
@@ -60,6 +62,9 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   const [now, setNow] = useState(Date.now());
   const timers = useRef<Set<number>>(new Set());
   const candidateRefresh = useRef<(() => Promise<void>) | null>(null);
+  const activeBatches = useRef(new Set<string>());
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const syncing = useRef<Set<string>>(new Set());
   useEffect(() => () => { for (const timer of timers.current) window.clearTimeout(timer); }, []);
   useEffect(() => {
@@ -89,6 +94,58 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     try { const started = await work(); update(id, { kind: "evaluation", runId: started.id }); }
     catch (reason) { fail(id, reason); throw reason; }
   }, [start, update, fail]);
+  const runCandidateBatch: OperationContextValue["runCandidateBatch"] = useCallback(async request => {
+    const id = `sandbox-round:${request.experimentId}:${request.round}`;
+    if (activeBatches.current.has(id)) return;
+    activeBatches.current.add(id);
+    start(`第 ${request.round} 轮 A/B/C Sandbox`, { id, current: 0, total: request.candidateIds.length, stage: "核对当前实验" });
+    let completed = 0, failed = 0;
+    try {
+      for (const candidateId of request.candidateIds) {
+        if (!mounted.current) return;
+        const [workspace, experiment] = await Promise.all([getJson<any>("/api/workspace"), getJson<any>(`/api/experiments/${request.experimentId}`)]);
+        if (!mounted.current) return;
+        if (workspace.current_baseline_id !== request.baselineId || (request.identity && identityKey(workspace) !== request.identity) || experiment.baseline_run_id !== request.baselineId) throw new Error("当前实验身份已变化，停止本轮运行");
+        if (experiment.result?.report_confirmation) throw new Error("Gate 2 已确认，本轮结果不能改变");
+        const candidate = experiment.candidates?.find((item: any) => item.id === candidateId);
+        if (!candidate || candidate.reasoning?.round !== request.round || !["A", "B", "C"].includes(candidate.reasoning?.candidate_label)) throw new Error("候选不属于本轮 A/B/C");
+        if (["evaluated", "failed"].includes(candidate.status)) { completed++; update(id, { current: completed }); continue; }
+        if (candidate.status !== "generated" || experiment.candidates.some((item: any) => ["running", "queued"].includes(item.status))) throw new Error("已有实验运行中，请等待后再继续");
+        const budget = experiment.evaluation_budget;
+        if (!budget || budget.used >= budget.max - (budget.reserved_for_d ?? 1)) throw new Error("Sandbox 预算不足，保留 D 额度");
+        const itemId = start(`Candidate ${candidate.reasoning.candidate_label} · Sandbox`, { candidateId, stage: "正在预约评测" });
+        try {
+          const started = await postJson<{ id: string }>(`/api/candidates/${candidateId}/run`);
+          update(itemId, { runId: started.id });
+          // ponytail: browser-owned serial queue; refresh requires a new explicit click for unstarted candidates.
+          let result: any;
+          do {
+            if (!mounted.current) return;
+            result = await getJson<any>(`/api/evaluations/${started.id}`);
+            update(itemId, evaluation(result));
+            if (["queued", "running"].includes(result.status)) await new Promise(resolve => window.setTimeout(resolve, 1000));
+          } while (["queued", "running"].includes(result.status));
+          if (!mounted.current) return;
+          // Evaluation completion precedes Candidate qualification persistence; wait for both.
+          let saved: any;
+          do {
+            const next = await getJson<any>(`/api/experiments/${request.experimentId}`);
+            saved = next.candidates?.find((item: any) => item.id === candidateId);
+            if (!saved) throw new Error("运行候选记录缺失，停止并核对审计");
+            if (["running", "queued"].includes(saved.status)) await new Promise(resolve => window.setTimeout(resolve, 1000));
+          } while (mounted.current && ["running", "queued"].includes(saved.status));
+          if (!mounted.current) return;
+          if (saved.result?.interrupted) throw new Error("服务器重启中断本项；其余未运行方案等待再次点击，不自动继续");
+          if (saved.status === "evaluated" && result.status === "completed") succeed(itemId);
+          else { failed++; fail(itemId, result.error_message || saved.result?.error || "评测未完整，预算已消耗"); }
+        } catch (reason) { fail(itemId, reason); throw reason; }
+        completed++; update(id, { current: completed, stage: `已结束 ${completed}/${request.candidateIds.length}${failed ? ` · ${failed} 项失败` : ""}` });
+      }
+      if (failed) throw new Error(`本轮已结束，${failed} 项运行失败；已完成结果保留，不自动重试`);
+      succeed(id);
+    } catch (reason) { fail(id, reason); throw reason; }
+    finally { activeBatches.current.delete(id); }
+  }, [start, update, succeed, fail]);
   const watchEvaluation = useCallback((id: string, title: string) => start(title, { id, kind: "evaluation" }), [start]);
   const watchRevision = useCallback((id: string) => start("局部修订", { id, kind: "revision" }), [start]);
   const registerCandidateRefresh = useCallback((refresh: () => Promise<void>) => { candidateRefresh.current = refresh; }, []);
@@ -140,7 +197,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       {item.current != null && item.total != null && item.total > 1 && <><div className="operation-count">{item.current} / {item.total}<span>{Math.round(item.current / item.total * 100)}%</span></div><progress value={item.current} max={item.total} /></>}
       {item.status === "failed" && <><small className="operation-error-summary">{shortError(item.error)}</small><button className="operation-detail-button" aria-label="查看错误详情" aria-expanded={detailId === item.id} aria-controls={`operation-detail-${item.id}`} onClick={() => setDetailId(current => current === item.id ? null : item.id)}>查看错误详情</button>{detailId === item.id && <div id={`operation-detail-${item.id}`} className="operation-details"><div>阶段：{item.stage || "未记录"}</div><div>耗时：{item.startedAt != null ? `${Math.max(0, ((item.endedAt ?? now) - item.startedAt) / 1000).toFixed(1)}s` : "未记录"}</div><div>错误：{item.errorDetail || item.error || "未记录"}</div><div>Operation ID：{item.id}</div>{item.provider && <div>Provider：{item.provider}</div>}{item.model && <div>Model：{item.model}</div>}{item.attempt != null && <div>Attempt：{item.attempt}</div>}</div>}</>}
     </section>)}</div>;
-  return <OperationContext.Provider value={{ operations, start, update, succeed, fail, run, startEvaluation, watchEvaluation, watchRevision, registerCandidateRefresh, unregisterCandidateRefresh, registerDialogHost, unregisterDialogHost }}>
+  return <OperationContext.Provider value={{ operations, runCandidateBatch, start, update, succeed, fail, run, startEvaluation, watchEvaluation, watchRevision, registerCandidateRefresh, unregisterCandidateRefresh, registerDialogHost, unregisterDialogHost }}>
     {children}
     {dialogHosts.length ? createPortal(console, dialogHosts[dialogHosts.length - 1]) : console}
   </OperationContext.Provider>;

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.governance import GovernanceStore
 from app.policy import DEFAULT_PIPELINE_CONFIG
+from identity_fixture import completed_baseline
 
 
 class TuningV12Tests(unittest.TestCase):
@@ -12,8 +13,7 @@ class TuningV12Tests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / 'demo.db')
-        self.baseline = self.store.create_evaluation_run({'id': 'GD-fixture', 'question_ids': [], 'questions': []}, DEFAULT_PIPELINE_CONFIG, {'model': 'fixture'})
-        self.store.finish_evaluation_run(self.baseline, 'completed', {})
+        self.baseline = completed_baseline(self.store)
         self.experiment = self.store.create_experiment(self.baseline)
 
     def candidate(self, label, diff, qualified=True, fixed=1):

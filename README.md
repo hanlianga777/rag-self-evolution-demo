@@ -2,7 +2,9 @@
 
 面向企业知识问答的评测驱动 RAG 质量运营与版本决策 Demo。
 
-**唯一当前有效规格：[V1.4 + Phase 1 冻结合同（2026-10-08）](docs/RAG_SELF_EVOLUTION_SPEC.md)**。当前合同以SPEC文首为准；[ChangeLog](docs/SPEC_CHANGELOG.md)追加历史，[Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md)区分真实Current与Legacy。历史验收只代表其日期的运行状态。
+**唯一当前有效规格：[V1.4 + Phase 1 + Baseline/Agent UI 恢复（2026-10-09）](docs/RAG_SELF_EVOLUTION_SPEC.md)**。当前合同以SPEC文首为准；[ChangeLog](docs/SPEC_CHANGELOG.md)追加历史，[Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md)区分真实Current与Legacy。历史验收只代表其日期的运行状态。
+
+Baseline 与 Agent 已恢复阶段、完整方案及证据报告；本轮 A/B/C 批执行复用既有单候选接口，运行失败保留结果，重启后须再次显式继续。所有实验/批准/发布仍需原有人工操作，资格与预算不变。[恢复验收、九图对照与演示脚本](docs/BASELINE_AGENT_RESTORATION.md)。
 
 当前真实Knowledge：4 PDF / 157页、349 Parent / 368 Child、text-embedding-v4 1024d、368 Indexed、9 Topics。原Full 100（40/20/40，机器87/用户批准13）已由用户冻结为GD-20261008024214127995，保留原题、审批、历史质量记录及Legacy Production。新建独立Golden Dataset V2 Medium 50（20/10/20），角色/场景/意图与真实Child/Parent页码持久化，十维业务审计参与资格；当前真实机器结果与未解决项见[Medium V2验收](docs/MEDIUM_V2_POLISH_VERIFICATION.md)和[50题审阅报告](backend/reports/medium_v2_polish_review.md)。本轮不自动批准、冻结、Baseline或Agent。
 

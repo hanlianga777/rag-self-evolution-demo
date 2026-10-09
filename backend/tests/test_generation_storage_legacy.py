@@ -66,7 +66,15 @@ class LegacyGenerationStorageTests(unittest.TestCase):
     def test_api_can_start_with_an_isolated_database_before_import_side_effects(self):
         isolated = Path(self.directory.name) / "isolated.db"
         result = subprocess.run(
-            [sys.executable, "-c", "from app.main import store; print(store.database_path)"],
+            [sys.executable, "-c", """
+import sys, socket, tempfile
+from unittest.mock import patch
+sys.path.insert(0, 'scripts')
+from test_v14_offline import isolated_corpus, offline_connect, offline_connect_ex
+with tempfile.TemporaryDirectory() as directory, patch.object(socket.socket, 'connect', offline_connect), patch.object(socket.socket, 'connect_ex', offline_connect_ex), isolated_corpus(directory, legacy_fixture=True):
+    from app.main import store
+    print(store.database_path)
+"""],
             env={**os.environ, "PYTHONPATH": "backend", "RAG_DEMO_DB_PATH": str(isolated)},
             capture_output=True, text=True, check=True,
         )

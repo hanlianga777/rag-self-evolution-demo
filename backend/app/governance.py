@@ -1877,7 +1877,10 @@ class GovernanceStore:
             raise ValueError(identity["baseline_unavailable_reason"])
         if run_id and run_id != identity["current_baseline_id"]:
             raise ValueError("Optimization Run 不属于当前 Baseline；旧实验仅供历史查看")
-        return self.evaluation_run(identity["current_baseline_id"])
+        if connection is None:
+            return self.evaluation_run(identity["current_baseline_id"])
+        row = connection.execute("SELECT * FROM evaluation_runs WHERE id=?", (identity["current_baseline_id"],)).fetchone()
+        return {**dict(row), "result": _load(row["result_json"], {}), "config": _load(row["config_json"], {}), "judge": _load(row["judge_json"], {})}
 
     def bad_case_rows(self):
         with self.connection() as connection:
@@ -2056,21 +2059,31 @@ class GovernanceStore:
         return self.candidate(candidate_id)
 
     def reserve_candidate_evaluation(self, candidate_id: str):
-        """Reserve a real execution, not a result, under SQLite's writer lock."""
-        with self.connection() as connection:
+        """Reserve execution and validate current identity in one writer transaction."""
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK, self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
-            candidate = self.candidate(candidate_id)
-            if not candidate or candidate['status'] not in {'generated', 'failed'}:
+            row = connection.execute("SELECT * FROM candidate_configs WHERE id=?", (candidate_id,)).fetchone()
+            if not row or row['status'] not in {'generated', 'failed'}:
                 raise ValueError('Candidate 已运行或正在执行')
-            experiment = self.experiment(candidate['experiment_id'])
+            candidate = {**dict(row), 'reasoning': _load(row['reasoning_json'], {})}
+            experiment = connection.execute("SELECT * FROM experiments WHERE id=?", (candidate['experiment_id'],)).fetchone()
+            if not experiment:
+                raise ValueError('Experiment 不存在')
+            self.require_current_baseline(experiment['baseline_run_id'], connection)
+            identity = self.current_baseline_identity(connection)
+            if experiment['status'] != 'direct_release' and identity['current_experiment_id'] != candidate['experiment_id']:
+                raise ValueError('Candidate 不属于当前 Optimization Run；旧实验仅供历史查看')
+            result = _load(experiment['result_json'], {})
             is_d = candidate['reasoning'].get('candidate_label') == 'D'
-            if experiment['result'].get('report_confirmation') and not is_d:
+            if result.get('report_confirmation') and not is_d:
                 raise ValueError('报告已确认，不能改变已确认的实验结果')
-            used = experiment['evaluation_budget']['used']
+            items = connection.execute("SELECT status, reasoning_json FROM candidate_configs WHERE experiment_id=?", (candidate['experiment_id'],)).fetchall()
+            used = sum(len(_load(item['reasoning_json'], {}).get('sandbox_attempts', [])) or int(item['status'] in {'evaluated', 'failed', 'running'}) for item in items)
             limit = MAX_EVALS if is_d else MAX_EVALS - 1
             if used >= limit:
                 raise ValueError('Sandbox budget exhausted；D 保留一次额度')
-            if is_d and not experiment['result'].get('report_confirmation'):
+            if is_d and not result.get('report_confirmation'):
                 raise ValueError('D 需要 Gate 2 报告确认')
             attempts = list(candidate['reasoning'].get('sandbox_attempts', []))
             attempts.append({'attempt': len(attempts) + 1, 'started_at': _now()})

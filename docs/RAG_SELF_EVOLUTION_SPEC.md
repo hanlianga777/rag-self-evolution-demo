@@ -1,4 +1,17 @@
-> 唯一当前有效版本：V1.4 + Phase 1 冻结合同（2026-10-08）。以下「当前有效合同」及被明确保留的业务规则优先；Historical / Superseded 记录不并行生效。
+> 唯一当前有效版本：V1.4 + Phase 1 冻结合同（2026-10-08）+ Baseline/Agent UI 恢复覆盖（2026-10-09）。以下「当前有效合同」及被明确保留的业务规则优先；Historical / Superseded 记录不并行生效。
+
+## Baseline / Agent UI 恢复覆盖 — 2026-10-09 `[CONFIRMED]`
+
+本轮用户任务书覆盖旧 UI 收口中“隐藏阶段条、仅 WHY/CHANGE/RESULT、Sandbox 主层仅四行”的展示限制。业务资格不改：11 Hard Gate、Search Space、12 次预算与 D 预留、Regression、D 晋升、人审与人工发布继续冻结。历史成绩、Primary、计划与业务数据不重写。
+
+- Baseline 恢复四阶段、Hard Gate/Overall/Bad Case 三项摘要、持久化运行来源、四组紧凑配置、Golden 组成与性能。群组 Gate 通过不代表逐题无失败；缺少观测明确未采集。Hard Gate 与 Bad Case 分表宽度，问题优先；逐题 Judge 0–4 正确性按对应百分比展示，历史已为百分数的值不二次缩放，原评分不变；案例依次展示业务问题、期望/实际、Golden/候选召回/最终上下文、Judge、初步归因。负向材料 Anchor 不是答案 Evidence。
+- Agent 恢复六阶段、问题分组、实验概览、短诊断与三列 Experiment Plan；A/B/C 同一 Baseline 展示 WHY/TARGET/CHANGE/EXPECTED/RISK/RESULT。历史 EXPECTED 缺失时只从保存假设给出明确标注的摘要，不调用模型补造。阶段完成、资格通过、人工确认分开。
+- Sandbox 主层显示 Gate、Bad Case、修复原问题、新增严重/普通失败、Regression 与资格，高级指标进共享 Drawer。历史字段 `target_bad_cases_fixed` 的真实口径为所有原失败题修复数，不能冒充候选目标题修复数。目标题独立解析保存引用。
+- 用户点击“运行本轮 A/B/C Sandbox”时，共享 Operation 捕获当前轮合法 generated A/B/C，调用既有单候选 API 串行预约。每项前重读当前身份、候选状态、预算及 Gate 2；已结束项跳过，普通单项失败保留且继续合法剩余项。身份/预算/Gate 2 失效、读写不确定或服务器中断则停止；页面刷新/服务器重启后未启动项须再次点击，failed 不隐式重试。不自动生成下一轮/D/批准/发布。预约事务内重验当前 Baseline 与 Experiment、状态、预算和报告冻结；独立人工 direct_release 保持既有合同。
+- 后续运行的初步归因优先明确安全风险；可答题仅依据真实候选/最终上下文证据观察给出 Retrieval、Ranking、Generation 方向，证据不足为待验证。原 Failure Tags、评分、Gate 与历史归因保留。
+- 条件 D 左右决策、发布来源/资格/人工确认/配置变化/历史和 Baseline vs active Production 双答案保留真实身份。单侧失败不清空成功侧。八导航、PageShell/共享视觉 Token 与唯一 800px Drawer 不变。
+
+验收及数据保护记录见 `BASELINE_AGENT_RESTORATION.md`。图形源 `KnowledgeDiagrams.tsx` 的业务流程、技术模块与箭头不受本轮展示恢复影响，无另画架构。
 
 ## 当前有效合同 — 2026-10-08 `[CONFIRMED]`
 

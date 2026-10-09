@@ -3,7 +3,7 @@ import { Send } from "lucide-react";
 import { errorMessage, identityKey, postJson } from "../api";
 import { Badge, CustomSelect } from "../components/Primitives";
 import { readSession, writeSession } from "../session";
-import { ExecutionMetrics, formatValue, parameterNames } from "../components/PipelineFields";
+import { ExecutionMetrics, ParameterDiff, formatValue, parameterNames } from "../components/PipelineFields";
 import type { Citation, PipelinePreview } from "../types";
 
 type Run = { status?: "running" | "completed" | "failed"; startedAt?: number; durationMs?: number; result?: PipelinePreview; error?: string; label?: string; comparisonId?: string; question?: string; sourceId?: string };
@@ -55,14 +55,17 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
   const keys = Object.keys(parameterNames).filter(key => leftScheme.config?.[key] !== rightScheme.config?.[key]);
   const summaryKeys = keys.length ? keys : ["prompt_strategy", "candidate_k", "top_k", "rerank"];
   return <div className="page experiment-page">
-    <p className="comparison-source">同一道问题，比较正式 Baseline 与当前 Production。</p>
+    <div className="comparison-identities"><span>正式 Baseline · <strong>{baselineId || "未就绪"}</strong></span><span>当前 Production · <strong>{active?.id || "未发布"}</strong></span></div>
+    <p className="comparison-source">同一道问题，比较正式 Baseline 与当前 Production。保存配置用于参数核对；回答仅来自本次主动运行。</p>
     <section className="experiment-query compare-toolbar">
       <CustomSelect ariaLabel="选择真实 Bad Case" value={selectedCase} onChange={id => { clearResults(); setSelectedCase(id); const item = badCases.find((row: any) => row.id === id); if (item) setQuestion(item.result?.question || ""); }} placeholder="Baseline Bad Case" options={[{ value: "", label: "Baseline Bad Case" }, ...badCases.map((item: any) => ({ value: item.id, label: item.result?.question || item.id }))]} />
       <textarea aria-label="试验问题" placeholder="输入或编辑同一道问题…" maxLength={1000} value={question} onChange={event => { clearResults(); setQuestion(event.target.value); }} />
       <div className="query-action"><button className="primary" disabled={busy || !question.trim() || !!blocked} onClick={() => void ask()}><Send size={15} />{busy ? "正在回答…" : "运行实时对比"}</button></div>
     </section>
     {blocked && <p className="error-notice" role="status">{blocked}</p>}
+    <section className="panel comparison-parameter-diff" aria-label="方案参数差异"><h2>方案参数差异</h2>{!blocked ? <ParameterDiff before={leftScheme.config} after={rightScheme.config} /> : <p className="muted">当前尚无两个有效的保存方案可比较。</p>}</section>
     <section className="experiment-results" aria-label="实时回答"><AnswerCard scheme={leftScheme} keys={summaryKeys} run={left} onOpenCitation={onOpenCitation} /><AnswerCard scheme={rightScheme} keys={summaryKeys} run={right} onOpenCitation={onOpenCitation} /></section>
+    {left.status === "completed" && right.status === "completed" && Array.isArray(left.result?.evidence) && Array.isArray(right.result?.evidence) && <p className="comparison-observation" role="status">本次可观察差异：Baseline 返回 {left.result?.evidence?.length ?? 0} 条 Evidence，Production 返回 {right.result?.evidence?.length ?? 0} 条 Evidence。引用数量不代表答案正确性；本次未进行实时 Judge 评分。</p>}
   </div>;
 }
 
@@ -77,12 +80,13 @@ function AnswerCard({ scheme, keys, run, onOpenCitation }: { scheme: Scheme; key
     <div className="answer-scroll">{run.error ? <p className="error-notice" role="alert">回答失败：{run.error}</p> : result ? <MarkdownAnswer text={result.answer} /> : <p className="muted">点击运行后显示实际回答。</p>}</div>
     <div className="answer-evidence">{result?.evidence?.length ? result.evidence.map((item: Citation) => <button className="document-link" key={item.chunk_id} onClick={() => onOpenCitation(item)}>{item.document} · P.{item.page_start}</button>) : result ? <span className="muted">本次回答未返回可定位 Evidence。</span> : null}</div>
     <footer className="answer-metrics-footer"><ExecutionMetrics compact metrics={result} /></footer>
+    <div className="answer-audit"><details><summary>查看本次运行审计</summary>{result ? <><p className="muted">实时预览 · {run.sourceId} · {run.question}</p><ExecutionMetrics metrics={result} /></> : <p className="muted">运行完成后显示已采集的耗时与 Token。</p>}</details></div>
   </article>;
 }
 
 function MarkdownAnswer({ text }: { text: string }) {
   const inline = (value: string) => value.split(/(\*\*[^*]+\*\*)/g).map((part, index) => part.startsWith("**") && part.endsWith("**") ? <strong key={index}>{part.slice(2, -2)}</strong> : part);
-  return <div className="answer-markdown">{text.split(/\n{2 }/).map((block, index) => {
+  return <div className="answer-markdown">{text.split(/\n{2,}/).map((block, index) => {
     const lines = block.split("\n");
     if (lines.every(line => /^\s*[-*]\s+/.test(line))) return <ul key={index}>{lines.map((line, lineIndex) => <li key={lineIndex}>{inline(line.replace(/^\s*[-*]\s+/, ""))}</li>)}</ul>;
     const heading = block.match(/^#{1,3}\s+(.+)$/);

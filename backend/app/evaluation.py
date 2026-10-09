@@ -16,9 +16,31 @@ ROOT_CAUSE_BY_TAG = {
 }
 
 
-def root_cause_layers(failure_tags: list[str]) -> tuple[str, list[str]]:
+def root_cause_layers(failure_tags: list[str], coverage: dict | None = None, test_category: str | None = None) -> tuple[str, list[str]]:
+    """Preliminary diagnosis from observed pipeline evidence; legacy callers retain tag order."""
     layers = list(dict.fromkeys(ROOT_CAUSE_BY_TAG[tag] for tag in failure_tags if tag in ROOT_CAUSE_BY_TAG))
-    return (layers[0], layers[1:]) if layers else ("None", [])
+    if test_category is None:
+        return (layers[0], layers[1:]) if layers else ("None", [])
+    if not failure_tags:
+        return "None", []
+    if "Safety" in layers:
+        primary = "Safety"
+    elif test_category in {"positive", "ablation"} and any(layer in layers for layer in {"Generation", "Retrieval", "Ranking"}):
+        candidate = (coverage or {}).get('candidate_recall', {}).get('all_hit')
+        final = (coverage or {}).get('final_context', {}).get('all_hit')
+        if not (coverage or {}).get('required_chunk_ids'):
+            primary = "Unknown"
+        elif candidate is False:
+            primary = "Retrieval"
+        elif candidate is True and final is False:
+            primary = "Ranking"
+        elif final is True:
+            primary = "Generation"
+        else:
+            primary = "Unknown"
+    else:
+        primary = layers[0] if layers else "Unknown"
+    return primary, [layer for layer in layers if layer != primary]
 
 
 def _percentile(values: list[float], percentile: float):
@@ -179,8 +201,8 @@ class EvaluationRunner:
             failure_tags.append("Performance Failure")
         failure_tags = list(dict.fromkeys(failure_tags))
         severity = "critical" if item["raw"].get("criticality") == "high" or item.get("negative_subtype") == "safety_critical" else "ordinary"
-        primary, secondary = root_cause_layers(failure_tags)
-        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "programmatic_metrics": {"retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit}, "passed": not failure_tags, "redline_pass": not redline}
+        primary, secondary = root_cause_layers(failure_tags, coverage, item["test_category"])
+        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "programmatic_metrics": {"retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnosis_status": "preliminary", "diagnostic_basis": "explicit_safety_failure" if primary == "Safety" else coverage["diagnostic_basis"]}, "passed": not failure_tags, "redline_pass": not redline}
 
     def execute_baseline(self, run_id, approved, config):
         cases = []

@@ -229,10 +229,10 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   await render(<EvolutionPage data={{ workspace: identity("B1", "E1"), evaluation: { id: "B1", status: "completed", config: {} }, optimization: { id: "E1", candidates: [d], result: { report_confirmation: { winner_id: "A" }, composite: { candidate_id: d.id } } } }} />);
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Sandbox")!.click());
   const coreRows = [...document.querySelectorAll(".sandbox-core-table tbody tr")];
-  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["Hard Gate", "Bad Case", "Regression", "Qualification"]);
+  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["Hard Gate", "Bad Case", "修复原 Bad Case", "新增失败", "Regression", "Qualification"]);
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "Hard Gate")?.lastElementChild?.textContent).toBe("11 / 11");
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "Regression")?.lastElementChild?.textContent).toBe("FAIL");
-  expect(coreRows.find(row => row.querySelector("td")?.textContent === "Qualification")?.lastElementChild?.textContent).toBe("FAIL");
+  expect(coreRows.find(row => row.querySelector("td")?.textContent === "Qualification")?.lastElementChild?.textContent).toBe("不合格");
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "A / B / C / D")!.click());
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "查看 D 完整报告与 Decision")!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不合格 · Hard Gate：通过");

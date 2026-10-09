@@ -17,13 +17,13 @@ it("filters persisted Baseline cases and opens their diagnostic detail", async (
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Bad Case 诊断")!.click());
-  expect(document.querySelector("tbody")?.textContent).toContain("Q02");
-  expect(document.querySelector("tbody")?.textContent).not.toContain("Q01");
+  expect(document.querySelector("tbody")?.textContent).toContain("未召回题");
+  expect(document.querySelector("tbody")?.textContent).not.toContain("正常题");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "全部")!.click());
-  expect(document.querySelector("tbody")?.textContent).toContain("Q01");
+  expect(document.querySelector("tbody")?.textContent).toContain("正常题");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "检索未命中")!.click());
-  expect(document.querySelector("tbody")?.textContent).toContain("Q02");
-  expect(document.querySelector("tbody")?.textContent).not.toContain("Q01");
+  expect(document.querySelector("tbody")?.textContent).toContain("未召回题");
+  expect(document.querySelector("tbody")?.textContent).not.toContain("正常题");
   await act(async () => (document.querySelector("tbody tr") as HTMLTableRowElement).click());
   expect(document.querySelector("[role=dialog]")?.textContent).toContain("未召回题");
   await act(async () => root.unmount());
