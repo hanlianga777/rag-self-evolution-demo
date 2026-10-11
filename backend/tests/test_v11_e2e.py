@@ -84,7 +84,10 @@ class FixtureEvaluationRuntime:
 
     def judge(self, _question, _expected, answer, _category, *, context=None):
         correct = answer != "错误答案"
-        return context_judgment({"correctness": 4 if correct else 0, "faithfulness": 1, "completeness": 1 if correct else 0, "behavior_pass": True, "reason": "固定 Judge", "missing_points": [], "unsupported_claims": []}, context)
+        result = context_judgment({"correctness": 4 if correct else 0, "faithfulness": 1 if correct else .5, "completeness": 1 if correct else 0, "behavior_pass": True, "reason": "固定 Judge", "missing_points": [], "unsupported_claims": [] if correct else [answer]}, context)
+        if not correct:
+            result['claim_reviews'] = [{'unsupported_claim_index':0, 'claim':answer, 'kind':'contradiction', 'changes_operation':True, 'critical':True, 'reason':'Fixture answer contradicts reference', 'support':[{'chunk_id':e['chunk_id'], 'quote':e['content']} for e in (context or {}).get('final_context', []) if e.get('content')][:1]}]
+        return result
 
 
 class V11BusinessE2E(unittest.TestCase):

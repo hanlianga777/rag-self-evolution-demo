@@ -14,7 +14,7 @@ class ContextTests(unittest.TestCase):
     def setUp(self):
         self.item = {'id':'q', 'question':'电池保护？', 'reference_answer':'未插入无法开启\n拔出自动关闭', 'test_category':'positive', 'raw':{}, 'evidence':[{'source_chunk_ids':['c1','c2']}]}
         self.entries = [{'chunk_id':'c2','parent_chunk_id':'p','document_id':'d','content':'电池功能：未插入无法开启；拔出自动关闭。'}]
-        self.judge = {'correctness':4,'faithfulness':1,'completeness':1,'behavior_pass':True,'reason':'fixture verified','unsupported_claims':[], 'evidence_sufficiency':{'status':'sufficient','source_applicable':True,'conflicts':[],'reason':'全部事实有来源','fact_support':[{'fact':f,'chunk_id':'c2','quote':f} for f in ['未插入无法开启','拔出自动关闭']]}}
+        self.judge = {'correctness':4,'faithfulness':1,'completeness':1,'behavior_pass':True,'reason':'fixture verified','unsupported_claims':[], 'claim_reviews':[], 'behavior_evidence':'', 'evidence_sufficiency':{'status':'sufficient','source_applicable':True,'conflicts':[],'reason':'全部事实有来源','fact_support':[{'fact':f,'chunk_id':'c2','quote':f} for f in ['未插入无法开启','拔出自动关闭']]}}
 
     def test_parent_complete_without_all_child_hits(self):
         runtime = type('Stub', (), {'judge':lambda _, *args, **kw: self.judge})()

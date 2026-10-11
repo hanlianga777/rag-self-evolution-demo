@@ -1,11 +1,12 @@
 """Versioned evidence observations; no provider or storage side effects."""
+import html
 import hashlib
 import json
 import re
 import unicodedata
 from .policy import GATE_DEFINITIONS
 
-VERSIONS = {'prompt_version': 'judge-v2-context', 'evidence_matcher_version': 'evidence-v2-parent', 'scoring_policy': 'v1.1-evidence-gates'}
+VERSIONS = {'prompt_version': 'judge-v3-claims', 'evidence_matcher_version': 'evidence-v3-scoped', 'scoring_policy': 'v1.2-grounded-diagnosis'}
 
 
 def policy_current(judge):
@@ -17,9 +18,13 @@ def evaluation_identity(snapshot, judge):
     return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
+def plain_text(text):
+    return re.sub(r'</?[A-Za-z][^>]*>', '', html.unescape(str(text)))
+
+
 def normalize(text):
     # Formatting only: retain signs, units and digits; no fuzzy semantic acceptance.
-    text = re.sub(r'</?[A-Za-z][^>]*>', '', unicodedata.normalize('NFKC', str(text)))
+    text = unicodedata.normalize('NFKC', plain_text(text))
     return re.sub(r'\s+', '', text)
 
 
@@ -27,7 +32,7 @@ def observe_evidence(item, entries):
     scope = {key:item.get('raw',{}).get(key) for key in ('product','product_scope','entity','version','source_reference','source_document_id','expected_response')}
     if item['test_category'] == 'negative':
         return {'status': 'not_applicable', 'source_constraints': scope, 'sufficient': None, 'facts': [], 'reason': '负向材料为Anchor，预期行为由统一Judge核验', 'version': VERSIONS['evidence_matcher_version']}
-    facts = [fact.strip() for fact in re.split(r'\n|[。；]', item.get('reference_answer') or '') if fact.strip()]
+    facts = [fact.strip() for fact in re.split(r'\n|[。；]', plain_text(item.get('reference_answer') or '')) if normalize(fact).strip('.,，：:、')]
     locations = []
     for fact in facts:
         matches = [entry for entry in entries or [] if normalize(fact) in normalize(entry.get('content', ''))]
@@ -42,11 +47,12 @@ def resolve_evidence(item, observation, judgment, entries):
     value = judgment.get('evidence_sufficiency', {})
     status = value.get('status', 'unknown')
     locations = value.get('fact_support', [])
+    unresolved = [c for c in value.get('conflicts', []) if not (isinstance(c, dict) and c.get('status') == 'resolved' and isinstance(c.get('scope'), str) and c['scope'].strip() and isinstance(c.get('reason'), str) and c['reason'].strip() and isinstance(c.get('support'), list) and len(c['support']) >= 2 and all(quote_present(q, entries) for q in c['support']) and len({(q['chunk_id'], normalize(q['quote'])) for q in c['support']}) >= 2)]
     # A sufficient judgment must locate every required fact in actual final context.
-    valid = isinstance(locations, list) and bool(locations) and all(isinstance(f, dict) and isinstance(f.get('fact'), str) and f['fact'].strip() and isinstance(f.get('quote'), str) and normalize(f['quote']) and any(normalize(f['quote']) in normalize(e.get('content', '')) and f.get('chunk_id') in {e.get('chunk_id'), e.get('parent_chunk_id')} for e in entries or []) for f in locations)
-    if status == 'sufficient' and (not all(any(f.get('fact') == needed['fact'] for f in locations if isinstance(f, dict)) for needed in observation['facts']) or not valid or value.get('source_applicable') is not True or value.get('conflicts')):
+    valid = isinstance(locations, list) and bool(locations) and all(isinstance(f, dict) and isinstance(f.get('fact'), str) and f['fact'].strip() and quote_present(f, entries) for f in locations)
+    if status == 'sufficient' and (not all(any(f.get('fact') == needed['fact'] for f in locations if isinstance(f, dict)) for needed in observation['facts']) or not valid or value.get('source_applicable') is not True or unresolved):
         status = 'unknown'
-    if value.get('conflicts') or value.get('source_applicable') is False:
+    if unresolved or value.get('source_applicable') is False:
         status = 'unknown'
     source_conflicts = []
     # Explicit scope constraints cannot be overridden by a model's boolean.
@@ -61,7 +67,30 @@ def resolve_evidence(item, observation, judgment, entries):
                 source_conflicts.append(f'{field}适用性未核实或冲突')
     if source_conflicts:
         status = 'unknown'
-    return {**observation, 'status': status, 'sufficient': True if status == 'sufficient' else False if status == 'insufficient' else None, 'judge_support': locations, 'source_applicable': value.get('source_applicable'), 'conflicts': value.get('conflicts', []) + source_conflicts, 'reason': value.get('reason') or 'Judge未提供可核实的充分性依据'}
+    return {**observation, 'status': status, 'sufficient': True if status == 'sufficient' else False if status == 'insufficient' else None, 'judge_support': locations, 'unresolved_conflicts': unresolved, 'source_applicable': value.get('source_applicable'), 'conflicts': value.get('conflicts', []) + source_conflicts, 'reason': value.get('reason') or 'Judge未提供可核实的充分性依据'}
+
+
+def quote_present(support, entries):
+    return isinstance(support, dict) and isinstance(support.get('chunk_id'), str) and bool(support['chunk_id'].strip()) and isinstance(support.get('quote'), str) and bool(normalize(support['quote'])) and any(support.get('chunk_id') in {e.get('chunk_id'), e.get('parent_chunk_id')} and normalize(support['quote']) in normalize(e.get('content', '')) for e in entries or [])
+
+
+def assess_claims(answer, judgment, entries):
+    """Validate the one Judge's classifications; historical untyped claims stay pending."""
+    result = {'accepted': [], 'confirmed': [], 'pending': []}
+    claims = judgment.get('unsupported_claims', [])
+    reviews = judgment.get('claim_reviews', [])
+    for index, claim in enumerate(claims):
+        matches = [r for r in reviews if isinstance(r, dict) and r.get('unsupported_claim_index') == index]
+        review = matches[0] if len(matches) == 1 else {}
+        kind = review.get('kind')
+        support = review.get('support', [])
+        valid = isinstance(review.get('claim'), str) and bool(normalize(review['claim'])) and normalize(review['claim']) in normalize(answer) and isinstance(review.get('reason'), str) and bool(review['reason'].strip()) and isinstance(support, list) and all(quote_present(q, entries) for q in support)
+        supported = valid and bool(support) and kind == 'supported_fact'
+        advice = valid and bool(support) and kind == 'reasonable_safety_advice' and review.get('changes_operation') is False
+        failure = valid and (kind == 'contradiction' and bool(support) or kind == 'unsupported_instruction' and review.get('changes_operation') is True)
+        bucket = 'accepted' if supported or advice else 'confirmed' if failure else 'pending'
+        result[bucket].append({'original_claim': claim, **review})
+    return result
 
 
 def diagnosis(case):

@@ -32,7 +32,7 @@ def context_judgment(scores, context):
     observation = (context or {}).get('programmatic_evidence_observation', {})
     support = [{'fact': f['fact'], 'chunk_id': loc['chunk_id'], 'quote': loc['quote']} for f in observation.get('facts', []) for loc in f.get('locations', [])[:1]]
     sufficient = bool(support) and len(support) == len(observation.get('facts', []))
-    return {**scores, 'evidence_sufficiency': {'status': 'sufficient' if sufficient else 'insufficient', 'source_applicable': True, 'conflicts': [], 'reason': 'Offline fixture exact final text coverage', 'fact_support': support}}
+    return {**scores, 'claim_reviews': [], 'behavior_evidence': '', 'evidence_sufficiency': {'status': 'sufficient' if sufficient else 'insufficient', 'source_applicable': True, 'conflicts': [], 'reason': 'Offline fixture exact final text coverage', 'fact_support': support}}
 
 
 def comparison_identity(store, baseline):

@@ -1,3 +1,7 @@
+## 2026-10-11：评测V1.2源代码修复（真实效果未执行）
+
+保存的新版Baseline `EVAL-20261011142700759144` 已真实完成：11/11、98.90、16题失败（confirmed6/needs_review10），属于v1.1规则，原记录保留。本轮源代码升级judge-v3-claims/evidence-v3-scoped/v1.2-grounded-diagnosis，离线依据16题验证通用修复，不提供新版真实成绩。未重启现有后端、未调用Provider、未重评或启动Agent。加载V1.2后，旧V1.1运行不能与新规则候选正式混用。验收与争议见 [EVALUATION_POLICY_V12](EVALUATION_POLICY_V12.md)。
+
 # Current Demo Truth
 
 ## 当前只读核对（2026-10-11）

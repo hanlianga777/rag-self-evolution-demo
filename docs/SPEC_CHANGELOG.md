@@ -1,3 +1,9 @@
+## 2026-10-11 — Baseline16题审计后的通用评测修复
+
+- 升级judge-v3-claims / evidence-v3-scoped / v1.2-grounded-diagnosis；HTML清理先于分句，区分未解决冲突与有来源的适用范围差异。
+- 单Judge结构化主张审计，合理安全建议不等于放行具体操作；关键方向错误与Negative后续指导独立检查，可信根因须有可定位依据。
+- 旧成绩/身份不迁移；Gate、Regression、Golden、Corpus和前端不变。离线验收见 EVALUATION_POLICY_V12.md；真实Provider未执行。
+
 ## 2026-10-11 — 统一评测、可信Agent与面客收口
 
 - SPEC文首新增当前合同，旧评测/目标字段/D规则标记Superseded；冻结Gate/Search Space/预算和人工治理不变。
