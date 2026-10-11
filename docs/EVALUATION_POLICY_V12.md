@@ -1,3 +1,5 @@
+> 后续V1.2.1最小补丁及真实验证发现见[EVALUATION_POLICY_V121](EVALUATION_POLICY_V121.md)。下文保留V1.2交付时事实。
+
 # 16题审计后的评测规则修复验收
 
 依据：真实Baseline `EVAL-20261011142700759144` 的16条保存记录。Ponytail full；仅Evaluation Engine、Evidence Matcher、Judge合同、必要诊断及相关测试/规范。没有修改前端、Golden、Corpus、11Gate阈值、Regression、Agent或发布逻辑。

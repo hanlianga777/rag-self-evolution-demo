@@ -9,6 +9,7 @@ import urllib.request
 
 from .config import Settings
 from .telemetry import record_usage
+from .evaluation_contract import claim_consistent
 
 
 class ProviderUnavailable(RuntimeError):
@@ -114,7 +115,9 @@ class DeepSeekProvider:
                     " 还返回 evidence_sufficiency:{status:sufficient|insufficient|unknown|not_applicable,source_applicable:布尔或null,reason:中文,conflicts:[],fact_support:[{fact:必要事实,chunk_id:实际上下文ID,quote:逐字原文}]}；fact_support的fact必须逐字复用programmatic_evidence_observation.facts中的每个fact；不得漏必要事实。覆盖问题所需全部事实，语义不明必须unknown。负向题not_applicable，另核验clarify/refusal、安全行为。") if context is not None else ""
         if context is not None:
             contract += (" conflicts必须结构化：{status:resolved|unresolved,scope:适用产品/型号/条件范围,reason:理由,support:[{chunk_id,quote}]}。实质冲突未解决才阻断；已解释的不同型号/条件不等于相互矛盾，resolved须至少两处真实引用证明范围区分。"
-                         " unsupported_claims仍列出待审主张，同时返回claim_reviews数组逐项索引：{unsupported_claim_index:整数,claim:实际答案逐字片段,kind:supported_fact|reasonable_safety_advice|unsupported_instruction|contradiction|unresolved,changes_operation:布尔,critical:布尔,reason:理由,support:[{chunk_id,quote}]}。"
+                         " unsupported_claims仍列出待审主张，同时返回claim_reviews数组逐项索引：{unsupported_claim_index:整数,claim:实际答案逐字片段,kind:supported_fact|reasonable_safety_advice|unsupported_instruction|contradiction|unresolved,changes_operation:布尔,operation_basis:{effect:none|conservative_only|technical_change|unknown,source_applicable:布尔或null},critical:布尔,reason:理由,support:[{chunk_id,quote}]}。"
+                         " changes_operation只表示是否新增或改变设备允许的技术操作步骤、条件、参数、阈值或维修流程；technical_change时true，none或conservative_only时false。保守暂停、停用、澄清、联系专业人员属于conservative_only，不能仅因中止使用设备就标true；若附带新增测量/维修/换件/试验/复用条件，须拆开逐项审查，技术指导为technical_change，严格核查适用来源。"
+                         " operation_basis须独立给出结构化判断依据，不以reason措辞代替：source_applicable表示实际上下文是否提供适用事实/警告支持（对contradiction表示反证适用），不确定用null；effect不确定用unknown，kind用unresolved。reasonable_safety_advice必须effect=conservative_only、changes_operation=false、source_applicable=true且有警告引用；supported_fact/contradiction须source_applicable=true及引用；unsupported_instruction必须effect=technical_change、changes_operation=true、source_applicable=false。矛盾或存疑保留待核实，不自行改写或放行。"
                          " supported_fact必须有适用来源。reasonable_safety_advice仅允许基于已有警告的保守停用、澄清或寻求专业帮助，不得新增技术参数、测量/维修/换件/试验步骤、方向、复用条件或来源身份断言；这些具体指导无来源归unsupported_instruction，存疑归unresolved。合理建议须引用相关警告依据并解释为何不改变操作条件。"
                          " 合理安全建议不因缺少逐字步骤而扣正确性/完整性/忠实性；无依据具体操作与矛盾事实必须影响忠实性，不能只评价核心回答。检查关键事实的方向、上下限、单位、否定和作用对象，尤其不得超过与不得低于；方向颠倒归contradiction并引用实际原文。关键技术矛盾critical=true时correctness不得高于2且faithfulness不得为1。"
                          " Negative即使澄清/拒答主行为正确，也必须审查随后每项具体操作和事实；不得忽略无依据换件、测量、日期保存等步骤。behavior_pass=false时返回behavior_evidence（实际答案逐字失败片段），其他情况可为空字符串。")
@@ -157,6 +160,7 @@ class DeepSeekProvider:
                         raise ValueError('Invalid typed claim review')
                     if r['kind'] == 'contradiction' and r['critical'] and (correctness > 2 or faithfulness == 1):
                         raise ValueError('Critical technical contradiction contradicts quality scores')
+                    r['consistency_status'] = 'consistent' if claim_consistent(r) else 'needs_review'
             return {**({'evidence_sufficiency': evidence, 'claim_reviews': reviews, 'behavior_evidence': result['behavior_evidence']} if context is not None else {}), "correctness": correctness, "completeness": float(completeness), "faithfulness": float(faithfulness), "behavior_pass": behavior_pass, "reason": str(result["reason"]), "missing_points": [str(item) for item in missing], "unsupported_claims": [str(item) for item in unsupported]}
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
             raise ProviderUnavailable("DeepSeek Judge 未返回有效 JSON") from error

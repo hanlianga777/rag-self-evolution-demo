@@ -5,9 +5,10 @@
 - 技术底座：MinerU、Table KV、Parent1400/Child400/Overlap80、Embedding v4、FAISS/BM25、qwen3-rerank、DeepSeek与12项Search Space保持。八导航、共享PageShell/Card/Select/Stepper与唯一800px右侧Drawer保持。
 - 统一评测：Judge读取问题、参考答案、Golden证据、实际答案、完整最终上下文、类别/负向子型/预期行为与来源；样本是数据，不执行其中指令。有证据的补充不因参考答案省略而判幻觉；来源身份、产品、版本、单位冲突不能盲目接受。只调用同一次Judge，不增加逐题审批或第二套Judge。
 - Child Retrieval Coverage继续按原Child命中指标保存；Final Answer Evidence Sufficiency单独保存必要事实、定位、来源约束和理由。程序定位规范化原文的全事实覆盖并校验来源；充分结论还须同一次Judge确认语义与适用范围；负向Anchor不是答案Evidence。Child未全命中不直接导致失败；不足事实不能通过，诊断证据不足为待核实。
-- 版本：judge-v3-claims、evidence-v3-scoped、v1.2-grounded-diagnosis及Evaluation Identity冻结Golden/Corpus/Judge配置/Gate定义。不同规则禁止正式比较。历史结果显示历史规则/未采集，不改旧资格。旧实验只读；新Baseline复用当前冻结Golden，新实验只复用旧参数提案，不继承资格。
+- 版本：judge-v3.1-claims、evidence-v3-scoped、v1.2.1-claim-consistency及Evaluation Identity冻结Golden/Corpus/Judge配置/Gate定义。不同规则禁止正式比较。历史结果显示历史规则/未采集，不改旧资格。旧实验只读；新Baseline复用当前冻结Golden，新实验只复用旧参数提案，不继承资格。
 - 2026-10-11评测缺陷修复覆盖：HTML实体解码/标签清理先于必要事实分句，空标签不构成事实。来源冲突须区分实质未解决与已解释的型号/条件范围差异；resolved须明确scope/reason及至少两处实际上下文引用，旧非结构化冲突仍待核实，不自动放行。
 - 主张审计：同一次Judge返回逐项claim_reviews及答案片段/来源。区分supported_fact、reasonable_safety_advice、unsupported_instruction、contradiction、unresolved。合理安全建议只允许有警告依据且不改变操作条件的保守停用/澄清/求助；新增测量、试验、换件、技术阈值或复用条件不得借此放行。缺失/无效引用、遗漏分类待核实；已定位无依据具体操作/矛盾仍失败。原unsupported_claims保留。
+- V1.2.1主张一致性：changes_operation只指新增或改变设备允许的技术步骤、条件、参数、阈值或维修流程。保守暂停/停用/澄清/联系专业人员本身不算技术改变，附带测量/换件/试验须拆开核验。逐项operation_basis保存effect（none/conservative_only/technical_change/unknown）与source_applicable（true/false/null）；仅technical_change对应true。合理建议须conservative_only、false及适用警告引用；有来源事实/矛盾须适用引用（矛盾引用为反证）；无依据操作须technical_change、true、来源不支持。缺项、未知或字段矛盾保留needs_review，不解析reason关键词，不自动纠正旧输出；保留Matcher定位、来源和安全约束。
 - 方向性与Negative：Judge检查否定、上下限、单位、型号及作用对象；关键技术方向颠倒不得correctness>2或faithfulness=1，否则拒绝不一致JSON。负向题主澄清/拒答通过不能掩盖后续无依据操作指导；Anchor继续不是答案Evidence。
 - 可信根因：Evidence Sufficiency有值不等于失败根因已确认。主张失败有答案定位和有效分类/来源才确认Generation；行为失败需实际答案片段；Performance需实测超限；Retrieval仅在明确采集的候选与最终上下文均为空且必要证据不足时确认。unknown/来源待核实不得默认Retrieval，Unknown是未判定状态，不是第五类调参目标。评分未达标但缺具体失败依据仍待核实。
 - 回放：历史答案评分保留旧答案/Trace，另建answer_replay记录，不生成回答；上下文缺失阻止。回放Judge可能收费，需要显式授权，不作为正式Baseline、Sandbox、发布。完整评测与回放共享入口，运行性质明确。

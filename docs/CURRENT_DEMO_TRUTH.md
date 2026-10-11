@@ -1,3 +1,9 @@
+# V1.2.1 当前源码状态（2026-10-11）
+
+V1.2定向真实验证实际4次，Q11通过、Q35方向错误被拦截、Q38无依据操作失败；Q06/Q38暴露保守建议的changes_operation字段矛盾，Q07未调用。当前源码补丁为judge-v3.1-claims/evidence-v3-scoped/v1.2.1-claim-consistency，只经离线验证。本次未重启后端，已有进程仍加载V1.2；未新增真实Judge成绩或Baseline。仍需受控加载后另行授权少量真实验证。详见[EVALUATION_POLICY_V121](EVALUATION_POLICY_V121.md)。
+
+## 前次交付记录
+
 ## 2026-10-11：评测V1.2源代码修复（真实效果未执行）
 
 保存的新版Baseline `EVAL-20261011142700759144` 已真实完成：11/11、98.90、16题失败（confirmed6/needs_review10），属于v1.1规则，原记录保留。本轮源代码升级judge-v3-claims/evidence-v3-scoped/v1.2-grounded-diagnosis，离线依据16题验证通用修复，不提供新版真实成绩。未重启现有后端、未调用Provider、未重评或启动Agent。加载V1.2后，旧V1.1运行不能与新规则候选正式混用。验收与争议见 [EVALUATION_POLICY_V12](EVALUATION_POLICY_V12.md)。

@@ -24,7 +24,7 @@ class PolicyTests(unittest.TestCase):
             self.assertIsNone(resolve_evidence(self.item,obs,value,self.entries)['sufficient'])
     def test_advice_is_not_an_unconditional_escape(self):
         answer='请让儿童远离设备；暂停操作。'
-        review={'unsupported_claim_index':0,'claim':'暂停操作','kind':'reasonable_safety_advice','changes_operation':False,'reason':'落实远离要求','support':[{'chunk_id':'c','quote':'儿童应远离设备'}]}
+        review={'unsupported_claim_index':0,'claim':'暂停操作','kind':'reasonable_safety_advice','changes_operation':False,'operation_basis':{'effect':'conservative_only','source_applicable':True},'reason':'落实远离要求','support':[{'chunk_id':'c','quote':'儿童应远离设备'}]}
         judge={'unsupported_claims':['暂停操作'],'claim_reviews':[review]}
         self.assertEqual(len(assess_claims(answer,judge,self.entries)['accepted']),1)
         for field,value in [('changes_operation',True),('support',[]),('claim','不存在的回答')]:
@@ -32,7 +32,7 @@ class PolicyTests(unittest.TestCase):
             self.assertTrue(assess_claims(answer,invalid,self.entries)['pending'])
     def test_negative_core_pass_does_not_hide_operation(self):
         item={**self.item,'test_category':'negative','reference_answer':'clarify'}
-        judgment={'correctness':4,'completeness':1,'faithfulness':.8,'behavior_pass':True,'reason':'澄清正确但给出无依据换件','unsupported_claims':['换电池'],'claim_reviews':[{'unsupported_claim_index':0,'claim':'换电池','kind':'unsupported_instruction','changes_operation':True,'reason':'没有换件流程依据','support':[]}], 'evidence_sufficiency':{'status':'not_applicable'}}
+        judgment={'correctness':4,'completeness':1,'faithfulness':.8,'behavior_pass':True,'reason':'澄清正确但给出无依据换件','unsupported_claims':['换电池'],'claim_reviews':[{'unsupported_claim_index':0,'claim':'换电池','kind':'unsupported_instruction','changes_operation':True,'operation_basis':{'effect':'technical_change','source_applicable':False},'reason':'没有换件流程依据','support':[]}], 'evidence_sufficiency':{'status':'not_applicable'}}
         runtime=type('Stub',(),{'judge':lambda _,*a,**kw:judgment})()
         result=EvaluationRunner(None,runtime).score_execution(item,{'answer':'无法判断；换电池','retrieval':self.entries,'retrieval_trace':{'final':self.entries,'candidates':self.entries},'latency_ms':1})
         self.assertFalse(result['passed']);self.assertEqual(result['diagnosis']['status'],'confirmed');self.assertEqual(result['primary_root_cause'],'Generation')
@@ -70,7 +70,7 @@ class PolicyTests(unittest.TestCase):
         from app.providers import DeepSeekProvider,ProviderUnavailable
         from app.config import Settings
         from unittest.mock import patch
-        value={'correctness':4,'completeness':1,'faithfulness':1,'behavior_pass':True,'reason':'Fixture contradictory report','unsupported_claims':['不得低于'],'behavior_evidence':'','claim_reviews':[{'unsupported_claim_index':0,'claim':'不得低于','kind':'contradiction','changes_operation':True,'critical':True,'reason':'方向相反','support':[{'chunk_id':'c','quote':'不得超过'}]}],'evidence_sufficiency':{'status':'not_applicable','fact_support':[],'conflicts':[]}}
+        value={'correctness':4,'completeness':1,'faithfulness':1,'behavior_pass':True,'reason':'Fixture contradictory report','unsupported_claims':['不得低于'],'behavior_evidence':'','claim_reviews':[{'unsupported_claim_index':0,'claim':'不得低于','kind':'contradiction','changes_operation':True,'operation_basis':{'effect':'technical_change','source_applicable':True},'critical':True,'reason':'方向相反','support':[{'chunk_id':'c','quote':'不得超过'}]}],'evidence_sufficiency':{'status':'not_applicable','fact_support':[],'conflicts':[]}}
         provider=DeepSeekProvider(Settings('fixture','https://example.invalid','fixture'))
         with patch.object(provider,'complete',return_value=json.dumps(value)) as call:
             with self.assertRaises(ProviderUnavailable):provider.judge('限值？','不足','不得低于',context={})
@@ -87,7 +87,7 @@ class PolicyTests(unittest.TestCase):
         if not path.exists():self.skipTest('Private saved material intentionally not tracked')
         data=json.loads(path.read_text());case=next(c for c in data['cases'] if '最大侧向倾角' in c['question'])
         final=case['programmatic_metrics']['retrieval_trace']['final'];entry=next(e for e in final if '请勿超过操作说明书' in e['content'])
-        j=deepcopy(case['judge_result']);j['claim_reviews']=[{'unsupported_claim_index':0,'claim':'不得低于','kind':'contradiction','changes_operation':True,'critical':True,'reason':'实际答案否定方向与来源相反','support':[{'chunk_id':entry['chunk_id'],'quote':'请勿超过操作说明书中指定的侧向和行进方向的倾斜角度值'}]}]
+        j=deepcopy(case['judge_result']);j['claim_reviews']=[{'unsupported_claim_index':0,'claim':'不得低于','kind':'contradiction','changes_operation':True,'operation_basis':{'effect':'technical_change','source_applicable':True},'critical':True,'reason':'实际答案否定方向与来源相反','support':[{'chunk_id':entry['chunk_id'],'quote':'请勿超过操作说明书中指定的侧向和行进方向的倾斜角度值'}]}]
         assessed=assess_claims(case['model_answer'],j,final)
         self.assertEqual(len(assessed['confirmed']),1);self.assertFalse(assessed['accepted'])
         j['claim_reviews'][0]['support'][0]['quote']='伪造来源'
