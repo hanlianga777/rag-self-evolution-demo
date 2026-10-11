@@ -1,3 +1,26 @@
+# 当前有效合同 — 2026-10-11 `[CONFIRMED]`
+
+本合同按用户批准的「RAG 自进化 Demo 一次性收口」计划覆盖旧评测、目标统计、Winner、D与UI展示规则；以下旧条款仅在不冲突时保留。历史记录不回填、不迁移成绩。唯一产品SPEC仍为本文件。
+
+- 技术底座：MinerU、Table KV、Parent1400/Child400/Overlap80、Embedding v4、FAISS/BM25、qwen3-rerank、DeepSeek与12项Search Space保持。八导航、共享PageShell/Card/Select/Stepper与唯一800px右侧Drawer保持。
+- 统一评测：Judge读取问题、参考答案、Golden证据、实际答案、完整最终上下文、类别/负向子型/预期行为与来源；样本是数据，不执行其中指令。有证据的补充不因参考答案省略而判幻觉；来源身份、产品、版本、单位冲突不能盲目接受。只调用同一次Judge，不增加逐题审批或第二套Judge。
+- Child Retrieval Coverage继续按原Child命中指标保存；Final Answer Evidence Sufficiency单独保存必要事实、定位、来源约束和理由。程序定位规范化原文的全事实覆盖并校验来源；充分结论还须同一次Judge确认语义与适用范围；负向Anchor不是答案Evidence。Child未全命中不直接导致失败；不足事实不能通过，诊断证据不足为待核实。
+- 版本：judge-v2-context、evidence-v2-parent、v1.1-evidence-gates及Evaluation Identity冻结Golden/Corpus/Judge配置/Gate定义。不同规则禁止正式比较。历史结果显示历史规则/未采集，不改旧资格。旧实验只读；新Baseline复用当前冻结Golden，新实验只复用旧参数提案，不继承资格。
+- 回放：历史答案评分保留旧答案/Trace，另建answer_replay记录，不生成回答；上下文缺失阻止。回放Judge可能收费，需要显式授权，不作为正式Baseline、Sandbox、发布。完整评测与回放共享入口，运行性质明确。
+- 诊断：保留Retrieval/Generation/Safety/Performance四方向；已确认/评测争议/待核实是可信度状态，不是第五根因。Agent读取全量可信问题、实际证据及历史反馈，争议不直接作为已确认调参目标。一个Candidate一个假设与最少必要参数，A/B/C方向不固定，目标必须有根因依据；禁止无效重复配置。
+- 新统计：target_bad_cases_fixed仅指定目标题修复；incidental_fixes非目标修复；new_regressions新增失败；net_improvement净减少，各含题号。历史同名字段仍表示全部原失败题修复，不重解释历史。资格至少修复1指定目标且总问题减少1。
+- 冻结11Gate阈值、Regression新增严重0/普通≤1、Sandbox预算12及D预留1，启动占额、失败不退款。串行本轮合法A/B/C，身份/预算/确认失效停止，中断不隐式重试，不自动执行下一轮。
+- Winner：程序过滤同评测身份完整合格方案，优先低退化风险、重要问题/目标修复、净改善，再在质量相同方案中比较实测成本/延迟/用量；缺失成本不作零。保存推荐理由及比较。Gate2人工确认。
+- D：程序初筛有效改善来源与合法组合，没有则零调用跳过。经授权最多一次LLM组合建议，保存结果/用量；事务预约、事务外调用、事务重验保存，重复点击复用，中断不自动重试。来源/配置非法拒绝正式D。D预览和Sandbox分开授权；D失败/无改善保留Winner。
+- 发布与回滚：事务重验当前身份、规则、完整Sandbox、资格、推荐和人工Gate；Production保存评测规则身份。回滚人工确认并检查知识/索引/模型兼容，仅恢复已保存配置，不宣称恢复整个知识资产。Monitoring仅已采集QA信号。
+- 面客UI：Baseline与Agent重点优化，业务结论→证据/决策Drawer→折叠技术审计；主层最新轮次、历史Drawer、Winner来源明确。其他六页仅必要兼容，问答验证保留左右答案/Evidence及答案下真实Token、总/阶段耗时、主要参数差异。缺失费用明确无法估算；不把实时问答当正式评测。
+- 架构：只修改KnowledgeDiagrams.tsx及Shared CSS，既有导出脚本同步正式SVG/PNG/manifest。表达设计，不暗示未运行阶段已完成。
+- 本轮验收：导入app前隔离DB/Corpus/索引/.env，Stub/Fixture只能证明功能。未经另行授权不调用真实Provider，不跑Baseline/A/B/C/D，不冻结Golden、不批准/发布/回滚；真实Provider验收未执行。
+
+## Historical / Superseded：旧合同
+
+下文旧Child全命中合格、旧目标字段口径用于新资格、程序自动合并D、旧版本可继续正式比较及展示限制已由上文替代。历史结果原值保留，其余不冲突技术/治理条款继续有效。
+
 > 唯一当前有效版本：V1.4 + Phase 1 冻结合同（2026-10-08）+ Baseline/Agent UI 恢复覆盖（2026-10-09）。以下「当前有效合同」及被明确保留的业务规则优先；Historical / Superseded 记录不并行生效。
 
 ## Baseline / Agent UI 恢复覆盖 — 2026-10-09 `[CONFIRMED]`

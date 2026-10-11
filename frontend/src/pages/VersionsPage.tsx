@@ -48,6 +48,8 @@ export function VersionsPage({ data }: { data: any }) {
 
   return <PageShell className="page versions-page" header={<div className="page-title"><div><h1>发布</h1><p>确认最终合格方案的参数变化，并由人工 Gate 发布至 Production。</p></div></div>}>
 
+    {data.monitoring?.recommendation && <p className="muted">Monitoring：{data.monitoring.recommendation.reason}</p>}
+    <p className="muted">回滚仅恢复兼容的历史配置；系统检查Corpus、索引与模型，不能恢复缺失知识资产。确认后仍由后端重验。</p>
     {error && <p className="error-notice" role="alert">{error}</p>}
     <section className="panel release-decision">
       <div className="section-head"><div><h2>{currentReleased ? `Production 来源 ${sourceName}` : currentVersion?.provenance === "bootstrap" ? "当前初始配置" : currentVersion ? "当前 Production · 发布审计未完整保存" : "尚无 Production 发布"}</h2>{currentVersion && <p className="muted">当前版本 · <ShortId value={currentVersion.id} /></p>}</div>{currentReleased && <Status value="Released" />}</div>

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from statistics import mean
+from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases
 
 from .policy import DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate
 
@@ -138,9 +139,14 @@ class EvaluationRunner:
         frozen = {item['id']: item for item in snapshot.get('questions', [])}
         items = []
         for key in snapshot.get('question_ids', []):
-            current = self.store.question(key)
+            try:
+                current = self.store.question(key)
+            except KeyError:
+                if key not in frozen or 'test_category' not in frozen[key]:
+                    raise ValueError('历史Snapshot缺少完整题目/类别，不能按当前题目补造')
+                current = {'id':key, **frozen[key], 'raw':frozen[key]}
             raw = frozen.get(key, current['raw'])
-            items.append({**current, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'), 'evidence': raw.get('acceptable_evidence', []), 'raw': raw, 'test_category': raw.get('test_category', current['test_category']), 'negative_subtype': raw.get('negative_subtype', current.get('negative_subtype'))})
+            items.append({**current, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'), 'evidence': raw.get('evidence', raw.get('acceptable_evidence', [])), 'raw': raw, 'test_category': raw.get('test_category', current['test_category']), 'negative_subtype': raw.get('negative_subtype', current.get('negative_subtype'))})
         return items
 
     def start_baseline(self):
@@ -164,13 +170,23 @@ class EvaluationRunner:
             config['knowledge_identity'] = index_info['knowledge_identity']
             config['candidate_k'] = index_info['knowledge_config']['candidate_k']
             config['top_k'] = index_info['knowledge_config']['top_k']
-        judge_meta = {"model": self.runtime.model, "prompt_version": "judge-v1", "scoring_policy": "v1.0.1-gates", "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
+        judge_meta = {"model": self.runtime.model, **VERSIONS, "temperature":0, "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
+        judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
         return self.store.create_evaluation_run(snapshot, config, judge_meta), approved, config
 
     def _case_result(self, item: dict, config: dict):
-        expected = item["reference_answer"] or item["raw"].get("expected_behavior", "拒答或澄清")
         execution = self.runtime.answer(item["question"], config)
-        judge = self.runtime.judge(item["question"], expected, execution["answer"], item["test_category"])
+        return self.score_execution(item, execution)
+
+    def score_execution(self, item, execution):
+        expected = item["reference_answer"] or item["raw"].get("expected_behavior", "拒答或澄清")
+        trace = execution.get('retrieval_trace') or {}
+        final = trace.get('final', [])
+        observation = observe_evidence(item, final)
+        judge = self.runtime.judge(item["question"], expected, execution["answer"], item["test_category"], context={'golden_evidence': item['evidence'], 'final_context': final, 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'), 'expected_behavior': item['raw'].get('expected_behavior'), 'source_constraints': observation['source_constraints'], 'programmatic_evidence_observation': observation})
+        sufficiency = resolve_evidence(item, observation, judge, final)
+        if item['test_category'] != 'negative' and not isinstance(trace.get('final'), list):
+            sufficiency.update(status='unknown', sufficient=None, reason='最终上下文未采集；不能把未采集当作检索遗漏')
         expected_chunks = {chunk_id for evidence in item["evidence"] for chunk_id in evidence.get("source_chunk_ids", [])}
         retrieved = [key for entry in execution["retrieval"] for key in entry.get("matched_child_ids", [entry.get("chunk_id")])]
         matching = [index + 1 for index, chunk_id in enumerate(retrieved) if chunk_id in expected_chunks]
@@ -188,11 +204,11 @@ class EvaluationRunner:
                 failure_tags.append("Generation Failure")
             if judge["faithfulness"] < targets["faithfulness"]:
                 failure_tags.append("Evidence / Citation Failure")
-            if expected_chunks and coverage['final_context']['all_hit'] is False:
-                if coverage['candidate_recall']['all_hit'] is True:
-                    failure_tags.append('Ranking Failure')
-                elif coverage['candidate_recall']['all_hit'] is False:
-                    failure_tags.append('Retrieval Failure')
+            if sufficiency['sufficient'] is False:
+                candidates = observe_evidence(item, trace.get('candidates', []))
+                failure_tags.append('Ranking Failure' if candidates['status'] == 'text_supported' else 'Retrieval Failure' if not final else 'Evidence / Citation Failure')
+            elif sufficiency['sufficient'] is None:
+                failure_tags.append('Evidence Pending Review')
         if not judge["behavior_pass"]:
             failure_tags.extend(["Unsafe Answer", "Safety Failure"])
         if judge.get("unsupported_claims"):
@@ -202,7 +218,47 @@ class EvaluationRunner:
         failure_tags = list(dict.fromkeys(failure_tags))
         severity = "critical" if item["raw"].get("criticality") == "high" or item.get("negative_subtype") == "safety_critical" else "ordinary"
         primary, secondary = root_cause_layers(failure_tags, coverage, item["test_category"])
-        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "programmatic_metrics": {"retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnosis_status": "preliminary", "diagnostic_basis": "explicit_safety_failure" if primary == "Safety" else coverage["diagnostic_basis"]}, "passed": not failure_tags, "redline_pass": not redline}
+        if failure_tags and primary not in {'Safety', 'Performance'}:
+            primary = 'Generation' if sufficiency['sufficient'] is True or item['test_category'] == 'negative' else 'Retrieval'
+        from .evaluation_contract import normalize
+        disputed = any(isinstance(claim, str) and normalize(claim) and any(normalize(claim) in normalize(entry.get('content', '')) for entry in final) for claim in judge.get('unsupported_claims', []))
+        diagnostic = {'status': 'confirmed' if sufficiency['sufficient'] is not None or item['test_category'] == 'negative' and not judge['behavior_pass'] else 'needs_review', 'reason': sufficiency['reason']}
+
+        if disputed:
+            diagnostic = {'status': 'disputed', 'reason': 'Judge无依据标签中的原文可在最终上下文定位；保留评分，待人工核对语义与来源'}
+        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "programmatic_metrics": {"evidence_sufficiency": sufficiency, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnosis_status": "preliminary", "diagnostic_basis": "explicit_safety_failure" if primary == "Safety" else coverage["diagnostic_basis"]}, "passed": not failure_tags, "redline_pass": not redline}
+
+    def start_replay(self, source_id):
+        source = self.store.evaluation_run(source_id)
+        if not source or source['status'] != 'completed':
+            raise ValueError('仅完整历史运行支持答案回放')
+        snapshot = json.loads(source['dataset_snapshot_json'])
+        saved = {r['question_id']: r for r in self.store.evaluation_case_results(source_id)}
+        if set(saved) != set(snapshot['question_ids']):
+            raise ValueError('历史逐题记录不完整')
+        executions = {}
+        for key, case in saved.items():
+            trace = case.get('programmatic_metrics', {}).get('retrieval_trace')
+            if not isinstance(trace, dict) or not isinstance(trace.get('final'), list) or any(not isinstance(e.get('content'), str) for e in trace['final']):
+                raise ValueError('历史最终上下文未完整保存，不能回放评分')
+            executions[key] = {**case['programmatic_metrics'], 'answer': case['model_answer'], 'retrieval': case.get('retrieved_chunks', []), 'retrieval_trace': trace}
+        judge = {**source['judge'], **VERSIONS, 'model': self.runtime.model, 'source_evaluation_id': source_id, 'execution_kind': 'answer_replay'}
+        judge['evaluation_identity'] = evaluation_identity(snapshot, judge)
+        items = self.snapshot_items(snapshot)
+        run_id = self.store.create_evaluation_run(snapshot, {**source['config'], 'run_target': 'answer_replay', 'source_evaluation_id': source_id}, judge)
+        return run_id, items, executions
+
+    def execute_replay(self, run_id, items, executions):
+        cases = []
+        try:
+            for item in items:
+                case = self.score_execution(item, executions[item['id']])
+                self.store.record_evaluation_case(run_id, item['id'], case)
+                cases.append(case)
+            result = {**summarize_evaluation_cases(cases), 'execution_kind': 'answer_replay', 'release_eligible': False, 'timing_provenance': '历史生成耗时，非本次生成性能'}
+            return self.store.finish_evaluation_run(run_id, 'completed', result)
+        except Exception as error:
+            return self.store.finish_evaluation_run(run_id, 'partial' if cases else 'failed', {**summarize_evaluation_cases(cases), 'execution_kind': 'answer_replay', 'release_eligible': False}, str(error))
 
     def execute_baseline(self, run_id, approved, config):
         cases = []
@@ -225,7 +281,11 @@ class EvaluationRunner:
         baseline = self.store.evaluation_run(experiment["baseline_run_id"]) if experiment else None
         if baseline is None or baseline["status"] != "completed":
             raise ValueError("Candidate 必须基于已完成的 Baseline 运行")
+        if not policy_current(baseline['judge']):
+            raise ValueError('评测规则已升级，请授权建立新Baseline；旧Candidate只读')
         snapshot = json.loads(baseline["dataset_snapshot_json"])
+        if baseline['judge'].get('evaluation_identity') != evaluation_identity(snapshot, baseline['judge']):
+            raise ValueError('Evaluation身份不匹配')
         approved = self.snapshot_items(snapshot)
         if baseline['judge'].get('model') != self.runtime.model:
             raise ValueError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
@@ -243,13 +303,15 @@ class EvaluationRunner:
         baseline_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(baseline["id"])}
         candidate_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(run_id)}
         failed = [question_id for question_id, item in baseline_cases.items() if not item.get("passed")]
-        fixed = sum(candidate_cases.get(question_id, {}).get("passed", False) for question_id in failed)
         passed = [(question_id, item) for question_id, item in baseline_cases.items() if item.get("passed")]
         regression = evaluate_regression(new_critical_failures=sum(not candidate_cases.get(question_id, {}).get("passed", False) and item.get("severity") == "critical" for question_id, item in passed), new_ordinary_failures=sum(not candidate_cases.get(question_id, {}).get("passed", False) and item.get("severity") != "critical" for question_id, item in passed))
-        qualification = qualify_candidate(run["result"]["gates"], regression, fixed, len(failed), run["result"]["bad_case_count"])
+        references = set(candidate['reasoning'].get('observed_evidence', []))
+        targets = [q for q in failed if q in references or f"BC-{baseline['id']}-{q}" in references]
+        comparison = compare_cases(baseline_cases, candidate_cases, targets)
+        qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), run["result"]["bad_case_count"])
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
-        result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], **run["result"], "regression": regression, "target_bad_cases_fixed": fixed, "qualification": qualification, "recommendation": None}
+        result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "recommendation": None}
         if candidate['reasoning'].get('candidate_label') == 'D':
             winner = self.store.candidate(candidate['reasoning']['winner_id'])
             winner_cases = {item['question_id']: item for item in self.store.evaluation_case_results(winner['result']['evaluation_run_id'])}

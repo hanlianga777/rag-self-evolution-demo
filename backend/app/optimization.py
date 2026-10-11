@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timezone
 from collections import Counter
 
+from .evaluation_contract import diagnosis
 from .telemetry import collect_usage, measure, cost_fields
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, MAX_EVALS, search_space_contract, validate_candidate_config
 
@@ -19,6 +20,8 @@ class OptimizationAgent:
         # Check identity before budget reads; the short claim serializes duplicate starts.
         self.store.require_current_baseline(baseline_run_id)
         bad_cases = [item for item in self.store.bad_case_rows() if item["run_id"] == baseline_run_id]
+        audited_cases = [{**item, 'diagnosis': diagnosis(item.get('result', {}))} for item in bad_cases]
+        bad_cases = [item for item in audited_cases if item['diagnosis']['status'] == 'confirmed']
         trigger = self.store.optimization_trigger(trigger_id) if trigger_id else None
         existing_id = experiment_id or (trigger or {}).get("optimization_run_id") or self.store.current_baseline_identity()["current_experiment_id"]
         existing = self.store.experiment(existing_id) if existing_id else None
@@ -59,10 +62,11 @@ class OptimizationAgent:
             "failed_gates": failed_gates,
             "evaluation_budget": evaluation_budget,
             "target_reference_map": target_reference_map,
-            "bad_cases": bad_cases,
+            "bad_cases": bad_cases, "all_bad_case_audit": audited_cases,
             "monitoring_context": monitoring_context,
             "monitoring_target_event_ids": monitoring_target_event_ids,
             "baseline_configuration": base_config,
+            "historical_config_proposals": [{'id': c['id'], 'config': c['config'], 'qualification_inherited': False} for c in self.store.candidates() if c['experiment_id'] != experiment_id],
             'prior_sandbox_results': [{'id': item['id'], 'hypothesis': item['reasoning'].get('hypothesis'), 'configuration': item['config'], 'result': item['result'], 'status': item['status']} for item in prior_candidates],
             "allowed_parameter_values": search_space_contract(),
             "excluded_automatic_parameters": sorted(EXCLUDED_AUTOMATIC_PARAMETERS),
@@ -73,7 +77,7 @@ class OptimizationAgent:
             with collect_usage() as usage, measure(stages, 'optimization_agent'):
                 try:
                     content = self.provider.complete(
-                        "你是 RAG Optimization Agent。只返回 JSON：{\"root_cause_cluster\":\"...\",\"observed_evidence\":[\"...\"],\"candidates\":[{\"id\":\"A\",\"hypothesis\":\"...\",\"why\":\"...\",\"target_bad_cases\":[\"...\"],\"config_diff\":{},\"risk\":\"...\"}]}。A/B/C 均按此格式；严格遵守用户消息中的 allowed_parameter_values 类型和值，不得输出隐藏推理或测试答案。",
+                        "你是 RAG Optimization Agent。只返回 JSON：{\"root_cause_cluster\":\"...\",\"observed_evidence\":[\"...\"],\"candidates\":[{\"id\":\"A\",\"hypothesis\":\"...\",\"why\":\"...\",\"target_bad_cases\":[\"...\"],\"config_diff\":{},\"risk\":\"...\",\"target_group\":\"...\",\"root_cause\":\"Retrieval|Generation|Safety|Performance\",\"root_cause_evidence\":[\"目标ID\"],\"expected_improvement\":\"...\"}]}。A/B/C 均按此格式；严格遵守用户消息中的 allowed_parameter_values 类型和值，不得输出隐藏推理或测试答案。",
                         json.dumps(prompt, ensure_ascii=False), json_mode=True,
                     )
                 finally:
@@ -94,9 +98,9 @@ class OptimizationAgent:
             for candidate in candidates:
                 audit["validation_stage"] = "schema"
                 audit["failed_candidate_id"] = candidate["id"]
-                for field in ("hypothesis", "why", "risk", "target_bad_cases", "config_diff"):
+                for field in ("hypothesis", "why", "risk", "target_group", "root_cause", "expected_improvement", "target_bad_cases", "config_diff"):
                     value = candidate.get(field)
-                    if field in ("hypothesis", "why", "risk"):
+                    if field in ("hypothesis", "why", "risk", "target_group", "root_cause", "expected_improvement"):
                         expected = "non-empty string"
                         valid = isinstance(value, str) and bool(value.strip())
                     elif field == "target_bad_cases":
@@ -112,6 +116,12 @@ class OptimizationAgent:
                 if unknown_targets:
                     audit.update(failed_field="target_bad_cases", actual_value=candidate["target_bad_cases"], expected_type="identifiers from current persisted evidence", allowed_values=sorted(target_reference_map))
                     raise ValueError(f"Agent Candidate {candidate['id']} target_bad_cases 引用了不存在的当前证据：" + ", ".join(unknown_targets))
+                evidence_refs = candidate.get('root_cause_evidence')
+                if not isinstance(evidence_refs, list) or set(evidence_refs) != set(candidate['target_bad_cases']):
+                    raise ValueError('根因依据必须对应全部目标引用')
+                causes = {item.get('result', {}).get('primary_root_cause') or item.get('category') for item in bad_cases if item['id'] in candidate['target_bad_cases'] or item['question_id'] in candidate['target_bad_cases']}
+                if candidate['root_cause'] not in {'Retrieval', 'Generation', 'Safety', 'Performance'} or causes and candidate['root_cause'] not in causes:
+                    raise ValueError('候选根因与可信目标不对应')
                 if candidate["hypothesis"].strip() in {item.get("reasoning", {}).get("hypothesis", "").strip() for item in prior_candidates}:
                     audit.update(failed_field="hypothesis", actual_value=candidate["hypothesis"], expected_type="new hypothesis", allowed_values=None)
                     raise ValueError("下一轮必须提出新的 Hypothesis")
@@ -134,7 +144,7 @@ class OptimizationAgent:
             batch = []
             for candidate, config in staged:
                 batch.append((f"R{round_number}-{candidate['id']}", config, {
-                    "root_cause_cluster": result.get("root_cause_cluster", "待人工复核"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
+                    "target_group": candidate["target_group"], "root_cause": candidate["root_cause"], "root_cause_evidence": candidate["root_cause_evidence"], "expected_improvement": candidate["expected_improvement"], "target_diagnosis": [item for item in bad_cases if item["id"] in candidate["target_bad_cases"] or item["question_id"] in candidate["target_bad_cases"]], "root_cause_cluster": result.get("root_cause_cluster", "待人工复核"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
                     "changed_parameters": {key: value for key, value in config.items() if value != base_config.get(key)}, "source_trigger_id": trigger_id, "monitoring_target_event_ids": monitoring_target_event_ids, "round": round_number, "candidate_label": candidate["id"],
                 }))
             audit["validation_stage"] = "persistence"

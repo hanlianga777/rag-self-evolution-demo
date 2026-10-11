@@ -50,8 +50,8 @@ class LifecycleService(AiService):
         result.update(retrieval=evidence, corpus_fingerprint=FINGERPRINT, mode='local', model='fixture', timing_semantics={'stages_are_nested_not_additive': True}, cost_estimation={'status': 'unavailable', 'amount': None, 'reason': 'price_unavailable'}, stages=[{'stage_name': 'retrieval', 'duration_ms': 10}, {'stage_name': 'generation', 'duration_ms': 80}])
         return result
 
-    def judge(self, question, expected, answer, category):
-        return FixtureEvaluationRuntime(self.store).judge(question, expected, answer, category)
+    def judge(self, question, expected, answer, category, *, context=None):
+        return FixtureEvaluationRuntime(self.store).judge(question, expected, answer, category, context=context)
 
 
 class ApiLifecycleTests(unittest.TestCase):
@@ -80,6 +80,13 @@ class ApiLifecycleTests(unittest.TestCase):
             if result['status'] in terminal: return result
             time.sleep(.01)
         self.fail('Fixture API did not terminate: ' + path)
+
+    def wait_decision(self):
+        for _ in range(300):
+            current = self.client.get('/api/optimization').json()
+            if current.get('recommendation', {}).get('result', {}).get('status') == 'Recommended': return current
+            time.sleep(.01)
+        self.fail('Fixture candidate evaluation finished but decision did not settle')
 
     def test_complete_v2_http_lifecycle_d_regression_keeps_winner_monitoring_round_one(self):
         self.assertTrue(self.client.get('/api/dataset').json(), 'Legacy seed is loaded')
@@ -138,11 +145,11 @@ class ApiLifecycleTests(unittest.TestCase):
         self.assertEqual(self.store.production_versions(), initial_versions)
         self.store.finish_candidate(score_candidate['id'], 'evaluated', score_candidate['result'])
         self.post('experiments/' + experiment['id'] + '/recommendation', {'candidate_id': winner})
-        composite = self.post('experiments/' + experiment['id'] + '/composite')
+        composite = self.post('experiments/' + experiment['id'] + '/composite', {'authorize_provider':True})
         self.assertEqual(composite['status'], 'generated')
         started = self.post('candidates/' + composite['id'] + '/run')
         self.wait('evaluations/' + started['id'], ('completed', 'failed'))
-        current = self.client.get('/api/optimization').json()
+        current = self.wait_decision()
         d = next(row for row in current['candidates'] if row['id'] == composite['id'])
         self.assertFalse(d['result']['qualification']['qualified'], json.dumps({'config': d['config'], 'reasoning': d['reasoning'], 'result': d['result']}, ensure_ascii=False))
         self.assertTrue(d['result']['gates']['passed'], 'D passes gates; two new ordinary failures fail Regression')

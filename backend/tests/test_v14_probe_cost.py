@@ -321,11 +321,12 @@ class ProbeCostTests(unittest.TestCase):
         from app.evaluation import EvaluationRunner
         execution = {'answer': 'wrong', 'latency_ms': 1, 'retrieval': [{'chunk_id': 'A'}],
                      'retrieval_trace': {'candidates': [{'chunk_id': 'A'}, {'chunk_id': 'B'}], 'final': [{'chunk_id': 'A'}]}}
-        runtime = SimpleNamespace(answer=lambda *_: execution, judge=lambda *_: {'correctness': 0, 'completeness': 0, 'faithfulness': 1, 'behavior_pass': True, 'unsupported_claims': []})
+        runtime = SimpleNamespace(answer=lambda *_: execution, judge=lambda *_, **kw: {'evidence_sufficiency':{'status':'insufficient','source_applicable':True,'conflicts':[],'fact_support':[],'reason':'Fixture missing evidence'}, 'correctness': 0, 'completeness': 0, 'faithfulness': 1, 'behavior_pass': True, 'unsupported_claims': []})
         runner = EvaluationRunner(None, runtime)
         item = {'question': 'question', 'reference_answer': 'answer', 'test_category': 'positive', 'evidence': [{'source_chunk_ids': ['A', 'B']}], 'raw': {}}
         result = runner._case_result(item, {})
-        self.assertIn('Ranking Failure', result['failure_tags'])
+        self.assertNotIn('Ranking Failure', result['failure_tags'])
+        self.assertIn('Evidence / Citation Failure', result['failure_tags'])
         self.assertNotIn('Retrieval Failure', result['failure_tags'])
         self.assertEqual(result['programmatic_metrics']['evidence_coverage']['final_context']['coverage'], .5)
         execution['retrieval_trace']['final'].append({'chunk_id': 'B'})

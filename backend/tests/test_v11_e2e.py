@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
@@ -12,6 +13,7 @@ from app.ai_service import AiService
 from app.evaluation import EvaluationRunner
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
+from identity_fixture import context_judgment
 
 
 class FixtureCorpus:
@@ -35,7 +37,16 @@ class FixtureProvider:
         if "RAG Optimization Agent" in system:
             payload = json.loads(prompt)
             targets = [item["id"] for item in payload["bad_cases"]] or payload["monitoring_target_event_ids"]
-            return json.dumps({"root_cause_cluster": "检索覆盖不足", "observed_evidence": targets, "candidates": [{"id": "A", "config_diff": {"top_k": 6}, "hypothesis": "扩大上下文", "why": "提高 TopK", "target_bad_cases": targets, "risk": "延迟"}, {"id": "B", "config_diff": {"min_score": 0.2}, "hypothesis": "过滤噪声", "why": "提高阈值", "target_bad_cases": targets, "risk": "召回"}, {"id": "C", "config_diff": {"min_score": 0.1}, "hypothesis": "平衡阈值", "why": "小幅提高阈值", "target_bad_cases": targets, "risk": "漏召回"}]}, ensure_ascii=False)
+            value = {"root_cause_cluster": "检索覆盖不足", "observed_evidence": targets, "candidates": [{"id": "A", "config_diff": {"top_k": 6}, "hypothesis": "扩大上下文", "why": "提高 TopK", "target_bad_cases": targets, "risk": "延迟"}, {"id": "B", "config_diff": {"min_score": 0.2}, "hypothesis": "过滤噪声", "why": "提高阈值", "target_bad_cases": targets, "risk": "召回"}, {"id": "C", "config_diff": {"min_score": 0.1}, "hypothesis": "平衡阈值", "why": "小幅提高阈值", "target_bad_cases": targets, "risk": "漏召回"}] }
+            cause = payload["bad_cases"][0]["result"].get("primary_root_cause", "Generation") if payload["bad_cases"] else "Generation"
+            for candidate in value["candidates"]:
+                candidate.update(target_group="Fixture可信问题", root_cause=cause, root_cause_evidence=targets, expected_improvement="Fixture目标改善")
+            return json.dumps(value, ensure_ascii=False)
+        if "唯一Optimization Agent" in system:
+            payload = json.loads(prompt)
+            winner = payload["winner"]; sources = payload["sources"]
+            diff = {k:v for k,v in sources[0]["config"].items() if k not in ("run_target", "candidate_id") and winner["config"].get(k) != v and v != payload["baseline"]["config"].get(k)}
+            return json.dumps({"should_generate_d":bool(diff), "source_candidates":[winner["id"],sources[0]["id"]],"root_cause_alignment":"fixture","complementary_capabilities":"fixture","proposed_config_diff":diff,"expected_improvement":"fixture","risks":"fixture","explanation":"fixture"})
         payload = json.loads(prompt)
         slot = payload["coverage_slot"]
         subtype = next((name for name in ("safe_rejection", "insufficient_evidence", "clarify", "safety_critical", "prompt_injection") if f"生成一个 {name} 负向问题" in system), None)
@@ -68,12 +79,12 @@ class FixtureEvaluationRuntime:
     def answer(self, question, config):
         item = next(row for row in self.store.questions() if row["question"] == question)
         fail = item["test_category"] == "positive" and item["raw"].get("coverage_slot") == "Q02" and config["top_k"] == 4
-        evidence = [{"chunk_id": item["evidence"][0]["source_chunk_ids"][0], "score": .95}] if item["evidence"] else []
-        return {"answer": "错误答案" if fail else item["reference_answer"] or "证据不足，无法回答。", "retrieval": evidence, "latency_ms": 100, "ttft_ms": 30, "input_tokens": 10, "output_tokens": 5}
+        evidence = [{"chunk_id": item["evidence"][0]["source_chunk_ids"][0], "score": .95, "content": item["reference_answer"] or "", "product":item["raw"].get("product"), "version":item["raw"].get("version")}] if item["evidence"] else []
+        return {"answer": "错误答案" if fail else item["reference_answer"] or "证据不足，无法回答。", "retrieval": evidence, "retrieval_trace":{"candidates":evidence,"final":evidence}, "latency_ms": 100, "ttft_ms": 30, "input_tokens": 10, "output_tokens": 5}
 
-    def judge(self, _question, _expected, answer, _category):
+    def judge(self, _question, _expected, answer, _category, *, context=None):
         correct = answer != "错误答案"
-        return {"correctness": 4 if correct else 0, "faithfulness": 1, "completeness": 1 if correct else 0, "behavior_pass": True, "reason": "固定 Judge", "missing_points": [], "unsupported_claims": []}
+        return context_judgment({"correctness": 4 if correct else 0, "faithfulness": 1, "completeness": 1 if correct else 0, "behavior_pass": True, "reason": "固定 Judge", "missing_points": [], "unsupported_claims": []}, context)
 
 
 class V11BusinessE2E(unittest.TestCase):
@@ -128,7 +139,7 @@ class V11BusinessE2E(unittest.TestCase):
         for label in "ABC":
             runner.run_candidate(f"{experiment['id']}-R1-{label}")
         self.store.confirm_experiment_report(experiment["id"], f"{experiment['id']}-R1-A", "test_human")
-        composite = self.store.create_composite(experiment["id"])
+        composite = self.store.create_composite(experiment["id"], self.provider, True)
         if composite["status"] == "generated":
             runner.run_candidate(composite["id"])
         recommendation = self.store.refresh_recommendation(experiment["id"])
@@ -160,7 +171,9 @@ class V11BusinessE2E(unittest.TestCase):
         version = self.store.publish_candidate(recommendation["recommended_candidate"], "fixture_reviewer")
         self.assertEqual(version["snapshot"]["human_release"]["actor"], "fixture_reviewer")
         self.assertEqual(version["previous_version_id"], "baseline-v1")
-        self.assertEqual(self.store.rollback_to("baseline-v1", "fixture_reviewer")["id"], "baseline-v1")
+        from app.corpus import INDEX_DIR
+        with patch('app.knowledge_pipeline.index_for_config', return_value=INDEX_DIR):
+            self.assertEqual(self.store.rollback_to("baseline-v1", "fixture_reviewer")["id"], "baseline-v1")
         self.assertEqual(len(self.store.production_versions()), 2)
 
     def test_e2e_05_production_monitoring_loop(self):
@@ -190,7 +203,7 @@ class V11BusinessE2E(unittest.TestCase):
             runner.run_candidate(f"{experiment['id']}-R1-{label}")
         winner = f"{experiment['id']}-R1-A"
         self.store.confirm_experiment_report(experiment['id'], winner, 'test_human')
-        composite = self.store.create_composite(experiment['id'])
+        composite = self.store.create_composite(experiment['id'], self.provider, True)
         self.assertEqual(composite['status'], 'generated')
         result = runner.run_candidate(composite['id'])
         self.assertEqual(len(self.store.evaluation_case_results(result['result']['evaluation_run_id'])), 20)

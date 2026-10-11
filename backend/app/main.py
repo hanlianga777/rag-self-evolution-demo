@@ -1211,7 +1211,10 @@ def save_pipeline_draft(payload: PipelineDraftRequest):
 
 @app.get("/api/monitoring")
 def monitoring():
-    return {"events": store.monitoring_events(), "triggers": store.optimization_triggers(), **store.current_baseline_identity()}
+    events = store.monitoring_events()
+    active = store.active_production()
+    confirmed = [e for e in events if e.get('bad_case') and e.get('determinable') and e.get('source', {}).get('production_version_id') == (active or {}).get('id')]
+    return {"events": events, "triggers": store.optimization_triggers(), "recommendation": {"status": "needs_human_review" if confirmed else "insufficient_signal", "event_ids": [e['id'] for e in confirmed], "reason": "已有人工判定QA失败，建议核对影响与兼容回滚范围；不自动回滚" if confirmed else "已有QA信号不足以建议回滚；不产生额外监测或Judge调用"}, **store.current_baseline_identity()}
 
 
 @app.post("/api/monitoring/events", status_code=201, dependencies=[Depends(require_trusted_origin)])
@@ -1302,13 +1305,17 @@ def select_recommendation(run_id: str, payload: RecommendationRequest):
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 
+class PaidActionRequest(BaseModel):
+    authorize_provider: bool = False
+
+
 @app.post('/api/experiments/{run_id}/composite', dependencies=[Depends(require_trusted_origin)])
-def create_composite(run_id: str):
+def create_composite(run_id: str, payload: PaidActionRequest | None = None):
     experiment = store.experiment(run_id)
     if experiment is not None:
         require_current_baseline(experiment["baseline_run_id"])
     try:
-        return store.create_composite(run_id)
+        return store.create_composite(run_id, ai_service.provider, bool(payload and payload.authorize_provider))
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -1346,10 +1353,14 @@ def publish_candidate(candidate_id: str, payload: ReviewRequest):
 
 @app.post("/api/versions/{version_id}/rollback", dependencies=[Depends(require_trusted_origin)])
 def rollback_version(version_id: str, payload: ReviewRequest):
+    if payload.decision != 'approved':
+        raise HTTPException(409, '回滚需要明确人工确认')
     try:
         return store.rollback_to(version_id, payload.actor)
     except KeyError:
         raise HTTPException(status_code=404, detail="Production version not found")
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
 
 
 @app.get("/api/tools")
@@ -1374,6 +1385,19 @@ def evaluation_run(run_id: str):
         raise HTTPException(status_code=404, detail="Evaluation run not found")
     cases = store.evaluation_case_results(run_id)
     return {**run, "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases, "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []))}
+
+
+@app.post('/api/evaluations/{source_id}/replay', dependencies=[Depends(require_trusted_origin)])
+def replay_evaluation(source_id: str, payload: PaidActionRequest):
+    if not payload.authorize_provider:
+        raise HTTPException(409, '历史答案评分会调用Judge产生Token费用，请明确授权')
+    try:
+        runner = EvaluationRunner(store, ai_service)
+        run_id, items, executions = runner.start_replay(source_id)
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    threading.Thread(target=runner.execute_replay, args=(run_id, items, executions), daemon=True).start()
+    return {'id': run_id, 'status': 'running', 'execution_kind': 'answer_replay', 'release_eligible': False}
 
 
 @app.post("/api/evaluations/run", status_code=201, dependencies=[Depends(require_trusted_origin)])

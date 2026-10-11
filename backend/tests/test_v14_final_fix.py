@@ -13,7 +13,7 @@ from app.golden_v2 import validate_golden_candidate
 from app.governance import GovernanceStore
 from app.policy import DEFAULT_PIPELINE_CONFIG
 from app.retrieval import RetrievalUnavailable
-from identity_fixture import completed_baseline
+from identity_fixture import completed_baseline, comparison_identity
 
 
 PROBE = {'question_quality': 30, 'golden_answer_quality': 30, 'evidence_support': 40}
@@ -196,8 +196,8 @@ class FinalCorpusWriteTests(unittest.TestCase):
         else:
             experiment = store.create_experiment(baseline, 'direct_release')
             store.save_candidate(experiment, 'A', DEFAULT_PIPELINE_CONFIG, {'candidate_label': 'A'})
-            evaluation = completed_baseline(store, target=None)
-            store.finish_candidate(experiment + '-A', 'evaluated', {'qualification': {'qualified': True}, 'gates': {'passed': True}, 'regression': {'passed': True}, 'evaluation_run_id': evaluation})
+            evaluation = completed_baseline(store, target='sandbox_candidate')
+            store.finish_candidate(experiment + '-A', 'evaluated', {**comparison_identity(store, baseline), 'qualification': {'qualified': True}, 'gates': {'passed': True}, 'regression': {'passed': True}, 'evaluation_run_id': evaluation})
             # Only this lock-interleaving fixture bypasses unrelated release proof;
             # API lifecycle and RL-05 still exercise real release guards.
             self.addCleanup(patch.stopall)
@@ -209,9 +209,8 @@ class FinalCorpusWriteTests(unittest.TestCase):
         for name in ('publish', 'confirm', 'claim', 'save'):
             with self.subTest(name=name):
                 store, _, work = self.fixture(name)
-                corpus = {'sources': None}
                 from app.corpus import current_manifest
-                corpus['sources'] = current_manifest()['sources']
+                corpus = current_manifest()
                 attempted, changed = threading.Event(), threading.Event()
                 held = []
                 def activate():

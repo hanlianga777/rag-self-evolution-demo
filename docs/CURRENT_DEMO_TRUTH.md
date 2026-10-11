@@ -1,6 +1,12 @@
 # Current Demo Truth
 
-## 当前真实状态（2026-10-08）
+## 当前只读核对（2026-10-11）
+
+真实SQLite保留Medium Snapshot `GD-20261008135532677480`、正式Baseline `EVAL-20261008135547421930`（50题、11/11 Gate、20 Bad Case）。当前实验 `EXP-20261008141549298005` 第一轮A/B/C均已评测且不合格，保存Bad Case分别20/17/23；第二轮A/B/C仍为generated。本轮没有重评、改题、批准、发布或回滚。Production仍为旧已发布版本，未替换。
+
+代码已升级统一上下文评测合同；上述旧规则结果继续原样保存，不能与新版Candidate正式比较。新版完整Baseline与真实Provider效果验收**未执行，待单独授权**。独立历史答案回放只能作诊断。保护证据与离线功能验收见[收口报告](SELF_EVOLUTION_CLOSURE.md)。已有真实后端进程未自动重启，不能把新代码离线验收描述为真实服务已升级。
+
+## Historical：真实状态（2026-10-08）
 
 Knowledge已激活4份PDF/157页，349 Parent/368 Child、text-embedding-v4 1024d/368 Indexed、9 Topics。Full 100/100、40/20/40、Gap0、机器合格87/用户人工批准13，已由用户冻结GD-20261008024214127995；本轮保留其全部题目、审批和质量记录。新Medium业务V2独立Run GGEN-20261008050011728151，50题20/10/20，使用现有九Topic与Corpus。真实质量、修订、人工待处理项见[Medium V2验收](MEDIUM_V2_POLISH_VERIFICATION.md)及[逐题审阅](../backend/reports/medium_v2_polish_review.md)。本轮未批准或冻结Medium，未运行Baseline/Agent；Production仍绑定Legacy。
 

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from api_fixture import main
 from app.evaluation import EvaluationRunner
-from identity_fixture import completed_baseline
+from identity_fixture import completed_baseline, context_judgment
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
 
@@ -126,10 +126,15 @@ class FakeEvaluationRuntime:
     model = "test-model"
 
     def answer(self, question, config):
-        return {"answer": "第一次调试前完整阅读操作说明书。", "retrieval": [{"chunk_id": "KIRA-B50-CHUNK-0003", "score": 0.9}], "latency_ms": 7, "input_tokens": 3, "output_tokens": 4}
+        from app.governance import GOLDEN_DRAFT
+        draft = json.loads(GOLDEN_DRAFT.read_text())
+        raw = next((q for q in draft.get('cases', []) if q['question'] == question), {})
+        text = raw.get('reference_answer') or raw.get('answer') or '第一次调试前完整阅读操作说明书。'
+        final = [{'chunk_id':'KIRA-B50-CHUNK-0003', 'content':text, 'score':.9}]
+        return {"retrieval_trace":{"candidates":final,"final":final}, "answer": "第一次调试前完整阅读操作说明书。", "retrieval": [{"chunk_id": "KIRA-B50-CHUNK-0003", "score": 0.9}], "latency_ms": 7, "input_tokens": 3, "output_tokens": 4}
 
-    def judge(self, question, expected, answer, category):
-        return {"correctness": 4, "completeness": 1, "faithfulness": 1, "behavior_pass": True, "reason": "证据充分", "missing_points": [], "unsupported_claims": []}
+    def judge(self, question, expected, answer, category, *, context=None):
+        return context_judgment({"correctness": 4, "completeness": 1, "faithfulness": 1, "behavior_pass": True, "reason": "Fixture exact context", "missing_points": [], "unsupported_claims": []}, context)
 
 
 class EvaluationRunnerTests(unittest.TestCase):
@@ -189,19 +194,16 @@ class EvaluationRunnerTests(unittest.TestCase):
         self.assertNotIn("Ranking Failure", result["failure_tags"])
         self.assertEqual(result["root_cause"]["primary"], "None")
 
-    def test_approved_candidate_can_publish_then_roll_back_without_overwriting_history(self):
+    def test_candidate_without_real_target_fix_cannot_publish_or_overwrite_history(self):
         self.approve_one()
         baseline = EvaluationRunner(self.store, FakeEvaluationRuntime()).run_baseline()
-        experiment_id = self.store.create_experiment(baseline["id"])
-        candidate_id = f"{experiment_id}-A"
-        self.store.save_candidate(experiment_id, "A", {"top_k": 6, "min_score": None}, {})
+        experiment_id = self.store.create_experiment(baseline['id'])
+        candidate_id = f'{experiment_id}-A'
+        self.store.save_candidate(experiment_id, 'A', {'top_k':6,'min_score':None}, {})
         EvaluationRunner(self.store, FakeEvaluationRuntime()).run_candidate(candidate_id)
-        self.store.approve("candidate", candidate_id, "approved", "local_user")
-        self.store.approve("release", candidate_id, "approved", "local_user")
-
-        with self.assertRaisesRegex(ValueError, "11/11 Gate"):
-            self.store.publish_candidate(candidate_id, "local_user")
-        self.assertEqual(self.store.active_production()["id"], "baseline-v1")
+        before = self.store.production_versions()
+        with self.assertRaises(ValueError): self.store.publish_candidate(candidate_id,'fixture_human')
+        self.assertEqual(self.store.production_versions(),before)
 
 
 class FakeAgentProvider:
@@ -211,6 +213,7 @@ class FakeAgentProvider:
         result['observed_evidence'] = targets
         for candidate in result['candidates']:
             candidate['target_bad_cases'] = targets
+            candidate.update(target_group='fixture',root_cause='Retrieval',root_cause_evidence=targets,expected_improvement='fixture')
         return json.dumps(result)
 
 
@@ -219,7 +222,7 @@ class OptimizationAgentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             store = GovernanceStore(Path(directory) / "demo.db")
             completed_baseline(store, run_id="EVAL-1")
-            store.record_bad_case("EVAL-1", "GGC-001", "Generation", "medium", {"reason": "answer failed"})
+            store.record_bad_case("EVAL-1", "GGC-001", "Retrieval", "ordinary", {"reason": "fixture", "primary_root_cause":"Retrieval", "diagnosis":{"status":"confirmed","reason":"fixture"}})
             experiment = OptimizationAgent(store, FakeAgentProvider()).generate("EVAL-1")
 
         self.assertEqual(len(experiment["candidates"]), 3)

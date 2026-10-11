@@ -116,10 +116,10 @@ class AiService:
             queries.append(self.provider.complete("生成仅用于检索的假设性文档摘要，不作为事实或答案。", question).strip())
         return queries
 
-    def judge(self, question: str, expected: str, answer: str, category: str) -> dict:
+    def judge(self, question: str, expected: str, answer: str, category: str, *, context: dict | None = None) -> dict:
         stages = []
         with measure(stages, "judge"), collect_usage() as usage:
-            result = self.provider.judge(question, expected, answer)
+            result = self.provider.judge(question, expected, answer, **({"context": context} if context is not None else {}))
         return {**result, "stages": stages, "token_usage": usage, **cost_fields(self.model, usage)}
 
     def quality_check(self, item: dict) -> dict:

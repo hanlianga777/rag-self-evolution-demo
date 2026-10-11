@@ -5,7 +5,7 @@ from pathlib import Path
 
 from app.governance import GovernanceStore
 from app.policy import DEFAULT_PIPELINE_CONFIG
-from identity_fixture import completed_baseline
+from identity_fixture import completed_baseline, comparison_identity
 
 
 class TuningV12Tests(unittest.TestCase):
@@ -19,7 +19,7 @@ class TuningV12Tests(unittest.TestCase):
     def candidate(self, label, diff, qualified=True, fixed=1):
         self.store.save_candidate(self.experiment, label, {**DEFAULT_PIPELINE_CONFIG, **diff}, {'round': 1, 'candidate_label': label, 'changed_parameters': diff})
         key = f'{self.experiment}-{label}'
-        self.store.finish_candidate(key, 'evaluated', {'qualification': {'qualified': qualified}, 'regression': {'passed': True}, 'gates': {'passed': qualified}, 'target_bad_cases_fixed': fixed})
+        self.store.finish_candidate(key, 'evaluated', {**comparison_identity(self.store,self.baseline), 'qualification': {'qualified': qualified}, 'regression': {'passed': True}, 'gates': {'passed': qualified}, 'target_bad_cases_fixed': fixed})
         return key
 
     def test_report_accepts_one_qualified_after_all_started_work_finishes(self):
@@ -41,7 +41,8 @@ class TuningV12Tests(unittest.TestCase):
         source = self.candidate('B', {'candidate_k': 24}, False)
         self.candidate('C', {'top_k': 4, 'min_score': .1}, False, fixed=0)
         self.store.confirm_experiment_report(self.experiment, winner, 'test_human')
-        composite = self.store.create_composite(self.experiment)
+        from test_v11_e2e import FixtureProvider
+        composite = self.store.create_composite(self.experiment, FixtureProvider(), True)
         self.assertEqual(composite['config']['top_k'], 6)
         self.assertEqual(composite['config']['candidate_k'], 24)
         self.assertEqual(composite['config']['min_score'], 0)
@@ -104,7 +105,8 @@ class TuningV12Tests(unittest.TestCase):
         winner = self.candidate('A', {'top_k': 6})
         self.candidate('B', {'candidate_k': 24}, False)
         self.store.confirm_experiment_report(self.experiment, winner, 'test_human')
-        composite = self.store.create_composite(self.experiment)
+        from test_v11_e2e import FixtureProvider
+        composite = self.store.create_composite(self.experiment, FixtureProvider(), True)
         self.store.reserve_candidate_evaluation(composite['id'])
         self.store.refresh_recommendation(self.experiment)
         self.store.interrupt_evaluation_runs()

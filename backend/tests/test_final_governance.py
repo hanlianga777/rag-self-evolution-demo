@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from identity_fixture import completed_baseline
+from identity_fixture import completed_baseline, comparison_identity
 from app.governance import GovernanceStore
 from app.evaluation import summarize_evaluation_cases
 
@@ -12,7 +12,7 @@ class FinalGovernanceTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / "demo.db")
-        completed_baseline(self.store)
+        self.baseline = completed_baseline(self.store)
 
     def test_monitoring_trigger_requires_human_confirmation(self):
         event = self.store.record_monitoring_event(
@@ -130,7 +130,7 @@ class FinalGovernanceTests(unittest.TestCase):
         self.assertEqual(result["probe_details"]["negative_checks"]["answerability"]["answerable"], True)
 
     def test_recommendation_waits_for_all_three_candidates_in_the_round(self):
-        experiment = self.store.create_experiment("EVAL-1")
+        experiment = self.store.create_experiment(self.baseline)
         for label in "ABC":
             candidate_id = f"{experiment}-R1-{label}"
             self.store.save_candidate(experiment, f"R1-{label}", {"top_k": 4}, {"round": 1, "candidate_label": label})
@@ -139,11 +139,11 @@ class FinalGovernanceTests(unittest.TestCase):
 
         recommendation = self.store.refresh_recommendation(experiment)
 
-        self.assertEqual(recommendation["status"], "Needs Report Confirmation")
+        self.assertEqual(recommendation["status"], "WAITING_FOR_ROUND_COMPLETION")
         self.assertEqual(len(recommendation['comparison']), 3)
 
     def test_round_budget_is_derived_from_evaluated_candidates(self):
-        experiment = self.store.create_experiment("EVAL-1")
+        experiment = self.store.create_experiment(self.baseline)
         for label in "ABC":
             candidate_id = f"{experiment}-R1-{label}"
             self.store.save_candidate(experiment, f"R1-{label}", {"top_k": 4}, {"round": 1, "candidate_label": label})
@@ -152,7 +152,7 @@ class FinalGovernanceTests(unittest.TestCase):
         self.assertEqual(self.store.experiment(experiment)["evaluation_budget"], {"used": 3, "max": 12, 'reserved_for_d': 1})
 
     def test_multiple_pareto_candidates_require_human_recommendation(self):
-        experiment = self.store.create_experiment("EVAL-1")
+        experiment = self.store.create_experiment(self.baseline)
         for label in "ABC":
             candidate_id = f"{experiment}-R1-{label}"
             self.store.save_candidate(experiment, f"R1-{label}", {"top_k": 4}, {"round": 1, "candidate_label": label})
@@ -165,9 +165,8 @@ class FinalGovernanceTests(unittest.TestCase):
         self.assertEqual(selected['report_confirmation']['winner_id'], f"{experiment}-R1-A")
         self.assertEqual(selected['status'], 'Needs Composite')
 
-    @staticmethod
-    def _qualified_result(qualified=True):
-        return {"qualification": {"qualified": qualified}, "metrics": {"positive_correctness": 80}, "comparison_metrics": {"recall_at_k": 90}, "gates": {"passed": qualified, "passed_count": 11, "total": 11}, "regression": {"passed": qualified, "status": "PASS" if qualified else "FAIL"}, "target_bad_cases_fixed": 1, "bad_case_count": 1}
+    def _qualified_result(self, qualified=True):
+        return {**comparison_identity(self.store,self.baseline),"qualification": {"qualified": qualified}, "metrics": {"positive_correctness": 80}, "comparison_metrics": {"recall_at_k": 90}, "gates": {"passed": qualified, "passed_count": 11, "total": 11}, "regression": {"passed": qualified, "status": "PASS" if qualified else "FAIL"}, "target_bad_cases_fixed": 1, "bad_case_count": 1}
 
     def _mini_candidates(self):
         candidates = []

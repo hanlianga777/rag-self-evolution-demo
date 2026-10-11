@@ -69,3 +69,8 @@ DeepSeek 是既有 Provider，显式服务于回答、生成、QC、Judge、Agen
 ## 2026-10-08 Medium V2集中收口
 
 本轮39题受控Revision与只读数据集诊断复用已有Candidate→Hard Validation→Probe→QC→人工Gate关系。自然度诊断是高级审计建议，不是新增Gate；用户确认、Snapshot、Baseline、Agent、Production边界不变。唯一KnowledgeDiagrams.tsx图形源和导出SVG/PNG关系无变化，不重新导出。实际结果见[集中收口验收](../docs/MEDIUM_V2_POLISH_VERIFICATION.md)。
+
+
+## 2026-10-11 统一评测与受控优化
+
+当前产品合同见 docs/RAG_SELF_EVOLUTION_SPEC.md 文首。Child命中指标与最终Parent证据充分性分开；统一Judge读取完整证据，Baseline/A/B/C/D冻结同评测身份。旧实验保留只读，历史答案回放不成为正式Baseline或发布依据。新目标修复/附带改善/新增失败分开，程序推荐Winner，Gate2人工确认；有效来源下D最多一次授权LLM建议，经程序校验后另行授权Sandbox。Gate3及兼容配置回滚仍由人工执行。图形表达设计，离线验收不证明真实Provider效果。

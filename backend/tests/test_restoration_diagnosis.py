@@ -28,8 +28,8 @@ class DiagnosisTests(unittest.TestCase):
         class OfflineRuntime:
             def answer(self, question, config):
                 return {'answer': 'fixture wrong answer', 'retrieval': [], 'retrieval_trace': {'candidates': [], 'final': []}, 'latency_ms': 1}
-            def judge(self, *args):
-                return {'correctness': 0, 'faithfulness': 1, 'completeness': 0, 'behavior_pass': True, 'unsupported_claims': []}
+            def judge(self, *args, **kwargs):
+                return {'correctness': 0, 'faithfulness': 1, 'completeness': 0, 'behavior_pass': True, 'unsupported_claims': [], 'evidence_sufficiency': {'status':'insufficient','source_applicable':True,'conflicts':[],'reason':'Fixture final context empty','fact_support':[]}}
         item = {'question': 'fixture question', 'reference_answer': 'fixture expected', 'raw': {}, 'test_category': 'positive', 'evidence': [{'source_chunk_ids': ['c1']} ]}
         result = EvaluationRunner(None, OfflineRuntime())._case_result(item, {})
         self.assertEqual(result['failure_tags'], ['Generation Failure', 'Retrieval Failure'])

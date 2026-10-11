@@ -32,6 +32,8 @@ class CorpusManagementTests(unittest.TestCase):
         (self.index / "faiss.index").write_bytes(b"old index")
         self.retriever = SimpleNamespace(_index=object(), _model=object())
         self.manager = CorpusManager(self.retriever, index_dir=self.index, documents_dir=self.documents, uploads_dir=self.uploads)
+        index_patch = patch.object(corpus, "INDEX_DIR", self.index)
+        index_patch.start(); self.addCleanup(index_patch.stop)
         self.patch_docs = patch.object(corpus, "DOCUMENTS_DIR", self.documents)
         self.patch_uploads = patch.object(corpus, "UPLOADS_DIR", self.uploads)
         self.patch_docs.start()

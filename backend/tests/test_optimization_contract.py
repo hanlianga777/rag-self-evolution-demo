@@ -12,11 +12,14 @@ from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, EXCLUDED_A
 
 
 def drafts():
-    return {"root_cause_cluster": "coverage", "observed_evidence": ["Q1"], "candidates": [
+    result = {"root_cause_cluster": "coverage", "observed_evidence": ["Q1"], "candidates": [
         {"id": "A", "hypothesis": "depth", "why": "more evidence", "target_bad_cases": ["Q1"], "config_diff": {"top_k": 6}, "risk": "latency"},
         {"id": "B", "hypothesis": "noise", "why": "filter", "target_bad_cases": ["Q1"], "config_diff": {"min_score": 0.1}, "risk": "recall"},
         {"id": "C", "hypothesis": "coverage", "why": "more candidates", "target_bad_cases": ["Q1"], "config_diff": {"candidate_k": 24}, "risk": "latency"},
     ]}
+    for candidate in result['candidates']:
+        candidate.update(target_group='fixture检索组', root_cause='Retrieval', root_cause_evidence=candidate['target_bad_cases'], expected_improvement='fixture预期覆盖')
+    return result
 
 
 class FixedProvider:
@@ -37,7 +40,7 @@ class OptimizationContractTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / "demo.db")
         completed_baseline(self.store, run_id="EVAL-test")
-        self.store.record_bad_case("EVAL-test", "Q1", "Generation", "medium", {"reason": "failed"})
+        self.store.record_bad_case("EVAL-test", "Q1", "Retrieval", "ordinary", {"reason": "fixture failed", "primary_root_cause":"Retrieval", "diagnosis":{"status":"confirmed","reason":"fixture omission"}})
 
     def run_drafts(self, result):
         # Each response is an independent first round; incomplete real rounds remain blocked.
@@ -80,6 +83,7 @@ class OptimizationContractTests(unittest.TestCase):
             self.assertEqual(set(audit['allowed_values']), {'Q1', 'BC-EVAL-test-Q1'})
         result = drafts()
         result['candidates'][0]['target_bad_cases'] = ['BC-EVAL-test-Q1']
+        result['candidates'][0]['root_cause_evidence'] = ['BC-EVAL-test-Q1']
         experiment, trace, _, _, _ = self.run_drafts(result)
         self.assertEqual(trace['status'], 'completed')
         self.assertEqual(experiment['candidates'][0]['reasoning']['observed_evidence'], ['BC-EVAL-test-Q1'])

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import hashlib
 import json
 import re
@@ -13,9 +14,9 @@ EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
 TARGET_TOKENS = 400
 OVERLAP_TOKENS = 60
 TOP_K = 4
-INDEX_DIR = Path(__file__).resolve().parents[1] / "data" / "index"
-DOCUMENTS_DIR = Path(__file__).resolve().parents[1] / "documents"
-UPLOADS_DIR = Path(__file__).resolve().parents[1] / "data" / "uploads"
+INDEX_DIR = Path(os.getenv("RAG_DEMO_INDEX_DIR") or Path(__file__).resolve().parents[1] / "data" / "index")
+DOCUMENTS_DIR = Path(os.getenv("RAG_DEMO_DOCUMENTS_DIR") or Path(__file__).resolve().parents[1] / "documents")
+UPLOADS_DIR = Path(os.getenv("RAG_DEMO_UPLOADS_DIR") or Path(__file__).resolve().parents[1] / "data" / "uploads")
 
 DOCUMENT_CATALOG = [
     {

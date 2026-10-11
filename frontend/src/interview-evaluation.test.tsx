@@ -35,7 +35,7 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
   expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["问题", "初步类型", "失败观察", "关键指标", "详情"]);
   expect(document.querySelector("tbody tr td:nth-child(2)")?.textContent).toBe("Query");
   await click("查看案例");
-  expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["问题", "预期与实际回答", "Golden Evidence", "Retrieved Evidence", "Judge", "初步诊断", "Secondary Signals", "关联 Gate", "身份与审计"]);
+  expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["案例结论", "问题", "预期与实际回答", "Golden Evidence", "Retrieved Evidence", "Evidence Matcher · 最终答案证据", "Judge", "初步诊断"]);
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Query");
   expect(JSON.stringify(input)).toBe(frozen);
   expect((fetch as any).mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === "GET")).toBe(true);

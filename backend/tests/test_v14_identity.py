@@ -152,6 +152,7 @@ class CurrentIdentityTests(unittest.TestCase):
         response = drafts()
         for candidate in response['candidates']:
             candidate['target_bad_cases'] = [event['id']]
+            candidate['root_cause_evidence'] = [event['id']]
         provider = FixedProvider(json.dumps(response))
         generated = OptimizationAgent(self.store, provider).generate(self.baseline, experiment_id=context)
         self.assertEqual(generated['id'], context)
@@ -177,6 +178,7 @@ class CurrentIdentityTests(unittest.TestCase):
             response = drafts()
             for candidate in response['candidates']:
                 candidate['target_bad_cases'] = [event_id]
+                candidate['root_cause_evidence'] = [event_id]
             response['candidates'][1]['target_bad_cases'] = [target]
             with self.assertRaisesRegex(ValueError, 'target_bad_cases'):
                 OptimizationAgent(self.store, FixedProvider(json.dumps(response))).generate(self.baseline, trigger)

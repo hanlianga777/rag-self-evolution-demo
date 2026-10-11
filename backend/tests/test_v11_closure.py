@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from identity_fixture import completed_baseline
+from identity_fixture import completed_baseline, comparison_identity
 from app.governance import GovernanceStore
 from app.policy import DEFAULT_PIPELINE_CONFIG
 
@@ -37,13 +37,13 @@ class V11ClosureTests(unittest.TestCase):
 
     def test_publish_is_the_only_human_release_action_and_is_atomic(self):
         baseline = completed_baseline(self.store)
-        run_id = self.store.create_evaluation_run(json.loads(self.store.evaluation_run(baseline)["dataset_snapshot_json"]), {**DEFAULT_PIPELINE_CONFIG, "run_target": "sandbox_candidate"}, {"model": "fixture"})
+        run_id = self.store.create_evaluation_run(json.loads(self.store.evaluation_run(baseline)["dataset_snapshot_json"]), {**DEFAULT_PIPELINE_CONFIG, "run_target": "sandbox_candidate"}, self.store.evaluation_run(baseline)["judge"])
         self.store.finish_evaluation_run(run_id, "completed", {"gates": {"passed": True}})
         experiment_id = self.store.create_experiment(baseline)
         for label in "ABC":
             self.store.save_candidate(experiment_id, label, DEFAULT_PIPELINE_CONFIG, {"round": 1, "candidate_label": label})
             self.store.finish_candidate(f"{experiment_id}-{label}", "evaluated", {
-                "qualification": {"qualified": label == "A"}, "evaluation_run_id": run_id,
+                **comparison_identity(self.store,baseline), "qualification": {"qualified": label == "A"}, "evaluation_run_id": run_id,
                 "gates": {"passed": label == "A", "passed_count": 11 if label == "A" else 0},
                 "regression": {"passed": label == "A"},
             })

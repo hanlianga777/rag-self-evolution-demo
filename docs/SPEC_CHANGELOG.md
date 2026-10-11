@@ -1,3 +1,10 @@
+## 2026-10-11 — 统一评测、可信Agent与面客收口
+
+- SPEC文首新增当前合同，旧评测/目标字段/D规则标记Superseded；冻结Gate/Search Space/预算和人工治理不变。
+- 上下文Judge、Parent证据充分性与评测身份；独立答案回放；新目标/附带修复统计和可信诊断。
+- 程序Winner、单次授权LLM D、发布身份及回滚兼容；Baseline/Agent面客层级与历史Drawer。
+- 既有唯一图源同步统一评测/预算/D边界。验收见 SELF_EVOLUTION_CLOSURE.md。真实Provider未执行。
+
 # RAG Self-Evolution SPEC ChangeLog
 
 本文件是产品规格变更的追加式历史记录。当前有效产品规则仅见 [V1.4 SPEC](RAG_SELF_EVOLUTION_SPEC.md)；以下旧版本条目不是并行生效规则。不得覆盖或重写既有条目。

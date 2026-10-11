@@ -11,13 +11,17 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 
-def export(url, directory):
+def export(url, directory, fixture=None):
     directory.mkdir(parents=True, exist_ok=True)
     sources = ['frontend/src/components/KnowledgeDiagrams.tsx', 'frontend/src/styles.css']
     manifest = {'source': sources, 'source_hashes': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in sources}, 'kind': '流程设计，不代表当前 Gate 或运行结果', 'exports': {}}
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={'width': 1440, 'height': 900})
+        if fixture:
+            payloads = json.loads(fixture.read_text())
+            from urllib.parse import urlparse
+            page.route('**/api/**', lambda route: route.fulfill(json=payloads.get(urlparse(route.request.url).path, {})))
         page.goto(url + '/#overview')
         page.get_by_role('heading', name='RAG 自进化项目概览', exact=True).wait_for()
         for tab, name in [('业务架构', '业务流程图'), ('技术架构', '技术架构图')]:
@@ -51,5 +55,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--url', default='http://127.0.0.1:5174')
     parser.add_argument('--output', type=Path, default=ROOT / '架构')
+    parser.add_argument('--fixture', type=Path, help='Explicit offline API fixture; no requests reach business services')
     args = parser.parse_args()
-    export(args.url.rstrip('/'), args.output)
+    export(args.url.rstrip('/'), args.output, args.fixture)

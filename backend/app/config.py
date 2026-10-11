@@ -17,7 +17,7 @@ class Settings:
 
 def load_values(env: dict[str, str] | None = None, env_file: Path | None = None) -> dict:
     values = dict(os.environ if env is None else env)
-    file_path = env_file or Path(__file__).resolve().parents[2] / ".env"
+    file_path = env_file or Path(os.getenv("RAG_DEMO_ENV_PATH") or Path(__file__).resolve().parents[2] / ".env")
     if file_path.exists():
         for line in file_path.read_text().splitlines():
             key, separator, value = line.partition("=")
