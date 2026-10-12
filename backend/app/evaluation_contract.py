@@ -25,6 +25,7 @@ def plain_text(text):
 def normalize(text):
     # Formatting only: retain signs, units and digits; no fuzzy semantic acceptance.
     text = unicodedata.normalize('NFKC', plain_text(text))
+    text = re.sub(r'(?<![A-Za-z0-9*])\*\*([^*\n]+)\*\*(?![A-Za-z0-9*])', r'\1', text)
     return re.sub(r'\s+', '', text)
 
 

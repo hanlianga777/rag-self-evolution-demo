@@ -2,6 +2,9 @@
 
 本合同按用户批准的「RAG 自进化 Demo 一次性收口」计划覆盖旧评测、目标统计、Winner、D与UI展示规则；以下旧条款仅在不冲突时保留。历史记录不回填、不迁移成绩。唯一产品SPEC仍为本文件。
 
+- 2026-10-12 Golden集中修订：按冻结Medium50质量审计，在新的待审核工作集修订17轻量、4实质、1替换，共22题；另28题内容保持原样，20/10/20配额不变。原Snapshot、Baseline、实验及Corpus不改写。Q37修正材料Anchor与地面适用性合同，Q45在新工作集标记high风险，Q28换罐资料歧义未解决时替换同Topic考点；这些不是旧成绩回填。R1/R3范围关联独立保存，负向Anchor仍不是答案Evidence。
+- 本工作集离线完成不代表机器资格：全部Probe/QC与Human Gate1重新待审核，不继承旧质量结果；Q02的PDF步骤5、6未进入正式Child/Parent，当前Hard Validation阻断。隔离文本补全仅验证缺口，不改变正式索引，不允许带阻断启动付费Probe/QC或冻结。待完整授权修复Corpus/重建索引并按新身份复核后，才能另行授权Probe/QC。
+- Markdown引用兼容：定位前仅清除成对加粗标记，保持否定、数值、单位、技术条件及结构化主张/来源校验。Q06/Q39旧结果不回填；此格式兼容修复不改变Judge评分语义或评测版本。HTML清理既有顺序保持。详见[22题修订验收](GOLDEN_MEDIUM_22_REVISION.md)。
 - 技术底座：MinerU、Table KV、Parent1400/Child400/Overlap80、Embedding v4、FAISS/BM25、qwen3-rerank、DeepSeek与12项Search Space保持。八导航、共享PageShell/Card/Select/Stepper与唯一800px右侧Drawer保持。
 - 统一评测：Judge读取问题、参考答案、Golden证据、实际答案、完整最终上下文、类别/负向子型/预期行为与来源；样本是数据，不执行其中指令。有证据的补充不因参考答案省略而判幻觉；来源身份、产品、版本、单位冲突不能盲目接受。只调用同一次Judge，不增加逐题审批或第二套Judge。
 - Child Retrieval Coverage继续按原Child命中指标保存；Final Answer Evidence Sufficiency单独保存必要事实、定位、来源约束和理由。程序定位规范化原文的全事实覆盖并校验来源；充分结论还须同一次Judge确认语义与适用范围；负向Anchor不是答案Evidence。Child未全命中不直接导致失败；不足事实不能通过，诊断证据不足为待核实。

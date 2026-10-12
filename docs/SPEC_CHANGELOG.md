@@ -1,3 +1,10 @@
+## 2026-10-12 — Medium Golden 22题离线集中修订
+
+- 新工作集覆盖审计17轻修、4实修、1替换；28题内容保持，原冻结Snapshot/成绩/实验/Corpus不改写。Q37修正Anchor主题，Q45新高风险标注，Q28替换待厂商确认的歧义流程。
+- Q06/Q39保存响应复现Markdown加粗定位缺陷，最小格式清理保留安全守卫；评测语义版本不升级，不回填历史。
+- Q02正确PDF答案因正式索引漏采而阻断Hard Validation；隔离文本预览不冒充重建索引。带阻断离线工作集禁止启动付费质量恢复；Probe/QC和Human Gate1均待授权。
+- 详见[完整修订报告](GOLDEN_MEDIUM_22_REVISION.md)。不修改架构图源、UI、Gate、Regression或Agent策略。
+
 ## 2026-10-12 — 第二轮Agent根因合同对齐
 
 - 真实Trace 8的B将三个confirmed Generation目标标为Retrieval，被现有校验拒绝；原始响应已保存，非网络/JSON故障。

@@ -676,6 +676,8 @@ class GovernanceStore:
             if row is None:
                 raise KeyError(run_id)
             audit = _load(row['hard_validation_json'], {})
+            if audit.get('offline_revision') and audit.get('hard_validation', {}).get('status') != 'passed':
+                raise ValueError('工作集 Hard Validation 尚未通过，不能启动付费 Probe/QC')
             expected = self._expected_count({'profile': _load(row['profile_json'], {})})
             ids = _load(row['question_ids_json'], [])
             pending = connection.execute(f"SELECT 1 FROM questions WHERE id IN ({','.join('?' for _ in ids)}) AND (probe_status!='probe_passed' OR qc_status NOT IN ('qc_passed','qc_failed')) LIMIT 1", ids).fetchone() if ids else None
