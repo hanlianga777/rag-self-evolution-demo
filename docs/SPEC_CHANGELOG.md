@@ -1,3 +1,7 @@
+# V1.2.1 Parser兼容修复（2026-10-12）
+
+behavior_pass=true时允许behavior_evidence缺省并规范化为空串；false时必须有实际答案中的非空失败片段，否则拒绝解析。保留原始Provider响应审计，不改评分规则、版本身份、Matcher或主张合同。保存Q06离线复现及Q35/Q38安全回归，未调用Provider或重评。详见[JUDGE_PARSER_COMPATIBILITY](JUDGE_PARSER_COMPATIBILITY.md)。
+
 # V1.2.1 — Judge技术操作语义与结构化一致性（2026-10-11）
 
 明确changes_operation不因保守中止使用而为true；新增operation_basis，交叉核验kind/effect/boolean/来源状态，未知或矛盾待核实。来源引用、安全和评分门槛不变，不用reason关键词自动判断。版本judge-v3.1-claims/evidence-v3-scoped/v1.2.1-claim-consistency；历史身份和结果保留。保存Q06/Q38真实响应离线复现，Q11/Q35/具体操作回归。未调用Provider、未重评、未重启服务。详见[EVALUATION_POLICY_V121](EVALUATION_POLICY_V121.md)。

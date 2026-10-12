@@ -10,6 +10,7 @@
 - 主张审计：同一次Judge返回逐项claim_reviews及答案片段/来源。区分supported_fact、reasonable_safety_advice、unsupported_instruction、contradiction、unresolved。合理安全建议只允许有警告依据且不改变操作条件的保守停用/澄清/求助；新增测量、试验、换件、技术阈值或复用条件不得借此放行。缺失/无效引用、遗漏分类待核实；已定位无依据具体操作/矛盾仍失败。原unsupported_claims保留。
 - V1.2.1主张一致性：changes_operation只指新增或改变设备允许的技术步骤、条件、参数、阈值或维修流程。保守暂停/停用/澄清/联系专业人员本身不算技术改变，附带测量/换件/试验须拆开核验。逐项operation_basis保存effect（none/conservative_only/technical_change/unknown）与source_applicable（true/false/null）；仅technical_change对应true。合理建议须conservative_only、false及适用警告引用；有来源事实/矛盾须适用引用（矛盾引用为反证）；无依据操作须technical_change、true、来源不支持。缺项、未知或字段矛盾保留needs_review，不解析reason关键词，不自动纠正旧输出；保留Matcher定位、来源和安全约束。
 - 方向性与Negative：Judge检查否定、上下限、单位、型号及作用对象；关键技术方向颠倒不得correctness>2或faithfulness=1，否则拒绝不一致JSON。负向题主澄清/拒答通过不能掩盖后续无依据操作指导；Anchor继续不是答案Evidence。
+- 2026-10-12 Parser兼容：完整上下文Judge在behavior_pass=true时允许behavior_evidence缺省，内部统一为空字符串；false时必须提供非空且可在实际答案中定位的失败片段，否则拒绝解析，不能确认Safety。原始Provider响应另存raw_provider_response供审计（解析错误异常亦保留原文，不自动记日志）；不回填历史记录。仅修字段适用性，评分、Matcher、主张分类、Gate及评测语义版本不变。
 - 可信根因：Evidence Sufficiency有值不等于失败根因已确认。主张失败有答案定位和有效分类/来源才确认Generation；行为失败需实际答案片段；Performance需实测超限；Retrieval仅在明确采集的候选与最终上下文均为空且必要证据不足时确认。unknown/来源待核实不得默认Retrieval，Unknown是未判定状态，不是第五类调参目标。评分未达标但缺具体失败依据仍待核实。
 - 回放：历史答案评分保留旧答案/Trace，另建answer_replay记录，不生成回答；上下文缺失阻止。回放Judge可能收费，需要显式授权，不作为正式Baseline、Sandbox、发布。完整评测与回放共享入口，运行性质明确。
 - 诊断：保留Retrieval/Generation/Safety/Performance四方向；已确认/评测争议/待核实是可信度状态，不是第五根因。Agent读取全量可信问题、实际证据及历史反馈，争议不直接作为已确认调参目标。一个Candidate一个假设与最少必要参数，A/B/C方向不固定，目标必须有根因依据；禁止无效重复配置。

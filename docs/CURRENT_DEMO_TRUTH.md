@@ -1,3 +1,9 @@
+# Parser兼容修复当前源码状态（2026-10-12）
+
+V1.2.1真实验证只调用Q06一次，返回合法JSON但因省略行为通过时的behavior_evidence而解析失败，Q38/Q07未执行。当前源码修复该字段兼容并严格核验行为失败片段，评分语义版本保持；本轮只离线验证，没有真实模型调用或重启后端。现有8010进程尚未加载本次补丁，需要受控加载后再经授权验证。历史Baseline仍原样。详见[JUDGE_PARSER_COMPATIBILITY](JUDGE_PARSER_COMPATIBILITY.md)。
+
+## 前次交付记录
+
 # V1.2.1 当前源码状态（2026-10-11）
 
 V1.2定向真实验证实际4次，Q11通过、Q35方向错误被拦截、Q38无依据操作失败；Q06/Q38暴露保守建议的changes_operation字段矛盾，Q07未调用。当前源码补丁为judge-v3.1-claims/evidence-v3-scoped/v1.2.1-claim-consistency，只经离线验证。本次未重启后端，已有进程仍加载V1.2；未新增真实Judge成绩或Baseline。仍需受控加载后另行授权少量真实验证。详见[EVALUATION_POLICY_V121](EVALUATION_POLICY_V121.md)。

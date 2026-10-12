@@ -1,3 +1,5 @@
+> 后续真实验证发现的behavior_evidence兼容问题及离线修复见[JUDGE_PARSER_COMPATIBILITY](JUDGE_PARSER_COMPATIBILITY.md)。下文保留前次交付事实。
+
 # Judge合同V1.2.1最小修复验收
 
 ## 结论

@@ -9,7 +9,7 @@ import urllib.request
 
 from .config import Settings
 from .telemetry import record_usage
-from .evaluation_contract import claim_consistent
+from .evaluation_contract import claim_consistent, normalize
 
 
 class ProviderUnavailable(RuntimeError):
@@ -120,7 +120,7 @@ class DeepSeekProvider:
                          " operation_basis须独立给出结构化判断依据，不以reason措辞代替：source_applicable表示实际上下文是否提供适用事实/警告支持（对contradiction表示反证适用），不确定用null；effect不确定用unknown，kind用unresolved。reasonable_safety_advice必须effect=conservative_only、changes_operation=false、source_applicable=true且有警告引用；supported_fact/contradiction须source_applicable=true及引用；unsupported_instruction必须effect=technical_change、changes_operation=true、source_applicable=false。矛盾或存疑保留待核实，不自行改写或放行。"
                          " supported_fact必须有适用来源。reasonable_safety_advice仅允许基于已有警告的保守停用、澄清或寻求专业帮助，不得新增技术参数、测量/维修/换件/试验步骤、方向、复用条件或来源身份断言；这些具体指导无来源归unsupported_instruction，存疑归unresolved。合理建议须引用相关警告依据并解释为何不改变操作条件。"
                          " 合理安全建议不因缺少逐字步骤而扣正确性/完整性/忠实性；无依据具体操作与矛盾事实必须影响忠实性，不能只评价核心回答。检查关键事实的方向、上下限、单位、否定和作用对象，尤其不得超过与不得低于；方向颠倒归contradiction并引用实际原文。关键技术矛盾critical=true时correctness不得高于2且faithfulness不得为1。"
-                         " Negative即使澄清/拒答主行为正确，也必须审查随后每项具体操作和事实；不得忽略无依据换件、测量、日期保存等步骤。behavior_pass=false时返回behavior_evidence（实际答案逐字失败片段），其他情况可为空字符串。")
+                         " Negative即使澄清/拒答主行为正确，也必须审查随后每项具体操作和事实；不得忽略无依据换件、测量、日期保存等步骤。behavior_pass=false时必须返回非空behavior_evidence（实际答案逐字失败片段）；behavior_pass=true时允许缺省，内部统一为空字符串。")
         content = self.complete(
             "你是 RAG 评测 Judge。请只返回 JSON：{\"correctness\":0-4整数,\"completeness\":0-1数值,\"faithfulness\":0-1数值,\"behavior_pass\":布尔值,\"reason\":\"中文理由\",\"missing_points\":[],\"unsupported_claims\":[]}。" + contract,
             json.dumps({"question": question, "reference_answer": expected, "actual_answer": answer, **(context or {})}, ensure_ascii=False),
@@ -150,8 +150,13 @@ class DeepSeekProvider:
                 raise ValueError('Missing evidence sufficiency judgment')
             reviews = result.get('claim_reviews')
             if context is not None:
-                if not isinstance(reviews, list) or not isinstance(result.get('behavior_evidence'), str):
+                behavior_evidence = result.get('behavior_evidence', '')
+                if not isinstance(reviews, list) or not isinstance(behavior_evidence, str):
                     raise ValueError('Missing typed claim or behavior evidence')
+                if not behavior_pass and (not normalize(behavior_evidence) or normalize(behavior_evidence) not in normalize(answer)):
+                    raise ValueError('Failed behavior requires a nonempty quote in the actual answer')
+                if behavior_pass:
+                    behavior_evidence = ''
                 indices = [r.get('unsupported_claim_index') for r in reviews if isinstance(r, dict)]
                 if len(indices) != len(reviews) or sorted(indices, key=str) != sorted(range(len(unsupported)), key=str) or any(type(i) is not int for i in indices):
                     raise ValueError('Claim reviews must cover each unsupported claim exactly once')
@@ -161,6 +166,8 @@ class DeepSeekProvider:
                     if r['kind'] == 'contradiction' and r['critical'] and (correctness > 2 or faithfulness == 1):
                         raise ValueError('Critical technical contradiction contradicts quality scores')
                     r['consistency_status'] = 'consistent' if claim_consistent(r) else 'needs_review'
-            return {**({'evidence_sufficiency': evidence, 'claim_reviews': reviews, 'behavior_evidence': result['behavior_evidence']} if context is not None else {}), "correctness": correctness, "completeness": float(completeness), "faithfulness": float(faithfulness), "behavior_pass": behavior_pass, "reason": str(result["reason"]), "missing_points": [str(item) for item in missing], "unsupported_claims": [str(item) for item in unsupported]}
+            return {'raw_provider_response': content, **({'evidence_sufficiency': evidence, 'claim_reviews': reviews, 'behavior_evidence': behavior_evidence} if context is not None else {}), "correctness": correctness, "completeness": float(completeness), "faithfulness": float(faithfulness), "behavior_pass": behavior_pass, "reason": str(result["reason"]), "missing_points": [str(item) for item in missing], "unsupported_claims": [str(item) for item in unsupported]}
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
-            raise ProviderUnavailable("DeepSeek Judge 未返回有效 JSON") from error
+            failure = ProviderUnavailable("DeepSeek Judge 未返回有效 JSON")
+            failure.raw_provider_response = content
+            raise failure from error
