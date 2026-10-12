@@ -111,3 +111,5 @@ DeepSeek请求/socket等待默认240秒，可用DEEPSEEK_TIMEOUT_SECONDS覆盖�
 
 
 Golden 50题最新离线状态：见[最终索引验收](docs/GOLDEN_FINAL_INDEX_OFFLINE.md)。Q02解析漏失已修复，但正式新索引等待1个变更Child的Embedding授权；49/50正式Hard Validation，不可启动完整Probe/QC。隔离文本50/50不代表正式索引资格。
+
+下一步[正式索引最小执行计划](docs/superpowers/plans/2026-10-12-golden-controlled-index-update.md)尚未授权：预计1次Embedding数组请求及1次Rerank，先独立构建验收，正式切换单独确认。
