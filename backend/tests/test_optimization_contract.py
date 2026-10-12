@@ -204,6 +204,11 @@ class OptimizationContractTests(unittest.TestCase):
             row=c.execute('SELECT result_json FROM agent_traces WHERE id=8').fetchone()
         saved=json.loads(row[0]);raw=saved['provider_raw_text']
         baseline=saved['baseline_id'];exp=saved['optimization_run_id']
+        # This private replay is frozen to the archived baseline Corpus, not live Knowledge.
+        from unittest.mock import patch
+        old_identity=json.loads(store.evaluation_run(baseline)['dataset_snapshot_json'])['corpus_fingerprint']
+        historical=patch('app.governance.current_manifest',return_value={'knowledge_identity':old_identity,'sources':old_identity['sources']})
+        historical.start();self.addCleanup(historical.stop)
         before=store.candidates(exp)
         provider=FixedProvider(raw)
         with self.assertRaisesRegex(ValueError,'候选根因与可信目标不对应'):

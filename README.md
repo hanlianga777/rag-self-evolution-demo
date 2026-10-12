@@ -120,3 +120,10 @@ Golden 50题前轮离线修复过程：见[最终索引离线验收](docs/GOLDEN
 本轮因保持DeepSeek请求配置下的20元预算预检阻断，未切换正式Corpus、未调用付费Provider。完整状态见[中文执行报告](docs/GOLDEN_OVERNIGHT_ACCEPTANCE.md)。只读复核入口为 `python3 scripts/preflight_golden_overnight.py --output <全新本地审计目录>`；不导入API、不联网、不激活。
 
 受控质量Worker内部可显式传入 `paid_run`，使用 `app.paid_run.PaidRun` 的全新账本、经核实的人民币保守费率/模型输出范围及实时身份校验函数。该上下文必须传至线程入口；它不改变请求参数、不自动重试或续跑，也不替代维护切换、预算预检或人工Gate。现有公共API没有新增执行入口，普通任务不自动使用本轮账本。正式执行前仍须重新核价、完成预算校验及按Stage3要求停服备份。
+# 2026-10-12/13 所有者授权连续运行
+
+新授权允许分任务输出上限和累计50元预算；正式Corpus已按Stage3切换，新工作集正式Hard Validation50/50。既有20元预检报告为历史记录。当前请求上限见`app.paid_run.REQUEST_LIMITS`，不改变模型/评分；Baseline和Candidate须冻结相同限制。
+
+本次受控入口为`scripts/run_golden_owner_night.py`，必须具备本轮原始用户授权，使用原持久化账本逐阶段显式继续，禁止重复阶段/未知费用续跑。`--stage repair-1/repair-2`只按审核过的局部变更走真实Revision接口；Baseline/Agent/Candidate通过真实应用ASGI接口写正式DB并调用真实Provider，不使用Fixture替代。Owner委托接口另核服务器授权文件、50题真实机器资格、逐题内容/风险/PDF依据；审批来源标记AI代理，不能冒充人工专家。普通人工审核和发布Gate保持。所有私有授权、账本、原始响应及回滚资产不入Git。
+
+真实结果见[本轮中文验收报告](docs/GOLDEN_OWNER_DELEGATED_ACCEPTANCE.md)：已冻结Owner委托Snapshot；Baseline因Judge超时停于8/50 Partial，未知Usage禁止自动续跑，Agent/ABC未启动。重启服务不会恢复付费任务。对已有人工路径允许复核的检索不连贯，可通过具名独立PDF审核显式接受；同一召回问题的QC P1须逐条处置并绑定当次质量记录，不豁免P0/失败/安全风险。

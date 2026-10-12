@@ -402,3 +402,11 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 - 新增显式受控质量运行：后台线程传入同一费用账本，Provider请求前预约费用、返回后校验Usage；拒绝自动重试/重开账本，技术异常停止后续题，内容不合格保留原治理合同。
 - 保持DeepSeek请求参数及全部评分/治理规则；用户选择不加输出上限，20元预算预检阻断，未正式切换、未调用Provider。
 - 真实新旧资产、50题及历史保护重新验证；报告见[GOLDEN_OVERNIGHT_ACCEPTANCE](GOLDEN_OVERNIGHT_ACCEPTANCE.md)。无UI/架构图、Judge、Golden内容或历史成绩修改。
+## 2026-10-12/13 — 正式Corpus切换、50元限额及所有者委托审核
+
+- 用户新授权替代上轮预算阻断：正式联动切换后50/50，保留历史；分任务输出上限、持久化50元预算和显式阶段继续，后台线程继承同一受控上下文。
+- 回答/Judge/查询上限冻结并纳入新Evaluation Identity，Candidate同尺校验；旧无上限字段的历史摘要不变，不改评分/门槛。
+- 新增本工作集专用Owner Delegated Review正式接口，复用JSON审计和审批事务，无新表迁移；记录真实AI主体、所有者预授权、逐题PDF依据，普通人工路径不变，不豁免质量/安全条件。
+- 修复业务审计漏传已有版本/章节范围、元数据单独修订被误判无变化；有界Revision保留谱系，不重生成50题。UI仅区分代审来源并同步唯一架构源及导出。
+
+- 实际执行：50题Probe/QC Passed，6项真实召回风险经PDF独立复核显式接受；Q23保留QC P1并绑定当前QC/Probe记录处置，不改评分。冻结Owner Snapshot后Baseline第9题Judge240秒超时，8/50 Partial，未知Usage保留预约并阻止后续Agent/Sandbox。首次停止原因不再被外围阶段异常覆盖。详见[GOLDEN_OWNER_DELEGATED_ACCEPTANCE.md](GOLDEN_OWNER_DELEGATED_ACCEPTANCE.md)。

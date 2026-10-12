@@ -44,7 +44,12 @@ class RevisionTests(unittest.TestCase):
         source = ROOT / 'output/playwright/golden50-quality-audit/source.json'
         if not source.exists(): self.skipTest('本地冻结Snapshot审计材料未入Git')
         snapshot = json.loads(source.read_text())['snapshot']
-        chunks = json.loads((ROOT / 'backend/data/index/chunks.json').read_text())
+        # Historical omission regression must use its preserved source Corpus.
+        source_id=snapshot['corpus_fingerprint']['corpus_snapshot_id']
+        bundles=[p.parent for p in (ROOT/'backend/data/index_versions').glob('*/manifest.json')
+                 if json.loads(p.read_text()).get('knowledge_identity',{}).get('corpus_snapshot_id')==source_id]
+        if not bundles:self.skipTest('Preserved historical Corpus unavailable')
+        chunks = json.loads((bundles[0]/'chunks.json').read_text())
         config = json.loads(CONFIG.read_text())
         draft = prepare(snapshot, chunks, config)
         self.assertEqual(set(draft['hard_validation']['blocked_questions']), {'Q02'})

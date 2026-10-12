@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from collections import Counter
 
 from .evaluation_contract import diagnosis
+from .paid_run import provider_task
 from .telemetry import collect_usage, measure, cost_fields
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, MAX_EVALS, search_space_contract, validate_candidate_config
 
@@ -16,6 +17,7 @@ class OptimizationAgent:
         self.store = store
         self.provider = provider
 
+    @provider_task('agent')
     def generate(self, baseline_run_id: str, trigger_id: str | None = None, experiment_id: str | None = None):
         # Check identity before budget reads; the short claim serializes duplicate starts.
         self.store.require_current_baseline(baseline_run_id)

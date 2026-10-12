@@ -173,6 +173,10 @@ class EvaluationRunner:
             config['candidate_k'] = index_info['knowledge_config']['candidate_k']
             config['top_k'] = index_info['knowledge_config']['top_k']
         judge_meta = {"model": self.runtime.model, **VERSIONS, "temperature":0, "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
+        from .paid_run import current_paid_run
+        if current_paid_run() and current_paid_run().output_limits:
+            limits = current_paid_run().output_limits
+            judge_meta['execution_snapshot']['request_limits'] = {key:limits[key] for key in ('answer','judge','query')}
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
         return snapshot, approved, config, judge_meta
 
@@ -360,6 +364,12 @@ class EvaluationRunner:
         if not policy_current(baseline['judge']):
             raise ValueError('评测规则已升级，请授权建立新Baseline；旧Candidate只读')
         snapshot = json.loads(baseline["dataset_snapshot_json"])
+        from .paid_run import current_paid_run
+        limits = baseline['judge'].get('execution_snapshot',{}).get('request_limits')
+        if limits is not None:
+            paid_run=current_paid_run()
+            if paid_run is None or paid_run.output_limits is None or limits!={key:paid_run.output_limits[key] for key in ('answer','judge','query')}:
+                raise ValueError('Candidate request limits must match frozen Baseline')
         if baseline['judge'].get('evaluation_identity') != evaluation_identity(snapshot, baseline['judge']):
             raise ValueError('Evaluation身份不匹配')
         approved = self.snapshot_items(snapshot)

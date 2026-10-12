@@ -33,6 +33,11 @@ class PaidRunTests(unittest.TestCase):
             from api_fixture import main
         return main
 
+    def test_first_stop_reason_survives_outer_stage_failure(self):
+        self.run.stop('ProviderTimeout')
+        self.run.stop('RuntimeError')
+        self.assertEqual(json.loads(self.path.read_text())['stopped'],'ProviderTimeout')
+
     def test_network_failure_and_missing_usage_stop_next_request(self):
         for missing in (False, True):
             path = Path(self.temp.name)/f'{missing}.json'
@@ -77,6 +82,55 @@ class PaidRunTests(unittest.TestCase):
         with patch.object(service,'_quality_check',side_effect=ProviderUnavailable('DeepSeek QC 未返回有效 JSON')) as call:
             with controlled_run(self.run), self.assertRaises(ProviderUnavailable): service.quality_check({})
             self.assertEqual(call.call_count,1)
+
+    def test_task_limits_are_explicit_and_unknown_task_never_calls_provider(self):
+        from app.paid_run import provider_task
+        from app.providers import DeepSeekProvider
+        from app.config import Settings
+        run = PaidRun(Path(self.temp.name)/'limited.json',50.,self.prices,{},identity_check=lambda:{},output_limits={'qc':16384,'answer':8192,'judge':32768})
+        provider = DeepSeekProvider(Settings('fixture','https://fixture.invalid','deepseek-v4-flash'))
+        with controlled_run(run), provider_task('qc'):
+            payload = json.loads(provider._request('s','u',True,False).data)
+        self.assertEqual(payload['max_tokens'],16384)
+        with controlled_run(run), patch('urllib.request.urlopen') as network:
+            with self.assertRaisesRegex(RuntimeError,'task'): provider.complete('s','u')
+        network.assert_not_called()
+
+    def test_request_limits_change_evaluation_identity_only_when_present(self):
+        from app.evaluation_contract import evaluation_identity
+        snapshot = {'id':'fixture','corpus_fingerprint':{}}
+        judge = {'model':'fixture','temperature':0}
+        original = evaluation_identity(snapshot,judge)
+        limited = {**judge,'execution_snapshot':{'request_limits':{'answer':8192,'judge':32768,'query':4096}}}
+        self.assertNotEqual(original,evaluation_identity(snapshot,limited))
+        changed = {**limited,'execution_snapshot':{'request_limits':{'answer':16384,'judge':32768,'query':4096}}}
+        self.assertNotEqual(evaluation_identity(snapshot,limited),evaluation_identity(snapshot,changed))
+
+    def test_explicit_next_stage_preserves_budget_and_rejects_duplicate_or_unknown_usage(self):
+        with controlled_run(self.run):
+            with paid_request('DeepSeek','deepseek-v4-flash',{}):
+                record_usage({'provider':'DeepSeek','requested_model':'deepseek-v4-flash','status':'ok','prompt_tokens':100,'completion_tokens':100})
+        continued=PaidRun.next_stage(self.path,'baseline',lambda:{'corpus':'new'})
+        self.assertEqual(continued.spent,self.run.spent)
+        self.assertEqual(len(continued.calls),1)
+        with self.assertRaisesRegex(RuntimeError,'duplicate'):
+            PaidRun.next_stage(self.path,'baseline',lambda:{'corpus':'new'})
+        continued.stop('uncertain')
+        with self.assertRaisesRegex(RuntimeError,'uncertain'):
+            PaidRun.next_stage(self.path,'agent',lambda:{'corpus':'new'})
+
+    def test_truncated_response_keeps_known_usage_and_does_not_retry(self):
+        import io
+        from app.providers import DeepSeekProvider
+        from app.config import Settings
+        provider=DeepSeekProvider(Settings('fixture','https://fixture.invalid','deepseek-v4-flash'))
+        body={'choices':[{'message':{'content':''},'finish_reason':'length'}],'usage':{'prompt_tokens':100,'completion_tokens':100}}
+        with controlled_run(self.run),patch('urllib.request.urlopen',return_value=io.BytesIO(json.dumps(body).encode())) as network:
+            with self.assertRaises(ProviderUnavailable):provider.complete('s','u')
+        self.assertEqual(network.call_count,1)
+        self.assertEqual(self.run.calls[0]['status'],'ok')
+        self.assertGreater(self.run.spent,0)
+        self.assertIsNotNone(self.run.stopped)
 
     def test_invalid_usage_is_saved_and_aborts_following_call(self):
         with controlled_run(self.run):

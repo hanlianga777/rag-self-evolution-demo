@@ -15,6 +15,8 @@ def policy_current(judge):
 
 def evaluation_identity(snapshot, judge):
     payload = {'golden': snapshot.get('id'), 'corpus': snapshot.get('corpus_fingerprint'), 'versions': {key: judge.get(key) for key in VERSIONS}, 'judge_config': {'model':judge.get('model'), 'temperature':judge.get('temperature',0), 'context':'full_final'}, 'gates': GATE_DEFINITIONS}
+    limits = judge.get('execution_snapshot',{}).get('request_limits')
+    if limits is not None: payload['request_limits'] = limits
     return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 

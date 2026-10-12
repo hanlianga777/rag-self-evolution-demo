@@ -357,14 +357,22 @@ class GovernanceStore:
             if item['review_status'] in {'needs_revision','rejected'} or manual.get(item['id']) in {'needs_revision','rejected'}:
                 reasons.append('人工标记需修订')
             human = item['stage'] == 'golden' and item['review_status'] == 'approved' and (manual.get(item['id'])!='dataset_confirmed' or provenance.get(item['id'])=='human') and item['probe_status']=='probe_passed' and item['qc_id'] is not None and not any(reason in reasons for reason in ('质量记录已过期','Corpus 身份已变化','局部修订未完成','Hard Validation 未通过')) and (not decisions.get(item['id'], {}).get('qc_created_at') or decisions[item['id']]['qc_created_at']==item['qc_created_at'])
-            status = 'human_approved' if human else 'needs_human_review' if reasons else 'machine_qualified'
+            delegated_mode = decisions.get(item['id'],{}).get('approval_mode')=='owner_delegated'
+            accepted_retrieval=decisions.get(item['id'],{}).get('review',{}).get('retrieval_risk_acceptance',{})
+            remaining=[reason for reason in reasons if not (reason=='检索不连贯' and accepted_retrieval.get('classification')=='RETRIEVAL_INCOHERENT' and accepted_retrieval.get('retrieval_not_fixed') is True and accepted_retrieval.get('probe_id')==item['probe_id'])]
+            if accepted_retrieval.get('qc_id')==item['qc_id'] and accepted_retrieval.get('qc_issue_disposition') and accepted_retrieval.get('probe_id')==item['probe_id'] and '检索不连贯' in reasons:
+                remaining=[reason for reason in remaining if reason!='QC P1']
+            delegated = human and delegated_mode and item['qc_status']=='qc_passed' and not remaining
+            human = human and not delegated_mode
+            status = 'owner_delegated_approved' if delegated else 'human_approved' if human else 'needs_human_review' if reasons else 'machine_qualified'
             # Historical safe rows retain their completed machine evidence; audit failures block current rows.
             result.append({**{key:item.get(key) for key in ('id','stage','review_status','probe_status','qc_status','question','test_category','negative_subtype','construction_type','created_at','updated_at')},
                 'raw': {key:item['raw'].get(key) for key in ('generation_run_id','coverage_slot','topic_cluster','source','source_positive_id','source_reference','replaces_question_id','classification_status')},
                 'slot':item['raw'].get('coverage_slot'), 'topic_cluster':item['raw'].get('topic_cluster'),
-                'probe':{'probe_details':{'classification':item['classification']}}, 'qc':{'priority':item['priority'],'score':item['qc_score']},
-                'qualification_status':status,'qualification_source':'human' if human else 'machine' if status=='machine_qualified' else None,
-                'attention_reasons':reasons, 'attention_categories':self.attention_categories(reasons), 'quality_audit':audit})
+                'probe':{'id':item['probe_id'],'probe_details':{'classification':item['classification']}}, 'qc':{'id':item['qc_id'],'priority':item['priority'],'score':item['qc_score']},
+                'qualification_status':status,'qualification_source':'owner_delegated' if delegated else 'human' if human else 'machine' if status=='machine_qualified' else None,
+                'attention_reasons':remaining if delegated else reasons, 'attention_categories':self.attention_categories(remaining if delegated else reasons),
+                'disclosed_retrieval_risk':accepted_retrieval if delegated else None,'quality_audit':audit})
         return result
 
     def active_pool_rows(self):
@@ -399,10 +407,11 @@ class GovernanceStore:
             coverage_ok = len(slots)==expected and {row['slot'] for row in rows}==set(slots) and all(row['test_category']==slots[row['slot']]['evaluation_group'] and row['topic_cluster']==slots[row['slot']]['topic_cluster'] for row in rows if row['slot'] in slots)
         machine = sum(row['qualification_status']=='machine_qualified' for row in rows)
         human = sum(row['qualification_status']=='human_approved' for row in rows)
+        delegated = sum(row['qualification_status']=='owner_delegated_approved' for row in rows)
         fingerprint = run['artifacts']['hard_validation'].get('corpus_fingerprint')
         identity_ok = fingerprint is None or fingerprint == manifest_identity(current_manifest())
-        ready = identity_ok and (run['status']=='completed' or run['status']=='candidate_generated' and not run['artifacts']['hard_validation'].get('slot_persistence_v1')) and len(rows)==expected and len({row['id'] for row in rows})==expected and counts_ok and coverage_ok and machine+human==expected
-        return {'gate':1,'status':'ready' if ready else 'pending','expected':expected,'generated':len(rows),'machine_qualified':machine,'needs_human_review':len(rows)-machine-human,'human_approved':human,'approved':human,'human_review_pending':len(rows)-machine-human,'profile_complete':counts_ok,'coverage_complete':coverage_ok,
+        ready = identity_ok and (run['status']=='completed' or run['status']=='candidate_generated' and not run['artifacts']['hard_validation'].get('slot_persistence_v1')) and len(rows)==expected and len({row['id'] for row in rows})==expected and counts_ok and coverage_ok and machine+human+delegated==expected
+        return {'gate':1,'status':'ready' if ready else 'pending','expected':expected,'generated':len(rows),'machine_qualified':machine,'needs_human_review':len(rows)-machine-human-delegated,'human_approved':human,'owner_delegated_approved':delegated,'approved':human+delegated,'human_review_pending':len(rows)-machine-human-delegated,'profile_complete':counts_ok,'coverage_complete':coverage_ok,
             'probe_passed':sum(row['probe_status']=='probe_passed' for row in rows),'qc_completed':sum(row['qc_status'] in {'qc_passed','qc_failed'} for row in rows),'qc_passed':sum(row['qc_status']=='qc_passed' for row in rows)}
 
     def save_business_candidates(self, candidates: list[dict], filename: str, file_hash: str, errors=None):
@@ -504,7 +513,7 @@ class GovernanceStore:
     def autofill_pool_run(self, profile_name, selected, chunks, plan_id=None, *, embeddings=None):
         from .golden_v2 import match_pool
         rows = self.active_pool_rows()
-        eligible = [row['id'] for row in rows if row['qualification_status'] in {'machine_qualified', 'human_approved'} and row['id'] not in selected]
+        eligible = [row['id'] for row in rows if row['qualification_status'] in {'machine_qualified', 'human_approved', 'owner_delegated_approved'} and row['id'] not in selected]
         preview = self.preview_pool_run(profile_name, selected + eligible, chunks, plan_id, embeddings=embeddings, preferred_ids=selected)
         matching = match_pool(preview['coverage_plan'], preview['validations'], preferred_ids=selected)
         ids = list(dict.fromkeys(selected + list(matching['matching'].values())))[:max(len(selected), len(preview['coverage_plan']['slots']))]
@@ -1193,7 +1202,7 @@ class GovernanceStore:
             drafts[item_id] = {**old, **candidate, "raw": {**old["raw"], "question": candidate["question"], "reference_answer": candidate["reference_answer"], "acceptable_evidence": evidence, "evidence": evidence, "validation": candidate["validation"], "ablation_metadata": candidate["ablation_metadata"]}}
             drafts[item_id]['raw'].update({key:candidate[key] for key in business_fields})
             old_ids = [key for source in old['evidence'] for key in source.get('source_chunk_ids', [])]
-            if all(drafts[item_id][field] == old[field] for field in ("question", "reference_answer")) and source_ids == old_ids and candidate['ablation_metadata'] == old['raw'].get('ablation_metadata', {}):
+            if all(drafts[item_id][field] == old[field] for field in ("question", "reference_answer")) and source_ids == old_ids and candidate['ablation_metadata'] == old['raw'].get('ablation_metadata', {}) and all(candidate.get(field)==old['raw'].get(field) for field in business_fields):
                 errors.append(f"{item_id}: 草案未改变问题、答案或证据")
         if len(drafts) == len(run["question_ids"]):
             active_ids = set(self.generation_run(run['generation_run_id'], qualification=False)['question_ids'])
@@ -1748,8 +1757,20 @@ class GovernanceStore:
         with CORPUS_LOCK:
             return self._review_generation_batch(question_ids, actor, confirmed_manual_review=confirmed_manual_review)
 
-    def _review_generation_batch(self, question_ids, actor, *, confirmed_manual_review=False):
-        if not confirmed_manual_review:
+    def review_owner_delegated_batch(self, generation_run_id, authorization_id, reviews):
+        from .full_text import CORPUS_LOCK
+        from .delegated_review import validate_delegation
+        with CORPUS_LOCK:
+            run=self.generation_run(generation_run_id,qualification=False)
+            if run is None: raise KeyError(generation_run_id)
+            ids=run['question_ids']
+            items={key:self.question(key) for key in ids}
+            delegated=validate_delegation(self.database_path.parent/'owner-delegated-review.json',authorization_id,run,
+                        self.candidate_rows(ids),items,reviews,self._quality_content)
+            return self._review_generation_batch(ids,'Codex',delegated=delegated)
+
+    def _review_generation_batch(self, question_ids, actor, *, confirmed_manual_review=False, delegated=None):
+        if not confirmed_manual_review and delegated is None:
             raise ValueError("Human Review confirmation is required")
         candidates = [self.question(question_id) for question_id in question_ids]
         runs = {item["raw"].get("generation_run_id") for item in candidates}
@@ -1775,24 +1796,40 @@ class GovernanceStore:
             if any(sum(item['test_category'] == category for item in candidates) != profile_count(run['profile'], category) for category in ('positive', 'ablation', 'negative')):
                 raise ValueError('Profile 类别数量不符')
             qualified = self.candidate_rows(question_ids)
+            if delegated is not None:
+                from .delegated_review import validate_delegation
+                delegated=validate_delegation(self.database_path.parent/'owner-delegated-review.json',delegated['authorization_id'],
+                    self.generation_run(run['id'],qualification=False),qualified,{q['id']:q for q in candidates},
+                    list(delegated['reviews'].values()),self._quality_content)
+                qualified=[{**row,'qualification_status':'owner_delegated_approved','qualification_source':'owner_delegated'}
+                           if set(row.get('attention_reasons',[])) in ({'检索不连贯'},{'QC P1','检索不连贯'}) else row for row in qualified]
             gate = self.gate_summary(run, qualified)
             if gate['status'] != 'ready':
-                blockers = [f"{row['id']}: {'、'.join(row['attention_reasons'])}" for row in qualified if row['qualification_status'] not in {'machine_qualified', 'human_approved'}]
+                blockers = [f"{row['id']}: {'、'.join(row['attention_reasons'])}" for row in qualified if row['qualification_status'] not in {'machine_qualified', 'human_approved', 'owner_delegated_approved'}]
                 raise ValueError(f"人工异常、Probe / QC、Profile 或 Coverage 尚未完成，Gate 1 Pending：{gate['generated']}/{gate['expected']}题，Profile {'完整' if gate['profile_complete'] else '不完整'}，Coverage {'完整' if gate['coverage_complete'] else '不完整'}；" + '；'.join(blockers or ['Generation Run 尚未完成']))
             sources = {row['id']:row['qualification_source'] for row in qualified}
             for question_id in question_ids:
                 if next(item for item in candidates if item["id"] == question_id)["stage"] == "golden":
                     continue
                 connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", ("golden", "approved", now, question_id))
-                connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at,metadata_json) VALUES (?, ?, ?, ?, ?, ?)", (question_id, "dataset", "dataset_confirmed", actor, now, _json({"qualification_source":sources[question_id]})))
-                connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, "confirmed", actor, now))
+                metadata={'qualification_source':sources[question_id]}
+                if delegated is not None:
+                    metadata={**{k:v for k,v in delegated.items() if k!='reviews'},'qualification_source':'owner_delegated','review':delegated['reviews'][question_id],
+                              'qc_created_at':self.qc_history(question_id)[0]['created_at']}
+                decision='owner_delegated_confirmed' if delegated is not None else 'dataset_confirmed'
+                connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at,metadata_json) VALUES (?, ?, ?, ?, ?, ?)", (question_id, "dataset", decision, actor, now, _json(metadata)))
+                connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, decision if delegated is not None else 'confirmed', actor, now))
             # Keep reads on the writer connection: SQLite cache spill can lock out other connections.
             snapshots = [_load(row['snapshot_json'], {}) | {'id': row['id']} for row in connection.execute("SELECT id, snapshot_json FROM dataset_versions WHERE status='approved' ORDER BY created_at DESC")]
             prior = next((item for item in snapshots if item.get('generation_run_id') == run['id'] and item.get('question_ids') == run['question_ids']), None)
             raw_questions = {item['id']: item['raw'] for item in candidates}
             snapshot = prior or {'id': f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}", 'generation_run_id': run['id'], 'profile': run['profile'], 'question_ids': run['question_ids'], 'questions': [raw_questions[key] for key in run['question_ids']], 'qualification_sources': sources, 'policy_version': 'v1.4' if run['artifacts']['hard_validation'].get('frozen_plan') else 'v1.3', 'coverage_plan': run['artifacts']['hard_validation'].get('frozen_plan'), 'corpus_fingerprint': run_fingerprint or manifest_identity(current_manifest())}
+            if delegated is not None and prior is None:
+                snapshot['approval_mode']='owner_delegated'
+                snapshot['qualification_sources']={key:'owner_delegated' for key in question_ids}
+                snapshot['delegation']={k:v for k,v in delegated.items() if k!='reviews'}
             if not prior:
-                connection.execute('INSERT INTO dataset_versions (id, status, source, snapshot_json, created_at) VALUES (?, ?, ?, ?, ?)', (snapshot['id'], 'approved', 'human_review', _json(snapshot), now))
+                connection.execute('INSERT INTO dataset_versions (id, status, source, snapshot_json, created_at) VALUES (?, ?, ?, ?, ?)', (snapshot['id'], 'approved', 'owner_delegated' if delegated is not None else 'human_review', _json(snapshot), now))
         return {"reviewed": [self.question(question_id) for question_id in question_ids], "generation_run_id": run['id'], 'snapshot': snapshot}
 
     def record_qc(self, question_id: str, result: dict, status: str, *, execution=None):

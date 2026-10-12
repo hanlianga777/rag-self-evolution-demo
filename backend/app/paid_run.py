@@ -1,4 +1,4 @@
-"""Opt-in, single serial paid run. No retry, automatic resume or request changes."""
+"""Opt-in, single serial paid run. No retry or implicit continuation."""
 import hashlib
 import json
 import math
@@ -10,15 +10,20 @@ from pathlib import Path
 
 _run = ContextVar('controlled_paid_run', default=None)
 _ticket = ContextVar('controlled_paid_ticket', default=None)
+_task = ContextVar('controlled_provider_task',default=None)
+REQUEST_LIMITS = {'business_audit':16384,'qc':16384,'answerability':12288,'negative_subtype':8192,
+                  'answer':8192,'judge':32768,'agent':16384,'query':4096,'revision':16384}
 
 
 class PaidRun:
-    def __init__(self, path, budget_yuan, prices, identity, *, identity_check=None):
+    def __init__(self, path, budget_yuan, prices, identity, *, identity_check=None, output_limits=None):
         if not math.isfinite(budget_yuan) or budget_yuan <= 0:
             raise ValueError('Invalid payment budget')
         self.path, self.budget, self.prices = Path(path), budget_yuan, prices
         self.identity, self.identity_check = identity, identity_check
+        self.output_limits = output_limits
         self.calls, self.spent, self.stopped = [], 0., None
+        self.stages = []
         try:
             descriptor = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         except FileExistsError:
@@ -30,7 +35,7 @@ class PaidRun:
         temporary = self.path.with_suffix(self.path.suffix+'.tmp')
         data = {'identity':self.identity, 'budget_yuan':self.budget, 'price_snapshot':self.prices,
                 'spent_yuan':self.spent, 'available_yuan':max(0.,self.budget-self.spent-sum(c['reserved_yuan'] for c in self.calls if c['status']=='reserved')),
-                'stopped':self.stopped, 'calls':self.calls}
+                'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
         with temporary.open('w') as stream:
             json.dump(data,stream,ensure_ascii=False,indent=2); stream.flush(); os.fsync(stream.fileno())
         os.replace(temporary,self.path)
@@ -39,8 +44,24 @@ class PaidRun:
         finally: os.close(descriptor)
 
     def stop(self, reason):
-        self.stopped = reason
+        self.stopped = self.stopped or reason
         self.save()
+
+    @classmethod
+    def next_stage(cls,path,stage,identity_check):
+        """Explicit continuation between completed stages, never retry an unknown charge."""
+        path=Path(path);data=json.loads(path.read_text())
+        if data['stopped'] or any(c['status']!='ok' for c in data['calls']):
+            raise RuntimeError('Paid stage has stopped or uncertain Usage; cannot continue')
+        if identity_check()!=data['identity']: raise RuntimeError('Paid continuation identity changed')
+        stages=data.get('stages',[])
+        if stage in [s['stage'] for s in stages]: raise RuntimeError('Paid stage already claimed; no duplicate execution')
+        run=cls.__new__(cls)
+        run.path,run.budget,run.prices=path,data['budget_yuan'],data['price_snapshot']
+        run.identity,run.identity_check=data['identity'],identity_check
+        run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],None
+        run.output_limits=data['output_limits'];run.stages=[*stages,{'stage':stage,'claimed_at':datetime.now(timezone.utc).isoformat()}]
+        run.save();return run
 
     def begin(self, provider, model, payload):
         if self.stopped: raise RuntimeError('Paid run stopped: '+self.stopped)
@@ -56,10 +77,13 @@ class PaidRun:
         encoded = json.dumps(payload,ensure_ascii=False).encode()
         repeated_query = (max(0,len(payload.get('documents',[]))-1)*len(str(payload.get('query','')).encode())) if provider=='Alibaba' else 0
         # UTF-8 bytes plus framing allowance conservatively bound input tokens.
-        reserved = ((len(encoded)+repeated_query+1024)*rate['input'] + rate['max_output']*rate['output'])/1_000_000
+        bound = payload.get('max_tokens',rate['max_output'])
+        if type(bound) is not int or not 0<=bound<=rate['max_output']: raise RuntimeError('Invalid output budget bound')
+        reserved = ((len(encoded)+repeated_query+1024)*rate['input'] + bound*rate['output'])/1_000_000
         if self.spent + reserved > self.budget: raise RuntimeError('Payment budget insufficient')
         call = {'provider':provider,'model':model,'status':'reserved','reserved_yuan':reserved,
-                'request_sha256':hashlib.sha256(encoded).hexdigest(),'started_at':datetime.now(timezone.utc).isoformat()}
+                'request_sha256':hashlib.sha256(encoded).hexdigest(),'started_at':datetime.now(timezone.utc).isoformat(),
+                'task':_task.get(),'max_tokens':payload.get('max_tokens')}
         self.calls.append(call); self.save()
         return call
 
@@ -81,8 +105,30 @@ class PaidRun:
         if amount>call['reserved_yuan'] or self.spent>self.budget:
             raise RuntimeError('Payment budget/Usage bound exceeded')
 
+    def limit(self):
+        task = _task.get()
+        if not self.output_limits or task not in self.output_limits:
+            raise RuntimeError('Controlled request task limit unavailable')
+        return self.output_limits[task]
+
+    def response(self, body):
+        call = _ticket.get()
+        if call is None: return
+        path = self.path.parent/f'{self.path.stem}-response-{len(self.calls):04d}.json'
+        with path.open('x') as stream:
+            json.dump(body,stream,ensure_ascii=False);stream.flush();os.fsync(stream.fileno())
+        call['raw_response_path'] = str(path)
+        self.save()
+
 
 def current_paid_run(): return _run.get()
+
+
+@contextmanager
+def provider_task(task):
+    token = _task.set(task)
+    try: yield
+    finally: _task.reset(token)
 
 
 @contextmanager

@@ -37,7 +37,7 @@ def export(url, directory, fixture=None):
                 clone.setAttribute('width',String(box.width*scale)); clone.setAttribute('height',String(box.height*scale));
                 clone.style.width = ''; clone.style.minWidth = ''; clone.style.height = '';
                 const title = node.querySelector('title').textContent;
-                return `<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1440" viewBox="0 0 1280 720" role="img"><title>${title}</title><rect width="1280" height="720" fill="${getComputedStyle(node.closest('figure')).backgroundColor}"/><text x="40" y="32" fill="#2d3142" font-family="system-ui,sans-serif" font-size="16" font-weight="700">${title}</text>${clone.outerHTML}<text x="40" y="704" fill="#4f5d75" font-family="system-ui,sans-serif" font-size="11">流程设计 · 当前运行状态请查看应用持久化结果；人工 Gate 不自动批准</text></svg>`;
+                return `<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1440" viewBox="0 0 1280 720" role="img"><title>${title}</title><rect width="1280" height="720" fill="${getComputedStyle(node.closest('figure')).backgroundColor}"/><text x="40" y="32" fill="#2d3142" font-family="system-ui,sans-serif" font-size="16" font-weight="700">${title}</text>${clone.outerHTML}<text x="40" y="704" fill="#4f5d75" font-family="system-ui,sans-serif" font-size="11">流程设计 · 当前运行状态请查看应用持久化结果；Gate1须人工或明确Owner委托 · 发布Gate不自动批准</text></svg>`;
             }''')
             target = directory / (name + '.svg')
             target.write_text(document)

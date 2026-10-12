@@ -164,6 +164,8 @@ class AlibabaProvider:
         call_started_at = datetime.now(timezone.utc).isoformat()
         try:
             with urllib.request.urlopen(request, timeout=60) as response: body = json.load(response)
+            from .paid_run import current_paid_run
+            if current_paid_run(): current_paid_run().response(body)
             record_usage({**body.get('usage', {}), 'provider':'Alibaba', 'requested_model':payload['model'], 'call_started_at':call_started_at, 'status':'ok', 'latency_ms':round((time.perf_counter()-started)*1000)})
             return body
         except (urllib.error.URLError, TimeoutError) as error:

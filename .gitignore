@@ -28,3 +28,4 @@ __pycache__/
 output/playwright/
 
 backend/data/legacy_index.json
+backend/data/owner-delegated-*.json

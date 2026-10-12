@@ -1,4 +1,5 @@
 const translations: Record<string, string> = {
+  "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "所有者委托 AI 审核通过", "ai_agent": "AI 代理",
   "unclassified": "待分类",
   "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
   "completed": "已完成", "running": "运行中", "queued": "排队中", "evaluating": "评测中",

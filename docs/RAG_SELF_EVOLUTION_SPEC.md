@@ -2,6 +2,11 @@
 
 本合同按用户批准的「RAG 自进化 Demo 一次性收口」计划覆盖旧评测、目标统计、Winner、D与UI展示规则；以下旧条款仅在不冲突时保留。历史记录不回填、不迁移成绩。唯一产品SPEC仍为本文件。
 
+- 2026-10-12/13所有者夜间新授权覆盖下条20元阻断：允许本次请求级max_tokens，新增累计规划50元；保留DeepSeek模型、原提示词评分、11 Gate/Regression。按真实历史完整输出设置业务审计/QC16384、Answerability12288、Subtype8192、回答8192、Judge32768、Agent16384、辅助查询4096；不得候选额外增加回答/Judge预算。限制写入运行账本，Baseline冻结回答/Judge/查询限制并纳入Evaluation Identity；无该字段的历史身份摘要不变。每次请求前预约、返回后按真实Usage结算；只对无未结请求的已完成阶段显式继续，阶段重复预约拒绝，未知Usage不计零且禁止自动续跑。
+- 本轮已正式授权并完成Stage3协调器切换，正式Corpus为`CORPUS-38c90d5628b68c76d53e`、Medium Plan `PLAN-89801791985fdfe13f1421cf`、工作集`GGEN-20261012120721324996`；原Validator正式50/50。旧DB Backup、旧索引/State、历史Snapshot/成绩/实验/Production独立保护；不走自动重建。下文“未切换/49/50”保留为早期记录，已由本条覆盖。
+- Owner Delegated Review仅适用于本轮工作集及同Run有谱系的受控修订，不是永久代审。服务器只读授权文件绑定原始用户指令摘要、项目所有者、Codex AI执行主体、Run/Corpus/Plan及有效期；新正式接口`/api/governance/owner-delegated-review`复用既有审批/冻结事务，必须50题20/10/20和9 Topic、Probe/QC/业务审计通过、逐题当前内容摘要/12项条件/风险判断/实际PDF页及Chunk引用可核验。扫描页只用已安装本地OCR核对，无新Provider。不得豁免P0、未通过Probe/QC/业务审计或未解决专业安全风险；不写虚假的`confirmed_manual_review=true`。仅对既有人工复核路径允许的“检索不连贯”提示，可独立PDF复核后显式接受；必须绑定本次Probe记录ID；仅当同一检索缺口产生QC P1待审且QC状态仍Passed时，允许逐条独立处置意见并绑定QC ID（不豁免P0或QC失败），保留Trace及未修复声明，不豁免检索执行失败或证据缺陷，新Probe使该接受失效。普通人工路径保持。逐题事件、Approval与Snapshot标记`owner_delegated`/`ai_agent`及授权来源，UI明确区别人工审核，历史审批不改。
+- 本轮内容修复最多两轮，沿既有Revision保留版本谱系并重置受影响质量/审批；允许修正真实难度标签，冻结Plan仍保留原目标，报告实际难度分布，不把目标冒充成果。业务审计须携带已持久化product_scope/source_scope及对应真实章节、封面/修订历史，避免R1/R3版次证据遗漏；只增加输入证据，不改变十维审计标准。复核成功后可按上述显式授权冻结、新Baseline、Agent及最多两轮ABC；不自动Gate2/D/发布或生产回滚。真实执行、费用和未通过阶段另存本轮审计报告。
+
 - 2026-10-12夜间受控运行：用户授权切换后质量验收，但选择保持DeepSeek请求配置、不新增输出上限，新增费用规划20元。可显式传入本轮PaidRun至既有质量Worker；线程入口设置独立上下文，DeepSeek/Alibaba共享逐请求持久化预算预约、Usage和停止账本。当前身份必须重验，缺价格/Usage/预算/持久化即停，不自动重开已有账本；QC/Answerability不重试，业务质量技术异常保留审计后停止后续题，内容不合格按既有合同继续检查并记录QC跳过。该约束仅限显式受控运行，不改普通入口或历史费用；不改变请求参数、Judge、Gate、Regression、模型或审批权限。预算预检已阻断：50次业务审计最大输出范围即超过20元，正式切换及付费调用均未执行，正式49/50、隔离50/50。Human Gate1仍须真实人工确认，后续Snapshot/Baseline/Agent/ABC未运行。详见[夜间执行报告](GOLDEN_OVERNIGHT_ACCEPTANCE.md)。
 
 - 2026-10-12 Golden集中修订：按冻结Medium50质量审计，在新的待审核工作集修订17轻量、4实质、1替换，共22题；另28题内容保持原样，20/10/20配额不变。原Snapshot、Baseline、实验及Corpus不改写。Q37修正材料Anchor与地面适用性合同，Q45在新工作集标记high风险，Q28换罐资料歧义未解决时替换同Topic考点；这些不是旧成绩回填。R1/R3范围关联独立保存，负向Anchor仍不是答案Evidence。

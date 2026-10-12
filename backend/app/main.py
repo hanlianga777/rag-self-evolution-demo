@@ -7,6 +7,7 @@ import os
 import sqlite3
 import logging
 import threading
+import contextvars
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -129,6 +130,12 @@ class BatchReviewRequest(BaseModel):
     question_ids: list[str] = Field(min_length=1)
     actor: str = Field(default="local_user", min_length=1, max_length=80)
     confirmed_manual_review: bool = False
+
+
+class OwnerDelegatedReviewRequest(BaseModel):
+    generation_run_id: str
+    authorization_id: str
+    reviews: list[dict] = Field(min_length=50,max_length=50)
 
 
 class DirectReleaseRequest(BaseModel):
@@ -474,14 +481,14 @@ def candidate_list(run_id: str | None = None, offset: int = Query(0, ge=0), limi
         raise HTTPException(status_code=404, detail="Generation run not found")
     rows = store.candidate_rows(run['question_ids']) if run else store.active_pool_rows()
     summary = {'total':len(rows), 'ai':sum(row['raw'].get('source')!='business_import' for row in rows), 'business':sum(row['raw'].get('source')=='business_import' for row in rows),
-        'machine_qualified':sum(row['qualification_status'] in {'machine_qualified','human_approved'} for row in rows),
+        'machine_qualified':sum(row['qualification_status'] in {'machine_qualified','human_approved','owner_delegated_approved'} for row in rows),
         'needs_processing':sum(row['qualification_status']=='needs_human_review' and row['probe_status']!='probe_pending' and row['qc_status']!='qc_pending' for row in rows),
         'pending_checks':sum(row['qualification_status']=='needs_human_review' and (row['probe_status']=='probe_pending' or row['qc_status']=='qc_pending') for row in rows)}
     types = sorted({row['construction_type'] for row in rows if row['construction_type']})
     candidate_index = [{key:row[key] for key in ('id','stage','review_status','probe_status','qc_status','test_category','raw','slot','topic_cluster','qualification_status','qualification_source','attention_reasons','attention_categories','probe','qc')} for row in rows] if run else []
     version_rows = rows
     risks = any(row['qualification_status']=='needs_human_review' for row in rows)
-    rows = [row for row in rows if (status=='all' or status=='attention' and (row['qualification_status']=='needs_human_review' or not risks) or status=='machine' and row['qualification_status']=='machine_qualified' or status=='usable' and row['qualification_status'] in {'machine_qualified','human_approved'} or status=='govern' and row['qualification_status']=='needs_human_review') and (source=='all' or (row['raw'].get('source') or 'ai_generated')==source) and (group=='all' or row['test_category']==group) and (construction=='all' or row['construction_type']==construction) and search.lower() in row['question'].lower()]
+    rows = [row for row in rows if (status=='all' or status=='attention' and (row['qualification_status']=='needs_human_review' or not risks) or status=='machine' and row['qualification_status']=='machine_qualified' or status=='usable' and row['qualification_status'] in {'machine_qualified','human_approved','owner_delegated_approved'} or status=='govern' and row['qualification_status']=='needs_human_review') and (source=='all' or (row['raw'].get('source') or 'ai_generated')==source) and (group=='all' or row['test_category']==group) and (construction=='all' or row['construction_type']==construction) and search.lower() in row['question'].lower()]
     version = hashlib.sha256(json.dumps([(row['id'],row['updated_at'],row['qualification_status'],row['attention_reasons'],row['quality_audit']) for row in version_rows],sort_keys=True).encode()).hexdigest()
     return {'rows':[{key:value for key,value in row.items() if key!='quality_audit'} for row in rows[offset:offset+limit]], 'candidate_index':candidate_index, 'total':len(rows), 'summary':summary, 'construction_types':types, 'data_version':version, 'corpus_fingerprint':manifest_identity(current_manifest()), 'generation_run_id':run_id, 'profile':run['profile'] if run else None}
 
@@ -881,7 +888,7 @@ def create_revision(question_id: str, payload: RevisionRequest):
         raise HTTPException(status_code=404, detail="Candidate not found") from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    threading.Thread(target=_prepare_revision, args=(run["id"], store, ai_service, corpus), daemon=True).start()
+    threading.Thread(target=contextvars.copy_context().run, args=(_prepare_revision,run["id"], store, ai_service, corpus), daemon=True).start()
     return {"id": run["id"], "status": "queued"}
 
 
@@ -997,7 +1004,7 @@ def apply_revision(revision_id: str):
         raise HTTPException(status_code=404, detail="Revision Run not found") from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    threading.Thread(target=_run_revision_quality, args=(revision_id, store, ai_service, corpus), daemon=True).start()
+    threading.Thread(target=contextvars.copy_context().run, args=(_run_revision_quality,revision_id, store, ai_service, corpus), daemon=True).start()
     return {"id": run["id"], "status": run["status"]}
 
 
@@ -1075,7 +1082,8 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
 
 
 def _revision_attempt(run_store, revision_id, stage, service, work):
-    for attempt in (1, 2):
+    from .paid_run import current_paid_run
+    for attempt in ((1,) if current_paid_run() else (1,2)):
         started = time.perf_counter()
         error = None
         try:
@@ -1084,7 +1092,7 @@ def _revision_attempt(run_store, revision_id, stage, service, work):
                 return work()
         except Exception as caught:
             error = caught
-            if not isinstance(caught, ProviderTimeout) or attempt == 2:
+            if current_paid_run() or not isinstance(caught, ProviderTimeout) or attempt == 2:
                 raise
         finally:
             run = run_store.revision_run(revision_id)
@@ -1105,6 +1113,16 @@ def review_mini_batch(payload: BatchReviewRequest):
     except sqlite3.Error as error:
         logging.getLogger(__name__).exception("Golden freeze database request failed")
         raise HTTPException(status_code=503, detail="Golden 冻结数据库请求失败，请刷新核对 Snapshot 后重试") from error
+
+
+@app.post('/api/governance/owner-delegated-review',dependencies=[Depends(require_trusted_origin)])
+def owner_delegated_review(payload: OwnerDelegatedReviewRequest):
+    try:
+        return store.review_owner_delegated_batch(payload.generation_run_id,payload.authorization_id,payload.reviews)
+    except KeyError as error:
+        raise HTTPException(status_code=404,detail='Delegated working set not found') from error
+    except (ValueError,OSError) as error:
+        raise HTTPException(status_code=409,detail=str(error)) from error
 
 
 @app.post("/api/governance/generation-runs/{generation_run_id}/snapshot", status_code=201, dependencies=[Depends(require_trusted_origin)])
@@ -1357,7 +1375,7 @@ def run_candidate(candidate_id: str):
         run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    threading.Thread(target=runner.execute_candidate, args=(run_id, approved, config, candidate, baseline), daemon=True).start()
+    threading.Thread(target=contextvars.copy_context().run, args=(runner.execute_candidate,run_id, approved, config, candidate, baseline), daemon=True).start()
     return {"id": run_id, "candidate_id": candidate_id, "status": "running", "run_mode": "real", "data_source": "real"}
 
 
@@ -1448,7 +1466,7 @@ def start_evaluation(payload: BaselineRunRequest | None = None):
         run_id, approved, config = runner.start_baseline(source_id)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    threading.Thread(target=runner.execute_baseline, args=(run_id, approved, config), daemon=True).start()
+    threading.Thread(target=contextvars.copy_context().run, args=(runner.execute_baseline,run_id, approved, config), daemon=True).start()
     return {"id": run_id, "status": "running", "run_mode": "real", "data_source": "real"}
 
 

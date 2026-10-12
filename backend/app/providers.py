@@ -45,6 +45,10 @@ class DeepSeekProvider:
             payload["response_format"] = {"type": "json_object"}
         if stream:
             payload["stream_options"] = {"include_usage": True}
+        from .paid_run import current_paid_run
+        run = current_paid_run()
+        if run is not None and run.output_limits is not None:
+            payload['max_tokens'] = run.limit()
         return urllib.request.Request(
             f"{self.settings.base_url}/chat/completions",
             data=json.dumps(payload).encode(),
@@ -59,18 +63,22 @@ class DeepSeekProvider:
             return self._complete_request(request,stream)
 
     def _complete_request(self, request, stream):
+        from .paid_run import current_paid_run
+        run = current_paid_run()
         started_at = time.perf_counter()
         call_started_at = datetime.now(timezone.utc).isoformat()
         try:
             with urllib.request.urlopen(request, timeout=self.settings.timeout_seconds) as response:
                 if stream:
-                    content, usage, ttft_started = [], {}, None
+                    content, usage, ttft_started, raw_events, finish_reason = [], {}, None, [], None
                     for raw_line in response:
+                        if run is not None: raw_events.append(raw_line.decode('utf-8'))
                         line = raw_line.decode("utf-8").strip()
                         if not line.startswith("data: ") or line == "data: [DONE]":
                             continue
                         event = json.loads(line[6:])
                         choice = (event.get("choices") or [{}])[0]
+                        finish_reason = choice.get('finish_reason') or finish_reason
                         delta = choice.get("delta", {}).get("content")
                         if isinstance(delta, str) and delta:
                             if ttft_started is None:
@@ -78,7 +86,8 @@ class DeepSeekProvider:
                             content.append(delta)
                         if isinstance(event.get("usage"), dict):
                             usage = event["usage"]
-                    body = {"choices": [{"message": {"content": "".join(content)}}], "usage": usage}
+                    body = {"choices": [{"message": {"content": "".join(content)},'finish_reason':finish_reason}], "usage": usage}
+                    if run is not None: body['_raw_sse'] = raw_events
                     ttft_ms = round((ttft_started - started_at) * 1000) if ttft_started is not None else None
                 else:
                     body = json.loads(response.read())
@@ -95,16 +104,21 @@ class DeepSeekProvider:
             raise ProviderNetworkError(f"DeepSeek 连接中断（{type(error).__name__}）") from error
         except json.JSONDecodeError as error:
             raise ProviderUnavailable("DeepSeek 返回无效 JSON") from error
+        usage = body.get('usage') if isinstance(body.get('usage'),dict) else {}
+        elapsed_ms = round((time.perf_counter()-started_at)*1000)
+        usage = {**usage,'requested_model':self.settings.model,'call_started_at':call_started_at,'provider':'DeepSeek','status':'ok','latency_ms':elapsed_ms}
+        if run is not None:
+            run.response(body)
+            record_usage(usage)
         try:
             content = body["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as error:
             raise ProviderUnavailable("DeepSeek 响应缺少内容") from error
         if not isinstance(content, str) or not content.strip():
             raise ProviderUnavailable("DeepSeek 返回的内容必须是非空字符串")
-        usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
-        elapsed_ms = round((time.perf_counter() - started_at) * 1000)
-        usage = {**usage, "requested_model": self.settings.model, "call_started_at": call_started_at, "provider":"DeepSeek", "status":"ok", "latency_ms":elapsed_ms}
-        record_usage(usage)
+        if run is None: record_usage(usage)
+        if run is not None and any(choice.get('finish_reason')=='length' for choice in body.get('choices',[])):
+            raise ProviderUnavailable('DeepSeek output truncated by task limit')
         return {"usage": usage, "content": content, "input_tokens": usage.get("prompt_tokens") if type(usage.get("prompt_tokens")) is int and usage["prompt_tokens"] >= 0 else None, "output_tokens": usage.get("completion_tokens") if type(usage.get("completion_tokens")) is int and usage["completion_tokens"] >= 0 else None, "ttft_ms": ttft_ms, "timing_unit": "ms", "generation_ms": elapsed_ms}
 
     def complete(self, system: str, user: str, json_mode: bool = False, *, temperature: float = 0.2) -> str:

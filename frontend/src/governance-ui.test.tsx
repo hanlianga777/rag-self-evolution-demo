@@ -11,6 +11,19 @@ import { OperationProvider } from "./operation";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it("distinguishes owner delegated AI approval from human review", async () => {
+  const run = { id: "GGEN-owner-fixture", status: "completed", profile: { expected_count: 1 }, question_ids: ["owner-Q01"], artifacts: {} };
+  const row = { id: "owner-Q01", slot: "Q01", question: "fixture", test_category: "positive", stage: "golden", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", qualification_status: "owner_delegated_approved" };
+  const snapshot = { id: "GD-owner-fixture", source: "owner_delegated", snapshot: { generation_run_id: run.id, question_ids: [row.id], approval_mode: "owner_delegated" } };
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.includes("/candidates?") ? goldenFixture(url, [row]) : url.includes("snapshots") ? [snapshot] : [])))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [row], snapshots: [snapshot] }} />));
+  expect(document.body.textContent).toContain("所有者委托 AI 审核");
+  expect(document.querySelector('.golden-summary-strip')?.textContent).toContain("所有者委托 AI 审核");
+  expect(document.body.textContent).not.toContain("已人工确认");
+  await act(async () => root.unmount());
+});
+
 it.each([false, true])("closes the Drawer after %s QC P0 acceptance and updates the table", async requiresQcAcceptance => {
   const run = { id: "GGEN-approve", status: "completed", profile: { expected_count: 1 }, question_ids: ["V1-Q01"], artifacts: {} };
   const base = { id: "V1-Q01", slot: "Q01", question: "如何安全操作？", test_category: "positive", legacy_question_type: "v1_mini", review_status: "human_review_pending", probe_status: "probe_passed", qc_status: requiresQcAcceptance ? "qc_failed" : "qc_passed", stage: "candidate", evidence: [], approval_eligibility: requiresQcAcceptance ? { requires_qc_p0_acceptance: true, blocking_reasons: [], qc_reason: "fixture risk" } : { can_approve: true } };
