@@ -22,7 +22,7 @@ from .ai_service import AiService
 from . import architecture_assets, business_import
 from .corpus import CorpusStore, UPLOADS_DIR, current_manifest
 from .full_text import CORPUS_LOCK
-from .corpus_management import CorpusManager
+from .corpus_management import CorpusManager, require_consistent_switch
 from .config import load_settings
 from .evaluation import EvaluationRunner, gate_details
 from .governance import GovernanceStore, GENERATION_PROFILES
@@ -38,8 +38,9 @@ app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR, check_dir=False), name="uploads")
 TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
 app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
-store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None)
 corpus = CorpusStore()
+require_consistent_switch(corpus.index_dir, os.getenv("RAG_DEMO_DB_PATH") or None)
+store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None)
 ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")
 corpus_manager = CorpusManager(ai_service.retriever, knowledge_pipeline=True, on_knowledge_activated=lambda: start_knowledge_golden())
 store.interrupt_revision_runs()

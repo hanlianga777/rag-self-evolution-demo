@@ -95,7 +95,7 @@
 
 **Interfaces:** 输入已验收新Bundle、旧Bundle完整身份、工作集预览、新备份及人工切换授权；输出原子指针切换、当前工作集新绑定、旧版本完整可寻址及回退记录。
 
-- [ ] 隔离测试指针切换/DB失败/进程中断：成功时新Bundle与新工作集同身份；失败时旧指针、旧工作集及Corpus State一起恢复。没有通过此测试不得正式切换。
+- [x] 隔离测试指针切换/DB失败/进程中断：成功时新Bundle与新工作集同身份；失败时旧指针、旧工作集及Corpus State一起恢复。没有通过此测试不得正式切换。
 - [ ] 只读确认无活动任务；切换时短暂停本项目API以阻止跨进程读写。独立脚本中的`CORPUS_LOCK`不能锁住另一个运行中的后端，不能靠它宣称跨进程安全。
 - [ ] 新做DB/索引备份，保存持久化操作记录：旧/新Bundle路径及身份、旧指针、旧State、工作集旧行及备份摘要。切换前再次校验`expected_active`与全Manifest身份，拒绝迟到产物。
 - [ ] 直接复用`CorpusManager.activate_bundle()`原子symlink切换和异常回退，**禁止调用`POST /api/knowledge/rebuild`或`CorpusManager._run()`**：其`on_knowledge_activated`会启动新的Full Golden生成，不在授权范围。
@@ -115,3 +115,8 @@
 ## 第一阶段执行记录
 
 已完成Task1/Task2，未执行Task3。实际结果及保留边界见[第一阶段验收](../../GOLDEN_Q02_STAGE1_ACCEPTANCE.md)。正式切换及完整Probe/QC仍须后续单独授权。
+
+
+## Stage3切换前隔离验证
+
+联动、真实SIGKILL、SQL异常、恢复再中断和共享启动守卫已验证，详情见[Stage3验收](../../GOLDEN_Q02_STAGE3_VERIFICATION.md)。只完成Task3的隔离验证部分，正式操作仍待下一次授权。未调用新的Provider。

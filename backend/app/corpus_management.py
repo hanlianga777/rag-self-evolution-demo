@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import sqlite3
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +14,34 @@ from pathlib import Path
 from .build_index import build_index, _parse_document
 from .full_text import CORPUS_LOCK, validate_bundle, write_full_text
 from .corpus import DOCUMENTS_DIR, INDEX_DIR, UPLOADS_DIR, current_manifest, discover_documents, EMBEDDING_MODEL, tokenizer_token_count
+
+
+def require_consistent_switch(index_dir, database_path=None):
+    """Read-only startup gate before migrations/workers; incomplete switches need maintenance recovery."""
+    index_dir=Path(index_dir)
+    journal=index_dir.parent/'q02-switch.json'
+    if not journal.exists(): return
+    record=json.loads(journal.read_text())
+    if record['phase'] not in ('completed','rolled_back'):
+        raise ValueError('Incomplete Q02 switch: maintenance recovery required before API startup')
+    expected=record['new_identity'] if record['phase']=='completed' else record['old_identity']
+    actual=validate_bundle(index_dir,require_full_text=True)['manifest']['knowledge_identity']
+    database=Path(database_path or index_dir.parent/'demo.db').resolve()
+    with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as connection:
+        row=connection.execute('SELECT hard_validation_json FROM golden_generation_artifacts WHERE generation_run_id=?',('GGEN-20261012120721324996',)).fetchone()
+        if row is None or actual!=expected or json.loads(row[0])['corpus_fingerprint']!=expected:
+            raise ValueError('Corpus pointer/Golden binding inconsistent; API startup blocked')
+        plan_id=json.loads(row[0])['frozen_plan']['plan_id']
+        if record['phase']=='completed' and record['new_plan_id']!=plan_id:
+            raise ValueError('Golden Plan binding inconsistent; API startup blocked')
+        ids=json.loads(connection.execute('SELECT question_ids_json FROM golden_generation_runs WHERE id=?',('GGEN-20261012120721324996',)).fetchone()[0])
+        plans=list(connection.execute('SELECT json_extract(raw_json,\'$.plan_id\') FROM questions WHERE id IN ('+','.join('?' for _ in ids)+')',ids))
+        if len(ids)!=50 or len(set(ids))!=50 or len(plans)!=50 or any(p[0]!=plan_id for p in plans):
+            raise ValueError('Working set Plan bindings inconsistent; API startup blocked')
+    state=index_dir.parent/'corpus_state.json'
+    if record['phase']=='rolled_back' and record['old_state'] is None and not state.exists(): return
+    if json.loads(state.read_text())['knowledge_identity']!=expected:
+        raise ValueError('Corpus State inconsistent; API startup blocked')
 
 
 class CorpusManager:

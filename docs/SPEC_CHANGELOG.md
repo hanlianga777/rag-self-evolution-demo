@@ -388,3 +388,12 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 - Q02真实候选/Rerank第1，最终Parent的14步逐条PDF定位通过；原Validator在新身份及Plan下50/50，22修订/28保留及20/10/20保持。
 - 全部29表行、正式Corpus/Golden绑定及历史资产不变；隔离索引故障回退/DB备份恢复验证通过。正式切换、Task3联动/中断恢复及Probe/QC待后续授权。
 - 21项离线测试与独立实物复核通过；不改Judge、Agent、UI、Gate或架构。详见[GOLDEN_Q02_STAGE1_ACCEPTANCE.md](GOLDEN_Q02_STAGE1_ACCEPTANCE.md)。
+
+
+## 2026-10-12 · Q02正式切换前联动与中断恢复验证
+
+- 复现原指针切换的硬退出留下新Corpus/旧Golden混合状态；受控协调器增加持久化旧/新身份、备份摘要、事务/State与未完成恢复，不重构通用知识库流程。
+- 启动脚本及API共享只读守卫，Migration/Worker之前拒绝未完成切换及Corpus/Plan/50题错配；直接API绕过脚本问题先复现后修复。
+- 11个真实数据副本正常/SQL异常/SIGKILL/恢复再中断场景通过，成功副本Hard Validation50/50；51项相关离线回归及启动A-G/LaunchAgent合同通过。
+- 本轮Provider0，正式29表全部行、77个旧/新源索引/PDF文件及调用账本不变。历史成绩及Production原Legacy绑定保留；旧Baseline不能在新Corpus下自动成为当前资格。
+- 正式切换仍须下一次明确授权及维护停服/无并发写入条件，Probe/QC/冻结/评测/Agent/发布未执行。图/UI与Judge/阈值不变。详见[GOLDEN_Q02_STAGE3_VERIFICATION.md](GOLDEN_Q02_STAGE3_VERIFICATION.md)。
