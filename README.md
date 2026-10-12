@@ -110,6 +110,6 @@ Golden 失败时保留已合格 Slot，使用现有补失败题入口；Probe/QC
 DeepSeek请求/socket等待默认240秒，可用DEEPSEEK_TIMEOUT_SECONDS覆盖；不等于整题/50题限时，也不改性能Gate。既有重新运行按钮在最新Baseline为partial/failed时会尝试同身份续跑，新建子Run保留原记录；完成题不重复调用，保存生成答案时只补Judge。身份不匹配返回409。若明确需要全新评测，原POST /api/evaluations/run可传 `{"fresh":true}`；显式来源用 `{"resume_source_id":"EVAL-..."}`。两者互斥，调用仍需用户费用授权，无后台自动重试。旧partial未保存的中间答案/用量无法补回。详见[中文验收报告](docs/BASELINE_STABILITY.md)。
 
 
-Golden 50题最新离线状态：见[最终索引验收](docs/GOLDEN_FINAL_INDEX_OFFLINE.md)。Q02解析漏失已修复，但正式新索引等待1个变更Child的Embedding授权；49/50正式Hard Validation，不可启动完整Probe/QC。隔离文本50/50不代表正式索引资格。
+Golden 50题前轮离线修复过程：见[最终索引离线验收](docs/GOLDEN_FINAL_INDEX_OFFLINE.md)。最新真实隔离构建结果见下方第一阶段验收；正式49/50，不可启动完整Probe/QC。
 
-下一步[正式索引最小执行计划](docs/superpowers/plans/2026-10-12-golden-controlled-index-update.md)尚未授权：预计1次Embedding数组请求及1次Rerank，先独立构建验收，正式切换单独确认。
+按[正式索引最小执行计划](docs/superpowers/plans/2026-10-12-golden-controlled-index-update.md)，[Q02第一阶段](docs/GOLDEN_Q02_STAGE1_ACCEPTANCE.md)已获授权并通过：真实2请求/1749 Tokens，隔离新Corpus下50/50，367向量逐位复用；正式Corpus及Golden绑定未切换，正式仍49/50。下一阶段切换须明确授权及联动/中断恢复验证，Probe/QC未运行。

@@ -379,3 +379,12 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 - 仅新工作集Q42关联PDF12/28页紧急停机材料，Q16/Q22补R1/R3版本与章节范围。原题/答案/Evidence、22修订及28保留内容不变。
 - 受控隔离补一个Child/Parent；文本预览50/50、BM25第1及14步Parent检查通过。正式索引仍旧版本、Hard Validation49/50；缺1个新Embedding，未激活、未伪造新Corpus身份。
 - 29表历史行及44份PDF/索引资产保护、Backup API回退验证；本轮0付费Provider，Probe/QC/Human Pending。详见[GOLDEN_FINAL_INDEX_OFFLINE.md](GOLDEN_FINAL_INDEX_OFFLINE.md)。正式架构与UI无变化。
+
+
+## 2026-10-12 · Q02第一阶段授权执行与真实检索验收
+
+- 用户限定最多1次双文本Embedding和1次Rerank，0.01元预算、无重试；实际2请求/1749 Tokens，按官网标价计算0.0008745元，账户扣款未查询。
+- 1个Child新向量、367行逐位复用，独立FAISS/新Corpus与两Plan；9 Topic membership/Slot复用，真实中心和摘要重算、来源明确。
+- Q02真实候选/Rerank第1，最终Parent的14步逐条PDF定位通过；原Validator在新身份及Plan下50/50，22修订/28保留及20/10/20保持。
+- 全部29表行、正式Corpus/Golden绑定及历史资产不变；隔离索引故障回退/DB备份恢复验证通过。正式切换、Task3联动/中断恢复及Probe/QC待后续授权。
+- 21项离线测试与独立实物复核通过；不改Judge、Agent、UI、Gate或架构。详见[GOLDEN_Q02_STAGE1_ACCEPTANCE.md](GOLDEN_Q02_STAGE1_ACCEPTANCE.md)。

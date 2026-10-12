@@ -1,6 +1,6 @@
 # Golden Q02正式索引受控更新执行计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 不改Golden题目内容，仅补Q02正式Corpus中的步骤5/6，以一个新Child向量、367个复用向量完成新版本构建和50题正式硬校验；正式切换单独授权。
 
@@ -13,7 +13,7 @@
 ## 当前授权与约束
 
 - 2026-10-12用户已授权先推送离线修复，提交`57b193b`已推送origin/main。
-- **本计划为待授权方案。本轮付费调用0，不构建正式新向量、不切换正式索引、不写Golden的新Corpus绑定。**
+- **第一阶段随后获得用户明确授权并通过：实际2请求/1749 Tokens，计算费用0.0008745元；隔离新Bundle与50/50通过。Task3正式切换仍未授权，正式Corpus与Golden绑定不变。**
 - 不再修改Golden题干、答案、Evidence内容、行为合同；只允许后续授权执行时必要的Corpus/Plan身份、引用定位及当前Validation更新。
 - 不修改Judge、Agent、UI、Hard Gate、Regression、Search Space；不跑Generation、DeepSeek、Probe/QC、Baseline、Sandbox，不批准/冻结/发布。
 - 保留全部旧Snapshot、旧50题Baseline、两轮A/B/C、Agent记录、Production、原PDF、旧正式与Legacy索引。
@@ -64,15 +64,15 @@
 
 **Interfaces:** 输入旧Bundle完整身份、已核实文本补丁、当前Pending工作集及授权预算；输出独立可验证的新Bundle、向量复用审计、新Corpus身份和待绑定Golden预览，默认不激活。
 
-- [ ] 先写隔离检查：未经授权禁止Provider；非单Child变更、模型/维度/旧身份不同、活动任务、旧向量不一致均拒绝；证实失败后实现最小受控构建。
-- [ ] 新做SQLite Backup API备份及完整旧索引/PDF摘要；不能只依赖上轮备份。固定旧Bundle路径及全身份，新staging位于`index_versions/<operation>-building`，不覆盖原版本。
-- [ ] 验证恰好1个Child、1个Parent、1个Block及第50页全文变化；所有其他Child记录与向量顺序完全一致。保留原ZIP，修订Block与PDF源、旧版本及补丁摘要绑定。
-- [ ] 获得阶段1授权后执行上述**一次**Embedding，验证恰好两条、响应顺序、float32、1024维、有限非零向量，沿用现有L2归一化；保存两个真实输出及Usage，失败保留诊断并停止。
-- [ ] 复制368×1024旧矩阵，仅替换第133行；另外367行逐位相同。**本地从完整新矩阵重建一个FAISS IndexFlatIP**，不向旧FAISS追加、不重算367个Embedding。
-- [ ] 生成新Chunk/Embedding/Index/Pipeline/Corpus身份，沿用当前`KnowledgePipeline.build()`的内容摘要算法；保留旧源PDF指纹，新产物身份不得冒用旧Corpus身份。
-- [ ] Coverage复制既有9 Topic membership与既有Slot，在新Plan中用新矩阵重算真实簇中心，更新Chunk/Embedding摘要及Corpus身份并记录旧Plan来源；不冒充重新执行K-means，不复用旧center/旧空间资格。若当前合同或校验无法接受受控membership复用，停止报告，不强行变更Topic或规则。
-- [ ] Corpus Bundle Coverage与Medium工作集Plan分别更新必要派生身份；Medium仍原50 Slot、20/10/20，不重新选题或生成题目。受影响Plan中心/摘要基于同一新矩阵。
-- [ ] 完整生成documents/chunks/parents/full_text/embeddings/faiss/coverage/manifest摘要；Child状态仅新向量验证后改为Indexed；完整`validate_bundle(require_full_text=True)`通过。
+- [x] 先写隔离检查：未经授权禁止Provider；非单Child变更、模型/维度/旧身份不同、活动任务、旧向量不一致均拒绝；证实失败后实现最小受控构建。
+- [x] 新做SQLite Backup API备份及完整旧索引/PDF摘要；不能只依赖上轮备份。固定旧Bundle路径及全身份，新staging位于`index_versions/<operation>-building`，不覆盖原版本。
+- [x] 验证恰好1个Child、1个Parent、1个Block及第50页全文变化；所有其他Child记录与向量顺序完全一致。保留原ZIP，修订Block与PDF源、旧版本及补丁摘要绑定。
+- [x] 获得阶段1授权后执行上述**一次**Embedding，验证恰好两条、响应顺序、float32、1024维、有限非零向量，沿用现有L2归一化；保存两个真实输出及Usage，失败保留诊断并停止。
+- [x] 复制368×1024旧矩阵，仅替换第133行；另外367行逐位相同。**本地从完整新矩阵重建一个FAISS IndexFlatIP**，不向旧FAISS追加、不重算367个Embedding。
+- [x] 生成新Chunk/Embedding/Index/Pipeline/Corpus身份，沿用当前`KnowledgePipeline.build()`的内容摘要算法；保留旧源PDF指纹，新产物身份不得冒用旧Corpus身份。
+- [x] Coverage复制既有9 Topic membership与既有Slot，在新Plan中用新矩阵重算真实簇中心，更新Chunk/Embedding摘要及Corpus身份并记录旧Plan来源；不冒充重新执行K-means，不复用旧center/旧空间资格。若当前合同或校验无法接受受控membership复用，停止报告，不强行变更Topic或规则。
+- [x] Corpus Bundle Coverage与Medium工作集Plan分别更新必要派生身份；Medium仍原50 Slot、20/10/20，不重新选题或生成题目。受影响Plan中心/摘要基于同一新矩阵。
+- [x] 完整生成documents/chunks/parents/full_text/embeddings/faiss/coverage/manifest摘要；Child状态仅新向量验证后改为Indexed；完整`validate_bundle(require_full_text=True)`通过。
 
 **验证：** 368行、1024d、FAISS重构矩阵逐行一致；367复用行摘要不变；所有Child→Parent→Block→PDF页可追溯；Manifest及Coverage均新身份；旧Bundle仍独立通过验证。
 
@@ -80,14 +80,14 @@
 
 **Interfaces:** 输入Task1完整新Bundle、真实Q02查询向量和未改内容的50题；输出检索Trace、50个完整Validator结果、内容不变与历史保护报告。
 
-- [ ] 将检索器固定到新staging，不借用正式Corpus指针；读取原Q02题干。采用现有冻结默认配置CandidateK12/TopK4、Hybrid/Rerank开启；无Rewrite/MultiQuery/HyDE，不进入AiService回答生成。
-- [ ] 复用Task1的真实查询向量，运行现有FAISS/BM25融合；留存Vector、BM25、融合后Candidate及内容。
-- [ ] 若Q02目标Child未进入真实候选，停止并保存检索失败，不能人为补入Rerank候选。正常候选进入**一次**真实qwen3-rerank请求，保存排序与Usage。
-- [ ] 执行既有Parent Expand，验证目标Child及`DOC-001-P-00133`在最终上下文；逐条检查14步、顺序、步骤5用户名回车、步骤6密码入口及第13步可选含义。使用PDF来源定位，不仅搜索“1.”到“14.”数字。
-- [ ] 将50题仅在隔离预览中绑定新Corpus/Plan，运行原`validate_golden_candidate()`，包含新Plan、Slot、来源身份与重复检查，要求**正式新Bundle对应Hard Validation 50/50**；不能只报无Coverage的文本50/50。
-- [ ] 更新Q02已有pdf_supplement状态为“已由新Bundle验证”，保留原遗漏和修复审计；只有新身份完整校验通过才解除该证据缺口标记，其他质量/人工风险不自动关闭。
-- [ ] 50题内容与当前工作集逐字段不变，22修订完整、28保留完整，配额20/10/20，Q42材料Anchor及R1/R3范围保持；Probe/QC/Human仍Pending，旧资格不继承。
-- [ ] 整体验收失败则停在staging；不继续付费请求，不切换、不重写Golden。报告2次调用实际用量/费用、50题结果与新旧身份，等待正式切换授权。
+- [x] 将检索器固定到新staging，不借用正式Corpus指针；读取原Q02题干。采用现有冻结默认配置CandidateK12/TopK4、Hybrid/Rerank开启；无Rewrite/MultiQuery/HyDE，不进入AiService回答生成。
+- [x] 复用Task1的真实查询向量，运行现有FAISS/BM25融合；留存Vector、BM25、融合后Candidate及内容。
+- [x] 若Q02目标Child未进入真实候选，停止并保存检索失败，不能人为补入Rerank候选。正常候选进入**一次**真实qwen3-rerank请求，保存排序与Usage。
+- [x] 执行既有Parent Expand，验证目标Child及`DOC-001-P-00133`在最终上下文；逐条检查14步、顺序、步骤5用户名回车、步骤6密码入口及第13步可选含义。使用PDF来源定位，不仅搜索“1.”到“14.”数字。
+- [x] 将50题仅在隔离预览中绑定新Corpus/Plan，运行原`validate_golden_candidate()`，包含新Plan、Slot、来源身份与重复检查，要求**正式新Bundle对应Hard Validation 50/50**；不能只报无Coverage的文本50/50。
+- [x] 更新Q02已有pdf_supplement状态为“已由新Bundle验证”，保留原遗漏和修复审计；只有新身份完整校验通过才解除该证据缺口标记，其他质量/人工风险不自动关闭。
+- [x] 50题内容与当前工作集逐字段不变，22修订完整、28保留完整，配额20/10/20，Q42材料Anchor及R1/R3范围保持；Probe/QC/Human仍Pending，旧资格不继承。
+- [x] 整体验收失败则停在staging；不继续付费请求，不切换、不重写Golden。报告2次调用实际用量/费用、50题结果与新旧身份，等待正式切换授权。
 
 **成功标准：** 新Bundle完整、Q02真实最终上下文覆盖14步、带新身份与Plan的50/50硬校验、所有保护检查通过。计划不提前保证Provider召回必然成功。
 
@@ -110,3 +110,8 @@
 第一阶段建议仅授权：**1次Embedding（1个Child+1条Q02查询）、1次Rerank、预计0.003元量级、预算0.01元、无重试；仅独立构建及验收，不正式切换**。
 
 验收报告通过后，再决定是否授权正式切换。完整50题Probe/QC仍是第三项单独授权，不包含在本计划的2请求中。
+
+
+## 第一阶段执行记录
+
+已完成Task1/Task2，未执行Task3。实际结果及保留边界见[第一阶段验收](../../GOLDEN_Q02_STAGE1_ACCEPTANCE.md)。正式切换及完整Probe/QC仍须后续单独授权。
