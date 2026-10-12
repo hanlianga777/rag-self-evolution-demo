@@ -344,6 +344,9 @@ class EvaluationRunner:
                 checkpoint = checkpoints.setdefault(item['id'], {'attempts':[]})
                 checkpoint.pop('inflight', None)
                 checkpoint['attempts'].append({'phase':phase, 'status':'error', 'error_type':type(error).__name__, 'cause_type':type(error.__cause__).__name__ if error.__cause__ else None, 'error':str(error), 'usage':locals().get('usage', []), 'elapsed_ms':round((time.perf_counter()-started)*1000) if 'started' in locals() else None})
+                checkpoint['attempts'][-1]['cause_message'] = str(error.__cause__) if error.__cause__ else None
+                if isinstance(getattr(error, 'raw_provider_response', None), str):
+                    checkpoint['attempts'][-1]['raw_provider_response'] = error.raw_provider_response
             return self.store.finish_evaluation_run(run_id, 'partial' if cases or any('execution' in c for c in checkpoints.values()) else 'failed', progress(), str(error))
 
     def start_candidate(self, candidate_id: str):

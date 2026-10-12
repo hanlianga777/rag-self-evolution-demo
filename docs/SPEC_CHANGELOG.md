@@ -1,3 +1,8 @@
+## 2026-10-12 — Candidate C技术失败审计
+
+- 确认C保存43题及第44题生成检查点；既有续跑在真实库隔离副本验证跳过43题，仅补7次Judge、6次Generation，保留A/B与原Run。
+- 修复执行器丢失Parser异常具体原因和异常携带原始响应的审计缺口；不修改Parser合同或评测语义，不补造历史响应。详见[C异常报告](CANDIDATE_C_FAILURE_AUDIT.md)。
+
 ## 2026-10-12 — Candidate Sandbox 检查点与批量暂停
 
 - 复用 Baseline 子Run恢复，Candidate预约与Run关联原子持久化；同身份人工续跑跳过完成题、复用生成成功答案，仅补Judge。

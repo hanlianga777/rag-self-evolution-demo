@@ -97,3 +97,53 @@ class CandidateResumeTests(unittest.TestCase):
                 self.assertEqual(saved['status'],'evaluated')
                 self.assertEqual(saved['result']['resume_source_id'],first['result']['evaluation_run_id'])
                 self.assertEqual(self.runtime.answers.count('Q1'),1);self.assertEqual(self.runtime.answers.count('Q2'),1)
+    def test_parser_failure_persists_cause_raw_response_and_usage(self):
+        from app.providers import ProviderUnavailable
+        from app.telemetry import record_usage
+        raw='{"correctness": "invalid fixture"}'
+        def invalid(q,*args,**kwargs):
+            record_usage({'provider':'fixture','prompt_tokens':12,'completion_tokens':7,'total_tokens':19})
+            error=ProviderUnavailable('DeepSeek Judge 未返回有效 JSON');error.raw_provider_response=raw
+            raise error from ValueError('correctness must be an integer between 0 and 4')
+        with patch.object(self.runtime,'judge',side_effect=invalid) as call:
+            result=self.runner.run_candidate(self.cid)
+        attempt=result['result']['checkpoints']['Q1']['attempts'][-1]
+        self.assertEqual(attempt['raw_provider_response'],raw)
+        self.assertEqual(attempt['cause_message'],'correctness must be an integer between 0 and 4')
+        self.assertEqual(attempt['usage'][0]['total_tokens'],19)
+        self.assertEqual(call.call_count,1);self.assertEqual(result['status'],'failed')
+        self.assertFalse(result['result']['qualification']['qualified'])
+        self.assertFalse(self.store.evaluation_case_results(result['result']['evaluation_run_id']))
+
+    def test_saved_c_copy_resumes_43_cases_and_generation_without_touching_a_b(self):
+        import shutil
+        from pathlib import Path
+        from app.governance import GovernanceStore
+        from app.evaluation import EvaluationRunner
+        from test_baseline_resume import Runtime
+        backup=Path(__file__).resolve().parents[2]/'output/playwright/candidate-c-audit/protected.db'
+        if not backup.exists():self.skipTest('Private real-record copy is not tracked')
+        copied=Path(self.tmp.name)/'candidate-c-copy.db';shutil.copy2(backup,copied)
+        store=GovernanceStore(copied);cid='EXP-20261012054110446321-R1-C'
+        candidate=store.candidate(cid);source=store.evaluation_run(candidate['result']['evaluation_run_id'])
+        snapshot=json.loads(source['dataset_snapshot_json'])
+        a_b=[deepcopy(store.candidate(cid[:-1]+x)) for x in ('A','B')]
+        source_before=deepcopy(source);rows_before=deepcopy(store.evaluation_case_results(source['id']))
+        runtime=Runtime(None);runtime.model=source['judge']['model'];runner=EvaluationRunner(store,runtime)
+        budget_before=store.experiment(candidate['experiment_id'])['evaluation_budget']['used']
+        started=runner.start_candidate(cid)
+        self.assertEqual(len(store.evaluation_case_results(started[0])),43)
+        judged=[];template=deepcopy(rows_before[0])
+        def score(item,execution):
+            judged.append(item['id']);case=deepcopy(template)
+            case.update(question_id=item['id'],question=item['question'],test_category=item['test_category'],negative_subtype=item.get('negative_subtype'),answer=execution['answer'])
+            return case
+        with patch.object(runner,'score_execution',side_effect=score):result=runner.execute_candidate(*started)
+        self.assertEqual(result['status'],'evaluated');self.assertEqual(result['result']['completed'],50)
+        self.assertEqual(len(judged),7);self.assertEqual(len(runtime.answers),6)
+        saved_generation=next(q for q,cp in source['result']['checkpoints'].items() if 'execution' in cp)
+        self.assertEqual(judged[0],saved_generation)
+        self.assertEqual(store.evaluation_run(source['id']),source_before)
+        self.assertEqual(store.evaluation_case_results(source['id']),rows_before)
+        self.assertEqual([store.candidate(cid[:-1]+x) for x in ('A','B')],a_b)
+        self.assertEqual(store.experiment(candidate['experiment_id'])['evaluation_budget']['used'],budget_before+1)
