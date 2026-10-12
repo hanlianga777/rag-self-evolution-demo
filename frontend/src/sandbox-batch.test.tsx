@@ -12,7 +12,7 @@ async function mount() {
   root = createRoot(document.body.appendChild(document.createElement("div"))); await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
 }
 
-it("serializes only generated candidates, keeps failure and ignores a repeated click", async () => {
+it("pauses on Provider failure, preserves unstarted candidates and ignores a repeated click", async () => {
   vi.useFakeTimers(); const posted: string[] = [], states: Record<string, string> = { A: "generated", B: "generated", C: "evaluated" };
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("workspace")) return new Response(JSON.stringify({ current_baseline_id: "E1" }));
@@ -23,9 +23,12 @@ it("serializes only generated candidates, keeps failure and ignores a repeated c
   }); vi.stubGlobal("fetch", fetcher); await mount();
   await act(async () => { document.querySelector("button")!.click(); document.querySelector("button")!.click(); });
   await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
-  expect(posted).toEqual(["A", "B"]);
-  expect(states).toEqual({ A: "failed", B: "evaluated", C: "evaluated" });
+  expect(posted).toEqual(["A"]);
+  expect(states).toEqual({ A: "failed", B: "generated", C: "evaluated" });
   expect(document.body.textContent).toContain("运行失败");
+  expect(document.body.textContent).toContain("本轮已暂停");
+  await act(async () => document.querySelector("button")!.click());
+  expect(posted).toEqual(["A", "B"]); // A is not implicitly retried; this click authorizes unstarted B.
   expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST").every(([url]) => url.includes("/candidates/"))).toBe(true);
 });
 
@@ -47,4 +50,17 @@ it("requires another explicit click after a server interruption", async () => {
   await mount(); await act(async () => document.querySelector("button")!.click());
   expect(posted).toEqual(["A"]);
   expect(document.body.textContent).toContain("重启");
+});
+
+it("continues after a completed but unqualified candidate", async () => {
+  const posted: string[] = [], states: Record<string,string> = { A:"generated", B:"generated", C:"generated" };
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("workspace")) return new Response(JSON.stringify({ current_baseline_id:"E1" }));
+    if (url.endsWith("/experiments/EXP")) return new Response(JSON.stringify({ baseline_run_id:"E1", evaluation_budget:{ used:posted.length,max:12,reserved_for_d:1 },result:{},candidates:Object.entries(states).map(([id,status])=>({ id,status,reasoning:{round:1,candidate_label:id},result:{qualification:{qualified:false}} })) }));
+    if (init?.method === "POST") { const id=url.split("/").at(-2)!; posted.push(id); states[id]="running"; return new Response(JSON.stringify({id:`RUN-${id}`})); }
+    const id=url.split("RUN-")[1]; states[id]="evaluated";
+    return new Response(JSON.stringify({status:"completed",cases:[]}));
+  }));
+  await mount(); await act(async () => document.querySelector("button")!.click());
+  expect(posted).toEqual(["A","B","C"]);
 });

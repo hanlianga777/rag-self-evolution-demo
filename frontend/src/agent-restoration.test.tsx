@@ -45,3 +45,14 @@ it("keeps a failed next-round generation visible alongside prior saved candidate
   expect(generation.classList.contains("blocked")).toBe(true);
   expect(generation.textContent).toContain("生成失败");
 });
+
+it("offers failed Sandbox continuation only through the existing paid confirmation", async () => {
+  await mount({ ...data, optimization:{ ...data.optimization, candidates:[{ ...candidates[0],status:"failed",result:{evaluation_run_id:"PARTIAL"}},candidates[1],candidates[2]] } });
+  await click("A / B / C / D");
+  const button=[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="继续 Sandbox")!;
+  expect(button.disabled).toBe(false);
+  await click("继续 Sandbox");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("仅补未完成题目或Judge");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("另占一次预算");
+  expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);
+});

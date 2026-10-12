@@ -363,12 +363,10 @@ class EvaluationRunner:
         if baseline['judge'].get('model') != self.runtime.model:
             raise ValueError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
         config = {**candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
-        candidate = self.store.reserve_candidate_evaluation(candidate_id)
-        try:
-            run_id = self.store.create_evaluation_run(snapshot, config, baseline['judge'])
-        except Exception as error:
-            self.store.finish_candidate(candidate_id, 'failed', {'error': str(error)})
-            raise
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK:
+            run_id = self.store.create_baseline_run(snapshot, config, baseline['judge'], candidate_id=candidate_id)
+            candidate = self.store.candidate(candidate_id)
         return run_id, approved, config, candidate, baseline
 
     def execute_candidate(self, run_id, approved, config, candidate, baseline):
@@ -384,7 +382,7 @@ class EvaluationRunner:
         qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), run["result"]["bad_case_count"])
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
-        result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "recommendation": None}
+        result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "recommendation": None}
         if candidate['reasoning'].get('candidate_label') == 'D':
             winner = self.store.candidate(candidate['reasoning']['winner_id'])
             winner_cases = {item['question_id']: item for item in self.store.evaluation_case_results(winner['result']['evaluation_run_id'])}

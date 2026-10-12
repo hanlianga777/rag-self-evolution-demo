@@ -103,9 +103,9 @@ export function EvolutionPage({ data }: { data: any }) {
   };
   const generate = () => requestPaid('生成A/B/C优化建议', '一次Agent策略分析调用；不自动执行Sandbox。', () => void executeGenerate());
   const continueRound = () => requestPaid('生成下一轮建议', '读取已保存历史实验反馈，一次Agent分析；不自动评测。', () => void action('生成下一轮A/B/C', () => postJson(`/api/experiments/${experiment.id}/continue`)));
-  const run = (candidate: any) => requestPaid(`${candidateName(candidate)} · Sandbox`, `Golden ${evaluation.cases?.length ?? '未采集'}题；每题生成回答+Judge，可能有额外改写/检索调用。预算${budget.used}/${budget.max}，D预留1次。`, () => void executeCandidate(candidate));
+  const run = (candidate: any) => requestPaid(`${candidateName(candidate)} · Sandbox`, `Golden ${evaluation.cases?.length ?? '未采集'}题；${candidate.status === 'failed' ? '同身份续跑，仅补未完成题目或Judge；本次启动另占一次预算。' : '每题生成回答+Judge，可能有额外改写/检索调用。'}预算${budget.used}/${budget.max}，D预留1次。`, () => void executeCandidate(candidate));
   const executeCandidate = async (candidate: any) => {
-    if (candidate.status !== "generated" || activeOperation(candidate.id)) return;
+    if (!["generated", "failed"].includes(candidate.status) || activeOperation(candidate.id)) return;
     const captured = identity;
     setBusy(true); setError("");
     try { await operation.startEvaluation(`Candidate ${candidate.reasoning?.candidate_label} · Sandbox`, () => postJson(`/api/candidates/${candidate.id}/run`), candidate.id); await refresh(); }
@@ -187,7 +187,7 @@ function ConfigDiff({ base, candidate }: { base: Record<string, any>; candidate:
 }
 
 function CandidateAction({ candidate, running, busy, onRun }: { candidate: any; running?: { current?: number; total?: number }; busy: boolean; onRun: () => void }) {
-  return <div className="candidate-card-action"><button className="secondary" disabled={busy || !!running || candidate.status !== "generated"} onClick={onRun}>{running ? "Sandbox 运行中" : candidate.status === "evaluated" ? "已评测" : "运行 Sandbox"}</button>{running && running.current != null && running.total != null && <span>{running.current} / {running.total}</span>}</div>;
+  return <div className="candidate-card-action"><button className="secondary" disabled={busy || !!running || !["generated", "failed"].includes(candidate.status)} onClick={onRun}>{running ? "Sandbox 运行中" : candidate.status === "evaluated" ? "已评测" : candidate.status === "failed" ? "继续 Sandbox" : "运行 Sandbox"}</button>{running && running.current != null && running.total != null && <span>{running.current} / {running.total}</span>}</div>;
 }
 
 const candidateName = (candidate?: any) => candidate ? `Candidate ${candidate.reasoning?.candidate_label || "—"}` : "Candidate";

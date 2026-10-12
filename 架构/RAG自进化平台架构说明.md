@@ -78,3 +78,5 @@ DeepSeek 是既有 Provider，显式服务于回答、生成、QC、Judge、Agen
 ## Evaluation运行保护补充（2026-10-12）
 
 共享Evaluation模块内部增加逐题检查点与失败阶段/Usage记录；同身份手动续跑使用独立子Run，复用已保存案例和生成上下文，不覆盖历史。复用既有SQLite JSON与API，不新增调度器、Provider或Judge，组件边界和正式图连线不变，因此图源及导出图不变。请求等待配置与冻结评分/性能Gate分离。细则见[Baseline稳定性报告](../docs/BASELINE_STABILITY.md)。
+
+Candidate Sandbox复用同一检查点/子Run路径，预约与预算、身份、Run关联原子保存；人工续跑仅补未保存步骤。浏览器共享Operation在单项未完整结束时暂停后续候选，人工再次点击才继续。仍使用既有SQLite JSON、单候选API及Evaluation模块，不新增调度器或改变图形边界，图源与导出产物不变。见[Candidate恢复验收](../docs/CANDIDATE_SANDBOX_RECOVERY.md)。

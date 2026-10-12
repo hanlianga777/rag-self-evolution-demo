@@ -1,3 +1,10 @@
+## 2026-10-12 — Candidate Sandbox 检查点与批量暂停
+
+- 复用 Baseline 子Run恢复，Candidate预约与Run关联原子持久化；同身份人工续跑跳过完成题、复用生成成功答案，仅补Judge。
+- 每次启动占额、失败不退款、D预留不变；预算/身份拒绝整体回滚。重启保留检查点及Run关联。
+- 未完整结束暂停A/B/C串行队列；再次人工点击仅启动未启动项，失败项须单独费用确认续跑。仅修改按钮行为/文字，视觉不变。
+- Judge/Matcher/Golden/Gate/Regression/Search Space/Agent策略及评测语义版本不变；历史成绩不回填。
+
 # Baseline超时与检查点保护（2026-10-12）
 
 默认DeepSeek请求等待240秒，未改性能Gate或Judge语义版本。生成检查点/逐题结果/失败阶段和Usage保存；原运行只读，手动同身份续跑建立子Run，跳过完成题和已生成答案，事务阻断身份混用/重复请求。原API支持resume_source_id/fresh，既有按钮在最新中断Baseline时选择续跑。验收及旧超时无法追溯项见[BASELINE_STABILITY](BASELINE_STABILITY.md)。

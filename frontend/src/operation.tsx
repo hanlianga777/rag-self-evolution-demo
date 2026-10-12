@@ -99,7 +99,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     if (activeBatches.current.has(id)) return;
     activeBatches.current.add(id);
     start(`第 ${request.round} 轮 A/B/C Sandbox`, { id, current: 0, total: request.candidateIds.length, stage: "核对当前实验" });
-    let completed = 0, failed = 0;
+    let completed = 0;
     try {
       for (const candidateId of request.candidateIds) {
         if (!mounted.current) return;
@@ -137,11 +137,10 @@ export function OperationProvider({ children, restore = true }: { children: Reac
           if (!mounted.current) return;
           if (saved.result?.interrupted) throw new Error("服务器重启中断本项；其余未运行方案等待再次点击，不自动继续");
           if (saved.status === "evaluated" && result.status === "completed") succeed(itemId);
-          else { failed++; fail(itemId, result.error_message || saved.result?.error || "评测未完整，预算已消耗"); }
+          else { throw new Error(`${result.error_message || saved.result?.error || "评测未完整，预算已消耗"}；本轮已暂停，其余候选等待人工决定`); }
         } catch (reason) { fail(itemId, reason); throw reason; }
-        completed++; update(id, { current: completed, stage: `已结束 ${completed}/${request.candidateIds.length}${failed ? ` · ${failed} 项失败` : ""}` });
+        completed++; update(id, { current: completed, stage: `已结束 ${completed}/${request.candidateIds.length}` });
       }
-      if (failed) throw new Error(`本轮已结束，${failed} 项运行失败；已完成结果保留，不自动重试`);
       succeed(id);
     } catch (reason) { fail(id, reason); throw reason; }
     finally { activeBatches.current.delete(id); }
