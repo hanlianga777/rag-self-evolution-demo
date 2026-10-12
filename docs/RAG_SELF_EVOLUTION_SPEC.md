@@ -12,6 +12,7 @@
 - 方向性与Negative：Judge检查否定、上下限、单位、型号及作用对象；关键技术方向颠倒不得correctness>2或faithfulness=1，否则拒绝不一致JSON。负向题主澄清/拒答通过不能掩盖后续无依据操作指导；Anchor继续不是答案Evidence。
 - 2026-10-12 Parser兼容：完整上下文Judge在behavior_pass=true时允许behavior_evidence缺省，内部统一为空字符串；false时必须提供非空且可在实际答案中定位的失败片段，否则拒绝解析，不能确认Safety。原始Provider响应另存raw_provider_response供审计（解析错误异常亦保留原文，不自动记日志）；不回填历史记录。仅修字段适用性，评分、Matcher、主张分类、Gate及评测语义版本不变。
 - 可信根因：Evidence Sufficiency有值不等于失败根因已确认。主张失败有答案定位和有效分类/来源才确认Generation；行为失败需实际答案片段；Performance需实测超限；Retrieval仅在明确采集的候选与最终上下文均为空且必要证据不足时确认。unknown/来源待核实不得默认Retrieval，Unknown是未判定状态，不是第五类调参目标。评分未达标但缺具体失败依据仍待核实。
+- 2026-10-12运行稳定性：DeepSeek默认请求/socket等待上限240秒（环境可覆盖），不是整题或整轮限时；原答案性能Gate阈值不变。Baseline逐题结果及生成答案/完整Trace检查点即时持久化，Provider失败独立记录阶段/异常/已采集Usage，不冒充Bad Case。用户再次点击运行时，最新partial/failed正式Baseline在同Golden/Corpus/Judge/Evaluation Identity/配置下新建续跑子Run，复制完成题并跳过调用，保存生成成功则只补Judge。历史Run不改写，不自动重试/续跑；同来源重复预约或活动评测禁止。身份变化返回409，显式fresh才新建全量；完整冻结题集未齐不得Completed。规则语义版本不变，运行超时与状态/阶段审计不进入评分尺。
 - 回放：历史答案评分保留旧答案/Trace，另建answer_replay记录，不生成回答；上下文缺失阻止。回放Judge可能收费，需要显式授权，不作为正式Baseline、Sandbox、发布。完整评测与回放共享入口，运行性质明确。
 - 诊断：保留Retrieval/Generation/Safety/Performance四方向；已确认/评测争议/待核实是可信度状态，不是第五根因。Agent读取全量可信问题、实际证据及历史反馈，争议不直接作为已确认调参目标。一个Candidate一个假设与最少必要参数，A/B/C方向不固定，目标必须有根因依据；禁止无效重复配置。
 - 新统计：target_bad_cases_fixed仅指定目标题修复；incidental_fixes非目标修复；new_regressions新增失败；net_improvement净减少，各含题号。历史同名字段仍表示全部原失败题修复，不重解释历史。资格至少修复1指定目标且总问题减少1。

@@ -1,3 +1,9 @@
+# Baseline稳定性当前状态（2026-10-12）
+
+最新真实Run EVAL-20261012014020569115为partial，Q01完整持久化，后续Q02超时；此前Run EVAL-20261012012720945107保存9题。旧失败阶段/中间答案/用量缺失，不能补造。当前源码仅将默认请求等待调到240秒并加入独立子Run检查点续跑；Judge/Matcher/Policy版本和Gate不变。已受控加载240秒配置与最终检查点修复。本轮不调用真实Provider，不运行Baseline或ABC；离线验收不是240秒配置的真实效果证明。详见[BASELINE_STABILITY](BASELINE_STABILITY.md)。
+
+## 前次记录
+
 # Parser兼容修复当前源码状态（2026-10-12）
 
 V1.2.1真实验证只调用Q06一次，返回合法JSON但因省略行为通过时的behavior_evidence而解析失败，Q38/Q07未执行。当前源码修复该字段兼容并严格核验行为失败片段，评分语义版本保持；本轮只离线验证，没有真实模型调用或重启后端。现有8010进程尚未加载本次补丁，需要受控加载后再经授权验证。历史Baseline仍原样。详见[JUDGE_PARSER_COMPATIBILITY](JUDGE_PARSER_COMPATIBILITY.md)。

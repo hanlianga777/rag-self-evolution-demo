@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import time
+from .telemetry import collect_usage
 from statistics import mean
 from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, normalize
 
@@ -149,7 +151,7 @@ class EvaluationRunner:
             items.append({**current, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'), 'evidence': raw.get('evidence', raw.get('acceptable_evidence', [])), 'raw': raw, 'test_category': raw.get('test_category', current['test_category']), 'negative_subtype': raw.get('negative_subtype', current.get('negative_subtype'))})
         return items
 
-    def start_baseline(self):
+    def baseline_inputs(self):
         snapshots = self.store.dataset_snapshots()
         if not snapshots:
             raise ValueError("正式评测需要已批准（approved）且显式创建的 Golden Snapshot")
@@ -172,7 +174,14 @@ class EvaluationRunner:
             config['top_k'] = index_info['knowledge_config']['top_k']
         judge_meta = {"model": self.runtime.model, **VERSIONS, "temperature":0, "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
-        return self.store.create_evaluation_run(snapshot, config, judge_meta), approved, config
+        return snapshot, approved, config, judge_meta
+
+    def start_baseline(self, resume_source_id=None):
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK:
+            snapshot, approved, config, judge = self.baseline_inputs()
+            run_id = self.store.create_baseline_run(snapshot, config, judge, resume_source_id)
+        return run_id, approved, config
 
     def _case_result(self, item: dict, config: dict):
         execution = self.runtime.answer(item["question"], config)
@@ -278,17 +287,64 @@ class EvaluationRunner:
             return self.store.finish_evaluation_run(run_id, 'partial' if cases else 'failed', {**summarize_evaluation_cases(cases), 'execution_kind': 'answer_replay', 'release_eligible': False}, str(error))
 
     def execute_baseline(self, run_id, approved, config):
-        cases = []
+        cases, checkpoints, phase, item = [], {}, 'initialization', None
+        run = self.store.evaluation_run(run_id)
+        frozen_ids = set(json.loads(run['dataset_snapshot_json'])['question_ids'])
+        lineage = {k:run['result'][k] for k in ('resume_source_id',) if k in run['result']}
+        def progress():
+            return {**summarize_evaluation_cases(cases), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None}}
         try:
+            if {i['id'] for i in approved} != frozen_ids or len(approved) != len(frozen_ids):
+                raise ValueError('未提交完整冻结题集，不能标为Completed')
+            cases = self.store.evaluation_case_results(run_id)
+            checkpoints = run['result'].get('checkpoints', {})
+            if not isinstance(checkpoints, dict) or not set(checkpoints) <= frozen_ids:
+                raise ValueError('检查点不属于冻结Snapshot')
+            saved = {c['question_id'] for c in cases}
+            expected = {i['id'] for i in approved}
+            if not saved <= expected or len(saved) != len(cases):
+                raise ValueError('Saved evaluation cases do not match frozen snapshot')
             for item in approved:
-                result = self._case_result(item, config)
-                self.store.record_evaluation_case(run_id, item["id"], result)
-                cases.append(result)
-                if not result["passed"]:
-                    self.store.record_bad_case(run_id, item["id"], result["root_cause"]["primary"], result["severity"], result)
-            return self.store.finish_evaluation_run(run_id, "completed", summarize_evaluation_cases(cases))
+                if item['id'] in saved:
+                    if item['id'] in checkpoints:
+                        checkpoints[item['id']].pop('execution', None)
+                        checkpoints[item['id']].pop('inflight', None)
+                    continue
+                checkpoint = checkpoints.setdefault(item['id'], {'attempts':[]})
+                if 'execution' in checkpoint and (not isinstance(checkpoint['execution'].get('answer'), str) or not isinstance(checkpoint['execution'].get('retrieval_trace', {}).get('final'), list)):
+                    raise ValueError('生成检查点缺少完整答案/最终上下文')
+                phase = 'generation' if 'execution' not in checkpoint else 'judge'
+                if phase == 'generation':
+                    checkpoint['inflight'] = phase
+                    self.store.update_evaluation_progress(run_id, progress())
+                    started = time.perf_counter()
+                    with collect_usage() as usage:
+                        execution = self.runtime.answer(item['question'], config)
+                    checkpoint['execution'] = execution
+                    checkpoint['attempts'].append({'phase':phase, 'status':'ok', 'usage':usage, 'elapsed_ms':round((time.perf_counter()-started)*1000)})
+                    checkpoint.pop('inflight', None)
+                    self.store.update_evaluation_progress(run_id, progress())
+                phase = 'judge'
+                checkpoint['inflight'] = phase
+                self.store.update_evaluation_progress(run_id, progress())
+                started = time.perf_counter()
+                with collect_usage() as usage:
+                    result = self.score_execution(item, checkpoint['execution'])
+                checkpoint['attempts'].append({'phase':phase, 'status':'ok', 'usage':usage, 'elapsed_ms':round((time.perf_counter()-started)*1000)})
+                self.store.record_evaluation_case(run_id, item['id'], result)
+                cases.append({'question_id':item['id'], **result})
+                if not result['passed']:
+                    self.store.record_bad_case(run_id, item['id'], result['root_cause']['primary'], result['severity'], result)
+                checkpoint.pop('execution', None)
+                checkpoint.pop('inflight', None)
+                self.store.update_evaluation_progress(run_id, progress())
+            return self.store.finish_evaluation_run(run_id, 'completed', {**progress(), 'evaluation_complete':True})
         except Exception as error:
-            return self.store.finish_evaluation_run(run_id, "partial" if cases else "failed", summarize_evaluation_cases(cases), str(error))
+            if item is not None:
+                checkpoint = checkpoints.setdefault(item['id'], {'attempts':[]})
+                checkpoint.pop('inflight', None)
+                checkpoint['attempts'].append({'phase':phase, 'status':'error', 'error_type':type(error).__name__, 'cause_type':type(error.__cause__).__name__ if error.__cause__ else None, 'error':str(error), 'usage':locals().get('usage', []), 'elapsed_ms':round((time.perf_counter()-started)*1000) if 'started' in locals() else None})
+            return self.store.finish_evaluation_run(run_id, 'partial' if cases or any('execution' in c for c in checkpoints.values()) else 'failed', progress(), str(error))
 
     def start_candidate(self, candidate_id: str):
         candidate = self.store.candidate(candidate_id)

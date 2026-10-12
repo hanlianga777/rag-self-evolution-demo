@@ -104,3 +104,7 @@ Golden 失败时保留已合格 Slot，使用现有补失败题入口；Probe/QC
 当前产品合同见 docs/RAG_SELF_EVOLUTION_SPEC.md 文首。Child命中指标与最终Parent证据充分性分开；统一Judge读取完整证据，Baseline/A/B/C/D冻结同评测身份。旧实验保留只读，历史答案回放不成为正式Baseline或发布依据。新目标修复/附带改善/新增失败分开，程序推荐Winner，Gate2人工确认；有效来源下D最多一次授权LLM建议，经程序校验后另行授权Sandbox。Gate3及兼容配置回滚仍由人工执行。图形表达设计，离线验收不证明真实Provider效果。
 
 评测规则V1.2通用缺陷修复、16题离线回归及真实验证边界见 [EVALUATION_POLICY_V12](docs/EVALUATION_POLICY_V12.md)。本次未重新运行真实Baseline。
+
+## Baseline请求超时与手动续跑
+
+DeepSeek请求/socket等待默认240秒，可用DEEPSEEK_TIMEOUT_SECONDS覆盖；不等于整题/50题限时，也不改性能Gate。既有重新运行按钮在最新Baseline为partial/failed时会尝试同身份续跑，新建子Run保留原记录；完成题不重复调用，保存生成答案时只补Judge。身份不匹配返回409。若明确需要全新评测，原POST /api/evaluations/run可传 `{"fresh":true}`；显式来源用 `{"resume_source_id":"EVAL-..."}`。两者互斥，调用仍需用户费用授权，无后台自动重试。旧partial未保存的中间答案/用量无法补回。详见[中文验收报告](docs/BASELINE_STABILITY.md)。

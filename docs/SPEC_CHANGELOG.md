@@ -1,3 +1,7 @@
+# Baseline超时与检查点保护（2026-10-12）
+
+默认DeepSeek请求等待240秒，未改性能Gate或Judge语义版本。生成检查点/逐题结果/失败阶段和Usage保存；原运行只读，手动同身份续跑建立子Run，跳过完成题和已生成答案，事务阻断身份混用/重复请求。原API支持resume_source_id/fresh，既有按钮在最新中断Baseline时选择续跑。验收及旧超时无法追溯项见[BASELINE_STABILITY](BASELINE_STABILITY.md)。
+
 # V1.2.1 Parser兼容修复（2026-10-12）
 
 behavior_pass=true时允许behavior_evidence缺省并规范化为空串；false时必须有实际答案中的非空失败片段，否则拒绝解析。保留原始Provider响应审计，不改评分规则、版本身份、Matcher或主张合同。保存Q06离线复现及Q35/Q38安全回归，未调用Provider或重评。详见[JUDGE_PARSER_COMPATIBILITY](JUDGE_PARSER_COMPATIBILITY.md)。

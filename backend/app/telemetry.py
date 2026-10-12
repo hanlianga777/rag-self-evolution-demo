@@ -25,11 +25,14 @@ def measure(stages, name, parent=None):
 @contextmanager
 def collect_usage():
     calls = []
+    parent = _usage.get()
     token = _usage.set(calls)
     try:
         yield calls
     finally:
         _usage.reset(token)
+        if parent is not None:
+            parent.extend(calls)
 
 def record_usage(usage):
     calls = _usage.get()

@@ -74,3 +74,7 @@ DeepSeek 是既有 Provider，显式服务于回答、生成、QC、Judge、Agen
 ## 2026-10-11 统一评测与受控优化
 
 当前产品合同见 docs/RAG_SELF_EVOLUTION_SPEC.md 文首。Child命中指标与最终Parent证据充分性分开；统一Judge读取完整证据，Baseline/A/B/C/D冻结同评测身份。旧实验保留只读，历史答案回放不成为正式Baseline或发布依据。新目标修复/附带改善/新增失败分开，程序推荐Winner，Gate2人工确认；有效来源下D最多一次授权LLM建议，经程序校验后另行授权Sandbox。Gate3及兼容配置回滚仍由人工执行。图形表达设计，离线验收不证明真实Provider效果。
+
+## Evaluation运行保护补充（2026-10-12）
+
+共享Evaluation模块内部增加逐题检查点与失败阶段/Usage记录；同身份手动续跑使用独立子Run，复用已保存案例和生成上下文，不覆盖历史。复用既有SQLite JSON与API，不新增调度器、Provider或Judge，组件边界和正式图连线不变，因此图源及导出图不变。请求等待配置与冻结评分/性能Gate分离。细则见[Baseline稳定性报告](../docs/BASELINE_STABILITY.md)。

@@ -8,7 +8,7 @@ class Settings:
     api_key: str
     base_url: str
     model: str
-    timeout_seconds: float = 60.0
+    timeout_seconds: float = 240.0
 
     @property
     def configured(self) -> bool:
@@ -28,7 +28,7 @@ def load_values(env: dict[str, str] | None = None, env_file: Path | None = None)
 
 def load_settings(env: dict[str, str] | None = None, env_file: Path | None = None) -> Settings:
     values = load_values(env, env_file)
-    timeout = float(values.get("DEEPSEEK_TIMEOUT_SECONDS", "60"))
+    timeout = float(values.get("DEEPSEEK_TIMEOUT_SECONDS", "240"))
     if not 0 < timeout <= 600:
         raise ValueError("DEEPSEEK_TIMEOUT_SECONDS must be between 0 and 600")
     return Settings(
