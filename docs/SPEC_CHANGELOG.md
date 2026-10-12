@@ -371,3 +371,11 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 - Primary Root Cause 保留每题一个真实原值；Secondary Signals 可多个，保留实际 Query/Metadata/Performance/Unknown 等，不强制五类映射、不改变诊断规则。当前已保存 Generation 6 / Safety 1 只作真实来源说明。
 - 唯一后端补充：现有 `GET /api/pipeline.index.dimension/indexed_count` 只读实际 FAISS `d/ntotal`、未知 null；不改模型/索引/DB/业务规则。保护正式 20 题 8/4/8、Baseline 9/11、A 10/11、B 7/11 Regression FAIL、C 11/11 已发布、D 10/11 保留 C。
 - 本轮禁止真实 Provider/Golden/Baseline/A/B/C/D/人工 Gate/发布重跑；仅隔离 Stub/前端与真实只读 GET 验收。Runbook 修正过时“尚无正式 Snapshot”口径，保留两张 V1.4 目标架构链接；历史报告日期与测试数字不作为本次证据。
+
+
+## 2026-10-12 · Golden最终索引离线修复与关联核实
+
+- MinerU图片image_footnote进入既有Block/Parent/Child/全文链，修复Q02第50页步骤5/6漏采根因；不重解析PDF、不改参数/模型。
+- 仅新工作集Q42关联PDF12/28页紧急停机材料，Q16/Q22补R1/R3版本与章节范围。原题/答案/Evidence、22修订及28保留内容不变。
+- 受控隔离补一个Child/Parent；文本预览50/50、BM25第1及14步Parent检查通过。正式索引仍旧版本、Hard Validation49/50；缺1个新Embedding，未激活、未伪造新Corpus身份。
+- 29表历史行及44份PDF/索引资产保护、Backup API回退验证；本轮0付费Provider，Probe/QC/Human Pending。详见[GOLDEN_FINAL_INDEX_OFFLINE.md](GOLDEN_FINAL_INDEX_OFFLINE.md)。正式架构与UI无变化。

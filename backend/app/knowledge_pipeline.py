@@ -88,7 +88,7 @@ def parent_child(document, blocks, counter, *, parent_tokens=1400, child_tokens=
         raw_text = block.get('text', '')
         if block.get('type') == 'table': raw_text = normalize_table(block.get('table_body', ''))
         if not raw_text:
-            raw_text = '\n'.join(block.get('list_items', []) + block.get('image_caption', []) + block.get('table_caption', [])) or block.get('code_body', '') or block.get('latex', '')
+            raw_text = '\n'.join(block.get('list_items', []) + block.get('image_caption', []) + block.get('image_footnote', []) + block.get('table_caption', [])) or block.get('code_body', '') or block.get('latex', '')
         if block.get('text_level') and raw_text: section = raw_text.strip()
         block_id = f"{document['id']}-BLOCK-{index + 1:05d}"
         parsed.append({'block_id': block_id, 'page': page, 'section_path': section, 'text': raw_text, 'raw': block})

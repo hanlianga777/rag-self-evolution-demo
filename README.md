@@ -108,3 +108,6 @@ Golden 失败时保留已合格 Slot，使用现有补失败题入口；Probe/QC
 ## Baseline请求超时与手动续跑
 
 DeepSeek请求/socket等待默认240秒，可用DEEPSEEK_TIMEOUT_SECONDS覆盖；不等于整题/50题限时，也不改性能Gate。既有重新运行按钮在最新Baseline为partial/failed时会尝试同身份续跑，新建子Run保留原记录；完成题不重复调用，保存生成答案时只补Judge。身份不匹配返回409。若明确需要全新评测，原POST /api/evaluations/run可传 `{"fresh":true}`；显式来源用 `{"resume_source_id":"EVAL-..."}`。两者互斥，调用仍需用户费用授权，无后台自动重试。旧partial未保存的中间答案/用量无法补回。详见[中文验收报告](docs/BASELINE_STABILITY.md)。
+
+
+Golden 50题最新离线状态：见[最终索引验收](docs/GOLDEN_FINAL_INDEX_OFFLINE.md)。Q02解析漏失已修复，但正式新索引等待1个变更Child的Embedding授权；49/50正式Hard Validation，不可启动完整Probe/QC。隔离文本50/50不代表正式索引资格。
