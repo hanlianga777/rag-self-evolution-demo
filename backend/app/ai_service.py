@@ -123,14 +123,15 @@ class AiService:
         return {**result, "stages": stages, "token_usage": usage, **cost_fields(self.model, usage)}
 
     def quality_check(self, item: dict) -> dict:
+        from .paid_run import current_paid_run
         stages = []
         with measure(stages, 'qc'), collect_usage() as usage:
-            for attempt in range(2):
+            for attempt in range(1 if current_paid_run() else 2):
                 try:
                     result = {**self._quality_check(item), 'response_retries': attempt}
                     break
                 except ProviderUnavailable as error:
-                    if attempt or not (isinstance(error, ProviderNetworkError) or '未返回有效 JSON' in str(error)):
+                    if current_paid_run() or attempt or not (isinstance(error, ProviderNetworkError) or '未返回有效 JSON' in str(error)):
                         raise
         return {**result, 'stages': stages, 'token_usage': usage, **cost_fields(self.model, usage)}
 
@@ -182,14 +183,15 @@ class AiService:
             raise ProviderUnavailable("DeepSeek QC 未返回有效 JSON") from error
 
     def answerability_check(self, question: str, hits: list[dict], signals: dict) -> dict:
+        from .paid_run import current_paid_run
         stages = []
         with measure(stages, 'answerability_judge'), collect_usage() as usage:
-            for attempt in range(2):
+            for attempt in range(1 if current_paid_run() else 2):
                 try:
                     result = {**self._answerability_check(question, hits, signals), 'response_retries': attempt}
                     break
                 except ProviderUnavailable as error:
-                    if attempt or not (isinstance(error, ProviderNetworkError) or '未返回有效 JSON' in str(error)):
+                    if current_paid_run() or attempt or not (isinstance(error, ProviderNetworkError) or '未返回有效 JSON' in str(error)):
                         raise
         return {**result, 'stages': stages, 'token_usage': usage, **cost_fields(self.model, usage)}
 

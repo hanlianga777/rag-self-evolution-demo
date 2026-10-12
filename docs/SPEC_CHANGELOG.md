@@ -397,3 +397,8 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 - 11个真实数据副本正常/SQL异常/SIGKILL/恢复再中断场景通过，成功副本Hard Validation50/50；51项相关离线回归及启动A-G/LaunchAgent合同通过。
 - 本轮Provider0，正式29表全部行、77个旧/新源索引/PDF文件及调用账本不变。历史成绩及Production原Legacy绑定保留；旧Baseline不能在新Corpus下自动成为当前资格。
 - 正式切换仍须下一次明确授权及维护停服/无并发写入条件，Probe/QC/冻结/评测/Agent/发布未执行。图/UI与Judge/阈值不变。详见[GOLDEN_Q02_STAGE3_VERIFICATION.md](GOLDEN_Q02_STAGE3_VERIFICATION.md)。
+## 2026-10-12 — 夜间运行安全边界与预算停止
+
+- 新增显式受控质量运行：后台线程传入同一费用账本，Provider请求前预约费用、返回后校验Usage；拒绝自动重试/重开账本，技术异常停止后续题，内容不合格保留原治理合同。
+- 保持DeepSeek请求参数及全部评分/治理规则；用户选择不加输出上限，20元预算预检阻断，未正式切换、未调用Provider。
+- 真实新旧资产、50题及历史保护重新验证；报告见[GOLDEN_OVERNIGHT_ACCEPTANCE](GOLDEN_OVERNIGHT_ACCEPTANCE.md)。无UI/架构图、Judge、Golden内容或历史成绩修改。

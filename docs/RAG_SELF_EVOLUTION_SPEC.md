@@ -2,6 +2,8 @@
 
 本合同按用户批准的「RAG 自进化 Demo 一次性收口」计划覆盖旧评测、目标统计、Winner、D与UI展示规则；以下旧条款仅在不冲突时保留。历史记录不回填、不迁移成绩。唯一产品SPEC仍为本文件。
 
+- 2026-10-12夜间受控运行：用户授权切换后质量验收，但选择保持DeepSeek请求配置、不新增输出上限，新增费用规划20元。可显式传入本轮PaidRun至既有质量Worker；线程入口设置独立上下文，DeepSeek/Alibaba共享逐请求持久化预算预约、Usage和停止账本。当前身份必须重验，缺价格/Usage/预算/持久化即停，不自动重开已有账本；QC/Answerability不重试，业务质量技术异常保留审计后停止后续题，内容不合格按既有合同继续检查并记录QC跳过。该约束仅限显式受控运行，不改普通入口或历史费用；不改变请求参数、Judge、Gate、Regression、模型或审批权限。预算预检已阻断：50次业务审计最大输出范围即超过20元，正式切换及付费调用均未执行，正式49/50、隔离50/50。Human Gate1仍须真实人工确认，后续Snapshot/Baseline/Agent/ABC未运行。详见[夜间执行报告](GOLDEN_OVERNIGHT_ACCEPTANCE.md)。
+
 - 2026-10-12 Golden集中修订：按冻结Medium50质量审计，在新的待审核工作集修订17轻量、4实质、1替换，共22题；另28题内容保持原样，20/10/20配额不变。原Snapshot、Baseline、实验及Corpus不改写。Q37修正材料Anchor与地面适用性合同，Q45在新工作集标记high风险，Q28换罐资料歧义未解决时替换同Topic考点；这些不是旧成绩回填。R1/R3范围关联独立保存，负向Anchor仍不是答案Evidence。
 - 本工作集离线完成不代表机器资格：全部Probe/QC与Human Gate1重新待审核，不继承旧质量结果；Q02的PDF步骤5、6未进入正式Child/Parent，当前Hard Validation阻断。隔离文本补全仅验证缺口，不改变正式索引，不允许带阻断启动付费Probe/QC或冻结。待完整授权修复Corpus/重建索引并按新身份复核后，才能另行授权Probe/QC。
 - 2026-10-12索引离线修复：MinerU图片`image_footnote`须进入同一Block→Parent/Child及页全文链；Q02漏采根因为本地转换忽略此字段。受控隔离补齐一个Child及其Parent/第50页全文，变更文本不得冒用旧Embedding；未授权Embedding时只保存无向量/FAISS/激活Manifest的文本预览，不生成正式新Corpus身份、不切换。仅新工作集Q42材料Anchor关联PDF12/28页紧急停机与复位章节，Negative不转为答案Evidence；Q16/Q22按PDF核实并持久化R1/R3章节/版本范围，不改原题和历史数据。正式Hard Validation仍49/50，文本预览50/50不代表索引或Probe/QC通过，详见[最终索引离线验收](GOLDEN_FINAL_INDEX_OFFLINE.md)。

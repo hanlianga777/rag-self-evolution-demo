@@ -150,6 +150,11 @@ class AlibabaProvider:
     def __init__(self, values=None): self.values = settings() if values is None else values
 
     def _post(self, path, payload):
+        from .paid_run import paid_request
+        with paid_request('Alibaba',payload['model'],payload):
+            return self._post_request(path,payload)
+
+    def _post_request(self, path, payload):
         key = self.values.get('DASHSCOPE_API_KEY', '').strip()
         base = self.values.get('DASHSCOPE_BASE_URL', '').rstrip('/')
         if not key or not base: raise ProviderUnavailable('Alibaba Key / business-space endpoint missing')

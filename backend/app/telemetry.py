@@ -38,6 +38,8 @@ def record_usage(usage):
     calls = _usage.get()
     if calls is not None:
         calls.append(dict(usage))
+    from .paid_run import payment_usage
+    payment_usage(usage)
 
 def price_config():
     path = Path(os.getenv('RAG_PRICE_CONFIG') or Path(__file__).resolve().parents[1] / 'config' / 'deepseek-prices.json')

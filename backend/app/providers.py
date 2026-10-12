@@ -54,6 +54,11 @@ class DeepSeekProvider:
     def complete_with_metrics(self, system: str, user: str, json_mode: bool = False, *, stream: bool = False, temperature: float = 0.2) -> dict:
         """Return provider usage and measured first-content latency when streaming is enabled."""
         request = self._request(system, user, json_mode, stream, temperature)
+        from .paid_run import paid_request
+        with paid_request('DeepSeek',self.settings.model,json.loads(request.data)):
+            return self._complete_request(request,stream)
+
+    def _complete_request(self, request, stream):
         started_at = time.perf_counter()
         call_started_at = datetime.now(timezone.utc).isoformat()
         try:

@@ -642,7 +642,17 @@ def resume_generation_quality(generation_run_id: str):
     return {"run_id": generation_run_id, "status": "probing"}
 
 
-def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=False, resume_quality=False):
+def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=False, resume_quality=False, paid_run=None):
+    from .paid_run import controlled_run
+    if paid_run is not None and (regenerate or not resume_quality):
+        raise ValueError('Controlled paid run only permits existing quality work')
+    # Pass the run explicitly: ContextVars are not inherited by background threads.
+    with controlled_run(paid_run):
+        return _run_mini_generation_work(run_id,run_store,service,run_corpus,regenerate=regenerate,resume_quality=resume_quality)
+
+
+def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regenerate=False, resume_quality=False):
+    from .paid_run import current_paid_run
     stage = "generation"
     profile = run_store.generation_run(run_id)["profile"]
 
@@ -715,14 +725,17 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
         business_usage = dict(quality_state.get('business_provider_usage', {}))
         for index, candidate in enumerate(saved, start=1):
             if business_run:
+                quality_error = None
                 try:
                     from .telemetry import collect_usage
                     with collect_usage() as calls:
                         _business_quality_step(run_store, service, run_corpus, candidate, saved)
                     quality_errors.pop(candidate['id'], None)
                 except Exception as error:
+                    quality_error = error
                     quality_errors[candidate['id']] = str(error)
-                    calls.extend(getattr(error, 'token_usage', []))
+                    extra_usage = getattr(error, 'token_usage', [])
+                    calls.extend([u for u in extra_usage if u not in calls] if current_paid_run() else extra_usage)
                 finally:
                     business_usage[candidate['id']] = [*business_usage.get(candidate['id'], []), *calls]
                 checked = run_store.question(candidate['id'])
@@ -730,6 +743,8 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
                 qc_completed += checked['qc_status'] in {'qc_passed','qc_failed'}
                 qc_skipped += checked['probe_status'] not in {'probe_pending','probe_passed'}
                 run_store.update_generation_run(run_id, status='qc', progress={'stage':'qc','probe_completed':probe_completed,'qc_completed':qc_completed,'qc_skipped':qc_skipped,'quality_processed':index,'slot':candidate['raw']['coverage_slot']}, validation={'business_quality_errors':quality_errors,'business_provider_usage':business_usage})
+                if quality_error is not None and current_paid_run():
+                    raise quality_error
                 continue
             stage = "probing"
             prior_probe = run_store.probe_history(candidate["id"])[0] if (resume_quality or regenerate) and candidate["probe_status"] == "probe_passed" else None
@@ -739,7 +754,8 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
             if reusable and prior_qc and prior_qc[0]["result"].get("execution_identity") == identity and candidate["qc_status"] == "qc_passed":
                 qc_completed += 1
                 continue
-            probe = {"status": "passed"} if reusable else run_store.run_probe(candidate["id"], service.retriever, run_corpus.chunks(), service.answerability_check, subtype_judge=service.negative_subtype_check)
+            probe = {"status": "passed"} if reusable else run_store.run_probe(candidate["id"], service.retriever, run_corpus.chunks(), service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=bool(current_paid_run()))
+            _require_probe_execution(probe)
             run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "slot": candidate["raw"].get("coverage_slot"), "probe_completed": index})
             if probe["status"] == "passed":
                 stage = "qc"
@@ -751,6 +767,7 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
         stage = "completed"
         run_store.update_generation_run(run_id, status="completed", progress={"stage": "completed"})
     except Exception as error:
+        if current_paid_run(): current_paid_run().stop(type(error).__name__)
         run_store.update_generation_run(run_id, status="failed", validation={"error": str(error), "failed_stage": stage}, progress={"stage": "failed"})
 
 
@@ -775,10 +792,17 @@ def _business_quality_step(run_store, service, run_corpus, candidate, peers):
         run_store.save_quality_audit(candidate['id'], audit)
     if candidate['probe_status'] != 'probe_passed':
         probe = run_store.run_probe(candidate['id'], service.retriever, run_corpus.chunks(), service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=True)
+        _require_probe_execution(probe)
         if probe['status'] != 'passed':
             return
     if candidate['qc_status'] not in {'qc_passed','qc_failed'}:
         _quality_check(run_store, service, candidate['id'])
+
+
+def _require_probe_execution(probe):
+    from .paid_run import current_paid_run
+    if current_paid_run() and (probe.get('classification') == 'RETRIEVAL_EXECUTION_FAILED' or probe.get('probe_details',{}).get('probe_execution_status') == 'failed'):
+        raise ProviderUnavailable('Probe retrieval execution failed; controlled paid run stopped')
 
 
 def _quality_check(run_store, service, question_id):
