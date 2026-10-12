@@ -184,6 +184,59 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertIsNone(experiment["result"]["parsed_json"])
         self.assertEqual(experiment["result"]["validation_stage"], "json_parse")
 
+    def test_prompt_and_root_cause_rejection_expose_persisted_mapping(self):
+        result=drafts();result['candidates'][1]['root_cause']='Generation'
+        experiment,trace,audit,provider,raw=self.run_drafts(result)
+        self.assertEqual(trace['status'],'failed')
+        self.assertEqual(audit['failed_candidate_id'],'B')
+        self.assertEqual(audit['failed_field'],'root_cause')
+        self.assertEqual(audit['allowed_values'],['Retrieval'])
+        self.assertEqual(provider.prompt['target_reference_map']['Q1']['primary_root_cause'],'Retrieval')
+        self.assertIn('参数干预环节',provider.prompt['rule'])
+
+    def test_saved_round2_response_reproduces_b_and_accepts_truthful_cause_with_same_intervention(self):
+        import shutil
+        backup=Path(__file__).resolve().parents[2]/'output/playwright/agent-round2-audit/protected.db'
+        if not backup.exists():self.skipTest('Private audit copy not tracked')
+        copied=Path(self.directory.name)/'round2-copy.db';shutil.copy2(backup,copied)
+        store=GovernanceStore(copied)
+        with store.connection() as c:
+            row=c.execute('SELECT result_json FROM agent_traces WHERE id=8').fetchone()
+        saved=json.loads(row[0]);raw=saved['provider_raw_text']
+        baseline=saved['baseline_id'];exp=saved['optimization_run_id']
+        before=store.candidates(exp)
+        provider=FixedProvider(raw)
+        with self.assertRaisesRegex(ValueError,'候选根因与可信目标不对应'):
+            OptimizationAgent(store,provider).generate(baseline,experiment_id=exp)
+        self.assertEqual(store.candidates(exp),before)
+        self.assertEqual(store.experiment(exp)['evaluation_budget']['used'],5)
+        for target in saved['parsed_candidates'][1]['target_bad_cases']:
+            ref=provider.prompt['target_reference_map'][target]
+            self.assertEqual(ref['primary_root_cause'],'Generation')
+            self.assertEqual(ref['diagnosis_status'],'confirmed')
+            self.assertTrue(ref['root_cause_evidence'])
+        self.assertTrue(all('checkpoints' not in item['result'] for item in provider.prompt['prior_sandbox_results']))
+        corrected=json.loads(raw);corrected['candidates'][1]['root_cause']='Generation'
+        # Offline counterfactual only: raw history and stored roots remain unchanged.
+        result=OptimizationAgent(store,FixedProvider(json.dumps(corrected))).generate(baseline,experiment_id=exp)
+        self.assertEqual(len(result['candidates']),6)
+        new_b=next(c for c in result['candidates'] if c['reasoning'].get('round')==2 and c['reasoning']['candidate_label']=='B')
+        self.assertEqual(new_b['reasoning']['root_cause'],'Generation')
+        self.assertEqual(new_b['reasoning']['changed_parameters'],corrected['candidates'][1]['config_diff'])
+        self.assertEqual([c for c in store.candidates(exp) if c['reasoning'].get('round')==1],before)
+
+    def test_generation_target_can_change_retrieval_parameters_without_relabeling(self):
+        self.store.record_bad_case('EVAL-test','Q1','Generation','ordinary',{'primary_root_cause':'Generation','diagnosis':{'status':'confirmed','reason':'fixture unsupported answer claim'}})
+        self.store.record_bad_case('EVAL-test','Q-unknown','Unknown','ordinary',{'primary_root_cause':'Unknown','diagnosis':{'status':'needs_review','reason':'fixture uncertainty'}})
+        response=drafts()
+        for candidate in response['candidates']:candidate['root_cause']='Generation'
+        provider=FixedProvider(json.dumps(response))
+        result=OptimizationAgent(self.store,provider).generate('EVAL-test')
+        self.assertEqual(len(result['candidates']),3)
+        self.assertTrue(all(c['reasoning']['root_cause']=='Generation' for c in result['candidates']))
+        self.assertNotIn('Q-unknown',provider.prompt['target_reference_map'])
+        self.assertTrue(all(c['config']!=result['candidates'][0]['config'] for c in result['candidates'][1:]))
+
 
 if __name__ == "__main__":
     unittest.main()

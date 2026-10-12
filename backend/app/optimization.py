@@ -44,7 +44,7 @@ class OptimizationAgent:
         monitoring_target_event_ids = [event["id"]] if event else []
         target_reference_map = {}
         for item in bad_cases:
-            reference = {"source": "baseline_bad_case", "baseline_id": baseline_run_id, "bad_case_id": item["id"], "question_id": item["question_id"]}
+            reference = {"source": "baseline_bad_case", "baseline_id": baseline_run_id, "bad_case_id": item["id"], "question_id": item["question_id"], "primary_root_cause": item.get("result", {}).get("primary_root_cause") or item.get("category"), "diagnosis_status": item["diagnosis"]["status"], "root_cause_evidence": item["diagnosis"]}
             target_reference_map[item["id"]] = reference
             target_reference_map[item["question_id"]] = reference
         if event:
@@ -67,10 +67,10 @@ class OptimizationAgent:
             "monitoring_target_event_ids": monitoring_target_event_ids,
             "baseline_configuration": base_config,
             "historical_config_proposals": [{'id': c['id'], 'config': c['config'], 'qualification_inherited': False} for c in self.store.candidates() if c['experiment_id'] != experiment_id],
-            'prior_sandbox_results': [{'id': item['id'], 'hypothesis': item['reasoning'].get('hypothesis'), 'configuration': item['config'], 'result': item['result'], 'status': item['status']} for item in prior_candidates],
+            'prior_sandbox_results': [{'id': item['id'], 'hypothesis': item['reasoning'].get('hypothesis'), 'configuration': item['config'], 'result': {k:v for k,v in item['result'].items() if k != 'checkpoints'}, 'status': item['status']} for item in prior_candidates],
             "allowed_parameter_values": search_space_contract(),
             "excluded_automatic_parameters": sorted(EXCLUDED_AUTOMATIC_PARAMETERS),
-            "rule": f"当前为 Round {round_number}。返回 {','.join(labels)} 并列、可解释 Candidate。One Candidate = One Hypothesis + Minimum Necessary Parameters。target_bad_cases 必须是 target_reference_map 中的实际标识符，禁止描述文本或未知 ID。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。根据 prior_sandbox_results 调整假设，不能重复已失败配置。",
+            "rule": f"当前为 Round {round_number}。返回 {','.join(labels)} 并列、可解释 Candidate。One Candidate = One Hypothesis + Minimum Necessary Parameters。target_bad_cases 必须是 target_reference_map 中的实际标识符，禁止描述文本或未知 ID。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。root_cause表示目标已经确认的根因归属，必须属于所引用Baseline目标在target_reference_map中的primary_root_cause集合，不能将参数干预环节当作根因。Generation问题可以提出检索参数干预，但须保持Generation根因并在why中引用实际答案/证据/Trace说明跨环节假设；不得把缺证据的检索遗漏猜测写成已确认Retrieval。Unknown/needs_review不得作为可信目标。根据 prior_sandbox_results 的真实修复/退化/Regression调整假设，不能重复已失败配置。",
         }
         try:
             stages = []
@@ -118,9 +118,11 @@ class OptimizationAgent:
                     raise ValueError(f"Agent Candidate {candidate['id']} target_bad_cases 引用了不存在的当前证据：" + ", ".join(unknown_targets))
                 evidence_refs = candidate.get('root_cause_evidence')
                 if not isinstance(evidence_refs, list) or set(evidence_refs) != set(candidate['target_bad_cases']):
+                    audit.update(failed_field='root_cause_evidence', actual_value=evidence_refs, expected_type='all target references', allowed_values=candidate['target_bad_cases'])
                     raise ValueError('根因依据必须对应全部目标引用')
                 causes = {item.get('result', {}).get('primary_root_cause') or item.get('category') for item in bad_cases if item['id'] in candidate['target_bad_cases'] or item['question_id'] in candidate['target_bad_cases']}
                 if candidate['root_cause'] not in {'Retrieval', 'Generation', 'Safety', 'Performance'} or causes and candidate['root_cause'] not in causes:
+                    audit.update(failed_field='root_cause', actual_value=candidate['root_cause'], expected_type='confirmed target root cause, not intervention stage', allowed_values=sorted(causes) if causes else ['Retrieval','Generation','Safety','Performance'])
                     raise ValueError('候选根因与可信目标不对应')
                 if candidate["hypothesis"].strip() in {item.get("reasoning", {}).get("hypothesis", "").strip() for item in prior_candidates}:
                     audit.update(failed_field="hypothesis", actual_value=candidate["hypothesis"], expected_type="new hypothesis", allowed_values=None)

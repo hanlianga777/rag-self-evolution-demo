@@ -17,6 +17,7 @@
 - 2026-10-12 Judge技术失败审计补充：执行检查点保留异常cause_message，以及异常携带的原始Judge响应raw_provider_response（缺失不伪造），与阶段/Usage一起保存。不自动重试，不把Parser错误记作回答Bad Case；既有Parser、安全校验、评测语义版本不变，不回填历史缺失响应。
 - 回放：历史答案评分保留旧答案/Trace，另建answer_replay记录，不生成回答；上下文缺失阻止。回放Judge可能收费，需要显式授权，不作为正式Baseline、Sandbox、发布。完整评测与回放共享入口，运行性质明确。
 - 诊断：保留Retrieval/Generation/Safety/Performance四方向；已确认/评测争议/待核实是可信度状态，不是第五根因。Agent读取全量可信问题、实际证据及历史反馈，争议不直接作为已确认调参目标。一个Candidate一个假设与最少必要参数，A/B/C方向不固定，目标必须有根因依据；禁止无效重复配置。
+- 2026-10-12 Agent合同对齐：可优化目标映射明确提供持久化primary_root_cause、confirmed状态及诊断依据；root_cause表示已确认根因，不表示config_diff干预环节，必须满足现有目标根因校验。Generation案例可提出有答案/证据/Trace依据的检索参数假设，不据此改写根因；Unknown/needs_review不成为可信目标。上一轮反馈保留配置、修复/退化/Regression/资格，执行checkpoint不重复发送给Agent（数据库原样保留）。根因拒绝审计保存具体字段、实际值与允许根因，不自动修正模型输出、重试或补生成；评分及预算规则不变。
 - 新统计：target_bad_cases_fixed仅指定目标题修复；incidental_fixes非目标修复；new_regressions新增失败；net_improvement净减少，各含题号。历史同名字段仍表示全部原失败题修复，不重解释历史。资格至少修复1指定目标且总问题减少1。
 - 冻结11Gate阈值、Regression新增严重0/普通≤1、Sandbox预算12及D预留1，启动占额、失败不退款。串行本轮合法A/B/C，身份/预算/确认失效停止，中断不隐式重试，不自动执行下一轮。
 - Winner：程序过滤同评测身份完整合格方案，优先低退化风险、重要问题/目标修复、净改善，再在质量相同方案中比较实测成本/延迟/用量；缺失成本不作零。保存推荐理由及比较。Gate2人工确认。

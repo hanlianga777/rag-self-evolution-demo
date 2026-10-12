@@ -1,3 +1,9 @@
+## 2026-10-12 — 第二轮Agent根因合同对齐
+
+- 真实Trace 8的B将三个confirmed Generation目标标为Retrieval，被现有校验拒绝；原始响应已保存，非网络/JSON故障。
+- Prompt目标映射显式提供根因/可信度/依据，并区分根因与参数干预。保留根因校验，补齐拒绝字段审计；历史反馈省略执行checkpoint，数据库不删改。
+- 保存响应离线复现与跨环节参数回归；不调用Provider、不生成真实Round2、不改第一轮或Sandbox预算。见[第二轮失败报告](AGENT_ROUND2_FAILURE_AUDIT.md)。
+
 ## 2026-10-12 — Candidate C技术失败审计
 
 - 确认C保存43题及第44题生成检查点；既有续跑在真实库隔离副本验证跳过43题，仅补7次Judge、6次Generation，保留A/B与原Run。
