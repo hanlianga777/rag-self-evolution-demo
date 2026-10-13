@@ -359,7 +359,7 @@ class EvaluationRunner:
                     checkpoint['attempts'][-1]['raw_provider_response'] = error.raw_provider_response
             return self.store.finish_evaluation_run(run_id, 'partial' if cases or any('execution' in c for c in checkpoints.values()) else 'failed', progress(), str(error))
 
-    def start_candidate(self, candidate_id: str):
+    def candidate_inputs(self, candidate_id: str):
         candidate = self.store.candidate(candidate_id)
         if candidate is None:
             raise ValueError("Candidate 不存在")
@@ -369,6 +369,9 @@ class EvaluationRunner:
             raise ValueError("Candidate 必须基于已完成的 Baseline 运行")
         if not policy_current(baseline['judge']):
             raise ValueError('评测规则已升级，请授权建立新Baseline；旧Candidate只读')
+        from .policy import validate_candidate_config
+        if not validate_candidate_config(candidate["config"])["valid"]:
+            raise ValueError("Candidate 参数超出 Search Space")
         snapshot = json.loads(baseline["dataset_snapshot_json"])
         from .paid_run import current_paid_run
         limits = baseline['judge'].get('execution_snapshot',{}).get('request_limits')
@@ -378,10 +381,16 @@ class EvaluationRunner:
                 raise ValueError('Candidate request limits must match frozen Baseline')
         if baseline['judge'].get('evaluation_identity') != evaluation_identity(snapshot, baseline['judge']):
             raise ValueError('Evaluation身份不匹配')
+        self.store.require_current_baseline(baseline["id"])
         approved = self.snapshot_items(snapshot)
         if baseline['judge'].get('model') != self.runtime.model:
             raise ValueError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
         config = {**candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
+        return approved, config, candidate, baseline
+
+    def start_candidate(self, candidate_id: str):
+        approved, config, candidate, baseline = self.candidate_inputs(candidate_id)
+        snapshot = json.loads(baseline["dataset_snapshot_json"])
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:
             run_id = self.store.create_baseline_run(snapshot, config, baseline['judge'], candidate_id=candidate_id)

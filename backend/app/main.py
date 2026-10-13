@@ -1367,6 +1367,18 @@ def create_composite(run_id: str, payload: PaidActionRequest | None = None):
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 
+@app.get("/api/candidates/{candidate_id}/preflight")
+def candidate_preflight(candidate_id: str):
+    try:
+        approved, config, candidate, baseline = EvaluationRunner(store, ai_service).candidate_inputs(candidate_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return {"candidate_id": candidate["id"], "baseline_run_id": baseline["id"],
+            "snapshot_id": baseline["dataset_version_id"], "question_count": len(approved),
+            "evaluation_identity": baseline["judge"]["evaluation_identity"], "judge": baseline["judge"],
+            "request_limits": baseline["judge"].get("execution_snapshot", {}).get("request_limits"), "config": config}
+
+
 @app.post("/api/candidates/{candidate_id}/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def run_candidate(candidate_id: str):
     candidate = store.candidate(candidate_id)

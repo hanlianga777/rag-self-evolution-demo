@@ -11,6 +11,7 @@ from app.evaluation import EvaluationRunner
 from identity_fixture import completed_baseline, context_judgment
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
+from app.policy import DEFAULT_PIPELINE_CONFIG
 
 
 class FakeRetriever(FullTextFixture):
@@ -174,7 +175,7 @@ class EvaluationRunnerTests(unittest.TestCase):
         self.approve_one()
         baseline = EvaluationRunner(self.store, FakeEvaluationRuntime()).run_baseline()
         experiment_id = self.store.create_experiment(baseline["id"])
-        self.store.save_candidate(experiment_id, "A", {"top_k": 6, "min_score": None}, {"hypothesis": "扩大召回"})
+        self.store.save_candidate(experiment_id, "A", {**DEFAULT_PIPELINE_CONFIG, "top_k": 6}, {"hypothesis": "扩大召回"})
 
         candidate = EvaluationRunner(self.store, FakeEvaluationRuntime()).run_candidate(f"{experiment_id}-A")
 
@@ -199,7 +200,7 @@ class EvaluationRunnerTests(unittest.TestCase):
         baseline = EvaluationRunner(self.store, FakeEvaluationRuntime()).run_baseline()
         experiment_id = self.store.create_experiment(baseline['id'])
         candidate_id = f'{experiment_id}-A'
-        self.store.save_candidate(experiment_id, 'A', {'top_k':6,'min_score':None}, {})
+        self.store.save_candidate(experiment_id, 'A', {**DEFAULT_PIPELINE_CONFIG,'top_k':6}, {})
         EvaluationRunner(self.store, FakeEvaluationRuntime()).run_candidate(candidate_id)
         before = self.store.production_versions()
         with self.assertRaises(ValueError): self.store.publish_candidate(candidate_id,'fixture_human')

@@ -422,3 +422,8 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 - 明确用户授权原未知请求最多一次Judge补跑，原348记录及预约保留，累计预算按可用余额收紧并留3元，原Judge/规则/Golden不变。
 - 实际恢复至21/50：原8题/Q09回答复用，Q09一次返回响应只做已保存内容的末尾闭合符恢复并通过原Parser（真实Bad Case）；Q22 Judge IncompleteRead/Usage未知停止，无新增重试或Agent/ABC。余额23.09→22.31，原348记录不变，详见[恢复验收](BASELINE_PARTIAL_RESUME_ACCEPTANCE.md)。
 - API重启清理曾标记后续非本轮Run为中断；新增最小执行PID归属保护及存活/退出回归，不伪造恢复其状态、不改评测身份或历史记录。
+
+## 2026-10-13 Sandbox冻结配置继承与HTTP预检
+
+- 共享Candidate输入校验供正式启动和只读preflight复用；严格验证Search Space及绑定Baseline身份。
+- 冻结限制进入实际Provider payload，不依赖当前固定数值；新Dataset/新Baseline不重绑旧Candidate。评测规则、Judge、Gate、Regression不变。
