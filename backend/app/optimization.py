@@ -66,7 +66,9 @@ class OptimizationAgent:
             "failed_gates": failed_gates,
             "evaluation_budget": evaluation_budget,
             "target_reference_map": target_reference_map,
-            "bad_cases": bad_cases, "all_bad_case_audit": audited_cases,
+            # result_json is an identical serialized copy of result; keep full evidence once per row.
+            "bad_cases": [{k:v for k,v in row.items() if k!='result_json'} for row in bad_cases],
+            "all_bad_case_audit": [{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases],
             "monitoring_context": monitoring_context,
             "monitoring_target_event_ids": monitoring_target_event_ids,
             "baseline_configuration": base_config,

@@ -1,5 +1,7 @@
 # 当前有效合同 — 2026-10-11 `[CONFIRMED]`
 
+- **2026-10-14 Agent上下文超限去重**：Provider真实400证明原消息1,106,742 Tokens超过1,048,576上限。仅在Agent传输的bad_cases/all_bad_case_audit行中省去result_json（它与已保留result对象是同一份结果），完整答案/评分/Evidence/Trace/可信度仍保留；13个Bad Case背景、7个Confirmed目标、引用映射及所有策略/治理条件不变。数据库与本地审计完整保留，不截断证据、不改变模型或输出参数、不新增费用/累计Token预算门槛。修复后Token数须由下一次明确授权的真实调用确认，离线估算不冒充Provider实测。
+
 - **2026-10-14 Agent请求与HTTP错误审计**：Agent在调用前记录脱敏请求摘要（模型/参数/角色/字节数/SHA/字符Token估算及估算方法），共用Provider本地检查消息、模型、布尔参数、temperature及显式max_tokens的接口类型/范围（1–393216）；不改变原请求参数、不新增Token预算阻断。HTTP失败保留脱敏正文、状态、Provider码、详情、失败阶段及重试判断，通过错误消息显示具体原因。旧失败记录不回填；请求体和真实评分/证据不因未证实的超限猜测而裁剪，Confirmed目标及全量Bad Case背景、Agent假设/最小参数策略、Search Space及评分治理保持不变。
 
 - **2026-10-13 Q38 Judge输出格式修复**：完整JSON示例补齐当前合同字段及claim_reviews形状，behavior_evidence明确为单个连续原文字符串（非数组），不改变评分语义或Judge/Matcher/Policy版本、冻结请求参数。结构错误按JSON语法/缺字段/合同违例记录具体原因与原响应；不补造缺失判断。明确授权Resume子Run的新请求使用独立六次结构失败窗口，保留全部继承审计；同Run进程恢复仍累计原次数，不增加上限或无限结构重试。

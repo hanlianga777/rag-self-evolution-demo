@@ -1,3 +1,10 @@
+## 2026-10-14 — Optimization Agent已证实上下文超限的无损去重
+
+- 真实HTTP400返回messages=1,106,742，最大上下文1,048,576；已确认消息超限，旧粗估不能代表实际Tokenizer。
+- 最小修复只从发给Agent的行中去掉与result完全相同的result_json字符串；所有结构化判断依据及13题/7目标保留，算法、Search Space、评分/身份/历史不动。
+- 真实请求隔离重建由5,774,935降至2,947,105字节；逐字段证明仅去掉冗余序列化字段。未真实调用Provider/Sandbox。
+- 详见[验收报告](AGENT_CONTEXT_LIMIT_ACCEPTANCE.md)。
+
 ## 2026-10-14 — Optimization Agent HTTP错误可诊断化
 
 - 隔离重建失败请求，SHA与历史一致；5.77MB请求体、约93.6万字符Token估算，仅为观测，缺旧400正文不能认定确切Provider拒绝原因。
