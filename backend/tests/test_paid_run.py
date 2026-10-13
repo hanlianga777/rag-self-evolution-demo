@@ -62,6 +62,27 @@ class PaidRunTests(unittest.TestCase):
         self.run.stop('RuntimeError')
         self.assertEqual(json.loads(self.path.read_text())['stopped'],'ProviderTimeout')
 
+    def test_checkpoint_authorization_keeps_all_unknown_reserves_and_requires_exact_scope(self):
+        old=self.run.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':10})
+        self.run.stop('ProviderNetworkError')
+        auth={'source':'direct_user_instruction','scope':'finite_checkpoint_resume',
+              'max_missing_request_retries':1,'source_evaluation_id':'partial-fixture',
+              'evaluation_identity':'frozen-fixture','held_request_sha256':[old['request_sha256']]}
+        resumed=PaidRun.next_stage(self.path,'baseline-recovery-1',lambda:{'corpus':'new'},authorization=auth)
+        self.assertEqual(resumed.calls,[old])
+        self.assertEqual(resumed.spent,0)
+        new=resumed.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':11})
+        resumed.stop('ProviderNetworkError')
+        with self.assertRaises(RuntimeError):
+            PaidRun.next_stage(self.path,'baseline-recovery-2',lambda:{'corpus':'new'},authorization=auth)
+        auth['held_request_sha256'].append(new['request_sha256'])
+        again=PaidRun.next_stage(self.path,'baseline-recovery-2',lambda:{'corpus':'new'},authorization=auth)
+        self.assertEqual(again.calls,[old,new])
+        self.assertEqual(len(again.continuation_authorizations),2)
+        with self.assertRaisesRegex(RuntimeError,'budget'):
+            again.budget=0.00001
+            again.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':12})
+
     def test_network_failure_and_missing_usage_stop_next_request(self):
         for missing in (False, True):
             path = Path(self.temp.name)/f'{missing}.json'

@@ -1,4 +1,4 @@
-"""Opt-in, single serial paid run. No retry or implicit continuation."""
+"""Opt-in, single serial paid run. No implicit retry or continuation."""
 import hashlib
 import json
 import math
@@ -37,6 +37,7 @@ class PaidRun:
         data = {'identity':self.identity, 'budget_yuan':self.budget, 'price_snapshot':self.prices,
                 'spent_yuan':self.spent, 'available_yuan':max(0.,self.budget-self.spent-sum(c['reserved_yuan'] for c in self.calls if c['status']=='reserved')),
                 'resume_authorization':getattr(self,'resume_authorization',None), 'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
+        data['continuation_authorizations']=getattr(self,'continuation_authorizations',[])
         with temporary.open('w') as stream:
             json.dump(data,stream,ensure_ascii=False,indent=2); stream.flush(); os.fsync(stream.fileno())
         os.replace(temporary,self.path)
@@ -50,11 +51,22 @@ class PaidRun:
 
     @classmethod
     def next_stage(cls,path,stage,identity_check,*,authorization=None,budget_yuan=None):
-        """Explicit continuation between completed stages, never retry an unknown charge."""
+        """Explicit authorized continuation; unknown charges remain reserved."""
         path=Path(path);data=json.loads(path.read_text())
         prior=data.get('resume_authorization')
-        unresolved=[i for i,c in enumerate(data['calls']) if c['status']!='ok' and (not prior or i!=prior['unknown_call_index'])]
-        if authorization is not None:
+        continuations=data.get('continuation_authorizations',[])
+        held=set(continuations[-1]['held_call_indices']) if continuations else set()
+        if prior:held.add(prior['unknown_call_index'])
+        unresolved=[i for i,c in enumerate(data['calls']) if c['status']!='ok' and i not in held]
+        if authorization and authorization.get('scope')=='finite_checkpoint_resume':
+            reserved=[i for i,c in enumerate(data['calls']) if c['status']=='reserved']
+            if (authorization.get('source')!='direct_user_instruction' or authorization.get('max_missing_request_retries')!=1
+                or not authorization.get('source_evaluation_id') or not authorization.get('evaluation_identity')
+                or authorization.get('held_request_sha256')!=[data['calls'][i]['request_sha256'] for i in reserved]
+                or any(c['status'] not in {'ok','reserved'} for c in data['calls'])):
+                raise RuntimeError('Exact checkpoint continuation authorization required')
+            continuations=[*continuations,{**authorization,'held_call_indices':reserved,'authorized_at':datetime.now(timezone.utc).isoformat()}]
+        elif authorization is not None:
             if prior or len(unresolved)!=1 or authorization.get('source')!='direct_user_instruction' or authorization.get('max_judge_retries')!=1:
                 raise RuntimeError('One explicit unknown Judge retry authorization required')
             index=unresolved[0];call=data['calls'][index]
@@ -71,6 +83,7 @@ class PaidRun:
         run.identity,run.identity_check=data['identity'],identity_check
         run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],None
         run.resume_authorization=prior
+        run.continuation_authorizations=continuations
         if budget_yuan is not None:
             if not math.isfinite(budget_yuan) or not 0<budget_yuan<=run.budget: raise ValueError('Resume budget must tighten existing limit')
             run.budget=budget_yuan
@@ -80,7 +93,10 @@ class PaidRun:
     def begin(self, provider, model, payload):
         if self.stopped: raise RuntimeError('Paid run stopped: '+self.stopped)
         auth=getattr(self,'resume_authorization',None)
-        if any(call['status']=='reserved' and (not auth or i!=auth['unknown_call_index']) for i,call in enumerate(self.calls)):
+        continuations=getattr(self,'continuation_authorizations',[])
+        held=set(continuations[-1]['held_call_indices']) if continuations else set()
+        if auth:held.add(auth['unknown_call_index'])
+        if any(call['status']=='reserved' and i not in held for i,call in enumerate(self.calls)):
             raise RuntimeError('Serial paid run already has an in-flight request')
         if self.identity_check is None or self.identity_check() != self.identity:
             raise RuntimeError('Paid run identity unavailable or changed')
