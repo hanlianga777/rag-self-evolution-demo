@@ -17,3 +17,22 @@
 .evolution-page .experiment-plan article > button {margin-top:auto;}
 :is(.evaluation-page,.evolution-page) .technical-record {white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:12px;}
 @media(max-width:700px){.evaluation-page .baseline-metrics,.evolution-page .confidence-summary{grid-template-columns:repeat(2,minmax(0,1fr));}:is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div{grid-template-columns:minmax(95px,1fr) 1fr 50px;gap:6px;}.evolution-page .candidate-card-body{grid-template-rows:100px 62px 110px 90px 80px 160px;}}
+:is(.evaluation-page,.evolution-page) .diagnosis-filters {display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:12px 0 18px;}
+:is(.evaluation-page,.evolution-page) .diagnosis-filters label {display:grid;gap:6px;min-width:150px;flex:1;}
+:is(.evaluation-page,.evolution-page) .detection-notice {margin-top:16px;color:var(--muted);font-size:var(--card-support);}
+.evolution-page .case-comparison {margin-top:24px;padding-top:18px;border-top:1px solid var(--line-soft);}
+.evolution-page .case-comparison > label {display:grid;gap:6px;max-width:340px;margin:14px 0;}
+@media(max-width:700px){:is(.evaluation-page,.evolution-page) .diagnosis-filters label{min-width:130px;}}
+/* Dedicated to the two workspaces, including their portal-mounted Drawers. */
+.diagnosis-list table {table-layout:fixed;min-width:900px;width:100%;}
+.diagnosis-list td {vertical-align:top;overflow-wrap:anywhere;}
+.diagnosis-list td.case-question {display:table-cell;max-width:none;}
+.diagnosis-list table :is(th,td):nth-child(1) {width:25%;}
+.diagnosis-list table :is(th,td):nth-child(2) {width:17%;}
+.diagnosis-list table :is(th,td):nth-child(3) {width:17%;}
+.diagnosis-list table :is(th,td):nth-child(4) {width:13%;}
+.diagnosis-list table :is(th,td):nth-child(5) {width:18%;}
+.diagnosis-list table :is(th,td):nth-child(6) {width:10%;}
+
+.drawer .diagnosis-list {overflow:auto !important;max-height:50vh;}
+.drawer .diagnosis-list table {min-width:900px !important;}

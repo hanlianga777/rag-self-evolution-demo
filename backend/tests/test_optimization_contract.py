@@ -63,6 +63,9 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(experiment["candidates"][0]["reasoning"]["proposal"], "more evidence")
         self.assertEqual(experiment["candidates"][0]["reasoning"]["observed_evidence"], ["Q1"])
         self.assertEqual(audit["provider_raw_text"], raw)
+        self.assertEqual(provider.prompt["bad_cases"][0]["diagnostic_view"]["confidence"],"confirmed")
+        self.assertTrue(provider.prompt["target_reference_map"]["Q1"]["diagnostic_view"]["target_eligible"])
+        self.assertIn("all_bad_case_audit",provider.prompt)
         self.assertIsNone(provider.prompt["failed_gates"])
         self.assertEqual(provider.prompt["baseline_gate_results"], {"passed": False})
         self.assertEqual(provider.prompt["allowed_parameter_values"], search_space_contract())
@@ -247,6 +250,17 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertTrue(all(c['reasoning']['root_cause']=='Generation' for c in result['candidates']))
         self.assertNotIn('Q-unknown',provider.prompt['target_reference_map'])
         self.assertTrue(all(c['config']!=result['candidates'][0]['config'] for c in result['candidates'][1:]))
+
+    def test_disputed_cases_are_agent_background_not_targets(self):
+        self.store.record_bad_case('EVAL-test','Q-risk','Unknown','ordinary',{'failure_tags':['Evidence Pending Review'],'primary_root_cause':'Unknown','diagnosis':{'status':'disputed','reason':'fixture matcher dispute'}})
+        provider=FixedProvider(json.dumps(drafts()))
+        OptimizationAgent(self.store,provider).generate('EVAL-test')
+        self.assertEqual(len(provider.prompt['bad_cases']),1)
+        self.assertEqual(len(provider.prompt['all_bad_case_audit']),2)
+        self.assertNotIn('Q-risk',provider.prompt['target_reference_map'])
+        risk=next(row for row in provider.prompt['all_bad_case_audit'] if row['question_id']=='Q-risk')
+        self.assertEqual(risk['diagnostic_view']['confidence'],'disputed')
+        self.assertFalse(risk['diagnostic_view']['target_eligible'])
 
 
 if __name__ == "__main__":

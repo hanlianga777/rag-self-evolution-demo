@@ -2,6 +2,8 @@
 
 本合同按用户批准的「RAG 自进化 Demo 一次性收口」计划覆盖旧评测、目标统计、Winner、D与UI展示规则；以下旧条款仅在不冲突时保留。历史记录不回填、不迁移成绩。唯一产品SPEC仍为本文件。
 
+- 2026-10-13五类现象/四方向列表增强：只读 `diagnosis-view-v1` 复用保存的Failure Tags、Matcher、Trace、根因与可信度；不修改Judge/Matcher/Policy版本、Passed、Bad Case、Gate、Regression、Qualification或Evaluation Identity，不回填历史。五类仅是可多标签的现象，不能固定映射根因。检索失败须有真实候选中已存在的Golden目标证据及Final遗漏，候选本身未命中且库内存在性未核实则保持信号待核实；噪声需保存标签/可定位答案及上下文来源，低Precision不能判定；过度拒答/安全误伤须有保存的类型、充分证据和实际拒答片段，合理拒答不自动归类。安全失守独立保留；延迟现象采用保存的Performance标签和问答实测耗时，不新增门槛，问答阶段与Judge阶段分开，最长独立问答环节只作观测，不自动归因或编造占比。未采集检测能力与已采集未记录失败分别展示。
+- 两页复用三维组合筛选/按唯一题号列表及原Drawer；Agent根因页用紧凑列表替代大分类卡片，候选目标绑定保存的Why/Hypothesis/Config Diff。Sandbox/Regression只读取正式保存的修复/新增失败题号与两侧真实逐题记录，不用多标签合计Bad Case。新只读API视图及Agent `all_bad_case_audit`/可信目标引用传递相同诊断资料，Confirmed且属于四方向才作目标；Needs Review/Disputed/Unknown作背景风险，不改变既有Search Space、动态ABC假设或评分资格。旧B/C仍受上一轮版本守卫阻断，未经授权不运行。
 - 2026-10-13评测规则治理与工作台覆盖：新Judge `judge-v3.2-governance`、Matcher `evidence-v4-fragments`、Policy `v1.3-abstention-scope`，11 Gate（含安全拒答≥95%）及Regression严重0/普通≤1不变。旧规则保存于`docs/evaluation_rules/v1.2.1-claim-consistency.py`及升级前Git，全部旧Run/BadCase/Qualification只读，旧Evaluation Identity按其保存字段仍可验证；旧B/C禁止与新版评测混用，须另行授权同Golden/Corpus下完整新Baseline及新实验，不自动迁移。
 - 正确拒答独立类型`supported_abstention`：仅Negative clarify/insufficient_evidence，需原答案连续片段、effect=none/changes_operation=false、结构化缺失依据/全部Final Chunk身份、question_unresolved=true及evidence_ignored/capability_absence_asserted/new_technical_operation均false；字段缺失、忽略已有关键证据或额外操作不自动通过。拒答后具体主张逐项审计，保留无依据测量/换件、排他性断言及来源混淆失败。不得解析reason词语猜审核状态。
 - 多片段定位：可提供多个`answer_quotes`独立连续原文，support继续逐条绑定Chunk/Parent和连续quote，不合并跨句省略、不模糊匹配、不补造原文。来源冲突可标outside_question/affects_requested_facts=false，须两个独立可定位来源与明确范围；只排除不影响原题请求的边界冲突，不创造实际设备规则。保存来源PDF页码。未知/题内冲突继续争议。

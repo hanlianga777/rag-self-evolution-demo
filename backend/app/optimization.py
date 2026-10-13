@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from collections import Counter
 
 from .evaluation_contract import diagnosis
+from .diagnostics import diagnostic_view
 from .paid_run import provider_task
 from .telemetry import collect_usage, measure, cost_fields
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, MAX_EVALS, search_space_contract, validate_candidate_config
@@ -22,8 +23,8 @@ class OptimizationAgent:
         # Check identity before budget reads; the short claim serializes duplicate starts.
         self.store.require_current_baseline(baseline_run_id)
         bad_cases = [item for item in self.store.bad_case_rows() if item["run_id"] == baseline_run_id]
-        audited_cases = [{**item, 'diagnosis': diagnosis(item.get('result', {}))} for item in bad_cases]
-        bad_cases = [item for item in audited_cases if item['diagnosis']['status'] == 'confirmed']
+        audited_cases = [{**item, 'diagnosis': diagnosis(item.get('result', {})), 'diagnostic_view':diagnostic_view(item.get('result', {}))} for item in bad_cases]
+        bad_cases = [item for item in audited_cases if item['diagnostic_view']['target_eligible']]
         trigger = self.store.optimization_trigger(trigger_id) if trigger_id else None
         existing_id = experiment_id or (trigger or {}).get("optimization_run_id") or self.store.current_baseline_identity()["current_experiment_id"]
         existing = self.store.experiment(existing_id) if existing_id else None
@@ -46,7 +47,7 @@ class OptimizationAgent:
         monitoring_target_event_ids = [event["id"]] if event else []
         target_reference_map = {}
         for item in bad_cases:
-            reference = {"source": "baseline_bad_case", "baseline_id": baseline_run_id, "bad_case_id": item["id"], "question_id": item["question_id"], "primary_root_cause": item.get("result", {}).get("primary_root_cause") or item.get("category"), "diagnosis_status": item["diagnosis"]["status"], "root_cause_evidence": item["diagnosis"]}
+            reference = {"source": "baseline_bad_case", "baseline_id": baseline_run_id, "bad_case_id": item["id"], "question_id": item["question_id"], "primary_root_cause": item.get("result", {}).get("primary_root_cause") or item.get("category"), "diagnosis_status": item["diagnosis"]["status"], "root_cause_evidence": item["diagnosis"], "diagnostic_view":item["diagnostic_view"]}
             target_reference_map[item["id"]] = reference
             target_reference_map[item["question_id"]] = reference
         if event:
@@ -72,7 +73,7 @@ class OptimizationAgent:
             'prior_sandbox_results': [{'id': item['id'], 'hypothesis': item['reasoning'].get('hypothesis'), 'configuration': item['config'], 'result': {k:v for k,v in item['result'].items() if k != 'checkpoints'}, 'status': item['status']} for item in prior_candidates],
             "allowed_parameter_values": search_space_contract(),
             "excluded_automatic_parameters": sorted(EXCLUDED_AUTOMATIC_PARAMETERS),
-            "rule": f"当前为 Round {round_number}。返回 {','.join(labels)} 并列、可解释 Candidate。One Candidate = One Hypothesis + Minimum Necessary Parameters。target_bad_cases 必须是 target_reference_map 中的实际标识符，禁止描述文本或未知 ID。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。root_cause表示目标已经确认的根因归属，必须属于所引用Baseline目标在target_reference_map中的primary_root_cause集合，不能将参数干预环节当作根因。Generation问题可以提出检索参数干预，但须保持Generation根因并在why中引用实际答案/证据/Trace说明跨环节假设；不得把缺证据的检索遗漏猜测写成已确认Retrieval。Unknown/needs_review不得作为可信目标。根据 prior_sandbox_results 的真实修复/退化/Regression调整假设，不能重复已失败配置。",
+            "rule": f"当前为 Round {round_number}。返回 {','.join(labels)} 并列、可解释 Candidate。One Candidate = One Hypothesis + Minimum Necessary Parameters。target_bad_cases 必须是 target_reference_map 中的实际标识符，禁止描述文本或未知 ID。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。root_cause表示目标已经确认的根因归属，必须属于所引用Baseline目标在target_reference_map中的primary_root_cause集合，不能将参数干预环节当作根因。Generation问题可以提出检索参数干预，但须保持Generation根因并在why中引用实际答案/证据/Trace说明跨环节假设；不得把缺证据的检索遗漏猜测写成已确认Retrieval。Unknown/needs_review/disputed不得作为可信目标。diagnostic_view的phenomena仅说明失败现象，不能一一映射技术根因；治理争议仅作风险背景，不作为目标。阶段耗时区分question_stages与judge_stages，不猜测未采集占比。根据 prior_sandbox_results 的真实修复/退化/Regression调整假设，不能重复已失败配置。",
         }
         try:
             stages = []

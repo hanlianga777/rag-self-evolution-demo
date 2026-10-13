@@ -28,6 +28,7 @@ from .config import load_settings
 from .evaluation import EvaluationRunner, gate_details
 from .governance import GovernanceStore, GENERATION_PROFILES
 from .optimization import OptimizationAgent
+from .diagnostics import diagnostic_view
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
 from .telemetry import price_config
 from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
@@ -1186,14 +1187,14 @@ def evaluation():
 
 @app.get("/api/bad-cases")
 def bad_cases():
-    return store.bad_case_rows()
+    return [{**row, "result": {**row["result"], "diagnostic_view": diagnostic_view(row["result"])}} for row in store.bad_case_rows()]
 
 
 @app.get("/api/bad-cases/{case_id}")
 def bad_case(case_id: str):
     for item in store.bad_case_rows():
         if item["id"] == case_id:
-            return item
+            return {**item,"result":{**item["result"],"diagnostic_view":diagnostic_view(item["result"])}}
     raise HTTPException(status_code=404, detail="Bad case not found")
 
 
@@ -1442,7 +1443,7 @@ def evaluation_run(run_id: str):
     run = next((item for item in store.evaluation_runs() if item["id"] == run_id), None)
     if run is None:
         raise HTTPException(status_code=404, detail="Evaluation run not found")
-    cases = store.evaluation_case_results(run_id)
+    cases = [{**case,"diagnostic_view":diagnostic_view(case)} for case in store.evaluation_case_results(run_id)]
     return {**run, "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases, "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []))}
 
 

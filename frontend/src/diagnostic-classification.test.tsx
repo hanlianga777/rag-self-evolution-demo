@@ -1,0 +1,45 @@
+// @vitest-environment jsdom
+import {act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {expect,it,vi} from 'vitest';
+import {filterDiagnosis,allDiagnosis,DiagnosisFilters,DiagnosisTable} from './components/EvaluationDiagnosis';
+const rows=[{question_id:'Q1',question:'操作',failure_tags:['Hallucination','Unsafe Answer'],primary_root_cause:'Safety',diagnosis:{status:'confirmed'}},{question_id:'Q2',question:'澄清',failure_tags:['Evidence Pending Review'],primary_root_cause:'Unknown',diagnosis:{status:'needs_review'}},{question_id:'Q3',question:'噪声',failure_tags:['Retrieval Noise'],primary_root_cause:'Generation',diagnosis:{status:'disputed'}}];
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
+it('combines three independent dimensions, keeps other issues and unique question counts',()=>{
+ expect(filterDiagnosis([...rows,rows[0]],allDiagnosis)).toHaveLength(3);
+ expect(filterDiagnosis(rows,{phenomenon:'other',root:'Safety',confidence:'confirmed'})).toEqual([rows[0]]);
+ expect(filterDiagnosis(rows,{phenomenon:'检索噪声',root:'Generation',confidence:'disputed'})).toEqual([rows[2]]);
+ expect(filterDiagnosis(rows,{...allDiagnosis,phenomenon:'安全边界误伤'})).toEqual([]);
+ expect(filterDiagnosis(rows,{...allDiagnosis,root:'Unknown'})).toEqual([rows[1]]);
+});
+it('renders shared classification filters, preserves evidence action and explicit empty state',async()=>{
+ const host=document.body.appendChild(document.createElement('div')),root=createRoot(host),select=vi.fn(),change=vi.fn();
+ await act(async()=>root.render(<><DiagnosisFilters rows={rows} value={allDiagnosis} onChange={change} /><DiagnosisTable rows={rows} onSelect={select}/></>));
+ expect(host.textContent).toContain('3 / 3 题');expect(host.textContent).toContain('安全边界失守');expect(host.textContent).toContain('待定位');
+ const reset=[...host.querySelectorAll('button')].find(b=>b.textContent==='恢复全部问题')!;await act(async()=>reset.click());expect(change).toHaveBeenCalledWith(allDiagnosis);
+ await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='查看案例')!.click());expect(select).toHaveBeenCalledWith(rows[0]);
+ await act(async()=>root.render(<DiagnosisTable rows={[]} onSelect={select}/>));expect(host.textContent).toContain('当前组合筛选无记录');await act(async()=>root.unmount());host.remove();
+});
+
+it('shows saved per-question repairs and Regression without generating results',async()=>{
+ const {CandidateCaseComparison}=await import('./components/CandidateCaseComparison');
+ const before={...rows[0],passed:false},after={...rows[0],passed:true};
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify({dataset_version_id:'fixture-golden',judge:{evaluation_identity:'fixture'},cases:[url.endsWith('/baseline')?before:after]}))));
+ const host=document.body.appendChild(document.createElement('div')),root=createRoot(host),select=vi.fn();
+ const candidate={id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'current',all_fixed_question_ids:['Q1','Q1']}};
+ await act(async()=>root.render(<CandidateCaseComparison candidates={[candidate]} baselineId="baseline" kind="fixed" onSelect={select}/>));
+ expect(host.textContent).toContain('未通过 → 通过');expect(host.textContent).toContain('保存为已修复');expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
+ await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Candidate证据')!.click());expect(select).toHaveBeenCalledWith(after);
+ await act(async()=>root.render(<CandidateCaseComparison candidates={[{id:'b',status:'generated',reasoning:{candidate_label:'B'},result:{}}]} baselineId="baseline" kind="regression" onSelect={select}/>));
+ expect(host.textContent).toContain('不展示模拟改善');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method||init.method==='GET')).toBe(true);
+ await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();
+});
+
+it('blocks saved comparisons with inconsistent evaluation identities',async()=>{
+ const {CandidateCaseComparison}=await import('./components/CandidateCaseComparison');
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify({dataset_version_id:'g',judge:{evaluation_identity:url.endsWith('/baseline')?'old':'new'},cases:[rows[0]]}))));
+ const host=document.body.appendChild(document.createElement('div')),root=createRoot(host);
+ await act(async()=>root.render(<CandidateCaseComparison candidates={[{id:'a',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'current',all_fixed_question_ids:['Q1']}}]} baselineId="baseline" kind="fixed" onSelect={()=>{}}/>));
+ expect(host.textContent).toContain('停止逐题对照');expect(host.querySelector('tbody')).toBeNull();
+ await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();
+});
