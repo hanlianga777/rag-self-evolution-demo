@@ -2,6 +2,13 @@
 
 本合同按用户批准的「RAG 自进化 Demo 一次性收口」计划覆盖旧评测、目标统计、Winner、D与UI展示规则；以下旧条款仅在不冲突时保留。历史记录不回填、不迁移成绩。唯一产品SPEC仍为本文件。
 
+- 2026-10-13评测规则治理与工作台覆盖：新Judge `judge-v3.2-governance`、Matcher `evidence-v4-fragments`、Policy `v1.3-abstention-scope`，11 Gate（含安全拒答≥95%）及Regression严重0/普通≤1不变。旧规则保存于`docs/evaluation_rules/v1.2.1-claim-consistency.py`及升级前Git，全部旧Run/BadCase/Qualification只读，旧Evaluation Identity按其保存字段仍可验证；旧B/C禁止与新版评测混用，须另行授权同Golden/Corpus下完整新Baseline及新实验，不自动迁移。
+- 正确拒答独立类型`supported_abstention`：仅Negative clarify/insufficient_evidence，需原答案连续片段、effect=none/changes_operation=false、结构化缺失依据/全部Final Chunk身份、question_unresolved=true及evidence_ignored/capability_absence_asserted/new_technical_operation均false；字段缺失、忽略已有关键证据或额外操作不自动通过。拒答后具体主张逐项审计，保留无依据测量/换件、排他性断言及来源混淆失败。不得解析reason词语猜审核状态。
+- 多片段定位：可提供多个`answer_quotes`独立连续原文，support继续逐条绑定Chunk/Parent和连续quote，不合并跨句省略、不模糊匹配、不补造原文。来源冲突可标outside_question/affects_requested_facts=false，须两个独立可定位来源与明确范围；只排除不影响原题请求的边界冲突，不创造实际设备规则。保存来源PDF页码。未知/题内冲突继续争议。
+- 新版负向行为一致性：保留原Judge behavior_pass，另存behavior_contract.raw_judge_pass/effective_pass/conflict/violations。已按类型/原文定位确认的无来源technical_change不能被主拒答通过豁免，政策行为失败且保存Safety依据。安全Gate与贡献题明细使用同一effective_pass，阈值不变；字段未采集不能写0。旧记录仍用其原始behavior_pass，不回填新字段或旧Gate。
+- 症状标签、四个主根因与Confirmed/Disputed/Needs Review独立；已定位真实失败可与未解决问题并存，保留pending_findings。未确认根因保持Unknown/待定位；主张定位、类型或原始来源冲突保存Evaluation / Data Quality治理类别，不成为第五类Agent参数方向，不进入可信优化目标。历史Case不回填可信度。离线复用旧回答/旧Judge作规则差异预览，不作为正式Baseline或资格。
+- Baseline只在报告Tab集中完整性/Overall/Gate/BadCase/可信度及下一步，Hard Gate以11项及关联依据为主，Bad Case分布按症状/根因/可信度切换，逐题与详情分层。Agent工作台按根因诊断、Agent策略、ABC、Sandbox、Regression、Recommendation展示；Why/Target/ConfigDiff/Expected/Risk均取持久化记录，未运行无模拟成绩，旧规则按钮锁定。两页专属CSS限定页面命名空间，复用唯一Drawer/现有Card和设计Token，不影响其他一级导航；长ID/模型/JSON/Usage/Trace在详情或高级折叠中保存。优化算法/Search Space/Winner/Gate2/Production合同不变。
+
 - 2026-10-13 Sandbox继承与只读预检：`GET /api/candidates/{id}/preflight`复用正式启动的共享输入校验，不预约、不调用Provider；Candidate从所属Experiment绑定的完整Baseline读取Snapshot、Corpus、Judge、Evaluation Identity及冻结request_limits，不取其他实验或全局默认值。普通请求可无PaidRun，执行Worker复用Run冻结限制；显式PaidRun须严格同值。启动前重验Search Space，事务内原身份/预算检查保留。切换Dataset或新Baseline不重绑旧Candidate，旧实验保持只读。跨Dataset及不同冻结限制回归使用隔离Mock，不能成为正式资格。
 
 - 2026-10-13 连续恢复新授权覆盖下条仅Q09一次限制：复用最新同身份Failed/Partial的有效Checkpoint，通过正式Resume新Run继续；不重执行已完成题及已保存回答。仅ProviderTimeout/IncompleteRead/短暂连接中断的缺失请求允许最多一次补跑，同题连续两次失败停止；解析、身份、数据及预算失败不重试。原账本全部调用及Unknown预约保留，后续每次显式恢复核对全部未结请求摘要、记录源Run/题号/原因并追加授权审计；预算按最新真实余额保留至少3元，外部未入账的中断请求另保守预约，不伪造逐请求记录。请求级串行恢复复用已经成功的检索和回答，模型/输出限制/Evaluation Identity不变；完整Baseline符合可信Bad Case合同后自动第一轮Agent/ABC及Regression，不自动Gate2或Production。仅本次显式运行脚本启用，普通API不隐式续跑。完整已保存响应的确定性本地格式回放须保留原响应、原评分/全部主张并通过原Parser，不修改Judge代码或重发付费请求。本轮Partial42，Q43补跑后仍IncompleteRead已停止，详见[连续恢复验收](BASELINE_CONTINUOUS_ACCEPTANCE.md)。

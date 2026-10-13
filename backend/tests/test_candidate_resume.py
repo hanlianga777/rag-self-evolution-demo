@@ -203,6 +203,14 @@ class CandidateResumeTests(unittest.TestCase):
         source_before=deepcopy(source);rows_before=deepcopy(store.evaluation_case_results(source['id']))
         runtime=Runtime(None);runtime.model=source['judge']['model'];runner=EvaluationRunner(store,runtime)
         budget_before=store.experiment(candidate['experiment_id'])['evaluation_budget']['used']
+        from app.evaluation_contract import policy_current
+        if not policy_current(source['judge']):
+            with self.assertRaisesRegex(ValueError,'评测规则已升级'):runner.start_candidate(cid)
+            self.assertEqual(store.evaluation_run(source['id']),source_before)
+            self.assertEqual(store.evaluation_case_results(source['id']),rows_before)
+            self.assertEqual([store.candidate(cid[:-1]+x) for x in ('A','B')],a_b)
+            self.assertEqual(store.experiment(candidate['experiment_id'])['evaluation_budget']['used'],budget_before)
+            return
         started=runner.start_candidate(cid)
         self.assertEqual(len(store.evaluation_case_results(started[0])),43)
         judged=[];template=deepcopy(rows_before[0])

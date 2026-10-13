@@ -24,7 +24,7 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("未通过 Hard Gate");
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("仍有 1 个单题问题");
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("Ablation Correctness");
-  expect(document.querySelector(".baseline-run-summary")?.textContent).toContain("judge-only-model");
+  expect(document.querySelector(".baseline-run-summary")?.textContent).not.toContain("judge-only-model");
   expect(document.body.textContent).not.toContain("Run ID");
   await click("Hard Gate");
   expect(document.querySelectorAll("tbody tr")).toHaveLength(11);
@@ -32,8 +32,8 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
   expect(document.querySelector("tbody")?.textContent).toContain("≥ 90.00%");
   expect(new Set([...document.querySelectorAll("tbody tr td:nth-child(2)")].map(cell => cell.textContent)).size).toBe(4);
   await click("Bad Case 诊断");
-  expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["问题", "初步类型", "失败观察", "关键指标", "详情"]);
-  expect(document.querySelector("tbody tr td:nth-child(2)")?.textContent).toBe("Query");
+  expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "失败现象", "主要根因", "可信度", "核心失败原因", "详情"]);
+  expect(document.querySelector("tbody tr td:nth-child(3)")?.textContent).toContain("Query");
   await click("查看案例");
   expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["案例结论", "问题", "预期与实际回答", "Golden Evidence", "Retrieved Evidence", "Evidence Matcher · 最终答案证据", "Judge", "初步诊断"]);
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Query");
@@ -44,7 +44,7 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
 it("uses saved generation evidence only and keeps technical identity in its Drawer", async () => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/api/bad-cases") ? [bad] : run))));
   await render(<EvaluationPage data={{ evaluation: run, badCases: [bad] }} />);
-  expect(document.querySelector(".config-summary-grid")?.textContent).not.toContain("judge-only-model");
+  expect(document.querySelector(".config-summary-grid")).toBeNull();
   await click("查看评测依据");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("judge-only-model");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("EVAL-stored");
@@ -59,15 +59,15 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
   expect(document.querySelector(".diagnosis-cards")?.textContent).toContain("查询表达");
   expect(document.querySelector(".diagnosis-cards")?.textContent).toContain("1 个 Bad Case");
-  expect(document.querySelector(".diagnosis-cards")?.textContent).toContain("当前证据不足以确定原因");
+  expect(document.querySelector(".diagnosis-cards")?.textContent).toContain("尚无已确认根因依据");
   expect(document.querySelector(".diagnosis-cards")?.textContent).not.toContain("Evidence Miss");
   expect(document.querySelector(".diagnosis-cards")?.textContent).toContain("Ablation Correctness");
-  await click("优化 Agent");
+  await click("Agent策略");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(0);
   expect([...document.querySelectorAll(".panel > .section-head h2")].map(header => header.textContent)).toEqual(["实验概览", "Agent Diagnosis", "Experiment Plan"]);
   expect(document.body.textContent).toContain("保存假设 A");
   expect(document.body.textContent).toContain("Search Space · 2");
-  await click("A / B / C / D");
+  await click("A / B / C");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
   expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["WHY", "TARGET", "CHANGE", "EXPECTED", "RISK", "RESULT"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("保存理由 A");
@@ -89,6 +89,6 @@ it.each([
   const optimization = { id: "EXP-stored", candidates: [winner, d], result: { report_confirmation: { winner_id: winner.id } }, recommendation: { result: { recommended_candidate: status === "evaluated" ? winner.id : null } } };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   await render(<EvolutionPage data={{ evaluation: run, badCases: [bad], optimization }} />);
-  await click("A / B / C / D");
+  await click("A / B / C");
   expect(document.querySelector(".composite-decision")?.textContent).toContain(expected);
 });

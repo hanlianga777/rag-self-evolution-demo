@@ -148,6 +148,13 @@ class ResumeTests(unittest.TestCase):
         info={'knowledge_identity':cfg['knowledge_identity'],'knowledge_config':{'candidate_k':cfg['candidate_k'],'top_k':cfg['top_k']},'embedding_model':execution['embedding_model'],'vector_index':execution['vector_index']}
         runtime.corpus=type('Corpus',(),{'index_info':lambda _:info})()
         before=deepcopy(source)
+        from app.evaluation_contract import policy_current
+        if not policy_current(source['judge']):
+            with patch('app.governance.manifest_identity',return_value=snapshot['corpus_fingerprint']):
+                with self.assertRaisesRegex(ValueError,'Evaluation Identity'):EvaluationRunner(store,runtime).start_baseline(source['id'])
+            self.assertEqual(store.evaluation_run(source['id']),before)
+            self.assertFalse(runtime.answers);self.assertFalse(runtime.judges)
+            return
         with patch('app.governance.manifest_identity',return_value=snapshot['corpus_fingerprint']):
             child,items,config=EvaluationRunner(store,runtime).start_baseline(source['id'])
         self.assertEqual(len(items),50);self.assertEqual(len(store.evaluation_case_results(child)),1);self.assertEqual(store.evaluation_run(source['id']),before);self.assertFalse(runtime.answers);self.assertFalse(runtime.judges)

@@ -68,7 +68,7 @@ it.each([{ proposal: "实际持久化 proposal" }, { why: "兼容 Why 字段" },
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   const candidate = { id: "E1-A", status: "generated", config: {}, reasoning: { candidate_label: "A", hypothesis: "假设", risk: "风险", observed_evidence: [], ...reasoning }, result: {} };
   await render(<EvolutionPage data={{ ...data("B1"), optimization: { id: "E1", candidates: [candidate] } }} />);
-  await clickText("A / B / C / D"); await clickText("查看方案与完整报告");
+  await clickText("A / B / C"); await clickText("查看方案与完整报告");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(`Why：${(reasoning as any).proposal || (reasoning as any).why || "未记录"}`);
 });
 
@@ -161,7 +161,7 @@ it("ID-08 clears Candidate Drawer and rejects an old candidate report after iden
   vi.stubGlobal("fetch", vi.fn((url: string) => url.includes("/evaluations/") ? new Promise<Response>(resolve => { resolveReport = resolve; }) : Promise.resolve(new Response(JSON.stringify({ search_space: {} })))));
   const old = { workspace: identity("B0", "E0"), evaluation: { id: "B0" }, optimization: { id: "E0", candidates: [{ id: "A0", config: {}, reasoning: { candidate_label: "A" }, result: { evaluation_run_id: "R0" } }] } };
   await render(<EvolutionPage data={old} />);
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "A / B / C / D")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "A / B / C")!.click());
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent?.includes("查看方案与完整报告"))!.click());
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   await act(async () => root.render(<EvolutionPage data={{ workspace: identity("B1"), evaluation: { id: "B1" }, optimization: { status: "not_run" } }} />));
@@ -233,7 +233,7 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "Hard Gate")?.lastElementChild?.textContent).toBe("11 / 11");
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "Regression")?.lastElementChild?.textContent).toBe("FAIL");
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "Qualification")?.lastElementChild?.textContent).toBe("不合格");
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "A / B / C / D")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "A / B / C")!.click());
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "查看 D 完整报告与 Decision")!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不合格 · Hard Gate：通过");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Regression：FAIL");

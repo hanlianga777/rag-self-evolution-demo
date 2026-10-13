@@ -495,7 +495,7 @@ class ProbeCostTests(unittest.TestCase):
             self.assertEqual(trace['corpus_fingerprint'], {'D': 'old'})
             self.assertTrue(any(stage['stage_name'] == 'bm25' for stage in trace['timings']))
             evaluation_store = Mock()
-            evaluation_store.evaluation_run.return_value = {"result": {}, "dataset_snapshot_json": json.dumps({"question_ids":[rows[0]["id"]]})}
+            evaluation_store.evaluation_run.return_value = {"judge": {}, "result": {}, "dataset_snapshot_json": json.dumps({"question_ids":[rows[0]["id"]]})}
             evaluation_store.evaluation_case_results.return_value = []
             EvaluationRunner(evaluation_store, service).execute_baseline('fixture-run', [store.question(rows[0]['id'])], {})
             self.assertEqual(evaluation_store.finish_evaluation_run.call_args.args[1], 'failed')

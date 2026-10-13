@@ -17,11 +17,11 @@ it("restores stages and complete generated plans without inventing evaluated res
   const frozen = JSON.stringify(data); await mount();
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
   expect(document.body.textContent).toContain("仍有 1 个 Bad Case");
-  await click("优化 Agent");
+  await click("Agent策略");
   expect(document.body.textContent).toContain("实验概览");
   expect(document.querySelectorAll(".experiment-plan article")).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/null|undefined|\[object Object\]/);
-  await click("A / B / C / D");
+  await click("A / B / C");
   expect([...document.querySelectorAll(".candidate-card:first-child .field-label")].map(e => e.textContent)).toEqual(["WHY", "TARGET", "CHANGE", "EXPECTED", "RISK", "RESULT"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("Sandbox 尚未运行");
   await click("查看目标 1 题");
@@ -48,7 +48,7 @@ it("keeps a failed next-round generation visible alongside prior saved candidate
 
 it("offers failed Sandbox continuation only through the existing paid confirmation", async () => {
   await mount({ ...data, optimization:{ ...data.optimization, candidates:[{ ...candidates[0],status:"failed",result:{evaluation_run_id:"PARTIAL"}},candidates[1],candidates[2]] } });
-  await click("A / B / C / D");
+  await click("A / B / C");
   const button=[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="继续 Sandbox")!;
   expect(button.disabled).toBe(false);
   await click("继续 Sandbox");

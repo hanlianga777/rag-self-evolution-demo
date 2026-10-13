@@ -211,6 +211,12 @@ class OptimizationContractTests(unittest.TestCase):
         historical.start();self.addCleanup(historical.stop)
         before=store.candidates(exp)
         provider=FixedProvider(raw)
+        from app.evaluation_contract import policy_current
+        if not policy_current(store.evaluation_run(baseline)['judge']):
+            with self.assertRaisesRegex(ValueError,'评测规则已升级'):
+                OptimizationAgent(store,provider).generate(baseline,experiment_id=exp)
+            self.assertEqual(store.candidates(exp),before)
+            return
         with self.assertRaisesRegex(ValueError,'候选根因与可信目标不对应'):
             OptimizationAgent(store,provider).generate(baseline,experiment_id=exp)
         self.assertEqual(store.candidates(exp),before)

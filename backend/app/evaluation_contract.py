@@ -6,7 +6,7 @@ import re
 import unicodedata
 from .policy import GATE_DEFINITIONS
 
-VERSIONS = {'prompt_version': 'judge-v3.1-claims', 'evidence_matcher_version': 'evidence-v3-scoped', 'scoring_policy': 'v1.2.1-claim-consistency'}
+VERSIONS = {'prompt_version': 'judge-v3.2-governance', 'evidence_matcher_version': 'evidence-v4-fragments', 'scoring_policy': 'v1.3-abstention-scope'}
 
 
 def policy_current(judge):
@@ -50,7 +50,7 @@ def resolve_evidence(item, observation, judgment, entries):
     value = judgment.get('evidence_sufficiency', {})
     status = value.get('status', 'unknown')
     locations = value.get('fact_support', [])
-    unresolved = [c for c in value.get('conflicts', []) if not (isinstance(c, dict) and c.get('status') == 'resolved' and isinstance(c.get('scope'), str) and c['scope'].strip() and isinstance(c.get('reason'), str) and c['reason'].strip() and isinstance(c.get('support'), list) and len(c['support']) >= 2 and all(quote_present(q, entries) for q in c['support']) and len({(q['chunk_id'], normalize(q['quote'])) for q in c['support']}) >= 2)]
+    unresolved = [c for c in value.get('conflicts', []) if not conflict_scoped(c, entries)]
     # A sufficient judgment must locate every required fact in actual final context.
     valid = isinstance(locations, list) and bool(locations) and all(isinstance(f, dict) and isinstance(f.get('fact'), str) and f['fact'].strip() and quote_present(f, entries) for f in locations)
     if status == 'sufficient' and (not all(any(f.get('fact') == needed['fact'] for f in locations if isinstance(f, dict)) for needed in observation['facts']) or not valid or value.get('source_applicable') is not True or unresolved):
@@ -70,7 +70,19 @@ def resolve_evidence(item, observation, judgment, entries):
                 source_conflicts.append(f'{field}适用性未核实或冲突')
     if source_conflicts:
         status = 'unknown'
-    return {**observation, 'status': status, 'sufficient': True if status == 'sufficient' else False if status == 'insufficient' else None, 'judge_support': locations, 'unresolved_conflicts': unresolved, 'source_applicable': value.get('source_applicable'), 'conflicts': value.get('conflicts', []) + source_conflicts, 'reason': value.get('reason') or 'Judge未提供可核实的充分性依据'}
+    return {**observation, 'status': status, 'sufficient': True if status == 'sufficient' else False if status == 'insufficient' else None, 'judge_support': locations, 'unresolved_conflicts': unresolved, 'source_applicable': value.get('source_applicable'), 'conflicts': value.get('conflicts', []) + source_conflicts, 'conflict_locations': [{'chunk_id':s.get('chunk_id'),'quote':s.get('quote'),'locations':[{'document_id':e.get('document_id'),'page_start':e.get('parent_page_start',e.get('page_start')),'page_end':e.get('parent_page_end',e.get('page_end'))} for e in entries or [] if s.get('chunk_id') in {e.get('chunk_id'),e.get('parent_chunk_id')}]} for c in value.get('conflicts',[]) if isinstance(c,dict) for s in (c.get('support') if isinstance(c.get('support'),list) else []) if isinstance(s,dict)], 'reason': value.get('reason') or 'Judge未提供可核实的充分性依据'}
+
+
+def conflict_scoped(conflict, entries):
+    if not isinstance(conflict,dict):return False
+    support=conflict.get('support',[])
+    verified=(isinstance(conflict.get('scope'),str) and bool(conflict['scope'].strip())
+              and isinstance(conflict.get('reason'),str) and bool(conflict['reason'].strip())
+              and isinstance(support,list) and len(support)>=2 and all(quote_present(q,entries) for q in support)
+              and len({(q['chunk_id'],normalize(q['quote'])) for q in support})>=2)
+    return bool(verified and (conflict.get('status')=='resolved' or
+        conflict.get('status')=='unresolved' and conflict.get('scope_status')=='outside_question'
+        and conflict.get('affects_requested_facts') is False))
 
 
 def quote_present(support, entries):
@@ -94,7 +106,24 @@ def claim_consistent(review):
             or kind == 'unsupported_instruction' and effect == 'technical_change' and not applicable)
 
 
-def assess_claims(answer, judgment, entries):
+def abstention_valid(review, judgment, entries, item):
+    basis=review.get('abstention_basis',{})
+    operation=review.get('operation_basis',{})
+    if not isinstance(basis,dict) or not isinstance(operation,dict):return False
+    expected=(item or {}).get('raw',{}).get('expected_behavior') or (item or {}).get('negative_subtype')
+    missing=basis.get('missing_requirements')
+    ids=basis.get('checked_chunk_ids')
+    return bool((item or {}).get('test_category')=='negative' and expected in {'clarify','insufficient_evidence'}
+        and judgment.get('behavior_pass') is True and review.get('changes_operation') is False
+        and operation.get('effect')=='none' and operation.get('source_applicable') is False
+        and basis.get('scope')=='final_context' and basis.get('question_unresolved') is True
+        and all(basis.get(k) is False for k in ('evidence_ignored','capability_absence_asserted','new_technical_operation'))
+        and isinstance(missing,list) and missing and all(isinstance(s,str) and s.strip() for s in missing)
+        and isinstance(ids,list) and all(isinstance(s,str) for s in ids)
+        and set(ids)=={e['chunk_id'] for e in entries or []})
+
+
+def assess_claims(answer, judgment, entries, *, item=None):
     """Validate the one Judge's classifications; historical untyped claims stay pending."""
     result = {'accepted': [], 'confirmed': [], 'pending': []}
     claims = judgment.get('unsupported_claims', [])
@@ -104,13 +133,21 @@ def assess_claims(answer, judgment, entries):
         review = matches[0] if len(matches) == 1 else {}
         kind = review.get('kind')
         support = review.get('support', [])
-        consistent = claim_consistent(review)
-        valid = consistent and isinstance(review.get('claim'), str) and bool(normalize(review['claim'])) and normalize(review['claim']) in normalize(answer) and isinstance(review.get('reason'), str) and bool(review['reason'].strip()) and isinstance(support, list) and all(quote_present(q, entries) for q in support)
+        abstention=kind=='supported_abstention' and abstention_valid(review,judgment,entries,item)
+        consistent = claim_consistent(review) or abstention
+        fragments=review.get('answer_quotes',[review.get('claim')])
+        answer_located=isinstance(fragments,list) and bool(fragments) and all(isinstance(q,str) and normalize(q) and normalize(q) in normalize(answer) for q in fragments)
+        source_located=isinstance(support,list) and all(quote_present(q,entries) for q in support)
+        valid = consistent and answer_located and isinstance(review.get('reason'), str) and bool(review['reason'].strip()) and source_located
         supported = valid and bool(support) and kind == 'supported_fact'
         advice = valid and bool(support) and kind == 'reasonable_safety_advice' and review.get('changes_operation') is False
         failure = valid and (kind == 'contradiction' and bool(support) or kind == 'unsupported_instruction' and review.get('changes_operation') is True)
-        bucket = 'accepted' if supported or advice else 'confirmed' if failure else 'pending'
-        result[bucket].append({'original_claim': claim, **review, 'consistency_status': 'consistent' if consistent else 'needs_review'})
+        bucket = 'accepted' if supported or advice or valid and abstention else 'confirmed' if failure else 'pending'
+        issues=[]
+        if not answer_located:issues.append('answer_quote_unlocated')
+        if not source_located:issues.append('source_quote_unlocated')
+        if not consistent:issues.append('claim_classification_unverified')
+        result[bucket].append({'original_claim': claim, **review, 'consistency_status': 'consistent' if consistent else 'needs_review','verification_issues':issues})
     return result
 
 

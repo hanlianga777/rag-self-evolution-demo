@@ -1,0 +1,19 @@
+.evaluation-page .baseline-metrics {grid-template-columns:repeat(3,minmax(0,1fr));}
+.evaluation-page .baseline-table th,.evolution-page .sandbox-core-table th {white-space:normal;}
+.evaluation-page .baseline-cases-table td {vertical-align:top;}
+.evaluation-page .baseline-cases-table th:first-child {width:28%;}
+.evaluation-page .baseline-cases-table th:last-child {width:90px;}
+:is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars {display:grid;gap:10px;margin:14px 0;}
+:is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div {display:grid;grid-template-columns:minmax(130px,1fr) 2fr 60px;gap:12px;align-items:center;}
+:is(.evaluation-page,.evolution-page) meter {width:100%;height:14px;accent-color:var(--card-good-ink);}
+:is(.evaluation-page,.evolution-page) .workbench-status {display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:var(--card-support);}
+.evolution-page .confidence-summary {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--card-gap);margin-bottom:var(--card-gap);}
+.evolution-page .confidence-summary > div {background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--card-radius);padding:var(--card-padding);display:grid;gap:6px;}
+.evolution-page .candidate-card-body {display:grid;grid-template-rows:100px 62px 110px 90px 80px 160px;flex:initial;overflow:visible;}
+.evolution-page .candidate-story-block {min-height:0;overflow:auto;padding:10px 0;border-bottom:1px solid var(--line-soft);}
+.evolution-page .candidate-story-block .truncated-text {overflow:hidden;}
+.evolution-page .experiment-plan {align-items:stretch;}
+.evolution-page .experiment-plan article {display:flex;flex-direction:column;min-width:0;}
+.evolution-page .experiment-plan article > button {margin-top:auto;}
+:is(.evaluation-page,.evolution-page) .technical-record {white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:12px;}
+@media(max-width:700px){.evaluation-page .baseline-metrics,.evolution-page .confidence-summary{grid-template-columns:repeat(2,minmax(0,1fr));}:is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div{grid-template-columns:minmax(95px,1fr) 1fr 50px;gap:6px;}.evolution-page .candidate-card-body{grid-template-rows:100px 62px 110px 90px 80px 160px;}}

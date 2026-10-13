@@ -1,3 +1,9 @@
+## 2026-10-13 — 评测规则治理与两个工作台
+
+- B类规则升级：Judge v3.2、Matcher v4、Policy v1.3；新增结构化正确拒答、连续多片段定位、题外冲突范围及治理争议记录。负向题另存政策行为有效值与原Judge矛盾依据；已定位的无来源技术操作不能由主拒答豁免，Gate汇总/逐题贡献采用同一有效值，旧记录沿用保存字段。旧规则/成绩/资格不迁移，50题旧Judge离线预览不作为真实评测。
+- A类展示：只改Baseline/Agent专属组件与样式，摘要按Tab分层，症状/根因/可信度独立，六阶段工作台/ABC齐列及保存的Regression明细。既有Drawer和设计Token复用。
+- 11 Gate及Regression阈值、四根因、Agent/SearchSpace/Winner/Gate2/Production保持；旧B/C因版本升级只读，后续完整新Baseline/新实验须另行付费授权。本轮Provider0，不跑任何正式评测或审批。详见[中文A–P验收报告](EVALUATION_GOVERNANCE_WORKBENCH_ACCEPTANCE.md)。
+
 ## 2026-10-13 连续恢复授权
 
 保留全部历史请求及未知预约，允许显式连续运行中的缺失网络请求最多一次恢复；同题第二次失败停止，解析及身份/预算错误不重试。新增受控执行脚本复用26题及Q27回答，合法自动衔接第一轮Agent/ABC；评分、Gate及冻结身份不变。真实执行推进至42/50；Q38仅对保存响应作证据字段格式回放，Q43两次网络失败后停止，详见[验收报告](BASELINE_CONTINUOUS_ACCEPTANCE.md)。
