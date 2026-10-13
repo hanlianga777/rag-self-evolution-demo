@@ -33,3 +33,13 @@ it("orders business evidence before diagnosis and preserves negative anchors and
   expect(document.body.textContent).toContain("保存的证据观察");
   expect(document.body.textContent).toContain("Generation");
 });
+
+it("shows Partial progress and timeout without calling it unrun or identity stale", async () => {
+  const run={id:"partial",status:"partial",error_message:"Judge request timed out",dataset_snapshot:{id:"frozen",question_ids:Array(50).fill("q")},result:{completed:8,total:50}};
+  vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url.endsWith("/api/bad-cases")?[]:run))));
+  await render(<EvaluationPage data={{evaluation:run,workspace:{requires_new_baseline:true,current_golden_id:"frozen"}}}/>);
+  expect(document.body.textContent).toContain("已完成 8 / 50");
+  expect(document.body.textContent).toContain("Judge request timed out");
+  expect(document.body.textContent).not.toContain("尚未运行 Baseline");
+  expect(document.body.textContent).not.toContain("历史评测 · 当前身份已失效");
+});

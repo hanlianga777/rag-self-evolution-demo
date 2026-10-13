@@ -35,6 +35,36 @@ class ResumeTests(unittest.TestCase):
     def tearDown(self):self.tmp.cleanup()
     def run_once(self):
         run,items,config=self.runner.start_baseline();return self.runner.execute_baseline(run,items,config)
+    def test_resume_uses_frozen_request_limits_without_new_paid_context(self):
+        from app.paid_run import PaidRun,controlled_run,REQUEST_LIMITS
+        paid=PaidRun(Path(self.tmp.name)/'paid.json',10.,{}, {},output_limits=REQUEST_LIMITS)
+        with controlled_run(paid):old=self.run_once()
+        run,items,config=self.runner.start_baseline(old['id'])
+        self.assertEqual(self.store.evaluation_run(run)['judge'],old['judge'])
+        self.assertEqual(self.store.evaluation_run(run)['judge']['evaluation_identity'],old['judge']['evaluation_identity'])
+
+    def test_display_returns_partial_without_granting_current_baseline_eligibility(self):
+        from unittest.mock import Mock
+        from api_fixture import main
+        store=Mock();store.current_baseline_identity.return_value={'current_baseline_id':None,'baseline_unavailable_reason':'not complete'}
+        store.dataset_snapshots.return_value=[{'id':'fixture-golden'}]
+        store.evaluation_runs.return_value=[{'id':'partial','status':'partial','dataset_version_id':'fixture-golden','config':{'run_target':'baseline'},'result':{'completed':8}}]
+        with patch.object(main,'store',store):result=main.evaluation()
+        self.assertEqual(result['id'],'partial');self.assertEqual(result['result']['completed'],8)
+        self.assertIsNone(result['current_baseline_id'])
+
+    def test_startup_keeps_a_live_worker_and_interrupts_dead_owner(self):
+        import os
+        old=self.run_once();self.runtime.fail=None
+        key,items,config=self.runner.start_baseline(old['id'])
+        with self.store.connection() as db:
+            saved=json.loads(db.execute('SELECT result_json FROM evaluation_runs WHERE id=?',(key,)).fetchone()[0]);saved['execution_owner_pid']=os.getpid()
+            db.execute('UPDATE evaluation_runs SET result_json=? WHERE id=?',(json.dumps(saved),key))
+        self.store.interrupt_evaluation_runs()
+        self.assertEqual(self.store.evaluation_run(key)['status'],'running')
+        with patch('app.governance.os.kill',side_effect=ProcessLookupError):self.store.interrupt_evaluation_runs()
+        self.assertEqual(self.store.evaluation_run(key)['status'],'failed')
+
     def test_resume_skips_completed_cases_and_saved_generation(self):
         old=self.run_once();self.assertEqual(old['status'],'partial');self.assertEqual(old['result']['completed'],1)
         checkpoint=old['result']['checkpoints']['Q2'];self.assertIn('execution',checkpoint);self.assertEqual(checkpoint['attempts'][-1]['phase'],'judge');self.assertEqual(len(checkpoint['attempts'][-1]['usage']),1)

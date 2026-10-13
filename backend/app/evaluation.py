@@ -151,7 +151,7 @@ class EvaluationRunner:
             items.append({**current, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'), 'evidence': raw.get('evidence', raw.get('acceptable_evidence', [])), 'raw': raw, 'test_category': raw.get('test_category', current['test_category']), 'negative_subtype': raw.get('negative_subtype', current.get('negative_subtype'))})
         return items
 
-    def baseline_inputs(self):
+    def baseline_inputs(self, resume_source_id=None):
         snapshots = self.store.dataset_snapshots()
         if not snapshots:
             raise ValueError("正式评测需要已批准（approved）且显式创建的 Golden Snapshot")
@@ -174,8 +174,9 @@ class EvaluationRunner:
             config['top_k'] = index_info['knowledge_config']['top_k']
         judge_meta = {"model": self.runtime.model, **VERSIONS, "temperature":0, "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
         from .paid_run import current_paid_run
-        if current_paid_run() and current_paid_run().output_limits:
-            limits = current_paid_run().output_limits
+        source=self.store.evaluation_run(resume_source_id) if resume_source_id else None
+        limits=current_paid_run().output_limits if current_paid_run() else (source or {}).get('judge',{}).get('execution_snapshot',{}).get('request_limits')
+        if limits:
             judge_meta['execution_snapshot']['request_limits'] = {key:limits[key] for key in ('answer','judge','query')}
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
         return snapshot, approved, config, judge_meta
@@ -183,7 +184,7 @@ class EvaluationRunner:
     def start_baseline(self, resume_source_id=None):
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:
-            snapshot, approved, config, judge = self.baseline_inputs()
+            snapshot, approved, config, judge = self.baseline_inputs(resume_source_id)
             run_id = self.store.create_baseline_run(snapshot, config, judge, resume_source_id)
         return run_id, approved, config
 
@@ -291,10 +292,15 @@ class EvaluationRunner:
             return self.store.finish_evaluation_run(run_id, 'partial' if cases else 'failed', {**summarize_evaluation_cases(cases), 'execution_kind': 'answer_replay', 'release_eligible': False}, str(error))
 
     def execute_baseline(self, run_id, approved, config):
+        from .paid_run import execution_limits
+        limits=self.store.evaluation_run(run_id)['judge'].get('execution_snapshot',{}).get('request_limits')
+        with execution_limits(limits):return self._execute_baseline(run_id,approved,config)
+
+    def _execute_baseline(self, run_id, approved, config):
         cases, checkpoints, phase, item = [], {}, 'initialization', None
         run = self.store.evaluation_run(run_id)
         frozen_ids = set(json.loads(run['dataset_snapshot_json'])['question_ids'])
-        lineage = {k:run['result'][k] for k in ('resume_source_id',) if k in run['result']}
+        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid') if k in run['result']}
         def progress():
             return {**summarize_evaluation_cases(cases), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None}}
         try:

@@ -410,3 +410,11 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 - 修复业务审计漏传已有版本/章节范围、元数据单独修订被误判无变化；有界Revision保留谱系，不重生成50题。UI仅区分代审来源并同步唯一架构源及导出。
 
 - 实际执行：50题Probe/QC Passed，6项真实召回风险经PDF独立复核显式接受；Q23保留QC P1并绑定当前QC/Probe记录处置，不改评分。冻结Owner Snapshot后Baseline第9题Judge240秒超时，8/50 Partial，未知Usage保留预约并阻止后续Agent/Sandbox。首次停止原因不再被外围阶段异常覆盖。详见[GOLDEN_OWNER_DELEGATED_ACCEPTANCE.md](GOLDEN_OWNER_DELEGATED_ACCEPTANCE.md)。
+
+## 2026-10-13 — Partial同身份恢复与一次Judge补跑
+
+- 修复普通Resume缺失已冻结request_limits引起的身份冲突；源Run限制用于实际Provider请求，仍严格校验全部身份/配置。
+- Partial展示与完整Baseline资格分开：页面显示当前Snapshot的8/50、超时与检查点，不把中断隐藏为未运行或已失效。
+- 明确用户授权原未知请求最多一次Judge补跑，原348记录及预约保留，累计预算按可用余额收紧并留3元，原Judge/规则/Golden不变。
+- 实际恢复至21/50：原8题/Q09回答复用，Q09一次返回响应只做已保存内容的末尾闭合符恢复并通过原Parser（真实Bad Case）；Q22 Judge IncompleteRead/Usage未知停止，无新增重试或Agent/ABC。余额23.09→22.31，原348记录不变，详见[恢复验收](BASELINE_PARTIAL_RESUME_ACCEPTANCE.md)。
+- API重启清理曾标记后续非本轮Run为中断；新增最小执行PID归属保护及存活/退出回归，不伪造恢复其状态、不改评测身份或历史记录。

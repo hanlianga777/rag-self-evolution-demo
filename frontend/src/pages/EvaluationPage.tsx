@@ -91,7 +91,7 @@ export function EvaluationPage({ data }: { data: any; navigate?: (page: any) => 
   const visible = cases.filter(item => filter === "all" || filter === "bad" && !item.passed || ["positive", "ablation", "negative"].includes(filter) && item.test_category === filter || filter === "retrieval" && item.programmatic_metrics?.retrieval_hit === false || filter === "generation" && item.primary_root_cause === "Generation" || filter === "safety" && item.primary_root_cause === "Safety");
   const badCount = result.bad_case_count ?? (cases.length ? cases.filter(item => !item.passed).length : relatedBad.length);
   const completed = run.status === "completed";
-  const stale = data.workspace?.requires_new_golden || data.workspace?.requires_new_baseline;
+  const stale = data.workspace?.requires_new_golden || data.workspace?.requires_new_baseline && (completed || data.workspace?.current_golden_id && snapshot.id !== data.workspace.current_golden_id);
   const generationModel = run.judge?.execution_snapshot?.generation_model;
   const collectedMetrics = [["Recall@K", comparison.recall_at_k, "%"], ["Precision@K", comparison.precision_at_k, "%"], ["MRR", comparison.mrr, ""], ["TTFT", comparison.ttft_seconds, " s"], ["Latency P50", result.metrics?.latency_p50_seconds, " s"], ["Latency P99", result.metrics?.latency_p99_seconds, " s"]].filter(([, value]) => typeof value === "number");
   const configGroups = [["Query", ["query_rewrite", "multi_query", "hyde", "alias_mapping"]], ["Retrieval", ["candidate_k", "top_k", "min_score", "hybrid_search", "hybrid_alpha", "metadata_filter"]], ["Rerank / Context", ["rerank"]], ["Generation", ["prompt_strategy"]]] as [string, string[]][];
@@ -101,14 +101,14 @@ export function EvaluationPage({ data }: { data: any; navigate?: (page: any) => 
     <ProviderAuthorization request={paid} onClose={() => setPaid(null)} />
     {run.id && <div className="review-batch"><span>{(run.requires_policy_upgrade || data.workspace?.requires_policy_upgrade) ? "历史评测规则；新实验需先建立新版Baseline" : "正式Baseline与历史答案评分分开保存"}</span><button className="text-button" onClick={() => setPaid({ title: '历史答案重新评分', description: `复用 ${snapshot.question_ids?.length ?? '未采集'} 题已保存回答，仅调用新版Judge，不生成RAG回答；不成为正式Baseline或Sandbox。`, execute: () => { void operation.startEvaluation('历史答案评分（回放）', async () => { const result = await postJson<Row>(`/api/evaluations/${run.id}/replay`, { authorize_provider: true }); setReplay(result); return result as { id: string }; }).catch(reason => setError(errorMessage(reason))); } })}>评测规则升级验证</button><button className="text-button" onClick={() => { setHistoryOpen(true); void getJson<Row[]>('/api/evaluations').then(setHistory).catch(reason => setError(errorMessage(reason))); }}>历史评测</button>{replay && <button className="text-button" onClick={() => { void getJson<Row>(`/api/evaluations/${replay.id}`).then(value => { setReplay(value); setReplayOpen(true); }).catch(reason => setError(errorMessage(reason))); }}>查看独立回放进度：{replay.status}</button>}</div>}
     <Drawer open={historyOpen} onOpenChange={setHistoryOpen} title="历史评测 · 原记录只读"><div className="drawer-body">{history.map(row => <section key={row.id}><h3>{row.config?.run_target === 'answer_replay' ? '历史答案评分（非完整重评）' : row.config?.run_target === 'sandbox_candidate' ? '候选Sandbox' : '正式Baseline'}</h3><p>{localTime(row.created_at)} · {row.status} · {row.judge?.scoring_policy || '历史规则'} · Bad Case {row.result?.bad_case_count ?? '未采集'}</p><button className="text-button" onClick={() => { void getJson<Row>(`/api/evaluations/${row.id}`).then(value => { if (value.config?.run_target === 'answer_replay') { setReplay(value); setReplayOpen(true); } else { setRun(value); } setHistoryOpen(false); }).catch(reason => setError(errorMessage(reason))); }}>查看只读报告</button></section>)}</div></Drawer>
-    {error && <p className="error-notice" role="alert">{error}</p>}
+    {(error || run.error_message) && <p className="error-notice" role="alert">{error || run.error_message}</p>}
     {stale && run.id && <p className="error-notice">当前知识库状态已变化；以下是历史 Run，不能作为当前发布依据。</p>}
     {!run.id ? <Section title="尚未运行 Baseline"><p>正式评测需要已批准 Golden Snapshot 与可用 Provider。</p></Section> : <>
 
       <StageStepper compact ariaLabel="Baseline 评测阶段" steps={[
         { label: "Golden 冻结", state: snapshot.id ? "completed" : "pending", detail: snapshot.id ? "本次冻结 Snapshot" : "等待冻结 Snapshot" },
         { label: "同一评测尺", state: run.judge?.scoring_policy ? "completed" : "pending", detail: run.judge?.scoring_policy || "历史未记录规则身份" },
-        { label: "Baseline 评测", state: completed ? "completed" : run.status === "running" ? "current" : run.status === "failed" ? "blocked" : "pending", detail: displayText(run.status || "not_run") },
+        { label: "Baseline 评测", state: completed ? "completed" : run.status === "running" ? "current" : ["failed", "partial"].includes(run.status) ? "blocked" : "pending", detail: displayText(run.status || "not_run") },
         { label: "Gate / Bad Case", state: stale || result.gates?.passed === false ? "blocked" : completed && result.gates?.passed === true ? "completed" : "pending", detail: stale ? "历史身份已失效" : completed ? `${badCount} 个单题问题` : "等待评测结果" },
       ]} />
       <div className="baseline-metrics" aria-label="Baseline 核心结果">
@@ -118,7 +118,7 @@ export function EvaluationPage({ data }: { data: any; navigate?: (page: any) => 
       </div>
       <section className={`baseline-conclusion ${stale ? "warning" : result.gates?.passed === true ? "good" : "neutral"}`}>
         <h2>{stale ? "历史评测 · 当前身份已失效" : completed ? result.gates?.passed === true ? "整体质量达标" : result.gates?.passed === false ? "Baseline 未通过 Hard Gate" : "评测已完成 · Gate 无法评估" : displayText(run.status || "not_run")}</h2>
-        <p>{completed ? badCount > 0 ? `仍有 ${badCount} 个单题问题。Hard Gate 检查群组聚合门槛，Bad Case 检查逐题失败；可继续受控优化，原有质量与安全门槛保持。` : "当前逐题记录无 Bad Case；后续关注监控反馈。" : "等待持久化评测结果。"}</p>
+        <p>{completed ? badCount > 0 ? `仍有 ${badCount} 个单题问题。Hard Gate 检查群组聚合门槛，Bad Case 检查逐题失败；可继续受控优化，原有质量与安全门槛保持。` : "当前逐题记录无 Bad Case；后续关注监控反馈。" : `已完成 ${result.completed ?? cases.length} / ${result.total ?? snapshot.question_ids?.length ?? "未采集"} 题；保留已完成结果及失败检查点。`}</p>
         {failures.length > 0 && <div className="failed-gate-grid">{failures.map(gate => <button className="text-button gate-failed" key={gate.metric} onClick={() => setSelectedGate(details.find(row => row.metric === gate.metric) || gate)}>{gateNames[gate.metric] || gate.metric} · {gateValue(gate)} / {gateThreshold(gate)} · FAIL</button>)}</div>}
       </section>
 

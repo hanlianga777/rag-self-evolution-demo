@@ -33,6 +33,30 @@ class PaidRunTests(unittest.TestCase):
             from api_fixture import main
         return main
 
+    def test_frozen_limits_apply_without_paid_context(self):
+        from app.paid_run import execution_limits, provider_task
+        from app.providers import DeepSeekProvider
+        from app.config import Settings
+        provider=DeepSeekProvider(Settings('fixture','https://fixture.invalid','deepseek-v4-flash'))
+        with execution_limits({'judge':32768}),provider_task('judge'):
+            self.assertEqual(json.loads(provider._request('s','u',True,False,.2).data)['max_tokens'],32768)
+
+    def test_one_explicit_unknown_retry_retains_original_call_and_reserve(self):
+        from app.paid_run import provider_task
+        payload={'messages':[],'max_tokens':10}
+        with provider_task('judge'):old=self.run.begin('DeepSeek','deepseek-v4-flash',payload)
+        self.run.stop('ProviderTimeout');original=json.loads(json.dumps(old))
+        auth={'source':'direct_user_instruction','request_sha256':old['request_sha256'],'max_judge_retries':1}
+        continued=PaidRun.next_stage(self.path,'resume',lambda:{'corpus':'new'},authorization=auth,budget_yuan=10.)
+        self.assertEqual(continued.calls[0],original)
+        with provider_task('judge'):new=continued.begin('DeepSeek','deepseek-v4-flash',payload)
+        continued.settle(new,{'provider':'DeepSeek','requested_model':'deepseek-v4-flash','status':'ok','prompt_tokens':1,'completion_tokens':1})
+        with self.assertRaises(RuntimeError):continued.begin('DeepSeek','deepseek-v4-flash',payload)
+        self.assertEqual(continued.calls[0]['status'],'reserved')
+        candidate=PaidRun.next_stage(self.path,'candidate-A1',lambda:{'corpus':'new'})
+        with provider_task('judge'):candidate.begin('DeepSeek','deepseek-v4-flash',payload)
+
+
     def test_first_stop_reason_survives_outer_stage_failure(self):
         self.run.stop('ProviderTimeout')
         self.run.stop('RuntimeError')

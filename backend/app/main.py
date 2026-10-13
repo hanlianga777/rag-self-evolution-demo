@@ -1177,6 +1177,10 @@ def qc_question(question_id: str):
 def evaluation():
     identity = store.current_baseline_identity()
     run = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
+    if run is None:
+        snapshots=store.dataset_snapshots()
+        snapshot_id=snapshots[0]['id'] if snapshots else None
+        run=next((r for r in store.evaluation_runs() if r['config'].get('run_target')=='baseline' and r['status'] in {'running','partial','failed'} and r['dataset_version_id']==snapshot_id),None)
     return {**(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity}
 
 

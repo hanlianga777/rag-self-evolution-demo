@@ -45,10 +45,9 @@ class DeepSeekProvider:
             payload["response_format"] = {"type": "json_object"}
         if stream:
             payload["stream_options"] = {"include_usage": True}
-        from .paid_run import current_paid_run
-        run = current_paid_run()
-        if run is not None and run.output_limits is not None:
-            payload['max_tokens'] = run.limit()
+        from .paid_run import current_request_limit
+        limit=current_request_limit()
+        if limit is not None: payload['max_tokens']=limit
         return urllib.request.Request(
             f"{self.settings.base_url}/chat/completions",
             data=json.dumps(payload).encode(),

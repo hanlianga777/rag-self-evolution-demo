@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import hashlib
 import re
 import sqlite3
@@ -1981,6 +1982,7 @@ class GovernanceStore:
                 keys = [r['question_id'] for r in rows]
                 if len(keys) != len(set(keys)) or not set(keys) <= set(snapshot['question_ids']):
                     raise ValueError('历史结果题号重复或不属于冻结Snapshot')
+            result['execution_owner_pid']=os.getpid()
             connection.execute('INSERT INTO evaluation_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (run_id,'running','real','real',snapshot['id'],_json(snapshot),_json(config),_json(judge),_json(result),None,_now(),None))
             if candidate_id:
                 attempts = candidate['reasoning']['sandbox_attempts']
@@ -2104,11 +2106,22 @@ class GovernanceStore:
             connection.execute("UPDATE experiments SET status='failed' WHERE status='generating'")
 
     def interrupt_evaluation_runs(self):
-        """Workers are process-local: retain spent attempts, never claim a live worker after restart."""
+        """Preserve live evaluation owners; interrupt exited or legacy workers."""
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
-            connection.execute("UPDATE evaluation_runs SET status='failed', error_message=?, completed_at=? WHERE status IN ('queued', 'running')", ('进程重启，评测已中断', _now()))
+            # ponytail: PID liveness; add process start identity if PID reuse needs detection.
+            live=set()
+            for run in connection.execute("SELECT id,result_json FROM evaluation_runs WHERE status IN ('queued','running')").fetchall():
+                pid=_load(run['result_json'],{}).get('execution_owner_pid')
+                if type(pid) is int and pid>0:
+                    try:os.kill(pid,0)
+                    except ProcessLookupError:pass
+                    except PermissionError:live.add(run['id'])
+                    else:live.add(run['id'])
+                if run['id'] not in live:
+                    connection.execute("UPDATE evaluation_runs SET status='failed',error_message=?,completed_at=? WHERE id=?",('进程重启，评测已中断',_now(),run['id']))
             interrupted = connection.execute("SELECT id, experiment_id, result_json FROM candidate_configs WHERE status='running'").fetchall()
+            interrupted=[row for row in interrupted if _load(row['result_json'],{}).get('evaluation_run_id') not in live]
             for row in interrupted:
                 result = {**_load(row['result_json'], {}), 'error': '进程重启，评测已中断', 'interrupted': True}
                 connection.execute("UPDATE candidate_configs SET status='failed', result_json=? WHERE id=?", (_json(result), row['id']))
