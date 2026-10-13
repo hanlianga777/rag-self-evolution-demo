@@ -1,5 +1,7 @@
 # 当前有效合同 — 2026-10-11 `[CONFIRMED]`
 
+- **2026-10-14 Agent请求与HTTP错误审计**：Agent在调用前记录脱敏请求摘要（模型/参数/角色/字节数/SHA/字符Token估算及估算方法），共用Provider本地检查消息、模型、布尔参数、temperature及显式max_tokens的接口类型/范围（1–393216）；不改变原请求参数、不新增Token预算阻断。HTTP失败保留脱敏正文、状态、Provider码、详情、失败阶段及重试判断，通过错误消息显示具体原因。旧失败记录不回填；请求体和真实评分/证据不因未证实的超限猜测而裁剪，Confirmed目标及全量Bad Case背景、Agent假设/最小参数策略、Search Space及评分治理保持不变。
+
 - **2026-10-13 Q38 Judge输出格式修复**：完整JSON示例补齐当前合同字段及claim_reviews形状，behavior_evidence明确为单个连续原文字符串（非数组），不改变评分语义或Judge/Matcher/Policy版本、冻结请求参数。结构错误按JSON语法/缺字段/合同违例记录具体原因与原响应；不补造缺失判断。明确授权Resume子Run的新请求使用独立六次结构失败窗口，保留全部继承审计；同Run进程恢复仍累计原次数，不增加上限或无限结构重试。
 
 - **2026-10-13 评测手动停止**：右下角Baseline/Sandbox运行窗口可“停止运行”，可信Origin的`POST /api/evaluations/{id}/stop`幂等保存停止请求。Worker在调用边界及退避期间检查，当前请求结束/超时后保存真实回答、评分及Usage，再停止；不得撤销已发出的Provider费用或强杀共享API。存活Worker确认前保留活动占用，失联Worker可直接停止。停止请求不被进度覆盖、不会自动恢复；结果保留Partial及全部Checkpoint，后续明确续跑创建新Run复用已有结果。关闭状态窗口仍只隐藏。评分语义、Identity、历史记录保持不变。

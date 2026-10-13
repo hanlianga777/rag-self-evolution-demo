@@ -1,3 +1,10 @@
+## 2026-10-14 — Optimization Agent HTTP错误可诊断化
+
+- 隔离重建失败请求，SHA与历史一致；5.77MB请求体、约93.6万字符Token估算，仅为观测，缺旧400正文不能认定确切Provider拒绝原因。
+- Agent增加调用前请求摘要及本地格式/参数校验；共用HTTP错误保存脱敏正文、状态/Provider码/详情，Agent记录失败阶段/重试判断并显示完整错误。
+- 未改Agent策略、13题读取/7个Confirmed目标、Search Space、Baseline/Golden/Judge/Matcher/Policy/Gate/Regression、费用及累计时间逻辑。没有真实Provider或Sandbox，无历史回填。
+- 详见[离线验收](AGENT_HTTP400_ACCEPTANCE.md)。
+
 ## 2026-10-13 — Q38 Judge结构输出与Resume计数修复
 
 - 真实响应复现定位behavior_evidence数组与原字符串合同冲突；补齐JSON形状示例、单个连续引文类型要求，保留严格字段校验及全部评分语义。

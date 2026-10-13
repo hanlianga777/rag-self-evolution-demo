@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timezone
 from collections import Counter
 
+from .providers import ProviderRequestError, provider_error_details
 from .evaluation_contract import diagnosis
 from .diagnostics import diagnostic_view
 from .paid_run import provider_task
@@ -79,10 +80,13 @@ class OptimizationAgent:
             stages = []
             with collect_usage() as usage, measure(stages, 'optimization_agent'):
                 try:
-                    content = self.provider.complete(
-                        "你是 RAG Optimization Agent。只返回 JSON：{\"root_cause_cluster\":\"...\",\"observed_evidence\":[\"...\"],\"candidates\":[{\"id\":\"A\",\"hypothesis\":\"...\",\"why\":\"...\",\"target_bad_cases\":[\"...\"],\"config_diff\":{},\"risk\":\"...\",\"target_group\":\"...\",\"root_cause\":\"Retrieval|Generation|Safety|Performance\",\"root_cause_evidence\":[\"目标ID\"],\"expected_improvement\":\"...\"}]}。A/B/C 均按此格式；严格遵守用户消息中的 allowed_parameter_values 类型和值，不得输出隐藏推理或测试答案。",
-                        json.dumps(prompt, ensure_ascii=False), json_mode=True,
-                    )
+                    system = "你是 RAG Optimization Agent。只返回 JSON：{\"root_cause_cluster\":\"...\",\"observed_evidence\":[\"...\"],\"candidates\":[{\"id\":\"A\",\"hypothesis\":\"...\",\"why\":\"...\",\"target_bad_cases\":[\"...\"],\"config_diff\":{},\"risk\":\"...\",\"target_group\":\"...\",\"root_cause\":\"Retrieval|Generation|Safety|Performance\",\"root_cause_evidence\":[\"目标ID\"],\"expected_improvement\":\"...\"}]}。A/B/C 均按此格式；严格遵守用户消息中的 allowed_parameter_values 类型和值，不得输出隐藏推理或测试答案。"
+                    user=json.dumps(prompt,ensure_ascii=False)
+                    audit['validation_stage']='request_validation'
+                    if callable(getattr(self.provider,'request_summary',None)):
+                        audit['request_summary']=self.provider.request_summary(system,user,json_mode=True)
+                    audit['validation_stage']='provider'
+                    content=self.provider.complete(system,user,json_mode=True)
                 finally:
                     audit.update(token_usage=usage, stages=stages, **cost_fields(getattr(getattr(self.provider, 'settings', None), 'model', None), usage))
             audit["provider_raw_text"] = content
@@ -156,6 +160,9 @@ class OptimizationAgent:
             self.store.save_agent_round(experiment_id, batch, {**result, **audit, "validation_stage": "completed", "round": round_number, "evaluation_budget": evaluation_budget})
             return self.store.experiment(experiment_id)
         except Exception as error:
-            audit["validation_error"] = str(error)
-            self.store.save_agent_trace(experiment_id, "failed", audit, str(error))
-            raise ValueError(str(error)) from error
+            if isinstance(error,ProviderRequestError):audit['validation_stage']='request_validation'
+            audit['provider_error']=provider_error_details(error,audit['validation_stage'])
+            message=f"{error}；失败阶段：{audit['validation_stage']}；可重试：{'是' if audit['provider_error']['retryable'] else '否'}"
+            audit["validation_error"] = message
+            self.store.save_agent_trace(experiment_id, "failed", audit, message)
+            raise ValueError(message) from error

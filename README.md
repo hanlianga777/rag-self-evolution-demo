@@ -133,3 +133,5 @@ Candidate启动前可调用 `GET /api/candidates/{id}/preflight` 只读核对绑
 评测运行窗口支持“停止运行”：等待当前请求结束并保存断点后停止，已完成题目保留；窗口×仅隐藏状态。手动停止后不自动恢复，需明确续跑。见[验收说明](docs/EVALUATION_STOP_ACCEPTANCE.md)。
 
 Q38 Judge结构异常修复：完整输出示例与原Parser一致，错误显示具体字段；显式Resume保留原审计、使用新Run的有限重试窗口。同Run重启不重置计数。见[Q38验收](docs/Q38_JUDGE_ACCEPTANCE.md)。
+
+Optimization Agent请求和HTTP错误审计保存模型/参数/大小/SHA及脱敏Provider错误码、正文、阶段和重试判断；Token估算仅为观测，不当作精确Tokenizer结果或费用阻断。见[离线验收](docs/AGENT_HTTP400_ACCEPTANCE.md)。

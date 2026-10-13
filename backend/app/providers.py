@@ -1,4 +1,5 @@
 import json
+import re
 import hashlib
 from contextvars import ContextVar
 import http.client
@@ -24,7 +25,31 @@ class ProviderTimeout(ProviderUnavailable):
 
 class ProviderAPIError(ProviderUnavailable):
     def __init__(self,message,*,status_code=None,retry_after=None,raw_provider_response=None):
-        super().__init__(message);self.status_code=status_code;self.retry_after=retry_after;self.raw_provider_response=raw_provider_response
+        self.status_code=status_code;self.retry_after=retry_after;self.raw_provider_response=raw_provider_response
+        try:body=json.loads(raw_provider_response or '{}')
+        except (ValueError,TypeError):body={}
+        value=body.get('error',body) if isinstance(body,dict) else body
+        self.provider_code=value.get('code') if isinstance(value,dict) else None
+        self.detail=value.get('message') if isinstance(value,dict) else value
+        if not isinstance(self.detail,str):self.detail=raw_provider_response
+        if self.provider_code is not None or self.detail:
+            message+=f"：{self.provider_code or 'unknown_code'}：{str(self.detail)[:500]}"
+        super().__init__(message)
+
+class ProviderRequestError(ProviderUnavailable):
+    pass
+
+
+def redact_provider_error(raw, api_key):
+    if api_key:raw=raw.replace(api_key,'[REDACTED]')
+    raw=re.sub(r'(?i)\bBearer\s+[^\s"\',}<>]+','Bearer [REDACTED]',raw)
+    return re.sub(r"(?i)(\b(?:authorization|api[-_]?key|access[_-]?token)\b[\"']?\s*[:=]\s*[\"']?)[^\s\"',}<>]+",r'\1[REDACTED]',raw)
+
+
+def provider_error_details(error, stage):
+    return {'http_status':getattr(error,'status_code',None),'provider_code':getattr(error,'provider_code',None),
+            'detail':getattr(error,'detail',None) or str(error),'raw_response':getattr(error,'raw_provider_response',None),
+            'stage':stage,'retryable':retryable_error(error),'error_type':type(error).__name__}
 
 class ProviderInvalidResponse(ProviderUnavailable):
     def __init__(self,message,*,raw_provider_response=None,metadata=None):
@@ -63,6 +88,10 @@ class DeepSeekProvider:
     def _request(self, system: str, user: str, json_mode: bool, stream: bool, temperature: float = 0.2):
         if not self.settings.configured:
             raise ProviderUnavailable("DeepSeek API Key 未配置")
+        if not isinstance(self.settings.model,str) or not self.settings.model.strip():raise ProviderRequestError('请求本地校验：model必须是非空字符串')
+        if not all(isinstance(value,str) and value.strip() for value in (system,user)):raise ProviderRequestError('请求本地校验：system/user消息必须是非空字符串')
+        if type(json_mode) is not bool or type(stream) is not bool:raise ProviderRequestError('请求本地校验：json_mode/stream必须是布尔值')
+        if type(temperature) not in (int,float) or not math.isfinite(temperature) or not 0<=temperature<=2:raise ProviderRequestError('请求本地校验：temperature必须是0到2的有限数值')
         payload = {
             "model": self.settings.model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -75,13 +104,30 @@ class DeepSeekProvider:
             payload["stream_options"] = {"include_usage": True}
         from .paid_run import current_request_limit
         limit=current_request_limit()
-        if limit is not None: payload['max_tokens']=limit
+        if limit is not None:
+            if type(limit) is not int or not 1<=limit<=393216:raise ProviderRequestError('请求本地校验：max_tokens必须是接口支持的1到393216整数')
+            payload['max_tokens']=limit
         return urllib.request.Request(
             f"{self.settings.base_url}/chat/completions",
             data=json.dumps(payload).encode(),
             headers={"Authorization": f"Bearer {self.settings.api_key}", "Content-Type": "application/json"},
             method="POST",
         )
+    def request_summary(self, system, user, json_mode=False, *, stream=False, temperature=0.2):
+        request=self._request(system,user,json_mode,stream,temperature)
+        payload=json.loads(request.data);text=system+user
+        non_ascii=sum(ord(c)>127 for c in text)
+        summary={key:payload.get(key) for key in ('model','temperature','stream','response_format','max_tokens')}
+        summary.update(request_sha256=hashlib.sha256(request.data).hexdigest(),body_bytes=len(request.data),
+                       roles=[m['role'] for m in payload['messages']],message_characters=len(text),
+                       input_token_estimate=round((len(text)-non_ascii)*.3+non_ascii*.6),
+                       token_estimate_method='approximate_character_ratio_not_model_tokenizer',
+                       token_estimate_source='https://api-docs.deepseek.com/quick_start/token_usage/')
+        try:fields=json.loads(user)
+        except ValueError:fields=None
+        if isinstance(fields,dict):summary['user_field_characters']={k:len(json.dumps(v,ensure_ascii=False)) for k,v in fields.items()}
+        return summary
+
     def complete_with_metrics(self, system: str, user: str, json_mode: bool = False, *, stream: bool = False, temperature: float = 0.2) -> dict:
         """Return provider usage and measured first-content latency when streaming is enabled."""
         _response_metadata.set({})
@@ -129,7 +175,7 @@ class DeepSeekProvider:
                     except json.JSONDecodeError as error:raise ProviderInvalidResponse("DeepSeek返回无效响应JSON",raw_provider_response=raw_body) from error
                     ttft_ms = None
         except urllib.error.HTTPError as error:
-            raise ProviderAPIError(f"DeepSeek API 错误（HTTP {error.code}）",status_code=error.code,retry_after=(error.headers or {}).get("Retry-After"),raw_provider_response=error.read().decode("utf-8",errors="replace").replace(self.settings.api_key,'[REDACTED]')) from error
+            raise ProviderAPIError(f"DeepSeek API 错误（HTTP {error.code}）",status_code=error.code,retry_after=(error.headers or {}).get("Retry-After"),raw_provider_response=redact_provider_error(error.read().decode("utf-8",errors="replace"),self.settings.api_key)) from error
         except urllib.error.URLError as error:
             if isinstance(error.reason, (TimeoutError, socket.timeout)):
                 raise ProviderTimeout("DeepSeek 请求超时，请重试") from error
