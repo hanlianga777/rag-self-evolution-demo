@@ -17,6 +17,78 @@ class CandidateResumeTests(unittest.TestCase):
         self.cid=self.exp+'-R1-A'
         self.runtime.answers=[];self.runtime.judges=[]
     def tearDown(self):baseline_fixture.ResumeTests.tearDown(self)
+    def freeze_request_limits(self):
+        from app.paid_run import REQUEST_LIMITS
+        from app.evaluation_contract import evaluation_identity
+        judge=deepcopy(self.baseline['judge'])
+        judge['execution_snapshot']['request_limits']={k:REQUEST_LIMITS[k] for k in ('answer','judge','query')}
+        judge['evaluation_identity']=evaluation_identity(json.loads(self.baseline['dataset_snapshot_json']),judge)
+        with self.store.connection() as c:
+            c.execute('UPDATE evaluation_runs SET judge_json=? WHERE id=?',(json.dumps(judge),self.baseline['id']))
+        return self.store.evaluation_run(self.baseline['id'])
+
+    def test_abc_api_inherits_frozen_limits_and_keeps_optimization_parameters(self):
+        import time
+        from fastapi.testclient import TestClient
+        from api_fixture import main
+        from app.paid_run import current_request_limit,provider_task
+        baseline=self.freeze_request_limits();limits=baseline['judge']['execution_snapshot']['request_limits']
+        configs=[self.store.candidate(self.cid)['config'],{**self.store.candidate(self.cid)['config'],'query_rewrite':True},
+                 {**self.store.candidate(self.cid)['config'],'metadata_filter':'FALLBACK'}]
+        for label,config in zip('ABC',configs):
+            if label!='A':self.store.save_candidate(self.exp,'R1-'+label,config,{'round':1,'candidate_label':label})
+        observed=[]
+        answer,judge=self.runtime.answer,self.runtime.judge
+        def check_answer(*args,**kwargs):
+            for task in ('answer','query'):
+                with provider_task(task):observed.append((task,current_request_limit()))
+            return answer(*args,**kwargs)
+        def check_judge(*args,**kwargs):
+            with provider_task('judge'):observed.append(('judge',current_request_limit()))
+            return judge(*args,**kwargs)
+        with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime), \
+             patch.object(self.runtime,'answer',side_effect=check_answer),patch.object(self.runtime,'judge',side_effect=check_judge):
+            with TestClient(main.app) as client:
+                for label,config in zip('ABC',configs):
+                    cid=self.exp+'-R1-'+label
+                    response=client.post('/api/candidates/'+cid+'/run',headers={'Origin':'http://127.0.0.1:5174'})
+                    self.assertEqual(response.status_code,201,response.text)
+                    for _ in range(100):
+                        candidate=self.store.candidate(cid)
+                        if candidate['status']!='running':break
+                        time.sleep(.02)
+                    self.assertEqual(candidate['status'],'evaluated')
+                    self.assertEqual(candidate['config'],config)
+                    run=self.store.evaluation_run(response.json()['id'])
+                    self.assertEqual(run['judge'],baseline['judge'])
+                    self.assertEqual(run['result']['completed'],4)
+        self.assertTrue(observed)
+        self.assertTrue(all(value==limits[task] for task,value in observed))
+        self.assertEqual(self.store.evaluation_run(baseline['id']),baseline)
+        with provider_task('answer'):self.assertIsNone(current_request_limit())
+
+    def test_explicit_tampered_limits_are_rejected_before_reservation(self):
+        from pathlib import Path
+        from app.paid_run import PaidRun,controlled_run,REQUEST_LIMITS
+        baseline=self.freeze_request_limits()
+        for task in ('answer','judge','query'):
+            limits={**REQUEST_LIMITS,task:REQUEST_LIMITS[task]+1}
+            paid=PaidRun(Path(self.tmp.name)/(task+'.json'),10.,{}, {},output_limits=limits)
+            with controlled_run(paid),self.assertRaisesRegex(ValueError,'request limits must match'):
+                self.runner.start_candidate(self.cid)
+            self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'],0)
+            self.assertEqual(paid.calls,[])
+        self.assertEqual(self.store.evaluation_run(baseline['id']),baseline)
+
+    def test_tampered_baseline_identity_is_still_rejected(self):
+        baseline=self.freeze_request_limits();judge=deepcopy(baseline['judge'])
+        judge['execution_snapshot']['request_limits']['answer']+=1
+        with self.store.connection() as c:
+            c.execute('UPDATE evaluation_runs SET judge_json=? WHERE id=?',(json.dumps(judge),baseline['id']))
+        with self.assertRaisesRegex(ValueError,'Evaluation身份不匹配'):
+            self.runner.start_candidate(self.cid)
+        self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'],0)
+
     def test_timeout_and_ssl_each_phase_resume_only_unfinished_work(self):
         for phase in ('generation','judge'):
             for error in (ProviderTimeout('offline timeout'),ssl.SSLEOFError('offline SSL EOF')):

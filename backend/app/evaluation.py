@@ -374,7 +374,7 @@ class EvaluationRunner:
         limits = baseline['judge'].get('execution_snapshot',{}).get('request_limits')
         if limits is not None:
             paid_run=current_paid_run()
-            if paid_run is None or paid_run.output_limits is None or limits!={key:paid_run.output_limits[key] for key in ('answer','judge','query')}:
+            if paid_run is not None and (paid_run.output_limits is None or limits!={key:paid_run.output_limits.get(key) for key in ('answer','judge','query')}):
                 raise ValueError('Candidate request limits must match frozen Baseline')
         if baseline['judge'].get('evaluation_identity') != evaluation_identity(snapshot, baseline['judge']):
             raise ValueError('Evaluation身份不匹配')
