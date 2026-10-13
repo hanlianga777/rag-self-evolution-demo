@@ -26,13 +26,13 @@ class ProviderTests(unittest.TestCase):
     def setUp(self):
         self.provider = DeepSeekProvider(Settings("test-key", "https://example.invalid", "test-model"))
 
-    def test_timeout_defaults_to_sixty_seconds_and_env_can_override_it(self):
-        self.assertEqual(self.provider.settings.timeout_seconds, 60)
+    def test_timeout_defaults_to_four_minutes_and_env_can_override_it(self):
+        self.assertEqual(self.provider.settings.timeout_seconds, 240)
         self.assertEqual(load_settings({"DEEPSEEK_TIMEOUT_SECONDS": "45"}, env_file=Path("/nonexistent-env-file")).timeout_seconds, 45)
         with patch("app.providers.urllib.request.urlopen", side_effect=TimeoutError("The read operation timed out")) as request:
             with self.assertRaisesRegex(ProviderTimeout, "DeepSeek 请求超时，请重试") as caught:
                 self.provider.complete("system", "question")
-        self.assertEqual(request.call_args.kwargs["timeout"], 60)
+        self.assertEqual(request.call_args.kwargs["timeout"], 240)
         self.assertIn("The read operation timed out", str(caught.exception.__cause__))
 
     def test_api_and_network_errors_are_not_classified_as_timeout(self):

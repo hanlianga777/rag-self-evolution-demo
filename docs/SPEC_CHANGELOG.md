@@ -1,3 +1,10 @@
+## 2026-10-13 — Baseline/Sandbox自动恢复与费用统计化
+
+- 共用执行器持久化生成/评分断点与重试审计，网络/暂时服务错误自动退避，Judge格式/字段异常只补Judge；六次不合格结构后保留断点停止，账户/身份/持久化错误不盲目重试。
+- 新授权持久化、SQLite并发领取及PID/线程归属保护，后台监控恢复真正中断的任务，不误接管存活Worker或自动激活旧历史Run。已完成Case不重复调用，Case/BadCase原子保存。
+- 评测PaidRun改为只统计，费用/余额/价格/Usage未知不阻断，未知费用不当0；请求参数与评测身份不变。未发现后端整批时长上限；移除Baseline前端300次轮询限制，刷新从DB定位实际任务。
+- Judge评分/Matcher/Gate/Regression/算法/Golden/Corpus与历史成绩不变。仅离线故障注入，无真实Provider。详见[中文验收](BASELINE_AUTORECOVERY_ACCEPTANCE.md)。
+
 ## 2026-10-13 — 五类现象与四方向真实列表闭环
 
 - 新增只读diagnosis-view-v1，保存标签/来源/Trace/独立可信度可追溯；缺证据的噪声/拒答/误伤不硬推断，安全失守独立保留，问答与Judge耗时分开。

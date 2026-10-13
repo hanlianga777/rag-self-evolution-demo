@@ -1869,9 +1869,10 @@ class GovernanceStore:
     def active_production(self):
         return next((item for item in self.production_versions() if item["status"] == "active"), None)
 
-    def evaluation_runs(self):
+    def evaluation_runs(self, *, authorized_only=False):
         with self.connection() as connection:
-            rows = connection.execute("SELECT * FROM evaluation_runs ORDER BY created_at DESC").fetchall()
+            where=" WHERE json_extract(result_json,'$.auto_recovery.authorized')=1 AND (status IN ('queued','running') OR status='completed' AND EXISTS (SELECT 1 FROM candidate_configs WHERE candidate_configs.status='running' AND json_extract(candidate_configs.result_json,'$.evaluation_run_id')=evaluation_runs.id))" if authorized_only else ""
+            rows = connection.execute("SELECT * FROM evaluation_runs"+where+" ORDER BY created_at DESC").fetchall()
         return [{**dict(row), "result": _load(row["result_json"], {}), "config": _load(row["config_json"], {}), "judge": _load(row["judge_json"], {})} for row in rows]
 
     def evaluation_run(self, run_id: str):
@@ -1939,7 +1940,7 @@ class GovernanceStore:
             )
         return run_id
 
-    def create_baseline_run(self, snapshot, config, judge, source_id=None, candidate_id=None):
+    def create_baseline_run(self, snapshot, config, judge, source_id=None, candidate_id=None, automatic=False):
         from .evaluation_contract import evaluation_identity, policy_current
         run_id = f"EVAL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         with self.connection() as connection:
@@ -1982,6 +1983,10 @@ class GovernanceStore:
                 keys = [r['question_id'] for r in rows]
                 if len(keys) != len(set(keys)) or not set(keys) <= set(snapshot['question_ids']):
                     raise ValueError('历史结果题号重复或不属于冻结Snapshot')
+            if automatic:
+                from .paid_run import current_paid_run
+                paid=current_paid_run()
+                result['auto_recovery']={'authorized':True,'state':'ready','ledger_path':str(paid.path) if paid else None,'ledger_identity':paid.identity if paid else None}
             result['execution_owner_pid']=os.getpid()
             connection.execute('INSERT INTO evaluation_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (run_id,'running','real','real',snapshot['id'],_json(snapshot),_json(config),_json(judge),_json(result),None,_now(),None))
             if candidate_id:
@@ -1995,15 +2000,38 @@ class GovernanceStore:
                     connection.execute('INSERT INTO bad_cases VALUES (?,?,?,?,?,?,?,?)', (f"BC-{run_id}-{row['question_id']}",run_id,row['question_id'],case['root_cause']['primary'],case['severity'],'new',row['result_json'],_now()))
         return run_id
 
+    def claim_evaluation_worker(self,run_id):
+        import threading,uuid
+        with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            row=connection.execute('SELECT * FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
+            if row is None or row['status'] not in {'queued','running'}:return False
+            result=_load(row['result_json'],{});auto=result.get('auto_recovery',{})
+            if auto.get('authorized') is not True:return False
+            owner=result.get('execution_owner_pid');thread=auto.get('worker_thread')
+            if auto.get('worker_token'):
+                if owner==os.getpid() and any(t.ident==thread and t.is_alive() for t in threading.enumerate()):return False
+                if owner!=os.getpid() and type(owner) is int:
+                    try:os.kill(owner,0)
+                    except ProcessLookupError:pass
+                    except PermissionError:return False
+                    else:return False
+            auto.update(worker_token=uuid.uuid4().hex,worker_thread=threading.get_ident(),state='running')
+            result.update(execution_owner_pid=os.getpid(),auto_recovery=auto)
+            connection.execute("UPDATE evaluation_runs SET status='running',result_json=?,error_message=NULL WHERE id=?",(_json(result),run_id))
+            return True
+
     def update_evaluation_progress(self, run_id, result):
         with self.connection() as connection:
             changed = connection.execute("UPDATE evaluation_runs SET result_json=? WHERE id=? AND status='running'", (_json(result),run_id)).rowcount
             if not changed:
                 raise ValueError('评测已终止，不能写入进度')
 
-    def record_evaluation_case(self, run_id: str, question_id: str, result: dict):
+    def record_evaluation_case(self, run_id: str, question_id: str, result: dict, *, with_bad_case=False):
         with self.connection() as connection:
             connection.execute("INSERT INTO evaluation_case_results(run_id, question_id, result_json) VALUES (?, ?, ?)", (run_id, question_id, _json(result)))
+            if with_bad_case and not result['passed']:
+                connection.execute("INSERT INTO bad_cases VALUES (?,?,?,?,?,?,?,?)",(f"BC-{run_id}-{question_id}",run_id,question_id,result['root_cause']['primary'],result['severity'],'new',_json(result),_now()))
 
     def finish_evaluation_run(self, run_id: str, status: str, result: dict, error_message: str | None = None):
         with self.connection() as connection:
@@ -2118,8 +2146,11 @@ class GovernanceStore:
                     except ProcessLookupError:pass
                     except PermissionError:live.add(run['id'])
                     else:live.add(run['id'])
+                if _load(run['result_json'],{}).get('auto_recovery',{}).get('authorized') and run['id'] not in live:
+                    connection.execute("UPDATE evaluation_runs SET status='queued' WHERE id=?",(run['id'],));live.add(run['id'])
                 if run['id'] not in live:
                     connection.execute("UPDATE evaluation_runs SET status='failed',error_message=?,completed_at=? WHERE id=?",('进程重启，评测已中断',_now(),run['id']))
+            live.update(row['id'] for row in connection.execute("SELECT id,result_json FROM evaluation_runs WHERE status='completed'") if _load(row['result_json'],{}).get('auto_recovery',{}).get('authorized'))
             interrupted = connection.execute("SELECT id, experiment_id, result_json FROM candidate_configs WHERE status='running'").fetchall()
             interrupted=[row for row in interrupted if _load(row['result_json'],{}).get('evaluation_run_id') not in live]
             for row in interrupted:

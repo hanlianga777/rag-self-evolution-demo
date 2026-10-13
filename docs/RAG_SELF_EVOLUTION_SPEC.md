@@ -2,6 +2,11 @@
 
 本合同按用户批准的「RAG 自进化 Demo 一次性收口」计划覆盖旧评测、目标统计、Winner、D与UI展示规则；以下旧条款仅在不冲突时保留。历史记录不回填、不迁移成绩。唯一产品SPEC仍为本文件。
 
+- 2026-10-13评测自动恢复覆盖此前评测费用/有限网络补跑约束：用户首次显式启动Baseline/Sandbox后保存auto_recovery授权，后台串行执行，不因整批时长、累计费用、内部余额预留、价格/Usage缺失或费用预约阻断。费用账本在评测公共链路仅统计，真实Usage/请求摘要/原响应/未知费用保存；Unknown不计0。Golden生产线/Probe/QC/Agent生成的旧专属授权不由本条扩大，实验MAX_EVALS/D预留及人工治理保持。
+- 问答/Judge网络超时、IncompleteRead及可恢复408/429/5xx按1/2/4/8…最高60秒退避，遵守Provider Retry-After，不设整批累计超时。余额/额度不足、认证/权限、配置/身份/持久化错误停止。Judge可重试格式/结构异常仅重做当前Judge；同阶段累计六次结构不合格判为不可自动恢复，保存完整Checkpoint，不伪造Completed。仅完整JSON的BOM/Markdown边界或IncompleteRead中完整JSON可确定性本地恢复，仍走原严格Parser，禁止补造字段/评分/证据。Judge/Matcher/Policy版本及Gate/Regression语义不变。
+- 请求级连接/读取超时保留；原冻结单请求模型参数/max_tokens属于Evaluation Identity，不能因取消累计Token预算而改变。未冻结请求限制的Run不新增max_tokens。本轮取消财务UTF-8预估/累计Token费用边界的执行阻断，不绕过Provider自身输出上限或账户限制。
+- 共用执行器逐题、生成答案与已评分结果分别持久化，Case/BadCase同事务。SQLite领取及PID/线程/Token保护防止并发重复调用，后台监控仅恢复带显式授权且无存活归属的任务；进程退出后同Run继承断点，不新增Sandbox次数。重启后完成的Candidate评测可零Provider完成资格持久化。停止/历史未授权Run不自动激活或回填；旧Partial经一次正式Resume建子Run后继承结果并启用新机制，本轮仅离线核验，不执行。
+- Baseline页面刷新以GET /api/evaluation?active_task=true定位保存任务，进度取实际逐题行数，轮询不再300次封顶；关闭/切页不停止Worker。自动重试/停止原因及含恢复谱系的真实请求统计显示在必要状态/评测依据中。默认概览API与其他一级导航不改。
 - 2026-10-13五类现象/四方向列表增强：只读 `diagnosis-view-v1` 复用保存的Failure Tags、Matcher、Trace、根因与可信度；不修改Judge/Matcher/Policy版本、Passed、Bad Case、Gate、Regression、Qualification或Evaluation Identity，不回填历史。五类仅是可多标签的现象，不能固定映射根因。检索失败须有真实候选中已存在的Golden目标证据及Final遗漏，候选本身未命中且库内存在性未核实则保持信号待核实；噪声需保存标签/可定位答案及上下文来源，低Precision不能判定；过度拒答/安全误伤须有保存的类型、充分证据和实际拒答片段，合理拒答不自动归类。安全失守独立保留；延迟现象采用保存的Performance标签和问答实测耗时，不新增门槛，问答阶段与Judge阶段分开，最长独立问答环节只作观测，不自动归因或编造占比。未采集检测能力与已采集未记录失败分别展示。
 - 两页复用三维组合筛选/按唯一题号列表及原Drawer；Agent根因页用紧凑列表替代大分类卡片，候选目标绑定保存的Why/Hypothesis/Config Diff。Sandbox/Regression只读取正式保存的修复/新增失败题号与两侧真实逐题记录，不用多标签合计Bad Case。新只读API视图及Agent `all_bad_case_audit`/可信目标引用传递相同诊断资料，Confirmed且属于四方向才作目标；Needs Review/Disputed/Unknown作背景风险，不改变既有Search Space、动态ABC假设或评分资格。旧B/C仍受上一轮版本守卫阻断，未经授权不运行。
 - 2026-10-13评测规则治理与工作台覆盖：新Judge `judge-v3.2-governance`、Matcher `evidence-v4-fragments`、Policy `v1.3-abstention-scope`，11 Gate（含安全拒答≥95%）及Regression严重0/普通≤1不变。旧规则保存于`docs/evaluation_rules/v1.2.1-claim-consistency.py`及升级前Git，全部旧Run/BadCase/Qualification只读，旧Evaluation Identity按其保存字段仍可验证；旧B/C禁止与新版评测混用，须另行授权同Golden/Corpus下完整新Baseline及新实验，不自动迁移。

@@ -102,14 +102,14 @@ class CandidateResumeTests(unittest.TestCase):
                         if q=='Q2':raise error
                         return original(q,*args,**kwargs)
                     with patch.object(self.runtime,'answer' if phase=='generation' else 'judge',side_effect=fail) as call:
-                        first=self.runner.run_candidate(self.cid)
+                        first=self.runner.run_candidate(self.cid, automatic=False)
                         self.assertEqual(sum(args.args[0]=='Q2' for args in call.call_args_list),1)
                     self.assertEqual(first['status'],'failed');self.assertEqual(first['result']['completed'],1)
                     source=self.store.evaluation_run(first['result']['evaluation_run_id']);before=deepcopy(source)
                     self.assertEqual(source['result']['checkpoints']['Q2']['attempts'][-1]['error_type'],type(error).__name__)
                     self.assertFalse(any(b['run_id']==source['id'] for b in self.store.bad_case_rows()))
                     count=self.runtime.answers.count('Q2');budget=self.store.experiment(self.exp)['evaluation_budget']['used']
-                    recovered=self.runner.run_candidate(self.cid)
+                    recovered=self.runner.run_candidate(self.cid, automatic=False)
                     self.assertEqual(recovered['status'],'evaluated');self.assertEqual(recovered['result']['completed'],4)
                     self.assertEqual(recovered['result']['resume_source_id'],source['id'])
                     self.assertEqual(self.runtime.answers.count('Q1'),1);self.assertEqual(self.runtime.judges.count('Q1'),1)
@@ -122,11 +122,11 @@ class CandidateResumeTests(unittest.TestCase):
         execution=self.runtime.answer('Q1',config)
         self.store.update_evaluation_progress(run,{'checkpoints':{'Q1':{'execution':execution,'attempts':[],'inflight':'judge'}}})
         self.store.interrupt_evaluation_runs()
-        result=self.runner.run_candidate(self.cid)
+        result=self.runner.run_candidate(self.cid, automatic=False)
         self.assertEqual(result['status'],'evaluated');self.assertEqual(self.runtime.answers.count('Q1'),1)
         self.assertEqual(result['result']['resume_source_id'],run)
     def test_resume_identity_budget_and_duplicate_guards_are_atomic(self):
-        self.runtime.fail='judge';first=self.runner.run_candidate(self.cid)
+        self.runtime.fail='judge';first=self.runner.run_candidate(self.cid, automatic=False)
         source=first['result']['evaluation_run_id'];old=self.store.evaluation_run(source)
         for field in ('config_json','judge_json','dataset_snapshot_json'):
             with self.store.connection() as c:
@@ -156,7 +156,7 @@ class CandidateResumeTests(unittest.TestCase):
         import time
         from fastapi.testclient import TestClient
         from api_fixture import main
-        self.runtime.fail='judge';first=self.runner.run_candidate(self.cid)
+        self.runtime.fail='judge';first=self.runner.run_candidate(self.cid, automatic=False)
         self.runtime.fail=None
         with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime):
             with TestClient(main.app) as client:
@@ -178,7 +178,7 @@ class CandidateResumeTests(unittest.TestCase):
             error=ProviderUnavailable('DeepSeek Judge 未返回有效 JSON');error.raw_provider_response=raw
             raise error from ValueError('correctness must be an integer between 0 and 4')
         with patch.object(self.runtime,'judge',side_effect=invalid) as call:
-            result=self.runner.run_candidate(self.cid)
+            result=self.runner.run_candidate(self.cid, automatic=False)
         attempt=result['result']['checkpoints']['Q1']['attempts'][-1]
         self.assertEqual(attempt['raw_provider_response'],raw)
         self.assertEqual(attempt['cause_message'],'correctness must be an integer between 0 and 4')

@@ -29,3 +29,6 @@ output/playwright/
 
 backend/data/legacy_index.json
 backend/data/owner-delegated-*.json
+
+# Private offline recovery audits and database backups
+output/evaluation-autorecovery-*/

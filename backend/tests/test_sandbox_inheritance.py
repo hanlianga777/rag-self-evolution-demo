@@ -52,7 +52,7 @@ class SandboxInheritanceTests(unittest.TestCase):
                         self.assertEqual(preview.json()['baseline_run_id'],baseline['id'])
                         self.assertEqual(preview.json()['config']['prompt_strategy'],config['prompt_strategy'])
                         self.assertEqual(len(payloads),before)
-                        result=self.runner.run_candidate(cid)
+                        result=self.runner.run_candidate(cid, automatic=False)
                         self.assertEqual(result['status'],'evaluated')
                         self.assertEqual(self.store.candidate(cid)['config'],config)
                         self.assertEqual(self.store.evaluation_run(result['result']['evaluation_run_id'])['judge'],baseline['judge'])
@@ -79,10 +79,10 @@ class SandboxInheritanceTests(unittest.TestCase):
     def test_frozen_limits_checkpoint_resume_and_explicit_context(self):
         limits={'answer':1536,'judge':6144,'query':768};baseline,exp,_=self.baseline_and_candidates(limits)
         cid=exp+'-R1-A';self.runtime.fail='judge'
-        first=self.runner.run_candidate(cid);source=self.store.evaluation_run(first['result']['evaluation_run_id'])
+        first=self.runner.run_candidate(cid, automatic=False);source=self.store.evaluation_run(first['result']['evaluation_run_id'])
         self.runtime.fail=None
         paid=PaidRun(Path(self.tmp.name)/'candidate.json',10.,{}, {},output_limits=limits)
-        with controlled_run(paid):result=self.runner.run_candidate(cid)
+        with controlled_run(paid):result=self.runner.run_candidate(cid, automatic=False)
         self.assertEqual(result['status'],'evaluated')
         self.assertEqual(result['result']['resume_source_id'],source['id'])
         self.assertEqual(self.runtime.answers.count('Q2'),2) # One Baseline and one Candidate; resume reuses answer.

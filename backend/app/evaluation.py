@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+import math
 from .telemetry import collect_usage
 from statistics import mean
 from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, normalize
@@ -186,11 +187,11 @@ class EvaluationRunner:
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
         return snapshot, approved, config, judge_meta
 
-    def start_baseline(self, resume_source_id=None):
+    def start_baseline(self, resume_source_id=None, *, automatic=False):
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:
             snapshot, approved, config, judge = self.baseline_inputs(resume_source_id)
-            run_id = self.store.create_baseline_run(snapshot, config, judge, resume_source_id)
+            run_id = self.store.create_baseline_run(snapshot, config, judge, resume_source_id, automatic=automatic)
         return run_id, approved, config
 
     def _case_result(self, item: dict, config: dict):
@@ -306,17 +307,27 @@ class EvaluationRunner:
             return self.store.finish_evaluation_run(run_id, 'partial' if cases else 'failed', {**summarize_evaluation_cases(cases), 'execution_kind': 'answer_replay', 'release_eligible': False}, str(error))
 
     def execute_baseline(self, run_id, approved, config):
-        from .paid_run import execution_limits
-        limits=self.store.evaluation_run(run_id)['judge'].get('execution_snapshot',{}).get('request_limits')
-        with execution_limits(limits):return self._execute_baseline(run_id,approved,config)
+        from .paid_run import execution_limits,accounting_only
+        run=self.store.evaluation_run(run_id)
+        if run['status']=='completed':return run
+        if run['result'].get('auto_recovery',{}).get('authorized') and not self.store.claim_evaluation_worker(run_id):return self.store.evaluation_run(run_id)
+        limits=run['judge'].get('execution_snapshot',{}).get('request_limits')
+        with execution_limits(limits),accounting_only():return self._execute_baseline(run_id,approved,config)
 
     def _execute_baseline(self, run_id, approved, config):
         cases, checkpoints, phase, item = [], {}, 'initialization', None
         run = self.store.evaluation_run(run_id)
         frozen_ids = set(json.loads(run['dataset_snapshot_json'])['question_ids'])
-        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid') if k in run['result']}
+        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery') if k in run['result']}
         def progress():
-            return {**summarize_evaluation_cases(cases), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None}}
+            from .telemetry import cost_fields
+            events=[u for cp in checkpoints.values() for attempt in cp.get('attempts',[]) for u in attempt.get('usage',[])]
+            accounting={'provenance':'logical_task_including_resume_history','call_events':len(events),
+                'unknown_usage_events':sum(type(u.get('prompt_tokens',u.get('total_tokens'))) is not int or u.get('provider')!='Alibaba' and type(u.get('completion_tokens')) is not int for u in events),
+                'known_input_tokens':sum(u.get('prompt_tokens',u.get('total_tokens',0)) for u in events if type(u.get('prompt_tokens',u.get('total_tokens'))) is int),
+                'known_output_tokens':sum(u['completion_tokens'] for u in events if type(u.get('completion_tokens')) is int),
+                **cost_fields(self.runtime.model,events)}
+            return {**summarize_evaluation_cases(cases), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints,'request_accounting':accounting, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None}}
         try:
             if {i['id'] for i in approved} != frozen_ids or len(approved) != len(frozen_ids):
                 raise ValueError('未提交完整冻结题集，不能标为Completed')
@@ -328,50 +339,109 @@ class EvaluationRunner:
             expected = {i['id'] for i in approved}
             if not saved <= expected or len(saved) != len(cases):
                 raise ValueError('Saved evaluation cases do not match frozen snapshot')
+            automatic=lineage.get('auto_recovery',{}).get('authorized') is True
+            def perform(phase,action):
+                from .providers import ProviderAPIError,ProviderInvalidResponse,retryable_error
+                prior=[a for a in checkpoint['attempts'] if a.get('phase')==phase]
+                failures=0;invalid_failures=0
+                for a in reversed(prior):
+                    if a.get('status')=='ok':break
+                    failures+=1;invalid_failures+=a.get('error_type')=='ProviderInvalidResponse'
+                while True:
+                    checkpoint['inflight']=phase
+                    if automatic:lineage['auto_recovery'].update(state='running',question_id=item['id'],phase=phase)
+                    self.store.update_evaluation_progress(run_id,progress())
+                    started=time.perf_counter();usage=[]
+                    try:
+                        with collect_usage() as usage:value=action()
+                    except Exception as error:
+                        failures+=1
+                        attempt={'phase':phase,'status':'error','error_type':type(error).__name__,'error':str(error),
+                                 'cause_type':type(error.__cause__).__name__ if error.__cause__ else None,
+                                 'cause_message':str(error.__cause__) if error.__cause__ else None,'usage':usage,
+                                 'elapsed_ms':round((time.perf_counter()-started)*1000),
+                                 'raw_provider_response':getattr(error,'raw_provider_response',None),
+                                 'response_metadata':getattr(error,'response_metadata',None),'provider_status_code':getattr(error,'status_code',None),'recorded_by_run_id':run_id}
+                        retry=retryable_error(error)
+                        # Repeated structurally invalid Judge replies are a terminal contract failure.
+                        if isinstance(error,ProviderInvalidResponse):
+                            invalid_failures+=1
+                            if invalid_failures>=6:retry=False
+                        attempt['retryable']=retry;checkpoint['attempts'].append(attempt);checkpoint.pop('inflight',None)
+                        if automatic and retry:
+                            delay=min(60,2**min(failures-1,6))
+                            if isinstance(error,ProviderAPIError):
+                                try:delay=max(delay,float(error.retry_after or 0))
+                                except (TypeError,ValueError):
+                                    try:
+                                        from email.utils import parsedate_to_datetime
+                                        delay=max(delay,parsedate_to_datetime(error.retry_after).timestamp()-time.time())
+                                    except (TypeError,ValueError,OverflowError):pass
+                            if not isinstance(delay,(int,float)) or not math.isfinite(delay):delay=60
+                            attempt['retry_delay_seconds']=delay
+                            lineage['auto_recovery'].update(state='retrying',question_id=item['id'],phase=phase,error=str(error),retry_count=failures)
+                            self.store.update_evaluation_progress(run_id,progress());time.sleep(delay);continue
+                        raise
+                    checkpoint['attempts'].append({'phase':phase,'status':'ok','recorded_by_run_id':run_id,'usage':usage,'elapsed_ms':round((time.perf_counter()-started)*1000)})
+                    checkpoint.pop('inflight',None);return value
             for item in approved:
                 if item['id'] in saved:
                     if item['id'] in checkpoints:
-                        checkpoints[item['id']].pop('execution', None)
-                        checkpoints[item['id']].pop('inflight', None)
+                        for key in ('execution','scored_result','inflight'):checkpoints[item['id']].pop(key,None)
                     continue
-                checkpoint = checkpoints.setdefault(item['id'], {'attempts':[]})
-                if 'execution' in checkpoint and (not isinstance(checkpoint['execution'].get('answer'), str) or not isinstance(checkpoint['execution'].get('retrieval_trace', {}).get('final'), list)):
+                checkpoint=checkpoints.setdefault(item['id'],{'attempts':[]})
+                if 'execution' in checkpoint and (not isinstance(checkpoint['execution'].get('answer'),str) or not isinstance(checkpoint['execution'].get('retrieval_trace',{}).get('final'),list)):
                     raise ValueError('生成检查点缺少完整答案/最终上下文')
-                phase = 'generation' if 'execution' not in checkpoint else 'judge'
-                if phase == 'generation':
-                    checkpoint['inflight'] = phase
-                    self.store.update_evaluation_progress(run_id, progress())
-                    started = time.perf_counter()
-                    with collect_usage() as usage:
-                        execution = self.runtime.answer(item['question'], config)
-                    checkpoint['execution'] = execution
-                    checkpoint['attempts'].append({'phase':phase, 'status':'ok', 'usage':usage, 'elapsed_ms':round((time.perf_counter()-started)*1000)})
-                    checkpoint.pop('inflight', None)
-                    self.store.update_evaluation_progress(run_id, progress())
-                phase = 'judge'
-                checkpoint['inflight'] = phase
-                self.store.update_evaluation_progress(run_id, progress())
-                started = time.perf_counter()
-                with collect_usage() as usage:
-                    result = self.score_execution(item, checkpoint['execution'])
-                checkpoint['attempts'].append({'phase':phase, 'status':'ok', 'usage':usage, 'elapsed_ms':round((time.perf_counter()-started)*1000)})
-                self.store.record_evaluation_case(run_id, item['id'], result)
-                cases.append({'question_id':item['id'], **result})
-                if not result['passed']:
-                    self.store.record_bad_case(run_id, item['id'], result['root_cause']['primary'], result['severity'], result)
-                checkpoint.pop('execution', None)
-                checkpoint.pop('inflight', None)
-                self.store.update_evaluation_progress(run_id, progress())
+                phase='generation'
+                if 'execution' not in checkpoint:
+                    checkpoint['execution']=perform(phase,lambda:self.runtime.answer(item['question'],config))
+                    self.store.update_evaluation_progress(run_id,progress())
+                phase='judge'
+                if 'scored_result' not in checkpoint:
+                    checkpoint['scored_result']=perform(phase,lambda:self.score_execution(item,checkpoint['execution']))
+                    self.store.update_evaluation_progress(run_id,progress())
+                result=checkpoint['scored_result']
+                self.store.record_evaluation_case(run_id,item['id'],result,with_bad_case=True)
+                cases.append({'question_id':item['id'],**result});saved.add(item['id'])
+                checkpoint.pop('execution',None);checkpoint.pop('scored_result',None);checkpoint.pop('inflight',None)
+                self.store.update_evaluation_progress(run_id,progress())
+            if automatic:lineage['auto_recovery']['state']='completed'
             return self.store.finish_evaluation_run(run_id, 'completed', {**progress(), 'evaluation_complete':True})
         except Exception as error:
             if item is not None:
                 checkpoint = checkpoints.setdefault(item['id'], {'attempts':[]})
                 checkpoint.pop('inflight', None)
-                checkpoint['attempts'].append({'phase':phase, 'status':'error', 'error_type':type(error).__name__, 'cause_type':type(error.__cause__).__name__ if error.__cause__ else None, 'error':str(error), 'usage':locals().get('usage', []), 'elapsed_ms':round((time.perf_counter()-started)*1000) if 'started' in locals() else None})
+                if not checkpoint['attempts'] or checkpoint['attempts'][-1].get('status')!='error':checkpoint['attempts'].append({'phase':phase, 'status':'error', 'error_type':type(error).__name__, 'cause_type':type(error.__cause__).__name__ if error.__cause__ else None, 'error':str(error), 'usage':locals().get('usage', []), 'elapsed_ms':round((time.perf_counter()-started)*1000) if 'started' in locals() else None})
                 checkpoint['attempts'][-1]['cause_message'] = str(error.__cause__) if error.__cause__ else None
                 if isinstance(getattr(error, 'raw_provider_response', None), str):
                     checkpoint['attempts'][-1]['raw_provider_response'] = error.raw_provider_response
+            if lineage.get('auto_recovery'):lineage['auto_recovery'].update(state='stopped',error=str(error))
             return self.store.finish_evaluation_run(run_id, 'partial' if cases or any('execution' in c for c in checkpoints.values()) else 'failed', progress(), str(error))
+
+    def recover_run(self,run_id):
+        from .paid_run import PaidRun,controlled_run,accounting_only
+        run=self.store.evaluation_run(run_id)
+        auto=run['result'].get('auto_recovery',{})
+        if not auto.get('authorized') or auto.get('state')=='stopped':return
+        snapshot=json.loads(run['dataset_snapshot_json'])
+        if run['judge'].get('evaluation_identity')!=evaluation_identity(snapshot,run['judge']) or not policy_current(run['judge']):raise ValueError('自动恢复Evaluation Identity不匹配')
+        if run['config'].get('candidate_id'):
+            items,config,candidate,baseline=self.candidate_inputs(run['config']['candidate_id'])
+            if config!=run['config'] or baseline['judge']!=run['judge']:raise ValueError('自动恢复Candidate身份不匹配')
+            execute=lambda:self.execute_candidate(run_id,items,config,candidate,baseline)
+        else:
+            current,items,config,judge=self.baseline_inputs(run_id)
+            if current!=snapshot or config!=run['config'] or judge!=run['judge']:raise ValueError('自动恢复冻结配置不匹配')
+            execute=lambda:self.execute_baseline(run_id,items,config)
+        if auto.get('ledger_path'):
+            def check_ledger_identity():
+                from .corpus import current_manifest,manifest_identity
+                if self.store.dataset_snapshots()[0]['id']!=snapshot['id'] or snapshot.get('corpus_fingerprint')!=manifest_identity(current_manifest()):raise ValueError('恢复期间Golden/Corpus身份变化')
+                return auto.get('ledger_identity')
+            ledger=PaidRun.load_accounting(auto['ledger_path'],check_ledger_identity)
+            if ledger.identity!=auto.get('ledger_identity'):raise ValueError('恢复费用账本绑定不同')
+            with controlled_run(ledger),accounting_only():return execute()
+        return execute()
 
     def candidate_inputs(self, candidate_id: str):
         candidate = self.store.candidate(candidate_id)
@@ -402,17 +472,18 @@ class EvaluationRunner:
         config = {**candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
         return approved, config, candidate, baseline
 
-    def start_candidate(self, candidate_id: str):
+    def start_candidate(self, candidate_id: str, *, automatic=False):
         approved, config, candidate, baseline = self.candidate_inputs(candidate_id)
         snapshot = json.loads(baseline["dataset_snapshot_json"])
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:
-            run_id = self.store.create_baseline_run(snapshot, config, baseline['judge'], candidate_id=candidate_id)
+            run_id = self.store.create_baseline_run(snapshot, config, baseline['judge'], candidate_id=candidate_id, automatic=automatic)
             candidate = self.store.candidate(candidate_id)
         return run_id, approved, config, candidate, baseline
 
     def execute_candidate(self, run_id, approved, config, candidate, baseline):
         run = self.execute_baseline(run_id, approved, config)
+        if run['status'] in {'queued','running'}:return self.store.candidate(candidate['id'])
         baseline_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(baseline["id"])}
         candidate_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(run_id)}
         failed = [question_id for question_id, item in baseline_cases.items() if not item.get("passed")]
@@ -435,8 +506,8 @@ class EvaluationRunner:
         recommendation = self.store.refresh_recommendation(candidate["experiment_id"])
         return {**finished, "recommendation": recommendation}
 
-    def run_baseline(self):
-        return self.execute_baseline(*self.start_baseline())
+    def run_baseline(self, *, automatic=True):
+        return self.execute_baseline(*self.start_baseline(automatic=automatic))
 
-    def run_candidate(self, candidate_id: str):
-        return self.execute_candidate(*self.start_candidate(candidate_id))
+    def run_candidate(self, candidate_id: str, *, automatic=True):
+        return self.execute_candidate(*self.start_candidate(candidate_id,automatic=automatic))

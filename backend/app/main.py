@@ -26,6 +26,7 @@ from .full_text import CORPUS_LOCK
 from .corpus_management import CorpusManager, require_consistent_switch
 from .config import load_settings
 from .evaluation import EvaluationRunner, gate_details
+from .evaluation_contract import policy_current
 from .governance import GovernanceStore, GENERATION_PROFILES
 from .optimization import OptimizationAgent
 from .diagnostics import diagnostic_view
@@ -49,6 +50,49 @@ store.interrupt_revision_runs()
 store.interrupt_generation_runs()
 store.interrupt_evaluation_runs()
 store.interrupt_agent_generations()
+
+
+_recovery_stop=threading.Event()
+
+
+def recover_authorized_evaluations():
+    def recover(run_id):
+        try:EvaluationRunner(store,ai_service).recover_run(run_id)
+        except Exception as error:
+            run=store.evaluation_run(run_id)
+            if run and run['status'] in {'queued','running'}:
+                result=run['result'];result['auto_recovery'].update(state='stopped',error=str(error))
+                store.finish_evaluation_run(run_id,'partial' if store.evaluation_case_results(run_id) else 'failed',result,str(error))
+    for run in store.evaluation_runs(authorized_only=True):
+        auto=run['result'].get('auto_recovery',{})
+        if not auto.get('authorized') or auto.get('state')=='stopped':continue
+        if run['status']=='running' and auto.get('worker_token'):
+            owner=run['result'].get('execution_owner_pid')
+            if owner==os.getpid() and any(t.ident==auto.get('worker_thread') and t.is_alive() for t in threading.enumerate()):continue
+            if owner!=os.getpid() and type(owner) is int:
+                try:os.kill(owner,0)
+                except ProcessLookupError:pass
+                except PermissionError:continue
+                else:continue
+        candidate=store.candidate(run['config']['candidate_id']) if run['config'].get('candidate_id') else None
+        if run['status'] in {'queued','running'} or run['status']=='completed' and candidate and candidate['status']=='running':
+            threading.Thread(target=recover,args=(run['id'],),daemon=True).start()
+
+
+@app.on_event('startup')
+def start_recovery_monitor():
+    _recovery_stop.clear()
+    def monitor():
+        while not _recovery_stop.is_set():
+            try:recover_authorized_evaluations()
+            except Exception:logging.exception('Evaluation recovery monitor unavailable')
+            _recovery_stop.wait(5)
+    threading.Thread(target=monitor,daemon=True).start()
+
+
+@app.on_event('shutdown')
+def stop_recovery_monitor():
+    _recovery_stop.set()
 
 
 @app.exception_handler(RetrievalUnavailable)
@@ -1174,15 +1218,28 @@ def qc_question(question_id: str):
         raise HTTPException(status_code=503, detail=str(error)) from error
 
 
+def persisted_evaluation_progress(run):
+    if run and run['status']!='completed':
+        with store.connection() as connection:
+            completed=connection.execute('SELECT count(DISTINCT question_id) FROM evaluation_case_results WHERE run_id=?',(run['id'],)).fetchone()[0]
+        result={**run.get('result',{}),'completed':completed,'total':len(json.loads(run['dataset_snapshot_json']).get('question_ids',[]))}
+        return {**run,'result':result}
+    return run
+
+
 @app.get("/api/evaluation")
-def evaluation():
+def evaluation(active_task: bool = False):
     identity = store.current_baseline_identity()
     run = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
+    if active_task:
+        snapshots=store.dataset_snapshots()
+        latest=next((r for r in store.evaluation_runs() if r['config'].get('run_target')=='baseline' and snapshots and r['dataset_version_id']==snapshots[0]['id']),None)
+        if latest:run=persisted_evaluation_progress(latest)
     if run is None:
         snapshots=store.dataset_snapshots()
         snapshot_id=snapshots[0]['id'] if snapshots else None
         run=next((r for r in store.evaluation_runs() if r['config'].get('run_target')=='baseline' and r['status'] in {'running','partial','failed'} and r['dataset_version_id']==snapshot_id),None)
-    return {**(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity}
+    return {**(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":not policy_current(run.get("judge",{}))} if active_task and run else {})}
 
 
 @app.get("/api/bad-cases")
@@ -1389,7 +1446,7 @@ def run_candidate(candidate_id: str):
             require_current_baseline(experiment["baseline_run_id"])
     runner = EvaluationRunner(store, ai_service)
     try:
-        run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id)
+        run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id,automatic=True)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     threading.Thread(target=contextvars.copy_context().run, args=(runner.execute_candidate,run_id, approved, config, candidate, baseline), daemon=True).start()
@@ -1443,8 +1500,9 @@ def evaluation_run(run_id: str):
     run = next((item for item in store.evaluation_runs() if item["id"] == run_id), None)
     if run is None:
         raise HTTPException(status_code=404, detail="Evaluation run not found")
+    run=persisted_evaluation_progress(run)
     cases = [{**case,"diagnostic_view":diagnostic_view(case)} for case in store.evaluation_case_results(run_id)]
-    return {**run, "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases, "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []))}
+    return {**run, "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":not policy_current(run.get("judge",{})), "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []))}
 
 
 @app.post('/api/evaluations/{source_id}/replay', dependencies=[Depends(require_trusted_origin)])
@@ -1480,7 +1538,7 @@ def start_evaluation(payload: BaselineRunRequest | None = None):
             latest = next((r for r in store.evaluation_runs() if r['config'].get('run_target') == 'baseline'), None)
             if latest and latest['status'] in {'partial','failed'}:
                 source_id = latest['id']
-        run_id, approved, config = runner.start_baseline(source_id)
+        run_id, approved, config = runner.start_baseline(source_id,automatic=True)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     threading.Thread(target=contextvars.copy_context().run, args=(runner.execute_baseline,run_id, approved, config), daemon=True).start()

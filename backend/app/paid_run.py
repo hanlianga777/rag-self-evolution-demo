@@ -12,6 +12,7 @@ _run = ContextVar('controlled_paid_run', default=None)
 _ticket = ContextVar('controlled_paid_ticket', default=None)
 _limits = ContextVar('frozen_execution_limits',default=None)
 _task = ContextVar('controlled_provider_task',default=None)
+_accounting = ContextVar('evaluation_accounting_only',default=False)
 REQUEST_LIMITS = {'business_audit':16384,'qc':16384,'answerability':12288,'negative_subtype':8192,
                   'answer':8192,'judge':32768,'agent':16384,'query':4096,'revision':16384}
 
@@ -35,7 +36,7 @@ class PaidRun:
     def save(self):
         temporary = self.path.with_suffix(self.path.suffix+'.tmp')
         data = {'identity':self.identity, 'budget_yuan':self.budget, 'price_snapshot':self.prices,
-                'spent_yuan':self.spent, 'available_yuan':max(0.,self.budget-self.spent-sum(c['reserved_yuan'] for c in self.calls if c['status']=='reserved')),
+                'spent_yuan':self.spent, 'budget_enforcement':not _accounting.get(), 'available_yuan':None if _accounting.get() else max(0.,self.budget-self.spent-sum(c['reserved_yuan'] for c in self.calls if c['status']=='reserved')),
                 'resume_authorization':getattr(self,'resume_authorization',None), 'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
         data['continuation_authorizations']=getattr(self,'continuation_authorizations',[])
         with temporary.open('w') as stream:
@@ -90,7 +91,23 @@ class PaidRun:
         run.output_limits=data['output_limits'];run.stages=[*stages,{'stage':stage,'claimed_at':datetime.now(timezone.utc).isoformat()}]
         run.save();return run
 
+    @classmethod
+    def load_accounting(cls,path,identity_check):
+        data=json.loads(Path(path).read_text());run=cls.__new__(cls)
+        run.path,run.budget,run.prices=Path(path),data['budget_yuan'],data['price_snapshot']
+        run.identity,run.identity_check=data['identity'],identity_check
+        run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],data.get('stopped')
+        run.stages=data.get('stages',[]);run.output_limits=data.get('output_limits')
+        return run
+
     def begin(self, provider, model, payload):
+        if _accounting.get():
+            if self.identity_check is None or self.identity_check()!=self.identity:raise RuntimeError('Paid run identity unavailable or changed')
+            call={'provider':provider,'model':model,'status':'reserved','reserved_yuan':0.,'upper_estimate_yuan':None,
+                  'request_sha256':hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest(),
+                  'started_at':datetime.now(timezone.utc).isoformat(),'task':_task.get(),'max_tokens':payload.get('max_tokens'),
+                  'accounting_only':True}
+            self.calls.append(call);self.save();return call
         if self.stopped: raise RuntimeError('Paid run stopped: '+self.stopped)
         auth=getattr(self,'resume_authorization',None)
         continuations=getattr(self,'continuation_authorizations',[])
@@ -128,6 +145,16 @@ class PaidRun:
         return call
 
     def settle(self, call, usage):
+        if call.get('accounting_only'):
+            call['usage']=usage
+            prompt=usage.get('prompt_tokens',usage.get('total_tokens'));output=usage.get('completion_tokens',0 if call['provider']=='Alibaba' else None)
+            valid=usage.get('status')=='ok' and usage.get('provider')==call['provider'] and usage.get('requested_model')==call['model'] and all(type(v) is int and v>=0 for v in (prompt,output))
+            rate=self.prices.get(call['model'],{})
+            priced=valid and rate.get('provider')==call['provider'] and all(type(rate.get(k)) in (int,float) and math.isfinite(rate[k]) and rate[k]>=0 for k in ('input','output'))
+            amount=(prompt*rate['input']+output*rate['output'])/1_000_000 if priced else None
+            call.update(status='ok' if valid else 'unknown',upper_estimate_yuan=amount)
+            if amount is not None:self.spent+=amount
+            self.save();return
         if call['status'] != 'reserved': raise RuntimeError('Duplicate payment Usage')
         call['usage'] = usage
         if usage.get('status')!='ok' or usage.get('provider')!=call['provider'] or usage.get('requested_model')!=call['model']:
@@ -192,9 +219,12 @@ def paid_request(provider, model, payload):
         call = run.begin(provider,model,payload)
         token = _ticket.set(call)
         yield
-        if call['status']!='ok': raise RuntimeError('Payment Usage missing')
+        if _accounting.get() and call['status']=='reserved':call['status']='unknown';run.save()
+        elif not _accounting.get() and call['status']!='ok':raise RuntimeError('Payment Usage missing')
     except Exception as error:
-        run.stop(type(error).__name__)
+        if _accounting.get():
+            if token is not None and call['status']=='reserved':call.update(status='unknown',error_type=type(error).__name__);run.save()
+        else:run.stop(type(error).__name__)
         raise
     finally:
         if token is not None: _ticket.reset(token)
@@ -218,3 +248,9 @@ def current_request_limit():
     if limits is None:return None
     if _task.get() not in limits:raise RuntimeError('Frozen task limit unavailable')
     return limits[_task.get()]
+
+@contextmanager
+def accounting_only():
+    token=_accounting.set(True)
+    try:yield
+    finally:_accounting.reset(token)
