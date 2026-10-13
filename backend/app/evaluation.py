@@ -345,7 +345,8 @@ class EvaluationRunner:
                     raise InterruptedError('用户停止运行，断点已保存')
             def perform(phase,action):
                 from .providers import ProviderAPIError,ProviderInvalidResponse,retryable_error
-                prior=[a for a in checkpoint['attempts'] if a.get('phase')==phase]
+                # Explicit Resume starts a new retry window; process recovery of this Run keeps its failures.
+                prior=[a for a in checkpoint['attempts'] if a.get('phase')==phase and a.get('recorded_by_run_id')==run_id]
                 failures=0;invalid_failures=0
                 for a in reversed(prior):
                     if a.get('status')=='ok':break

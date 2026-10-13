@@ -1,11 +1,13 @@
 # 当前有效合同 — 2026-10-11 `[CONFIRMED]`
 
+- **2026-10-13 Q38 Judge输出格式修复**：完整JSON示例补齐当前合同字段及claim_reviews形状，behavior_evidence明确为单个连续原文字符串（非数组），不改变评分语义或Judge/Matcher/Policy版本、冻结请求参数。结构错误按JSON语法/缺字段/合同违例记录具体原因与原响应；不补造缺失判断。明确授权Resume子Run的新请求使用独立六次结构失败窗口，保留全部继承审计；同Run进程恢复仍累计原次数，不增加上限或无限结构重试。
+
 - **2026-10-13 评测手动停止**：右下角Baseline/Sandbox运行窗口可“停止运行”，可信Origin的`POST /api/evaluations/{id}/stop`幂等保存停止请求。Worker在调用边界及退避期间检查，当前请求结束/超时后保存真实回答、评分及Usage，再停止；不得撤销已发出的Provider费用或强杀共享API。存活Worker确认前保留活动占用，失联Worker可直接停止。停止请求不被进度覆盖、不会自动恢复；结果保留Partial及全部Checkpoint，后续明确续跑创建新Run复用已有结果。关闭状态窗口仍只隐藏。评分语义、Identity、历史记录保持不变。
 
 本合同按用户批准的「RAG 自进化 Demo 一次性收口」计划覆盖旧评测、目标统计、Winner、D与UI展示规则；以下旧条款仅在不冲突时保留。历史记录不回填、不迁移成绩。唯一产品SPEC仍为本文件。
 
 - 2026-10-13评测自动恢复覆盖此前评测费用/有限网络补跑约束：用户首次显式启动Baseline/Sandbox后保存auto_recovery授权，后台串行执行，不因整批时长、累计费用、内部余额预留、价格/Usage缺失或费用预约阻断。费用账本在评测公共链路仅统计，真实Usage/请求摘要/原响应/未知费用保存；Unknown不计0。Golden生产线/Probe/QC/Agent生成的旧专属授权不由本条扩大，实验MAX_EVALS/D预留及人工治理保持。
-- 问答/Judge网络超时、IncompleteRead及可恢复408/429/5xx按1/2/4/8…最高60秒退避，遵守Provider Retry-After，不设整批累计超时。余额/额度不足、认证/权限、配置/身份/持久化错误停止。Judge可重试格式/结构异常仅重做当前Judge；同阶段累计六次结构不合格判为不可自动恢复，保存完整Checkpoint，不伪造Completed。仅完整JSON的BOM/Markdown边界或IncompleteRead中完整JSON可确定性本地恢复，仍走原严格Parser，禁止补造字段/评分/证据。Judge/Matcher/Policy版本及Gate/Regression语义不变。
+- 问答/Judge网络超时、IncompleteRead及可恢复408/429/5xx按1/2/4/8…最高60秒退避，遵守Provider Retry-After，不设整批累计超时。余额/额度不足、认证/权限、配置/身份/持久化错误停止。Judge可重试格式/结构异常仅重做当前Judge；同一Run同阶段累计六次结构不合格判为不可自动恢复，保存完整Checkpoint，不伪造Completed。仅完整JSON的BOM/Markdown边界或IncompleteRead中完整JSON可确定性本地恢复，仍走原严格Parser，禁止补造字段/评分/证据。Judge/Matcher/Policy版本及Gate/Regression语义不变。
 - 请求级连接/读取超时保留；原冻结单请求模型参数/max_tokens属于Evaluation Identity，不能因取消累计Token预算而改变。未冻结请求限制的Run不新增max_tokens。本轮取消财务UTF-8预估/累计Token费用边界的执行阻断，不绕过Provider自身输出上限或账户限制。
 - 共用执行器逐题、生成答案与已评分结果分别持久化，Case/BadCase同事务。SQLite领取及PID/线程/Token保护防止并发重复调用，后台监控仅恢复带显式授权且无存活归属的任务；进程退出后同Run继承断点，不新增Sandbox次数。重启后完成的Candidate评测可零Provider完成资格持久化。停止/历史未授权Run不自动激活或回填；旧Partial经一次正式Resume建子Run后继承结果并启用新机制，本轮仅离线核验，不执行。
 - Baseline页面刷新以GET /api/evaluation?active_task=true定位保存任务，进度取实际逐题行数，轮询不再300次封顶；关闭/切页不停止Worker。自动重试/停止原因及含恢复谱系的真实请求统计显示在必要状态/评测依据中。默认概览API与其他一级导航不改。

@@ -131,3 +131,5 @@ Golden 50题前轮离线修复过程：见[最终索引离线验收](docs/GOLDEN
 Candidate启动前可调用 `GET /api/candidates/{id}/preflight` 只读核对绑定Baseline、冻结身份/限制及优化配置，不预约或调用Provider。旧Dataset/旧Baseline实验不会重绑当前Baseline。
 
 评测运行窗口支持“停止运行”：等待当前请求结束并保存断点后停止，已完成题目保留；窗口×仅隐藏状态。手动停止后不自动恢复，需明确续跑。见[验收说明](docs/EVALUATION_STOP_ACCEPTANCE.md)。
+
+Q38 Judge结构异常修复：完整输出示例与原Parser一致，错误显示具体字段；显式Resume保留原审计、使用新Run的有限重试窗口。同Run重启不重置计数。见[Q38验收](docs/Q38_JUDGE_ACCEPTANCE.md)。
