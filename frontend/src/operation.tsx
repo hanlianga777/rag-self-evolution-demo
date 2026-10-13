@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { createPortal } from "react-dom";
 import { getJson, postJson, identityKey } from "./api";
 
-type Operation = { id: string; runId?: string; candidateId?: string; title: string; status: "running" | "completed" | "failed"; kind?: "evaluation" | "revision"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
+type Operation = { id: string; runId?: string; candidateId?: string; title: string; status: "running" | "completed" | "failed" | "stopped"; stopping?: boolean; stopError?: string; kind?: "evaluation" | "revision"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
 type BatchRequest = { experimentId: string; baselineId: string; round: number; candidateIds: string[]; identity?: string };
 type OperationContextValue = {
   runCandidateBatch: (request: BatchRequest) => Promise<void>;
@@ -28,6 +28,10 @@ export function useOperation() { return useContext(OperationContext); }
 function evaluation(run: any): Partial<Operation> {
   let total: number | undefined;
   try { total = JSON.parse(run.dataset_snapshot_json || "{}").question_ids?.length; } catch { /* old run has no readable snapshot */ }
+  if (run.result?.stop_request) {
+    const active = ["queued", "running"].includes(run.status);
+    return { status: active ? "running" : "stopped", stopping: active, stage: active ? "正在停止，等待当前请求结束并保存断点" : "已停止，断点已保存", current: run.cases?.length, total, ...(!active ? { endedAt: Date.now() } : {}) };
+  }
   return { status: ["queued", "running"].includes(run.status) ? "running" : run.status === "completed" ? "completed" : "failed", stage: ["queued", "running"].includes(run.status) ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败", current: run.cases?.length, total, error: run.error_message };
 }
 
@@ -189,11 +193,26 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     return () => window.clearInterval(timer);
   }, [operations, update, succeed, fail]);
 
+  const stoppingRuns = useRef(new Set<string>());
+  const stopEvaluation = async (item: Operation) => {
+    if (stoppingRuns.current.has(item.id)) return;
+    stoppingRuns.current.add(item.id);
+    update(item.id, { stopping: true, stopError: undefined });
+    try {
+      const result = await postJson<any>(`/api/evaluations/${item.runId || item.id}/stop`, {});
+      update(item.id, evaluation(result));
+    } catch (reason) {
+      update(item.id, { stopping: false, stopError: `停止请求失败：${reason instanceof Error ? reason.message : String(reason)}` });
+    } finally { stoppingRuns.current.delete(item.id); }
+  };
+
   const visible = operations.filter(item => !item.dismissed).slice(-3);
   const console = !!visible.length && <div className="operation-stack" aria-label="运行状态">{visible.map(item => <section className="operation-console" key={item.id} role={item.status === "failed" ? "alert" : "status"}>
       <div className="operation-head"><strong>{item.title}</strong><button aria-label="关闭运行状态" onClick={() => setOperations(current => current.map(row => row.id === item.id && row.status === "running" ? { ...row, dismissed: true } : row).filter(row => row.id !== item.id || row.status === "running"))}>×</button></div>
-      <p>{item.status === "failed" ? "运行失败" : item.status === "completed" ? "✓ 完成" : item.restored ? `数据库记录：${item.stage || "运行中"}（Worker 未确认）` : item.stage || "运行中"}{item.startedAt != null && <span> · {Math.max(0, ((item.endedAt ?? now) - item.startedAt) / 1000).toFixed(1)}s</span>}</p>
+      <p>{item.status === "stopped" ? "已停止，断点已保存" : item.status === "failed" ? "运行失败" : item.status === "completed" ? "✓ 完成" : item.restored ? `数据库记录：${item.stage || "运行中"}（Worker 未确认）` : item.stage || "运行中"}{item.startedAt != null && <span> · {Math.max(0, ((item.endedAt ?? now) - item.startedAt) / 1000).toFixed(1)}s</span>}</p>
       {item.current != null && item.total != null && item.total > 1 && <><div className="operation-count">{item.current} / {item.total}<span>{Math.round(item.current / item.total * 100)}%</span></div><progress value={item.current} max={item.total} /></>}
+      {item.status === "running" && (item.kind === "evaluation" || item.runId) && <button className="operation-stop-button" disabled={item.stopping} onClick={() => void stopEvaluation(item)}>{item.stopping ? "正在停止…" : "停止运行"}</button>}
+      {item.stopError && <small role="alert" className="operation-error-summary">{item.stopError}</small>}
       {item.status === "failed" && <><small className="operation-error-summary">{shortError(item.error)}</small><button className="operation-detail-button" aria-label="查看错误详情" aria-expanded={detailId === item.id} aria-controls={`operation-detail-${item.id}`} onClick={() => setDetailId(current => current === item.id ? null : item.id)}>查看错误详情</button>{detailId === item.id && <div id={`operation-detail-${item.id}`} className="operation-details"><div>阶段：{item.stage || "未记录"}</div><div>耗时：{item.startedAt != null ? `${Math.max(0, ((item.endedAt ?? now) - item.startedAt) / 1000).toFixed(1)}s` : "未记录"}</div><div>错误：{item.errorDetail || item.error || "未记录"}</div><div>Operation ID：{item.id}</div>{item.provider && <div>Provider：{item.provider}</div>}{item.model && <div>Model：{item.model}</div>}{item.attempt != null && <div>Attempt：{item.attempt}</div>}</div>}</>}
     </section>)}</div>;
   return <OperationContext.Provider value={{ operations, runCandidateBatch, start, update, succeed, fail, run, startEvaluation, watchEvaluation, watchRevision, registerCandidateRefresh, unregisterCandidateRefresh, registerDialogHost, unregisterDialogHost }}>

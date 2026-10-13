@@ -65,6 +65,8 @@ def recover_authorized_evaluations():
                 store.finish_evaluation_run(run_id,'partial' if store.evaluation_case_results(run_id) else 'failed',result,str(error))
     for run in store.evaluation_runs(authorized_only=True):
         auto=run['result'].get('auto_recovery',{})
+        if run['result'].get('stop_request'):
+            store.request_evaluation_stop(run['id']);continue
         if not auto.get('authorized') or auto.get('state')=='stopped':continue
         if run['status']=='running' and auto.get('worker_token'):
             owner=run['result'].get('execution_owner_pid')
@@ -1503,6 +1505,14 @@ def evaluation_run(run_id: str):
     run=persisted_evaluation_progress(run)
     cases = [{**case,"diagnostic_view":diagnostic_view(case)} for case in store.evaluation_case_results(run_id)]
     return {**run, "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":not policy_current(run.get("judge",{})), "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []))}
+
+
+@app.post('/api/evaluations/{run_id}/stop', dependencies=[Depends(require_trusted_origin)])
+def stop_evaluation(run_id: str):
+    if store.evaluation_run(run_id) is None:
+        raise HTTPException(status_code=404,detail='Evaluation run not found')
+    store.request_evaluation_stop(run_id)
+    return evaluation_run(run_id)
 
 
 @app.post('/api/evaluations/{source_id}/replay', dependencies=[Depends(require_trusted_origin)])

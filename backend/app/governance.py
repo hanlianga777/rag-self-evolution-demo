@@ -2007,7 +2007,7 @@ class GovernanceStore:
             row=connection.execute('SELECT * FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
             if row is None or row['status'] not in {'queued','running'}:return False
             result=_load(row['result_json'],{});auto=result.get('auto_recovery',{})
-            if auto.get('authorized') is not True:return False
+            if auto.get('authorized') is not True or result.get('stop_request'):return False
             owner=result.get('execution_owner_pid');thread=auto.get('worker_thread')
             if auto.get('worker_token'):
                 if owner==os.getpid() and any(t.ident==thread and t.is_alive() for t in threading.enumerate()):return False
@@ -2021,8 +2021,37 @@ class GovernanceStore:
             connection.execute("UPDATE evaluation_runs SET status='running',result_json=?,error_message=NULL WHERE id=?",(_json(result),run_id))
             return True
 
+    def request_evaluation_stop(self, run_id):
+        """Persist cancellation without releasing a live Worker's execution slot."""
+        import threading
+        with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            row=connection.execute('SELECT * FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
+            if row is None:raise ValueError('Evaluation run not found')
+            if row['status'] in {'queued','running'}:
+                result=_load(row['result_json'],{});auto=result.get('auto_recovery',{})
+                result.setdefault('stop_request',{'requested_at':_now(),'reason':'用户停止运行'})
+                owner=result.get('execution_owner_pid')
+                alive=owner==os.getpid() and any(t.ident==auto.get('worker_thread') and t.is_alive() for t in threading.enumerate())
+                if owner!=os.getpid() and type(owner) is int:
+                    try:os.kill(owner,0);alive=True
+                    except ProcessLookupError:pass
+                    except PermissionError:alive=True
+                if alive:
+                    connection.execute('UPDATE evaluation_runs SET result_json=? WHERE id=?',(_json(result),run_id))
+                else:
+                    auto.update(state='stopped',error='用户停止运行');result['auto_recovery']=auto
+                    result['evaluation_complete']=False
+                    connection.execute("UPDATE evaluation_runs SET status='partial',result_json=?,error_message=?,completed_at=? WHERE id=?",(_json(result),'用户停止运行',_now(),run_id))
+                    connection.execute("UPDATE candidate_configs SET status='failed' WHERE status='running' AND json_extract(result_json,'$.evaluation_run_id')=?",(run_id,))
+        return self.evaluation_run(run_id)
+
     def update_evaluation_progress(self, run_id, result):
         with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            row=connection.execute('SELECT result_json FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
+            stop=_load(row['result_json'],{}).get('stop_request') if row else None
+            if stop:result['stop_request']=stop
             changed = connection.execute("UPDATE evaluation_runs SET result_json=? WHERE id=? AND status='running'", (_json(result),run_id)).rowcount
             if not changed:
                 raise ValueError('评测已终止，不能写入进度')
@@ -2035,6 +2064,13 @@ class GovernanceStore:
 
     def finish_evaluation_run(self, run_id: str, status: str, result: dict, error_message: str | None = None):
         with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            row=connection.execute('SELECT result_json FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
+            stop=_load(row['result_json'],{}).get('stop_request') if row else None
+            if stop:
+                result['stop_request']=stop;result['evaluation_complete']=False
+                result.setdefault('auto_recovery',{}).update(state='stopped',error='用户停止运行')
+                status='partial';error_message='用户停止运行'
             connection.execute("UPDATE evaluation_runs SET status = ?, result_json = ?, error_message = ?, completed_at = ? WHERE id = ?", (status, _json(result), error_message, _now(), run_id))
         return next(item for item in self.evaluation_runs() if item["id"] == run_id)
 

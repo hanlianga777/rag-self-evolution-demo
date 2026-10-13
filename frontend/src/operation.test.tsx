@@ -259,3 +259,34 @@ it("keeps Provider operations out of Pipeline configuration", async () => {
   expect(fetcher.mock.calls).toHaveLength(1);
   await act(async () => root.unmount());
 });
+
+it("stops a persisted evaluation once and keeps its saved progress", async () => {
+  let resolve!: (value: Response) => void;
+  const fetcher = vi.fn((_url: RequestInfo | URL, _init?: RequestInit) => new Promise<Response>(done => { resolve = done; }));
+  vi.stubGlobal("fetch", fetcher);
+  function Harness() { const op = useOperation(); useEffect(() => { op.watchEvaluation("EVAL-stop", "Baseline Evaluation"); }, []); return null; }
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
+  const button = [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "停止运行")!;
+  await act(async () => { button.click(); button.click(); });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(fetcher.mock.calls[0][0]).toContain("/api/evaluations/EVAL-stop/stop");
+  expect(button.disabled).toBe(true);
+  await act(async () => resolve(new Response(JSON.stringify({ status: "partial", result: { stop_request: { reason: "用户停止运行" } }, cases: Array(37).fill({}), dataset_snapshot_json: JSON.stringify({ question_ids: Array(50).fill("q") }) }), { status: 200 })));
+  expect(document.body.textContent).toContain("已停止，断点已保存");
+  expect(document.body.textContent).toContain("37 / 50");
+  expect(document.querySelector(".operation-stop-button")).toBeNull();
+  await act(async () => root.unmount());
+});
+
+it("keeps evaluation running when the stop request fails", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail: "服务不可用" }), { status: 503 })));
+  function Harness() { const op = useOperation(); useEffect(() => { op.watchEvaluation("EVAL-stop", "Baseline Evaluation"); }, []); return null; }
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
+  await act(async () => document.querySelector<HTMLButtonElement>(".operation-stop-button")!.click());
+  expect(document.body.textContent).toContain("停止请求失败");
+  expect(document.querySelector<HTMLButtonElement>(".operation-stop-button")!.disabled).toBe(false);
+  expect(document.body.textContent).not.toContain("已停止，断点已保存");
+  await act(async () => root.unmount());
+});

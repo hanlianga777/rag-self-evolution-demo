@@ -340,6 +340,9 @@ class EvaluationRunner:
             if not saved <= expected or len(saved) != len(cases):
                 raise ValueError('Saved evaluation cases do not match frozen snapshot')
             automatic=lineage.get('auto_recovery',{}).get('authorized') is True
+            def check_stop():
+                if self.store.evaluation_run(run_id)['result'].get('stop_request'):
+                    raise InterruptedError('用户停止运行，断点已保存')
             def perform(phase,action):
                 from .providers import ProviderAPIError,ProviderInvalidResponse,retryable_error
                 prior=[a for a in checkpoint['attempts'] if a.get('phase')==phase]
@@ -348,6 +351,7 @@ class EvaluationRunner:
                     if a.get('status')=='ok':break
                     failures+=1;invalid_failures+=a.get('error_type')=='ProviderInvalidResponse'
                 while True:
+                    check_stop()
                     checkpoint['inflight']=phase
                     if automatic:lineage['auto_recovery'].update(state='running',question_id=item['id'],phase=phase)
                     self.store.update_evaluation_progress(run_id,progress())
@@ -380,11 +384,15 @@ class EvaluationRunner:
                             if not isinstance(delay,(int,float)) or not math.isfinite(delay):delay=60
                             attempt['retry_delay_seconds']=delay
                             lineage['auto_recovery'].update(state='retrying',question_id=item['id'],phase=phase,error=str(error),retry_count=failures)
-                            self.store.update_evaluation_progress(run_id,progress());time.sleep(delay);continue
+                            self.store.update_evaluation_progress(run_id,progress())
+                            for _ in range(math.ceil(delay)):
+                                check_stop();time.sleep(min(1,delay));delay-=min(1,delay)
+                            continue
                         raise
                     checkpoint['attempts'].append({'phase':phase,'status':'ok','recorded_by_run_id':run_id,'usage':usage,'elapsed_ms':round((time.perf_counter()-started)*1000)})
                     checkpoint.pop('inflight',None);return value
             for item in approved:
+                check_stop()
                 if item['id'] in saved:
                     if item['id'] in checkpoints:
                         for key in ('execution','scored_result','inflight'):checkpoints[item['id']].pop(key,None)
@@ -405,6 +413,7 @@ class EvaluationRunner:
                 cases.append({'question_id':item['id'],**result});saved.add(item['id'])
                 checkpoint.pop('execution',None);checkpoint.pop('scored_result',None);checkpoint.pop('inflight',None)
                 self.store.update_evaluation_progress(run_id,progress())
+            check_stop()
             if automatic:lineage['auto_recovery']['state']='completed'
             return self.store.finish_evaluation_run(run_id, 'completed', {**progress(), 'evaluation_complete':True})
         except Exception as error:
@@ -422,7 +431,7 @@ class EvaluationRunner:
         from .paid_run import PaidRun,controlled_run,accounting_only
         run=self.store.evaluation_run(run_id)
         auto=run['result'].get('auto_recovery',{})
-        if not auto.get('authorized') or auto.get('state')=='stopped':return
+        if not auto.get('authorized') or auto.get('state')=='stopped' or run['result'].get('stop_request'):return
         snapshot=json.loads(run['dataset_snapshot_json'])
         if run['judge'].get('evaluation_identity')!=evaluation_identity(snapshot,run['judge']) or not policy_current(run['judge']):raise ValueError('自动恢复Evaluation Identity不匹配')
         if run['config'].get('candidate_id'):

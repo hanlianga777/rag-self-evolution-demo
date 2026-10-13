@@ -129,3 +129,5 @@ Golden 50题前轮离线修复过程：见[最终索引离线验收](docs/GOLDEN
 真实结果见[本轮中文验收报告](docs/GOLDEN_OWNER_DELEGATED_ACCEPTANCE.md)：已冻结Owner委托Snapshot；Baseline因Judge超时停于8/50 Partial，未知Usage禁止自动续跑，Agent/ABC未启动。重启服务不会恢复付费任务。对已有人工路径允许复核的检索不连贯，可通过具名独立PDF审核显式接受；同一召回问题的QC P1须逐条处置并绑定当次质量记录，不豁免P0/失败/安全风险。
 
 Candidate启动前可调用 `GET /api/candidates/{id}/preflight` 只读核对绑定Baseline、冻结身份/限制及优化配置，不预约或调用Provider。旧Dataset/旧Baseline实验不会重绑当前Baseline。
+
+评测运行窗口支持“停止运行”：等待当前请求结束并保存断点后停止，已完成题目保留；窗口×仅隐藏状态。手动停止后不自动恢复，需明确续跑。见[验收说明](docs/EVALUATION_STOP_ACCEPTANCE.md)。

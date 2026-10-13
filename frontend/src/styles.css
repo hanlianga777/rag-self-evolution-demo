@@ -1244,3 +1244,6 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .evaluation-page .baseline-gates-table :is(th,td):nth-child(5) { width:15%; }
 .evaluation-page .baseline-gates-table :is(th,td):nth-child(6) { width:12%; }
 .evaluation-page .baseline-gates-table tbody tr { height:42px; }
+
+.operation-stop-button { margin-top: 12px; padding: 6px 12px; border: 1px solid #c6d6e6; border-radius: 6px; background: transparent; color: #e6edf5; cursor: pointer; }
+.operation-stop-button:disabled { opacity: .6; cursor: wait; }
