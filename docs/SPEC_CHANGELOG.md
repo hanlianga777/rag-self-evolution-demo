@@ -1,3 +1,10 @@
+## 2026-10-14 Medium50业务问题优先与本轮完整演化授权
+
+- 新Medium保留20/10/20、九Topic与既有配额，先独立业务问题设计并逐Slot落盘，再核验Corpus/PDF答案；禁止证据阶段反推改写问题。
+- 十维审计强化单核心意图与设计谱系；正式评测语义/Identity、Search Space、11Gate、Regression保持。
+- 本轮唯一Run显式Provider授权不设金额上限，复用账本仅统计；真实逐题委托审核合格才冻结，单轮ABC完成后停Gate2前。
+- 历史Snapshot/评测/审批只读，真实运行结论另见MEDIUM50_FULL_EVOLUTION_ACCEPTANCE.md。
+
 ## 2026-10-14 — Bad Case有效性与Agent策略输入隔离
 
 - 独立核验当前95.80 Mini20：Q03 Generation、Q10候选召回Retrieval；Q06主体正确，附加版本元数据断言未闭合，仅保留质量审计。

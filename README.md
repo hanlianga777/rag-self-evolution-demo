@@ -154,3 +154,5 @@ Optimization Agent请求和HTTP错误审计保存模型/参数/大小/SHA及脱�
 Agent上下文超限已通过传输去重修复：省去重复的result_json字符串，完整result及证据仍保留，数据库历史不变。见[验收](docs/AGENT_CONTEXT_LIMIT_ACCEPTANCE.md)。
 
 Mini20支持显式Business V2业务出题与十维审计，保留原Coverage/Construction约束。所有者委托AI审核必须绑定唯一Run、当前Corpus/Plan、明确Profile及实际授权来源，不冒充真人。具体本次结果见[Mini20收口验收](docs/MINI20_QUALITY_CLOSURE_ACCEPTANCE.md)。
+
+2026-10-14新Medium50采用问题设计先于证据核验，设计阶段不传PDF正文/答案；独立审计检查单核心意图及设计谱系。仅本次授权CLI `scripts/run_medium50_full_evolution.py` 复用正式Generation/治理/委托审核/Baseline/Agent/Sandbox链路；账本不设本轮金额上限，真实完整结果见[验收](docs/MEDIUM50_FULL_EVOLUTION_ACCEPTANCE.md)。审核不达标时不冻结，停在Gate2前。

@@ -99,7 +99,7 @@ def medium_plan(base, chunks, profile):
                         'coverage_anchor_chunk_ids':[key], 'related_clusters':sorted({base['chunk_clusters'][c] for c in material}),
                         'document_id':child['document_id'], 'product':child.get('product'), 'section_path':child.get('section_path'),
                         'requirements':{'product':child.get('product'), 'bridge':None, 'aggregation_items':[]}, 'ablation_attribute':'colloquial' if group == 'ablation' else None,
-                        'generation_strategy':'business_v2', 'user_role':'售后工程师 / 现场运维' if number % 5 < 3 else '终端客户 / 设备操作员' if number % 5 == 3 else '技术支持 / 客服人员',
+                        'generation_strategy':'business_v2', 'generation_path':'business_question_first', 'user_role':'售后工程师 / 现场运维' if number % 5 < 3 else '终端客户 / 设备操作员' if number % 5 == 3 else '技术支持 / 客服人员',
                         'difficulty':difficulty, 'selected_reason':'existing_topic_business_evidence', 'reused':False}
                 slot.pop('negative_subtype', None); slot.pop('expected_behavior', None)
                 if group == 'negative':
@@ -118,7 +118,7 @@ def medium_plan(base, chunks, profile):
 def instruction(slot, repair=None):
     category = slot['test_category']
     return (f"业务场景驱动Golden V2。角色：{slot['user_role']}；目标难度：{slot['difficulty']}；Group：{category}。"
-            "先从真实Child及Parent识别具体工作任务，明确业务场景和用户意图，再模拟用户自然提问。只使用给定证据，不虚构故障、功能、型号、版本或维修步骤。"
+            + ("角色、业务场景、当前问题、单一核心意图和自然提问已先行设计；此阶段才使用真实Child及Parent核验可答性和参考答案。" if slot.get("generation_path") == "business_question_first" else "先从真实Child及Parent识别具体工作任务，明确业务场景和用户意图，再模拟用户自然提问。") + "只使用给定证据，不虚构故障、功能、型号、版本或维修步骤。"
             "避免说明书反向出题、整段原文引用、全部属性枚举和无关多问；复杂度来自证据支持的条件判断、排查或明确的信息边界，不能靠问题长度。"
             "返回JSON：question、business_scenario、user_intent、reference_answer（正向/消融才需要）。参考答案必须由给定Child中的连续原句或字段值组成，多句换行，不推断、不翻译；Parent只补充语境。"
             + (f"Construction为Aggregation：围绕一个实际工作任务，明确这些全部事实为何共同影响操作或维护决策：{slot['requirements']['aggregation_items']}。答案须完整覆盖冻结的事实集合，不得缩减或用无业务意义的全部属性枚举代替任务；若无法形成真实任务，保留失败，不改名Ordinary。" if slot.get('construction_type') == 'Aggregation' else '')
