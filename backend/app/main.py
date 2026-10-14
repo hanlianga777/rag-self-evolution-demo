@@ -973,7 +973,8 @@ def _generate_revision_with_weak_keyword_repair(run, run_store, service, chunks,
     generated = dict(existing or {})
     attempts = list(run.get("generation_attempts", []))
     draft_attempt = (run.get("active_draft") or {}).get("number")
-    for attempt in (1, 2):
+    attempts_allowed = (1,) if any(item['raw'].get('generation_path')=='business_question_first' for item in run['before'].values()) else (1,2)
+    for attempt in attempts_allowed:
         prompt_run = {**run, 'repair_error': '；'.join(errors) if attempt > 1 else None}
         try:
             generated = _revision_attempt(run_store, run['id'], 'generating', service, lambda: service.generate_revision_drafts(prompt_run, chunks, existing=generated, **({'on_progress': on_progress} if on_progress else {})))
@@ -984,7 +985,7 @@ def _generate_revision_with_weak_keyword_repair(run, run_store, service, chunks,
         _, errors, _, _ = run_store._validate_revision_drafts(run, chunks, service.revision_similarity, generated)
         attempts.append({'question_ids': run['question_ids'], 'draft_attempt': draft_attempt, 'attempt': attempt, 'at': datetime.now(timezone.utc).isoformat(), 'drafts': generated, 'validation_errors': errors})
         run_store.update_revision(run["id"], generation_attempts=attempts, generated_drafts=generated)
-        if not errors or attempt == 2:
+        if not errors or attempt == attempts_allowed[-1]:
             break
         failed_ids = {key for key in run['question_ids'] if any(error.startswith(key + ':') for error in errors)}
         generated = {key: value for key, value in generated.items() if key not in failed_ids}

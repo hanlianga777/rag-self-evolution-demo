@@ -102,9 +102,15 @@ class PaidRun:
 
     def begin(self, provider, model, payload):
         if _accounting.get():
+            if self.stopped: raise RuntimeError('Paid run stopped: '+self.stopped)
+            request_hash = hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest()
+            if any(call['status']=='reserved' for call in self.calls):
+                raise RuntimeError('Serial paid run already has an in-flight request')
+            if any(call['status']=='unknown' and call['provider']==provider and call['model']==model and call['request_sha256']==request_hash for call in self.calls):
+                raise RuntimeError('Cannot repeat an unknown request')
             if self.identity_check is None or self.identity_check()!=self.identity:raise RuntimeError('Paid run identity unavailable or changed')
             call={'provider':provider,'model':model,'status':'reserved','reserved_yuan':0.,'upper_estimate_yuan':None,
-                  'request_sha256':hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest(),
+                  'request_sha256':request_hash,'request_payload':payload,
                   'started_at':datetime.now(timezone.utc).isoformat(),'task':_task.get(),'max_tokens':payload.get('max_tokens'),
                   'accounting_only':True}
             self.calls.append(call);self.save();return call
@@ -219,12 +225,14 @@ def paid_request(provider, model, payload):
         call = run.begin(provider,model,payload)
         token = _ticket.set(call)
         yield
-        if _accounting.get() and call['status']=='reserved':call['status']='unknown';run.save()
+        if _accounting.get() and call['status']!='ok':
+            if call['status']=='reserved':call['status']='unknown';run.save()
+            raise RuntimeError('Payment Usage missing or invalid')
         elif not _accounting.get() and call['status']!='ok':raise RuntimeError('Payment Usage missing')
     except Exception as error:
         if _accounting.get():
             if token is not None and call['status']=='reserved':call.update(status='unknown',error_type=type(error).__name__);run.save()
-        else:run.stop(type(error).__name__)
+        run.stop(type(error).__name__)
         raise
     finally:
         if token is not None: _ticket.reset(token)

@@ -1187,6 +1187,19 @@ class GovernanceStore:
             from .golden_v2 import validate_golden_candidate
             frozen = (self.generation_run(run['generation_run_id'], qualification=False).get('artifacts') or {}).get('hard_validation', {}).get('frozen_plan')
             context = {'slot_id': old['raw'].get('coverage_slot'), 'corpus_fingerprint': manifest_identity(current_manifest())}
+            design_record = (run.get('question_first_designs') or {}).get(item_id)
+            if design_record:
+                try:
+                    valid_design = (design_record.get('origin')=='business_question_first' and design_record.get('actor_type')=='ai_agent'
+                        and design_record.get('plan_id')==(frozen or {}).get('plan_id')
+                        and all(design_record['design'].get(key)==candidate.get(key) for key in ('question','business_scenario','user_intent'))
+                        and datetime.fromisoformat(design_record['design_saved_at']) < datetime.fromisoformat(design_record['evidence_verified_at']))
+                except (KeyError,TypeError,ValueError):
+                    valid_design = False
+                if not valid_design:
+                    errors.append(f'{item_id}: 独立业务设计与核验谱系不一致')
+                    continue
+                candidate.update(business_design=design_record['design'],business_design_provenance={key:value for key,value in design_record.items() if key not in {'verified_draft','design'}},previous_business_design=old['raw'].get('business_design'))
             service = getattr(similarity, '__self__', None)
             if source_ids and service and isinstance(getattr(service, 'corpus', None), CorpusStore):
                 context['original_tables'] = service.corpus.original_tables([by_chunk[key] for key in source_ids])
@@ -1200,6 +1213,8 @@ class GovernanceStore:
             candidate['validation'] = {k: v for k, v in validation.items() if k != 'normalized_candidate'}
             drafts[item_id] = {**old, **candidate, "raw": {**old["raw"], "question": candidate["question"], "reference_answer": candidate["reference_answer"], "acceptable_evidence": evidence, "evidence": evidence, "validation": candidate["validation"], "ablation_metadata": candidate["ablation_metadata"]}}
             drafts[item_id]['raw'].update({key:candidate[key] for key in business_fields})
+            if design_record:
+                drafts[item_id]['raw'].update({key:candidate[key] for key in ('business_design','business_design_provenance','previous_business_design')})
             old_ids = [key for source in old['evidence'] for key in source.get('source_chunk_ids', [])]
             if all(drafts[item_id][field] == old[field] for field in ("question", "reference_answer")) and source_ids == old_ids and candidate['ablation_metadata'] == old['raw'].get('ablation_metadata', {}) and all(candidate.get(field)==old['raw'].get(field) for field in business_fields):
                 errors.append(f"{item_id}: 草案未改变问题、答案或证据")

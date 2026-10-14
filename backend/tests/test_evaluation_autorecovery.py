@@ -27,14 +27,16 @@ class AutomaticRecoveryTests(unittest.TestCase):
         self.assertEqual(result['judge']['evaluation_identity'],identity)
         self.assertEqual(result['result']['checkpoints']['Q2']['attempts'][1]['status'],'error')
 
-    def test_accounting_does_not_block_on_budget_or_unknown_usage(self):
+    def test_accounting_ignores_budget_but_stops_on_unknown_usage(self):
         run=PaidRun(Path(self.tmp.name)/'audit.json',.001,{}, {},identity_check=lambda:{})
         with controlled_run(run),accounting_only():
             with paid_request('DeepSeek','fixture',{'max_tokens':999999}):record_usage({'status':'ok','provider':'DeepSeek','requested_model':'fixture','prompt_tokens':1000000,'completion_tokens':1000000})
-            with paid_request('DeepSeek','fixture',{}):pass
-            with paid_request('DeepSeek','fixture',{}):pass
-        self.assertEqual(len(run.calls),3);self.assertIsNone(run.calls[0]['upper_estimate_yuan'])
-        self.assertEqual(run.calls[1]['status'],'unknown');self.assertEqual(run.calls[2]['status'],'unknown')
+            with self.assertRaisesRegex(RuntimeError,'Usage missing'):
+                with paid_request('DeepSeek','fixture',{}):pass
+            with self.assertRaisesRegex(RuntimeError,'stopped'):
+                with paid_request('DeepSeek','fixture',{}):self.fail('Unknown Usage must stop before another request')
+        self.assertEqual(len(run.calls),2);self.assertIsNone(run.calls[0]['upper_estimate_yuan'])
+        self.assertEqual(run.calls[1]['status'],'unknown');self.assertTrue(run.stopped)
 
     def test_format_recovery_preserves_strict_judge_validation(self):
         provider=DeepSeekProvider(Settings('fixture','https://invalid','fixture'))

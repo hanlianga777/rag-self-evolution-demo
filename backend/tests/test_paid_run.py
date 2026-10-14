@@ -270,5 +270,35 @@ class PaidRunTests(unittest.TestCase):
             with paid_request('Alibaba','qwen3-rerank',{'query':'Q'*1000,'documents':['D']*12}):
                 self.fail('Repeated query billing must be reserved before network')
 
+    def test_accounting_stops_after_network_failure_and_never_repeats_unknown_payload(self):
+        from app.paid_run import accounting_only
+        payload = {'messages': [], 'max_tokens':10}
+        with accounting_only(), controlled_run(self.run):
+            with self.assertRaisesRegex(OSError, 'offline network'):
+                with paid_request('DeepSeek','deepseek-v4-flash',payload):
+                    raise OSError('offline network')
+            self.assertEqual(self.run.calls[0]['status'], 'unknown')
+            with self.assertRaisesRegex(RuntimeError, 'stopped'):
+                self.run.begin('DeepSeek','deepseek-v4-flash',{'messages':['another']})
+            self.run.stopped = None  # Explicit continuation may allow unrelated requests.
+            with self.assertRaisesRegex(RuntimeError, 'unknown request'):
+                self.run.begin('DeepSeek','deepseek-v4-flash',payload)
+
+    def test_checkpoint_vectors_require_exact_successful_request_identity(self):
+        import hashlib, importlib.util
+        path = Path(__file__).resolve().parents[2]/'scripts/run_medium50_full_evolution.py'
+        spec = importlib.util.spec_from_file_location('medium50_scope_test',path)
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        response = Path(self.temp.name)/'offline-vector.json'
+        response.write_text(json.dumps({'data':[{'index':0,'embedding':[3.,4.]}]}))
+        payload = {'model':'text-embedding-v4','input':['actual question'],'dimensions':2}
+        digest = hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest()
+        calls = [{'status':'ok','model':'text-embedding-v4','request_sha256':digest,'raw_response_path':str(response)},
+                 {'status':'unknown','model':'text-embedding-v4','request_sha256':'other','raw_response_path':str(response)}]
+        service = SimpleNamespace(corpus=SimpleNamespace(index_info=lambda:{'dimension':2,'knowledge_identity':{'fixture':'sha'}}))
+        self.assertEqual(module.restore_saved_vectors(service,{'calls':calls},['actual question','unverified question']),1)
+        self.assertEqual(set(service._revision_vectors),{'actual question'})
+        self.assertAlmostEqual(float(service._revision_vectors['actual question'][0]),.6)
+
 
 if __name__ == '__main__': unittest.main()

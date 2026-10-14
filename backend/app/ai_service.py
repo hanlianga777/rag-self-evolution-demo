@@ -289,6 +289,11 @@ class AiService:
         self.prepare_revision_similarity([first, second])
         return float(self._revision_vectors[first] @ self._revision_vectors[second])
 
+    @staticmethod
+    def business_slot_scope(slot, plan, chunks):
+        headings = sorted({c.get('section_path','') for c in chunks if plan['chunk_clusters'].get(c['chunk_id'])==slot['topic_cluster'] and c.get('product')==slot.get('product') and 0<len(c.get('section_path',''))<=18 and not re.search(r'^\d+[.、]|[。；：？]',c.get('section_path',''))})
+        return {**slot,'topic_label':next(c['label'] for c in plan['clusters'] if c['cluster_id']==slot['topic_cluster']),'business_scope':headings[:12]}
+
     def select_revision_material(self, run: dict, chunks: list[dict]) -> dict:
         """Resolve real, product-scoped source material before asking the model to draft."""
         by_id = {chunk["chunk_id"]: chunk for chunk in chunks}
@@ -304,6 +309,12 @@ class AiService:
             old = run["before"][item_id]
             change = run["changes"].get(item_id, {})
             slot = old["raw"].get("coverage_slot")
+            if old['raw'].get('generation_path')=='business_question_first':
+                plan = self.store.generation_run(run['generation_run_id'],qualification=False)['artifacts']['hard_validation']['frozen_plan']
+                frozen = next(s for s in plan['slots'] if s['slot']==slot)
+                ids = frozen['material_chunk_ids']
+                decisions[item_id] = {'method':'frozen_material_anchor','scope':'same_topic_product','reason':'材料Anchor不作为预先选择的答案Evidence','chunk_ids':ids,'manual':False,'document_ids':sorted({by_id[key]['document_id'] for key in ids})}
+                continue
             anchor = next((entry for entry in coverage if entry.get("slot") == slot), {})
             original = [key for source in old["evidence"] for key in source.get("source_chunk_ids", [])]
             document_id = by_id[original[0]]["document_id"] if original and original[0] in by_id else anchor.get("document_id")
@@ -371,6 +382,40 @@ class AiService:
             if item_id in drafts:
                 continue
             old = run["before"][item_id]
+            if old['raw'].get('generation_path')=='business_question_first':
+                plan = self.store.generation_run(run['generation_run_id'],qualification=False)['artifacts']['hard_validation']['frozen_plan']
+                slot = next(s for s in plan['slots'] if s['slot']==old['raw']['coverage_slot'])
+                slot = self.business_slot_scope({**slot,'difficulty':old['raw']['difficulty'],'sources':[by_chunk[k] for k in slot['material_chunk_ids']]},plan,chunks)
+                if run.get('replacement'):
+                    slot['failed_business_intents'] = [old['raw'].get('user_intent') or (old['raw'].get('business_design') or {}).get('user_intent')]
+                    for previous in self.store.revision_runs(run['generation_run_id']):
+                        if previous['id'] == run['id']: continue
+                        for key, record in previous.get('question_first_designs', {}).items():
+                            if previous['before'][key]['raw'].get('coverage_slot') == slot['slot']:
+                                slot['failed_business_intents'].append(record['design']['user_intent'])
+                    slot['failed_business_intents'] = list(dict.fromkeys(filter(None, slot['failed_business_intents'])))
+                peers = [self.store.question(k)['question'] for k in self.store.generation_run(run['generation_run_id'],qualification=False)['question_ids'] if k!=item_id]
+                records = dict(self.store.revision_run(run['id']).get('question_first_designs') or {})
+                prior = records.get(item_id)
+                draft_attempt = (run.get('active_draft') or {}).get('number',0)
+                if prior and prior.get('draft_attempt',0)!=draft_attempt:
+                    history = list(self.store.revision_run(run['id']).get('question_first_design_history') or [])
+                    self.store.update_revision(run['id'],question_first_design_history=[*history,{'question_id':item_id,**prior}])
+                    prior = None
+                def persist_design(design):
+                    if prior and prior['design']!=design: raise ValueError('已保存独立业务设计不能覆盖')
+                    records[item_id] = prior or {'design':design,'design_saved_at':datetime.now(timezone.utc).isoformat(),'model':self.model,'actor_type':'ai_agent','origin':'business_question_first','plan_id':plan['plan_id'],'draft_attempt':draft_attempt}
+                    self.store.update_revision(run['id'],question_first_designs=records)
+                if prior and prior.get('verified_draft'):
+                    drafts[item_id] = dict(prior['verified_draft'])
+                else:
+                    verified = self.business_question_first(slot,[],peers,None,save_design=persist_design,prior_design=prior['design'] if prior else None)
+                    drafts[item_id] = {key:verified[key] for key in ('question','reference_answer','business_scenario','user_intent')}
+                    drafts[item_id]['source_chunk_ids'] = [c['chunk_id'] for c in verified['verified_sources']] if old['test_category']!='negative' else []
+                    records[item_id] = {**records[item_id],'evidence_verified_at':datetime.now(timezone.utc).isoformat(),'verified_draft':drafts[item_id]}
+                    self.store.update_revision(run['id'],question_first_designs=records)
+                if on_progress: on_progress(index,len(ids),item_id,drafts)
+                continue
             selected = (run.get("material_selection") or {}).get(item_id, {}).get("chunk_ids") or run["changes"].get(item_id, {}).get("source_chunk_ids") or [key for source in old["evidence"] for key in source.get("source_chunk_ids", [])]
             sources = [{"chunk_id": key, "document_id": by_chunk[key].get("document_id"), "document_name": by_chunk[key].get("document_name"), "product": by_chunk[key].get("product"), "section_path": by_chunk[key].get("section_path"), "page_start": by_chunk[key].get("page_start"), "page_end": by_chunk[key].get("page_end"), "text": by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))} for key in selected if key in by_chunk]
             instruction = "只重写当前 Golden Candidate，不改题型、负向子类或鲁棒性属性。只返回 JSON，字段为 question、reference_answer、source_chunk_ids。负向题 reference_answer=null 且 source_chunk_ids=[]；证据只能从所提供的 Chunk 选择。"
@@ -432,11 +477,21 @@ class AiService:
         if on_progress:
             on_progress({"stage": "coverage", "coverage_plan": coverage})
         for slot in plan:
+            if slot.get('generation_path') == 'business_question_first' and coverage_plan:
+                slot = self.business_slot_scope(slot,coverage_plan,chunks)
             attempts, candidate = list(slot_audit.get(slot["slot"], [])), None
             if any(item.get("coverage_slot") == slot["slot"] for item in candidates):
                 continue
             pending_design = attempts.pop().get('business_design') if attempts and attempts[-1].get('validation_error') == 'evidence_verification_pending' else None
-            for retry in range(2):
+            from .paid_run import current_paid_run
+            paid_scope = current_paid_run()
+            final_replacement = bool(paid_scope and getattr(paid_scope, 'golden_replacement_round', None) == 2 and getattr(paid_scope, 'golden_replacement_run_id', None) == paid_scope.identity.get('generation_run_id') and coverage_plan and paid_scope.identity.get('plan_id') == coverage_plan['plan_id'])
+            draft_revision = getattr(paid_scope, 'golden_draft_revisions', {}).get(slot['slot']) if paid_scope and getattr(paid_scope,'golden_revision_run_id',None) == paid_scope.identity.get('generation_run_id') and coverage_plan and paid_scope.identity.get('plan_id') == coverage_plan['plan_id'] else None
+            attempt_limit = min(1 if final_replacement else 2, max(0, (4 if final_replacement else 3) - len(attempts))) if slot.get('generation_path') == 'business_question_first' else 2
+            if draft_revision and len(attempts) == 4:
+                pending_design, attempt_limit = draft_revision['business_design'], 1
+            slot = {**slot, 'failed_business_intents':[a['business_design']['user_intent'] for a in attempts if (a.get('business_design') or {}).get('user_intent')]}
+            for retry in range(attempt_limit):
                 attempt = len(attempts) + 1
                 instruction = self._slot_instruction(slot, attempts[-1]["validation_error"] if attempts else None)
                 business = slot.get("generation_strategy") == "business_v2"
@@ -457,7 +512,10 @@ class AiService:
                             else:
                                 response = self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload, **({"parent_context": self.business_parent_context(slot)} if business else {}), "prior_questions": [item["question"] for item in candidates]}, ensure_ascii=False), json_mode=True)
                                 generated = json.loads(response)
-                        if isinstance(generated, dict): generated["generation_method"] = "provider"
+                        if isinstance(generated, dict):
+                            generated["generation_method"] = "owner_controlled_draft_revision" if draft_revision else "provider"
+                            if draft_revision:
+                                generated.update(business_draft_revision=draft_revision['audit'], difficulty=draft_revision['difficulty'])
                     if not isinstance(generated, dict):
                         generated = {}
                         raise ValueError("invalid JSON object")
@@ -476,15 +534,19 @@ class AiService:
                 except (json.JSONDecodeError, ProviderUnavailable, ValueError, OSError, RuntimeError) as caught:
                     error = "invalid JSON" if isinstance(caught, json.JSONDecodeError) else str(caught)
                     error_type = type(caught).__name__
+                    if getattr(caught, 'business_design', None):
+                        generated = {**caught.business_design, 'business_design':caught.business_design, **({'verified_sources':caught.verified_sources} if hasattr(caught,'verified_sources') else {})}
                     from .paid_run import current_paid_run
                     if current_paid_run() and isinstance(caught, (ProviderUnavailable, OSError, RuntimeError)):
                         raise
-                attempts.append({"slot": slot["slot"], "attempt": attempt, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "business_design": generated.get("business_design"), "source_chunk_ids": [source["chunk_id"] for source in slot["sources"]] if slot["test_category"] != "negative" else [], "selected_evidence": [{"chunk_id": source["chunk_id"], "document_id": source.get("document_id"), "document_name": source.get("document_name"), "chunk_text": source.get("chunk_text", source.get("text", ""))} for source in slot["sources"]], "test_category": slot["test_category"], "negative_subtype": slot.get("negative_subtype"), "ablation_attribute": slot.get("ablation_attribute"), "expected_behavior": slot.get("expected_behavior"), "structured_type": slot.get("structured_type"), "source_positive_slot": slot.get("source_positive_slot"), "validation_error": error, "hard_validation_checks": checks, "error_type": error_type, "response_preview": response[:500] if error and response and not generated else None, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction, "source": "ai_generated", "construction_type": candidate.get("construction_type") if candidate else None, "generation_method": generated.get("generation_method", "provider"), "token_usage": generated_usage, "latency_ms":round((time.perf_counter()-attempt_started)*1000)})
+                selected_sources = generated.get('verified_sources', slot['sources'])
+                if draft_revision: generated['business_draft_revision'] = draft_revision['audit']
+                attempts.append({"slot": slot["slot"], "attempt": attempt, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "business_design": generated.get("business_design"), "business_draft_revision":generated.get("business_draft_revision"), "source_chunk_ids": [source["chunk_id"] for source in selected_sources] if slot["test_category"] != "negative" else [], "selected_evidence": [{"chunk_id": source["chunk_id"], "document_id": source.get("document_id"), "document_name": source.get("document_name"), "chunk_text": source.get("chunk_text", source.get("text", ""))} for source in selected_sources], "test_category": slot["test_category"], "negative_subtype": slot.get("negative_subtype"), "ablation_attribute": slot.get("ablation_attribute"), "expected_behavior": slot.get("expected_behavior"), "structured_type": slot.get("structured_type"), "source_positive_slot": slot.get("source_positive_slot"), "validation_error": error, "hard_validation_checks": checks, "error_type": error_type, "response_preview": response[:500] if error and response and not generated else None, "model": self.model, "timestamp": datetime.now(timezone.utc).isoformat(), "generation_instruction": instruction, "source": "ai_generated", "construction_type": candidate.get("construction_type") if candidate else None, "generation_method": generated.get("generation_method", "provider"), "token_usage": generated_usage, "latency_ms":round((time.perf_counter()-attempt_started)*1000)})
                 slot_audit[slot["slot"]] = attempts
                 if not error:
                     candidates.append(candidate)
                 if on_progress:
-                    on_progress({"stage": "generating", "slot": slot["slot"], "attempt": attempt, "completed_slots": len(candidates), "slot_complete": not error or retry == 1, "slot_audit": slot_audit.copy(), "candidate": candidate if not error else None})
+                    on_progress({"stage": "generating", "slot": slot["slot"], "attempt": attempt, "completed_slots": len(candidates), "slot_complete": not error or retry == attempt_limit - 1, "slot_audit": slot_audit.copy(), "candidate": candidate if not error else None})
                 if not error:
                     break
             slot_audit[slot["slot"]] = attempts
@@ -540,40 +602,67 @@ class AiService:
 
     @staticmethod
     def _slot_candidate(slot: dict, generated: dict, instruction: str) -> dict:
-        category, sources = slot["test_category"], slot["sources"]
+        category, sources = slot["test_category"], generated.get('verified_sources', slot["sources"])
+        if generated.get('business_draft_revision'): slot = {**slot, 'difficulty':generated['difficulty']}
         evidence = [] if category == "negative" else [{"source_chunk_ids": [chunk["chunk_id"] for chunk in sources], "evidence_key_points": [chunk.get("chunk_text", chunk.get("text", "")) for chunk in sources]}]
         kind = slot.get("construction_type") or slot.get("structured_type") or 'Ordinary'
         ablation = {key: generated.get(key) for key in ("original_entity", "alias_expression") if generated.get(key)}
-        return {**{key:slot[key] for key in ("generation_strategy", "generation_path", "user_role", "difficulty", "business_negative") if key in slot}, **{key:generated.get(key) for key in ("business_scenario", "user_intent") if slot.get("generation_strategy") == "business_v2"}, "test_category": category, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "expected_behavior": slot.get("expected_behavior") if category == "negative" else None, "negative_subtype": slot.get("negative_subtype"), "evidence": evidence, "ablation_attribute": slot.get("ablation_attribute"), "ablation_metadata": ablation, "coverage_slot": slot["slot"], "source_positive_slot": slot.get("source_positive_slot"), "generation_instruction": instruction, "source": "ai_generated", "construction_type": kind, "topic_cluster": slot.get("topic_cluster"), "related_clusters": slot.get("related_clusters", []), "coverage_anchor_chunk_ids": slot.get("coverage_anchor_chunk_ids", []), "generation_method": generated.get("generation_method", "provider"), **({"business_design":generated["business_design"]} if generated.get("business_design") else {})}
+        return {**{key:slot[key] for key in ("generation_strategy", "generation_path", "user_role", "difficulty", "business_negative") if key in slot}, **{key:generated.get(key) for key in ("business_scenario", "user_intent") if slot.get("generation_strategy") == "business_v2"}, "test_category": category, "question": generated.get("question"), "reference_answer": generated.get("reference_answer"), "expected_behavior": slot.get("expected_behavior") if category == "negative" else None, "negative_subtype": slot.get("negative_subtype"), "evidence": evidence, "ablation_attribute": slot.get("ablation_attribute"), "ablation_metadata": ablation, "coverage_slot": slot["slot"], "source_positive_slot": slot.get("source_positive_slot"), "generation_instruction": instruction, "source": "ai_generated", "construction_type": kind, "topic_cluster": slot.get("topic_cluster"), "related_clusters": slot.get("related_clusters", []), "coverage_anchor_chunk_ids": slot.get("coverage_anchor_chunk_ids", []), "generation_method": generated.get("generation_method", "provider"), **({"business_design":generated["business_design"]} if generated.get("business_design") else {}), **({"business_draft_revision":generated['business_draft_revision']} if generated.get('business_draft_revision') else {})}
 
     @provider_task('revision')
     def business_question_first(self, slot, sources, peers, repair, *, save_design=None, prior_design=None):
         from .business_golden import instruction
-        context = {key:slot.get(key) for key in ('slot','test_category','user_role','difficulty','product','section_path','topic_cluster','business_negative','negative_subtype','expected_behavior','ablation_attribute')}
+        context = {key:slot.get(key) for key in ('slot','test_category','user_role','difficulty','product','topic_label','business_scope','failed_business_intents','topic_cluster','business_negative','negative_subtype','expected_behavior','ablation_attribute')}
         context['prior_questions'] = peers
-        context['failure_reason'] = repair
+        context['previous_attempt_failed'] = bool(repair)
         design = prior_design or json.loads(self.provider.complete(
-            '业务问题设计阶段。未提供PDF原文或答案，禁止猜参考答案。根据角色、产品及主题范围设计真实工作场景，明确遇到的问题和一个核心用户意图，再写自然提问。复杂题仍只考一个业务目标，多个必要步骤可以属于同一目标。消融采用口语表达。负向按给定类型设计真实信息/安全/澄清边界，不虚构功能。仅JSON：question,business_scenario,user_intent。',
+            JUDGE_DATA_BOUNDARY + '业务问题设计阶段。未提供PDF原文或答案，禁止猜参考答案。根据角色、产品及主题范围设计真实工作场景，明确遇到的问题和一个核心用户意图，再写自然提问。只请求一个可验收的业务结果，不同时追加配置选择、流程执行、故障诊断或报告查询等独立目标。必须避开failed_business_intents，换新的独立业务意图，不仅换说法；问题简洁自然，角色和场景放元数据，避免每题套用同一个现场开场白。复杂题仍只考一个业务目标，多个必要步骤可以属于同一目标。消融采用口语表达。负向按给定类型设计真实信息/安全/澄清边界，不虚构功能。重试只获失败标记，不获答案或证据摘要；换一个真实的独立业务意图，不拼接问题。仅JSON：question,business_scenario,user_intent。',
             json.dumps(context,ensure_ascii=False), json_mode=True))
         fields = ('question','business_scenario','user_intent')
         if not isinstance(design,dict) or any(not isinstance(design.get(key),str) or not design[key].strip() for key in fields):
             raise ValueError('业务问题设计字段缺失')
         design = {key:design[key] for key in fields}
         if save_design: save_design(design)
+        hits = self.retriever.retrieve(design['question'], DEFAULT_PIPELINE_CONFIG)
+        known = {chunk['chunk_id']:chunk for chunk in self.corpus.chunks()}
+        keys = list(dict.fromkeys([source['chunk_id'] for source in slot['sources']] + [key for hit in hits for key in hit.get('matched_child_ids', [])]))
+        pool = [known[key] for key in keys if key in known and known[key].get('product') == slot.get('product')]
+        if slot['test_category'] != 'negative':
+            pages = {(c.get('document_id'),page) for c in pool if type(c.get('page_start')) is int and type(c.get('page_end')) is int for page in range(c['page_start'],c['page_end']+1)}
+            pool.extend(c for key,c in known.items() if key not in {source['chunk_id'] for source in pool} and c.get('product') == slot.get('product') and type(c.get('page_start')) is int and type(c.get('page_end')) is int and any((c.get('document_id'),page) in pages for page in range(c['page_start'],c['page_end']+1)))
+        sources = [{key:chunk.get(key) for key in ('chunk_id','product','document_name','section_path','page_start','page_end','chunk_text')} for chunk in pool]
         grounded = json.loads(self.provider.complete(
-            instruction(slot,repair) + '此处仅核验已经设计的问题，question/business_scenario/user_intent必须逐字保持business_design，不能围绕答案改写问题。证据无法回答或不符合Slot时返回verification_error原因，不编造答案。',
-            json.dumps({'business_design':design,'sources':sources,'parent_context':self.business_parent_context(slot)},ensure_ascii=False), json_mode=True))
+            instruction(slot,repair) + '正向/消融须额外返回source_chunk_ids，仅选sources中真正支持答案的Child，不把材料Anchor充当答案证据。此处仅核验已经设计的问题，question/business_scenario/user_intent必须逐字保持business_design，不能围绕答案改写问题。正向/消融须核对同页续段和完整流程范围，不漏必要后续步骤或安全条件，不把邻近但适用条件不同的重启/故障恢复步骤拼入答案；source_chunk_ids必须覆盖所有实际必要事实。正向/消融无法回答时返回verification_error；Negative核验的是所给子类型的澄清/拒答边界，信息缺失可能正是预期，不能仅因无答案返回verification_error；仅在负向类型或场景不成立、实际可以直接回答而不应拒答时返回verification_error。局部无答案不证明整库缺失，后续真实整库Probe仍须检查。Negative返回原设计三字段及reference_answer:null，不编造答案。',
+            json.dumps({'business_design':design,'sources':sources,'parent_context':self.business_parent_context({'sources':pool})},ensure_ascii=False), json_mode=True))
+        error = None
         if not isinstance(grounded,dict) or grounded.get('verification_error'):
-            raise ValueError('业务问题证据核验失败：'+str(grounded.get('verification_error') if isinstance(grounded,dict) else 'invalid object'))
-        if any(grounded.get(key)!=design[key] for key in fields):
-            raise ValueError('证据核验不得改写业务问题设计')
-        return {**grounded,'business_design':design,'generation_path':'business_question_first'}
+            error = '业务问题证据核验失败：'+str(grounded.get('verification_error') if isinstance(grounded,dict) else 'invalid object')
+        elif any(grounded.get(key)!=design[key] for key in fields):
+            error = '证据核验不得改写业务问题设计'
+        if error:
+            failure = ValueError(error)
+            failure.business_design = design
+            failure.verified_sources = pool
+            raise failure
+        selected = grounded.get('source_chunk_ids')
+        if slot['test_category'] != 'negative' and (not isinstance(selected,list) or not selected or any(key not in {chunk['chunk_id'] for chunk in pool} for key in selected)):
+            failure = ValueError('证据核验缺少有效Child引用')
+            failure.business_design = design
+            failure.verified_sources = pool
+            raise failure
+        return {**{key:grounded.get(key) for key in (*fields,'reference_answer','source_chunk_ids','original_entity','alias_expression')},'business_design':design,'generation_path':'business_question_first',
+                'verified_sources':[known[key] for key in dict.fromkeys(selected)] if slot['test_category'] != 'negative' else slot['sources']}
 
     def business_parent_context(self, slot):
         ids = {source.get('parent_chunk_id') for source in slot['sources']}
         import pathlib
         path = pathlib.Path(self.corpus.index_dir) / 'parents.json'
-        return [{key:p.get(key) for key in ('chunk_id','document_name','section_path','page_start','page_end','chunk_text')} for p in json.loads(path.read_text()) if p['chunk_id'] in ids]
+        parents = [{key:p.get(key) for key in ('chunk_id','document_name','section_path','page_start','page_end','chunk_text')} for p in json.loads(path.read_text()) if p['chunk_id'] in ids]
+        full_text_path = path.parent / 'full_text.json'
+        if full_text_path.is_file():
+            pages = {(c['document_id'],page) for c in slot['sources'] for page in range(c['page_start'],c['page_end']+1)}
+            parents.extend({'document_id':p['document_id'],'page_start':p['page'],'page_end':p['page'],'chunk_text':p['text'],'source_scope':'original_parsed_page'} for p in json.loads(full_text_path.read_text())['pages'] if (p['document_id'],p['page']) in pages)
+        return parents
 
     @provider_task('business_audit')
     def business_quality_audit(self, item, peers, *, context_chunk_ids=()):
@@ -597,9 +686,12 @@ class AiService:
         sources.extend(by_id[key] for key in sorted(extra-{None}) if key in by_id and key not in {s['chunk_id'] for s in sources})
         sources.extend(by_id[key] for key in dict.fromkeys(context_chunk_ids) if key not in {s['chunk_id'] for s in sources})
         corpus_fingerprint = manifest_identity(current_manifest())
-        payload = {'question':item['question'], 'answer':item['reference_answer'], 'metadata':{key:item['raw'].get(key) for key in ('user_role','business_scenario','user_intent','difficulty','business_negative','expected_behavior','expected_response','topic_cluster','product_scope','source_scope','generation_path','business_design')}, 'sources':sources, 'prior_questions':peers}
+        payload = {'question':item['question'], 'answer':item['reference_answer'], 'metadata':{key:item['raw'].get(key) for key in ('user_role','business_scenario','user_intent','difficulty','business_negative','expected_behavior','expected_response','topic_cluster','product_scope','source_scope','generation_path','business_design','business_design_provenance','business_draft_revision')}, 'sources':sources, 'prior_questions':peers}
+        if item['raw'].get('generation_path') == 'business_question_first':
+            payload['parent_context'] = self.business_parent_context({'sources':sources})
+            payload['revisions'] = [{key:revision.get(key) for key in ('id','actor','applied_at','changes','replacement','previous_hash','new_hash')} for revision in self.store.revision_history(item['id']) if revision.get('applied_at') and revision.get('generation_run_id') == item['raw'].get('generation_run_id')]
         with collect_usage() as usage:
-            content = self.provider.complete(JUDGE_DATA_BOUNDARY + '独立审计业务题质量，不预设通过。仅返回JSON对象，顶层为checks字典、reason字符串、difficulty_observed基础/中等/复杂。checks中必须恰有以下十项显式布尔，true表示通过：' + ','.join(CHECKS) + '。naturalness真实用户口吻；business_value工作任务价值；intent仅一个核心用户意图和答案验收目标，同一任务必要步骤可多项，多个独立目标不通过；grounding答案/负向边界依据；independence自包含；copying检验问题是否机械搬运/枚举，business_question_first须对照持久化business_design验证设计先于Evidence且核验未反推改写问题，参考答案原文引用是冻结规范，不因答案逐字引用判失败；duplicates没有语义重复；type正向可答或负向需澄清/拒答；coverage材料主题匹配；diversity难度与意图多样且难度符合目标。不能仅按禁词判断；不得因设备存在型号就推断不存在的版本。', json.dumps(payload,ensure_ascii=False), json_mode=True, temperature=0)
+            content = self.provider.complete(JUDGE_DATA_BOUNDARY + '独立审计业务题质量，不预设通过。仅返回JSON对象，顶层为checks字典、reason字符串、difficulty_observed基础/中等/复杂。checks中必须恰有以下十项显式布尔，true表示通过：' + ','.join(CHECKS) + '。naturalness真实用户口吻；business_value工作任务价值；intent仅一个核心用户意图和答案验收目标，同一任务必要步骤可多项，多个独立目标不通过；grounding答案/负向边界依据；independence自包含；copying检验问题是否机械搬运/枚举，business_question_first须对照持久化business_design验证设计先于Evidence且核验未反推改写问题，参考答案原文引用是冻结规范，不因答案逐字引用判失败；duplicates没有语义重复；type正向可答或负向需澄清/拒答；coverage材料主题匹配；diversity难度与意图多样且难度符合目标。必须核对parent_context中的完整流程适用范围，不能把使用前检查的重启步骤当作安全故障恢复授权；原文动作或部件存在未解决歧义不得因逐字引用而通过。revisions为实际已应用修订谱系，与旧business_design不同不自动证明反推，但必须核对真实前后设计和修订依据，禁止自我肯定。不能仅按禁词判断；不得因设备存在型号就推断不存在的版本。', json.dumps(payload,ensure_ascii=False), json_mode=True, temperature=0)
         try:
             result = json.loads(content)
             if isinstance(result, dict) and 'checks' not in result and set(CHECKS).issubset(result):
