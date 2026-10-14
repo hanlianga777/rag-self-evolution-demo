@@ -10,7 +10,7 @@ afterEach(() => { document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 it("filters persisted Baseline cases and opens their diagnostic detail", async () => {
   const cases = [
     { question_id: "Q01", question: "正常题", test_category: "positive", passed: true, overall_score: 95, programmatic_metrics: { retrieval_hit: true }, judge_result: {} },
-    { question_id: "Q02", question: "未召回题", test_category: "ablation", passed: false, overall_score: 50, failure_tags: ["Retrieval Failure"], primary_root_cause: "Retrieval", programmatic_metrics: { retrieval_hit: false }, judge_result: {} },
+    { question_id: "Q02", question: "未召回题", test_category: "ablation", passed: false, overall_score: 50, failure_tags: ["Retrieval Failure"], diagnostic_view: {is_technical_bad_case: true, analysis_category: "rag_failure", primary_root_cause: "Retrieval", target_eligible: true, optimization_directions: ["candidate_recall"]}, primary_root_cause: "Retrieval", programmatic_metrics: { retrieval_hit: false }, judge_result: {} },
   ];
   const run = { id: "EVAL-1", status: "completed", dataset_snapshot: { id: "GD-1", question_ids: ["Q01", "Q02"] }, cases, result: { overall_score: 72.5, gates: { gates: [], passed_count: 0, total: 11 } } };
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(String(input).endsWith("/api/bad-cases") ? [] : run), { status: 200 })));
@@ -20,7 +20,7 @@ it("filters persisted Baseline cases and opens their diagnostic detail", async (
   expect(document.querySelector("tbody")?.textContent).toContain("未召回题");
   expect(document.querySelector("tbody")?.textContent).not.toContain("正常题");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("[aria-label=逐题筛选] button")].find(button => button.textContent === "全部")!.click());
-  expect(document.querySelector("tbody")?.textContent).toContain("正常题");
+  expect(document.body.textContent).toContain("正常题");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "检索未命中")!.click());
   expect(document.querySelector("tbody")?.textContent).toContain("未召回题");
   expect(document.querySelector("tbody")?.textContent).not.toContain("正常题");

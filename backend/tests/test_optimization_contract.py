@@ -75,7 +75,8 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(audit["provider_raw_text"], raw)
         self.assertNotIn("confidence",provider.prompt["bad_cases"][0]["diagnostic_view"])
         self.assertTrue(provider.prompt["target_reference_map"]["Q1"]["diagnostic_view"]["target_eligible"])
-        self.assertIn("all_bad_case_audit",provider.prompt)
+        self.assertNotIn("all_bad_case_audit",provider.prompt)
+        self.assertIn("all_bad_case_audit",audit)
         self.assertIsNone(provider.prompt["failed_gates"])
         self.assertEqual(provider.prompt["baseline_gate_results"], {"passed": False})
         self.assertEqual(provider.prompt["allowed_parameter_values"], search_space_contract())
@@ -295,14 +296,18 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertNotIn('Q-unknown',provider.prompt['target_reference_map'])
         self.assertFalse(self.store.candidates())
 
-    def test_disputed_cases_are_agent_background_not_targets(self):
+    def test_evaluation_audit_is_local_only_not_strategy_input(self):
         self.store.record_bad_case('EVAL-test','Q-risk','Unknown','ordinary',{'failure_tags':['Evidence Pending Review'],'primary_root_cause':'Unknown','diagnosis':{'status':'disputed','reason':'fixture matcher dispute'}})
         provider=FixedProvider(json.dumps(drafts()))
         OptimizationAgent(self.store,provider).generate('EVAL-test')
         self.assertEqual(len(provider.prompt['bad_cases']),1)
-        self.assertEqual(len(provider.prompt['all_bad_case_audit']),2)
+        self.assertNotIn('all_bad_case_audit',provider.prompt)
+        audit=self.store.experiment(self.store.latest_experiment()['id'])['result']
+        with self.store.connection() as connection:
+            audit=json.loads(connection.execute('SELECT result_json FROM agent_traces ORDER BY id DESC LIMIT 1').fetchone()[0])
+        self.assertEqual(len(audit['all_bad_case_audit']),2)
         self.assertNotIn('Q-risk',provider.prompt['target_reference_map'])
-        risk=next(row for row in provider.prompt['all_bad_case_audit'] if row['question_id']=='Q-risk')
+        risk=next(row for row in audit['all_bad_case_audit'] if row['question_id']=='Q-risk')
         self.assertNotIn('confidence',risk['diagnostic_view'])
         self.assertEqual(risk['diagnostic_view']['analysis_category'],'insufficient_evidence')
         self.assertFalse(risk['diagnostic_view']['target_eligible'])

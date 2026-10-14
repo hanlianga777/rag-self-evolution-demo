@@ -58,12 +58,12 @@ it('separates saved formal blockers from confirmed regression without clearing p
 });
 it('uses saved root evidence in the compact diagnosis column and keeps absent evidence pending',async()=>{
  const {DiagnosisTable}=await import('./components/EvaluationDiagnosis');
- await render(<DiagnosisTable rows={[{question_id:'q1',diagnosis:{answer_quote:'保存的答案原文',reason:'保存原因'},judge_result:{reason:'非根因评语'}},{question_id:'q2',judge_result:{reason:'不能冒充核心证据'}}]} onSelect={()=>{}}/>);
- expect(document.querySelector('tbody')?.textContent).toContain('保存的答案原文');expect(document.querySelector('tbody')?.textContent).toContain('核心证据未采集');expect(document.querySelector('tbody')?.textContent).not.toContain('不能冒充核心证据');
+ await render(<DiagnosisTable rows={[{question_id:'q1',diagnostic_view:{is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Generation',optimization_directions:['grounded_generation'],evidence_checks:[{answer_quote:'保存的答案原文'}]},diagnosis:{answer_quote:'保存的答案原文',reason:'保存原因'},judge_result:{reason:'非根因评语'}},{question_id:'q2',judge_result:{reason:'不能冒充核心证据'}}]} onSelect={()=>{}}/>);
+ expect(document.querySelector('tbody')?.textContent).toContain('保存的答案原文');expect(document.querySelector('tbody')?.textContent).not.toContain('q2');expect(document.querySelector('tbody')?.textContent).not.toContain('不能冒充核心证据');
 });
 it('keeps all Full100 diagnosis rows available in pages of fifty and resets after filtering',async()=>{
  const {DiagnosisTable}=await import('./components/EvaluationDiagnosis');
- const rows=Array.from({length:100},(_,i)=>({question_id:`Q${i+1}`,question:`完整题目${i+1}`})),onSelect=vi.fn();
+ const rows=Array.from({length:100},(_,i)=>({question_id:`Q${i+1}`,question:`完整题目${i+1}`,diagnostic_view:{is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Retrieval',optimization_directions:['candidate_recall']}})),onSelect=vi.fn();
  await render(<DiagnosisTable rows={rows} onSelect={onSelect}/>);
  expect(document.querySelectorAll('tbody tr')).toHaveLength(50);expect(document.querySelector('tbody')?.textContent).toContain('完整题目50');expect(document.querySelector('tbody')?.textContent).not.toContain('完整题目51');
  await click('下一页');expect(document.querySelectorAll('tbody tr')).toHaveLength(50);expect(document.querySelector('tbody')?.textContent).toContain('完整题目100');

@@ -1,8 +1,10 @@
 # RAG Evolution
 
-2026-10-14最终收口：Bad Case业务流程移除诊断可信度分类；全部问题按实际证据自动分析，评测范围核验问题不驱动RAG调参。普通Positive错误不因behavior=false归Safety。Judge/Matcher/Policy再次升级，正式实验须另行授权同新版Baseline；原始审计与三个Human Gate保持。[最终验收](docs/BAD_CASE_FINAL_MECHANISM_ACCEPTANCE.md)。
+2026-10-14当前收口：技术Bad Case与独立质量审计分离；当前95.80 Mini20核实Q03 Generation、Q10候选召回Retrieval，Q06不作为调参目标。仅诊断与Agent输入修复，Evaluation Identity不变，当前Baseline可直接复用，无须再次付费评测。本轮Provider0，等待用户在前端启动Agent。[A—H验收](docs/BAD_CASE_VALIDITY_ACCEPTANCE.md)。
 
-2026-10-14：全部Bad Case自动分析，按实际回答/证据/Trace筛选可信优化目标；评测规则问题不进入RAG参数优化，不新增人工Gate。Matcher/Policy已升级，历史Mini20 Baseline仍保留原成绩，后续正式实验须另行授权新版Baseline。Baseline详情与Golden Candidate共享视觉规范，原始答案及审计保留。[本轮验收](docs/BAD_CASE_AUTOMATION_ACCEPTANCE.md)。
+历史阶段记录（已由上条覆盖）：Bad Case业务流程移除诊断可信度分类；全部问题按实际证据自动分析，评测范围核验问题不驱动RAG调参。普通Positive错误不因behavior=false归Safety。Judge/Matcher/Policy再次升级，正式实验须另行授权同新版Baseline；原始审计与三个Human Gate保持。[最终验收](docs/BAD_CASE_FINAL_MECHANISM_ACCEPTANCE.md)。
+
+历史阶段记录：全部Bad Case自动分析，按实际回答/证据/Trace筛选可信优化目标；评测规则问题不进入RAG参数优化，不新增人工Gate。Matcher/Policy已升级，历史Mini20 Baseline仍保留原成绩，后续正式实验须另行授权新版Baseline。Baseline详情与Golden Candidate共享视觉规范，原始答案及审计保留。[本轮验收](docs/BAD_CASE_AUTOMATION_ACCEPTANCE.md)。
 
 当前规则以[唯一SPEC文首](docs/RAG_SELF_EVOLUTION_SPEC.md)为准。2026-10-14已按用户授权清空历史实验，知识资产保持；当前问答使用保留参数的**初始配置（未评测、未发布）**。新Golden、Baseline与受控候选需重新治理，不自动恢复历史审计。
 

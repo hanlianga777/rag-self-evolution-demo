@@ -43,8 +43,8 @@ it('keeps raw answers and all technical records in a closed audit while presenti
 it('uses automatic evidence assessment instead of historical confidence for the business conclusion', () => {
   render(<BaselineCaseDetails item={{ passed: false, question_id: 'offline', diagnosis: { status: 'disputed' }, primary_root_cause: 'Unknown', diagnostic_view: { analysis_category: 'evaluation_issue', analysis_reason: '安全拒答正确，但评测规则存在兼容问题。', target_eligible: false } }} snapshot={{}} config={{}} gates={[]} />);
   const cards = document.querySelectorAll('.bad-case-details > section');
-  expect(cards[0].textContent).toContain('评测规则问题');
-  expect(cards[4].textContent).toContain('不能通过调整 RAG 参数消除评测误判');
+  expect(cards[0].textContent).toContain('评测核验未闭合');
+  expect(cards[4].textContent).toContain('原失败与资格阻断保持，不形成 RAG 调参目标');
   expect(cards[3].textContent).toContain('最终上下文 未采集');
 });
 it('formats mixed HTML and markdown lists and turns behavior enums into the saved business expectation', () => {
@@ -80,7 +80,7 @@ it('shows concrete saved contradiction quotes, source facts and missing facts in
 });
 
 it.each(['confirmed','disputed','needs_review'])('keeps historical and Agent shared details free of confidence labels while preserving %s raw audit', status => {
-  const item = {question_id:'historical-case',primary_root_cause:'Safety',diagnosis:{status,reason:'旧诊断'},diagnostic_view:{primary_root_cause:'Generation',analysis_category:'rag_failure',analysis_reason:'已有依据被错误解释',target_eligible:true}};
+  const item = {question_id:'historical-case',primary_root_cause:'Safety',diagnosis:{status,reason:'旧诊断'},diagnostic_view:{primary_root_cause:'Generation',analysis_category:'rag_failure',is_technical_bad_case:true,optimization_directions:['grounded_generation'],analysis_reason:'已有依据被错误解释',target_eligible:true}};
   const before=JSON.stringify(item);
   render(<CaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
   const business=[...document.querySelectorAll('.bad-case-details > section')].map(el=>el.textContent).join('');

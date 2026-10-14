@@ -72,6 +72,23 @@ def validate_intervention(candidate, targets, baseline):
         if not isinstance(candidate.get(field),str) or not candidate[field].strip():raise ValueError('缺少可验证假设、预期改善或回归风险')
 
 
+def strategy_case(row):
+    """Only verified technical findings enter strategy input; raw audits stay local."""
+    case=row.get('result',{})
+    view=row.get('diagnostic_view') or diagnostic_view(case)
+    return {'id':row.get('id'),'question_id':row.get('question_id'),'category':view['primary_root_cause'],
+            'result':{key:case.get(key) for key in ('question','reference_answer','model_answer','test_category','negative_subtype')} | {'primary_root_cause':view['primary_root_cause']},
+            'retrieval_trace':(case.get('programmatic_metrics') or {}).get('retrieval_trace'),
+            'golden_evidence':{key:(case.get('programmatic_metrics') or {}).get('evidence_sufficiency',{}).get(key) for key in ('source_constraints','facts')},
+            'diagnostic_view':{key:view[key] for key in ('analysis_category','analysis_reason','primary_root_cause','target_eligible','is_technical_bad_case','evidence_checks','optimization_directions','trace_observations','retrieval_failure_stage')}}
+
+
+def strategy_candidate(candidate):
+    return {key:candidate.get(key) for key in ('id','config','status')} | {
+        'reasoning':{key:value for key,value in candidate.get('reasoning',{}).items() if key!='target_diagnosis'},
+        'result':{key:value for key,value in candidate.get('result',{}).items() if key not in {'checkpoints','all_bad_case_audit'}}}
+
+
 class OptimizationAgent:
     def __init__(self, store, provider):
         self.store = store
@@ -109,7 +126,7 @@ class OptimizationAgent:
         monitoring_target_event_ids = [event["id"]] if event else []
         target_reference_map = {}
         for item in bad_cases:
-            reference = {"source": "baseline_bad_case", "baseline_id": baseline_run_id, "bad_case_id": item["id"], "question_id": item["question_id"], "primary_root_cause": item["diagnostic_view"]["primary_root_cause"], "analysis_category": item["diagnostic_view"]["analysis_category"], "root_cause_evidence": item["diagnostic_view"]["evidence_checks"], "diagnostic_view":item["diagnostic_view"]}
+            reference = {"source": "baseline_bad_case", "baseline_id": baseline_run_id, "bad_case_id": item["id"], "question_id": item["question_id"], "primary_root_cause": item["diagnostic_view"]["primary_root_cause"], "analysis_category": item["diagnostic_view"]["analysis_category"], "root_cause_evidence": item["diagnostic_view"]["evidence_checks"], "diagnostic_view":strategy_case(item)["diagnostic_view"]}
             target_reference_map[item["id"]] = reference
             target_reference_map[item["question_id"]] = reference
         if event:
@@ -119,7 +136,7 @@ class OptimizationAgent:
         persisted_gates = (gate_results or {}).get("gates")
         failed_gates = [gate for gate in persisted_gates if gate.get("passed") is False] if isinstance(persisted_gates, list) else None
         labels = ['A', 'B', 'C'][:min(3, MAX_EVALS - 1 - completed)]
-        audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "root_cause_counts": dict(Counter(item['diagnostic_view']['primary_root_cause'] for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases], "monitoring_context": monitoring_context, "monitoring_target_event_ids": monitoring_target_event_ids, "target_reference_map": target_reference_map, "evaluation_budget": evaluation_budget, "baseline_gate_results": gate_results, "failed_gates": failed_gates}
+        audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "all_bad_case_audit": [{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases], "root_cause_counts": dict(Counter(item['diagnostic_view']['primary_root_cause'] for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases], "monitoring_context": monitoring_context, "monitoring_target_event_ids": monitoring_target_event_ids, "target_reference_map": target_reference_map, "evaluation_budget": evaluation_budget, "baseline_gate_results": gate_results, "failed_gates": failed_gates}
         prompt = {
             "baseline_id": baseline_run_id,
             "experiment_id": experiment_id,
@@ -127,9 +144,8 @@ class OptimizationAgent:
             "failed_gates": failed_gates,
             "evaluation_budget": evaluation_budget,
             "target_reference_map": target_reference_map,
-            # result_json is an identical serialized copy of result; keep full evidence once per row.
-            "bad_cases": [{k:v for k,v in row.items() if k!='result_json'} for row in bad_cases],
-            "all_bad_case_audit": [{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases],
+            # Verified strategy evidence only; complete raw audits are persisted locally.
+            "bad_cases": [strategy_case(row) for row in bad_cases],
             "monitoring_context": monitoring_context,
             "monitoring_target_event_ids": monitoring_target_event_ids,
             "baseline_configuration": base_config,
@@ -225,7 +241,7 @@ class OptimizationAgent:
             for candidate, config in staged:
                 batch.append((f"R{round_number}-{candidate['id']}", config, {
                     "intervention_direction":candidate['intervention_direction'], "parameter_dependencies":candidate.get('parameter_dependencies',[]), "evidence_assertions":candidate['evidence_assertions'], "performance_stage":candidate.get('performance_stage'),
-                    "target_group": candidate["target_group"], "root_cause": candidate["root_cause"], "root_cause_evidence": candidate["root_cause_evidence"], "expected_improvement": candidate["expected_improvement"], "target_diagnosis": [item for item in bad_cases if item["id"] in candidate["target_bad_cases"] or item["question_id"] in candidate["target_bad_cases"]], "root_cause_cluster": result.get("root_cause_cluster", "证据核查未完成"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
+                    "target_group": candidate["target_group"], "root_cause": candidate["root_cause"], "root_cause_evidence": candidate["root_cause_evidence"], "expected_improvement": candidate["expected_improvement"], "target_diagnosis": [strategy_case(item) for item in bad_cases if item["id"] in candidate["target_bad_cases"] or item["question_id"] in candidate["target_bad_cases"]], "root_cause_cluster": result.get("root_cause_cluster", "证据核查未完成"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
                     "changed_parameters": {key: value for key, value in config.items() if value != base_config.get(key)}, "source_trigger_id": trigger_id, "monitoring_target_event_ids": monitoring_target_event_ids, "round": round_number, "candidate_label": candidate["id"],
                 }))
             audit["validation_stage"] = "persistence"

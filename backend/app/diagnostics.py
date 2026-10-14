@@ -123,6 +123,19 @@ def automatic_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
         result.update(analysis_category='evaluation_issue',analysis_reason='原Judge已核验所问步骤完整正确；附加说明有原文出处，但来源流程适用范围未完成结构化核验，不能据此生成RAG调参目标。',
                       evidence_checks=pending)
         return result
+    if (case.get('test_category') in {'positive','ablation'} and pending and not confirmed
+        and judge.get('behavior_pass') is True and judge.get('correctness')==4
+        and judge.get('faithfulness')==1 and judge.get('completeness')==1
+        and not judge.get('missing_points') and sufficiency.get('sufficient') is True
+        and sufficiency.get('source_applicable') is True and not sufficiency.get('unresolved_conflicts')
+        and all(r.get('kind')=='unresolved' and r.get('changes_operation') is False
+                and (r.get('operation_basis') or {}).get('effect')=='none'
+                and normalize(r.get('claim','')) and normalize(r['claim']) in normalize(case.get('model_answer',''))
+                and not set(r.get('verification_issues',[])) & {'answer_quote_unlocated','source_quote_unlocated'} for r in pending)):
+        result.update(analysis_category='evaluation_issue',analysis_reason='所问事实已由原Judge核验完整正确，未闭合项仅为附加主张的证据或适用范围；保留正式失败与资格阻断，不能推定RAG技术故障。',evidence_checks=pending)
+        return result
+    # Independently proved required-fact omissions do not inherit the unresolved
+    # status of unrelated additions. All source/semantic/identity guards still apply.
     # An explicitly collected empty Final has no equivalent source facts. Legacy
     # traces may lack stage metadata; a missing/failed trace is never an empty one.
     required=set((metrics.get('evidence_coverage') or {}).get('required_chunk_ids') or [])
@@ -152,7 +165,7 @@ def automatic_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     if (case.get('test_category') in {'positive','ablation'} and required and isinstance(candidates,list)
         and isinstance(trace.get('final'),list) and isinstance(trace.get('reranked'),list) and sufficiency.get('sufficient') is False
         and sufficiency.get('source_applicable') is True and not sufficiency.get('unresolved_conflicts')
-        and not claims.get('pending') and judge.get('completeness',1)<1 and judge.get('missing_points')
+        and judge.get('completeness',1)<1 and judge.get('missing_points')
         and judge.get('evidence_sufficiency',{}).get('status')=='insufficient'
         and judge['evidence_sufficiency'].get('source_applicable') is True
         and isinstance(judge['evidence_sufficiency'].get('fact_support'),list)
@@ -262,8 +275,19 @@ def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
     root=analysis['primary_root_cause']
     if case.get('test_category') in {'positive','ablation'} and root!='Safety':
         phenomena.pop('安全边界失守',None)
+    from .optimization import INTERVENTIONS
+    directions=[name for name,(_,required_observations) in INTERVENTIONS.items() if set(observations)&required_observations]
+    technical=analysis['target_eligible'] and root in {'Retrieval','Generation','Safety','Performance'} and bool(directions)
+    issues=[{'type':g.get('type','evaluation_audit'),'evidence':g.get('evidence',g)} for g in governance]
+    if not technical and case.get('passed') is False:
+        issues.append({'type':analysis['analysis_category'],'reason':analysis['analysis_reason'],'evidence':analysis['evidence_checks']})
+    # Quality-audit labels and legacy secondary roots must not pollute technical charts.
+    for name in ('主张定位/范围核验缺口','评测证据核验缺口','来源冲突','检索失败信号待核实','延迟信号待核实','拒答归因待核实','噪声归因待核实'):
+        phenomena.pop(name,None)
     return {'view_version':'diagnosis-view-v3',**analysis,'phenomena':list(phenomena.values()),'primary_root_cause':root,
-            'secondary_root_causes':case.get('secondary_root_causes') or case.get('root_cause',{}).get('secondary') or [],
+            'secondary_root_causes':[],
+            'is_technical_bad_case':technical,'optimization_directions':directions if technical else [],
+            'evaluation_quality_audit':{'issues':issues,'blocking':bool(issues) and case.get('passed') is False},
             'root_cause_evidence':{'reason':analysis['analysis_reason'],'findings':analysis['evidence_checks']},'governance':governance,
-            'target_eligible':analysis['target_eligible'],
+            'target_eligible':technical,
             'typical_detection':detection,'latency':latency,'trace_observations':observations}

@@ -54,7 +54,7 @@ it("formats Baseline time locally and shortens the run ID", async () => {
 });
 
 it("keeps the Baseline Bad Case table compact and detail ready", async () => {
-  const run = { id: "EVAL-1", status: "completed", dataset_snapshot: { question_ids: ["Q1"] }, result: { gates: { gates: [], total: 11, passed_count: 8 } }, cases: [{ question_id: "Q1", question: "发生故障后如何恢复运行？", passed: false, primary_root_cause: "Generation", failure_tags: ["Hallucination", "Citation Failure", "Unsupported Claim"] }] };
+  const run = { id: "EVAL-1", status: "completed", dataset_snapshot: { question_ids: ["Q1"] }, result: { gates: { gates: [], total: 11, passed_count: 8 } }, cases: [{ question_id: "Q1", question: "发生故障后如何恢复运行？", passed: false, diagnostic_view: {is_technical_bad_case: true, analysis_category: "rag_failure", primary_root_cause: "Generation", target_eligible: true, optimization_directions: ["grounded_generation"]}, primary_root_cause: "Generation", failure_tags: ["Hallucination", "Citation Failure", "Unsupported Claim"] }] };
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(String(input).endsWith("/api/bad-cases") ? [] : run), { status: 200 })));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });

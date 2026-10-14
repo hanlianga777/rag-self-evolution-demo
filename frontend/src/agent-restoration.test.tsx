@@ -7,7 +7,7 @@ import { EvolutionPage } from "./pages/EvolutionPage";
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 let root: ReturnType<typeof createRoot>;
 afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
-const bad = { id: "BC1", run_id: "E1", question_id: "Q1", category: "Generation", result: { question: "设备停机后如何恢复运行？", failure_tags: ["Hallucination"], primary_root_cause: "Generation" } };
+const bad = { id: "BC1", run_id: "E1", question_id: "Q1", category: "Generation", result: { question: "设备停机后如何恢复运行？", failure_tags: ["Hallucination"], diagnostic_view: {is_technical_bad_case: true, analysis_category: "rag_failure", primary_root_cause: "Generation", target_eligible: true, optimization_directions: ["grounded_generation"]}, primary_root_cause: "Generation" } };
 const candidates = ["A", "B", "C"].map((candidate_label, i) => ({ id: `EXP-R1-${candidate_label}`, status: "generated", config: { top_k: 4 + i, prompt_strategy: "grounded" }, reasoning: { round: 1, candidate_label, hypothesis: `验证假设${candidate_label}`, proposal: `方案依据${candidate_label}`, risk: "可能增加噪声", observed_evidence: ["BC1"] }, result: {} }));
 const data = { workspace: { current_baseline_id: "E1" }, evaluation: { id: "E1", status: "completed", config: { top_k: 4 }, result: { gates: { passed: true, passed_count: 11, total: 11 }, bad_case_count: 1 } }, badCases: [bad], optimization: { id: "EXP", baseline_run_id: "E1", candidates, evaluation_budget: { used: 0, max: 12, reserved_for_d: 1 }, rounds: [{ round: 1, total: 3, evaluated: 0, complete: false }], result: { root_cause_cluster: "基于已保存证据验证回答边界" } } };
 async function mount(value: any = data) { vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} })))); root = createRoot(document.body.appendChild(document.createElement("div"))); await act(async () => root.render(<EvolutionPage data={value} />)); }
@@ -16,7 +16,7 @@ async function click(label: string) { await act(async () => [...document.querySe
 it("restores stages and complete generated plans without inventing evaluated results", async () => {
   const frozen = JSON.stringify(data); await mount();
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
-  expect(document.body.textContent).toContain("仍有 1 个 Bad Case");
+  expect(document.body.textContent).toContain("原始失败 1 题");
   await click("Agent策略");
   expect(document.body.textContent).toContain("实验概览");
   expect(document.querySelectorAll(".experiment-plan article")).toHaveLength(3);

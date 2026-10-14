@@ -1,4 +1,4 @@
-.evaluation-page .baseline-metrics {grid-template-columns:repeat(3,minmax(0,1fr));}
+.evaluation-page .baseline-metrics {grid-template-columns:repeat(4,minmax(0,1fr));}
 .evaluation-page .baseline-table th,.evolution-page .sandbox-core-table th {white-space:normal;}
 .evaluation-page .baseline-cases-table td {vertical-align:top;}
 .evaluation-page .baseline-cases-table th:first-child {width:28%;}

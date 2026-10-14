@@ -1,3 +1,10 @@
+## 2026-10-14 — Bad Case有效性与Agent策略输入隔离
+
+- 独立核验当前95.80 Mini20：Q03 Generation、Q10候选召回Retrieval；Q06主体正确，附加版本元数据断言未闭合，仅保留质量审计。
+- 通用必要事实诊断不再被无关pending全局否决，保留全部来源/Corpus/Canonical Final/语义遗漏防护。四类技术目标须有可验证方向；质量审计与技术故障可同题并存。
+- ABC/D策略输入投影仅正式技术证据，完整原始失败审计只留本地；业务技术列表/分布与质量审计分开，无新工作台或审批。
+- Judge/Matcher/Policy身份不变，当前正式Baseline可复用；原分数、Golden、11 Gate、Regression、默认参数与三个Human Gate不改。Provider0，隔离Mock验收，停止等待用户运行Agent。[A—H验收](BAD_CASE_VALIDITY_ACCEPTANCE.md)。
+
 ## 2026-10-14 — Bad Case诊断与Agent机制最终收口
 
 - 移除业务诊断可信度体系及其API派生/前端统计筛选列；历史status与原Judge/Matcher/Regression审计保留，Golden治理状态不变。
