@@ -87,7 +87,10 @@ class FixtureEvaluationRuntime:
         correct = answer != "错误答案"
         result = context_judgment({"correctness": 4 if correct else 0, "faithfulness": 1 if correct else .5, "completeness": 1 if correct else 0, "behavior_pass": True, "reason": "固定 Judge", "missing_points": [], "unsupported_claims": [] if correct else [answer]}, context)
         if not correct:
+            result['missing_points']=[f['fact'] for f in (context or {}).get('programmatic_evidence_observation',{}).get('facts',[])]
             result['claim_reviews'] = [{'unsupported_claim_index':0, 'claim':answer, 'kind':'contradiction', 'changes_operation':True, 'operation_basis':{'effect':'technical_change','source_applicable':True}, 'critical':True, 'reason':'Fixture answer contradicts reference', 'support':[{'chunk_id':e['chunk_id'], 'quote':e['content']} for e in (context or {}).get('final_context', []) if e.get('content')][:1]}]
+        if not correct and not (context or {}).get('final_context'):
+            result.update(unsupported_claims=[],claim_reviews=[])
         return result
 
 
@@ -175,9 +178,12 @@ class V11BusinessE2E(unittest.TestCase):
         version = self.store.publish_candidate(recommendation["recommended_candidate"], "fixture_reviewer")
         self.assertEqual(version["snapshot"]["human_release"]["actor"], "fixture_reviewer")
         self.assertEqual(version["previous_version_id"], "baseline-v1")
-        from app.corpus import INDEX_DIR
-        with patch('app.knowledge_pipeline.index_for_config', return_value=INDEX_DIR):
-            self.assertEqual(self.store.rollback_to("baseline-v1", "fixture_reviewer")["id"], "baseline-v1")
+        from test_v14_probe_cost import bundle
+        with tempfile.TemporaryDirectory() as directory:
+            index=Path(directory)/'rollback-index'
+            bundle(index)
+            with patch('app.knowledge_pipeline.index_for_config', return_value=index):
+                self.assertEqual(self.store.rollback_to("baseline-v1", "fixture_reviewer")["id"], "baseline-v1")
         self.assertEqual(len(self.store.production_versions()), 2)
 
     def test_e2e_05_production_monitoring_loop(self):

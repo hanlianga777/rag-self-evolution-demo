@@ -100,6 +100,8 @@ class ContextTests(unittest.TestCase):
 
 class CompositeTests(unittest.TestCase):
     def setUp(self):
+        from diagnostic_fixture import install_corpus, retrieval_case
+        install_corpus(self)
         from app.governance import GovernanceStore
         from app.corpus import current_manifest, manifest_identity
         from app.policy import DEFAULT_PIPELINE_CONFIG
@@ -110,7 +112,7 @@ class CompositeTests(unittest.TestCase):
         with self.store.connection() as c:c.execute("INSERT INTO dataset_versions VALUES (?, 'approved','human_review',?,'now')",('fixture-g',json.dumps(self.snapshot)))
         self.baseline=self.store.create_evaluation_run(self.snapshot,{**DEFAULT_PIPELINE_CONFIG,'run_target':'baseline'},self.meta)
         self.store.record_evaluation_case(self.baseline,'q',{'passed':False})
-        self.store.record_bad_case(self.baseline,'q','Retrieval','ordinary',{'primary_root_cause':'Retrieval','diagnosis':{'status':'confirmed','reason':'fixture gap'},'programmatic_metrics':{'evidence_coverage':{'required_chunk_ids':['c']},'retrieval_trace':{'candidates':[],'final':[]}}})
+        self.store.record_bad_case(self.baseline,'q','Retrieval','ordinary',retrieval_case()[0])
         self.store.finish_evaluation_run(self.baseline,'completed',{'gates':{'passed':True}})
         self.experiment=self.store.create_experiment(self.baseline,'completed')
         self.winner=self.store.save_candidate(self.experiment,'A',DEFAULT_PIPELINE_CONFIG,{'candidate_label':'A','round':1,'observed_evidence':['q']})

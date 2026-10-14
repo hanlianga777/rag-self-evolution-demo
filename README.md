@@ -1,5 +1,7 @@
 # RAG Evolution
 
+2026-10-14：全部Bad Case自动分析，按实际回答/证据/Trace筛选可信优化目标；评测规则问题不进入RAG参数优化，不新增人工Gate。Matcher/Policy已升级，历史Mini20 Baseline仍保留原成绩，后续正式实验须另行授权新版Baseline。Baseline详情与Golden Candidate共享视觉规范，原始答案及审计保留。[本轮验收](docs/BAD_CASE_AUTOMATION_ACCEPTANCE.md)。
+
 当前规则以[唯一SPEC文首](docs/RAG_SELF_EVOLUTION_SPEC.md)为准。2026-10-14已按用户授权清空历史实验，知识资产保持；当前问答使用保留参数的**初始配置（未评测、未发布）**。新Golden、Baseline与受控候选需重新治理，不自动恢复历史审计。
 
 评估按答案质量/检索效果/安全鲁棒/性能体验组织；Pending及Disputed仍阻断资格，与已确认失败分开解释。Agent允许0–3个有真实Trace支持、单一干预的候选；D同样验证，11 Gate与正式Regression阈值不变。真实模型效果未由本轮离线测试确认。

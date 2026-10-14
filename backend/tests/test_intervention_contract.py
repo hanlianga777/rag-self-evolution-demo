@@ -16,9 +16,8 @@ from app.evaluation_contract import compare_cases
 
 
 def target(root='Generation', final=True):
-    return {'primary_root_cause':root,'diagnosis':{'status':'confirmed','findings':[{'kind':'unsupported_instruction'}]},
-        'programmatic_metrics':{'evidence_coverage':{'required_chunk_ids':['c']},
-            'evidence_sufficiency':{'sufficient':final},'retrieval_trace':{'candidates':[{'chunk_id':'c'}],'final':[{'chunk_id':'c'}] if final else []}}}
+    from diagnostic_fixture import generation_case, retrieval_case
+    return generation_case(root) if final else retrieval_case()[0]
 
 
 def proposal(direction='grounded_generation', diff=None, observation='confirmed_claim'):
@@ -28,6 +27,12 @@ def proposal(direction='grounded_generation', diff=None, observation='confirmed_
 
 
 class InterventionTests(unittest.TestCase):
+    def setUp(self):
+        from unittest.mock import patch
+        from diagnostic_fixture import retrieval_case
+        corpus=patch('app.diagnostics._current_corpus',return_value=(retrieval_case()[1],{'corpus':'one'}))
+        corpus.start();self.addCleanup(corpus.stop)
+
     def test_final_complete_cannot_be_called_recall_failure(self):
         case=target();p=proposal('query_expansion',{'query_rewrite':True},'recall_missing')
         with self.assertRaisesRegex(ValueError,'Trace'):validate_intervention(p,{'q':case},{'query_rewrite':False})
@@ -43,18 +48,21 @@ class InterventionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'Trace'):validate_intervention(p,{'q':case},{'candidate_k':12})
 
     def test_ranking_omission_and_recall_gap_are_distinct(self):
-        case=target(final=False);p=proposal('context_selection',{'top_k':6},'ranking_omission')
+        case=target(final=False);p=proposal('context_selection',{'top_k':6},'ranking_omission');p['root_cause']='Retrieval'
+        case['programmatic_metrics']['retrieval_trace']['candidates'].append({'chunk_id':'missing'})
+        case['programmatic_metrics']['retrieval_trace']['reranked'].append({'chunk_id':'missing'})
         validate_intervention(p,{'q':case},{'top_k':4})
         p.update(intervention_direction='candidate_recall',config_diff={'candidate_k':24},evidence_assertions=[{'target_id':'q','observation':'recall_missing'}])
         with self.assertRaisesRegex(ValueError,'Trace'):validate_intervention(p,{'q':case},{'candidate_k':12})
         case['programmatic_metrics']['retrieval_trace']['candidates']=[]
+        case['programmatic_metrics']['retrieval_trace']['reranked']=[]
         validate_intervention(p,{'q':case},{'candidate_k':12})
 
     def test_cross_direction_rejected_dependencies_required(self):
         p=proposal(diff={'prompt_strategy':'Grounded','metadata_filter':'STRICT'})
         with self.assertRaisesRegex(ValueError,'方向'):validate_intervention(p,{'q':target()},{'prompt_strategy':'Abstention','metadata_filter':'OFF'})
         case=target(final=False);case['programmatic_metrics']['retrieval_trace']['candidates']=[]
-        p=proposal('query_expansion',{'query_rewrite':True,'multi_query':2},'recall_missing')
+        p=proposal('query_expansion',{'query_rewrite':True,'multi_query':2},'recall_missing');p['root_cause']='Retrieval'
         with self.assertRaisesRegex(ValueError,'依赖'):validate_intervention(p,{'q':case},{'query_rewrite':False,'multi_query':False})
         p['parameter_dependencies']=[{'parameters':['query_rewrite','multi_query'],'reason':'两种查询分别覆盖原问别名与同义表达缺口'}]
         validate_intervention(p,{'q':case},{'query_rewrite':False,'multi_query':False})
@@ -82,16 +90,23 @@ class InterventionTests(unittest.TestCase):
     def test_confirmed_candidate_to_final_omission_is_retrieval_with_ranking_stage(self):
         from app.evaluation import EvaluationRunner
         judgment={'correctness':0,'faithfulness':1,'completeness':0,'behavior_pass':True,'reason':'缺少必要事实','unsupported_claims':[],
-                  'evidence_sufficiency':{'status':'insufficient','source_applicable':True,'conflicts':[],'fact_support':[]}}
+                  'evidence_sufficiency':{'status':'insufficient','source_applicable':True,'conflicts':[],'fact_support':[]},'missing_points':['必要事实']}
         runtime=type('Saved',(),{'judge':lambda *_a,**_kw:deepcopy(judgment)})()
         item={'id':'fixture','question':'问题','reference_answer':'必要事实','test_category':'positive','evidence':[{'source_chunk_ids':['c']}],'raw':{}}
-        execution={'answer':'未回答','retrieval':[],'retrieval_trace':{'candidates':[{'chunk_id':'c','content':'必要事实'}],'final':[]},'latency_ms':1}
+        from test_automatic_diagnostics import recall_case
+        actual,chunks=recall_case()
+        item.update(reference_answer='检查外壳\n检查传感器是否脏污',evidence=[{'source_chunk_ids':['covered','missing']}])
+        judgment['missing_points']=['检查传感器是否脏污']
+        judgment['evidence_sufficiency']['fact_support']=[{'fact':'检查外壳','chunk_id':'covered','quote':'检查外壳'}]
+        trace=actual['programmatic_metrics']['retrieval_trace']
+        trace['candidates'].append({'chunk_id':'missing','content':'检查传感器是否脏污'})
+        execution={'answer':'检查外壳','retrieval':trace['final'],'retrieval_trace':trace,'latency_ms':1}
         case=EvaluationRunner(None,runtime).score_execution(item,execution)
         self.assertEqual(case['primary_root_cause'],'Retrieval')
         self.assertEqual(case['diagnosis']['retrieval_failure_stage'],'ranking_context_selection')
         self.assertEqual(case['diagnosis']['status'],'confirmed')
         self.assertIn('Ranking Failure',case['failure_tags'])
-        self.assertEqual(case['evaluation_outcome']['confirmed_failure_tags'],['Ranking Failure'])
+        self.assertIn('Ranking Failure',case['evaluation_outcome']['confirmed_failure_tags'])
         self.assertFalse(case['passed'])
 
     def test_materialize_preserves_only_real_optional_source_version(self):
@@ -121,10 +136,13 @@ class InterventionTests(unittest.TestCase):
         self.assertEqual(compare_cases({'missing':{'passed':True}},{},[])['unclassified_regression_question_ids'],['missing'])
 
     def test_diagnostic_observations_do_not_invent_corpus_coverage(self):
-        case=target(final=False);view=diagnostic_view(case)
+        case=target(final=False)
+        case['programmatic_metrics']['retrieval_trace']['candidates'].append({'chunk_id':'missing'})
+        case['programmatic_metrics']['retrieval_trace']['reranked'].append({'chunk_id':'missing'})
+        view=diagnostic_view(case)
         self.assertIn('ranking_omission',view['trace_observations'])
         self.assertNotIn('recall_missing',view['trace_observations'])
-        self.assertEqual(case['primary_root_cause'],'Generation')
+        self.assertEqual(case['primary_root_cause'],'Retrieval')
 
     def test_alternative_sufficient_final_source_is_not_a_retrieval_failure_phenomenon(self):
         case=target(final=True)

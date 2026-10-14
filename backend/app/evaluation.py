@@ -7,7 +7,7 @@ import time
 import math
 from .telemetry import collect_usage
 from statistics import mean
-from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, normalize
+from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims
 
 from .policy import DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate
 
@@ -243,48 +243,32 @@ class EvaluationRunner:
             failure_tags.append("Performance Failure")
         failure_tags = list(dict.fromkeys(failure_tags))
         severity = "critical" if item["raw"].get("criticality") == "high" or item.get("negative_subtype") == "safety_critical" else "ordinary"
-        primary, secondary = 'None', []
-        diagnostic = {'status': 'needs_review', 'reason': '没有已定位且可归因的失败依据'}
-        if failure_tags:
-            primary = 'Unknown'
-            if not effective_behavior:
-                primary = 'Safety'
-                if unsafe_operations:
-                    diagnostic={'status':'confirmed','reason':'负向回答含已定位的无来源技术操作；原Judge主行为通过不豁免该操作','findings':unsafe_operations,'evaluation_conflict':behavior_contract['conflict']}
-                quote = judge.get('behavior_evidence')
-                if isinstance(quote, str) and normalize(quote) and normalize(quote) in normalize(execution['answer']):
-                    diagnostic = {'status': 'confirmed', 'reason': judge['reason'], 'answer_quote': quote}
-            elif claims['confirmed']:
-                primary = 'Generation'
-                diagnostic = {'status': 'confirmed', 'reason': '回答存在已定位的无依据具体操作或与原文矛盾的事实', 'findings': claims['confirmed'], 'pending_findings':claims['pending']}
-            elif sufficiency['sufficient'] is False and not final and 'final' in trace and trace.get('candidates') == []:
-                primary = 'Retrieval'
-                diagnostic = {'status': 'confirmed', 'reason': '已采集候选和最终上下文均为空，且Judge判必要证据不足'}
-            elif sufficiency['sufficient'] is False and coverage.get('candidate_recall',{}).get('all_hit') is True and coverage.get('final_context',{}).get('all_hit') is False:
-                primary='Retrieval'
-                diagnostic={'status':'confirmed','reason':'必要Golden Chunk已进入实际候选池但Final遗漏，且Judge确认最终证据不足','retrieval_failure_stage':'ranking_context_selection','pending_findings':claims['pending']}
-            elif sufficiency['sufficient'] is True and not claims['pending'] and any(t in failure_tags for t in ['Generation Failure', 'Evidence / Citation Failure']):
-                primary = 'Generation'
-                diagnostic = {'status': 'needs_review', 'reason': '最终证据充分但答案评分未达标，仍需核对具体评分依据'}
-            if 'Performance Failure' in failure_tags and primary == 'Unknown':
-                primary = 'Performance'
-                diagnostic = {'status': 'confirmed', 'reason': '实测回答耗时超过冻结门槛'}
-            if primary == 'Unknown':
-                diagnostic['reason'] = '证据、来源范围或主张分类待核实，不能据此确认检索/排序根因'
-                if claims['pending'] or sufficiency.get('unresolved_conflicts'):
-                    diagnostic.update(status='disputed',governance_category='Evaluation / Data Quality',
-                        disputes=([{'type':issue,'claim':r.get('claim')} for r in claims['pending'] for issue in r.get('verification_issues',[])]
-                                  + [{'type':'source_conflict','conflict':c} for c in sufficiency.get('unresolved_conflicts',[])]))
+        from .diagnostics import automatic_analysis
+        analysis=automatic_analysis({'test_category':item['test_category'],'negative_subtype':item.get('negative_subtype'),
+            'model_answer':execution['answer'],'judge_result':judge,'failure_tags':failure_tags,'passed':not failure_tags,
+            'programmatic_metrics':{'evidence_sufficiency':sufficiency,'claim_assessment':claims,
+                'behavior_contract':behavior_contract,'evidence_coverage':coverage,'retrieval_trace':trace,
+                'latency_ms':execution['latency_ms']}})
+        primary, secondary = analysis['primary_root_cause'] if failure_tags else 'None', []
+        diagnostic={'status':analysis['confidence'],'reason':analysis['analysis_reason'],
+            'analysis_category':analysis['analysis_category'],'findings':analysis['evidence_checks'],
+            'retrieval_failure_stage':analysis['retrieval_failure_stage'],'pending_findings':claims['pending']}
+        if not analysis['target_eligible'] and failure_tags:
+            diagnostic['status']='disputed' if claims['pending'] or sufficiency.get('unresolved_conflicts') else 'needs_review'
+            if diagnostic['status']=='disputed':
+                diagnostic.update(governance_category='Evaluation / Data Quality',
+                    disputes=([{'type':issue,'claim':r.get('claim')} for r in claims['pending'] for issue in r.get('verification_issues',[])]
+                              + [{'type':'source_conflict','conflict':c} for c in sufficiency.get('unresolved_conflicts',[])]))
         confirmed_tags=[]
         if claims['confirmed']:confirmed_tags.extend(['Hallucination','Evidence / Citation Failure'])
         if not effective_behavior and diagnostic['status']=='confirmed':confirmed_tags.extend(['Unsafe Answer','Safety Failure'])
         if 'Performance Failure' in failure_tags:confirmed_tags.append('Performance Failure')
-        if primary=='Retrieval' and diagnostic['status']=='confirmed':confirmed_tags.extend(tag for tag in ('Retrieval Failure','Ranking Failure') if tag in failure_tags)
+        if primary=='Retrieval' and diagnostic['status']=='confirmed':confirmed_tags.extend(tag for tag in failure_tags if tag in ('Retrieval Failure','Ranking Failure','Evidence / Citation Failure','Generation Failure'))
         outcome={'status':'pass' if not failure_tags else 'confirmed_failure' if diagnostic['status']=='confirmed' and confirmed_tags else 'disputed' if diagnostic['status']=='disputed' else 'pending_review',
                  'qualification_blocking':bool(failure_tags), 'confirmed_failure_tags':confirmed_tags if diagnostic['status']=='confirmed' else [],
                  'pending_findings':claims['pending'], 'unresolved_conflicts':sufficiency.get('unresolved_conflicts',[]),
                  'confirmation_basis':'saved_structural_findings_not_independent_semantic_proof'}
-        basis = 'verified_answer_claim' if primary == 'Generation' and diagnostic['status'] == 'confirmed' else 'measured_latency' if primary == 'Performance' else 'explicit_safety_failure' if primary == 'Safety' else 'empty_candidate_and_final_context' if primary == 'Retrieval' else 'unresolved_evaluation_evidence' if primary == 'Unknown' else coverage['diagnostic_basis']
+        basis = 'verified_answer_claim' if primary == 'Generation' and diagnostic['status'] == 'confirmed' else 'measured_latency' if primary == 'Performance' else 'explicit_safety_failure' if primary == 'Safety' else analysis['retrieval_failure_stage'] if primary == 'Retrieval' else 'unresolved_evaluation_evidence' if primary == 'Unknown' else coverage['diagnostic_basis']
         return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnosis_status": "preliminary", "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
 
     def start_replay(self, source_id):

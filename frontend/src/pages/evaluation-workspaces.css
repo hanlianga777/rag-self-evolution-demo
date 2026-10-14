@@ -41,3 +41,20 @@
 .evaluation-page .evaluation-dimensions > section {min-width:0;border:1px solid var(--card-border);border-radius:var(--card-radius);padding:var(--card-padding);}
 .evaluation-page .evaluation-dimensions dd small {display:block;color:var(--muted);font-size:var(--card-support);}
 @media(max-width:700px){.evaluation-page .evaluation-dimensions{grid-template-columns:1fr;}}
+/* Baseline detail follows the existing Golden Candidate card tokens. */
+.bad-case-details {gap:var(--card-gap);font-size:var(--card-body);color:var(--ink);}
+.bad-case-details > .candidate-card {background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--card-radius);padding:var(--card-padding);margin:0;}
+.bad-case-details h3 {font-size:var(--card-title);font-weight:700;color:var(--navy);margin:4px 0;}
+.bad-case-details h4 {font-size:var(--card-support);font-weight:600;letter-spacing:0;text-transform:none;margin:14px 0 7px;}
+.bad-case-details p {font-size:var(--card-body);line-height:1.65;margin:6px 0;}
+.bad-case-details .muted {font-size:var(--card-support);color:var(--muted);}
+.bad-case-details .case-answer-stack {display:grid;gap:var(--card-gap);}
+.bad-case-details .case-answer-stack > div + div {border-top:1px solid var(--line-soft);padding-top:6px;}
+.bad-case-details .case-answer {min-width:0;overflow-wrap:anywhere;white-space:normal;}
+.bad-case-details .case-answer :is(ol,ul) {padding-left:24px;margin:8px 0;}
+.bad-case-details .case-answer ol {list-style:decimal;}
+.bad-case-details .case-answer ul {list-style:disc;}
+.bad-case-details .case-answer li {margin:7px 0;line-height:1.65;}
+.bad-case-details .case-answer h5 {font-size:var(--card-body);margin:10px 0 6px;}
+.bad-case-details .technical-record {white-space:pre-wrap;overflow-wrap:anywhere;font-size:var(--card-support);}
+.bad-case-details summary {cursor:pointer;color:var(--navy);overflow-wrap:anywhere;}

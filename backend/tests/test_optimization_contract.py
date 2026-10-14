@@ -12,9 +12,8 @@ from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, EXCLUDED_A
 
 
 def trace_case(root='Retrieval'):
-    return {'primary_root_cause':root,'diagnosis':{'status':'confirmed','reason':'offline fixture verified gap'},
-            'programmatic_metrics':{'evidence_coverage':{'required_chunk_ids':['c1','c2']},
-                'retrieval_trace':{'candidates':[{'chunk_id':'c1'}],'final':[]}}}
+    from diagnostic_fixture import retrieval_case, generation_case
+    return retrieval_case()[0] if root=='Retrieval' else generation_case(root)
 
 
 def drafts():
@@ -42,6 +41,10 @@ class FixedProvider:
 
 class OptimizationContractTests(unittest.TestCase):
     def setUp(self):
+        from unittest.mock import patch
+        from diagnostic_fixture import retrieval_case
+        self.corpus_patch=patch('app.diagnostics._current_corpus',return_value=(retrieval_case()[1],{'corpus':'one'}))
+        self.corpus_patch.start();self.addCleanup(self.corpus_patch.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / "demo.db")
@@ -279,17 +282,17 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(new_b['reasoning']['changed_parameters'],corrected['candidates'][1]['config_diff'])
         self.assertEqual([c for c in store.candidates(exp) if c['reasoning'].get('round')==1],before)
 
-    def test_generation_target_can_change_retrieval_parameters_without_relabeling(self):
+    def test_generation_target_requires_retrieval_evidence_before_cross_stage_hypothesis(self):
         self.store.record_bad_case('EVAL-test','Q1','Generation','ordinary',trace_case('Generation'))
         self.store.record_bad_case('EVAL-test','Q-unknown','Unknown','ordinary',{'primary_root_cause':'Unknown','diagnosis':{'status':'needs_review','reason':'fixture uncertainty'}})
         response=drafts()
         for candidate in response['candidates']:candidate['root_cause']='Generation'
         provider=FixedProvider(json.dumps(response))
-        result=OptimizationAgent(self.store,provider).generate('EVAL-test')
-        self.assertEqual(len(result['candidates']),3)
-        self.assertTrue(all(c['reasoning']['root_cause']=='Generation' for c in result['candidates']))
+        with self.assertRaisesRegex(ValueError,'Trace'):
+            OptimizationAgent(self.store,provider).generate('EVAL-test')
+        self.assertEqual(provider.prompt['target_reference_map']['Q1']['primary_root_cause'],'Generation')
         self.assertNotIn('Q-unknown',provider.prompt['target_reference_map'])
-        self.assertTrue(all(c['config']!=result['candidates'][0]['config'] for c in result['candidates'][1:]))
+        self.assertFalse(self.store.candidates())
 
     def test_disputed_cases_are_agent_background_not_targets(self):
         self.store.record_bad_case('EVAL-test','Q-risk','Unknown','ordinary',{'failure_tags':['Evidence Pending Review'],'primary_root_cause':'Unknown','diagnosis':{'status':'disputed','reason':'fixture matcher dispute'}})

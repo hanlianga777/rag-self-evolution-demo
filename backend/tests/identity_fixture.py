@@ -21,9 +21,11 @@ def completed_baseline(store, target='baseline', snapshot=None, run_id=None):
             connection.execute('UPDATE evaluation_runs SET id=? WHERE id=?', (run_id, created_id))
     else:
         run_id = created_id
-    store.record_evaluation_case(run_id, 'Q1', {'passed': False, 'primary_root_cause': 'Retrieval', 'diagnosis': {'status': 'confirmed', 'reason': 'offline fixture verified omission'}})
+    from diagnostic_fixture import generation_case
+    case={**generation_case(), 'passed':False}
+    store.record_evaluation_case(run_id, 'Q1', case)
     store.finish_evaluation_run(run_id, 'completed', {'gates': {'passed': False}})
-    store.record_bad_case(run_id, 'Q1', 'Retrieval', 'ordinary', {'reason': 'test', 'primary_root_cause': 'Retrieval', 'diagnosis': {'status': 'confirmed', 'reason': 'offline fixture verified omission'}})
+    store.record_bad_case(run_id, 'Q1', 'Retrieval', 'ordinary', case)
     return run_id
 
 

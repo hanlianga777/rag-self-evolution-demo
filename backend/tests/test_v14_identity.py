@@ -20,6 +20,8 @@ from identity_fixture import completed_baseline
 
 class CurrentIdentityTests(unittest.TestCase):
     def setUp(self):
+        from diagnostic_fixture import install_corpus
+        install_corpus(self)
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.store = GovernanceStore(Path(directory.name) / 'demo.db')

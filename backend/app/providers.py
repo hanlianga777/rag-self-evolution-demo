@@ -289,7 +289,7 @@ class DeepSeekProvider:
                         raise ValueError(f'claim_reviews[{review_index}].abstention_basis missing for supported_abstention')
                     if r['kind'] == 'contradiction' and r['critical'] and (correctness > 2 or faithfulness == 1):
                         raise ValueError('Critical technical contradiction contradicts quality scores')
-                    consistent=claim_consistent(r) or r['kind']=='supported_abstention' and abstention_valid(r,result,context.get('final_context',[]),{'test_category':context.get('category'),'negative_subtype':context.get('negative_subtype'),'raw':context})
+                    consistent=claim_consistent(r) or r['kind']=='supported_abstention' and abstention_valid(r,result,context.get('final_context',[]),{'test_category':context.get('category'),'negative_subtype':context.get('negative_subtype'),'raw':context},answer=answer)
                     r['consistency_status'] = 'consistent' if consistent else 'needs_review'
             return {'raw_provider_response': content,'response_metadata':_response_metadata.get(),'format_recovery':recovery, **({'evidence_sufficiency': evidence, 'claim_reviews': reviews, 'behavior_evidence': behavior_evidence} if context is not None else {}), "correctness": correctness, "completeness": float(completeness), "faithfulness": float(faithfulness), "behavior_pass": behavior_pass, "reason": str(result["reason"]), "missing_points": [str(item) for item in missing], "unsupported_claims": [str(item) for item in unsupported]}
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as error:

@@ -223,9 +223,9 @@ class OptimizationAgentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             store = GovernanceStore(Path(directory) / "demo.db")
             completed_baseline(store, run_id="EVAL-1")
-            store.record_bad_case("EVAL-1", "GGC-001", "Retrieval", "ordinary", {"reason": "fixture", "primary_root_cause":"Retrieval", "diagnosis":{"status":"confirmed","reason":"fixture"}})
-            for row in store.bad_case_rows():
-                store.record_bad_case(row['run_id'],row['question_id'],'Retrieval','ordinary',{**row['result'],'programmatic_metrics':{'evidence_coverage':{'required_chunk_ids':['c']},'retrieval_trace':{'candidates':[{'chunk_id':'c'}],'final':[]}}})
+            from diagnostic_fixture import retrieval_case,install_corpus
+            install_corpus(self)
+            store.record_bad_case("EVAL-1", "Q1", "Retrieval", "ordinary", retrieval_case()[0])
             experiment = OptimizationAgent(store, FakeAgentProvider()).generate("EVAL-1")
 
         self.assertEqual(len(experiment["candidates"]), 3)

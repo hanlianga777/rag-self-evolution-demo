@@ -1,3 +1,10 @@
+## 2026-10-14 — Bad Case自动诊断、Agent证据准入与安全拒答兼容
+
+- 全量Bad Case自动分析；实际证据决定优化目标，评测问题与证据不足保留背景，不新增人工审批。通用候选召回缺口核验实际答案、当前Corpus、Candidate/Final/Parent及Judge事实，生成矛盾优先保留。
+- Matcher evidence-v6-safe-abstention、Policy v1.5-diagnostic-targets；安全拒答须完整来源及逐项操作审核，不以类型直接通过。旧Baseline与历史评分不改，新Baseline/Sandbox必须统一新版身份。
+- Baseline详情复用Golden Candidate视觉母版，答案仅渲染格式化；高级审计保留完整原文。11 Gate/Regression/Search Space及三个人工Gate不变。
+- 本轮Provider 0，不自动评测/Agent/Candidate/Sandbox/审批；验证见[验收报告](BAD_CASE_AUTOMATION_ACCEPTANCE.md)。
+
 ## 2026-10-14 — Mini Business V2及限定Profile委托审核
 
 - Mini显式business_v2复用Topic/Group/产品配额与十维审计；通用业务选材避免封底/声明驱动机械题，专项无支持在新Plan记录真实Ordinary fallback，旧冻结Plan/题目不改名；Medium及知识资产不变。

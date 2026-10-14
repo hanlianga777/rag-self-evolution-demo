@@ -93,3 +93,6 @@ SQLite历史管理以对象依赖闭包保留，非引用历史实验/评测各5
 Mini显式Business V2保留现有8/4/8、动态Topic及Slot产品/子型要求，通用业务选材后据真实材料确定Construction，专项无支持在新Plan记录Ordinary fallback，复用Medium的业务Prompt与十维审计链。限定Run/Corpus/Plan/Profile的所有者委托AI逐题审核复用原事务与实际PDF核验；只有真实全部合格才冻结。流程节点无新增，正式图继续同源；实际结果见Mini20验收文档，不预设通过。
 
 负向十维审计保持材料Anchor身份，必要时显式追加最多3个当前同产品Child作为审计输入上下文，保存来源ID/Corpus；默认不扩张，不改Golden Evidence，也不发送整个Corpus。原Probe全文/向量边界与QC不降级。
+
+
+2026-10-14：全部Bad Case进入原诊断与Agent背景，证据充分的真实RAG失败才进入单一干预目标；评测规则问题、证据不足单独保留，不新增Human Gate。后续正式Baseline/Sandbox须统一新版Evaluation Identity；历史结果只读。

@@ -39,3 +39,7 @@ DeepSeek 只经后端显式调用，密钥不返回前端。检索是 Vector/BM2
 ## 2026-10-11 统一评测与受控优化
 
 当前产品合同见 docs/RAG_SELF_EVOLUTION_SPEC.md 文首。Child命中指标与最终Parent证据充分性分开；统一Judge读取完整证据，Baseline/A/B/C/D冻结同评测身份。旧实验保留只读，历史答案回放不成为正式Baseline或发布依据。新目标修复/附带改善/新增失败分开，程序推荐Winner，Gate2人工确认；有效来源下D最多一次授权LLM建议，经程序校验后另行授权Sandbox。Gate3及兼容配置回滚仍由人工执行。图形表达设计，离线验收不证明真实Provider效果。
+
+## 2026-10-14 自动诊断与版本边界
+
+Baseline全部Bad Case → 既有诊断模块（实际回答、Golden、当前Corpus及Child/Parent/Trace、同一次Judge）→ 真实RAG失败 / 评测机制问题 / 证据不足 → Agent全量背景、仅证据合格目标 → 单一干预候选 → 同新版身份Sandbox/Regression → 原Gate2/3。评测问题不驱动RAG调参；分析不新增审批。旧Run和成绩只读，跨规则比较被身份守卫拒绝。正式图仍唯一来源于KnowledgeDiagrams.tsx；本轮不运行Provider或实验。

@@ -52,7 +52,7 @@ class DiagnosticViewTests(unittest.TestCase):
                 client=TestClient(main.app)
                 detail=client.get('/api/evaluations/'+key).json()
                 bad=client.get('/api/bad-cases').json()
-                self.assertEqual(detail['cases'][0]['diagnostic_view']['primary_root_cause'],'Retrieval')
+                self.assertEqual(detail['cases'][0]['diagnostic_view']['primary_root_cause'],'Generation')
                 self.assertIn('diagnostic_view',bad[0]['result'])
                 self.assertEqual(store.evaluation_case_results(key),before)
                 self.assertNotIn('diagnostic_view',store.bad_case_rows()[0]['result'])

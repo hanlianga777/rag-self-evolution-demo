@@ -11,6 +11,8 @@ from test_optimization_contract import trace_case
 
 class TuningV12Tests(unittest.TestCase):
     def setUp(self):
+        from diagnostic_fixture import install_corpus
+        install_corpus(self)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / 'demo.db')

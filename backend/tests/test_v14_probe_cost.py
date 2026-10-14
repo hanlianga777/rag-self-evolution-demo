@@ -319,11 +319,20 @@ class ProbeCostTests(unittest.TestCase):
 
     def test_vp10_evaluation_stores_generation_evidence_and_separates_candidate_misses(self):
         from app.evaluation import EvaluationRunner
-        execution = {'answer': 'wrong', 'latency_ms': 1, 'retrieval': [{'chunk_id': 'A'}],
-                     'retrieval_trace': {'candidates': [{'chunk_id': 'A'}, {'chunk_id': 'B'}], 'final': [{'chunk_id': 'A'}]}}
-        runtime = SimpleNamespace(answer=lambda *_: execution, judge=lambda *_, **kw: {'evidence_sufficiency':{'status':'insufficient','source_applicable':True,'conflicts':[],'fact_support':[],'reason':'Fixture missing evidence'}, 'correctness': 0, 'completeness': 0, 'faithfulness': 1, 'behavior_pass': True, 'unsupported_claims': []})
-        runner = EvaluationRunner(None, runtime)
-        item = {'question': 'question', 'reference_answer': 'answer', 'test_category': 'positive', 'evidence': [{'source_chunk_ids': ['A', 'B']}], 'raw': {}}
+        from test_automatic_diagnostics import recall_case
+        from diagnostic_fixture import install_corpus
+        install_corpus(self)
+        saved,chunks=recall_case()
+        trace=saved['programmatic_metrics']['retrieval_trace']
+        trace['candidates'].append({'chunk_id':'missing','content':chunks[1]['chunk_text']})
+        trace['reranked'].append({'chunk_id':'missing','content':chunks[1]['chunk_text']})
+        execution={'answer':'wrong','latency_ms':1,'retrieval':list(trace['final']),'retrieval_trace':trace}
+        runtime=SimpleNamespace(answer=lambda *_:execution,judge=lambda *_,**kw:{
+            'evidence_sufficiency':saved['judge_result']['evidence_sufficiency'],'correctness':0,'completeness':0,
+            'missing_points':['检查传感器是否脏污'],'faithfulness':1,'behavior_pass':True,'unsupported_claims':[]})
+        runner=EvaluationRunner(None,runtime)
+        item={'question':'question','reference_answer':'检查外壳\n检查传感器是否脏污','test_category':'positive',
+              'evidence':[{'source_chunk_ids':['covered','missing']}],'raw':{}}
         result = runner._case_result(item, {})
         self.assertIn('Ranking Failure', result['failure_tags'])
         self.assertEqual(result['primary_root_cause'],'Retrieval')
@@ -333,8 +342,8 @@ class ProbeCostTests(unittest.TestCase):
         self.assertIn('Evidence / Citation Failure', result['failure_tags'])
         self.assertNotIn('Retrieval Failure', result['failure_tags'])
         self.assertEqual(result['programmatic_metrics']['evidence_coverage']['final_context']['coverage'], .5)
-        execution['retrieval_trace']['final'].append({'chunk_id': 'B'})
-        execution['retrieval'].append({'chunk_id': 'B'})
+        execution['retrieval_trace']['final'].append({'chunk_id':'missing','document_id':'manual','product':'device','content':chunks[1]['chunk_text']})
+        execution['retrieval'].append({'chunk_id':'missing','content':chunks[1]['chunk_text']})
         result = runner._case_result(item, {})
         self.assertIn('Generation Failure', result['failure_tags'])
         self.assertNotIn('Ranking Failure',result['failure_tags'])
