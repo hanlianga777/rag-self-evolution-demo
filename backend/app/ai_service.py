@@ -542,9 +542,17 @@ class AiService:
         return [{key:p.get(key) for key in ('chunk_id','document_name','section_path','page_start','page_end','chunk_text')} for p in json.loads(path.read_text()) if p['chunk_id'] in ids]
 
     @provider_task('business_audit')
-    def business_quality_audit(self, item, peers):
+    def business_quality_audit(self, item, peers, *, context_chunk_ids=()):
         from .business_golden import CHECKS
         by_id = {c['chunk_id']:c for c in self.corpus.chunks()}
+        if not isinstance(context_chunk_ids, (tuple, list)) or len(context_chunk_ids) > 3 or any(not isinstance(key, str) or key not in by_id for key in context_chunk_ids):
+            raise ValueError('Business audit context requires at most three current Child IDs')
+        if context_chunk_ids:
+            if item['test_category'] != 'negative':
+                raise ValueError('Additional business audit context is only allowed for Negative')
+            products = {by_id[key].get('product') for key in item['raw'].get('coverage_anchor_chunk_ids', []) if key in by_id}
+            if len(products) != 1 or None in products or any(by_id[key].get('product') not in products for key in context_chunk_ids):
+                raise ValueError('Business audit context must match the original Anchor product')
         sources = [by_id[key] for key in item['raw'].get('validation', {}).get('normalized_candidate', {}).get('source_chunk_ids', []) if key in by_id]
         if not sources:
             keys = item['raw'].get('coverage_anchor_chunk_ids', []) if item['test_category']=='negative' else [key for e in item['evidence'] for key in e['source_chunk_ids']]
@@ -553,7 +561,9 @@ class AiService:
         extra={scope.get('chapter_anchor')}
         extra.update(key for key,chunk in by_id.items() if chunk['document_id'] in scope.get('documents',[]) and ('修订历史' in chunk['chunk_text'] or chunk.get('page_start')==1))
         sources.extend(by_id[key] for key in sorted(extra-{None}) if key in by_id and key not in {s['chunk_id'] for s in sources})
-        payload = {'question':item['question'], 'answer':item['reference_answer'], 'metadata':{key:item['raw'].get(key) for key in ('user_role','business_scenario','user_intent','difficulty','business_negative','expected_behavior','topic_cluster','product_scope','source_scope')}, 'sources':sources, 'prior_questions':peers}
+        sources.extend(by_id[key] for key in dict.fromkeys(context_chunk_ids) if key not in {s['chunk_id'] for s in sources})
+        corpus_fingerprint = manifest_identity(current_manifest())
+        payload = {'question':item['question'], 'answer':item['reference_answer'], 'metadata':{key:item['raw'].get(key) for key in ('user_role','business_scenario','user_intent','difficulty','business_negative','expected_behavior','expected_response','topic_cluster','product_scope','source_scope')}, 'sources':sources, 'prior_questions':peers}
         with collect_usage() as usage:
             content = self.provider.complete(JUDGE_DATA_BOUNDARY + '独立审计业务题质量，不预设通过。仅返回JSON对象，顶层为checks字典、reason字符串、difficulty_observed基础/中等/复杂。checks中必须恰有以下十项显式布尔，true表示通过：' + ','.join(CHECKS) + '。naturalness真实用户口吻；business_value工作任务价值；intent意图清楚；grounding答案/负向边界依据；independence自包含；copying检验问题是否机械搬运/枚举，参考答案原文引用是冻结规范，不因答案逐字引用判失败；duplicates没有语义重复；type正向可答或负向需澄清/拒答；coverage材料主题匹配；diversity难度与意图多样且难度符合目标。不能仅按禁词判断；不得因设备存在型号就推断不存在的版本。', json.dumps(payload,ensure_ascii=False), json_mode=True, temperature=0)
         try:
@@ -568,7 +578,7 @@ class AiService:
             raise failure from error
         if not all(item['raw'].get(key) for key in ('user_role','business_scenario','user_intent')):
             result['checks']['intent'] = False
-        return {**result, 'audit_version':'business-v2', 'token_usage':usage, 'attention_reason':'题目质量需修订'}
+        return {**result, 'audit_version':'business-v2', 'token_usage':usage, 'attention_reason':'题目质量需修订', 'audit_source_chunk_ids':[s['chunk_id'] for s in sources], 'corpus_fingerprint':corpus_fingerprint}
 
     def _indexed_embeddings(self, chunks: list[dict]) -> np.ndarray:
         """Use persisted FAISS vectors aligned with the persisted chunk order."""

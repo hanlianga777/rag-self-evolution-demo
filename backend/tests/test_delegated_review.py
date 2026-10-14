@@ -1,13 +1,19 @@
 """Offline owner delegation validation; not human or Provider acceptance."""
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 from datetime import datetime,timezone,timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from app.delegated_review import validate_delegation, CHECKS
+# Isolation precedes all app imports; these are offline fixtures only.
+_isolation=tempfile.TemporaryDirectory()
+for _name,_leaf in [('RAG_DEMO_DB_PATH','demo.db'),('RAG_DEMO_ENV_PATH','missing.env'),('RAG_DEMO_INDEX_DIR','index'),('RAG_DEMO_DOCUMENTS_DIR','documents'),('RAG_DEMO_UPLOADS_DIR','uploads')]:
+    os.environ[_name]=str(Path(_isolation.name)/_leaf)
+
+from app.delegated_review import validate_delegation, pdf_page_text, CHECKS
 
 
 class DelegatedReviewTests(unittest.TestCase):
@@ -27,7 +33,7 @@ class DelegatedReviewTests(unittest.TestCase):
         self.reviews=[{'question_id':r['id'],'content_hash':'fixture-hash','decision':'A','checks':dict.fromkeys(CHECKS,True),
                        'risk':'none','basis':'Independent fixture review, not model self-confirmation',
                        'sources':[{'document_id':'D','chunk_id':'C','page':1,'quote':'source fact'}]} for r in self.rows]
-        self.run={'id':'fixture-run','status':'completed','question_ids':[r['id'] for r in self.rows],'artifacts':{'hard_validation':{'corpus_fingerprint':self.auth['corpus'],'frozen_plan':{'plan_id':'fixture-plan','clusters':[{}]*9}}}}
+        self.run={'profile':{'name':'medium','positive_count':20,'ablation_count':10,'negative_count':20,'expected_count':50},'id':'fixture-run','status':'completed','question_ids':[r['id'] for r in self.rows],'artifacts':{'hard_validation':{'corpus_fingerprint':self.auth['corpus'],'frozen_plan':{'plan_id':'fixture-plan','clusters':[{}]*9}}}}
 
     def check(self):
         return validate_delegation(self.path,'fixture-owner',self.run,self.rows,self.items,self.reviews,
@@ -39,6 +45,58 @@ class DelegatedReviewTests(unittest.TestCase):
         self.assertEqual(result['review_actor_type'],'ai_agent')
         self.assertEqual(result['delegated_by'],'project_owner')
         self.assertEqual(len(result['reviews']),50)
+
+    def mini(self):
+        self.rows=self.rows[:20]
+        self.items={row['id']:self.items[row['id']] for row in self.rows}
+        for i,item in enumerate(self.items.values()):
+            item['test_category']='positive' if i<8 else 'ablation' if i<12 else 'negative'
+        self.reviews=self.reviews[:20]
+        self.run['question_ids']=[row['id'] for row in self.rows]
+        self.run['profile']={'name':'mini','positive_count':8,'ablation_count':4,'negative_count':8,'expected_count':20}
+        self.auth['profile']=dict(self.run['profile'])
+        self.path.write_text(json.dumps(self.auth))
+
+    def test_twenty_scoped_reviews_require_explicit_matching_mini_profile(self):
+        self.mini()
+        result=self.check()
+        self.assertEqual(len(result['reviews']),20)
+        self.assertEqual(result['review_actor_type'],'ai_agent')
+        self.assertEqual(result['authorization_source_sha256'],self.auth['source_sha256'])
+
+    def test_mini_rejects_missing_unknown_wrong_or_partial_authorization_scope(self):
+        self.mini()
+        for field,value in [('profile',None),('profile',{'name':'full'}),('profile',{'name':'mini'}),
+                            ('authorization_id','unknown'),('generation_run_id','other'),('plan_id','other')]:
+            with self.subTest(field=field,value=value):
+                self.path.write_text(json.dumps({**self.auth,field:value}))
+                with self.assertRaises(ValueError):self.check()
+        self.path.write_text(json.dumps(self.auth))
+
+    def test_profile_and_counts_cannot_be_relabelled_to_expand_authorization(self):
+        self.mini()
+        for profile in [{**self.run['profile'],'name':'medium'}, {**self.run['profile'],'positive_count':7},
+                        {**self.run['profile'],'expected_count':50}, {}]:
+            with self.subTest(profile=profile):
+                original=self.run['profile'];self.run['profile']=profile
+                with self.assertRaises(ValueError):self.check()
+                self.run['profile']=original
+        self.items['0']['test_category']='negative'
+        with self.assertRaises(ValueError):self.check()
+
+    def test_mini_does_not_waive_pdf_quality_or_review_identity(self):
+        self.mini()
+        with self.assertRaises(ValueError):
+            validate_delegation(self.path,'fixture-owner',self.run,self.rows,self.items,self.reviews,
+                                lambda item:'fixture-hash',verify_sources=lambda sources:False)
+        self.rows[0]['qualification_status']='needs_human_review'
+        with self.assertRaises(ValueError):self.check()
+        self.rows[0]['qualification_status']='machine_qualified'
+        self.reviews[0]['content_hash']='stale'
+        with self.assertRaises(ValueError):self.check()
+        self.reviews[0]['content_hash']='fixture-hash'
+        self.reviews[-1]=self.reviews[0]
+        with self.assertRaises(ValueError):self.check()
 
     def test_failed_quality_risk_stale_content_and_incomplete_set_rejected(self):
         for field,value in [('decision','C'),('risk','unresolved'),('content_hash','stale')]:
@@ -56,6 +114,27 @@ class DelegatedReviewTests(unittest.TestCase):
             changed={**self.auth,field:value};self.path.write_text(json.dumps(changed))
             with self.assertRaises(ValueError):self.check()
             self.path.write_text(json.dumps(self.auth))
+
+    def test_pdf_private_glyph_uses_local_ocr_but_ordinary_text_does_not(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        document=Mock()
+        document.__enter__=Mock(return_value=document)
+        document.__exit__=Mock(return_value=False)
+        document.__len__=Mock(return_value=1)
+        page=Mock()
+        document.__getitem__=Mock(return_value=page)
+        page.get_pixmap.return_value.tobytes.return_value=b'local-image'
+        ocr=Mock(return_value=SimpleNamespace(txts=['www.kaercher.com/dealersearch']))
+        with patch('pymupdf.open',return_value=document),patch('app.delegated_review.local_ocr',return_value=ocr):
+            page.get_text.return_value=''
+            self.assertEqual(pdf_page_text('fixture-private-glyph.pdf',1,1),'www.kaercher.com/dealersearch')
+            ocr.assert_called_once_with(b'local-image')
+            ocr.reset_mock()
+            page.get_text.return_value='真实设备资料 IPX3'
+            self.assertEqual(pdf_page_text('fixture-readable.pdf',1,1),'真实设备资料 IPX3')
+            ocr.assert_not_called()
+        pdf_page_text.cache_clear()
 
     def test_missing_pdf_support_rejected(self):
         with self.assertRaises(ValueError):

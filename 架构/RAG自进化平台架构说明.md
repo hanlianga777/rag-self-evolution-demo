@@ -87,3 +87,9 @@ Candidate Sandbox复用同一检查点/子Run路径，预约与预算、身份�
 组件边界仍为同一个Evaluation/Optimization/SQLite模块。正式图A/B/C表示最多3个有据候选，允许不足；每个候选及D的参数方向与Trace由程序校验。Matcher确定定位及结构合同，Judge判断语义，Policy保守阻断与计算11 Gate/Regression；正式阻断和结构化确证分列，语义争议不变成第五个调参方向。生成共享文档身份和逐Chunk章节/页码/全文，避免把Trace元数据误认为模型原来已经收到的信息。
 
 SQLite历史管理以对象依赖闭包保留，非引用历史实验/评测各50，活动/当前/发布及恢复链保护，不对Case/Trace机械限行。此次用户授权重新开始将旧发布依赖迁为无资格bootstrap配置后事务清空；唯一备份与审计在库外保留。清理标记只解除旧Golden绑定，不豁免Corpus State/索引身份。上述流程不声明真实模型已改善或人工Gate已通过。
+
+## 2026-10-14 Mini业务治理适配
+
+Mini显式Business V2保留现有8/4/8、动态Topic及Slot产品/子型要求，通用业务选材后据真实材料确定Construction，专项无支持在新Plan记录Ordinary fallback，复用Medium的业务Prompt与十维审计链。限定Run/Corpus/Plan/Profile的所有者委托AI逐题审核复用原事务与实际PDF核验；只有真实全部合格才冻结。流程节点无新增，正式图继续同源；实际结果见Mini20验收文档，不预设通过。
+
+负向十维审计保持材料Anchor身份，必要时显式追加最多3个当前同产品Child作为审计输入上下文，保存来源ID/Corpus；默认不扩张，不改Golden Evidence，也不发送整个Corpus。原Probe全文/向量边界与QC不降级。

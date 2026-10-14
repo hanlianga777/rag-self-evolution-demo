@@ -146,3 +146,5 @@ Q38 Judge结构异常修复：完整输出示例与原Parser一致，错误显�
 Optimization Agent请求和HTTP错误审计保存模型/参数/大小/SHA及脱敏Provider错误码、正文、阶段和重试判断；Token估算仅为观测，不当作精确Tokenizer结果或费用阻断。见[离线验收](docs/AGENT_HTTP400_ACCEPTANCE.md)。
 
 Agent上下文超限已通过传输去重修复：省去重复的result_json字符串，完整result及证据仍保留，数据库历史不变。见[验收](docs/AGENT_CONTEXT_LIMIT_ACCEPTANCE.md)。
+
+Mini20支持显式Business V2业务出题与十维审计，保留原Coverage/Construction约束。所有者委托AI审核必须绑定唯一Run、当前Corpus/Plan、明确Profile及实际授权来源，不冒充真人。具体本次结果见[Mini20收口验收](docs/MINI20_QUALITY_CLOSURE_ACCEPTANCE.md)。

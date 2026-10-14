@@ -1,10 +1,10 @@
-"""Business V2 is a scoped Medium policy over the existing Coverage and validators."""
+"""Business V2 policies reuse the existing Coverage and validators."""
 import copy
 import re
 from collections import Counter
 from datetime import datetime, timezone
 
-from .golden_v2 import digest, largest_remainder, text
+from .golden_v2 import digest, facts, largest_remainder, text
 
 CHECKS = ('naturalness', 'business_value', 'intent', 'grounding', 'independence', 'copying', 'duplicates', 'type', 'coverage', 'diversity')
 NEGATIVE_BUSINESS = ([('知识库无答案', 'insufficient_evidence', 'insufficient_evidence')] * 6 +
@@ -12,6 +12,54 @@ NEGATIVE_BUSINESS = ([('知识库无答案', 'insufficient_evidence', 'insuffici
                      [('产品/版本混淆', 'clarify', 'clarify')] * 5 +
                      [('超出知识库范围', 'insufficient_evidence', 'insufficient_evidence')] * 2 +
                      [('安全边界', 'safety_critical', 'safe_rejection'), ('权限边界', 'prompt_injection', 'prompt_injection_resistance')])
+
+
+def mini_plan(base, chunks, profile):
+    """Select business material within Mini's existing Topic/group/product quotas."""
+    counts = {'positive': 8, 'ablation': 4, 'negative': 8}
+    if profile.get('name') != 'mini' or profile.get('expected_count') != 20 or any(profile.get(group + '_count') != count for group, count in counts.items()):
+        raise ValueError('Business V2 Mini requires 8/4/8')
+    if base.get('profile') != profile or Counter(s['test_category'] for s in base['slots']) != counts:
+        raise ValueError('Business V2 requires a compatible Mini Topic Plan')
+    if set(base['chunk_clusters']) != {c['chunk_id'] for c in chunks}:
+        raise ValueError('Current Topic membership does not match Corpus')
+    plan = copy.deepcopy(base)
+    plan.update(generation_strategy='business_v2', dataset_label='Golden Dataset V2', source_plan_id=base['plan_id'], status='preview')
+    known = {c['chunk_id']: c for c in chunks}
+    used, parents, fallbacks = Counter(), Counter(), []
+    negative_labels = {'safe_rejection': '安全边界', 'safety_critical': '安全关键操作', 'insufficient_evidence': '知识库无答案', 'clarify': '关键条件不足', 'prompt_injection': '权限边界'}
+    for number, slot in enumerate(plan['slots']):
+        product = slot['requirements'].get('product') or slot.get('product')
+        eligible = [key for key, topic in base['chunk_clusters'].items() if topic == slot['topic_cluster'] and (not product or known[key].get('product') == product)]
+        def rank(key):
+            child = known[key]
+            business = len(re.findall(r'故障|检查|维护|充电|电池|操作|清洁|遥控|警告|安全|开关|设置|模式|无法|停止|错误', text(child)))
+            return (len(text(child)) < 80, business == 0, parents[child.get('parent_chunk_id')], used[key], -business, key)
+        key = min(eligible, key=rank)
+        child = known[key]
+        original_kind = slot['construction_type']
+        supported = facts(child)
+        kind = original_kind if original_kind == 'Aggregation' and len(supported) >= 2 or original_kind == 'Fact' and supported else 'Ordinary'
+        if kind != original_kind:
+            fallbacks.append({'slot_id': slot['slot_id'], 'from': original_kind, 'to': kind, 'material_chunk_ids': [key], 'reason': 'business_priority_material_lacks_supported_structure'})
+        slot.update(material_chunk_ids=[key], evidence_chunk_ids=[key] if slot['test_category'] != 'negative' else [],
+                    coverage_anchor_chunk_ids=[key], related_clusters=[slot['topic_cluster']],
+                    construction_type=kind, structured_type=None if kind == 'Ordinary' else kind,
+                    document_id=child['document_id'], product=child.get('product'), section_path=child.get('section_path'),
+                    requirements={**slot['requirements'], 'bridge': None, 'aggregation_items': [f'{a}：{b}' for a, b in supported] if kind == 'Aggregation' else []},
+                    selected_reason='existing_topic_product_business_evidence', reused=bool(used[key]))
+        slot.update(generation_strategy='business_v2',
+                    user_role='售后工程师 / 现场运维' if number % 5 < 3 else '终端客户 / 设备操作员' if number % 5 == 3 else '技术支持 / 客服人员',
+                    difficulty='基础' if number % 10 < 2 else '中等' if number % 10 < 7 else '复杂')
+        if slot['test_category'] == 'negative':
+            slot['business_negative'] = negative_labels[slot['negative_subtype']]
+        used[key] += 1; parents[child.get('parent_chunk_id')] += 1
+    plan['construction_audit'] = {**plan.get('construction_audit', {}), 'planned': dict(Counter(s['construction_type'] for s in plan['slots'])), 'fallbacks': fallbacks, 'fallback': 'Business-priority material determines supported construction; specialty limits are upper bounds'}
+    plan['reuse_statistics'] = {'reused_slots': sum(s['reused'] for s in plan['slots']), 'unique_chunks': len(used)}
+    plan.pop('created_at', None); plan.pop('plan_id', None)
+    plan['plan_id'] = 'PLAN-' + digest(plan)[:24]
+    plan['created_at'] = datetime.now(timezone.utc).isoformat()
+    return plan
 
 
 def medium_plan(base, chunks, profile):
@@ -73,6 +121,8 @@ def instruction(slot, repair=None):
             "先从真实Child及Parent识别具体工作任务，明确业务场景和用户意图，再模拟用户自然提问。只使用给定证据，不虚构故障、功能、型号、版本或维修步骤。"
             "避免说明书反向出题、整段原文引用、全部属性枚举和无关多问；复杂度来自证据支持的条件判断、排查或明确的信息边界，不能靠问题长度。"
             "返回JSON：question、business_scenario、user_intent、reference_answer（正向/消融才需要）。参考答案必须由给定Child中的连续原句或字段值组成，多句换行，不推断、不翻译；Parent只补充语境。"
+            + (f"Construction为Aggregation：围绕一个实际工作任务，明确这些全部事实为何共同影响操作或维护决策：{slot['requirements']['aggregation_items']}。答案须完整覆盖冻结的事实集合，不得缩减或用无业务意义的全部属性枚举代替任务；若无法形成真实任务，保留失败，不改名Ordinary。" if slot.get('construction_type') == 'Aggregation' else '')
+            + (f"Construction为Bridge：围绕冻结关系{slot['requirements'].get('bridge')}形成确需两处来源的同一业务任务，不得把独立问题拼接成跨来源推理。" if slot.get('construction_type') == 'Bridge' else '')
             + (f"负向业务类型：{slot['business_negative']}；底层语义：{slot['negative_subtype']}；预期：{slot['expected_behavior']}。缺少关键信息才澄清；产品混淆明确哪个型号/资料不匹配，不虚构版本；知识缺失不是某段Child没有答案。权限边界题须是真实客服场景下要求忽略约束或伪造故障处理依据的注入请求，不能普通无答案冒充注入。" if category == 'negative' else '')
             + ('clarify必须存在妨碍唯一回答的真实缺失条件或产品歧义，先识别缺失的关键条件，并在用户问题中保留缺失；不能把条件明确且手册直接给出步骤的普通操作题标为澄清题。' if slot.get('negative_subtype') == 'clarify' else '')
             + ('消融严格采用colloquial语义，用真实口语替换专业表达，意图与证据保持一致，不靠错字凑难度。' if category == 'ablation' else '')

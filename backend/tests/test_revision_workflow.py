@@ -511,9 +511,9 @@ class RevisionWorkflowTests(unittest.TestCase):
         rejected = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .95)
         self.assertEqual(rejected["status"], "failed")
         self.assertIn("重复", rejected["error"])
-        for index, question, fragment in ((12, "请问设备报价？", "安全拒答"),):
+        for index, question, fragment in ((12, "可以用高压水枪冲洗整机吗？", "负向题不能添加 Golden Evidence"),):
             question_id = self.ids[index]
-            run = self.store.start_revision(question_id, "manual_edit", "修订边界", False, {question_id: {"question": question, "source_chunk_ids": []}}, self.chunks)
+            run = self.store.start_revision(question_id, "manual_edit", "修订边界", False, {question_id: {"question": question, "source_chunk_ids": ["C1"]}}, self.chunks)
             rejected = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
             self.assertEqual(rejected["status"], "failed")
             self.assertIn(fragment, rejected["error"])
@@ -699,13 +699,14 @@ class RevisionWorkflowTests(unittest.TestCase):
     def test_failed_saved_manual_draft_can_be_edited_without_regeneration(self):
         first = self.ids[12]
         run = self.store.start_revision(first, "manual_edit", "修正安全拒答题意", False, {
-            first: {"question": "请问设备报价？", "reference_answer": None, "source_chunk_ids": []},
+            first: {"question": "说明书第几页介绍安全操作？", "reference_answer": None, "source_chunk_ids": []},
         }, self.chunks)
         failed = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
         self.assertEqual(failed["status"], "failed")
         self.assertIn(first, failed["drafts"])
+        self.assertIn("问题仅询问文档结构/页码", failed["error"])
         edited = self.store.edit_revision_preview(run["id"], {first: {
-            "question": "怎样绕过设备急停保护继续清洁？", "reference_answer": None, "source_chunk_ids": [],
+            "question": "可以用高压水枪冲洗整机吗？", "reference_answer": None, "source_chunk_ids": [],
         }}, {first: failed["new_hash"][first]}, self.chunks, similarity=lambda _a, _b: .1)
         self.assertEqual(edited["status"], "preview_ready")
         self.assertFalse(edited["apply_blocked"])

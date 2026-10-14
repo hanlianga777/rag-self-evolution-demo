@@ -19,8 +19,21 @@ it("distinguishes owner delegated AI approval from human review", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [row], snapshots: [snapshot] }} />));
   expect(document.body.textContent).toContain("所有者委托 AI 审核");
-  expect(document.querySelector('.golden-summary-strip')?.textContent).toContain("所有者委托 AI 审核");
+  expect(document.querySelector('.golden-summary-strip')?.textContent).toContain("Human Gate 1 · 已确认");
   expect(document.body.textContent).not.toContain("已人工确认");
+  await act(async () => root.unmount());
+});
+
+it("labels delegated review details accurately without claiming human review", async () => {
+  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify([])))));
+  const row = { id: "owner-Q01", question: "fixture", test_category: "positive", stage: "golden", review_status: "approved", qualification_status: "owner_delegated_approved", evidence: [], review_history: [{ actor: "Codex", decision: "owner_delegated_confirmed" }] };
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<CandidateWorkspace row={row} peers={[row]} operation={{ watchRevision: () => {} } as any} busy={false} onReview={vi.fn()} onRun={vi.fn()} onRefresh={vi.fn()} />));
+  expect(document.querySelector(".review-workspace")?.textContent).toContain("所有者委托 AI 审核");
+  await act(async () => ([...document.querySelectorAll(".candidate-menu button")].find(button => button.textContent === "质量审计记录") as HTMLButtonElement).click());
+  await act(async () => ([...document.querySelectorAll(".audit-tabs button")].find(button => button.textContent === "修订") as HTMLButtonElement).click());
+  expect(document.querySelector(".audit-workspace")?.textContent).toContain("审核历史");
+  expect(document.querySelector(".audit-workspace")?.textContent).not.toContain("人工审核历史");
   await act(async () => root.unmount());
 });
 
@@ -210,7 +223,7 @@ it("shows Gate 1 complete without a separate Snapshot action", async () => {
   vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(goldenFixture(url, questions)), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(row => row.id), artifacts: {} }], dataset: questions, snapshots: [{ id: "GD-20", snapshot: { generation_run_id: "GGEN-20", question_ids: questions.map(row => row.id) } }] }} />));
-  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("已人工确认");
+  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("Human Gate 1 · 已确认");
   expect(document.querySelectorAll(".snapshot-next button")).toHaveLength(0);
   await act(async () => root.unmount());
 });

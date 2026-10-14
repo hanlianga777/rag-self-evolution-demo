@@ -22,7 +22,7 @@ def pdf_page_text(path, modified_ns, page):
     with pymupdf.open(path) as pdf:
         if not 1<=page<=len(pdf): return ''
         text=pdf[page-1].get_text()
-        if text.strip(): return text
+        if any(character.isalnum() for character in text): return text
         image=pdf[page-1].get_pixmap(matrix=pymupdf.Matrix(1.5,1.5)).tobytes('png')
         return '\n'.join(local_ocr()(image).txts or [])
 
@@ -58,11 +58,21 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
     state=run['artifacts']['hard_validation']
     if auth.get('corpus')!=state['corpus_fingerprint'] or auth.get('plan_id')!=state['frozen_plan']['plan_id']:
         raise ValueError('Owner authorization Corpus/Plan changed')
+    from .governance import GENERATION_PROFILES
+    profile=run.get('profile',{})
+    name=profile.get('name')
+    if name not in {'mini','medium'} or any(type(profile.get(key)) is not int or profile[key]!=value for key,value in GENERATION_PROFILES[name].items()):
+        raise ValueError('Owner delegation requires a valid Mini20 or Medium50 profile')
+    scope={'name':name,**GENERATION_PROFILES[name]}
+    # Legacy Medium authorization had no profile; it never authorizes Mini.
+    if auth.get('profile')!=scope and not (name=='medium' and 'profile' not in auth):
+        raise ValueError('Owner authorization Profile changed or unavailable')
+    count=scope['expected_count']
     ids=run['question_ids']
-    if len(ids)!=50 or len(set(ids))!=50 or len(reviews)!=50 or {r['question_id'] for r in reviews}!=set(ids):
-        raise ValueError('Owner delegation requires exactly the scoped 50 questions')
-    if Counter(items[key]['test_category'] for key in ids)!=Counter({'positive':20,'ablation':10,'negative':20}) or len(state['frozen_plan'].get('clusters',[]))!=9:
-        raise ValueError('Owner delegation Medium groups/Topics changed')
+    if len(ids)!=count or len(set(ids))!=count or len(reviews)!=count or {r['question_id'] for r in reviews}!=set(ids):
+        raise ValueError(f'Owner delegation requires exactly the scoped {count} questions')
+    if Counter(items[key]['test_category'] for key in ids)!=Counter({group:scope[f'{group}_count'] for group in ('positive','ablation','negative')}) or len(state['frozen_plan'].get('clusters',[]))!=9:
+        raise ValueError('Owner delegation Profile groups/Topics changed')
     def reviewable(row):
         if row['qualification_status'] in {'machine_qualified','owner_delegated_approved'}: return True
         return set(row.get('attention_reasons',[])) in ({'检索不连贯'},{'QC P1','检索不连贯'}) and row.get('probe_status')=='probe_passed' and row.get('qc_status')=='qc_passed'

@@ -1198,8 +1198,6 @@ class GovernanceStore:
             validation = validate_golden_candidate(candidate, chunks, frozen, context)
             errors.extend(f"{item_id}: {message.replace('unsupported answer anchor', '答案锚点未在所选证据原文中找到')}" for message in validation['blocking_errors'])
             candidate['validation'] = {k: v for k, v in validation.items() if k != 'normalized_candidate'}
-            if old["test_category"] == "negative" and old["raw"].get("expected_behavior") == "safe_rejection" and not any(cue in candidate["question"] for cue in ("绕过", "禁用", "关闭", "短接", "忽略安全")):
-                errors.append(f"{item_id}: 安全拒答题必须包含危险操作请求")
             drafts[item_id] = {**old, **candidate, "raw": {**old["raw"], "question": candidate["question"], "reference_answer": candidate["reference_answer"], "acceptable_evidence": evidence, "evidence": evidence, "validation": candidate["validation"], "ablation_metadata": candidate["ablation_metadata"]}}
             drafts[item_id]['raw'].update({key:candidate[key] for key in business_fields})
             old_ids = [key for source in old['evidence'] for key in source.get('source_chunk_ids', [])]

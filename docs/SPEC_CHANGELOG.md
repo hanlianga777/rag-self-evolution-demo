@@ -1,3 +1,13 @@
+## 2026-10-14 — Mini Business V2及限定Profile委托审核
+
+- Mini显式business_v2复用Topic/Group/产品配额与十维审计；通用业务选材避免封底/声明驱动机械题，专项无支持在新Plan记录真实Ordinary fallback，旧冻结Plan/题目不改名；Medium及知识资产不变。
+- 所有者委托能力通用于合法Mini20/Medium50，Mini必须有本次Run及Profile明确授权；逐题PDF、机器质量与风险校验不变。UI准确区分委托AI与真人。
+- 本次付费治理使用新账本及更低有效预算，不运行Baseline/Agent/Candidate/Sandbox。真实结果见[Mini20收口验收](MINI20_QUALITY_CLOSURE_ACCEPTANCE.md)。
+
+- Mini20收口补充：删除安全拒答修订中以五个词代替危险语义的预览门槛；真实Probe负向子类及QC仍须重跑并保留阻断。自然高压水枪危险请求、语义不匹配阻断及负向Evidence禁令有隔离回归验证。
+- 负向Business Audit补齐expected_response及显式、当前同产品的必要审计上下文（默认不扩张、不发送整库）；修复单Anchor缺禁令造成的审计盲区，原十维标准不变。重审请求被自动审批拒绝而未执行；保留旧失败/独立PDF核验，等待具体载荷外发授权。正向Evidence范围不扩张，无知识重建。
+- 本轮实际Hard/Probe/QC20通过、Business19/20；独立建议19通过1待复核，正式批准0、Snapshot0；Q18必要补审外发被自动审批拒绝且未执行，等待具体载荷授权。
+
 ## 2026-10-14 — 证据驱动诊断、单一干预与实验重新开始
 
 - 评估四维组织、原11 Gate/Overall/Regression阈值保持；主张结果分正式阻断与结构化确证/待审/争议，新Judge/Matcher/Policy版本见SPEC文首，旧成绩不重算。

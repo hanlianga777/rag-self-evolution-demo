@@ -663,11 +663,12 @@ def generate_golden(payload: GenerationRequest):
     try:
         with CORPUS_LOCK:
             if payload.strategy == 'business_v2':
-                from .business_golden import medium_plan
-                base = json.loads((corpus.index_dir / 'coverage.json').read_text())
+                from .business_golden import medium_plan, mini_plan
+                base = current_coverage_plan(payload.profile, payload.plan_id) if payload.profile == 'mini' else json.loads((corpus.index_dir / 'coverage.json').read_text())
                 if base['corpus_fingerprint'] != manifest_identity(current_manifest()):
                     raise ValueError('Topic Plan 已过期')
-                plan = medium_plan(base, corpus.chunks(), {'name':payload.profile, **GENERATION_PROFILES[payload.profile]})
+                planner = mini_plan if payload.profile == 'mini' else medium_plan
+                plan = planner(base, corpus.chunks(), {'name':payload.profile, **GENERATION_PROFILES[payload.profile]})
                 with store.connection() as connection:
                     connection.execute('INSERT OR IGNORE INTO coverage_plan_previews VALUES (?,?,?)', (plan['plan_id'], json.dumps(plan, ensure_ascii=False), plan['created_at']))
             else:
