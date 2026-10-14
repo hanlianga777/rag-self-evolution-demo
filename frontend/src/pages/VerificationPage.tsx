@@ -13,6 +13,8 @@ import { useOperation } from "../operation";
 export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void }) {
   const operation = useOperation();
   const [tab, setTab] = useState<"qa" | "compare" | "monitoring">(() => { const value = readSession("rag-qa-tab", { tab: "qa" }).tab; return ["qa", "compare", "monitoring"].includes(value) ? value as "qa" | "compare" | "monitoring" : "qa"; }), [busy, setBusy] = useState(false), [error, setError] = useState(""), [monitoring, setMonitoring] = useState<any>(data.monitoring || {});
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyBusy, setHistoryBusy] = useState(false);
   const [eventDetail, setEventDetail] = useState<any>(null);
   const [contextDetail, setContextDetail] = useState(false);
   const [triggerId, setTriggerId] = useState<string | null>(null);
@@ -31,12 +33,12 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
   }, [contextId]);
 
   const requests = useRef(0);
-  useEffect(() => { setMonitoring(data.monitoring || {}); }, [data.monitoring]);
+  useEffect(() => { setMonitoring(data.monitoring || {}); setHistoryPage(1); }, [data.monitoring]);
   useEffect(() => () => { requests.current++; }, []);
   const [citation, setCitation] = useState<Citation | null>(null), [sourceText, setSourceText] = useState("");
   useEffect(() => writeSession("rag-qa-tab", { tab }), [tab]);
   useEffect(() => { setSourceText(""); if (!citation) return; let cancelled = false; void getJson<any>(`/api/documents/${encodeURIComponent(citation.document_id)}`).then(value => { if (!cancelled) setSourceText(value.chunks?.find((chunk: any) => chunk.chunk_id === citation.chunk_id)?.chunk_text || citation.content_preview); }).catch(() => { if (!cancelled) setSourceText(citation.content_preview); }); return () => { cancelled = true; }; }, [citation]);
-  const refresh = async () => { const ticket = ++requests.current; const value = await getJson("/api/monitoring"); if (ticket === requests.current) setMonitoring(value); };
+  const refresh = async (page=historyPage) => { const ticket = ++requests.current; setHistoryBusy(true); try { const value = await getJson(`/api/monitoring?page=${page}&limit=50`); if (ticket === requests.current) { setMonitoring(value); setHistoryPage(page); } } finally { if(ticket===requests.current)setHistoryBusy(false); } };
   const assess = async (event: any, bad_case: boolean, severity: "ordinary" | "critical") => { setBusy(true); setError(""); try { await operation.run("保存人工监控判定", () => postJson(`/api/monitoring/events/${event.id}/assessment`, { bad_case, severity })); await refresh(); } catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); } };
   const confirm = async (trigger: any) => { setBusy(true); setError(""); try { await operation.run("确认 Optimization Trigger", () => postJson(`/api/monitoring/triggers/${trigger.id}/confirm`, { decision: "approved" })); await refresh(); } catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); } };
   const startAgent = async () => {
@@ -63,7 +65,7 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
     {tab === "monitoring" && <Section title="Monitoring">
       <p className="muted">Production QA → 人工判断 Bad Case → Confirm Trigger → 下一轮 Optimization Agent</p>
       {error && <p className="error-notice" role="alert">{error}</p>}
-      <div className="table-scroll monitoring-table"><table><thead><tr><th>问题</th><th>当前状态</th><th>人工判断</th><th>操作</th></tr></thead><tbody>{(monitoring.events || []).map((event: any) => {
+      <div className="review-batch"><button disabled={historyBusy || historyPage===1} onClick={()=>void refresh(historyPage-1).catch(reason=>setError(errorMessage(reason)))}>上一页</button><span>第 {historyPage} 页 · 每页最多50条</span><button disabled={historyBusy || Math.max(monitoring.events?.length || 0,monitoring.triggers?.length || 0)<50} onClick={()=>void refresh(historyPage+1).catch(reason=>setError(errorMessage(reason)))}>下一页</button></div><div className="table-scroll monitoring-table"><table><thead><tr><th>问题</th><th>当前状态</th><th>人工判断</th><th>操作</th></tr></thead><tbody>{(monitoring.events || []).map((event: any) => {
         const eventTrigger = (monitoring.triggers || []).find((row: any) => row.event_id === event.id);
         return <tr key={event.id}><td><button className="text-button" onClick={() => setEventDetail(event)}><TruncatedText lines={2}>{event.question}</TruncatedText></button></td><td>{eventTrigger ? <Status value={eventTrigger.status} /> : event.determinable ? "已判定" : "待人工判断"}</td><td>{event.determinable ? event.bad_case ? event.severity === "critical" ? "人工安全 Bad Case" : "人工 Bad Case" : "人工判定正常" : "待判定"}</td><td><button className="text-button" disabled={busy} onClick={() => void assess(event, false, "ordinary")}>正常</button> <button className="text-button" disabled={busy} onClick={() => void assess(event, true, "ordinary")}>Bad Case</button> <button className="text-button" disabled={busy} onClick={() => void assess(event, true, "critical")}>安全问题</button></td></tr>;
       })}</tbody></table>{!(monitoring.events || []).length && <p className="muted">暂无真实问答记录。</p>}</div>

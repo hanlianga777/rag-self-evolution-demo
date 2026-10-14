@@ -292,7 +292,7 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
   const context = () => ({ id: "E-monitor", baseline_run_id: "B1", status: started ? "completed" : "pending_agent", result: { round: started ? 1 : 0 }, candidates: started ? ["A", "B", "C"].map(id => ({ id })) : [] });
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === "POST") { posts.push({ url, body: JSON.parse(init.body as string) }); if (url.endsWith("/confirm")) confirmed = true; else if (url.endsWith("/experiments/run")) started = true; }
-    return new Response(JSON.stringify(url.endsWith("/monitoring") ? monitoring() : url.includes("/experiments/") ? context() : {}));
+    return new Response(JSON.stringify(url.endsWith("/monitoring?page=1&limit=50") ? monitoring() : url.includes("/experiments/") ? context() : {}));
   }));
   await render(<VerificationPage data={{ ...data("B1"), monitoring: monitoring(), optimization: { id: "E-prior", candidates: [{ id: "old-A" }] } }} onOpenDocument={() => {}} onOpenCitation={() => {}} />);
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Monitoring")!.click());

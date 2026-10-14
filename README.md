@@ -1,5 +1,14 @@
 # RAG Evolution
 
+当前规则以[唯一SPEC文首](docs/RAG_SELF_EVOLUTION_SPEC.md)为准。2026-10-14已按用户授权清空历史实验，知识资产保持；当前问答使用保留参数的**初始配置（未评测、未发布）**。新Golden、Baseline与受控候选需重新治理，不自动恢复历史审计。
+
+评估按答案质量/检索效果/安全鲁棒/性能体验组织；Pending及Disputed仍阻断资格，与已确认失败分开解释。Agent允许0–3个有真实Trace支持、单一干预的候选；D同样验证，11 Gate与正式Regression阈值不变。真实模型效果未由本轮离线测试确认。
+
+后台每分钟按完整对象和依赖清理，历史实验/评测非引用对象各50；当前/活动/被Production引用的完整审计链保留，Full100不截成50题。历史列表每页最多50，详情保存完整Trace。维护清理工具默认只读：`python3 scripts/reset_experiment_history.py`；真正清理须停写入、明确`--execute --maintenance --backup <唯一新路径>`，不能把它用于普通启动或自动清理。唯一备份和旧审计仅外部保留。
+
+本轮依据、实测性能与Mini20准备见[验收报告](docs/RAG_DIAGNOSTIC_RESET_ACCEPTANCE.md)。`./start.sh`及5174/8010入口不变；不要自行启动Provider实验。
+
+
 面向企业知识问答的评测驱动 RAG 质量运营与版本决策 Demo。
 
 **唯一当前有效规格：[V1.4 + Phase 1 + Baseline/Agent UI 恢复（2026-10-09）](docs/RAG_SELF_EVOLUTION_SPEC.md)**。当前合同以SPEC文首为准；[ChangeLog](docs/SPEC_CHANGELOG.md)追加历史，[Current Demo Truth](docs/CURRENT_DEMO_TRUTH.md)区分真实Current与Legacy。历史验收只代表其日期的运行状态。

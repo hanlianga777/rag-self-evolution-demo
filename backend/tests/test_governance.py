@@ -214,7 +214,7 @@ class FakeAgentProvider:
         result['observed_evidence'] = targets
         for candidate in result['candidates']:
             candidate['target_bad_cases'] = targets
-            candidate.update(target_group='fixture',root_cause='Retrieval',root_cause_evidence=targets,expected_improvement='fixture')
+            candidate.update(intervention_direction='context_selection',evidence_assertions=[{'target_id':target,'observation':'ranking_omission'} for target in targets],parameter_dependencies=[],target_group='fixture',root_cause='Retrieval',root_cause_evidence=targets,expected_improvement='fixture')
         return json.dumps(result)
 
 
@@ -224,6 +224,8 @@ class OptimizationAgentTests(unittest.TestCase):
             store = GovernanceStore(Path(directory) / "demo.db")
             completed_baseline(store, run_id="EVAL-1")
             store.record_bad_case("EVAL-1", "GGC-001", "Retrieval", "ordinary", {"reason": "fixture", "primary_root_cause":"Retrieval", "diagnosis":{"status":"confirmed","reason":"fixture"}})
+            for row in store.bad_case_rows():
+                store.record_bad_case(row['run_id'],row['question_id'],'Retrieval','ordinary',{**row['result'],'programmatic_metrics':{'evidence_coverage':{'required_chunk_ids':['c']},'retrieval_trace':{'candidates':[{'chunk_id':'c'}],'final':[]}}})
             experiment = OptimizationAgent(store, FakeAgentProvider()).generate("EVAL-1")
 
         self.assertEqual(len(experiment["candidates"]), 3)

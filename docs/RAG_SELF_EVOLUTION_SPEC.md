@@ -1,4 +1,11 @@
-# 当前有效合同 — 2026-10-11 `[CONFIRMED]`
+# 当前有效合同 — 2026-10-14 `[CONFIRMED]`
+
+- **2026-10-14 诊断合同、单一干预与实验重新开始（覆盖下方冲突旧条款）**：本轮真实Provider调用0、费用0，不跑Baseline/Sandbox/Probe/QC/Mini，不重建Knowledge。按用户明确授权清空全部历史实验/Golden/审批/Monitoring及旧Seed，只保留迁移、工具、Pipeline/别名配置和知识资产。旧活动参数与真实索引绑定迁为新的`bootstrap`初始运行配置；没有Evaluation/Approval/旧Candidate成绩或发布资格。一个SQLite Backup API备份仅作外部恢复，既有审计文件只读留在output，不自动导回活动库。清理标记绑定当前Corpus身份，旧Q02启动守卫仅豁免已清除的旧Golden工作集依赖，索引/Corpus State仍须完全一致；迁移记录防止重启Seed回流。
+- **评估与治理**：答案质量（Correctness/Faithfulness/Completeness）、检索效果（Recall/Precision/MRR）、安全鲁棒（Injection/Safe Rejection/Safety Critical）、性能体验（Latency/TTFT/Token Cost）统一组织已有真实指标；五类典型现象非互斥且非穷尽，四个技术根因及Confirmed/Needs Review/Disputed复用现有诊断。Judge `judge-v3.3-operation-scope`、Matcher `evidence-v5-claim-scope`、Policy `v1.4-governance-outcomes`。11 Gate、Overall计算、严重新增0/普通新增≤1不变。`passed`仍保守阻断Pending/Disputed，不自动通过；保存`evaluation_outcome`及正式阻断/结构化Confirmed/Pending/Disputed/未分类回归明细，不称结构化确认等于独立业务事实确证。旧成绩不静默重算；后续新Baseline/候选须同新版Evaluation Identity。混合提示注入中的缺依据部分可在完整严格拒答合同下接受，不豁免后续无来源操作。合理安全建议、条件式资料与直接授权、排他性断言和主动操作逐项区分，语义一致性仍须未来真实验证。
+- **根因与Agent**：One Candidate = One Verifiable Hypothesis + One Coherent Intervention Direction + Minimum Necessary Parameters。保存前确定性核Search Space、实际Baseline Diff、所有Confirmed目标的同一主根因、实际候选/Final Trace、证据断言、方向参数集合、预期改善/风险；同方向多参数须保存覆盖全部变更的依赖理由。查询扩展、候选池、上下文选择、来源过滤、生成和实测性能阶段分开，未经证明的跨方向组合拒绝；D同样校验完整Baseline→D Diff，明显跨方向来源在Provider前排除，合法无组合保留Winner。允许0–3个候选并保存`insufficient_evidence`，没有足够目标时不调用模型。根因不能因干预在检索层就从Generation改成Retrieval。已确认排序遗漏只在必要Chunk全部进入候选、Final遗漏且Judge确认不足时成立；Final语义充分时不因某Golden ID缺失声称召回失败。没有实际Trace的Monitoring人工判断不等价于技术根因证据。
+- **生成端输入**：文档产品/厂商/文件名/真实版本共享一次，Chunk短引用携章节与正文所覆盖页码；保留全文/Trace映射，不推断缺失版本。仅用适用产品/版本操作，未确认先澄清；区分有据操作、保守停用/官方求助与无据维修/换件/测量/上电/测试/阈值，正确拒答不豁免后续步骤。不声称离线Prompt验证等于模型效果已改善。
+- **历史保留与列表**：复用后台监控每60秒事务清理按依赖闭包完整保留对象；已结束实验与评测各最多50个非引用历史对象，Golden工作集/Snapshot各50个，并保护当前Golden/Baseline/Experiment、活动任务、所有保留Production及其可回滚审计依赖、恢复父Run、Topic来源/题目谱系及关联Monitoring。被引用对象不受50限制，Case/Trace/100题Full不得按50行截断；预览缓存50；导入回执保留最近50及仍被候选/Golden引用的完整批次。历史评测、版本及Monitoring UI/API每页最多50，当前完整题组不分页截断。列表去除重复序列化/Checkpoint正文，详情继续保留；Bad Case集合定位当前Baseline，旧Run在其详情查看。所有人工Gate与真实付费运行继续另行授权。
+
 
 - **2026-10-14 Agent上下文超限去重**：Provider真实400证明原消息1,106,742 Tokens超过1,048,576上限。仅在Agent传输的bad_cases/all_bad_case_audit行中省去result_json（它与已保留result对象是同一份结果），完整答案/评分/Evidence/Trace/可信度仍保留；13个Bad Case背景、7个Confirmed目标、引用映射及所有策略/治理条件不变。数据库与本地审计完整保留，不截断证据、不改变模型或输出参数、不新增费用/累计Token预算门槛。修复后Token数须由下一次明确授权的真实调用确认，离线估算不冒充Provider实测。
 

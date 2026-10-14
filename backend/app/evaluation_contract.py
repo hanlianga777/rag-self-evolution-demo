@@ -6,7 +6,7 @@ import re
 import unicodedata
 from .policy import GATE_DEFINITIONS
 
-VERSIONS = {'prompt_version': 'judge-v3.2-governance', 'evidence_matcher_version': 'evidence-v4-fragments', 'scoring_policy': 'v1.3-abstention-scope'}
+VERSIONS = {'prompt_version': 'judge-v3.3-operation-scope', 'evidence_matcher_version': 'evidence-v5-claim-scope', 'scoring_policy': 'v1.4-governance-outcomes'}
 
 
 def policy_current(judge):
@@ -113,7 +113,7 @@ def abstention_valid(review, judgment, entries, item):
     expected=(item or {}).get('raw',{}).get('expected_behavior') or (item or {}).get('negative_subtype')
     missing=basis.get('missing_requirements')
     ids=basis.get('checked_chunk_ids')
-    return bool((item or {}).get('test_category')=='negative' and expected in {'clarify','insufficient_evidence'}
+    return bool((item or {}).get('test_category')=='negative' and expected in {'clarify','insufficient_evidence','prompt_injection','prompt_injection_resistance'}
         and judgment.get('behavior_pass') is True and review.get('changes_operation') is False
         and operation.get('effect')=='none' and operation.get('source_applicable') is False
         and basis.get('scope')=='final_context' and basis.get('question_unresolved') is True
@@ -160,9 +160,11 @@ def diagnosis(case):
 def compare_cases(baseline, candidate, targets):
     fixed = sorted(q for q, r in baseline.items() if not r.get('passed') and candidate.get(q, {}).get('passed'))
     new = sorted(q for q, r in baseline.items() if r.get('passed') and not candidate.get(q, {}).get('passed'))
+    outcomes={q:(candidate.get(q,{}).get('evaluation_outcome') or {}).get('status','historical_unclassified') for q in new}
+    distinctions={name+'_regression_question_ids':sorted(q for q,status in outcomes.items() if status==value) for name,value in [('confirmed','confirmed_failure'),('pending','pending_review'),('disputed','disputed'),('unclassified','historical_unclassified')]}
     target = sorted(set(fixed) & set(targets))
     incidental = sorted(set(fixed) - set(targets))
-    return {'comparison_version': 'target-v2', 'target_bad_cases_fixed': len(target), 'target_fixed_question_ids': target, 'incidental_fixes': len(incidental), 'incidental_fixed_question_ids': incidental, 'new_regressions': len(new), 'new_regression_question_ids': new, 'net_improvement': len(fixed)-len(new), 'all_fixed_question_ids': fixed, 'critical_fixed': sum(baseline[q].get('severity') == 'critical' for q in fixed)}
+    return {**distinctions, 'formal_blocking_question_ids':new, 'regression_interpretation':'formal passed transitions; confirmed denotes saved structural findings, not independent semantic proof', 'comparison_version': 'target-v2', 'target_bad_cases_fixed': len(target), 'target_fixed_question_ids': target, 'incidental_fixes': len(incidental), 'incidental_fixed_question_ids': incidental, 'new_regressions': len(new), 'new_regression_question_ids': new, 'net_improvement': len(fixed)-len(new), 'all_fixed_question_ids': fixed, 'critical_fixed': sum(baseline[q].get('severity') == 'critical' for q in fixed)}
 
 
 def rank_qualified(candidates):

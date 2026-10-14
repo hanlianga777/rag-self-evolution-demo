@@ -194,6 +194,7 @@ class VectorRetriever:
             "parent_chunk_id": chunk.get("parent_chunk_id"),
             "document_id": chunk["document_id"], "document": chunk.get("document_name") or chunk.get("document") or chunk["document_id"],
             "product": chunk.get("product"), "vendor": chunk.get("vendor"), "chunk_id": chunk["chunk_id"],
+            **({"version":chunk["version"]} if chunk.get("version") else {}),
             "section": chunk.get("section"), "section_path": chunk.get("section_path"),
             "page_start": chunk.get("page_start"), "page_end": chunk.get("page_end"), "score": round(float(score), 4),
             "content_preview": chunk.get("chunk_text", chunk.get("text", ""))[:220], "content": chunk.get("chunk_text", chunk.get("text", "")),

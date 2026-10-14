@@ -1,3 +1,12 @@
+## 2026-10-14 — 证据驱动诊断、单一干预与实验重新开始
+
+- 评估四维组织、原11 Gate/Overall/Regression阈值保持；主张结果分正式阻断与结构化确证/待审/争议，新Judge/Matcher/Policy版本见SPEC文首，旧成绩不重算。
+- Agent及D保存前验证Trace、方向及必要联动；允许候选不足，不强凑ABC。Monitoring人工判定不替代技术Trace。
+- 生成输入共享文档身份、Chunk引用/范围/全文，明确操作边界；仅离线输入验证，效果待后续授权。
+- 用户授权事务清空旧Golden/实验/审批/Monitoring/Seed；当前参数保存为未评测未发布bootstrap，Knowledge不重建。保留一次SQLite备份及外部审计。
+- 依赖闭包对象保留（非引用实验/评测各50、活动/引用豁免）及历史分页≤50；关联Q02启动守卫识别Corpus绑定的清理标记。
+- 验收与Mini20前置条件见[RAG机制修复与清理验收](RAG_DIAGNOSTIC_RESET_ACCEPTANCE.md)。本轮Provider0，不创建或运行Mini。
+
 ## 2026-10-14 — Optimization Agent已证实上下文超限的无损去重
 
 - 真实HTTP400返回messages=1,106,742，最大上下文1,048,576；已确认消息超限，旧粗估不能代表实际Tokenizer。

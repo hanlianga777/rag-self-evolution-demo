@@ -80,3 +80,10 @@ DeepSeek 是既有 Provider，显式服务于回答、生成、QC、Judge、Agen
 共享Evaluation模块内部增加逐题检查点与失败阶段/Usage记录；同身份手动续跑使用独立子Run，复用已保存案例和生成上下文，不覆盖历史。复用既有SQLite JSON与API，不新增调度器、Provider或Judge，组件边界和正式图连线不变，因此图源及导出图不变。请求等待配置与冻结评分/性能Gate分离。细则见[Baseline稳定性报告](../docs/BASELINE_STABILITY.md)。
 
 Candidate Sandbox复用同一检查点/子Run路径，预约与预算、身份、Run关联原子保存；人工续跑仅补未保存步骤。浏览器共享Operation在单项未完整结束时暂停后续候选，人工再次点击才继续。仍使用既有SQLite JSON、单候选API及Evaluation模块，不新增调度器或改变图形边界，图源与导出产物不变。见[Candidate恢复验收](../docs/CANDIDATE_SANDBOX_RECOVERY.md)。
+
+
+## 2026-10-14 当前诊断与历史对象生命周期
+
+组件边界仍为同一个Evaluation/Optimization/SQLite模块。正式图A/B/C表示最多3个有据候选，允许不足；每个候选及D的参数方向与Trace由程序校验。Matcher确定定位及结构合同，Judge判断语义，Policy保守阻断与计算11 Gate/Regression；正式阻断和结构化确证分列，语义争议不变成第五个调参方向。生成共享文档身份和逐Chunk章节/页码/全文，避免把Trace元数据误认为模型原来已经收到的信息。
+
+SQLite历史管理以对象依赖闭包保留，非引用历史实验/评测各50，活动/当前/发布及恢复链保护，不对Case/Trace机械限行。此次用户授权重新开始将旧发布依赖迁为无资格bootstrap配置后事务清空；唯一备份与审计在库外保留。清理标记只解除旧Golden绑定，不豁免Corpus State/索引身份。上述流程不声明真实模型已改善或人工Gate已通过。

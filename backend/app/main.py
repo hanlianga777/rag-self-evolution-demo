@@ -85,7 +85,14 @@ def recover_authorized_evaluations():
 def start_recovery_monitor():
     _recovery_stop.clear()
     def monitor():
+        last_retention=0.0
         while not _recovery_stop.is_set():
+            if time.monotonic()-last_retention>=60:
+                try:
+                    from .history import prune_history
+                    prune_history(store)
+                except Exception:logging.exception('History retention unavailable')
+                last_retention=time.monotonic()
             try:recover_authorized_evaluations()
             except Exception:logging.exception('Evaluation recovery monitor unavailable')
             _recovery_stop.wait(5)
@@ -1246,7 +1253,8 @@ def evaluation(active_task: bool = False):
 
 @app.get("/api/bad-cases")
 def bad_cases():
-    return [{**row, "result": {**row["result"], "diagnostic_view": diagnostic_view(row["result"])}} for row in store.bad_case_rows()]
+    current=store.current_baseline_identity()['current_baseline_id']
+    return [{**row, "result": {**row["result"], "diagnostic_view": diagnostic_view(row["result"])}} for row in store.bad_case_rows() if row["run_id"]==current]
 
 
 @app.get("/api/bad-cases/{case_id}")
@@ -1267,8 +1275,9 @@ def optimization():
 
 
 @app.get("/api/versions")
-def versions():
-    return store.production_versions()
+def versions(page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=50)):
+    rows=sorted(store.production_versions(),key=lambda r:r['status']!='active')
+    return rows[(page-1)*limit:page*limit]
 
 
 @app.get("/api/pipeline")
@@ -1317,11 +1326,15 @@ def save_pipeline_draft(payload: PipelineDraftRequest):
 
 
 @app.get("/api/monitoring")
-def monitoring():
-    events = store.monitoring_events()
+def monitoring(page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=50)):
+    all_events = store.monitoring_events()
+    events=all_events[(page-1)*limit:page*limit]
     active = store.active_production()
-    confirmed = [e for e in events if e.get('bad_case') and e.get('determinable') and e.get('source', {}).get('production_version_id') == (active or {}).get('id')]
-    return {"events": events, "triggers": store.optimization_triggers(), "recommendation": {"status": "needs_human_review" if confirmed else "insufficient_signal", "event_ids": [e['id'] for e in confirmed], "reason": "已有人工判定QA失败，建议核对影响与兼容回滚范围；不自动回滚" if confirmed else "已有QA信号不足以建议回滚；不产生额外监测或Judge调用"}, **store.current_baseline_identity()}
+    confirmed = [e for e in all_events if e.get('bad_case') and e.get('determinable') and e.get('source', {}).get('production_version_id') == (active or {}).get('id')]
+    event_ids={e['id'] for e in events};triggers={}
+    for trigger in store.optimization_triggers():
+        if trigger['event_id'] in event_ids:triggers.setdefault(trigger['event_id'],trigger)
+    return {"events": events, "triggers": list(triggers.values()), "recommendation": {"status": "needs_human_review" if confirmed else "insufficient_signal", "event_ids": [e['id'] for e in confirmed], "reason": "已有人工判定QA失败，建议核对影响与兼容回滚范围；不自动回滚" if confirmed else "已有QA信号不足以建议回滚；不产生额外监测或Judge调用"}, **store.current_baseline_identity()}
 
 
 @app.post("/api/monitoring/events", status_code=201, dependencies=[Depends(require_trusted_origin)])
@@ -1493,13 +1506,13 @@ def activate_version(version_id: str):
 
 
 @app.get("/api/evaluations")
-def evaluation_runs():
-    return store.evaluation_runs()
+def evaluation_runs(page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=50)):
+    return store.evaluation_history(page,limit)
 
 
 @app.get("/api/evaluations/{run_id}")
 def evaluation_run(run_id: str):
-    run = next((item for item in store.evaluation_runs() if item["id"] == run_id), None)
+    run = store.evaluation_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Evaluation run not found")
     run=persisted_evaluation_progress(run)

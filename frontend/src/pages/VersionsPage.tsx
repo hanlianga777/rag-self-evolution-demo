@@ -13,15 +13,17 @@ function candidateName(candidate: any, candidateId?: string) {
 
 export function VersionsPage({ data }: { data: any }) {
   const operation = useOperation();
-  const [versions, setVersions] = useState<any[]>(data.versions || []);
+  const [versions, setVersions] = useState<any[]>((data.versions || []).slice(0,50));
   const [candidates, setCandidates] = useState<any[]>(data.optimization?.candidates || []);
   const [error, setError] = useState("");
   const [report, setReport] = useState<any>(null);
   const [detail, setDetail] = useState<"config" | "candidates" | null>(null);
   const [busy, setBusy] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyBusy, setHistoryBusy] = useState(false);
   const [confirmation, setConfirmation] = useState<{ kind: "release" | "rollback"; item: any } | null>(null);
   const orderedCandidates = [...candidates].sort((a, b) => ["A", "B", "C", "D"].indexOf(a.reasoning?.candidate_label) - ["A", "B", "C", "D"].indexOf(b.reasoning?.candidate_label));
-  const currentVersion = versions.find(version => version.status === "active");
+  const currentVersion = versions.find(version => version.status === "active") || data.versions?.find((version:any)=>version.status === "active");
   const snapshot = currentVersion?.snapshot || {};
   const currentBaselineId = data.workspace?.current_baseline_id === undefined ? data.evaluation?.id : data.workspace.current_baseline_id;
   const publishedBaselineId = snapshot.baseline_run_id || snapshot.evaluation_result?.baseline_run_id;
@@ -37,8 +39,14 @@ export function VersionsPage({ data }: { data: any }) {
   const released = (candidate: any) => versions.some(version => version.provenance === "published" && version.snapshot?.candidate_id === candidate.id);
   const canRelease = (candidate: any) => { const state = candidate.release_state || {}; return !released(candidate) && state.sandbox && state.qualified && state.recommended && state.round_complete && !state.human_release; };
   const pendingCandidates = orderedCandidates.filter(canRelease);
-  useEffect(() => { setVersions(data.versions || []); setCandidates(data.optimization?.candidates || []); setReport(null); setDetail(null); }, [data]);
-  const reload = async () => { const [versions, experiment] = await Promise.all([getJson<any[]>("/api/versions"), getJson<any>("/api/optimization")]); setVersions(versions); setCandidates(experiment.candidates || []); };
+  useEffect(() => { setVersions((data.versions || []).slice(0,50)); setHistoryPage(1); setCandidates(data.optimization?.candidates || []); setReport(null); setDetail(null); }, [data]);
+  const reload = async () => { const [versions, experiment] = await Promise.all([getJson<any[]>("/api/versions?page=1&limit=50"), getJson<any>("/api/optimization")]); setVersions(versions); setHistoryPage(1); setCandidates(experiment.candidates || []); };
+  const loadHistory = async (page:number) => {
+    setHistoryBusy(true);
+    try { const rows=await getJson<any[]>(`/api/versions?page=${page}&limit=50`); setVersions(rows); setHistoryPage(page); }
+    catch(reason) { setError(errorMessage(reason)); }
+    finally { setHistoryBusy(false); }
+  };
   const rollback = async (version: any) => { setBusy(true); setError(""); try { const active: any = await operation.run(`回滚至 ${version.id}`, () => postJson(`/api/versions/${version.id}/rollback`, { decision: "approved" })); setVersions(current => current.map(item => ({ ...item, status: item.id === active.id ? "active" : item.status === "active" ? "archived" : item.status }))); await reload(); setConfirmation(null); } catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); } };
   const release = async (candidate: any) => {
     if (!canRelease(candidate)) return;
@@ -68,7 +76,7 @@ export function VersionsPage({ data }: { data: any }) {
       <div className="header-actions release-detail-actions">{currentVersion && <button className="secondary" onClick={() => setDetail("config")}>查看完整配置</button>}<button className="text-button" onClick={() => setDetail("candidates")}>查看其他 Candidate</button></div>
       {!!pendingCandidates.length && <div className="unpublished-candidates">{pendingCandidates.map(candidate => <div key={candidate.id}><div><strong>{candidateName(candidate)}</strong><span className="muted"> · 本轮推荐，尚未发布</span><button className="text-button" onClick={() => setReport(candidate)}>查看评测报告</button></div><div className="release-actions"><button className="primary" disabled={busy} onClick={() => setConfirmation({ kind: "release", item: candidate })}>确认发布</button></div></div>)}</div>}
     </section>
-    {!!versions.length && <div className="release-history"><Section title="版本记录"><div className="table-scroll"><table><thead><tr><th>版本</th><th>参数摘要</th><th>评测</th><th>状态</th><th>操作</th></tr></thead><tbody>{versions.map(version => <tr key={version.id}><td><button className="text-button" onClick={() => setReport({ version })}>{version.id}</button>{version.provenance === "bootstrap" && <span> · 初始配置</span>}</td><td>Prompt {version.config?.prompt_strategy ?? "—"} · CandidateK {version.config?.candidate_k ?? "—"} · TopK {version.config?.top_k ?? "—"}</td><td><ShortId value={version.evaluation_run_id} /></td><td>{version.provenance === "bootstrap" && version.status === "active" ? "当前初始配置" : <Status value={version.status || "未记录"} />}</td><td>{version.status !== "active" && <button className="text-button" disabled={busy} onClick={() => setConfirmation({ kind: "rollback", item: version })}>回滚至此版本</button>}</td></tr>)}</tbody></table></div></Section></div>}
+    {(!!versions.length || historyPage>1) && <div className="release-history"><Section title="版本记录"><div className="review-batch"><button disabled={historyBusy || historyPage===1} onClick={()=>void loadHistory(historyPage-1)}>上一页</button><span>第 {historyPage} 页 · 每页最多50条</span><button disabled={historyBusy || versions.length<50} onClick={()=>void loadHistory(historyPage+1)}>下一页</button></div><div className="table-scroll"><table><thead><tr><th>版本</th><th>参数摘要</th><th>评测</th><th>状态</th><th>操作</th></tr></thead><tbody>{versions.map(version => <tr key={version.id}><td><button className="text-button" onClick={() => setReport({ version })}>{version.id}</button>{version.provenance === "bootstrap" && <span> · 初始配置</span>}</td><td>Prompt {version.config?.prompt_strategy ?? "—"} · CandidateK {version.config?.candidate_k ?? "—"} · TopK {version.config?.top_k ?? "—"}</td><td><ShortId value={version.evaluation_run_id} /></td><td>{version.provenance === "bootstrap" && version.status === "active" ? "当前初始配置" : <Status value={version.status || "未记录"} />}</td><td>{version.status !== "active" && <button className="text-button" disabled={busy} onClick={() => setConfirmation({ kind: "rollback", item: version })}>回滚至此版本</button>}</td></tr>)}</tbody></table></div></Section></div>}
     <Drawer open={!!detail} onOpenChange={open => !open && setDetail(null)} title={detail === "config" ? "Production 完整配置与发布快照" : "其他 Candidate · 发布资格"}><div className="drawer-body">
       {detail === "config" && <><div className="parameter-list">{Object.entries(currentVersion?.config || {}).map(([key, value]) => <div key={key}><span>{parameterNames[key] || key}</span><strong>{formatValue(value)}</strong></div>)}</div></>}
       {detail === "candidates" && <div className="candidate-release-list">{orderedCandidates.map(candidate => <article className="candidate-release-row" key={candidate.id}><strong>{candidateName(candidate)}</strong><Status value={released(candidate) ? "Released" : candidate.release_state?.qualified ? "待 Gate 3" : candidate.status === "failed" ? "failed" : candidate.status === "evaluated" ? "Not Qualified" : "not_run"} /><p className="candidate-release-blocker">{released(candidate) ? "历史发布记录已保存" : canRelease(candidate) ? "满足本轮发布资格，等待人工 Gate 3" : candidate.release_state?.human_release ? "已记录人工发布，请核对版本记录" : !candidate.release_state?.sandbox ? "阻断：Sandbox 尚未完成" : !candidate.release_state?.qualified ? "阻断：资格未通过" : !candidate.release_state?.recommended ? "阻断：尚未完成 Gate 2 推荐确认" : "阻断：本轮 Conditional D 决策尚未完成"}</p><p>Hard Gate：{candidate.result?.gates ? `${candidate.result.gates.passed_count} / ${candidate.result.gates.total}` : "未评测"} · Regression：{candidate.result?.regression?.status || "未评测"}</p><button className="text-button" onClick={() => { setDetail(null); setReport(candidate); }}>查看 Candidate 评测报告</button></article>)}{!candidates.length && <p className="muted">暂无可进入发布流程的真实 Candidate。</p>}</div>}

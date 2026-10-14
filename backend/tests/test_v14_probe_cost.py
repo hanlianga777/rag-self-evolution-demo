@@ -325,7 +325,11 @@ class ProbeCostTests(unittest.TestCase):
         runner = EvaluationRunner(None, runtime)
         item = {'question': 'question', 'reference_answer': 'answer', 'test_category': 'positive', 'evidence': [{'source_chunk_ids': ['A', 'B']}], 'raw': {}}
         result = runner._case_result(item, {})
-        self.assertNotIn('Ranking Failure', result['failure_tags'])
+        self.assertIn('Ranking Failure', result['failure_tags'])
+        self.assertEqual(result['primary_root_cause'],'Retrieval')
+        self.assertEqual(result['diagnosis']['status'],'confirmed')
+        self.assertEqual(result['diagnosis']['retrieval_failure_stage'],'ranking_context_selection')
+        self.assertTrue(result['programmatic_metrics']['evidence_coverage']['candidate_recall']['all_hit'])
         self.assertIn('Evidence / Citation Failure', result['failure_tags'])
         self.assertNotIn('Retrieval Failure', result['failure_tags'])
         self.assertEqual(result['programmatic_metrics']['evidence_coverage']['final_context']['coverage'], .5)
@@ -333,6 +337,7 @@ class ProbeCostTests(unittest.TestCase):
         execution['retrieval'].append({'chunk_id': 'B'})
         result = runner._case_result(item, {})
         self.assertIn('Generation Failure', result['failure_tags'])
+        self.assertNotIn('Ranking Failure',result['failure_tags'])
         self.assertEqual(result['programmatic_metrics']['evidence_coverage']['diagnostic_basis'], 'final_evidence_available')
         execution.pop('retrieval_trace')
         result = runner._case_result(item, {})
@@ -495,7 +500,7 @@ class ProbeCostTests(unittest.TestCase):
             self.assertEqual(trace['corpus_fingerprint'], {'D': 'old'})
             self.assertTrue(any(stage['stage_name'] == 'bm25' for stage in trace['timings']))
             evaluation_store = Mock()
-            evaluation_store.evaluation_run.return_value = {"judge": {}, "result": {}, "dataset_snapshot_json": json.dumps({"question_ids":[rows[0]["id"]]})}
+            evaluation_store.evaluation_run.return_value = {"status":"running", "judge": {}, "result": {}, "dataset_snapshot_json": json.dumps({"question_ids":[rows[0]["id"]]})}
             evaluation_store.evaluation_case_results.return_value = []
             EvaluationRunner(evaluation_store, service).execute_baseline('fixture-run', [store.question(rows[0]['id'])], {})
             self.assertEqual(evaluation_store.finish_evaluation_run.call_args.args[1], 'failed')

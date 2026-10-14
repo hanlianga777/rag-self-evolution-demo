@@ -11,6 +11,12 @@ from app.optimization import OptimizationAgent
 from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
 
 
+def trace_case(root='Retrieval'):
+    return {'primary_root_cause':root,'diagnosis':{'status':'confirmed','reason':'offline fixture verified gap'},
+            'programmatic_metrics':{'evidence_coverage':{'required_chunk_ids':['c1','c2']},
+                'retrieval_trace':{'candidates':[{'chunk_id':'c1'}],'final':[]}}}
+
+
 def drafts():
     result = {"root_cause_cluster": "coverage", "observed_evidence": ["Q1"], "candidates": [
         {"id": "A", "hypothesis": "depth", "why": "more evidence", "target_bad_cases": ["Q1"], "config_diff": {"top_k": 6}, "risk": "latency"},
@@ -18,7 +24,7 @@ def drafts():
         {"id": "C", "hypothesis": "coverage", "why": "more candidates", "target_bad_cases": ["Q1"], "config_diff": {"candidate_k": 24}, "risk": "latency"},
     ]}
     for candidate in result['candidates']:
-        candidate.update(target_group='fixture检索组', root_cause='Retrieval', root_cause_evidence=candidate['target_bad_cases'], expected_improvement='fixture预期覆盖')
+        candidate.update(intervention_direction='candidate_recall' if candidate['id']=='C' else 'context_selection', evidence_assertions=[{'target_id':'Q1','observation':'recall_missing' if candidate['id']=='C' else 'ranking_omission'}], parameter_dependencies=[], target_group='fixture检索组', root_cause='Retrieval', root_cause_evidence=candidate['target_bad_cases'], expected_improvement='fixture预期覆盖')
     return result
 
 
@@ -40,12 +46,13 @@ class OptimizationContractTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / "demo.db")
         completed_baseline(self.store, run_id="EVAL-test")
-        self.store.record_bad_case("EVAL-test", "Q1", "Retrieval", "ordinary", {"reason": "fixture failed", "primary_root_cause":"Retrieval", "diagnosis":{"status":"confirmed","reason":"fixture omission"}})
+        self.store.record_bad_case("EVAL-test", "Q1", "Retrieval", "ordinary", trace_case())
 
     def run_drafts(self, result):
         # Each response is an independent first round; incomplete real rounds remain blocked.
         self.store = GovernanceStore(Path(self.directory.name) / f"contract-{len(list(Path(self.directory.name).glob('*.db')))}.db")
         completed_baseline(self.store, run_id="EVAL-test")
+        self.store.record_bad_case("EVAL-test","Q1","Retrieval","ordinary",trace_case())
         raw = json.dumps(result, ensure_ascii=False)
         provider = FixedProvider(raw)
         try:
@@ -87,6 +94,7 @@ class OptimizationContractTests(unittest.TestCase):
         result = drafts()
         result['candidates'][0]['target_bad_cases'] = ['BC-EVAL-test-Q1']
         result['candidates'][0]['root_cause_evidence'] = ['BC-EVAL-test-Q1']
+        result['candidates'][0]['evidence_assertions'][0]['target_id']='BC-EVAL-test-Q1'
         experiment, trace, _, _, _ = self.run_drafts(result)
         self.assertEqual(trace['status'], 'completed')
         self.assertEqual(experiment['candidates'][0]['reasoning']['observed_evidence'], ['BC-EVAL-test-Q1'])
@@ -130,6 +138,37 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertIn("invalid candidate_k", audit["validation_error"])
         self.assertTrue(audit["timestamp"])
 
+    def test_insufficient_evidence_can_persist_zero_or_fewer_candidates(self):
+        for count in (0,1,2):
+            response=drafts()
+            response['candidates']=response['candidates'][:count]
+            response['insufficient_evidence']='Only these hypotheses have actual trace support'
+            experiment,trace,audit,_,_=self.run_drafts(response)
+            self.assertEqual(trace['status'],'completed')
+            self.assertEqual(len(experiment['candidates']),count)
+            self.assertEqual(experiment['result']['generation_status'],'insufficient_evidence')
+            self.assertEqual(audit['generated_candidate_count'],count)
+            self.assertEqual(audit['insufficient_evidence'],response['insufficient_evidence'])
+
+    def test_no_confirmed_target_persists_insufficient_without_provider(self):
+        self.store.record_bad_case('EVAL-test','Q1','Unknown','ordinary',{'primary_root_cause':'Unknown','diagnosis':{'status':'disputed'}})
+        provider=FixedProvider('must not be called')
+        result=OptimizationAgent(self.store,provider).generate('EVAL-test')
+        self.assertIsNone(provider.prompt)
+        self.assertEqual(result['candidates'],[])
+        self.assertFalse(result['result']['provider_called'])
+        self.assertEqual(result['result']['generation_status'],'insufficient_evidence')
+
+    def test_intervention_failure_is_atomic_and_retains_raw_audit(self):
+        response=drafts()
+        response['candidates'][1]['config_diff']['prompt_strategy']='Abstention'
+        experiment,trace,audit,_,raw=self.run_drafts(response)
+        self.assertEqual(trace['status'],'failed')
+        self.assertEqual(experiment['candidates'],[])
+        self.assertEqual(audit['validation_stage'],'intervention')
+        self.assertEqual(audit['failed_candidate_id'],'B')
+        self.assertEqual(audit['provider_raw_text'],raw)
+
     def test_strict_types_and_discrete_values(self):
         for field, value, valid in (
             ("top_k", True, False), ("top_k", False, False), ("top_k", 4, True),
@@ -148,6 +187,7 @@ class OptimizationContractTests(unittest.TestCase):
     def test_hybrid_off_and_dependency(self):
         result = drafts()
         result["candidates"][0]["config_diff"] = {"hybrid_search": False}
+        result["candidates"][0].update(intervention_direction="candidate_recall", evidence_assertions=[{"target_id":"Q1","observation":"recall_missing"}])
         experiment, trace, _, _, _ = self.run_drafts(result)
         self.assertEqual(trace["status"], "completed")
         self.assertNotIn("hybrid_alpha", experiment["candidates"][0]["config"])
@@ -240,7 +280,7 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual([c for c in store.candidates(exp) if c['reasoning'].get('round')==1],before)
 
     def test_generation_target_can_change_retrieval_parameters_without_relabeling(self):
-        self.store.record_bad_case('EVAL-test','Q1','Generation','ordinary',{'primary_root_cause':'Generation','diagnosis':{'status':'confirmed','reason':'fixture unsupported answer claim'}})
+        self.store.record_bad_case('EVAL-test','Q1','Generation','ordinary',trace_case('Generation'))
         self.store.record_bad_case('EVAL-test','Q-unknown','Unknown','ordinary',{'primary_root_cause':'Unknown','diagnosis':{'status':'needs_review','reason':'fixture uncertainty'}})
         response=drafts()
         for candidate in response['candidates']:candidate['root_cause']='Generation'

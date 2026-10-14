@@ -17,7 +17,7 @@ it("restores compact Baseline summary without treating aggregate Gate success as
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("92.50");
   expect(document.body.textContent).toContain("仍有 20 个单题问题");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll("thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "可信度", "核心失败原因", "详情"]);
+  expect([...document.querySelectorAll("thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "可信度", "核心证据", "详情"]);
   expect(document.querySelector("tbody")?.textContent).not.toContain("Hallucination");
   expect(document.querySelector("tbody")?.textContent).toContain("待核实");
   expect(document.querySelector(".baseline-metrics")).toBeNull();

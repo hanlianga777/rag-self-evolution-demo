@@ -6,6 +6,7 @@ from pathlib import Path
 from app.governance import GovernanceStore
 from app.policy import DEFAULT_PIPELINE_CONFIG
 from identity_fixture import completed_baseline, comparison_identity
+from test_optimization_contract import trace_case
 
 
 class TuningV12Tests(unittest.TestCase):
@@ -14,12 +15,13 @@ class TuningV12Tests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / 'demo.db')
         self.baseline = completed_baseline(self.store)
+        self.store.record_bad_case(self.baseline,"Q1","Retrieval","ordinary",trace_case())
         self.experiment = self.store.create_experiment(self.baseline)
 
     def candidate(self, label, diff, qualified=True, fixed=1):
-        self.store.save_candidate(self.experiment, label, {**DEFAULT_PIPELINE_CONFIG, **diff}, {'round': 1, 'candidate_label': label, 'changed_parameters': diff})
+        self.store.save_candidate(self.experiment, label, {**DEFAULT_PIPELINE_CONFIG, **diff}, {'round': 1, 'candidate_label': label, 'changed_parameters': diff, 'observed_evidence':['Q1']})
         key = f'{self.experiment}-{label}'
-        self.store.finish_candidate(key, 'evaluated', {**comparison_identity(self.store,self.baseline), 'qualification': {'qualified': qualified}, 'regression': {'passed': True}, 'gates': {'passed': qualified}, 'target_bad_cases_fixed': fixed})
+        self.store.finish_candidate(key, 'evaluated', {**comparison_identity(self.store,self.baseline), 'qualification': {'qualified': qualified}, 'regression': {'passed': True}, 'gates': {'passed': qualified}, 'target_bad_cases_fixed': fixed, 'all_fixed_question_ids':['Q1'] if fixed else [], 'net_improvement':fixed})
         return key
 
     def test_report_accepts_one_qualified_after_all_started_work_finishes(self):
@@ -38,15 +40,18 @@ class TuningV12Tests(unittest.TestCase):
 
     def test_d_uses_effective_failed_source_and_preserves_winner_conflicts(self):
         winner = self.candidate('A', {'top_k': 6})
-        source = self.candidate('B', {'candidate_k': 24}, False)
-        self.candidate('C', {'top_k': 4, 'min_score': .1}, False, fixed=0)
+        source = self.candidate('B', {'top_k':4,'min_score':.2}, False)
+        ineffective = self.candidate('C', {'top_k': 4, 'min_score': .1}, False, fixed=0)
         self.store.confirm_experiment_report(self.experiment, winner, 'test_human')
         from test_v11_e2e import FixtureProvider
         composite = self.store.create_composite(self.experiment, FixtureProvider(), True)
         self.assertEqual(composite['config']['top_k'], 6)
-        self.assertEqual(composite['config']['candidate_k'], 24)
-        self.assertEqual(composite['config']['min_score'], 0)
+        self.assertEqual(composite['config']['candidate_k'], DEFAULT_PIPELINE_CONFIG['candidate_k'])
+        self.assertEqual(composite['config']['min_score'], .2)
         self.assertIn(source, [item['candidate_id'] for item in composite['reasoning']['sources']])
+        self.assertNotIn(ineffective,[item['candidate_id'] for item in composite['reasoning']['sources']])
+        self.assertEqual(self.store.candidate(source)['config']['top_k'],4)
+        self.assertEqual(composite['reasoning']['intervention_direction'],'context_selection')
         self.assertEqual(composite['status'], 'generated')
 
     def test_no_effective_composite_keeps_winner_without_fake_d(self):
@@ -103,7 +108,7 @@ class TuningV12Tests(unittest.TestCase):
 
     def test_restart_of_d_restores_winner_recommendation(self):
         winner = self.candidate('A', {'top_k': 6})
-        self.candidate('B', {'candidate_k': 24}, False)
+        self.candidate('B', {'min_score':.2}, False)
         self.store.confirm_experiment_report(self.experiment, winner, 'test_human')
         from test_v11_e2e import FixtureProvider
         composite = self.store.create_composite(self.experiment, FixtureProvider(), True)

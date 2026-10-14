@@ -11,7 +11,7 @@ afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML =
 
 it("offers one human release action after recommendation without posting before confirmation", async () => {
   const candidate = { id: "EXP-fixture-A", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true, human_release: false } };
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/versions") ? [] : url.endsWith("/optimization") ? { candidates: [candidate] } : {}))));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/versions?page=1&limit=50") ? [] : url.endsWith("/optimization") ? { candidates: [candidate] } : {}))));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [], optimization: { candidates: [candidate] } }} /></OperationProvider>));
   const actions = document.querySelectorAll<HTMLButtonElement>(".release-actions button");
@@ -46,7 +46,7 @@ it("requires every saved release eligibility guard and a separate rollback confi
     await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [], optimization: { candidates: [{ id: "C", release_state: { ...state, [key]: false } }] } }} /></OperationProvider>));
     expect([...document.querySelectorAll("button")].some(node => node.textContent === "确认发布")).toBe(false);
   }
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/versions") ? [] : url.endsWith("/optimization") ? {} : { id: "old" }))));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/versions?page=1&limit=50") ? [] : url.endsWith("/optimization") ? {} : { id: "old" }))));
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [{ id: "new", status: "active" }, { id: "old", status: "archived" }] }} /></OperationProvider>));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(node => node.textContent === "回滚至此版本")!.click());
   expect(document.querySelector(".confirm-dialog")?.textContent).toContain("确认回滚 Production");

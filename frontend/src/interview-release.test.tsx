@@ -77,7 +77,7 @@ it("requires human judgement and confirmation before starting only the linked Mo
   const monitoring = () => ({ events: [{ id: "M1", question: "人工发现的问题", determinable: assessed, bad_case: assessed }], triggers: assessed ? [{ id: "T1", event_id: "M1", reason: "人工 Bad Case", status: confirmed ? "human_confirmed" : "pending_human_confirm", optimization_run_id: confirmed ? "EXP-same" : null }] : [] });
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === "POST") { posts.push({ url, body: JSON.parse(String(init.body)) }); if (url.endsWith("/assessment")) assessed = true; if (url.endsWith("/confirm")) confirmed = true; if (url.endsWith("/experiments/run")) started = true; }
-    const value = url.endsWith("/monitoring") ? monitoring() : url.includes("/experiments/") ? { id: "EXP-same", baseline_run_id: "B1", status: started ? "completed" : "pending_agent", result: { round: started ? 1 : 0 }, candidates: started ? [{ id: "A" }] : [] } : {};
+    const value = url.endsWith("/monitoring?page=1&limit=50") ? monitoring() : url.includes("/experiments/") ? { id: "EXP-same", baseline_run_id: "B1", status: started ? "completed" : "pending_agent", result: { round: started ? 1 : 0 }, candidates: started ? [{ id: "A" }] : [] } : {};
     return new Response(JSON.stringify(value));
   }));
   await render(<VerificationPage data={{ workspace: { current_baseline_id: "B1" }, monitoring: monitoring(), optimization: { id: "EXP-prior", candidates: [{ id: "prior-A" }] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);

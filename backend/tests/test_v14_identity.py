@@ -13,7 +13,7 @@ from app.corpus import current_manifest
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
 from app.policy import DEFAULT_PIPELINE_CONFIG
-from test_optimization_contract import FixedProvider, drafts
+from test_optimization_contract import FixedProvider, drafts, trace_case
 
 
 from identity_fixture import completed_baseline
@@ -24,6 +24,7 @@ class CurrentIdentityTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.store = GovernanceStore(Path(directory.name) / 'demo.db')
         self.baseline = completed_baseline(self.store)
+        self.store.record_bad_case(self.baseline,"Q1","Retrieval","ordinary",trace_case())
         self.previous = main.store
         main.store = self.store
         self.addCleanup(setattr, main, 'store', self.previous)
@@ -131,60 +132,47 @@ class CurrentIdentityTests(unittest.TestCase):
         with self.store.connection() as connection:
             self.assertEqual(connection.execute('SELECT count(*) FROM experiments').fetchone()[0], 1)
 
-    def test_confirmed_assessed_monitoring_event_starts_without_baseline_bad_cases(self):
+    def test_confirmed_assessed_monitoring_event_requires_trace_before_candidates(self):
         with self.store.connection() as connection:
-            connection.execute('DELETE FROM bad_cases WHERE run_id=?', (self.baseline,))
-            connection.execute('UPDATE evaluation_case_results SET result_json=? WHERE run_id=?', (json.dumps({'passed': True}), self.baseline))
-        self.store.finish_evaluation_run(self.baseline, 'completed', {'gates': {'passed': True}})
-        frozen_baseline = self.store.evaluation_run(self.baseline)
-        provider = FixedProvider(json.dumps(drafts()))
-        with self.assertRaisesRegex(ValueError, '没有真实 Bad Case'):
-            OptimizationAgent(self.store, provider).generate(self.baseline)
+            connection.execute('DELETE FROM bad_cases WHERE run_id=?',(self.baseline,))
+            connection.execute('UPDATE evaluation_case_results SET result_json=? WHERE run_id=?',(json.dumps({'passed':True}),self.baseline))
+        self.store.finish_evaluation_run(self.baseline,'completed',{'gates':{'passed':True}})
+        frozen=self.store.evaluation_run(self.baseline)
+        provider=FixedProvider(json.dumps(drafts()))
+        result=OptimizationAgent(self.store,provider).generate(self.baseline)
+        self.assertEqual(result['result']['generation_status'],'insufficient_evidence')
+        self.assertEqual(result['candidates'],[])
         self.assertIsNone(provider.prompt)
-        self.assertIsNone(self.store.latest_experiment())
-        event = self.store.record_monitoring_event(question='生产安全问题', answer='生产错误', bad_case=False, severity='ordinary', determinable=False)
-        self.store.assess_monitoring_event(event['id'], bad_case=True, severity='critical')
-        trigger = self.store.optimization_trigger_for_event(event['id'])
-        with self.assertRaisesRegex(ValueError, '已确认、已判定'):
-            OptimizationAgent(self.store, provider).generate(self.baseline, trigger_id=trigger['id'])
-        self.assertIsNone(self.store.latest_experiment())
-        context = self.store.confirm_optimization_trigger(trigger['id'], 'reviewer')['optimization_run_id']
-        response = drafts()
-        for candidate in response['candidates']:
-            candidate['target_bad_cases'] = [event['id']]
-            candidate['root_cause_evidence'] = [event['id']]
-        provider = FixedProvider(json.dumps(response))
-        generated = OptimizationAgent(self.store, provider).generate(self.baseline, experiment_id=context)
-        self.assertEqual(generated['id'], context)
-        self.assertEqual({row['reasoning']['round'] for row in generated['candidates']}, {1})
-        self.assertEqual(len(generated['candidates']), 3)
-        self.assertEqual(provider.prompt['bad_cases'], [])
-        self.assertEqual(provider.prompt['monitoring_target_event_ids'], [event['id']])
-        self.assertEqual(provider.prompt['monitoring_context']['event']['id'], event['id'])
-        self.assertEqual(generated['result']['source_bad_case_ids'], [])
-        self.assertEqual(generated['result']['monitoring_target_event_ids'], [event['id']])
-        self.assertTrue(all(row['reasoning']['monitoring_target_event_ids'] == [event['id']] for row in generated['candidates']))
-        self.assertEqual(self.store.bad_case_rows(), [])
-        self.assertEqual(self.store.evaluation_case_results(self.baseline), [{'question_id': 'Q1', 'passed': True}])
-        self.assertEqual(self.store.evaluation_run(self.baseline), frozen_baseline)
+        event=self.store.record_monitoring_event(question='生产安全问题',answer='生产错误',bad_case=False,severity='ordinary',determinable=False)
+        self.store.assess_monitoring_event(event['id'],bad_case=True,severity='critical')
+        trigger=self.store.optimization_trigger_for_event(event['id'])
+        with self.assertRaisesRegex(ValueError,'Human Confirm'):
+            OptimizationAgent(self.store,provider).generate(self.baseline,trigger_id=trigger['id'])
+        context=self.store.confirm_optimization_trigger(trigger['id'],'reviewer')['optimization_run_id']
+        result=OptimizationAgent(self.store,provider).generate(self.baseline,experiment_id=context)
+        self.assertEqual(result['id'],context)
+        self.assertEqual(result['candidates'],[])
+        self.assertEqual(result['result']['generation_status'],'insufficient_evidence')
+        self.assertFalse(result['result']['provider_called'])
+        self.assertIsNone(provider.prompt)
+        self.assertEqual(self.store.bad_case_rows(),[])
+        self.assertEqual(self.store.evaluation_case_results(self.baseline),[{'question_id':'Q1','passed':True}])
+        self.assertEqual(self.store.evaluation_run(self.baseline),frozen)
 
-    def test_monitoring_only_rejects_invented_or_baseline_target(self):
-        with self.store.connection() as connection:
-            connection.execute('DELETE FROM bad_cases WHERE run_id=?', (self.baseline,))
-        trigger = self.trigger()
-        context = self.store.confirm_optimization_trigger(trigger, 'reviewer')['optimization_run_id']
-        event_id = self.store.optimization_trigger(trigger)['event_id']
-        for target in ('invented-MON-id', 'Q1', 'BC-other-run-Q1'):
-            response = drafts()
-            for candidate in response['candidates']:
-                candidate['target_bad_cases'] = [event_id]
-                candidate['root_cause_evidence'] = [event_id]
-            response['candidates'][1]['target_bad_cases'] = [target]
-            with self.assertRaisesRegex(ValueError, 'target_bad_cases'):
-                OptimizationAgent(self.store, FixedProvider(json.dumps(response))).generate(self.baseline, trigger)
-            self.assertEqual(self.store.experiment(context)['candidates'], [])
-            self.assertEqual(self.store.experiment(context)['result']['allowed_values'], [event_id])
-        self.assertEqual(self.store.bad_case_rows(), [])
+    def test_monitoring_only_does_not_send_invented_targets_to_provider(self):
+        with self.store.connection() as connection:connection.execute('DELETE FROM bad_cases WHERE run_id=?',(self.baseline,))
+        trigger=self.trigger()
+        context=self.store.confirm_optimization_trigger(trigger,'reviewer')['optimization_run_id']
+        for target in ('invented-MON-id','Q1','BC-other-run-Q1'):
+            response=drafts()
+            response['candidates'][1]['target_bad_cases']=[target]
+            provider=FixedProvider(json.dumps(response))
+            result=OptimizationAgent(self.store,provider).generate(self.baseline,trigger)
+            self.assertEqual(result['id'],context)
+            self.assertEqual(result['candidates'],[])
+            self.assertEqual(result['result']['generation_status'],'insufficient_evidence')
+            self.assertIsNone(provider.prompt)
+        self.assertEqual(self.store.bad_case_rows(),[])
 
     def test_preview_endpoint_preserves_production_source_across_answer_switch(self):
         from app.ai_service import AiService

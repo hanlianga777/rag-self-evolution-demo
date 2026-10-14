@@ -110,6 +110,7 @@ class CompositeTests(unittest.TestCase):
         with self.store.connection() as c:c.execute("INSERT INTO dataset_versions VALUES (?, 'approved','human_review',?,'now')",('fixture-g',json.dumps(self.snapshot)))
         self.baseline=self.store.create_evaluation_run(self.snapshot,{**DEFAULT_PIPELINE_CONFIG,'run_target':'baseline'},self.meta)
         self.store.record_evaluation_case(self.baseline,'q',{'passed':False})
+        self.store.record_bad_case(self.baseline,'q','Retrieval','ordinary',{'primary_root_cause':'Retrieval','diagnosis':{'status':'confirmed','reason':'fixture gap'},'programmatic_metrics':{'evidence_coverage':{'required_chunk_ids':['c']},'retrieval_trace':{'candidates':[],'final':[]}}})
         self.store.finish_evaluation_run(self.baseline,'completed',{'gates':{'passed':True}})
         self.experiment=self.store.create_experiment(self.baseline,'completed')
         self.winner=self.store.save_candidate(self.experiment,'A',DEFAULT_PIPELINE_CONFIG,{'candidate_label':'A','round':1,'observed_evidence':['q']})
@@ -123,13 +124,36 @@ class CompositeTests(unittest.TestCase):
 
     def provider(self,generate=True,diff=None):
         from unittest.mock import Mock
-        value={'should_generate_d':generate,'source_candidates':[self.winner['id'],self.other['id']], 'root_cause_alignment':'fixture根因','complementary_capabilities':'fixture互补','proposed_config_diff':diff if diff is not None else {'query_rewrite':True},'expected_improvement':'fixture覆盖','risks':'fixture延迟','explanation':'fixture建议'}
+        value={'should_generate_d':generate,'source_candidates':[self.winner['id'],self.other['id']], 'root_cause_alignment':'fixture根因','complementary_capabilities':'fixture互补','proposed_config_diff':diff if diff is not None else {'query_rewrite':True},'expected_improvement':'fixture覆盖','risks':'fixture延迟','explanation':'fixture建议','hypothesis':'fixture查询表达','root_cause':'Retrieval','intervention_direction':'query_expansion','evidence_assertions':[{'target_id':'q','observation':'recall_missing'}],'parameter_dependencies':[]}
         return Mock(complete=Mock(return_value=json.dumps(value)),settings=Settings('fixture','https://example.invalid','fixture'))
 
     def test_d_requires_separate_paid_authorization(self):
         provider=self.provider()
         with self.assertRaisesRegex(ValueError,'授权'):self.store.create_composite(self.experiment,provider,False)
         provider.complete.assert_not_called()
+
+    def test_cross_stage_source_union_is_rejected_before_provider(self):
+        with self.store.connection() as connection:
+            connection.execute('UPDATE candidate_configs SET config_json=? WHERE id=?',(json.dumps({**self.winner['config'],'prompt_strategy':'Abstention'}),self.winner['id']))
+        provider=self.provider()
+        value=self.store.create_composite(self.experiment,provider,False)
+        self.assertEqual(value['status'],'no_effective_composite')
+        self.assertEqual(value['provider_calls'],0)
+        provider.complete.assert_not_called()
+        self.assertEqual(self.store.recommendation(self.experiment)['result']['recommended_candidate'],self.winner['id'])
+
+    def test_coherent_multi_parameter_d_needs_saved_evidence_and_dependencies(self):
+        with self.store.connection() as connection:
+            connection.execute('UPDATE candidate_configs SET config_json=? WHERE id=?',(json.dumps({**self.winner['config'],'multi_query':2}),self.winner['id']))
+        provider=self.provider()
+        value=json.loads(provider.complete.return_value)
+        value['parameter_dependencies']=[{'parameters':['query_rewrite','multi_query'],'reason':'同一查询扩展动作分别覆盖别名与措辞缺口'}]
+        provider.complete.return_value=json.dumps(value)
+        result=self.store.create_composite(self.experiment,provider,True)
+        self.assertEqual(result['status'],'generated')
+        self.assertEqual(result['reasoning']['changed_parameters'],{'query_rewrite':True,'multi_query':2})
+        self.assertEqual(result['reasoning']['intervention_direction'],'query_expansion')
+        self.assertEqual(result['reasoning']['root_cause_evidence'],['q'])
 
     def test_d_saved_decision_is_reused_without_call(self):
         provider=self.provider();first=self.store.create_composite(self.experiment,provider,True)

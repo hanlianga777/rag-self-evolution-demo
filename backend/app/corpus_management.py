@@ -28,6 +28,15 @@ def require_consistent_switch(index_dir, database_path=None):
     actual=validate_bundle(index_dir,require_full_text=True)['manifest']['knowledge_identity']
     database=Path(database_path or index_dir.parent/'demo.db').resolve()
     with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as connection:
+        reset_name='experiment-reset-v1:'+str(expected.get('corpus_snapshot_id'))
+        reset=connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").fetchone()
+        reset=reset and connection.execute('SELECT 1 FROM schema_migrations WHERE name=?',(reset_name,)).fetchone()
+        if reset:
+            # A user-authorized reset deletes old Golden bindings, never Knowledge identity.
+            state=index_dir.parent/'corpus_state.json'
+            if actual!=expected or not state.exists() or json.loads(state.read_text())['knowledge_identity']!=expected:
+                raise ValueError('Corpus State inconsistent after experiment reset; API startup blocked')
+            return
         row=connection.execute('SELECT hard_validation_json FROM golden_generation_artifacts WHERE generation_run_id=?',('GGEN-20261012120721324996',)).fetchone()
         if row is None or actual!=expected or json.loads(row[0])['corpus_fingerprint']!=expected:
             raise ValueError('Corpus pointer/Golden binding inconsistent; API startup blocked')

@@ -39,8 +39,13 @@ def diagnostic_view(case):
         add(name,'failure_tags.'+tag)
     if required and required<=candidates:
         detection['检索失败']='not_observed'
-        if coverage.get('final_context',{}).get('all_hit') is False:
+        if coverage.get('final_context',{}).get('all_hit') is False and sufficiency.get('sufficient') is not True:
             add('检索失败','evidence_coverage.required_chunk_ids + retrieval_trace.candidates + final_context','observed')
+    confirmed=(metrics.get('claim_assessment') or {}).get('confirmed') or []
+    if any(r.get('kind')=='unsupported_instruction' and r.get('changes_operation') is True for r in confirmed):
+        add('无依据技术操作','claim_assessment.confirmed','observed')
+    if case.get('negative_subtype')=='prompt_injection' and (metrics.get('behavior_contract') or {}).get('effective_pass') is False:
+        add('提示词注入失败','behavior_contract.effective_pass','observed')
     conflicts=sufficiency.get('unresolved_conflicts') or []
     pending=(metrics.get('claim_assessment') or {}).get('pending') or []
     governance=[]
@@ -58,9 +63,20 @@ def diagnostic_view(case):
              'bottleneck':max(measured,key=lambda s:s['duration_ms']) if measured else None}
     if isinstance(latency['question_ms'],(int,float)) and detection['延迟黑洞']!='observed':
         detection['延迟黑洞']='not_observed' # No new latency threshold; use saved Performance Failure.
+    observations=[]
+    if isinstance(trace.get('candidates'),list) and isinstance(trace.get('final'),list):
+        final_ids={i for row in trace['final'] for i in row.get('matched_child_ids',[row.get('chunk_id')])}
+        if required and required-candidates and sufficiency.get('sufficient') is not True:observations.append('recall_missing')
+        if required & candidates-final_ids and sufficiency.get('sufficient') is not True:observations.append('ranking_omission')
+        if sufficiency.get('sufficient') is True:observations.append('final_sufficient')
+        if audit.get('findings') or (metrics.get('claim_assessment') or {}).get('confirmed'):observations.append('confirmed_claim')
+        if case.get('primary_root_cause')=='Safety' and audit.get('status')=='confirmed':
+            observations.append('safety_failure')
+        if noise_supported and 'Retrieval Noise' in (case.get('failure_tags') or []):observations.append('retrieval_noise')
+        if any(s.get('stage_name') and isinstance(s.get('duration_ms'),(int,float)) for s in measured) and 'Performance Failure' in (case.get('failure_tags') or []):observations.append('measured_latency')
     root=case.get('primary_root_cause') or case.get('root_cause',{}).get('primary') or 'Unknown'
     return {'view_version':'diagnosis-view-v1','phenomena':list(phenomena.values()),'primary_root_cause':root,
             'secondary_root_causes':case.get('secondary_root_causes') or case.get('root_cause',{}).get('secondary') or [],
             'confidence':audit['status'],'root_cause_evidence':audit,'governance':governance,
             'target_eligible':audit['status']=='confirmed' and root in {'Retrieval','Generation','Safety','Performance'},
-            'typical_detection':detection,'latency':latency}
+            'typical_detection':detection,'latency':latency,'trace_observations':observations}

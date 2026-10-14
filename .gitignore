@@ -32,3 +32,6 @@ backend/data/owner-delegated-*.json
 
 # Private offline recovery audits and database backups
 output/evaluation-autorecovery-*/
+
+# External read-only audit exports; never restore into the active experiment database.
+output/baseline-ab-root-cause-audit-20261014/
