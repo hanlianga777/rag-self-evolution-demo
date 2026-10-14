@@ -19,7 +19,7 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
   const input = { evaluation: run, badCases: [bad] }, frozen = JSON.stringify(input);
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/api/bad-cases") ? [bad] : run))));
   await render(<EvaluationPage data={input} />);
-  expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(4);
+  expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(0);
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("10 / 11");
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("未通过 Hard Gate");
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("仍有 1 个逐题失败");
@@ -32,7 +32,7 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
   expect(document.querySelector("tbody")?.textContent).toContain("≥ 90.00%");
   expect(new Set([...document.querySelectorAll("tbody tr td:nth-child(2)")].map(cell => cell.textContent)).size).toBe(4);
   await click("Bad Case 诊断");
-  expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "核心证据", "详情"]);
+  expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "优化方向", "详情"]);
   expect(document.querySelector("tbody tr td:nth-child(3)")?.textContent).toContain("Retrieval");
   await click("查看案例");
   expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["案例结论", "业务问题", "预期与实际回答", "证据依据", "诊断与优化方向"]);
@@ -63,15 +63,15 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect(document.querySelector(".diagnosis-list")?.textContent).toContain("Candidate A");
   expect(document.querySelector(".diagnosis-list")?.textContent).not.toContain("Evidence Miss");
   expect(document.querySelectorAll(".diagnosis-cards")).toHaveLength(0);
-  await click("Agent策略");
+  await click("优化 Agent");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(0);
-  expect([...document.querySelectorAll(".panel > .section-head h2")].map(header => header.textContent)).toEqual(["实验概览", "Agent Diagnosis", "Experiment Plan"]);
+  expect([...document.querySelectorAll(".panel > .section-head h2")].map(header => header.textContent)).toEqual(["Agent 决策关系", "问题与策略关联", "实验方案概览"]);
   expect(document.body.textContent).toContain("保存假设 A");
   expect(document.body.textContent).toContain("Search Space · 2");
-  await click("A / B / C");
+  await click("A/B/C/D");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
-  expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["WHY", "TARGET", "CHANGE", "EXPECTED", "RISK", "RESULT"]);
-  expect(document.querySelector(".candidate-card")?.textContent).toContain("保存理由 A");
+  expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["优化目标", "优化策略", "参数变化", "预期收益", "潜在风险", "实验结果"]);
+  expect(document.querySelector(".candidate-card")?.textContent).toContain("持久化问题");
   await click("Sandbox");
   expect([...document.querySelectorAll("tbody tr > td:first-child")].map(cell => cell.textContent)).toEqual(["Hard Gate", "Bad Case", "修复原 Bad Case", "新增失败", "Regression", "Qualification"]);
   expect(document.body.textContent).not.toContain("Input Tokens");
@@ -90,6 +90,6 @@ it.each([
   const optimization = { id: "EXP-stored", candidates: [winner, d], result: { report_confirmation: { winner_id: winner.id } }, recommendation: { result: { recommended_candidate: status === "evaluated" ? winner.id : null } } };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   await render(<EvolutionPage data={{ evaluation: run, badCases: [bad], optimization }} />);
-  await click("A / B / C");
+  await click("A/B/C/D");
   expect(document.querySelector(".composite-decision")?.textContent).toContain(expected);
 });

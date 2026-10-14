@@ -12,12 +12,12 @@ it("restores compact Baseline summary without treating aggregate Gate success as
   const frozen = JSON.stringify(run);
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/api/bad-cases") ? [] : run))));
   await render(<EvaluationPage data={{ evaluation: run }} />);
-  expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(4);
+  expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(0);
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("11 / 11");
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("92.50");
   expect(document.body.textContent).toContain("仍有 20 个逐题失败");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll("thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "核心证据", "详情"]);
+  expect([...document.querySelectorAll("thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "优化方向", "详情"]);
   expect(document.querySelector("tbody")?.textContent).not.toContain("Hallucination");
   expect(document.querySelector("tbody")?.textContent).toContain("当前组合筛选无记录");
   expect(document.querySelector(".quality-audit")?.textContent).toContain("历史记录缺少");

@@ -27,7 +27,7 @@ it('old policy blocks batch execution and preserves historical data',async()=>{
 it('latest candidate cards and history Drawer keep round provenance',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const candidates=[1,2].flatMap(round=>['A','B','C'].map(label=>({id:`fixture-${round}-${label}`,status:round===1?'evaluated':'generated',config:{top_k:6},reasoning:{round,candidate_label:label,hypothesis:`saved ${round}-${label}`},result:{}})));
- await render(<EvolutionPage data={{evaluation:run,optimization:{id:'fixture-E',candidates}}}/>);await click('A / B / C');
+ await render(<EvolutionPage data={{evaluation:run,optimization:{id:'fixture-E',candidates}}}/>);await click('A/B/C/D');
  expect(document.querySelectorAll('.candidate-card')).toHaveLength(3);expect(document.querySelector('.candidate-card')?.textContent).toContain('saved 2-A');
  await click('历史实验 · 1轮');expect(document.querySelector('[role=dialog]')?.textContent).toContain('saved 1-A');
  expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('saved 2-A');

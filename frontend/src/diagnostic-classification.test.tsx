@@ -31,7 +31,7 @@ it('shows saved per-question repairs and Regression without generating results',
  expect(host.textContent).toContain('未通过 → 通过');expect(host.textContent).toContain('保存为已修复');expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Candidate证据')!.click());expect(select).toHaveBeenCalledWith(after);
  await act(async()=>root.render(<CandidateCaseComparison candidates={[{id:'b',status:'generated',reasoning:{candidate_label:'B'},result:{}}]} baselineId="baseline" kind="regression" onSelect={select}/>));
- expect(host.textContent).toContain('不展示模拟改善');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method||init.method==='GET')).toBe(true);
+ expect(host.textContent).toContain('回归对照未判定');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method||init.method==='GET')).toBe(true);
  await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();
 });
 

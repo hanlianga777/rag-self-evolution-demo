@@ -1,5 +1,7 @@
 # 当前有效合同 — 2026-10-15 `[CONFIRMED]`
 
+- **2026-10-15工作台产品表达合同**：Baseline保留报告/Hard Gate/Bad Case三页签，Agent保留六页签，以保存的问题证据→假设→实际参数Diff→实验→回归→推荐串联。典型现象仅为诊断视图，多标签按题去重；代表案例动态选择，不修改目标资格。原始失败与技术Bad Case分列，缺失显示未采集；未运行/运行失败/部分完成不得冒充完整资格或最终Winner。Regression只比较匹配身份的完整已保存结果，保留前后回答与证据；Recommendation只解释保存决策，不重算或自动批准。完整配置、用量与技术审计折叠保留，共用Drawer宽度；Search Space、Frozen配置、Gate及后端策略不变。见[UI验收](WORKBENCH_PRODUCT_EXPRESSION_ACCEPTANCE.md)。
+
 - **本轮Medium50有限失败停止（2026-10-15）**：Q07实际PDF92—93页压缩空气/进水部件歧义仍未关闭；覆盖补齐一次及独立替换一次共耗尽同Slot两次新候选替换。Q27第二次替换Coverage Slot不匹配未应用。依任务书停止，当前32/50机器合格、39题Probe/QC通过、11份新替换质量Interrupted；无Owner批准/新Snapshot/Baseline/Agent/A/B/C。961次真实请求960份Usage已知+1份Unknown且未重发；21份PDF/索引及旧Snapshot/评测/实验/Production全部行不变。详细逐题结果及费用限制见[验收](MEDIUM50_FULL_EVOLUTION_ACCEPTANCE.md)。此停止不得以放宽门槛、第三次替换或旧成绩冒充完成解除。
 
 - **2026-10-15独立新候选设计谱系（覆盖旧AI局部生成路径）**：新business_question_first题的AI修订/替换也复用独立问题设计器。Stage1不发送原答案/Evidence、Probe/QC或详细失败反馈；冻结Topic/产品/Slot材料只是业务Anchor，设计先服务端持久化，再正式检索/证据核验。设计/核验时间、真实模型与AI主体、新旧设计、完整Revision谱系保存；客户端不能注入business_design。成功设计及核验草案复用，同一草案不重复付费；新替换避开本Slot此前真实服务端保存设计的全部意图（仅意图，不传答案/错误证据），包含未应用的失败草案；新路径每次自动构造严格一次，失败保留具体草案，再依有限内容/替换合同处理；原十维审计不放宽。旧路径、旧Mini/历史数据及原配额/门槛不回填。R3真实型号范围需PDF简介支持，不能由“B2遥控器”文件名推断可用或不可用，补入实际Child依据后重审。

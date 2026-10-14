@@ -23,28 +23,42 @@ export function DiagnosisDistribution({rows}:{rows:any[]}){
 export const typicalPhenomena=['检索失败','检索噪声','模型过度拒答','安全边界误伤','延迟黑洞'];
 export const caseData=(row:any)=>row.result || row;
 export const caseId=(row:any)=>row.question_id || row.result?.question_id || row.id;
-export const questionLabel=(id:string)=>id?.startsWith('Q')?id:id?`Q${id.slice(-2)}`:'题号未采集';
-export type DiagnosisFilter={phenomenon:string;root:string};
+export const questionLabel=(id:string)=>{const slot=id?.match(/^V1G-\d+-(\d{2})(?:-R\d+)?$/)?.[1];return slot?`Q${slot}`:id || '题号未采集';};
+export const optimizationDirection=(value?:string)=>({query_expansion:'查询表达与扩展',candidate_recall:'候选召回覆盖',context_selection:'排序与上下文选择',source_filter:'产品与来源筛选',grounded_generation:'有据生成与回答约束',stage_performance:'实测阶段性能'}[value || ''] || '保存方向未采集');
+export const savedDirections=(row:any)=>caseData(row).diagnostic_view?.optimization_directions?.map(optimizationDirection).join('、') || '保存方向未采集';
+export type DiagnosisFilter={phenomenon:string;root:string;examples?:boolean};
 export const allDiagnosis:DiagnosisFilter={phenomenon:'all',root:'all'};
 export function filterDiagnosis(rows:any[],filter:DiagnosisFilter){
- const seen=new Set();return rows.filter(row=>{const item=caseData(row),id=caseId(row);if(seen.has(id))return false;seen.add(id);
+ const seen=new Set();const filtered=rows.filter(row=>{const item=caseData(row),id=caseId(row);if(seen.has(id))return false;seen.add(id);
  const labels=symptoms(item);
  return (filter.phenomenon==='all' || filter.phenomenon==='other' && labels.some(label=>!typicalPhenomena.includes(label)) || labels.includes(filter.phenomenon))
   && (filter.root==='all' || currentRoot(row)===filter.root);
  });
+ if(!filter.examples)return filtered;
+ const represented=new Set<string>();return filtered.filter(row=>{const labels=symptoms(caseData(row));const first=labels.some(label=>!represented.has(label));labels.forEach(label=>represented.add(label));return first;});
 }
 
-export function DiagnosisFilters({value,onChange,rows:allRows}:{value:DiagnosisFilter;onChange:(value:DiagnosisFilter)=>void;rows:any[]}){
- const rows=technicalDiagnosisRows(allRows);
- const dimensions=[['phenomenon','失败现象',[...typicalPhenomena,'other']],['root','技术根因',['Retrieval','Generation','Safety','Performance']]] as const;
- return <div className="diagnosis-filters">{dimensions.map(([key,label,values])=><label key={key}>{label}<CustomSelect ariaLabel={label} value={value[key]} onChange={next=>onChange({...value,[key]:next})} options={[{value:'all',label:'全部'},...values.map(v=>({value:v,label:v==='other'?'其他真实问题':key==='root'?rootName(v):v}))]} /></label>)}<button className="text-button" onClick={()=>onChange(allDiagnosis)}>恢复全部问题</button><span className="muted">{filterDiagnosis(rows,value).length} / {new Set(rows.map(caseId)).size} 题 · 多标签不重复计数</span></div>;
+export function PhenomenonSummary({rows,value,onChange}:{rows:any[];value:string;onChange:(value:string)=>void}){
+ const unique=technicalDiagnosisRows(rows);
+ return <div className="phenomenon-summary" aria-label="典型失败模式">{typicalPhenomena.map(name=>{
+  const observed=unique.filter(row=>symptoms(caseData(row)).includes(name)).length;
+  const detection=unique.map(row=>caseData(row).diagnostic_view?.typical_detection?.[name]);
+  const collected=detection.length>0 && detection.every(status=>status && status!=='not_collected');
+  return <button key={name} aria-pressed={value===name} onClick={()=>onChange(value===name?'all':name)}><span>{name}</span><strong>{observed?`${observed} 题`:collected?'未观察到':'未采集'}</strong></button>;
+ })}<p className="muted">按唯一题号统计；同题可出现多个现象。其他保存的现象可在筛选中查看。</p></div>;
 }
-export function DiagnosisTable({rows:allRows,onSelect,strategy}:{rows:any[];onSelect:(row:any)=>void;strategy?:(row:any)=>React.ReactNode}){
+
+export function DiagnosisFilters({value,onChange,rows:allRows,technicalOnly=true,visibleCount}:{value:DiagnosisFilter;onChange:(value:DiagnosisFilter)=>void;rows:any[];technicalOnly?:boolean;visibleCount?:number}){
+ const rows=technicalOnly?technicalDiagnosisRows(allRows):filterDiagnosis(allRows,allDiagnosis);
+ const dimensions=[['phenomenon','失败现象',[...typicalPhenomena,'other']],['root','技术根因',['Retrieval','Generation','Safety','Performance']]] as const;
+ return <div className="diagnosis-filters">{dimensions.map(([key,label,values])=><label key={key}>{label}<CustomSelect ariaLabel={label} value={value[key]} onChange={next=>onChange({...value,[key]:next})} options={[{value:'all',label:'全部'},...values.map(v=>({value:v,label:v==='other'?'其他真实问题':key==='root'?rootName(v):v}))]} /></label>)}<button className="text-button" aria-pressed={!!value.examples} onClick={()=>onChange({...value,examples:!value.examples})}>每类首例</button><button className="text-button" onClick={()=>onChange(allDiagnosis)}>恢复全部问题</button><span className="muted">{visibleCount ?? filterDiagnosis(rows,value).length} / {new Set(rows.map(caseId)).size} 题 · 多标签不重复计数</span></div>;
+}
+export function DiagnosisTable({rows:allRows,onSelect,strategy,evidence=false}:{rows:any[];onSelect:(row:any)=>void;strategy?:(row:any)=>React.ReactNode;evidence?:boolean}){
  const rows=technicalDiagnosisRows(allRows);
  const [page,setPage]=useState(1);
  useEffect(()=>setPage(1),[allRows]);
  const pages=Math.max(1,Math.ceil(rows.length/50)),current=Math.min(page,pages);
- return <>{rows.length>50 && <div className="review-batch"><button disabled={current===1} onClick={()=>setPage(current-1)}>上一页</button><span>第 {current} / {pages} 页 · 共 {rows.length} 题 · 每页最多50条</span><button disabled={current===pages} onClick={()=>setPage(current+1)}>下一页</button></div>}<div className="table-scroll baseline-table baseline-cases-table diagnosis-list"><table><thead><tr><th>题号 / 问题</th><th>失败现象</th><th>主要技术根因</th><th>{strategy?'优化方向':'核心证据'}</th><th>详情</th></tr></thead><tbody>{rows.slice((current-1)*50,current*50).map(row=>{const item=caseData(row),labels=symptoms(item),proposal=strategy?.(row);return <tr key={caseId(row)} tabIndex={0} onClick={()=>onSelect(row)} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();onSelect(row)}}}><td className="case-question"><small>{questionLabel(caseId(row))}</small><TruncatedText lines={2}>{item.question || '问题未采集'}</TruncatedText></td><td>{labels.slice(0,2).join('、') || '未采集'}{labels.length>2 && <details onClick={event=>event.stopPropagation()}><summary>另 {labels.length-2} 个标签</summary>{labels.slice(2).join('、')}</details>}</td><td>{rootName(currentRoot(row))}</td><td onClick={event=>strategy && event.stopPropagation()}>{strategy?(typeof proposal==='string'?<TruncatedText lines={2}>{proposal}</TruncatedText>:proposal):<TruncatedText lines={2}>{coreEvidence(item)}</TruncatedText>}</td><td><button className="text-button" onClick={event=>{event.stopPropagation();onSelect(row)}}>查看案例</button></td></tr>})}{!rows.length && <tr><td colSpan={5}>当前组合筛选无记录；可恢复全部问题。分类未采集不代表真实案例为0。</td></tr>}</tbody></table></div></>;
+ return <>{rows.length>50 && <div className="review-batch"><button disabled={current===1} onClick={()=>setPage(current-1)}>上一页</button><span>第 {current} / {pages} 页 · 共 {rows.length} 题 · 每页最多50条</span><button disabled={current===pages} onClick={()=>setPage(current+1)}>下一页</button></div>}<div className={`table-scroll baseline-table baseline-cases-table diagnosis-list ${evidence?"with-evidence":""}`}><table><thead><tr><th>题号 / 问题</th><th>失败现象</th><th>主要技术根因</th>{evidence && <th>诊断依据</th>}<th>{strategy?'优化方向':'核心证据'}</th><th>详情</th></tr></thead><tbody>{rows.slice((current-1)*50,current*50).map(row=>{const item=caseData(row),labels=symptoms(item),proposal=strategy?.(row);return <tr key={caseId(row)} tabIndex={0} onClick={()=>onSelect(row)} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();onSelect(row)}}}><td className="case-question"><small>{questionLabel(caseId(row))}</small><TruncatedText lines={2}>{item.question || '问题未采集'}</TruncatedText></td><td>{labels.slice(0,2).join('、') || '未采集'}{labels.length>2 && <details onClick={event=>event.stopPropagation()}><summary>另 {labels.length-2} 个标签</summary>{labels.slice(2).join('、')}</details>}</td><td>{rootName(currentRoot(row))}</td>{evidence && <td><TruncatedText lines={2}>{coreEvidence(item)}</TruncatedText></td>}<td onClick={event=>strategy && event.stopPropagation()}>{strategy?(typeof proposal==='string'?<TruncatedText lines={2}>{proposal}</TruncatedText>:proposal):<TruncatedText lines={2}>{coreEvidence(item)}</TruncatedText>}</td><td><button className="text-button" onClick={event=>{event.stopPropagation();onSelect(row)}}>查看案例</button></td></tr>})}{!rows.length && <tr><td colSpan={evidence?6:5}>当前组合筛选无记录；可恢复全部问题。分类未采集不代表真实案例为0。</td></tr>}</tbody></table></div></>;
 }
 export function DetectionNotice({rows}:{rows:any[]}){
  return <details className="detection-notice"><summary>五类检测依据与边界</summary>{typicalPhenomena.map(name=>{const views=rows.map(caseData).map(item=>item.diagnostic_view);const observed=filterDiagnosis(rows,allDiagnosis).filter(row=>symptoms(caseData(row)).includes(name)).length;

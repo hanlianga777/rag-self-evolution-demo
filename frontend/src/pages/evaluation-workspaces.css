@@ -7,14 +7,14 @@
 :is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div {display:grid;grid-template-columns:minmax(130px,1fr) 2fr 60px;gap:12px;align-items:center;}
 :is(.evaluation-page,.evolution-page) meter {width:100%;height:14px;accent-color:var(--card-good-ink);}
 :is(.evaluation-page,.evolution-page) .workbench-status {display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:var(--card-support);}
-.evolution-page .candidate-card-body {display:grid;grid-template-rows:100px 62px 110px 90px 80px 160px;flex:initial;overflow:visible;}
-.evolution-page .candidate-story-block {min-height:0;overflow:auto;padding:10px 0;border-bottom:1px solid var(--line-soft);}
+.evolution-page .candidate-card-body {display:grid;grid-template-rows:minmax(68px,auto) minmax(95px,auto) minmax(84px,auto) minmax(65px,auto) minmax(65px,auto) minmax(155px,auto);flex:1;overflow:visible;}
+.evolution-page .candidate-story-block {min-height:0;overflow:visible;padding:10px 0;border-bottom:1px solid var(--line-soft);}
 .evolution-page .candidate-story-block .truncated-text {overflow:hidden;}
 .evolution-page .experiment-plan {align-items:stretch;}
 .evolution-page .experiment-plan article {display:flex;flex-direction:column;min-width:0;}
 .evolution-page .experiment-plan article > button {margin-top:auto;}
 :is(.evaluation-page,.evolution-page) .technical-record {white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:12px;}
-@media(max-width:700px){.evaluation-page .baseline-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}:is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div{grid-template-columns:minmax(95px,1fr) 1fr 50px;gap:6px;}.evolution-page .candidate-card-body{grid-template-rows:100px 62px 110px 90px 80px 160px;}}
+@media(max-width:700px){.evaluation-page .baseline-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}:is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div{grid-template-columns:minmax(95px,1fr) 1fr 50px;gap:6px;}.evolution-page .candidate-card-body{grid-template-rows:none;}}
 :is(.evaluation-page,.evolution-page) .diagnosis-filters {display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:12px 0 18px;}
 :is(.evaluation-page,.evolution-page) .diagnosis-filters label {display:grid;gap:6px;min-width:150px;flex:1;}
 :is(.evaluation-page,.evolution-page) .detection-notice {margin-top:16px;color:var(--muted);font-size:var(--card-support);}
@@ -56,3 +56,68 @@
 .bad-case-details .case-answer h5 {font-size:var(--card-body);margin:10px 0 6px;}
 .bad-case-details .technical-record {white-space:pre-wrap;overflow-wrap:anywhere;font-size:var(--card-support);}
 .bad-case-details summary {cursor:pointer;color:var(--navy);overflow-wrap:anywhere;}
+
+/* Read-only workspace expression uses the existing root typography and card palette. */
+:is(.evaluation-page,.evolution-page).page-shell :is(.page-shell-header,.page-content) {min-width:0;}
+:is(.evaluation-page,.evolution-page).page-shell .tabs {max-width:100%;overflow-x:auto;white-space:nowrap;}
+:is(.evaluation-page,.evolution-page).page-shell .page-title {flex-wrap:wrap;}
+.evaluation-page.page-shell .baseline-metrics {gap:0;border:1px solid var(--card-border);border-radius:var(--card-radius);overflow:hidden;margin:12px 0 20px;}
+.evaluation-page.page-shell .baseline-metrics > div {border:0;border-radius:0;padding:14px 18px;}
+.evaluation-page.page-shell .baseline-metrics > div + div {border-left:1px solid var(--line-soft);}
+.evaluation-page.page-shell .baseline-conclusion h2 {font-size:1.15rem;}
+.evaluation-page.page-shell .baseline-conclusion p {font-size:1rem;}
+:is(.evaluation-page,.evolution-page).page-shell .report-grid :is(dt,dd) {font-size:1rem;}
+.phenomenon-summary {display:flex;flex-wrap:wrap;gap:8px;margin:16px 0;}
+.phenomenon-summary button {display:flex;gap:12px;align-items:center;padding:9px 12px;border:1px solid var(--card-border);border-radius:var(--card-radius);background:var(--card-bg);font-size:1rem;}
+.phenomenon-summary button[aria-pressed="true"] {background:var(--card-good-bg);border-color:var(--card-good-border);color:var(--card-good-ink);}
+.phenomenon-summary strong {font-weight:500;color:var(--muted);font-size:.9rem;}
+.phenomenon-summary p {flex-basis:100%;margin:2px 0;}
+.agent-decision-flow {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));list-style:none;gap:var(--card-gap);padding:0;margin:0 0 14px;}
+.agent-decision-flow li {display:grid;gap:8px;background:var(--card-good-bg);border:1px solid var(--card-good-border);border-radius:var(--card-radius);padding:16px;min-width:0;}
+.agent-decision-flow strong {color:var(--card-good-ink);font-size:1rem;}
+.agent-decision-flow span {color:var(--muted);font-size:.9rem;}
+.strategy-relations table {table-layout:fixed;min-width:760px;}
+.strategy-relations :is(th,td) {vertical-align:top;overflow-wrap:anywhere;}
+.strategy-relations th:nth-child(1) {width:35%;}
+.strategy-relations th:nth-child(2) {width:27%;}
+.strategy-relations th:nth-child(3) {width:25%;}
+.strategy-relations th:nth-child(4) {width:13%;}
+.strategy-relations td > div + div {margin-top:12px;padding-top:8px;border-top:1px solid var(--line-soft);}
+.evolution-page.page-shell .candidate-cards > .candidate-card {display:flex;flex-direction:column;font-size:1rem;padding:16px;}
+.evolution-page.page-shell .candidate-cards :is(p,small,.field-label,.candidate-result dt) {font-size:inherit;}
+.evolution-page.page-shell .candidate-cards .field-label {font-weight:600;color:var(--navy);text-transform:none;letter-spacing:0;}
+.evolution-page.page-shell .candidate-cards .candidate-card-header h3 {font-size:1.15rem;}
+.evolution-page.page-shell .candidate-card-action {margin-top:12px;}
+.compact-config-diff {display:grid;gap:8px;margin:8px 0;}
+.compact-config-diff > div {display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-width:0;}
+.compact-config-diff dt {color:var(--muted);}
+.compact-config-diff dd {margin:0;overflow-wrap:anywhere;}
+.regression-impact {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--card-gap);margin:18px 0;}
+.regression-impact article {padding:16px;border:1px solid var(--card-border);border-radius:var(--card-radius);min-width:0;}
+.regression-impact h3 {margin:0 0 12px;font-size:1.15rem;}
+.regression-impact .report-grid {grid-template-columns:1fr;margin:14px 0;}
+.regression-impact .report-grid > div {display:flex;justify-content:space-between;gap:8px;}
+.recommendation-comparison table {min-width:760px;table-layout:fixed;}
+.recommendation-comparison td {vertical-align:top;overflow-wrap:anywhere;}
+.recommendation-comparison th:last-child {width:30%;}
+.diagnosis-list.with-evidence table :is(th,td) {width:auto;}
+.diagnosis-list.with-evidence table :is(th,td):nth-child(1) {width:23%;}
+.diagnosis-list.with-evidence table :is(th,td):nth-child(4) {width:25%;}
+.diagnosis-list.with-evidence table :is(th,td):nth-child(5) {width:20%;}
+.diagnosis-list.with-evidence table :is(th,td):last-child {width:9%;}
+.drawer .evaluation-dimensions {display:grid;gap:16px;}
+.drawer .evaluation-dimensions h3 {font-size:1rem;}
+@media(max-width:900px){.regression-impact{grid-template-columns:1fr;}}
+@media(max-width:700px){.agent-decision-flow{grid-template-columns:1fr;}.evaluation-page.page-shell .baseline-metrics > div{padding:12px;}.evaluation-page.page-shell .baseline-metrics > div:nth-child(3){border-left:0;border-top:1px solid var(--line-soft);}.evaluation-page.page-shell .baseline-metrics > div:nth-child(4){border-top:1px solid var(--line-soft);}}
+
+:is(.evaluation-page,.evolution-page).page-shell .page-content .table-scroll {height:auto;max-height:none;min-height:0;}
+
+.workbench-drawer .drawer-body {font-size:1rem;}
+.workbench-drawer .bad-case-details,.workbench-drawer .bad-case-details p {font-size:1rem;}
+.workbench-drawer .bad-case-details h3 {font-size:1.1rem;}
+.workbench-drawer .bad-case-details h4,.workbench-drawer .bad-case-details .case-answer h5 {font-size:1rem;}
+.workbench-drawer .bad-case-details > .candidate-card {padding:16px;}
+.workbench-drawer .bad-case-details .muted {font-size:.9rem;}
+.evaluation-page.page-shell .baseline-metrics :is(span,small) {font-size:.9rem;}
+.evolution-page.page-shell .candidate-story-block > small {display:block;font-size:.9rem;}
+.evolution-page.page-shell .candidate-story-block .text-button {margin-top:4px;}
