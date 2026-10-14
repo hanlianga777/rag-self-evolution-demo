@@ -13,6 +13,7 @@ import faiss
 import numpy as np
 
 from app.ai_service import AiService
+from app.diagnostics import diagnostic_view
 from app.corpus import CorpusStore
 from app.corpus_management import CorpusManager
 from app.full_text import checksum, write_full_text, validate_bundle, search_full_text
@@ -336,7 +337,8 @@ class ProbeCostTests(unittest.TestCase):
         result = runner._case_result(item, {})
         self.assertIn('Ranking Failure', result['failure_tags'])
         self.assertEqual(result['primary_root_cause'],'Retrieval')
-        self.assertEqual(result['diagnosis']['status'],'confirmed')
+        self.assertEqual(result['diagnosis']['analysis_category'],'rag_failure')
+        self.assertTrue(diagnostic_view(result)['target_eligible']);self.assertNotIn('status',result['diagnosis'])
         self.assertEqual(result['diagnosis']['retrieval_failure_stage'],'ranking_context_selection')
         self.assertTrue(result['programmatic_metrics']['evidence_coverage']['candidate_recall']['all_hit'])
         self.assertIn('Evidence / Citation Failure', result['failure_tags'])

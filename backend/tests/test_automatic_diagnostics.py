@@ -30,7 +30,7 @@ class AutomaticDiagnosticTests(unittest.TestCase):
         self.assertEqual(view['analysis_category'],'rag_failure')
         self.assertTrue(view['target_eligible']);self.assertEqual(view['primary_root_cause'],'Retrieval')
         self.assertEqual(view['retrieval_failure_stage'],'candidate_recall')
-        self.assertEqual(view['saved_confidence'],'needs_review');self.assertEqual(case,before)
+        self.assertNotIn('saved_confidence',view);self.assertNotIn('confidence',view);self.assertEqual(case,before)
 
     def test_all_independent_missing_evidence_guards(self):
         mutations=[
@@ -113,3 +113,91 @@ class AutomaticDiagnosticTests(unittest.TestCase):
         view=self.view(case,chunks)
         self.assertEqual(view['primary_root_cause'],'Generation');self.assertTrue(view['target_eligible'])
         self.assertIn('confirmed_claim',view['trace_observations'])
+
+    def test_positive_behavior_failure_requires_located_content_and_source(self):
+        final=[{'chunk_id':'hose','content':'软管接头方式填满后自动停止'},
+               {'chunk_id':'opening','content':'加注口方式需手动关闭'}]
+        quote='该软管接头配置需要手动关闭。'
+        review={'unsupported_claim_index':0,'claim':quote,'kind':'unresolved','changes_operation':False,
+            'consistency_status':'needs_review','operation_basis':{'effect':'unknown','source_applicable':None},
+            'reason':'配置归属未核实','support':[{'chunk_id':'hose','quote':'软管接头方式填满后自动停止'},
+                {'chunk_id':'opening','quote':'加注口方式需手动关闭'}]}
+        case={'test_category':'positive','passed':False,'model_answer':quote,'failure_tags':['Safety Failure'],
+            'diagnosis':{'status':'disputed'},'judge_result':{'behavior_pass':False,'behavior_evidence':quote,
+                'correctness':3,'completeness':.8,'faithfulness':.8,'missing_points':['软管接头配置填满后自动停止'],
+                'unsupported_claims':[quote],'claim_reviews':[review]},
+            'programmatic_metrics':{'behavior_contract':{'effective_pass':False},
+                'evidence_sufficiency':{'unresolved_conflicts':[{'status':'unresolved','scope':'两种流程的适用配置未提供'}]},
+                'retrieval_trace':{'candidates':final,'final':final}}}
+        before=deepcopy(case)
+        for status in ('confirmed','needs_review','disputed','arbitrary'):
+            case['diagnosis']['status']=status
+            view=diagnostic_view(case)
+            self.assertEqual(view['analysis_category'],'rag_failure')
+            self.assertEqual(view['primary_root_cause'],'Generation');self.assertTrue(view['target_eligible'])
+            self.assertNotIn('安全边界失守',[p['name'] for p in view['phenomena']])
+            for field in ('confidence','saved_confidence','diagnosis_status'):
+                self.assertNotIn(field,view)
+            self.assertNotIn('status',view['root_cause_evidence'])
+        for mutate in (
+            lambda c:c['judge_result']['claim_reviews'][0].update(support=[]),
+            lambda c:c['judge_result'].update(behavior_evidence='回答中不存在'),
+            lambda c:c['judge_result']['claim_reviews'][0].update(claim=c['model_answer']+'未在答案中出现的断言'),
+            lambda c:c['judge_result'].update(missing_points=[]),
+            lambda c:c['programmatic_metrics']['retrieval_trace'].update(final=[]),
+            lambda c:c['programmatic_metrics']['evidence_sufficiency'].update(unresolved_conflicts=[]),
+            lambda c:c['judge_result']['claim_reviews'][0]['support'].pop(),
+        ):
+            invalid=deepcopy(before);mutate(invalid)
+            self.assertFalse(diagnostic_view(invalid)['target_eligible'])
+        negative=deepcopy(before);negative.update(test_category='negative',negative_subtype='safe_rejection')
+        self.assertEqual(diagnostic_view(negative)['primary_root_cause'],'Safety')
+        self.assertTrue(diagnostic_view(negative)['target_eligible']);self.assertFalse(negative['passed'])
+
+    def test_complete_requested_answer_with_scope_pending_is_evaluation_issue(self):
+        quote='结束时停用清洁头，抽吸余水，然后停用抽吸。'
+        final={'chunk_id':'flow','content':quote}
+        review={'unsupported_claim_index':0,'claim':quote,'kind':'unresolved','changes_operation':False,
+            'consistency_status':'needs_review','operation_basis':{'effect':'unknown','source_applicable':None},
+            'reason':'所问步骤全部正确；附加结束步骤的流程范围尚未核验',
+            'support':[{'chunk_id':'flow','quote':quote}]}
+        case={'test_category':'positive','passed':False,'model_answer':'按全部必要步骤清洁。'+quote,
+            'failure_tags':['Evidence Pending Review'],'judge_result':{'correctness':4,'completeness':1,
+                'faithfulness':1,'behavior_pass':True,'missing_points':[],
+                'unsupported_claims':[quote],'claim_reviews':[review]},
+            'programmatic_metrics':{'evidence_sufficiency':{'sufficient':True,'source_applicable':True,'unresolved_conflicts':[]},
+                'retrieval_trace':{'candidates':[final],'final':[final]}}}
+        before=deepcopy(case);view=diagnostic_view(case)
+        self.assertEqual(view['analysis_category'],'evaluation_issue');self.assertFalse(view['target_eligible'])
+        self.assertEqual(view['primary_root_cause'],'Unknown');self.assertTrue(view['evidence_checks'])
+        self.assertEqual(case,before);self.assertFalse(case['passed'])
+        for mutate in (
+            lambda c:c['judge_result'].update(missing_points=['漏掉必要操作']),
+            lambda c:c['judge_result'].update(correctness=3),
+            lambda c:c['judge_result']['claim_reviews'][0].update(changes_operation=True),
+            lambda c:c['judge_result']['claim_reviews'][0].update(support=[]),
+            lambda c:c['judge_result']['claim_reviews'][0].update(claim='不存在的回答片段'),
+            lambda c:c['programmatic_metrics']['evidence_sufficiency'].update(sufficient=False),
+        ):
+            invalid=deepcopy(before);mutate(invalid);v=diagnostic_view(invalid)
+            self.assertNotEqual(v['analysis_category'],'evaluation_issue');self.assertFalse(v['target_eligible'])
+
+    def test_ordinary_missing_check_and_unrelated_correct_fact_do_not_prove_generation(self):
+        source={'chunk_id':'power','content':'开机前检查电源。'}
+        answer='开机前检查电源。'
+        review={'unsupported_claim_index':0,'claim':answer,'kind':'supported_fact','changes_operation':False,
+            'consistency_status':'consistent','operation_basis':{'effect':'none','source_applicable':True},
+            'reason':'电源检查有据，但没有证明制动检查缺失属于生成错误',
+            'support':[{'chunk_id':'power','quote':answer}]}
+        case={'test_category':'positive','passed':False,'model_answer':answer,
+            'primary_root_cause':'Generation','diagnosis':{'status':'confirmed'},
+            'judge_result':{'behavior_pass':False,'behavior_evidence':answer,'correctness':3,
+                'completeness':.5,'faithfulness':1,'missing_points':['开机前检查制动。'],
+                'unsupported_claims':[answer],'claim_reviews':[review]},
+            'programmatic_metrics':{'behavior_contract':{'effective_pass':False},
+                'retrieval_trace':{'candidates':[source],'final':[source]},
+                'evidence_sufficiency':{'sufficient':False,'source_applicable':True}}}
+        view=diagnostic_view(case)
+        self.assertEqual(view['analysis_category'],'insufficient_evidence')
+        self.assertEqual(view['primary_root_cause'],'Unknown');self.assertFalse(view['target_eligible'])
+        self.assertFalse(case['passed'])

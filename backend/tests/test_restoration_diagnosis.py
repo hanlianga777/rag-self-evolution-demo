@@ -35,7 +35,9 @@ class DiagnosisTests(unittest.TestCase):
         self.assertEqual(result['failure_tags'], ['Generation Failure', 'Retrieval Failure'])
         self.assertFalse(result['passed'])
         self.assertEqual(result['primary_root_cause'], 'Retrieval')
-        self.assertEqual(result['root_cause']['diagnosis_status'], 'preliminary')
+        self.assertNotIn('diagnosis_status', result['root_cause'])
+        self.assertNotIn('status', result['diagnosis'])
+        self.assertEqual(result['diagnosis']['analysis_category'], 'rag_failure')
 
 
 class ReservationTests(unittest.TestCase):

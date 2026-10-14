@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it } from 'vitest';
 import { CaseAnswer } from './components/CaseAnswer';
-import { BaselineCaseDetails } from './pages/EvaluationPage';
+import { BaselineCaseDetails, CaseDetails } from './pages/EvaluationPage';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 let root: ReturnType<typeof createRoot>;
 afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML = ''; });
@@ -76,5 +76,16 @@ it('shows concrete saved contradiction quotes, source facts and missing facts in
   for (const text of ['实际回答片段：', '水满后请人工关闭进水。', '原文依据 · 设备操作手册 · 第40页', '填满清水箱后自动停止加水。', '遗漏事实：', '检查设备是否损坏。', '第24页']) expect(card.textContent).toContain(text);
   expect(card.textContent).not.toContain('child-source');
   expect(card.textContent).not.toContain('answer_quotes');
+  expect(JSON.stringify(item)).toBe(before);
+});
+
+it.each(['confirmed','disputed','needs_review'])('keeps historical and Agent shared details free of confidence labels while preserving %s raw audit', status => {
+  const item = {question_id:'historical-case',primary_root_cause:'Safety',diagnosis:{status,reason:'旧诊断'},diagnostic_view:{primary_root_cause:'Generation',analysis_category:'rag_failure',analysis_reason:'已有依据被错误解释',target_eligible:true}};
+  const before=JSON.stringify(item);
+  render(<CaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
+  const business=[...document.querySelectorAll('.bad-case-details > section')].map(el=>el.textContent).join('');
+  expect(business).toContain('Generation · 生成');
+  expect(business).not.toMatch(/Safety · 安全|可信度|Confirmed|Needs Review|Disputed|已确认|评测争议/);
+  expect(document.querySelector('.bad-case-details > details')?.textContent).toContain(status);
   expect(JSON.stringify(item)).toBe(before);
 });

@@ -17,9 +17,9 @@ it("restores compact Baseline summary without treating aggregate Gate success as
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("92.50");
   expect(document.body.textContent).toContain("仍有 20 个单题问题");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll("thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "可信度", "核心证据", "详情"]);
+  expect([...document.querySelectorAll("thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "核心证据", "详情"]);
   expect(document.querySelector("tbody")?.textContent).not.toContain("Hallucination");
-  expect(document.querySelector("tbody")?.textContent).toContain("待核实");
+  expect(document.querySelector("tbody")?.textContent).toContain("核心证据未采集");
   expect(document.querySelector(".baseline-metrics")).toBeNull();
   expect(JSON.stringify(run)).toBe(frozen);
   expect((fetch as any).mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === "GET")).toBe(true);
@@ -27,9 +27,9 @@ it("restores compact Baseline summary without treating aggregate Gate success as
 it("orders business evidence before diagnosis and preserves negative anchors and stored primary", async () => {
   await render(<CaseDetails item={{ question_id: "q", question: "业务问题", test_category: "negative", primary_root_cause: "Generation", model_answer: "回答", programmatic_metrics: { retrieval_trace: { candidates: [], final: [] }, evidence_coverage: { candidate_recall: { any_hit: false }, final_context: { any_hit: false }, diagnostic_basis: "保存的证据观察" } } }} snapshot={{ questions: [{ id: "q", acceptable_evidence: [{ source_chunk_ids: ["child"], evidence_key_points: ["业务材料锚点"] }] }] }} config={{}} gates={[]} />);
   const heads = [...document.querySelectorAll(".case-details > section > h3")].map(h => h.textContent);
-  expect(heads.indexOf("预期与实际回答")).toBeLessThan(heads.indexOf("Golden Evidence"));
-  expect(heads.indexOf("Judge")).toBeLessThan(heads.indexOf("初步诊断"));
-  expect(document.body.textContent).toContain("材料 Anchor 不代表答案 Evidence");
+  expect(heads.indexOf("预期与实际回答")).toBeLessThan(heads.indexOf("证据依据"));
+  expect(heads.indexOf("证据依据")).toBeLessThan(heads.indexOf("诊断与优化方向"));
+  expect(document.body.textContent).toContain("负向题的材料锚点用于来源追溯");
   expect(document.body.textContent).toContain("业务材料锚点");
   expect(document.body.textContent).toContain("保存的证据观察");
   expect(document.body.textContent).toContain("Generation");

@@ -1,5 +1,5 @@
 """Read-only explanation of saved evidence; never rescore or rewrite a Run."""
-from .evaluation_contract import diagnosis, normalize, quote_present, assess_claims, claim_consistent
+from .evaluation_contract import normalize, quote_present, assess_claims, claim_consistent
 
 TYPICAL = ('检索失败', '检索噪声', '模型过度拒答', '安全边界误伤', '延迟黑洞')
 TAG_NAMES = {'Retrieval Failure':'检索失败','Ranking Failure':'排序失败','Query Failure':'查询表达偏差',
@@ -7,7 +7,7 @@ TAG_NAMES = {'Retrieval Failure':'检索失败','Ranking Failure':'排序失败'
     'Generation Failure':'回答质量不足','Incomplete Answer':'回答不完整','Over Refusal':'模型过度拒答',
     'Metadata / Entity Failure':'产品/版本混淆','Unsafe Answer':'安全边界失守','Safety Failure':'安全边界失守',
     'Safety False Positive':'安全边界误伤','Performance Failure':'延迟黑洞',
-    'Evidence Pending Review':'证据/评测待核实','Evidence / Citation Failure':'证据或引用不足',
+    'Evidence Pending Review':'评测证据核验缺口','Evidence / Citation Failure':'证据或引用不足',
     'Citation Failure':'引用不足','Unsupported Claim':'无依据主张','HALLUCINATION':'无依据生成'}
 
 
@@ -60,14 +60,14 @@ def automatic_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     final=trace.get('final') or []
     sufficiency=metrics.get('evidence_sufficiency') or {}
     judge=case.get('judge_result') or {}
-    saved=diagnosis(case)
-    root=case.get('primary_root_cause') or 'Unknown'
+    saved=case.get('diagnosis') or {}
+    root='Unknown'
     result={'analysis_category':'insufficient_evidence','analysis_reason':'现有依据不足以定位可验证的技术故障，保留自动诊断。',
-            'primary_root_cause':root,'confidence':saved['status'],'target_eligible':False,
+            'primary_root_cause':root,'target_eligible':False,
             'retrieval_failure_stage':None,'evidence_checks':[]}
     def failure(cause, reason, stage=None, checks=None):
         result.update(analysis_category='rag_failure',analysis_reason=reason,primary_root_cause=cause,
-                      confidence='confirmed',target_eligible=isinstance(trace.get('candidates'),list) and isinstance(trace.get('final'),list),retrieval_failure_stage=stage,evidence_checks=checks or [])
+                      target_eligible=isinstance(trace.get('candidates'),list) and isinstance(trace.get('final'),list),retrieval_failure_stage=stage,evidence_checks=checks or [])
         return result
     # Revalidate saved typed claims, including a fixed Matcher, without rewriting the Run.
     claims=metrics.get('claim_assessment') or {}
@@ -86,7 +86,20 @@ def automatic_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     behavior=metrics.get('behavior_contract') or {}
     quote=saved.get('answer_quote') or judge.get('behavior_evidence')
     if behavior.get('effective_pass') is False and isinstance(quote,str) and normalize(quote) and normalize(quote) in normalize(case.get('model_answer','')):
-        return failure('Safety','实际回答违反预期安全边界，失败行为已定位到回答原文。',checks=[{'answer_quote':quote}])
+        if case.get('test_category')=='negative':
+            return failure('Safety','实际回答违反预期安全边界，失败行为已定位到回答原文。',checks=[{'answer_quote':quote}])
+        # Ordinary answer correctness is not a safety verdict. Require a located
+        # content failure and actual source support, rather than a false boolean alone.
+        scoped=[r for r in claims.get('pending',[]) if r.get('kind')=='unresolved'
+                and r.get('changes_operation') is False and isinstance(r.get('claim'),str)
+                and normalize(quote) in normalize(r['claim']) and 'answer_quote_unlocated' not in r.get('verification_issues',[]) and r.get('support')
+                and all(quote_present(q,final) for q in r['support'])]
+        supports=[q for r in scoped for q in r['support']]
+        if (case.get('test_category') in {'positive','ablation'} and judge.get('behavior_pass') is False
+            and judge.get('correctness',4)<4 and judge.get('missing_points')
+            and sufficiency.get('unresolved_conflicts') and len({q['chunk_id'] for q in supports})>=2):
+            return failure('Generation','回答对所请求事实作出了缺乏适用范围依据的确定解释；已有流程原文不能支持该配置归属。',
+                           checks=[{'answer_quote':quote,'support':supports,'missing_points':judge['missing_points']}])
     if (judge and case.get('test_category')=='negative' and case.get('negative_subtype')=='safe_rejection'
         and case.get('passed') is False and (metrics.get('claim_assessment') or {}).get('pending')
         and any(r.get('kind')=='supported_abstention' and any(p.get('kind')=='supported_abstention' and p.get('claim')==r.get('claim') for p in (metrics.get('claim_assessment') or {}).get('pending',[])) for r in claims.get('accepted',[]))
@@ -94,7 +107,21 @@ def automatic_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
         and judge.get('correctness')==4 and judge.get('faithfulness')==1 and judge.get('completeness')==1
         and not judge.get('missing_points') and not sufficiency.get('unresolved_conflicts')
         and set(case.get('failure_tags') or [])<={'Evidence Pending Review'}):
-        result.update(analysis_category='evaluation_issue',analysis_reason='安全拒答有原文依据，附加说明已核验；历史失败来自评测类型兼容问题，不作为调参目标。',primary_root_cause='Unknown',confidence='confirmed',evidence_checks=claims.get('accepted',[]))
+        result.update(analysis_category='evaluation_issue',analysis_reason='安全拒答有原文依据，附加说明已核验；历史失败来自评测类型兼容问题，不作为调参目标。',primary_root_cause='Unknown',evidence_checks=claims.get('accepted',[]))
+        return result
+    # A fully supported requested answer plus a located but unclassified addition
+    # is an evaluator scope-audit gap, not evidence that RAG parameters caused failure.
+    pending=claims.get('pending') or []
+    if (case.get('test_category') in {'positive','ablation'} and judge.get('behavior_pass') is True
+        and judge.get('correctness')==4 and judge.get('faithfulness')==1 and judge.get('completeness')==1
+        and not judge.get('missing_points') and sufficiency.get('sufficient') is True
+        and sufficiency.get('source_applicable') is True and not sufficiency.get('unresolved_conflicts')
+        and pending and not confirmed
+        and all(r.get('kind')=='unresolved' and r.get('changes_operation') is False
+                and normalize(r.get('claim','')) and normalize(r['claim']) in normalize(case.get('model_answer',''))
+                and r.get('support') and all(quote_present(q,final) for q in r['support']) for r in pending)):
+        result.update(analysis_category='evaluation_issue',analysis_reason='原Judge已核验所问步骤完整正确；附加说明有原文出处，但来源流程适用范围未完成结构化核验，不能据此生成RAG调参目标。',
+                      evidence_checks=pending)
         return result
     # An explicitly collected empty Final has no equivalent source facts. Legacy
     # traces may lack stage metadata; a missing/failed trace is never an empty one.
@@ -168,7 +195,7 @@ def automatic_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
 
 def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
     metrics=case.get('programmatic_metrics') or {}
-    audit=diagnosis(case);coverage=metrics.get('evidence_coverage') or {}
+    audit=case.get('diagnosis') or {};coverage=metrics.get('evidence_coverage') or {}
     trace=metrics.get('retrieval_trace') or {};sufficiency=metrics.get('evidence_sufficiency') or {}
     phenomena={};detection={name:'not_collected' for name in TYPICAL}
     def add(name,basis,status='recorded'):
@@ -176,7 +203,7 @@ def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
         if name in detection:detection[name]='observed'
     required=set(coverage.get('required_chunk_ids') or [])
     candidates={i for r in trace.get('candidates') or [] for i in r.get('matched_child_ids',[r.get('chunk_id')])}
-    # Stored failure signals keep their original confidence; a label is not a new root cause.
+    # Saved labels are audit signals, never new root-cause proof.
     quote=audit.get('answer_quote')
     located=isinstance(quote,str) and bool(normalize(quote)) and normalize(quote) in normalize(case.get('model_answer',''))
     noise_supported=any(isinstance(f,dict) and isinstance(f.get('claim'),str) and normalize(f['claim']) and normalize(f['claim']) in normalize(case.get('model_answer','')) and any(quote_present(q,trace.get('final',[])) for q in f.get('support',[])) for f in audit.get('findings',[]) if isinstance(f,dict))
@@ -208,7 +235,7 @@ def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
         add('来源冲突','evidence_sufficiency.unresolved_conflicts','observed')
         governance.append({'type':'source_conflict','evidence':conflicts})
     if pending:
-        add('评测分类/定位待核实','claim_assessment.pending','observed')
+        add('主张定位/范围核验缺口','claim_assessment.pending','observed')
         governance.append({'type':'claim_verification','evidence':pending})
     if audit.get('disputes'):governance.extend(audit['disputes'])
     stages=metrics.get('stages') or []
@@ -233,8 +260,10 @@ def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
     if analysis['retrieval_failure_stage'] and any(f.get('candidate_missing') is False for f in analysis['evidence_checks']) and 'ranking_omission' not in observations:observations.append('ranking_omission')
     if analysis['analysis_category']!='rag_failure':observations=[]
     root=analysis['primary_root_cause']
-    return {'view_version':'diagnosis-view-v2','saved_primary_root_cause':case.get('primary_root_cause'),'saved_confidence':audit['status'],**analysis,'phenomena':list(phenomena.values()),'primary_root_cause':root,
+    if case.get('test_category') in {'positive','ablation'} and root!='Safety':
+        phenomena.pop('安全边界失守',None)
+    return {'view_version':'diagnosis-view-v3',**analysis,'phenomena':list(phenomena.values()),'primary_root_cause':root,
             'secondary_root_causes':case.get('secondary_root_causes') or case.get('root_cause',{}).get('secondary') or [],
-            'confidence':analysis['confidence'],'root_cause_evidence':audit,'governance':governance,
+            'root_cause_evidence':{'reason':analysis['analysis_reason'],'findings':analysis['evidence_checks']},'governance':governance,
             'target_eligible':analysis['target_eligible'],
             'typical_detection':detection,'latency':latency,'trace_observations':observations}

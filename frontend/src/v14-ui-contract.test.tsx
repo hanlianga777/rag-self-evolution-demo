@@ -69,7 +69,7 @@ it.each([{ proposal: "实际持久化 proposal" }, { why: "兼容 Why 字段" },
   const candidate = { id: "E1-A", status: "generated", config: {}, reasoning: { candidate_label: "A", hypothesis: "假设", risk: "风险", observed_evidence: [], ...reasoning }, result: {} };
   await render(<EvolutionPage data={{ ...data("B1"), optimization: { id: "E1", candidates: [candidate] } }} />);
   await clickText("A / B / C"); await clickText("查看方案与完整报告");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(`Why：${(reasoning as any).proposal || (reasoning as any).why || "未记录"}`);
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(`Why：${(reasoning as any).proposal || (reasoning as any).why || "未保存依据"}`);
 });
 
 it.each([0, 1.25, null])("M4 Sandbox and release keep frozen estimated cost %s and source-backed missing reason", async cost => {

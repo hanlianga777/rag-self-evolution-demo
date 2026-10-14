@@ -96,3 +96,6 @@ Mini显式Business V2保留现有8/4/8、动态Topic及Slot产品/子型要求�
 
 
 2026-10-14：全部Bad Case进入原诊断与Agent背景，证据充分的真实RAG失败才进入单一干预目标；评测规则问题、证据不足单独保留，不新增Human Gate。后续正式Baseline/Sandbox须统一新版Evaluation Identity；历史结果只读。
+
+
+2026-10-14机制最终收口：全量Bad Case事实核查→四类技术归因→证据支持的单一干预，不使用诊断可信度标签准入。来源范围核验缺口不驱动RAG调参；旧状态只在高级审计保留。普通业务错误与安全失败分离，所有正式比较继续冻结同一Evaluation Identity，原三个人工Gate保持。图源流程关系不变，无新增独立工作台。

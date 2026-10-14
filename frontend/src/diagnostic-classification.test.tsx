@@ -7,8 +7,8 @@ const rows=[{question_id:'Q1',question:'操作',failure_tags:['Hallucination','U
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 it('combines three independent dimensions, keeps other issues and unique question counts',()=>{
  expect(filterDiagnosis([...rows,rows[0]],allDiagnosis)).toHaveLength(3);
- expect(filterDiagnosis(rows,{phenomenon:'other',root:'Safety',confidence:'confirmed'})).toEqual([rows[0]]);
- expect(filterDiagnosis(rows,{phenomenon:'检索噪声',root:'Generation',confidence:'disputed'})).toEqual([rows[2]]);
+ expect(filterDiagnosis(rows,{phenomenon:'other',root:'Safety'})).toEqual([rows[0]]);
+ expect(filterDiagnosis(rows,{phenomenon:'检索噪声',root:'Generation'})).toEqual([rows[2]]);
  expect(filterDiagnosis(rows,{...allDiagnosis,phenomenon:'安全边界误伤'})).toEqual([]);
  expect(filterDiagnosis(rows,{...allDiagnosis,root:'Unknown'})).toEqual([rows[1]]);
 });
@@ -42,4 +42,20 @@ it('blocks saved comparisons with inconsistent evaluation identities',async()=>{
  await act(async()=>root.render(<CandidateCaseComparison candidates={[{id:'a',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'current',all_fixed_question_ids:['Q1']}}]} baselineId="baseline" kind="fixed" onSelect={()=>{}}/>));
  expect(host.textContent).toContain('停止逐题对照');expect(host.querySelector('tbody')).toBeNull();
  await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();
+});
+
+it('uses current analysis root and evidence ahead of historical labels, counts unique questions',async()=>{
+ const {DiagnosisDistribution,currentRoot,coreEvidence}=await import('./components/EvaluationDiagnosis');
+ const current={question_id:'Q03',primary_root_cause:'Safety',diagnosis:{status:'confirmed',answer_quote:'旧安全证据'},diagnostic_view:{primary_root_cause:'Generation',analysis_category:'rag_failure',analysis_reason:'配置适用范围解释错误',target_eligible:true,evidence_checks:[{answer_quotes:['实际错误配置说明']}]}};
+ const evaluator={question_id:'Q06',primary_root_cause:'Safety',diagnosis:{status:'disputed'},diagnostic_view:{primary_root_cause:'Unknown',analysis_category:'evaluation_issue',analysis_reason:'评测规则错误：原文支持实际操作步骤',target_eligible:false}};
+ expect(currentRoot(current)).toBe('Generation');expect(currentRoot(evaluator)).toBe('Unknown');
+ expect(coreEvidence(current)).toBe('实际错误配置说明');expect(coreEvidence(evaluator)).toContain('评测规则错误');
+ expect(filterDiagnosis([current,evaluator],{phenomenon:'all',root:'Generation'})).toEqual([current]);
+ const host=document.body.appendChild(document.createElement('div')),root=createRoot(host);
+ await act(async()=>root.render(<><DiagnosisFilters rows={[current,evaluator]} value={allDiagnosis} onChange={()=>{}}/><DiagnosisTable rows={[current,evaluator]} onSelect={()=>{}}/><DiagnosisDistribution rows={[current,current,evaluator]}/></>));
+ expect(host.textContent).not.toMatch(/可信度|Confirmed|Needs Review|Disputed|评测争议|已确认/);
+ expect([...host.querySelectorAll('thead th')].map(el=>el.textContent)).toEqual(['题号 / 问题','失败现象','主要技术根因','核心证据','详情']);
+ await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='主要根因')!.click());
+ expect([...host.querySelectorAll('meter')].map(el=>el.value)).toEqual([1,1]);
+ await act(async()=>root.unmount());host.remove();
 });

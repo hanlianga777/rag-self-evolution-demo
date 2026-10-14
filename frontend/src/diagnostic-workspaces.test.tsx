@@ -54,12 +54,12 @@ it('separates saved formal blockers from confirmed regression without clearing p
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const result={comparison_version:'offline',regression:{status:'FAIL',new_critical_failures:0,new_ordinary_failures:2},formal_blocking_question_ids:['q1','q2'],confirmed_regression_question_ids:[],pending_regression_question_ids:['q1'],disputed_regression_question_ids:['q2'],unclassified_regression_question_ids:[]};
  await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result}]}}}/>);await click('Sandbox');
- expect(document.body.textContent).toContain('正式阻断 2 题，其中保存的已确认失败 0、待复核 1、争议 1');expect(document.body.textContent).toContain('不等于已确认业务退步');expect(document.body.textContent).toContain('FAIL');
+ expect(document.body.textContent).toContain('正式阻断 2 题，资格仍按保存的 Regression 结果判定');expect(document.body.textContent).not.toMatch(/已确认失败|待复核|争议|未分类/);expect(document.body.textContent).toContain('FAIL');expect(result.pending_regression_question_ids).toEqual(['q1']);expect(result.disputed_regression_question_ids).toEqual(['q2']);
 });
 it('uses saved root evidence in the compact diagnosis column and keeps absent evidence pending',async()=>{
  const {DiagnosisTable}=await import('./components/EvaluationDiagnosis');
  await render(<DiagnosisTable rows={[{question_id:'q1',diagnosis:{answer_quote:'保存的答案原文',reason:'保存原因'},judge_result:{reason:'非根因评语'}},{question_id:'q2',judge_result:{reason:'不能冒充核心证据'}}]} onSelect={()=>{}}/>);
- expect(document.querySelector('tbody')?.textContent).toContain('保存的答案原文');expect(document.querySelector('tbody')?.textContent).toContain('待核实 · 核心证据未采集');expect(document.querySelector('tbody')?.textContent).not.toContain('不能冒充核心证据');
+ expect(document.querySelector('tbody')?.textContent).toContain('保存的答案原文');expect(document.querySelector('tbody')?.textContent).toContain('核心证据未采集');expect(document.querySelector('tbody')?.textContent).not.toContain('不能冒充核心证据');
 });
 it('keeps all Full100 diagnosis rows available in pages of fifty and resets after filtering',async()=>{
  const {DiagnosisTable}=await import('./components/EvaluationDiagnosis');

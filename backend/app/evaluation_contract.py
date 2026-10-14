@@ -6,7 +6,7 @@ import re
 import unicodedata
 from .policy import GATE_DEFINITIONS
 
-VERSIONS = {'prompt_version': 'judge-v3.3-operation-scope', 'evidence_matcher_version': 'evidence-v6-safe-abstention', 'scoring_policy': 'v1.5-diagnostic-targets'}
+VERSIONS = {'prompt_version': 'judge-v3.4-scoped-reference', 'evidence_matcher_version': 'evidence-v7-scoped-reference', 'scoring_policy': 'v1.6-evidence-diagnosis'}
 
 
 def policy_current(judge):
@@ -146,6 +146,43 @@ def abstention_valid(review, judgment, entries, item, *, answer=None):
         and set(ids)=={e['chunk_id'] for e in entries or []})
 
 
+def scoped_reference_valid(review, judgment, entries, item, answer):
+    """A located conditional source reference never authorizes the requested workflow."""
+    basis=review.get('scope_basis',{})
+    operation=review.get('operation_basis',{})
+    if not isinstance(basis,dict) or not isinstance(operation,dict):return False
+    scope_quote=basis.get('answer_scope_quote')
+    fragments=review.get('answer_quotes',[review.get('claim')])
+    if not (isinstance(scope_quote,str) and normalize(scope_quote)
+            and isinstance(fragments,list) and fragments
+            and all(isinstance(q,str) and normalize(q) and normalize(q) in normalize(answer) for q in fragments)
+            and any(normalize(scope_quote) in normalize(q) for q in fragments)):
+        return False
+    support=review.get('support')
+    source_scope=basis.get('source_scope')
+    if not isinstance(support,list) or not support or not quote_present(source_scope,entries):return False
+    # Resolve every quote to one actual Final entry; a condition from another entry cannot scope it.
+    located=[[i for i,e in enumerate(entries or []) if quote_present(q,[e])] for q in [source_scope,*support]]
+    if any(len(matches)!=1 for matches in located) or len({matches[0] for matches in located})!=1:return False
+    entry=entries[located[0][0]]
+    metadata=entry.get('metadata') or {}
+    identity={k:entry.get(k) or metadata.get(k) for k in ('document_id','product','version')}
+    if not all(isinstance(identity[k],str) and normalize(identity[k]) for k in ('document_id','product')):return False
+    # Same-entry references need no invented edition when neither source nor question declares one.
+    declared_versions=[source['version'] for source in (entry,metadata) if source.get('version') is not None]
+    if any(not isinstance(v,str) or not normalize(v) for v in declared_versions):return False
+    constraints=(item or {}).get('raw') or {}
+    for field, actual in identity.items():
+        expected=constraints.get('source_document_id' if field=='document_id' else field)
+        if expected is not None and (actual is None or not isinstance(expected,str) or normalize(expected)!=normalize(actual)):return False
+        if entry.get(field) and metadata.get(field) and normalize(entry[field])!=normalize(metadata[field]):return False
+    return bool((item or {}).get('test_category') in {'positive','ablation'}
+        and judgment.get('behavior_pass') is True and review.get('changes_operation') is False
+        and operation.get('effect')=='none' and operation.get('source_applicable') is False
+        and all(basis.get(k) is False for k in ('requested_workflow_applicable','authorizes_operation','evidence_ignored'))
+        and basis.get('source_identity_matches') is True)
+
+
 def assess_claims(answer, judgment, entries, *, item=None):
     """Validate the one Judge's classifications; historical untyped claims stay pending."""
     result = {'accepted': [], 'confirmed': [], 'pending': []}
@@ -157,7 +194,8 @@ def assess_claims(answer, judgment, entries, *, item=None):
         kind = review.get('kind')
         support = review.get('support', [])
         abstention=kind=='supported_abstention' and abstention_valid(review,judgment,entries,item,answer=answer)
-        consistent = claim_consistent(review) or abstention
+        reference=kind=='scoped_reference' and scoped_reference_valid(review,judgment,entries,item,answer)
+        consistent = claim_consistent(review) or abstention or reference
         fragments=review.get('answer_quotes',[review.get('claim')])
         answer_located=isinstance(fragments,list) and bool(fragments) and all(isinstance(q,str) and normalize(q) and normalize(q) in normalize(answer) for q in fragments)
         source_located=isinstance(support,list) and all(quote_present(q,entries) for q in support)
@@ -165,19 +203,13 @@ def assess_claims(answer, judgment, entries, *, item=None):
         supported = valid and bool(support) and kind == 'supported_fact'
         advice = valid and bool(support) and kind == 'reasonable_safety_advice' and review.get('changes_operation') is False
         failure = valid and (kind == 'contradiction' and bool(support) or kind == 'unsupported_instruction' and review.get('changes_operation') is True)
-        bucket = 'accepted' if supported or advice or valid and abstention else 'confirmed' if failure else 'pending'
+        bucket = 'accepted' if supported or advice or valid and (abstention or reference and bool(support)) else 'confirmed' if failure else 'pending'
         issues=[]
         if not answer_located:issues.append('answer_quote_unlocated')
         if not source_located:issues.append('source_quote_unlocated')
         if not consistent:issues.append('claim_classification_unverified')
         result[bucket].append({'original_claim': claim, **review, 'consistency_status': 'consistent' if consistent else 'needs_review','verification_issues':issues})
     return result
-
-
-def diagnosis(case):
-    if case.get('diagnosis'):
-        return case['diagnosis']
-    return {'status': 'needs_review', 'reason': '历史评测缺少新版上下文判断，不能仅凭失败标签确证根因'}
 
 
 def compare_cases(baseline, candidate, targets):

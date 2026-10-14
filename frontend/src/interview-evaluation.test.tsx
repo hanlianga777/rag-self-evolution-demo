@@ -32,11 +32,11 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
   expect(document.querySelector("tbody")?.textContent).toContain("≥ 90.00%");
   expect(new Set([...document.querySelectorAll("tbody tr td:nth-child(2)")].map(cell => cell.textContent)).size).toBe(4);
   await click("Bad Case 诊断");
-  expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "可信度", "核心证据", "详情"]);
-  expect(document.querySelector("tbody tr td:nth-child(3)")?.textContent).toContain("Query");
+  expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "核心证据", "详情"]);
+  expect(document.querySelector("tbody tr td:nth-child(3)")?.textContent).toContain("Retrieval");
   await click("查看案例");
   expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["案例结论", "业务问题", "预期与实际回答", "证据依据", "诊断与优化方向"]);
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Query");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Retrieval");
   expect(document.querySelector<HTMLDetailsElement>(".bad-case-details > details")?.open).toBe(false);
   expect(JSON.stringify(input)).toBe(frozen);
   expect((fetch as any).mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === "GET")).toBe(true);
@@ -58,7 +58,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space }))));
   await render(<EvolutionPage data={input} />);
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
-  expect(document.querySelector(".diagnosis-list")?.textContent).toContain("Query · 查询表达");
+  expect(document.querySelector(".diagnosis-list")?.textContent).toContain("Retrieval · 检索");
   expect(document.querySelector(".diagnosis-filters")?.textContent).toContain("1 / 1 题");
   expect(document.querySelector(".diagnosis-list")?.textContent).toContain("Candidate A");
   expect(document.querySelector(".diagnosis-list")?.textContent).not.toContain("Evidence Miss");

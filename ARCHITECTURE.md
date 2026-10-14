@@ -43,3 +43,6 @@ DeepSeek 只经后端显式调用，密钥不返回前端。检索是 Vector/BM2
 ## 2026-10-14 自动诊断与版本边界
 
 Baseline全部Bad Case → 既有诊断模块（实际回答、Golden、当前Corpus及Child/Parent/Trace、同一次Judge）→ 真实RAG失败 / 评测机制问题 / 证据不足 → Agent全量背景、仅证据合格目标 → 单一干预候选 → 同新版身份Sandbox/Regression → 原Gate2/3。评测问题不驱动RAG调参；分析不新增审批。旧Run和成绩只读，跨规则比较被身份守卫拒绝。正式图仍唯一来源于KnowledgeDiagrams.tsx；本轮不运行Provider或实验。
+
+
+2026-10-14最终机制收口：业务层与Agent决策移除诊断可信度分类；四类根因由实际失败证据决定。普通事实行为失败与真实安全违规分离，主体正确但附加流程范围未闭合只作评测核验缺口。原Judge、Matcher、Trace、历史诊断与Regression阻断继续审计；新版单Judge条件资料引用按实际来源身份验证，正式Baseline/Sandbox不得跨身份比较。三个Human Gate职责不变。

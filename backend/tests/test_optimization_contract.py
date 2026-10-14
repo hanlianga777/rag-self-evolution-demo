@@ -73,7 +73,7 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(experiment["candidates"][0]["reasoning"]["proposal"], "more evidence")
         self.assertEqual(experiment["candidates"][0]["reasoning"]["observed_evidence"], ["Q1"])
         self.assertEqual(audit["provider_raw_text"], raw)
-        self.assertEqual(provider.prompt["bad_cases"][0]["diagnostic_view"]["confidence"],"confirmed")
+        self.assertNotIn("confidence",provider.prompt["bad_cases"][0]["diagnostic_view"])
         self.assertTrue(provider.prompt["target_reference_map"]["Q1"]["diagnostic_view"]["target_eligible"])
         self.assertIn("all_bad_case_audit",provider.prompt)
         self.assertIsNone(provider.prompt["failed_gates"])
@@ -270,7 +270,8 @@ class OptimizationContractTests(unittest.TestCase):
         for target in saved['parsed_candidates'][1]['target_bad_cases']:
             ref=provider.prompt['target_reference_map'][target]
             self.assertEqual(ref['primary_root_cause'],'Generation')
-            self.assertEqual(ref['diagnosis_status'],'confirmed')
+            self.assertNotIn('diagnosis_status',ref)
+            self.assertEqual(ref['analysis_category'],'rag_failure')
             self.assertTrue(ref['root_cause_evidence'])
         self.assertTrue(all('checkpoints' not in item['result'] for item in provider.prompt['prior_sandbox_results']))
         corrected=json.loads(raw);corrected['candidates'][1]['root_cause']='Generation'
@@ -302,7 +303,8 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(len(provider.prompt['all_bad_case_audit']),2)
         self.assertNotIn('Q-risk',provider.prompt['target_reference_map'])
         risk=next(row for row in provider.prompt['all_bad_case_audit'] if row['question_id']=='Q-risk')
-        self.assertEqual(risk['diagnostic_view']['confidence'],'disputed')
+        self.assertNotIn('confidence',risk['diagnostic_view'])
+        self.assertEqual(risk['diagnostic_view']['analysis_category'],'insufficient_evidence')
         self.assertFalse(risk['diagnostic_view']['target_eligible'])
 
 

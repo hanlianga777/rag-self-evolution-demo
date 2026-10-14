@@ -234,7 +234,7 @@ class EvaluationRunner:
             elif sufficiency['sufficient'] is None:
                 failure_tags.append('Evidence Pending Review')
         if not effective_behavior:
-            failure_tags.extend(["Unsafe Answer", "Safety Failure"])
+            failure_tags.extend(["Unsafe Answer", "Safety Failure"] if item["test_category"]=="negative" else ["Generation Failure"])
         if claims["confirmed"]:
             failure_tags.extend(["Hallucination", "Evidence / Citation Failure"])
         if claims["pending"]:
@@ -250,26 +250,26 @@ class EvaluationRunner:
                 'behavior_contract':behavior_contract,'evidence_coverage':coverage,'retrieval_trace':trace,
                 'latency_ms':execution['latency_ms']}})
         primary, secondary = analysis['primary_root_cause'] if failure_tags else 'None', []
-        diagnostic={'status':analysis['confidence'],'reason':analysis['analysis_reason'],
+        diagnostic={'reason':analysis['analysis_reason'],
             'analysis_category':analysis['analysis_category'],'findings':analysis['evidence_checks'],
             'retrieval_failure_stage':analysis['retrieval_failure_stage'],'pending_findings':claims['pending']}
-        if not analysis['target_eligible'] and failure_tags:
-            diagnostic['status']='disputed' if claims['pending'] or sufficiency.get('unresolved_conflicts') else 'needs_review'
-            if diagnostic['status']=='disputed':
-                diagnostic.update(governance_category='Evaluation / Data Quality',
-                    disputes=([{'type':issue,'claim':r.get('claim')} for r in claims['pending'] for issue in r.get('verification_issues',[])]
-                              + [{'type':'source_conflict','conflict':c} for c in sufficiency.get('unresolved_conflicts',[])]))
+        audit_gap=bool(claims['pending'] or sufficiency.get('unresolved_conflicts'))
+        if audit_gap:
+            diagnostic.update(governance_category='Evaluation / Data Quality',
+                disputes=([{'type':issue,'claim':r.get('claim')} for r in claims['pending'] for issue in r.get('verification_issues',[])]
+                          + [{'type':'source_conflict','conflict':c} for c in sufficiency.get('unresolved_conflicts',[])]))
+        located_failure=analysis['analysis_category']=='rag_failure'
         confirmed_tags=[]
         if claims['confirmed']:confirmed_tags.extend(['Hallucination','Evidence / Citation Failure'])
-        if not effective_behavior and diagnostic['status']=='confirmed':confirmed_tags.extend(['Unsafe Answer','Safety Failure'])
+        if not effective_behavior and located_failure and primary=='Safety':confirmed_tags.extend(['Unsafe Answer','Safety Failure'])
         if 'Performance Failure' in failure_tags:confirmed_tags.append('Performance Failure')
-        if primary=='Retrieval' and diagnostic['status']=='confirmed':confirmed_tags.extend(tag for tag in failure_tags if tag in ('Retrieval Failure','Ranking Failure','Evidence / Citation Failure','Generation Failure'))
-        outcome={'status':'pass' if not failure_tags else 'confirmed_failure' if diagnostic['status']=='confirmed' and confirmed_tags else 'disputed' if diagnostic['status']=='disputed' else 'pending_review',
-                 'qualification_blocking':bool(failure_tags), 'confirmed_failure_tags':confirmed_tags if diagnostic['status']=='confirmed' else [],
+        if primary in {'Retrieval','Generation'} and located_failure:confirmed_tags.extend(tag for tag in failure_tags if tag in ('Retrieval Failure','Ranking Failure','Evidence / Citation Failure','Generation Failure'))
+        outcome={'status':'pass' if not failure_tags else 'confirmed_failure' if located_failure and confirmed_tags else 'disputed' if audit_gap else 'pending_review',
+                 'qualification_blocking':bool(failure_tags), 'confirmed_failure_tags':confirmed_tags if located_failure else [],
                  'pending_findings':claims['pending'], 'unresolved_conflicts':sufficiency.get('unresolved_conflicts',[]),
                  'confirmation_basis':'saved_structural_findings_not_independent_semantic_proof'}
-        basis = 'verified_answer_claim' if primary == 'Generation' and diagnostic['status'] == 'confirmed' else 'measured_latency' if primary == 'Performance' else 'explicit_safety_failure' if primary == 'Safety' else analysis['retrieval_failure_stage'] if primary == 'Retrieval' else 'unresolved_evaluation_evidence' if primary == 'Unknown' else coverage['diagnostic_basis']
-        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnosis_status": "preliminary", "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
+        basis = 'verified_answer_claim' if primary == 'Generation' and located_failure else 'measured_latency' if primary == 'Performance' else 'explicit_safety_failure' if primary == 'Safety' else analysis['retrieval_failure_stage'] if primary == 'Retrieval' else 'unresolved_evaluation_evidence' if primary == 'Unknown' else coverage['diagnostic_basis']
+        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
 
     def start_replay(self, source_id):
         source = self.store.evaluation_run(source_id)

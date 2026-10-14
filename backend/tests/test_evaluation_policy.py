@@ -5,6 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 from app.evaluation_contract import observe_evidence, resolve_evidence, assess_claims
 from app.evaluation import EvaluationRunner
+from app.diagnostics import diagnostic_view
 
 class PolicyTests(unittest.TestCase):
     def setUp(self):
@@ -35,13 +36,13 @@ class PolicyTests(unittest.TestCase):
         judgment={'correctness':4,'completeness':1,'faithfulness':.8,'behavior_pass':True,'reason':'澄清正确但给出无依据换件','unsupported_claims':['换电池'],'claim_reviews':[{'unsupported_claim_index':0,'claim':'换电池','kind':'unsupported_instruction','changes_operation':True,'operation_basis':{'effect':'technical_change','source_applicable':False},'reason':'没有换件流程依据','support':[]}], 'evidence_sufficiency':{'status':'not_applicable'}}
         runtime=type('Stub',(),{'judge':lambda _,*a,**kw:judgment})()
         result=EvaluationRunner(None,runtime).score_execution(item,{'answer':'无法判断；换电池','retrieval':self.entries,'retrieval_trace':{'final':self.entries,'candidates':self.entries},'latency_ms':1})
-        self.assertFalse(result['passed']);self.assertEqual(result['diagnosis']['status'],'confirmed');self.assertEqual(result['primary_root_cause'],'Safety')
+        self.assertFalse(result['passed']);self.assertEqual(result['diagnosis']['analysis_category'],'rag_failure');self.assertNotIn('status',result['diagnosis']);self.assertEqual(result['primary_root_cause'],'Safety')
         self.assertFalse(result['programmatic_metrics']['behavior_contract']['effective_pass'])
     def test_unknown_is_not_retrieval_or_confirmed(self):
         judgment={'correctness':4,'completeness':1,'faithfulness':1,'behavior_pass':True,'reason':'范围待核实','unsupported_claims':[], 'evidence_sufficiency':{'status':'unknown','reason':'范围待核实'}}
         runtime=type('Stub',(),{'judge':lambda _,*a,**kw:judgment})()
         result=EvaluationRunner(None,runtime).score_execution(self.item,{'answer':'儿童远离','retrieval':self.entries,'retrieval_trace':{'final':self.entries,'candidates':self.entries},'latency_ms':1})
-        self.assertEqual(result['primary_root_cause'],'Unknown');self.assertEqual(result['diagnosis']['status'],'needs_review')
+        self.assertEqual(result['primary_root_cause'],'Unknown');self.assertEqual(result['diagnosis']['analysis_category'],'insufficient_evidence');self.assertNotIn('status',result['diagnosis'])
     def test_saved_sixteen_cases_are_not_preapproved(self):
         path=Path(__file__).resolve().parents[2]/'output/playwright/evaluation-policy-v12/saved-baseline.json'
         if not path.exists():self.skipTest('Private saved material intentionally not tracked')
@@ -62,7 +63,7 @@ class PolicyTests(unittest.TestCase):
                 self.assertEqual(result['judge_result'],j)
                 if j['unsupported_claims']:
                     self.assertFalse(result['passed'])
-                    self.assertNotEqual(result['diagnosis']['status'],'confirmed')
+                    self.assertFalse(diagnostic_view(result)['target_eligible']);self.assertNotIn('status',result['diagnosis'])
                 if result['programmatic_metrics']['evidence_sufficiency']['status']=='unknown':
                     self.assertNotEqual(result['primary_root_cause'],'Retrieval')
                 self.assertEqual(case,original)

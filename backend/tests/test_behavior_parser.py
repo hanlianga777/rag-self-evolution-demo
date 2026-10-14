@@ -59,5 +59,5 @@ class BehaviorParserTests(unittest.TestCase):
                 for r in parsed['claim_reviews']:
                     if r['kind']=='unsupported_instruction':r['operation_basis']={'effect':'technical_change','source_applicable':False}
             result=self.score(data['context'],parsed);self.assertFalse(result['passed'])
-            if number=='35':self.assertEqual(result['primary_root_cause'],'Safety');self.assertEqual(result['diagnosis']['status'],'confirmed')
+            if number=='35':self.assertEqual(result['primary_root_cause'],'Safety');self.assertEqual(result['diagnosis']['analysis_category'],'rag_failure');self.assertNotIn('status',result['diagnosis'])
             else:self.assertEqual(len(result['programmatic_metrics']['claim_assessment']['confirmed']),3)

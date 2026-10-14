@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from collections import Counter
 
 from .providers import ProviderRequestError, provider_error_details
-from .evaluation_contract import diagnosis
 from .diagnostics import diagnostic_view
 from .paid_run import provider_task
 from .telemetry import collect_usage, measure, cost_fields
@@ -83,7 +82,8 @@ class OptimizationAgent:
         # Check identity before budget reads; the short claim serializes duplicate starts.
         self.store.require_current_baseline(baseline_run_id)
         bad_cases = [item for item in self.store.bad_case_rows() if item["run_id"] == baseline_run_id]
-        audited_cases = [{**item, 'diagnosis': diagnosis(item.get('result', {})), 'diagnostic_view':diagnostic_view(item.get('result', {}))} for item in bad_cases]
+        audited_cases = [{**item, 'diagnostic_view':diagnostic_view(item.get('result', {}))} for item in bad_cases]
+        audited_cases = [{**item, 'category':item['diagnostic_view']['primary_root_cause']} for item in audited_cases]
         bad_cases = [item for item in audited_cases if item['diagnostic_view']['target_eligible']]
         trigger = self.store.optimization_trigger(trigger_id) if trigger_id else None
         existing_id = experiment_id or (trigger or {}).get("optimization_run_id") or self.store.current_baseline_identity()["current_experiment_id"]
@@ -109,7 +109,7 @@ class OptimizationAgent:
         monitoring_target_event_ids = [event["id"]] if event else []
         target_reference_map = {}
         for item in bad_cases:
-            reference = {"source": "baseline_bad_case", "baseline_id": baseline_run_id, "bad_case_id": item["id"], "question_id": item["question_id"], "primary_root_cause": item["diagnostic_view"]["primary_root_cause"], "diagnosis_status": item["diagnostic_view"]["confidence"], "root_cause_evidence": item["diagnostic_view"]["evidence_checks"], "diagnostic_view":item["diagnostic_view"]}
+            reference = {"source": "baseline_bad_case", "baseline_id": baseline_run_id, "bad_case_id": item["id"], "question_id": item["question_id"], "primary_root_cause": item["diagnostic_view"]["primary_root_cause"], "analysis_category": item["diagnostic_view"]["analysis_category"], "root_cause_evidence": item["diagnostic_view"]["evidence_checks"], "diagnostic_view":item["diagnostic_view"]}
             target_reference_map[item["id"]] = reference
             target_reference_map[item["question_id"]] = reference
         if event:
@@ -140,7 +140,7 @@ class OptimizationAgent:
             "intervention_contract": {key:{'parameters':sorted(parameters),'required_observations':sorted(observations)} for key,(parameters,observations) in INTERVENTIONS.items()},
             "evidence_contract": "必须输出intervention_direction、evidence_assertions:[{target_id,observation}]、parameter_dependencies:[{parameters,reason}]。每目标断言只能取保存diagnostic_view.trace_observations；recall_missing须候选缺必要Chunk，ranking_omission须候选已含但Final遗漏。禁止完整召回却声称召回失败。多参数必须同一方向且解释必要依赖，不得跨阶段凑组合。stage_performance须performance_stage对应保存的独立瓶颈stage_name，参数与该阶段对应。",
 
-            "rule": f"当前为 Round {round_number}。最多返回 {','.join(labels)} 并列、可解释 Candidate；证据不足可返回少量或空candidates并提供insufficient_evidence原因。One Candidate = One Verifiable Hypothesis + One Coherent Intervention Direction + Minimum Necessary Parameters。target_bad_cases 必须是 target_reference_map 中的实际标识符，禁止描述文本或未知 ID。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。root_cause表示目标已经确认的根因归属，必须属于所引用Baseline目标在target_reference_map中的primary_root_cause集合，不能将参数干预环节当作根因。Generation问题可以提出检索参数干预，但须保持Generation根因并在why中引用实际答案/证据/Trace说明跨环节假设；不得把缺证据的检索遗漏猜测写成已确认Retrieval。正式目标由diagnostic_view.target_eligible及证据确定，不以历史展示状态准入；evaluation_issue/insufficient_evidence不得作为调参目标。diagnostic_view的phenomena仅说明失败现象，不能一一映射技术根因；治理争议仅作风险背景，不作为目标。阶段耗时区分question_stages与judge_stages，不猜测未采集占比。根据 prior_sandbox_results 的真实修复/退化/Regression调整假设，不能重复已失败配置。",
+            "rule": f"当前为 Round {round_number}。最多返回 {','.join(labels)} 并列、可解释 Candidate；证据不足可返回少量或空candidates并提供insufficient_evidence原因。One Candidate = One Verifiable Hypothesis + One Coherent Intervention Direction + Minimum Necessary Parameters。target_bad_cases 必须是 target_reference_map 中的实际标识符，禁止描述文本或未知 ID。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。root_cause表示目标已经确认的根因归属，必须属于所引用Baseline目标在target_reference_map中的primary_root_cause集合，不能将参数干预环节当作根因。Generation问题可以提出检索参数干预，但须保持Generation根因并在why中引用实际答案/证据/Trace说明跨环节假设；不得把缺证据的检索遗漏猜测写成已确认Retrieval。正式目标只由diagnostic_view.target_eligible、primary_root_cause和实际证据确定；result中的旧根因/diagnosis/status只作历史原始审计，不作为当前优化依据；evaluation_issue/insufficient_evidence不得作为调参目标。diagnostic_view的phenomena仅说明失败现象，不能一一映射技术根因；治理争议仅作风险背景，不作为目标。阶段耗时区分question_stages与judge_stages，不猜测未采集占比。根据 prior_sandbox_results 的真实修复/退化/Regression调整假设，不能重复已失败配置。",
         }
         try:
             stages = []
@@ -197,7 +197,7 @@ class OptimizationAgent:
                     raise ValueError('根因依据必须对应全部目标引用')
                 causes = {item['diagnostic_view']['primary_root_cause'] for item in bad_cases if item['id'] in candidate['target_bad_cases'] or item['question_id'] in candidate['target_bad_cases']}
                 if candidate['root_cause'] not in {'Retrieval', 'Generation', 'Safety', 'Performance'} or causes and candidate['root_cause'] not in causes:
-                    audit.update(failed_field='root_cause', actual_value=candidate['root_cause'], expected_type='confirmed target root cause, not intervention stage', allowed_values=sorted(causes) if causes else ['Retrieval','Generation','Safety','Performance'])
+                    audit.update(failed_field='root_cause', actual_value=candidate['root_cause'], expected_type='evidence-based target root cause, not intervention stage', allowed_values=sorted(causes) if causes else ['Retrieval','Generation','Safety','Performance'])
                     raise ValueError('候选根因与可信目标不对应')
                 if candidate["hypothesis"].strip() in {item.get("reasoning", {}).get("hypothesis", "").strip() for item in prior_candidates}:
                     audit.update(failed_field="hypothesis", actual_value=candidate["hypothesis"], expected_type="new hypothesis", allowed_values=None)
@@ -225,7 +225,7 @@ class OptimizationAgent:
             for candidate, config in staged:
                 batch.append((f"R{round_number}-{candidate['id']}", config, {
                     "intervention_direction":candidate['intervention_direction'], "parameter_dependencies":candidate.get('parameter_dependencies',[]), "evidence_assertions":candidate['evidence_assertions'], "performance_stage":candidate.get('performance_stage'),
-                    "target_group": candidate["target_group"], "root_cause": candidate["root_cause"], "root_cause_evidence": candidate["root_cause_evidence"], "expected_improvement": candidate["expected_improvement"], "target_diagnosis": [item for item in bad_cases if item["id"] in candidate["target_bad_cases"] or item["question_id"] in candidate["target_bad_cases"]], "root_cause_cluster": result.get("root_cause_cluster", "待人工复核"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
+                    "target_group": candidate["target_group"], "root_cause": candidate["root_cause"], "root_cause_evidence": candidate["root_cause_evidence"], "expected_improvement": candidate["expected_improvement"], "target_diagnosis": [item for item in bad_cases if item["id"] in candidate["target_bad_cases"] or item["question_id"] in candidate["target_bad_cases"]], "root_cause_cluster": result.get("root_cause_cluster", "证据核查未完成"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
                     "changed_parameters": {key: value for key, value in config.items() if value != base_config.get(key)}, "source_trigger_id": trigger_id, "monitoring_target_event_ids": monitoring_target_event_ids, "round": round_number, "candidate_label": candidate["id"],
                 }))
             audit["validation_stage"] = "persistence"

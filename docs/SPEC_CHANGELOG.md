@@ -1,3 +1,10 @@
+## 2026-10-14 — Bad Case诊断与Agent机制最终收口
+
+- 移除业务诊断可信度体系及其API派生/前端统计筛选列；历史status与原Judge/Matcher/Regression审计保留，Golden治理状态不变。
+- 修复普通Positive行为失败误归Safety，范围断言失败须关联实际主张、来源和冲突；完整正确主体与附加流程范围审计分开，不将评测问题作为调参目标。
+- 同次Judge增加严格scoped_reference合同；版本升级为judge-v3.4-scoped-reference/evidence-v7-scoped-reference/v1.6-evidence-diagnosis，旧记录不回填，正式新Baseline/Sandbox同身份。
+- 四类技术根因/五类非穷尽现象、三个Human Gate、11 Hard Gate、Regression及Search Space保持。Provider0，未启动正式评测或Agent。[最终验收](BAD_CASE_FINAL_MECHANISM_ACCEPTANCE.md)。
+
 ## 2026-10-14 — Bad Case自动诊断、Agent证据准入与安全拒答兼容
 
 - 全量Bad Case自动分析；实际证据决定优化目标，评测问题与证据不足保留背景，不新增人工审批。通用候选召回缺口核验实际答案、当前Corpus、Candidate/Final/Parent及Judge事实，生成矛盾优先保留。

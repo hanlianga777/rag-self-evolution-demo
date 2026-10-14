@@ -5,11 +5,11 @@ from app.diagnostics import diagnostic_view
 from app.evaluation_contract import VERSIONS
 
 class DiagnosticViewTests(unittest.TestCase):
-    def test_multiple_phenomena_preserve_unknown_confidence_and_original(self):
+    def test_multiple_phenomena_preserve_unknown_cause_and_original(self):
         case={'failure_tags':['Hallucination','Unsafe Answer'],'primary_root_cause':'Unknown','diagnosis':{'status':'needs_review'},'passed':False}
         before=deepcopy(case);v=diagnostic_view(case)
         self.assertEqual(case,before);self.assertEqual(v['primary_root_cause'],'Unknown')
-        self.assertEqual(v['confidence'],'needs_review');self.assertEqual(len(v['phenomena']),2)
+        self.assertNotIn('confidence',v);self.assertNotIn('saved_confidence',v);self.assertEqual(len(v['phenomena']),2)
         self.assertFalse(v['target_eligible'])
 
     def test_final_omission_requires_actual_candidate_evidence(self):
@@ -60,7 +60,11 @@ class DiagnosticViewTests(unittest.TestCase):
 
     def test_verified_noise_does_not_map_generation_root_to_retrieval(self):
         case={'failure_tags':['Retrieval Noise'],'model_answer':'只能使用','primary_root_cause':'Generation','diagnosis':{'status':'confirmed','findings':[{'claim':'只能使用','support':[{'chunk_id':'c','quote':'可以使用'}]}]},'programmatic_metrics':{'retrieval_trace':{'final':[{'chunk_id':'c','content':'可以使用'}]}}}
+        claim={'kind':'contradiction','claim':'只能使用','changes_operation':True,'operation_basis':{'effect':'technical_change','source_applicable':True},'support':case['diagnosis']['findings'][0]['support']}
+        case['test_category']='positive';case['programmatic_metrics']['claim_assessment']={'confirmed':[claim]}
+        case['programmatic_metrics']['retrieval_trace']['candidates']=[{'chunk_id':'c'}]
         view=diagnostic_view(case)
+        self.assertTrue(view['target_eligible'])
         self.assertIn('检索噪声',[p['name'] for p in view['phenomena']]);self.assertEqual(view['primary_root_cause'],'Generation')
         case['diagnosis']['findings'][0]['support'][0]['quote']='不存在'
         self.assertNotIn('检索噪声',[p['name'] for p in diagnostic_view(case)['phenomena']])
