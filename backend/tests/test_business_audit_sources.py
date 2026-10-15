@@ -44,6 +44,46 @@ class BusinessAuditSourceTests(unittest.TestCase):
         self.assertEqual({s['chunk_id'] for s in payload['sources']}, {'ANCHOR', 'CHAPTER', 'VERSION'})
         self.assertEqual(payload['metadata']['expected_response'], self.item['raw']['expected_response'])
 
+    def test_peer_business_context_uses_selected_current_run_metadata_without_answers(self):
+        self.item.update(id='SELF')
+        self.item['raw']['generation_run_id'] = 'RUN'
+        peer = {'id': 'PEER', 'stage': 'candidate', 'question': '新版设备如何查看报告？',
+                'reference_answer': 'DO NOT SEND PEER ANSWER', 'test_category': 'positive', 'negative_subtype': None,
+                'evidence': [{'source_chunk_ids': ['ANCHOR']}],
+                'raw': {'generation_run_id': 'RUN', 'coverage_slot': 'Q02', 'user_role': '管理员',
+                        'business_scenario': '巡检后查看报告', 'user_intent': '查看报告', 'topic_cluster': 'T001'}}
+        hidden = {**copy.deepcopy(peer), 'id': 'UNSELECTED', 'question': '未选取的问题'}
+        history = {**copy.deepcopy(peer), 'id': 'OLD', 'stage': 'superseded'}
+        foreign = {**copy.deepcopy(peer), 'id': 'FOREIGN', 'raw': {**peer['raw'], 'generation_run_id': 'OTHER_RUN'}}
+        outside = {**copy.deepcopy(peer), 'id': 'OUTSIDE'}
+        unknown_product = {**copy.deepcopy(peer), 'id': 'NO_PRODUCT', 'question': '当前提示能判断吗？',
+                           'test_category': 'negative', 'negative_subtype': 'clarify', 'evidence': [],
+                           'raw': {**peer['raw'], 'coverage_slot': 'Q03', 'expected_behavior': 'clarify'}}
+        saved = {x['id']: x for x in [self.item, peer, hidden, history, foreign, outside, unknown_product]}
+        self.service.store = SimpleNamespace(
+            generation_run=lambda *args, **kwargs: {'question_ids': ['SELF', 'PEER', 'OLD', 'FOREIGN', 'UNSELECTED', 'NO_PRODUCT'],
+                                                    'artifacts': {'hard_validation': {}}},
+            question=lambda key: copy.deepcopy(saved[key]),
+        )
+        peers = [self.item['question'], peer['question'], unknown_product['question']]
+        original = copy.deepcopy(saved)
+        # The judge remains free to reject diversity despite the complete input.
+        self.service.provider.complete.return_value = json.dumps({'checks': dict.fromkeys(CHECKS, False), 'reason': 'offline independent rejection'})
+        result = self.service.business_quality_audit(self.item, peers)
+        payload = json.loads(self.service.provider.complete.call_args.args[1])
+        self.assertEqual(payload['prior_questions'], peers)
+        self.assertEqual(payload.get('peer_business_context'), [
+            {'id': 'PEER', 'slot': 'Q02', 'question': '新版设备如何查看报告？', 'user_role': '管理员',
+             'business_scenario': '巡检后查看报告', 'user_intent': '查看报告', 'test_category': 'positive',
+             'negative_subtype': None, 'expected_behavior': None, 'topic_cluster': 'T001', 'product': 'KIRA B 50'},
+            {'id': 'NO_PRODUCT', 'slot': 'Q03', 'question': '当前提示能判断吗？', 'user_role': '管理员',
+             'business_scenario': '巡检后查看报告', 'user_intent': '查看报告', 'test_category': 'negative',
+             'negative_subtype': 'clarify', 'expected_behavior': 'clarify', 'topic_cluster': 'T001', 'product': None},
+        ])
+        self.assertNotIn('DO NOT SEND PEER ANSWER', json.dumps(payload['peer_business_context']))
+        self.assertEqual(saved, original)
+        self.assertTrue(all(value is False for value in result['checks'].values()))
+
     def test_explicit_negative_context_only_adds_requested_current_same_product_child(self):
         original = copy.deepcopy(self.item)
         payload = self.payload(context_chunk_ids=('BOUNDARY',))

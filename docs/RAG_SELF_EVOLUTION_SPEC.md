@@ -1,8 +1,11 @@
 # 当前有效合同 — 2026-10-15 `[CONFIRMED]`
 
+- **本轮正式冻结回执**：`GGEN-20261015110926448917` / `PLAN-2e284ba3cc81d33dca08c279` / 原Corpus的50题Hard Validation、v4 Audit、Probe、QC与独立审核全部通过；依既有12项具名检索风险接受及Owner委托正式事务冻结`GD-20261015135415953347`，50条真实审批事件及Snapshot已核对。检索风险未修复，旧失败保留；159次请求均成功、费用Unknown，未运行Baseline/Agent/Sandbox，详见[质量收口报告](MEDIUM50_GOLDEN_CLOSURE_REPORT.md)。
 
+
+- **本轮绑定身份的Provider数据外发补充授权**：项目所有者明确授权继续`GGEN-20261015110926448917` / `PLAN-2e284ba3cc81d33dca08c279` / `CORPUS-38c90d5628b68c76d53e`的16题治理、新版Audit、必要Probe/QC及全50题独立审核/合格后Gate1冻结；只向`https://api.deepseek.com/chat/completions`及项目当前已配置百炼官方HTTPS业务空间地址与必要Embedding/Rerank路径发送必要题目/场景、参考答案/预期、Child片段、页码/产品/Topic/Slot及去重上下文。执行前核对完整URL/官方域名，不修改目的地；不发送凭据正文、无关个人信息、完整PDF/整库或无关文件/历史DB；保留账本、Usage、费用或Unknown、成功请求复用与有限恢复，不隐式重试未知请求。不扩展到其他Run/Plan或Baseline/Agent/Sandbox。
 - **2026-10-15 Medium50最终质量收口（最新用户指令，覆盖下文所有冲突的难度/复杂题前置与后续实验授权）**：正式50题Positive20/Ablation10/Negative20、九Topic及真实产品/业务能力覆盖保持。彻底取消基础/中等/复杂固定数量、Complex Slot、至少15个复杂意图可行性前置、难度标签一致性及由难度导致的生成/审核/Gate1/冻结阻断；difficulty仅可选描述，Fact/Aggregation/Bridge不等同难度。不得把基础题升级或机械拼接。旧Plan/Run/审核只读保留；新正式Plan拥有新身份，优先复用当前Revision有效成果、Probe/QC，真实内容变化必须重验。
-- **Golden题目与审核质量合同`business-quality-v4`**：机器人售后/现场运维用户的角色→真实场景→一个核心业务意图→自然提问先行持久化，之后才核验PDF/生成参考答案；不得由答案反推问题。单一任务必要的完整步骤可多条，多个独立目标不拼接；生产RAG多问处理不受此规则影响。十维Business Audit保留自然度、价值、单意图、依据、自包含、非机械抄题、去重、真实题型、Topic和意图/场景多样性；diversity不检查难度目标或数量，难度观察缺失/不匹配不阻断。真实型号/版本范围、安全歧义、Evidence缺口、Fake Negative、注入子类型错误、P0/P1及当前Hash/Corpus身份继续按原合同处理，不改分或改Evidence造通过。
+- **Golden题目与审核质量合同`business-quality-v4`**：机器人售后/现场运维用户的角色→真实场景→一个核心业务意图→自然提问先行持久化，之后才核验PDF/生成参考答案；不得由答案反推问题。Stage1同步执行既有真实负向边界：不虚构版本/固件/章节，已明确的跨产品不可套用判断不能冒充澄清，仅越权索密码/日志或免流程不能冒充覆盖模型指令/泄露系统提示/伪造事实的注入。单一任务必要的完整步骤可多条，多个独立目标不拼接；生产RAG多问处理不受此规则影响。十维Business Audit保留自然度、价值、单意图、依据、自包含、非机械抄题、去重、真实题型、Topic和意图/场景多样性；diversity不检查难度目标或数量，难度观察缺失/不匹配不阻断。真实型号/版本范围、安全歧义、Evidence缺口、Fake Negative、注入子类型错误、P0/P1及当前Hash/Corpus身份继续按原合同处理，不改分或改Evidence造通过。
 - **本轮委托审批与执行范围**：用户明确授权Codex AI Agent / Owner Delegated AI Review逐题独立专业检查并在50题Hard Validation/Business Audit/Probe/QC、独立审核全部合格且无Blocking Risk时，自主复用正式Human Gate1批准/冻结事务，无需用户逐题点击或再次普通确认。新Run/Plan/Corpus/Hash须绑定真实授权与新审核；保留主体、12项证据/安全检查、独立十维业务结论及晚于最新质量记录的有时区时间，不以旧难度配额阻断。仅允许既有合同明确支持的具名检索P1接受，不豁免实际失败/P0。Provider允许必要调用、无人民币总额上限，保留Usage/请求Hash/原响应/Unknown及Checkpoint，不无故重复成功请求、不隐式重试未知请求。禁止修改PDF/Parent/Child/Embedding/FAISS/Corpus、历史Snapshot/Baseline/Candidate/Sandbox、生产默认参数、11 Gate、Regression与Search Space；本轮冻结后停止，不运行Baseline/Agent/Sandbox/Regression/Gate2/Production。最终实际执行、50题逐题审核与Snapshot见[质量收口报告](MEDIUM50_GOLDEN_CLOSURE_REPORT.md)。
 
 以下先前2026-10-15条款及报告是历史执行记录；其中固定难度配额、复杂意图可行性前置和本轮之外实验授权不再适用于本轮。
@@ -13,6 +16,8 @@
 - **本轮重新规划可行性结果**：四PDF157页完整核查，三轮106份业务设计/版本保留，交叉复核仅支持3个新增复杂业务意图方向，加上旧Q38/Q39两个可供保留，共5个可行性方向（非本轮真实治理已通过题数、非Corpus客观上限）；K19另有重量Child页码超范围阻塞。未满足先独立证实15个复杂意图的前置条件，未创建新Plan/Run、未新增Provider调用、未批准/冻结。所有29张表全行、21份PDF/索引与Corpus State及历史账本不变，Q36/Q44/Q50旧失败不伪造关闭。完整设计、分歧、50题旧工作集真实状态及工程结果见[Golden专项验收](MEDIUM50_GOLDEN_FINAL_ACCEPTANCE.md)。
 
 - **2026-10-15 Medium50本轮有限治理结束**：当前50题独立审核已按内容Hash全部记录；题型20/10/20，Machine Qualified 21/50，Hard Validation 50/50，Business Audit十维全True 32/50，Probe 48/50、QC 47/50，保留Q36/Q44负向Probe失败及Q50 QC P0。持久化难度10/27/13；独立实际难度基础18/中等21/复杂2，另9题类型或证据边界未成立，不能计入配额。Q24/Q28/Q30安全前提补齐，Q41仅恢复本地参数错误未执行的Judge/QC，Q27理由补齐后审计仍失败，Q32真实上下文补齐后审计通过。未满足冻结条件，未执行Owner批准、新Snapshot、Baseline、Agent或A/B/C。三笔Unknown及早期38次已成功检索重发均保留真实账目，旧40题、Snapshot/评测/实验/Production及21份PDF/索引不变。详见[最终验收](MEDIUM50_FINAL_ACCEPTANCE.md)。
+
+- 2026-10-15 `No SPEC Change`：Business Audit去重/多样性上下文补齐当前Run被选中现行题的真实角色、场景、意图、题型及产品/Topic元数据，保留原题面列表；排除自身、历史替代题及异Run，不传同行答案、不预填结论。十项质量语义及门槛不变，旧失败保留，真实结果决定后续资格。
 
 - 2026-10-15：Business Audit 的实际已应用修订谱系同步传入持久化 reason，供独立审计核对修订依据；reason 是作者陈述，不能替代来源证据或强制通过。十项检查及阈值不变。
 
