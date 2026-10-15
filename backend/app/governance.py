@@ -316,8 +316,13 @@ class GovernanceStore:
                 LEFT JOIN qc_results c ON c.id=(SELECT MAX(id) FROM qc_results WHERE question_id=q.id)
                 LEFT JOIN question_quality_audits a ON a.id=(SELECT MAX(id) FROM question_quality_audits WHERE question_id=q.id)
                 {where} ORDER BY q.id""", args).fetchall()
-            events = list(connection.execute("SELECT question_id,decision,metadata_json FROM review_events WHERE gate='dataset' ORDER BY id"))
+            events = list(connection.execute("SELECT question_id,decision,metadata_json,created_at FROM review_events WHERE gate='dataset' ORDER BY id"))
             manual = {row['question_id']: row['decision'] for row in events}
+            manual_at = {row['question_id']: row['created_at'] for row in events}
+            revalidated = dict(connection.execute("""SELECT question.value, MAX(json_extract(revision.audit_json, '$.finished_at'))
+                FROM candidate_revision_runs revision, json_each(revision.audit_json, '$.question_ids') question
+                WHERE revision.status='completed' AND json_extract(revision.audit_json, '$.applied_at') IS NOT NULL
+                GROUP BY question.value"""))
             provenance = {row['question_id']:_load(row['metadata_json'], {}).get('qualification_source') for row in events}
             decisions = {row['question_id']:_load(row['metadata_json'], {}) for row in events}
             active = set()
@@ -355,7 +360,7 @@ class GovernanceStore:
                 reasons.append('Hard Validation 未通过')
             if item['id'] in active:
                 reasons.append('局部修订未完成')
-            if item['review_status'] in {'needs_revision','rejected'} or manual.get(item['id']) in {'needs_revision','rejected'}:
+            if item['review_status'] in {'needs_revision','rejected'} or (manual.get(item['id']) in {'needs_revision','rejected'} and (revalidated.get(item['id']) or '') <= manual_at[item['id']]):
                 reasons.append('人工标记需修订')
             human = item['stage'] == 'golden' and item['review_status'] == 'approved' and (manual.get(item['id'])!='dataset_confirmed' or provenance.get(item['id'])=='human') and item['probe_status']=='probe_passed' and item['qc_id'] is not None and not any(reason in reasons for reason in ('质量记录已过期','Corpus 身份已变化','局部修订未完成','Hard Validation 未通过')) and (not decisions.get(item['id'], {}).get('qc_created_at') or decisions[item['id']]['qc_created_at']==item['qc_created_at'])
             delegated_mode = decisions.get(item['id'],{}).get('approval_mode')=='owner_delegated'

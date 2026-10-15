@@ -160,3 +160,5 @@ Mini20支持显式Business V2业务出题与十维审计，保留原Coverage/Con
 2026-10-14新Medium50采用问题设计先于证据核验，设计阶段不传PDF正文/答案；独立审计检查单核心意图及设计谱系。仅本次授权CLI `scripts/run_medium50_full_evolution.py` 复用正式Generation/治理/委托审核/Baseline/Agent/Sandbox链路；账本不设本轮金额上限，实际有限失败结果见[验收](docs/MEDIUM50_FULL_EVOLUTION_ACCEPTANCE.md)：当前32/50机器合格，Q07实际PDF歧义且两次新替换耗尽，未冻结、未执行新Baseline/Agent/A/B/C；检查点与未知Usage保留。
 
 2026-10-15 Baseline 与 Agent 工作台完成前端产品表达重构；现有规则与数据保持。见[验收报告](docs/WORKBENCH_PRODUCT_EXPRESSION_ACCEPTANCE.md)及[最终截图图库](docs/screenshots/workbench-20261015/index.html)。截图中的Mini20是既有结果，不代表前序Medium50已完成。
+
+2026-10-15 Medium50本轮有限治理结束：沿用原Run，50题独立审核已记录，21/50机器合格；实际难度、题型边界及Q50 P0仍阻断冻结，未执行新Baseline/Agent/A/B/C。DNS和Q09连接中断分别获一次精确重试，三笔Unknown及早期38次成功请求重发完整记账。逐题结果、费用与验证见[最终验收](docs/MEDIUM50_FINAL_ACCEPTANCE.md)。

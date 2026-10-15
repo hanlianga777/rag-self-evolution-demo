@@ -114,7 +114,7 @@ class BusinessQuestionFirstTests(unittest.TestCase):
         service = object.__new__(AiService)
         source = {'chunk_id':'C1','product':'KIRA B 50','chunk_text':'重新启动设备','document_id':'D1'}
         service.corpus = SimpleNamespace(chunks=lambda:[source])
-        service.store = SimpleNamespace(revision_history=lambda key:[{'id':'REV1','applied_at':'now','actor':'Codex','generation_run_id':'RUN','changes':{key:{'question':'安全开关故障后能继续吗？'}}}])
+        service.store = SimpleNamespace(revision_history=lambda key:[{'id':'REV1','applied_at':'now','actor':'Codex','reason':'纠正运输与存放范围混用，保留原存放意图','generation_run_id':'RUN','changes':{key:{'question':'安全开关故障后能继续吗？'}}}])
         service.business_parent_context = lambda slot: [{'chunk_text':'使用前检查。安全开关故障应立即停止。'}]
         from app.business_golden import CHECKS
         service.provider = SimpleNamespace(complete=lambda system,payload,**kwargs: captured.append(json.loads(payload)) or json.dumps({'checks':{key:True for key in CHECKS},'reason':'offline contract test','difficulty_observed':'基础'}))
@@ -122,6 +122,7 @@ class BusinessQuestionFirstTests(unittest.TestCase):
         service.business_quality_audit(item, [])
         self.assertIn('立即停止', captured[0]['parent_context'][0]['chunk_text'])
         self.assertEqual(captured[0]['revisions'][0]['actor'], 'Codex')
+        self.assertEqual(captured[0]['revisions'][0]['reason'], '纠正运输与存放范围混用，保留原存放意图')
         self.assertEqual(captured[0]['revisions'][0]['changes']['Q1']['question'], item['question'])
 
     def test_grounding_keeps_same_page_continuation_after_design(self):

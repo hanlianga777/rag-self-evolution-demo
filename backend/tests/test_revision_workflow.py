@@ -82,6 +82,24 @@ class RevisionWorkflowTests(unittest.TestCase):
             self.store.record_qc(question_id, {"score": 90, "priority": "P2", "reason": "通过"}, "passed")
             self.store.review_question(question_id, "needs_revision" if index in {0, 8, 12, 14} else "approved", "reviewer", reason="业务价值低" if index == 0 else "人工判定" if index in {8, 12, 14} else None)
 
+    def test_completed_revision_retires_only_older_manual_marker(self):
+        key = self.ids[0]
+        revision = self.store.start_revision(key, 'manual_edit', '修复原题', False,
+            {key: {'question': '启动前如何检查急停？', 'reference_answer': '启动前检查急停按钮',
+                   'source_chunk_ids': ['C2']}}, self.chunks)
+        self.store.prepare_revision(revision['id'], self.chunks, similarity=lambda _a, _b: .1)
+        self.store.apply_revision(revision['id'], self.chunks, similarity=lambda _a, _b: .1)
+        self.assertIn('人工标记需修订', self.store.candidate_rows([key])[0]['attention_reasons'])
+        self.store.record_probe_result(key, {'question_quality': 30, 'golden_answer_quality': 30, 'evidence_support': 40})
+        self.store.record_qc(key, {'score': 90, 'priority': 'P2', 'reason': '离线通过'}, 'passed')
+        self.store.finish_revision_quality(revision['id'], {key: {'probe': 'passed', 'qc': 'qc_passed'}})
+        self.assertEqual(self.store.question(key)['review_status'], 'human_review_pending')
+        self.assertNotIn('人工标记需修订', self.store.candidate_rows([key])[0]['attention_reasons'])
+        self.assertEqual(self.store.question(key)['stage'], 'candidate')
+        self.assertTrue(any(event['decision'] == 'needs_revision' for event in self.store.review_history(key)))
+        self.store.review_question(key, 'needs_revision', 'reviewer', reason='新版本仍有风险')
+        self.assertIn('人工标记需修订', self.store.candidate_rows([key])[0]['attention_reasons'])
+
     def test_business_difficulty_and_expected_response_survive_preview_apply(self):
         key = self.ids[0]
         old = self.store.question(key)

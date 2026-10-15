@@ -39,6 +39,7 @@ class PaidRun:
                 'spent_yuan':self.spent, 'budget_enforcement':not _accounting.get(), 'available_yuan':None if _accounting.get() else max(0.,self.budget-self.spent-sum(c['reserved_yuan'] for c in self.calls if c['status']=='reserved')),
                 'resume_authorization':getattr(self,'resume_authorization',None), 'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
         data['continuation_authorizations']=getattr(self,'continuation_authorizations',[])
+        data['accounting_retry_authorization']=getattr(self,'accounting_retry_authorization',None)
         with temporary.open('w') as stream:
             json.dump(data,stream,ensure_ascii=False,indent=2); stream.flush(); os.fsync(stream.fileno())
         os.replace(temporary,self.path)
@@ -98,6 +99,7 @@ class PaidRun:
         run.identity,run.identity_check=data['identity'],identity_check
         run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],data.get('stopped')
         run.stages=data.get('stages',[]);run.output_limits=data.get('output_limits')
+        run.accounting_retry_authorization=data.get('accounting_retry_authorization')
         return run
 
     def begin(self, provider, model, payload):
@@ -106,13 +108,21 @@ class PaidRun:
             request_hash = hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest()
             if any(call['status']=='reserved' for call in self.calls):
                 raise RuntimeError('Serial paid run already has an in-flight request')
-            if any(call['status']=='unknown' and call['provider']==provider and call['model']==model and call['request_sha256']==request_hash for call in self.calls):
-                raise RuntimeError('Cannot repeat an unknown request')
+            unknown = [i for i, call in enumerate(self.calls) if call['status']=='unknown' and call['provider']==provider and call['model']==model and call['request_sha256']==request_hash]
+            retry_of = None
+            if unknown:
+                auth = getattr(self, 'accounting_retry_authorization', None) or {}
+                if (auth.get('source') != 'direct_user_instruction' or auth.get('max_request_retries') != 1
+                    or unknown != [auth.get('unknown_call_index')] or auth.get('request_sha256') != request_hash
+                    or any(call.get('retry_of_call_index') == unknown[0] for call in self.calls)):
+                    raise RuntimeError('Cannot repeat an unknown request without unused exact authorization')
+                retry_of = unknown[0]
             if self.identity_check is None or self.identity_check()!=self.identity:raise RuntimeError('Paid run identity unavailable or changed')
             call={'provider':provider,'model':model,'status':'reserved','reserved_yuan':0.,'upper_estimate_yuan':None,
                   'request_sha256':request_hash,'request_payload':payload,
                   'started_at':datetime.now(timezone.utc).isoformat(),'task':_task.get(),'max_tokens':payload.get('max_tokens'),
                   'accounting_only':True}
+            if retry_of is not None: call['retry_of_call_index'] = retry_of
             self.calls.append(call);self.save();return call
         if self.stopped: raise RuntimeError('Paid run stopped: '+self.stopped)
         auth=getattr(self,'resume_authorization',None)

@@ -57,6 +57,42 @@ class PaidRunTests(unittest.TestCase):
         with provider_task('judge'):candidate.begin('DeepSeek','deepseek-v4-flash',payload)
 
 
+    def test_accounting_explicit_retry_keeps_unknown_and_allows_exactly_once(self):
+        from app.paid_run import accounting_only
+        payload = {'messages': [], 'max_tokens': 10}
+        with accounting_only():
+            old = self.run.begin('DeepSeek', 'deepseek-v4-flash', payload)
+            old['status'] = 'unknown'
+            original = json.loads(json.dumps(old))
+            self.run.accounting_retry_authorization = {
+                'source': 'direct_user_instruction', 'unknown_call_index': 0,
+                'request_sha256': old['request_sha256'], 'max_request_retries': 1,
+            }
+            self.run.save()
+            restored = PaidRun.load_accounting(self.path, lambda: {'corpus': 'new'})
+            new = restored.begin('DeepSeek', 'deepseek-v4-flash', payload)
+            self.assertEqual(new['retry_of_call_index'], 0)
+            restored.settle(new, {'provider': 'DeepSeek', 'requested_model': 'deepseek-v4-flash',
+                                 'status': 'ok', 'prompt_tokens': 1, 'completion_tokens': 1})
+            with self.assertRaisesRegex(RuntimeError, 'unknown request'):
+                restored.begin('DeepSeek', 'deepseek-v4-flash', payload)
+            self.assertEqual(restored.calls[0], original)
+
+    def test_accounting_retry_rejects_wrong_or_missing_authorization(self):
+        from app.paid_run import accounting_only
+        payload = {'messages': [], 'max_tokens': 10}
+        with accounting_only():
+            old = self.run.begin('DeepSeek', 'deepseek-v4-flash', payload)
+            old['status'] = 'unknown'
+            for auth in (None, {'source': 'direct_user_instruction', 'unknown_call_index': 1,
+                                'request_sha256': old['request_sha256'], 'max_request_retries': 1},
+                         {'source': 'direct_user_instruction', 'unknown_call_index': 0,
+                          'request_sha256': 'wrong', 'max_request_retries': 1}):
+                self.run.accounting_retry_authorization = auth
+                with self.assertRaisesRegex(RuntimeError, 'unknown request'):
+                    self.run.begin('DeepSeek', 'deepseek-v4-flash', payload)
+            self.assertEqual(len(self.run.calls), 1)
+
     def test_first_stop_reason_survives_outer_stage_failure(self):
         self.run.stop('ProviderTimeout')
         self.run.stop('RuntimeError')

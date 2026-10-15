@@ -1,5 +1,15 @@
 # 当前有效合同 — 2026-10-15 `[CONFIRMED]`
 
+- **2026-10-15 Medium50本轮有限治理结束**：当前50题独立审核已按内容Hash全部记录；题型20/10/20，Machine Qualified 21/50，Hard Validation 50/50，Business Audit十维全True 32/50，Probe 48/50、QC 47/50，保留Q36/Q44负向Probe失败及Q50 QC P0。持久化难度10/27/13；独立实际难度基础18/中等21/复杂2，另9题类型或证据边界未成立，不能计入配额。Q24/Q28/Q30安全前提补齐，Q41仅恢复本地参数错误未执行的Judge/QC，Q27理由补齐后审计仍失败，Q32真实上下文补齐后审计通过。未满足冻结条件，未执行Owner批准、新Snapshot、Baseline、Agent或A/B/C。三笔Unknown及早期38次已成功检索重发均保留真实账目，旧40题、Snapshot/评测/实验/Production及21份PDF/索引不变。详见[最终验收](MEDIUM50_FINAL_ACCEPTANCE.md)。
+
+- 2026-10-15：Business Audit 的实际已应用修订谱系同步传入持久化 reason，供独立审计核对修订依据；reason 是作者陈述，不能替代来源证据或强制通过。十项检查及阈值不变。
+
+- **2026-10-15修订后当前资格身份修复**：已有受控Revision已应用且当前Probe/QC完成后，题目仍是Candidate/待审核；旧版本needs_revision/rejected事件完整保留，不再机械当成当前人工阻断。列表仅在实际完成修订时间晚于旧标记、且当前review_status不再为需修订/拒绝时退役旧标记；新版本的人工标记仍阻断，未完成修订不解除。当前Hash/Corpus、Hard Validation、Business Audit、Probe/QC/P0/P1及独立Owner审核全部仍检查，不自动批准、不冻结、不声明风险已被机器关闭。
+
+
+- **2026-10-15 Medium50最终治理新增授权（覆盖前轮有限失败停止，仅本Run）**：沿用`GGEN-20261014153537417845`/`PLAN-e3868ba5fac1f4ff39ca94b2`/原Corpus，保留旧题与检查身份、Mini20及历史结果。未解决Slot本轮最多两次独立新候选、每候选最多两次定向内容修订，先恢复11份未完成质量，独立失败不阻断其他Slot。保持20/10/20，真实难度须达10/25/15，保持9Topic/产品/Group/Construction；不得只换标签。机器治理全部通过且逐题独立PDF审核合格后，才以Codex AI Agent / Owner Delegated AI Review执行既有Gate1事务及新Snapshot，之后同身份Baseline及最多合法A/B/C各一次Sandbox，停Gate2前。费用无本轮金额硬上限，成功请求复用、未知Usage不记0。
+- **本轮DNS请求一次精确重试授权**：恢复质量时新增call961（零基）DNS失败，SHA`d806edbbe06769c8d6900f31bc7245b81ac9e07ec6df5a2abc04d41a2e28aff3`。自动审查拒绝重分类后，用户明确“授权一次精确重试，保留Unknown”。原记录/费用保持Unknown，记账模式仅通过真实直接授权、精确call index/SHA及单次retry_of标记允许一次；失败停止，未授权未知请求仍禁止重发，上一轮call513不重试。后续Q09设计请求call1089响应IncompleteRead、Usage Unknown，用户另行明确授权该SHA `e04c1128104bd338b06a848170c11ba2c3b0a8967e19f1ec82bbb8bdbb6dc1a6`一次精确重试；原记录仍保留，授权不相互复用。本轮进度见[最终验收](MEDIUM50_FINAL_ACCEPTANCE.md)。
+
 - **2026-10-15 产品叙事与 UI V2（覆盖前条展示组织，业务合同不变）**：Baseline 合并运行摘要/Golden 构成为评测信息，报告、Hard Gate、诊断各自结论先行；现象与四方向根因各一组按钮，去除重复下拉/每类首例/恢复操作，返回页签恢复全部。质量审计为次级折叠入口。Agent 问题页只引用技术目标；优化页按真实问题→保存的多个假设→实际参数 Diff 关联，去除重复概览；候选页保留完整方案。Sandbox 展示保存修复/新增/净改善及资格，Regression 按候选按钮对照同身份的完整记录，不在主表重复根因；Recommendation 读取已保存正式决策，不重算资格、不预判最终 Winner。发布按合格方案→工作台 Gate2/条件D→Gate3 人工确认→Production 组织，Diff 为当前运行配置→待发布方案，历史版本与回滚在此管理。问答区区分初始配置和经 Candidate 晋升的 Production；比较条件不足时使用紧凑前置条件空态，正常比较保持双栏同构，参数/用量进入审计。Monitoring 仅表达实际问答记录→人工判定→人工确认 Trigger→既有下一轮 Agent，不宣称主动告警或自动发布。目标专用 Disclosure 使用现有 Chevron、原生键盘行为及 aria-expanded；全部目标详情继承 Golden 白卡分组、唯一 --drawer-width 和固定底部，字体/表格/筛选样式限定四页面及其 Drawer，其他一级导航不变。API、Search Space、Judge/Matcher、11 Gate、Regression、发布资格/请求载荷和真实数据均未改。真实浏览器与隔离 UI Fixture 分开验收，Fixture 不进入正式数据库或产品构建。见[完整验收](UI_STORYTELLING_FINAL_ACCEPTANCE.md)。
 
 - **2026-10-15工作台产品表达合同**：Baseline保留报告/Hard Gate/Bad Case三页签，Agent保留六页签，以保存的问题证据→假设→实际参数Diff→实验→回归→推荐串联。典型现象仅为诊断视图，多标签按题去重；代表案例动态选择，不修改目标资格。原始失败与技术Bad Case分列，缺失显示未采集；未运行/运行失败/部分完成不得冒充完整资格或最终Winner。Regression只比较匹配身份的完整已保存结果，保留前后回答与证据；Recommendation只解释保存决策，不重算或自动批准。完整配置、用量与技术审计折叠保留，共用Drawer宽度；Search Space、Frozen配置、Gate及后端策略不变。见[UI验收](WORKBENCH_PRODUCT_EXPRESSION_ACCEPTANCE.md)。
