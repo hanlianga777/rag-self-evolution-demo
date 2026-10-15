@@ -7,11 +7,7 @@ from datetime import datetime, timezone
 from .golden_v2 import digest, facts, largest_remainder, text
 
 CHECKS = ('naturalness', 'business_value', 'intent', 'grounding', 'independence', 'copying', 'duplicates', 'type', 'coverage', 'diversity')
-QUALITY_CONTRACT = 'business-quality-v3'
-DIFFICULTY_CRITERIA = ('基础：一个明确知识点即可回答。中等：完整操作流程、多个必要步骤或产品适用条件。'
-                       '复杂：单一业务决策必须结合两个以上真实相关条件或必要的多来源证据，具有明确判断过程，不能摘录一条原文得到完整结论。'
-                       '同一决策的必要合取条件可以分别核查，不要求因果耦合；多个无关目标不得拼接。'
-                       '固定多步流程、普通查表、安全主题、长题面或技术术语本身均不构成复杂。')
+QUALITY_CONTRACT = 'business-quality-v4'
 NEGATIVE_BUSINESS = ([('知识库无答案', 'insufficient_evidence', 'insufficient_evidence')] * 6 +
                      [('关键条件不足', 'clarify', 'clarify')] * 5 +
                      [('产品/版本混淆', 'clarify', 'clarify')] * 5 +
@@ -29,7 +25,7 @@ def mini_plan(base, chunks, profile):
     if set(base['chunk_clusters']) != {c['chunk_id'] for c in chunks}:
         raise ValueError('Current Topic membership does not match Corpus')
     plan = copy.deepcopy(base)
-    plan.update(generation_strategy='business_v2', dataset_label='Golden Dataset V2', source_plan_id=base['plan_id'], status='preview')
+    plan.update(generation_strategy='business_v2', dataset_label='Golden Dataset V2', source_plan_id=base['plan_id'], status='preview', quality_contract=QUALITY_CONTRACT)
     known = {c['chunk_id']: c for c in chunks}
     used, parents, fallbacks = Counter(), Counter(), []
     negative_labels = {'safe_rejection': '安全边界', 'safety_critical': '安全关键操作', 'insufficient_evidence': '知识库无答案', 'clarify': '关键条件不足', 'prompt_injection': '权限边界'}
@@ -54,8 +50,8 @@ def mini_plan(base, chunks, profile):
                     requirements={**slot['requirements'], 'bridge': None, 'aggregation_items': [f'{a}：{b}' for a, b in supported] if kind == 'Aggregation' else []},
                     selected_reason='existing_topic_product_business_evidence', reused=bool(used[key]))
         slot.update(generation_strategy='business_v2',
-                    user_role='售后工程师 / 现场运维' if number % 5 < 3 else '终端客户 / 设备操作员' if number % 5 == 3 else '技术支持 / 客服人员',
-                    difficulty='基础' if number % 10 < 2 else '中等' if number % 10 < 7 else '复杂')
+                    user_role='售后工程师 / 现场运维' if number % 5 < 3 else '终端客户 / 设备操作员' if number % 5 == 3 else '技术支持 / 客服人员')
+        slot.pop('difficulty', None)
         if slot['test_category'] == 'negative':
             slot['business_negative'] = negative_labels[slot['negative_subtype']]
         used[key] += 1; parents[child.get('parent_chunk_id')] += 1
@@ -74,7 +70,7 @@ def medium_plan(base, chunks, profile):
     if set(base['chunk_clusters']) != set(known):
         raise ValueError('Current Topic membership does not match Corpus')
     plan = copy.deepcopy(base)
-    plan.update(profile=profile, generation_strategy='business_v2', dataset_label='Golden Dataset V2', source_plan_id=base['plan_id'], status='preview', slots=[], gaps=[])
+    plan.update(profile=profile, generation_strategy='business_v2', dataset_label='Golden Dataset V2', source_plan_id=base['plan_id'], status='preview', quality_contract=QUALITY_CONTRACT, slots=[], gaps=[])
     sizes = [cluster['size'] for cluster in plan['clusters']]
     capacity = largest_remainder(50, sizes)
     quotas = {}
@@ -97,15 +93,15 @@ def medium_plan(base, chunks, profile):
                 child = known[key]
                 siblings = [c for c in chunks if c.get('parent_chunk_id') == child.get('parent_chunk_id') and c['chunk_id'] != key]
                 number = len(plan['slots'])
-                difficulty = '基础' if number % 10 < 2 else '中等' if number % 10 < 7 else '复杂'
-                material = [key] + [c['chunk_id'] for c in siblings[:2] if difficulty != '基础']
+                material = [key] + [c['chunk_id'] for c in siblings[:2]]
                 slot = {**copy.deepcopy(template), 'slot':f'Q{number+1:02d}', 'slot_id':f'Q{number+1:02d}', 'evaluation_group':group, 'test_category':group,
                         'construction_type':'Ordinary', 'structured_type':None, 'material_chunk_ids':material, 'evidence_chunk_ids':material if group != 'negative' else [],
                         'coverage_anchor_chunk_ids':[key], 'related_clusters':sorted({base['chunk_clusters'][c] for c in material}),
                         'document_id':child['document_id'], 'product':child.get('product'), 'section_path':child.get('section_path'),
                         'requirements':{'product':child.get('product'), 'bridge':None, 'aggregation_items':[]}, 'ablation_attribute':'colloquial' if group == 'ablation' else None,
                         'generation_strategy':'business_v2', 'generation_path':'business_question_first', 'user_role':'售后工程师 / 现场运维' if number % 5 < 3 else '终端客户 / 设备操作员' if number % 5 == 3 else '技术支持 / 客服人员',
-                        'difficulty':difficulty, 'selected_reason':'existing_topic_business_evidence', 'reused':False}
+                        'selected_reason':'existing_topic_business_evidence', 'reused':False}
+                slot.pop('difficulty', None)
                 slot.pop('negative_subtype', None); slot.pop('expected_behavior', None)
                 if group == 'negative':
                     slot['business_negative'], slot['negative_subtype'], slot['expected_behavior'] = NEGATIVE_BUSINESS[negative]
@@ -122,10 +118,9 @@ def medium_plan(base, chunks, profile):
 
 def instruction(slot, repair=None):
     category = slot['test_category']
-    return (f"业务场景驱动Golden V2。角色：{slot['user_role']}；目标难度：{slot['difficulty']}；Group：{category}。"
-            + DIFFICULTY_CRITERIA
+    return (f"业务场景驱动Golden V2。角色：{slot['user_role']}；Group：{category}。"
             + ("角色、业务场景、当前问题、单一核心意图和自然提问已先行设计；此阶段才使用真实Child及Parent核验可答性和参考答案。" if slot.get("generation_path") == "business_question_first" else "先从真实Child及Parent识别具体工作任务，明确业务场景和用户意图，再模拟用户自然提问。") + "只使用给定证据，不虚构故障、功能、型号、版本或维修步骤。"
-            "避免说明书反向出题、整段原文引用、全部属性枚举和无关多问；复杂度来自证据支持的条件判断、排查或明确的信息边界，不能靠问题长度。"
+            "避免说明书反向出题、整段原文引用、全部属性枚举和无关多问；每题只服务一个真实业务目标，不为难度拼接意图。"
             "返回JSON：question、business_scenario、user_intent、reference_answer（正向/消融才需要）。参考答案必须由给定Child中的连续原句或字段值组成，多句换行，不推断、不翻译；Parent只补充语境。"
             + (f"Construction为Aggregation：围绕一个实际工作任务，明确这些全部事实为何共同影响操作或维护决策：{slot['requirements']['aggregation_items']}。答案须完整覆盖冻结的事实集合，不得缩减或用无业务意义的全部属性枚举代替任务；若无法形成真实任务，保留失败，不改名Ordinary。" if slot.get('construction_type') == 'Aggregation' else '')
             + (f"Construction为Bridge：围绕冻结关系{slot['requirements'].get('bridge')}形成确需两处来源的同一业务任务，不得把独立问题拼接成跨来源推理。" if slot.get('construction_type') == 'Bridge' else '')

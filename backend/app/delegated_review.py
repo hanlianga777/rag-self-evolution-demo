@@ -80,20 +80,17 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
         raise ValueError('Owner delegation cannot waive machine quality')
     from .business_golden import CHECKS as BUSINESS_CHECKS, QUALITY_CONTRACT
     plan = state['frozen_plan']
-    current_contract = plan.get('quality_contract') == QUALITY_CONTRACT
-    if current_contract and (any(not isinstance(r.get('actual_difficulty'),str) for r in reviews)
-        or Counter(r.get('actual_difficulty') for r in reviews) != Counter({'基础':10,'中等':25,'复杂':15})):
-        raise ValueError('Independent difficulty distribution must be 10/25/15')
+    current_contract = plan.get('quality_contract') in {'business-quality-v3', QUALITY_CONTRACT}
     for review in reviews:
         item=items[review['question_id']]
         row=next(r for r in rows if r['id']==review['question_id'])
         if current_contract:
-            target = next((s.get('difficulty') for s in plan.get('slots',[]) if s['slot'] == item['raw'].get('coverage_slot')), None)
-            if review.get('actual_difficulty') != target or item['raw'].get('difficulty') != target:
-                raise ValueError('Independent difficulty differs from frozen Slot')
+            if not any(s['slot'] == item['raw'].get('coverage_slot') for s in plan.get('slots', [])):
+                raise ValueError('Independent review frozen Slot scope unavailable')
+            if plan.get('quality_contract') == QUALITY_CONTRACT and (row.get('quality_audit') or {}).get('audit_version') != QUALITY_CONTRACT:
+                raise ValueError('Current business quality contract audit unavailable')
             if (not isinstance(review.get('business_checks'),dict) or set(review['business_checks']) != set(BUSINESS_CHECKS)
                 or any(v is not True for v in review['business_checks'].values())
-                or not isinstance(review.get('difficulty_basis'),str) or not review['difficulty_basis'].strip()
                 or review.get('actor') != 'Codex AI Agent / Owner Delegated AI Review'):
                 raise ValueError('Independent business review unavailable')
             try:

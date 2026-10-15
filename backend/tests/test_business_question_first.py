@@ -49,6 +49,8 @@ class BusinessQuestionFirstTests(unittest.TestCase):
         service.retriever = SimpleNamespace(retrieve=lambda query, config: searches.append(query) or [{'matched_child_ids':['C1']}])
         slot = {'slot':'Q01','test_category':'positive','user_role':'设备操作员','difficulty':'中等','product':'KIRA B 50','section_path':'加水 SECRET_ANSWER','topic_cluster':'T1','sources':[{'chunk_id':'C1','product':'KIRA B 50','chunk_text':'SECRET_ANSWER'}]}
         result = service.business_question_first(slot, [{'source_text':'SECRET_ANSWER'}], [], 'SECRET_ANSWER was missing')
+        self.assertNotIn('difficulty', calls[0])
+        self.assertNotIn('difficulty_criteria', calls[0])
         self.assertEqual(result['question'],design['question'])
         self.assertEqual(result['business_design'],design)
         self.assertNotIn('business_draft_revision',result)

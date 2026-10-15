@@ -385,7 +385,7 @@ class AiService:
             if old['raw'].get('generation_path')=='business_question_first':
                 plan = self.store.generation_run(run['generation_run_id'],qualification=False)['artifacts']['hard_validation']['frozen_plan']
                 slot = next(s for s in plan['slots'] if s['slot']==old['raw']['coverage_slot'])
-                slot = self.business_slot_scope({**slot,'difficulty':old['raw']['difficulty'],'sources':[by_chunk[k] for k in slot['material_chunk_ids']]},plan,chunks)
+                slot = self.business_slot_scope({**slot,'difficulty':old['raw'].get('difficulty'),'sources':[by_chunk[k] for k in slot['material_chunk_ids']]},plan,chunks)
                 if run.get('replacement'):
                     slot['failed_business_intents'] = [old['raw'].get('user_intent') or (old['raw'].get('business_design') or {}).get('user_intent')]
                     for previous in self.store.revision_runs(run['generation_run_id']):
@@ -515,7 +515,8 @@ class AiService:
                         if isinstance(generated, dict):
                             generated["generation_method"] = "owner_controlled_draft_revision" if draft_revision else "provider"
                             if draft_revision:
-                                generated.update(business_draft_revision=draft_revision['audit'], difficulty=draft_revision['difficulty'])
+                                generated.update(business_draft_revision=draft_revision['audit'])
+                                if 'difficulty' in draft_revision: generated['difficulty'] = draft_revision['difficulty']
                     if not isinstance(generated, dict):
                         generated = {}
                         raise ValueError("invalid JSON object")
@@ -603,7 +604,7 @@ class AiService:
     @staticmethod
     def _slot_candidate(slot: dict, generated: dict, instruction: str) -> dict:
         category, sources = slot["test_category"], generated.get('verified_sources', slot["sources"])
-        if generated.get('business_draft_revision'): slot = {**slot, 'difficulty':generated['difficulty']}
+        if generated.get('business_draft_revision') and 'difficulty' in generated: slot = {**slot, 'difficulty':generated['difficulty']}
         evidence = [] if category == "negative" else [{"source_chunk_ids": [chunk["chunk_id"] for chunk in sources], "evidence_key_points": [chunk.get("chunk_text", chunk.get("text", "")) for chunk in sources]}]
         kind = slot.get("construction_type") or slot.get("structured_type") or 'Ordinary'
         ablation = {key: generated.get(key) for key in ("original_entity", "alias_expression") if generated.get(key)}
@@ -611,13 +612,12 @@ class AiService:
 
     @provider_task('revision')
     def business_question_first(self, slot, sources, peers, repair, *, save_design=None, prior_design=None):
-        from .business_golden import instruction, DIFFICULTY_CRITERIA
-        context = {key:slot.get(key) for key in ('slot','test_category','user_role','difficulty','product','topic_label','business_scope','failed_business_intents','topic_cluster','business_negative','negative_subtype','expected_behavior','ablation_attribute')}
-        context['difficulty_criteria'] = DIFFICULTY_CRITERIA
+        from .business_golden import instruction
+        context = {key:slot.get(key) for key in ('slot','test_category','user_role','product','topic_label','business_scope','failed_business_intents','topic_cluster','business_negative','negative_subtype','expected_behavior','ablation_attribute')}
         context['prior_questions'] = peers
         context['previous_attempt_failed'] = bool(repair)
         design = prior_design or json.loads(self.provider.complete(
-            JUDGE_DATA_BOUNDARY + '业务问题设计阶段。未提供PDF原文或答案，禁止猜参考答案。根据角色、产品及主题范围设计真实工作场景，明确遇到的问题和一个核心用户意图，再写自然提问。只请求一个可验收的业务结果，不同时追加配置选择、流程执行、故障诊断或报告查询等独立目标。必须避开failed_business_intents，换新的独立业务意图，不仅换说法；问题简洁自然，角色和场景放元数据，避免每题套用同一个现场开场白。复杂题仍只考一个业务目标，多个必要步骤可以属于同一目标。消融采用口语表达。负向按给定类型设计真实信息/安全/澄清边界，不虚构功能。重试只获失败标记，不获答案或证据摘要；换一个真实的独立业务意图，不拼接问题。仅JSON：question,business_scenario,user_intent。',
+            JUDGE_DATA_BOUNDARY + '业务问题设计阶段。未提供PDF原文或答案，禁止猜参考答案。根据角色、产品及主题范围设计真实工作场景，明确遇到的问题和一个核心用户意图，再写自然提问。只请求一个可验收的业务结果，不同时追加配置选择、流程执行、故障诊断或报告查询等独立目标。必须避开failed_business_intents，换新的独立业务意图，不仅换说法；问题简洁自然，角色和场景放元数据，避免每题套用同一个现场开场白。多个必要步骤可以属于同一业务目标，不要求特定难度。消融采用口语表达。负向按给定类型设计真实信息/安全/澄清边界，不虚构功能。重试只获失败标记，不获答案或证据摘要；换一个真实的独立业务意图，不拼接问题。仅JSON：question,business_scenario,user_intent。',
             json.dumps(context,ensure_ascii=False), json_mode=True))
         fields = ('question','business_scenario','user_intent')
         if not isinstance(design,dict) or any(not isinstance(design.get(key),str) or not design[key].strip() for key in fields):
@@ -667,18 +667,16 @@ class AiService:
 
     @provider_task('business_audit')
     def business_quality_audit(self, item, peers, *, context_chunk_ids=()):
-        from .business_golden import CHECKS, QUALITY_CONTRACT, DIFFICULTY_CRITERIA
-        target = None
+        from .business_golden import CHECKS, QUALITY_CONTRACT
+        current_contract = False
         if item['raw'].get('generation_run_id'):
             run = self.store.generation_run(item['raw']['generation_run_id'], qualification=False)
             if run is None:
                 raise ValueError('Business Audit generation scope unavailable')
             plan = run.get('artifacts',{}).get('hard_validation',{}).get('frozen_plan') or {}
-            if plan.get('quality_contract') == QUALITY_CONTRACT:
-                slot = next((s for s in plan['slots'] if s['slot'] == item['raw'].get('coverage_slot')), {})
-                target = slot.get('difficulty')
-                if target not in {'基础','中等','复杂'}:
-                    raise ValueError('Business Audit frozen difficulty scope unavailable')
+            current_contract = plan.get('quality_contract') in {'business-quality-v3', QUALITY_CONTRACT}
+            if current_contract and not any(s['slot'] == item['raw'].get('coverage_slot') for s in plan.get('slots', [])):
+                raise ValueError('Business Audit frozen Slot scope unavailable')
         by_id = {c['chunk_id']:c for c in self.corpus.chunks()}
         if not isinstance(context_chunk_ids, (tuple, list)) or len(context_chunk_ids) > 3 or any(not isinstance(key, str) or key not in by_id for key in context_chunk_ids):
             raise ValueError('Business audit context requires at most three current Child IDs')
@@ -699,17 +697,16 @@ class AiService:
         sources.extend(by_id[key] for key in dict.fromkeys(context_chunk_ids) if key not in {s['chunk_id'] for s in sources})
         corpus_fingerprint = manifest_identity(current_manifest())
         payload = {'question':item['question'], 'answer':item['reference_answer'], 'metadata':{key:item['raw'].get(key) for key in ('user_role','business_scenario','user_intent','difficulty','business_negative','expected_behavior','expected_response','topic_cluster','product_scope','source_scope','generation_path','business_design','business_design_provenance','business_draft_revision')}, 'sources':sources, 'prior_questions':peers}
-        payload.update(difficulty_criteria=DIFFICULTY_CRITERIA, difficulty_target=target or item['raw'].get('difficulty'))
         if item['raw'].get('generation_path') == 'business_question_first':
             payload['parent_context'] = self.business_parent_context({'sources':sources})
             payload['revisions'] = [{key:revision.get(key) for key in ('id','actor','reason','applied_at','changes','replacement','previous_hash','new_hash')} for revision in self.store.revision_history(item['id']) if revision.get('applied_at') and revision.get('generation_run_id') == item['raw'].get('generation_run_id')]
         with collect_usage() as usage:
-            content = self.provider.complete(JUDGE_DATA_BOUNDARY + '独立审计业务题质量，不预设通过。仅返回JSON对象，顶层为checks字典、reason字符串、difficulty_observed基础/中等/复杂。checks中必须恰有以下十项显式布尔，true表示通过：' + ','.join(CHECKS) + '。naturalness真实用户口吻；business_value工作任务价值；intent仅一个核心用户意图和答案验收目标，同一任务必要步骤可多项，多个独立目标不通过；grounding答案/负向边界依据；independence自包含；copying检验问题是否机械搬运/枚举，business_question_first须对照持久化business_design验证设计先于Evidence且核验未反推改写问题，参考答案原文引用是冻结规范，不因答案逐字引用判失败；duplicates没有语义重复；type正向可答或负向需澄清/拒答；coverage材料主题匹配；diversity难度与意图多样且难度符合目标。必须核对parent_context中的完整流程适用范围，不能把使用前检查的重启步骤当作安全故障恢复授权；原文动作或部件存在未解决歧义不得因逐字引用而通过。revisions为实际已应用修订谱系，与旧business_design不同不自动证明反推，但必须核对真实前后设计和修订依据，禁止自我肯定。不能仅按禁词判断；不得因设备存在型号就推断不存在的版本。', json.dumps(payload,ensure_ascii=False), json_mode=True, temperature=0)
+            content = self.provider.complete(JUDGE_DATA_BOUNDARY + '独立审计业务题质量，不预设通过。仅返回JSON对象，顶层为checks字典、reason字符串；difficulty_observed仅可选描述，不影响通过。checks中必须恰有以下十项显式布尔，true表示通过：' + ','.join(CHECKS) + '。naturalness真实用户口吻；business_value工作任务价值；intent仅一个核心用户意图和答案验收目标，同一任务必要步骤可多项，多个独立目标不通过；grounding答案/负向边界依据；independence自包含；copying检验问题是否机械搬运/枚举，business_question_first须对照持久化business_design验证设计先于Evidence且核验未反推改写问题，参考答案原文引用是冻结规范，不因答案逐字引用判失败；duplicates没有语义重复；type正向可答或负向需澄清/拒答；coverage材料主题匹配；diversity检查真实业务意图、角色和场景多样性；不检查基础/中等/复杂标签、比例或Slot难度目标，不得因难度失败。必须核对parent_context中的完整流程适用范围，不能把使用前检查的重启步骤当作安全故障恢复授权；原文动作或部件存在未解决歧义不得因逐字引用而通过。revisions为实际已应用修订谱系，与旧business_design不同不自动证明反推，但必须核对真实前后设计和修订依据，禁止自我肯定。不能仅按禁词判断；不得因设备存在型号就推断不存在的版本。', json.dumps(payload,ensure_ascii=False), json_mode=True, temperature=0)
         try:
             result = json.loads(content)
             if isinstance(result, dict) and 'checks' not in result and set(CHECKS).issubset(result):
                 result = {**{key:value for key,value in result.items() if key not in CHECKS}, 'checks':{key:result[key] for key in CHECKS}}
-            if set(result.get('checks',{})) != set(CHECKS) or any(type(x) is not bool for x in result['checks'].values()) or not isinstance(result.get('reason'),str) or result.get('difficulty_observed') not in {'基础','中等','复杂'}:
+            if set(result.get('checks',{})) != set(CHECKS) or any(type(x) is not bool for x in result['checks'].values()) or not isinstance(result.get('reason'),str):
                 raise ValueError('Business Audit JSON schema invalid')
         except (ValueError, TypeError) as error:
             failure = ProviderUnavailable('业务质量审计未返回有效JSON')
@@ -719,12 +716,7 @@ class AiService:
             result['checks']['intent'] = False
         if item['raw'].get('generation_path') == 'business_question_first' and not item['raw'].get('business_design'):
             result['checks']['copying'] = False
-        if target:
-            result['difficulty_target'] = target
-            if result['difficulty_observed'] != target or item['raw'].get('difficulty') != target:
-                result['checks']['diversity'] = False
-                result['reason'] += f'；冻结Slot目标{target}，当前标签{item["raw"].get("difficulty")}，独立观察{result["difficulty_observed"]}，难度不一致。'
-        return {**result, 'audit_version':QUALITY_CONTRACT if target else 'business-v2', 'token_usage':usage, 'attention_reason':'题目质量需修订', 'audit_source_chunk_ids':[s['chunk_id'] for s in sources], 'corpus_fingerprint':corpus_fingerprint}
+        return {**result, 'audit_version':QUALITY_CONTRACT if current_contract else 'business-v2', 'token_usage':usage, 'attention_reason':'题目质量需修订', 'audit_source_chunk_ids':[s['chunk_id'] for s in sources], 'corpus_fingerprint':corpus_fingerprint}
 
     def _indexed_embeddings(self, chunks: list[dict]) -> np.ndarray:
         """Use persisted FAISS vectors aligned with the persisted chunk order."""

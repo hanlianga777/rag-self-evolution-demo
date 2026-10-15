@@ -46,11 +46,11 @@ class DelegatedReviewTests(unittest.TestCase):
         self.assertEqual(result['delegated_by'],'project_owner')
         self.assertEqual(len(result['reviews']),50)
 
-    def test_new_contract_requires_current_independent_business_and_difficulty_review(self):
+    def test_new_contract_requires_current_independent_business_review_without_difficulty(self):
         import copy
-        from app.business_golden import CHECKS as BUSINESS_CHECKS
+        from app.business_golden import CHECKS as BUSINESS_CHECKS, QUALITY_CONTRACT
         plan = self.run['artifacts']['hard_validation']['frozen_plan']
-        plan.update(quality_contract='business-quality-v3',slots=[])
+        plan.update(quality_contract=QUALITY_CONTRACT,slots=[])
         for index,review in enumerate(self.reviews):
             level = '基础' if index < 10 else '中等' if index < 35 else '复杂'
             slot = f'Q{index+1:02d}'
@@ -58,13 +58,14 @@ class DelegatedReviewTests(unittest.TestCase):
             item['raw'].update(coverage_slot=slot,difficulty=level)
             item['updated_at'] = (datetime.now(timezone.utc)-timedelta(minutes=1)).isoformat()
             self.rows[index]['quality_audit_created_at'] = item['updated_at']
+            self.rows[index]['quality_audit'] = {'audit_version':QUALITY_CONTRACT}
             plan['slots'].append({'slot':slot,'difficulty':level})
             review.update(actual_difficulty=level,difficulty_basis='Offline independent conditional evidence review',
                           business_checks=dict.fromkeys(BUSINESS_CHECKS,True),
                           actor='Codex AI Agent / Owner Delegated AI Review',reviewed_at=datetime.now(timezone.utc).isoformat())
         self.assertEqual(self.check()['review_actor_type'],'ai_agent')
         original = copy.deepcopy(self.reviews)
-        for field,value in [('actual_difficulty','复杂'),('business_checks',{}),('difficulty_basis',''),
+        for field,value in [('business_checks',{}),
                             ('actor','project_owner'),('reviewed_at',None),
                             ('reviewed_at',(datetime.now(timezone.utc)-timedelta(days=1)).isoformat()),
                             ('reviewed_at',(datetime.now(timezone.utc)+timedelta(days=1)).isoformat())]:
@@ -81,6 +82,12 @@ class DelegatedReviewTests(unittest.TestCase):
         for review,slot in zip(self.reviews,plan['slots']):
             review['actual_difficulty'] = slot['difficulty'] = '中等'
             self.items[review['question_id']]['raw']['difficulty'] = '中等'
+        self.assertEqual(self.check()['review_actor_type'],'ai_agent')
+        for review in self.reviews:
+            review.pop('actual_difficulty',None)
+            review.pop('difficulty_basis',None)
+        self.assertEqual(self.check()['review_actor_type'],'ai_agent')
+        self.rows[0]['quality_audit']['audit_version'] = 'business-quality-v3'
         with self.assertRaises(ValueError):self.check()
 
     def mini(self):
@@ -225,12 +232,12 @@ class DelegatedReviewTests(unittest.TestCase):
         raw={**item['raw'],'generation_strategy':'business_v2','difficulty':'中等','user_role':'现场运维','business_scenario':'检查设备','user_intent':'核对检查要求'}
         with store.connection() as db:db.execute('UPDATE questions SET raw_json=? WHERE id=?',(json.dumps(raw),item['id']))
         chunks=[{'chunk_id':'C','document_id':'D','document_name':'fixture.pdf','chunk_text':'必须先确认状态'}]
-        run=store.start_revision(item['id'],'manual_edit','修正实际难度标签',False,{item['id']:{'difficulty':'基础'}},chunks,actor='Codex')
+        run=store.start_revision(item['id'],'manual_edit','移除非阻断难度描述',False,{item['id']:{'difficulty':None}},chunks,actor='Codex')
         prepared=store.prepare_revision(run['id'],chunks,similarity=lambda a,b:0.)
         self.assertTrue(prepared['validation']['passed'],prepared['validation'])
         applied=store.apply_revision(run['id'],chunks,similarity=lambda a,b:0.)
         current=store.question(item['id'])
-        self.assertEqual(current['raw']['difficulty'],'基础')
+        self.assertIsNone(current['raw']['difficulty'])
         self.assertEqual(current['question'],item['question'])
         self.assertEqual(current['probe_status'],'probe_pending')
         self.assertEqual(current['qc_status'],'qc_pending')

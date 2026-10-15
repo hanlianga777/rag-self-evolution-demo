@@ -1,5 +1,12 @@
 # 当前有效合同 — 2026-10-15 `[CONFIRMED]`
 
+
+- **2026-10-15 Medium50最终质量收口（最新用户指令，覆盖下文所有冲突的难度/复杂题前置与后续实验授权）**：正式50题Positive20/Ablation10/Negative20、九Topic及真实产品/业务能力覆盖保持。彻底取消基础/中等/复杂固定数量、Complex Slot、至少15个复杂意图可行性前置、难度标签一致性及由难度导致的生成/审核/Gate1/冻结阻断；difficulty仅可选描述，Fact/Aggregation/Bridge不等同难度。不得把基础题升级或机械拼接。旧Plan/Run/审核只读保留；新正式Plan拥有新身份，优先复用当前Revision有效成果、Probe/QC，真实内容变化必须重验。
+- **Golden题目与审核质量合同`business-quality-v4`**：机器人售后/现场运维用户的角色→真实场景→一个核心业务意图→自然提问先行持久化，之后才核验PDF/生成参考答案；不得由答案反推问题。单一任务必要的完整步骤可多条，多个独立目标不拼接；生产RAG多问处理不受此规则影响。十维Business Audit保留自然度、价值、单意图、依据、自包含、非机械抄题、去重、真实题型、Topic和意图/场景多样性；diversity不检查难度目标或数量，难度观察缺失/不匹配不阻断。真实型号/版本范围、安全歧义、Evidence缺口、Fake Negative、注入子类型错误、P0/P1及当前Hash/Corpus身份继续按原合同处理，不改分或改Evidence造通过。
+- **本轮委托审批与执行范围**：用户明确授权Codex AI Agent / Owner Delegated AI Review逐题独立专业检查并在50题Hard Validation/Business Audit/Probe/QC、独立审核全部合格且无Blocking Risk时，自主复用正式Human Gate1批准/冻结事务，无需用户逐题点击或再次普通确认。新Run/Plan/Corpus/Hash须绑定真实授权与新审核；保留主体、12项证据/安全检查、独立十维业务结论及晚于最新质量记录的有时区时间，不以旧难度配额阻断。仅允许既有合同明确支持的具名检索P1接受，不豁免实际失败/P0。Provider允许必要调用、无人民币总额上限，保留Usage/请求Hash/原响应/Unknown及Checkpoint，不无故重复成功请求、不隐式重试未知请求。禁止修改PDF/Parent/Child/Embedding/FAISS/Corpus、历史Snapshot/Baseline/Candidate/Sandbox、生产默认参数、11 Gate、Regression与Search Space；本轮冻结后停止，不运行Baseline/Agent/Sandbox/Regression/Gate2/Production。最终实际执行、50题逐题审核与Snapshot见[质量收口报告](MEDIUM50_GOLDEN_CLOSURE_REPORT.md)。
+
+以下先前2026-10-15条款及报告是历史执行记录；其中固定难度配额、复杂意图可行性前置和本轮之外实验授权不再适用于本轮。
+
 - **2026-10-15 Medium50 Golden专项重新规划授权（覆盖前轮固定Slot/次数及后续实验范围）**：先审计失败共同原因并完整核查四PDF，先保存业务问题设计，再匹配证据；充分扩展角色/视角/真实条件并独立证实至少15个不同复杂意图后，才整体确定新Plan的Complex Slot。允许新Run/Plan和合理Topic/产品/Group/难度重分配；旧Run/Plan/Revision/Snapshot及知识资产只读。保持50题、20/10/20、九Topic、正式Negative配额与真实难度10/25/15，不临时迁就失败题改Slot。按失败原因有界修订，不无限同意图或重复成功请求。只在全部当前身份质量/独立审核及配额满足后执行匹配本轮授权的Owner Delegated Gate1及冻结；本轮不执行Baseline、Agent、Sandbox、Regression、Gate2或Production。不能独立证实15个复杂意图时如实保留可行性证据与缺口，不以标签或评分凑数。设计与实施方案见`docs/superpowers/specs/2026-10-15-medium50-golden-closure-design.md`。
 - **新Plan质量合同`business-quality-v3`**：业务设计、证据核验和Business Audit共享明确难度判据；审计以题目实际Run的冻结Plan为准（不信任候选克隆遗留标记），读取Slot目标并保存目标/实际观察，观察或当前标签不匹配时diversity为False，原始观察/理由保留。新合同委托冻结额外检查独立十维业务结论、实际难度逐Slot匹配与10/25/15、非空难度依据、真实AI审核主体和晚于题目质量更新及最新Business Audit落库两者较晚时点的有时区审核时间；候选摘要附最新审计时间供此校验使用，保留所有原Hash/Corpus/PDF/资格/P0/P1/授权检查。既有Plan及历史审计/批准不回填、不静默改分。属于Golden合同，不修改生产RAG Prompt、模型、Frozen Pipeline、11 Gate或Regression。
 

@@ -1183,9 +1183,6 @@ class GovernanceStore:
             evidence = [] if old["test_category"] == "negative" else [{"source_chunk_ids": source_ids, "evidence_key_points": [by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))[:160] for key in source_ids if key in by_chunk]}]
             candidate = {**old["raw"], "question": str(change.get("question", old["question"])).strip(), "reference_answer": change.get("reference_answer", old["reference_answer"]), "evidence": evidence, "test_category": old["test_category"], "expected_behavior": old["raw"].get("expected_behavior"), "ablation_attribute": old["raw"].get("ablation_attribute"), "ablation_metadata": change.get("ablation_metadata", old["raw"].get("ablation_metadata", {}))}
             candidate.update({key: change.get(key, old['raw'].get(key)) for key in business_fields})
-            if business_fields and candidate.get('difficulty') not in {'基础','中等','复杂'}:
-                errors.append(f'{item_id}: 业务难度必须为基础/中等/复杂')
-                continue
             if business_fields and candidate.get('expected_response') is not None and (not isinstance(candidate['expected_response'], str) or not candidate['expected_response'].strip()):
                 errors.append(f'{item_id}: 预期回复必须为非空文本')
                 continue

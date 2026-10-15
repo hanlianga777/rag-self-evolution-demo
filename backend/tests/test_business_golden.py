@@ -13,7 +13,8 @@ class BusinessPlanTests(unittest.TestCase):
         self.assertEqual(json.dumps(base,sort_keys=True),old)
         self.assertEqual(len(plan['slots']),50)
         self.assertEqual(Counter(s['test_category'] for s in plan['slots']),{'positive':20,'ablation':10,'negative':20})
-        self.assertEqual(Counter(s['difficulty'] for s in plan['slots']),{'基础':10,'中等':25,'复杂':15})
+        self.assertTrue(all('difficulty' not in s for s in plan['slots']))
+        self.assertNotIn('目标难度', instruction(plan['slots'][0]))
         self.assertEqual(plan['chunk_clusters'],base['chunk_clusters'])
         self.assertEqual(len(plan['coverage']['anchor_topics']),9)
         self.assertEqual(Counter(s['business_negative'] for s in plan['slots'] if s['test_category']=='negative'),{'知识库无答案':6,'关键条件不足':5,'产品/版本混淆':5,'超出知识库范围':2,'安全边界':1,'权限边界':1})
@@ -27,30 +28,31 @@ class BusinessPlanTests(unittest.TestCase):
         self.assertEqual({s[2] for s in NEGATIVE_BUSINESS},{'insufficient_evidence','clarify','safe_rejection','prompt_injection_resistance'})
 
 class BusinessAuditTests(unittest.TestCase):
-    def test_frozen_difficulty_cannot_pass_by_changing_the_current_label(self):
+    def test_difficulty_is_optional_and_cannot_override_business_checks(self):
         from types import SimpleNamespace
         from app.ai_service import AiService
-        from app.business_golden import CHECKS
+        from app.business_golden import CHECKS, QUALITY_CONTRACT
         service = object.__new__(AiService)
         service.corpus = SimpleNamespace(chunks=lambda:[])
-        plan = {'quality_contract':'business-quality-v3','slots':[{'slot':'Q01','difficulty':'复杂'}]}
+        plan = {'quality_contract':QUALITY_CONTRACT,'slots':[{'slot':'Q01','difficulty':'复杂'}]}
         service.store = SimpleNamespace(generation_run=lambda *args,**kwargs:{'artifacts':{'hard_validation':{'frozen_plan':plan}}})
-        service.provider = SimpleNamespace(complete=lambda *args,**kwargs:json.dumps({'checks':dict.fromkeys(CHECKS,True),'reason':'offline observation','difficulty_observed':'中等'}))
+        result = {'checks':dict.fromkeys(CHECKS,True),'reason':'offline observation'}
+        service.provider = SimpleNamespace(complete=lambda *args,**kwargs:json.dumps(result))
         item = {'question':'怎样检查？','reference_answer':'断电','test_category':'positive','evidence':[],
-                'raw':{'generation_run_id':'RUN','coverage_slot':'Q01','difficulty':'中等','user_role':'运维','business_scenario':'维护','user_intent':'检查'}}
-        audit = service.business_quality_audit(item,[])
-        self.assertFalse(audit['checks']['diversity'])
-        self.assertEqual(audit['difficulty_observed'],'中等')
-        self.assertEqual(audit['difficulty_target'],'复杂')
-        item['raw']['difficulty'] = '复杂'
-        self.assertFalse(service.business_quality_audit(item,[])['checks']['diversity'])
-        plan['slots'][0]['difficulty'] = '中等'
-        item['raw']['difficulty'] = '中等'
-        self.assertTrue(service.business_quality_audit(item,[])['checks']['diversity'])
+                'raw':{'generation_run_id':'RUN','coverage_slot':'Q01','user_role':'运维','business_scenario':'维护','user_intent':'检查'}}
+        for observed in (None, '基础', 'unknown'):
+            result['difficulty_observed'] = observed
+            audit = service.business_quality_audit(item,[])
+            self.assertTrue(audit['checks']['diversity'])
+            self.assertEqual(audit['audit_version'],QUALITY_CONTRACT)
+            self.assertNotIn('difficulty_target',audit)
         plan['slots'].clear()
-        with self.assertRaises(ValueError):service.business_quality_audit(item,[])
+        with self.assertRaisesRegex(ValueError, 'Slot scope'):service.business_quality_audit(item,[])
+        plan['slots'].append({'slot':'Q01'})
+        result['checks']['business_value'] = False
+        self.assertFalse(service.business_quality_audit(item,[])['checks']['business_value'])
         plan.pop('quality_contract')
-        item['raw']['golden_quality_contract'] = 'business-quality-v3'
+        item['raw']['golden_quality_contract'] = QUALITY_CONTRACT
         self.assertEqual(service.business_quality_audit(item,[])['audit_version'],'business-v2')
 
     def test_missing_and_failed_business_audit_block_qualification(self):
@@ -73,12 +75,11 @@ class BusinessAuditTests(unittest.TestCase):
             self.assertEqual(store.candidate_rows([key])[0]['qualification_status'],'needs_human_review')
             self.assertEqual(store.dataset_snapshots(),[])
 
-    def test_audit_requires_explicit_checks_difficulty_and_real_intent(self):
+    def test_audit_requires_explicit_checks_and_real_intent(self):
         from types import SimpleNamespace
         from unittest.mock import Mock
         from app.ai_service import AiService
         from app.business_golden import CHECKS
-        from app.providers import ProviderUnavailable
         service = object.__new__(AiService)
         service.corpus = SimpleNamespace(chunks=lambda:[])
         service.provider = Mock()
@@ -92,7 +93,7 @@ class BusinessAuditTests(unittest.TestCase):
         self.assertFalse(service.business_quality_audit(item,[])['checks']['intent'])
         result['difficulty_observed'] = 'unknown'
         service.provider.complete.return_value = json.dumps(result)
-        with self.assertRaises(ProviderUnavailable):service.business_quality_audit(item,[])
+        self.assertFalse(service.business_quality_audit(item,[])['checks']['intent'])
 
     def test_revision_retains_business_fields_without_changing_frozen_role(self):
         from app.governance import GovernanceStore

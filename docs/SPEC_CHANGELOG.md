@@ -1,3 +1,9 @@
+## 2026-10-15 · Medium50最终质量收口：取消难度硬约束
+
+- 依据最新Owner指令取消全部基础/中等/复杂配额、目标标签匹配和15个复杂意图前置；difficulty仅可选描述，正式题型仍20/10/20，Topic/产品/检索能力与真实质量门槛保留。
+- `business-quality-v4`保持十维业务审核和独立Owner审核，diversity只看真实意图/场景多样性；不改Probe/QC/证据/安全门槛，不改生产RAG Prompt、11Gate或Regression。
+- 优先复用当前有效成果，必要修订/替换保留谱系并重验；本轮仅Golden委托Gate1与冻结，冻结后停止。真实执行结果和完整50题见[收口报告](MEDIUM50_GOLDEN_CLOSURE_REPORT.md)。
+
 ## 2026-10-15 · Golden专项重新规划与实际难度校验
 
 - 新任务允许独立Plan/Run及整体重分配，先完整Corpus可行性与至少15个独立复杂意图，再确定Complex Slot；保留50、20/10/20、九Topic与正式负向配额，不再死守旧Slot或固定两次替换。仅Golden冻结，不进入后续实验。

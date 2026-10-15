@@ -46,7 +46,7 @@ class MiniBusinessProfileTests(unittest.TestCase):
             self.assertTrue(all(after['requirements'][key] == value for key, value in before['requirements'].items()))
             self.assertEqual(after['generation_strategy'], 'business_v2')
             self.assertTrue(after['user_role'])
-            self.assertTrue(after['difficulty'])
+            self.assertNotIn('difficulty',after)
         negatives = [s for s in plan['slots'] if s['test_category'] == 'negative']
         self.assertTrue(all(s['business_negative'] for s in negatives))
         self.assertEqual(plan['source_plan_id'], 'original')
