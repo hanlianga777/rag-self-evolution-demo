@@ -16,7 +16,7 @@ it('renders shared classification filters, preserves evidence action and explici
  const host=document.body.appendChild(document.createElement('div')),root=createRoot(host),select=vi.fn(),change=vi.fn();
  await act(async()=>root.render(<><DiagnosisFilters rows={rows} value={allDiagnosis} onChange={change} /><DiagnosisTable rows={rows} onSelect={select}/></>));
  expect(host.textContent).toContain('2 / 2 题');expect(host.textContent).toContain('安全边界失守');expect(host.textContent).not.toContain('待定位');
- const reset=[...host.querySelectorAll('button')].find(b=>b.textContent==='恢复全部问题')!;await act(async()=>reset.click());expect(change).toHaveBeenCalledWith(allDiagnosis);
+ const all=host.querySelector<HTMLButtonElement>('[aria-label="失败现象"] button')!;await act(async()=>all.click());expect(change).toHaveBeenCalledWith({...allDiagnosis,examples:false});expect(host.querySelector('[role=combobox]')).toBeNull();
  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='查看案例')!.click());expect(select).toHaveBeenCalledWith(rows[0]);
  await act(async()=>root.render(<DiagnosisTable rows={[]} onSelect={select}/>));expect(host.textContent).toContain('当前组合筛选无记录');await act(async()=>root.unmount());host.remove();
 });
@@ -28,7 +28,7 @@ it('shows saved per-question repairs and Regression without generating results',
  const host=document.body.appendChild(document.createElement('div')),root=createRoot(host),select=vi.fn();
  const candidate={id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'current',all_fixed_question_ids:['Q1','Q1']}};
  await act(async()=>root.render(<CandidateCaseComparison candidates={[candidate]} baselineId="baseline" kind="fixed" onSelect={select}/>));
- expect(host.textContent).toContain('未通过 → 通过');expect(host.textContent).toContain('保存为已修复');expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
+ expect(host.querySelector('tbody tr td:nth-child(2)')?.textContent).toBe('未通过');expect(host.querySelector('tbody tr td:nth-child(3)')?.textContent).toBe('通过');expect(host.textContent).toContain('保存为已修复');expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Candidate证据')!.click());expect(select).toHaveBeenCalledWith(after);
  await act(async()=>root.render(<CandidateCaseComparison candidates={[{id:'b',status:'generated',reasoning:{candidate_label:'B'},result:{}}]} baselineId="baseline" kind="regression" onSelect={select}/>));
  expect(host.textContent).toContain('回归对照未判定');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method||init.method==='GET')).toBe(true);

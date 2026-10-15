@@ -1,3 +1,9 @@
+# UI V2 只读验收（2026-10-15）
+
+本轮仅重组 Baseline、Agent、发布、问答验证的前端表达，未执行新评测或问答。当前页面读取已保存 Mini20：Overall 95.80、11/11 Hard Gate、3 个原始失败、2 个技术 Bad Case。Candidate A 已评测不合格，B/C 尚未完成；当前运行初始配置，没有经 Candidate 人工晋升的新 Production。Medium50 工作集仍按有限失败合同停止，不被上述旧有 Mini20 成绩替代。真实状态以当前保存身份为准，不将 Fixture 答案/审批/回滚截图视为业务结果。
+
+[完整 UI 验收](UI_STORYTELLING_FINAL_ACCEPTANCE.md)。以下为历史记录。
+
 # Baseline稳定性当前状态（2026-10-12）
 
 最新真实Run EVAL-20261012014020569115为partial，Q01完整持久化，后续Q02超时；此前Run EVAL-20261012012720945107保存9题。旧失败阶段/中间答案/用量缺失，不能补造。当前源码仅将默认请求等待调到240秒并加入独立子Run检查点续跑；Judge/Matcher/Policy版本和Gate不变。已受控加载240秒配置与最终检查点修复。本轮不调用真实Provider，不运行Baseline或ABC；离线验收不是240秒配置的真实效果证明。详见[BASELINE_STABILITY](BASELINE_STABILITY.md)。

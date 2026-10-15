@@ -1,0 +1,592 @@
+{
+  "results": [
+    {
+      "name": "01-baseline-report",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "02-hard-gate",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "03-bad-cases",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "04-bad-case-drawer",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [
+        {
+          "width": 800,
+          "height": 1000,
+          "bodyWidth": 798,
+          "bodyScroll": 798
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "05-agent-diagnosis",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "06-agent-strategy",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "07-candidates",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "08-candidate-drawer",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [
+        {
+          "width": 800,
+          "height": 1000,
+          "bodyWidth": 798,
+          "bodyScroll": 798
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "09-sandbox",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "10-regression",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "11-regression-drawer",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [
+        {
+          "width": 800,
+          "height": 1000,
+          "bodyWidth": 798,
+          "bodyScroll": 798
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "12-recommendation",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "13-release",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "14-version-detail",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "15-release-eligibility",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [
+        {
+          "width": 800,
+          "height": 1000,
+          "bodyWidth": 798,
+          "bodyScroll": 798
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "16-verification",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "17-comparison-unpublished",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "18-monitoring",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "reference-overview",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "reference-knowledge",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "reference-settings",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "reference-governance",
+      "width": 1440,
+      "fixture": false,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-regression",
+      "width": 1440,
+      "fixture": true,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-regression-drawer",
+      "width": 1440,
+      "fixture": true,
+      "viewport": 1440,
+      "drawer": [
+        {
+          "width": 800,
+          "height": 1000,
+          "bodyWidth": 798,
+          "bodyScroll": 798
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-rollback-confirmation",
+      "width": 1440,
+      "fixture": true,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-qa-answer",
+      "width": 1440,
+      "fixture": true,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-qa-answer-drawer",
+      "width": 1440,
+      "fixture": true,
+      "viewport": 1440,
+      "drawer": [
+        {
+          "width": 800,
+          "height": 1000,
+          "bodyWidth": 798,
+          "bodyScroll": 798
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-comparison-completed",
+      "width": 1440,
+      "fixture": true,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-monitoring",
+      "width": 1440,
+      "fixture": true,
+      "viewport": 1440,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-feedback-drawer",
+      "width": 1440,
+      "fixture": true,
+      "viewport": 1440,
+      "drawer": [
+        {
+          "width": 800,
+          "height": 1000,
+          "bodyWidth": 798,
+          "bodyScroll": 798
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "01-baseline-report",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "02-hard-gate",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "03-bad-cases",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "04-bad-case-drawer",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [
+        {
+          "width": 390,
+          "height": 844,
+          "bodyWidth": 388,
+          "bodyScroll": 388
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "05-agent-diagnosis",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "06-agent-strategy",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "07-candidates",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "08-candidate-drawer",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [
+        {
+          "width": 390,
+          "height": 844,
+          "bodyWidth": 388,
+          "bodyScroll": 388
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "09-sandbox",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "10-regression",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "11-regression-drawer",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [
+        {
+          "width": 390,
+          "height": 844,
+          "bodyWidth": 388,
+          "bodyScroll": 388
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "12-recommendation",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "13-release",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "14-version-detail",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [
+        {
+          "width": 390,
+          "height": 844,
+          "bodyWidth": 388,
+          "bodyScroll": 388
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "15-release-eligibility",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [
+        {
+          "width": 390,
+          "height": 844,
+          "bodyWidth": 388,
+          "bodyScroll": 388
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "16-verification",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "17-comparison-unpublished",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "18-monitoring",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "reference-overview",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "reference-knowledge",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "reference-settings",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "reference-governance",
+      "width": 390,
+      "fixture": false,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-regression",
+      "width": 390,
+      "fixture": true,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-regression-drawer",
+      "width": 390,
+      "fixture": true,
+      "viewport": 390,
+      "drawer": [
+        {
+          "width": 390,
+          "height": 844,
+          "bodyWidth": 388,
+          "bodyScroll": 388
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-rollback-confirmation",
+      "width": 390,
+      "fixture": true,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-qa-answer",
+      "width": 390,
+      "fixture": true,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-qa-answer-drawer",
+      "width": 390,
+      "fixture": true,
+      "viewport": 390,
+      "drawer": [
+        {
+          "width": 390,
+          "height": 844,
+          "bodyWidth": 388,
+          "bodyScroll": 388
+        }
+      ],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-comparison-completed",
+      "width": 390,
+      "fixture": true,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-monitoring",
+      "width": 390,
+      "fixture": true,
+      "viewport": 390,
+      "drawer": [],
+      "nativeSummaries": []
+    },
+    {
+      "name": "fixture-feedback-drawer",
+      "width": 390,
+      "fixture": true,
+      "viewport": 390,
+      "drawer": [
+        {
+          "width": 390,
+          "height": 844,
+          "bodyWidth": 388,
+          "bodyScroll": 388
+        }
+      ],
+      "nativeSummaries": []
+    }
+  ],
+  "errors": [],
+  "blocked": [],
+  "realApiMutations": 0
+}

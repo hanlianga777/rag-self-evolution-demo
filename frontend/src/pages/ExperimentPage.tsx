@@ -1,9 +1,11 @@
+import { StoryDisclosure } from "../components/Storytelling";
+import { StoryEmpty } from "../components/Storytelling";
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { errorMessage, identityKey, postJson } from "../api";
-import { Badge, CustomSelect } from "../components/Primitives";
+import { Badge, ConclusionCard, CustomSelect } from "../components/Primitives";
 import { readSession, writeSession } from "../session";
-import { ExecutionMetrics, ParameterDiff, formatValue, parameterNames } from "../components/PipelineFields";
+import { ExecutionMetrics, ParameterDiff } from "../components/PipelineFields";
 import type { Citation, PipelinePreview } from "../types";
 
 type Run = { status?: "running" | "completed" | "failed"; startedAt?: number; durationMs?: number; result?: PipelinePreview; error?: string; label?: string; comparisonId?: string; question?: string; sourceId?: string };
@@ -52,35 +54,31 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
     await Promise.all([request(leftScheme, setLeft), request(rightScheme, setRight)]);
     if (ticket === requests.current && captured === currentIdentity.current) setBusy(false);
   };
-  const keys = Object.keys(parameterNames).filter(key => leftScheme.config?.[key] !== rightScheme.config?.[key]);
-  const summaryKeys = keys.length ? keys : ["prompt_strategy", "candidate_k", "top_k", "rerank"];
-  return <div className="page experiment-page">
-    <div className="comparison-identities"><span>正式 Baseline · <strong>{baselineId || "未就绪"}</strong></span><span>当前 Production · <strong>{active?.id || "未发布"}</strong></span></div>
-    <p className="comparison-source">同一道问题，比较正式 Baseline 与当前 Production。保存配置用于参数核对；回答仅来自本次主动运行。</p>
+
+  if (blocked) return <div className="page experiment-page"><ConclusionCard title="当前尚不具备 Baseline / Production 实时对比条件" tone="neutral">{blocked} 系统初始运行配置可以用于问答验证；只有经 Candidate 晋升发布的新 Production 才进入此对比。</ConclusionCard><StoryEmpty title="先完成有效 Baseline 与人工发布" action={<><a className="secondary" href="#evaluation">查看 Baseline</a><a className="secondary" href="#versions">查看发布条件</a></>}>保留历史评测与初始配置；前置条件满足后，使用同一道问题比较实际回答与引用。本页不会生成预览结果或实时评分。</StoryEmpty></div>;
+  return <div className="page experiment-page"><ConclusionCard title={left.status === "completed" && right.status === "completed" ? "同题实际回答已保存，可核对内容与引用差异" : "对比当前有效 Baseline 与已发布 Production"} tone="neutral">{left.status === "completed" && right.status === "completed" ? "两侧均为本次主动运行返回的真实回答；未调用 Judge，不产生新评分或资格。" : "选择或输入同一道问题，再主动运行两套已保存配置。参数差异可展开核对，回答未运行时不预判改善。"}</ConclusionCard>
     <section className="experiment-query compare-toolbar">
       <CustomSelect ariaLabel="选择真实 Bad Case" value={selectedCase} onChange={id => { clearResults(); setSelectedCase(id); const item = badCases.find((row: any) => row.id === id); if (item) setQuestion(item.result?.question || ""); }} placeholder="Baseline Bad Case" options={[{ value: "", label: "Baseline Bad Case" }, ...badCases.map((item: any) => ({ value: item.id, label: item.result?.question || item.id }))]} />
       <textarea aria-label="试验问题" placeholder="输入或编辑同一道问题…" maxLength={1000} value={question} onChange={event => { clearResults(); setQuestion(event.target.value); }} />
       <div className="query-action"><button className="primary" disabled={busy || !question.trim() || !!blocked} onClick={() => void ask()}><Send size={15} />{busy ? "正在回答…" : "运行实时对比"}</button></div>
     </section>
-    {blocked && <p className="error-notice" role="status">{blocked}</p>}
-    <section className="panel comparison-parameter-diff" aria-label="方案参数差异"><h2>方案参数差异</h2>{!blocked ? <ParameterDiff before={leftScheme.config} after={rightScheme.config} /> : <p className="muted">当前尚无两个有效的保存方案可比较。</p>}</section>
-    <section className="experiment-results" aria-label="实时回答"><AnswerCard scheme={leftScheme} keys={summaryKeys} run={left} onOpenCitation={onOpenCitation} /><AnswerCard scheme={rightScheme} keys={summaryKeys} run={right} onOpenCitation={onOpenCitation} /></section>
+    <StoryDisclosure label="查看方案参数差异"><ParameterDiff before={leftScheme.config} after={rightScheme.config}/></StoryDisclosure>
+    <section className="experiment-results" aria-label="实时回答"><AnswerCard scheme={leftScheme} run={left} onOpenCitation={onOpenCitation}/><AnswerCard scheme={rightScheme} run={right} onOpenCitation={onOpenCitation}/></section>
     {left.status === "completed" && right.status === "completed" && Array.isArray(left.result?.evidence) && Array.isArray(right.result?.evidence) && <p className="comparison-observation" role="status">本次可观察差异：Baseline 返回 {left.result?.evidence?.length ?? 0} 条 Evidence，Production 返回 {right.result?.evidence?.length ?? 0} 条 Evidence。引用数量不代表答案正确性；本次未进行实时 Judge 评分。</p>}
   </div>;
 }
 
-function AnswerCard({ scheme, keys, run, onOpenCitation }: { scheme: Scheme; keys: string[]; run: Run; onOpenCitation: (citation: Citation) => void }) {
+function AnswerCard({ scheme, run, onOpenCitation }: { scheme: Scheme; run: Run; onOpenCitation: (citation: Citation) => void }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { if (run.status !== "running") return; const timer = window.setInterval(() => setNow(Date.now()), 100); return () => window.clearInterval(timer); }, [run.status]);
   const elapsed = run.startedAt == null ? "" : `${((run.durationMs ?? Math.max(0, now - run.startedAt)) / 1000).toFixed(1)}s`;
   const result: any = run.result;
-  const config = result?.config || scheme.config || {};
   return <article className={`experiment-answer-card ${scheme.id === "baseline" ? "compare-baseline" : "compare-production"}`}><div className="answer-card-header"><Badge tone="neutral">{run.label || scheme.label}</Badge><span className={run.status || "waiting"}>{run.status === "running" ? `等待 · ${elapsed}` : run.status === "completed" ? "已完成" : run.status === "failed" ? "失败" : "等待运行"}</span></div>
-    <div className="answer-config">{keys.filter(key => config[key] != null).map(key => <span key={key}>{parameterNames[key]}: <strong>{formatValue(config[key])}</strong></span>)}</div>
+    <p className="muted">配置身份：{run.sourceId || scheme.version || "未记录"}</p>
     <div className="answer-scroll">{run.error ? <p className="error-notice" role="alert">回答失败：{run.error}</p> : result ? <MarkdownAnswer text={result.answer} /> : <p className="muted">点击运行后显示实际回答。</p>}</div>
     <div className="answer-evidence">{result?.evidence?.length ? result.evidence.map((item: Citation) => <button className="document-link" key={item.chunk_id} onClick={() => onOpenCitation(item)}>{item.document} · P.{item.page_start}</button>) : result ? <span className="muted">本次回答未返回可定位 Evidence。</span> : null}</div>
-    <footer className="answer-metrics-footer"><ExecutionMetrics compact metrics={result} /></footer>
-    <div className="answer-audit"><details><summary>查看本次运行审计</summary>{result ? <><p className="muted">实时预览 · {run.sourceId} · {run.question}</p><ExecutionMetrics metrics={result} /></> : <p className="muted">运行完成后显示已采集的耗时与 Token。</p>}</details></div>
+    <footer className="answer-metrics-footer"><ExecutionMetrics compact metrics={{latency_ms:result?.latency_ms}} /></footer>
+    <div className="answer-audit"><StoryDisclosure label={<>查看本次运行审计</>}>{result ? <><p className="muted">实时预览 · {run.sourceId} · {run.question}</p><ExecutionMetrics metrics={result} /><ParameterDiff after={result.config || scheme.config || {}} /></> : <p className="muted">运行完成后显示已采集的耗时与 Token。</p>}</StoryDisclosure></div>
   </article>;
 }
 

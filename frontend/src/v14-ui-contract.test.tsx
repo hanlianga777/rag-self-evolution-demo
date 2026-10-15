@@ -229,14 +229,14 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   await render(<EvolutionPage data={{ workspace: identity("B1", "E1"), evaluation: { id: "B1", status: "completed", config: {} }, optimization: { id: "E1", candidates: [d], result: { report_confirmation: { winner_id: "A" }, composite: { candidate_id: d.id } } } }} />);
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Sandbox")!.click());
   const coreRows = [...document.querySelectorAll(".sandbox-core-table tbody tr")];
-  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["Hard Gate", "Bad Case", "修复原 Bad Case", "新增失败", "Regression", "Qualification"]);
+  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["Hard Gate", "Bad Case", "修复原 Bad Case", "新增失败", "Regression", "正式资格"]);
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "Hard Gate")?.lastElementChild?.textContent).toBe("11 / 11");
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "Regression")?.lastElementChild?.textContent).toBe("未通过");
-  expect(coreRows.find(row => row.querySelector("td")?.textContent === "Qualification")?.lastElementChild?.textContent).toBe("不合格");
+  expect(coreRows.find(row => row.querySelector("td")?.textContent === "正式资格")?.lastElementChild?.textContent).toBe("不合格");
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "A/B/C/D")!.click());
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "查看 D 完整报告与 Decision")!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不合格 · Hard Gate：通过");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Regression：FAIL");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Regression：未通过");
 });
 
 it.each([undefined, "running", "failed"])("review R2 keeps %s Baseline at Evaluation before Agent", async status => {
@@ -312,7 +312,7 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
   await clickText("启动此上下文 Agent · Round 1");
   expect(posts[1]).toEqual({ url: expect.stringContaining("/api/experiments/run"), body: { trigger_id: "T1" } });
   expect(posts).toHaveLength(2);
-  expect(document.querySelector(".monitoring-context")?.textContent).toContain("Agent 状态：completed · Round 1");
+  expect(document.querySelector(".monitoring-context")?.textContent).toContain("Agent 状态：已完成 · Round 1");
   expect([...document.querySelectorAll("button")].some(button => button.textContent?.includes("启动此上下文"))).toBe(false);
   await clickText("查看 Trigger 上下文");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联实验：E-monitor");

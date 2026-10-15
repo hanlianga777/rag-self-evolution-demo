@@ -1,5 +1,7 @@
 # RAG Evolution
 
+2026-10-15 UI V2：Baseline → 有据策略与候选实验 → Regression / Recommendation → 人工发布 → 实际问答反馈，四个导航按三大业务模块组织。复用现有视觉与接口，正式数据和资格不变；未运行正式问答或付费模型。当前真实 Golden 有限停止保持，UI 不代表前序真实链路已完成。[完整验收与截图](docs/UI_STORYTELLING_FINAL_ACCEPTANCE.md)。
+
 2026-10-14当前收口：技术Bad Case与独立质量审计分离；当前95.80 Mini20核实Q03 Generation、Q10候选召回Retrieval，Q06不作为调参目标。仅诊断与Agent输入修复，Evaluation Identity不变，当前Baseline可直接复用，无须再次付费评测。本轮Provider0，等待用户在前端启动Agent。[A—H验收](docs/BAD_CASE_VALIDITY_ACCEPTANCE.md)。
 
 历史阶段记录（已由上条覆盖）：Bad Case业务流程移除诊断可信度分类；全部问题按实际证据自动分析，评测范围核验问题不驱动RAG调参。普通Positive错误不因behavior=false归Safety。Judge/Matcher/Policy再次升级，正式实验须另行授权同新版Baseline；原始审计与三个Human Gate保持。[最终验收](docs/BAD_CASE_FINAL_MECHANISM_ACCEPTANCE.md)。

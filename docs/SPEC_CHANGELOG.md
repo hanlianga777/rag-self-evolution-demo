@@ -1,3 +1,10 @@
+## 2026-10-15 · 三大业务模块产品叙事与 UI V2
+
+- Baseline 合并评测信息、结论先行、按钮分类及次级质量审计；Agent 改为真实问题连接多个保存假设与最小 Diff，删除重复概览，Regression 聚焦前后结果与影响。
+- 发布增加真实决策关系、待发布资格与当前配置 Diff；问答验证区分初始配置/已发布 Candidate，条件不足不展示空双栏，Monitoring 展示人工反馈闭环。
+- 四页面专属样式与统一 Chevron Disclosure / Golden 白卡 Drawer；前端展示合同更新，API、评分、资格、参数及运行记录不变。
+- 验证、截图与数据保护见[最终验收](UI_STORYTELLING_FINAL_ACCEPTANCE.md)。
+
 ## 2026-10-15 · Baseline 与 Agent 工作台产品表达
 
 - 三个Baseline及六个Agent页签简化展示；问题证据、保存假设与实际参数变化形成可追溯关系。

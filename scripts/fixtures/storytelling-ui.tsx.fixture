@@ -1,0 +1,32 @@
+import React,{useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import {EvaluationPage} from './src/pages/EvaluationPage';
+import {EvolutionPage} from './src/pages/EvolutionPage';
+import './src/styles.css';
+import {VersionsPage} from './src/pages/VersionsPage';
+import {VerificationPage} from './src/pages/VerificationPage';
+import {OperationProvider} from './src/operation';
+const view={is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Retrieval',optimization_directions:['candidate_recall'],phenomena:[{name:'检索失败'}],evidence_checks:[{fact:'Fixture：保存的必要事实'}]};
+const before=[{question_id:'Q81',question:'Fixture：如何完成有依据的操作？',passed:false,model_answer:'Fixture Baseline：缺少必要事实。',severity:'ordinary',diagnostic_view:view},{question_id:'Q82',question:'Fixture：是否可以继续运行？',passed:true,model_answer:'Fixture Baseline：保留安全限制。',severity:'critical'}];
+const base={id:'FIXTURE-BASE',status:'completed',dataset_version_id:'FIXTURE-G',judge:{evaluation_identity:'FIXTURE-IDENTITY'},config:{candidate_k:20,top_k:4,prompt_strategy:'Grounded'},dataset_snapshot:{id:'FIXTURE-G',question_ids:['Q81','Q82'],questions:[]},cases:before,result:{overall_score:90,bad_case_count:1,gates:{passed:true,passed_count:11,total:11,gates:[]}}};
+const afterA=[{...before[0],passed:true,model_answer:'Fixture Candidate A：补齐必要事实。'},{...before[1]}];
+const afterB=[afterA[0],{...before[1],passed:false,model_answer:'Fixture Candidate B：错误删除安全限制。',diagnostic_view:{...view,primary_root_cause:'Safety',optimization_directions:['grounded_generation'],phenomena:[{name:'安全边界失守'}],analysis_reason:'Fixture：保存的安全退化证据。'}}];
+const common={comparison_version:'fixture',target_bad_cases_fixed:1,all_fixed_question_ids:['Q81'],bad_case_count:0,net_improvement:1,gates:{passed:true,passed_count:11,total:11},regression:{passed:true,status:'PASS',new_critical_failures:0,new_ordinary_failures:0},qualification:{qualified:true,checks:{hard_gates:true,regression:true,target_bad_case_fixed:true,total_bad_cases_reduced:true}}};
+const candidates=[{id:'FIXTURE-A',status:'evaluated',config:{...base.config,candidate_k:40},reasoning:{candidate_label:'A',hypothesis:'Fixture：扩大候选覆盖以补齐必要事实。',intervention_direction:'candidate_recall',observed_evidence:['FIXTURE-BC']},result:{...common,evaluation_run_id:'FIXTURE-RUN-A',new_regression_question_ids:[]}},{id:'FIXTURE-B',status:'evaluated',config:{...base.config,prompt_strategy:'Completeness'},reasoning:{candidate_label:'B',hypothesis:'Fixture：验证回答约束。',intervention_direction:'grounded_generation',observed_evidence:['FIXTURE-BC']},result:{...common,evaluation_run_id:'FIXTURE-RUN-B',bad_case_count:1,net_improvement:0,new_regression_question_ids:['Q82'],regression:{passed:false,status:'FAIL',new_critical_failures:1,new_ordinary_failures:0},qualification:{qualified:false,checks:{hard_gates:true,regression:false,target_bad_case_fixed:true,total_bad_cases_reduced:false}}}},{id:'FIXTURE-C',status:'failed',config:base.config,reasoning:{candidate_label:'C'},result:{evaluation_run_id:'FIXTURE-PARTIAL',qualification:{qualified:false}}}];
+
+const prod={id:'FIXTURE-PROD',status:'active',provenance:'published',previous_version_id:'FIXTURE-OLD',created_at:'2026-10-15T03:00:00Z',config:{...base.config,candidate_k:40},snapshot:{candidate_id:'FIXTURE-A',human_release:{decision:'approved',actor:'fixture'},recommendation:{result:{recommended_candidate:'FIXTURE-A',report_confirmation:{winner_id:'FIXTURE-A'}}},hard_gate_results:common.gates,regression:common.regression}};
+const event={id:'FIXTURE-EVENT',question:'Fixture：现场发现的安全限制是否仍然有效？',answer:'Fixture：这是隔离 UI 的保存回答，必须保留安全限制。',determinable:false,source:{production_version_id:prod.id,corpus_fingerprint:'FIXTURE-CORPUS'},metrics:{latency_ms:120,input_tokens:12,output_tokens:8}};
+const data={workspace:{current_baseline_id:base.id,current_experiment_id:'FIXTURE-EXP'},evaluation:base,badCases:[{id:'FIXTURE-BC',run_id:base.id,question_id:'Q81',result:before[0]}],optimization:{id:'FIXTURE-EXP',candidates},versions:[prod,{id:'FIXTURE-OLD',status:'archived',provenance:'bootstrap',config:base.config}],monitoring:{events:[event],triggers:[]}};
+const citation={document_id:'FIXTURE-DOC',document:'Fixture 文档',chunk_id:'FIXTURE-CHUNK',page_start:1,page_end:1,score:.9,section_path:'隔离证据',content_preview:'Fixture：保持安全限制，缺少依据时说明不确定。'};
+const preview=(version:string)=>({answer:'Fixture：保持安全限制。\n\n1. 核对保存的来源。\n2. 缺少依据时请求澄清。',question:'Fixture：如何操作？',version,config:version===prod.id?prod.config:base.config,latency_ms:120,evidence:[citation],sources:['Fixture 文档'],input_tokens:12,output_tokens:8});
+(window as any).fixtureRequests=[];
+window.fetch=async(input,init)=>{const url=String(input);(window as any).fixtureRequests.push({url,method:init?.method || 'GET'});let value:any={};
+if(init?.method && init.method!=='GET'){
+ const body=JSON.parse(String(init.body || '{}'));
+ if(url.endsWith('/api/preview'))value={baseline:preview(prod.id),model:'Fixture model',mode:'mock',latency_ms:120};
+ else if(url.endsWith('/api/preview/scheme'))value=preview(body.scheme_id==='baseline'?base.id:prod.id);
+ else throw new Error('Fixture 禁止该写入操作，绝不连接真实API');
+}else value=url.endsWith('/FIXTURE-RUN-A')?{...base,cases:afterA}:url.endsWith('/FIXTURE-RUN-B')?{...base,cases:afterB}:url.includes('/api/evaluation')?base:url.includes('/api/pipeline')?{search_space:{}}:url.includes('/api/bad-cases')?data.badCases:url.includes('/api/monitoring')?data.monitoring:url.includes('/api/documents/')?{chunks:[{chunk_id:citation.chunk_id,chunk_text:citation.content_preview}]}:{};
+return new Response(JSON.stringify(value));};
+function QA(){const [page,setPage]=useState('agent');return <OperationProvider restore={false}><div style={{height:'100dvh',display:'flex',flexDirection:'column'}}><nav style={{padding:'8px 16px',display:'flex',gap:12,background:'#faf0d8',flexWrap:'wrap'}}>{['baseline','agent','release','qa'].map(p=><button key={p} onClick={()=>setPage(p)}>Fixture {p}</button>)}</nav><div style={{flex:1,minHeight:0}}>{page==='baseline'?<EvaluationPage data={data}/>:page==='agent'?<EvolutionPage data={data}/>:page==='release'?<VersionsPage data={data}/>:<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>}</div></div><div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:10000,background:'#faf0d8',padding:'4px 12px',textAlign:'center',fontSize:12,pointerEvents:'none'}}>隔离 UI Fixture · 非真实业务成绩 · 无 Provider / 数据库写入</div></OperationProvider>};
+createRoot(document.getElementById('root')!).render(<QA/>);

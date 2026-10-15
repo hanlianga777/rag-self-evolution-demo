@@ -13,10 +13,10 @@ it("separates saved Before/After configuration from live answers and keeps the a
   vi.stubGlobal("fetch", vi.fn());
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
-  expect(document.querySelector('[aria-label="方案参数差异"]')?.textContent).toContain("Grounded");
-  expect(document.querySelector('[aria-label="方案参数差异"]')?.textContent).toContain("Abstention");
-  expect(document.querySelector(".comparison-identities")?.textContent).toContain("B-new");
-  expect(document.querySelector(".comparison-identities")?.textContent).toContain("P-old");
+  expect(document.querySelector(".story-disclosure")?.textContent).toContain("Grounded");
+  expect(document.querySelector(".story-disclosure")?.textContent).toContain("Abstention");
+  expect(document.querySelector(".experiment-results")?.textContent).toContain("B-new");
+  expect(document.querySelector(".experiment-results")?.textContent).toContain("P-old");
   expect(document.querySelectorAll(".answer-audit details")).toHaveLength(2);
   expect(document.querySelectorAll(".answer-audit details[open]")).toHaveLength(0);
   expect(fetch).not.toHaveBeenCalled();

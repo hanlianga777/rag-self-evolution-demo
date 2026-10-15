@@ -59,13 +59,13 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   await render(<EvolutionPage data={input} />);
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
   expect(document.querySelector(".diagnosis-list")?.textContent).toContain("Retrieval · 检索");
-  expect(document.querySelector(".diagnosis-filters")?.textContent).toContain("1 / 1 题");
+  expect(document.querySelector(".diagnosis-filters")).toBeNull();
   expect(document.querySelector(".diagnosis-list")?.textContent).toContain("Candidate A");
   expect(document.querySelector(".diagnosis-list")?.textContent).not.toContain("Evidence Miss");
   expect(document.querySelectorAll(".diagnosis-cards")).toHaveLength(0);
   await click("优化 Agent");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(0);
-  expect([...document.querySelectorAll(".panel > .section-head h2")].map(header => header.textContent)).toEqual(["Agent 决策关系", "问题与策略关联", "实验方案概览"]);
+  expect([...document.querySelectorAll(".panel > .section-head h2")].map(header => header.textContent)).toEqual(["问题与策略关联"]);
   expect(document.body.textContent).toContain("保存假设 A");
   expect(document.body.textContent).toContain("Search Space · 2");
   await click("A/B/C/D");
@@ -73,7 +73,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["优化目标", "优化策略", "参数变化", "预期收益", "潜在风险", "实验结果"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("持久化问题");
   await click("Sandbox");
-  expect([...document.querySelectorAll("tbody tr > td:first-child")].map(cell => cell.textContent)).toEqual(["Hard Gate", "Bad Case", "修复原 Bad Case", "新增失败", "Regression", "Qualification"]);
+  expect([...document.querySelectorAll("tbody tr > td:first-child")].map(cell => cell.textContent)).toEqual(["Hard Gate", "Bad Case", "修复原 Bad Case", "新增失败", "Regression", "正式资格"]);
   expect(document.body.textContent).not.toContain("Input Tokens");
   await click("查看高级指标");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Input Tokens");

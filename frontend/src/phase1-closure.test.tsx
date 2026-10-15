@@ -43,13 +43,10 @@ it("ignores a corrupt cached answer and blocks comparison without a valid formal
   const data = { evaluation: { config: { prompt_strategy: "Grounded" } }, optimization: { candidates: [{ id: "c", config: { prompt_strategy: "Abstention" }, reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } }] }, versions: [{ id: "p", status: "active", provenance: "published", config: { prompt_strategy: "Abstention" }, snapshot: { candidate_id: "c" } }] };
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
-  expect(document.querySelector("textarea")!.value).toBe("");
-  expect(document.querySelector('[aria-label="方案 A"]')).toBeNull();
-  expect(document.querySelector('[aria-label="方案 B"]')).toBeNull();
-  expect(document.querySelector(".error-notice")?.textContent).toContain("需要当前有效 Baseline");
-  const textarea = document.querySelector("textarea")!;
-  await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "缺少正式基准仍不可运行"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
-  expect((document.querySelector(".query-action button") as HTMLButtonElement).disabled).toBe(true);
+  expect(document.querySelector("textarea")).toBeNull();
+  expect(document.querySelector(".experiment-results")).toBeNull();
+  expect(document.querySelector(".conclusion-card")?.textContent).toContain("需要当前有效 Baseline");
+  expect(document.querySelector('a[href="#evaluation"]')).not.toBeNull();
   expect(fetch).not.toHaveBeenCalled();
 });
 it("opens long text on focus and clears its tooltip on blur", async () => {

@@ -54,7 +54,7 @@ it('separates saved formal blockers from confirmed regression without clearing p
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const result={comparison_version:'offline',regression:{status:'FAIL',new_critical_failures:0,new_ordinary_failures:2},formal_blocking_question_ids:['q1','q2'],confirmed_regression_question_ids:[],pending_regression_question_ids:['q1'],disputed_regression_question_ids:['q2'],unclassified_regression_question_ids:[]};
  await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result}]}}}/>);await click('Sandbox');
- expect(document.body.textContent).toContain('正式阻断 2 题，资格仍按保存的 Regression 结果判定');expect(document.body.textContent).not.toMatch(/已确认失败|待复核|争议|未分类/);expect(document.body.textContent).toContain('未通过');expect(result.pending_regression_question_ids).toEqual(['q1']);expect(result.disputed_regression_question_ids).toEqual(['q2']);
+ expect(document.querySelector('.sandbox-core-table')?.textContent).toContain('正式阻断 · 严重 0 / 普通 2');expect(document.body.textContent).not.toMatch(/已确认失败|待复核|争议|未分类/);expect(document.body.textContent).toContain('未通过');expect(result.pending_regression_question_ids).toEqual(['q1']);expect(result.disputed_regression_question_ids).toEqual(['q2']);
 });
 it('uses saved root evidence in the compact diagnosis column and keeps absent evidence pending',async()=>{
  const {DiagnosisTable}=await import('./components/EvaluationDiagnosis');

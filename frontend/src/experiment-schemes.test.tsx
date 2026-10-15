@@ -36,8 +36,8 @@ it("fixes Baseline and Production and selecting a Bad Case only fills the questi
 
 it("blocks before real Production exists, even with a qualified Candidate", async () => {
   const value = { ...data, optimization: { candidates: [{ id: "C-1", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } }] }, versions: [{ id: "baseline-v1", status: "active", provenance: "bootstrap", snapshot: { candidate_id: "" }, config: {} }] };
-  const root = await mount(value); await chooseCase();
-  expect((document.querySelector(".query-action button") as HTMLButtonElement).disabled).toBe(true);
+  const fetcher=vi.fn();vi.stubGlobal("fetch",fetcher);const root = await mount(value);
+  expect(document.querySelector(".query-action button")).toBeNull();expect(document.querySelector(".experiment-results")).toBeNull();expect(fetcher).not.toHaveBeenCalled();
   expect(document.body.textContent).toContain("尚无已发布 Production");
   await act(async () => root.unmount());
 });
@@ -49,10 +49,10 @@ it("captures the same question, shows config inside each answer, and keeps one-s
   }); vi.stubGlobal("fetch", fetcher);
   const root = await mount(); await chooseCase(); await run();
   expect(fetcher.mock.calls.map(([, init]) => JSON.parse(String(init?.body)).question)).toEqual(["固定问题", "固定问题"]);
-  expect(document.querySelectorAll(".answer-config")).toHaveLength(2);
+  expect(document.querySelectorAll(".answer-config")).toHaveLength(0);expect(document.querySelectorAll(".answer-audit details")).toHaveLength(2);
   expect(document.querySelector(".answer-markdown strong")?.textContent).toBe("停机");
   expect(document.body.textContent).toContain("模拟失败");
-  expect(document.querySelectorAll(".answer-metrics-footer")[1].textContent).toContain("Input Tokens0");
+  expect(document.querySelectorAll(".answer-metrics-footer")[1].textContent).not.toContain("Input Tokens");expect(document.querySelectorAll(".answer-audit")[1].textContent).toContain("Input Tokens：0");
   expect(document.querySelectorAll(".answer-metrics-footer")[1].textContent).not.toContain("历史费用未采集");
   await act(async () => root.unmount());
 });

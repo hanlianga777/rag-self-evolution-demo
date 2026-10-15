@@ -19,7 +19,7 @@ it("centres the actual published snapshot while a newer recommendation remains u
   await render(<VersionsPage data={{ versions: [production, { id: "baseline-v1", status: "archived", config: { prompt_strategy: "Grounded", rerank: false } }], optimization: { candidates: [candidate], recommendation: { result: { recommended_candidate: candidate.id } } } }} />);
   expect(document.querySelector(".release-decision")?.textContent).toContain("Production 来源 Candidate C");
   expect(document.querySelector(".release-decision")?.textContent).toContain("11 / 11");
-  expect(document.querySelector(".release-decision")?.textContent).toContain("Regression PASS");
+  expect(document.querySelector(".release-decision")?.textContent).toContain("Regression 通过");
   expect(document.querySelector(".release-decision")?.textContent).toContain("Gate 3 人工发布已确认");
   expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("Candidate A");
   expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("确认发布");
@@ -35,7 +35,7 @@ it("shows only changed parameters on the release main screen and opens full conf
   expect(document.querySelector(".release-decision details")).toBeNull();
   await click("查看完整配置");
   expect(document.querySelector(".drawer")?.textContent).toContain("Rerank");
-  expect(document.querySelector(".drawer pre")).toBeNull();
+  expect(document.querySelector(".drawer pre")?.closest("details")?.open).toBe(false);
 });
 
 it("does not invent manual publication evidence for incomplete historical snapshots", async () => {

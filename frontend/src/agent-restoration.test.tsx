@@ -18,8 +18,8 @@ it("restores stages and complete generated plans without inventing evaluated res
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
   expect(document.body.textContent).toContain("原始失败 1 题");
   await click("优化 Agent");
-  expect(document.body.textContent).toContain("Agent 决策关系");
-  expect(document.querySelectorAll(".experiment-plan article")).toHaveLength(3);
+  expect(document.body.textContent).toContain("问题与策略关联");
+  expect(document.querySelectorAll(".strategy-hypotheses > section")).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/null|undefined|\[object Object\]/);
   await click("A/B/C/D");
   expect([...document.querySelectorAll(".candidate-card:first-child .field-label")].map(e => e.textContent)).toEqual(["优化目标", "优化策略", "参数变化", "预期收益", "潜在风险", "实验结果"]);
