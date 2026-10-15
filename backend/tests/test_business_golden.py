@@ -27,6 +27,32 @@ class BusinessPlanTests(unittest.TestCase):
         self.assertEqual({s[2] for s in NEGATIVE_BUSINESS},{'insufficient_evidence','clarify','safe_rejection','prompt_injection_resistance'})
 
 class BusinessAuditTests(unittest.TestCase):
+    def test_frozen_difficulty_cannot_pass_by_changing_the_current_label(self):
+        from types import SimpleNamespace
+        from app.ai_service import AiService
+        from app.business_golden import CHECKS
+        service = object.__new__(AiService)
+        service.corpus = SimpleNamespace(chunks=lambda:[])
+        plan = {'quality_contract':'business-quality-v3','slots':[{'slot':'Q01','difficulty':'复杂'}]}
+        service.store = SimpleNamespace(generation_run=lambda *args,**kwargs:{'artifacts':{'hard_validation':{'frozen_plan':plan}}})
+        service.provider = SimpleNamespace(complete=lambda *args,**kwargs:json.dumps({'checks':dict.fromkeys(CHECKS,True),'reason':'offline observation','difficulty_observed':'中等'}))
+        item = {'question':'怎样检查？','reference_answer':'断电','test_category':'positive','evidence':[],
+                'raw':{'generation_run_id':'RUN','coverage_slot':'Q01','difficulty':'中等','user_role':'运维','business_scenario':'维护','user_intent':'检查'}}
+        audit = service.business_quality_audit(item,[])
+        self.assertFalse(audit['checks']['diversity'])
+        self.assertEqual(audit['difficulty_observed'],'中等')
+        self.assertEqual(audit['difficulty_target'],'复杂')
+        item['raw']['difficulty'] = '复杂'
+        self.assertFalse(service.business_quality_audit(item,[])['checks']['diversity'])
+        plan['slots'][0]['difficulty'] = '中等'
+        item['raw']['difficulty'] = '中等'
+        self.assertTrue(service.business_quality_audit(item,[])['checks']['diversity'])
+        plan['slots'].clear()
+        with self.assertRaises(ValueError):service.business_quality_audit(item,[])
+        plan.pop('quality_contract')
+        item['raw']['golden_quality_contract'] = 'business-quality-v3'
+        self.assertEqual(service.business_quality_audit(item,[])['audit_version'],'business-v2')
+
     def test_missing_and_failed_business_audit_block_qualification(self):
         import tempfile
         from pathlib import Path

@@ -1,5 +1,10 @@
 # 当前有效合同 — 2026-10-15 `[CONFIRMED]`
 
+- **2026-10-15 Medium50 Golden专项重新规划授权（覆盖前轮固定Slot/次数及后续实验范围）**：先审计失败共同原因并完整核查四PDF，先保存业务问题设计，再匹配证据；充分扩展角色/视角/真实条件并独立证实至少15个不同复杂意图后，才整体确定新Plan的Complex Slot。允许新Run/Plan和合理Topic/产品/Group/难度重分配；旧Run/Plan/Revision/Snapshot及知识资产只读。保持50题、20/10/20、九Topic、正式Negative配额与真实难度10/25/15，不临时迁就失败题改Slot。按失败原因有界修订，不无限同意图或重复成功请求。只在全部当前身份质量/独立审核及配额满足后执行匹配本轮授权的Owner Delegated Gate1及冻结；本轮不执行Baseline、Agent、Sandbox、Regression、Gate2或Production。不能独立证实15个复杂意图时如实保留可行性证据与缺口，不以标签或评分凑数。设计与实施方案见`docs/superpowers/specs/2026-10-15-medium50-golden-closure-design.md`。
+- **新Plan质量合同`business-quality-v3`**：业务设计、证据核验和Business Audit共享明确难度判据；审计以题目实际Run的冻结Plan为准（不信任候选克隆遗留标记），读取Slot目标并保存目标/实际观察，观察或当前标签不匹配时diversity为False，原始观察/理由保留。新合同委托冻结额外检查独立十维业务结论、实际难度逐Slot匹配与10/25/15、非空难度依据、真实AI审核主体和晚于题目质量更新及最新Business Audit落库两者较晚时点的有时区审核时间；候选摘要附最新审计时间供此校验使用，保留所有原Hash/Corpus/PDF/资格/P0/P1/授权检查。既有Plan及历史审计/批准不回填、不静默改分。属于Golden合同，不修改生产RAG Prompt、模型、Frozen Pipeline、11 Gate或Regression。
+
+- **本轮重新规划可行性结果**：四PDF157页完整核查，三轮106份业务设计/版本保留，交叉复核仅支持3个新增复杂业务意图方向，加上旧Q38/Q39两个可供保留，共5个可行性方向（非本轮真实治理已通过题数、非Corpus客观上限）；K19另有重量Child页码超范围阻塞。未满足先独立证实15个复杂意图的前置条件，未创建新Plan/Run、未新增Provider调用、未批准/冻结。所有29张表全行、21份PDF/索引与Corpus State及历史账本不变，Q36/Q44/Q50旧失败不伪造关闭。完整设计、分歧、50题旧工作集真实状态及工程结果见[Golden专项验收](MEDIUM50_GOLDEN_FINAL_ACCEPTANCE.md)。
+
 - **2026-10-15 Medium50本轮有限治理结束**：当前50题独立审核已按内容Hash全部记录；题型20/10/20，Machine Qualified 21/50，Hard Validation 50/50，Business Audit十维全True 32/50，Probe 48/50、QC 47/50，保留Q36/Q44负向Probe失败及Q50 QC P0。持久化难度10/27/13；独立实际难度基础18/中等21/复杂2，另9题类型或证据边界未成立，不能计入配额。Q24/Q28/Q30安全前提补齐，Q41仅恢复本地参数错误未执行的Judge/QC，Q27理由补齐后审计仍失败，Q32真实上下文补齐后审计通过。未满足冻结条件，未执行Owner批准、新Snapshot、Baseline、Agent或A/B/C。三笔Unknown及早期38次已成功检索重发均保留真实账目，旧40题、Snapshot/评测/实验/Production及21份PDF/索引不变。详见[最终验收](MEDIUM50_FINAL_ACCEPTANCE.md)。
 
 - 2026-10-15：Business Audit 的实际已应用修订谱系同步传入持久化 reason，供独立审计核对修订依据；reason 是作者陈述，不能替代来源证据或强制通过。十项检查及阈值不变。

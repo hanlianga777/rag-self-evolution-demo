@@ -611,8 +611,9 @@ class AiService:
 
     @provider_task('revision')
     def business_question_first(self, slot, sources, peers, repair, *, save_design=None, prior_design=None):
-        from .business_golden import instruction
+        from .business_golden import instruction, DIFFICULTY_CRITERIA
         context = {key:slot.get(key) for key in ('slot','test_category','user_role','difficulty','product','topic_label','business_scope','failed_business_intents','topic_cluster','business_negative','negative_subtype','expected_behavior','ablation_attribute')}
+        context['difficulty_criteria'] = DIFFICULTY_CRITERIA
         context['prior_questions'] = peers
         context['previous_attempt_failed'] = bool(repair)
         design = prior_design or json.loads(self.provider.complete(
@@ -666,7 +667,18 @@ class AiService:
 
     @provider_task('business_audit')
     def business_quality_audit(self, item, peers, *, context_chunk_ids=()):
-        from .business_golden import CHECKS
+        from .business_golden import CHECKS, QUALITY_CONTRACT, DIFFICULTY_CRITERIA
+        target = None
+        if item['raw'].get('generation_run_id'):
+            run = self.store.generation_run(item['raw']['generation_run_id'], qualification=False)
+            if run is None:
+                raise ValueError('Business Audit generation scope unavailable')
+            plan = run.get('artifacts',{}).get('hard_validation',{}).get('frozen_plan') or {}
+            if plan.get('quality_contract') == QUALITY_CONTRACT:
+                slot = next((s for s in plan['slots'] if s['slot'] == item['raw'].get('coverage_slot')), {})
+                target = slot.get('difficulty')
+                if target not in {'基础','中等','复杂'}:
+                    raise ValueError('Business Audit frozen difficulty scope unavailable')
         by_id = {c['chunk_id']:c for c in self.corpus.chunks()}
         if not isinstance(context_chunk_ids, (tuple, list)) or len(context_chunk_ids) > 3 or any(not isinstance(key, str) or key not in by_id for key in context_chunk_ids):
             raise ValueError('Business audit context requires at most three current Child IDs')
@@ -687,6 +699,7 @@ class AiService:
         sources.extend(by_id[key] for key in dict.fromkeys(context_chunk_ids) if key not in {s['chunk_id'] for s in sources})
         corpus_fingerprint = manifest_identity(current_manifest())
         payload = {'question':item['question'], 'answer':item['reference_answer'], 'metadata':{key:item['raw'].get(key) for key in ('user_role','business_scenario','user_intent','difficulty','business_negative','expected_behavior','expected_response','topic_cluster','product_scope','source_scope','generation_path','business_design','business_design_provenance','business_draft_revision')}, 'sources':sources, 'prior_questions':peers}
+        payload.update(difficulty_criteria=DIFFICULTY_CRITERIA, difficulty_target=target or item['raw'].get('difficulty'))
         if item['raw'].get('generation_path') == 'business_question_first':
             payload['parent_context'] = self.business_parent_context({'sources':sources})
             payload['revisions'] = [{key:revision.get(key) for key in ('id','actor','reason','applied_at','changes','replacement','previous_hash','new_hash')} for revision in self.store.revision_history(item['id']) if revision.get('applied_at') and revision.get('generation_run_id') == item['raw'].get('generation_run_id')]
@@ -706,7 +719,12 @@ class AiService:
             result['checks']['intent'] = False
         if item['raw'].get('generation_path') == 'business_question_first' and not item['raw'].get('business_design'):
             result['checks']['copying'] = False
-        return {**result, 'audit_version':'business-v2', 'token_usage':usage, 'attention_reason':'题目质量需修订', 'audit_source_chunk_ids':[s['chunk_id'] for s in sources], 'corpus_fingerprint':corpus_fingerprint}
+        if target:
+            result['difficulty_target'] = target
+            if result['difficulty_observed'] != target or item['raw'].get('difficulty') != target:
+                result['checks']['diversity'] = False
+                result['reason'] += f'；冻结Slot目标{target}，当前标签{item["raw"].get("difficulty")}，独立观察{result["difficulty_observed"]}，难度不一致。'
+        return {**result, 'audit_version':QUALITY_CONTRACT if target else 'business-v2', 'token_usage':usage, 'attention_reason':'题目质量需修订', 'audit_source_chunk_ids':[s['chunk_id'] for s in sources], 'corpus_fingerprint':corpus_fingerprint}
 
     def _indexed_embeddings(self, chunks: list[dict]) -> np.ndarray:
         """Use persisted FAISS vectors aligned with the persisted chunk order."""

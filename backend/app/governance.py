@@ -310,7 +310,7 @@ class GovernanceStore:
                 json_extract(c.result_json,'$.execution_identity.content_hash') AS qc_hash,
                 json_extract(c.result_json,'$.priority') AS priority,
                 json_extract(c.result_json,'$.score') AS qc_score,
-                p.id AS probe_id, c.id AS qc_id, c.created_at AS qc_created_at, a.content_hash AS audit_hash, a.audit_json
+                p.id AS probe_id, c.id AS qc_id, c.created_at AS qc_created_at, a.content_hash AS audit_hash, a.audit_json, a.created_at AS audit_created_at
                 FROM questions q
                 LEFT JOIN probe_results p ON p.id=(SELECT MAX(id) FROM probe_results WHERE question_id=q.id)
                 LEFT JOIN qc_results c ON c.id=(SELECT MAX(id) FROM qc_results WHERE question_id=q.id)
@@ -378,7 +378,7 @@ class GovernanceStore:
                 'probe':{'id':item['probe_id'],'probe_details':{'classification':item['classification']}}, 'qc':{'id':item['qc_id'],'priority':item['priority'],'score':item['qc_score']},
                 'qualification_status':status,'qualification_source':'owner_delegated' if delegated else 'human' if human else 'machine' if status=='machine_qualified' else None,
                 'attention_reasons':remaining if delegated else reasons, 'attention_categories':self.attention_categories(remaining if delegated else reasons),
-                'disclosed_retrieval_risk':accepted_retrieval if delegated else None,'quality_audit':audit})
+                'disclosed_retrieval_risk':accepted_retrieval if delegated else None,'quality_audit':audit,'quality_audit_created_at':item['audit_created_at']})
         return result
 
     def active_pool_rows(self):

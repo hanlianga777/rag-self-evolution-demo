@@ -78,9 +78,31 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
         return set(row.get('attention_reasons',[])) in ({'检索不连贯'},{'QC P1','检索不连贯'}) and row.get('probe_status')=='probe_passed' and row.get('qc_status')=='qc_passed'
     if run['status']!='completed' or any(not reviewable(r) for r in rows) or {r['id'] for r in rows}!=set(ids):
         raise ValueError('Owner delegation cannot waive machine quality')
+    from .business_golden import CHECKS as BUSINESS_CHECKS, QUALITY_CONTRACT
+    plan = state['frozen_plan']
+    current_contract = plan.get('quality_contract') == QUALITY_CONTRACT
+    if current_contract and (any(not isinstance(r.get('actual_difficulty'),str) for r in reviews)
+        or Counter(r.get('actual_difficulty') for r in reviews) != Counter({'基础':10,'中等':25,'复杂':15})):
+        raise ValueError('Independent difficulty distribution must be 10/25/15')
     for review in reviews:
         item=items[review['question_id']]
         row=next(r for r in rows if r['id']==review['question_id'])
+        if current_contract:
+            target = next((s.get('difficulty') for s in plan.get('slots',[]) if s['slot'] == item['raw'].get('coverage_slot')), None)
+            if review.get('actual_difficulty') != target or item['raw'].get('difficulty') != target:
+                raise ValueError('Independent difficulty differs from frozen Slot')
+            if (not isinstance(review.get('business_checks'),dict) or set(review['business_checks']) != set(BUSINESS_CHECKS)
+                or any(v is not True for v in review['business_checks'].values())
+                or not isinstance(review.get('difficulty_basis'),str) or not review['difficulty_basis'].strip()
+                or review.get('actor') != 'Codex AI Agent / Owner Delegated AI Review'):
+                raise ValueError('Independent business review unavailable')
+            try:
+                reviewed_at = datetime.fromisoformat(review['reviewed_at'])
+                quality_at = max(datetime.fromisoformat(item['updated_at']), datetime.fromisoformat(row['quality_audit_created_at']))
+                if reviewed_at.utcoffset() is None or not quality_at <= reviewed_at <= datetime.now(timezone.utc):
+                    raise ValueError('Independent review must follow current quality checks')
+            except (KeyError,TypeError,ValueError) as error:
+                raise ValueError('Independent review timestamp unavailable or stale') from error
         if set(row.get('attention_reasons',[])) in ({'检索不连贯'},{'QC P1','检索不连贯'}):
             accepted=review.get('retrieval_risk_acceptance',{})
             if accepted.get('classification')!='RETRIEVAL_INCOHERENT' or accepted.get('retrieval_not_fixed') is not True or not accepted.get('reason') or not row.get('probe',{}).get('id') or accepted.get('probe_id')!=row['probe']['id']:

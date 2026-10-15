@@ -162,3 +162,5 @@ Mini20支持显式Business V2业务出题与十维审计，保留原Coverage/Con
 2026-10-15 Baseline 与 Agent 工作台完成前端产品表达重构；现有规则与数据保持。见[验收报告](docs/WORKBENCH_PRODUCT_EXPRESSION_ACCEPTANCE.md)及[最终截图图库](docs/screenshots/workbench-20261015/index.html)。截图中的Mini20是既有结果，不代表前序Medium50已完成。
 
 2026-10-15 Medium50本轮有限治理结束：沿用原Run，50题独立审核已记录，21/50机器合格；实际难度、题型边界及Q50 P0仍阻断冻结，未执行新Baseline/Agent/A/B/C。DNS和Q09连接中断分别获一次精确重试，三笔Unknown及早期38次成功请求重发完整记账。逐题结果、费用与验证见[最终验收](docs/MEDIUM50_FINAL_ACCEPTANCE.md)。
+
+2026-10-15后续Golden专项允许重新规划独立Plan/Run；完整核查四PDF157页及三轮106份业务设计/版本后，尚未独立证实15个合法复杂意图。未创建凑标签的新Plan/Run、未新增Provider调用或冻结；新质量合同补齐冻结目标/实际难度与当前独立审核校验，历史数据只读保留。详见[Golden专项验收](docs/MEDIUM50_GOLDEN_FINAL_ACCEPTANCE.md)。

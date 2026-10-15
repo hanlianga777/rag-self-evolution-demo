@@ -46,6 +46,43 @@ class DelegatedReviewTests(unittest.TestCase):
         self.assertEqual(result['delegated_by'],'project_owner')
         self.assertEqual(len(result['reviews']),50)
 
+    def test_new_contract_requires_current_independent_business_and_difficulty_review(self):
+        import copy
+        from app.business_golden import CHECKS as BUSINESS_CHECKS
+        plan = self.run['artifacts']['hard_validation']['frozen_plan']
+        plan.update(quality_contract='business-quality-v3',slots=[])
+        for index,review in enumerate(self.reviews):
+            level = '基础' if index < 10 else '中等' if index < 35 else '复杂'
+            slot = f'Q{index+1:02d}'
+            item = self.items[review['question_id']]
+            item['raw'].update(coverage_slot=slot,difficulty=level)
+            item['updated_at'] = (datetime.now(timezone.utc)-timedelta(minutes=1)).isoformat()
+            self.rows[index]['quality_audit_created_at'] = item['updated_at']
+            plan['slots'].append({'slot':slot,'difficulty':level})
+            review.update(actual_difficulty=level,difficulty_basis='Offline independent conditional evidence review',
+                          business_checks=dict.fromkeys(BUSINESS_CHECKS,True),
+                          actor='Codex AI Agent / Owner Delegated AI Review',reviewed_at=datetime.now(timezone.utc).isoformat())
+        self.assertEqual(self.check()['review_actor_type'],'ai_agent')
+        original = copy.deepcopy(self.reviews)
+        for field,value in [('actual_difficulty','复杂'),('business_checks',{}),('difficulty_basis',''),
+                            ('actor','project_owner'),('reviewed_at',None),
+                            ('reviewed_at',(datetime.now(timezone.utc)-timedelta(days=1)).isoformat()),
+                            ('reviewed_at',(datetime.now(timezone.utc)+timedelta(days=1)).isoformat())]:
+            with self.subTest(field=field,value=value):
+                self.reviews = copy.deepcopy(original)
+                self.reviews[0][field] = value
+                with self.assertRaises(ValueError):self.check()
+        self.reviews = copy.deepcopy(original)
+        self.reviews[0]['reviewed_at'] = (datetime.now(timezone.utc)-timedelta(seconds=30)).isoformat()
+        self.rows[0]['quality_audit_created_at'] = datetime.now(timezone.utc).isoformat()
+        with self.assertRaises(ValueError):self.check()
+        self.rows[0]['quality_audit_created_at'] = self.items[self.reviews[0]['question_id']]['updated_at']
+        self.reviews = copy.deepcopy(original)
+        for review,slot in zip(self.reviews,plan['slots']):
+            review['actual_difficulty'] = slot['difficulty'] = '中等'
+            self.items[review['question_id']]['raw']['difficulty'] = '中等'
+        with self.assertRaises(ValueError):self.check()
+
     def mini(self):
         self.rows=self.rows[:20]
         self.items={row['id']:self.items[row['id']] for row in self.rows}
