@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import hashlib
+import uuid
 import re
 import sqlite3
 from contextlib import contextmanager, nullcontext
@@ -2160,9 +2161,12 @@ class GovernanceStore:
                 connection.execute("INSERT INTO experiments (id, baseline_run_id, status, result_json, created_at) VALUES (?, ?, 'generating', '{}', ?)", (experiment_id, baseline_run_id, _now()))
             else:
                 connection.execute("UPDATE experiments SET status='generating' WHERE id=?", (experiment_id,))
-        return experiment_id, candidates, current_round + 1, used
+            context = existing['result'] if existing else {}
+            claim = {'token': uuid.uuid4().hex, 'owner_pid': os.getpid(), 'started_at': _now()}
+            connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json({**context, 'agent_generation': claim}), experiment_id))
+        return experiment_id, candidates, current_round + 1, used, claim['token']
 
-    def save_agent_round(self, experiment_id, candidates, result):
+    def save_agent_round(self, experiment_id, candidates, result, *, generation_token=None):
         """Validated A/B/C and completed trace become visible together or not at all."""
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK, self.connection() as connection:
@@ -2170,14 +2174,15 @@ class GovernanceStore:
             row = connection.execute("SELECT * FROM experiments WHERE id=?", (experiment_id,)).fetchone()
             self.require_current_baseline(row["baseline_run_id"], connection)
             persisted = _load(row["result_json"], {})
-            if row["status"] != "generating" or persisted.get("report_confirmation"):
+            if (row["status"] != "generating" or persisted.get("report_confirmation")
+                    or (persisted.get("agent_generation") or {}).get("token") != generation_token):
                 raise ValueError("Optimization Context 已变化，不能保存本轮候选")
             for candidate_id, config, reasoning in candidates:
                 connection.execute("INSERT INTO candidate_configs (id, experiment_id, status, config_json, reasoning_json, result_json, created_at) VALUES (?, ?, 'generated', ?, ?, '{}', ?)", (f"{experiment_id}-{candidate_id}", experiment_id, _json(config), _json(reasoning), _now()))
             connection.execute("INSERT INTO agent_traces(experiment_id, status, result_json, created_at) VALUES (?, 'completed', ?, ?)", (experiment_id, _json(result), _now()))
             connection.execute("UPDATE experiments SET status='completed', result_json=? WHERE id=?", (_json({**persisted, **result}), experiment_id))
 
-    def save_agent_trace(self, experiment_id: str, status: str, result: dict, error_message: str | None = None):
+    def save_agent_trace(self, experiment_id: str, status: str, result: dict, error_message: str | None = None, *, generation_token=None):
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             current = connection.execute('SELECT status, result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
@@ -2187,11 +2192,23 @@ class GovernanceStore:
                 if key in persisted:
                     merged[key] = persisted[key]
             connection.execute("INSERT INTO agent_traces(experiment_id, status, result_json, error_message, created_at) VALUES (?, ?, ?, ?, ?)", (experiment_id, status, _json(result), error_message, _now()))
+            claim = persisted.get('agent_generation')
+            if claim and (claim.get('token') != generation_token or current['status'] != 'generating'):
+                return  # Preserve the audit above; a stale callback cannot own current state.
             connection.execute("UPDATE experiments SET status = ?, result_json = ? WHERE id = ?", (current['status'] if persisted.get('report_confirmation') else status, _json(merged), experiment_id))
 
     def interrupt_agent_generations(self):
         with self.connection() as connection:
-            connection.execute("UPDATE experiments SET status='failed' WHERE status='generating'")
+            for row in connection.execute("SELECT id,result_json FROM experiments WHERE status='generating'").fetchall():
+                context = _load(row['result_json'], {})
+                pid = (context.get('agent_generation') or {}).get('owner_pid')
+                if type(pid) is int and pid > 0:
+                    try: os.kill(pid, 0)
+                    except ProcessLookupError: pass
+                    except PermissionError: continue
+                    else: continue
+                context['agent_interruption'] = {'at': _now(), 'reason': 'Generation owner exited or legacy ownership unavailable'}
+                connection.execute("UPDATE experiments SET status='failed',result_json=? WHERE id=?", (_json(context), row['id']))
 
     def interrupt_evaluation_runs(self):
         """Preserve live evaluation owners; interrupt exited or legacy workers."""

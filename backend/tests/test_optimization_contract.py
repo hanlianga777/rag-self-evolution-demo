@@ -312,6 +312,48 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(risk['diagnostic_view']['analysis_category'],'insufficient_evidence')
         self.assertFalse(risk['diagnostic_view']['target_eligible'])
 
+    def test_live_owner_survives_import_cleanup_and_old_callbacks(self):
+        from unittest.mock import patch
+        experiment, *_ = self.store.claim_agent_generation('EVAL-test')
+        claim = self.store.experiment(experiment)['result'].get('agent_generation')
+        self.store.interrupt_agent_generations()
+        self.assertEqual(self.store.experiment(experiment)['status'], 'generating')
+        self.assertTrue(claim)
+        self.store.save_agent_trace(experiment, 'failed', {}, 'current failure', generation_token=claim['token'])
+        self.store.claim_agent_generation('EVAL-test', experiment_id=experiment)
+        current = self.store.experiment(experiment)['result']['agent_generation']
+        self.store.save_agent_trace(experiment, 'failed', {}, 'late failure', generation_token=claim['token'])
+        self.assertEqual(self.store.experiment(experiment)['status'], 'generating')
+        with self.assertRaises(ValueError):
+            self.store.save_agent_round(experiment, [], {}, generation_token=claim['token'])
+        self.store.save_agent_round(experiment, [], {}, generation_token=current['token'])
+        self.store.save_agent_trace(experiment, 'failed', {}, 'late same-token failure', generation_token=current['token'])
+        self.assertEqual(self.store.experiment(experiment)['status'], 'completed')
+        self.store.claim_agent_generation('EVAL-test', experiment_id=experiment)
+        with patch('app.governance.os.kill', side_effect=ProcessLookupError):
+            self.store.interrupt_agent_generations()
+        self.assertEqual(self.store.experiment(experiment)['status'], 'failed')
+
+    def test_persistence_response_reuse_revalidates_without_second_provider_call(self):
+        import hashlib
+        from unittest.mock import patch
+        provider = FixedProvider(json.dumps(drafts()))
+        provider.request_summary = lambda system,user,**kwargs: {'request_sha256':hashlib.sha256((system+user).encode()).hexdigest()}
+        real_complete = provider.complete
+        calls = []
+        def complete(*args, **kwargs):
+            from app.telemetry import record_usage
+            calls.append(True)
+            record_usage({'provider': 'Stub', 'status': 'ok'})
+            return real_complete(*args, **kwargs)
+        provider.complete = complete
+        with patch.object(self.store, 'save_agent_round', side_effect=ValueError('persistence interrupted')):
+            with self.assertRaises(ValueError): OptimizationAgent(self.store,provider).generate('EVAL-test')
+        result = OptimizationAgent(self.store,provider).generate('EVAL-test')
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(result['candidates']), 3)
+        self.assertIn('response_reuse',result['result'])
+
 
 if __name__ == "__main__":
     unittest.main()

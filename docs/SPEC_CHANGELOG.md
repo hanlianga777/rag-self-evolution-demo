@@ -1,3 +1,7 @@
+## 2026-10-15 · Agent持久化归属修复
+
+- `No SPEC Change`：生成领取保存PID和唯一Token；启动清理保留仍存活的生成者，保存与失败回调核对领取Token，过期回调仅留Trace。当前Baseline/Golden/Corpus及原子保存状态保护保持。仅请求完整SHA一致且原Provider成功、失败阶段为persistence的原响应可复用；仍重新执行全部Schema/目标/Search Space/干预校验，旧Usage与失败Trace保留，不继承资格。
+
 ## 2026-10-15 · 绑定Run的具体Provider与载荷补充授权
 
 - Owner明确授权现有Medium50 Run/Plan/Corpus的必要数据发送至DeepSeek固定HTTPS地址和当前配置的官方百炼业务空间Endpoint；仅Golden治理/独立审核/全部合格后的Gate1冻结。目的地、载荷、账本、未知请求及历史数据保护均保留；不修改Provider配置或扩展实验范围。

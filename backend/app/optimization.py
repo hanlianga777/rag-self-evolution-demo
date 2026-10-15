@@ -114,10 +114,10 @@ class OptimizationAgent:
         base_config = {**DEFAULT_PIPELINE_CONFIG, **baseline["config"]}
         base_config.pop("run_target", None)
         base_config.pop("knowledge_identity", None)
-        experiment_id, prior_candidates, round_number, completed = self.store.claim_agent_generation(baseline_run_id, trigger_id, existing_id)
+        experiment_id, prior_candidates, round_number, completed, generation_token = self.store.claim_agent_generation(baseline_run_id, trigger_id, existing_id)
         if not bad_cases:
             reason='暂无足够依据生成合格优化假设：没有具备实际证据与Trace的可验证Baseline目标；Monitoring事件须先补齐同等证据'
-            self.store.save_agent_round(experiment_id, [], {'generation_status':'insufficient_evidence','insufficient_evidence':reason,'generated_candidate_count':0,'round':round_number,'provider_called':False,'all_bad_case_audit':[{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases]})
+            self.store.save_agent_round(experiment_id, [], {'generation_status':'insufficient_evidence','insufficient_evidence':reason,'generated_candidate_count':0,'round':round_number,'provider_called':False,'all_bad_case_audit':[{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases]}, generation_token=generation_token)
             return self.store.experiment(experiment_id)
         prior = [base_config] + [item["config"] for item in prior_candidates]
         context = self.store.experiment(experiment_id)["result"]
@@ -168,7 +168,17 @@ class OptimizationAgent:
                     if callable(getattr(self.provider,'request_summary',None)):
                         audit['request_summary']=self.provider.request_summary(system,user,json_mode=True)
                     audit['validation_stage']='provider'
-                    content=self.provider.complete(system,user,json_mode=True)
+                    previous = confirmed_context
+                    request_hash = audit.get('request_summary', {}).get('request_sha256')
+                    if (request_hash and previous.get('validation_stage') == 'persistence'
+                            and previous.get('baseline_id') == baseline_run_id
+                            and previous.get('request_summary', {}).get('request_sha256') == request_hash
+                            and isinstance(previous.get('provider_raw_text'), str)
+                            and any(item.get('status') == 'ok' for item in previous.get('token_usage', []))):
+                        content = previous['provider_raw_text']
+                        audit['response_reuse'] = {'request_sha256': request_hash, 'source_timestamp': previous['timestamp'], 'new_provider_call': False}
+                    else:
+                        content=self.provider.complete(system,user,json_mode=True)
                 finally:
                     audit.update(token_usage=usage, stages=stages, **cost_fields(getattr(getattr(self.provider, 'settings', None), 'model', None), usage))
             audit["provider_raw_text"] = content
@@ -245,12 +255,12 @@ class OptimizationAgent:
                     "changed_parameters": {key: value for key, value in config.items() if value != base_config.get(key)}, "source_trigger_id": trigger_id, "monitoring_target_event_ids": monitoring_target_event_ids, "round": round_number, "candidate_label": candidate["id"],
                 }))
             audit["validation_stage"] = "persistence"
-            self.store.save_agent_round(experiment_id, batch, {**result, **audit, "generation_status":"insufficient_evidence" if len(candidates)<len(labels) else "completed", "requested_candidate_count":len(labels), "generated_candidate_count":len(candidates), "validation_stage": "completed", "round": round_number, "evaluation_budget": evaluation_budget})
+            self.store.save_agent_round(experiment_id, batch, {**result, **audit, "generation_status":"insufficient_evidence" if len(candidates)<len(labels) else "completed", "requested_candidate_count":len(labels), "generated_candidate_count":len(candidates), "validation_stage": "completed", "round": round_number, "evaluation_budget": evaluation_budget}, generation_token=generation_token)
             return self.store.experiment(experiment_id)
         except Exception as error:
             if isinstance(error,ProviderRequestError):audit['validation_stage']='request_validation'
             audit['provider_error']=provider_error_details(error,audit['validation_stage'])
             message=f"{error}；失败阶段：{audit['validation_stage']}；可重试：{'是' if audit['provider_error']['retryable'] else '否'}"
             audit["validation_error"] = message
-            self.store.save_agent_trace(experiment_id, "failed", audit, message)
+            self.store.save_agent_trace(experiment_id, "failed", audit, message, generation_token=generation_token)
             raise ValueError(message) from error

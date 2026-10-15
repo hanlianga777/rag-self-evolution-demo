@@ -1,5 +1,7 @@
 # 当前有效合同 — 2026-10-15 `[CONFIRMED]`
 
+- **本轮Agent最小恢复授权**：基于已完成正式Baseline及冻结Golden50，仅修复Agent持久化状态归属，优先精确请求SHA相同的已成功响应并重验全部候选约束；随后执行本轮合法A/B/C Sandbox，沿用现有费用/Identity/Gate/Regression保护，不运行新Baseline、第二轮Agent、Gate2、Composite D或Production。内部PID/Token修复不改变这些业务规则。
+
 - **本轮正式冻结回执**：`GGEN-20261015110926448917` / `PLAN-2e284ba3cc81d33dca08c279` / 原Corpus的50题Hard Validation、v4 Audit、Probe、QC与独立审核全部通过；依既有12项具名检索风险接受及Owner委托正式事务冻结`GD-20261015135415953347`，50条真实审批事件及Snapshot已核对。检索风险未修复，旧失败保留；159次请求均成功、费用Unknown，未运行Baseline/Agent/Sandbox，详见[质量收口报告](MEDIUM50_GOLDEN_CLOSURE_REPORT.md)。
 
 

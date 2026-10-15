@@ -192,7 +192,7 @@ class FinalCorpusWriteTests(unittest.TestCase):
             work = lambda: store.claim_agent_generation(baseline)
         elif name == 'save':
             experiment, *_ = store.claim_agent_generation(baseline)
-            work = lambda: store.save_agent_round(experiment, [(f'R1-{label}', {}, {'round': 1, 'candidate_label': label}) for label in 'ABC'], {'source': 'Stub'})
+            work = lambda: store.save_agent_round(experiment, [(f'R1-{label}', {}, {'round': 1, 'candidate_label': label}) for label in 'ABC'], {'source': 'Stub'}, generation_token=store.experiment(experiment)['result']['agent_generation']['token'])
         else:
             experiment = store.create_experiment(baseline, 'direct_release')
             store.save_candidate(experiment, 'A', DEFAULT_PIPELINE_CONFIG, {'candidate_label': 'A'})
@@ -261,5 +261,5 @@ class FinalCorpusWriteTests(unittest.TestCase):
             connection.execute('ALTER TABLE candidate_configs ADD COLUMN compatible_extra TEXT')
         context = store.confirm_optimization_trigger(trigger, 'fixture')['optimization_run_id']
         self.assertEqual(store.claim_agent_generation(store.experiment(context)['baseline_run_id'], trigger)[0], context)
-        store.save_agent_round(context, [(f'R1-{label}', {}, {'round': 1}) for label in 'ABC'], {})
+        store.save_agent_round(context, [(f'R1-{label}', {}, {'round': 1}) for label in 'ABC'], {}, generation_token=store.experiment(context)['result']['agent_generation']['token'])
         self.assertEqual(len(store.experiment(context)['candidates']), 3)
