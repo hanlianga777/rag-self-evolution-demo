@@ -7,7 +7,7 @@ import time
 import math
 from .telemetry import collect_usage
 from statistics import mean
-from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims
+from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, validate_business_judgment
 
 from .policy import DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate
 
@@ -184,6 +184,10 @@ class EvaluationRunner:
         limits=current_paid_run().output_limits if current_paid_run() else (source or {}).get('judge',{}).get('execution_snapshot',{}).get('request_limits')
         if limits:
             judge_meta['execution_snapshot']['request_limits'] = {key:limits[key] for key in ('answer','judge','query')}
+        from .evaluation_contract import BUSINESS_JUDGE_PROMPT
+        from .ai_service import GENERATION_BOUNDARY, GENERATION_PROMPT_VERSION
+        import hashlib
+        judge_meta.update(judge_prompt_sha256=hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(),generation_prompt_version=GENERATION_PROMPT_VERSION,generation_boundary_sha256=hashlib.sha256(GENERATION_BOUNDARY.encode()).hexdigest())
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
         return snapshot, approved, config, judge_meta
 
@@ -203,7 +207,10 @@ class EvaluationRunner:
         trace = execution.get('retrieval_trace') or {}
         final = trace.get('final', [])
         observation = observe_evidence(item, final)
-        judge = self.runtime.judge(item["question"], expected, execution["answer"], item["test_category"], context={'golden_evidence': item['evidence'], 'final_context': final, 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'), 'expected_behavior': item['raw'].get('expected_behavior'), 'source_constraints': observation['source_constraints'], 'programmatic_evidence_observation': observation})
+        from .ai_service import generation_context
+        judge = self.runtime.judge(item["question"], expected, execution["answer"], item["test_category"], context={'contract_version':VERSIONS['scoring_policy'], 'retrieval_candidates':trace.get('candidates',[]), 'baseline_findings':item.get('baseline_findings'), 'sources_legend':json.loads(generation_context(final).split('\n',1)[0])['sources'], 'golden_evidence': item['evidence'], 'final_context': final, 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'), 'expected_behavior': item['raw'].get('expected_behavior'), 'source_constraints': observation['source_constraints'], 'programmatic_evidence_observation': observation})
+        if 'verdict' in judge:
+            return self._score_business(item, execution, judge, expected)
         sufficiency = resolve_evidence(item, observation, judge, final)
         if item['test_category'] != 'negative' and not isinstance(trace.get('final'), list):
             sufficiency.update(status='unknown', sufficient=None, reason='最终上下文未采集；不能把未采集当作检索遗漏')
@@ -271,6 +278,44 @@ class EvaluationRunner:
         basis = 'verified_answer_claim' if primary == 'Generation' and located_failure else 'measured_latency' if primary == 'Performance' else 'explicit_safety_failure' if primary == 'Safety' else analysis['retrieval_failure_stage'] if primary == 'Retrieval' else 'unresolved_evaluation_evidence' if primary == 'Unknown' else coverage['diagnostic_basis']
         return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
 
+    def _score_business(self, item, execution, judge, expected):
+        from .providers import ProviderInvalidResponse
+        from .diagnostics import automatic_analysis
+        from .retrieval import evidence_coverage
+        trace = execution.get('retrieval_trace') or {}
+        try:
+            validate_business_judgment(judge, execution['answer'], trace.get('final'), category=item['test_category'], constraints=item.get('raw'))
+            quality = judge['quality']
+            if not isinstance(quality,dict):raise ValueError('quality metrics must be an object')
+            if (type(quality.get('correctness')) is not int or not 0 <= quality['correctness'] <= 4
+                or any(type(quality.get(k)) not in (int,float) or not math.isfinite(quality[k]) or not 0 <= quality[k] <= 1 for k in ('faithfulness','completeness'))):
+                raise ValueError('quality metrics required by unchanged Hard Gates are invalid')
+        except (ValueError, KeyError, TypeError) as error:
+            raise ProviderInvalidResponse(str(error),raw_provider_response=judge.get('raw_provider_response')) from error
+        passed = judge['verdict'] == 'PASS'
+        severity = 'critical' if any(i['critical'] for i in judge['issues']) or item.get('negative_subtype') == 'safety_critical' or item.get('raw',{}).get('criticality') == 'high' else 'ordinary'
+        required={c for e in item.get('evidence',[]) for c in e.get('source_chunk_ids',[])}
+        coverage=evidence_coverage(trace,required)
+        metrics={k:execution.get(k) for k in ('latency_ms','ttft_ms','input_tokens','output_tokens','provider_cost','stages','token_usage','estimated_cost','cost_estimation')}
+        retrieved=[c for e in execution.get('retrieval',[]) for c in e.get('matched_child_ids',[e.get('chunk_id')])]
+        matching=[i+1 for i,c in enumerate(retrieved) if c in required]
+        sufficient=None if item['test_category']=='negative' else all(check['support'] for check in judge['checks'])
+        metrics.update(retrieval_hit=bool(matching) if required else None,retrieval_precision=len(matching)/len(retrieved)*100 if required and retrieved else None,retrieval_rank=matching[0] if matching else None,retrieval_trace=trace,evidence_coverage=coverage,
+            behavior_contract={'effective_pass':passed,'raw_judge_pass':passed,'violations':judge['issues']},
+            evidence_sufficiency={'status':'not_applicable' if sufficient is None else 'sufficient' if sufficient else 'insufficient','sufficient':sufficient,'source_constraints':{k:item.get('raw',{}).get(k) for k in ('product','product_scope','entity','version','source_reference','source_document_id','expected_response')},'facts':judge['checks'],'version':VERSIONS['evidence_matcher_version']},
+            judge_usage=judge.get('token_usage'),judge_stages=judge.get('stages'),judge_cost=judge.get('estimated_cost'),judge_cost_estimation=judge.get('cost_estimation'))
+        outcome={'contract_version':VERSIONS['scoring_policy'],'execution_complete':True,'verdict':judge['verdict'],'qualification_blocking':not passed}
+        case={'question':item['question'],'reference_answer':expected,'test_category':item['test_category'],'negative_subtype':item.get('negative_subtype'),'severity':severity,
+            'model_answer':execution['answer'],'retrieved_chunks':execution.get('retrieval',[]),'programmatic_metrics':metrics,'judge_result':{**judge,**quality,'behavior_pass':passed},
+            'evaluation_outcome':outcome,'passed':passed,'redline_pass':passed,
+            'overall_score':round((quality['correctness']*25+quality['completeness']*100+quality['faithfulness']*100)/3,2),
+            'failure_tags':[] if passed else ['Business Failure']}
+        analysis=automatic_analysis(case)
+        case.update(primary_root_cause=analysis['primary_root_cause'],secondary_root_causes=[],
+            diagnosis={'reason':analysis['analysis_reason'],'analysis_category':analysis['analysis_category'],'findings':analysis['evidence_checks'],'retrieval_failure_stage':analysis['retrieval_failure_stage']},
+            root_cause={'primary':analysis['primary_root_cause'],'secondary':[],'diagnostic_basis':analysis['retrieval_failure_stage'] or analysis['analysis_reason']})
+        return case
+
     def start_replay(self, source_id):
         source = self.store.evaluation_run(source_id)
         if not source or source['status'] != 'completed':
@@ -324,7 +369,7 @@ class EvaluationRunner:
                 'known_input_tokens':sum(u.get('prompt_tokens',u.get('total_tokens',0)) for u in events if type(u.get('prompt_tokens',u.get('total_tokens'))) is int),
                 'known_output_tokens':sum(u['completion_tokens'] for u in events if type(u.get('completion_tokens')) is int),
                 **cost_fields(self.runtime.model,events)}
-            return {**summarize_evaluation_cases(cases), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints,'request_accounting':accounting, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None}}
+            return {**summarize_evaluation_cases(cases), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints,'request_accounting':accounting, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None, 'stage_total_seconds':600, 'stage_max_attempts':3}}
         try:
             if {i['id'] for i in approved} != frozen_ids or len(approved) != len(frozen_ids):
                 raise ValueError('未提交完整冻结题集，不能标为Completed')
@@ -341,21 +386,34 @@ class EvaluationRunner:
                 if self.store.evaluation_run(run_id)['result'].get('stop_request'):
                     raise InterruptedError('用户停止运行，断点已保存')
             def perform(phase,action):
-                from .providers import ProviderAPIError,ProviderInvalidResponse,retryable_error
+                from .providers import ProviderAPIError,ProviderInvalidResponse,retryable_error,stage_deadline
                 # Explicit Resume starts a new retry window; process recovery of this Run keeps its failures.
                 prior=[a for a in checkpoint['attempts'] if a.get('phase')==phase and a.get('recorded_by_run_id')==run_id]
                 failures=0;invalid_failures=0
                 for a in reversed(prior):
                     if a.get('status')=='ok':break
                     failures+=1;invalid_failures+=a.get('error_type')=='ProviderInvalidResponse'
+                windows=checkpoint.setdefault('phase_windows',{})
+                window=windows.get(phase)
+                if not window or window.get('run_id')!=run_id:
+                    window={'run_id':run_id,'started_at':time.time()};windows[phase]=window
+                deadline=time.monotonic()+max(0,600-(time.time()-window['started_at']))
+                if checkpoint.get('inflight')==phase:checkpoint.setdefault('unknown_execution',{})[phase]=True
+                if checkpoint.get('unknown_execution',{}).get(phase):
+                    raise RuntimeError('Unknown request execution after worker loss; explicit request/usage reconciliation required')
                 while True:
                     check_stop()
+                    if failures>=3 or invalid_failures>=2 or time.monotonic()>=deadline:
+                        raise RuntimeError('Provider stage exhausted 3 attempts or 600 seconds')
                     checkpoint['inflight']=phase
                     if automatic:lineage['auto_recovery'].update(state='running',question_id=item['id'],phase=phase)
                     self.store.update_evaluation_progress(run_id,progress())
                     started=time.perf_counter();usage=[]
                     try:
-                        with collect_usage() as usage:value=action()
+                        with collect_usage() as usage,stage_deadline(deadline):value=action()
+                        if time.monotonic()>deadline:
+                            checkpoint['execution' if phase=='generation' else 'scored_result']=value
+                            raise RuntimeError('Provider stage exceeded 600 seconds')
                     except Exception as error:
                         failures+=1
                         attempt={'phase':phase,'status':'error','error_type':type(error).__name__,'error':str(error),
@@ -364,11 +422,14 @@ class EvaluationRunner:
                                  'elapsed_ms':round((time.perf_counter()-started)*1000),
                                  'raw_provider_response':getattr(error,'raw_provider_response',None),
                                  'response_metadata':getattr(error,'response_metadata',None),'provider_status_code':getattr(error,'status_code',None),'recorded_by_run_id':run_id}
-                        retry=retryable_error(error)
+                        unknown=any(u.get('status')=='unknown' or u.get('provider') in {'DeepSeek','Alibaba'} and type(u.get('prompt_tokens',u.get('total_tokens'))) is not int for u in usage)
+                        retry=retryable_error(error) and not unknown and failures<3 and time.monotonic()<deadline
                         # Repeated structurally invalid Judge replies are a terminal contract failure.
                         if isinstance(error,ProviderInvalidResponse):
                             invalid_failures+=1
-                            if invalid_failures>=6:retry=False
+                            if invalid_failures>=2:retry=False
+                        attempt['request_execution_unknown']=unknown
+                        if unknown:checkpoint.setdefault('unknown_execution',{})[phase]=True
                         attempt['retryable']=retry;checkpoint['attempts'].append(attempt);checkpoint.pop('inflight',None)
                         if automatic and retry:
                             delay=min(60,2**min(failures-1,6))
@@ -380,6 +441,7 @@ class EvaluationRunner:
                                         delay=max(delay,parsedate_to_datetime(error.retry_after).timestamp()-time.time())
                                     except (TypeError,ValueError,OverflowError):pass
                             if not isinstance(delay,(int,float)) or not math.isfinite(delay):delay=60
+                            delay=min(delay,max(0,deadline-time.monotonic()))
                             attempt['retry_delay_seconds']=delay
                             lineage['auto_recovery'].update(state='retrying',question_id=item['id'],phase=phase,error=str(error),retry_count=failures)
                             self.store.update_evaluation_progress(run_id,progress())
@@ -474,6 +536,8 @@ class EvaluationRunner:
             raise ValueError('Evaluation身份不匹配')
         self.store.require_current_baseline(baseline["id"])
         approved = self.snapshot_items(snapshot)
+        baseline_cases={c['question_id']:c for c in self.store.evaluation_case_results(baseline['id'])}
+        approved=[{**item,'baseline_findings':baseline_cases.get(item['id'],{}).get('judge_result',{}).get('issues',[])} for item in approved]
         if baseline['judge'].get('model') != self.runtime.model:
             raise ValueError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
         config = {**candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
@@ -500,6 +564,12 @@ class EvaluationRunner:
         targets = [q for q in failed if q in references or f"BC-{baseline['id']}-{q}" in references]
         comparison = compare_cases(baseline_cases, candidate_cases, targets)
         regression.update({key:comparison[key] for key in ('formal_blocking_question_ids','confirmed_regression_question_ids','pending_regression_question_ids','disputed_regression_question_ids','unclassified_regression_question_ids','regression_interpretation')})
+        if comparison.get('comparison_version') == VERSIONS['scoring_policy']:
+            critical_ids={q for q in comparison['new_regression_question_ids'] if candidate_cases[q].get('severity')=='critical' or any(i.get('critical') is True for i in candidate_cases[q].get('judge_result',{}).get('issues',[]))}
+            regression=evaluate_regression(new_critical_failures=len(critical_ids),new_ordinary_failures=len(comparison['new_regression_question_ids'])-len(critical_ids))
+            regression.update(comparison)
+            regression['passed']=regression['passed'] and comparison['comparison_complete'] and not comparison['continued_failure_new_critical_question_ids']
+            regression['status']='PASS' if regression['passed'] else 'FAIL' if comparison['comparison_complete'] else 'NOT_EVALUABLE'
         qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), run["result"]["bad_case_count"])
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}

@@ -50,11 +50,16 @@ def _canonical_final(trace, by_id):
             return False
         if any(entry.get(k)!=child.get(k) or canonical.get(k)!=child.get(k) for k in ('document_id','product','version')):
             return False
+        if entry.get('source_scope'):
+            from .ai_service import attach_heading_scopes
+            if attach_heading_scopes([entry],list(by_id.values()))[0].get('source_scope') != entry['source_scope']:return False
     return True
 
 
 def automatic_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     """Shared Baseline/Agent evidence analysis; no writes, scoring or Provider calls."""
+    if (case.get('evaluation_outcome') or {}).get('contract_version') == 'business-vnext-1':
+        return business_analysis(case,corpus_chunks=corpus_chunks,corpus_fingerprint=corpus_fingerprint)
     metrics=case.get('programmatic_metrics') or {}
     trace=metrics.get('retrieval_trace') or {}
     final=trace.get('final') or []
@@ -273,11 +278,12 @@ def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
     if analysis['retrieval_failure_stage'] and any(f.get('candidate_missing') is False for f in analysis['evidence_checks']) and 'ranking_omission' not in observations:observations.append('ranking_omission')
     if analysis['analysis_category']!='rag_failure':observations=[]
     root=analysis['primary_root_cause']
+    if root=='Performance' and analysis['target_eligible'] and 'measured_latency' not in observations:observations.append('measured_latency')
     if case.get('test_category') in {'positive','ablation'} and root!='Safety':
         phenomena.pop('安全边界失守',None)
     from .optimization import INTERVENTIONS
     directions=[name for name,(_,required_observations) in INTERVENTIONS.items() if set(observations)&required_observations]
-    technical=analysis['target_eligible'] and root in {'Retrieval','Generation','Safety','Performance'} and bool(directions)
+    technical=analysis['target_eligible'] and root in {'Retrieval','Ranking','Generation','Safety','Performance'} and bool(directions)
     issues=[{'type':g.get('type','evaluation_audit'),'evidence':g.get('evidence',g)} for g in governance]
     if not technical and case.get('passed') is False:
         issues.append({'type':analysis['analysis_category'],'reason':analysis['analysis_reason'],'evidence':analysis['evidence_checks']})
@@ -291,3 +297,42 @@ def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
             'root_cause_evidence':{'reason':analysis['analysis_reason'],'findings':analysis['evidence_checks']},'governance':governance,
             'target_eligible':technical,
             'typical_detection':detection,'latency':latency,'trace_observations':observations}
+
+
+def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
+    """Locate the single Judge's fact-level findings in canonical stage evidence."""
+    from .evaluation_contract import business_verdict, validate_business_judgment
+    result={'analysis_category':'insufficient_evidence','analysis_reason':'未形成完整、适用且可定位的技术证据。','primary_root_cause':'Unknown','target_eligible':False,'retrieval_failure_stage':None,'evidence_checks':[]}
+    if business_verdict(case) != 'FAIL':return result
+    trace=(case.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
+    if trace.get('status') != 'completed' or any(not isinstance(trace.get(k),list) for k in ('candidates','final')):return result
+    judge=case.get('judge_result') or {}
+    try:validate_business_judgment(judge,case.get('model_answer',''),trace['final'],category=case.get('test_category'))
+    except ValueError:return result
+    if corpus_chunks is None:corpus_chunks,corpus_fingerprint=_current_corpus(trace)
+    if not corpus_fingerprint or trace.get('corpus_fingerprint') != corpus_fingerprint:return result
+    by_id={c['chunk_id']:c for c in corpus_chunks or []}
+    if not _canonical_final(trace,by_id):return result
+    if not _canonical_final({'final':trace['candidates'],'parent_expand':False},by_id):return result
+    sources=[{**c,'content':c.get('chunk_text') or c.get('text') or c.get('content','')} for c in corpus_chunks or []]
+    def verified(support,entries):return isinstance(support,list) and bool(support) and all(quote_present(q,entries,display=True) for q in support)
+    findings=[]
+    for check in judge['checks']:
+        if check['met'] or check.get('scope_resolved') is not True:continue
+        if verified(check['support'],trace['final']):
+            findings.append(('Generation',None,{**check,'candidate_missing':False}))
+        elif verified(check.get('reference_support'),sources) and isinstance(check.get('candidate_support'),list):
+            candidate=verified(check.get('candidate_support'),trace['candidates'])
+            if check['candidate_support'] and not candidate:continue  # Invalid diagnostic quote is not evidence of absence.
+            findings.append(('Ranking' if candidate else 'Retrieval','ranking_context_selection' if candidate else 'candidate_recall',{**check,'candidate_missing':not candidate}))
+    for issue in judge['issues']:
+        if issue.get('scope_resolved') is not True:continue
+        if verified(issue['support'],trace['final']) or issue['critical'] and verified(issue.get('reference_support'),sources):
+            findings.append(('Safety' if issue.get('safety_violation') is True or issue['critical'] else 'Generation',None,issue))
+    metrics=case.get('programmatic_metrics') or {}
+    if not findings and type(metrics.get('latency_ms')) in (int,float) and metrics['latency_ms']>60000 and any(type(s.get('duration_ms')) in (int,float) and s['duration_ms']>0 for s in metrics.get('stages',[]) if isinstance(s,dict)):
+        findings.append(('Performance',None,{'latency_ms':metrics['latency_ms'],'stages':metrics['stages']}))
+    if findings:
+        root,stage,_=findings[0]
+        result.update(analysis_category='rag_failure',analysis_reason=judge['reason'],primary_root_cause=root,target_eligible=True,retrieval_failure_stage=stage,evidence_checks=[f[2] for f in findings])
+    return result

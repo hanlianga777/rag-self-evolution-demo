@@ -1,4 +1,22 @@
-# 当前有效合同 — 2026-10-15 `[CONFIRMED]`
+# 当前有效评测合同 — 2026-10-20 VNext `[CONFIRMED]`
+
+本节依据Owner《VNext统一修复》附件生效，覆盖下文所有冲突的旧评测、Claim分类、诊断准入、Regression及自动恢复语义；旧条款保留为历史，不得同时执行。既有Golden/Knowledge生产治理、50题20/10/20、11项Hard Gate阈值、三个人工Gate、Search Space及Production保护保持。
+
+- **本轮执行授权**：仅代码统一修复、Mock/Fake Provider及真实保存记录的只读离线验收、必要服务更新；禁止付费Provider、新正式Baseline/Candidate、冻结/审批/发布/回滚。历史Provider委托和执行授权不延续至本轮。
+- **二元业务合同**：Judge `judge-vnext-1`、Matcher `evidence-vnext-1`、Policy `business-vnext-1`、Generation `generation-vnext-1`。业务结果只有PASS/FAIL；核心事实、必要信息及安全前提完整、技术内容有真实适用Final支持、全答无实质越界才PASS。执行/解析/来源损坏保存已有错误与Partial/Failed状态，不生成业务FAIL或技术Bad Case；未完成阻断资格。
+- **Judge/Matcher职责**：单次Judge输出verdict/checks/issues/reason，quality独立保留Correctness/Faithfulness/Completeness供原11 Gate，不替代业务判断。取消新版逐句七类Claim及题型互斥；旧解析/解释函数仅服务历史和既有非正式工具，不参与新版通过条件。checks覆盖全部必要原子事实与安全条件，允许同义/真实等价来源；Matcher只定位完整Final及Parent/matched_child_ids中的真实片段，共享S来源图例，不做另一套语义评测。保留产品/型号/版本、数值单位、否定、条件与安全方向；跨段分别引用，不伪装连续原文。
+- **必要操作安全与Owner裁决**：维护/清洁/换件/充电/上电/故障恢复的实际必要安全前提不得因未提问而省略；普通事实不强加无关套话。未知接口、介质、型号或安全条件不能转为当前可执行步骤。Owner已确认B/Q36=FAIL：版本化离线基准157P/43F/0未决，BL37/13、A41/9、B40/10、C39/11。旧三份审计及数据库数字不回填；裁决来源与200个原回答/Final哈希见离线fixture和实施报告，不是新正式成绩。
+- **技术诊断与Agent**：必须有已完成真实业务FAIL、可定位缺陷、可信规范、适用完整Final、当前Canonical/Corpus及候选阶段证据。语义覆盖来自同次Judge；可选诊断字段reference_support/candidate_support/scope_resolved提供可核验片段，缺证据则不准入，不猜根因。候选缺证据为Retrieval，候选有而Final遗漏为Ranking/Context Selection，Final有而回答错为Generation；Safety须已证实边界失败，Performance须真实指标。不能凭missing_points/标签/指定ID/关键词直接归因。单候选单主要假设/方向，可解释必要联动，允许零候选，无第二审核Agent。历史Q编号只作测试键，禁止产品硬编码。
+- **Regression与资格**：同Golden/Corpus及新评测Identity且完整结果才比较业务翻转；FAIL→PASS为修复，PASS→FAIL为新增，指定目标另算。新增失败同时核题目严重性及Judge确认的严重问题；持续FAIL新issues单列，新增严重风险单独阻断，即使失败题数量不增。原严重新增0、普通新增≤1不变。新候选同一次Judge读取Baseline findings解释已存在问题的语义对应，避免仅措辞不同制造新严重风险；每个Candidate issue明确提供旧缺陷索引与理由，或null表示新缺陷；缺少对应信息则比较未完成并阻断资格，不凭措辞制造新增风险。禁止从离线基准选Winner/授予资格。
+- **新Revision来源派生同步**：新草案与已验证更新复用Validator输出同步evidence、source_chunk_ids及evidence_locations；无验证时不沿用旧定位。仅改变后续写入逻辑，不回填Frozen Golden或旧Revision。
+- **身份与知识范围**：保存Judge Prompt SHA、Generation版本/边界SHA；版本变化进入新Identity，旧Baseline/Candidate只读且禁止直接续跑实验。现有R1/R3独立标题块可只读解释为新上下文的source_scope（标题来源、原句、页码），不改旧Final/Chunk/Parent/索引/Embedding/Corpus。无法由真实标题闭合时不猜；知识制品内容确需变化必须新Knowledge/Corpus并检查Golden兼容。
+- **有限恢复（显式替代旧无限瞬态恢复）**：每题每Provider阶段最多首次+2次恢复，总墙钟600秒；结构错误最多1次纠正且占同一额度。DeepSeek请求超时取既有请求配置（默认240秒）与剩余阶段时间较小者；成功生成保存复用，低分不重生成。Unknown Usage/Worker失联的未知执行不自动重发，保留账本/断点并停止，须先核对明确授权。Stop在既有调用/退避边界生效。重复Case提交由同一SQLite事务验证等内容幂等，冲突拒绝，无需迁移/重写旧表。
+- **界面与架构**：维持既有页面/导航/卡片/Drawer和单一Optimization Agent。展示二元业务结果、执行异常、持续失败新风险与保存资格；历史明确版本，不显示新的三级质量标签。现有架构图的节点/关系仍适用，未改正式图源或另画不同版本；评测节点内部合同由本节明确。
+- **验收边界**：200条原内容和哈希、显式结构化测试响应、Matcher/Parser/诊断/Agent/比较/恢复/Stop/Unknown/隔离API及前端测试是离线验收；不证明新版LLM语义将真实得到157/43。以后正式运行须另行授权，先新版完整Baseline，再基于真实合格技术目标生成新候选并同身份Sandbox，之后原人工Gate。
+
+实现与实际测试证据见[RAG_EVALUATION_VNEXT_IMPLEMENTATION_REPORT](RAG_EVALUATION_VNEXT_IMPLEMENTATION_REPORT.md)。以下旧条款与本节冲突的部分仅历史记录。
+
+# 历史评测执行记录与既有 Golden / Knowledge 治理合同（2026-10-15及以前）
 
 - **本轮Agent最小恢复授权**：基于已完成正式Baseline及冻结Golden50，仅修复Agent持久化状态归属，优先精确请求SHA相同的已成功响应并重验全部候选约束；随后执行本轮合法A/B/C Sandbox，沿用现有费用/Identity/Gate/Regression保护，不运行新Baseline、第二轮Agent、Gate2、Composite D或Production。内部PID/Token修复不改变这些业务规则。
 

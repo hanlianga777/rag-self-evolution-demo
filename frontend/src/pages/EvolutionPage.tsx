@@ -80,7 +80,7 @@ export function EvolutionPage({ data }: { data: any }) {
   const requestPaid = (title: string, description: string, execute: () => void) => setPaid({ title, description, execute });
   const runBatch = () => requestPaid('运行本轮 A/B/C Sandbox', `Golden ${evaluation.dataset_snapshot?.question_ids?.length ?? evaluation.cases?.length ?? '未采集'} 题，待运行 ${pending.length} 个Candidate；每题回答+Judge；预算 ${budget.used}/${budget.max}，D预留1次。Rewrite/MultiQuery/HyDE启用时有额外模型调用。`, () => void executeBatch());
   const activeOperation = (candidateId: string) => operation.operations.find(item => item.candidateId === candidateId && item.status === "running");
-  const technicalCases=technicalDiagnosisRows(badCases);
+  const technicalCases=policyBlocked ? [] : technicalDiagnosisRows(badCases);
   const causes = technicalCases.reduce((counts: Record<string, number>, item: any) => ({ ...counts, [rootCause(item)]: (counts[rootCause(item)] || 0) + 1 }), {} as Record<string, number>);
   const targetCount=technicalCases.length;
   const targetCountLabel=badCases.length && badCases.every((row:any)=>caseData(row).diagnostic_view) || evaluation.result?.bad_case_count===0 ? targetCount : "未采集";
@@ -144,8 +144,8 @@ export function EvolutionPage({ data }: { data: any }) {
     {error && <p className="error-notice" role="alert">{error}</p>}
     {experiment?.result?.generation_status==='insufficient_evidence' && <p className="workbench-status" role="status">候选依据不足：{experiment.result.insufficient_evidence || '暂无足够依据生成合格优化假设；待核实原始证据，不补造A/B/C。'}</p>}
     {data.workspace?.baseline_unavailable_reason && <p className="error-notice">{data.workspace.baseline_unavailable_reason}</p>}
-    <p className="agent-identity">{evaluation.id ? <>{policyBlocked ? "历史 Baseline：" : "当前 Baseline："}<ShortId value={evaluation.id} /> · {evaluation.result?.gates?.passed === true ? `整体达标（${evaluation.result.gates.passed_count}/${evaluation.result.gates.total}）` : `${failedGates.length} 项 Gate 待改善`} · 原始失败 {evaluation.result?.bad_case_count ?? (badCases.length || "未采集")} 题 · 技术 Bad Case {targetCountLabel} 题</> : "当前有效 Baseline 尚未就绪。"}</p>
-    {stage === "bad" && <Section title="本轮优化目标"><p>当前 {targetCountLabel} 个技术 Bad Case，涉及 {Object.entries(causes).map(([name,count])=>`${rootName(name)} ${count}题`).join("、") || "尚无已保存的技术根因"}。仅有实际故障依据与合法优化方向的问题进入目标列表。</p><DiagnosisTable evidence rows={technicalCases} onSelect={setSelectedBadCase} strategy={row=><><TruncatedText lines={2}>{savedDirections(row)}</TruncatedText>{currentRound.filter(c=>targetRows(c,[row]).length).map(c=><button className="text-button" key={c.id} onClick={()=>setTargetCandidate(c)}>{candidateName(c)} · 查看目标</button>)}</>} /><p className="muted">失败现象分类及评测质量审计见 Baseline；此处只引用其保存的技术诊断。</p></Section>}
+    <p className="agent-identity">{evaluation.id ? <>{policyBlocked ? "历史 Baseline：" : "当前 Baseline："}<ShortId value={evaluation.id} /> · {evaluation.result?.gates?.passed === true ? `群组Gate通过（${evaluation.result.gates.passed_count}/${evaluation.result.gates.total}）` : `${failedGates.length} 项 Gate 待改善`} · 原始失败 {evaluation.result?.bad_case_count ?? (badCases.length || "未采集")} 题 · {policyBlocked ? "新版目标待建立" : <>技术 Bad Case {targetCountLabel} 题</>}</> : "当前有效 Baseline 尚未就绪。"}</p>
+    {stage === "bad" && <Section title={policyBlocked ? "新版目标尚未形成" : "本轮优化目标"}><p>{policyBlocked ? "旧合同记录只作历史追溯，不作为新版 Agent 目标；请授权建立新版 Baseline。" : <>当前 {targetCountLabel} 个技术 Bad Case，涉及 {Object.entries(causes).map(([name,count])=>`${rootName(name)} ${count}题`).join("、") || "尚无已保存的技术根因"}。仅有实际故障依据与合法优化方向的问题进入目标列表。</>}</p><DiagnosisTable evidence rows={technicalCases} onSelect={setSelectedBadCase} strategy={row=><><TruncatedText lines={2}>{savedDirections(row)}</TruncatedText>{currentRound.filter(c=>targetRows(c,[row]).length).map(c=><button className="text-button" key={c.id} onClick={()=>setTargetCandidate(c)}>{candidateName(c)} · 查看目标</button>)}</>} /><p className="muted">失败现象分类及评测质量审计见 Baseline；此处只引用其保存的技术诊断。</p></Section>}
 
     {stage === "agent" && <>
       <ConclusionCard title={currentRound.length ? `${targetCountLabel} 个技术目标，${currentRound.length} 个已保存优化假设` : "技术问题已分离，等待有据优化假设"} tone="neutral">同一问题可以对应不同干预假设。下方从实际问题证据连接到候选方案的参数变化；预期收益须由 Sandbox 验证，不能代替结果。</ConclusionCard>
@@ -260,7 +260,10 @@ function regressionText(result: any): string {
   const fixed = result.target_bad_cases_fixed;
   const counts = r.new_critical_failures != null && r.new_ordinary_failures != null ? `新增严重 ${r.new_critical_failures}、普通 ${r.new_ordinary_failures} 个失败（上限分别为 0、1）` : "新增失败明细未采集";
   const classification = Array.isArray(result.formal_blocking_question_ids) ? `；正式阻断 ${result.formal_blocking_question_ids.length} 题，资格仍按保存的 Regression 结果判定` : '';
-  return `${fixed == null ? "问题修复数未采集" : `修复 ${fixed} 个${result.comparison_version ? "指定目标" : "原问题（历史统计）"}`}；${counts}。${classification}`;
+  const continued = result.continued_failure_new_critical_question_ids || r.continued_failure_new_critical_question_ids;
+  const risk = Array.isArray(continued) && continued.length ? `；持续失败题新增严重风险 ${continued.length} 题，阻断资格` : '';
+  const incomplete = result.comparison_complete === false || r.comparison_complete === false ? '；评测执行未完成，比较与资格阻断' : '';
+  return `${fixed == null ? "问题修复数未采集" : `修复 ${fixed} 个${result.comparison_version ? "指定目标" : "原问题（历史统计）"}`}；${counts}。${classification}${risk}${incomplete}`;
 }
 
 export function CandidateReasoning({candidate}:{candidate:any}) {

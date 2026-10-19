@@ -1,3 +1,12 @@
+## 2026-10-20 · Evaluation VNext统一修复
+
+- Owner采纳二元业务合同及B/Q36=FAIL，版本化离线基准157/43；原200条回答/Final/原Judge/Regression及三份独立审计不回填。
+- 新Judge/Matcher/Policy及Generation身份；checks/issues替代新版逐句七类Claim，quality保留原11 Gate，真实Final/Parent/来源范围与安全约束保持。共享S图例，Matcher只定位，诊断以同次语义判断与Canonical阶段证据准入。
+- 真实业务翻转、持续FAIL新缺陷/严重风险、执行完整性贯通Sandbox与资格。单Agent/单方向/零候选保持，不改阈值、导航或人工发布。
+- 显式取代无限瞬态恢复：阶段3次/600秒，结构最多1次纠正；未知Usage或失联请求停止，成功生成复用，Case事务幂等。只读标题来源解释R1/R3范围，无知识制品重建。
+- 新Revision同步已验证Evidence来源ID/页码定位，旧冻结记录只读；事务Case写入拒绝冲突。
+- 本轮仅离线及必要本地服务验证，真实Provider/正式Baseline/Candidate/发布调用0；验证细节及剩余模型效果限制见实施报告。
+
 ## 2026-10-15 · Agent持久化归属修复
 
 - `No SPEC Change`：生成领取保存PID和唯一Token；启动清理保留仍存活的生成者，保存与失败回调核对领取Token，过期回调仅留Trace。当前Baseline/Golden/Corpus及原子保存状态保护保持。仅请求完整SHA一致且原Provider成功、失败阶段为persistence的原响应可复用；仍重新执行全部Schema/目标/Search Space/干预校验，旧Usage与失败Trace保留，不继承资格。

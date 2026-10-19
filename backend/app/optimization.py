@@ -162,7 +162,7 @@ class OptimizationAgent:
             stages = []
             with collect_usage() as usage, measure(stages, 'optimization_agent'):
                 try:
-                    system = "你是 RAG Optimization Agent。只返回 JSON：{\"root_cause_cluster\":\"...\",\"observed_evidence\":[\"...\"],\"candidates\":[{\"id\":\"A\",\"hypothesis\":\"...\",\"why\":\"...\",\"target_bad_cases\":[\"...\"],\"config_diff\":{},\"risk\":\"...\",\"target_group\":\"...\",\"root_cause\":\"Retrieval|Generation|Safety|Performance\",\"root_cause_evidence\":[\"目标ID\"],\"expected_improvement\":\"...\"}]}。Candidate还必须含intervention_direction、evidence_assertions、parameter_dependencies，见用户合同；不足时返回insufficient_evidence；严格遵守用户消息中的 allowed_parameter_values 类型和值，不得输出隐藏推理或测试答案。"
+                    system = "你是 RAG Optimization Agent。只返回 JSON：{\"root_cause_cluster\":\"...\",\"observed_evidence\":[\"...\"],\"candidates\":[{\"id\":\"A\",\"hypothesis\":\"...\",\"why\":\"...\",\"target_bad_cases\":[\"...\"],\"config_diff\":{},\"risk\":\"...\",\"target_group\":\"...\",\"root_cause\":\"Retrieval|Ranking|Generation|Safety|Performance\",\"root_cause_evidence\":[\"目标ID\"],\"expected_improvement\":\"...\"}]}。Candidate还必须含intervention_direction、evidence_assertions、parameter_dependencies，见用户合同；不足时返回insufficient_evidence；严格遵守用户消息中的 allowed_parameter_values 类型和值，不得输出隐藏推理或测试答案。"
                     user=json.dumps(prompt,ensure_ascii=False)
                     audit['validation_stage']='request_validation'
                     if callable(getattr(self.provider,'request_summary',None)):
@@ -222,8 +222,8 @@ class OptimizationAgent:
                     audit.update(failed_field='root_cause_evidence', actual_value=evidence_refs, expected_type='all target references', allowed_values=candidate['target_bad_cases'])
                     raise ValueError('根因依据必须对应全部目标引用')
                 causes = {item['diagnostic_view']['primary_root_cause'] for item in bad_cases if item['id'] in candidate['target_bad_cases'] or item['question_id'] in candidate['target_bad_cases']}
-                if candidate['root_cause'] not in {'Retrieval', 'Generation', 'Safety', 'Performance'} or causes and candidate['root_cause'] not in causes:
-                    audit.update(failed_field='root_cause', actual_value=candidate['root_cause'], expected_type='evidence-based target root cause, not intervention stage', allowed_values=sorted(causes) if causes else ['Retrieval','Generation','Safety','Performance'])
+                if candidate['root_cause'] not in {'Retrieval', 'Ranking', 'Generation', 'Safety', 'Performance'} or causes and candidate['root_cause'] not in causes:
+                    audit.update(failed_field='root_cause', actual_value=candidate['root_cause'], expected_type='evidence-based target root cause, not intervention stage', allowed_values=sorted(causes) if causes else ['Retrieval','Ranking','Generation','Safety','Performance'])
                     raise ValueError('候选根因与可信目标不对应')
                 if candidate["hypothesis"].strip() in {item.get("reasoning", {}).get("hypothesis", "").strip() for item in prior_candidates}:
                     audit.update(failed_field="hypothesis", actual_value=candidate["hypothesis"], expected_type="new hypothesis", allowed_values=None)

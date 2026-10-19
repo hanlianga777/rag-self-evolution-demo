@@ -1,3 +1,5 @@
+> 历史版本记录：当前生效评测合同为[SPEC文首VNext](RAG_SELF_EVOLUTION_SPEC.md)，本页旧字段/通过规则不参与新版正式评测。
+
 > 后续真实验证发现的behavior_evidence兼容问题及离线修复见[JUDGE_PARSER_COMPATIBILITY](JUDGE_PARSER_COMPATIBILITY.md)。下文保留前次交付事实。
 
 # Judge合同V1.2.1最小修复验收

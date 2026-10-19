@@ -123,7 +123,8 @@ class CandidateResumeTests(unittest.TestCase):
         self.store.update_evaluation_progress(run,{'checkpoints':{'Q1':{'execution':execution,'attempts':[],'inflight':'judge'}}})
         self.store.interrupt_evaluation_runs()
         result=self.runner.run_candidate(self.cid, automatic=False)
-        self.assertEqual(result['status'],'evaluated');self.assertEqual(self.runtime.answers.count('Q1'),1)
+        self.assertEqual(result['status'],'failed');self.assertEqual(self.runtime.answers.count('Q1'),1)
+        self.assertIn('Unknown request',result['result']['error'])
         self.assertEqual(result['result']['resume_source_id'],run)
     def test_resume_identity_budget_and_duplicate_guards_are_atomic(self):
         self.runtime.fail='judge';first=self.runner.run_candidate(self.cid, automatic=False)

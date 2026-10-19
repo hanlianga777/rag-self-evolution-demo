@@ -100,7 +100,9 @@ class ResumeTests(unittest.TestCase):
         self.store.update_evaluation_progress(run,{'checkpoints':{'Q1':{'execution':self.runtime.answer('Q1',config),'attempts':[],'inflight':'judge'}}})
         self.store.interrupt_evaluation_runs()
         child,items,config=self.runner.start_baseline(run);self.runtime.fail=None
-        result=self.runner.execute_baseline(child,items,config);self.assertEqual(result['status'],'completed');self.assertEqual(self.runtime.answers.count('Q1'),1)
+        result=self.runner.execute_baseline(child,items,config);self.assertEqual(result['status'],'partial');self.assertEqual(self.runtime.answers.count('Q1'),1)
+        self.assertIn('Unknown request',result['error_message']);self.assertEqual(self.runtime.judges,[])
+        self.assertIn('execution',result['result']['checkpoints']['Q1'])
 
     def test_incomplete_items_cannot_complete_or_call_provider(self):
         run,items,config=self.runner.start_baseline()

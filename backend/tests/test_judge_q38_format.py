@@ -57,10 +57,10 @@ class RetryWindowTests(unittest.TestCase):
         runtime=fixture.Runtime(fail=None);runner=EvaluationRunner(self.store,runtime)
         key,items,config=runner.start_baseline(automatic=True)
         result=self.store.evaluation_run(key)['result']
-        result['checkpoints']={'Q1':{'execution':runtime.answer('Q1',config),'attempts':[{'phase':'judge','status':'error','error_type':'ProviderInvalidResponse','recorded_by_run_id':key}]*5}}
+        result['checkpoints']={'Q1':{'execution':runtime.answer('Q1',config),'attempts':[{'phase':'judge','status':'error','error_type':'ProviderInvalidResponse','recorded_by_run_id':key}]*2}}
         self.store.update_evaluation_progress(key,result)
         def judge(*a,**kw):runtime.judges.append(a[0]);raise ProviderInvalidResponse('fixture contract')
         runtime.judge=judge
         completed=runner.execute_baseline(key,items,config)
-        self.assertEqual(completed['status'],'partial');self.assertEqual(runtime.judges,['Q1'])
-        self.assertEqual(len(completed['result']['checkpoints']['Q1']['attempts']),6)
+        self.assertEqual(completed['status'],'partial');self.assertEqual(runtime.judges,[])
+        self.assertEqual(len(completed['result']['checkpoints']['Q1']['attempts']),2)

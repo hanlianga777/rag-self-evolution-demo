@@ -1214,7 +1214,8 @@ class GovernanceStore:
             validation = validate_golden_candidate(candidate, chunks, frozen, context)
             errors.extend(f"{item_id}: {message.replace('unsupported answer anchor', '答案锚点未在所选证据原文中找到')}" for message in validation['blocking_errors'])
             candidate['validation'] = {k: v for k, v in validation.items() if k != 'normalized_candidate'}
-            drafts[item_id] = {**old, **candidate, "raw": {**old["raw"], "question": candidate["question"], "reference_answer": candidate["reference_answer"], "acceptable_evidence": evidence, "evidence": evidence, "validation": candidate["validation"], "ablation_metadata": candidate["ablation_metadata"]}}
+            candidate.update(source_chunk_ids=validation['normalized_candidate']['source_chunk_ids'],evidence_locations=validation['evidence_locations'])
+            drafts[item_id] = {**old, **candidate, "raw": {**old["raw"], "question": candidate["question"], "reference_answer": candidate["reference_answer"], "acceptable_evidence": evidence, "evidence": evidence, "validation": candidate["validation"], "ablation_metadata": candidate["ablation_metadata"], "source_chunk_ids":candidate["source_chunk_ids"], "evidence_locations":candidate["evidence_locations"]}}
             drafts[item_id]['raw'].update({key:candidate[key] for key in business_fields})
             if design_record:
                 drafts[item_id]['raw'].update({key:candidate[key] for key in ('business_design','business_design_provenance','previous_business_design')})
@@ -1500,6 +1501,7 @@ class GovernanceStore:
             if not validation['valid']:
                 raise ValueError('; '.join(validation['blocking_errors']))
         raw = {**current["raw"], "question": question, "reference_answer": reference_answer, "acceptable_evidence": evidence, "evidence": evidence, "validation": validation}
+        raw.update(source_chunk_ids=list(dict.fromkeys(key for source in evidence for key in source.get('source_chunk_ids',[]))), evidence_locations=validation['evidence_locations'] if validation else [])
         if auto_repair:
             raw.update({'quality_repair_count': 1, 'revision_version': current['raw'].get('revision_version', 1) + 1, 'quality_repair': {'actor': actor, 'at': _now(), 'before': {'question': current['question'], 'reference_answer': current['reference_answer'], 'evidence': current['evidence']}, 'trigger': {'probe_status': current['probe_status'], 'qc_status': current['qc_status']}}})
         with self.connection() as connection:
@@ -2083,6 +2085,11 @@ class GovernanceStore:
 
     def record_evaluation_case(self, run_id: str, question_id: str, result: dict, *, with_bad_case=False):
         with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            existing=connection.execute('SELECT result_json FROM evaluation_case_results WHERE run_id=? AND question_id=?',(run_id,question_id)).fetchall()
+            if existing:
+                if len(existing)==1 and _load(existing[0]['result_json'],{})==result:return
+                raise ValueError('保存的评测Case只读，拒绝重复或冲突写入')
             connection.execute("INSERT INTO evaluation_case_results(run_id, question_id, result_json) VALUES (?, ?, ?)", (run_id, question_id, _json(result)))
             if with_bad_case and not result['passed']:
                 connection.execute("INSERT INTO bad_cases VALUES (?,?,?,?,?,?,?,?)",(f"BC-{run_id}-{question_id}",run_id,question_id,result['root_cause']['primary'],result['severity'],'new',_json(result),_now()))

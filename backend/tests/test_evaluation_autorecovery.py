@@ -45,7 +45,7 @@ class AutomaticRecoveryTests(unittest.TestCase):
         with patch.object(provider,'complete',return_value='{"correctness":4'):
             with self.assertRaises(ProviderInvalidResponse):provider.judge('q','a','a')
 
-    def test_dead_worker_recovers_checkpoint_without_replaying_completed_question(self):
+    def test_dead_worker_stops_unknown_inflight_without_replaying_completed_question(self):
         runtime=Runtime(fail=None);runner=EvaluationRunner(self.store,runtime)
         key,items,config=runner.start_baseline(automatic=True)
         case=runner._case_result(items[0],config);self.store.record_evaluation_case(key,items[0]['id'],case)
@@ -57,8 +57,10 @@ class AutomaticRecoveryTests(unittest.TestCase):
         with patch('app.governance.os.kill',side_effect=ProcessLookupError):
             self.store.interrupt_evaluation_runs();self.assertEqual(self.store.evaluation_run(key)['status'],'queued')
             completed=runner.recover_run(key)
-        self.assertEqual(completed['status'],'completed');self.assertEqual(runtime.answers.count('Q1'),1);self.assertEqual(runtime.answers.count('Q2'),1)
-        self.assertEqual(len(self.store.evaluation_case_results(key)),4)
+        self.assertEqual(completed['status'],'partial');self.assertEqual(runtime.answers.count('Q1'),1);self.assertEqual(runtime.answers.count('Q2'),1)
+        self.assertIn('Unknown request',completed['error_message'])
+        self.assertEqual(len(self.store.evaluation_case_results(key)),1)
+        self.assertIn('execution',completed['result']['checkpoints']['Q2'])
 
     def test_same_worker_cannot_claim_twice_or_rejudge_completed_run(self):
         runtime=Runtime(fail=None);runner=EvaluationRunner(self.store,runtime)
@@ -86,7 +88,7 @@ class AutomaticRecoveryTests(unittest.TestCase):
         with patch('app.evaluation.time.sleep'):result=runner.execute_baseline(key,items,config)
         self.assertEqual(result['status'],'partial');checkpoint=result['result']['checkpoints']['Q1']
         errors=[a for a in checkpoint['attempts'] if a['status']=='error']
-        self.assertEqual(len(errors),6);self.assertEqual(errors[-1]['raw_provider_response'],'{}');self.assertIn('execution',checkpoint)
+        self.assertEqual(len(errors),2);self.assertEqual(errors[-1]['raw_provider_response'],'{}');self.assertIn('execution',checkpoint)
 
     def test_long_task_is_not_stopped_by_elapsed_time(self):
         import itertools

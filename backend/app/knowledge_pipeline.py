@@ -21,7 +21,7 @@ import numpy as np
 
 from .corpus import EMBEDDING_MODEL, source_fingerprint, _split_long_part
 from .full_text import CORPUS_LOCK, checksum, validate_bundle, write_full_text
-from .providers import ProviderUnavailable
+from .providers import ProviderUnavailable, request_timeout
 
 CONFIG = {'parser': 'MinerU', 'parser_mode': 'vlm', 'table_normalize': 'table-kv-v1',
           'chunk_strategy': 'Parent-Child', 'parent_tokens': 1400, 'child_tokens': 400,
@@ -163,7 +163,7 @@ class AlibabaProvider:
         started = time.perf_counter()
         call_started_at = datetime.now(timezone.utc).isoformat()
         try:
-            with urllib.request.urlopen(request, timeout=60) as response: body = json.load(response)
+            with urllib.request.urlopen(request, timeout=request_timeout(60)) as response: body = json.load(response)
             from .paid_run import current_paid_run
             if current_paid_run(): current_paid_run().response(body)
             record_usage({**body.get('usage', {}), 'provider':'Alibaba', 'requested_model':payload['model'], 'call_started_at':call_started_at, 'status':'ok', 'latency_ms':round((time.perf_counter()-started)*1000)})
