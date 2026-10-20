@@ -184,3 +184,5 @@ Mini20支持显式Business V2业务出题与十维审计，保留原Coverage/Con
 2026-10-15最新Medium50质量收口取消全部难度配额及15个复杂意图前置，只保留20/10/20题型与真实业务/证据/安全质量门槛；旧失败记录不回填。逐题治理、Owner Delegated审核与正式冻结的真实状态见[质量收口报告](docs/MEDIUM50_GOLDEN_CLOSURE_REPORT.md)。
 
 本轮Medium50已完成50/50真实质量检查与独立审核，通过Owner Delegated Gate1冻结`GD-20261015135415953347`；12项检索风险依既有合同具名接受并保留未修复记录。159次请求均成功，费用均为Unknown；本轮停止于Golden，未启动Baseline/Agent/Sandbox。详见上述质量收口报告。
+
+Baseline框架稳定性：Judge V4明确必要Final事实与非必要行为审查的输出边界；非法响应不改判。单题已知可恢复错误耗尽保留Checkpoint后继续，连续两题耗尽熔断；Partial禁止形成正式Overall/Gate，显式恢复复用成功结果。运行版本可由`GET /api/evaluation`的`runtime_contract`核对。详见[修复与离线验证报告](docs/BASELINE_RESILIENCE_FIX_REPORT.md)。

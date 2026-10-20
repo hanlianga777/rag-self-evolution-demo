@@ -1,0 +1,25 @@
+.......F.....F
+======================================================================
+FAIL: test_known_retry_after_exhausting_deadline_is_isolated (test_baseline_resilience.BaselineResilienceTests.test_known_retry_after_exhausting_deadline_is_isolated)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_resilience.py", line 164, in test_known_retry_after_exhausting_deadline_is_isolated
+    self.assertEqual(result['result']['completed'],49);self.assertEqual(calls.count(target['question']),1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 49
+
+======================================================================
+FAIL: test_stale_contract_keeps_existing_cases_and_checkpoint_audit (test_baseline_resilience.BaselineResilienceTests.test_stale_contract_keeps_existing_cases_and_checkpoint_audit)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_resilience.py", line 152, in test_stale_contract_keeps_existing_cases_and_checkpoint_audit
+    self.assertEqual(result['result']['checkpoints'],cp)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {} != {'Q1': {'execution': {'answer': '事实', 'ret[342 chars]'}]}}
+Diff is 879 characters long. Set self.maxDiff to None to see it.
+
+----------------------------------------------------------------------
+Ran 14 tests in 5.183s
+
+FAILED (failures=2)
+ISOLATION: /var/folders/1x/qtv6hmzn0xn_hwv0nrq22b3m0000gn/T/rag-closure-offline-dky0n16t TESTS: 14 FAILURES: 2 ERRORS: 0

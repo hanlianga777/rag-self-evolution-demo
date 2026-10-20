@@ -1,0 +1,15 @@
+{
+  "backend_tests": 274,
+  "new_resilience_tests": 16,
+  "frontend_files": 42,
+  "frontend_tests": 244,
+  "build": "PASS",
+  "historical_offline_records": 200,
+  "historical_explicit_response_PASS": 157,
+  "historical_explicit_response_FAIL": 43,
+  "real_provider_calls": 0,
+  "new_formal_runs": 0,
+  "independent_review": "all known findings closed; 16 isolated tests passed",
+  "systemic_breaker": "two consecutive exhausted recoverable cases; account/config/Unknown/Stop terminate immediately",
+  "data_protection": "all 29 table logical hashes and 21 index/PDF assets unchanged"
+}

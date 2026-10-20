@@ -1,0 +1,29 @@
+{
+  "runtime_contract": {
+    "prompt_version": "judge-vnext-4-output-contract",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "scoring_policy": "business-vnext-1",
+    "output_parser_version": "business-output-3-evidence-roles",
+    "safety_guard_version": "finite-safety-1",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605",
+    "judge_prompt_sha256": "160faf5ee7970dc2242a174623c6f199a28bc2d1f2b7b9f40b8afe4da29e9711",
+    "loaded_code_sha256": {
+      "validator": "b1480a961c3b1fc222ee71a5ef494bdf6d6292dc3aa23f0796d0ac3f00c8e5bf",
+      "provider_parser": "1bc3365142859b0459e9fbf599680018ba069b8ee0a86ec95d459c652d34abc2",
+      "scorer": "f9ed06db1329c4851e5f198a98e634be03c3ce63df02d69184b628898be7caf9",
+      "batch_runner": "cf4888a7e218f30229a79d2b014dfc9689c8ff7c80b06d0030df4de3b4ce5a7c"
+    }
+  },
+  "all_tables_unchanged": true,
+  "table_count": 29,
+  "all_index_and_pdf_assets_unchanged": true,
+  "asset_count": 21,
+  "latest_run_preserved": "EVAL-20261020145850446479",
+  "latest_status": "partial",
+  "requires_policy_upgrade": true,
+  "frontend_http": 200,
+  "new_formal_runs": 0,
+  "provider_calls": 0,
+  "live_api_checkpoint_matches_db": true
+}

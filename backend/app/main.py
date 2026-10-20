@@ -2,6 +2,7 @@ from .corpus import manifest_identity
 import csv
 import io
 import hashlib
+import marshal
 import json
 import os
 import sqlite3
@@ -26,7 +27,7 @@ from .full_text import CORPUS_LOCK
 from .corpus_management import CorpusManager, require_consistent_switch
 from .config import load_settings
 from .evaluation import EvaluationRunner, gate_details
-from .evaluation_contract import policy_current
+from .evaluation_contract import policy_current, VERSIONS, BUSINESS_JUDGE_PROMPT, validate_business_judgment
 from .governance import GovernanceStore, GENERATION_PROFILES
 from .optimization import OptimizationAgent
 from .diagnostics import diagnostic_view
@@ -35,6 +36,12 @@ from .telemetry import price_config
 from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
 from .retrieval import RetrievalUnavailable
 
+
+# Fingerprint loaded objects, not source files that may have changed under a live process.
+EVALUATION_RUNTIME_CONTRACT = {**VERSIONS, 'judge_prompt_sha256':hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(),
+    'loaded_code_sha256':{name:hashlib.sha256(marshal.dumps(fn.__code__)).hexdigest() for name,fn in {
+        'validator':validate_business_judgment, 'provider_parser':DeepSeekProvider._judge_business,
+        'scorer':EvaluationRunner.score_execution, 'batch_runner':EvaluationRunner._execute_baseline}.items()}}
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
 app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1] / "documents"), name="documents")
@@ -1250,7 +1257,7 @@ def evaluation(active_task: bool = False):
         snapshots=store.dataset_snapshots()
         snapshot_id=snapshots[0]['id'] if snapshots else None
         run=next((r for r in store.evaluation_runs() if r['config'].get('run_target')=='baseline' and r['status'] in {'running','partial','failed'} and r['dataset_version_id']==snapshot_id),None)
-    return {**(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":not policy_current(run.get("judge",{}))} if run else {})}
+    return {"runtime_contract":EVALUATION_RUNTIME_CONTRACT, **(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":not policy_current(run.get("judge",{}))} if run else {})}
 
 
 @app.get("/api/bad-cases")

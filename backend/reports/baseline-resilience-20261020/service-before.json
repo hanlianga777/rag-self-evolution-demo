@@ -1,0 +1,165 @@
+{
+  "assets": {
+    "backend/data/index/DOC-004-blocks.json": "6d6dc775ac632ccda93b0ebc2f65954d53572f5e23417779b04f961afcf1b7eb",
+    "backend/data/index/DOC-001-mineru.zip": "b3bb83c6a306c70e4d77fae31771918562015416e26cc3aa65bad2ef6e3a64d2",
+    "backend/data/index/source-manifest.json": "dc6aad86c333db4042343d77ec8a34867deb3c59be0f35ecea0748c016099a9a",
+    "backend/data/index/faiss.index": "ee5bb4977dcf28f8e2f8d1dfe92dee43e2106797710216958c05654eaacc2164",
+    "backend/data/index/DOC-004-mineru.zip": "ab056366a908ed5e3ef3195797fe705e1977848b324c97d2bf6900d7a6841fe6",
+    "backend/data/index/DOC-001-blocks.json": "86d6f4ef5bfa8bc329cd1376d420e4c22a8de5af81ac933f536412e5f36a1462",
+    "backend/data/index/DOC-002-blocks.json": "365ea72cfa8c75a7d3848e667c47548c0496134057705aed67b8ff390f91d6f0",
+    "backend/data/index/DOC-003-mineru.zip": "d848327ef6572c742063bc593f147c952b96f531700a8d4b82c01c61e048f7d0",
+    "backend/data/index/parents.json": "3ea4832bda1cc1bf446ba92d8bdd972ce6c399650fc36e033151504a3253b928",
+    "backend/data/index/embeddings.npy": "a9ddcb7468286082a6f16ea754281c926cd269ef5c7d0aaa74df42103ac65448",
+    "backend/data/index/documents.json": "056335fb99b5f180e24edef54316be1e5aa2d887f3d6bf7884227e147e6de054",
+    "backend/data/index/manifest.json": "edef3a1b3d56fe91fc29c3df89db3712ba90c788db47cf794dbebf33d18c7131",
+    "backend/data/index/coverage.json": "a4b1bb92692ea804f533a798d426d17b9b685729d7905fb20f418d24ace73551",
+    "backend/data/index/chunks.json": "ed52f56b622f8b5d677d1828ec0dd745713f568c71e5412618e34f4131ee3ddd",
+    "backend/data/index/full_text.json": "314eab3323aea22036f80fc30053420960ce7e96fd6d0163ee23fde37136c197",
+    "backend/data/index/DOC-002-mineru.zip": "4a0045c922154bda52c3acec9167de5307c72c0ee3fc9702b7323f9e6884fa62",
+    "backend/data/index/DOC-003-blocks.json": "06ee9785ad508838a90dd1a5bc280258cfd1219fb7ba47664ffb37bcc5a0b7de",
+    "backend/documents/卡赫_KIRA_B_50完整操作说明_中文版.pdf": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+    "backend/documents/宇树_B2遥控器使用说明_中文版.pdf": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+    "backend/documents/宇树_B2四足机器人用户手册_中文版.pdf": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+    "backend/documents/宇树_B2电池与充电器使用说明_中文版.pdf": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+  },
+  "tables": {
+    "agent_traces": {
+      "rows": 4,
+      "sha256": "9bb1ee6b655a686b92bf5182f0f725b410d65cfeddc4b6f1cce936cd7d58328c"
+    },
+    "alias_mappings": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "approvals": {
+      "rows": 77,
+      "sha256": "af03d498167cb2cbab114a1e65aebee357a584cc39b387f074a49d68704c8241"
+    },
+    "bad_cases": {
+      "rows": 104,
+      "sha256": "a3a77ab2a2c6d7e43639fb2567f21840233d392d0de6e5e7fa6c47ca6509d1f3"
+    },
+    "business_import_batches": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "candidate_configs": {
+      "rows": 6,
+      "sha256": "48ceefb4fd2bcf8a8cd4a2793e2fdb90b414aa88ab9ae94f2f112e32d97fc2b8"
+    },
+    "candidate_revision_runs": {
+      "rows": 183,
+      "sha256": "47b1de834ab4e586b92f2836e0baf0893d0ec0daada9310327bbd75d831a17f6"
+    },
+    "coverage_plan_previews": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "dataset_versions": {
+      "rows": 2,
+      "sha256": "7730b5ac17b38045452f44852e2a8b8bd82b27517bab843e0a70b2286230611d"
+    },
+    "demo_state": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "evaluation_case_results": {
+      "rows": 302,
+      "sha256": "e4e885e7b6f03f3c61597d3f12aa0e5d5f284b2fc95a12f6894d87d143fee348"
+    },
+    "evaluation_runs": {
+      "rows": 11,
+      "sha256": "eb68449f15028e805804250c783950d49a56388c994e1c5a479bfe386abf6960"
+    },
+    "experiments": {
+      "rows": 2,
+      "sha256": "4ecbc25b510838d388ec05255626c54fbe7a80c01989f8b7f83ea29d8783f1d7"
+    },
+    "golden_generation_artifacts": {
+      "rows": 4,
+      "sha256": "b020547d4937085ddbb39c5e9f5015eab2f9c85e9ff5821e731aae5d6241320f"
+    },
+    "golden_generation_runs": {
+      "rows": 4,
+      "sha256": "93851ce0b4b982d9b53d889dfced05bead5076bf4e4832bb1302a818ef3aa402"
+    },
+    "monitoring_events": {
+      "rows": 1,
+      "sha256": "c5ecef65ea1f5032362f8076d0c4cd9afc19cf28c6867d1043daa7b66e54fcdc"
+    },
+    "optimization_triggers": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "pipeline_config_draft": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "probe_results": {
+      "rows": 287,
+      "sha256": "3dfad789895d346540d883117b9281264ebfa0d2408216ae4bfd65a3552d1adf"
+    },
+    "production_versions": {
+      "rows": 1,
+      "sha256": "2f6b374d972f5fcebe858d900c61178492c843e5f1a9296b22e4e367599a91e3"
+    },
+    "qc_results": {
+      "rows": 270,
+      "sha256": "1128ff5e582bb534aadd3d5644e1ccf7127325bc6838647541ce0562ff21cf64"
+    },
+    "question_quality_audits": {
+      "rows": 284,
+      "sha256": "98d3f9957c431e69cc82b9ecf93bc9a8e7448b025785f914d36fbdc6b8bede64"
+    },
+    "questions": {
+      "rows": 225,
+      "sha256": "3dda758bcbd6c16fd1e08a81e9a2e8b25cef951e0adede5236aa8b9348b0c559"
+    },
+    "recommendations": {
+      "rows": 2,
+      "sha256": "9b43221119e5fb1e2772c63d7c44560fd087c8b38612b6803f5f08f3a541f4ab"
+    },
+    "review_events": {
+      "rows": 232,
+      "sha256": "0a56e5cdc44dbdcee68a1673b455fc9f432d35f90cb85d7c530fb8620abff012"
+    },
+    "rollback_history": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "schema_migrations": {
+      "rows": 7,
+      "sha256": "2796c86b347a67022fafb38a463cedb650ecc758dedb0ce353a733fd2547d4eb"
+    },
+    "tool_calls": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "tool_registry": {
+      "rows": 5,
+      "sha256": "11bb97a2bc90e2e69dc7fd23660a1d732d256de8477d21f62db0623b7c58d227"
+    }
+  },
+  "api_judge": {
+    "baseline_version": "runtime-initial-20261014030238448891",
+    "evaluation_identity": "b94f1c25a42076ee6dee977a88d0aec1be2220ae9f40a257d559e21cea986b1d",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "execution_snapshot": {
+      "embedding_model": "text-embedding-v4",
+      "generation_model": "deepseek-v4-flash",
+      "temperature": 0.2,
+      "vector_index": "FAISS IndexFlatIP (normalized cosine similarity)"
+    },
+    "generation_boundary_sha256": "d1fa3c13186c04fb95bd01be6615f25c6a59dbdd766290a108c4bfac78456ea2",
+    "generation_prompt_version": "generation-vnext-1",
+    "judge_prompt_sha256": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+    "model": "deepseek-v4-flash",
+    "output_parser_version": "business-output-3-evidence-roles",
+    "prompt_version": "judge-vnext-3-safety-consistency",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_guard_version": "finite-safety-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605",
+    "scoring_policy": "business-vnext-1",
+    "temperature": 0
+  }
+}

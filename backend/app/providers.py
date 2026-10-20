@@ -250,7 +250,7 @@ class DeepSeekProvider:
                     raise ValueError('invalid baseline issue semantic correspondence')
             return {**result,'raw_provider_response':content,'response_metadata':_response_metadata.get(),'format_recovery':recovery}
         except (ValueError, KeyError, TypeError) as error:
-            raise ProviderInvalidResponse(f'VNext Judge合同无效：{error}',raw_provider_response=content,metadata=_response_metadata.get()) from error
+            raise ProviderInvalidResponse(f'VNext Judge合同无效：{error}',raw_provider_response=content,metadata={**_response_metadata.get(),'validation_error':{'category':'business_contract','message':str(error)}}) from error
 
     def judge(self, question: str, expected: str, answer: str, *, context: dict | None = None) -> dict:
         if (context or {}).get('contract_version') == 'business-vnext-1':

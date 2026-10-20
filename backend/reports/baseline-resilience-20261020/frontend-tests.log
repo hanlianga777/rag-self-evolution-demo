@@ -1,0 +1,5 @@
+vitest --run; full temporary log: /tmp/rag-resilience-frontend.log
+ Test Files  42 passed (42)
+      Tests  244 passed (244)
+   Start at  23:09:54
+   Duration  13.38s (transform 2.23s, setup 0ms, collect 13.51s, tests 25.43s, environment 30.07s, prepare 3.70s)

@@ -205,13 +205,13 @@ class EvaluationRunner:
         execution = self.runtime.answer(item["question"], config)
         return self.score_execution(item, execution)
 
-    def score_execution(self, item, execution):
+    def score_execution(self, item, execution, *, judge_correction=None):
         expected = item["reference_answer"] or item["raw"].get("expected_behavior", "拒答或澄清")
         trace = execution.get('retrieval_trace') or {}
         final = trace.get('final', [])
         observation = observe_evidence(item, final)
         from .ai_service import generation_context
-        judge = self.runtime.judge(item["question"], expected, execution["answer"], item["test_category"], context={'contract_version':VERSIONS['scoring_policy'], 'retrieval_candidates':trace.get('candidates',[]), 'baseline_findings':item.get('baseline_findings'), 'sources_legend':json.loads(generation_context(final).split('\n',1)[0])['sources'], 'golden_evidence': item['evidence'], 'final_context': final, 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'), 'expected_behavior': item['raw'].get('expected_behavior'), 'source_constraints': observation['source_constraints'], 'programmatic_evidence_observation': observation})
+        judge = self.runtime.judge(item["question"], expected, execution["answer"], item["test_category"], context={**({'judge_correction':judge_correction} if judge_correction else {}), 'contract_version':VERSIONS['scoring_policy'], 'retrieval_candidates':trace.get('candidates',[]), 'baseline_findings':item.get('baseline_findings'), 'sources_legend':json.loads(generation_context(final).split('\n',1)[0])['sources'], 'golden_evidence': item['evidence'], 'final_context': final, 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'), 'expected_behavior': item['raw'].get('expected_behavior'), 'source_constraints': observation['source_constraints'], 'programmatic_evidence_observation': observation})
         if 'verdict' in judge:
             return self._score_business(item, execution, judge, expected)
         sufficiency = resolve_evidence(item, observation, judge, final)
@@ -369,8 +369,10 @@ class EvaluationRunner:
         cases, checkpoints, phase, item = [], {}, 'initialization', None
         run = self.store.evaluation_run(run_id)
         frozen_ids = set(json.loads(run['dataset_snapshot_json'])['question_ids'])
+        cases = self.store.evaluation_case_results(run_id)
+        checkpoints = run['result'].get('checkpoints', {})
         lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery') if k in run['result']}
-        def progress():
+        def progress(*, complete=False):
             from .telemetry import cost_fields
             events=[u for cp in checkpoints.values() for attempt in cp.get('attempts',[]) for u in attempt.get('usage',[])]
             accounting={'provenance':'logical_task_including_resume_history','call_events':len(events),
@@ -378,12 +380,16 @@ class EvaluationRunner:
                 'known_input_tokens':sum(u.get('prompt_tokens',u.get('total_tokens',0)) for u in events if type(u.get('prompt_tokens',u.get('total_tokens'))) is int),
                 'known_output_tokens':sum(u['completion_tokens'] for u in events if type(u.get('completion_tokens')) is int),
                 **cost_fields(self.runtime.model,events)}
-            return {**summarize_evaluation_cases(cases), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints,'request_accounting':accounting, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None, 'stage_total_seconds':600, 'stage_max_attempts':3}}
+            summary=summarize_evaluation_cases(cases)
+            errors=[{'question_id':q, **cp['technical_error']} for q,cp in checkpoints.items() if cp.get('technical_error')]
+            if not complete:
+                summary.update(overall_score=None, overall_score_status='NOT_EVALUABLE', gates={**evaluate_gates({}), 'passed':None})
+            return {**summary, 'technical_errors':errors, 'technical_error_count':len(errors), 'attempted':len(cases)+len(errors), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints,'request_accounting':accounting, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None, 'stage_total_seconds':600, 'stage_max_attempts':3}}
         try:
+            if not policy_current(run['judge']) or run['judge'].get('evaluation_identity')!=evaluation_identity(json.loads(run['dataset_snapshot_json']),run['judge']):
+                raise ValueError('Evaluation Identity或加载的合同版本不一致，禁止继续Provider调用')
             if {i['id'] for i in approved} != frozen_ids or len(approved) != len(frozen_ids):
                 raise ValueError('未提交完整冻结题集，不能标为Completed')
-            cases = self.store.evaluation_case_results(run_id)
-            checkpoints = run['result'].get('checkpoints', {})
             if not isinstance(checkpoints, dict) or not set(checkpoints) <= frozen_ids:
                 raise ValueError('检查点不属于冻结Snapshot')
             saved = {c['question_id'] for c in cases}
@@ -395,7 +401,7 @@ class EvaluationRunner:
                 if self.store.evaluation_run(run_id)['result'].get('stop_request'):
                     raise InterruptedError('用户停止运行，断点已保存')
             def perform(phase,action):
-                from .providers import ProviderAPIError,ProviderInvalidResponse,retryable_error,stage_deadline
+                from .providers import ProviderAPIError,ProviderInvalidResponse,ProviderTimeout,retryable_error,stage_deadline
                 # Explicit Resume starts a new retry window; process recovery of this Run keeps its failures.
                 prior=[a for a in checkpoint['attempts'] if a.get('phase')==phase and a.get('recorded_by_run_id')==run_id]
                 failures=0;invalid_failures=0
@@ -413,6 +419,12 @@ class EvaluationRunner:
                 while True:
                     check_stop()
                     if failures>=3 or invalid_failures>=2 or time.monotonic()>=deadline:
+                        last=checkpoint['attempts'][-1] if checkpoint['attempts'] else {}
+                        if (last.get('phase')==phase and last.get('recorded_by_run_id')==run_id
+                                and last.get('status')=='error' and last.get('retryable') is True
+                                and last.get('request_execution_unknown') is False):
+                            last['retryable']=False
+                            raise ProviderTimeout('Known Provider stage exhausted 3 attempts or 600 seconds')
                         raise RuntimeError('Provider stage exhausted 3 attempts or 600 seconds')
                     checkpoint['inflight']=phase
                     if automatic:lineage['auto_recovery'].update(state='running',question_id=item['id'],phase=phase)
@@ -422,7 +434,7 @@ class EvaluationRunner:
                         with collect_usage() as usage,stage_deadline(deadline):value=action()
                         if time.monotonic()>deadline:
                             checkpoint['execution' if phase=='generation' else 'scored_result']=value
-                            raise RuntimeError('Provider stage exceeded 600 seconds')
+                            raise ProviderTimeout('Known complete Provider response exceeded 600 seconds')
                     except Exception as error:
                         failures+=1
                         attempt={'phase':phase,'status':'error','error_type':type(error).__name__,'error':str(error),
@@ -460,35 +472,64 @@ class EvaluationRunner:
                         raise
                     checkpoint['attempts'].append({'phase':phase,'status':'ok','recorded_by_run_id':run_id,'usage':usage,'elapsed_ms':round((time.perf_counter()-started)*1000)})
                     checkpoint.pop('inflight',None);return value
+            consecutive_errors=0
             for item in approved:
                 check_stop()
                 if item['id'] in saved:
                     if item['id'] in checkpoints:
-                        for key in ('execution','scored_result','inflight'):checkpoints[item['id']].pop(key,None)
+                        for key in ('execution','scored_result','inflight','technical_error'):checkpoints[item['id']].pop(key,None)
                     continue
                 checkpoint=checkpoints.setdefault(item['id'],{'attempts':[]})
                 if 'execution' in checkpoint and (not isinstance(checkpoint['execution'].get('answer'),str) or not isinstance(checkpoint['execution'].get('retrieval_trace',{}).get('final'),list)):
                     raise ValueError('生成检查点缺少完整答案/最终上下文')
-                phase='generation'
-                if 'execution' not in checkpoint:
-                    checkpoint['execution']=perform(phase,lambda:self.runtime.answer(item['question'],config))
+                try:
+                    phase='generation'
+                    if 'execution' not in checkpoint:
+                        checkpoint['execution']=perform(phase,lambda:self.runtime.answer(item['question'],config))
+                        self.store.update_evaluation_progress(run_id,progress())
+                    phase='judge'
+                    if 'scored_result' not in checkpoint:
+                        def score():
+                            previous=next((a for a in reversed(checkpoint['attempts']) if a.get('phase')=='judge' and a.get('recorded_by_run_id')==run_id and a.get('error_type')=='ProviderInvalidResponse'),None)
+                            correction={'error':previous['error'], 'previous_response':previous.get('raw_provider_response')} if previous else None
+                            return self.score_execution(item,checkpoint['execution'],judge_correction=correction)
+                        checkpoint['scored_result']=perform(phase,score)
+                        self.store.update_evaluation_progress(run_id,progress())
+                except Exception as error:
+                    from .providers import retryable_error
+                    last=checkpoint['attempts'][-1] if checkpoint['attempts'] else {}
+                    # Only known, exhausted recoverable requests are isolated; auth/config/Unknown/Stop halt.
+                    if not (automatic and retryable_error(error) and last.get('status')=='error'
+                            and last.get('recorded_by_run_id')==run_id and last.get('retryable') is False
+                            and last.get('request_execution_unknown') is False):
+                        raise
+                    checkpoint['technical_error']={'phase':phase, 'error_type':type(error).__name__, 'error':str(error)}
+                    consecutive_errors+=1
                     self.store.update_evaluation_progress(run_id,progress())
-                phase='judge'
-                if 'scored_result' not in checkpoint:
-                    checkpoint['scored_result']=perform(phase,lambda:self.score_execution(item,checkpoint['execution']))
-                    self.store.update_evaluation_progress(run_id,progress())
+                    # ponytail: two adjacent exhausted cases are a circuit breaker; no extra diagnostic calls.
+                    if consecutive_errors>=2:
+                        raise RuntimeError('连续两题受控重试耗尽；疑似系统性配置或合同失效，已停止Provider调用') from error
+                    continue
                 result=checkpoint['scored_result']
                 self.store.record_evaluation_case(run_id,item['id'],result,with_bad_case=True)
                 cases.append({'question_id':item['id'],**result});saved.add(item['id'])
+                consecutive_errors=0
+                checkpoint.pop('technical_error',None)
                 checkpoint.pop('execution',None);checkpoint.pop('scored_result',None);checkpoint.pop('inflight',None)
                 self.store.update_evaluation_progress(run_id,progress())
             check_stop()
+            errors=progress()['technical_errors']
+            if errors:
+                message=f"{len(errors)}题技术异常；已完成{len(cases)}/{len(frozen_ids)}，检查点已保存，须恢复后才能形成完整成绩"
+                if automatic:lineage['auto_recovery'].update(state='stopped',error=message)
+                return self.store.finish_evaluation_run(run_id,'partial',progress(),message)
             if automatic:lineage['auto_recovery']['state']='completed'
-            return self.store.finish_evaluation_run(run_id, 'completed', {**progress(), 'evaluation_complete':True})
+            return self.store.finish_evaluation_run(run_id, 'completed', {**progress(complete=True), 'evaluation_complete':True})
         except Exception as error:
             if item is not None:
                 checkpoint = checkpoints.setdefault(item['id'], {'attempts':[]})
                 checkpoint.pop('inflight', None)
+                if not isinstance(error,InterruptedError):checkpoint.setdefault('technical_error',{'phase':phase,'error_type':type(error).__name__,'error':str(error)})
                 if not checkpoint['attempts'] or checkpoint['attempts'][-1].get('status')!='error':checkpoint['attempts'].append({'phase':phase, 'status':'error', 'error_type':type(error).__name__, 'cause_type':type(error.__cause__).__name__ if error.__cause__ else None, 'error':str(error), 'usage':locals().get('usage', []), 'elapsed_ms':round((time.perf_counter()-started)*1000) if 'started' in locals() else None})
                 checkpoint['attempts'][-1]['cause_message'] = str(error.__cause__) if error.__cause__ else None
                 if isinstance(getattr(error, 'raw_provider_response', None), str):

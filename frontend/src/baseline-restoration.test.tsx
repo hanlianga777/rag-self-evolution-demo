@@ -59,3 +59,16 @@ it("also labels the historical completed baseline as a new-version rerun", async
   await render(<EvaluationPage data={{evaluation:run}}/>);
   expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("重新运行 Baseline（新版本）"))).toBe(true);
 });
+
+it("keeps partial technical exceptions separate from business failures on all Baseline tabs", async () => {
+  const run={id:"partial-49",status:"partial",error_message:"1题技术异常",dataset_snapshot:{question_ids:Array(50).fill("q")},cases:[],result:{completed:49,total:50,attempted:50,technical_error_count:1,technical_errors:[{question_id:"fixture-18",phase:"judge",error:"support missing"}],bad_case_count:0,overall_score:null,overall_score_status:"NOT_EVALUABLE",gates:{passed:null,total:11,passed_count:0,gates:[]}}};
+  vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url.endsWith("/api/bad-cases")?[]:run))));
+  await render(<EvaluationPage data={{evaluation:run}}/>);
+  expect(document.body.textContent).toContain("已完成 49 / 50");
+  expect(document.body.textContent).toContain("题目级技术异常 1（不计入 Bad Case）");
+  expect(document.body.textContent).not.toContain("Baseline 群组Gate通过");
+  for(const label of ["Hard Gate","Bad Case 诊断"]){
+    await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent===label)!.click());
+    expect(document.body.textContent).toContain("题目级技术异常 1（不计入 Bad Case）");
+  }
+});

@@ -1,0 +1,27 @@
+....F...F.......
+======================================================================
+FAIL: test_crash_after_case_commit_clears_stale_error_without_rejudging (test_baseline_resilience.BaselineResilienceTests.test_crash_after_case_commit_clears_stale_error_without_rejudging)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_resilience.py", line 203, in test_crash_after_case_commit_clears_stale_error_without_rejudging
+    self.assertEqual(result['status'],'completed');self.assertEqual(result['result']['technical_error_count'],0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'partial' != 'completed'
+- partial
++ completed
+
+
+======================================================================
+FAIL: test_known_late_complete_response_is_saved_and_resume_does_not_repeat_it (test_baseline_resilience.BaselineResilienceTests.test_known_late_complete_response_is_saved_and_resume_does_not_repeat_it)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_resilience.py", line 216, in test_known_late_complete_response_is_saved_and_resume_does_not_repeat_it
+    self.assertEqual(old['result']['completed'],49);self.assertEqual(old['result']['technical_error_count'],1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 49
+
+----------------------------------------------------------------------
+Ran 16 tests in 5.345s
+
+FAILED (failures=2)
+ISOLATION: /var/folders/1x/qtv6hmzn0xn_hwv0nrq22b3m0000gn/T/rag-closure-offline-waulvfz7 TESTS: 16 FAILURES: 2 ERRORS: 0

@@ -673,3 +673,7 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 - 同Slot全历史替换额度核对：Q07两次新替换耗尽仍有实际PDF气/水部件歧义；Q27第二替换Hard Validation失败未应用，按原有限失败合同停止。
 - 当前32/50机器合格、39题Probe/QC通过、11份质量中断；未批准、冻结或执行新Baseline/Agent/ABC。961次真实调用保留960份Usage及1份未知，未知请求未重发；费用Unknown不写0。
 - 21份PDF/索引资产及旧Snapshot/评测/实验/Production行保持；逐题当前身份与真实失败见MEDIUM50_FULL_EVOLUTION_ACCEPTANCE.md。
+
+## 2026-10-20 Baseline框架稳定性
+
+- **2026-10-20 Baseline框架稳定性修复（当前）**：Judge升级`judge-vnext-4-output-contract`，进入既有Evaluation Identity；Parser/Matcher真实性标准、有限Safety Guard与11 Gate阈值不变。Positive/Ablation必要事实及安全适用性met=true必须真实适用Final非空support；未虚构、谨慎核对/咨询等非必要行为审查写reason，不能额外作为无Final支持的正确事实，也不能删除必要事实来规避校验。真实必要Final缺失应由Judge明确met=false/FAIL；原始非法PASS响应仍是技术异常，不由Parser猜改判分。Negative纯拒答可无support，附加技术事实仍须Final。既有首次+2恢复/600秒不变，结构错误最多纠正一次，重试带原始非法输出及错误反馈，输入仍不可信。授权自动批评中，已知执行的可恢复错误耗尽后保留题目级technical_error和原始响应/答案/阶段/Usage，继续其余题；连续两题耗尽保守熔断并停止调用，认证/配置错误、Unknown及Stop立即停止。最终有技术异常仅Partial，不产生正式Overall或Hard Gate通过，不计业务Bad Case、不进入Agent；同身份显式恢复复用成功题及生成答案，仅补缺失判分。旧Prompt身份只读，须新版本运行，不自动重评。`/api/evaluation`返回加载对象的Prompt/Parser/Validator/Scorer/Batch代码指纹，防止把磁盘源码当成运行版本。页面沿用原布局展示持久化技术异常。架构节点与关系不变，评测节点内部容错语义按本条更新。详见[框架稳定性报告](BASELINE_RESILIENCE_FIX_REPORT.md)。

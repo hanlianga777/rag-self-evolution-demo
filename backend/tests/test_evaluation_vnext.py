@@ -111,11 +111,11 @@ class BoundedRecoveryTests(unittest.TestCase):
             runtime=fixture.Runtime(fail=None);runner=EvaluationRunner(holder.store,runtime)
             def judge(*a,**kw):
                 runtime.judges.append(a[0])
-                if len(runtime.judges)>3:raise AssertionError('unbounded retry detected by test sentinel')
+                if len(runtime.judges)>6:raise AssertionError('unbounded retry detected by test sentinel')
                 raise ProviderTimeout('offline timeout')
             runtime.judge=judge;key,items,config=runner.start_baseline(automatic=True)
             with patch('app.evaluation.time.sleep'):r=runner.execute_baseline(key,items,config)
-            self.assertEqual(len(runtime.judges),3);self.assertEqual(runtime.answers,['Q1']);self.assertEqual(r['status'],'partial');self.assertEqual(holder.store.evaluation_case_results(key),[])
+            self.assertEqual(len(runtime.judges),6);self.assertEqual(runtime.answers,['Q1','Q2']);self.assertEqual(r['status'],'partial');self.assertEqual(holder.store.evaluation_case_results(key),[])
             self.assertIn('execution',r['result']['checkpoints']['Q1'])
         finally:holder.tearDown()
 
