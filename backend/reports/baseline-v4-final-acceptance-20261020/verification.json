@@ -1,0 +1,28 @@
+{
+  "live_runtime_contract": {
+    "prompt_version": "judge-vnext-4-output-contract",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "scoring_policy": "business-vnext-1",
+    "output_parser_version": "business-output-4-negative-facts",
+    "safety_guard_version": "finite-safety-1",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605",
+    "judge_prompt_sha256": "d7369e24e41be85123d795d388bc52a995fb5d287e577a228a09d42678e6a693",
+    "loaded_code_sha256": {
+      "validator": "9d509642d2d8061980dc19047cda652304579e5f46cf9bbe6cdc3d7aafb6f13f",
+      "provider_parser": "1bc3365142859b0459e9fbf599680018ba069b8ee0a86ec95d459c652d34abc2",
+      "scorer": "e1bff39f989846689246d01b1244e233ab9fd64b7ae9d0bd400016147e3ebdb1",
+      "batch_runner": "337490a439aa7c656e4d7e6ddd7d31ff99ecf60d7c3c119c348af17eb747de6c"
+    }
+  },
+  "all_production_tables_unchanged": true,
+  "latest_run_id": "EVAL-20261020145850446479",
+  "latest_status": "partial",
+  "provider_calls": 0,
+  "new_formal_runs": 0,
+  "three_case_validation": "PREPARED_NOT_AUTHORIZED_NOT_EXECUTED",
+  "targeted_tests": 140,
+  "independent_reviewer_tests": 23,
+  "unresolved_program_blockers": [],
+  "semantic_limit": "LLM omitted/misclassified facts require independent content review; not proved by Parser acceptance"
+}

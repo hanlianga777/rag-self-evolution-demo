@@ -1,0 +1,8 @@
+{
+  "manifest.json": "7e2a819a115ca54d4f25435af3275535f3527e75feb44d5f817402380801dd2f",
+  "protection-before.json": "d81f687da50e1697c6faa4aa6cbbcbbaab240d318d7beb205f8d802a9aca4a90",
+  "reproduction-before-fix.log": "3f8095e0b189328c42ed97ed967e93389177fdccad4fabc2ad41abace743fba5",
+  "requests.json": "87fc5b1b5e9e20eb7eddcc80e4340346e22bd047136e1a15d1dc039eebeae9fc",
+  "targeted-tests.log": "aa48ccbf6d85c43ad9eb1202a13a9c3a61df984fab430f761472f63b1a50c9cc",
+  "verification.json": "30dc71eb9c370f66cf0b42f4bbaf52a7bb25e1ec1a7d0e65a67b62ac5583c78d"
+}

@@ -677,3 +677,7 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 ## 2026-10-20 Baseline框架稳定性
 
 - **2026-10-20 Baseline框架稳定性修复（当前）**：Judge升级`judge-vnext-4-output-contract`，进入既有Evaluation Identity；Parser/Matcher真实性标准、有限Safety Guard与11 Gate阈值不变。Positive/Ablation必要事实及安全适用性met=true必须真实适用Final非空support；未虚构、谨慎核对/咨询等非必要行为审查写reason，不能额外作为无Final支持的正确事实，也不能删除必要事实来规避校验。真实必要Final缺失应由Judge明确met=false/FAIL；原始非法PASS响应仍是技术异常，不由Parser猜改判分。Negative纯拒答可无support，附加技术事实仍须Final。既有首次+2恢复/600秒不变，结构错误最多纠正一次，重试带原始非法输出及错误反馈，输入仍不可信。授权自动批评中，已知执行的可恢复错误耗尽后保留题目级technical_error和原始响应/答案/阶段/Usage，继续其余题；连续两题耗尽保守熔断并停止调用，认证/配置错误、Unknown及Stop立即停止。最终有技术异常仅Partial，不产生正式Overall或Hard Gate通过，不计业务Bad Case、不进入Agent；同身份显式恢复复用成功题及生成答案，仅补缺失判分。旧Prompt身份只读，须新版本运行，不自动重评。`/api/evaluation`返回加载对象的Prompt/Parser/Validator/Scorer/Batch代码指纹，防止把磁盘源码当成运行版本。页面沿用原布局展示持久化技术异常。架构节点与关系不变，评测节点内部容错语义按本条更新。详见[框架稳定性报告](BASELINE_RESILIENCE_FIX_REPORT.md)。
+
+## 2026-10-20 V4上线前合同验收
+
+- **2026-10-20 V4上线前Negative合同验收（当前）**：保留V4 Judge与既有流程，仅补`checks[].check_type`：未声明默认`fact`；所有类别met=true的fact一律真实适用Final非空support并核产品/版本约束。只有Negative显式`negative_behavior`的纯拒答/澄清/抗注入行为允许空support，仍需真实答案引用；非法类型、其他类别借用行为豁免均技术异常。混合行为/附加技术事实必须由同次Judge拆开，禁止以角色标签隐藏事实；Parser不凭自然语言/关键词推断或补写角色。Parser升级`business-output-4-negative-facts`进入Identity，旧记录不回填。Baseline与历史回放的Partial/Failed共用未完成聚合屏蔽，Overall/Gate不可评估，技术异常不造业务Bad Case。没有改11 Gate、Matcher、Safety Guard或架构。Q01/Q21/Q40仅冻结保存答案/完整Final与3次单Judge预算方案，未经Owner授权不调用Provider；真验收逐题独立核查事实覆盖、引用适用性和判定合理性，不以Parser通过代替。模型漏列或错分行为/事实仍属语义覆盖风险，未宣称程序能够穷尽理解。

@@ -1,0 +1,53 @@
+{
+  "status": "PREPARED_NOT_AUTHORIZED_NOT_EXECUTED",
+  "provider_calls": 0,
+  "new_formal_runs": 0,
+  "requests": 3,
+  "max_requests": 3,
+  "automatic_retries": 0,
+  "sequence": [
+    1,
+    21,
+    40
+  ],
+  "stop_on_first_technical_or_semantic_validation_failure": true,
+  "reuse_only_saved_answers_and_full_final": true,
+  "versions": {
+    "prompt_version": "judge-vnext-4-output-contract",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "scoring_policy": "business-vnext-1",
+    "output_parser_version": "business-output-4-negative-facts",
+    "safety_guard_version": "finite-safety-1",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605"
+  },
+  "prompt_sha256": "d7369e24e41be85123d795d388bc52a995fb5d287e577a228a09d42678e6a693",
+  "payloads_sha256": "67b820502ad1d8094e4c572184df59d315f5f1b96bdc45a136564e907b4f1881",
+  "input_tokens_conservative_bound": 80913,
+  "output_tokens_total_cap": 98304,
+  "price_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "price_checked_date": "2026-10-20",
+  "price_CNY_per_million": {
+    "off_peak_input_uncached": 1,
+    "off_peak_output": 4,
+    "peak_input_uncached": 2,
+    "peak_output": 8
+  },
+  "cost_basis": "all input cache misses; peak prices for conservative ceiling; UTF-8 byte bound +256 message overhead per request",
+  "estimated_typical_CNY": [
+    0.08,
+    0.2
+  ],
+  "conservative_3_call_ceiling_CNY": 0.9483,
+  "recommended_authorization_budget_CNY": 1.0,
+  "release_eligible": false,
+  "validation": [
+    "raw JSON and schema valid",
+    "every Golden required fact/expected behavior covered",
+    "every additional technical fact split as fact, actual applicable Final support",
+    "Negative pure behavior has original answer quotes and explicit negative_behavior",
+    "whole-answer conflicts/omissions reviewed independently",
+    "not merely Parser success"
+  ],
+  "production_tables_unchanged": true
+}

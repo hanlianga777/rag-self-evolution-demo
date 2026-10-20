@@ -1,0 +1,86 @@
+FEFFFFFFF.
+======================================================================
+ERROR: test_incomplete_summary_does_not_issue_overall_or_gate_success (test_negative_final_contract.NegativeFinalContractTests.test_incomplete_summary_does_not_issue_overall_or_gate_success)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_negative_final_contract.py", line 49, in test_incomplete_summary_does_not_issue_overall_or_gate_success
+    result=summarize_evaluation_cases([case],complete=False)
+TypeError: summarize_evaluation_cases() got an unexpected keyword argument 'complete'
+
+======================================================================
+FAIL: test_correct_negative_fact_without_final_must_not_silently_pass (test_negative_final_contract.NegativeFinalContractTests.test_correct_negative_fact_without_final_must_not_silently_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_negative_final_contract.py", line 19, in test_correct_negative_fact_without_final_must_not_silently_pass
+    with self.assertRaisesRegex(ValueError,'Final support'):self.validate()
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_mixed_behavior_and_fact_needs_real_applicable_final_not_anchor_or_candidate (test_negative_final_contract.NegativeFinalContractTests.test_mixed_behavior_and_fact_needs_real_applicable_final_not_anchor_or_candidate) (key='product')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_negative_final_contract.py", line 34, in test_mixed_behavior_and_fact_needs_real_applicable_final_not_anchor_or_candidate
+    with self.subTest(key=key),self.assertRaises(ValueError):self.validate(v,bad)
+                               ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_mixed_behavior_and_fact_needs_real_applicable_final_not_anchor_or_candidate (test_negative_final_contract.NegativeFinalContractTests.test_mixed_behavior_and_fact_needs_real_applicable_final_not_anchor_or_candidate) (key='version')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_negative_final_contract.py", line 34, in test_mixed_behavior_and_fact_needs_real_applicable_final_not_anchor_or_candidate
+    with self.subTest(key=key),self.assertRaises(ValueError):self.validate(v,bad)
+                               ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_only_explicit_negative_behavior_is_exempt_and_source_scoping_still_applies (test_negative_final_contract.NegativeFinalContractTests.test_only_explicit_negative_behavior_is_exempt_and_source_scoping_still_applies) (kind=None)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_negative_final_contract.py", line 27, in test_only_explicit_negative_behavior_is_exempt_and_source_scoping_still_applies
+    with self.subTest(kind=kind),self.assertRaises(ValueError):self.validate(bad,[])
+                                 ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_only_explicit_negative_behavior_is_exempt_and_source_scoping_still_applies (test_negative_final_contract.NegativeFinalContractTests.test_only_explicit_negative_behavior_is_exempt_and_source_scoping_still_applies) (kind='unknown')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_negative_final_contract.py", line 27, in test_only_explicit_negative_behavior_is_exempt_and_source_scoping_still_applies
+    with self.subTest(kind=kind),self.assertRaises(ValueError):self.validate(bad,[])
+                                 ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_only_explicit_negative_behavior_is_exempt_and_source_scoping_still_applies (test_negative_final_contract.NegativeFinalContractTests.test_only_explicit_negative_behavior_is_exempt_and_source_scoping_still_applies) (kind=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_negative_final_contract.py", line 27, in test_only_explicit_negative_behavior_is_exempt_and_source_scoping_still_applies
+    with self.subTest(kind=kind),self.assertRaises(ValueError):self.validate(bad,[])
+                                 ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_partial_and_failed_replay_never_publish_aggregate_or_bad_case (test_negative_final_contract.NegativeFinalContractTests.test_partial_and_failed_replay_never_publish_aggregate_or_bad_case)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_negative_final_contract.py", line 66, in test_partial_and_failed_replay_never_publish_aggregate_or_bad_case
+    self.assertIsNone(result['result']['overall_score']);self.assertIsNone(result['result']['gates']['passed'])
+                                                         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not None
+
+======================================================================
+FAIL: test_provider_and_scorer_share_strict_rejection_and_preserve_raw (test_negative_final_contract.NegativeFinalContractTests.test_provider_and_scorer_share_strict_rejection_and_preserve_raw)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_negative_final_contract.py", line 44, in test_provider_and_scorer_share_strict_rejection_and_preserve_raw
+    with self.assertRaises(ProviderInvalidResponse) as error:provider.judge('q','先澄清',self.answer,context={'contract_version':'business-vnext-1','category':'negative','final_context':self.final})
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ProviderInvalidResponse not raised
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.149s
+
+FAILED (failures=8, errors=1)
+ISOLATION: /var/folders/1x/qtv6hmzn0xn_hwv0nrq22b3m0000gn/T/rag-closure-offline-g1v9nocu TESTS: 7 FAILURES: 8 ERRORS: 1

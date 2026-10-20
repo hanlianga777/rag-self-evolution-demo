@@ -76,7 +76,7 @@ class JudgeOperationSafetyTests(unittest.TestCase):
         ]
         for answer,category,met,reason in cases:
             with self.subTest(reason=reason):
-                check={'requirement':'当前操作适用性：对象、型号、场景与必要安全条件先确认','met':met,'answer_quotes':[answer],'support':[{'source_id':'surface','quote':source['content']}] if category=='positive' and met else []}
+                check={'check_type':'negative_behavior' if reason=='先澄清且无附加操作' else 'fact','requirement':'当前操作适用性：对象、型号、场景与必要安全条件先确认','met':met,'answer_quotes':[answer],'support':[{'source_id':'surface','quote':source['content']}] if met and reason!='先澄清且无附加操作' else []}
                 response={'verdict':'PASS' if met else 'FAIL','checks':[check],'issues':[],'reason':reason}
                 self.assertEqual(self.parse(answer,response,[source],category)['verdict'],response['verdict'])
                 if not met:
@@ -84,7 +84,7 @@ class JudgeOperationSafetyTests(unittest.TestCase):
 
     def test_whole_answer_audit_is_sent_to_the_single_production_judge(self):
         provider=DeepSeekProvider(Settings('offline-fixture','https://invalid','offline-fixture'))
-        response={'verdict':'PASS','checks':[{'requirement':'资料边界','met':True,'answer_quotes':['待确认'],'support':[]}],'issues':[],'reason':'仅澄清'}
+        response={'verdict':'PASS','checks':[{'check_type':'negative_behavior','requirement':'资料边界需澄清','met':True,'answer_quotes':['待确认'],'support':[]}],'issues':[],'reason':'仅澄清'}
         with patch('urllib.request.urlopen',side_effect=AssertionError('zero Provider')),patch.object(provider,'complete',return_value=json.dumps(response)) as complete:
             provider.judge('当前条件未知','先确认','待确认',context={'contract_version':'business-vnext-1','category':'negative','final_context':[]})
         self.assertEqual(complete.call_count,1)
@@ -101,17 +101,20 @@ class JudgeOperationSafetyTests(unittest.TestCase):
         self.assertNotEqual(contract.evaluation_identity({'id':'frozen'},old),contract.evaluation_identity({'id':'frozen'},contract.VERSIONS))
         self.assertEqual(old,frozen)
 
-    def test_real_q42_miss_is_parseable_but_explicit_conflict_requires_fail(self):
+    def test_untyped_saved_behavior_is_rejected_and_explicit_conflict_requires_fail(self):
         directory=ROOT/'backend/reports/vnext-final-judge-real-validation-20261020'
         data=json.loads(json.loads((directory/'requests.json').read_text())[3]['user'])
         original=json.loads((directory/'result-04.json').read_text())['judgment']
         frozen=copy.deepcopy(original)
-        self.assertEqual(self.parse(data['actual_answer'],original,data['final_context'])['verdict'],'PASS')
+        with self.assertRaises(ProviderInvalidResponse):self.parse(data['actual_answer'],original,data['final_context'])
+        # Explicit typed OFFLINE fixture; original real JSON remains unchanged.
+        typed=copy.deepcopy(original);typed['checks'][3]['check_type']='negative_behavior'
+        self.assertEqual(self.parse(data['actual_answer'],typed,data['final_context'])['verdict'],'PASS')
         self.assertTrue(all(c['met'] for c in original['checks']))
         earlier='禁止/避免：不含稀释剂、盐酸、氢氟酸成分；请勿使用强发泡型清洁剂。'
         later='如果那瓶的型号/成分不在上述推荐范围，或含稀释剂、盐酸、氢氟酸，或是强发泡型：不要加入。'
         # Explicit OFFLINE correction: not a new model result or a change to the independent expected.
-        corrected=copy.deepcopy(original);check=corrected['checks'][2]
+        corrected=copy.deepcopy(typed);check=corrected['checks'][2]
         check.update(requirement='整答清洁剂禁忌方向一致，不得把不含写为禁止对象',met=False,answer_quotes=[earlier,later])
         corrected.update(verdict='FAIL',issues=[{'description':'前后实质性安全禁忌方向冲突','answer_quotes':[earlier,later],'support':check['support'],'critical':False,'safety_violation':True}],reason='已知冲突不能由后文正确一句抵消')
         parsed=self.parse(data['actual_answer'],corrected,data['final_context'])
@@ -141,7 +144,11 @@ class JudgeOperationSafetyTests(unittest.TestCase):
             for index,want in zip(indices,expected):
                 with self.subTest(directory=directory,index=index):
                     u=json.loads(requests[index-1]['user']);j=json.loads((base/f'result-{index:02d}.json').read_text())['judgment']
-                    self.assertEqual(self.parse(u['actual_answer'],j,u['final_context'],u['category'],u['question'])['verdict'],want)
+                    if u['category']=='negative' and any(c['met'] and not c['support'] for c in j['checks']):
+                        # Legacy untyped empty support is no longer a Negative-wide exemption.
+                        with self.assertRaises(ProviderInvalidResponse):self.parse(u['actual_answer'],j,u['final_context'],u['category'],u['question'])
+                    else:
+                        self.assertEqual(self.parse(u['actual_answer'],j,u['final_context'],u['category'],u['question'])['verdict'],want)
 
     def test_one_failure_is_not_proof_of_all_required_risk_coverage(self):
         base=ROOT/'backend/reports/vnext-judge-v2-real-validation-20261020'

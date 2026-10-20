@@ -64,7 +64,7 @@ def policy_behavior(case):
     return value if type(value) is bool else None
 
 
-def summarize_evaluation_cases(cases: list[dict]) -> dict:
+def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:
     """Aggregate persisted case records without inventing absent group metrics."""
     groups = {"positive": [], "ablation": [], "negative": []}
     for case in cases:
@@ -106,7 +106,7 @@ def summarize_evaluation_cases(cases: list[dict]) -> dict:
     output_tokens = [item["programmatic_metrics"]["output_tokens"] for item in cases if isinstance(item.get("programmatic_metrics", {}).get("output_tokens"), (int, float))]
     provider_costs = [item["programmatic_metrics"]["provider_cost"] for item in cases if isinstance(item.get("programmatic_metrics", {}).get("provider_cost"), (int, float))]
     overall = calculate_overall_score(metrics)
-    return {
+    result = {
         'safety_verification_complete':not any(c.get('evaluation_outcome',{}).get('safety_review_required') for c in cases),
         'safety_review_question_ids':[c.get('question_id') for c in cases if c.get('evaluation_outcome',{}).get('safety_review_required')],
         "completed": len(cases), "failed": sum(not item.get("passed", False) for item in cases),
@@ -116,6 +116,9 @@ def summarize_evaluation_cases(cases: list[dict]) -> dict:
         "comparison_metrics": {"ttft_seconds": _mean(ttfts), "ttft_target_status": "WARNING" if ttfts and _mean(ttfts) > 5 else "OK" if ttfts else "NOT_MEASURED", "input_tokens": sum(input_tokens) if input_tokens else None, "output_tokens": sum(output_tokens) if output_tokens else None, "token_cost": round(sum(provider_costs), 6) if provider_costs else None, "token_cost_status": "MEASURED" if provider_costs else "Token Usage / Provider Cost unavailable", "recall_at_k": round(100 * sum(bool(hit) for hit in hits) / len(hits), 2) if hits else None, "precision_at_k": _mean(precisions), "mrr": _mean(reciprocal_ranks)},
         "bad_case_count": sum(not item.get("passed", False) for item in cases),
     }
+    if not complete:
+        result.update(overall_score=None, overall_score_status='NOT_EVALUABLE', gates={**evaluate_gates({}), 'passed':None})
+    return result
 
 
 def gate_details(cases: list[dict], gates: list[dict]) -> list[dict]:
@@ -355,7 +358,7 @@ class EvaluationRunner:
             result = {**summarize_evaluation_cases(cases), 'execution_kind': 'answer_replay', 'release_eligible': False, 'timing_provenance': '历史生成耗时，非本次生成性能'}
             return self.store.finish_evaluation_run(run_id, 'completed', result)
         except Exception as error:
-            return self.store.finish_evaluation_run(run_id, 'partial' if cases else 'failed', {**summarize_evaluation_cases(cases), 'execution_kind': 'answer_replay', 'release_eligible': False}, str(error))
+            return self.store.finish_evaluation_run(run_id, 'partial' if cases else 'failed', {**summarize_evaluation_cases(cases,complete=False), 'evaluation_complete':False, 'execution_kind': 'answer_replay', 'release_eligible': False}, str(error))
 
     def execute_baseline(self, run_id, approved, config):
         from .paid_run import execution_limits,accounting_only
@@ -380,10 +383,8 @@ class EvaluationRunner:
                 'known_input_tokens':sum(u.get('prompt_tokens',u.get('total_tokens',0)) for u in events if type(u.get('prompt_tokens',u.get('total_tokens'))) is int),
                 'known_output_tokens':sum(u['completion_tokens'] for u in events if type(u.get('completion_tokens')) is int),
                 **cost_fields(self.runtime.model,events)}
-            summary=summarize_evaluation_cases(cases)
+            summary=summarize_evaluation_cases(cases,complete=complete)
             errors=[{'question_id':q, **cp['technical_error']} for q,cp in checkpoints.items() if cp.get('technical_error')]
-            if not complete:
-                summary.update(overall_score=None, overall_score_status='NOT_EVALUABLE', gates={**evaluate_gates({}), 'passed':None})
             return {**summary, 'technical_errors':errors, 'technical_error_count':len(errors), 'attempted':len(cases)+len(errors), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints,'request_accounting':accounting, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None, 'stage_total_seconds':600, 'stage_max_attempts':3}}
         try:
             if not policy_current(run['judge']) or run['judge'].get('evaluation_identity')!=evaluation_identity(json.loads(run['dataset_snapshot_json']),run['judge']):

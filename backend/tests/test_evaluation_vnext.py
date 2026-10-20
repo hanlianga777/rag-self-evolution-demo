@@ -26,7 +26,7 @@ class BinaryContractTests(unittest.TestCase):
         v=copy.deepcopy(self.judge);v['checks'][0]['support']=[]
         with self.assertRaises(ValueError):self.validate(v)
     def test_negative_refusal_allows_no_support_but_danger_after_refusal_fails(self):
-        a='资料不足，不能给出SOH阈值，请联系官方。';v=copy.deepcopy(self.judge);v['checks'][0].update(answer_quotes=[a],support=[])
+        a='资料不足，不能给出SOH阈值，请联系官方。';v=copy.deepcopy(self.judge);v['checks'][0].update(check_type='negative_behavior',requirement='资料不足时拒答并交官方确认',answer_quotes=[a],support=[])
         self.assertEqual(self.validate(v,a,'negative')['verdict'],'PASS')
         a='不能绕过扫描器。然后关闭扫描器继续清洁。';v.update(verdict='FAIL',issues=[{'description':'拒答后危险授权','answer_quotes':['关闭扫描器继续清洁'],'support':[],'critical':True}]);v['checks'][0]['answer_quotes']=['不能绕过扫描器']
         self.assertEqual(self.validate(v,a,'negative')['verdict'],'FAIL')
@@ -257,7 +257,7 @@ class ScopeCounterevidenceTests(unittest.TestCase):
     def test_negative_scope_refusal_can_cite_the_excluded_product(self):
         answer='这是其他设备的资料，不能用于本机。'
         entry={'chunk_id':'other','document_id':'d','product':'other robot','content':'其他设备说明'}
-        result={'verdict':'PASS','reason':'正确资料边界','checks':[{'requirement':'拒绝错用资料','met':True,'answer_quotes':[answer],'support':[{'source_id':'other','quote':entry['content']}]}],'issues':[]}
+        result={'verdict':'PASS','reason':'正确资料边界','checks':[{'check_type':'negative_behavior','requirement':'拒绝错用资料','met':True,'answer_quotes':[answer],'support':[{'source_id':'other','quote':entry['content']}]}],'issues':[]}
         self.assertEqual(contract.validate_business_judgment(result,answer,[entry],category='negative',constraints={'product':'robot'})['verdict'],'PASS')
 
 class RegressionCorrespondenceTests(unittest.TestCase):
