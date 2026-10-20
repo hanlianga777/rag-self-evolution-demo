@@ -1,0 +1,20 @@
+{
+  "actual_requests": 1,
+  "prompt_tokens": 7945,
+  "completion_tokens": 11916,
+  "total_tokens": 19861,
+  "cached_input_tokens": 256,
+  "uncached_input_tokens": 7689,
+  "reasoning_tokens": 10693,
+  "elapsed_ms": 58573,
+  "started_at": "2026-10-20T15:47:26.068038+08:00",
+  "estimated_peak_yuan": 0.11071624000000001,
+  "conservative_ledger_yuan": 0.111218,
+  "budget_yuan": 3,
+  "provider_invoice_amount_available": false,
+  "pricing_cny_per_million": {
+    "uncached_input": 2,
+    "cached_input": 0.04,
+    "output": 8
+  }
+}

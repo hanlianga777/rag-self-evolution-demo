@@ -1,0 +1,55 @@
+{
+  "sequence": 1,
+  "quote_count": 8,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险 仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂 遵守清洁剂上的安全提示",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "请勿使用强发泡型清洁剂",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "请遵守计量提示",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "1 清洁剂加注口\n填充口盖子\n3 清洁剂液位指示器\n2. 注入清洁剂",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "请遵守计量提示",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "推荐的清洁剂：\n适用范围=所有防水地板的保养清洁；清洁剂=CA 50 CRM 756\n适用范围=保养清洁与护理组件；清洁剂=RM 746RM 780\n适用范围=工业地板的保养清洁和彻底清洁；清洁剂=RM 69\n适用范围=光面地板的保养清洁；清洁剂=RM 755\n适用范围=精细陶瓷瓷砖的保养清洁和彻底清洁；清洁剂=RM 753\n适用范围=耐酸地板的保养清洁和彻底清洁；清洁剂=RM 751\n适用范围=清洁和消毒；清洁剂=RM 732\n适用范围=耐碱地板铺层的彻底清洁；清洁剂=RM 752\n适用范围=不耐碱地板的彻底清洁和除垢层；清洁剂=RM 754",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00119",
+      "quote": "提示：\n为了快速更换清洁剂，可以取下清洁剂罐，并换上另一个清洁剂罐",
+      "located": true
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "actual_requests": 1,
+  "remaining_unexecuted": 6,
+  "retries": 0,
+  "terminal_safety_stop": true,
+  "frozen_inputs_unchanged": true,
+  "report_links_and_json_valid": true,
+  "actual_credential_absent": true,
+  "personal_local_paths_absent": true,
+  "report_sha256": "e230f974a35d9aad9124ecb453e180413bba0c9c7ae3bb9a0b999b45e9186afb",
+  "raw_provider_response_sha256": "3f2544d14489149992a31692ed2376a92fc58653b55752ada75aa772d925224a"
+}

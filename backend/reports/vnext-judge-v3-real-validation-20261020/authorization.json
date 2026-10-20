@@ -1,0 +1,19 @@
+{
+  "source": "direct_user_instruction",
+  "user_response": "Owner已授权Judge V3最多7条真实DeepSeek调用，每样本一次不重试，总费用≤人民币¥3；Q42必须FAIL并明确识别前后禁忌方向冲突与双方原句，否则立即停止",
+  "judge_version": "judge-vnext-3-safety-consistency",
+  "authorization_scope": "7 frozen samples (2 historical, 5 synthetic controls, including unchanged A1/A2/A3) in approved order; one Judge request each; CNY3 maximum; no retry, generation, retrieval, Baseline or Sandbox",
+  "authorized_at": "2026-10-20T15:47:26.065315+08:00",
+  "identity": {
+    "commit": "ac92abc1745143b53ee232a9782b8747aaf9c431",
+    "prompt_sha256": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+    "prepared_sha256": "e814891c2ad4737de5be9b96c3b515f068f9bb28405087bcc8eaddc87333289e"
+  },
+  "price_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "currency": "CNY",
+  "price_checked_date": "2026-10-20",
+  "peak_input_cache_miss_per_million": 2,
+  "peak_output_per_million": 8,
+  "off_peak_input_cache_miss_per_million": 1,
+  "off_peak_output_per_million": 4
+}

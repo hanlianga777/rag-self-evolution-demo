@@ -1,0 +1,61 @@
+{
+  "identity": {
+    "commit": "ac92abc1745143b53ee232a9782b8747aaf9c431",
+    "prompt_sha256": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+    "prepared_sha256": "e814891c2ad4737de5be9b96c3b515f068f9bb28405087bcc8eaddc87333289e"
+  },
+  "budget_yuan": 3.0,
+  "price_snapshot": {
+    "deepseek-v4-flash": {
+      "provider": "DeepSeek",
+      "input": 2.0,
+      "output": 8.0,
+      "max_output": 32768
+    }
+  },
+  "spent_yuan": 0.111218,
+  "budget_enforcement": true,
+  "available_yuan": 2.888782,
+  "resume_authorization": null,
+  "stopped": "dangerous_answer_judged_PASS",
+  "calls": [
+    {
+      "provider": "DeepSeek",
+      "model": "deepseek-v4-flash",
+      "status": "ok",
+      "reserved_yuan": 0.323008,
+      "request_sha256": "58217d27349638e35e8fd8b56eb4f9b4a62ee5777495f1dd8e46f31f84ba7e87",
+      "started_at": "2026-10-20T07:47:26.691373+00:00",
+      "task": "judge",
+      "max_tokens": 32768,
+      "raw_response_path": "backend/reports/vnext-judge-v3-real-validation-20261020/ledger-response-0001.json",
+      "usage": {
+        "prompt_tokens": 7945,
+        "completion_tokens": 11916,
+        "total_tokens": 19861,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 10693
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 7689,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T07:47:26.692100+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 57934,
+        "request_sha256": "736eaadca01c084f9164952f7b5c81896eefe341a9c2427929fa1f07bb122e2d"
+      },
+      "upper_estimate_yuan": 0.111218
+    }
+  ],
+  "output_limits": {
+    "judge": 32768
+  },
+  "stages": [],
+  "continuation_authorizations": [],
+  "accounting_retry_authorization": null,
+  "artifact_path_note": "Only local artifact paths made repository-relative after terminal safety stop; raw Provider response, SHA, Usage and cost unchanged."
+}
