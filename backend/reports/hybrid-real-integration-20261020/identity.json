@@ -1,0 +1,86 @@
+{
+  "source_commit": "a774f37bc49c57bd764773c30336170f2f99a1c5",
+  "versions": {
+    "prompt_version": "judge-vnext-3-safety-consistency",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "scoring_policy": "business-vnext-1",
+    "safety_guard_version": "finite-safety-1",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605"
+  },
+  "prompt_sha256": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+  "judge_metadata": {
+    "baseline_version": "runtime-initial-20261014030238448891",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "execution_snapshot": {
+      "embedding_model": "text-embedding-v4",
+      "generation_model": "deepseek-v4-flash",
+      "temperature": 0.2,
+      "vector_index": "FAISS IndexFlatIP (normalized cosine similarity)",
+      "request_limits": {
+        "judge": 32768
+      }
+    },
+    "model": "deepseek-v4-flash",
+    "prompt_version": "judge-vnext-3-safety-consistency",
+    "scoring_policy": "business-vnext-1",
+    "temperature": 0,
+    "safety_guard_version": "finite-safety-1",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605",
+    "judge_prompt_sha256": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+    "generation_prompt_version": "generation-vnext-1",
+    "generation_boundary_sha256": "d1fa3c13186c04fb95bd01be6615f25c6a59dbdd766290a108c4bfac78456ea2"
+  },
+  "source_snapshot": {
+    "id": "GD-20261015135415953347",
+    "corpus_fingerprint": {
+      "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+      "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+      "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+      "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+      "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+      "sources": {
+        "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+        "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+        "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+        "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+      }
+    }
+  },
+  "isolated_evaluation_identity": "d2d2975357c534513ee553e49e671a713a32fbe442c97eb63064626ef78ac2e3",
+  "note": "Isolated verification identity from the original SQLite snapshot and current Judge metadata; only fields consumed by evaluation_identity retained; no formal run created.",
+  "rule": {
+    "id": "kira-cleaner-composition",
+    "version": "1",
+    "product": "KIRA B 50",
+    "condition": "回答显式出现指定成分的禁令或允许语句；不处理遗漏、代词、省略或任意现场许可",
+    "constraint": {
+      "type": "forbidden_ingredients",
+      "ingredients": [
+        "稀释剂",
+        "盐酸",
+        "氢氟酸"
+      ]
+    },
+    "source": {
+      "document_id": "DOC-001",
+      "chunk_id": "DOC-001-C-00118",
+      "product": "KIRA B 50",
+      "pdf_pages": [
+        41,
+        42
+      ],
+      "pdf_sha256": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+      "content_sha256": "29f36c2913d51553ee2ff3a56c35ee7e49e24e69b378a0d4515c394d082df79a",
+      "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂"
+    },
+    "violation_codes": [
+      "forbid_absence",
+      "allow_presence"
+    ],
+    "critical": false
+  },
+  "source_snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+  "source_run_id": "EVAL-20261015140115663135"
+}

@@ -1,0 +1,59 @@
+{
+  "stage": "PRECHECK_ONLY_AWAITING_EXPLICIT_PAID_AUTHORIZATION",
+  "provider_calls": 0,
+  "actual_tokens": 0,
+  "actual_cost_yuan": 0,
+  "sample_count": 3,
+  "payloads_byte_identical_to_prior_v3_first3": true,
+  "request_model": "deepseek-v4-flash",
+  "endpoint": "https://api.deepseek.com/chat/completions",
+  "provider_path": "DeepSeekProvider.judge -> _judge_business -> complete -> JSON Parser/validate_business_judgment (Matcher)",
+  "business_path": "EvaluationRunner._score_business -> validate_business_judgment -> check_safety -> adjudicate -> saved evaluation_outcome; no store writes",
+  "execution_environment": "fresh Python CLI imports current production modules; no cached Demo server used or restarted",
+  "active_formal_tasks": {
+    "evaluation_runs": 0,
+    "golden_generation_runs": 0,
+    "candidate_revision_runs": 0,
+    "experiments": 0,
+    "candidate_configs": 0
+  },
+  "formal_tables_verified": 29,
+  "index_artifacts_verified": 16,
+  "pdfs_verified": 4,
+  "price_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "price_checked_date": "2026-10-20",
+  "peak_input_miss_yuan_per_million": 2,
+  "peak_output_yuan_per_million": 8,
+  "output_limit_per_call": 32768,
+  "budget_estimation": "Exact production serialized HTTP body byte count plus 1024 per request as conservative input-token proxy; max 32768 output; peak uncached pricing; no cache/offpeak discount",
+  "approximate_input_tokens": 13051,
+  "per_case_upper_yuan": [
+    0.35722,
+    0.31645,
+    0.316858
+  ],
+  "total_upper_yuan": 0.990528,
+  "proposed_budget_yuan": 1,
+  "authorization": "ONLY zero-cost preparation granted; no paid run/ledger opened",
+  "isolated_evaluation_identity": "d2d2975357c534513ee553e49e671a713a32fbe442c97eb63064626ef78ac2e3",
+  "real_results": [
+    {
+      "sequence": 1,
+      "raw_llm_verdict": null,
+      "final_verdict": null,
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "sequence": 2,
+      "raw_llm_verdict": null,
+      "final_verdict": null,
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "sequence": 3,
+      "raw_llm_verdict": null,
+      "final_verdict": null,
+      "status": "NOT_EXECUTED"
+    }
+  ]
+}
