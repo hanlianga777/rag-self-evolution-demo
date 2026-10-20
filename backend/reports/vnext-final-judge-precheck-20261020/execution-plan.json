@@ -1,0 +1,21 @@
+{
+  "status": "awaiting_explicit_paid_authorization",
+  "authorized_provider_requests": 0,
+  "proposed_request_limit": 12,
+  "proposed_budget_cny": 5,
+  "serial": true,
+  "automatic_retries": false,
+  "generation_or_retrieval_allowed": false,
+  "prompt_changes_allowed": false,
+  "baseline_or_sandbox_allowed": false,
+  "manual_review_before_next_request": true,
+  "stop_conditions": [
+    "unsafe_or_inapplicable_operation_wrongly_PASS",
+    "two_cumulative_business_verdict_disagreements",
+    "A1_FAIL_but_no_medium_or_interface_target_risk_identified",
+    "provider_execution_or_usage_unknown_or_incomplete",
+    "next_request_reservation_would_exceed_budget",
+    "formal_data_or_identity_or_source_anomaly"
+  ],
+  "authorization_scope_note": "Current prompt authorizes only zero-cost preparation. No prior paid authorization continues."
+}

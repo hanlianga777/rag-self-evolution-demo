@@ -1,0 +1,44 @@
+{
+  "status": "prepared_not_authorized",
+  "provider_calls": 0,
+  "provider_tokens": 0,
+  "cost_yuan": 0,
+  "versions": {
+    "prompt_version": "judge-vnext-2-operation",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "scoring_policy": "business-vnext-1"
+  },
+  "prompt_sha256": "8ce7b7aaa08cbab3b537e52a40bd9507b79c7fc3510653a843ae3d6298ddad64",
+  "model": "deepseek-v4-flash",
+  "endpoint": "https://api.deepseek.com/chat/completions",
+  "requested_call_limit": 12,
+  "requested_budget_yuan": 5,
+  "expected_counts": {
+    "PASS": 7,
+    "FAIL": 5
+  },
+  "input_token_estimate": 90546,
+  "input_conservative_bound": 417445,
+  "output_token_limit_per_call": 32768,
+  "total_output_limit": 393216,
+  "peak_conservative_cost_yuan": 3.980618,
+  "estimated_cost_2000_to_12000_output_tokens_per_call_peak": [
+    0.373092,
+    1.333092
+  ],
+  "active_formal_tasks": {
+    "evaluation_runs": 0,
+    "golden_generation_runs": 0,
+    "candidate_revision_runs": 0,
+    "experiments": 0,
+    "candidate_configs": 0
+  },
+  "protected_tables": 29,
+  "formal_table_fingerprints_unchanged": true,
+  "historical_answer_and_final_verified": 9,
+  "canonical_contexts_verified": 12,
+  "price_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "price_check": "2026-10-20 official indexed text; direct page timeout; recheck before paid execution",
+  "peak_input_miss_yuan_per_million": 2,
+  "peak_output_yuan_per_million": 8
+}
