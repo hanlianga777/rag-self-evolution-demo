@@ -1,0 +1,73 @@
+{
+  "sequence": 2,
+  "quote_count": 11,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00114",
+      "quote": "无对接站，含加注系统",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00115",
+      "quote": "向上翻转污水箱盖子",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00196",
+      "quote": "冲洗污水箱，结合冲洗系统",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00026",
+      "quote": "对于电池供电的设备，请拔出电池插头或断开电池连接",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00181",
+      "quote": "在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00115",
+      "quote": "请打开水箱盖直到止挡位置，以免意外关闭\n当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00115",
+      "quote": "将进水软管连接到设备的软管接头上",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00115",
+      "quote": "注意最高水温为 $5 0 ~ { } ^ { \\circ } \\mathsf { C } !$",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00115",
+      "quote": "4. 打开进水口\n填满清水箱之后自动停止加水",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00196",
+      "quote": "冲洗污水箱，结合冲洗系统",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "进行大约 30 秒的冲洗过程",
+      "located": true
+    }
+  ]
+}

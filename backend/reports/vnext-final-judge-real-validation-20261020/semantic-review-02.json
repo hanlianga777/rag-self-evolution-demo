@@ -1,0 +1,19 @@
+{
+  "sequence": 2,
+  "reviewed_before_next_request": true,
+  "verdict_agreement": true,
+  "operation_conditions_covered": [
+    "KIRA B 50, no dock with filling system",
+    "clean water and correct hose connector",
+    "water <=50 C",
+    "power isolation and dock separation",
+    "lid stop and crush exclusion",
+    "automatic stop when filled"
+  ],
+  "issues_empty": true,
+  "review": "PASS覆盖真实清水加注完整必要条件，明确不是水箱冲洗；未因共同Final包含气/水歧义而误杀。未单独使用当前操作适用性标题，但checks实际覆盖适用性。",
+  "parser_matcher": "passed",
+  "quote_location_count": 11,
+  "quotes_all_located": true,
+  "continue_allowed": true
+}

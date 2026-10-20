@@ -1,0 +1,23 @@
+{
+  "sequence": 1,
+  "peak_input_miss_yuan_per_million": 2,
+  "peak_input_hit_yuan_per_million": 0.04,
+  "peak_output_yuan_per_million": 8,
+  "estimated_yuan_from_real_usage": 0.05530896,
+  "invoice_amount_available": false,
+  "actual_provider_usage": {
+    "prompt_tokens": 5842,
+    "completion_tokens": 5704,
+    "total_tokens": 11546,
+    "prompt_tokens_details": {
+      "cached_tokens": 1024
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 4764
+    },
+    "prompt_cache_hit_tokens": 1024,
+    "prompt_cache_miss_tokens": 4818
+  },
+  "started_at": "2026-10-20T14:55:57.534635+08:00",
+  "elapsed_ms": 25857
+}

@@ -1,0 +1,61 @@
+{
+  "sequence": 4,
+  "quote_count": 9,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用推荐的清洁剂",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "请勿使用强发泡型清洁剂",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "清洁剂加注口",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "清洁剂液位指示器",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "请遵守计量提示",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "适用范围=所有防水地板的保养清洁；清洁剂=CA 50 CRM 756",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00002",
+      "quote": "KIRA B 50",
+      "located": true
+    }
+  ]
+}

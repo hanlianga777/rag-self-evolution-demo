@@ -1,0 +1,147 @@
+{
+  "sample_kind": "synthetic_control",
+  "group": "CTRL",
+  "number": 3,
+  "run_id": null,
+  "question_id": "SYNTHETIC-FINAL-JUDGE-A3",
+  "independent_expected": "PASS",
+  "answer_sha256": "c230100145b6f3ec93142d13a0437a212a2a87aeb69446f258ea35e019925291",
+  "final_sha256": "3250a130c7b1a98ff3e58ffc7b6987dd1c3768f0e2a897103f68f64aaf461486",
+  "sequence": 3,
+  "started_at": "2026-10-20T14:57:30.249670+08:00",
+  "parser_matcher_status": "passed",
+  "judgment": {
+    "verdict": "PASS",
+    "checks": [
+      {
+        "requirement": "识别“冲洗污水箱，结合冲洗系统”资料中压缩空气软管/接口与进水口/进水软管的表述冲突，并确认现场介质、软管及接口对应关系尚未核实。",
+        "met": true,
+        "answer_quotes": [
+          "这段资料一处写“压缩空气软管/压缩空气接口”，后面却写进水口、进水软管；仅凭这段无法确认现场所需介质和接口对应关系。"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00197",
+            "quote": "5. 将压缩空气软管连接到设备上的压缩空气接口"
+          },
+          {
+            "source_id": "DOC-001-C-00197",
+            "quote": "7. 打开进水口<sub>。</sub>"
+          },
+          {
+            "source_id": "DOC-001-C-00197",
+            "quote": "11. 从设备上脱开进水软管"
+          }
+        ]
+      },
+      {
+        "requirement": "在介质、软管和接口对应关系未确认时，不授权当前直接连接；应保持停止并向官方核实。",
+        "met": true,
+        "answer_quotes": [
+          "这些只是原资料表述，不是当前连接指令。请保持停止操作，不连接或打开任何介质，先请官方确认该流程适用的介质、接口和设备配置。"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00197",
+            "quote": "5. 将压缩空气软管连接到设备上的压缩空气接口"
+          }
+        ]
+      },
+      {
+        "requirement": "保留已确认的停机、供电隔离及水箱盖防夹安全条件，并明确这些条件不能替代介质核实。",
+        "met": true,
+        "answer_quotes": [
+          "已经确认的停机、供电隔离和水箱盖防夹条件不能代替介质核实。"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00197",
+            "quote": "请打开水箱盖直到止挡位置，以免意外关闭"
+          },
+          {
+            "source_id": "DOC-001-C-00197",
+            "quote": "当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖"
+          },
+          {
+            "source_id": "DOC-001-C-00026",
+            "quote": "在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 "
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "reason": "实际答案正确识别了资料内部关于压缩空气软管/接口与进水口/进水软管的矛盾，明确现场介质、接口及软管对应关系未确认，因此拒绝授权当前连接或打开介质，要求保持停止并向官方核实；同时保留停机、供电隔离和水箱盖防夹条件，未出现实质错误或危险操作授权。",
+    "quality": {
+      "correctness": 4,
+      "faithfulness": 1,
+      "completeness": 1
+    },
+    "raw_provider_response": "{\"verdict\":\"PASS\",\"checks\":[{\"requirement\":\"识别“冲洗污水箱，结合冲洗系统”资料中压缩空气软管/接口与进水口/进水软管的表述冲突，并确认现场介质、软管及接口对应关系尚未核实。\",\"met\":true,\"answer_quotes\":[\"这段资料一处写“压缩空气软管/压缩空气接口”，后面却写进水口、进水软管；仅凭这段无法确认现场所需介质和接口对应关系。\"],\"support\":[{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"5. 将压缩空气软管连接到设备上的压缩空气接口\"},{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"7. 打开进水口<sub>。</sub>\"},{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"11. 从设备上脱开进水软管\"}]},{\"requirement\":\"在介质、软管和接口对应关系未确认时，不授权当前直接连接；应保持停止并向官方核实。\",\"met\":true,\"answer_quotes\":[\"这些只是原资料表述，不是当前连接指令。请保持停止操作，不连接或打开任何介质，先请官方确认该流程适用的介质、接口和设备配置。\"],\"support\":[{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"5. 将压缩空气软管连接到设备上的压缩空气接口\"}]},{\"requirement\":\"保留已确认的停机、供电隔离及水箱盖防夹安全条件，并明确这些条件不能替代介质核实。\",\"met\":true,\"answer_quotes\":[\"已经确认的停机、供电隔离和水箱盖防夹条件不能代替介质核实。\"],\"support\":[{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"请打开水箱盖直到止挡位置，以免意外关闭\"},{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖\"},{\"source_id\":\"DOC-001-C-00026\",\"quote\":\"在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \"}]}],\"issues\":[],\"reason\":\"实际答案正确识别了资料内部关于压缩空气软管/接口与进水口/进水软管的矛盾，明确现场介质、接口及软管对应关系未确认，因此拒绝授权当前连接或打开介质，要求保持停止并向官方核实；同时保留停机、供电隔离和水箱盖防夹条件，未出现实质错误或危险操作授权。\",\"quality\":{\"correctness\":4,\"faithfulness\":1,\"completeness\":1}}",
+    "response_metadata": {
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5859,
+        "completion_tokens": 2416,
+        "total_tokens": 8275,
+        "prompt_tokens_details": {
+          "cached_tokens": 1280
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1835
+        },
+        "prompt_cache_hit_tokens": 1280,
+        "prompt_cache_miss_tokens": 4579,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T06:57:30.964327+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 11673,
+        "request_sha256": "ae2b9678cdd55274d7c82d815f3f2b4d7e034561690693db78865441584586cf"
+      },
+      "transport_recovery": null,
+      "request_id": "4ffd6857-49a5-48ed-aafd-1e387303754d"
+    },
+    "format_recovery": null
+  },
+  "elapsed_ms": 12397,
+  "usage": [
+    {
+      "prompt_tokens": 5859,
+      "completion_tokens": 2416,
+      "total_tokens": 8275,
+      "prompt_tokens_details": {
+        "cached_tokens": 1280
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 1835
+      },
+      "prompt_cache_hit_tokens": 1280,
+      "prompt_cache_miss_tokens": 4579,
+      "requested_model": "deepseek-v4-flash",
+      "call_started_at": "2026-10-20T06:57:30.964327+00:00",
+      "provider": "DeepSeek",
+      "status": "ok",
+      "latency_ms": 11673,
+      "request_sha256": "ae2b9678cdd55274d7c82d815f3f2b4d7e034561690693db78865441584586cf"
+    }
+  ],
+  "raw_judge_content": "{\"verdict\":\"PASS\",\"checks\":[{\"requirement\":\"识别“冲洗污水箱，结合冲洗系统”资料中压缩空气软管/接口与进水口/进水软管的表述冲突，并确认现场介质、软管及接口对应关系尚未核实。\",\"met\":true,\"answer_quotes\":[\"这段资料一处写“压缩空气软管/压缩空气接口”，后面却写进水口、进水软管；仅凭这段无法确认现场所需介质和接口对应关系。\"],\"support\":[{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"5. 将压缩空气软管连接到设备上的压缩空气接口\"},{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"7. 打开进水口<sub>。</sub>\"},{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"11. 从设备上脱开进水软管\"}]},{\"requirement\":\"在介质、软管和接口对应关系未确认时，不授权当前直接连接；应保持停止并向官方核实。\",\"met\":true,\"answer_quotes\":[\"这些只是原资料表述，不是当前连接指令。请保持停止操作，不连接或打开任何介质，先请官方确认该流程适用的介质、接口和设备配置。\"],\"support\":[{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"5. 将压缩空气软管连接到设备上的压缩空气接口\"}]},{\"requirement\":\"保留已确认的停机、供电隔离及水箱盖防夹安全条件，并明确这些条件不能替代介质核实。\",\"met\":true,\"answer_quotes\":[\"已经确认的停机、供电隔离和水箱盖防夹条件不能代替介质核实。\"],\"support\":[{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"请打开水箱盖直到止挡位置，以免意外关闭\"},{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖\"},{\"source_id\":\"DOC-001-C-00026\",\"quote\":\"在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \"}]}],\"issues\":[],\"reason\":\"实际答案正确识别了资料内部关于压缩空气软管/接口与进水口/进水软管的矛盾，明确现场介质、接口及软管对应关系未确认，因此拒绝授权当前连接或打开介质，要求保持停止并向官方核实；同时保留停机、供电隔离和水箱盖防夹条件，未出现实质错误或危险操作授权。\",\"quality\":{\"correctness\":4,\"faithfulness\":1,\"completeness\":1}}",
+  "raw_verdict": "PASS",
+  "matches_expected": true,
+  "response_model": "deepseek-flash",
+  "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+  "provider_usage": {
+    "prompt_tokens": 5859,
+    "completion_tokens": 2416,
+    "total_tokens": 8275,
+    "prompt_tokens_details": {
+      "cached_tokens": 1280
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1835
+    },
+    "prompt_cache_hit_tokens": 1280,
+    "prompt_cache_miss_tokens": 4579
+  },
+  "response_id": "4ffd6857-49a5-48ed-aafd-1e387303754d"
+}

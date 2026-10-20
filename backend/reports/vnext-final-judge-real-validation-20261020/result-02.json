@@ -1,0 +1,198 @@
+{
+  "sample_kind": "synthetic_control",
+  "group": "CTRL",
+  "number": 2,
+  "run_id": null,
+  "question_id": "SYNTHETIC-FINAL-JUDGE-A2",
+  "independent_expected": "PASS",
+  "answer_sha256": "ebbcfbd5d5960deda223bcf9500a417a6ec4bf1e6c1e6f7322c9d64f29910db2",
+  "final_sha256": "3250a130c7b1a98ff3e58ffc7b6987dd1c3768f0e2a897103f68f64aaf461486",
+  "sequence": 2,
+  "started_at": "2026-10-20T14:56:36.324942+08:00",
+  "parser_matcher_status": "passed",
+  "judgment": {
+    "verdict": "PASS",
+    "checks": [
+      {
+        "requirement": "回答针对 KIRA B 50 的“无对接站、含加注系统”清水箱加注场景，而非“水箱冲洗”流程。",
+        "met": true,
+        "answer_quotes": [
+          "在已确认的无对接站、含加注系统的清水加注场景下",
+          "此流程不用于解释另一段水箱冲洗资料的气/水混写"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00114",
+            "quote": "无对接站，含加注系统"
+          },
+          {
+            "source_id": "DOC-001-C-00115",
+            "quote": "向上翻转污水箱盖子"
+          },
+          {
+            "source_id": "DOC-001-C-00196",
+            "quote": "冲洗污水箱，结合冲洗系统"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "回答保留题述停机、电池供电隔离、脱离对接站且不涉及电气维修的安全前提。",
+        "met": true,
+        "answer_quotes": [
+          "继续保持题述停机、供电隔离与脱离对接站条件"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00026",
+            "quote": "对于电池供电的设备，请拔出电池插头或断开电池连接"
+          },
+          {
+            "source_id": "DOC-001-C-00181",
+            "quote": "在执行任何工作之前，请将设备与对接站断开，或拔出电源插头"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "操作要求将箱盖翻开到止挡位置，并在关闭前确认四肢不在水箱与盖之间。",
+        "met": true,
+        "answer_quotes": [
+          "向上翻开污水箱盖并打开到止挡位置，防止意外关闭",
+          "确保四肢不在水箱与盖子之间后盖上污水箱盖"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00115",
+            "quote": "请打开水箱盖直到止挡位置，以免意外关闭\n当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "进水软管应连接到设备的软管接头，水温不超过50°C。",
+        "met": true,
+        "answer_quotes": [
+          "将进水软管连接到设备的软管接头，水温不超过50°C"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00115",
+            "quote": "将进水软管连接到设备的软管接头上"
+          },
+          {
+            "source_id": "DOC-001-C-00115",
+            "quote": "注意最高水温为 $5 0 ~ { } ^ { \\circ } \\mathsf { C } !$"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "加注时打开进水口，清水箱填满后自动停止加水。",
+        "met": true,
+        "answer_quotes": [
+          "打开进水口，清水箱填满后自动停止加水"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00115",
+            "quote": "4. 打开进水口\n填满清水箱之后自动停止加水"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "明确不把本加注流程套用于“水箱冲洗”。",
+        "met": true,
+        "answer_quotes": [
+          "此流程不用于解释另一段水箱冲洗资料的气/水混写"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00196",
+            "quote": "冲洗污水箱，结合冲洗系统"
+          },
+          {
+            "source_id": "DOC-001-C-00197",
+            "quote": "进行大约 30 秒的冲洗过程"
+          }
+        ],
+        "scope_resolved": true
+      }
+    ],
+    "issues": [],
+    "reason": "回答完整覆盖无对接站、含加注系统的清水箱加注步骤，保留停机、电池隔离、脱离对接站等安全前提，并执行了开盖到止挡、四肢远离盖缝、软管连接、水温不超过50°C、打开进水口及自动停止等必要操作；同时明确与水箱冲洗区分。开头并列引用DOC-001-C-00113虽不直接属于无对接站场景，但未造成步骤或安全结论错误，不影响整体通过。",
+    "quality": {
+      "correctness": 4,
+      "faithfulness": 0.9,
+      "completeness": 1
+    },
+    "raw_provider_response": "{\"verdict\":\"PASS\",\"checks\":[{\"requirement\":\"回答针对 KIRA B 50 的“无对接站、含加注系统”清水箱加注场景，而非“水箱冲洗”流程。\",\"met\":true,\"answer_quotes\":[\"在已确认的无对接站、含加注系统的清水加注场景下\",\"此流程不用于解释另一段水箱冲洗资料的气/水混写\"],\"support\":[{\"source_id\":\"DOC-001-C-00114\",\"quote\":\"无对接站，含加注系统\"},{\"source_id\":\"DOC-001-C-00115\",\"quote\":\"向上翻转污水箱盖子\"},{\"source_id\":\"DOC-001-C-00196\",\"quote\":\"冲洗污水箱，结合冲洗系统\"}],\"scope_resolved\":true},{\"requirement\":\"回答保留题述停机、电池供电隔离、脱离对接站且不涉及电气维修的安全前提。\",\"met\":true,\"answer_quotes\":[\"继续保持题述停机、供电隔离与脱离对接站条件\"],\"support\":[{\"source_id\":\"DOC-001-C-00026\",\"quote\":\"对于电池供电的设备，请拔出电池插头或断开电池连接\"},{\"source_id\":\"DOC-001-C-00181\",\"quote\":\"在执行任何工作之前，请将设备与对接站断开，或拔出电源插头\"}],\"scope_resolved\":true},{\"requirement\":\"操作要求将箱盖翻开到止挡位置，并在关闭前确认四肢不在水箱与盖之间。\",\"met\":true,\"answer_quotes\":[\"向上翻开污水箱盖并打开到止挡位置，防止意外关闭\",\"确保四肢不在水箱与盖子之间后盖上污水箱盖\"],\"support\":[{\"source_id\":\"DOC-001-C-00115\",\"quote\":\"请打开水箱盖直到止挡位置，以免意外关闭\\n当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖\"}],\"scope_resolved\":true},{\"requirement\":\"进水软管应连接到设备的软管接头，水温不超过50°C。\",\"met\":true,\"answer_quotes\":[\"将进水软管连接到设备的软管接头，水温不超过50°C\"],\"support\":[{\"source_id\":\"DOC-001-C-00115\",\"quote\":\"将进水软管连接到设备的软管接头上\"},{\"source_id\":\"DOC-001-C-00115\",\"quote\":\"注意最高水温为 $5 0 ~ { } ^ { \\\\circ } \\\\mathsf { C } !$\"}],\"scope_resolved\":true},{\"requirement\":\"加注时打开进水口，清水箱填满后自动停止加水。\",\"met\":true,\"answer_quotes\":[\"打开进水口，清水箱填满后自动停止加水\"],\"support\":[{\"source_id\":\"DOC-001-C-00115\",\"quote\":\"4. 打开进水口\\n填满清水箱之后自动停止加水\"}],\"scope_resolved\":true},{\"requirement\":\"明确不把本加注流程套用于“水箱冲洗”。\",\"met\":true,\"answer_quotes\":[\"此流程不用于解释另一段水箱冲洗资料的气/水混写\"],\"support\":[{\"source_id\":\"DOC-001-C-00196\",\"quote\":\"冲洗污水箱，结合冲洗系统\"},{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"进行大约 30 秒的冲洗过程\"}],\"scope_resolved\":true}],\"issues\":[],\"reason\":\"回答完整覆盖无对接站、含加注系统的清水箱加注步骤，保留停机、电池隔离、脱离对接站等安全前提，并执行了开盖到止挡、四肢远离盖缝、软管连接、水温不超过50°C、打开进水口及自动停止等必要操作；同时明确与水箱冲洗区分。开头并列引用DOC-001-C-00113虽不直接属于无对接站场景，但未造成步骤或安全结论错误，不影响整体通过。\",\"quality\":{\"correctness\":4,\"faithfulness\":0.9,\"completeness\":1}}",
+    "response_metadata": {
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 5915,
+        "completion_tokens": 6195,
+        "total_tokens": 12110,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5359
+        },
+        "prompt_cache_hit_tokens": 1024,
+        "prompt_cache_miss_tokens": 4891,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T06:56:37.045231+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 28123,
+        "request_sha256": "373b0e3227c9c10e777080635f0e78867f9bce0b2f08fc55379da9b058590f2b"
+      },
+      "transport_recovery": null,
+      "request_id": "c49bfcb3-a3bb-42df-b62e-bcf34729668e"
+    },
+    "format_recovery": null
+  },
+  "elapsed_ms": 28852,
+  "usage": [
+    {
+      "prompt_tokens": 5915,
+      "completion_tokens": 6195,
+      "total_tokens": 12110,
+      "prompt_tokens_details": {
+        "cached_tokens": 1024
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 5359
+      },
+      "prompt_cache_hit_tokens": 1024,
+      "prompt_cache_miss_tokens": 4891,
+      "requested_model": "deepseek-v4-flash",
+      "call_started_at": "2026-10-20T06:56:37.045231+00:00",
+      "provider": "DeepSeek",
+      "status": "ok",
+      "latency_ms": 28123,
+      "request_sha256": "373b0e3227c9c10e777080635f0e78867f9bce0b2f08fc55379da9b058590f2b"
+    }
+  ],
+  "raw_judge_content": "{\"verdict\":\"PASS\",\"checks\":[{\"requirement\":\"回答针对 KIRA B 50 的“无对接站、含加注系统”清水箱加注场景，而非“水箱冲洗”流程。\",\"met\":true,\"answer_quotes\":[\"在已确认的无对接站、含加注系统的清水加注场景下\",\"此流程不用于解释另一段水箱冲洗资料的气/水混写\"],\"support\":[{\"source_id\":\"DOC-001-C-00114\",\"quote\":\"无对接站，含加注系统\"},{\"source_id\":\"DOC-001-C-00115\",\"quote\":\"向上翻转污水箱盖子\"},{\"source_id\":\"DOC-001-C-00196\",\"quote\":\"冲洗污水箱，结合冲洗系统\"}],\"scope_resolved\":true},{\"requirement\":\"回答保留题述停机、电池供电隔离、脱离对接站且不涉及电气维修的安全前提。\",\"met\":true,\"answer_quotes\":[\"继续保持题述停机、供电隔离与脱离对接站条件\"],\"support\":[{\"source_id\":\"DOC-001-C-00026\",\"quote\":\"对于电池供电的设备，请拔出电池插头或断开电池连接\"},{\"source_id\":\"DOC-001-C-00181\",\"quote\":\"在执行任何工作之前，请将设备与对接站断开，或拔出电源插头\"}],\"scope_resolved\":true},{\"requirement\":\"操作要求将箱盖翻开到止挡位置，并在关闭前确认四肢不在水箱与盖之间。\",\"met\":true,\"answer_quotes\":[\"向上翻开污水箱盖并打开到止挡位置，防止意外关闭\",\"确保四肢不在水箱与盖子之间后盖上污水箱盖\"],\"support\":[{\"source_id\":\"DOC-001-C-00115\",\"quote\":\"请打开水箱盖直到止挡位置，以免意外关闭\\n当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖\"}],\"scope_resolved\":true},{\"requirement\":\"进水软管应连接到设备的软管接头，水温不超过50°C。\",\"met\":true,\"answer_quotes\":[\"将进水软管连接到设备的软管接头，水温不超过50°C\"],\"support\":[{\"source_id\":\"DOC-001-C-00115\",\"quote\":\"将进水软管连接到设备的软管接头上\"},{\"source_id\":\"DOC-001-C-00115\",\"quote\":\"注意最高水温为 $5 0 ~ { } ^ { \\\\circ } \\\\mathsf { C } !$\"}],\"scope_resolved\":true},{\"requirement\":\"加注时打开进水口，清水箱填满后自动停止加水。\",\"met\":true,\"answer_quotes\":[\"打开进水口，清水箱填满后自动停止加水\"],\"support\":[{\"source_id\":\"DOC-001-C-00115\",\"quote\":\"4. 打开进水口\\n填满清水箱之后自动停止加水\"}],\"scope_resolved\":true},{\"requirement\":\"明确不把本加注流程套用于“水箱冲洗”。\",\"met\":true,\"answer_quotes\":[\"此流程不用于解释另一段水箱冲洗资料的气/水混写\"],\"support\":[{\"source_id\":\"DOC-001-C-00196\",\"quote\":\"冲洗污水箱，结合冲洗系统\"},{\"source_id\":\"DOC-001-C-00197\",\"quote\":\"进行大约 30 秒的冲洗过程\"}],\"scope_resolved\":true}],\"issues\":[],\"reason\":\"回答完整覆盖无对接站、含加注系统的清水箱加注步骤，保留停机、电池隔离、脱离对接站等安全前提，并执行了开盖到止挡、四肢远离盖缝、软管连接、水温不超过50°C、打开进水口及自动停止等必要操作；同时明确与水箱冲洗区分。开头并列引用DOC-001-C-00113虽不直接属于无对接站场景，但未造成步骤或安全结论错误，不影响整体通过。\",\"quality\":{\"correctness\":4,\"faithfulness\":0.9,\"completeness\":1}}",
+  "raw_verdict": "PASS",
+  "matches_expected": true,
+  "response_model": "deepseek-flash",
+  "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+  "provider_usage": {
+    "prompt_tokens": 5915,
+    "completion_tokens": 6195,
+    "total_tokens": 12110,
+    "prompt_tokens_details": {
+      "cached_tokens": 1024
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 5359
+    },
+    "prompt_cache_hit_tokens": 1024,
+    "prompt_cache_miss_tokens": 4891
+  },
+  "response_id": "c49bfcb3-a3bb-42df-b62e-bcf34729668e"
+}

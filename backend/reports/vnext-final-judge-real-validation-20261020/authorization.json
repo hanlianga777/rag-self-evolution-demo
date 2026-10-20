@@ -1,0 +1,19 @@
+{
+  "source": "direct_user_instruction",
+  "user_response": "确认授权。同意按已冻结的12条样本执行真实DeepSeek Judge验证；最多12次，每条一次不重试，总费用上限人民币¥5；A1必须明确识别连接介质/接口不明风险",
+  "judge_version": "judge-vnext-2-operation",
+  "authorization_scope": "12 frozen samples (9 historical, 3 synthetic controls) in approved order; one Judge request each; CNY5 maximum; no retry, generation, retrieval, Baseline or Sandbox",
+  "authorized_at": "2026-10-20T14:55:57.529618+08:00",
+  "identity": {
+    "commit": "782f8beb9fec80eb96cdf2afaeac6038ae898a2b",
+    "prompt_sha256": "8ce7b7aaa08cbab3b537e52a40bd9507b79c7fc3510653a843ae3d6298ddad64",
+    "prepared_sha256": "c329d541c93aeafc5829f997531a8ec60ed131d033a65f3ba057fe19df961429"
+  },
+  "price_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "currency": "CNY",
+  "price_checked_date": "2026-10-20",
+  "peak_input_cache_miss_per_million": 2,
+  "peak_output_per_million": 8,
+  "off_peak_input_cache_miss_per_million": 1,
+  "off_peak_output_per_million": 4
+}

@@ -1,0 +1,12 @@
+{
+  "prompt_tokens": 25276,
+  "completion_tokens": 21495,
+  "total_tokens": 46771,
+  "cached_input_tokens": 4352,
+  "uncached_input_tokens": 20924,
+  "reasoning_tokens": 17884,
+  "elapsed_ms": 99887,
+  "estimated_peak_yuan": 0.21398208,
+  "conservative_ledger_yuan": 0.222512,
+  "budget_yuan": 5
+}

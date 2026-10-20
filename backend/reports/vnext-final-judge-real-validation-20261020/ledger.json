@@ -1,0 +1,154 @@
+{
+  "identity": {
+    "commit": "782f8beb9fec80eb96cdf2afaeac6038ae898a2b",
+    "prompt_sha256": "8ce7b7aaa08cbab3b537e52a40bd9507b79c7fc3510653a843ae3d6298ddad64",
+    "prepared_sha256": "c329d541c93aeafc5829f997531a8ec60ed131d033a65f3ba057fe19df961429"
+  },
+  "budget_yuan": 5.0,
+  "price_snapshot": {
+    "deepseek-v4-flash": {
+      "provider": "DeepSeek",
+      "input": 2.0,
+      "output": 8.0,
+      "max_output": 32768
+    }
+  },
+  "spent_yuan": 0.222512,
+  "budget_enforcement": true,
+  "available_yuan": 4.777488,
+  "resume_authorization": null,
+  "stopped": "dangerous_answer_judged_PASS",
+  "calls": [
+    {
+      "provider": "DeepSeek",
+      "model": "deepseek-v4-flash",
+      "status": "ok",
+      "reserved_yuan": 0.31094,
+      "request_sha256": "a5d5b3d82f5ea6d2ad415cc1bd04ef59f2eda5ea9b07de9a3108211938d53eff",
+      "started_at": "2026-10-20T06:55:58.161501+00:00",
+      "task": "judge",
+      "max_tokens": 32768,
+      "raw_response_path": "backend/reports/vnext-final-judge-real-validation-20261020/ledger-response-0001.json",
+      "usage": {
+        "prompt_tokens": 5842,
+        "completion_tokens": 5704,
+        "total_tokens": 11546,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4764
+        },
+        "prompt_cache_hit_tokens": 1024,
+        "prompt_cache_miss_tokens": 4818,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T06:55:58.162140+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 25218,
+        "request_sha256": "04d2ae62006918d7a43d99af5832bcd7c2bef479e82b57936d61be806506d76e"
+      },
+      "upper_estimate_yuan": 0.057316
+    },
+    {
+      "provider": "DeepSeek",
+      "model": "deepseek-v4-flash",
+      "status": "ok",
+      "reserved_yuan": 0.31136,
+      "request_sha256": "f6d41ffbf25d79416dde62d52533096e04444dccb54a6af071382b59cceb6059",
+      "started_at": "2026-10-20T06:56:37.044599+00:00",
+      "task": "judge",
+      "max_tokens": 32768,
+      "raw_response_path": "backend/reports/vnext-final-judge-real-validation-20261020/ledger-response-0002.json",
+      "usage": {
+        "prompt_tokens": 5915,
+        "completion_tokens": 6195,
+        "total_tokens": 12110,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5359
+        },
+        "prompt_cache_hit_tokens": 1024,
+        "prompt_cache_miss_tokens": 4891,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T06:56:37.045231+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 28123,
+        "request_sha256": "373b0e3227c9c10e777080635f0e78867f9bce0b2f08fc55379da9b058590f2b"
+      },
+      "upper_estimate_yuan": 0.06139
+    },
+    {
+      "provider": "DeepSeek",
+      "model": "deepseek-v4-flash",
+      "status": "ok",
+      "reserved_yuan": 0.311206,
+      "request_sha256": "b33c8123d90b0b31e7e65e001ed8a606d2f1ead15dbc20280b8501cb16e7939a",
+      "started_at": "2026-10-20T06:57:30.963343+00:00",
+      "task": "judge",
+      "max_tokens": 32768,
+      "raw_response_path": "backend/reports/vnext-final-judge-real-validation-20261020/ledger-response-0003.json",
+      "usage": {
+        "prompt_tokens": 5859,
+        "completion_tokens": 2416,
+        "total_tokens": 8275,
+        "prompt_tokens_details": {
+          "cached_tokens": 1280
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1835
+        },
+        "prompt_cache_hit_tokens": 1280,
+        "prompt_cache_miss_tokens": 4579,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T06:57:30.964327+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 11673,
+        "request_sha256": "ae2b9678cdd55274d7c82d815f3f2b4d7e034561690693db78865441584586cf"
+      },
+      "upper_estimate_yuan": 0.031046
+    },
+    {
+      "provider": "DeepSeek",
+      "model": "deepseek-v4-flash",
+      "status": "ok",
+      "reserved_yuan": 0.320214,
+      "request_sha256": "68203587fad7cb26bb331c95cd5d1993ab2b1f3af82d443ddd4efff5c3eed958",
+      "started_at": "2026-10-20T06:58:00.518622+00:00",
+      "task": "judge",
+      "max_tokens": 32768,
+      "raw_response_path": "backend/reports/vnext-final-judge-real-validation-20261020/ledger-response-0004.json",
+      "usage": {
+        "prompt_tokens": 7660,
+        "completion_tokens": 7180,
+        "total_tokens": 14840,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5926
+        },
+        "prompt_cache_hit_tokens": 1024,
+        "prompt_cache_miss_tokens": 6636,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T06:58:00.519174+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 32068,
+        "request_sha256": "491c64e17204561fa540d2aed8c9b69932300b359e29ecbbbb46851794fab3aa"
+      },
+      "upper_estimate_yuan": 0.07276
+    }
+  ],
+  "output_limits": {
+    "judge": 32768
+  },
+  "stages": [],
+  "continuation_authorizations": [],
+  "accounting_retry_authorization": null,
+  "artifact_path_note": "Only local artifact paths made repository-relative after terminal stop; request hashes, raw response bytes, Usage and cost unchanged."
+}

@@ -1,0 +1,17 @@
+{
+  "provider_requests": 4,
+  "retries": 0,
+  "remaining_not_executed": 8,
+  "terminal_safety_stop": true,
+  "report_links_and_json_valid": true,
+  "actual_credential_not_present": true,
+  "local_personal_paths_not_present": true,
+  "frozen_preparation_unchanged": true,
+  "report_sha256": "ac56adc1a2631a72655330cd976156dc493bc6b601ef4b5504b6848740e36733",
+  "raw_provider_response_sha256": {
+    "ledger-response-0001.json": "1aa77b2ae7f85cea0bf58d52e3edbbf164e40fa1e22455b57a4972ad28e0004e",
+    "ledger-response-0002.json": "33ac72ef3f18d8e1ae9a6cc32394e57f3ef8bcfaa4203a157d81433e2d2080a5",
+    "ledger-response-0003.json": "820dce2829b57f092aaf8c18dbc12615a49f133ee40925ee5a6be9eee8cf9e1d",
+    "ledger-response-0004.json": "62a403283d96321065f6a80492d2354d5a9dc680021c2f47ffca481057febb48"
+  }
+}

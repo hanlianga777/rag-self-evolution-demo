@@ -1,0 +1,73 @@
+{
+  "sequence": 1,
+  "quote_count": 11,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "candidate_support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "5. 将压缩空气软管连接到设备上的压缩空气接口",
+      "located": true
+    },
+    {
+      "field": "candidate_support",
+      "source_id": "DOC-001-C-00115",
+      "quote": "将进水软管连接到设备的软管接头上",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "5. 将压缩空气软管连接到设备上的压缩空气接口",
+      "located": true
+    },
+    {
+      "field": "candidate_support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "7. 打开进水口<sub>。</sub>\n8. 进行大约 30 秒的冲洗过程<sub>。</sub>\n9. 关闭进水<sub>。</sub>\n10. 退出功能“水箱冲洗”<sub>。</sub>\n11. 从设备上脱开进水软管",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00026",
+      "quote": "在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00181",
+      "quote": "在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "请打开水箱盖直到止挡位置，以免意外关闭\n当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "5. 将压缩空气软管连接到设备上的压缩空气接口",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "7. 打开进水口<sub>。</sub>",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "11. 从设备上脱开进水软管",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00115",
+      "quote": "将进水软管连接到设备的软管接头上",
+      "located": true
+    }
+  ]
+}
