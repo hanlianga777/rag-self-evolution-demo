@@ -1,3 +1,9 @@
+## 2026-10-20 · Judge关键安全事实全答一致性定向修复
+
+- 针对真实Q42仅采纳后文正确禁忌、忽略前段反向表述的漏判，新增判分前逐项回扫整答：覆盖每个安全要求的所有相关实质表述，answer_quotes逐段保留，冲突双方进入check/issues；不同条件、错误引用与明确纠错须按语义区分，不按否定词判分。
+- Judge升级`judge-vnext-3-safety-consistency`，Prompt SHA `e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b`；既有Identity自动区分。此次只改Prompt检查流程与版本，Schema/Parser/Matcher、生产调用次数、11 Gate/Regression/Agent均不变，不引入第二审核或逐句Claim分类。
+- 本轮Provider0；显式模拟及旧真实回包解析只证明程序处理，不能证明新版LLM安全语义已通过。原200条157P/43F、Q42旧真实错误PASS和其余历史数据/知识资产保持；Baseline50继续暂停。详见[RAG_VNEXT_JUDGE_SAFETY_CONSISTENCY_FIX_REPORT](RAG_VNEXT_JUDGE_SAFETY_CONSISTENCY_FIX_REPORT.md)。
+
 ## 2026-10-20 · Judge当前操作适用性定向修复
 
 - 真实小样本Q39漏判来自Judge按答案组织checks、将普通来源范围外推为当前授权并接受后置澄清；原Prompt已有安全提醒，Parser/Matcher并未发生结构或定位异常。

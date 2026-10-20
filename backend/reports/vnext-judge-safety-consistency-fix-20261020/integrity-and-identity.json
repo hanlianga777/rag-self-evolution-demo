@@ -1,0 +1,27 @@
+{
+  "provider_calls": 0,
+  "real_provider_tokens": 0,
+  "real_provider_cost_yuan": 0,
+  "formal_tables_unchanged": 29,
+  "active_formal_tasks": {
+    "evaluation_runs": 0,
+    "golden_generation_runs": 0,
+    "candidate_revision_runs": 0,
+    "experiments": 0,
+    "candidate_configs": 0
+  },
+  "knowledge_artifacts_verified": 16,
+  "pdf_sources_verified": 4,
+  "independent_200_fixture_and_prior_real_evidence_unchanged": true,
+  "matcher_parser_provider_gate_regression_and_frontend_code_unchanged": true,
+  "protected_formal_tables_reference": "../vnext-final-judge-precheck-20261020/protection.json",
+  "protected_asset_reference": "../vnext-final-judge-precheck-20261020/asset-protection.json",
+  "versions": {
+    "prompt_version": "judge-vnext-3-safety-consistency",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "scoring_policy": "business-vnext-1"
+  },
+  "prompt_sha256": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+  "prompt_characters": 2989,
+  "production_diff_scope": "evaluation_contract.py version and five Prompt clauses only"
+}

@@ -1,6 +1,8 @@
 # RAG Evolution
 
-2026-10-20 当前评测版本：**VNext**（judge-vnext-2-operation / evidence-vnext-1 / business-vnext-1）。业务仅PASS/FAIL，执行异常独立；同义与适用等价Final可接受，必要安全与型号条件不可放宽。旧Baseline/Candidate成绩只读，新实验须另行授权新版完整Baseline。Owner固定的200条离线基准为157P/43F；这不是新LLM成绩。
+2026-10-20 当前评测版本：**VNext**（judge-vnext-3-safety-consistency / evidence-vnext-1 / business-vnext-1）。业务仅PASS/FAIL，执行异常独立；同义与适用等价Final可接受，必要安全与型号条件不可放宽。旧Baseline/Candidate成绩只读，新实验须另行授权新版完整Baseline。Owner固定的200条离线基准为157P/43F；这不是新LLM成绩。
+
+关键安全事实全答一致性：在独立定要求与操作适用性之后，逐项回扫整答所有相关表述，核对否定方向与内部矛盾，既有answer_quotes保留冲突双方；明确引用并纠正错误不机械判FAIL。仅升级同一次Judge的Prompt检查流程与版本，不新增Schema/语义规则引擎。本轮Provider0，真实Q42漏判是否闭环仍待新授权复验，见[一致性修复报告](docs/RAG_VNEXT_JUDGE_SAFETY_CONSISTENCY_FIX_REPORT.md)。
 
 安全定向修复：先独立确定必要前提，再审整段回答的当前操作适用性；仅升级Judge Prompt与版本，Schema/Matcher/门槛保持。本轮真实Provider调用0，真实安全能力仍待另行授权的小样本复验，见[修复报告](docs/RAG_VNEXT_JUDGE_SAFETY_FIX_REPORT.md)。
 

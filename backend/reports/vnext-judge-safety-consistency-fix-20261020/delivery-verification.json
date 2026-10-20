@@ -1,0 +1,13 @@
+{
+  "provider_calls": 0,
+  "report_links_valid": true,
+  "prompt_sha_synced_to_spec_report": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+  "production_prompt_has_no_question_or_run_id_rules": true,
+  "no_schema_parser_matcher_change": true,
+  "formal_data_and_assets_unchanged": true,
+  "related_tests_confirmed": 231,
+  "offline_cases": 200,
+  "expected_PASS": 157,
+  "expected_FAIL": 43,
+  "model_semantic_fix_not_claimed": true
+}

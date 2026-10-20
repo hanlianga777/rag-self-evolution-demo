@@ -1,0 +1,47 @@
+{
+  "verification_kind": "OFFLINE_program_handling_and_Prompt_contract_NOT_new_LLM_accuracy",
+  "provider_calls": 0,
+  "valid_red_run": {
+    "tests": 13,
+    "failures": 2,
+    "errors": 0,
+    "failed_contracts": [
+      "production Prompt missing whole-answer scan protocol",
+      "v2 identity still current before version upgrade"
+    ]
+  },
+  "green_core": {
+    "tests": 74,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 3.276
+  },
+  "related_regression_first": {
+    "tests": 231,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 21.129,
+    "background_thread_exception": "sqlite3.OperationalError unable to open temporary test database during execute_candidate/refresh_recommendation; suspected cleanup race, specific cause not proven"
+  },
+  "recovery_modules_recheck": {
+    "tests": 38,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 14.003,
+    "background_thread_exception": false
+  },
+  "related_regression_confirmation": {
+    "tests": 231,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 23.436,
+    "background_thread_exception": false
+  },
+  "existing_warning": "Starlette TestClient/httpx deprecation; no skipped assertions or production changes to hide it",
+  "historical_cases": {
+    "records": 200,
+    "PASS": 157,
+    "FAIL": 43,
+    "independent_expected_modified": false
+  }
+}
