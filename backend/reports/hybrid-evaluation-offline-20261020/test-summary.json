@@ -1,0 +1,49 @@
+{
+  "kind": "OFFLINE deterministic/explicit response/saved response replay; NOT new LLM validation",
+  "provider_calls": 0,
+  "guard_test_methods": 17,
+  "core_before_last_source_page_case": {
+    "tests": 90,
+    "failures": 0,
+    "errors": 0
+  },
+  "backend_related": {
+    "tests": 248,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 20.54,
+    "background_thread_warning": "Existing candidate execute/refresh_recommendation thread encountered unable to open temporary database during cleanup; not treated as a Guard semantic result"
+  },
+  "frontend": {
+    "files": 42,
+    "tests": 241,
+    "failures": 0
+  },
+  "typescript_and_vite_build": "passed",
+  "architecture_export": "unique source + offline API fixture; SVG/PNG visually inspected",
+  "existing_warning": "Starlette TestClient/httpx deprecation",
+  "core": {
+    "tests": 91,
+    "failures": 0,
+    "errors": 0
+  },
+  "delivery_core": {
+    "tests": 78,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 2.835
+  },
+  "backend_related_confirmation": {
+    "tests": 248,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 19.636,
+    "background_thread_exception": false
+  },
+  "recovery_recheck": {
+    "tests": 38,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 9.383
+  }
+}

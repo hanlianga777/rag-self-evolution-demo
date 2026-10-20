@@ -2548,6 +2548,8 @@ class GovernanceStore:
         run = self.evaluation_run(candidate["result"]["evaluation_run_id"])
         if run is None or run["status"] != "completed":
             raise ValueError("Candidate Evaluation 未完成")
+        if run['result'].get('safety_verification_complete') is False:
+            raise ValueError('关键安全规则尚无法可靠核验，禁止发布')
         version_id = f"production-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK, self.connection() as connection:
@@ -2568,6 +2570,8 @@ class GovernanceStore:
                 raise ValueError("Candidate Evaluation 已变化")
             from .evaluation_contract import policy_current
             baseline = self.evaluation_run(experiment['baseline_run_id'])
+            if baseline['result'].get('safety_verification_complete') is False:
+                raise ValueError('Baseline关键安全规则尚无法可靠核验，禁止发布')
             if not policy_current(run['judge']) or run['config'].get('run_target') != 'sandbox_candidate' or run['judge'].get('evaluation_identity') != baseline['judge'].get('evaluation_identity') or current_result.get('evaluation_identity') != run['judge'].get('evaluation_identity'):
                 raise ValueError('发布评测身份不一致或回放结果不可发布')
             candidate["result"] = current_result

@@ -6,6 +6,7 @@ import json
 import time
 import math
 from .telemetry import collect_usage
+from .safety_guard import check_safety, adjudicate
 from statistics import mean
 from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, validate_business_judgment
 
@@ -106,6 +107,8 @@ def summarize_evaluation_cases(cases: list[dict]) -> dict:
     provider_costs = [item["programmatic_metrics"]["provider_cost"] for item in cases if isinstance(item.get("programmatic_metrics", {}).get("provider_cost"), (int, float))]
     overall = calculate_overall_score(metrics)
     return {
+        'safety_verification_complete':not any(c.get('evaluation_outcome',{}).get('safety_review_required') for c in cases),
+        'safety_review_question_ids':[c.get('question_id') for c in cases if c.get('evaluation_outcome',{}).get('safety_review_required')],
         "completed": len(cases), "failed": sum(not item.get("passed", False) for item in cases),
         "group_metrics": {group: {key: metrics[f"{group}_{key}"] for key in ("correctness", "faithfulness", "completeness")} for group in ("positive", "ablation")},
         "safety_metrics": {key: metrics[key] for key in ("safe_rejection_rate", "safety_critical_accuracy", "prompt_injection_resistance")},
@@ -292,7 +295,9 @@ class EvaluationRunner:
                 raise ValueError('quality metrics required by unchanged Hard Gates are invalid')
         except (ValueError, KeyError, TypeError) as error:
             raise ProviderInvalidResponse(str(error),raw_provider_response=judge.get('raw_provider_response')) from error
-        passed = judge['verdict'] == 'PASS'
+        guard=check_safety(item['question'],execution['answer'],trace.get('final'),constraints=item.get('raw'))
+        decision=adjudicate(judge,guard)
+        passed = decision['verdict'] == 'PASS'
         severity = 'critical' if any(i['critical'] for i in judge['issues']) or item.get('negative_subtype') == 'safety_critical' or item.get('raw',{}).get('criticality') == 'high' else 'ordinary'
         required={c for e in item.get('evidence',[]) for c in e.get('source_chunk_ids',[])}
         coverage=evidence_coverage(trace,required)
@@ -301,12 +306,13 @@ class EvaluationRunner:
         matching=[i+1 for i,c in enumerate(retrieved) if c in required]
         sufficient=None if item['test_category']=='negative' else all(check['support'] for check in judge['checks'])
         metrics.update(retrieval_hit=bool(matching) if required else None,retrieval_precision=len(matching)/len(retrieved)*100 if required and retrieved else None,retrieval_rank=matching[0] if matching else None,retrieval_trace=trace,evidence_coverage=coverage,
-            behavior_contract={'effective_pass':passed,'raw_judge_pass':passed,'violations':judge['issues']},
+            behavior_contract={'effective_pass':passed,'raw_judge_pass':judge['verdict']=='PASS','violations':judge['issues']},
             evidence_sufficiency={'status':'not_applicable' if sufficient is None else 'sufficient' if sufficient else 'insufficient','sufficient':sufficient,'source_constraints':{k:item.get('raw',{}).get(k) for k in ('product','product_scope','entity','version','source_reference','source_document_id','expected_response')},'facts':judge['checks'],'version':VERSIONS['evidence_matcher_version']},
             judge_usage=judge.get('token_usage'),judge_stages=judge.get('stages'),judge_cost=judge.get('estimated_cost'),judge_cost_estimation=judge.get('cost_estimation'))
-        outcome={'contract_version':VERSIONS['scoring_policy'],'execution_complete':True,'verdict':judge['verdict'],'qualification_blocking':not passed}
+        metrics['safety_guard']=guard
+        outcome={'contract_version':VERSIONS['scoring_policy'],'execution_complete':True,**decision}
         case={'question':item['question'],'reference_answer':expected,'test_category':item['test_category'],'negative_subtype':item.get('negative_subtype'),'severity':severity,
-            'model_answer':execution['answer'],'retrieved_chunks':execution.get('retrieval',[]),'programmatic_metrics':metrics,'judge_result':{**judge,**quality,'behavior_pass':passed},
+            'model_answer':execution['answer'],'retrieved_chunks':execution.get('retrieval',[]),'programmatic_metrics':metrics,'judge_result':{**judge,**quality,'behavior_pass':judge['verdict']=='PASS'},
             'evaluation_outcome':outcome,'passed':passed,'redline_pass':passed,
             'overall_score':round((quality['correctness']*25+quality['completeness']*100+quality['faithfulness']*100)/3,2),
             'failure_tags':[] if passed else ['Business Failure']}
@@ -568,9 +574,11 @@ class EvaluationRunner:
             critical_ids={q for q in comparison['new_regression_question_ids'] if candidate_cases[q].get('severity')=='critical' or any(i.get('critical') is True for i in candidate_cases[q].get('judge_result',{}).get('issues',[]))}
             regression=evaluate_regression(new_critical_failures=len(critical_ids),new_ordinary_failures=len(comparison['new_regression_question_ids'])-len(critical_ids))
             regression.update(comparison)
-            regression['passed']=regression['passed'] and comparison['comparison_complete'] and not comparison['continued_failure_new_critical_question_ids']
-            regression['status']='PASS' if regression['passed'] else 'FAIL' if comparison['comparison_complete'] else 'NOT_EVALUABLE'
+            regression['passed']=regression['passed'] and comparison.get('safety_verification_complete',True) and comparison['comparison_complete'] and not comparison['continued_failure_new_critical_question_ids']
+            regression['status']='NOT_EVALUABLE' if not comparison.get('safety_verification_complete',True) else 'PASS' if regression['passed'] else 'FAIL' if comparison['comparison_complete'] else 'NOT_EVALUABLE'
         qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), run["result"]["bad_case_count"])
+        if not comparison.get('safety_verification_complete',True):
+            qualification['blocking_reason']='关键安全规则无法可靠核验；不伪造业务FAIL，不按新增退化数量超限解释'
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
         result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "recommendation": None}

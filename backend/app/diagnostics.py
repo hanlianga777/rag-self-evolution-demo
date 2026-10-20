@@ -317,6 +317,10 @@ def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     sources=[{**c,'content':c.get('chunk_text') or c.get('text') or c.get('content','')} for c in corpus_chunks or []]
     def verified(support,entries):return isinstance(support,list) and bool(support) and all(quote_present(q,entries,display=True) for q in support)
     findings=[]
+    from .safety_guard import check_safety
+    guard=check_safety(case.get('question',''),case.get('model_answer',''),trace['final'],constraints=(case.get('programmatic_metrics',{}).get('evidence_sufficiency') or {}).get('source_constraints'))
+    for finding in guard['findings']:
+        findings.append(('Safety',None,finding))
     for check in judge['checks']:
         if check['met'] or check.get('scope_resolved') is not True:continue
         if verified(check['support'],trace['final']):
@@ -334,5 +338,5 @@ def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
         findings.append(('Performance',None,{'latency_ms':metrics['latency_ms'],'stages':metrics['stages']}))
     if findings:
         root,stage,_=findings[0]
-        result.update(analysis_category='rag_failure',analysis_reason=judge['reason'],primary_root_cause=root,target_eligible=True,retrieval_failure_stage=stage,evidence_checks=[f[2] for f in findings])
+        result.update(analysis_category='rag_failure',analysis_reason=next((f[2]['description'] for f in findings if f[2].get('rule_id')),judge['reason']),primary_root_cause=root,target_eligible=True,retrieval_failure_stage=stage,evidence_checks=[f[2] for f in findings])
     return result

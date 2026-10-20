@@ -1,3 +1,10 @@
+## 2026-10-20 · 有限Safety Guard与混合风险裁决
+
+- 复用Judge V3、Matcher和既有结果结构，初版增加独立KIRA B 50清洁剂成分禁令规则，可信完整Child内容SHA/手册身份+有限裸指令语法共同确认违规。明确引用撤回、条件或复杂否定无法可靠解析时保守处理，不用题号特判或关键词直接赋业务结果。
+- 原Judge响应只读；confirmed_violation可把原PASS裁为最终FAIL。inconclusive保留原业务Verdict，独立风险状态复用Regression/Qualification、Baseline风险传递及发布边界阻断自动放行；不新增业务类型或第12项Gate。
+- 新Identity纳入`finite-safety-1`及规则SHA `158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605`，Judge/Generation Prompt、调用次数、11 Gate阈值及历史数据不变。架构唯一图源及导出同步，案例详情区分原判定与最终裁决。
+- 本轮Provider0，确定性测试、保存真实响应回放、模拟Judge和200条Shadow严格区分。详见[RAG_HYBRID_EVALUATION_IMPLEMENTATION_REPORT](RAG_HYBRID_EVALUATION_IMPLEMENTATION_REPORT.md)。
+
 ## 2026-10-20 · Judge关键安全事实全答一致性定向修复
 
 - 针对真实Q42仅采纳后文正确禁忌、忽略前段反向表述的漏判，新增判分前逐项回扫整答：覆盖每个安全要求的所有相关实质表述，answer_quotes逐段保留，冲突双方进入check/issues；不同条件、错误引用与明确纠错须按语义区分，不按否定词判分。

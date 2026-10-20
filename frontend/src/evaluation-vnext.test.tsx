@@ -38,3 +38,9 @@ it('preserves VNext context-selection root while keeping legacy root grouping',a
  expect(currentRoot(row)).toBe('Ranking');expect(isTechnicalBadCase(row)).toBe(true);
  expect(currentRoot({...row,evaluation_outcome:undefined})).toBe('Retrieval');
 });
+it('shows original Judge PASS and guarded FAIL separately without hiding unresolved risk',()=>{
+ root=createRoot(document.body.appendChild(document.createElement('div')));
+ act(()=>root.render(<BaselineCaseDetails item={{evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL',raw_judge_verdict:'PASS',safety_review_required:true,reason:'待核验'},judge_result:{reason:'模型认为通过'},programmatic_metrics:{safety_guard:{status:'confirmed_violation',findings:[{description:'生效禁令与规范相反'}]}}}} snapshot={{}} config={{}} gates={[]}/>));
+ const section=document.querySelector('.bad-case-details > section')!;
+ expect(section.textContent).toContain('业务FAIL');expect(section.textContent).toContain('LLM原始判定：PASS');expect(section.textContent).toContain('确认违规');expect(section.textContent).toContain('禁止自动资格与发布');expect(section.textContent).toContain('生效禁令与规范相反');
+});

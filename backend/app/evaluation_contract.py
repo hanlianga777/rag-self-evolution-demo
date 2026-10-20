@@ -5,8 +5,9 @@ import json
 import re
 import unicodedata
 from .policy import GATE_DEFINITIONS
+from .safety_guard import SAFETY_IDENTITY
 
-VERSIONS = {'prompt_version': 'judge-vnext-3-safety-consistency', 'evidence_matcher_version': 'evidence-vnext-1', 'scoring_policy': 'business-vnext-1'}
+VERSIONS = {'prompt_version': 'judge-vnext-3-safety-consistency', 'evidence_matcher_version': 'evidence-vnext-1', 'scoring_policy': 'business-vnext-1', **SAFETY_IDENTITY}
 
 
 def policy_current(judge):
@@ -249,9 +250,14 @@ def compare_cases(baseline, candidate, targets):
                 else:
                     complete=False
             if issues: added[q] = issues
+        for q in continued:
+            prior={(f['rule_id'],f['violation_code']) for f in baseline[q].get('programmatic_metrics',{}).get('safety_guard',{}).get('findings',[])}
+            for f in candidate[q].get('programmatic_metrics',{}).get('safety_guard',{}).get('findings',[]):
+                if (f['rule_id'],f['violation_code']) not in prior:added.setdefault(q,[]).append(f)
+        safety_review=sorted(q for q in set(baseline)|set(candidate) if any(c.get('evaluation_outcome',{}).get('safety_review_required') for c in [baseline.get(q,{}),candidate.get(q,{})]))
         critical = sorted(q for q, issues in added.items() if any(i.get('critical') is True for i in issues))
         target = sorted(set(fixed) & set(targets))
-        return {'comparison_version':'business-vnext-1','comparison_complete':complete,'all_fixed_question_ids':fixed,'target_fixed_question_ids':target,'target_bad_cases_fixed':len(target),'incidental_fixed_question_ids':sorted(set(fixed)-set(target)), 'incidental_fixes':len(set(fixed)-set(target)), 'new_regression_question_ids':new,'new_regressions':len(new),'net_improvement':len(fixed)-len(new),'critical_fixed':sum(baseline[q].get('severity')=='critical' for q in fixed),'continued_failure_question_ids':continued,'continued_failure_new_issues':added,'continued_failure_new_critical_question_ids':critical,'formal_blocking_question_ids':sorted(set(new)|set(critical)), 'confirmed_regression_question_ids':new,'pending_regression_question_ids':[],'disputed_regression_question_ids':[],'unclassified_regression_question_ids':[],'regression_interpretation':'complete binary business judgments; new critical issues in continued failures also block qualification'}
+        return {'comparison_version':'business-vnext-1','comparison_complete':complete,'safety_verification_complete':not safety_review,'safety_review_question_ids':safety_review,'all_fixed_question_ids':fixed,'target_fixed_question_ids':target,'target_bad_cases_fixed':len(target),'incidental_fixed_question_ids':sorted(set(fixed)-set(target)), 'incidental_fixes':len(set(fixed)-set(target)), 'new_regression_question_ids':new,'new_regressions':len(new),'net_improvement':len(fixed)-len(new),'critical_fixed':sum(baseline[q].get('severity')=='critical' for q in fixed),'continued_failure_question_ids':continued,'continued_failure_new_issues':added,'continued_failure_new_critical_question_ids':critical,'formal_blocking_question_ids':sorted(set(new)|set(critical)), 'confirmed_regression_question_ids':new,'pending_regression_question_ids':[],'disputed_regression_question_ids':[],'unclassified_regression_question_ids':[],'regression_interpretation':'complete binary business judgments; new critical issues in continued failures also block qualification'}
     fixed = sorted(q for q, r in baseline.items() if not r.get('passed') and candidate.get(q, {}).get('passed'))
     new = sorted(q for q, r in baseline.items() if r.get('passed') and not candidate.get(q, {}).get('passed'))
     outcomes={q:(candidate.get(q,{}).get('evaluation_outcome') or {}).get('status','historical_unclassified') for q in new}
