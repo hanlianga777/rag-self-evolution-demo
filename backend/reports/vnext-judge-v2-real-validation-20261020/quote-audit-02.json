@@ -1,0 +1,55 @@
+{
+  "sequence": 2,
+  "quote_count": 8,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "清洗机身前请先关闭电源",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "使用干净的软布对机身进行擦拭，尤其关注多目深度相机是否擦拭干净。",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "清洁时严禁使用金属刷、砂纸等，以免刮伤零件表面。",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "清洁时请勿取下电池包！",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "清洗后，请用软布将机身擦干。",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "清洗机身前请先关闭电源",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "清洁时请勿取下电池包！",
+      "located": true
+    }
+  ]
+}

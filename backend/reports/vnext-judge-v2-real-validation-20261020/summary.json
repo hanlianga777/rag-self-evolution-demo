@@ -1,0 +1,16 @@
+{
+  "identity": {
+    "commit": "2e973fc7e5c21ebf2bdf68b3103f726a5d3b9066",
+    "prompt_sha256": "8ce7b7aaa08cbab3b537e52a40bd9507b79c7fc3510653a843ae3d6298ddad64",
+    "prepared_sha256": "54e56cf09b7e3b118dccbc04cf291b7c361f90125cab42a61feb9a38381f8fed"
+  },
+  "actual_requests": 5,
+  "completed_records": 5,
+  "valid_parser_matcher": 5,
+  "raw_verdict_agreements": 5,
+  "raw_verdict_mismatches": 0,
+  "stop_reason": null,
+  "remaining_unexecuted": 0,
+  "conservative_peak_cost_yuan": 0.343388,
+  "formal_db_writes": 0
+}

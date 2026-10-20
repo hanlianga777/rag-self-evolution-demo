@@ -1,0 +1,186 @@
+{
+  "sample_kind": "synthetic_control",
+  "group": "SYN",
+  "number": 2,
+  "run_id": null,
+  "question_id": "SYNTHETIC-JUDGE-V2-2",
+  "independent_expected": "PASS",
+  "answer_sha256": "510d019c4ae45198d2ca56b980c3df166800a79ca6b40db86a67c8d43080063b",
+  "final_sha256": "d67db53d88567980c2d6559e53abb41f2adb713c18e5a9c27758fbef95a7529c",
+  "sequence": 2,
+  "started_at": "2026-10-20T11:05:43.975619+08:00",
+  "parser_matcher_status": "passed",
+  "judgment": {
+    "verdict": "PASS",
+    "checks": [
+      {
+        "requirement": "先关闭电源再清洁机身。",
+        "met": true,
+        "answer_quotes": [
+          "先关闭电源"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-002-C-00054",
+            "quote": "清洗机身前请先关闭电源"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "使用干净软布擦拭机身表面，尤其关注多目深度相机。",
+        "met": true,
+        "answer_quotes": [
+          "使用干净的软布擦拭机身表面，尤其关注多目深度相机"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-002-C-00054",
+            "quote": "使用干净的软布对机身进行擦拭，尤其关注多目深度相机是否擦拭干净。"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "清洁时严禁使用金属刷、砂纸，以免刮伤零件表面。",
+        "met": true,
+        "answer_quotes": [
+          "不要使用金属刷、砂纸，避免刮伤"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-002-C-00054",
+            "quote": "清洁时严禁使用金属刷、砂纸等，以免刮伤零件表面。"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "清洁时不要取下电池包。",
+        "met": true,
+        "answer_quotes": [
+          "清洁时不要取下电池包"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-002-C-00054",
+            "quote": "清洁时请勿取下电池包！"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "清洗后用软布将机身擦干。",
+        "met": true,
+        "answer_quotes": [
+          "清洗后，用软布把机身擦干"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-002-C-00054",
+            "quote": "清洗后，请用软布将机身擦干。"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "当前操作适用性：对象为B2整机雨天使用后的机身表面普通雨水水渍，已确认非其他液体，设备已关闭电源，电池包正确安装且无异常，只清洁机身表面；已确认型号、场景、液体性质、电源状态、电池状态和清洁范围，必要安全前提齐全。",
+        "met": true,
+        "answer_quotes": [
+          "按B2手册“1. 清洁”",
+          "先关闭电源",
+          "清洁时不要取下电池包"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-002-C-00054",
+            "quote": "当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。"
+          },
+          {
+            "source_id": "DOC-002-C-00054",
+            "quote": "清洗机身前请先关闭电源"
+          },
+          {
+            "source_id": "DOC-002-C-00054",
+            "quote": "清洁时请勿取下电池包！"
+          }
+        ],
+        "scope_resolved": true
+      }
+    ],
+    "issues": [],
+    "reason": "回答覆盖了说明书要求的关闭电源、干净软布擦拭机身表面并关注多目深度相机、禁用金属刷和砂纸、清洁时勿取下电池包、清洗后软布擦干等必要事实与安全前提；型号和现场条件适用，未发现实质错误。",
+    "quality": {
+      "correctness": 4,
+      "faithfulness": 1,
+      "completeness": 1
+    },
+    "raw_provider_response": "{\"verdict\":\"PASS\",\"checks\":[{\"requirement\":\"先关闭电源再清洁机身。\",\"met\":true,\"answer_quotes\":[\"先关闭电源\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洗机身前请先关闭电源\"}],\"scope_resolved\":true},{\"requirement\":\"使用干净软布擦拭机身表面，尤其关注多目深度相机。\",\"met\":true,\"answer_quotes\":[\"使用干净的软布擦拭机身表面，尤其关注多目深度相机\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"使用干净的软布对机身进行擦拭，尤其关注多目深度相机是否擦拭干净。\"}],\"scope_resolved\":true},{\"requirement\":\"清洁时严禁使用金属刷、砂纸，以免刮伤零件表面。\",\"met\":true,\"answer_quotes\":[\"不要使用金属刷、砂纸，避免刮伤\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洁时严禁使用金属刷、砂纸等，以免刮伤零件表面。\"}],\"scope_resolved\":true},{\"requirement\":\"清洁时不要取下电池包。\",\"met\":true,\"answer_quotes\":[\"清洁时不要取下电池包\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洁时请勿取下电池包！\"}],\"scope_resolved\":true},{\"requirement\":\"清洗后用软布将机身擦干。\",\"met\":true,\"answer_quotes\":[\"清洗后，用软布把机身擦干\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洗后，请用软布将机身擦干。\"}],\"scope_resolved\":true},{\"requirement\":\"当前操作适用性：对象为B2整机雨天使用后的机身表面普通雨水水渍，已确认非其他液体，设备已关闭电源，电池包正确安装且无异常，只清洁机身表面；已确认型号、场景、液体性质、电源状态、电池状态和清洁范围，必要安全前提齐全。\",\"met\":true,\"answer_quotes\":[\"按B2手册“1. 清洁”\",\"先关闭电源\",\"清洁时不要取下电池包\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。\"},{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洗机身前请先关闭电源\"},{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洁时请勿取下电池包！\"}],\"scope_resolved\":true}],\"issues\":[],\"reason\":\"回答覆盖了说明书要求的关闭电源、干净软布擦拭机身表面并关注多目深度相机、禁用金属刷和砂纸、清洁时勿取下电池包、清洗后软布擦干等必要事实与安全前提；型号和现场条件适用，未发现实质错误。\",\"quality\":{\"correctness\":4,\"faithfulness\":1,\"completeness\":1}}",
+    "response_metadata": {
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 2741,
+        "completion_tokens": 2176,
+        "total_tokens": 4917,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1522
+        },
+        "prompt_cache_hit_tokens": 1024,
+        "prompt_cache_miss_tokens": 1717,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T03:05:44.609788+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 12154,
+        "request_sha256": "c02b7d265720a19e4e0d2cf5a6cc5d444ce9d57159752fb84fd9daf118cfc64e"
+      },
+      "transport_recovery": null,
+      "request_id": "8bc366b7-f670-43c9-9fae-982d2816dd2f"
+    },
+    "format_recovery": null
+  },
+  "elapsed_ms": 12799,
+  "usage": [
+    {
+      "prompt_tokens": 2741,
+      "completion_tokens": 2176,
+      "total_tokens": 4917,
+      "prompt_tokens_details": {
+        "cached_tokens": 1024
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 1522
+      },
+      "prompt_cache_hit_tokens": 1024,
+      "prompt_cache_miss_tokens": 1717,
+      "requested_model": "deepseek-v4-flash",
+      "call_started_at": "2026-10-20T03:05:44.609788+00:00",
+      "provider": "DeepSeek",
+      "status": "ok",
+      "latency_ms": 12154,
+      "request_sha256": "c02b7d265720a19e4e0d2cf5a6cc5d444ce9d57159752fb84fd9daf118cfc64e"
+    }
+  ],
+  "raw_judge_content": "{\"verdict\":\"PASS\",\"checks\":[{\"requirement\":\"先关闭电源再清洁机身。\",\"met\":true,\"answer_quotes\":[\"先关闭电源\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洗机身前请先关闭电源\"}],\"scope_resolved\":true},{\"requirement\":\"使用干净软布擦拭机身表面，尤其关注多目深度相机。\",\"met\":true,\"answer_quotes\":[\"使用干净的软布擦拭机身表面，尤其关注多目深度相机\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"使用干净的软布对机身进行擦拭，尤其关注多目深度相机是否擦拭干净。\"}],\"scope_resolved\":true},{\"requirement\":\"清洁时严禁使用金属刷、砂纸，以免刮伤零件表面。\",\"met\":true,\"answer_quotes\":[\"不要使用金属刷、砂纸，避免刮伤\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洁时严禁使用金属刷、砂纸等，以免刮伤零件表面。\"}],\"scope_resolved\":true},{\"requirement\":\"清洁时不要取下电池包。\",\"met\":true,\"answer_quotes\":[\"清洁时不要取下电池包\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洁时请勿取下电池包！\"}],\"scope_resolved\":true},{\"requirement\":\"清洗后用软布将机身擦干。\",\"met\":true,\"answer_quotes\":[\"清洗后，用软布把机身擦干\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洗后，请用软布将机身擦干。\"}],\"scope_resolved\":true},{\"requirement\":\"当前操作适用性：对象为B2整机雨天使用后的机身表面普通雨水水渍，已确认非其他液体，设备已关闭电源，电池包正确安装且无异常，只清洁机身表面；已确认型号、场景、液体性质、电源状态、电池状态和清洁范围，必要安全前提齐全。\",\"met\":true,\"answer_quotes\":[\"按B2手册“1. 清洁”\",\"先关闭电源\",\"清洁时不要取下电池包\"],\"support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。\"},{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洗机身前请先关闭电源\"},{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"清洁时请勿取下电池包！\"}],\"scope_resolved\":true}],\"issues\":[],\"reason\":\"回答覆盖了说明书要求的关闭电源、干净软布擦拭机身表面并关注多目深度相机、禁用金属刷和砂纸、清洁时勿取下电池包、清洗后软布擦干等必要事实与安全前提；型号和现场条件适用，未发现实质错误。\",\"quality\":{\"correctness\":4,\"faithfulness\":1,\"completeness\":1}}",
+  "raw_verdict": "PASS",
+  "matches_expected": true,
+  "response_model": "deepseek-flash",
+  "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+  "provider_usage": {
+    "prompt_tokens": 2741,
+    "completion_tokens": 2176,
+    "total_tokens": 4917,
+    "prompt_tokens_details": {
+      "cached_tokens": 1024
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1522
+    },
+    "prompt_cache_hit_tokens": 1024,
+    "prompt_cache_miss_tokens": 1717
+  },
+  "response_id": "8bc366b7-f670-43c9-9fae-982d2816dd2f"
+}

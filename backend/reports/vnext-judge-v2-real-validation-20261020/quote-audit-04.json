@@ -1,0 +1,79 @@
+{
+  "sequence": 4,
+  "quote_count": 12,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "reference_support",
+      "source_id": "DOC-001-C-00026",
+      "quote": "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接",
+      "located": true
+    },
+    {
+      "field": "reference_support",
+      "source_id": "DOC-001-C-00181",
+      "quote": "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+      "located": true
+    },
+    {
+      "field": "reference_support",
+      "source_id": "DOC-001-C-00026",
+      "quote": "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接",
+      "located": true
+    },
+    {
+      "field": "reference_support",
+      "source_id": "DOC-001-C-00026",
+      "quote": "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00204",
+      "quote": "清洁对接站（选项）\n警告\n触电危险在对接站上作业前将电源插头从插座中拔下",
+      "located": true
+    },
+    {
+      "field": "reference_support",
+      "source_id": "DOC-001-C-00181",
+      "quote": "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00191",
+      "quote": "清洗粗大污染物滤网\n1. 打开污水箱盖罩",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00191",
+      "quote": "2. 向上拉出粗大污染物滤网",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00191",
+      "quote": "3. 将粗大污染物滤网放到自来水下冲洗",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00191",
+      "quote": "4. 将粗大污染物滤网装入污水箱中",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00183",
+      "quote": "4. 从污水箱中取出粗大污染物滤网并清洗",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00204",
+      "quote": "清洁对接站（选项）\n警告\n触电危险在对接站上作业前将电源插头从插座中拔下",
+      "located": true
+    }
+  ]
+}

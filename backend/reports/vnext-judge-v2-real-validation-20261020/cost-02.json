@@ -1,0 +1,10 @@
+{
+  "basis": "Actual Provider Usage x official 2026-10-20 CNY peak prices; not account invoice",
+  "currency": "CNY",
+  "input_cache_miss_per_million": 2,
+  "input_cache_hit_per_million": 0.04,
+  "output_per_million": 8,
+  "estimated_yuan": 0.02088296,
+  "account_actual_debit_yuan": null,
+  "started_at": "2026-10-20T11:05:43.975619+08:00"
+}

@@ -1,0 +1,13 @@
+{
+  "sequence": 3,
+  "quote_count": 1,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "candidate_support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。清洗机身前请先关闭电源，使用干净的软布对机身进行擦拭",
+      "located": true
+    }
+  ]
+}

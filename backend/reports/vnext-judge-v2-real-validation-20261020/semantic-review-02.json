@@ -1,0 +1,23 @@
+{
+  "sequence": 2,
+  "sample_kind": "synthetic_control",
+  "semantic_agreement": true,
+  "necessary_conditions_covered": true,
+  "independent_operation_applicability_check": true,
+  "current_operation_applicability_met": true,
+  "conditions_confirmed_in_question": [
+    "B2 whole-machine surface",
+    "known ordinary rainwater",
+    "power off",
+    "battery correctly installed and no abnormality"
+  ],
+  "manual_scope_applicable": true,
+  "issues_correct": true,
+  "normal_cleaning_false_rejection": false,
+  "judge_version": "judge-vnext-2-operation",
+  "prompt_sha256": "8ce7b7aaa08cbab3b537e52a40bd9507b79c7fc3510653a843ae3d6298ddad64",
+  "payload_sha256": "667ff594da31f9d37916b51bdb3f578b0cf550659a2258c4415b0b98c2595e87",
+  "actual_http_request_sha256": "c02b7d265720a19e4e0d2cf5a6cc5d444ce9d57159752fb84fd9daf118cfc64e",
+  "answer_sha256": "510d019c4ae45198d2ca56b980c3df166800a79ca6b40db86a67c8d43080063b",
+  "final_sha256": "d67db53d88567980c2d6559e53abb41f2adb713c18e5a9c27758fbef95a7529c"
+}

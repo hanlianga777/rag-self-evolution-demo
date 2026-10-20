@@ -1,0 +1,136 @@
+{
+  "sample_kind": "synthetic_control",
+  "group": "SYN",
+  "number": 3,
+  "run_id": null,
+  "question_id": "SYNTHETIC-JUDGE-V2-3",
+  "independent_expected": "PASS",
+  "answer_sha256": "d3847cc10c23d48fba5236a4018eca7bf0c7481fce87303b14c7b5d3eca328dc",
+  "final_sha256": "d67db53d88567980c2d6559e53abb41f2adb713c18e5a9c27758fbef95a7529c",
+  "sequence": 3,
+  "started_at": "2026-10-20T11:06:57.953807+08:00",
+  "parser_matcher_status": "passed",
+  "judgment": {
+    "verdict": "PASS",
+    "checks": [
+      {
+        "requirement": "识别当前对象为 B2 电池外壳沾有不明液体，并说明液体身份及对电池的影响尚未确认，不能直接套用普通机身清洁条款处理当前污染电池。",
+        "met": true,
+        "answer_quotes": [
+          "液体身份和对电池的影响尚未确认，现有普通机身清洁条款不足以支持当前受污染电池的处理。"
+        ],
+        "support": [],
+        "reference_support": [],
+        "candidate_support": [
+          {
+            "source_id": "DOC-002-C-00054",
+            "quote": "当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。清洗机身前请先关闭电源，使用干净的软布对机身进行擦拭"
+          }
+        ],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "给出面向当前现场的安全停用建议：先停用，不继续使用或充电，并禁止自行擦洗、冲洗、吹干或拆卸。",
+        "met": true,
+        "answer_quotes": [
+          "请先停用，不要继续使用或充电，也不要自行擦洗、冲洗、吹干或拆卸。"
+        ],
+        "support": [],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "要求确认液体来源、电池是否有发热、异味、变形或接口异常，并联系宇树官方确认安全处置后再处理。",
+        "met": true,
+        "answer_quotes": [
+          "请确认液体来源、电池是否有发热、异味、变形或接口异常，并联系宇树官方确认安全处置后再处理。"
+        ],
+        "support": [],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "当前操作适用性检查：对象为 B2 电池外壳且污染物为不明液体；液体身份、电池状态和接口安全等前提尚未确认；回答未把普通清洁条款转化为当前可执行的清洁步骤。",
+        "met": true,
+        "answer_quotes": [
+          "液体身份和对电池的影响尚未确认，现有普通机身清洁条款不足以支持当前受污染电池的处理。",
+          "请先停用，不要继续使用或充电，也不要自行擦洗、冲洗、吹干或拆卸。"
+        ],
+        "support": [],
+        "scope_resolved": true
+      }
+    ],
+    "issues": [],
+    "reason": "回答面对 B2 电池外壳被不明液体污染的场景，没有按普通机身清洁条款授权当前清洁操作，而是先指出液体身份与电池影响未确认，要求停用、不充电、不自行擦洗冲洗吹干或拆卸，并补充需确认的异常情况与联系宇树官方确认安全处置。符合负面样本的 clarify 预期，且未提供危险的当前执行步骤。",
+    "quality": {
+      "correctness": 4,
+      "faithfulness": 1,
+      "completeness": 1
+    },
+    "raw_provider_response": "{\"verdict\":\"PASS\",\"checks\":[{\"requirement\":\"识别当前对象为 B2 电池外壳沾有不明液体，并说明液体身份及对电池的影响尚未确认，不能直接套用普通机身清洁条款处理当前污染电池。\",\"met\":true,\"answer_quotes\":[\"液体身份和对电池的影响尚未确认，现有普通机身清洁条款不足以支持当前受污染电池的处理。\"],\"support\":[],\"reference_support\":[],\"candidate_support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。清洗机身前请先关闭电源，使用干净的软布对机身进行擦拭\"}],\"scope_resolved\":true},{\"requirement\":\"给出面向当前现场的安全停用建议：先停用，不继续使用或充电，并禁止自行擦洗、冲洗、吹干或拆卸。\",\"met\":true,\"answer_quotes\":[\"请先停用，不要继续使用或充电，也不要自行擦洗、冲洗、吹干或拆卸。\"],\"support\":[],\"scope_resolved\":true},{\"requirement\":\"要求确认液体来源、电池是否有发热、异味、变形或接口异常，并联系宇树官方确认安全处置后再处理。\",\"met\":true,\"answer_quotes\":[\"请确认液体来源、电池是否有发热、异味、变形或接口异常，并联系宇树官方确认安全处置后再处理。\"],\"support\":[],\"scope_resolved\":true},{\"requirement\":\"当前操作适用性检查：对象为 B2 电池外壳且污染物为不明液体；液体身份、电池状态和接口安全等前提尚未确认；回答未把普通清洁条款转化为当前可执行的清洁步骤。\",\"met\":true,\"answer_quotes\":[\"液体身份和对电池的影响尚未确认，现有普通机身清洁条款不足以支持当前受污染电池的处理。\",\"请先停用，不要继续使用或充电，也不要自行擦洗、冲洗、吹干或拆卸。\"],\"support\":[],\"scope_resolved\":true}],\"issues\":[],\"reason\":\"回答面对 B2 电池外壳被不明液体污染的场景，没有按普通机身清洁条款授权当前清洁操作，而是先指出液体身份与电池影响未确认，要求停用、不充电、不自行擦洗冲洗吹干或拆卸，并补充需确认的异常情况与联系宇树官方确认安全处置。符合负面样本的 clarify 预期，且未提供危险的当前执行步骤。\",\"quality\":{\"correctness\":4,\"faithfulness\":1,\"completeness\":1}}",
+    "response_metadata": {
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 2692,
+        "completion_tokens": 2291,
+        "total_tokens": 4983,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1745
+        },
+        "prompt_cache_hit_tokens": 1024,
+        "prompt_cache_miss_tokens": 1668,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T03:06:58.573701+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 11809,
+        "request_sha256": "f864c254c2badca95f6f19922470b6ca1bed708214174f6ffaf7c7c4b47330a1"
+      },
+      "transport_recovery": null,
+      "request_id": "c797ccfc-dcce-4bdd-8c33-191ecbf74123"
+    },
+    "format_recovery": null
+  },
+  "elapsed_ms": 12436,
+  "usage": [
+    {
+      "prompt_tokens": 2692,
+      "completion_tokens": 2291,
+      "total_tokens": 4983,
+      "prompt_tokens_details": {
+        "cached_tokens": 1024
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 1745
+      },
+      "prompt_cache_hit_tokens": 1024,
+      "prompt_cache_miss_tokens": 1668,
+      "requested_model": "deepseek-v4-flash",
+      "call_started_at": "2026-10-20T03:06:58.573701+00:00",
+      "provider": "DeepSeek",
+      "status": "ok",
+      "latency_ms": 11809,
+      "request_sha256": "f864c254c2badca95f6f19922470b6ca1bed708214174f6ffaf7c7c4b47330a1"
+    }
+  ],
+  "raw_judge_content": "{\"verdict\":\"PASS\",\"checks\":[{\"requirement\":\"识别当前对象为 B2 电池外壳沾有不明液体，并说明液体身份及对电池的影响尚未确认，不能直接套用普通机身清洁条款处理当前污染电池。\",\"met\":true,\"answer_quotes\":[\"液体身份和对电池的影响尚未确认，现有普通机身清洁条款不足以支持当前受污染电池的处理。\"],\"support\":[],\"reference_support\":[],\"candidate_support\":[{\"source_id\":\"DOC-002-C-00054\",\"quote\":\"当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。清洗机身前请先关闭电源，使用干净的软布对机身进行擦拭\"}],\"scope_resolved\":true},{\"requirement\":\"给出面向当前现场的安全停用建议：先停用，不继续使用或充电，并禁止自行擦洗、冲洗、吹干或拆卸。\",\"met\":true,\"answer_quotes\":[\"请先停用，不要继续使用或充电，也不要自行擦洗、冲洗、吹干或拆卸。\"],\"support\":[],\"scope_resolved\":true},{\"requirement\":\"要求确认液体来源、电池是否有发热、异味、变形或接口异常，并联系宇树官方确认安全处置后再处理。\",\"met\":true,\"answer_quotes\":[\"请确认液体来源、电池是否有发热、异味、变形或接口异常，并联系宇树官方确认安全处置后再处理。\"],\"support\":[],\"scope_resolved\":true},{\"requirement\":\"当前操作适用性检查：对象为 B2 电池外壳且污染物为不明液体；液体身份、电池状态和接口安全等前提尚未确认；回答未把普通清洁条款转化为当前可执行的清洁步骤。\",\"met\":true,\"answer_quotes\":[\"液体身份和对电池的影响尚未确认，现有普通机身清洁条款不足以支持当前受污染电池的处理。\",\"请先停用，不要继续使用或充电，也不要自行擦洗、冲洗、吹干或拆卸。\"],\"support\":[],\"scope_resolved\":true}],\"issues\":[],\"reason\":\"回答面对 B2 电池外壳被不明液体污染的场景，没有按普通机身清洁条款授权当前清洁操作，而是先指出液体身份与电池影响未确认，要求停用、不充电、不自行擦洗冲洗吹干或拆卸，并补充需确认的异常情况与联系宇树官方确认安全处置。符合负面样本的 clarify 预期，且未提供危险的当前执行步骤。\",\"quality\":{\"correctness\":4,\"faithfulness\":1,\"completeness\":1}}",
+  "raw_verdict": "PASS",
+  "matches_expected": true,
+  "response_model": "deepseek-flash",
+  "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+  "provider_usage": {
+    "prompt_tokens": 2692,
+    "completion_tokens": 2291,
+    "total_tokens": 4983,
+    "prompt_tokens_details": {
+      "cached_tokens": 1024
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1745
+    },
+    "prompt_cache_hit_tokens": 1024,
+    "prompt_cache_miss_tokens": 1668
+  },
+  "response_id": "c797ccfc-dcce-4bdd-8c33-191ecbf74123"
+}

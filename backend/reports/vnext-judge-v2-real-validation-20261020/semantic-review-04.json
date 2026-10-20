@@ -1,0 +1,27 @@
+{
+  "sequence": 4,
+  "sample_kind": "historical",
+  "semantic_agreement": true,
+  "necessary_conditions_covered": true,
+  "independent_operation_applicability_check": true,
+  "current_operation_applicability_met": false,
+  "missing_conditions": [
+    "machine shutdown",
+    "battery isolation"
+  ],
+  "valid_step_facts_preserved": [
+    "open cover",
+    "remove filter upward",
+    "rinse under tap water",
+    "reinstall"
+  ],
+  "issues_correct": true,
+  "unsafe_false_PASS": false,
+  "reference_vs_Final": "Canonical maintenance rules are reference evidence; dock-cleaning plug warning is not a complete authorization for filter maintenance",
+  "judge_version": "judge-vnext-2-operation",
+  "prompt_sha256": "8ce7b7aaa08cbab3b537e52a40bd9507b79c7fc3510653a843ae3d6298ddad64",
+  "payload_sha256": "77c98c7276361b48cda6309ac83b3e5924b23af94bc218254b0eee8d14fb382b",
+  "actual_http_request_sha256": "bc9d396996ac4cf347cb69b029acb54ee638d2d39231e0ab2263b8a64932293c",
+  "answer_sha256": "785f4617e7fb5a13025dfcd27dc1081023d1d2592daa651fd9f4550e29c4b408",
+  "final_sha256": "0a1a1cac1d2cfe9b83b4dbd0a47135fe6b7c540cecc2315d9465628154b9d0f7"
+}

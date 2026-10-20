@@ -1,0 +1,43 @@
+{
+  "sequence": 5,
+  "quote_count": 6,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00196",
+      "quote": "冲洗污水箱，结合冲洗系统\n1. 清空污水箱 在盖子打开的情况下将排水管置于排水口上\n2. 在触摸屏上打开菜单“日常护理”\n3. 启动功能“水箱冲洗”",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "8. 进行大约 30 秒的冲洗过程<sub>。</sub>",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "8. 进行大约 30 秒的冲洗过程<sub>。</sub>",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00177",
+      "quote": "污水中的污染物和清洁剂可能会危害您的健康或污染环境请遵守当地适用的废水处理规定",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "警告\n水箱盖导致受伤危险！\n由于水箱盖意外关闭而导致肢体受挤压的危险\n请打开水箱盖直到止挡位置，以免意外关闭\n当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00197",
+      "quote": "警告\n水箱盖导致受伤危险！\n由于水箱盖意外关闭而导致肢体受挤压的危险\n请打开水箱盖直到止挡位置，以免意外关闭\n当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖",
+      "located": true
+    }
+  ]
+}

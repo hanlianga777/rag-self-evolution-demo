@@ -1,0 +1,14 @@
+{
+  "old_backend_pid": "64259",
+  "new_backend_pid": "71334",
+  "process": "1255 Tue Oct 20 11:02:58 2026     /Library/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8010",
+  "production_module_versions": {
+    "prompt_version": "judge-vnext-2-operation",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "scoring_policy": "business-vnext-1"
+  },
+  "production_prompt_sha256": "8ce7b7aaa08cbab3b537e52a40bd9507b79c7fc3510653a843ae3d6298ddad64",
+  "api_evaluation_status": 200,
+  "old_baseline_requires_policy_upgrade": true,
+  "verification_method": "old process predates v2 source; controlled original-supervisor reload; current production module imported and exact SHA verified; new service startup and old-identity gate checked"
+}

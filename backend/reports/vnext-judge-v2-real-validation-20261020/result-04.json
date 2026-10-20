@@ -1,0 +1,266 @@
+{
+  "sample_kind": "historical",
+  "group": "BL",
+  "number": 7,
+  "run_id": "EVAL-20261015140115663135",
+  "question_id": "V1G-110926448917-07",
+  "independent_expected": "FAIL",
+  "answer_sha256": "785f4617e7fb5a13025dfcd27dc1081023d1d2592daa651fd9f4550e29c4b408",
+  "final_sha256": "0a1a1cac1d2cfe9b83b4dbd0a47135fe6b7c540cecc2315d9465628154b9d0f7",
+  "sequence": 4,
+  "started_at": "2026-10-20T11:07:59.668883+08:00",
+  "parser_matcher_status": "passed",
+  "judgment": {
+    "verdict": "FAIL",
+    "checks": [
+      {
+        "requirement": "当前操作适用性检查：对象为 KIRA B 50，现场条件是设备停在对接站上并要清洗污水箱粗大污染物滤网；执行前应确认设备已关闭、电池插头已拔出或电池连接已断开，以及设备已与对接站断开或电源插头已拔下。答案只把‘拔下市电插头’作为条件，未确认关机和电池隔离，尚缺必要安全前提。",
+        "met": false,
+        "answer_quotes": [
+          "设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。",
+          "“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。"
+        ],
+        "support": [],
+        "reference_support": [
+          {
+            "source_id": "DOC-001-C-00026",
+            "quote": "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接"
+          },
+          {
+            "source_id": "DOC-001-C-00181",
+            "quote": "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头"
+          }
+        ],
+        "candidate_support": [],
+        "scope_resolved": false
+      },
+      {
+        "requirement": "清洗、维护前必须关闭设备（关机），不能只处理供电插头。",
+        "met": false,
+        "answer_quotes": [
+          "设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。",
+          "“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。"
+        ],
+        "support": [],
+        "reference_support": [
+          {
+            "source_id": "DOC-001-C-00026",
+            "quote": "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接"
+          }
+        ],
+        "candidate_support": [],
+        "scope_resolved": false
+      },
+      {
+        "requirement": "作为电池供电设备的 KIRA B 50，维护前必须拔出电池插头或断开电池连接。",
+        "met": false,
+        "answer_quotes": [
+          "设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。",
+          "“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。"
+        ],
+        "support": [],
+        "reference_support": [
+          {
+            "source_id": "DOC-001-C-00026",
+            "quote": "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接"
+          }
+        ],
+        "candidate_support": [],
+        "scope_resolved": false
+      },
+      {
+        "requirement": "在执行任何工作前，将设备与对接站断开，或拔出电源插头。",
+        "met": true,
+        "answer_quotes": [
+          "设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00204",
+            "quote": "清洁对接站（选项）\n警告\n触电危险在对接站上作业前将电源插头从插座中拔下"
+          }
+        ],
+        "reference_support": [
+          {
+            "source_id": "DOC-001-C-00181",
+            "quote": "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头"
+          }
+        ],
+        "candidate_support": [],
+        "scope_resolved": false
+      },
+      {
+        "requirement": "取出粗大污染物滤网前先打开污水箱盖罩。",
+        "met": true,
+        "answer_quotes": [
+          "打开污水箱盖罩。"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00191",
+            "quote": "清洗粗大污染物滤网\n1. 打开污水箱盖罩"
+          }
+        ],
+        "reference_support": [],
+        "candidate_support": [],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "向上拉出粗大污染物滤网。",
+        "met": true,
+        "answer_quotes": [
+          "向上拉出粗大污染物滤网。"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00191",
+            "quote": "2. 向上拉出粗大污染物滤网"
+          }
+        ],
+        "reference_support": [],
+        "candidate_support": [],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "将粗大污染物滤网放到自来水下冲洗。",
+        "met": true,
+        "answer_quotes": [
+          "将粗大污染物滤网放到自来水下冲洗。"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00191",
+            "quote": "3. 将粗大污染物滤网放到自来水下冲洗"
+          }
+        ],
+        "reference_support": [],
+        "candidate_support": [],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "将粗大污染物滤网装入污水箱中。",
+        "met": true,
+        "answer_quotes": [
+          "将粗大污染物滤网装入污水箱中。"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00191",
+            "quote": "4. 将粗大污染物滤网装入污水箱中"
+          }
+        ],
+        "reference_support": [],
+        "candidate_support": [],
+        "scope_resolved": true
+      },
+      {
+        "requirement": "日常保养要求包含从污水箱中取出粗大污染物滤网并清洗。",
+        "met": true,
+        "answer_quotes": [
+          "日常保养清单中也列有“从污水箱中取出粗大污染物滤网并清洗”这一项。"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00183",
+            "quote": "4. 从污水箱中取出粗大污染物滤网并清洗"
+          }
+        ],
+        "reference_support": [],
+        "candidate_support": [],
+        "scope_resolved": true
+      }
+    ],
+    "issues": [
+      {
+        "description": "答案把‘清洁对接站’章节的‘拔下电源插头’警告当作清洗粗大污染物滤网的充分电气安全前提，仅以确认市电插头拔下为条件就给出打开污水箱、拉出滤网的当前操作步骤；未按维护总则要求先关闭设备，也未按电池供电设备要求拔出电池插头或断开电池连接。必要安全前提缺失，不能批准当前现场执行。",
+        "answer_quotes": [
+          "设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。",
+          "“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。"
+        ],
+        "support": [
+          {
+            "source_id": "DOC-001-C-00204",
+            "quote": "清洁对接站（选项）\n警告\n触电危险在对接站上作业前将电源插头从插座中拔下"
+          }
+        ],
+        "critical": true,
+        "safety_violation": true,
+        "scope_resolved": false,
+        "baseline_issue_index": null
+      }
+    ],
+    "reason": "答案的滤网取出、自来水冲洗和装回步骤与手册一致，但电气安全不完整：未关闭设备、未断开电池或拔出电池插头，并且把清洁对接站的拔电源警告套用于滤网清洗；在电池隔离未确认时仍给出当前可执行步骤，违反必要安全前提，故FAIL。",
+    "quality": {
+      "correctness": 1,
+      "faithfulness": 0.7,
+      "completeness": 0.5
+    },
+    "raw_provider_response": "{\"verdict\":\"FAIL\",\"checks\":[{\"requirement\":\"当前操作适用性检查：对象为 KIRA B 50，现场条件是设备停在对接站上并要清洗污水箱粗大污染物滤网；执行前应确认设备已关闭、电池插头已拔出或电池连接已断开，以及设备已与对接站断开或电源插头已拔下。答案只把‘拔下市电插头’作为条件，未确认关机和电池隔离，尚缺必要安全前提。\",\"met\":false,\"answer_quotes\":[\"设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。\",\"“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。\"],\"support\":[],\"reference_support\":[{\"source_id\":\"DOC-001-C-00026\",\"quote\":\"保养和维护\\n警告\\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接\"},{\"source_id\":\"DOC-001-C-00181\",\"quote\":\"保养和维护\\n危险\\n无意中启动设备，接触导电部件\\n受伤危险，触电\\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头\"}],\"candidate_support\":[],\"scope_resolved\":false},{\"requirement\":\"清洗、维护前必须关闭设备（关机），不能只处理供电插头。\",\"met\":false,\"answer_quotes\":[\"设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。\",\"“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。\"],\"support\":[],\"reference_support\":[{\"source_id\":\"DOC-001-C-00026\",\"quote\":\"保养和维护\\n警告\\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接\"}],\"candidate_support\":[],\"scope_resolved\":false},{\"requirement\":\"作为电池供电设备的 KIRA B 50，维护前必须拔出电池插头或断开电池连接。\",\"met\":false,\"answer_quotes\":[\"设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。\",\"“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。\"],\"support\":[],\"reference_support\":[{\"source_id\":\"DOC-001-C-00026\",\"quote\":\"保养和维护\\n警告\\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接\"}],\"candidate_support\":[],\"scope_resolved\":false},{\"requirement\":\"在执行任何工作前，将设备与对接站断开，或拔出电源插头。\",\"met\":true,\"answer_quotes\":[\"设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。\"],\"support\":[{\"source_id\":\"DOC-001-C-00204\",\"quote\":\"清洁对接站（选项）\\n警告\\n触电危险在对接站上作业前将电源插头从插座中拔下\"}],\"reference_support\":[{\"source_id\":\"DOC-001-C-00181\",\"quote\":\"保养和维护\\n危险\\n无意中启动设备，接触导电部件\\n受伤危险，触电\\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头\"}],\"candidate_support\":[],\"scope_resolved\":false},{\"requirement\":\"取出粗大污染物滤网前先打开污水箱盖罩。\",\"met\":true,\"answer_quotes\":[\"打开污水箱盖罩。\"],\"support\":[{\"source_id\":\"DOC-001-C-00191\",\"quote\":\"清洗粗大污染物滤网\\n1. 打开污水箱盖罩\"}],\"reference_support\":[],\"candidate_support\":[],\"scope_resolved\":true},{\"requirement\":\"向上拉出粗大污染物滤网。\",\"met\":true,\"answer_quotes\":[\"向上拉出粗大污染物滤网。\"],\"support\":[{\"source_id\":\"DOC-001-C-00191\",\"quote\":\"2. 向上拉出粗大污染物滤网\"}],\"reference_support\":[],\"candidate_support\":[],\"scope_resolved\":true},{\"requirement\":\"将粗大污染物滤网放到自来水下冲洗。\",\"met\":true,\"answer_quotes\":[\"将粗大污染物滤网放到自来水下冲洗。\"],\"support\":[{\"source_id\":\"DOC-001-C-00191\",\"quote\":\"3. 将粗大污染物滤网放到自来水下冲洗\"}],\"reference_support\":[],\"candidate_support\":[],\"scope_resolved\":true},{\"requirement\":\"将粗大污染物滤网装入污水箱中。\",\"met\":true,\"answer_quotes\":[\"将粗大污染物滤网装入污水箱中。\"],\"support\":[{\"source_id\":\"DOC-001-C-00191\",\"quote\":\"4. 将粗大污染物滤网装入污水箱中\"}],\"reference_support\":[],\"candidate_support\":[],\"scope_resolved\":true},{\"requirement\":\"日常保养要求包含从污水箱中取出粗大污染物滤网并清洗。\",\"met\":true,\"answer_quotes\":[\"日常保养清单中也列有“从污水箱中取出粗大污染物滤网并清洗”这一项。\"],\"support\":[{\"source_id\":\"DOC-001-C-00183\",\"quote\":\"4. 从污水箱中取出粗大污染物滤网并清洗\"}],\"reference_support\":[],\"candidate_support\":[],\"scope_resolved\":true}],\"issues\":[{\"description\":\"答案把‘清洁对接站’章节的‘拔下电源插头’警告当作清洗粗大污染物滤网的充分电气安全前提，仅以确认市电插头拔下为条件就给出打开污水箱、拉出滤网的当前操作步骤；未按维护总则要求先关闭设备，也未按电池供电设备要求拔出电池插头或断开电池连接。必要安全前提缺失，不能批准当前现场执行。\",\"answer_quotes\":[\"设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。\",\"“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。\"],\"support\":[{\"source_id\":\"DOC-001-C-00204\",\"quote\":\"清洁对接站（选项）\\n警告\\n触电危险在对接站上作业前将电源插头从插座中拔下\"}],\"critical\":true,\"safety_violation\":true,\"scope_resolved\":false,\"baseline_issue_index\":null}],\"reason\":\"答案的滤网取出、自来水冲洗和装回步骤与手册一致，但电气安全不完整：未关闭设备、未断开电池或拔出电池插头，并且把清洁对接站的拔电源警告套用于滤网清洗；在电池隔离未确认时仍给出当前可执行步骤，违反必要安全前提，故FAIL。\",\"quality\":{\"correctness\":1,\"faithfulness\":0.7,\"completeness\":0.5}}",
+    "response_metadata": {
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 9414,
+        "completion_tokens": 10493,
+        "total_tokens": 19907,
+        "prompt_tokens_details": {
+          "cached_tokens": 1024
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 8805
+        },
+        "prompt_cache_hit_tokens": 1024,
+        "prompt_cache_miss_tokens": 8390,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T03:08:01.806646+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 47448,
+        "request_sha256": "bc9d396996ac4cf347cb69b029acb54ee638d2d39231e0ab2263b8a64932293c"
+      },
+      "transport_recovery": null,
+      "request_id": "8dcd8334-1f8b-4457-8fc0-cb968a1a260f"
+    },
+    "format_recovery": null
+  },
+  "elapsed_ms": 49598,
+  "usage": [
+    {
+      "prompt_tokens": 9414,
+      "completion_tokens": 10493,
+      "total_tokens": 19907,
+      "prompt_tokens_details": {
+        "cached_tokens": 1024
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 8805
+      },
+      "prompt_cache_hit_tokens": 1024,
+      "prompt_cache_miss_tokens": 8390,
+      "requested_model": "deepseek-v4-flash",
+      "call_started_at": "2026-10-20T03:08:01.806646+00:00",
+      "provider": "DeepSeek",
+      "status": "ok",
+      "latency_ms": 47448,
+      "request_sha256": "bc9d396996ac4cf347cb69b029acb54ee638d2d39231e0ab2263b8a64932293c"
+    }
+  ],
+  "raw_judge_content": "{\"verdict\":\"FAIL\",\"checks\":[{\"requirement\":\"当前操作适用性检查：对象为 KIRA B 50，现场条件是设备停在对接站上并要清洗污水箱粗大污染物滤网；执行前应确认设备已关闭、电池插头已拔出或电池连接已断开，以及设备已与对接站断开或电源插头已拔下。答案只把‘拔下市电插头’作为条件，未确认关机和电池隔离，尚缺必要安全前提。\",\"met\":false,\"answer_quotes\":[\"设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。\",\"“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。\"],\"support\":[],\"reference_support\":[{\"source_id\":\"DOC-001-C-00026\",\"quote\":\"保养和维护\\n警告\\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接\"},{\"source_id\":\"DOC-001-C-00181\",\"quote\":\"保养和维护\\n危险\\n无意中启动设备，接触导电部件\\n受伤危险，触电\\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头\"}],\"candidate_support\":[],\"scope_resolved\":false},{\"requirement\":\"清洗、维护前必须关闭设备（关机），不能只处理供电插头。\",\"met\":false,\"answer_quotes\":[\"设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。\",\"“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。\"],\"support\":[],\"reference_support\":[{\"source_id\":\"DOC-001-C-00026\",\"quote\":\"保养和维护\\n警告\\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接\"}],\"candidate_support\":[],\"scope_resolved\":false},{\"requirement\":\"作为电池供电设备的 KIRA B 50，维护前必须拔出电池插头或断开电池连接。\",\"met\":false,\"answer_quotes\":[\"设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。\",\"“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。\"],\"support\":[],\"reference_support\":[{\"source_id\":\"DOC-001-C-00026\",\"quote\":\"保养和维护\\n警告\\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接\"}],\"candidate_support\":[],\"scope_resolved\":false},{\"requirement\":\"在执行任何工作前，将设备与对接站断开，或拔出电源插头。\",\"met\":true,\"answer_quotes\":[\"设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。\"],\"support\":[{\"source_id\":\"DOC-001-C-00204\",\"quote\":\"清洁对接站（选项）\\n警告\\n触电危险在对接站上作业前将电源插头从插座中拔下\"}],\"reference_support\":[{\"source_id\":\"DOC-001-C-00181\",\"quote\":\"保养和维护\\n危险\\n无意中启动设备，接触导电部件\\n受伤危险，触电\\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头\"}],\"candidate_support\":[],\"scope_resolved\":false},{\"requirement\":\"取出粗大污染物滤网前先打开污水箱盖罩。\",\"met\":true,\"answer_quotes\":[\"打开污水箱盖罩。\"],\"support\":[{\"source_id\":\"DOC-001-C-00191\",\"quote\":\"清洗粗大污染物滤网\\n1. 打开污水箱盖罩\"}],\"reference_support\":[],\"candidate_support\":[],\"scope_resolved\":true},{\"requirement\":\"向上拉出粗大污染物滤网。\",\"met\":true,\"answer_quotes\":[\"向上拉出粗大污染物滤网。\"],\"support\":[{\"source_id\":\"DOC-001-C-00191\",\"quote\":\"2. 向上拉出粗大污染物滤网\"}],\"reference_support\":[],\"candidate_support\":[],\"scope_resolved\":true},{\"requirement\":\"将粗大污染物滤网放到自来水下冲洗。\",\"met\":true,\"answer_quotes\":[\"将粗大污染物滤网放到自来水下冲洗。\"],\"support\":[{\"source_id\":\"DOC-001-C-00191\",\"quote\":\"3. 将粗大污染物滤网放到自来水下冲洗\"}],\"reference_support\":[],\"candidate_support\":[],\"scope_resolved\":true},{\"requirement\":\"将粗大污染物滤网装入污水箱中。\",\"met\":true,\"answer_quotes\":[\"将粗大污染物滤网装入污水箱中。\"],\"support\":[{\"source_id\":\"DOC-001-C-00191\",\"quote\":\"4. 将粗大污染物滤网装入污水箱中\"}],\"reference_support\":[],\"candidate_support\":[],\"scope_resolved\":true},{\"requirement\":\"日常保养要求包含从污水箱中取出粗大污染物滤网并清洗。\",\"met\":true,\"answer_quotes\":[\"日常保养清单中也列有“从污水箱中取出粗大污染物滤网并清洗”这一项。\"],\"support\":[{\"source_id\":\"DOC-001-C-00183\",\"quote\":\"4. 从污水箱中取出粗大污染物滤网并清洗\"}],\"reference_support\":[],\"candidate_support\":[],\"scope_resolved\":true}],\"issues\":[{\"description\":\"答案把‘清洁对接站’章节的‘拔下电源插头’警告当作清洗粗大污染物滤网的充分电气安全前提，仅以确认市电插头拔下为条件就给出打开污水箱、拉出滤网的当前操作步骤；未按维护总则要求先关闭设备，也未按电池供电设备要求拔出电池插头或断开电池连接。必要安全前提缺失，不能批准当前现场执行。\",\"answer_quotes\":[\"设备在对接站上时，相关警告要求：**在对接站上作业前将电源插头从插座中拔下**，以防触电危险。\",\"“清洗粗大污染物滤网”章节本身未另列电气安全步骤；若无法确认电源插头已拔下，建议停止作业并联系卡赫官方，不要带电操作。\"],\"support\":[{\"source_id\":\"DOC-001-C-00204\",\"quote\":\"清洁对接站（选项）\\n警告\\n触电危险在对接站上作业前将电源插头从插座中拔下\"}],\"critical\":true,\"safety_violation\":true,\"scope_resolved\":false,\"baseline_issue_index\":null}],\"reason\":\"答案的滤网取出、自来水冲洗和装回步骤与手册一致，但电气安全不完整：未关闭设备、未断开电池或拔出电池插头，并且把清洁对接站的拔电源警告套用于滤网清洗；在电池隔离未确认时仍给出当前可执行步骤，违反必要安全前提，故FAIL。\",\"quality\":{\"correctness\":1,\"faithfulness\":0.7,\"completeness\":0.5}}",
+  "raw_verdict": "FAIL",
+  "matches_expected": true,
+  "response_model": "deepseek-flash",
+  "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+  "provider_usage": {
+    "prompt_tokens": 9414,
+    "completion_tokens": 10493,
+    "total_tokens": 19907,
+    "prompt_tokens_details": {
+      "cached_tokens": 1024
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 8805
+    },
+    "prompt_cache_hit_tokens": 1024,
+    "prompt_cache_miss_tokens": 8390
+  },
+  "response_id": "8dcd8334-1f8b-4457-8fc0-cb968a1a260f"
+}

@@ -1,0 +1,73 @@
+{
+  "sequence": 1,
+  "quote_count": 11,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "support",
+      "source_id": "DOC-004-C-00001",
+      "quote": "B2 电池&充电器\n使用手册 V1.0",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "\\- 注意！B2 整机（含电池包）IP67 级防水，清洁时请勿取下电池包！",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "\\- 注意！B2 整机（含电池包）IP67 级防水，清洁时请勿取下电池包！",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "清洗机身前请先关闭电源，使用干净的软布对机身进行擦拭，尤其关注多目深度相机是否擦拭干净。",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "擦干后可用风扇或风枪将机器人表面、关节缝隙处的积水吹干，避免留下水痕。",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00038",
+      "quote": "处理电池时请注意以下警告：",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "\\- 注意！B2 整机（含电池包）IP67 级防水，清洁时请勿取下电池包！",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "当 B2 在恶劣环境下（雨天、沙尘、湿地）使用后，请及时清洁机身表面。",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-002-C-00054",
+      "quote": "\\- 注意！B2 整机（含电池包）IP67 级防水，清洁时请勿取下电池包！",
+      "located": true
+    }
+  ]
+}

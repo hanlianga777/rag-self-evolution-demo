@@ -1,0 +1,19 @@
+{
+  "source": "direct_user_instruction",
+  "user_response": "本轮已获得项目Owner明确授权：最多5次真实Judge请求，总预算不超过人民币¥2，每条一次，不自动重试",
+  "judge_version": "judge-vnext-2-operation",
+  "authorization_scope": "5 frozen samples (3 historical, 2 synthetic controls) in approved order; one Judge request each; CNY2 maximum; no retry, generation, retrieval, Baseline or Sandbox",
+  "authorized_at": "2026-10-20T11:04:41.701193+08:00",
+  "identity": {
+    "commit": "2e973fc7e5c21ebf2bdf68b3103f726a5d3b9066",
+    "prompt_sha256": "8ce7b7aaa08cbab3b537e52a40bd9507b79c7fc3510653a843ae3d6298ddad64",
+    "prepared_sha256": "54e56cf09b7e3b118dccbc04cf291b7c361f90125cab42a61feb9a38381f8fed"
+  },
+  "price_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "currency": "CNY",
+  "price_checked_date": "2026-10-20",
+  "peak_input_cache_miss_per_million": 2,
+  "peak_output_per_million": 8,
+  "off_peak_input_cache_miss_per_million": 1,
+  "off_peak_output_per_million": 4
+}
