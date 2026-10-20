@@ -1,0 +1,73 @@
+{
+  "sequence": 1,
+  "quote_count": 11,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "reference_support",
+      "source_id": "DOC-001-C-00026",
+      "quote": "在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接",
+      "located": true
+    },
+    {
+      "field": "reference_support",
+      "source_id": "DOC-001-C-00026",
+      "quote": "对于电池供电的设备，请拔出电池插头或断开电池连接",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00204",
+      "quote": "在对接站上作业前将电源插头从插座中拔下",
+      "located": true
+    },
+    {
+      "field": "candidate_support",
+      "source_id": "DOC-001-C-00204",
+      "quote": "在对接站上作业前将电源插头从插座中拔下",
+      "located": true
+    },
+    {
+      "field": "reference_support",
+      "source_id": "DOC-001-C-00181",
+      "quote": "在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00191",
+      "quote": "打开污水箱盖罩",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00191",
+      "quote": "向上拉出粗大污染物滤网",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00191",
+      "quote": "将粗大污染物滤网放到自来水下冲洗",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00191",
+      "quote": "将粗大污染物滤网装入污水箱中",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00183",
+      "quote": "从污水箱中取出粗大污染物滤网并清洗",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00204",
+      "quote": "在对接站上作业前将电源插头从插座中拔下",
+      "located": true
+    }
+  ]
+}

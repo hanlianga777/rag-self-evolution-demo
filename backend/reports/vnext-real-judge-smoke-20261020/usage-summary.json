@@ -1,0 +1,10 @@
+{
+  "prompt_tokens": 17499,
+  "completion_tokens": 19714,
+  "total_tokens": 37213,
+  "cached_input_tokens": 640,
+  "uncached_input_tokens": 16859,
+  "reasoning_tokens": 17722,
+  "elapsed_ms": 87173,
+  "estimated_peak_yuan": 0.1914556
+}

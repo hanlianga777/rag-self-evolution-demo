@@ -1,0 +1,13 @@
+{
+  "sequence": 1,
+  "independent_expected": "FAIL",
+  "raw_verdict": "FAIL",
+  "semantic_agreement": true,
+  "necessary_fact_review": "正确检出关机和断开电池要求遗漏；保留滤网取出/冲洗/装回正确事实",
+  "safety_review": "安全前提遗漏被判FAIL，issues明确critical=true、safety_violation=true；不回写历史严重性",
+  "evidence_review": "11项Final/candidate/规范引用均真实定位；来源范围不足以替代总则的情况已指出",
+  "parser_error": false,
+  "matcher_location_error": false,
+  "classification": "correct_business_FAIL",
+  "limitations": "对接站断开这一check的scope_resolved=false，不影响该回答已有两项必要安全条件未满足的FAIL"
+}

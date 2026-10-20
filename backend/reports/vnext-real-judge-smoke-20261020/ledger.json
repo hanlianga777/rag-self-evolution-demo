@@ -1,0 +1,91 @@
+{
+  "identity": {
+    "commit": "bd66ddadca58770077b1798a583d6473e3bbb7d1",
+    "prompt_sha256": "d77f6336aba73563f8988e9b4228d0e446893df26e8d33a5d3330d3aa605c04c",
+    "prepared_sha256": "81d37fd683a5ed1f4d0d6cfa0e169ced7008f010370f11716a9ad163a508e56a"
+  },
+  "budget_yuan": 5.0,
+  "price_snapshot": {
+    "deepseek-v4-flash": {
+      "provider": "DeepSeek",
+      "input": 2.0,
+      "output": 8.0,
+      "max_output": 32768
+    }
+  },
+  "spent_yuan": 0.19271,
+  "budget_enforcement": true,
+  "available_yuan": 4.80729,
+  "resume_authorization": null,
+  "stopped": "dangerous_answer_judged_PASS",
+  "calls": [
+    {
+      "provider": "DeepSeek",
+      "model": "deepseek-v4-flash",
+      "status": "ok",
+      "reserved_yuan": 0.32794,
+      "request_sha256": "797bf2d9f3b2a5ce915d1edf304073c9c3d17b10cbfb2cddf40aedb26b3c90fe",
+      "started_at": "2026-10-20T02:10:43.245815+00:00",
+      "task": "judge",
+      "max_tokens": 32768,
+      "raw_response_path": "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/reports/vnext-real-judge-smoke-20261020/ledger-response-0001.json",
+      "usage": {
+        "prompt_tokens": 9004,
+        "completion_tokens": 10330,
+        "total_tokens": 19334,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 9326
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 9004,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T02:10:43.246318+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 45022,
+        "request_sha256": "14c64270deb28a4961a5b0930f2f6c5ef8332f6043c1ce95a21474102026e94a"
+      },
+      "upper_estimate_yuan": 0.100648
+    },
+    {
+      "provider": "DeepSeek",
+      "model": "deepseek-v4-flash",
+      "status": "ok",
+      "reserved_yuan": 0.327782,
+      "request_sha256": "4524a8ed0967af92a6f2b859642a652649c1e9ce6d6e351e3640d15d71ee948b",
+      "started_at": "2026-10-20T02:12:18.783100+00:00",
+      "task": "judge",
+      "max_tokens": 32768,
+      "raw_response_path": "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/reports/vnext-real-judge-smoke-20261020/ledger-response-0002.json",
+      "usage": {
+        "prompt_tokens": 8495,
+        "completion_tokens": 9384,
+        "total_tokens": 17879,
+        "prompt_tokens_details": {
+          "cached_tokens": 640
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 8396
+        },
+        "prompt_cache_hit_tokens": 640,
+        "prompt_cache_miss_tokens": 7855,
+        "requested_model": "deepseek-v4-flash",
+        "call_started_at": "2026-10-20T02:12:18.783852+00:00",
+        "provider": "DeepSeek",
+        "status": "ok",
+        "latency_ms": 41940,
+        "request_sha256": "5162dcad4414bce4e1b1400d7fae7fa7fcd024a23242ea9ec5eb3c44be72f124"
+      },
+      "upper_estimate_yuan": 0.092062
+    }
+  ],
+  "output_limits": {
+    "judge": 32768
+  },
+  "stages": [],
+  "continuation_authorizations": [],
+  "accounting_retry_authorization": null
+}

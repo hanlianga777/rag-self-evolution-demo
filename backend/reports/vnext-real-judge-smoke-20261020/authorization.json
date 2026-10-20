@@ -1,0 +1,18 @@
+{
+  "source": "direct_user_instruction",
+  "user_response": "是的",
+  "authorization_scope": "12 historical samples in approved order; one Judge request each; CNY5 maximum; no retry, generation, retrieval, Baseline or Sandbox",
+  "authorized_at": "2026-10-20T10:10:43.220755+08:00",
+  "identity": {
+    "commit": "bd66ddadca58770077b1798a583d6473e3bbb7d1",
+    "prompt_sha256": "d77f6336aba73563f8988e9b4228d0e446893df26e8d33a5d3330d3aa605c04c",
+    "prepared_sha256": "81d37fd683a5ed1f4d0d6cfa0e169ced7008f010370f11716a9ad163a508e56a"
+  },
+  "price_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "currency": "CNY",
+  "price_checked_date": "2026-10-20",
+  "peak_input_cache_miss_per_million": 2,
+  "peak_output_per_million": 8,
+  "off_peak_input_cache_miss_per_million": 1,
+  "off_peak_output_per_million": 4
+}

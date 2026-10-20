@@ -1,0 +1,35 @@
+{
+  "configured": true,
+  "model": "deepseek-v4-flash",
+  "url": "https://api.deepseek.com/chat/completions",
+  "versions": {
+    "prompt_version": "judge-vnext-1",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "scoring_policy": "business-vnext-1"
+  },
+  "prompt_sha256": "d77f6336aba73563f8988e9b4228d0e446893df26e8d33a5d3330d3aa605c04c",
+  "records": 12,
+  "expectations": {
+    "PASS": 5,
+    "FAIL": 7
+  },
+  "input_token_estimate": 92544,
+  "input_token_conservative_bound": 422769,
+  "output_token_limit_per_call": 32768,
+  "total_output_limit": 393216,
+  "peak_conservative_cost_yuan": 3.991266,
+  "off_peak_conservative_cost_yuan": 1.995633,
+  "estimated_cost_2000_to_8000_output_tokens_per_call_peak": [
+    0.377088,
+    0.953088
+  ],
+  "active_tasks": {
+    "evaluation_runs": 0,
+    "golden_generation_runs": 0,
+    "candidate_revision_runs": 0,
+    "experiments": 0,
+    "candidate_configs": 0
+  },
+  "protected_tables": 29,
+  "provider_calls": 0
+}
