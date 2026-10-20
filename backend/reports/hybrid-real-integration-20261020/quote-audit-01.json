@@ -1,0 +1,79 @@
+{
+  "sequence": 1,
+  "quote_count": 12,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂 遵守清洁剂上的安全提示",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "请勿使用强发泡型清洁剂",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "请遵守计量提示",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "推荐的清洁剂：",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "1 清洁剂加注口",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "填充口盖子",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "3 清洁剂液位指示器",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "2. 注入清洁剂",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00119",
+      "quote": "提示：\n为了快速更换清洁剂，可以取下清洁剂罐，并换上另一个清洁剂罐",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用推荐的清洁剂",
+      "located": true
+    }
+  ]
+}

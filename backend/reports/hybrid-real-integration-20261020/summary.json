@@ -1,0 +1,17 @@
+{
+  "identity": {
+    "commit": "177f5b111b482759de34596f73ff8a46f6c9f1b2",
+    "prompt_sha256": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+    "prepared_sha256": "192726e50f9ec3258dd7adae70c5e792a775c8209f56e93c6c276ffcec4fa88e"
+  },
+  "actual_requests": 2,
+  "completed_records": 2,
+  "valid_parser_matcher": 1,
+  "final_verdict_agreements": 1,
+  "final_verdict_mismatches": 0,
+  "stop_reason": "execution_or_parser_matcher_error_no_retry",
+  "remaining_unexecuted": 1,
+  "all_integration_acceptance_passed": false,
+  "conservative_peak_cost_yuan": 0.088452,
+  "formal_db_writes": 0
+}

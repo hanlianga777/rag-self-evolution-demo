@@ -1,0 +1,82 @@
+{
+  "sample_kind": "synthetic_control",
+  "group": "CTRL-V3",
+  "number": 2,
+  "run_id": null,
+  "question_id": "SYNTHETIC-JUDGE-V3-2",
+  "independent_expected": "PASS",
+  "answer_sha256": "6911f715927337b8fa1170f3907cc81cd775deef6b8ee69e6cc2ec80e645521c",
+  "final_sha256": "46b37ea83832373880b41281cbd0703ba96f7ed9cfe0424d9588105c01336460",
+  "sequence": 2,
+  "started_at": "2026-10-20T17:50:01.637553+08:00",
+  "error_type": "ProviderInvalidResponse",
+  "error": "VNext Judge合同无效：answer quote is missing or not located",
+  "parser_matcher_status": "execution_error",
+  "error_metadata": {
+    "finish_reason": "stop",
+    "usage": {
+      "prompt_tokens": 3541,
+      "completion_tokens": 1724,
+      "total_tokens": 5265,
+      "prompt_tokens_details": {
+        "cached_tokens": 1280
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 1297
+      },
+      "prompt_cache_hit_tokens": 1280,
+      "prompt_cache_miss_tokens": 2261,
+      "requested_model": "deepseek-v4-flash",
+      "call_started_at": "2026-10-20T09:50:02.324772+00:00",
+      "provider": "DeepSeek",
+      "status": "ok",
+      "latency_ms": 8191,
+      "request_sha256": "ed1b6c38961007c3421eae69c87f1c488ac1d4e09bfeb198514596945e6a8477"
+    },
+    "transport_recovery": null,
+    "request_id": "27136bb7-0c5c-48bb-8649-94810a621bba"
+  },
+  "elapsed_ms": 8883,
+  "usage": [
+    {
+      "prompt_tokens": 3541,
+      "completion_tokens": 1724,
+      "total_tokens": 5265,
+      "prompt_tokens_details": {
+        "cached_tokens": 1280
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 1297
+      },
+      "prompt_cache_hit_tokens": 1280,
+      "prompt_cache_miss_tokens": 2261,
+      "requested_model": "deepseek-v4-flash",
+      "call_started_at": "2026-10-20T09:50:02.324772+00:00",
+      "provider": "DeepSeek",
+      "status": "ok",
+      "latency_ms": 8191,
+      "request_sha256": "ed1b6c38961007c3421eae69c87f1c488ac1d4e09bfeb198514596945e6a8477"
+    }
+  ],
+  "raw_judge_content": "{\"verdict\":\"PASS\",\"checks\":[{\"requirement\":\"仅限使用手册/资料推荐的清洁剂。\",\"met\":true,\"answer_quotes\":[\"仅限使用手册推荐的清洁剂\"],\"support\":[{\"source_id\":\"DOC-001-C-00118\",\"quote\":\"仅限使用推荐的清洁剂\"}]},{\"requirement\":\"清洁剂必须不含稀释剂、盐酸和氢氟酸；不得把“禁止含有”表述成“禁止不含”。\",\"met\":true,\"answer_quotes\":[\"只允许不含稀释剂、盐酸和氢氟酸的清洁剂，含有这些成分的不可使用\"],\"support\":[{\"source_id\":\"DOC-001-C-00118\",\"quote\":\"仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂\"}]},{\"requirement\":\"不得使用强发泡型清洁剂。\",\"met\":true,\"answer_quotes\":[\"请勿使用强发泡型清洁剂\"],\"support\":[{\"source_id\":\"DOC-001-C-00118\",\"quote\":\"请勿使用强发泡型清洁剂\"}]},{\"requirement\":\"应遵守清洁剂的安全提示和计量提示。\",\"met\":true,\"answer_quotes\":[\"并遵守清洁剂上的安全提示和计量提示\"],\"support\":[{\"source_id\":\"DOC-001-C-00118\",\"quote\":\"遵守清洁剂上的安全提示\"},{\"source_id\":\"DOC-001-C-00118\",\"quote\":\"请遵守计量提示\"}]},{\"requirement\":\"仅核对资料含义，不对未知瓶装产品是否可加注作判断。\",\"met\":true,\"answer_quotes\":[],\"support\":[]}],\"issues\":[],\"reason\":\"回答准确复述了KIRA B 50手册关于推荐清洁剂、禁用成分、禁止强发泡以及遵守安全与计量提示的要求；没有把“不得含有”误写成“不得含有”的反面，也未对未知瓶装产品作可加注判断。\",\"quality\":{\"correctness\":4,\"faithfulness\":1,\"completeness\":1}}",
+  "raw_verdict": "PASS",
+  "matches_expected": null,
+  "final_verdict": null,
+  "response_model": "deepseek-flash",
+  "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+  "provider_usage": {
+    "prompt_tokens": 3541,
+    "completion_tokens": 1724,
+    "total_tokens": 5265,
+    "prompt_tokens_details": {
+      "cached_tokens": 1280
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1297
+    },
+    "prompt_cache_hit_tokens": 1280,
+    "prompt_cache_miss_tokens": 2261
+  },
+  "response_id": "27136bb7-0c5c-48bb-8649-94810a621bba",
+  "stop_reason": "execution_or_parser_matcher_error_no_retry"
+}

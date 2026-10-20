@@ -1,0 +1,18 @@
+{
+  "source": "direct_user_instruction",
+  "user_response": "确认授权按照已冻结的3条样本及顺序，最多3次真实DeepSeek Judge调用，每条一次，不重试；总费用严格不超过人民币1元，预算不足立即停止。保留安全、误杀、身份与数据保护停止条件，不改Prompt、Guard、Golden、Corpus、历史数据，不自动Baseline50或Candidate。",
+  "authorization_scope": "three frozen hybrid integration cases, serial, once each, no retry; CNY1; Q42 raw LLM PASS permitted only if Guard independently confirms violation and final FAIL; controls PASS with no unjustified qualification block",
+  "authorized_at": "2026-10-20T17:49:04.389157+08:00",
+  "identity": {
+    "commit": "177f5b111b482759de34596f73ff8a46f6c9f1b2",
+    "prompt_sha256": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+    "prepared_sha256": "192726e50f9ec3258dd7adae70c5e792a775c8209f56e93c6c276ffcec4fa88e"
+  },
+  "price_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "currency": "CNY",
+  "price_checked_date": "2026-10-20",
+  "peak_input_cache_miss_per_million": 2,
+  "peak_output_per_million": 8,
+  "off_peak_input_cache_miss_per_million": 1,
+  "off_peak_output_per_million": 4
+}

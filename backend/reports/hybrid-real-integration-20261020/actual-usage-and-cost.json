@@ -1,0 +1,49 @@
+{
+  "currency": "CNY",
+  "price_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "price_checked_date": "2026-10-20",
+  "time_band": "peak, both calls started 17:49/17:50 Asia/Shanghai on Tuesday",
+  "cost_kind": "Usage-based estimate, NOT account billing statement; ledger conservatively ignores cache discounts",
+  "calls": [
+    {
+      "sequence": 1,
+      "prompt_tokens": 7945,
+      "completion_tokens": 6461,
+      "total_tokens": 14406,
+      "cached_tokens": 7808,
+      "cache_miss_tokens": 137,
+      "reasoning_tokens": 5465,
+      "peak_cache_aware_estimate_yuan": 0.05227432,
+      "conservative_peak_uncached_estimate_yuan": 0.067578,
+      "end_to_end_judge_elapsed_ms": 30267,
+      "provider_latency_ms": 29392
+    },
+    {
+      "sequence": 2,
+      "prompt_tokens": 3541,
+      "completion_tokens": 1724,
+      "total_tokens": 5265,
+      "cached_tokens": 1280,
+      "cache_miss_tokens": 2261,
+      "reasoning_tokens": 1297,
+      "peak_cache_aware_estimate_yuan": 0.0183652,
+      "conservative_peak_uncached_estimate_yuan": 0.020874,
+      "end_to_end_judge_elapsed_ms": 8883,
+      "provider_latency_ms": 8191
+    }
+  ],
+  "total": {
+    "prompt_tokens": 11486,
+    "completion_tokens": 8185,
+    "total_tokens": 19671,
+    "cached_tokens": 9088,
+    "cache_miss_tokens": 2398,
+    "reasoning_tokens": 6762,
+    "peak_cache_aware_estimate_yuan": 0.07063952,
+    "conservative_peak_uncached_estimate_yuan": 0.088452,
+    "end_to_end_judge_elapsed_ms": 39150,
+    "provider_latency_ms": 37583
+  },
+  "budget_yuan": 1,
+  "unknown_usage_calls": 0
+}

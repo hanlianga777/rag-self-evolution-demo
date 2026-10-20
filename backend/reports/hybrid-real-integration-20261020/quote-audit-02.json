@@ -1,0 +1,37 @@
+{
+  "sequence": 2,
+  "quote_count": 5,
+  "all_quotes_located": true,
+  "quotes": [
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用推荐的清洁剂",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "请勿使用强发泡型清洁剂",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "遵守清洁剂上的安全提示",
+      "located": true
+    },
+    {
+      "field": "support",
+      "source_id": "DOC-001-C-00118",
+      "quote": "请遵守计量提示",
+      "located": true
+    }
+  ]
+}

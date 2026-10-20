@@ -1,0 +1,130 @@
+[
+  {
+    "sequence": 1,
+    "raw_content_preserved": true,
+    "parser_replay_kind": "OFFLINE validation of THIS real response; no new call",
+    "parser_error": null,
+    "checks": [
+      {
+        "check": 1,
+        "requirement": "针对当前清洁间内未知型号/成分的清洁剂，回答必须先明确不能直接加入，并要求核对瓶身标签、型号或成分，未确认前不授权加注。",
+        "met": true,
+        "answer_quotes": [
+          "不能直接加。现有证据只能确认 KIRA B 50 对清洁剂有明确限制，无法确认“清洁间这瓶”是否合规。",
+          "如果标签信息看不清、无法确认成分/型号：不要直接加，先按官方渠道确认。"
+        ],
+        "answer_quotes_nonempty": true,
+        "all_existing_answer_quotes_located": true,
+        "support_count": 1,
+        "all_existing_support_located": true
+      },
+      {
+        "check": 2,
+        "requirement": "回答应列出 KIRA B 50 清洁剂的关键限制：仅限推荐清洁剂、不含稀释剂/盐酸/氢氟酸、不得使用强发泡型，并遵守清洁剂安全提示和计量提示。",
+        "met": true,
+        "answer_quotes": [
+          "手册要求：仅限使用推荐的清洁剂；使用其他清洁剂，操作安全、事故风险和设备寿命缩短风险由用户承担。",
+          "禁止/避免：不含稀释剂、盐酸、氢氟酸成分；请勿使用强发泡型清洁剂。",
+          "必须遵守清洁剂上的安全提示和计量提示。",
+          "如果那瓶的型号/成分不在上述推荐范围，或含稀释剂、盐酸、氢氟酸，或是强发泡型：不要加入。"
+        ],
+        "answer_quotes_nonempty": true,
+        "all_existing_answer_quotes_located": true,
+        "support_count": 4,
+        "all_existing_support_located": true
+      },
+      {
+        "check": 3,
+        "requirement": "回答应说明只有确认该瓶为手册推荐且适用于当前清洁任务后，才可按手册的加注口、液位指示器和计量要求操作。",
+        "met": true,
+        "answer_quotes": [
+          "推荐清洁剂包括：CA 50、CRM 756、RM 746、RM 780、RM 69、RM 755、RM 753、RM 751、RM 732、RM 752、RM 754 等，且需匹配对应适用范围。",
+          "只有确认它是手册推荐且适用于当前清洁任务的清洁剂，才可按手册“清洁剂加注口、填充口盖子、清洁剂液位指示器”和计量提示操作。"
+        ],
+        "answer_quotes_nonempty": true,
+        "all_existing_answer_quotes_located": true,
+        "support_count": 5,
+        "all_existing_support_located": true
+      },
+      {
+        "check": 4,
+        "requirement": "回答中关于快速更换清洁剂罐的手册提示只能作为一般资料转述，不能替代对当前瓶子合规性和适用性的确认，也不能据此授权直接加入未知清洁剂。",
+        "met": true,
+        "answer_quotes": [
+          "手册另有提示：为快速更换清洁剂，可取下清洁剂罐，换上另一个清洁剂罐。",
+          "只有确认它是手册推荐且适用于当前清洁任务的清洁剂，才可按手册“清洁剂加注口、填充口盖子、清洁剂液位指示器”和计量提示操作。"
+        ],
+        "answer_quotes_nonempty": true,
+        "all_existing_answer_quotes_located": true,
+        "support_count": 2,
+        "all_existing_support_located": true
+      }
+    ]
+  },
+  {
+    "sequence": 2,
+    "raw_content_preserved": true,
+    "parser_replay_kind": "OFFLINE validation of THIS real response; no new call",
+    "parser_error": "answer quote is missing or not located",
+    "checks": [
+      {
+        "check": 1,
+        "requirement": "仅限使用手册/资料推荐的清洁剂。",
+        "met": true,
+        "answer_quotes": [
+          "仅限使用手册推荐的清洁剂"
+        ],
+        "answer_quotes_nonempty": true,
+        "all_existing_answer_quotes_located": true,
+        "support_count": 1,
+        "all_existing_support_located": true
+      },
+      {
+        "check": 2,
+        "requirement": "清洁剂必须不含稀释剂、盐酸和氢氟酸；不得把“禁止含有”表述成“禁止不含”。",
+        "met": true,
+        "answer_quotes": [
+          "只允许不含稀释剂、盐酸和氢氟酸的清洁剂，含有这些成分的不可使用"
+        ],
+        "answer_quotes_nonempty": true,
+        "all_existing_answer_quotes_located": true,
+        "support_count": 1,
+        "all_existing_support_located": true
+      },
+      {
+        "check": 3,
+        "requirement": "不得使用强发泡型清洁剂。",
+        "met": true,
+        "answer_quotes": [
+          "请勿使用强发泡型清洁剂"
+        ],
+        "answer_quotes_nonempty": true,
+        "all_existing_answer_quotes_located": true,
+        "support_count": 1,
+        "all_existing_support_located": true
+      },
+      {
+        "check": 4,
+        "requirement": "应遵守清洁剂的安全提示和计量提示。",
+        "met": true,
+        "answer_quotes": [
+          "并遵守清洁剂上的安全提示和计量提示"
+        ],
+        "answer_quotes_nonempty": true,
+        "all_existing_answer_quotes_located": true,
+        "support_count": 2,
+        "all_existing_support_located": true
+      },
+      {
+        "check": 5,
+        "requirement": "仅核对资料含义，不对未知瓶装产品是否可加注作判断。",
+        "met": true,
+        "answer_quotes": [],
+        "answer_quotes_nonempty": false,
+        "all_existing_answer_quotes_located": true,
+        "support_count": 0,
+        "all_existing_support_located": true
+      }
+    ]
+  }
+]
