@@ -1,0 +1,130 @@
+[
+  {
+    "original_response_sha256": "df8efbd58429e34cf554fd05812758c9042f222ee64f39d497ed61cbe0f84dcc",
+    "old_validator_error": "answer quote is missing or not located",
+    "new_verdict": {
+      "contract_version": "business-vnext-1",
+      "execution_complete": true,
+      "raw_judge_verdict": "FAIL",
+      "verdict": "FAIL",
+      "risk_status": "not_applicable",
+      "qualification_blocking": true,
+      "safety_review_required": false,
+      "arbitration_version": "hybrid-risk-1",
+      "reason": "已确认规则违规优先；未命中仅代表有限范围未检出"
+    },
+    "root_cause": "Ranking",
+    "support_locations": [
+      {
+        "section": "checks",
+        "index": 0,
+        "support": {
+          "source_id": "DOC-001-C-00002",
+          "quote": "KIRA B 50\nKIRA B 50\nZH"
+        },
+        "stage": "final"
+      },
+      {
+        "section": "checks",
+        "index": 1,
+        "support": {
+          "source_id": "DOC-001-C-00185",
+          "quote": "5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电"
+        },
+        "stage": "final"
+      },
+      {
+        "section": "checks",
+        "index": 2,
+        "support": {
+          "source_id": "DOC-001-C-00185",
+          "quote": "5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电"
+        },
+        "stage": "final"
+      },
+      {
+        "section": "checks",
+        "index": 5,
+        "support": {
+          "source_id": "DOC-001-C-00002",
+          "quote": "KIRA B 50\nKIRA B 50\nZH"
+        },
+        "stage": "final"
+      },
+      {
+        "section": "issues",
+        "index": 0,
+        "support": {
+          "source_id": "DOC-001-C-00180",
+          "quote": "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备"
+        },
+        "stage": "candidate_requirement_evidence"
+      },
+      {
+        "section": "issues",
+        "index": 1,
+        "support": {
+          "source_id": "DOC-001-C-00180",
+          "quote": "运输和存放时注意设备的重量"
+        },
+        "stage": "candidate_requirement_evidence"
+      }
+    ],
+    "raw_judge_verdict_unchanged": true
+  },
+  {
+    "original_response_sha256": "b92c21188f0e0843c23ddae861eeb7c6046ab09ad91f1cbcc0d785f716a1b3c6",
+    "old_validator_error": "support is not located in actual full Final",
+    "new_verdict": {
+      "contract_version": "business-vnext-1",
+      "execution_complete": true,
+      "raw_judge_verdict": "FAIL",
+      "verdict": "FAIL",
+      "risk_status": "not_applicable",
+      "qualification_blocking": true,
+      "safety_review_required": false,
+      "arbitration_version": "hybrid-risk-1",
+      "reason": "已确认规则违规优先；未命中仅代表有限范围未检出"
+    },
+    "root_cause": "Ranking",
+    "support_locations": [
+      {
+        "section": "checks",
+        "index": 2,
+        "support": {
+          "source_id": "DOC-001-C-00185",
+          "quote": "较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电"
+        },
+        "stage": "final"
+      },
+      {
+        "section": "checks",
+        "index": 3,
+        "support": {
+          "source_id": "DOC-001-C-00185",
+          "quote": "较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电"
+        },
+        "stage": "final"
+      },
+      {
+        "section": "checks",
+        "index": 4,
+        "support": {
+          "source_id": "DOC-001-C-00002",
+          "quote": "KIRA B 50\nKIRA B 50\nZH"
+        },
+        "stage": "final"
+      },
+      {
+        "section": "issues",
+        "index": 0,
+        "support": {
+          "source_id": "DOC-001-C-00180",
+          "quote": "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备"
+        },
+        "stage": "candidate_requirement_evidence"
+      }
+    ],
+    "raw_judge_verdict_unchanged": true
+  }
+]

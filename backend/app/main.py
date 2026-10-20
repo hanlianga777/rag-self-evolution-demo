@@ -1250,7 +1250,7 @@ def evaluation(active_task: bool = False):
         snapshots=store.dataset_snapshots()
         snapshot_id=snapshots[0]['id'] if snapshots else None
         run=next((r for r in store.evaluation_runs() if r['config'].get('run_target')=='baseline' and r['status'] in {'running','partial','failed'} and r['dataset_version_id']==snapshot_id),None)
-    return {**(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":not policy_current(run.get("judge",{}))} if active_task and run else {})}
+    return {**(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":not policy_current(run.get("judge",{}))} if run else {})}
 
 
 @app.get("/api/bad-cases")

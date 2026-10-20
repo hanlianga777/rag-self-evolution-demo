@@ -1,0 +1,1463 @@
+{
+  "run_id": "EVAL-20261020105804727444",
+  "question": {
+    "ablation_attribute": null,
+    "ablation_metadata": {},
+    "acceptable_evidence": [
+      {
+        "evidence_key_points": [
+          "运输\n小心\n忽视重量受伤与损坏危险运输和存放时注意设备的重量请勿在湿滑地面或坡道上行驶\n1. 清空清水箱和污水箱\n2. 用车辆运输时，根据现行准则固定设备以防滑动和倾翻\n",
+          "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+          "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电"
+        ],
+        "source_chunk_ids": [
+          "DOC-001-C-00179",
+          "DOC-001-C-00180",
+          "DOC-001-C-00185"
+        ]
+      }
+    ],
+    "business_design": {
+      "business_scenario": "终端客户因仓库季节性停用，需要将 KIRA B 50 长期存放，操作员询问存放前的安全处理要求。",
+      "question": "客户有台 KIRA B 50 准备停用三个月，收起来之前按手册需要怎么处理？电池要充到多少，清水箱和污水箱里的水能不能留着？",
+      "user_intent": "获取 KIRA B 50 长期存放前对电池和水箱等设备的处理要求，确保再次启用时设备状态正常。"
+    },
+    "business_design_provenance": {
+      "actor_type": "ai_agent",
+      "design_saved_at": "2026-10-15T07:14:33.493582+00:00",
+      "draft_attempt": 0,
+      "evidence_verified_at": "2026-10-15T07:15:03.919240+00:00",
+      "model": "deepseek-v4-flash",
+      "origin": "business_question_first",
+      "plan_id": "PLAN-e3868ba5fac1f4ff39ca94b2"
+    },
+    "business_scenario": "客户将KIRA B 50停用三个月，操作员需要按原手册安排长期存放及存放期间的电池维护。",
+    "clone_provenance": {
+      "copied_at": "2026-10-15T11:09:26.915751+00:00",
+      "semantic_content_unchanged": true,
+      "source_content_hash": "bb9af5b93d6ee93123be370a0b2c09771a62c552624980b21d1e9c00d48f7385"
+    },
+    "construction_type": "Ordinary",
+    "coverage_anchor_chunk_ids": [
+      "DOC-001-C-00118"
+    ],
+    "coverage_match": {
+      "anchor": null,
+      "eligible_slot_ids": [
+        "Q04",
+        "Q05",
+        "Q06"
+      ],
+      "related_clusters": [
+        "T002"
+      ],
+      "status": "matched"
+    },
+    "coverage_slot": "Q04",
+    "difficulty": "中等",
+    "evaluation_group": "positive",
+    "evidence": [
+      {
+        "evidence_key_points": [
+          "运输\n小心\n忽视重量受伤与损坏危险运输和存放时注意设备的重量请勿在湿滑地面或坡道上行驶\n1. 清空清水箱和污水箱\n2. 用车辆运输时，根据现行准则固定设备以防滑动和倾翻\n",
+          "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+          "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电"
+        ],
+        "source_chunk_ids": [
+          "DOC-001-C-00179",
+          "DOC-001-C-00180",
+          "DOC-001-C-00185"
+        ]
+      }
+    ],
+    "evidence_locations": [
+      {
+        "char_end": 434,
+        "char_start": 0,
+        "chunk_id": "DOC-001-C-00118",
+        "document_id": "DOC-001",
+        "normalization": "NFKC_alphanumeric_lowercase_v1",
+        "page_end": 42,
+        "page_start": 41,
+        "quote": "清洁剂\n小心\n损坏危险\n仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险 仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂 遵守清洁剂上的安全提示\n提示\n请勿使用强发泡型清洁剂\n请遵守计量提示\n\n推荐的清洁剂：\n适用范围=所有防水地板的保养清洁；清洁剂=CA 50 CRM 756\n适用范围=保养清洁与护理组件；清洁剂=RM 746RM 780\n适用范围=工业地板的保养清洁和彻底清洁；清洁剂=RM 69\n适用范围=光面地板的保养清洁；清洁剂=RM 755\n适用范围=精细陶瓷瓷砖的保养清洁和彻底清洁；清洁剂=RM 753\n适用范围=耐酸地板的保养清洁和彻底清洁；清洁剂=RM 751\n适用范围=清洁和消毒；清洁剂=RM 732\n适用范围=耐碱地板铺层的彻底清洁；清洁剂=RM 752\n适用范围=不耐碱地板的彻底清洁和除垢层；清洁剂=RM 754\n1 清洁剂加注口\n填充口盖子\n3 清洁剂液位指示器\n2. 注入清洁剂\n"
+      }
+    ],
+    "expected_behavior": null,
+    "expected_response": null,
+    "generation_instruction": "业务场景驱动Golden V2。角色：终端客户 / 设备操作员；目标难度：中等；Group：positive。角色、业务场景、当前问题、单一核心意图和自然提问已先行设计；此阶段才使用真实Child及Parent核验可答性和参考答案。只使用给定证据，不虚构故障、功能、型号、版本或维修步骤。避免说明书反向出题、整段原文引用、全部属性枚举和无关多问；复杂度来自证据支持的条件判断、排查或明确的信息边界，不能靠问题长度。返回JSON：question、business_scenario、user_intent、reference_answer（正向/消融才需要）。参考答案必须由给定Child中的连续原句或字段值组成，多句换行，不推断、不翻译；Parent只补充语境。上次失败：业务问题证据核验失败：给定Child证据仅包含推荐清洁剂、安全提示、清洁剂加注口、清洁剂液位指示器和“注入清洁剂”等信息，未提及清洁剂类型在清洁菜单或维护菜单中的设置路径与操作步骤，因此无法回答具体从哪个菜单进入以及如何设置清洁剂类型。。只修本Slot。",
+    "generation_method": "validated_reuse",
+    "generation_model": "deepseek-v4-flash",
+    "generation_path": "business_question_first",
+    "generation_profile": "v1.4-medium",
+    "generation_run_id": "GGEN-20261015110926448917",
+    "generation_strategy": "business_v2",
+    "id": "V1G-110926448917-04",
+    "negative_subtype": null,
+    "plan_id": "PLAN-2e284ba3cc81d33dca08c279",
+    "planner_version": "golden-planner-v2.1",
+    "previous_business_design": {
+      "business_scenario": "终端客户新入职的设备操作员准备第一次独立操作 KIRA B 50，执行清洁任务前需要确认个人防护要求。",
+      "question": "KIRA B 50 开始清洁作业前，操作员需要按规定穿戴哪些个人防护装备？",
+      "user_intent": "获取 KIRA B 50 操作时要求的个人防护装备清单。"
+    },
+    "question": "KIRA B 50准备停用三个月再用，按手册长期存放时要注意哪些要求，蓄电池在存放前和存放期间怎么维护？",
+    "reference_answer": "运输和存放时注意设备的重量\n只在室内存放设备\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+    "related_clusters": [
+      "T002"
+    ],
+    "replaces_question_id": "V1G-153537417845-04-R201632573162",
+    "source": "ai_generated",
+    "source_chunk_ids": [
+      "DOC-001-C-00118"
+    ],
+    "source_positive_id": null,
+    "source_positive_slot": null,
+    "source_reference": {
+      "generation_run_id": "GGEN-20261014153537417845",
+      "question_id": "V1G-153537417845-04-R201632573162-R071130672980"
+    },
+    "test_category": "positive",
+    "topic_cluster": "T002",
+    "user_intent": "按KIRA B 50手册的实际要求安排三个月长期存放和必要的电池维护。",
+    "user_role": "终端客户 / 设备操作员",
+    "validation": {
+      "blocking_errors": [],
+      "construction_checks": {
+        "nodes": [
+          "DOC-001-C-00179",
+          "DOC-001-C-00180",
+          "DOC-001-C-00185"
+        ],
+        "status": "passed",
+        "type": "Ordinary"
+      },
+      "coverage_match": {
+        "anchor": null,
+        "eligible_slot_ids": [
+          "Q04",
+          "Q05",
+          "Q06",
+          "Q14",
+          "Q15"
+        ],
+        "related_clusters": [
+          "T002",
+          "T007"
+        ],
+        "status": "matched"
+      },
+      "duplicate_checks": {
+        "normalized_exact_duplicate": false,
+        "semantic_similarity": {
+          "calibrated_duplicate_threshold": null,
+          "compared_count": 0,
+          "decision": "observation_only",
+          "max_score": null,
+          "status": "not_run"
+        }
+      },
+      "evidence_locations": [
+        {
+          "char_end": 84,
+          "char_start": 0,
+          "chunk_id": "DOC-001-C-00179",
+          "document_id": "DOC-001",
+          "normalization": "NFKC_alphanumeric_lowercase_v1",
+          "page_end": 84,
+          "page_start": 84,
+          "quote": "运输\n小心\n忽视重量受伤与损坏危险运输和存放时注意设备的重量请勿在湿滑地面或坡道上行驶\n1. 清空清水箱和污水箱\n2. 用车辆运输时，根据现行准则固定设备以防滑动和倾翻\n"
+        },
+        {
+          "char_end": 39,
+          "char_start": 0,
+          "chunk_id": "DOC-001-C-00180",
+          "document_id": "DOC-001",
+          "normalization": "NFKC_alphanumeric_lowercase_v1",
+          "page_end": 85,
+          "page_start": 85,
+          "quote": "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备"
+        },
+        {
+          "char_end": 115,
+          "char_start": 0,
+          "chunk_id": "DOC-001-C-00185",
+          "document_id": "DOC-001",
+          "normalization": "NFKC_alphanumeric_lowercase_v1",
+          "page_end": 86,
+          "page_start": 86,
+          "quote": "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电"
+        }
+      ],
+      "original_table_evidence": {
+        "DOC-001-C-00179": [],
+        "DOC-001-C-00180": [],
+        "DOC-001-C-00185": []
+      },
+      "valid": true,
+      "validator_version": "golden-validator-v2.1",
+      "warnings": [
+        "近重复语义校验未执行；已执行规范化精确去重"
+      ]
+    }
+  },
+  "old_judge_identity": {
+    "baseline_version": "runtime-initial-20261014030238448891",
+    "evaluation_identity": "77b19271ddb234d6ddb7d99159e0a8ef2195fe608ea6866a8d0bf0342282ebb3",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "execution_snapshot": {
+      "embedding_model": "text-embedding-v4",
+      "generation_model": "deepseek-v4-flash",
+      "temperature": 0.2,
+      "vector_index": "FAISS IndexFlatIP (normalized cosine similarity)"
+    },
+    "generation_boundary_sha256": "d1fa3c13186c04fb95bd01be6615f25c6a59dbdd766290a108c4bfac78456ea2",
+    "generation_prompt_version": "generation-vnext-1",
+    "judge_prompt_sha256": "8ce7b7aaa08cbab3b537e52a40bd9507b79c7fc3510653a843ae3d6298ddad64",
+    "model": "deepseek-v4-flash",
+    "prompt_version": "judge-vnext-2-operation",
+    "scoring_policy": "business-vnext-1",
+    "temperature": 0
+  },
+  "checkpoint": {
+    "attempts": [
+      {
+        "elapsed_ms": 7304,
+        "phase": "generation",
+        "recorded_by_run_id": "EVAL-20261020105804727444",
+        "status": "ok",
+        "usage": [
+          {
+            "call_started_at": "2026-10-20T10:59:39.251391+00:00",
+            "latency_ms": 306,
+            "prompt_tokens": 33,
+            "provider": "Alibaba",
+            "requested_model": "text-embedding-v4",
+            "status": "ok",
+            "total_tokens": 33
+          },
+          {
+            "call_started_at": "2026-10-20T10:59:39.569135+00:00",
+            "latency_ms": 490,
+            "provider": "Alibaba",
+            "requested_model": "qwen3-rerank",
+            "status": "ok",
+            "total_tokens": 1791
+          },
+          {
+            "call_started_at": "2026-10-20T10:59:40.076795+00:00",
+            "completion_tokens": 1060,
+            "completion_tokens_details": {
+              "reasoning_tokens": 691
+            },
+            "latency_ms": 6319,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 717,
+            "prompt_tokens": 717,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "provider": "DeepSeek",
+            "request_sha256": "c0ef702635ca93901944588868e62ba55c4abff62e6a799d917107809021990f",
+            "requested_model": "deepseek-v4-flash",
+            "status": "ok",
+            "total_tokens": 1777
+          }
+        ]
+      },
+      {
+        "cause_message": "answer quote is missing or not located",
+        "cause_type": "ValueError",
+        "elapsed_ms": 37801,
+        "error": "VNext Judge合同无效：answer quote is missing or not located",
+        "error_type": "ProviderInvalidResponse",
+        "phase": "judge",
+        "provider_status_code": null,
+        "raw_provider_response": "{\"verdict\":\"FAIL\",\"checks\":[{\"requirement\":\"识别产品为卡赫 KIRA B 50，不把宇树 B2 的存放/电池要求套用到 KIRA B 50。\",\"met\":true,\"answer_quotes\":[\"仅按卡赫 **KIRA B 50** 手册摘录回答；宇树 B2 的存放/电池要求不适用于 KIRA B 50，不能套用。\"],\"support\":[{\"source_id\":\"DOC-001-C-00002\",\"quote\":\"KIRA B 50\\nKIRA B 50\\nZH\"}],\"scope_resolved\":true},{\"requirement\":\"较长时间停机时，只有给蓄电池完全充电后才能存储设备。\",\"met\":true,\"answer_quotes\":[\"**停用前先给蓄电池完全充电**，然后再存储设备。\"],\"support\":[{\"source_id\":\"DOC-001-C-00185\",\"quote\":\"5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电\"}],\"scope_resolved\":true},{\"requirement\":\"存放期间至少每月一次给蓄电池重新完全充电。\",\"met\":true,\"answer_quotes\":[\"**存放期间至少每月一次给蓄电池重新完全充电**。停用三个月时，应按“至少每月一次”执行，不能只充一次后放置三个月。\"],\"support\":[{\"source_id\":\"DOC-001-C-00185\",\"quote\":\"5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电\"}],\"scope_resolved\":true},{\"requirement\":\"存放设备时只在室内存放。\",\"met\":false,\"answer_quotes\":[],\"support\":[],\"reference_support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"存放\\n小心\\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\\n只在室内存放设备\"}],\"candidate_support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"存放\\n小心\\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\\n只在室内存放设备\"}],\"scope_resolved\":true},{\"requirement\":\"运输和存放时注意设备重量，避免受伤与损坏。\",\"met\":false,\"answer_quotes\":[],\"support\":[],\"reference_support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"存放\\n小心\\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\\n只在室内存放设备\"}],\"candidate_support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"运输和存放时注意设备的重量\"}],\"scope_resolved\":true},{\"requirement\":\"未确认的存放条件不得擅自补造，尤其不得套用 B2 的存放/电池要求。\",\"met\":true,\"answer_quotes\":[\"现有 KIRA B 50 证据未给出存放温度/湿度范围、是否必须取出电池、充电器如何存放、启用前检查项目等。不要引用 B2 的“取出电池包”“低于30%充到70%”等要求到 KIRA B 50。\"],\"support\":[{\"source_id\":\"DOC-001-C-00002\",\"quote\":\"KIRA B 50\\nKIRA B 50\\nZH\"}],\"scope_resolved\":true}],\"issues\":[{\"description\":\"遗漏手册要求的室内存放限制：答案未告知设备只应在室内存放。\",\"answer_quotes\":[],\"support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"存放\\n小心\\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\\n只在室内存放设备\"}],\"critical\":true,\"safety_violation\":false,\"scope_resolved\":true,\"baseline_issue_index\":null},{\"description\":\"遗漏手册关于运输和存放时注意设备重量的要求。\",\"answer_quotes\":[],\"support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"运输和存放时注意设备的重量\"}],\"critical\":true,\"safety_violation\":false,\"scope_resolved\":true,\"baseline_issue_index\":null}],\"reason\":\"答案正确区分了 KIRA B 50 与宇树 B2，并正确说明停用前完全充电、存放期间至少每月完全充电一次，也未套用不适用型号的要求；但遗漏了手册中的“只在室内存放设备”和“运输和存放时注意设备重量”两项长期存放要求，必要事实不完整，因此判 FAIL。\",\"quality\":{\"correctness\":3,\"faithfulness\":1.0,\"completeness\":0.5}}",
+        "recorded_by_run_id": "EVAL-20261020105804727444",
+        "request_execution_unknown": false,
+        "response_metadata": {
+          "finish_reason": "stop",
+          "request_id": "447efa1f-9c89-4587-9c09-6b931a1ee591",
+          "transport_recovery": null,
+          "usage": {
+            "call_started_at": "2026-10-20T10:59:46.436617+00:00",
+            "completion_tokens": 8356,
+            "completion_tokens_details": {
+              "reasoning_tokens": 7390
+            },
+            "latency_ms": 37795,
+            "prompt_cache_hit_tokens": 1024,
+            "prompt_cache_miss_tokens": 7173,
+            "prompt_tokens": 8197,
+            "prompt_tokens_details": {
+              "cached_tokens": 1024
+            },
+            "provider": "DeepSeek",
+            "request_sha256": "a1e6c9220e5427322d71596b467b865468afe16a5e2e7c7b147d6b3a31ed3226",
+            "requested_model": "deepseek-v4-flash",
+            "status": "ok",
+            "total_tokens": 16553
+          }
+        },
+        "retry_delay_seconds": 1,
+        "retryable": true,
+        "status": "error",
+        "usage": [
+          {
+            "call_started_at": "2026-10-20T10:59:46.436617+00:00",
+            "completion_tokens": 8356,
+            "completion_tokens_details": {
+              "reasoning_tokens": 7390
+            },
+            "latency_ms": 37795,
+            "prompt_cache_hit_tokens": 1024,
+            "prompt_cache_miss_tokens": 7173,
+            "prompt_tokens": 8197,
+            "prompt_tokens_details": {
+              "cached_tokens": 1024
+            },
+            "provider": "DeepSeek",
+            "request_sha256": "a1e6c9220e5427322d71596b467b865468afe16a5e2e7c7b147d6b3a31ed3226",
+            "requested_model": "deepseek-v4-flash",
+            "status": "ok",
+            "total_tokens": 16553
+          }
+        ]
+      },
+      {
+        "cause_message": "support is not located in actual full Final",
+        "cause_type": "ValueError",
+        "elapsed_ms": 43955,
+        "error": "VNext Judge合同无效：support is not located in actual full Final",
+        "error_type": "ProviderInvalidResponse",
+        "phase": "judge",
+        "provider_status_code": null,
+        "raw_provider_response": "{\"verdict\":\"FAIL\",\"checks\":[{\"requirement\":\"长期存放时，手册要求只在室内存放设备。\",\"met\":false,\"answer_quotes\":[],\"support\":[],\"reference_support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"存放\\n小心\\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\\n只在室内存放设备\"}],\"candidate_support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"存放\\n小心\\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\\n只在室内存放设备\"}],\"scope_resolved\":true},{\"requirement\":\"运输和存放时，手册要求注意设备的重量。\",\"met\":false,\"answer_quotes\":[],\"support\":[],\"reference_support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"运输和存放时注意设备的重量\"}],\"candidate_support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"运输和存放时注意设备的重量\"}],\"scope_resolved\":true},{\"requirement\":\"较长时间停机时，只有给电池完全充电后才能存储设备。\",\"met\":true,\"answer_quotes\":[\"**停用前先给蓄电池完全充电**，然后再存储设备。\"],\"support\":[{\"source_id\":\"DOC-001-C-00185\",\"quote\":\"较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电\"}],\"reference_support\":[{\"source_id\":\"DOC-001-C-00185\",\"quote\":\"较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电\"}],\"candidate_support\":[{\"source_id\":\"DOC-001-C-00185\",\"quote\":\"较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电\"}],\"scope_resolved\":true},{\"requirement\":\"存放期间至少每月一次给蓄电池重新完全充电。\",\"met\":true,\"answer_quotes\":[\"**存放期间至少每月一次给蓄电池重新完全充电**。\"],\"support\":[{\"source_id\":\"DOC-001-C-00185\",\"quote\":\"较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电\"}],\"reference_support\":[{\"source_id\":\"DOC-001-C-00185\",\"quote\":\"至少每月一次给蓄电池重新完全充电\"}],\"candidate_support\":[{\"source_id\":\"DOC-001-C-00185\",\"quote\":\"较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电\"}],\"scope_resolved\":true},{\"requirement\":\"回答应限定在 KIRA B 50，不把宇树 B2 的存放/电池要求套用到该设备。\",\"met\":true,\"answer_quotes\":[\"仅按卡赫 **KIRA B 50** 手册摘录回答；宇树 B2 的存放/电池要求不适用于 KIRA B 50，不能套用。\"],\"support\":[{\"source_id\":\"DOC-001-C-00002\",\"quote\":\"KIRA B 50\\nKIRA B 50\\nZH\"}],\"scope_resolved\":true}],\"issues\":[{\"description\":\"回答在“可确认的长期存放要求”中只列了充电与月度保养，遗漏手册长期存放要求中的“只在室内存放设备”和“运输/存放时注意设备重量”。\",\"answer_quotes\":[\"**可确认的长期存放要求**\",\"1. **停用前先给蓄电池完全充电**，然后再存储设备。\",\"2. **存放期间至少每月一次给蓄电池重新完全充电**。停用三个月时，应按“至少每月一次”执行，不能只充一次后放置三个月。\",\"3. 同期按月执行手册列出的保养项：清洁污水箱和盖子之间的密封件；检查该密封件，必要时更换；清洁毛刷通道；清洁清水过滤器。\"],\"support\":[{\"source_id\":\"DOC-001-C-00180\",\"quote\":\"存放\\n小心\\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\\n只在室内存放设备\"}],\"critical\":true,\"safety_violation\":false,\"scope_resolved\":true,\"baseline_issue_index\":null,\"baseline_match_reason\":null}],\"reason\":\"回答对蓄电池停用前完全充电及存放期间至少每月一次完全充电的维护要求回答正确，也正确限定了 KIRA B 50；但遗漏手册长期存放要求中的“只在室内存放设备”和“运输/存放时注意设备重量”，必要事实不完整，故FAIL。\",\"quality\":{\"correctness\":4,\"faithfulness\":1.0,\"completeness\":0.5}}",
+        "recorded_by_run_id": "EVAL-20261020105804727444",
+        "request_execution_unknown": false,
+        "response_metadata": {
+          "finish_reason": "stop",
+          "request_id": "72214348-2d9d-455a-9c27-ce1e3468430c",
+          "transport_recovery": null,
+          "usage": {
+            "call_started_at": "2026-10-20T11:00:25.277860+00:00",
+            "completion_tokens": 9748,
+            "completion_tokens_details": {
+              "reasoning_tokens": 8757
+            },
+            "latency_ms": 43948,
+            "prompt_cache_hit_tokens": 8063,
+            "prompt_cache_miss_tokens": 134,
+            "prompt_tokens": 8197,
+            "prompt_tokens_details": {
+              "cached_tokens": 8063
+            },
+            "provider": "DeepSeek",
+            "request_sha256": "a1e6c9220e5427322d71596b467b865468afe16a5e2e7c7b147d6b3a31ed3226",
+            "requested_model": "deepseek-v4-flash",
+            "status": "ok",
+            "total_tokens": 17945
+          }
+        },
+        "retryable": false,
+        "status": "error",
+        "usage": [
+          {
+            "call_started_at": "2026-10-20T11:00:25.277860+00:00",
+            "completion_tokens": 9748,
+            "completion_tokens_details": {
+              "reasoning_tokens": 8757
+            },
+            "latency_ms": 43948,
+            "prompt_cache_hit_tokens": 8063,
+            "prompt_cache_miss_tokens": 134,
+            "prompt_tokens": 8197,
+            "prompt_tokens_details": {
+              "cached_tokens": 8063
+            },
+            "provider": "DeepSeek",
+            "request_sha256": "a1e6c9220e5427322d71596b467b865468afe16a5e2e7c7b147d6b3a31ed3226",
+            "requested_model": "deepseek-v4-flash",
+            "status": "ok",
+            "total_tokens": 17945
+          }
+        ]
+      }
+    ],
+    "execution": {
+      "answer": "仅按卡赫 **KIRA B 50** 手册摘录回答；宇树 B2 的存放/电池要求不适用于 KIRA B 50，不能套用。\n\n**可确认的长期存放要求**\n1. **停用前先给蓄电池完全充电**，然后再存储设备。  \n   ——[DOC-001-C-00185 | S3 | 每月一次 | 页86–86]\n2. **存放期间至少每月一次给蓄电池重新完全充电**。停用三个月时，应按“至少每月一次”执行，不能只充一次后放置三个月。  \n   ——[DOC-001-C-00185 | S3 | 每月一次 | 页86–86]\n3. 同期按月执行手册列出的保养项：清洁污水箱和盖子之间的密封件；检查该密封件，必要时更换；清洁毛刷通道；清洁清水过滤器。  \n   ——[DOC-001-C-00185 | S3 | 每月一次 | 页86–86]\n\n**未确认、不要猜测的条件**\n现有 KIRA B 50 证据未给出存放温度/湿度范围、是否必须取出电池、充电器如何存放、启用前检查项目等。不要引用 B2 的“取出电池包”“低于30%充到70%”等要求到 KIRA B 50。若需这些条件，应查 KIRA B 50 完整操作说明对应章节或联系卡赫官方确认。  \n产品身份依据：[DOC-001-C-00002 | S3 | KIRA B 50 | 页1–1]\n\n**执行要点**：停用前完全充电→每月至少重新完全充电一次并做上述清洁检查→电池或充电异常时停止操作并求助官方。",
+      "corpus_fingerprint": {
+        "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+        "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+        "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+        "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+        "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+        "sources": {
+          "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+          "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+          "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+          "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+        }
+      },
+      "cost_estimation": {
+        "aliases": [
+          "deepseek-v4-flash"
+        ],
+        "amount": 0.00074355,
+        "billing_mode": "provider_hit_counter",
+        "calculated_at": "2026-10-20T10:59:46.399181+00:00",
+        "calls": [
+          {
+            "amount": 0.0007435499999999999,
+            "billing_period": "off_peak",
+            "call_started_at": "2026-10-20T10:59:40.076795+00:00",
+            "rates": {
+              "cached_input_per_million": 0.003,
+              "input_per_million": 0.15,
+              "output_per_million": 0.6
+            }
+          }
+        ],
+        "checked_at": "2026-09-30",
+        "cost_config_version": "deepseek-flash-2026-09-30",
+        "currency": "USD",
+        "effective_date": "2026-09-30",
+        "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+        "model": "deepseek-flash",
+        "peak_hours_utc": [
+          [
+            1,
+            4
+          ],
+          [
+            6,
+            10
+          ]
+        ],
+        "peak_weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "periods": {
+          "off_peak": {
+            "cached_input_per_million": 0.003,
+            "input_per_million": 0.15,
+            "output_per_million": 0.6
+          },
+          "peak": {
+            "cached_input_per_million": 0.006,
+            "input_per_million": 0.3,
+            "output_per_million": 1.2
+          }
+        },
+        "price_config_version": "deepseek-flash-2026-09-30",
+        "price_snapshot": {
+          "aliases": [
+            "deepseek-v4-flash"
+          ],
+          "billing_mode": "provider_hit_counter",
+          "checked_at": "2026-09-30",
+          "cost_config_version": "deepseek-flash-2026-09-30",
+          "currency": "USD",
+          "effective_date": "2026-09-30",
+          "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+          "model": "deepseek-flash",
+          "peak_hours_utc": [
+            [
+              1,
+              4
+            ],
+            [
+              6,
+              10
+            ]
+          ],
+          "peak_weekdays": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "periods": {
+            "off_peak": {
+              "cached_input_per_million": 0.003,
+              "input_per_million": 0.15,
+              "output_per_million": 0.6
+            },
+            "peak": {
+              "cached_input_per_million": 0.006,
+              "input_per_million": 0.3,
+              "output_per_million": 1.2
+            }
+          },
+          "price_config_version": "deepseek-flash-2026-09-30",
+          "provider": "DeepSeek",
+          "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+          "unit": 1000000
+        },
+        "provider": "DeepSeek",
+        "reason": null,
+        "requested_model": "deepseek-v4-flash",
+        "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+        "status": "estimated",
+        "unit": 1000000
+      },
+      "estimated_cost": {
+        "aliases": [
+          "deepseek-v4-flash"
+        ],
+        "amount": 0.00074355,
+        "billing_mode": "provider_hit_counter",
+        "calculated_at": "2026-10-20T10:59:46.399181+00:00",
+        "calls": [
+          {
+            "amount": 0.0007435499999999999,
+            "billing_period": "off_peak",
+            "call_started_at": "2026-10-20T10:59:40.076795+00:00",
+            "rates": {
+              "cached_input_per_million": 0.003,
+              "input_per_million": 0.15,
+              "output_per_million": 0.6
+            }
+          }
+        ],
+        "checked_at": "2026-09-30",
+        "cost_config_version": "deepseek-flash-2026-09-30",
+        "currency": "USD",
+        "effective_date": "2026-09-30",
+        "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+        "model": "deepseek-flash",
+        "peak_hours_utc": [
+          [
+            1,
+            4
+          ],
+          [
+            6,
+            10
+          ]
+        ],
+        "peak_weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "periods": {
+          "off_peak": {
+            "cached_input_per_million": 0.003,
+            "input_per_million": 0.15,
+            "output_per_million": 0.6
+          },
+          "peak": {
+            "cached_input_per_million": 0.006,
+            "input_per_million": 0.3,
+            "output_per_million": 1.2
+          }
+        },
+        "price_config_version": "deepseek-flash-2026-09-30",
+        "price_snapshot": {
+          "aliases": [
+            "deepseek-v4-flash"
+          ],
+          "billing_mode": "provider_hit_counter",
+          "checked_at": "2026-09-30",
+          "cost_config_version": "deepseek-flash-2026-09-30",
+          "currency": "USD",
+          "effective_date": "2026-09-30",
+          "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+          "model": "deepseek-flash",
+          "peak_hours_utc": [
+            [
+              1,
+              4
+            ],
+            [
+              6,
+              10
+            ]
+          ],
+          "peak_weekdays": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "periods": {
+            "off_peak": {
+              "cached_input_per_million": 0.003,
+              "input_per_million": 0.15,
+              "output_per_million": 0.6
+            },
+            "peak": {
+              "cached_input_per_million": 0.006,
+              "input_per_million": 0.3,
+              "output_per_million": 1.2
+            }
+          },
+          "price_config_version": "deepseek-flash-2026-09-30",
+          "provider": "DeepSeek",
+          "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+          "unit": 1000000
+        },
+        "provider": "DeepSeek",
+        "reason": null,
+        "requested_model": "deepseek-v4-flash",
+        "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+        "status": "estimated",
+        "unit": 1000000
+      },
+      "input_tokens": 717,
+      "latency_ms": 7300,
+      "mode": "live",
+      "model": "deepseek-v4-flash",
+      "output_tokens": 1060,
+      "retrieval": [
+        {
+          "child_content": "2. 存放\nB2 需存放于干燥、阴凉的室内，避免日晒及雨淋，以免零部件锈蚀而缩短使用寿命。长时间存放时取出电池包。",
+          "chunk_id": "DOC-002-C-00055",
+          "content_preview": "2. 存放\nB2 需存放于干燥、阴凉的室内，避免日晒及雨淋，以免零部件锈蚀而缩短使用寿命。长时间存放时取出电池包。",
+          "document": "宇树_B2四足机器人用户手册_中文版.pdf",
+          "document_id": "DOC-002",
+          "matched_child_ids": [
+            "DOC-002-C-00055"
+          ],
+          "page_end": 18,
+          "page_start": 18,
+          "parent_chunk_id": "DOC-002-P-00047",
+          "parent_page_end": 18,
+          "parent_page_start": 18,
+          "product": "B2 四足机器人",
+          "rerank_score": 0.6735961530842496,
+          "score": 0.6735961530842496,
+          "section": "2. 存放",
+          "section_path": "2. 存放",
+          "vendor": "宇树科技"
+        },
+        {
+          "child_content": "- 保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 $40^{\\circ}$ C 的环境下。\n3. 切勿过充电池，否则将对电芯造成损害。\n4. 若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于 30%，请把电池充电到 70% 后再继续保存。以免电池过放而损坏电池。",
+          "chunk_id": "DOC-004-C-00027",
+          "content_preview": "- 保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 $40^{\\circ}$ C 的环境下。\n3. 切勿过充电池，否则将对电芯造成损害。\n4. 若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于 30%，请把电池充电到 70% 后再继续保存。以免电池过放而损坏电池。",
+          "document": "宇树_B2电池与充电器使用说明_中文版.pdf",
+          "document_id": "DOC-004",
+          "matched_child_ids": [
+            "DOC-004-C-00027"
+          ],
+          "page_end": 11,
+          "page_start": 11,
+          "parent_chunk_id": "DOC-004-P-00023",
+          "parent_page_end": 11,
+          "parent_page_start": 11,
+          "product": "B2 电池与充电器",
+          "rerank_score": 0.5614031274296221,
+          "score": 0.5614031274296221,
+          "section": "- 保养",
+          "section_path": "- 保养",
+          "vendor": "宇树科技"
+        },
+        {
+          "child_content": "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+          "chunk_id": "DOC-001-C-00185",
+          "content_preview": "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+          "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+          "document_id": "DOC-001",
+          "matched_child_ids": [
+            "DOC-001-C-00185"
+          ],
+          "page_end": 86,
+          "page_start": 86,
+          "parent_chunk_id": "DOC-001-P-00183",
+          "parent_page_end": 86,
+          "parent_page_start": 86,
+          "product": "KIRA B 50",
+          "rerank_score": 0.560067711920892,
+          "score": 0.560067711920892,
+          "section": "每月一次",
+          "section_path": "每月一次",
+          "vendor": "卡赫"
+        },
+        {
+          "child_content": "KIRA B 50\nKIRA B 50\nZH\n",
+          "chunk_id": "DOC-001-C-00002",
+          "content_preview": "KIRA B 50\nKIRA B 50\nZH\n",
+          "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+          "document_id": "DOC-001",
+          "matched_child_ids": [
+            "DOC-001-C-00002"
+          ],
+          "page_end": 1,
+          "page_start": 1,
+          "parent_chunk_id": "DOC-001-P-00002",
+          "parent_page_end": 1,
+          "parent_page_start": 1,
+          "product": "KIRA B 50",
+          "rerank_score": 0.5598047554877975,
+          "score": 0.5598047554877975,
+          "section": "KIRA B 50",
+          "section_path": "KIRA B 50",
+          "vendor": "卡赫"
+        }
+      ],
+      "retrieval_trace": {
+        "aliases": {},
+        "artifact_schema_version": 3,
+        "candidate_stage": "post_metadata_filter_fusion_candidate_cap_pre_rerank",
+        "candidates": [
+          {
+            "bm25_normalized": 1.0,
+            "bm25_raw": 23.680514610045062,
+            "chunk_id": "DOC-001-C-00185",
+            "content": "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+            "content_preview": "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "fusion_score": 0.9663594920245572,
+            "page_end": 86,
+            "page_start": 86,
+            "parent_chunk_id": "DOC-001-P-00183",
+            "product": "KIRA B 50",
+            "rank": 1,
+            "score": 0.9664,
+            "section": "每月一次",
+            "section_path": "每月一次",
+            "sources": [
+              "vector",
+              "bm25"
+            ],
+            "vector_normalized": 0.9327189840491144,
+            "vector_raw": 0.5998004674911499,
+            "vendor": "卡赫"
+          },
+          {
+            "bm25_normalized": 0.8424181309686978,
+            "bm25_raw": 19.9488948581711,
+            "chunk_id": "DOC-001-C-00002",
+            "content": "KIRA B 50\nKIRA B 50\nZH\n",
+            "content_preview": "KIRA B 50\nKIRA B 50\nZH\n",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "fusion_score": 0.8716446904266506,
+            "page_end": 1,
+            "page_start": 1,
+            "parent_chunk_id": "DOC-001-P-00002",
+            "product": "KIRA B 50",
+            "rank": 2,
+            "score": 0.8716,
+            "section": "KIRA B 50",
+            "section_path": "KIRA B 50",
+            "sources": [
+              "vector",
+              "bm25"
+            ],
+            "vector_normalized": 0.9008712498846033,
+            "vector_raw": 0.5793202519416809,
+            "vendor": "卡赫"
+          },
+          {
+            "bm25_normalized": 0.7892589483996371,
+            "bm25_raw": 18.690058058686407,
+            "chunk_id": "DOC-001-C-00184",
+            "content": "每周\n1. 使用湿微纤维抹布清洁传感器 如有必要，请额外使用玻璃清洁剂\n2. ## 定期使用时，至少每周给蓄电池完全充电一次并且没有间断",
+            "content_preview": "每周\n1. 使用湿微纤维抹布清洁传感器 如有必要，请额外使用玻璃清洁剂\n2. ## 定期使用时，至少每周给蓄电池完全充电一次并且没有间断",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "fusion_score": 0.8448177608671501,
+            "page_end": 86,
+            "page_start": 86,
+            "parent_chunk_id": "DOC-001-P-00182",
+            "product": "KIRA B 50",
+            "rank": 3,
+            "score": 0.8448,
+            "section": "每周",
+            "section_path": "每周",
+            "sources": [
+              "vector",
+              "bm25"
+            ],
+            "vector_normalized": 0.9003765733346631,
+            "vector_raw": 0.5790021419525146,
+            "vendor": "卡赫"
+          },
+          {
+            "bm25_normalized": 0.0,
+            "bm25_raw": null,
+            "chunk_id": "DOC-001-C-00023",
+            "content": "蓄电池\n本设备内置锂离子蓄电池 这些电池需遵守特殊标准 只有卡赫的客户服务部门或专业人员才能对有缺陷的电池进行拆卸和安装以及测试\n关于存放和运输的说明，请联系卡赫的客户服务部门获取\n危险\n不允许对设备进行改造和改动\n\n不得打开蓄电池，有发生短路的危险 此外，刺激性蒸气或腐蚀性液体可能会泄漏\n蓄电池不得承受强光辐射 受热及火烤 有爆炸危险\n不得在有爆炸危险的环境中使用充电器\n请勿在脏污或潮湿状态下使用充电器\n在充电过程中确保足够的通风\n爆炸危险 请勿在电池附近或电池充电室中使用明火，产生火花或抽烟\n爆炸危险 不要把任何工具或类似的东西放在电池上，即放在端极和电池接线上",
+            "content_preview": "蓄电池\n本设备内置锂离子蓄电池 这些电池需遵守特殊标准 只有卡赫的客户服务部门或专业人员才能对有缺陷的电池进行拆卸和安装以及测试\n关于存放和运输的说明，请联系卡赫的客户服务部门获取\n危险\n不允许对设备进行改造和改动\n\n不得打开蓄电池，有发生短路的危险 此外，刺激性蒸气或腐蚀性液体可能会泄漏\n蓄电池不得承受强光辐射 受热及火烤 有爆炸危险\n不得在有爆炸危险的环境中使用充电器\n请勿在脏污或潮湿状态下使用充电器\n在充电过程中确保足够的通风\n",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "fusion_score": 0.5,
+            "page_end": 10,
+            "page_start": 9,
+            "parent_chunk_id": "DOC-001-P-00023",
+            "product": "KIRA B 50",
+            "rank": 4,
+            "score": 0.5,
+            "section": "蓄电池",
+            "section_path": "蓄电池",
+            "sources": [
+              "vector"
+            ],
+            "vector_normalized": 1.0,
+            "vector_raw": 0.6430666446685791,
+            "vendor": "卡赫"
+          },
+          {
+            "bm25_normalized": 0.0,
+            "bm25_raw": null,
+            "chunk_id": "DOC-002-C-00055",
+            "content": "2. 存放\nB2 需存放于干燥、阴凉的室内，避免日晒及雨淋，以免零部件锈蚀而缩短使用寿命。长时间存放时取出电池包。",
+            "content_preview": "2. 存放\nB2 需存放于干燥、阴凉的室内，避免日晒及雨淋，以免零部件锈蚀而缩短使用寿命。长时间存放时取出电池包。",
+            "document": "宇树_B2四足机器人用户手册_中文版.pdf",
+            "document_id": "DOC-002",
+            "fusion_score": 0.4999195467031388,
+            "page_end": 18,
+            "page_start": 18,
+            "parent_chunk_id": "DOC-002-P-00047",
+            "product": "B2 四足机器人",
+            "rank": 5,
+            "score": 0.4999,
+            "section": "2. 存放",
+            "section_path": "2. 存放",
+            "sources": [
+              "vector"
+            ],
+            "vector_normalized": 0.9998390934062776,
+            "vector_raw": 0.642963171005249,
+            "vendor": "宇树科技"
+          },
+          {
+            "bm25_normalized": 0.0,
+            "bm25_raw": null,
+            "chunk_id": "DOC-004-C-00027",
+            "content": "- 保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 $40^{\\circ}$ C 的环境下。\n3. 切勿过充电池，否则将对电芯造成损害。\n4. 若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于 30%，请把电池充电到 70% 后再继续保存。以免电池过放而损坏电池。",
+            "content_preview": "- 保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 $40^{\\circ}$ C 的环境下。\n3. 切勿过充电池，否则将对电芯造成损害。\n4. 若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于 30%，请把电池充电到 70% 后再继续保存。以免电池过放而损坏电池。",
+            "document": "宇树_B2电池与充电器使用说明_中文版.pdf",
+            "document_id": "DOC-004",
+            "fusion_score": 0.48145672001919015,
+            "page_end": 11,
+            "page_start": 11,
+            "parent_chunk_id": "DOC-004-P-00023",
+            "product": "B2 电池与充电器",
+            "rank": 6,
+            "score": 0.4815,
+            "section": "- 保养",
+            "section_path": "- 保养",
+            "sources": [
+              "vector"
+            ],
+            "vector_normalized": 0.9629134400383803,
+            "vector_raw": 0.6192175149917603,
+            "vendor": "宇树科技"
+          },
+          {
+            "bm25_normalized": 0.0,
+            "bm25_raw": null,
+            "chunk_id": "DOC-001-C-00024",
+            "content": "警告\n每次使用前，请检查设备和电源线是否损坏 不要再使用损坏的设备，损坏的部件只能由专业人员进行维修让儿童远离电池和充电器\n不要给损坏的电池充电 请卡赫客户服务部更换损坏的电池\n不要把损坏的电池扔到家庭垃圾中 应告知卡赫客户服务部\n避免与从损坏电池溢出的液体接触 在意外接触的情况下，用清水冲洗液体 如果接触到眼睛，还应就医\n小心\n请务必遵守这些使用说明 处理蓄电池时，遵守立法机构的建议\n电源电压必须与充电器铭牌上规定的电压一致\n只能将蓄电池用于本设备 禁止将其用于其他目的，这是危险行为",
+            "content_preview": "警告\n每次使用前，请检查设备和电源线是否损坏 不要再使用损坏的设备，损坏的部件只能由专业人员进行维修让儿童远离电池和充电器\n不要给损坏的电池充电 请卡赫客户服务部更换损坏的电池\n不要把损坏的电池扔到家庭垃圾中 应告知卡赫客户服务部\n避免与从损坏电池溢出的液体接触 在意外接触的情况下，用清水冲洗液体 如果接触到眼睛，还应就医\n小心\n请务必遵守这些使用说明 处理蓄电池时，遵守立法机构的建议\n电源电压必须与充电器铭牌上规定的电压一致\n只能将蓄",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "fusion_score": 0.47522140413618924,
+            "page_end": 10,
+            "page_start": 10,
+            "parent_chunk_id": "DOC-001-P-00024",
+            "product": "KIRA B 50",
+            "rank": 7,
+            "score": 0.4752,
+            "section": "警告",
+            "section_path": "警告",
+            "sources": [
+              "vector"
+            ],
+            "vector_normalized": 0.9504428082723785,
+            "vector_raw": 0.6111980676651001,
+            "vendor": "卡赫"
+          },
+          {
+            "bm25_normalized": 0.0,
+            "bm25_raw": null,
+            "chunk_id": "DOC-004-C-00001",
+            "content": "B2 电池&充电器\n使用手册 V1.0",
+            "content_preview": "B2 电池&充电器\n使用手册 V1.0",
+            "document": "宇树_B2电池与充电器使用说明_中文版.pdf",
+            "document_id": "DOC-004",
+            "fusion_score": 0.4604639708262257,
+            "page_end": 1,
+            "page_start": 1,
+            "parent_chunk_id": "DOC-004-P-00001",
+            "product": "B2 电池与充电器",
+            "rank": 8,
+            "score": 0.4605,
+            "section": "B2 电池&充电器",
+            "section_path": "B2 电池&充电器",
+            "sources": [
+              "vector"
+            ],
+            "vector_normalized": 0.9209279416524514,
+            "vector_raw": 0.5922180414199829,
+            "vendor": "宇树科技"
+          },
+          {
+            "bm25_normalized": 0.0,
+            "bm25_raw": null,
+            "chunk_id": "DOC-004-C-00026",
+            "content": "- 存储和运输\n1. 不使用电池包时，请将电池包从机器人中取出并存放在儿童接触不到的地方。\n2. 禁止将电池包放在靠近热源的地方，比如阳光直射或热天的车内、火源或加热炉。电池包理想保存温度为 $20^{\\circ}$ C- $25^{\\circ}$ C，电池包理想保存环境湿度：45%-75%。\n3. 储存时，请注意确保电池周边的环境散热良好，没有杂物等易燃易爆物品。\n4. 存放电池包的环境应保持干燥。请勿将电池包置于水中或者可能会漏水的地方。\n5. 禁止机械撞击、碾压、刺穿电池包，禁止将电池包跌落或人为短路。\n6. 禁止将电池包与眼镜、手表、金属项链、发夹或者其他金属物体一起贮藏或运输。\n7. 切勿运输有破损的电池包。一旦需要运输电池包，务必将电池包放电至 $65\\%$ 电量左右。\n8. 切勿将电池包彻底放完电后长时间存储，以避免电池包进入过放状态，造成电芯损坏，将无法恢复使用。",
+            "content_preview": "- 存储和运输\n1. 不使用电池包时，请将电池包从机器人中取出并存放在儿童接触不到的地方。\n2. 禁止将电池包放在靠近热源的地方，比如阳光直射或热天的车内、火源或加热炉。电池包理想保存温度为 $20^{\\circ}$ C- $25^{\\circ}$ C，电池包理想保存环境湿度：45%-75%。\n3. 储存时，请注意确保电池周边的环境散热良好，没有杂物等易燃易爆物品。\n4. 存放电池包的环境应保持干燥。请勿将电池包置于水中或者可能会漏水的",
+            "document": "宇树_B2电池与充电器使用说明_中文版.pdf",
+            "document_id": "DOC-004",
+            "fusion_score": 0.45115659956169635,
+            "page_end": 11,
+            "page_start": 11,
+            "parent_chunk_id": "DOC-004-P-00022",
+            "product": "B2 电池与充电器",
+            "rank": 9,
+            "score": 0.4512,
+            "section": "- 存储和运输",
+            "section_path": "- 存储和运输",
+            "sources": [
+              "vector"
+            ],
+            "vector_normalized": 0.9023131991233927,
+            "vector_raw": 0.5802475214004517,
+            "vendor": "宇树科技"
+          },
+          {
+            "bm25_normalized": 0.0,
+            "bm25_raw": null,
+            "chunk_id": "DOC-001-C-00180",
+            "content": "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+            "content_preview": "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "fusion_score": 0.4409677641806351,
+            "page_end": 85,
+            "page_start": 85,
+            "parent_chunk_id": "DOC-001-P-00178",
+            "product": "KIRA B 50",
+            "rank": 10,
+            "score": 0.441,
+            "section": "存放",
+            "section_path": "存放",
+            "sources": [
+              "vector"
+            ],
+            "vector_normalized": 0.8819355283612702,
+            "vector_raw": 0.5671433210372925,
+            "vendor": "卡赫"
+          },
+          {
+            "bm25_normalized": 0.0,
+            "bm25_raw": null,
+            "chunk_id": "DOC-001-C-00108",
+            "content": "给蓄电池充电\n结合对接站运行时，蓄电池自动充电\n不含对接站：\n1. 打开设备舱的门\n1 2\n充电线设备舱的门\n\na. 拉出充电线<sub>。</sub>\nb. 如果设备不带充电线，将带有冷连接器的电源线插入对接端口上的电源插口\n1 电源插口2 对接端口\n2. 将充电线的电源插头插入插座充电过程自动进行。在触摸屏上显示充电状态。在充电过程中不得使用设备。当蓄电池完全放电时，充电过程大约需要8小时\n3. 充电过程结束之后，从插座中拔下电源插头\n4. 将电源线存放在设备舱内，或从对接端口中拔下电源线",
+            "content_preview": "给蓄电池充电\n结合对接站运行时，蓄电池自动充电\n不含对接站：\n1. 打开设备舱的门\n1 2\n充电线设备舱的门\n\na. 拉出充电线<sub>。</sub>\nb. 如果设备不带充电线，将带有冷连接器的电源线插入对接端口上的电源插口\n1 电源插口2 对接端口\n2. 将充电线的电源插头插入插座充电过程自动进行。在触摸屏上显示充电状态。在充电过程中不得使用设备。当蓄电池完全放电时，充电过程大约需要8小时\n3. 充电过程结束之后，从插座中拔下电源",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "fusion_score": 0.43908665858179,
+            "page_end": 37,
+            "page_start": 36,
+            "parent_chunk_id": "DOC-001-P-00107",
+            "product": "KIRA B 50",
+            "rank": 11,
+            "score": 0.4391,
+            "section": "给蓄电池充电",
+            "section_path": "给蓄电池充电",
+            "sources": [
+              "vector"
+            ],
+            "vector_normalized": 0.87817331716358,
+            "vector_raw": 0.5647239685058594,
+            "vendor": "卡赫"
+          },
+          {
+            "bm25_normalized": 0.0,
+            "bm25_raw": null,
+            "chunk_id": "DOC-001-C-00042",
+            "content": "质量保证\nX\n请勿将电池扔进垃圾桶\n我们的主管销售公司所发布的质量保证条件在每个国家均适用 在质量保证期内，如果您的产品发生了任何故障，我们都将为您提供免费维修，但是这种故障应当是由于机身材料或制造上的缺陷造成的 如属质量保证情况，请凭发票联系贵方经销商或就近联系获得授权的客户服务点\n（地址详见背面 ）",
+            "content_preview": "质量保证\nX\n请勿将电池扔进垃圾桶\n我们的主管销售公司所发布的质量保证条件在每个国家均适用 在质量保证期内，如果您的产品发生了任何故障，我们都将为您提供免费维修，但是这种故障应当是由于机身材料或制造上的缺陷造成的 如属质量保证情况，请凭发票联系贵方经销商或就近联系获得授权的客户服务点\n（地址详见背面 ）",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "fusion_score": 0.43439853930922134,
+            "page_end": 15,
+            "page_start": 14,
+            "parent_chunk_id": "DOC-001-P-00042",
+            "product": "KIRA B 50",
+            "rank": 12,
+            "score": 0.4344,
+            "section": "质量保证",
+            "section_path": "质量保证",
+            "sources": [
+              "vector"
+            ],
+            "vector_normalized": 0.8687970786184427,
+            "vector_raw": 0.5586944222450256,
+            "vendor": "卡赫"
+          }
+        ],
+        "config": {
+          "alias_mapping": false,
+          "candidate_k": 12,
+          "hybrid_alpha": 0.5,
+          "hybrid_search": true,
+          "hyde": false,
+          "knowledge_identity": {
+            "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+            "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+            "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+            "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+            "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+            "sources": {
+              "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+              "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+              "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+              "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+            }
+          },
+          "metadata_filter": "OFF",
+          "min_score": 0,
+          "multi_query": false,
+          "prompt_strategy": "Abstention",
+          "query_rewrite": false,
+          "rerank": true,
+          "run_target": "baseline",
+          "top_k": 4
+        },
+        "corpus_fingerprint": {
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+          }
+        },
+        "final": [
+          {
+            "child_content": "2. 存放\nB2 需存放于干燥、阴凉的室内，避免日晒及雨淋，以免零部件锈蚀而缩短使用寿命。长时间存放时取出电池包。",
+            "chunk_id": "DOC-002-C-00055",
+            "content": "2. 存放\nB2 需存放于干燥、阴凉的室内，避免日晒及雨淋，以免零部件锈蚀而缩短使用寿命。长时间存放时取出电池包。",
+            "content_preview": "2. 存放\nB2 需存放于干燥、阴凉的室内，避免日晒及雨淋，以免零部件锈蚀而缩短使用寿命。长时间存放时取出电池包。",
+            "document": "宇树_B2四足机器人用户手册_中文版.pdf",
+            "document_id": "DOC-002",
+            "matched_child_ids": [
+              "DOC-002-C-00055"
+            ],
+            "page_end": 18,
+            "page_start": 18,
+            "parent_chunk_id": "DOC-002-P-00047",
+            "parent_page_end": 18,
+            "parent_page_start": 18,
+            "product": "B2 四足机器人",
+            "rerank_score": 0.6735961530842496,
+            "score": 0.6735961530842496,
+            "section": "2. 存放",
+            "section_path": "2. 存放",
+            "vendor": "宇树科技"
+          },
+          {
+            "child_content": "- 保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 $40^{\\circ}$ C 的环境下。\n3. 切勿过充电池，否则将对电芯造成损害。\n4. 若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于 30%，请把电池充电到 70% 后再继续保存。以免电池过放而损坏电池。",
+            "chunk_id": "DOC-004-C-00027",
+            "content": "- 保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 $40^{\\circ}$ C 的环境下。\n3. 切勿过充电池，否则将对电芯造成损害。\n4. 若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于 30%，请把电池充电到 70% 后再继续保存。以免电池过放而损坏电池。",
+            "content_preview": "- 保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 $40^{\\circ}$ C 的环境下。\n3. 切勿过充电池，否则将对电芯造成损害。\n4. 若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于 30%，请把电池充电到 70% 后再继续保存。以免电池过放而损坏电池。",
+            "document": "宇树_B2电池与充电器使用说明_中文版.pdf",
+            "document_id": "DOC-004",
+            "matched_child_ids": [
+              "DOC-004-C-00027"
+            ],
+            "page_end": 11,
+            "page_start": 11,
+            "parent_chunk_id": "DOC-004-P-00023",
+            "parent_page_end": 11,
+            "parent_page_start": 11,
+            "product": "B2 电池与充电器",
+            "rerank_score": 0.5614031274296221,
+            "score": 0.5614031274296221,
+            "section": "- 保养",
+            "section_path": "- 保养",
+            "vendor": "宇树科技"
+          },
+          {
+            "child_content": "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+            "chunk_id": "DOC-001-C-00185",
+            "content": "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+            "content_preview": "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "matched_child_ids": [
+              "DOC-001-C-00185"
+            ],
+            "page_end": 86,
+            "page_start": 86,
+            "parent_chunk_id": "DOC-001-P-00183",
+            "parent_page_end": 86,
+            "parent_page_start": 86,
+            "product": "KIRA B 50",
+            "rerank_score": 0.560067711920892,
+            "score": 0.560067711920892,
+            "section": "每月一次",
+            "section_path": "每月一次",
+            "vendor": "卡赫"
+          },
+          {
+            "child_content": "KIRA B 50\nKIRA B 50\nZH\n",
+            "chunk_id": "DOC-001-C-00002",
+            "content": "KIRA B 50\nKIRA B 50\nZH\n",
+            "content_preview": "KIRA B 50\nKIRA B 50\nZH\n",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "matched_child_ids": [
+              "DOC-001-C-00002"
+            ],
+            "page_end": 1,
+            "page_start": 1,
+            "parent_chunk_id": "DOC-001-P-00002",
+            "parent_page_end": 1,
+            "parent_page_start": 1,
+            "product": "KIRA B 50",
+            "rerank_score": 0.5598047554877975,
+            "score": 0.5598047554877975,
+            "section": "KIRA B 50",
+            "section_path": "KIRA B 50",
+            "vendor": "卡赫"
+          }
+        ],
+        "parent_expand": true,
+        "queries": [
+          "KIRA B 50准备停用三个月再用，按手册长期存放时要注意哪些要求，蓄电池在存放前和存放期间怎么维护？"
+        ],
+        "question": "KIRA B 50准备停用三个月再用，按手册长期存放时要注意哪些要求，蓄电池在存放前和存放期间怎么维护？",
+        "reranked": [
+          {
+            "chunk_id": "DOC-002-C-00055",
+            "content": "2. 存放\nB2 需存放于干燥、阴凉的室内，避免日晒及雨淋，以免零部件锈蚀而缩短使用寿命。长时间存放时取出电池包。",
+            "content_preview": "2. 存放\nB2 需存放于干燥、阴凉的室内，避免日晒及雨淋，以免零部件锈蚀而缩短使用寿命。长时间存放时取出电池包。",
+            "document": "宇树_B2四足机器人用户手册_中文版.pdf",
+            "document_id": "DOC-002",
+            "page_end": 18,
+            "page_start": 18,
+            "parent_chunk_id": "DOC-002-P-00047",
+            "product": "B2 四足机器人",
+            "rerank_score": 0.6735961530842496,
+            "score": 0.6735961530842496,
+            "section": "2. 存放",
+            "section_path": "2. 存放",
+            "vendor": "宇树科技"
+          },
+          {
+            "chunk_id": "DOC-004-C-00027",
+            "content": "- 保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 $40^{\\circ}$ C 的环境下。\n3. 切勿过充电池，否则将对电芯造成损害。\n4. 若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于 30%，请把电池充电到 70% 后再继续保存。以免电池过放而损坏电池。",
+            "content_preview": "- 保养\n1. 切勿在温度过高或温度过低的环境下使用充电器对电池进行充电。\n2. 切勿将电池存储在室温超过 $40^{\\circ}$ C 的环境下。\n3. 切勿过充电池，否则将对电芯造成损害。\n4. 若较长时间不使用电池时，请定期检查电池剩余的电量，如果电量低于 30%，请把电池充电到 70% 后再继续保存。以免电池过放而损坏电池。",
+            "document": "宇树_B2电池与充电器使用说明_中文版.pdf",
+            "document_id": "DOC-004",
+            "page_end": 11,
+            "page_start": 11,
+            "parent_chunk_id": "DOC-004-P-00023",
+            "product": "B2 电池与充电器",
+            "rerank_score": 0.5614031274296221,
+            "score": 0.5614031274296221,
+            "section": "- 保养",
+            "section_path": "- 保养",
+            "vendor": "宇树科技"
+          },
+          {
+            "chunk_id": "DOC-001-C-00185",
+            "content": "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+            "content_preview": "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "page_end": 86,
+            "page_start": 86,
+            "parent_chunk_id": "DOC-001-P-00183",
+            "product": "KIRA B 50",
+            "rerank_score": 0.560067711920892,
+            "score": 0.560067711920892,
+            "section": "每月一次",
+            "section_path": "每月一次",
+            "vendor": "卡赫"
+          },
+          {
+            "chunk_id": "DOC-001-C-00002",
+            "content": "KIRA B 50\nKIRA B 50\nZH\n",
+            "content_preview": "KIRA B 50\nKIRA B 50\nZH\n",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "page_end": 1,
+            "page_start": 1,
+            "parent_chunk_id": "DOC-001-P-00002",
+            "product": "KIRA B 50",
+            "rerank_score": 0.5598047554877975,
+            "score": 0.5598047554877975,
+            "section": "KIRA B 50",
+            "section_path": "KIRA B 50",
+            "vendor": "卡赫"
+          },
+          {
+            "chunk_id": "DOC-001-C-00180",
+            "content": "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+            "content_preview": "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "page_end": 85,
+            "page_start": 85,
+            "parent_chunk_id": "DOC-001-P-00178",
+            "product": "KIRA B 50",
+            "rerank_score": 0.5136494390264027,
+            "score": 0.5136494390264027,
+            "section": "存放",
+            "section_path": "存放",
+            "vendor": "卡赫"
+          },
+          {
+            "chunk_id": "DOC-001-C-00184",
+            "content": "每周\n1. 使用湿微纤维抹布清洁传感器 如有必要，请额外使用玻璃清洁剂\n2. ## 定期使用时，至少每周给蓄电池完全充电一次并且没有间断",
+            "content_preview": "每周\n1. 使用湿微纤维抹布清洁传感器 如有必要，请额外使用玻璃清洁剂\n2. ## 定期使用时，至少每周给蓄电池完全充电一次并且没有间断",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "page_end": 86,
+            "page_start": 86,
+            "parent_chunk_id": "DOC-001-P-00182",
+            "product": "KIRA B 50",
+            "rerank_score": 0.5059382458996127,
+            "score": 0.5059382458996127,
+            "section": "每周",
+            "section_path": "每周",
+            "vendor": "卡赫"
+          },
+          {
+            "chunk_id": "DOC-001-C-00023",
+            "content": "蓄电池\n本设备内置锂离子蓄电池 这些电池需遵守特殊标准 只有卡赫的客户服务部门或专业人员才能对有缺陷的电池进行拆卸和安装以及测试\n关于存放和运输的说明，请联系卡赫的客户服务部门获取\n危险\n不允许对设备进行改造和改动\n\n不得打开蓄电池，有发生短路的危险 此外，刺激性蒸气或腐蚀性液体可能会泄漏\n蓄电池不得承受强光辐射 受热及火烤 有爆炸危险\n不得在有爆炸危险的环境中使用充电器\n请勿在脏污或潮湿状态下使用充电器\n在充电过程中确保足够的通风\n爆炸危险 请勿在电池附近或电池充电室中使用明火，产生火花或抽烟\n爆炸危险 不要把任何工具或类似的东西放在电池上，即放在端极和电池接线上",
+            "content_preview": "蓄电池\n本设备内置锂离子蓄电池 这些电池需遵守特殊标准 只有卡赫的客户服务部门或专业人员才能对有缺陷的电池进行拆卸和安装以及测试\n关于存放和运输的说明，请联系卡赫的客户服务部门获取\n危险\n不允许对设备进行改造和改动\n\n不得打开蓄电池，有发生短路的危险 此外，刺激性蒸气或腐蚀性液体可能会泄漏\n蓄电池不得承受强光辐射 受热及火烤 有爆炸危险\n不得在有爆炸危险的环境中使用充电器\n请勿在脏污或潮湿状态下使用充电器\n在充电过程中确保足够的通风\n",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "page_end": 10,
+            "page_start": 9,
+            "parent_chunk_id": "DOC-001-P-00023",
+            "product": "KIRA B 50",
+            "rerank_score": 0.48093889275025203,
+            "score": 0.48093889275025203,
+            "section": "蓄电池",
+            "section_path": "蓄电池",
+            "vendor": "卡赫"
+          },
+          {
+            "chunk_id": "DOC-004-C-00001",
+            "content": "B2 电池&充电器\n使用手册 V1.0",
+            "content_preview": "B2 电池&充电器\n使用手册 V1.0",
+            "document": "宇树_B2电池与充电器使用说明_中文版.pdf",
+            "document_id": "DOC-004",
+            "page_end": 1,
+            "page_start": 1,
+            "parent_chunk_id": "DOC-004-P-00001",
+            "product": "B2 电池与充电器",
+            "rerank_score": 0.471906033374953,
+            "score": 0.471906033374953,
+            "section": "B2 电池&充电器",
+            "section_path": "B2 电池&充电器",
+            "vendor": "宇树科技"
+          },
+          {
+            "chunk_id": "DOC-004-C-00026",
+            "content": "- 存储和运输\n1. 不使用电池包时，请将电池包从机器人中取出并存放在儿童接触不到的地方。\n2. 禁止将电池包放在靠近热源的地方，比如阳光直射或热天的车内、火源或加热炉。电池包理想保存温度为 $20^{\\circ}$ C- $25^{\\circ}$ C，电池包理想保存环境湿度：45%-75%。\n3. 储存时，请注意确保电池周边的环境散热良好，没有杂物等易燃易爆物品。\n4. 存放电池包的环境应保持干燥。请勿将电池包置于水中或者可能会漏水的地方。\n5. 禁止机械撞击、碾压、刺穿电池包，禁止将电池包跌落或人为短路。\n6. 禁止将电池包与眼镜、手表、金属项链、发夹或者其他金属物体一起贮藏或运输。\n7. 切勿运输有破损的电池包。一旦需要运输电池包，务必将电池包放电至 $65\\%$ 电量左右。\n8. 切勿将电池包彻底放完电后长时间存储，以避免电池包进入过放状态，造成电芯损坏，将无法恢复使用。",
+            "content_preview": "- 存储和运输\n1. 不使用电池包时，请将电池包从机器人中取出并存放在儿童接触不到的地方。\n2. 禁止将电池包放在靠近热源的地方，比如阳光直射或热天的车内、火源或加热炉。电池包理想保存温度为 $20^{\\circ}$ C- $25^{\\circ}$ C，电池包理想保存环境湿度：45%-75%。\n3. 储存时，请注意确保电池周边的环境散热良好，没有杂物等易燃易爆物品。\n4. 存放电池包的环境应保持干燥。请勿将电池包置于水中或者可能会漏水的",
+            "document": "宇树_B2电池与充电器使用说明_中文版.pdf",
+            "document_id": "DOC-004",
+            "page_end": 11,
+            "page_start": 11,
+            "parent_chunk_id": "DOC-004-P-00022",
+            "product": "B2 电池与充电器",
+            "rerank_score": 0.4707702361945202,
+            "score": 0.4707702361945202,
+            "section": "- 存储和运输",
+            "section_path": "- 存储和运输",
+            "vendor": "宇树科技"
+          },
+          {
+            "chunk_id": "DOC-001-C-00024",
+            "content": "警告\n每次使用前，请检查设备和电源线是否损坏 不要再使用损坏的设备，损坏的部件只能由专业人员进行维修让儿童远离电池和充电器\n不要给损坏的电池充电 请卡赫客户服务部更换损坏的电池\n不要把损坏的电池扔到家庭垃圾中 应告知卡赫客户服务部\n避免与从损坏电池溢出的液体接触 在意外接触的情况下，用清水冲洗液体 如果接触到眼睛，还应就医\n小心\n请务必遵守这些使用说明 处理蓄电池时，遵守立法机构的建议\n电源电压必须与充电器铭牌上规定的电压一致\n只能将蓄电池用于本设备 禁止将其用于其他目的，这是危险行为",
+            "content_preview": "警告\n每次使用前，请检查设备和电源线是否损坏 不要再使用损坏的设备，损坏的部件只能由专业人员进行维修让儿童远离电池和充电器\n不要给损坏的电池充电 请卡赫客户服务部更换损坏的电池\n不要把损坏的电池扔到家庭垃圾中 应告知卡赫客户服务部\n避免与从损坏电池溢出的液体接触 在意外接触的情况下，用清水冲洗液体 如果接触到眼睛，还应就医\n小心\n请务必遵守这些使用说明 处理蓄电池时，遵守立法机构的建议\n电源电压必须与充电器铭牌上规定的电压一致\n只能将蓄",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "page_end": 10,
+            "page_start": 10,
+            "parent_chunk_id": "DOC-001-P-00024",
+            "product": "KIRA B 50",
+            "rerank_score": 0.41845570354489736,
+            "score": 0.41845570354489736,
+            "section": "警告",
+            "section_path": "警告",
+            "vendor": "卡赫"
+          },
+          {
+            "chunk_id": "DOC-001-C-00042",
+            "content": "质量保证\nX\n请勿将电池扔进垃圾桶\n我们的主管销售公司所发布的质量保证条件在每个国家均适用 在质量保证期内，如果您的产品发生了任何故障，我们都将为您提供免费维修，但是这种故障应当是由于机身材料或制造上的缺陷造成的 如属质量保证情况，请凭发票联系贵方经销商或就近联系获得授权的客户服务点\n（地址详见背面 ）",
+            "content_preview": "质量保证\nX\n请勿将电池扔进垃圾桶\n我们的主管销售公司所发布的质量保证条件在每个国家均适用 在质量保证期内，如果您的产品发生了任何故障，我们都将为您提供免费维修，但是这种故障应当是由于机身材料或制造上的缺陷造成的 如属质量保证情况，请凭发票联系贵方经销商或就近联系获得授权的客户服务点\n（地址详见背面 ）",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "page_end": 15,
+            "page_start": 14,
+            "parent_chunk_id": "DOC-001-P-00042",
+            "product": "KIRA B 50",
+            "rerank_score": 0.3521687782164078,
+            "score": 0.3521687782164078,
+            "section": "质量保证",
+            "section_path": "质量保证",
+            "vendor": "卡赫"
+          },
+          {
+            "chunk_id": "DOC-001-C-00108",
+            "content": "给蓄电池充电\n结合对接站运行时，蓄电池自动充电\n不含对接站：\n1. 打开设备舱的门\n1 2\n充电线设备舱的门\n\na. 拉出充电线<sub>。</sub>\nb. 如果设备不带充电线，将带有冷连接器的电源线插入对接端口上的电源插口\n1 电源插口2 对接端口\n2. 将充电线的电源插头插入插座充电过程自动进行。在触摸屏上显示充电状态。在充电过程中不得使用设备。当蓄电池完全放电时，充电过程大约需要8小时\n3. 充电过程结束之后，从插座中拔下电源插头\n4. 将电源线存放在设备舱内，或从对接端口中拔下电源线",
+            "content_preview": "给蓄电池充电\n结合对接站运行时，蓄电池自动充电\n不含对接站：\n1. 打开设备舱的门\n1 2\n充电线设备舱的门\n\na. 拉出充电线<sub>。</sub>\nb. 如果设备不带充电线，将带有冷连接器的电源线插入对接端口上的电源插口\n1 电源插口2 对接端口\n2. 将充电线的电源插头插入插座充电过程自动进行。在触摸屏上显示充电状态。在充电过程中不得使用设备。当蓄电池完全放电时，充电过程大约需要8小时\n3. 充电过程结束之后，从插座中拔下电源",
+            "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "document_id": "DOC-001",
+            "page_end": 37,
+            "page_start": 36,
+            "parent_chunk_id": "DOC-001-P-00107",
+            "product": "KIRA B 50",
+            "rerank_score": 0.33233607004058907,
+            "score": 0.33233607004058907,
+            "section": "给蓄电池充电",
+            "section_path": "给蓄电池充电",
+            "vendor": "卡赫"
+          }
+        ],
+        "status": "completed"
+      },
+      "stages": [
+        {
+          "duration_ms": 0.007,
+          "end_time": "2026-10-20T10:59:39.096606+00:00",
+          "parent": null,
+          "stage_name": "query_processing",
+          "start_time": "2026-10-20T10:59:39.096594+00:00"
+        },
+        {
+          "duration_ms": 0.004,
+          "end_time": "2026-10-20T10:59:39.250550+00:00",
+          "parent": "retrieval",
+          "stage_name": "metadata_filter",
+          "start_time": "2026-10-20T10:59:39.250533+00:00"
+        },
+        {
+          "duration_ms": 306.483,
+          "end_time": "2026-10-20T10:59:39.557079+00:00",
+          "parent": "vector_search",
+          "stage_name": "query_embedding",
+          "start_time": "2026-10-20T10:59:39.250592+00:00"
+        },
+        {
+          "duration_ms": 2.697,
+          "end_time": "2026-10-20T10:59:39.559784+00:00",
+          "parent": "vector_search",
+          "stage_name": "faiss_search",
+          "start_time": "2026-10-20T10:59:39.557094+00:00"
+        },
+        {
+          "duration_ms": 309.92,
+          "end_time": "2026-10-20T10:59:39.560509+00:00",
+          "parent": "retrieval",
+          "stage_name": "vector_search",
+          "start_time": "2026-10-20T10:59:39.250584+00:00"
+        },
+        {
+          "duration_ms": 8.205,
+          "end_time": "2026-10-20T10:59:39.568723+00:00",
+          "parent": "retrieval",
+          "stage_name": "bm25",
+          "start_time": "2026-10-20T10:59:39.560518+00:00"
+        },
+        {
+          "duration_ms": 0.037,
+          "end_time": "2026-10-20T10:59:39.568775+00:00",
+          "parent": "retrieval",
+          "stage_name": "hybrid_fusion",
+          "start_time": "2026-10-20T10:59:39.568736+00:00"
+        },
+        {
+          "duration_ms": 490.584,
+          "end_time": "2026-10-20T10:59:40.059445+00:00",
+          "parent": "retrieval",
+          "stage_name": "rerank",
+          "start_time": "2026-10-20T10:59:39.568862+00:00"
+        },
+        {
+          "duration_ms": 4.905,
+          "end_time": "2026-10-20T10:59:40.064367+00:00",
+          "parent": "retrieval",
+          "stage_name": "parent_expand",
+          "start_time": "2026-10-20T10:59:40.059480+00:00"
+        },
+        {
+          "duration_ms": 856.414,
+          "end_time": "2026-10-20T10:59:40.065528+00:00",
+          "parent": null,
+          "stage_name": "retrieval",
+          "start_time": "2026-10-20T10:59:39.209106+00:00"
+        },
+        {
+          "duration_ms": 10.191,
+          "end_time": "2026-10-20T10:59:40.075757+00:00",
+          "parent": null,
+          "stage_name": "context_build",
+          "start_time": "2026-10-20T10:59:40.065583+00:00"
+        },
+        {
+          "duration_ms": 6320.11,
+          "end_time": "2026-10-20T10:59:46.396321+00:00",
+          "parent": null,
+          "stage_name": "generation",
+          "start_time": "2026-10-20T10:59:40.076027+00:00"
+        }
+      ],
+      "timing_semantics": {
+        "generation_includes_ttft": true,
+        "stages_are_nested_not_additive": true,
+        "ttft": "request_to_first_content"
+      },
+      "timing_unit": "ms",
+      "token_usage": {
+        "auxiliary_queries": [],
+        "generation": {
+          "call_started_at": "2026-10-20T10:59:40.076795+00:00",
+          "completion_tokens": 1060,
+          "completion_tokens_details": {
+            "reasoning_tokens": 691
+          },
+          "latency_ms": 6319,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 717,
+          "prompt_tokens": 717,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "provider": "DeepSeek",
+          "request_sha256": "c0ef702635ca93901944588868e62ba55c4abff62e6a799d917107809021990f",
+          "requested_model": "deepseek-v4-flash",
+          "status": "ok",
+          "total_tokens": 1777
+        }
+      },
+      "ttft_ms": 4550
+    },
+    "phase_windows": {
+      "generation": {
+        "run_id": "EVAL-20261020105804727444",
+        "started_at": 1792493979.093492
+      },
+      "judge": {
+        "run_id": "EVAL-20261020105804727444",
+        "started_at": 1792493986.422427
+      }
+    }
+  }
+}

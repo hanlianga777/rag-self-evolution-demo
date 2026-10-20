@@ -1,3 +1,9 @@
+## 2026-10-20 · Baseline3/50中断与证据角色修复
+
+- 真实Q04引用在候选而非Final，另一次遗漏issue无答案原句；新增严格FAIL-only遗漏规范证据关联，不能为PASS借用候选或全库材料。新Parser `business-output-3-evidence-roles`，原响应和Final身份保留；模型/Prompt/Guard/Gate不变。
+- Provider、评分、诊断一致传实际候选并保存证据阶段；旧Partial版本失效标识与前端fresh入口同步。发现真实Run仍为V2旧进程，已备份、无活动任务后重载，未续跑。
+- 真实响应离线复现、20份扫描、273后端/前端回归、200条与历史保护详见[修复报告](BASELINE50_INTERRUPTION_FIX_REPORT.md)。Provider0，原3题保留，必须新身份运行。
+
 ## 2026-10-20 · 输出合同兼容收口与Baseline50准备
 
 - 新增版本化的保守辅助范围分类：仅接收能从原问题有限句式明确重建、且不是Golden参考要求的非断言范围回声；未知、必要事实和安全行为仍严格校验。修复保存真实控制的空引用辅助项，不修改原响应、Judge V3 Prompt或Guard规则。

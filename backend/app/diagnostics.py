@@ -307,7 +307,7 @@ def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     trace=(case.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
     if trace.get('status') != 'completed' or any(not isinstance(trace.get(k),list) for k in ('candidates','final')):return result
     judge=case.get('judge_result') or {}
-    try:validate_business_judgment(judge,case.get('model_answer',''),trace['final'],category=case.get('test_category'),question=case.get('question'),reference=case.get('reference_answer'))
+    try:validate_business_judgment(judge,case.get('model_answer',''),trace['final'],category=case.get('test_category'),question=case.get('question'),reference=case.get('reference_answer'),candidates=trace.get('candidates'))
     except ValueError:return result
     if corpus_chunks is None:corpus_chunks,corpus_fingerprint=_current_corpus(trace)
     if not corpus_fingerprint or trace.get('corpus_fingerprint') != corpus_fingerprint:return result

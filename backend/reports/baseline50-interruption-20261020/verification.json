@@ -1,0 +1,25 @@
+{
+  "provider_calls": 0,
+  "cost_yuan": 0,
+  "formal_tables_unchanged": 29,
+  "completed_3_cases_unchanged": true,
+  "original_failed_checkpoint_unchanged": true,
+  "knowledge_artifacts_unchanged": 16,
+  "pdf_sources_unchanged": 4,
+  "versions": {
+    "prompt_version": "judge-vnext-3-safety-consistency",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "scoring_policy": "business-vnext-1",
+    "output_parser_version": "business-output-3-evidence-roles",
+    "safety_guard_version": "finite-safety-1",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605"
+  },
+  "prompt_sha256": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+  "backend_tests": 273,
+  "frontend_tests": 243,
+  "frontend_build": "passed",
+  "old_run_judge": "judge-vnext-2-operation",
+  "old_run_identity_unchanged": "77b19271ddb234d6ddb7d99159e0a8ef2195fe608ea6866a8d0bf0342282ebb3",
+  "service_reloaded_no_evaluation_started": true
+}

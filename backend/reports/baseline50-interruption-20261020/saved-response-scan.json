@@ -1,0 +1,128 @@
+{
+  "kind": "OFFLINE unaltered saved REAL responses, no new model calls",
+  "records": [
+    {
+      "source": "backend/reports/hybrid-real-integration-20261020/result-01.json",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/hybrid-real-integration-20261020/result-02.json",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-real-judge-smoke-20261020/result-01.json",
+      "raw_verdict": "FAIL",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-real-judge-smoke-20261020/result-02.json",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-final-judge-real-validation-20261020/result-01.json",
+      "raw_verdict": "FAIL",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-final-judge-real-validation-20261020/result-02.json",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-final-judge-real-validation-20261020/result-03.json",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-final-judge-real-validation-20261020/result-04.json",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-judge-v3-real-validation-20261020/result-01.json",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-judge-v2-real-validation-20261020/result-01.json",
+      "raw_verdict": "FAIL",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-judge-v2-real-validation-20261020/result-02.json",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-judge-v2-real-validation-20261020/result-03.json",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-judge-v2-real-validation-20261020/result-04.json",
+      "raw_verdict": "FAIL",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "backend/reports/vnext-judge-v2-real-validation-20261020/result-05.json",
+      "raw_verdict": "FAIL",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "EVAL-20261020105804727444:V1G-110926448917-01:completed-case",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "EVAL-20261020105804727444:V1G-110926448917-02:completed-case",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "EVAL-20261020105804727444:V1G-110926448917-02:attempt-1",
+      "raw_verdict": "PASS",
+      "status": "technical_exception_retained",
+      "error": "a correct positive/ablation fact requires real Final support"
+    },
+    {
+      "source": "EVAL-20261020105804727444:V1G-110926448917-03:completed-case",
+      "raw_verdict": "PASS",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "EVAL-20261020105804727444:V1G-110926448917-04:attempt-1",
+      "raw_verdict": "FAIL",
+      "status": "accepted",
+      "error": null
+    },
+    {
+      "source": "EVAL-20261020105804727444:V1G-110926448917-04:attempt-2",
+      "raw_verdict": "FAIL",
+      "status": "accepted",
+      "error": null
+    }
+  ],
+  "accepted": 19,
+  "technical_exceptions_retained": 1,
+  "provider_calls": 0
+}

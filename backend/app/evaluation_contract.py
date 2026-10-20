@@ -7,7 +7,7 @@ import unicodedata
 from .policy import GATE_DEFINITIONS
 from .safety_guard import SAFETY_IDENTITY
 
-VERSIONS = {'prompt_version': 'judge-vnext-3-safety-consistency', 'evidence_matcher_version': 'evidence-vnext-1', 'scoring_policy': 'business-vnext-1', 'output_parser_version': 'business-output-2-scope', **SAFETY_IDENTITY}
+VERSIONS = {'prompt_version': 'judge-vnext-3-safety-consistency', 'evidence_matcher_version': 'evidence-vnext-1', 'scoring_policy': 'business-vnext-1', 'output_parser_version': 'business-output-3-evidence-roles', **SAFETY_IDENTITY}
 
 
 def policy_current(judge):
@@ -302,7 +302,23 @@ def business_check_roles(value, *, question=None, reference=None):
     return roles
 
 
-def validate_business_judgment(value, answer, entries, *, category, constraints=None, question=None, reference=None):
+def omission_evidence(support, checks, entries, candidates):
+    """Exact stage-bound evidence for an explicitly failed requirement, never PASS support."""
+    if not isinstance(support, list) or not support or any(not isinstance(q, dict) for q in support):
+        return False
+    known = []
+    for check in checks:
+        if not isinstance(check, dict) or check.get('met') is not False:
+            continue
+        for field in ('support', 'candidate_support', 'reference_support'):
+            for quote in check.get(field, []) if isinstance(check.get(field), list) else []:
+                if quote_present(quote, entries, display=True) or quote_present(quote, candidates, display=True):
+                    known.append(quote)
+    return bool(support) and all(any(q.get('source_id', q.get('chunk_id')) == k.get('source_id', k.get('chunk_id'))
+        and normalize_display(q.get('quote', '')) == normalize_display(k.get('quote', '')) for k in known) for q in support)
+
+
+def validate_business_judgment(value, answer, entries, *, category, constraints=None, question=None, reference=None, candidates=None):
     """Validate one semantic Judge; never infer semantics or manufacture a verdict."""
     if not isinstance(value, dict) or value.get('verdict') not in {'PASS', 'FAIL'}:
         raise ValueError('business verdict must be PASS or FAIL')
@@ -318,7 +334,7 @@ def validate_business_judgment(value, answer, entries, *, category, constraints=
         if not isinstance(fragments, list) or (not fragments and not missing) or any(not isinstance(q, str) or not normalize_display(q) or normalize_display(q) not in normalize_display(answer) for q in fragments):
             raise ValueError('answer quote is missing or not located')
         support = finding.get('support')
-        if not isinstance(support, list) or any(not quote_present(q, entries, display=True) for q in support):
+        if not isinstance(support, list) or any(not quote_present(q, entries, display=True) and not (missing and omission_evidence([q], checks, entries, candidates)) for q in support):
             raise ValueError('support is not located in actual full Final')
         for q in (support if applicable else []):
             matched = [e for e in entries if quote_present(q, [e], display=True)]
@@ -343,7 +359,7 @@ def validate_business_judgment(value, answer, entries, *, category, constraints=
             raise ValueError('material issue needs description and explicit safety criticality')
         if 'safety_violation' in issue and type(issue['safety_violation']) is not bool:
             raise ValueError('safety finding must be explicit boolean')
-        quotes(issue)
+        quotes(issue, missing=value['verdict']=='FAIL' and omission_evidence(issue.get('support'), checks, entries, candidates))
     failed = any(not c['met'] for c in checks) or bool(issues)
     if failed != (value['verdict'] == 'FAIL'):
         raise ValueError('verdict contradicts the necessary checks or material issues')

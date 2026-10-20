@@ -81,10 +81,11 @@ export function EvaluationPage({ data }: { data: any; navigate?: (page: any) => 
     finally { setHistoryBusy(false); }
   };
 
+  const canResume = ["partial", "failed"].includes(run.status) && !run.requires_policy_upgrade;
   const start = async () => {
     setBusy(true); setError("");
     try {
-      await operation.startEvaluation("Baseline Evaluation", async () => { const started: Row = await postJson("/api/evaluations/run"); setRun(started); return started as { id: string }; });
+      await operation.startEvaluation("Baseline Evaluation", async () => { const started: Row = await postJson("/api/evaluations/run", run.requires_policy_upgrade ? { fresh: true } : undefined); setRun(started); return started as { id: string }; });
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusy(false); }
   };
@@ -111,7 +112,7 @@ export function EvaluationPage({ data }: { data: any; navigate?: (page: any) => 
   const stale = data.workspace?.requires_new_golden || data.workspace?.requires_new_baseline && (completed || data.workspace?.current_golden_id && snapshot.id !== data.workspace.current_golden_id);
 
 
-  return <PageShell className="page evaluation-page" header={<div className="page-title"><div><h1>Baseline</h1><p>用冻结 Golden 评测当前版本，识别质量门槛、单题失败及可优化问题。</p></div><button className="secondary" disabled={busy || ["queued","running"].includes(run.status) || data.workspace?.requires_new_golden === true} onClick={() => setPaid({ title: ["partial","failed"].includes(run.status) ? "恢复 Baseline 断点评测" : "完整真实 Baseline 重评", description: ["partial","failed"].includes(run.status) ? `已完成 ${result.completed ?? cases.length}/${result.total ?? snapshot.question_ids?.length ?? "未采集"}；复用已完成结果与保存回答，仅处理缺失请求。每阶段最多3次尝试、600秒；Unknown请求停止，成功回答复用。` : `Golden ${snapshot.question_ids?.length ?? "未采集"} 题；每题生成回答及Judge，另含检索/改写调用。每阶段最多3次尝试、600秒，新评测保留历史结果。`, execute: () => void start() })}><Play size={15} />{run.status === "completed" ? "重新运行 Baseline" : ["queued","running"].includes(run.status) ? "后台评测进行中" : ["partial","failed"].includes(run.status) ? "恢复 Baseline" : "运行 Baseline 评测"}</button></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>Hard Gate</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
+  return <PageShell className="page evaluation-page" header={<div className="page-title"><div><h1>Baseline</h1><p>用冻结 Golden 评测当前版本，识别质量门槛、单题失败及可优化问题。</p></div><button className="secondary" disabled={busy || ["queued","running"].includes(run.status) || data.workspace?.requires_new_golden === true} onClick={() => setPaid({ title: canResume ? "恢复 Baseline 断点评测" : "完整真实 Baseline 重评", description: canResume ? `已完成 ${result.completed ?? cases.length}/${result.total ?? snapshot.question_ids?.length ?? "未采集"}；复用已完成结果与保存回答，仅处理缺失请求。每阶段最多3次尝试、600秒；Unknown请求停止，成功回答复用。` : `Golden ${snapshot.question_ids?.length ?? "未采集"} 题；每题生成回答及Judge，另含检索/改写调用。每阶段最多3次尝试、600秒，新评测保留历史结果。`, execute: () => void start() })}><Play size={15} />{run.status === "completed" ? (run.requires_policy_upgrade ? "重新运行 Baseline（新版本）" : "重新运行 Baseline") : ["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.requires_policy_upgrade ? "重新运行 Baseline（新版本）" : "运行 Baseline 评测"}</button></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>Hard Gate</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
 
     <ProviderAuthorization request={paid} onClose={() => setPaid(null)} />
 

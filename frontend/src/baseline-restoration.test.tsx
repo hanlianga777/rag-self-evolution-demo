@@ -45,3 +45,17 @@ it("shows Partial progress and timeout without calling it unrun or identity stal
   expect(document.body.textContent).not.toContain("尚未运行 Baseline");
   expect(document.body.textContent).not.toContain("历史评测 · 当前身份已失效");
 });
+
+it("offers a fresh versioned run for an incompatible partial baseline", async () => {
+  const run={id:"old",status:"partial",requires_policy_upgrade:true,result:{completed:3,total:50},dataset_snapshot:{question_ids:["q"]},cases:[]};
+  vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url.endsWith("/api/bad-cases")?[]:run))));
+  await render(<EvaluationPage data={{evaluation:run}}/>);
+  expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("重新运行 Baseline（新版本）"))).toBe(true);
+});
+
+it("also labels the historical completed baseline as a new-version rerun", async () => {
+  const run={id:"old-completed",status:"completed",requires_policy_upgrade:true,result:{completed:50},dataset_snapshot:{question_ids:["q"]},cases:[]};
+  vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url.endsWith("/api/bad-cases")?[]:run))));
+  await render(<EvaluationPage data={{evaluation:run}}/>);
+  expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("重新运行 Baseline（新版本）"))).toBe(true);
+});
