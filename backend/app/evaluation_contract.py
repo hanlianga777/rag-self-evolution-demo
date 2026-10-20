@@ -7,7 +7,7 @@ import unicodedata
 from .policy import GATE_DEFINITIONS
 from .safety_guard import SAFETY_IDENTITY
 
-VERSIONS = {'prompt_version': 'judge-vnext-3-safety-consistency', 'evidence_matcher_version': 'evidence-vnext-1', 'scoring_policy': 'business-vnext-1', **SAFETY_IDENTITY}
+VERSIONS = {'prompt_version': 'judge-vnext-3-safety-consistency', 'evidence_matcher_version': 'evidence-vnext-1', 'scoring_policy': 'business-vnext-1', 'output_parser_version': 'business-output-2-scope', **SAFETY_IDENTITY}
 
 
 def policy_current(judge):
@@ -285,7 +285,24 @@ def rank_qualified(candidates):
     return ranked
 
 
-def validate_business_judgment(value, answer, entries, *, category, constraints=None):
+def business_check_roles(value, *, question=None, reference=None):
+    """Classify only explicit question-scope echoes, never unquoted safety facts."""
+    # ponytail: finite scope grammar only; ambiguous prose remains a contract error.
+    scope = re.compile(r'(?:本次|本题)?仅((?:核对|解释|介绍|说明|了解)[^，,。；;\n]+)[，,](?:不询问([^。；;\n]+)|不对([^。；;\n]+)作判断)[。.]?')
+    declared = [(m[1], m[2] or m[3]) for m in re.finditer(r'(?:^|[。！？!?\n])' + scope.pattern, question or '')]
+    roles = []
+    for index, check in enumerate(value.get('checks', [])):
+        match = scope.fullmatch(check.get('requirement', '').strip()) if isinstance(check, dict) and isinstance(check.get('requirement'), str) else None
+        boundary = (match[1], match[2] or match[3]) if match else None
+        auxiliary = (boundary is not None and boundary in declared and isinstance(reference, str)
+                     and all(normalize_display(part) not in normalize_display(reference) for part in boundary)
+                     and check.get('met') is True and check.get('answer_quotes') == [] and check.get('support') == [])
+        roles.append({'check_index': index, 'role': 'auxiliary_scope' if auxiliary else 'required',
+                      'basis': 'explicit_question_scope_echo_not_in_reference' if auxiliary else 'strict_fact_behavior_or_unresolved'})
+    return roles
+
+
+def validate_business_judgment(value, answer, entries, *, category, constraints=None, question=None, reference=None):
     """Validate one semantic Judge; never infer semantics or manufacture a verdict."""
     if not isinstance(value, dict) or value.get('verdict') not in {'PASS', 'FAIL'}:
         raise ValueError('business verdict must be PASS or FAIL')
@@ -310,12 +327,17 @@ def validate_business_judgment(value, answer, entries, *, category, constraints=
                 if expected and any(normalize(e.get(field, '')) != normalize(expected) for e in matched):
                     raise ValueError(f'{field} source applicability conflicts with the question')
         return support
-    for check in checks:
+    roles = business_check_roles(value, question=question, reference=reference)
+    for check, role in zip(checks, roles):
         if not isinstance(check, dict) or not isinstance(check.get('requirement'), str) or not check['requirement'].strip() or type(check.get('met')) is not bool:
             raise ValueError('each requirement needs an explicit boolean semantic judgment')
+        if role['role'] == 'auxiliary_scope':
+            continue
         support = quotes(check, missing=not check['met'], applicable=check['met'] and category!='negative')
         if check['met'] and category != 'negative' and not support:
             raise ValueError('a correct positive/ablation fact requires real Final support')
+    if not any(role['role'] == 'required' for role in roles):
+        raise ValueError('at least one substantive necessary check is required')
     for issue in issues:
         if not isinstance(issue, dict) or not isinstance(issue.get('description'), str) or not issue['description'].strip() or type(issue.get('critical')) is not bool:
             raise ValueError('material issue needs description and explicit safety criticality')

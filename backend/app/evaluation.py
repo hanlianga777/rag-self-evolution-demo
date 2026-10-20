@@ -8,7 +8,7 @@ import math
 from .telemetry import collect_usage
 from .safety_guard import check_safety, adjudicate
 from statistics import mean
-from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, validate_business_judgment
+from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, validate_business_judgment, business_check_roles
 
 from .policy import DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate
 
@@ -287,7 +287,7 @@ class EvaluationRunner:
         from .retrieval import evidence_coverage
         trace = execution.get('retrieval_trace') or {}
         try:
-            validate_business_judgment(judge, execution['answer'], trace.get('final'), category=item['test_category'], constraints=item.get('raw'))
+            validate_business_judgment(judge, execution['answer'], trace.get('final'), category=item['test_category'], constraints=item.get('raw'), question=item['question'], reference=expected)
             quality = judge['quality']
             if not isinstance(quality,dict):raise ValueError('quality metrics must be an object')
             if (type(quality.get('correctness')) is not int or not 0 <= quality['correctness'] <= 4
@@ -304,7 +304,9 @@ class EvaluationRunner:
         metrics={k:execution.get(k) for k in ('latency_ms','ttft_ms','input_tokens','output_tokens','provider_cost','stages','token_usage','estimated_cost','cost_estimation')}
         retrieved=[c for e in execution.get('retrieval',[]) for c in e.get('matched_child_ids',[e.get('chunk_id')])]
         matching=[i+1 for i,c in enumerate(retrieved) if c in required]
-        sufficient=None if item['test_category']=='negative' else all(check['support'] for check in judge['checks'])
+        roles=business_check_roles(judge,question=item['question'],reference=expected)
+        metrics['judge_check_roles']=roles
+        sufficient=None if item['test_category']=='negative' else all(check['support'] for check,role in zip(judge['checks'],roles) if role['role']=='required')
         metrics.update(retrieval_hit=bool(matching) if required else None,retrieval_precision=len(matching)/len(retrieved)*100 if required and retrieved else None,retrieval_rank=matching[0] if matching else None,retrieval_trace=trace,evidence_coverage=coverage,
             behavior_contract={'effective_pass':passed,'raw_judge_pass':judge['verdict']=='PASS','violations':judge['issues']},
             evidence_sufficiency={'status':'not_applicable' if sufficient is None else 'sufficient' if sufficient else 'insufficient','sufficient':sufficient,'source_constraints':{k:item.get('raw',{}).get(k) for k in ('product','product_scope','entity','version','source_reference','source_document_id','expected_response')},'facts':judge['checks'],'version':VERSIONS['evidence_matcher_version']},

@@ -241,7 +241,7 @@ class DeepSeekProvider:
             if text.startswith('```json\n') and text.endswith('\n```'):
                 text=text[8:-4];recovery='markdown_fence'
             result=json.loads(text)
-            validate_business_judgment(result,answer,context.get('final_context'),category=context.get('category'),constraints=context.get('source_constraints'))
+            validate_business_judgment(result,answer,context.get('final_context'),category=context.get('category'),constraints=context.get('source_constraints'),question=question,reference=expected)
             for issue in result['issues']:
                 if context.get('baseline_findings') is not None and 'baseline_issue_index' not in issue:
                     raise ValueError('missing baseline issue semantic correspondence')

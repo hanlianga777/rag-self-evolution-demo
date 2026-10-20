@@ -1,3 +1,9 @@
+## 2026-10-20 · 输出合同兼容收口与Baseline50准备
+
+- 新增版本化的保守辅助范围分类：仅接收能从原问题有限句式明确重建、且不是Golden参考要求的非断言范围回声；未知、必要事实和安全行为仍严格校验。修复保存真实控制的空引用辅助项，不修改原响应、Judge V3 Prompt或Guard规则。
+- Provider、共享评分与诊断透传原问题/参考要求；评分器排除已核清辅助项的空support并记录check角色，避免原始Judge与最终评分证据状态冲突。Parser `business-output-2-scope`纳入新Identity，不回填历史。
+- 保持11 Gate、Regression/Qualification/Agent、Generation、知识与历史数据；技术错误不造业务FAIL。零Provider离线统一验收、200条显式响应及Baseline50预算见[集中报告](RAG_EVALUATION_CONTRACT_CLOSEOUT_REPORT.md)。不再默认追加单题真实测试；正式Baseline仍须Owner新授权。
+
 ## 2026-10-20 · 有限Safety Guard与混合风险裁决
 
 - 复用Judge V3、Matcher和既有结果结构，初版增加独立KIRA B 50清洁剂成分禁令规则，可信完整Child内容SHA/手册身份+有限裸指令语法共同确认违规。明确引用撤回、条件或复杂否定无法可靠解析时保守处理，不用题号特判或关键词直接赋业务结果。

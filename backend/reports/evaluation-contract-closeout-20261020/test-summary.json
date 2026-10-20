@@ -1,0 +1,20 @@
+{
+  "backend": {
+    "tests": 267,
+    "result": "passed",
+    "log": "backend-tests.log"
+  },
+  "new_contract_tests": 10,
+  "frontend": {
+    "files": 42,
+    "tests": 241,
+    "result": "passed",
+    "log": "frontend-tests.log"
+  },
+  "build": "passed TypeScript + Vite",
+  "provider_calls": 0,
+  "test_isolation": "temporary DB, copied Corpus/documents, empty .env, cleared Provider keys, forced mock; urlopen forbidden before test app imports",
+  "explicit_200": "157 PASS / 43 FAIL from explicit structured OFFLINE responses, NOT new LLM output",
+  "saved_real_replay": "unaltered prior real Provider JSON through current Provider/Parser/scoring",
+  "mock_control": "unexecuted correction control uses explicit MOCK response, NOT real LLM"
+}

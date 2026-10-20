@@ -1,5 +1,7 @@
 # RAG Evolution
 
+2026-10-20 评测合同收口：保持Judge V3 Prompt与Safety Guard，新增Parser `business-output-2-scope`及新Evaluation Identity。严格必要事实/安全证据与可核清的辅助资料范围分开，原响应保留，技术异常不作业务Bad Case。统一离线验收及[Baseline50准备/预算](docs/RAG_EVALUATION_CONTRACT_CLOSEOUT_REPORT.md)完成后可直接申请正式运行授权；不默认追加单题付费测试，本轮Provider0。
+
 2026-10-20 当前为VNext混合评测：有限来源绑定Safety Guard（`finite-safety-1`）+原Judge V3+统一风险裁决。原Judge结果保留，确认规则违规可覆盖为最终FAIL；无法可靠核验不伪造FAIL，但阻断自动资格/发布。不新增LLM调用或Gate。支持范围与离线Shadow证据见[混合评测实施报告](docs/RAG_HYBRID_EVALUATION_IMPLEMENTATION_REPORT.md)，只读复核：`python3 scripts/verify_hybrid_evaluation.py`。
 
 2026-10-20 当前评测版本：**VNext**（judge-vnext-3-safety-consistency / evidence-vnext-1 / business-vnext-1）。业务仅PASS/FAIL，执行异常独立；同义与适用等价Final可接受，必要安全与型号条件不可放宽。旧Baseline/Candidate成绩只读，新实验须另行授权新版完整Baseline。Owner固定的200条离线基准为157P/43F；这不是新LLM成绩。

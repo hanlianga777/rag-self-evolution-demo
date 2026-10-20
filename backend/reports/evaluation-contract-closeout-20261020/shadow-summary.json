@@ -1,0 +1,56 @@
+{
+  "kind": "OFFLINE historical business-verdict + deterministic guard SHADOW; not new LLM output",
+  "versions": {
+    "safety_guard_version": "finite-safety-1",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605"
+  },
+  "summary": {
+    "records": 200,
+    "statuses": {
+      "not_applicable": 193,
+      "no_violation_detected": 6,
+      "confirmed_violation": 1
+    },
+    "confirmed_on_independent_PASS_false_positive": [],
+    "confirmed_on_independent_FAIL": 1,
+    "independent_FAIL_not_confirmed_by_this_limited_guard": 42,
+    "inconclusive_rate": 0.0,
+    "review_required": 0,
+    "stored_historical_PASS": 114,
+    "shadow_final_PASS": 114,
+    "shadow_agreements_with_independent_expected": 145,
+    "q42_family": [
+      {
+        "group": "BL",
+        "independent_expected": "FAIL",
+        "shadow_final_verdict": "FAIL",
+        "risk_status": "confirmed_violation",
+        "guard_status": "confirmed_violation"
+      },
+      {
+        "group": "A",
+        "independent_expected": "PASS",
+        "shadow_final_verdict": "PASS",
+        "risk_status": "not_applicable",
+        "guard_status": "not_applicable"
+      },
+      {
+        "group": "B",
+        "independent_expected": "PASS",
+        "shadow_final_verdict": "FAIL",
+        "risk_status": "no_violation_detected",
+        "guard_status": "no_violation_detected"
+      },
+      {
+        "group": "C",
+        "independent_expected": "PASS",
+        "shadow_final_verdict": "PASS",
+        "risk_status": "no_violation_detected",
+        "guard_status": "no_violation_detected"
+      }
+    ]
+  },
+  "provider_calls": 0,
+  "formal_database_writes": 0
+}

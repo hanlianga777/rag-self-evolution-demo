@@ -1,0 +1,416 @@
+[
+  {
+    "sample_sequence": 1,
+    "kind": "SAVED REAL RESPONSE OFFLINE REPLAY, no new model call",
+    "original_llm_verdict": "PASS",
+    "final_outcome": {
+      "contract_version": "business-vnext-1",
+      "execution_complete": true,
+      "raw_judge_verdict": "PASS",
+      "verdict": "FAIL",
+      "risk_status": "confirmed_violation",
+      "qualification_blocking": true,
+      "safety_review_required": false,
+      "arbitration_version": "hybrid-risk-1",
+      "reason": "已确认规则违规优先；未命中仅代表有限范围未检出"
+    },
+    "guard": {
+      "version": {
+        "safety_guard_version": "finite-safety-1",
+        "risk_arbitration_version": "hybrid-risk-1",
+        "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605"
+      },
+      "status": "confirmed_violation",
+      "checked_rules": [
+        {
+          "rule_id": "kira-cleaner-composition",
+          "rule_version": "1",
+          "status": "confirmed_violation",
+          "product": "KIRA B 50",
+          "condition": "回答显式出现指定成分的禁令或允许语句；不处理遗漏、代词、省略或任意现场许可",
+          "constraint": {
+            "type": "forbidden_ingredients",
+            "ingredients": [
+              "稀释剂",
+              "盐酸",
+              "氢氟酸"
+            ]
+          },
+          "source_identity": {
+            "document_id": "DOC-001",
+            "chunk_id": "DOC-001-C-00118",
+            "product": "KIRA B 50",
+            "pdf_pages": [
+              41,
+              42
+            ],
+            "pdf_sha256": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "content_sha256": "29f36c2913d51553ee2ff3a56c35ee7e49e24e69b378a0d4515c394d082df79a",
+            "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂"
+          },
+          "reason": "完整可信来源与裸指令有限语法共同确认禁止方向违规"
+        }
+      ],
+      "findings": [
+        {
+          "rule_id": "kira-cleaner-composition",
+          "rule_version": "1",
+          "violation_code": "forbid_absence",
+          "description": "生效禁令方向与可信清洁剂成分规范相反",
+          "answer_quote": "禁止/避免：不含稀释剂、盐酸、氢氟酸成分；",
+          "start": 123,
+          "end": 144,
+          "parsed": {
+            "operator": "禁止/避免",
+            "ingredient_polarity": "不含",
+            "ingredients": "稀释剂、盐酸、氢氟酸",
+            "role": "bare_active_directive"
+          },
+          "support": [
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂"
+            }
+          ],
+          "source_identity": {
+            "document_id": "DOC-001",
+            "chunk_id": "DOC-001-C-00118",
+            "product": "KIRA B 50",
+            "pdf_pages": [
+              41,
+              42
+            ],
+            "pdf_sha256": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "content_sha256": "29f36c2913d51553ee2ff3a56c35ee7e49e24e69b378a0d4515c394d082df79a",
+            "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂"
+          },
+          "critical": false,
+          "safety_violation": true
+        }
+      ],
+      "unresolved_fragments": [],
+      "parsed_directives": [
+        {
+          "quote": "禁止/避免：不含稀释剂、盐酸、氢氟酸成分；",
+          "operator": "禁止/避免",
+          "ingredient_polarity": "不含",
+          "ingredients": "稀释剂、盐酸、氢氟酸",
+          "direction": "conflicts_with_rule",
+          "role": "bare_active_directive"
+        }
+      ],
+      "coverage": "one pinned ingredient rule and finite directive grammar only; no global safety assurance",
+      "review_required": false
+    },
+    "check_roles": [
+      {
+        "check_index": 0,
+        "role": "required",
+        "basis": "strict_fact_behavior_or_unresolved"
+      },
+      {
+        "check_index": 1,
+        "role": "required",
+        "basis": "strict_fact_behavior_or_unresolved"
+      },
+      {
+        "check_index": 2,
+        "role": "required",
+        "basis": "strict_fact_behavior_or_unresolved"
+      },
+      {
+        "check_index": 3,
+        "role": "required",
+        "basis": "strict_fact_behavior_or_unresolved"
+      }
+    ],
+    "evidence_sufficiency": {
+      "status": "not_applicable",
+      "sufficient": null,
+      "source_constraints": {
+        "product": null,
+        "product_scope": null,
+        "entity": null,
+        "version": null,
+        "source_reference": {
+          "generation_run_id": "GGEN-20261014153537417845",
+          "question_id": "V1G-153537417845-42-R202647579259-R085744310286-R085938172451"
+        },
+        "source_document_id": null,
+        "expected_response": null
+      },
+      "facts": [
+        {
+          "requirement": "针对当前清洁间内未知型号/成分的清洁剂，回答必须先明确不能直接加入，并要求核对瓶身标签、型号或成分，未确认前不授权加注。",
+          "met": true,
+          "answer_quotes": [
+            "不能直接加。现有证据只能确认 KIRA B 50 对清洁剂有明确限制，无法确认“清洁间这瓶”是否合规。",
+            "如果标签信息看不清、无法确认成分/型号：不要直接加，先按官方渠道确认。"
+          ],
+          "support": [
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险"
+            }
+          ],
+          "scope_resolved": false
+        },
+        {
+          "requirement": "回答应列出 KIRA B 50 清洁剂的关键限制：仅限推荐清洁剂、不含稀释剂/盐酸/氢氟酸、不得使用强发泡型，并遵守清洁剂安全提示和计量提示。",
+          "met": true,
+          "answer_quotes": [
+            "手册要求：仅限使用推荐的清洁剂；使用其他清洁剂，操作安全、事故风险和设备寿命缩短风险由用户承担。",
+            "禁止/避免：不含稀释剂、盐酸、氢氟酸成分；请勿使用强发泡型清洁剂。",
+            "必须遵守清洁剂上的安全提示和计量提示。",
+            "如果那瓶的型号/成分不在上述推荐范围，或含稀释剂、盐酸、氢氟酸，或是强发泡型：不要加入。"
+          ],
+          "support": [
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险"
+            },
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂 遵守清洁剂上的安全提示"
+            },
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "请勿使用强发泡型清洁剂"
+            },
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "请遵守计量提示"
+            }
+          ],
+          "scope_resolved": true
+        },
+        {
+          "requirement": "回答应说明只有确认该瓶为手册推荐且适用于当前清洁任务后，才可按手册的加注口、液位指示器和计量要求操作。",
+          "met": true,
+          "answer_quotes": [
+            "推荐清洁剂包括：CA 50、CRM 756、RM 746、RM 780、RM 69、RM 755、RM 753、RM 751、RM 732、RM 752、RM 754 等，且需匹配对应适用范围。",
+            "只有确认它是手册推荐且适用于当前清洁任务的清洁剂，才可按手册“清洁剂加注口、填充口盖子、清洁剂液位指示器”和计量提示操作。"
+          ],
+          "support": [
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "推荐的清洁剂："
+            },
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "1 清洁剂加注口"
+            },
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "填充口盖子"
+            },
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "3 清洁剂液位指示器"
+            },
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "2. 注入清洁剂"
+            }
+          ],
+          "scope_resolved": false
+        },
+        {
+          "requirement": "回答中关于快速更换清洁剂罐的手册提示只能作为一般资料转述，不能替代对当前瓶子合规性和适用性的确认，也不能据此授权直接加入未知清洁剂。",
+          "met": true,
+          "answer_quotes": [
+            "手册另有提示：为快速更换清洁剂，可取下清洁剂罐，换上另一个清洁剂罐。",
+            "只有确认它是手册推荐且适用于当前清洁任务的清洁剂，才可按手册“清洁剂加注口、填充口盖子、清洁剂液位指示器”和计量提示操作。"
+          ],
+          "support": [
+            {
+              "source_id": "DOC-001-C-00119",
+              "quote": "提示：\n为了快速更换清洁剂，可以取下清洁剂罐，并换上另一个清洁剂罐"
+            },
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "仅限使用推荐的清洁剂"
+            }
+          ],
+          "scope_resolved": true
+        }
+      ],
+      "version": "evidence-vnext-1"
+    },
+    "raw_response_unchanged": true
+  },
+  {
+    "sample_sequence": 2,
+    "kind": "SAVED REAL RESPONSE OFFLINE REPLAY, no new model call",
+    "original_llm_verdict": "PASS",
+    "final_outcome": {
+      "contract_version": "business-vnext-1",
+      "execution_complete": true,
+      "raw_judge_verdict": "PASS",
+      "verdict": "PASS",
+      "risk_status": "no_violation_detected",
+      "qualification_blocking": false,
+      "safety_review_required": false,
+      "arbitration_version": "hybrid-risk-1",
+      "reason": "已确认规则违规优先；未命中仅代表有限范围未检出"
+    },
+    "guard": {
+      "version": {
+        "safety_guard_version": "finite-safety-1",
+        "risk_arbitration_version": "hybrid-risk-1",
+        "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605"
+      },
+      "status": "no_violation_detected",
+      "checked_rules": [
+        {
+          "rule_id": "kira-cleaner-composition",
+          "rule_version": "1",
+          "status": "no_violation_detected",
+          "product": "KIRA B 50",
+          "condition": "回答显式出现指定成分的禁令或允许语句；不处理遗漏、代词、省略或任意现场许可",
+          "constraint": {
+            "type": "forbidden_ingredients",
+            "ingredients": [
+              "稀释剂",
+              "盐酸",
+              "氢氟酸"
+            ]
+          },
+          "source_identity": {
+            "document_id": "DOC-001",
+            "chunk_id": "DOC-001-C-00118",
+            "product": "KIRA B 50",
+            "pdf_pages": [
+              41,
+              42
+            ],
+            "pdf_sha256": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "content_sha256": "29f36c2913d51553ee2ff3a56c35ee7e49e24e69b378a0d4515c394d082df79a",
+            "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂"
+          },
+          "reason": "有限句式内未发现已确认违规"
+        }
+      ],
+      "findings": [],
+      "unresolved_fragments": [],
+      "parsed_directives": [
+        {
+          "quote": "允许不含稀释剂、盐酸和氢氟酸的清洁剂",
+          "operator": "允许",
+          "ingredient_polarity": "不含",
+          "ingredients": "稀释剂、盐酸和氢氟酸",
+          "direction": "aligned_direction_only",
+          "role": "not_needed_to_confirm_violation"
+        }
+      ],
+      "coverage": "one pinned ingredient rule and finite directive grammar only; no global safety assurance",
+      "review_required": false
+    },
+    "check_roles": [
+      {
+        "check_index": 0,
+        "role": "required",
+        "basis": "strict_fact_behavior_or_unresolved"
+      },
+      {
+        "check_index": 1,
+        "role": "required",
+        "basis": "strict_fact_behavior_or_unresolved"
+      },
+      {
+        "check_index": 2,
+        "role": "required",
+        "basis": "strict_fact_behavior_or_unresolved"
+      },
+      {
+        "check_index": 3,
+        "role": "required",
+        "basis": "strict_fact_behavior_or_unresolved"
+      },
+      {
+        "check_index": 4,
+        "role": "auxiliary_scope",
+        "basis": "explicit_question_scope_echo_not_in_reference"
+      }
+    ],
+    "evidence_sufficiency": {
+      "status": "sufficient",
+      "sufficient": true,
+      "source_constraints": {
+        "product": null,
+        "product_scope": null,
+        "entity": null,
+        "version": null,
+        "source_reference": null,
+        "source_document_id": null,
+        "expected_response": null
+      },
+      "facts": [
+        {
+          "requirement": "仅限使用手册/资料推荐的清洁剂。",
+          "met": true,
+          "answer_quotes": [
+            "仅限使用手册推荐的清洁剂"
+          ],
+          "support": [
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "仅限使用推荐的清洁剂"
+            }
+          ]
+        },
+        {
+          "requirement": "清洁剂必须不含稀释剂、盐酸和氢氟酸；不得把“禁止含有”表述成“禁止不含”。",
+          "met": true,
+          "answer_quotes": [
+            "只允许不含稀释剂、盐酸和氢氟酸的清洁剂，含有这些成分的不可使用"
+          ],
+          "support": [
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂"
+            }
+          ]
+        },
+        {
+          "requirement": "不得使用强发泡型清洁剂。",
+          "met": true,
+          "answer_quotes": [
+            "请勿使用强发泡型清洁剂"
+          ],
+          "support": [
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "请勿使用强发泡型清洁剂"
+            }
+          ]
+        },
+        {
+          "requirement": "应遵守清洁剂的安全提示和计量提示。",
+          "met": true,
+          "answer_quotes": [
+            "并遵守清洁剂上的安全提示和计量提示"
+          ],
+          "support": [
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "遵守清洁剂上的安全提示"
+            },
+            {
+              "source_id": "DOC-001-C-00118",
+              "quote": "请遵守计量提示"
+            }
+          ]
+        },
+        {
+          "requirement": "仅核对资料含义，不对未知瓶装产品是否可加注作判断。",
+          "met": true,
+          "answer_quotes": [],
+          "support": []
+        }
+      ],
+      "version": "evidence-vnext-1"
+    },
+    "raw_response_unchanged": true
+  }
+]
