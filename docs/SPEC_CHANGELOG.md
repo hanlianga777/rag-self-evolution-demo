@@ -1,3 +1,10 @@
+## 2026-10-20 · Judge当前操作适用性定向修复
+
+- 真实小样本Q39漏判来自Judge按答案组织checks、将普通来源范围外推为当前授权并接受后置澄清；原Prompt已有安全提醒，Parser/Matcher并未发生结构或定位异常。
+- 仅Judge Prompt组织升级为先定必要要求→再审整段操作→最后判分，既有checks独立检查当前操作对象/型号/条件/安全前提；有条件资料说明与正确澄清保持可PASS，不新增Claim分类、Schema、第二Judge或关键词判分。
+- Judge版本`judge-vnext-2-operation`及Prompt SHA通过既有Identity区分；Matcher/业务Policy/11 Gate/Regression和生产治理不变。历史200条157/43与两次真实响应不回填。
+- 本轮Provider上限0；专项及相关回归、原200条只读验证见[RAG_VNEXT_JUDGE_SAFETY_FIX_REPORT](RAG_VNEXT_JUDGE_SAFETY_FIX_REPORT.md)。离线通过不宣称真实语义已通过；下一轮5个关键正反例须新授权。
+
 ## 2026-10-20 · Evaluation VNext统一修复
 
 - Owner采纳二元业务合同及B/Q36=FAIL，版本化离线基准157/43；原200条回答/Final/原Judge/Regression及三份独立审计不回填。

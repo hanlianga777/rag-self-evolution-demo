@@ -1,8 +1,10 @@
 # RAG Evolution
 
-2026-10-20 当前评测版本：**VNext**（judge-vnext-1 / evidence-vnext-1 / business-vnext-1）。业务仅PASS/FAIL，执行异常独立；同义与适用等价Final可接受，必要安全与型号条件不可放宽。旧Baseline/Candidate成绩只读，新实验须另行授权新版完整Baseline。Owner固定的200条离线基准为157P/43F；这不是新LLM成绩。
+2026-10-20 当前评测版本：**VNext**（judge-vnext-2-operation / evidence-vnext-1 / business-vnext-1）。业务仅PASS/FAIL，执行异常独立；同义与适用等价Final可接受，必要安全与型号条件不可放宽。旧Baseline/Candidate成绩只读，新实验须另行授权新版完整Baseline。Owner固定的200条离线基准为157P/43F；这不是新LLM成绩。
 
-验证：`python3 scripts/verify_evaluation_vnext.py`只读核200条与显式结构化Judge测试响应；`python3 scripts/verify_self_evolution.py test_evaluation_vnext`在临时库/知识副本、空.env与禁网下检查通用规则；`cd frontend && npm test && npm run build`。不自行启动付费评测。实现、完整验证与正式执行顺序见[实施报告](docs/RAG_EVALUATION_VNEXT_IMPLEMENTATION_REPORT.md)，唯一生效合同见[SPEC文首](docs/RAG_SELF_EVOLUTION_SPEC.md)。
+安全定向修复：先独立确定必要前提，再审整段回答的当前操作适用性；仅升级Judge Prompt与版本，Schema/Matcher/门槛保持。本轮真实Provider调用0，真实安全能力仍待另行授权的小样本复验，见[修复报告](docs/RAG_VNEXT_JUDGE_SAFETY_FIX_REPORT.md)。
+
+验证：`python3 scripts/verify_evaluation_vnext.py`只读核200条与显式结构化Judge测试响应；`python3 scripts/verify_self_evolution.py test_judge_operation_safety test_evaluation_vnext`在临时库/知识副本、空.env与禁网下检查通用规则；`cd frontend && npm test && npm run build`。不自行启动付费评测。实现、完整验证与正式执行顺序见[实施报告](docs/RAG_EVALUATION_VNEXT_IMPLEMENTATION_REPORT.md)，唯一生效合同见[SPEC文首](docs/RAG_SELF_EVOLUTION_SPEC.md)。
 
 以下按日期保留为历史阶段描述；“可直接复用旧Baseline”、旧Pending/Disputed通过合同与无限恢复不再生效。当前运行状态应读取Demo真实数据。
 
