@@ -1181,7 +1181,7 @@ class GovernanceStore:
             if old["test_category"] == "negative" and source_ids:
                 errors.append(f"{item_id}: 负向题不能添加 Golden Evidence")
                 continue
-            evidence = [] if old["test_category"] == "negative" else [{"source_chunk_ids": source_ids, "evidence_key_points": [by_chunk[key].get("chunk_text", by_chunk[key].get("text", ""))[:160] for key in source_ids if key in by_chunk]}]
+            evidence = [] if old["test_category"] == "negative" else [{"source_chunk_ids": source_ids, "evidence_key_points": [by_chunk[key].get("chunk_text", by_chunk[key].get("text", "")) for key in source_ids if key in by_chunk]}]
             candidate = {**old["raw"], "question": str(change.get("question", old["question"])).strip(), "reference_answer": change.get("reference_answer", old["reference_answer"]), "evidence": evidence, "test_category": old["test_category"], "expected_behavior": old["raw"].get("expected_behavior"), "ablation_attribute": old["raw"].get("ablation_attribute"), "ablation_metadata": change.get("ablation_metadata", old["raw"].get("ablation_metadata", {}))}
             candidate.update({key: change.get(key, old['raw'].get(key)) for key in business_fields})
             if business_fields and candidate.get('expected_response') is not None and (not isinstance(candidate['expected_response'], str) or not candidate['expected_response'].strip()):
@@ -1956,7 +1956,7 @@ class GovernanceStore:
     def bad_case_rows(self):
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM bad_cases ORDER BY created_at DESC").fetchall()
-        return [{**dict(row), "result": _load(row["result_json"], {})} for row in rows]
+        return [{**dict(row), "result": {**_load(row["result_json"], {}), "run_id":row["run_id"], "question_id":row["question_id"]}} for row in rows]
 
     def create_evaluation_run(self, snapshot: dict, config: dict, judge: dict):
         run_id = f"EVAL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
@@ -2000,7 +2000,7 @@ class GovernanceStore:
             raise ValueError('历史结果题号重复或不属于冻结Snapshot')
         return source, rows
 
-    def create_baseline_run(self, snapshot, config, judge, source_id=None, candidate_id=None, automatic=False):
+    def create_baseline_run(self, snapshot, config, judge, source_id=None, candidate_id=None, automatic=False, judge_replay=None):
         run_id = f"EVAL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
@@ -2017,6 +2017,20 @@ class GovernanceStore:
             if source_id:
                 source, rows = self.validate_evaluation_resume(connection, snapshot, config, judge, source_id, candidate_id=candidate_id)
                 result = {'resume_source_id':source_id, 'checkpoints':_load(source['result_json'], {}).get('checkpoints', {})}
+                if _load(source['result_json'], {}).get('judge_replay'):result['judge_replay']=_load(source['result_json'], {})['judge_replay']
+            if judge_replay:
+                from .judge_replay import source_digest
+                from .diagnostic_evidence import digest
+                source_row=connection.execute('SELECT * FROM evaluation_runs WHERE id=?',(judge_replay['source_run_id'],)).fetchone()
+                if source_row is None:raise ValueError('Replay source disappeared')
+                source={**dict(source_row),'result':_load(source_row['result_json'],{}),'config':_load(source_row['config_json'],{}),'judge':_load(source_row['judge_json'],{})}
+                original_cases=[{'question_id':r['question_id'],**_load(r['result_json'],{}),'run_id':source['id']} for r in connection.execute('SELECT question_id,result_json FROM evaluation_case_results WHERE run_id=? ORDER BY id',(source['id'],))]
+                if (source_digest(source,original_cases)!=judge_replay['source_sha256'] or not judge_replay['can_replay']
+                    or judge_replay['new_judge']!=judge or set(judge_replay['executions'])!=set(snapshot['question_ids'])):raise ValueError('Replay source or target identity changed')
+                result['checkpoints']={key:{'execution':execution,'attempts':[]} for key,execution in judge_replay['executions'].items()}
+                result['judge_replay']={k:v for k,v in judge_replay.items() if k not in {'executions','new_judge'}}
+                result['judge_replay']['execution_sha256']={key:digest(e) for key,e in judge_replay['executions'].items()}
+                result['judge_replay']['timing_provenance']='historical_generation_not_current_latency'
             if automatic:
                 from .paid_run import current_paid_run
                 paid=current_paid_run()
@@ -2116,7 +2130,7 @@ class GovernanceStore:
     def evaluation_case_results(self, run_id: str):
         with self.connection() as connection:
             rows = connection.execute("SELECT question_id, result_json FROM evaluation_case_results WHERE run_id = ? ORDER BY id", (run_id,)).fetchall()
-        return [{"question_id": row["question_id"], **_load(row["result_json"], {})} for row in rows]
+        return [{"question_id": row["question_id"], **_load(row["result_json"], {}), "run_id":run_id} for row in rows]
 
     def record_bad_case(self, run_id: str, question_id: str, category: str, severity: str, result: dict):
         case_id = f"BC-{run_id}-{question_id}"

@@ -76,6 +76,6 @@ class OutputCompatibilityTests(unittest.TestCase):
         u={**self.u,'question':'请介绍文档。本次仅解释资料范围，不询问安装地点。'}
         j=copy.deepcopy(self.j);j['checks'][-1]['requirement']='仅解释资料范围，不对安装地点作判断。'
         self.validate(j,u)
-        self.assertEqual(VERSIONS['output_parser_version'],'business-output-4-negative-facts')
+        self.assertEqual(VERSIONS['output_parser_version'],'business-output-5-fact-scope')
         old={k:v for k,v in VERSIONS.items() if k!='output_parser_version'}
         self.assertNotEqual(evaluation_identity({'id':'frozen'},old),evaluation_identity({'id':'frozen'},VERSIONS))

@@ -82,6 +82,17 @@ class RevisionWorkflowTests(unittest.TestCase):
             self.store.record_qc(question_id, {"score": 90, "priority": "P2", "reason": "通过"}, "passed")
             self.store.review_question(question_id, "needs_revision" if index in {0, 8, 12, 14} else "approved", "reviewer", reason="业务价值低" if index == 0 else "人工判定" if index in {8, 12, 14} else None)
 
+    def test_revision_retains_required_norm_after_160_characters(self):
+        key=self.ids[0];before=self.store.question(key)
+        self.chunks[1]['chunk_text']='普通设备说明。'*40+'维护前必须切断电池电源。'
+        revision=self.store.start_revision(key,'manual_edit','保留完整规范',False,
+            {key:{'question':'维护前必须如何隔离电源？','reference_answer':'维护前必须切断电池电源。','source_chunk_ids':['C2']}},self.chunks)
+        result=self.store.prepare_revision(revision['id'],self.chunks,similarity=lambda _a,_b:.1)
+        self.assertEqual(result['status'],'preview_ready',result.get('error'))
+        evidence=result['drafts'][key]['evidence'][0]['evidence_key_points'][0]
+        self.assertGreater(len(evidence),160);self.assertTrue(evidence.endswith('维护前必须切断电池电源。'))
+        self.assertEqual(self.store.question(key),before)
+
     def test_completed_revision_retires_only_older_manual_marker(self):
         key = self.ids[0]
         revision = self.store.start_revision(key, 'manual_edit', '修复原题', False,

@@ -20,7 +20,7 @@ def verify(database):
             stack.enter_context(patch.dict(os.environ,{key:value}))
         from app.diagnostics import diagnostic_view
         from app.diagnostic_evidence import digest,case_digest
-        from app.evaluation_contract import VERSIONS,BUSINESS_JUDGE_PROMPT,evaluation_identity,validate_business_judgment
+        from app.evaluation_contract import VERSIONS,BUSINESS_JUDGE_PROMPT,evaluation_identity,validate_business_judgment,policy_current
         from app.ai_service import GENERATION_BOUNDARY
         from app.governance import GovernanceStore
         from app.optimization import validate_intervention
@@ -34,8 +34,8 @@ def verify(database):
         snapshot=json.loads(run['dataset_snapshot_json']);judge=json.loads(run['judge_json']);result=json.loads(run['result_json']);config=json.loads(run['config_json'])
         raw_cases=list(c.execute('SELECT question_id,result_json FROM evaluation_case_results WHERE run_id=?',(run['id'],)))
         saved_hash=digest([list(row) for row in raw_cases]);assert run['status']=='partial' and len(raw_cases)==49
-        assert all(judge[k]==v for k,v in VERSIONS.items()) and evaluation_identity(snapshot,judge)==judge['evaluation_identity']
-        assert hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest()==judge['judge_prompt_sha256']
+        assert not policy_current(judge), 'V4 history must remain separate from V5'
+        assert judge['evaluation_identity']=='d18aab6365a63c6de63e295866a7036e0fe6a25f1f74c2afbb4782bbab73ae3e'
         assert hashlib.sha256(GENERATION_BOUNDARY.encode()).hexdigest()==judge['generation_boundary_sha256']
         assert len(GATE_DEFINITIONS)==11 and ALLOWED_SEARCH_SPACE['top_k']==(4,6)
         expected={3:'Ranking',4:'Ranking',6:'Ranking',7:'Retrieval',8:'Ranking',17:'Retrieval',24:'Retrieval',27:'Ranking',28:'Retrieval',29:'Retrieval'}
@@ -72,12 +72,15 @@ def verify(database):
             except ValueError as error:assert str(error)=='support is not located in actual full Final'
             else:raise AssertionError('Q18 invalid raw PASS silently accepted')
         store=object.__new__(GovernanceStore)
-        store.validate_evaluation_start(c,snapshot,judge);_,rows=store.validate_evaluation_resume(c,snapshot,config,judge,run['id']);assert len(rows)==49
+        store.validate_evaluation_start(c,snapshot,judge)
+        try:store.validate_evaluation_resume(c,snapshot,config,judge,run['id'])
+        except ValueError:pass
+        else:raise AssertionError('old V4 run must not resume under V5')
         assert digest([list(row) for row in c.execute('SELECT question_id,result_json FROM evaluation_case_results WHERE run_id=?',(run['id'],))])==saved_hash
         assert c.total_changes==0 and hashlib.sha256(database.read_bytes()).hexdigest()==before
         return {'kind':'readonly_saved_diagnosis_NOT_Baseline_or_Agent_run','provider_calls':0,'run_id':run['id'],
             'identity':judge['evaluation_identity'],'database_sha256':before,'completed_unchanged':49,'business_pass_unchanged':passes,'business_fail_unchanged':10,
-            'q18':'technical_error; same-identity explicit resume guards pass, not executed; repeated title-support failure remains possible',
+            'q18':'technical_error; V4 resume blocked after V5 upgrade; fresh identity Judge-only Replay required; no Provider executed',
             'gate_definitions_sha256':digest(GATE_DEFINITIONS),'search_space_sha256':digest(ALLOWED_SEARCH_SPACE),'diagnoses':diagnoses}
 
 if __name__=='__main__':

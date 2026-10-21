@@ -129,6 +129,7 @@ def context_selection_options(trace,findings,chunks,checks):
     if not required:return None,'未定位待恢复的完整必要事实支持'
     if not isinstance(trace.get('reranked'),list):return None,'未采集完整reranked列表'
     required.extend(c['support'] for c in checks if c['met'] and c.get('support'))
+    required.extend(f['preserve_support'] for _,_,f in findings if f.get('preserve_support'))
     baseline={k:trace.get('config',{}).get(k,default) for k,default in [('top_k',4),('rerank',True),('min_score',0)]}
     parents={c['canonical_parent']['chunk_id']:c['canonical_parent'] for c in chunks if c.get('canonical_parent')}
     options=[]

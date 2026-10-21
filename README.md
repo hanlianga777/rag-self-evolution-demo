@@ -1,6 +1,8 @@
 # RAG Evolution
 
-2026-10-21 诊断更新：既有评测Identity不变，通过独立审计记录的Case/Snapshot/Corpus/全阶段溯源校验解释已保存业务FAIL；部分Final支持不冒充完整规范、Critical不等于Safety。Ranking仅允许保存Trace验证可恢复且保留既有事实的上下文干预；无可用策略可零候选。Baseline主表保留全部业务FAIL，根因和完整证据在案例抽屉。当前最新Run仍Partial，Q18未恢复，本轮Provider0。[实现与验收](docs/BASELINE_DIAGNOSTIC_EVIDENCE_FIX_REPORT.md)，只读验证：`python3 scripts/verify_baseline_diagnostics.py`。
+2026-10-21 当前为V5 Fact/Scope合同与完整规范输入，新身份重判分须另行授权。已实现通用可追溯Diagnostic语义补证、逐题Judge-only正式Baseline复用预检；生产50份生成数据可复用，尚未真实重评。旧V4 Partial只读，禁止当作新版恢复。第一阶段Provider0。[验收与下一阶段预算](docs/CONTRACT_RESOLVER_REPLAY_V5_ACCEPTANCE.md)。离线验收：`python3 scripts/verify_contract_replay_v5.py --simulate`（仅临时副本Mock，无真实调用）。
+
+2026-10-21 前轮诊断更新（V4历史）：既有评测Identity不变，通过独立审计记录的Case/Snapshot/Corpus/全阶段溯源校验解释已保存业务FAIL；部分Final支持不冒充完整规范、Critical不等于Safety。Ranking仅允许保存Trace验证可恢复且保留既有事实的上下文干预；无可用策略可零候选。Baseline主表保留全部业务FAIL，根因和完整证据在案例抽屉。当前最新Run仍Partial，Q18未恢复，本轮Provider0。[实现与验收](docs/BASELINE_DIAGNOSTIC_EVIDENCE_FIX_REPORT.md)，只读验证：`python3 scripts/verify_baseline_diagnostics.py`。
 
 2026-10-20 Baseline中断修复：当前Parser `business-output-3-evidence-roles`，严格区分实际Final的回答证据与候选中遗漏要求的规范证据；旧V2 Partial不可直接续跑。已重载服务，刷新Baseline页使用“重新运行 Baseline（新版本）”，保留旧3题与检查点；本轮无Provider调用。[根因、验证及操作说明](docs/BASELINE50_INTERRUPTION_FIX_REPORT.md)。
 

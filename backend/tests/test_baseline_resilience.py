@@ -136,7 +136,7 @@ class BaselineResilienceTests(unittest.TestCase):
         runtime.judge=flaky;result=self.execute(runner)
         with patch.object(main,'store',self.store):
             api=main.evaluation(active_task=True)
-            self.assertEqual(api['runtime_contract']['prompt_version'],'judge-vnext-4-output-contract')
+            self.assertEqual(api['runtime_contract']['prompt_version'],'judge-vnext-5-fact-scope')
             self.assertEqual(set(api['runtime_contract']['loaded_code_sha256']),{'validator','provider_parser','scorer','batch_runner'})
             self.assertEqual(api['result']['completed'],49);self.assertEqual(api['result']['technical_error_count'],1)
             self.assertIsNone(api['current_baseline_id']);self.assertEqual(main.bad_cases(),[])

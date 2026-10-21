@@ -158,7 +158,7 @@ class CurrentIdentityTests(unittest.TestCase):
         self.assertFalse(result['result']['provider_called'])
         self.assertIsNone(provider.prompt)
         self.assertEqual(self.store.bad_case_rows(),[])
-        self.assertEqual(self.store.evaluation_case_results(self.baseline),[{'question_id':'Q1','passed':True}])
+        self.assertEqual(self.store.evaluation_case_results(self.baseline),[{'question_id':'Q1','passed':True,'run_id':self.baseline}])
         self.assertEqual(self.store.evaluation_run(self.baseline),frozen)
 
     def test_monitoring_only_does_not_send_invented_targets_to_provider(self):

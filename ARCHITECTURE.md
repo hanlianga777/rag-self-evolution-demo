@@ -1,3 +1,9 @@
+## 2026-10-21 · 当前V5合同与既有节点内部流程
+
+沿用Golden → Baseline → Bad Case → Agent → Sandbox → Regression → Recommendation → 人工发布，四维指标与五类典型Bad Case不改。评测节点内部区分Final正文Fact与经Canonical标题/页序/结构绑定的Scope，完整冻结规范作为独立Judge输入，版本纳入新Identity。Diagnostic复用现有Provider做显式授权的一次语义补证，真实来源/覆盖经程序校验后单独保存sidecar；没有第二Agent，读取不调用模型。
+
+Judge-only Baseline逐题核验旧生成执行，在同一创建事务核源并只种入execution，后续走原Baseline逐题保存、重试/异常、Gate及当前身份守卫。生成禁止条件随Checkpoint恢复保留；旧Judge/成绩不复制。前端只在原Baseline页/Drawer增补预检、费用授权及证据读取。正式图的节点、关系与图源不变，故无另画架构图或导出差异。[当前合同与离线验收](docs/CONTRACT_RESOLVER_REPLAY_V5_ACCEPTANCE.md)。
+
 ## 2026-10-21 · 既有诊断节点内部证据校验
 
 产品节点及关系维持Golden → Baseline → Bad Case → Agent → Sandbox → Regression → Recommendation → 人工发布，正式图源及导出不改。原诊断模块增加独立只读审计事实校验：持久化Case/冻结Snapshot/Canonical Corpus/完整阶段/审计文件SHA闭合后推导阶段根因；独立审查与同次Judge字段分别溯源，不成为第二Judge或人工Gate，不写成绩或修正历史JSON。未知新证据仍阻断，Critical不充当Safety类别。

@@ -59,7 +59,7 @@ class PolicyTests(unittest.TestCase):
                 raw=next(q for q in data['snapshot']['questions'] if q['question']==case['question'])
                 item={'id':raw['id'],'question':raw['question'],'reference_answer':raw.get('reference_answer'),'test_category':case['test_category'],'negative_subtype':case.get('negative_subtype'),'evidence':raw.get('evidence',[]),'raw':raw}
                 runtime=type('SavedJudge',(),{'judge':lambda _,*a,**kw:j})()
-                result=EvaluationRunner(None,runtime).score_execution(item,{'answer':case['model_answer'],'retrieval':case['retrieved_chunks'],'retrieval_trace':trace,'latency_ms':case['programmatic_metrics']['latency_ms']})
+                result=EvaluationRunner(None,runtime).score_execution(item,{'answer':case['model_answer'],'retrieval':case['retrieved_chunks'],'retrieval_trace':{**trace,'status':'offline_legacy_policy_fixture'},'latency_ms':case['programmatic_metrics']['latency_ms']})
                 self.assertEqual(result['judge_result'],j)
                 if j['unsupported_claims']:
                     self.assertFalse(result['passed'])

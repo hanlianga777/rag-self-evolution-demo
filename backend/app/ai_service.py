@@ -37,19 +37,23 @@ def attach_heading_scopes(entries, chunks):
     positions={c.get('chunk_id'):i for i,c in enumerate(chunks)}
     for position,chunk in enumerate(chunks):
         text=(chunk.get('chunk_text') or chunk.get('text','')).strip()
-        if re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,15}\s*遥控器',text):
-            headings.setdefault(chunk.get('document_id'),[]).append((chunk.get('page_start',0),position,chunk,text))
+        if text and (chunk.get('block_type') in {'heading','title'} or re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,15}\s*遥控器',text)):
+            headings.setdefault(chunk.get('document_id'),[]).append((chunk.get('page_start') or 0,position,chunk,text))
     result=[]
     for entry in entries:
-        start=entry.get('parent_page_start',entry.get('page_start',0))
-        end=entry.get('parent_page_end',entry.get('page_end',start))
-        available=sorted(headings.get(entry.get('document_id'),[]),key=lambda h:h[:2])
-        before=[h for h in available if h[0]<=start and (entry.get('chunk_id') not in positions or h[1]<=positions[entry['chunk_id']])]
-        inside=[h for h in available if start<h[0]<=end]
-        scopes=([before[-1]] if before else [])+inside
+        start=entry.get('parent_page_start') or entry.get('page_start') or 0
+        end=entry.get('parent_page_end') or entry.get('page_end') or start
+        available=sorted([h for h in headings.get(entry.get('document_id'),[]) if all(h[2].get(k)==entry.get(k) for k in ('product','version'))],key=lambda h:h[:2])
+        span=[positions[entry['chunk_id']]] if entry.get('chunk_id') in positions else []
+        if 'parent_page_start' in entry:
+            span=[i for i,c in enumerate(chunks) if c.get('parent_chunk_id')==entry.get('parent_chunk_id')] or span
+        lower=min(span) if span else None;upper=max(span) if span else None
+        before=[h for h in available if h[0]<=start and (lower is None or h[1]<=lower)]
+        inside=[h for h in available if start<h[0]<=end or lower is not None and lower<h[1]<=upper and start<=h[0]<=end]
+        scopes=list({h[2]['chunk_id']:h for h in ([before[-1]] if before else [])+inside}.values())
         # A Parent spanning two model headings cannot inherit a single scope.
         scope={'heading':scopes[0][3],'source_id':scopes[0][2]['chunk_id'],'quote':scopes[0][3],'page_start':scopes[0][0]} if len(scopes)==1 else None
-        result.append({**entry,**({'source_scope':scope} if scope else {})})
+        result.append({**{k:v for k,v in entry.items() if k!='source_scope'},**({'source_scope':scope} if scope else {})})
     return result
 
 
@@ -178,6 +182,17 @@ class AiService:
         with measure(stages, "judge"), collect_usage() as usage:
             result = self.provider.judge(question, expected, answer, **({"context": context} if context is not None else {}))
         return {**result, "stages": stages, "token_usage": usage, **cost_fields(self.model, usage)}
+
+    @provider_task('judge')
+    def resolve_diagnostic(self,payload):
+        from .evidence_resolver import SEMANTIC_PROMPT
+        with collect_usage() as usage:
+            raw=self.provider.complete(SEMANTIC_PROMPT,json.dumps(payload,ensure_ascii=False),json_mode=True,temperature=0)
+        try:response=json.loads(raw)
+        except ValueError as error:
+            from .providers import ProviderInvalidResponse
+            raise ProviderInvalidResponse('诊断语义JSON无效',raw_provider_response=raw) from error
+        return {**response,'_raw_response':raw,'_usage':usage,'_model':self.model}
 
     @provider_task('qc')
     def quality_check(self, item: dict) -> dict:

@@ -1537,6 +1537,46 @@ def stop_evaluation(run_id: str):
     return evaluation_run(run_id)
 
 
+@app.get('/api/evaluations/{source_id}/judge-replay/preflight')
+def judge_replay_preflight(source_id: str):
+    try:return EvaluationRunner(store,ai_service).judge_replay_preflight(source_id)
+    except (ValueError,KeyError) as error:raise HTTPException(409,str(error)) from error
+
+
+@app.post('/api/evaluations/{source_id}/judge-replay',status_code=201,dependencies=[Depends(require_trusted_origin)])
+def judge_replay(source_id: str,payload: PaidActionRequest):
+    if not payload.authorize_provider:raise HTTPException(409,'新版Judge-only Baseline会产生Judge费用，必须明确授权；禁止生成模型调用')
+    try:
+        runner=EvaluationRunner(store,ai_service)
+        run_id,items,config=runner.start_judge_replay(source_id)
+    except (ValueError,KeyError) as error:raise HTTPException(409,str(error)) from error
+    threading.Thread(target=contextvars.copy_context().run,args=(runner.execute_baseline,run_id,items,config),daemon=True).start()
+    return {'id':run_id,'status':'running','execution_kind':'judge_only_baseline','generation_calls':0}
+
+
+@app.get('/api/evaluations/{run_id}/cases/{question_id}/diagnostic-evidence')
+def diagnostic_evidence_preflight(run_id: str,question_id: str):
+    from .evidence_resolver import resolve_persisted
+    from .diagnostics import _current_corpus
+    run=store.evaluation_run(run_id)
+    if not run:raise HTTPException(404,'Run not found')
+    chunks,fingerprint=_current_corpus({'corpus_fingerprint':json.loads(run['dataset_snapshot_json'])['corpus_fingerprint']})
+    try:return resolve_persisted(store,run_id,question_id,chunks,fingerprint)
+    except ValueError as error:raise HTTPException(409,str(error)) from error
+
+
+@app.post('/api/evaluations/{run_id}/cases/{question_id}/resolve-diagnostics',dependencies=[Depends(require_trusted_origin)])
+def resolve_diagnostics(run_id: str,question_id: str,payload: PaidActionRequest):
+    if not payload.authorize_provider:raise HTTPException(409,'语义补证最多一次Judge调用，必须明确授权；不会修改历史成绩')
+    from .evidence_resolver import resolve_persisted
+    from .diagnostics import _current_corpus
+    run=store.evaluation_run(run_id)
+    if not run:raise HTTPException(404,'Run not found')
+    chunks,fingerprint=_current_corpus({'corpus_fingerprint':json.loads(run['dataset_snapshot_json'])['corpus_fingerprint']})
+    try:return resolve_persisted(store,run_id,question_id,chunks,fingerprint,semantic=ai_service.resolve_diagnostic,persist=True)
+    except ValueError as error:raise HTTPException(409,str(error)) from error
+
+
 @app.post('/api/evaluations/{source_id}/replay', dependencies=[Depends(require_trusted_origin)])
 def replay_evaluation(source_id: str, payload: PaidActionRequest):
     if not payload.authorize_provider:

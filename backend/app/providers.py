@@ -233,7 +233,7 @@ class DeepSeekProvider:
     def _judge_business(self, question, expected, answer, context):
         from .evaluation_contract import BUSINESS_JUDGE_PROMPT, validate_business_judgment
         _response_metadata.set({})
-        payload={k:v for k,v in context.items() if k!='programmatic_evidence_observation'}
+        payload={k:v for k,v in context.items() if k!='programmatic_evidence_observation' and not k.startswith('_')}
         content=self.complete(BUSINESS_JUDGE_PROMPT,json.dumps({'question':question,'reference_answer':expected,'actual_answer':answer,**payload},ensure_ascii=False),json_mode=True,temperature=0)
         try:
             text=content.strip().removeprefix('\ufeff')
@@ -241,7 +241,7 @@ class DeepSeekProvider:
             if text.startswith('```json\n') and text.endswith('\n```'):
                 text=text[8:-4];recovery='markdown_fence'
             result=json.loads(text)
-            validate_business_judgment(result,answer,context.get('final_context'),category=context.get('category'),constraints=context.get('source_constraints'),question=question,reference=expected,candidates=context.get('retrieval_candidates'))
+            validate_business_judgment(result,answer,context.get('final_context'),category=context.get('category'),constraints=context.get('source_constraints'),question=question,reference=expected,candidates=context.get('retrieval_candidates'),canonical_chunks=context.get('_canonical_chunks'))
             for issue in result['issues']:
                 if context.get('baseline_findings') is not None and 'baseline_issue_index' not in issue:
                     raise ValueError('missing baseline issue semantic correspondence')

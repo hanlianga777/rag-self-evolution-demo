@@ -315,7 +315,8 @@ def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
         return blocked('retrieval_trace.status/candidates/final未完整采集')
     judge=case.get('judge_result') or {}
     constraints=(case.get('programmatic_metrics',{}).get('evidence_sufficiency') or {}).get('source_constraints') or {}
-    try:validate_business_judgment(judge,case.get('model_answer',''),trace['final'],category=case.get('test_category'),constraints=constraints,question=case.get('question'),reference=case.get('reference_answer'),candidates=trace.get('candidates'))
+    if corpus_chunks is None:corpus_chunks,corpus_fingerprint=_current_corpus(trace)
+    try:validate_business_judgment(judge,case.get('model_answer',''),trace['final'],category=case.get('test_category'),constraints=constraints,question=case.get('question'),reference=case.get('reference_answer'),candidates=trace.get('candidates'),canonical_chunks=corpus_chunks)
     except ValueError as error:return blocked('原始Judge合同校验失败：'+str(error))
     if corpus_chunks is None:corpus_chunks,corpus_fingerprint=_current_corpus(trace)
     if not corpus_fingerprint or trace.get('corpus_fingerprint') != corpus_fingerprint:return blocked('当前Canonical Corpus身份不匹配')
@@ -338,6 +339,9 @@ def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     review,frozen=saved_review(case)
     findings,review_gaps=review_findings(case,trace,corpus_chunks,review,frozen)
     gaps.extend(review_gaps)
+    from .evidence_resolver import saved_findings
+    resolved,resolver_gaps=saved_findings(case,corpus_chunks,corpus_fingerprint)
+    findings.extend(resolved);gaps.extend(resolver_gaps)
     from .safety_guard import check_safety
     guard=check_safety(case.get('question',''),case.get('model_answer',''),trace['final'],constraints=(case.get('programmatic_metrics',{}).get('evidence_sufficiency') or {}).get('source_constraints'))
     findings.extend(('Safety',None,f) for f in guard['findings'])

@@ -247,10 +247,12 @@ class DiagnosticEvidenceBoundaryTests(VNextStageTests):
         self.assertFalse(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['target_eligible'])
     def test_business_failure_cannot_show_a_passed_redline(self):
         from app.evaluation import EvaluationRunner
-        c,_=self.case('final');v={**c['judge_result'],'quality':{'correctness':2,'faithfulness':.5,'completeness':.5}}
+        c,chunks=self.case('final');v={**c['judge_result'],'quality':{'correctness':2,'faithfulness':.5,'completeness':.5}}
         runtime=type('Runtime',(),{'judge':lambda _,*a,**kw:v})()
         item={'question':'维护前安全条件','reference_answer':'维护前关闭整机并断开电池','test_category':'positive','raw':{},'evidence':[]}
-        result=EvaluationRunner(None,runtime).score_execution(item,{'answer':c['model_answer'],'retrieval':c['programmatic_metrics']['retrieval_trace']['final'],'retrieval_trace':c['programmatic_metrics']['retrieval_trace'],'latency_ms':1})
+        from unittest.mock import patch
+        with patch('app.diagnostics._current_corpus',return_value=(chunks,'fixture-corpus')):
+            result=EvaluationRunner(None,runtime).score_execution(item,{'answer':c['model_answer'],'retrieval':c['programmatic_metrics']['retrieval_trace']['final'],'retrieval_trace':c['programmatic_metrics']['retrieval_trace'],'latency_ms':1})
         self.assertFalse(result['redline_pass'])
         self.assertIs(result['programmatic_metrics']['evidence_sufficiency']['sufficient'],True, 'Final can be sufficient even when generation omitted a required safety fact')
 

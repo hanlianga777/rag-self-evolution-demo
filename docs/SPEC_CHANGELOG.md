@@ -1,3 +1,11 @@
+## 2026-10-21 · V5 Fact/Scope、通用证据补证与正式Judge-only Baseline
+
+- 统一Fact正文与Scope标题来源合同，核文档/产品/版本/Canonical页序与Parent范围，显式scope不能代替操作事实；升级Prompt/Parser/Matcher/输入身份。
+- 同身份冻结来源读取完整规范，保留旧摘要，Negative Anchor角色不变；新Revision取消160字截断，旧Golden只读。
+- Diagnostic提供显式授权的一次语义补证及独立sidecar持久化；程序校验来源/阶段/复合要求并推根因，绑定Run/配置/全文/Prompt身份；不依赖历史10题审计记录，不加第二Agent或自动付费读取。
+- Judge-only Replay逐题核50份执行，事务校验源、种入execution不复制旧判分，正式Baseline守卫/11 Gate/重试/人工流程复用；缺失或损坏记录禁止生成兜底。
+- 旧V4 Partial不能续为V5；新增现有Baseline页只读复用预检及显式费用确认。Q27仅有离线扩展方案，不改参数域。第一阶段Provider0、旧库/知识/成绩只读，详见[验收报告](CONTRACT_RESOLVER_REPLAY_V5_ACCEPTANCE.md)。
+
 ## 2026-10-21 · Baseline只读证据诊断与Agent合法干预
 
 - 独立审计事实记录经Case/Snapshot/Corpus/全阶段/审计文件SHA及规范来源验证后，只用于诊断；不改历史Judge、Frozen Golden、Corpus或评分Identity。新题缺证据仍阻断，不以missing当候选空集，不回填scope=false。

@@ -188,6 +188,9 @@ class EvaluationRunner:
         from .paid_run import current_paid_run
         source=self.store.evaluation_run(resume_source_id) if resume_source_id else None
         limits=current_paid_run().output_limits if current_paid_run() else (source or {}).get('judge',{}).get('execution_snapshot',{}).get('request_limits')
+        if not limits:
+            from .paid_run import REQUEST_LIMITS
+            limits=REQUEST_LIMITS
         if limits:
             judge_meta['execution_snapshot']['request_limits'] = {key:limits[key] for key in ('answer','judge','query')}
         from .evaluation_contract import BUSINESS_JUDGE_PROMPT
@@ -230,15 +233,27 @@ class EvaluationRunner:
         execution = self.runtime.answer(item["question"], config)
         return self.score_execution(item, execution)
 
-    def score_execution(self, item, execution, *, judge_correction=None):
-        expected = item["reference_answer"] or item["raw"].get("expected_behavior", "拒答或澄清")
+    def judge_context(self,item,execution,judge_correction=None):
         trace = execution.get('retrieval_trace') or {}
         final = trace.get('final', [])
         observation = observe_evidence(item, final)
+        from .diagnostics import _current_corpus
+        from .canonical_evidence import full_norms
+        chunks,fingerprint=_current_corpus(trace)
+        norms=full_norms(item.get('raw') or item,chunks) if fingerprint else []
+        if trace.get('status')=='completed' and trace.get('corpus_fingerprint') and not fingerprint:
+            raise ValueError('Judge输入Canonical Corpus身份无法验证')
         from .ai_service import generation_context
-        judge = self.runtime.judge(item["question"], expected, execution["answer"], item["test_category"], context={**({'judge_correction':judge_correction} if judge_correction else {}), 'contract_version':VERSIONS['scoring_policy'], 'retrieval_candidates':trace.get('candidates',[]), 'baseline_findings':item.get('baseline_findings'), 'sources_legend':json.loads(generation_context(final).split('\n',1)[0])['sources'], 'golden_evidence': item['evidence'], 'final_context': final, 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'), 'expected_behavior': item['raw'].get('expected_behavior'), 'source_constraints': observation['source_constraints'], 'programmatic_evidence_observation': observation})
+        return {**({'judge_correction':judge_correction} if judge_correction else {}), 'contract_version':VERSIONS['scoring_policy'], 'retrieval_candidates':trace.get('candidates',[]), 'baseline_findings':item.get('baseline_findings'), 'sources_legend':json.loads(generation_context(final).split('\n',1)[0])['sources'], 'golden_evidence': item['evidence'], 'golden_norms':norms, '_canonical_chunks':chunks, 'scope_sources':[{**c,'content':c.get('chunk_text',c.get('text',''))} for c in chunks if c['chunk_id'] in {(e.get('source_scope') or {}).get('source_id') for e in final}], 'final_context': final, 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'), 'expected_behavior': item['raw'].get('expected_behavior'), 'source_constraints': observation['source_constraints'], 'programmatic_evidence_observation': observation}
+
+    def score_execution(self, item, execution, *, judge_correction=None):
+        expected = item["reference_answer"] or item["raw"].get("expected_behavior", "拒答或澄清")
+        context=self.judge_context(item,execution,judge_correction)
+        trace=execution.get('retrieval_trace') or {};final=trace.get('final',[])
+        observation=context['programmatic_evidence_observation'];chunks=context['_canonical_chunks']
+        judge=self.runtime.judge(item['question'],expected,execution['answer'],item['test_category'],context=context)
         if 'verdict' in judge:
-            return self._score_business(item, execution, judge, expected)
+            return self._score_business(item, execution, judge, expected,canonical_chunks=chunks)
         sufficiency = resolve_evidence(item, observation, judge, final)
         if item['test_category'] != 'negative' and not isinstance(trace.get('final'), list):
             sufficiency.update(status='unknown', sufficient=None, reason='最终上下文未采集；不能把未采集当作检索遗漏')
@@ -306,13 +321,13 @@ class EvaluationRunner:
         basis = 'verified_answer_claim' if primary == 'Generation' and located_failure else 'measured_latency' if primary == 'Performance' else 'explicit_safety_failure' if primary == 'Safety' else analysis['retrieval_failure_stage'] if primary == 'Retrieval' else 'unresolved_evaluation_evidence' if primary == 'Unknown' else coverage['diagnostic_basis']
         return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
 
-    def _score_business(self, item, execution, judge, expected):
+    def _score_business(self, item, execution, judge, expected, *, canonical_chunks=None):
         from .providers import ProviderInvalidResponse
         from .diagnostics import automatic_analysis
         from .retrieval import evidence_coverage
         trace = execution.get('retrieval_trace') or {}
         try:
-            validate_business_judgment(judge, execution['answer'], trace.get('final'), category=item['test_category'], constraints=item.get('raw'), question=item['question'], reference=expected, candidates=trace.get('candidates'))
+            validate_business_judgment(judge, execution['answer'], trace.get('final'), category=item['test_category'], constraints=item.get('raw'), question=item['question'], reference=expected, candidates=trace.get('candidates'),canonical_chunks=canonical_chunks)
             quality = judge['quality']
             if not isinstance(quality,dict):raise ValueError('quality metrics must be an object')
             if (type(quality.get('correctness')) is not int or not 0 <= quality['correctness'] <= 4
@@ -332,11 +347,12 @@ class EvaluationRunner:
         roles=business_check_roles(judge,question=item['question'],reference=expected)
         metrics['judge_check_roles']=roles
         metrics['judge_support_locations']=[{'section':section,'index':index,'support':q,'stage':'final' if quote_present(q,trace.get('final'),display=True) else 'candidate_requirement_evidence'} for section in ('checks','issues') for index,finding in enumerate(judge[section]) for q in finding['support']]
-        sufficient=None if item['test_category']=='negative' else all(check['support'] for check,role in zip(judge['checks'],roles) if role['role']=='required')
+        sufficient=None if item['test_category']=='negative' else all(check.get('scope_support') if check.get('check_type')=='scope' else check['support'] for check,role in zip(judge['checks'],roles) if role['role']=='required')
         metrics.update(retrieval_hit=bool(matching) if required else None,retrieval_precision=len(matching)/len(retrieved)*100 if required and retrieved else None,retrieval_rank=matching[0] if matching else None,retrieval_trace=trace,evidence_coverage=coverage,
             behavior_contract={'effective_pass':passed,'raw_judge_pass':judge['verdict']=='PASS','violations':judge['issues']},
             evidence_sufficiency={'status':'not_applicable' if sufficient is None else 'sufficient' if sufficient else 'insufficient','sufficient':sufficient,'source_constraints':{k:item.get('raw',{}).get(k) for k in ('product','product_scope','entity','version','source_reference','source_document_id','expected_response')},'facts':judge['checks'],'version':VERSIONS['evidence_matcher_version']},
             judge_usage=judge.get('token_usage'),judge_stages=judge.get('stages'),judge_cost=judge.get('estimated_cost'),judge_cost_estimation=judge.get('cost_estimation'))
+        metrics['judge_scope_locations']=[{'section':section,'index':index,'support':q,'stage':'canonical_bound_scope_only'} for section in ('checks','issues') for index,finding in enumerate(judge[section]) for q in finding.get('scope_support',[])]
         metrics['safety_guard']=guard
         outcome={'contract_version':VERSIONS['scoring_policy'],'execution_complete':True,**decision}
         case={'question':item['question'],'reference_answer':expected,'test_category':item['test_category'],'negative_subtype':item.get('negative_subtype'),'severity':severity,
@@ -349,6 +365,29 @@ class EvaluationRunner:
             diagnosis={'reason':analysis['analysis_reason'],'analysis_category':analysis['analysis_category'],'findings':analysis['evidence_checks'],'retrieval_failure_stage':analysis['retrieval_failure_stage']},
             root_cause={'primary':analysis['primary_root_cause'],'secondary':[],'diagnostic_basis':analysis['retrieval_failure_stage'] or analysis['analysis_reason']})
         return case
+
+    def judge_replay_preflight(self,source_id,*,include_executions=False):
+        from .judge_replay import replay_eligibility
+        from .diagnostics import _current_corpus
+        source=self.store.evaluation_run(source_id)
+        if not source:raise ValueError('Replay source not found')
+        snapshot,items,config,judge=self.baseline_inputs(source_id)
+        chunks,fingerprint=_current_corpus({'corpus_fingerprint':snapshot['corpus_fingerprint']})
+        result=replay_eligibility(source,self.store.evaluation_case_results(source_id),snapshot,config,judge,chunks,fingerprint)
+        with self.store.connection() as connection:
+            try:self.store.validate_evaluation_start(connection,snapshot,judge)
+            except ValueError as error:result.update(can_replay=False,start_blocker=str(error))
+        if not include_executions:result.pop('executions')
+        return result
+
+    def start_judge_replay(self,source_id,*,automatic=True):
+        from .full_text import CORPUS_LOCK
+        with CORPUS_LOCK:
+            plan=self.judge_replay_preflight(source_id,include_executions=True)
+            if not plan['can_replay']:raise ValueError('Replay eligibility blocked: '+json.dumps({k:v for k,v in plan.items() if k not in {'executions','new_judge'}},ensure_ascii=False))
+            snapshot,items,config,judge=self.baseline_inputs(source_id)
+            run_id=self.store.create_baseline_run(snapshot,config,judge,automatic=automatic,judge_replay=plan)
+        return run_id,items,config
 
     def start_replay(self, source_id):
         source = self.store.evaluation_run(source_id)
@@ -396,7 +435,7 @@ class EvaluationRunner:
         frozen_ids = set(json.loads(run['dataset_snapshot_json'])['question_ids'])
         cases = self.store.evaluation_case_results(run_id)
         checkpoints = run['result'].get('checkpoints', {})
-        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery') if k in run['result']}
+        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay') if k in run['result']}
         def progress(*, complete=False):
             from .telemetry import cost_fields
             events=[u for cp in checkpoints.values() for attempt in cp.get('attempts',[]) for u in attempt.get('usage',[])]
@@ -507,9 +546,15 @@ class EvaluationRunner:
                     raise ValueError('生成检查点缺少完整答案/最终上下文')
                 try:
                     phase='generation'
+                    if 'execution' not in checkpoint and lineage.get('judge_replay'):
+                        raise ValueError('Judge-only Replay execution missing; generation is forbidden')
                     if 'execution' not in checkpoint:
                         checkpoint['execution']=perform(phase,lambda:self.runtime.answer(item['question'],config))
                         self.store.update_evaluation_progress(run_id,progress())
+                    if lineage.get('judge_replay'):
+                        from .diagnostic_evidence import digest
+                        expected_execution=lineage['judge_replay']['execution_sha256'].get(item['id'])
+                        if digest(checkpoint['execution'])!=expected_execution:raise ValueError('Replay saved execution identity changed')
                     phase='judge'
                     if 'scored_result' not in checkpoint:
                         def score():

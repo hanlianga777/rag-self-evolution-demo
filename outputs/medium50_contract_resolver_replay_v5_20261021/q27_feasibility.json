@@ -1,0 +1,46 @@
+{
+  "kind": "offline_query_only_BM25_counterfactual_NOT_online_strategy",
+  "run_id": "EVAL-20261021013401711966",
+  "question_id": "V1G-110926448917-27-R123429216749",
+  "question": "这层楼昨晚重新摆了桌椅，KIRA B50再自己清洁前，这种变化要怎么处理？",
+  "selected_rank": [
+    "DOC-001-C-00096",
+    "DOC-001-C-00085",
+    "DOC-001-C-00087",
+    "DOC-001-C-00057",
+    "DOC-001-C-00080",
+    "DOC-002-C-00054",
+    "DOC-001-C-00002",
+    "DOC-001-C-00049",
+    "DOC-001-C-00119",
+    "DOC-001-C-00058",
+    "DOC-001-C-00082",
+    "DOC-002-C-00053"
+  ],
+  "trials": [
+    {
+      "top_k": 4,
+      "restore_missing_norm": true,
+      "preserve_met_facts": true,
+      "final_ids": [
+        "DOC-001-C-00096",
+        "DOC-001-C-00085",
+        "DOC-001-C-00087",
+        "DOC-001-C-00057"
+      ]
+    },
+    {
+      "top_k": 6,
+      "restore_missing_norm": true,
+      "preserve_met_facts": true,
+      "final_ids": [
+        "DOC-001-C-00096",
+        "DOC-001-C-00085",
+        "DOC-001-C-00087",
+        "DOC-001-C-00057",
+        "DOC-001-C-00080",
+        "DOC-002-C-00054"
+      ]
+    }
+  ]
+}
