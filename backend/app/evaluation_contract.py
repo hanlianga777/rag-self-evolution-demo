@@ -7,7 +7,7 @@ import unicodedata
 from .policy import GATE_DEFINITIONS
 from .safety_guard import SAFETY_IDENTITY
 
-VERSIONS = {'prompt_version': 'judge-vnext-5-fact-scope', 'evidence_matcher_version': 'evidence-vnext-2-fact-scope', 'scoring_policy': 'business-vnext-1', 'output_parser_version': 'business-output-5-fact-scope', 'judge_input_version':'frozen-canonical-norms-1', **SAFETY_IDENTITY}
+VERSIONS = {'prompt_version': 'judge-vnext-5-fact-scope', 'evidence_matcher_version': 'evidence-vnext-2-fact-scope', 'scoring_policy': 'business-vnext-1', 'output_parser_version': 'business-output-5.1-substantive-checks', 'judge_input_version':'frozen-canonical-norms-1', **SAFETY_IDENTITY}
 
 
 def policy_current(judge):
@@ -400,7 +400,8 @@ def validate_business_judgment(value, answer, entries, *, category, constraints=
                 raise ValueError('scope check requires an actual answer quote identifying that heading')
         if check['met'] and needs_final and not support:
             raise ValueError('a correct positive/ablation fact requires real Final support' if category != 'negative' else 'a correct negative fact requires real Final support')
-    if not any(role['role'] == 'required' for role in roles):
+    substantive={'fact','negative_behavior'} if category=='negative' else {'fact'}
+    if not any(role['role']=='required' and check.get('check_type','fact') in substantive for check,role in zip(checks,roles)):
         raise ValueError('at least one substantive necessary check is required')
     for issue in issues:
         if not isinstance(issue, dict) or not isinstance(issue.get('description'), str) or not issue['description'].strip() or type(issue.get('critical')) is not bool:
@@ -469,3 +470,9 @@ BUSINESS_JUDGE_PROMPT = (
     '来源别名S1/S2按sources_legend解释，不是型号。完整Parent和matched_child_ids均是本次Final，不能只读preview。'
     '跨段支持列多个真实片段，禁止伪装为一条连续原文；禁止无来源参数/换件/测量/上电/测试和产品能力承诺。'
 )
+
+
+def business_judge_input(question,expected,answer,context):
+    """One official Judge input builder, shared with the read-only probe preflight."""
+    payload={k:v for k,v in context.items() if k!='programmatic_evidence_observation' and not k.startswith('_')}
+    return json.dumps({'question':question,'reference_answer':expected,'actual_answer':answer,**payload},ensure_ascii=False)

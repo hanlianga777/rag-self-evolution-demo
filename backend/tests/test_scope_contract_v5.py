@@ -17,7 +17,8 @@ class ScopeContractTests(unittest.TestCase):
         judgment={'verdict':'PASS','reason':'scope and fact','issues':[], 'checks':[
             {'check_type':'scope','requirement':'R3遥控器','met':True,'answer_quotes':['R3遥控器'],'support':[],'scope_support':[q]},
             {'check_type':'fact','requirement':'校准','met':True,'answer_quotes':['长按按钮'],'support':[{'source_id':'body','quote':'长按按钮完成校准。'}]}]}
-        validate_business_judgment(judgment,'R3遥控器长按按钮',final,category='positive',canonical_chunks=chunks)
+        for category in ['positive','ablation','negative']:
+            validate_business_judgment(judgment,'R3遥控器长按按钮',final,category=category,canonical_chunks=chunks)
         operation=deepcopy(judgment);operation['checks'][0]['requirement']='长按按钮执行操作'
         with self.assertRaises(ValueError):validate_business_judgment(operation,'R3遥控器长按按钮',final,category='positive',canonical_chunks=chunks)
         bad=deepcopy(judgment);bad['checks'][0]['check_type']='fact'
@@ -39,3 +40,27 @@ class ScopeContractTests(unittest.TestCase):
         for child in chunks:child.update(page_start=3,parent_chunk_id='combined-parent')
         parent={**chunks[1],'content':'R3遥控器。校准。R1遥控器。安装。','parent_page_start':3,'parent_page_end':3}
         self.assertNotIn('source_scope',attach_heading_scopes([parent],chunks)[0])
+
+    def test_scope_only_is_not_a_substantive_judgment_for_any_category(self):
+        chunks,final,q=self.example()
+        for category in ['positive','ablation','negative']:
+            value={'verdict':'PASS','reason':'only scope','issues':[],'checks':[{'check_type':'scope','requirement':'R3遥控器','met':True,'answer_quotes':['R3遥控器'],'support':[],'scope_support':[q]}]}
+            with self.assertRaisesRegex(ValueError,'substantive'):
+                validate_business_judgment(value,'R3遥控器',final,category=category,canonical_chunks=chunks)
+    def test_scope_plus_failed_fact_remains_fail_and_negative_behavior_is_valid(self):
+        chunks,final,q=self.example()
+        scope={'check_type':'scope','requirement':'R3遥控器','met':True,'answer_quotes':['R3遥控器'],'support':[],'scope_support':[q]}
+        fact={'check_type':'fact','requirement':'校准步骤','met':False,'answer_quotes':[],'support':[]}
+        value={'verdict':'FAIL','reason':'遗漏事实','issues':[],'checks':[scope,fact]}
+        self.assertEqual(validate_business_judgment(value,'R3遥控器',final,category='positive',canonical_chunks=chunks)['verdict'],'FAIL')
+        value.update(verdict='PASS',checks=[scope,{'check_type':'negative_behavior','requirement':'拒绝危险操作','met':True,'answer_quotes':['拒绝危险操作'],'support':[]}])
+        validate_business_judgment(value,'R3遥控器，拒绝危险操作',final,category='negative',canonical_chunks=chunks)
+
+    def test_valid_scope_cannot_rescue_false_or_forged_fact(self):
+        chunks,final,q=self.example()
+        scope={'check_type':'scope','requirement':'R3遥控器','met':True,'answer_quotes':['R3遥控器'],'support':[],'scope_support':[q]}
+        fact={'check_type':'fact','requirement':'校准步骤','met':False,'answer_quotes':[],'support':[]}
+        value={'verdict':'PASS','reason':'scope cannot rescue fact','issues':[],'checks':[scope,fact]}
+        with self.assertRaises(ValueError):validate_business_judgment(value,'R3遥控器',final,category='positive',canonical_chunks=chunks)
+        value['checks'][1]={'check_type':'fact','requirement':'校准步骤','met':True,'answer_quotes':['长按按钮'],'support':[{'source_id':'body','quote':'伪造校准参数'}]}
+        with self.assertRaises(ValueError):validate_business_judgment(value,'R3遥控器长按按钮',final,category='positive',canonical_chunks=chunks)

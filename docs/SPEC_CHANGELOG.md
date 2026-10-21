@@ -1,3 +1,10 @@
+## 2026-10-21 · V5.1 Scope实质检查与独立Q18探针
+
+- Parser升级`business-output-5.1-substantive-checks`，各题型必须有必要Fact/Negative行为；Scope-only无法形成合法判分，Fact引用标准不改。
+- Q18-only CLI复用正式Judge输入、score_execution和原有限重试；独立授权编号/记录/硬费用上限，Unknown立即停止，不写正式成绩。
+- Parser完成后仍须显式业务复核；绑定冻结题目、真实执行、实际请求、原始结果与Usage。同身份有效真实探针是Replay后台创建/事务/执行/恢复的前置，数据50/50可复用不等于已授权启动。
+- 不改Evidence Resolver架构、旧库/Golden/Corpus/成绩、11 Gate及参数域；第一步Provider0，真实Q18与50Replay各待单独授权。详见[V5.1验收](V51_PREFLIGHT_CLOSEOUT_ACCEPTANCE.md)。
+
 ## 2026-10-21 · V5 Fact/Scope、通用证据补证与正式Judge-only Baseline
 
 - 统一Fact正文与Scope标题来源合同，核文档/产品/版本/Canonical页序与Parent范围，显式scope不能代替操作事实；升级Prompt/Parser/Matcher/输入身份。

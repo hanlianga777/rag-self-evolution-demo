@@ -2031,6 +2031,9 @@ class GovernanceStore:
                 result['judge_replay']={k:v for k,v in judge_replay.items() if k not in {'executions','new_judge'}}
                 result['judge_replay']['execution_sha256']={key:digest(e) for key,e in judge_replay['executions'].items()}
                 result['judge_replay']['timing_provenance']='historical_generation_not_current_latency'
+            if result.get('judge_replay'):
+                from .q18_probe import require_reviewed_probe
+                require_reviewed_probe(self.database_path,{**result['judge_replay'],'new_judge':judge})
             if automatic:
                 from .paid_run import current_paid_run
                 paid=current_paid_run()

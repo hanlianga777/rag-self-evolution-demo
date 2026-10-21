@@ -9,7 +9,7 @@ sys.path.insert(0,str(ROOT/'backend'))
 def verify(simulate=False):
     database=ROOT/'backend/data/demo.db';before=hashlib.sha256(database.read_bytes()).hexdigest()
     with tempfile.TemporaryDirectory() as temporary,contextlib.ExitStack() as stack:
-        stack.enter_context(patch.dict(os.environ,{'RAG_DEMO_DB_PATH':str(database),'RAG_DEMO_ENV_PATH':temporary+'/missing.env','RAG_DIAGNOSTIC_DIR':temporary+'/diagnostics','RAG_DEMO_INDEX_DIR':str(ROOT/'backend/data/index'),'RAG_DEMO_DOCUMENTS_DIR':str(ROOT/'backend/documents')}))
+        stack.enter_context(patch.dict(os.environ,{'RAG_DEMO_DB_PATH':str(database),'RAG_DEMO_ENV_PATH':temporary+'/missing.env','RAG_DIAGNOSTIC_DIR':temporary+'/diagnostics','RAG_JUDGE_PROBE_DIR':temporary+'/probes','RAG_DEMO_INDEX_DIR':str(ROOT/'backend/data/index'),'RAG_DEMO_DOCUMENTS_DIR':str(ROOT/'backend/documents')}))
         from app.governance import GovernanceStore
         from app.corpus import CorpusStore
         from app.evaluation import EvaluationRunner
@@ -59,6 +59,11 @@ def verify(simulate=False):
             runtime.judge=mock_judge;runtime.answer=lambda *a,**k:(_ for _ in ()).throw(AssertionError('Replay called generation'))
             isolated_runner=EvaluationRunner(fake_store,runtime)
             old=deepcopy_json(fake_store.evaluation_run(source_id));old_cases=deepcopy_json(fake_store.evaluation_case_results(source_id))
+            try:isolated_runner.start_judge_replay(source_id,automatic=False)
+            except ValueError as error:assert 'Q18' in str(error)
+            else:raise AssertionError('Replay bypassed Q18 probe')
+            # Explicit test-only bypass; no fake real probe/human approval is saved.
+            stack.enter_context(patch('app.q18_probe.require_reviewed_probe',return_value='ISOLATED_TEST_GATE_ONLY'))
             run_id,approved,cfg=isolated_runner.start_judge_replay(source_id,automatic=False)
             completed=isolated_runner.execute_baseline(run_id,approved,cfg)
             assert completed['status']=='completed' and len(calls)==50,(completed['status'],completed.get('error_message'))
@@ -75,7 +80,7 @@ def verify(simulate=False):
             resumed=isolated_runner.execute_baseline(child_id,approved,cfg)
             assert resumed['status']!='completed' and len(calls)==called_before and resumed['result'].get('judge_replay')
             assert fake_store.evaluation_run(source_id)==old
-            proof={'kind':'ISOLATED_MOCK_NOT_PROVIDER','judges':50,'generations':0,'completed':50,'require_current_baseline':True,'old_source_unchanged':True,
+            proof={'kind':'ISOLATED_MOCK_NOT_PROVIDER','judges':50,'generations':0,'completed':50,'probe_gate_explicit_test_only_bypass':True,'require_current_baseline':True,'old_source_unchanged':True,
                 'damaged_execution_blocks_without_generation':True,'resumed_child_keeps_no_generation_guard':True}
         plan.pop('executions');plan['normative_input_inventory']=norms;plan['scope_binding_checks']=q18_checks;plan['mock_proof']=proof
         rates=json.loads((ROOT/'backend/config/deepseek-prices.json').read_text())

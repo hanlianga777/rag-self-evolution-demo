@@ -1,0 +1,384 @@
+{
+  "verification_kind": "offline_structured_test_responses_NOT_LLM_Judge",
+  "records": 200,
+  "counts": {
+    "BL": [
+      37,
+      13
+    ],
+    "A": [
+      41,
+      9
+    ],
+    "B": [
+      40,
+      10
+    ],
+    "C": [
+      39,
+      11
+    ]
+  },
+  "PASS": 157,
+  "FAIL": 43,
+  "owner_unresolved": 0,
+  "baseline_diagnostics": {
+    "Q01": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q02": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q03": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q04": {
+      "root": "Ranking",
+      "stage": "ranking_context_selection",
+      "target_eligible": true
+    },
+    "Q05": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q06": {
+      "root": "Ranking",
+      "stage": "ranking_context_selection",
+      "target_eligible": true
+    },
+    "Q07": {
+      "root": "Retrieval",
+      "stage": "candidate_recall",
+      "target_eligible": true
+    },
+    "Q08": {
+      "root": "Ranking",
+      "stage": "ranking_context_selection",
+      "target_eligible": true
+    },
+    "Q09": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q10": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q11": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q12": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q13": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q14": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q15": {
+      "root": "Generation",
+      "stage": null,
+      "target_eligible": true
+    },
+    "Q16": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q17": {
+      "root": "Retrieval",
+      "stage": "candidate_recall",
+      "target_eligible": true
+    },
+    "Q18": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q19": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q20": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q21": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q22": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q23": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q24": {
+      "root": "Retrieval",
+      "stage": "candidate_recall",
+      "target_eligible": true
+    },
+    "Q25": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q26": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q27": {
+      "root": "Ranking",
+      "stage": "ranking_context_selection",
+      "target_eligible": false
+    },
+    "Q28": {
+      "root": "Retrieval",
+      "stage": "candidate_recall",
+      "target_eligible": true
+    },
+    "Q29": {
+      "root": "Retrieval",
+      "stage": "candidate_recall",
+      "target_eligible": true
+    },
+    "Q30": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q31": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q32": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q33": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q34": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q35": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q36": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q37": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q38": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q39": {
+      "root": "Safety",
+      "stage": null,
+      "target_eligible": true
+    },
+    "Q40": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q41": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q42": {
+      "root": "Safety",
+      "stage": null,
+      "target_eligible": true
+    },
+    "Q43": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q44": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q45": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q46": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q47": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q48": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q49": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    },
+    "Q50": {
+      "root": "Unknown",
+      "stage": null,
+      "target_eligible": false
+    }
+  },
+  "comparisons": {
+    "A": {
+      "comparison_complete": true,
+      "all_fixed_question_ids": [
+        "V1G-110926448917-24",
+        "V1G-110926448917-29",
+        "V1G-110926448917-39",
+        "V1G-110926448917-42-R122110917880-R124502591488"
+      ],
+      "new_regression_question_ids": [],
+      "continued_failure_new_issues": {
+        "V1G-110926448917-15": [
+          {
+            "description": "虽指出按钮9，但在移动后明确松开安全开关，激活后没有再次握紧以运行；Final C141已给必要动作，未解决“转起来”。",
+            "critical": false,
+            "safety_violation": true,
+            "answer_quotes": [
+              "KIRA B 50 手册中没有“单独开启清洁机组”的一个总入口；手动模式下是按“抽吸装置 / 清洁头 / 边刷”分别激活。要刷固定污渍，应操作“激活/停用清洁头”，并按手册顺序开启清洁机组。"
+            ],
+            "support": [
+              {
+                "source_id": "DOC-001-C-00059",
+                "quote": "应始终按照以下顺序打开清洁机组：1. 抽吸装置2. 刷头3. 侧刷"
+              },
+              {
+                "source_id": "DOC-001-C-00140",
+                "quote": "在手动运行的过程中，由操作人员在待清洁的场地上引导该设备"
+              },
+              {
+                "source_id": "DOC-001-C-00141",
+                "quote": "当清洁头已开启时，才能激活边刷"
+              },
+              {
+                "source_id": "DOC-001-C-00102",
+                "quote": "1 防撞保护板解锁2 防撞保护板3 刷辊4 清洁头5 换刷解锁键"
+              }
+            ],
+            "scope_resolved": true,
+            "baseline_issue_index": null
+          }
+        ],
+        "V1G-110926448917-17": [
+          {
+            "description": "已补R3右DL和R1左灯，但把“一声开机”作为通用步骤；R3 PDF第4页要求两声，不能套用R1/早期B2用户手册。",
+            "critical": false,
+            "safety_violation": false,
+            "answer_quotes": [
+              "按手册，B2 遥控器“重新配对/绑定”不是在遥控器上按某个配对键，而是在 **Unitree Explore App** 里绑定。先确认您换上的备件是 **R1 还是 R3**，因为两者绑定入口相同，但连接成功后的确认灯不同。"
+            ],
+            "support": [
+              {
+                "source_id": "DOC-002-C-00038",
+                "quote": "(2) 使用遥控器控制"
+              },
+              {
+                "source_id": "DOC-003-C-00025",
+                "quote": "首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控器设置】，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。"
+              },
+              {
+                "source_id": "DOC-003-C-00015",
+                "quote": "首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控器设置】-打开遥控器开关，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。"
+              },
+              {
+                "source_id": "DOC-003-C-00005",
+                "quote": "R3 遥控器属于 B2 遥控模块的一部分,遥控手柄内置数传模块、蓝牙模块。机器狗与遥控器可以通过 Unitree Explore App 进行绑定，绑定成功后开机即可自动连接。可操纵机器狗在站立时实现 3 轴姿态与 3 轴位置稳定全控，还可以操纵机器狗在平整地面上实现前进后退、左右侧移、原地转弯、按一定规则行走（直线，圆形，线，矩形）、上下斜坡/台阶等。遥控手柄采用更加容易持握的设计，结构符合人体工程学，手感更舒适。"
+              }
+            ],
+            "scope_resolved": true,
+            "baseline_issue_index": null
+          }
+        ]
+      },
+      "continued_failure_new_critical_question_ids": []
+    },
+    "B": {
+      "comparison_complete": true,
+      "all_fixed_question_ids": [
+        "V1G-110926448917-04",
+        "V1G-110926448917-06",
+        "V1G-110926448917-08",
+        "V1G-110926448917-15",
+        "V1G-110926448917-39",
+        "V1G-110926448917-42-R122110917880-R124502591488"
+      ],
+      "new_regression_question_ids": [
+        "V1G-110926448917-14-R121644121082-R123334431505",
+        "V1G-110926448917-36-R122036474962",
+        "V1G-110926448917-41"
+      ],
+      "continued_failure_new_issues": {},
+      "continued_failure_new_critical_question_ids": []
+    },
+    "C": {
+      "comparison_complete": true,
+      "all_fixed_question_ids": [
+        "V1G-110926448917-15",
+        "V1G-110926448917-39",
+        "V1G-110926448917-42-R122110917880-R124502591488"
+      ],
+      "new_regression_question_ids": [
+        "V1G-110926448917-41"
+      ],
+      "continued_failure_new_issues": {},
+      "continued_failure_new_critical_question_ids": []
+    }
+  },
+  "provider_calls": 0
+}

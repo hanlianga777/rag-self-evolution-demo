@@ -1,0 +1,2265 @@
+{
+  "can_replay": true,
+  "source_run_id": "EVAL-20261021013401711966",
+  "source_sha256": "afebff084525280de9a1c216180770375932ecf5f43ae6d9f25cb51ff1acec64",
+  "source_evaluation_identity": "d18aab6365a63c6de63e295866a7036e0fe6a25f1f74c2afbb4782bbab73ae3e",
+  "new_evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+  "new_versions": {
+    "prompt_version": "judge-vnext-5-fact-scope",
+    "evidence_matcher_version": "evidence-vnext-2-fact-scope",
+    "scoring_policy": "business-vnext-1",
+    "output_parser_version": "business-output-5.1-substantive-checks",
+    "judge_input_version": "frozen-canonical-norms-1",
+    "safety_guard_version": "finite-safety-1",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605"
+  },
+  "total": 50,
+  "reusable": 50,
+  "eligibility": [
+    {
+      "question_id": "V1G-110926448917-01",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "dbab3035e8cdca1bc72ba7ae318ca91ed09b59a7698532a10e90798e625f533e",
+      "execution_sha256": "d7927ef8c735000afcd90a55a42ab01cbc25e9566712164eac026ac7a4afe877",
+      "stage_sha256": {
+        "candidates": "247ed10fcc8caa720c82982fcb872b89dd0840578d7ed0cacaa3374822111ac8",
+        "reranked": "ac3489a9b874796fe7a8943aa3f09458c405eed77262f59e58e7c1d120c6a253",
+        "final": "ba256599f084a4c66c3092547f767c9598a49a06543e0c154f6967e97938ef24"
+      },
+      "generation_request_sha256": "727bbbf3019e2d9f263df11eae99e4219d5710ec8f90afd1037a9565246fb32b",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00138",
+          "full_characters": 152,
+          "summary_characters": [
+            152
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-02",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "bf0d5633574f0eff5739b1eec9ab09fd4fd946dfb55ab0f387ca12a83c9aa8a1",
+      "execution_sha256": "f0d6b70602dc8c8c48f1466deaba453863bcd7ae3d6eeefbb5812d7bb7313348",
+      "stage_sha256": {
+        "candidates": "eb1ff79ca152ed3a9f164419ad9df99395247883efa9ac8e32c1ecf5ad83bf84",
+        "reranked": "6fa4f382b26db41ddbafa8089f714ebcf596416ec76c9b9656c30d8f6113212a",
+        "final": "685e94064e6a96639663a0ac53c9c145e023ea7b20a4e5dd45c0fce4f7125b8e"
+      },
+      "generation_request_sha256": "bf0a2b96b340b41e23a7bcb5bafd2ef440a72b90e9faead7c4ee07dca5a21d26",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00134",
+          "full_characters": 282,
+          "summary_characters": [
+            282
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-03",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "34fd648b7654de650acdc81d9be832e0f153e559298c53023ec9427501d9aab4",
+      "execution_sha256": "09f2a5ece623ffb2bad9f6bc7bf3a9f177e20f49ae22ff580023fb42923f591e",
+      "stage_sha256": {
+        "candidates": "8841513994bbd8c714852bb932ef976c9da4ff3639c60857f0b41d02b2ab5f91",
+        "reranked": "6863a0275537ef102fde54ceb2d12df59cc8b20786793bee5b998f8643cc997b",
+        "final": "20c7a974531afd1ac9ee1512fe5bd6787a7ab230c1752e101dc25b3f7b870c91"
+      },
+      "generation_request_sha256": "b65a157330836f61f10e5748444eae1a186e8e6d6351e08f745ed77ad6018853",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00132",
+          "full_characters": 219,
+          "summary_characters": [
+            160,
+            160
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00134",
+          "full_characters": 282,
+          "summary_characters": [
+            160,
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-04",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "dd2df1b006f0a5cf074474b3a26ff3bc1df7d088907f46162d10a7efc52b3fa8",
+      "execution_sha256": "6bac67b61ada9f2dccc3919ef58b224b76c56ee77c21df62b9c28aa6c85fc03d",
+      "stage_sha256": {
+        "candidates": "4a26dcee3e6905448c4b4571098ace5753daf2268e128fca87994f349be2ae96",
+        "reranked": "fc575cb277145f390d6c3f446aa375bc2ed4873b10f370c780ca96bed89849d6",
+        "final": "e9a4eebd0267675d3ab5c69486f5cd889e1cf4dac01ba1f07ea98369b8237f4e"
+      },
+      "generation_request_sha256": "c0ef702635ca93901944588868e62ba55c4abff62e6a799d917107809021990f",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00179",
+          "full_characters": 86,
+          "summary_characters": [
+            86,
+            39,
+            115
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00180",
+          "full_characters": 39,
+          "summary_characters": [
+            86,
+            39,
+            115
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00185",
+          "full_characters": 115,
+          "summary_characters": [
+            86,
+            39,
+            115
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-05",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "f00807ed6211540c850d163489bdbb789acdc76174c4958184b1f3be6244fc0a",
+      "execution_sha256": "ade848f181fb60c259dd5be2754f17e8711a69c10255bf6c94f621a74d7c83ed",
+      "stage_sha256": {
+        "candidates": "b43cd1203455f6b49ecdbfd946cc1ac6f4cd84deda04606b9f541d3fc4eee2df",
+        "reranked": "a25e5e89f751cac94f65c288d95b65566827cc05b8d774bfde0e00734e3c2358",
+        "final": "d95a1b1ae6c1b5a7464df8b7c5900fb4864e82422e23613ffeb9f15483c1a214"
+      },
+      "generation_request_sha256": "4e89b7038b031781487489f9f8abdff6a284a7616548af4c4e05405702cdacdd",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00010",
+          "full_characters": 26,
+          "summary_characters": [
+            26
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-06",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "a0ecb5525dec1ef1fc06556ff6e3d4fa80c5b7440cb7177f49d60440cc6c6642",
+      "execution_sha256": "a7ee8e7851285c688939ec887f7fdca28fa1b08730a77606b982f951770ee774",
+      "stage_sha256": {
+        "candidates": "4ba4e96ab9549c0e8e9abc577713d994dac78cb7a4624fc23e7f1db752e28ffa",
+        "reranked": "1779906289bc295020f2d7668a2719b59ac4cf78d5e42d56065f4c1d438ec03d",
+        "final": "bfcaef3fe88955d60077294f5e5a7e6b627a1e3871343238454ae5e3056dc87d"
+      },
+      "generation_request_sha256": "eca5df8a6874a097c21654258cca634ff9276a4a4f28648a833f3fb91a03231a",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00026",
+          "full_characters": 254,
+          "summary_characters": [
+            160,
+            60,
+            154,
+            48
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00181",
+          "full_characters": 60,
+          "summary_characters": [
+            160,
+            60,
+            154,
+            48
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00204",
+          "full_characters": 154,
+          "summary_characters": [
+            160,
+            60,
+            154,
+            48
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00017",
+          "full_characters": 48,
+          "summary_characters": [
+            160,
+            60,
+            154,
+            48
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-07",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "882d2324c0411e6bfa1a89e509557bb2035e36f0a34b668ae249604fa92d56aa",
+      "execution_sha256": "10fa8bb5056b75b9d2b36c1c251aa8802d28238b0231b18768d64e2eec4afa93",
+      "stage_sha256": {
+        "candidates": "008df57c628a584a5b82b81ca9ffd34bdf137340375569c5a40b944c46e6fc3d",
+        "reranked": "3af0b96a5614238ee3130439e2d21847ae89360f26cc23968d85dac8021d1a71",
+        "final": "0a1a1cac1d2cfe9b83b4dbd0a47135fe6b7c540cecc2315d9465628154b9d0f7"
+      },
+      "generation_request_sha256": "2c2615c65be46a3e333be68b9f9c20545ec6aaf997f678ab018c08ad428d13bd",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00026",
+          "full_characters": 254,
+          "summary_characters": [
+            160,
+            60,
+            75
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00181",
+          "full_characters": 60,
+          "summary_characters": [
+            160,
+            60,
+            75
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00191",
+          "full_characters": 75,
+          "summary_characters": [
+            160,
+            60,
+            75
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-08",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "60514d175974942979962476e5b1e25e2ae2b4a9916cd9452df16bb6d9401798",
+      "execution_sha256": "6826087ac61edb9cee477e2c07d33b9c01c1077edad84162ecb45fb569e38a2d",
+      "stage_sha256": {
+        "candidates": "6c81b6b178e14afdca2f8f8a7ac7161a8490b1e97a2a4b39faa32179f78a214a",
+        "reranked": "951d68944b9966c125ca2f3e6ac4c001685c3dce2796ba219a947acf9d5bedd4",
+        "final": "8e90884a09787a5c10b04c10b016a395442f7702885981652f6f5a924d924822"
+      },
+      "generation_request_sha256": "4765e7b9c120e7d029b6f6006dd867837934eccd2d675045d02516b6fccecf9c",
+      "normative_sources": [
+        {
+          "source_id": "DOC-004-C-00030",
+          "full_characters": 289,
+          "summary_characters": [
+            160,
+            107,
+            117
+          ]
+        },
+        {
+          "source_id": "DOC-004-C-00032",
+          "full_characters": 107,
+          "summary_characters": [
+            160,
+            107,
+            117
+          ]
+        },
+        {
+          "source_id": "DOC-004-C-00034",
+          "full_characters": 117,
+          "summary_characters": [
+            160,
+            107,
+            117
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-09-R121605382144",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "d691c696caba4c6ad94d45d6f2b85513e2da03002ef0fd89a10472f4fcaa3658",
+      "execution_sha256": "fea0ef3b1e502ee4529d6569e98e8a31eda07759c9a718185f0f87e5c3903448",
+      "stage_sha256": {
+        "candidates": "461abec7b001194ce716c22fb85e60539c87653ad5c9fa4aaebf8fbeaeac88e3",
+        "reranked": "d1258ca2754af393b6c88e0741f61b2f9a0f61ea6f9f9c9c38156971e6dfaae5",
+        "final": "a0a4b4477164fc83609f433afd97fe16d25667435736d06be7f5096d05faab1d"
+      },
+      "generation_request_sha256": "9e02f19195f44b39a52fa3c0f7d909eaf46fc9359e2493bda708875af3fe3838",
+      "normative_sources": [
+        {
+          "source_id": "DOC-004-C-00028",
+          "full_characters": 138,
+          "summary_characters": [
+            138
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-10",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "7282ec4c67aa968a3120ffddcb38359d06f0818a83e4064f543e7d38da90c034",
+      "execution_sha256": "fda49130ce92720541a7173fb2c177e7df46f3c2f7d72935882c24b70ca44a40",
+      "stage_sha256": {
+        "candidates": "3bcb0aba2769f254015a153e73828bd54141c26a7ff7f0cfce1c103ff6ebbc75",
+        "reranked": "d624093c64af6e072525087b6a58dd9616049dde68a37548a55f58d8fd2ec22a",
+        "final": "f4341fc98343bde51663777005976dc69dc4aef8bbf4832d6df1d547822e3b4c"
+      },
+      "generation_request_sha256": "a24a076f54d09f5aa6373a8813a6c625e801a2698b467893767a0a40a614d71a",
+      "normative_sources": [
+        {
+          "source_id": "DOC-002-C-00023",
+          "full_characters": 434,
+          "summary_characters": [
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-11",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "8ba9f4b37e9dd893c1301a1a9405a67e8b435d2f9e04ec15d5b6a2c476d3ca76",
+      "execution_sha256": "198887bbb1f30dac5a5829499bf080f4261317d6bdae14d1e21d66a83bc2819d",
+      "stage_sha256": {
+        "candidates": "1230398869e3910140cb8827bc176755db78164c0e4092292c6096df68262547",
+        "reranked": "994d7dcf231a230bcdbae63acdbb71ebf7379b3a28177f32cc1105b11648adcf",
+        "final": "b2c68c2376f844731fe3a7784013f39f068f381fb6423fcaa7ad38beb1983881"
+      },
+      "generation_request_sha256": "e43394d34a255d010b95dfb4169970c6e4ad1024a473525c23b6d0a62649a258",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00144",
+          "full_characters": 211,
+          "summary_characters": [
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-12",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "841a0b2c2cb9e352b9fb99f3f90786479442406a9ee78ca4ead89df673420066",
+      "execution_sha256": "5c1d26b736fabd5a6476ab5ef6988f9e817f398adf6a673dbacff3e08fbce5ce",
+      "stage_sha256": {
+        "candidates": "f8f1080c3eee9b63059ea5650134fce35f227e1cfdab22a902483e90ab436511",
+        "reranked": "112863e8868436168a4ab3805a5d8d0b760702adb787ba181749e6608aa457bd",
+        "final": "bf0431ff2128a001fc741a5d7cab46bea2ab53911b144d8258e0b09fa1f68072"
+      },
+      "generation_request_sha256": "ae50800c5c2a7e8e513b0d7ed00a05dc8d57d7f87150779a595c376e3f418b1a",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00176",
+          "full_characters": 217,
+          "summary_characters": [
+            217
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-13",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "c8e6812cbf52c8ade64b53db9a13167778021b95abb8228d6fa43dfbc33a5de7",
+      "execution_sha256": "f2932e0897d100eef7fbb6d0495a0db9170383baf2f16b66bfa570d906c2ee65",
+      "stage_sha256": {
+        "candidates": "35755f19bcae6292990b97b5aef91f709493f35d3e45f6458d5e53c29fe7cec0",
+        "reranked": "cebf185bae32eebe3bf73aa68b4f5ba1a6e30fd48dc9ccb97d70dd737af1d5bf",
+        "final": "168284c7d58fae3e636de4fb4c44fc997a505cb413207bb470ab66390e951f74"
+      },
+      "generation_request_sha256": "e369f376ceb754fc7086b7f9a5426cfa38c8650dbb419677c6d9bc742e00463d",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00047",
+          "full_characters": 218,
+          "summary_characters": [
+            160,
+            160,
+            115,
+            121
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00144",
+          "full_characters": 211,
+          "summary_characters": [
+            160,
+            160,
+            115,
+            121
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00045",
+          "full_characters": 115,
+          "summary_characters": [
+            160,
+            160,
+            115,
+            121
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00046",
+          "full_characters": 121,
+          "summary_characters": [
+            160,
+            160,
+            115,
+            121
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-14-R121644121082-R123334431505",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "8a12327943aeee1b86acd1a23e4f168650f23dc6ce5d4cce491d9ba09db48d80",
+      "execution_sha256": "b425933379734c51ba9e7284e75d08e8ac8e90160b1cbab97200dcfa1ff67d22",
+      "stage_sha256": {
+        "candidates": "ece72ae23003e5be1234c6f3e3a337b1be9556a0397690d36c31fd1e715c71d9",
+        "reranked": "2fccfa3c760e1041cf301ebaa03711c699305e514d7e6cb32fb48351cd9c067c",
+        "final": "7733d3799622001f9c087f96b97f4a75d4fd1e3f25f02ab5766b3bb3c0a72b82"
+      },
+      "generation_request_sha256": "7bb0fef64d58f0050f63638064ba2495dbc582c7f2c7a28566509315d27bdb04",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00007",
+          "full_characters": 156,
+          "summary_characters": [
+            156,
+            31,
+            85
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00031",
+          "full_characters": 31,
+          "summary_characters": [
+            156,
+            31,
+            85
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00095",
+          "full_characters": 85,
+          "summary_characters": [
+            156,
+            31,
+            85
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-15",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "5c5600847d636df13aa5b83b2a39228b5f44fd2324200903322eebd8a6a5249a",
+      "execution_sha256": "907a3330409d7bb32f94a3d34e77b332edb2251a452a16dd993ffcadd437289b",
+      "stage_sha256": {
+        "candidates": "254a18c31a5a3b84240b3af0fcf892f01c999299f9995d3730919971321f6c6b",
+        "reranked": "2c4271bfd73964beb16c09f6cfad57616a1ebb2056fa06406f4418d1c5a9dbf8",
+        "final": "aa665c163a56d3c77d25ecb6476dd6fbb4919a72d9dc8cea8182b94d85f75226"
+      },
+      "generation_request_sha256": "c85fe346d322b2eaf33989e14cc521406b08e6b8fa5dbfdef56e504bc09e8d36",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00140",
+          "full_characters": 250,
+          "summary_characters": [
+            160,
+            47
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00141",
+          "full_characters": 47,
+          "summary_characters": [
+            160,
+            47
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-16-R123410142321",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "4d9aba3bdc52c3bb1fe4078b70c0552f8d4e68150cc5bcae04e2b7530420d029",
+      "execution_sha256": "4f3c4cecea078d6875ba073f32b2a311ad770b192ffad511ac6965add62ce139",
+      "stage_sha256": {
+        "candidates": "338f46a8d7ba52968c5d5dd3b2d740e47138eedd35481ddd68a591bb9fe2ddce",
+        "reranked": "bd4caf5c9aca99a262e8e3fc5e831a9b1cd5677ab8bcb52d24908b490e1eb413",
+        "final": "369a0eb3ba8aece7d06aba864f0c85867bc02dcc89223c4344fb2b3038e776ef"
+      },
+      "generation_request_sha256": "886b1b9439598d1f6ea1317c25f2dbf5fb9839aa12108d82c35e6a9b62318dca",
+      "normative_sources": [
+        {
+          "source_id": "DOC-002-C-00020",
+          "full_characters": 234,
+          "summary_characters": [
+            160,
+            65
+          ]
+        },
+        {
+          "source_id": "DOC-002-C-00021",
+          "full_characters": 65,
+          "summary_characters": [
+            160,
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-17",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "d820fc83fa539d89ff181aee30ae48607d236b95524b905f558c5075a341d1ef",
+      "execution_sha256": "9e4bf084548aba8530413cc0106288ad37212f75a00f8a2e256f5d9ef1a0a7e1",
+      "stage_sha256": {
+        "candidates": "ff45e7d2be279a9ccf661c8dfe705d6547259970539577ddd0def242a4170665",
+        "reranked": "5a06692876c2fc418fa36bf5cf68e922f76084857c1d607193abcff7add41f2d",
+        "final": "d912040fe29b1c2c8549d4ee877e6ed38ad7c7383cfe2e72233c653454de6c1a"
+      },
+      "generation_request_sha256": "6021723b2f5e0435356bb61794a478970b0d7b5f2c1a4b42260a829fd17cdc02",
+      "normative_sources": [
+        {
+          "source_id": "DOC-003-C-00015",
+          "full_characters": 513,
+          "summary_characters": [
+            160,
+            160
+          ]
+        },
+        {
+          "source_id": "DOC-003-C-00025",
+          "full_characters": 512,
+          "summary_characters": [
+            160,
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-18",
+      "eligible": true,
+      "blockers": [],
+      "origin": "generation_checkpoint",
+      "answer_sha256": "947e921750b0a23cb1233541739399ec41f51a1c5c8d337f74b93fb6791bd673",
+      "execution_sha256": "bba7c28b6687bd52ac1accf03c49bdf4909beeee7eb0b72ae8b33a60ee7d8966",
+      "stage_sha256": {
+        "candidates": "3dd62089a4a70e7baeedda589f05701ac2c9e22dc14a27aa2cb26c0cf2def574",
+        "reranked": "d23d0376c412181eb73e409ae6f8b6fa2ae71c69eb083a77ea81c6e3c7cd6474",
+        "final": "05fb029acda3875d45371a44cb822a10907dd3970d1c51f96fe41793ab7c5c0c"
+      },
+      "generation_request_sha256": "8816be5b5ce194698689b635ba5ecc99c695a9271fe1aad48a678dca6f1cbf09",
+      "normative_sources": [
+        {
+          "source_id": "DOC-003-C-00009",
+          "full_characters": 190,
+          "summary_characters": [
+            160,
+            160
+          ]
+        },
+        {
+          "source_id": "DOC-003-C-00022",
+          "full_characters": 190,
+          "summary_characters": [
+            160,
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-19",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "cfc5c9276b5f8beaac25f6c20d2d6670f321702d750694aed92e4daf03a58980",
+      "execution_sha256": "38a1f3f47bff1e1f71e6ca0d7b3ca28647ce87de78fad4e946456e8d96e32608",
+      "stage_sha256": {
+        "candidates": "0498f43b1207302f00ed674cd0c05f22a5505b04d1d82e04ceda8fde4202e5cc",
+        "reranked": "627bcf6da1ebe95fdb517c4524e950075d69ebf40c9bd9d258cece5e53688606",
+        "final": "217b06eec6d03b93d60289d09cb31b5e57efaa53c9d059908cd5c8428a43d6c5"
+      },
+      "generation_request_sha256": "ff5092c07868008044b2749dfb9ce6fdef94989760901051b2cd0a7d2c160599",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00236",
+          "full_characters": 93,
+          "summary_characters": [
+            93
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-20",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "5ca94044618b1954062a006ffd8a7d42b71c6b55dcfc6dd3b6db19e6b7a77c6d",
+      "execution_sha256": "687b1001c72c1ad12262d020888cd1da491e056fec0ec2ab66e99a62ab4173aa",
+      "stage_sha256": {
+        "candidates": "61de858ac36429bc0d0679adba60e3bb8a0063e1a87d576080ee0e4760286842",
+        "reranked": "2de3ec41255be8658817de2e7fac2fb6c96cf2bb28f173aed7b96f362c579061",
+        "final": "08844a849842e3f3822d1311a81aef89c47524358d323624c7655fadba90af47"
+      },
+      "generation_request_sha256": "763badfe6bf134fcbff7dacebddc10d7c726052cd5aed60527094549171dc02d",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00209",
+          "full_characters": 44,
+          "summary_characters": [
+            44
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-21",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "95ca4db790e91c33cbdacbb5e89f3d76c15eb699b412bb0865ae1ece0daf7068",
+      "execution_sha256": "3334acdedc0e7e37f8c5d2a2397f9633959df2f00352ddb2d898a8bce8f7facc",
+      "stage_sha256": {
+        "candidates": "e6a2900b069e553bab707e7eeeb3edea32d46383c1db51ce65417dc7dea2067c",
+        "reranked": "731a37cae0783ac066f921db4dd4be3e88f5bb7ecea3916e936ece2f91604198",
+        "final": "8bac8a6c2e555d9ce6d364123a37db1da6c132221ef74ad1e19439d943d9db5d"
+      },
+      "generation_request_sha256": "1021a280e130fc2ee6c24da5c7125676e2307aa4a41f1c09b08ce365246a93ec",
+      "normative_sources": [
+        {
+          "source_id": "DOC-003-C-00003",
+          "full_characters": 108,
+          "summary_characters": [
+            108
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-22",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "23e073f7896bba6e80505d51c1d511fc9bc9439024e1155a71fce416410ba982",
+      "execution_sha256": "a24c46edcbbc3d3c59686a4e1f747f6e4fdb53d0c0593be9043358557e326dcf",
+      "stage_sha256": {
+        "candidates": "31bc27370edc3fdd01ee90207872cba9c8c02463848481f233897e87d5f33c36",
+        "reranked": "40693626f70cc530dba81632cd38f0bf7bf109f083740575df79a1311aed15a5",
+        "final": "678ef2dda86c0395588b6cd805abb0466e1c060947a699cb533847e98b83fe5d"
+      },
+      "generation_request_sha256": "a0b9dbae2e82c237e20e7b960da1826fd09b74a4d22b17a19450edcb975f3d45",
+      "normative_sources": [
+        {
+          "source_id": "DOC-003-C-00010",
+          "full_characters": 124,
+          "summary_characters": [
+            124,
+            160
+          ]
+        },
+        {
+          "source_id": "DOC-003-C-00005",
+          "full_characters": 213,
+          "summary_characters": [
+            124,
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-23",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "2ae815d859ec4de4f32cbed751be5c51c77107a082b23f13a8ffd8491216ccbb",
+      "execution_sha256": "80adba4951c7dacab1713eeb2554e80e9bbdafd624cc9c32ecde99bd68277142",
+      "stage_sha256": {
+        "candidates": "f387303517c00fc2e9cdbaf853720e6e03614b8bb8713039a4563112863ac204",
+        "reranked": "7a6dee0c23fbfa86645ba665437cfc1bb42bb6f5458addaf7c980b2365e265c6",
+        "final": "769056800f8c4ef585bba9010666d2895baad40136671f1808effdfbaef05b80"
+      },
+      "generation_request_sha256": "d12be16a2bf3c5e68922279824158770f8a852d375c5ad79246136eb393eef89",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00008",
+          "full_characters": 29,
+          "summary_characters": [
+            29,
+            59
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00009",
+          "full_characters": 59,
+          "summary_characters": [
+            29,
+            59
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-24",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "0c7da215185faf518c2021b8b575a82f233cd7b6399f76c272ffdf99bc130452",
+      "execution_sha256": "f14e9abb663d7897cd3e6fb40524938054867ad0f55e2bedaebf23a70d9ffd51",
+      "stage_sha256": {
+        "candidates": "172989ab98fe8c2e3d9d53f3ce66a2350c9182abbd27b8c9c9db088e55c9b09f",
+        "reranked": "cecc3265cdfd40a25af6868b7836f213354aa22c78b4f78b97d01dface3f886b",
+        "final": "95680b074fdb5d9a465af0a85a1543a9ea043b940904a7a519d6473b502b2e2a"
+      },
+      "generation_request_sha256": "36f2d2a3814aec770e28f4810fc773efec8454ea5850f9574793fd6e722cda8d",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00022",
+          "full_characters": 143,
+          "summary_characters": [
+            143,
+            160
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00118",
+          "full_characters": 436,
+          "summary_characters": [
+            143,
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-25",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "f2cd83bac0b3ffc68a096c823330d071eb9d3d59d44890c2be519d74e19499d3",
+      "execution_sha256": "93c766c07aef71fce6ab222ecd85cd0ae823d3465d79eccd0f39bf352d481239",
+      "stage_sha256": {
+        "candidates": "8f8b6f9bca30d2df15193ad6ca5a35ae0be27934243befe108589129cace7ca4",
+        "reranked": "2b98e4d2f4484ba68b72602a70f9785d3f9267d0d480d649c9756cd02979f6ec",
+        "final": "30348521628c332e64f7d42bad1a786447f1827a71c4a1715616cb1b6563225f"
+      },
+      "generation_request_sha256": "0149a3e88ed8c42f6715937dcf2e78b2a6ccc724996d06e07d8b8f69c5edc043",
+      "normative_sources": [
+        {
+          "source_id": "DOC-004-C-00016",
+          "full_characters": 350,
+          "summary_characters": [
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-26",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "e5aae23f217e4adc4c6b54a6769d20edb99e3e4bec1f125feb3bd8e863e383c2",
+      "execution_sha256": "564396512698813a4f4ee1eda3fce7a73055a34fe1ae8ba744dbadc5a3fd9b8b",
+      "stage_sha256": {
+        "candidates": "6c15dd22c1c4eb335057c9e326c3e86d843e68093aebcc2cb805178c162b7a50",
+        "reranked": "4f26ad1f817557e380d42989387ee400cc4d688026f95d62c1b12ca0e0b6589a",
+        "final": "0f954f28ef5ba54448dd5b7547af00c74967e6ec72298a8feacb30aa74d3a811"
+      },
+      "generation_request_sha256": "2f67a6fd14f4eecf60b08c92215569da0db28609352a8a0c8944350cabb484a1",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00154",
+          "full_characters": 91,
+          "summary_characters": [
+            91
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-27-R123429216749",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "301717962f96532ca8c4213b78bd4c6ddc3511ce6efff89e25ae34c7ebde0346",
+      "execution_sha256": "91e549f59368f14c0ff866c970a1887de72422d3176e5460090bd3573bd19cb8",
+      "stage_sha256": {
+        "candidates": "992b519698e62b7dc19cf2fe7f293b819a0bb7d74e25d48ddba98823bf44e67b",
+        "reranked": "098135cc945d31ae7f422bf8ba7abf4656082477783cd6c9faaa2d633792562e",
+        "final": "50f7e96d2e56a9c4b8a3a65c13f04c1088c2602ff79369a6a792f652f37214a8"
+      },
+      "generation_request_sha256": "b01681c73f50802731120495518812a4bcdcf8b2223a294e9fea3384f1906a63",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00096",
+          "full_characters": 91,
+          "summary_characters": [
+            91
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-28",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "6843a947c487895837c06b1c39d27bf69aad0f55b433ae782c32ea0faceb0fdd",
+      "execution_sha256": "073f2341ff895c386d6f6f95f5e6849e68c5cc6b8877feb891edeca45e7761f1",
+      "stage_sha256": {
+        "candidates": "4b2f289d2ce9ab8892813bad1c0740dbc7547281364bb2cbf6e10f778f7b6604",
+        "reranked": "c77721316f8ef1ce1f49f0ef4616cc66191f638c1c806c36d45c354d10c07970",
+        "final": "891ea3d688b2bf8ea570624aca068641ae1d70ccb231b0319d5c782498a9391d"
+      },
+      "generation_request_sha256": "c141d50bd0e72bf9ddb81af7f15c594e820cab584bfd184b8fd45049d6988caa",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00026",
+          "full_characters": 254,
+          "summary_characters": [
+            160,
+            60,
+            155
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00181",
+          "full_characters": 60,
+          "summary_characters": [
+            160,
+            60,
+            155
+          ]
+        },
+        {
+          "source_id": "DOC-001-C-00200",
+          "full_characters": 155,
+          "summary_characters": [
+            160,
+            60,
+            155
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-29",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "123c6cc6cd9eb5fc3a3f974f0fa45873f8f9a418cade0b340eb64c3f346b6b21",
+      "execution_sha256": "d1ea6793b7445a660fa569afca11a096da072ca014c914aecbe88d697b71ce5d",
+      "stage_sha256": {
+        "candidates": "c7cf1f389b3766b082e72198ab1a0ab480c10e86d54da485585f71a5323c7cc1",
+        "reranked": "d3d32c0e7ef405462cd0ae1eb27a09ae05a20e7ff328740c2b295dc173fc3e6b",
+        "final": "3cdf038048c0ae3fdde55fafb37875219f172585c7764465a962c4f5416028bb"
+      },
+      "generation_request_sha256": "4a284f4d8e13995ee8232a3e3be18f2f3e5268da06f126a511fb934442ce13b7",
+      "normative_sources": [
+        {
+          "source_id": "DOC-002-C-00056",
+          "full_characters": 419,
+          "summary_characters": [
+            160
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-30-R131552256939",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "0c8b333c16f8c2d0dd00f04999db7416c865629a6929426e77d2bbad19125592",
+      "execution_sha256": "5596c0d6fbd8c3d17fcddd018d3997c6e5a17fced6470b965c02fe3b71ec4342",
+      "stage_sha256": {
+        "candidates": "e8cae42d408157947bc071695e61a9151d8d6dd1c0b7c09e4c5c98e1e1a148dc",
+        "reranked": "f6b56466e461d04f3274ff2029641b108665faecd878f37691b28340a8122141",
+        "final": "f524179db61d1a84c1bb7db094a98f19dac3c1090778a8e1b936d99c441c03f5"
+      },
+      "generation_request_sha256": "4909b83f4aa68ce6d0b03e48fc5518302167043d79d3430fe7905cfc6ff4a2b2",
+      "normative_sources": [
+        {
+          "source_id": "DOC-001-C-00233",
+          "full_characters": 81,
+          "summary_characters": [
+            81
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-31",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "e1b5761c1e357d0134c8ae022a5d68b84ef809f577690c40efa180c81f40fafd",
+      "execution_sha256": "d3e68fccd5148ebf49bcca55787cc282f5e4b7c85beeeb24faef537ffed31fd3",
+      "stage_sha256": {
+        "candidates": "27dc0ca3c055d71f47c65aefd2bfdfe99b601de55e4fe580acc0aa875f15d3a5",
+        "reranked": "13d5e8060ff44a5e9de0d290138ea383bf0d9e109b1f0043b41e88a4643a0bd3",
+        "final": "464f6e46d64fc9f4b6329d06aec88a86b28eeda0baa5b7d086f4c4dbd9077eae"
+      },
+      "generation_request_sha256": "9d5ceb55553f59cf15f1fd9ed9b1187b6e7a2dad5ab42e7cd7c7da8a94ca715b",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-32",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "caaa098007352f93c4082f6505e013ff0a9384c9f5b083284ed22bc173f3ce26",
+      "execution_sha256": "bf870dabcd7b8c8b59a714bee39a5168d3d43f2386f0438a3e6cdff65a4a342a",
+      "stage_sha256": {
+        "candidates": "be03add3e3ec258d3a1647c77384768b07e43e6d27539aa1a6e464e269bf1ac6",
+        "reranked": "e1f52bfc8081d8577240348fc326557f0817c99287d55e92e922d405afb30933",
+        "final": "881d9088c5d082a9a6e4d4921acff2ec82874da71dea723d12f0bc5d5c32ffd6"
+      },
+      "generation_request_sha256": "60255fcff003dd8167d64b833892969f89d611592407c1b47f9523cc9b7ccc4f",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-33",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "6712dd499f7b695ad5e5a3dac38d0ad1bc10f867cbb3c399ff9bfce0db2914d4",
+      "execution_sha256": "5b7415a48f1ab5294216d179d3009e9e6653fc034413484fa38a8604fab067ba",
+      "stage_sha256": {
+        "candidates": "2e10c5d914019075abc022168a6ce977365b25938429ecea22ad329adf69c6c8",
+        "reranked": "4d3a00deb9126eda9f4af533313af666572e6167182539226348f98809bf0cc5",
+        "final": "13bbd0286483882b8fce3f5c4238641bd6daeb20c98b30c8c3fcb5358b0a0bf9"
+      },
+      "generation_request_sha256": "b8d2709d005f34d4dbbd4c905ce397bb38bc9263313be2ed1883f9bda7c89a5d",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-34-R122000134985-R124446127201",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "4acdbe36f54e944aa0b297ad50b1cffe3d494666426c1584be202419b5c27242",
+      "execution_sha256": "b879e3f1c0f92706f6d35f2aaf1684a0c1c0f4ba6a16a10e6d6f550a569f8022",
+      "stage_sha256": {
+        "candidates": "b9fabb5b67746b09c198c51ebe5a9c272cb8fc1612ad9ec3bb80565afc0465b7",
+        "reranked": "27bf0ffe65da86f444bd3a440bbba3566eb497592b8e43ab8f5f7618a48e3178",
+        "final": "1d24854da8a0960359f993b68d4efaf74f34de6d424cd37e9f3be66d606d426c"
+      },
+      "generation_request_sha256": "b60e357c060a401cc2892cff37f2af3de1a08febf4b1b635271538d7bd3425ef",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-35",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "49846f4db4fdd8f48b0861d597e727f7e4bb261e55b2e4df44818ae38c0df98f",
+      "execution_sha256": "a31032b1f0c1013337888c53f732b50d985289ad94429a348b12414adcfa42ac",
+      "stage_sha256": {
+        "candidates": "36f0fbdc17d6b01cb80b3e3af4fa080428d4b95a491a1a56d638ed5b5653de75",
+        "reranked": "45423fda64ec478de7840b7201146c2ace17f2eb4b520cb26087b3b3590bd418",
+        "final": "b6f9440b5dcf5014a7456154abeca50d383f8d9f4e3421dc027723d196237e00"
+      },
+      "generation_request_sha256": "135c181edf918b5f778430c92f85057db1d86d4f19549b6c7175b34744314da6",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-36-R122036474962",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "2da81b3f44184e67ad0607a9691955b7648d1ab890bf8c62c8daf09878232cc1",
+      "execution_sha256": "1d537666c68235029025ca0dc286ce1df6d10c72ed5eefb56a1185ac95c56c89",
+      "stage_sha256": {
+        "candidates": "9cc68becb5030af49179000fad41eb98104393ceb79f11f867bd7e54cf799b74",
+        "reranked": "e2514663f6dac6c959a242e16201f8847c0fb632b003fa5b280d8af5a3d2aa09",
+        "final": "70e3c795e46e54fef1c5315d95073cef85315aba5eb08c49fa6ad36fd73ba1bb"
+      },
+      "generation_request_sha256": "57d1d59177688a49cbc7de7ac3d537d07628916e886d41aaf0616096e3026ebe",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-37",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "718a81f2dc2ec95b2d578410a25e0dd44f308d972e91282da3776d41be5f22d9",
+      "execution_sha256": "86070d0357a4d310078a81e28db07c34ad6b870dd2caad3d6870a1095ab82c5a",
+      "stage_sha256": {
+        "candidates": "15583f8ba0302f6340b29463cfae6cd8059991514aa051e626d26f403d1b5e7d",
+        "reranked": "3ce0506e87741858987dc9f0ef532c1c7d86d38083da1924ba5423bfbdf6711b",
+        "final": "74ccb27ae482c1d9ae8c442d75e36d06edb4ca5c8266b4e962ccb9588b2a49de"
+      },
+      "generation_request_sha256": "17dacedc43add7f7432ff56f0e037018519c827e9160d44066b291fb3c111240",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-38",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "f81b6c6c7e037e9d3d7f607c0a0495b753d52da384d51440f68852ea55f10b50",
+      "execution_sha256": "174b90265238aaf2c23aa77081b4269e6d417adddab1706369ddfc4ab1c553e2",
+      "stage_sha256": {
+        "candidates": "743c06bb9b2339c7cd56684c252f0ec4459cc411f689633eba3b5c560ef5214e",
+        "reranked": "359c1488ff45ea4d6f0c91b8221faa4eae351a79dc86e8fce82c9fef8c179588",
+        "final": "2019ce1040134ff6225a5094b3976b8f58420233d98d67d7995850fe255f1c08"
+      },
+      "generation_request_sha256": "caf87e39291585b92eb1aa9fef7fc2f76e0ffa4a84471f6e9f87a5abfabd4dab",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-39",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "4371aa0f5078d076728b9cdef72e4eb53d9417a946d7390dc99bbeb65b63f599",
+      "execution_sha256": "065855ed54dd38d33516dc43c5666dbc2e13cdf63740109bebd1d38bdd66a7d7",
+      "stage_sha256": {
+        "candidates": "272cc8c2953f3ac8b4ef81bfe510d34a1fd6db2e714904b8804be671fbbcc1b3",
+        "reranked": "af9154f3fddcd80aa53b8808292217fe179c44c91f36d6aaf9e7dd160ee27c37",
+        "final": "b6a6e437e3d67f7229787bf7736e318bcfb1f7fe28262f57b62dc37e2ec942d6"
+      },
+      "generation_request_sha256": "bc2aad58363c3f433948bbb41d24a674c1b74770f36190f701d251544bd074b2",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-40",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "2dc2fe1e6988be3c6015f3100bd4fed13b2bb875b2f4f7bbc5da91cc7bb7679b",
+      "execution_sha256": "74ff202cc7476e6eaa822d20cb733e43283aabab4243536fe46f15851a2ed019",
+      "stage_sha256": {
+        "candidates": "76a66d921b17f2e88360dad7a0743602d7e2400d085ea4fd8f8408958abedd18",
+        "reranked": "74162f8f5578617b9ba01d24854928af3434db72e52595bfa5e9939b83d6bb2b",
+        "final": "654dde60ad967dbaeb09b42e8741a53fd65dbe34d63f9777cf6b3ccfe1f28c13"
+      },
+      "generation_request_sha256": "04ea2c92c71277bce9808915b1a740d5b9cb7a75034d106379209826dc6e58c4",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-41",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "891bd07fddf88a1df40c6f3276f80994c26336d94713e7f577bd58e74dc8d093",
+      "execution_sha256": "9be108df9c76a377027ca9d6f4ff6095c97eaca58b291d30ca400c06e02591b4",
+      "stage_sha256": {
+        "candidates": "fdd419bc779d57d8ee4fe950d934418d10675e7b551a5a3ddaaab08bac566510",
+        "reranked": "bb0ba513ca4a4f1782029bb8674a2a2367c2b066f8b6d08565368b4e528927ab",
+        "final": "f3a5dbc27b3f0051f8a8473bd64ef6e67e247bcebdd378c60db0399f67813780"
+      },
+      "generation_request_sha256": "1a8b6bc62b74fd08566727158dc48763b21a1c38714539e442418e31c8c717a9",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-42-R122110917880-R124502591488",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "731f3873b2f3e06c00181119aaafd51880b9fa3d055b2101acceffc344f91bba",
+      "execution_sha256": "bb494802f182ea6726de5cf421fbc60a64fb97dfda21bfcb78df8c60186e6dba",
+      "stage_sha256": {
+        "candidates": "3734a919ce49a0d1aa4f0f3d0d6d3b26dd788d1a3196af382607542f930851f6",
+        "reranked": "012a649d1dd2c997179e8102155ec187f403564c7a38d966c38c64d05532c4e6",
+        "final": "97d7dc1f6844db6ba44e04fa7e777952a7cc01a097fc210ed7e5b90b04e8bec5"
+      },
+      "generation_request_sha256": "d2b8345f15c518b9ecb8419adce5f87b95f81e4cbf5264b69ee39982c9fd46c5",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-43",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "cd446c4d278284b54c9749a1b25f672020948827c4aeba7d72284953d9040e68",
+      "execution_sha256": "df4c1cf1a0c858b082104666826ef113671029de8c270ca55c5dd2c3a67efafe",
+      "stage_sha256": {
+        "candidates": "4294bee36286e8b553340d6d6c3f194b81b85c6a369a93baa3337cc0b33d19ef",
+        "reranked": "c3f14b97ac9d074180beb854e0d40cd7362cb26e20fcc8e8f615c5aa75717e74",
+        "final": "68336756d0f0b2000363496f9da26ce5bff07e203ecf67395333dbcfd20af962"
+      },
+      "generation_request_sha256": "a14e1e0f9f47fa5c80a53ae00170406d74426e95482bc6754627e7dd579aa749",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-44-R122200100987-R124516421396",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "9cd14dcad2563ab48c6af253b7629b8b283c2ca81222b9c7fc9a1fec8a0b9217",
+      "execution_sha256": "8cd2c4c37d1622134eaf94155477710388054dcb12579bf37823ecad5dccaf76",
+      "stage_sha256": {
+        "candidates": "da47bc80762b876dfbf2889264e4c8a357a2e009e7d7a0bc59c9fb56d7bac6dd",
+        "reranked": "6bf350acbc9a22f98793d4a27aa94ef2f8a32b2b7ce111a6a1713a1209909485",
+        "final": "b5d6dfb90d6f292757c17c645284562757c14b9310eed299fcd7b1a70eea8df4"
+      },
+      "generation_request_sha256": "8128cbee64ecf55dc3ebba446ab52480529f71da6614d744753fb552773be598",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-45-R122231403350-R124530599411",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "6609092e6e29e8faf6145fceffcfd68244e11c93c6b68537b7f53802befde410",
+      "execution_sha256": "8f755a8bcfbe7c083d2115f8754012d683a5ed189249aa2d3e0d1295c4561544",
+      "stage_sha256": {
+        "candidates": "2efd4700836367b7002c6aeac529371cbf364c6e6ba20d01744e55bcb3e53a4c",
+        "reranked": "6636eeed87f5f40592391fefa89318c8795796a78af92bd2fbc32108e53bac5c",
+        "final": "332be03f3fffd94fa50c17f5332a0d32e5e650b494f8e34d629bc61753e66d65"
+      },
+      "generation_request_sha256": "b4cfd291f0532ed0483be7efbb6fa747bc530566556a7f80b532bca73c23a29b",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-46-R122330616323-R124558701867",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "f5bf2d1091fc44a83a7299a0d541bbaac295cb31df668274c364a3817fcb62bb",
+      "execution_sha256": "0c3e7a59233fed142dead543491a862ca9295530080136d5dcbe3fc0334e3c12",
+      "stage_sha256": {
+        "candidates": "e20442ae79f5a2d040dc8a1538822598df737957c220581db50d2c348a75a751",
+        "reranked": "d3ba452bd547bb32959e1bd345e7e9bab5090f89cadc2dddbc241bf283292978",
+        "final": "ce7d262bccab678c1e4bb6e052ecb35868adf2d04eda1d2d4ec6314e46cdacb9"
+      },
+      "generation_request_sha256": "7bfdf73460ae1053ca4917be569769e44d69922614ee65cdd76c3d031ce2261a",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-47",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "4f1f2570dbedf656a79dd5d0dbdb9ba926de362d713cc10767d43fab1860310e",
+      "execution_sha256": "08899a580a492f256938db8fbbe91946539b72725abeb636b94ecf2eaec3885d",
+      "stage_sha256": {
+        "candidates": "4cb71563884f7e0106328b4b4c40f6b29c713b91ac5ac9811063462dac2239ad",
+        "reranked": "f948779b77346187018f014448abbb446aa3d649921828cd8cc336ec5e6e5961",
+        "final": "4c3090ed8ddf08c87f1069c3155da2ec915c4fc7fc067df7735dd22609bbd947"
+      },
+      "generation_request_sha256": "7afea0baea14273a930fdef79d0e52c5a520a18213fa7783ba50716e62e4fe3a",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-48",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "4cde636f57ac0f413ffaa1382a8b3cbfee14651a6a3b603e8c74d0ee76fd5cec",
+      "execution_sha256": "b5f67764f2e8bcdefff5fe33ef5d58acc234e37163c914e18d7ea51bd6251611",
+      "stage_sha256": {
+        "candidates": "b7559528b663883532080ae71fa340ed8f3c2facd1ed4ab0fef492ebf01e56c3",
+        "reranked": "c2aa046be663ffbee93454f17fa49ecfab2e47152f33dce6340fcd0127ffc039",
+        "final": "08b1b61c546cde3fd068bef7b7958a31f06a2a165268edc7f80d0fd9c8810c6e"
+      },
+      "generation_request_sha256": "ec9970432cd9bfbda600369301ddbeae6205b7823ee12dab197fd8a79076d015",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-49",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "817081a3314edbdb04c4011483987da7e6d602cd91e411d1211fc43b9f3a40ed",
+      "execution_sha256": "2f1542ec0b2e86f185684504b9bd21b7a9b8de6c920b78034cb55a92e4e3d697",
+      "stage_sha256": {
+        "candidates": "6d0243ef0eb68c1951e3682f2aae95c9cf3a251e90d8e0e72f7c6f58cdaaed91",
+        "reranked": "65a1bf7c288b85ed4c6abd906d5cc7dc0c680b9d4719f171ef23117601e599bb",
+        "final": "d34d12ab1d1b2c0670fc9aa68987830a606d47cffb86a7e7edeaa8cfa6f5a218"
+      },
+      "generation_request_sha256": "43bead69a25fcd54ffb37b4c3dff89c92cff7d3dec1a039c9613813da49d74cc",
+      "normative_sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-50-R122406390043-R124544152999",
+      "eligible": true,
+      "blockers": [],
+      "origin": "scored_case_generation",
+      "answer_sha256": "4d38c72126d798eb89621716f840461f9d0a6ee6505c1eab5eda6b8088edd97d",
+      "execution_sha256": "33902537f4cbec9ce34d0c90b0a8eb1490cdf5fd2ab15a10b05c715f8dae41c7",
+      "stage_sha256": {
+        "candidates": "5806caba00ae0804d79ace746cc8baf1e74200847edb0723412cd534a33b3980",
+        "reranked": "c3bd0cd588e76082268ef01f0454fb3ae6f30416fd0582854f2ec148752fb6fe",
+        "final": "7945eb13e294804418750fab1d3254261b7e5f9f9085ed2bbe7f3d18f3bd4ed3"
+      },
+      "generation_request_sha256": "a074f72215f3511d5ea5bf8235564a8ceda02bb6104e4db22fe0a08c4aa13d1a",
+      "normative_sources": []
+    }
+  ],
+  "generation_calls": 0,
+  "judge_calls": 50,
+  "max_attempts_per_question": 3,
+  "max_judge_calls": 150,
+  "request_output_limit": 32768,
+  "timing_provenance": "historical_generation_not_current_latency",
+  "new_judge": {
+    "model": "deepseek-v4-flash",
+    "prompt_version": "judge-vnext-5-fact-scope",
+    "evidence_matcher_version": "evidence-vnext-2-fact-scope",
+    "scoring_policy": "business-vnext-1",
+    "output_parser_version": "business-output-5.1-substantive-checks",
+    "judge_input_version": "frozen-canonical-norms-1",
+    "safety_guard_version": "finite-safety-1",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605",
+    "temperature": 0,
+    "baseline_version": "runtime-initial-20261014030238448891",
+    "execution_snapshot": {
+      "embedding_model": "text-embedding-v4",
+      "vector_index": "FAISS IndexFlatIP (normalized cosine similarity)",
+      "generation_model": "deepseek-v4-flash",
+      "temperature": 0.2,
+      "request_limits": {
+        "answer": 8192,
+        "judge": 32768,
+        "query": 4096
+      }
+    },
+    "judge_prompt_sha256": "817ebd0f2be42e36f1e7c6bd1c1d35805aaa7d17ed30ec33ac539b01c26fdefd",
+    "generation_prompt_version": "generation-vnext-1",
+    "generation_boundary_sha256": "d1fa3c13186c04fb95bd01be6615f25c6a59dbdd766290a108c4bfac78456ea2",
+    "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf"
+  },
+  "can_start_replay": false,
+  "probe_blocker": "Q18 independent real probe and explicit business review required for this Evaluation Identity",
+  "normative_input_inventory": [
+    {
+      "question_id": "V1G-110926448917-01",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00138",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "一般设置\n1. 按下“设置”菜单中的“一般设置”按钮\n1\n“一般设置”按钮\n\n2. 按下“一般设置”按钮\n显示当前的一般设置。\n当激活“警告灯”时，会激活 警告灯\n可以在“设定时区”下设置相应时区\n当激活“快速模式”时，会激活 快速模式\n快速模式已激活 | \n快速模式已停用 | 最大 3.6 km/h"
+          ],
+          "full_characters": 152
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-02",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00134",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "1. 在设置菜单中按下“用户配置”按钮\n2. 按下“新用户”按钮\n\n3. 选择所需语言\n4. 点击用户名的输入栏\n5. 利用屏幕上的键盘输入用户名，点击回车键完成\n6. 按下“密码”按钮\n7. 点击“密码输入”输入栏\n8. 利用屏幕上的键盘输入密码\n9. 在“密码确认”输入栏中再次输入密码进行确认\n\n10. 按下操作按钮\n11. 按下“权限”按钮-\n1 确认2 “权限”按钮3 权限列表4 出厂设置权限 操作人员5 出厂设置权限 主管\n12. 按下所需用户组的出厂设置按钮 操作人员 或 主管\n13. 如有必要，可以更改列表中的个别权限\n14. 按下操作按钮"
+          ],
+          "full_characters": 282
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-03",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00132",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "设置\n1. 按主菜单中按下设置按钮\nLorem ipsum dolor sit\nLorem ipsum dolor sit\nLorem ipsum dolor sit\n\n1 “用户配置”按钮\n显示设置菜单。\n1 创建和管理用户\n2 设置时间和日期\n3 配置网络连接\n4 系统信息（工作时间<sub>、</sub>软件版",
+            "1. 在设置菜单中按下“用户配置”按钮\n2. 按下“新用户”按钮\n\n3. 选择所需语言\n4. 点击用户名的输入栏\n5. 利用屏幕上的键盘输入用户名，点击回车键完成\n6. 按下“密码”按钮\n7. 点击“密码输入”输入栏\n8. 利用屏幕上的键盘输入密码\n9. 在“密码确认”输入栏中再次输入密码进行确认\n\n10. 按下操"
+          ],
+          "full_characters": 219
+        },
+        {
+          "chunk_id": "DOC-001-C-00134",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "设置\n1. 按主菜单中按下设置按钮\nLorem ipsum dolor sit\nLorem ipsum dolor sit\nLorem ipsum dolor sit\n\n1 “用户配置”按钮\n显示设置菜单。\n1 创建和管理用户\n2 设置时间和日期\n3 配置网络连接\n4 系统信息（工作时间<sub>、</sub>软件版",
+            "1. 在设置菜单中按下“用户配置”按钮\n2. 按下“新用户”按钮\n\n3. 选择所需语言\n4. 点击用户名的输入栏\n5. 利用屏幕上的键盘输入用户名，点击回车键完成\n6. 按下“密码”按钮\n7. 点击“密码输入”输入栏\n8. 利用屏幕上的键盘输入密码\n9. 在“密码确认”输入栏中再次输入密码进行确认\n\n10. 按下操"
+          ],
+          "full_characters": 282
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-04",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00179",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "运输\n小心\n忽视重量受伤与损坏危险运输和存放时注意设备的重量请勿在湿滑地面或坡道上行驶\n1. 清空清水箱和污水箱\n2. 用车辆运输时，根据现行准则固定设备以防滑动和倾翻\n",
+            "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+            "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电"
+          ],
+          "full_characters": 86
+        },
+        {
+          "chunk_id": "DOC-001-C-00180",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "运输\n小心\n忽视重量受伤与损坏危险运输和存放时注意设备的重量请勿在湿滑地面或坡道上行驶\n1. 清空清水箱和污水箱\n2. 用车辆运输时，根据现行准则固定设备以防滑动和倾翻\n",
+            "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+            "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电"
+          ],
+          "full_characters": 39
+        },
+        {
+          "chunk_id": "DOC-001-C-00185",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "运输\n小心\n忽视重量受伤与损坏危险运输和存放时注意设备的重量请勿在湿滑地面或坡道上行驶\n1. 清空清水箱和污水箱\n2. 用车辆运输时，根据现行准则固定设备以防滑动和倾翻\n",
+            "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+            "每月一次\n1. 清洁污水箱和盖子之间的密封件\n2. 检查污水箱和盖子之间的密封件，必要时更换密封件\n3. 清洁毛刷通道\n4. 清洁清水过滤器\n5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电"
+          ],
+          "full_characters": 115
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-05",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00010",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "个人防护装备\n小心\n在设备上工作时请您佩戴合适的手套"
+          ],
+          "full_characters": 26
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-06",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00026",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \n小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零部件上进行工作\n小心\n只允许已授权的客户服务处或熟知该领域所有重要安全规定的专业人员进行设备修",
+            "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "清洁对接站（选项）\n警告\n触电危险在对接站上作业前将电源插头从插座中拔下\n1 污水槽2 盖板3 对接站4 位置码5 对接推杆6 带浮子的浮动开关\n1. 取下盖板2. 检查浮子开关和浮子是否脏污，必要时清洁3. 清洁污水槽，并用水冲洗4. 装上盖板\n\n5. 用湿布清洁位置码\n6. 检查对接推杆是否能自由活动",
+            "危险\n\n决不能用湿手触及电源插头或者插座\n危险\n防护等级 I 的设备只能按规定连接到接地电源上"
+          ],
+          "full_characters": 254
+        },
+        {
+          "chunk_id": "DOC-001-C-00181",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \n小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零部件上进行工作\n小心\n只允许已授权的客户服务处或熟知该领域所有重要安全规定的专业人员进行设备修",
+            "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "清洁对接站（选项）\n警告\n触电危险在对接站上作业前将电源插头从插座中拔下\n1 污水槽2 盖板3 对接站4 位置码5 对接推杆6 带浮子的浮动开关\n1. 取下盖板2. 检查浮子开关和浮子是否脏污，必要时清洁3. 清洁污水槽，并用水冲洗4. 装上盖板\n\n5. 用湿布清洁位置码\n6. 检查对接推杆是否能自由活动",
+            "危险\n\n决不能用湿手触及电源插头或者插座\n危险\n防护等级 I 的设备只能按规定连接到接地电源上"
+          ],
+          "full_characters": 60
+        },
+        {
+          "chunk_id": "DOC-001-C-00204",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \n小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零部件上进行工作\n小心\n只允许已授权的客户服务处或熟知该领域所有重要安全规定的专业人员进行设备修",
+            "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "清洁对接站（选项）\n警告\n触电危险在对接站上作业前将电源插头从插座中拔下\n1 污水槽2 盖板3 对接站4 位置码5 对接推杆6 带浮子的浮动开关\n1. 取下盖板2. 检查浮子开关和浮子是否脏污，必要时清洁3. 清洁污水槽，并用水冲洗4. 装上盖板\n\n5. 用湿布清洁位置码\n6. 检查对接推杆是否能自由活动",
+            "危险\n\n决不能用湿手触及电源插头或者插座\n危险\n防护等级 I 的设备只能按规定连接到接地电源上"
+          ],
+          "full_characters": 154
+        },
+        {
+          "chunk_id": "DOC-001-C-00017",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \n小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零部件上进行工作\n小心\n只允许已授权的客户服务处或熟知该领域所有重要安全规定的专业人员进行设备修",
+            "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "清洁对接站（选项）\n警告\n触电危险在对接站上作业前将电源插头从插座中拔下\n1 污水槽2 盖板3 对接站4 位置码5 对接推杆6 带浮子的浮动开关\n1. 取下盖板2. 检查浮子开关和浮子是否脏污，必要时清洁3. 清洁污水槽，并用水冲洗4. 装上盖板\n\n5. 用湿布清洁位置码\n6. 检查对接推杆是否能自由活动",
+            "危险\n\n决不能用湿手触及电源插头或者插座\n危险\n防护等级 I 的设备只能按规定连接到接地电源上"
+          ],
+          "full_characters": 48
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-07",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00026",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \n小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零部件上进行工作\n小心\n只允许已授权的客户服务处或熟知该领域所有重要安全规定的专业人员进行设备修",
+            "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "清洗粗大污染物滤网\n1. 打开污水箱盖罩\n\n2. 向上拉出粗大污染物滤网\n3. 将粗大污染物滤网放到自来水下冲洗\n4. 将粗大污染物滤网装入污水箱中"
+          ],
+          "full_characters": 254
+        },
+        {
+          "chunk_id": "DOC-001-C-00181",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \n小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零部件上进行工作\n小心\n只允许已授权的客户服务处或熟知该领域所有重要安全规定的专业人员进行设备修",
+            "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "清洗粗大污染物滤网\n1. 打开污水箱盖罩\n\n2. 向上拉出粗大污染物滤网\n3. 将粗大污染物滤网放到自来水下冲洗\n4. 将粗大污染物滤网装入污水箱中"
+          ],
+          "full_characters": 60
+        },
+        {
+          "chunk_id": "DOC-001-C-00191",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \n小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零部件上进行工作\n小心\n只允许已授权的客户服务处或熟知该领域所有重要安全规定的专业人员进行设备修",
+            "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "清洗粗大污染物滤网\n1. 打开污水箱盖罩\n\n2. 向上拉出粗大污染物滤网\n3. 将粗大污染物滤网放到自来水下冲洗\n4. 将粗大污染物滤网装入污水箱中"
+          ],
+          "full_characters": 75
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-08",
+      "sources": [
+        {
+          "chunk_id": "DOC-004-C-00030",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "专用充电器进行充电。对于使用非 Unitree 官方提供的充电器进行充电所造成的一切后果，Unitree 将不予负责。\n11. 使用接触式充电器充电时请将充电板和 B2 放置在水泥地面等周围无易燃、可燃物的地面。请留意充电过程，以防发生意外。\n12. 禁止在机器人运行结束后，立刻对进行充电。此时，电池处于高温状态，强制",
+            "- 清洁\n当长时间未使用接触式充电器，在使用前请先清洁充电板表面。擦拭表面时请先关闭电源，使用干燥的软布对充电板表面和机身底部充电电极进行擦拭，尤其关注表面是否擦拭干净；清洁时严禁使用金属刷、砂纸等，以免刮伤表面。",
+            "- 检查\n在充电前后开展例行检查，可大幅度提升产品可靠性能，降低安全隐患，延长使用寿命。\n1. 检查充电器表面有无变形、鼓包等；\n2. 检查充电接口有无水渍、异物等。\nB2 电池&充电器使用手册\n© 2023 宇树科技 版权所有\n12"
+          ],
+          "full_characters": 289
+        },
+        {
+          "chunk_id": "DOC-004-C-00032",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "专用充电器进行充电。对于使用非 Unitree 官方提供的充电器进行充电所造成的一切后果，Unitree 将不予负责。\n11. 使用接触式充电器充电时请将充电板和 B2 放置在水泥地面等周围无易燃、可燃物的地面。请留意充电过程，以防发生意外。\n12. 禁止在机器人运行结束后，立刻对进行充电。此时，电池处于高温状态，强制",
+            "- 清洁\n当长时间未使用接触式充电器，在使用前请先清洁充电板表面。擦拭表面时请先关闭电源，使用干燥的软布对充电板表面和机身底部充电电极进行擦拭，尤其关注表面是否擦拭干净；清洁时严禁使用金属刷、砂纸等，以免刮伤表面。",
+            "- 检查\n在充电前后开展例行检查，可大幅度提升产品可靠性能，降低安全隐患，延长使用寿命。\n1. 检查充电器表面有无变形、鼓包等；\n2. 检查充电接口有无水渍、异物等。\nB2 电池&充电器使用手册\n© 2023 宇树科技 版权所有\n12"
+          ],
+          "full_characters": 107
+        },
+        {
+          "chunk_id": "DOC-004-C-00034",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "专用充电器进行充电。对于使用非 Unitree 官方提供的充电器进行充电所造成的一切后果，Unitree 将不予负责。\n11. 使用接触式充电器充电时请将充电板和 B2 放置在水泥地面等周围无易燃、可燃物的地面。请留意充电过程，以防发生意外。\n12. 禁止在机器人运行结束后，立刻对进行充电。此时，电池处于高温状态，强制",
+            "- 清洁\n当长时间未使用接触式充电器，在使用前请先清洁充电板表面。擦拭表面时请先关闭电源，使用干燥的软布对充电板表面和机身底部充电电极进行擦拭，尤其关注表面是否擦拭干净；清洁时严禁使用金属刷、砂纸等，以免刮伤表面。",
+            "- 检查\n在充电前后开展例行检查，可大幅度提升产品可靠性能，降低安全隐患，延长使用寿命。\n1. 检查充电器表面有无变形、鼓包等；\n2. 检查充电接口有无水渍、异物等。\nB2 电池&充电器使用手册\n© 2023 宇树科技 版权所有\n12"
+          ],
+          "full_characters": 117
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-09-R121605382144",
+      "sources": [
+        {
+          "chunk_id": "DOC-004-C-00028",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "- 废弃\n鼓包、跌落、进水、破损等损坏的电池需要进行报废处理，不得继续使用，以免引起安全风险。务必将电池彻底放完电后，才将电池置于指定的电池回收箱中。电池是危险化学品，严禁废置于普通垃圾箱。相关细节，请遵循当地电池回收和弃置的法律法规。\n© 2023 宇树科技 版权所有\n11"
+          ],
+          "full_characters": 138
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-10",
+      "sources": [
+        {
+          "chunk_id": "DOC-002-C-00023",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "电池充电\n① 将电池从 B2 机身中取出（向外拉出电池包提带）\n② 充电器先插入输入交流电源\n(100-240V,50/60Hz)\n③ 连接 B2 电池\n④ 充满电后手动断电\n1. 连接充电器到交流电源（100-240V，50/60Hz）。连接前必须确保外接电源电压与充电器额定输入电压匹配，否则会导致充电器损坏（在充电"
+          ],
+          "full_characters": 434
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-11",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00144",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "位置码\n必须在起点固定 位置码 如果一条路线的终点需要作为另一条路线的起点，则在路线的终点同样必须有一个 位置码 位置码 用于定位<sub>。</sub>\n位置码 在设备上随附\n位置码 不得覆膜，因为覆膜会降低可识别性\n在一个清洁对象中，所有 位置码 必须拥有不同的代码\n\n在不同路线中可以包含相同的 位置码\n必须将每"
+          ],
+          "full_characters": 211
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-12",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00176",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "清洁报告\n可以在 清洁报告 检查已完成的清洁任务的结果\n1. 按下 清洁报告 按钮\n\n1 按钮 清洁报告\n2. 点击所需清洁任务，以查看详情\n1 滚动条2 已完成的清洁任务3 执行 日期和时间4 执行时长5 经过的清洁线路6 地图视图\n显示所选清洁任务的详情。\n\n1 已清洁的面积，以平方米为单位2 符合程度3 清洁线路的长度4 清洁时长5 设备位置6 已清洁的面积7 未清洁的面积（障碍物）8 速度 快速蓝色绿色黄色橙色红色慢速"
+          ],
+          "full_characters": 217
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-13",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00047",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "将环境划分为清洁区\n对于实用划分，环境可分为结构永久不变的区域和环境经常变化的区域（例如由于季节性供货）\n得益于之后阐述的连接功能，单独示教的清洁区达到了高度灵活性 大约 30-60 分钟的分区时间也在资源利用和可用性方面得到了证明\n此外，个别经常利用的区域可以更常清洁，或者在环境发生重大变化的情况下，只需对受影响的路",
+            "位置码\n必须在起点固定 位置码 如果一条路线的终点需要作为另一条路线的起点，则在路线的终点同样必须有一个 位置码 位置码 用于定位<sub>。</sub>\n位置码 在设备上随附\n位置码 不得覆膜，因为覆膜会降低可识别性\n在一个清洁对象中，所有 位置码 必须拥有不同的代码\n\n在不同路线中可以包含相同的 位置码\n必须将每",
+            "位置代码\n自动清洁需要位置代码 若要开始一条清洁路线，必须将设备置于一个位置代码前方 因此应将它们安排在建筑物内的战略点位 该位置代码由设备可读取的代码和人类可读取的位置代码 ID 组成\n请将位置代码固定在 66 cm 的高度\n",
+            "提示\n每台设备不得使用多个带有相同 ID 的位置代码\n在每个位置代码上可存储任意数量的路线\n若要开始一条路线，必须将设备置于相关位置代码的前方\n请勿为位置代码覆膜 由于覆膜，设备可能会无法正确识别位置代码\n在无位置代码的情况下也可能会结束路线"
+          ],
+          "full_characters": 218
+        },
+        {
+          "chunk_id": "DOC-001-C-00144",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "将环境划分为清洁区\n对于实用划分，环境可分为结构永久不变的区域和环境经常变化的区域（例如由于季节性供货）\n得益于之后阐述的连接功能，单独示教的清洁区达到了高度灵活性 大约 30-60 分钟的分区时间也在资源利用和可用性方面得到了证明\n此外，个别经常利用的区域可以更常清洁，或者在环境发生重大变化的情况下，只需对受影响的路",
+            "位置码\n必须在起点固定 位置码 如果一条路线的终点需要作为另一条路线的起点，则在路线的终点同样必须有一个 位置码 位置码 用于定位<sub>。</sub>\n位置码 在设备上随附\n位置码 不得覆膜，因为覆膜会降低可识别性\n在一个清洁对象中，所有 位置码 必须拥有不同的代码\n\n在不同路线中可以包含相同的 位置码\n必须将每",
+            "位置代码\n自动清洁需要位置代码 若要开始一条清洁路线，必须将设备置于一个位置代码前方 因此应将它们安排在建筑物内的战略点位 该位置代码由设备可读取的代码和人类可读取的位置代码 ID 组成\n请将位置代码固定在 66 cm 的高度\n",
+            "提示\n每台设备不得使用多个带有相同 ID 的位置代码\n在每个位置代码上可存储任意数量的路线\n若要开始一条路线，必须将设备置于相关位置代码的前方\n请勿为位置代码覆膜 由于覆膜，设备可能会无法正确识别位置代码\n在无位置代码的情况下也可能会结束路线"
+          ],
+          "full_characters": 211
+        },
+        {
+          "chunk_id": "DOC-001-C-00045",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "将环境划分为清洁区\n对于实用划分，环境可分为结构永久不变的区域和环境经常变化的区域（例如由于季节性供货）\n得益于之后阐述的连接功能，单独示教的清洁区达到了高度灵活性 大约 30-60 分钟的分区时间也在资源利用和可用性方面得到了证明\n此外，个别经常利用的区域可以更常清洁，或者在环境发生重大变化的情况下，只需对受影响的路",
+            "位置码\n必须在起点固定 位置码 如果一条路线的终点需要作为另一条路线的起点，则在路线的终点同样必须有一个 位置码 位置码 用于定位<sub>。</sub>\n位置码 在设备上随附\n位置码 不得覆膜，因为覆膜会降低可识别性\n在一个清洁对象中，所有 位置码 必须拥有不同的代码\n\n在不同路线中可以包含相同的 位置码\n必须将每",
+            "位置代码\n自动清洁需要位置代码 若要开始一条清洁路线，必须将设备置于一个位置代码前方 因此应将它们安排在建筑物内的战略点位 该位置代码由设备可读取的代码和人类可读取的位置代码 ID 组成\n请将位置代码固定在 66 cm 的高度\n",
+            "提示\n每台设备不得使用多个带有相同 ID 的位置代码\n在每个位置代码上可存储任意数量的路线\n若要开始一条路线，必须将设备置于相关位置代码的前方\n请勿为位置代码覆膜 由于覆膜，设备可能会无法正确识别位置代码\n在无位置代码的情况下也可能会结束路线"
+          ],
+          "full_characters": 115
+        },
+        {
+          "chunk_id": "DOC-001-C-00046",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "将环境划分为清洁区\n对于实用划分，环境可分为结构永久不变的区域和环境经常变化的区域（例如由于季节性供货）\n得益于之后阐述的连接功能，单独示教的清洁区达到了高度灵活性 大约 30-60 分钟的分区时间也在资源利用和可用性方面得到了证明\n此外，个别经常利用的区域可以更常清洁，或者在环境发生重大变化的情况下，只需对受影响的路",
+            "位置码\n必须在起点固定 位置码 如果一条路线的终点需要作为另一条路线的起点，则在路线的终点同样必须有一个 位置码 位置码 用于定位<sub>。</sub>\n位置码 在设备上随附\n位置码 不得覆膜，因为覆膜会降低可识别性\n在一个清洁对象中，所有 位置码 必须拥有不同的代码\n\n在不同路线中可以包含相同的 位置码\n必须将每",
+            "位置代码\n自动清洁需要位置代码 若要开始一条清洁路线，必须将设备置于一个位置代码前方 因此应将它们安排在建筑物内的战略点位 该位置代码由设备可读取的代码和人类可读取的位置代码 ID 组成\n请将位置代码固定在 66 cm 的高度\n",
+            "提示\n每台设备不得使用多个带有相同 ID 的位置代码\n在每个位置代码上可存储任意数量的路线\n若要开始一条路线，必须将设备置于相关位置代码的前方\n请勿为位置代码覆膜 由于覆膜，设备可能会无法正确识别位置代码\n在无位置代码的情况下也可能会结束路线"
+          ],
+          "full_characters": 121
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-14-R121644121082-R123334431505",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00007",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "安全提示\n首次使用本设备前，请注意仔细阅读本操作说明书以及完整操作说明书（设备显示屏中），然后按其操作\n在护罩和所有盖子均已关闭的情况下，才能操作本设备\n按下紧急停机按钮，在紧急情况下立即停用\n只能在不超过最大允许坡度的场地上操作设备（参见小节“技术数据”）\n在对接过程中，请勿将任何身体部位伸入对接站和设备之间",
+            "紧急停机按钮\n如果按下紧急停机按钮，所有清洁和行驶功能立即结束",
+            "按下紧急停机按钮会发生什么？\n设备立即停止，清洁机组关闭 屏幕仍然正常工作 若要恢复运行，必须旋转并拉出紧急停机按钮 然后设备会记录当前路线的清洁<sub>。</sub>"
+          ],
+          "full_characters": 156
+        },
+        {
+          "chunk_id": "DOC-001-C-00031",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "安全提示\n首次使用本设备前，请注意仔细阅读本操作说明书以及完整操作说明书（设备显示屏中），然后按其操作\n在护罩和所有盖子均已关闭的情况下，才能操作本设备\n按下紧急停机按钮，在紧急情况下立即停用\n只能在不超过最大允许坡度的场地上操作设备（参见小节“技术数据”）\n在对接过程中，请勿将任何身体部位伸入对接站和设备之间",
+            "紧急停机按钮\n如果按下紧急停机按钮，所有清洁和行驶功能立即结束",
+            "按下紧急停机按钮会发生什么？\n设备立即停止，清洁机组关闭 屏幕仍然正常工作 若要恢复运行，必须旋转并拉出紧急停机按钮 然后设备会记录当前路线的清洁<sub>。</sub>"
+          ],
+          "full_characters": 31
+        },
+        {
+          "chunk_id": "DOC-001-C-00095",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "安全提示\n首次使用本设备前，请注意仔细阅读本操作说明书以及完整操作说明书（设备显示屏中），然后按其操作\n在护罩和所有盖子均已关闭的情况下，才能操作本设备\n按下紧急停机按钮，在紧急情况下立即停用\n只能在不超过最大允许坡度的场地上操作设备（参见小节“技术数据”）\n在对接过程中，请勿将任何身体部位伸入对接站和设备之间",
+            "紧急停机按钮\n如果按下紧急停机按钮，所有清洁和行驶功能立即结束",
+            "按下紧急停机按钮会发生什么？\n设备立即停止，清洁机组关闭 屏幕仍然正常工作 若要恢复运行，必须旋转并拉出紧急停机按钮 然后设备会记录当前路线的清洁<sub>。</sub>"
+          ],
+          "full_characters": 85
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-15",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00140",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "手动模式\n在手动运行的过程中，由操作人员在待清洁的场地上引导该设备\n1. 在触摸屏上选择功能“手动清洁”\n1 隐藏/显示菜单项“刷子功率和抽吸功率”2 电池充电状态3 清洁剂计量4 抽吸功率5 刷子功率\n\n6 返回功能选择7 水量8 激活/停用边刷9 激活/停用清洁头10 激活/停用抽吸装置11 清水箱液位\n2. 操",
+            "提示\n当清洁头已开启时，才能激活边刷\n7. 操作并握紧安全开关\n8. 将设备推到待清洁的场地上"
+          ],
+          "full_characters": 250
+        },
+        {
+          "chunk_id": "DOC-001-C-00141",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "手动模式\n在手动运行的过程中，由操作人员在待清洁的场地上引导该设备\n1. 在触摸屏上选择功能“手动清洁”\n1 隐藏/显示菜单项“刷子功率和抽吸功率”2 电池充电状态3 清洁剂计量4 抽吸功率5 刷子功率\n\n6 返回功能选择7 水量8 激活/停用边刷9 激活/停用清洁头10 激活/停用抽吸装置11 清水箱液位\n2. 操",
+            "提示\n当清洁头已开启时，才能激活边刷\n7. 操作并握紧安全开关\n8. 将设备推到待清洁的场地上"
+          ],
+          "full_characters": 47
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-16-R123410142321",
+      "sources": [
+        {
+          "chunk_id": "DOC-002-C-00020",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "- 搭载其他外设，提升作业精准率\nB2 提供多个扩展接口，1000M-Base-Ethernet×4、USB3.0×4、12V×4、5V×1、24V×4、BAT×1，可以搭载各种外设，可与 Unitree 自研产品 Z1 机械臂完美协同，完成复杂任务，用户还可适配各种外设如气体传感、温度传感、5G 组网、红外云台、工业",
+            "接口说明\nB2 机身侧面提供 sdk 扩展口，以便开发者继续更多的扩展功能开发，如下图所示。\n© 2023 宇树科技 版权所有\n6"
+          ],
+          "full_characters": 234
+        },
+        {
+          "chunk_id": "DOC-002-C-00021",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "- 搭载其他外设，提升作业精准率\nB2 提供多个扩展接口，1000M-Base-Ethernet×4、USB3.0×4、12V×4、5V×1、24V×4、BAT×1，可以搭载各种外设，可与 Unitree 自研产品 Z1 机械臂完美协同，完成复杂任务，用户还可适配各种外设如气体传感、温度传感、5G 组网、红外云台、工业",
+            "接口说明\nB2 机身侧面提供 sdk 扩展口，以便开发者继续更多的扩展功能开发，如下图所示。\n© 2023 宇树科技 版权所有\n6"
+          ],
+          "full_characters": 65
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-17",
+      "sources": [
+        {
+          "chunk_id": "DOC-003-C-00015",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "R3 遥控器基本操作\n首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控器设置】-打开遥控器开关，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。\n遥控器开机并且与 B2 连接成功后，右侧 DL 指示灯亮，这就意味着遥控器与 B2 数传模块已连接，此时可通过遥控器",
+            "R1 遥控器基本操作\n首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控器设置】，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。\n遥控器开机并且与 B2 连接成功后，左侧面数据传输灯全亮，这就意味着遥控器与 B2 数传模块已连接，此时可通过遥控器控制 B2。使用"
+          ],
+          "full_characters": 513
+        },
+        {
+          "chunk_id": "DOC-003-C-00025",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "R3 遥控器基本操作\n首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控器设置】-打开遥控器开关，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。\n遥控器开机并且与 B2 连接成功后，右侧 DL 指示灯亮，这就意味着遥控器与 B2 数传模块已连接，此时可通过遥控器",
+            "R1 遥控器基本操作\n首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控器设置】，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。\n遥控器开机并且与 B2 连接成功后，左侧面数据传输灯全亮，这就意味着遥控器与 B2 数传模块已连接，此时可通过遥控器控制 B2。使用"
+          ],
+          "full_characters": 512
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-18",
+      "sources": [
+        {
+          "chunk_id": "DOC-003-C-00009",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "遥控器摇杆校准\n手持遥控但不要触碰摇杆，按下遥控上按键 F1 和 F3 并同时松开，此时遥控器发出连续“嘀\\~嘀\\~”声（1次/秒）代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀\\~嘀\\~”声停止，此时校准就绪。单按 F3 一次使校准生效，完成校准。\n校准摇杆时，校准前请不要触碰摇杆，进入校准模",
+            "遥控器摇杆校准\n手持遥控但不要触碰摇杆，按下遥控上按键 F1 和 F3 并同时松开，此时遥控器发出连续“嘀\\~嘀\\~”声（1次/秒）代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀\\~嘀\\~”声停止，此时校准就绪。单按 F3 一次使校准生效，完成校准。\n校准摇杆时，校准前请不要触碰摇杆，进入校准模"
+          ],
+          "full_characters": 190
+        },
+        {
+          "chunk_id": "DOC-003-C-00022",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "遥控器摇杆校准\n手持遥控但不要触碰摇杆，按下遥控上按键 F1 和 F3 并同时松开，此时遥控器发出连续“嘀\\~嘀\\~”声（1次/秒）代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀\\~嘀\\~”声停止，此时校准就绪。单按 F3 一次使校准生效，完成校准。\n校准摇杆时，校准前请不要触碰摇杆，进入校准模",
+            "遥控器摇杆校准\n手持遥控但不要触碰摇杆，按下遥控上按键 F1 和 F3 并同时松开，此时遥控器发出连续“嘀\\~嘀\\~”声（1次/秒）代表已进入校准模式。进入校准模式后将左右摇杆打满舵并旋转数圈，直至“嘀\\~嘀\\~”声停止，此时校准就绪。单按 F3 一次使校准生效，完成校准。\n校准摇杆时，校准前请不要触碰摇杆，进入校准模"
+          ],
+          "full_characters": 190
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-19",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00236",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "探测到悬崖时，用户未登录\n原因：\n悬崖激光扫描器探测到悬崖并触发了安全停止 只有当用户已登录时，才允许在悬崖附近手动操作机器人排除故障\n1. 在悬崖附近操作机器人时，使用用户个人资料登录"
+          ],
+          "full_characters": 93
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-20",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00209",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "原因：\n排除故障：\n1. 发生了内部错误 重启机器人 如果错误仍然存在，请致电售后服务部"
+          ],
+          "full_characters": 44
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-21",
+      "sources": [
+        {
+          "chunk_id": "DOC-003-C-00003",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "用户须知\n自 2024 年 12 月起，R1 遥控器已全面升级至新一代 R3 遥控器。新版遥控器的操作方式与旧版保持一致，确保您能够无缝过渡并享受升级带来的便利。\n新旧版遥控器将随机发货，请以实物为准。感谢您的支持。"
+          ],
+          "full_characters": 108
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-22",
+      "sources": [
+        {
+          "chunk_id": "DOC-003-C-00010",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "开启/关闭遥控器\n\\- 开启遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀\\~嘀\\~”两声，即遥控开启。\n\\- 关闭遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀\\~嘀\\~嘀\\~”三声，即遥控关闭。\n短按+长按 2 秒及以上",
+            "简介\nR3 遥控器属于 B2 遥控模块的一部分,遥控手柄内置数传模块、蓝牙模块。机器狗与遥控器可以通过 Unitree Explore App 进行绑定，绑定成功后开机即可自动连接。可操纵机器狗在站立时实现 3 轴姿态与 3 轴位置稳定全控，还可以操纵机器狗在平整地面上实现前进后退、左右侧移、原地转弯、按一定规则行走（"
+          ],
+          "full_characters": 124
+        },
+        {
+          "chunk_id": "DOC-003-C-00005",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "开启/关闭遥控器\n\\- 开启遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀\\~嘀\\~”两声，即遥控开启。\n\\- 关闭遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀\\~嘀\\~嘀\\~”三声，即遥控关闭。\n短按+长按 2 秒及以上",
+            "简介\nR3 遥控器属于 B2 遥控模块的一部分,遥控手柄内置数传模块、蓝牙模块。机器狗与遥控器可以通过 Unitree Explore App 进行绑定，绑定成功后开机即可自动连接。可操纵机器狗在站立时实现 3 轴姿态与 3 轴位置稳定全控，还可以操纵机器狗在平整地面上实现前进后退、左右侧移、原地转弯、按一定规则行走（"
+          ],
+          "full_characters": 213
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-23",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00008",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "危险等级\n危险\n提示导致人员重伤或死亡的直接威胁性危险\n",
+            "警告\n提示可能导致人员重伤或死亡的危险状况\n小心\n提示可能导致轻度伤害的危险状况\n注意\n提示可能产生财产损失的危险状况"
+          ],
+          "full_characters": 29
+        },
+        {
+          "chunk_id": "DOC-001-C-00009",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "危险等级\n危险\n提示导致人员重伤或死亡的直接威胁性危险\n",
+            "警告\n提示可能导致人员重伤或死亡的危险状况\n小心\n提示可能导致轻度伤害的危险状况\n注意\n提示可能产生财产损失的危险状况"
+          ],
+          "full_characters": 59
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-24",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00022",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "使用清洁剂运行\n小心\n洗涤剂应远离孩童妥善保管\n小心\n不得未稀释使用推荐的洗涤剂 该产品可以安全使用，因为其不含酸性 碱性或污染环境的材料 洗涤剂若是不小心溅入眼睛，必须立即用水彻底冲洗并且若不慎吞咽则应立即就医\n小心\n仅使用制造商推荐的清洁剂，并遵守清洁剂制造商的使用 处置和警告说明",
+            "清洁剂\n小心\n损坏危险\n仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险 仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂 遵守清洁剂上的安全提示\n提示\n请勿使用强发泡型清洁剂\n请遵守计量提示\n\n推荐的清洁剂：\n适用范围=所有防水地板的保养清洁；清洁剂=CA 50 C"
+          ],
+          "full_characters": 143
+        },
+        {
+          "chunk_id": "DOC-001-C-00118",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "使用清洁剂运行\n小心\n洗涤剂应远离孩童妥善保管\n小心\n不得未稀释使用推荐的洗涤剂 该产品可以安全使用，因为其不含酸性 碱性或污染环境的材料 洗涤剂若是不小心溅入眼睛，必须立即用水彻底冲洗并且若不慎吞咽则应立即就医\n小心\n仅使用制造商推荐的清洁剂，并遵守清洁剂制造商的使用 处置和警告说明",
+            "清洁剂\n小心\n损坏危险\n仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险 仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂 遵守清洁剂上的安全提示\n提示\n请勿使用强发泡型清洁剂\n请遵守计量提示\n\n推荐的清洁剂：\n适用范围=所有防水地板的保养清洁；清洁剂=CA 50 C"
+          ],
+          "full_characters": 436
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-25",
+      "sources": [
+        {
+          "chunk_id": "DOC-004-C-00016",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "插入式充电器\n1. 连接充电器到交流电源（100-240V，50/60Hz）。连接前必须确保外接电源电压与充电器额定输入电压匹配，否则会导致充电器损坏（在充电器铭牌上有标识该充电器的额定输入电压）。\n2. 给电池充电前，先插入输入交流电源，然后充电器接电池。\n3. 给电池充电前，请确保电池包处于关闭状态，否则会损坏电池"
+          ],
+          "full_characters": 350
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-26",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00154",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "搜索路线，按照 位置码\n通过该功能，按照起点的 位置码 布置路线1. 点击“位置码”开关1 “位置码”开关现在可用路线按照“位置码”排序2. 点击打开包含所搜索 位置码 的文件夹\n"
+          ],
+          "full_characters": 91
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-27-R123429216749",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00096",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "地图是否具备自学习功能，并补充新障碍物？\n不，地图不具备自学习功能 对原始布局进行细微改动不成问题 对布局的改动越大，则设备的效率就越低 如果布局发生了重大变化，则必须重新示教该路线"
+          ],
+          "full_characters": 91
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-28",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00026",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \n小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零部件上进行工作\n小心\n只允许已授权的客户服务处或熟知该领域所有重要安全规定的专业人员进行设备修",
+            "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "更换刷辊\n1. 按下按钮，将防撞保护板转到一侧\n\n2. 按下解锁按钮\n3. 转出轴承盖\n4. 拉出刷辊\n提示：如果黄色指示器刷毛与其他刷毛长度相同，则说明刷辊已磨损\n5. 装入新刷辊，并来回转动刷辊，使其在从动件上方居中\n6. 摆回轴承盖，将刷辊的端盖卡入轴承盖\n7. 抬起削刮胶条，摆回防撞保护板并将其卡入"
+          ],
+          "full_characters": 254
+        },
+        {
+          "chunk_id": "DOC-001-C-00181",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \n小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零部件上进行工作\n小心\n只允许已授权的客户服务处或熟知该领域所有重要安全规定的专业人员进行设备修",
+            "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "更换刷辊\n1. 按下按钮，将防撞保护板转到一侧\n\n2. 按下解锁按钮\n3. 转出轴承盖\n4. 拉出刷辊\n提示：如果黄色指示器刷毛与其他刷毛长度相同，则说明刷辊已磨损\n5. 装入新刷辊，并来回转动刷辊，使其在从动件上方居中\n6. 摆回轴承盖，将刷辊的端盖卡入轴承盖\n7. 抬起削刮胶条，摆回防撞保护板并将其卡入"
+          ],
+          "full_characters": 60
+        },
+        {
+          "chunk_id": "DOC-001-C-00200",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "保养和维护\n警告\n在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接 \n小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零部件上进行工作\n小心\n只允许已授权的客户服务处或熟知该领域所有重要安全规定的专业人员进行设备修",
+            "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "更换刷辊\n1. 按下按钮，将防撞保护板转到一侧\n\n2. 按下解锁按钮\n3. 转出轴承盖\n4. 拉出刷辊\n提示：如果黄色指示器刷毛与其他刷毛长度相同，则说明刷辊已磨损\n5. 装入新刷辊，并来回转动刷辊，使其在从动件上方居中\n6. 摆回轴承盖，将刷辊的端盖卡入轴承盖\n7. 抬起削刮胶条，摆回防撞保护板并将其卡入"
+          ],
+          "full_characters": 155
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-29",
+      "sources": [
+        {
+          "chunk_id": "DOC-002-C-00056",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "检查保养\n在使用前后开展例行检查，可大幅度提升产品可靠性能，降低安全隐患，延长使用寿命。不带电检查表\n类型=整机外观；要点=1. 机身外观是否清洁、无破损或变形痕迹2. 相机表面镜片有无异物3. 头部激光雷达周围有无异物遮挡\n类型=结构；要点=1. 目视及触摸检查机身、各个关节及连接处、足端组件是否完好,有裂纹或者有破"
+          ],
+          "full_characters": 419
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-30-R131552256939",
+      "sources": [
+        {
+          "chunk_id": "DOC-001-C-00233",
+          "role": "normative_requirement_only",
+          "frozen_summary": [
+            "制动测试失败 检查手动制动器松开装置\n原因：\n机器人测试已接合制动器时检测到运动\n排除故障：\n1. 制动器很可能没有接合 将轮子之间的红色杠杆向右推，使其接合\n"
+          ],
+          "full_characters": 81
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-31",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-32",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-33",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-34-R122000134985-R124446127201",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-35",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-36-R122036474962",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-37",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-38",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-39",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-40",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-41",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-42-R122110917880-R124502591488",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-43",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-44-R122200100987-R124516421396",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-45-R122231403350-R124530599411",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-46-R122330616323-R124558701867",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-47",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-48",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-49",
+      "sources": []
+    },
+    {
+      "question_id": "V1G-110926448917-50-R122406390043-R124544152999",
+      "sources": []
+    }
+  ],
+  "scope_binding_checks": [
+    {
+      "question_id": "V1G-110926448917-17",
+      "final_id": "DOC-003-C-00025",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": true
+    },
+    {
+      "question_id": "V1G-110926448917-17",
+      "final_id": "DOC-003-C-00005",
+      "title_id": "DOC-003-C-00004",
+      "title": "R3遥控器",
+      "scope_valid": true,
+      "body_fact_valid": true
+    },
+    {
+      "question_id": "V1G-110926448917-17",
+      "final_id": "DOC-003-C-00019",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-18",
+      "final_id": "DOC-003-C-00009",
+      "title_id": "DOC-003-C-00004",
+      "title": "R3遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-18",
+      "final_id": "DOC-003-C-00022",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-18",
+      "final_id": "DOC-003-C-00008",
+      "title_id": "DOC-003-C-00004",
+      "title": "R3遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-18",
+      "final_id": "DOC-003-C-00025",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": true
+    },
+    {
+      "question_id": "V1G-110926448917-21",
+      "final_id": "DOC-003-C-00004",
+      "title_id": "DOC-003-C-00004",
+      "title": "R3遥控器",
+      "scope_valid": true,
+      "body_fact_valid": true
+    },
+    {
+      "question_id": "V1G-110926448917-21",
+      "final_id": "DOC-003-C-00027",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-21",
+      "final_id": "DOC-003-C-00018",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": true
+    },
+    {
+      "question_id": "V1G-110926448917-22",
+      "final_id": "DOC-003-C-00023",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-22",
+      "final_id": "DOC-003-C-00010",
+      "title_id": "DOC-003-C-00004",
+      "title": "R3遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-22",
+      "final_id": "DOC-003-C-00005",
+      "title_id": "DOC-003-C-00004",
+      "title": "R3遥控器",
+      "scope_valid": true,
+      "body_fact_valid": true
+    },
+    {
+      "question_id": "V1G-110926448917-22",
+      "final_id": "DOC-003-C-00004",
+      "title_id": "DOC-003-C-00004",
+      "title": "R3遥控器",
+      "scope_valid": true,
+      "body_fact_valid": true
+    },
+    {
+      "question_id": "V1G-110926448917-31",
+      "final_id": "DOC-003-C-00019",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-31",
+      "final_id": "DOC-003-C-00025",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": true
+    },
+    {
+      "question_id": "V1G-110926448917-31",
+      "final_id": "DOC-003-C-00027",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-31",
+      "final_id": "DOC-003-C-00010",
+      "title_id": "DOC-003-C-00004",
+      "title": "R3遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-48",
+      "final_id": "DOC-003-C-00021",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": false
+    },
+    {
+      "question_id": "V1G-110926448917-48",
+      "final_id": "DOC-003-C-00025",
+      "title_id": "DOC-003-C-00018",
+      "title": "R1遥控器",
+      "scope_valid": true,
+      "body_fact_valid": true
+    }
+  ],
+  "mock_proof": {
+    "kind": "ISOLATED_MOCK_NOT_PROVIDER",
+    "judges": 50,
+    "generations": 0,
+    "completed": 50,
+    "probe_gate_explicit_test_only_bypass": true,
+    "require_current_baseline": true,
+    "old_source_unchanged": true,
+    "damaged_execution_blocks_without_generation": true,
+    "resumed_child_keeps_no_generation_guard": true
+  },
+  "cost_preflight": {
+    "pricing": "local snapshot only, recheck before authorization",
+    "price_snapshot": {
+      "provider": "DeepSeek",
+      "model": "deepseek-flash",
+      "aliases": [
+        "deepseek-v4-flash"
+      ],
+      "currency": "USD",
+      "unit": 1000000,
+      "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+      "checked_at": "2026-09-30",
+      "effective_date": "2026-09-30",
+      "billing_mode": "provider_hit_counter",
+      "price_config_version": "deepseek-flash-2026-09-30",
+      "periods": {
+        "peak": {
+          "input_per_million": 0.3,
+          "cached_input_per_million": 0.006,
+          "output_per_million": 1.2
+        },
+        "off_peak": {
+          "input_per_million": 0.15,
+          "cached_input_per_million": 0.003,
+          "output_per_million": 0.6
+        }
+      },
+      "peak_hours_utc": [
+        [
+          1,
+          4
+        ],
+        [
+          6,
+          10
+        ]
+      ],
+      "peak_weekdays": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous."
+    },
+    "input_estimate": 413273,
+    "input_estimate_method": "existing approximate_character_ratio_not_model_tokenizer",
+    "input_conservative_range": [
+      289291,
+      619910
+    ],
+    "output_expected_range": [
+      50000,
+      300000
+    ],
+    "output_per_attempt_cap": 32768,
+    "expected_usd_range": [
+      0.073393665,
+      0.54597285
+    ],
+    "correction_feedback_extra_input_estimate_cap": 3276800,
+    "worst_150_attempts_estimate_usd": 7.4391985499999995,
+    "q18_probe_calls": 1,
+    "q18_probe_max_calls": 3,
+    "full_replay_calls": 50,
+    "full_replay_max_calls": 150,
+    "semantic_diagnostics_extra_calls": "0 in Replay; separate explicit authorization, at most one per requested case",
+    "hard_cost_cap": "must freeze a user-authorized budget/token limits before real execution; estimate is not billing proof"
+  },
+  "provider_calls": 0,
+  "database_sha256": "983488ce11505c8d1e8e94677a6619a8b48f0bed23ecf57cccc869f0629d0e46",
+  "production_history_unchanged": true
+}

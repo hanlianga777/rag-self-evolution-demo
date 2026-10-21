@@ -231,10 +231,9 @@ class DeepSeekProvider:
         return self.complete_with_metrics(system,user,json_mode,temperature=temperature)['content']
 
     def _judge_business(self, question, expected, answer, context):
-        from .evaluation_contract import BUSINESS_JUDGE_PROMPT, validate_business_judgment
+        from .evaluation_contract import BUSINESS_JUDGE_PROMPT, validate_business_judgment,business_judge_input
         _response_metadata.set({})
-        payload={k:v for k,v in context.items() if k!='programmatic_evidence_observation' and not k.startswith('_')}
-        content=self.complete(BUSINESS_JUDGE_PROMPT,json.dumps({'question':question,'reference_answer':expected,'actual_answer':answer,**payload},ensure_ascii=False),json_mode=True,temperature=0)
+        content=self.complete(BUSINESS_JUDGE_PROMPT,business_judge_input(question,expected,answer,context),json_mode=True,temperature=0)
         try:
             text=content.strip().removeprefix('\ufeff')
             recovery=None

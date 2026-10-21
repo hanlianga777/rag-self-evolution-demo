@@ -18,6 +18,7 @@ backend/data/pending_uploads/
 backend/data/corpus_operations/
 backend/data/corpus_state.json
 backend/data/q02-*
+backend/data/judge_probes/
 backend/data/architecture/
 .demo-logs/
 __pycache__/

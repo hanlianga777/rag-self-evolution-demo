@@ -1,6 +1,10 @@
-# 当前有效评测合同 — 2026-10-21 VNext V5 `[CONFIRMED]`
+# 当前有效评测合同 — 2026-10-21 VNext V5.1 `[CONFIRMED]`
 
 本节及以下安全语义补充依据Owner当前指令生效；覆盖下文所有冲突的旧评测、Claim分类、诊断准入、Regression及自动恢复语义；旧条款保留为历史，不得同时执行。既有Golden/Knowledge生产治理、50题20/10/20、11项Hard Gate阈值、三个人工Gate、Search Space及Production保护保持。
+
+- **2026-10-21 V5.1执行前收口（当前，覆盖下条V5 Parser及Replay执行前置）**：Parser升级为`business-output-5.1-substantive-checks`进入新Evaluation Identity；Positive/Ablation至少有一项必要fact，Negative至少有必要fact或negative_behavior，只有scope或辅助范围项的响应均技术异常。真实正文引用与Scope绑定、原始checks/verdict、Judge Prompt、Matcher、Guard、11 Gate不改，不由Parser补写业务结论。新Identity为`4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf`；旧V5与V4历史只读。
+- **独立Q18探针及Replay门禁**：最小CLI复用正式judge_context/输入构造/score_execution及共用有限重试循环，限定已保存Q18执行，禁止generation；同一授权编号以独占文件阻止重入，最多3次Judge、合同错误最多1次纠正、600秒；Unknown或未结算请求停止且不自动重发。仅已知已结算可恢复响应允许按共用规则有限重试。执行前重新核最新身份、全50复用资格、Golden/Corpus/配置及实际加载Provider配置，价格核查不超过24小时、冻结USD硬预算并逐请求预留。结果/原始响应/引用定位/Usage/费用/审批独立sidecar，不写正式Baseline。绑定源Run摘要、Q18 execution、冻结题目、官方请求、Judge配置/身份；重读验证Canonical引用和原始响应，变更即失效。
+- **业务复核与独立授权**：Parser完成状态为judge_complete，必须人工逐项核必要事实/安全及Scope与Fact分离，并显式留下actor、决定和证据说明后，才可放行同身份Replay。正确业务FAIL的Judge也可通过复核；不以PASS或Parser合法自动批准。Mock不解锁。Replay预检区分can_replay（数据可复用）和can_start_replay（含探针门禁），后台start、创建事务、执行及显式恢复都复核，不只禁用前端按钮；正式50题费用授权始终独立，探针不覆盖批量。本轮Provider0，仅离线实施，完成后停止；详见[V5.1验收与授权边界](V51_PREFLIGHT_CLOSEOUT_ACCEPTANCE.md)。架构沿原Baseline Evaluation节点内部增加执行前守卫，不新增业务阶段或工作台，原图节点与连线保持。
 
 - **2026-10-21 V5 Fact/Scope、完整规范与Judge-only Baseline（当前，替代下方V4身份不变/旧恢复说明）**：Judge `judge-vnext-5-fact-scope`、Parser `business-output-5-fact-scope`、Matcher `evidence-vnext-2-fact-scope`、输入 `frozen-canonical-norms-1` 进入新Evaluation Identity；业务Policy、四维指标、11 Gate、有限Safety Guard、Search Space不变。Fact support只能定位真实Final正文；Scope另用scope_support绑定Final Child、Canonical标题ID/原文、document/product/version和Canonical页序/结构。标题不得拼入content；伪造页码/绑定/跨型号或Parent跨多个标题均拒绝。显式scope检查的requirement须为单个真实标题，真实答案须引用该标题，不能用scope承载操作事实；其他事实可附Scope证明范围，但不能替代正文support。有限可验证标题包括既有独立型号标题及Canonical显式heading/title；无法定位的范围继续拒绝，语义现场适用性仍由Judge核验。
 - **完整冻结规范输入**：按冻结source_chunk_ids从同身份Canonical Corpus读取全文，保留原evidence摘要、来源和normative_requirement_only角色；Negative锚点仍只作material_anchor_only。完整规范只用于确定必要要求，绝非Final/PASS事实支持。旧Golden/Snapshot不回填；新Revision保存完整规范，不再无条件[:160]。Generation Prompt/Boundary不变；新Judge输入/Parser/Matcher须新身份，旧Partial禁止续为新版。

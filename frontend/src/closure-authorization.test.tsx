@@ -33,7 +33,7 @@ it('latest candidate cards and history Drawer keep round provenance',async()=>{
  expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('saved 2-A');
 });
 it('new Judge-only baseline inspects each eligibility before explicit fee authorization',async()=>{
- const plan={can_replay:true,reusable:50,total:50,judge_calls:50,max_judge_calls:150,new_evaluation_identity:'v5-identity',source_sha256:'source-sha',eligibility:[{question_id:'new-q',eligible:true,origin:'generation_checkpoint'}]};
+ const plan={can_replay:true,can_start_replay:true,reusable:50,total:50,judge_calls:50,max_judge_calls:150,new_evaluation_identity:'v5-identity',source_sha256:'source-sha',eligibility:[{question_id:'new-q',eligible:true,origin:'generation_checkpoint'}]};
  const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?plan:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
  await render(<EvaluationPage data={{evaluation:run}}/>);await click('新版Baseline判分（复用回答）');
  expect(document.body.textContent).toContain('50 / 50');expect(document.body.textContent).not.toContain('恢复 Baseline');
@@ -44,5 +44,14 @@ it('ineligible saved execution blocks Judge-only baseline without falling back t
  const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?{can_replay:false,reusable:49,total:50,eligibility:[{question_id:'missing-q',eligible:false,blockers:['complete_generated_answer_missing']}]}:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
  await render(<EvaluationPage data={{evaluation:run}}/>);await click('新版Baseline判分（复用回答）');
  expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='授权新版 Judge-only Baseline')?.disabled).toBe(true);
+ expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
+});
+
+it('50 reusable executions still require the independent Q18 probe before fee authorization',async()=>{
+ const plan={can_replay:true,can_start_replay:false,reusable:50,total:50,probe_blocker:'Q18 independent real probe and explicit business review required',eligibility:[]};
+ const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?plan:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
+ await render(<EvaluationPage data={{evaluation:run}}/>);await click('新版Baseline判分（复用回答）');
+ expect(document.body.textContent).toContain('50 / 50');expect(document.body.textContent).toContain('请先独立验证Q18');
+ await click('授权新版 Judge-only Baseline');expect(document.querySelector('[role=dialog]')).toBeNull();
  expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
 });

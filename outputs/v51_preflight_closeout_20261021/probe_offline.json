@@ -1,0 +1,17 @@
+{
+  "kind": "ISOLATED_HTTP_MOCK_NOT_REAL_PROBE",
+  "provider_calls": 0,
+  "reusable": 50,
+  "authorization_price_loaded_config_preflight_blocks": true,
+  "correction_uses_official_input": true,
+  "real_http_parser_truncation_corrected": true,
+  "known_attempt_limit": 3,
+  "invalid_response_attempt_limit": 2,
+  "unknown_stops_after": 1,
+  "authorization_reuse_rejected": true,
+  "parser_complete_requires_business_review": true,
+  "mock_tampered_unreviewed_blocked": true,
+  "start_and_transaction_gate": true,
+  "production_and_copy_database_unchanged": true,
+  "generation_calls": 0
+}

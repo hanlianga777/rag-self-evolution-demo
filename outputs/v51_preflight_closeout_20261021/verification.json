@@ -1,0 +1,54 @@
+{
+  "provider_calls": 0,
+  "backend": {
+    "command": "python3 scripts/verify_self_evolution.py",
+    "tests": 823,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 369.683
+  },
+  "targeted": {
+    "tests": 50,
+    "passed": true,
+    "latest_scope_categories_subset": 19
+  },
+  "frontend": {
+    "command": "cd frontend && npm test",
+    "files": 44,
+    "tests": 251,
+    "passed": true
+  },
+  "frontend_build": {
+    "command": "cd frontend && npm run build",
+    "passed": true
+  },
+  "replay": {
+    "reusable": 50,
+    "total": 50,
+    "can_start_replay": false,
+    "generation_calls": 0,
+    "mock_judge_calls_in_disposable_copy": 50,
+    "gate_bypass": "explicit test-only patch, no real probe or approval generated"
+  },
+  "q18_probe": "isolated actual saved execution + fake HTTP, full official Parser/Validator, no formal DB writes",
+  "history": {
+    "completed": 49,
+    "PASS": 39,
+    "FAIL": 10,
+    "Q18": "old technical error unchanged",
+    "offline_200_PASS": 157,
+    "offline_200_FAIL": 43,
+    "protected_files_unchanged": 25
+  },
+  "review": {
+    "independent_review": true,
+    "fixed_findings": [
+      "frozen Q18 item/input and request digests bind review",
+      "known settled truncated responses retain finite correction"
+    ],
+    "blocking_findings_remaining": 0
+  },
+  "first_full_run": "822 tests, 1 obsolete literal Parser version expectation; updated, targeted and final full rerun passed",
+  "service": "not restarted; deploy and verify loaded V5.1 before future real execution",
+  "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf"
+}

@@ -1,0 +1,82 @@
+{
+  "binding": "af2f0a1edfe9920ceba81d542082a71b249423e0a61ed7bc10e8a6085ae9b47f",
+  "source_run_id": "EVAL-20261021013401711966",
+  "new_evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+  "reusable": 50,
+  "total": 50,
+  "generation_calls": 0,
+  "max_judge_calls": 3,
+  "max_contract_corrections": 1,
+  "stage_deadline_seconds": 600,
+  "request": {
+    "model": "deepseek-v4-flash",
+    "temperature": 0,
+    "stream": false,
+    "response_format": {
+      "type": "json_object"
+    },
+    "max_tokens": 32768,
+    "request_sha256": "ae8ae93ce071929c9369983f4a220ceabf08c1c9c582521b77ec6abd256bccec",
+    "body_bytes": 88462,
+    "roles": [
+      "system",
+      "user"
+    ],
+    "message_characters": 27264,
+    "input_token_estimate": 11724,
+    "token_estimate_method": "approximate_character_ratio_not_model_tokenizer",
+    "token_estimate_source": "https://api-docs.deepseek.com/quick_start/token_usage/",
+    "user_field_characters": {
+      "question": 93,
+      "reference_answer": 189,
+      "actual_answer": 758,
+      "contract_version": 18,
+      "retrieval_candidates": 12256,
+      "baseline_findings": 4,
+      "sources_legend": 109,
+      "golden_evidence": 427,
+      "golden_norms": 1532,
+      "scope_sources": 1466,
+      "final_context": 5625,
+      "category": 10,
+      "negative_subtype": 4,
+      "expected_behavior": 4,
+      "source_constraints": 266
+    }
+  },
+  "limits": {
+    "answer": 8192,
+    "judge": 32768,
+    "query": 4096
+  },
+  "provider_calls": 0,
+  "cost_preflight": {
+    "price_snapshot": {
+      "model": "deepseek-v4-flash",
+      "served_model_notice": "Official legacy alias currently served by DeepSeek-V4.1-Flash-1017; requested model remains unchanged",
+      "currency": "USD",
+      "source_url": "https://api-docs.deepseek.com/quick_start/pricing/",
+      "checked_at": "2026-10-21T08:56:04+00:00",
+      "input_per_million": 0.3,
+      "output_per_million": 1.2,
+      "basis": "peak cache-miss conservative bound; not account debit",
+      "authorization_budget_cap_usd": 0.5,
+      "max_price_age_seconds": 86400
+    },
+    "fresh": true,
+    "currency": "USD",
+    "input_token_estimate": 11724,
+    "expected_output_range": [
+      1000,
+      6000
+    ],
+    "one_attempt_estimate_usd": [
+      0.0047171999999999995,
+      0.010717200000000001
+    ],
+    "first_request_byte_bound_usd": 0.06616739999999999,
+    "correction_input": "actual payload bytes checked against remaining budget before every attempt",
+    "authorization_budget_cap_usd": 0.5,
+    "automatic_real_calls": 0
+  }
+}
