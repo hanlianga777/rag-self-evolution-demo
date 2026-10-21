@@ -1,0 +1,53 @@
+{
+  "head": "9afd8cf",
+  "operation_id": "operation-1792544590934-1uwel",
+  "operation_started_utc": "2026-10-21T01:03:10.934000+00:00",
+  "raw_failed_request_body": "not retained in server access log; UI branch and offline default-request reproduction used",
+  "selected_source_id": "EVAL-20261020145850446479",
+  "source_status": "partial",
+  "golden_id_equal": true,
+  "snapshot_differences": [],
+  "pipeline_differences": [],
+  "judge_differences": [
+    {
+      "field": "evaluation_identity",
+      "saved": "b94f1c25a42076ee6dee977a88d0aec1be2220ae9f40a257d559e21cea986b1d",
+      "current": "d18aab6365a63c6de63e295866a7036e0fe6a25f1f74c2afbb4782bbab73ae3e"
+    },
+    {
+      "field": "judge_prompt_sha256",
+      "saved": "e6cdaba08a037d96b3916f041d2513306233c60d35a10fd7c0f881a0afa80c9b",
+      "current": "d7369e24e41be85123d795d388bc52a995fb5d287e577a228a09d42678e6a693"
+    },
+    {
+      "field": "output_parser_version",
+      "saved": "business-output-3-evidence-roles",
+      "current": "business-output-4-negative-facts"
+    },
+    {
+      "field": "prompt_version",
+      "saved": "judge-vnext-3-safety-consistency",
+      "current": "judge-vnext-4-output-contract"
+    }
+  ],
+  "current_corpus_matches_snapshot": true,
+  "live_runtime_contract": {
+    "prompt_version": "judge-vnext-4-output-contract",
+    "evidence_matcher_version": "evidence-vnext-1",
+    "scoring_policy": "business-vnext-1",
+    "output_parser_version": "business-output-4-negative-facts",
+    "safety_guard_version": "finite-safety-1",
+    "risk_arbitration_version": "hybrid-risk-1",
+    "safety_rules_sha256": "158d9a346ef28eb80016ffc329f94048baf7802803ffdc4c670dc1a9c309e605",
+    "judge_prompt_sha256": "d7369e24e41be85123d795d388bc52a995fb5d287e577a228a09d42678e6a693",
+    "loaded_code_sha256": {
+      "validator": "9d509642d2d8061980dc19047cda652304579e5f46cf9bbe6cdc3d7aafb6f13f",
+      "provider_parser": "1bc3365142859b0459e9fbf599680018ba069b8ee0a86ec95d459c652d34abc2",
+      "scorer": "e1bff39f989846689246d01b1244e233ab9fd64b7ae9d0bd400016147e3ebdb1",
+      "batch_runner": "337490a439aa7c656e4d7e6ddd7d31ff99ecf60d7c3c119c348af17eb747de6c"
+    }
+  },
+  "old_source_start_error": "Golden/Corpus/Judge/Evaluation Identity或配置不同，禁止混合；请明确fresh新建完整评测",
+  "fresh_input_question_count": 50,
+  "provider_calls": 0
+}

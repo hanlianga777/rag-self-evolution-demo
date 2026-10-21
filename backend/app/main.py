@@ -1550,6 +1550,25 @@ def replay_evaluation(source_id: str, payload: PaidActionRequest):
     return {'id': run_id, 'status': 'running', 'execution_kind': 'answer_replay', 'release_eligible': False}
 
 
+def require_baseline_corpus():
+    if corpus_manager.state():
+        snapshots = store.dataset_snapshots()
+        if not snapshots or snapshots[0]['snapshot'].get('corpus_fingerprint') != manifest_identity(current_manifest()):
+            raise ValueError('Corpus 已变化；请基于当前知识库重新生成并确认 Golden 测试集')
+
+
+@app.get('/api/evaluation/preflight')
+def baseline_preflight(resume_source_id: str | None = None):
+    try:
+        require_baseline_corpus()
+    except ValueError as error:
+        return {'can_start':False,'can_resume':False,'resume_source_id':None,'reason':str(error),'resume_reason':None}
+    result=EvaluationRunner(store,ai_service).baseline_preflight(resume_source_id)
+    return {**result,'entry_code_sha256':{name:hashlib.sha256(marshal.dumps(fn.__code__,0)).hexdigest() for name,fn in {
+        'preflight':EvaluationRunner.baseline_preflight,'start_guard':GovernanceStore.validate_evaluation_start,
+        'resume_guard':GovernanceStore.validate_evaluation_resume}.items()}}
+
+
 class BaselineRunRequest(BaseModel):
     resume_source_id: str | None = None
     fresh: bool = False
@@ -1557,19 +1576,14 @@ class BaselineRunRequest(BaseModel):
 
 @app.post("/api/evaluations/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def start_evaluation(payload: BaselineRunRequest | None = None):
-    if corpus_manager.state():
-        snapshots = store.dataset_snapshots()
-        if not snapshots or snapshots[0]["snapshot"].get("corpus_fingerprint") != manifest_identity(current_manifest()):
-            raise HTTPException(status_code=409, detail="Corpus 已变化；请基于当前知识库重新生成并确认 Golden 测试集")
     runner = EvaluationRunner(store, ai_service)
     try:
-        if payload and payload.fresh and payload.resume_source_id:
+        require_baseline_corpus()
+        if not payload or not (payload.fresh or payload.resume_source_id):
+            raise ValueError('请显式指定fresh:true或resume_source_id，禁止隐式恢复历史任务')
+        if payload.fresh and payload.resume_source_id:
             raise ValueError('fresh与resume_source_id不能同时指定')
         source_id = payload.resume_source_id if payload else None
-        if not source_id and not (payload and payload.fresh):
-            latest = next((r for r in store.evaluation_runs() if r['config'].get('run_target') == 'baseline'), None)
-            if latest and latest['status'] in {'partial','failed'}:
-                source_id = latest['id']
         run_id, approved, config = runner.start_baseline(source_id,automatic=True)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error

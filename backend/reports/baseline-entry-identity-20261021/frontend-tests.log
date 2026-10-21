@@ -1,0 +1,15 @@
+
+> rag-evolution-frontend@0.1.0 test
+> vitest run --run src/baseline-entry.test.tsx src/baseline-restoration.test.tsx src/baseline-autorecovery.test.tsx
+
+
+ RUN  v2.1.9 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/frontend
+
+ ✓ src/baseline-autorecovery.test.tsx (2 tests) 112ms
+ ✓ src/baseline-restoration.test.tsx (6 tests) 114ms
+ ✓ src/baseline-entry.test.tsx (3 tests) 163ms
+
+ Test Files  3 passed (3)
+      Tests  11 passed (11)
+   Start at  09:24:11
+   Duration  1.37s (transform 269ms, setup 0ms, collect 1.27s, tests 389ms, environment 1.48s, prepare 259ms)

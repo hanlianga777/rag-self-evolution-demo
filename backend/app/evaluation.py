@@ -197,6 +197,28 @@ class EvaluationRunner:
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
         return snapshot, approved, config, judge_meta
 
+    def baseline_preflight(self, resume_source_id=None):
+        """Read-only snapshot of the exact transactional start/resume guards."""
+        from .full_text import CORPUS_LOCK
+        result={'can_start':False, 'can_resume':False, 'resume_source_id':None, 'reason':None, 'resume_reason':None}
+        try:
+            with CORPUS_LOCK:
+                snapshot, _, config, judge = self.baseline_inputs(resume_source_id)
+                with self.store.connection() as connection:
+                    connection.execute('BEGIN')
+                    self.store.validate_evaluation_start(connection,snapshot,judge)
+                    result['can_start']=True
+                    if resume_source_id:
+                        try:
+                            self.store.validate_evaluation_resume(connection,snapshot,config,judge,resume_source_id)
+                        except ValueError as error:
+                            result['resume_reason']=str(error)
+                        else:
+                            result.update(can_resume=True,resume_source_id=resume_source_id)
+        except ValueError as error:
+            result.update(can_start=False,reason=str(error))
+        return result
+
     def start_baseline(self, resume_source_id=None, *, automatic=False):
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:

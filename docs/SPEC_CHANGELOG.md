@@ -681,3 +681,7 @@ Implementation Authorized / In Progress。按原始参考截图和用户确认�
 ## 2026-10-20 V4上线前合同验收
 
 - **2026-10-20 V4上线前Negative合同验收（当前）**：保留V4 Judge与既有流程，仅补`checks[].check_type`：未声明默认`fact`；所有类别met=true的fact一律真实适用Final非空support并核产品/版本约束。只有Negative显式`negative_behavior`的纯拒答/澄清/抗注入行为允许空support，仍需真实答案引用；非法类型、其他类别借用行为豁免均技术异常。混合行为/附加技术事实必须由同次Judge拆开，禁止以角色标签隐藏事实；Parser不凭自然语言/关键词推断或补写角色。Parser升级`business-output-4-negative-facts`进入Identity，旧记录不回填。Baseline与历史回放的Partial/Failed共用未完成聚合屏蔽，Overall/Gate不可评估，技术异常不造业务Bad Case。没有改11 Gate、Matcher、Safety Guard或架构。Q01/Q21/Q40仅冻结保存答案/完整Final与3次单Judge预算方案，未经Owner授权不调用Provider；真验收逐题独立核查事实覆盖、引用适用性和判定合理性，不以Parser通过代替。模型漏列或错分行为/事实仍属语义覆盖风险，未宣称程序能够穷尽理解。
+
+## 2026-10-21 Baseline入口身份预检
+
+- **2026-10-21 Baseline入口身份修复（当前）**：新建/恢复严格条件从原事务提取为共享只读校验，GET `/api/evaluation/preflight?resume_source_id=...` 与实际事务创建共用同一Golden/Corpus/Production、完整配置/Judge/Evaluation Identity、状态/重复子Run/已有Case资格；没有第二套身份标准。页面仅根据服务端can_start/can_resume决定按钮，状态/聚焦刷新，打开费用授权框前重新预检并固定请求：同身份恢复显式resume_source_id，不同身份明确fresh:true；Golden/Corpus新建条件不足禁用并显示原因。POST不再默认挑最近Partial/Failed，没有fresh或明确ID即409；事务内仍最终复核并保护竞争变化，不自动降级为其他Run或fresh。原历史Run/Checkpoint只读，Judge V4、Negative合同、Golden、11 Gate及评分身份不变；架构节点与关系不变，仅统一原入口资格读取。本轮仅离线测试/必要服务重载，Provider0，3题/50题均未授权执行。

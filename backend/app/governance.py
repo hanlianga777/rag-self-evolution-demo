@@ -1967,18 +1967,44 @@ class GovernanceStore:
             )
         return run_id
 
-    def create_baseline_run(self, snapshot, config, judge, source_id=None, candidate_id=None, automatic=False):
+    def validate_evaluation_start(self, connection, snapshot, judge, *, candidate_id=None):
+        if connection.execute("SELECT id FROM evaluation_runs WHERE status IN ('queued','running')").fetchone():
+            raise ValueError('已有活动评测，禁止重复启动')
+        golden = connection.execute("SELECT * FROM dataset_versions WHERE status='approved' ORDER BY created_at DESC,rowid DESC LIMIT 1").fetchone()
+        if golden is None or golden['id'] != snapshot['id'] or {'id':golden['id'], **_load(golden['snapshot_json'], {})} != snapshot:
+            raise ValueError('Golden身份已变化')
+        if isinstance(snapshot.get('corpus_fingerprint'), dict) and snapshot['corpus_fingerprint'].get('pipeline_version_id') and snapshot['corpus_fingerprint'] != manifest_identity(current_manifest()):
+            raise ValueError('当前Corpus身份已变化')
+        if not candidate_id:
+            production = connection.execute("SELECT id FROM production_versions WHERE status='active'").fetchone()
+            if judge.get('baseline_version') != (production['id'] if production else None):
+                raise ValueError('当前Production配置身份已变化')
+
+    def validate_evaluation_resume(self, connection, snapshot, config, judge, source_id, *, candidate_id=None):
         from .evaluation_contract import evaluation_identity, policy_current
+        if snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest()):
+            raise ValueError('续跑Corpus身份不匹配，禁止混合结果')
+        source = connection.execute('SELECT * FROM evaluation_runs WHERE id=?', (source_id,)).fetchone()
+        if source is None or source['status'] not in {'partial','failed'} or _load(source['config_json'], {}).get('run_target') != ('sandbox_candidate' if candidate_id else 'baseline'):
+            raise ValueError('仅中断的同身份评测可以授权续跑')
+        source_judge = _load(source['judge_json'], {})
+        if (_load(source['dataset_snapshot_json'], {}) != snapshot or _load(source['config_json'], {}) != config or not policy_current(source_judge)
+            or source_judge.get('evaluation_identity') != evaluation_identity(snapshot, judge) or (candidate_id and source_judge != judge)
+            or any(source_judge.get(k) != judge.get(k) for k in ('model','temperature','execution_snapshot','baseline_version'))):
+            raise ValueError('Golden/Corpus/Judge/Evaluation Identity或配置不同，禁止混合；请明确fresh新建完整评测')
+        if connection.execute("SELECT id FROM evaluation_runs WHERE json_extract(result_json,'$.resume_source_id')=?", (source_id,)).fetchone():
+            raise ValueError('该Run已续跑，请使用最新子Run，禁止重复预约')
+        rows = connection.execute('SELECT question_id,result_json FROM evaluation_case_results WHERE run_id=? ORDER BY id', (source_id,)).fetchall()
+        keys = [r['question_id'] for r in rows]
+        if len(keys) != len(set(keys)) or not set(keys) <= set(snapshot['question_ids']):
+            raise ValueError('历史结果题号重复或不属于冻结Snapshot')
+        return source, rows
+
+    def create_baseline_run(self, snapshot, config, judge, source_id=None, candidate_id=None, automatic=False):
         run_id = f"EVAL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
-            if connection.execute("SELECT id FROM evaluation_runs WHERE status IN ('queued','running')").fetchone():
-                raise ValueError('已有活动评测，禁止重复启动')
-            golden = connection.execute("SELECT * FROM dataset_versions WHERE status='approved' ORDER BY created_at DESC,rowid DESC LIMIT 1").fetchone()
-            if golden is None or golden['id'] != snapshot['id'] or {'id':golden['id'], **_load(golden['snapshot_json'], {})} != snapshot:
-                raise ValueError('Golden身份已变化')
-            if isinstance(snapshot.get('corpus_fingerprint'), dict) and snapshot['corpus_fingerprint'].get('pipeline_version_id') and snapshot['corpus_fingerprint'] != manifest_identity(current_manifest()):
-                raise ValueError('当前Corpus身份已变化')
+            self.validate_evaluation_start(connection, snapshot, judge, candidate_id=candidate_id)
             if candidate_id:
                 candidate = self.reserve_candidate_evaluation(candidate_id, connection)
                 baseline = self.require_current_baseline(self.experiment(candidate['experiment_id'])['baseline_run_id'], connection)
@@ -1987,29 +2013,10 @@ class GovernanceStore:
                     raise ValueError('Candidate/Baseline身份或配置已变化')
                 previous = connection.execute("SELECT id FROM evaluation_runs WHERE json_extract(config_json,'$.candidate_id')=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (candidate_id,)).fetchone()
                 source_id = previous['id'] if previous else None
-            else:
-                production = connection.execute("SELECT id FROM production_versions WHERE status='active'").fetchone()
-                if judge.get('baseline_version') != (production['id'] if production else None):
-                    raise ValueError('当前Production配置身份已变化')
             result, rows = {}, []
             if source_id:
-                if snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest()):
-                    raise ValueError('续跑Corpus身份不匹配，禁止混合结果')
-                source = connection.execute('SELECT * FROM evaluation_runs WHERE id=?', (source_id,)).fetchone()
-                if source is None or source['status'] not in {'partial','failed'} or _load(source['config_json'], {}).get('run_target') != ('sandbox_candidate' if candidate_id else 'baseline'):
-                    raise ValueError('仅中断的同身份评测可以授权续跑')
-                source_judge = _load(source['judge_json'], {})
-                if (_load(source['dataset_snapshot_json'], {}) != snapshot or _load(source['config_json'], {}) != config or not policy_current(source_judge)
-                    or source_judge.get('evaluation_identity') != evaluation_identity(snapshot, judge) or (candidate_id and source_judge != judge)
-                    or any(source_judge.get(k) != judge.get(k) for k in ('model','temperature','execution_snapshot','baseline_version'))):
-                    raise ValueError('Golden/Corpus/Judge/Evaluation Identity或配置不同，禁止混合；请明确fresh新建完整评测')
-                if connection.execute("SELECT id FROM evaluation_runs WHERE json_extract(result_json,'$.resume_source_id')=?", (source_id,)).fetchone():
-                    raise ValueError('该Run已续跑，请使用最新子Run，禁止重复预约')
+                source, rows = self.validate_evaluation_resume(connection, snapshot, config, judge, source_id, candidate_id=candidate_id)
                 result = {'resume_source_id':source_id, 'checkpoints':_load(source['result_json'], {}).get('checkpoints', {})}
-                rows = connection.execute('SELECT question_id,result_json FROM evaluation_case_results WHERE run_id=? ORDER BY id', (source_id,)).fetchall()
-                keys = [r['question_id'] for r in rows]
-                if len(keys) != len(set(keys)) or not set(keys) <= set(snapshot['question_ids']):
-                    raise ValueError('历史结果题号重复或不属于冻结Snapshot')
             if automatic:
                 from .paid_run import current_paid_run
                 paid=current_paid_run()

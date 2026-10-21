@@ -34,7 +34,7 @@ class GovernanceApiTests(unittest.TestCase):
         self.assertEqual(response.json()[0]["review_status"], "human_review_pending")
 
     def test_evaluation_is_blocked_until_a_human_approves_a_question(self):
-        response = self.client.post("/api/evaluations/run", headers={"Origin": "http://127.0.0.1:5174"})
+        response = self.client.post("/api/evaluations/run", json={"fresh":True}, headers={"Origin": "http://127.0.0.1:5174"})
 
         self.assertEqual(response.status_code, 409)
         self.assertIn("approved", response.json()["detail"])

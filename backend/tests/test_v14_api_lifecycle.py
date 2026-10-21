@@ -107,7 +107,7 @@ class ApiLifecycleTests(unittest.TestCase):
         self.assertEqual(self.store.dataset_summary()['approved'], 20)
         snapshot = self.store.dataset_snapshots()[0]
         snapshot_before = json.dumps(snapshot, sort_keys=True)
-        baseline = self.post('evaluations/run')
+        baseline = self.post('evaluations/run',{'fresh':True})
         baseline = self.wait('evaluations/' + baseline['id'], ('completed', 'failed'))
         baseline_before = self.store.evaluation_run(baseline['id'])
         self.assertEqual(baseline['status'], 'completed')

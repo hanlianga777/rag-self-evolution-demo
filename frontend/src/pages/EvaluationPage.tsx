@@ -34,6 +34,8 @@ const localTime = (value?: string) => {
 };
 
 
+const baselinePreflight = (runId?: string) => getJson<Row>(`/api/evaluation/preflight${runId ? `?resume_source_id=${encodeURIComponent(runId)}` : ''}`);
+
 export function EvaluationPage({ data }: { data: any; navigate?: (page: any) => void }) {
   const operation = useOperation();
   const [paid, setPaid] = useState<PaidRequest | null>(null);
@@ -55,6 +57,20 @@ export function EvaluationPage({ data }: { data: any; navigate?: (page: any) => 
   const [technicalOpen, setTechnicalOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [preflight,setPreflight]=useState<Row | null>(null);
+  useEffect(()=>{
+    let cancelled=false;
+    const load=async()=>{
+      setPreflight(null);
+      try {
+        const value=await baselinePreflight(run.id);
+        if(!cancelled)setPreflight(value);
+      } catch(reason) {if(!cancelled)setPreflight({can_start:false,reason:errorMessage(reason)});}
+    };
+    void load();window.addEventListener('focus',load);
+    return()=>{cancelled=true;window.removeEventListener('focus',load);};
+  },[run.id,run.status]);
+
 
   useEffect(()=>{let cancelled=false;void getJson<Row>('/api/evaluation?active_task=true').then(value=>{if(!cancelled && value.id)setRun(value)}).catch(()=>{});return()=>{cancelled=true};},[]);
   useEffect(() => {
@@ -81,13 +97,28 @@ export function EvaluationPage({ data }: { data: any; navigate?: (page: any) => 
     finally { setHistoryBusy(false); }
   };
 
-  const canResume = ["partial", "failed"].includes(run.status) && !run.requires_policy_upgrade;
-  const start = async () => {
+  const canResume = preflight?.can_resume === true && !!preflight.resume_source_id;
+  const start = async (request: Row) => {
     setBusy(true); setError("");
     try {
-      await operation.startEvaluation("Baseline Evaluation", async () => { const started: Row = await postJson("/api/evaluations/run", run.requires_policy_upgrade ? { fresh: true } : undefined); setRun(started); return started as { id: string }; });
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setBusy(false); }
+      await operation.startEvaluation("Baseline Evaluation", async () => { const started: Row = await postJson("/api/evaluations/run", request); setRun(started); return started as { id: string }; });
+    } catch (reason) {
+      setError(errorMessage(reason));
+      setPreflight(await baselinePreflight(run.id).catch(error=>({can_start:false,reason:errorMessage(error)})));
+    } finally { setBusy(false); }
+  };
+  const prepareStart = async () => {
+    setBusy(true);setError("");
+    try {
+      const current=await baselinePreflight(run.id);setPreflight(current);
+      if(current.can_start !== true)return;
+      const resume=current.can_resume === true && !!current.resume_source_id;
+      const request=resume ? {resume_source_id:current.resume_source_id} : {fresh:true};
+      setPaid({title:resume ? "恢复 Baseline 断点评测" : "完整真实 Baseline 重评",
+        description:resume ? "复用已完成结果与保存回答，仅处理缺失请求。每阶段最多3次尝试、600秒；Unknown请求停止，成功回答复用。" : "完整真实Baseline重评；每题生成回答及Judge，另含检索/改写调用。新建保留旧Run及Checkpoint。",
+        execute:()=>void start(request)});
+    } catch(reason) {setPreflight({can_start:false,reason:errorMessage(reason)});}
+    finally {setBusy(false);}
   };
 
   const result = run.result || {};
@@ -112,9 +143,12 @@ export function EvaluationPage({ data }: { data: any; navigate?: (page: any) => 
   const stale = data.workspace?.requires_new_golden || data.workspace?.requires_new_baseline && (completed || data.workspace?.current_golden_id && snapshot.id !== data.workspace.current_golden_id);
 
 
-  return <PageShell className="page evaluation-page" header={<div className="page-title"><div><h1>Baseline</h1><p>用冻结 Golden 评测当前版本，识别质量门槛、单题失败及可优化问题。</p></div><button className="secondary" disabled={busy || ["queued","running"].includes(run.status) || data.workspace?.requires_new_golden === true} onClick={() => setPaid({ title: canResume ? "恢复 Baseline 断点评测" : "完整真实 Baseline 重评", description: canResume ? `已完成 ${result.completed ?? cases.length}/${result.total ?? snapshot.question_ids?.length ?? "未采集"}；复用已完成结果与保存回答，仅处理缺失请求。每阶段最多3次尝试、600秒；Unknown请求停止，成功回答复用。` : `Golden ${snapshot.question_ids?.length ?? "未采集"} 题；每题生成回答及Judge，另含检索/改写调用。每阶段最多3次尝试、600秒，新评测保留历史结果。`, execute: () => void start() })}><Play size={15} />{run.status === "completed" ? (run.requires_policy_upgrade ? "重新运行 Baseline（新版本）" : "重新运行 Baseline") : ["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.requires_policy_upgrade ? "重新运行 Baseline（新版本）" : "运行 Baseline 评测"}</button></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>Hard Gate</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
+  return <PageShell className="page evaluation-page" header={<div className="page-title"><div><h1>Baseline</h1><p>用冻结 Golden 评测当前版本，识别质量门槛、单题失败及可优化问题。</p></div><button className="secondary" disabled={busy || preflight?.can_start !== true} onClick={() => void prepareStart()}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "重新运行 Baseline（新版本）" : "运行 Baseline 评测"}</button></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>Hard Gate</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
 
     <ProviderAuthorization request={paid} onClose={() => setPaid(null)} />
+    {preflight?.reason && <p className="error-notice" role="alert">无法启动 Baseline：{preflight.reason}</p>}
+    {preflight?.can_start && preflight.resume_reason && <p className="muted">原任务不能恢复：{preflight.resume_reason}；请明确新建完整评测，历史断点保留。</p>}
+
 
     <Drawer className="workbench-drawer" open={historyOpen} onOpenChange={setHistoryOpen} title="历史评测 · 原记录只读"><div className="drawer-body"><div className="review-batch"><button disabled={historyBusy || historyPage===1} onClick={()=>void loadHistory(historyPage-1)}>上一页</button><span>第 {historyPage} 页 · 每页最多50条</span><button disabled={historyBusy || history.length<50} onClick={()=>void loadHistory(historyPage+1)}>下一页</button></div>{!history.length && <p>暂无历史评测记录。</p>}{history.map(row => <section key={row.id}><h3>{row.config?.run_target === 'answer_replay' ? '历史答案评分（非完整重评）' : row.config?.run_target === 'sandbox_candidate' ? '候选Sandbox' : '正式Baseline'}</h3><p>{localTime(row.created_at)} · {displayText(row.status || "未采集")} · {row.judge?.scoring_policy || '历史规则'} · Bad Case {row.result?.bad_case_count ?? '未采集'}</p><button className="text-button" onClick={() => { void getJson<Row>(`/api/evaluations/${row.id}`).then(value => { if (value.config?.run_target === 'answer_replay') { setReplay(value); setReplayOpen(true); } else { setRun(value); } setHistoryOpen(false); }).catch(reason => setError(errorMessage(reason))); }}>查看只读报告</button></section>)}</div></Drawer>
     {run.result?.auto_recovery?.authorized && !completed && <p className="workbench-status" role="status">{run.result.auto_recovery.state==='retrying'?`后台自动重试${run.result.auto_recovery.phase==='judge'?'Judge':'问答请求'} · 本题第${run.result.auto_recovery.retry_count}次恢复，已完成题目不会重复调用。`:run.result.auto_recovery.state==='stopped'?'后台已保存断点并停止：存在不可自动恢复的错误，详见评测依据。':'后台任务持续执行；刷新或关闭页面不停止Worker。'}</p>}

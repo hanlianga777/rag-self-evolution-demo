@@ -1,0 +1,71 @@
+E/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+FE.EEEE
+======================================================================
+ERROR: test_active_task_duplicate_resume_and_unknown_checkpoint_are_blocked (test_baseline_entry.BaselineEntryTests.test_active_task_duplicate_resume_and_unknown_checkpoint_are_blocked)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_entry.py", line 37, in test_active_task_duplicate_resume_and_unknown_checkpoint_are_blocked
+    active=self.runner.baseline_preflight(old['id']);self.assertFalse(active['can_start']);self.assertIn('活动',active['reason'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'EvaluationRunner' object has no attribute 'baseline_preflight'
+
+======================================================================
+ERROR: test_corpus_or_missing_golden_prevents_fresh_and_resume (test_baseline_entry.BaselineEntryTests.test_corpus_or_missing_golden_prevents_fresh_and_resume)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_entry.py", line 44, in test_corpus_or_missing_golden_prevents_fresh_and_resume
+    result=self.runner.baseline_preflight(old['id']);self.assertFalse(result['can_resume'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'EvaluationRunner' object has no attribute 'baseline_preflight'
+
+======================================================================
+ERROR: test_identical_partial_is_explicitly_resumable_without_writes_or_provider (test_baseline_entry.BaselineEntryTests.test_identical_partial_is_explicitly_resumable_without_writes_or_provider)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_entry.py", line 15, in test_identical_partial_is_explicitly_resumable_without_writes_or_provider
+    result=self.runner.baseline_preflight(old['id'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'EvaluationRunner' object has no attribute 'baseline_preflight'
+
+======================================================================
+ERROR: test_judge_parser_identity_and_full_request_parameters_cannot_resume (test_baseline_entry.BaselineEntryTests.test_judge_parser_identity_and_full_request_parameters_cannot_resume)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_entry.py", line 25, in test_judge_parser_identity_and_full_request_parameters_cannot_resume
+    result=self.runner.baseline_preflight(old['id'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'EvaluationRunner' object has no attribute 'baseline_preflight'
+
+======================================================================
+ERROR: test_knowledge_corpus_mismatch_disables_fresh (test_baseline_entry.BaselineEntryTests.test_knowledge_corpus_mismatch_disables_fresh)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_entry.py", line 49, in test_knowledge_corpus_mismatch_disables_fresh
+    result=self.runner.baseline_preflight();self.assertFalse(result['can_start']);self.assertIn('Knowledge',result['reason'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'EvaluationRunner' object has no attribute 'baseline_preflight'
+
+======================================================================
+ERROR: test_pipeline_and_golden_snapshot_change_forces_fresh (test_baseline_entry.BaselineEntryTests.test_pipeline_and_golden_snapshot_change_forces_fresh)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_entry.py", line 32, in test_pipeline_and_golden_snapshot_change_forces_fresh
+    result=self.runner.baseline_preflight(old['id']);self.assertFalse(result['can_resume']);self.assertTrue(result['can_start'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'EvaluationRunner' object has no attribute 'baseline_preflight'
+
+======================================================================
+FAIL: test_api_does_not_implicitly_resume_or_call_provider (test_baseline_entry.BaselineEntryTests.test_api_does_not_implicitly_resume_or_call_provider)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/tests/test_baseline_entry.py", line 57, in test_api_does_not_implicitly_resume_or_call_provider
+    p=client.get('/api/evaluation/preflight',params={'resume_source_id':old['id']});self.assertEqual(p.status_code,200);self.assertTrue(p.json()['can_resume'])
+                                                                                    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 404 != 200
+
+----------------------------------------------------------------------
+Ran 8 tests in 1.192s
+
+FAILED (failures=1, errors=6)
+ISOLATION: /var/folders/1x/qtv6hmzn0xn_hwv0nrq22b3m0000gn/T/rag-closure-offline-a5lc2km5 TESTS: 8 FAILURES: 1 ERRORS: 6

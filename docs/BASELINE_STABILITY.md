@@ -23,7 +23,7 @@
 - 用户再次授权点击原运行按钮，在最新正式Baseline中断时建立**独立子Run**：同身份复制完整案例并跳过全部已完成调用；有生成检查点时只补Judge，没有时才生成。历史原Run、成绩、资格不覆盖。
 - Golden完整Snapshot、Corpus、Judge规则/模型/温度/执行模型、Evaluation Identity、Production来源及完整Pipeline配置核对；事务预约阻断活动评测、重复来源续跑及身份混用。失败子Run可再次由用户选择续跑，已使用父Run不能重复预约。
 - 只有完整冻结题集的每题真实结果齐备才Completed；否则failed/partial，不能成为正式Baseline、Agent或发布依据。没有自动重试、无限重试、定时恢复或自动ABC。
-- API仍是POST /api/evaluations/run；默认选择最新partial/failed正式Baseline。显式resume_source_id选择来源；身份不符返回409。明确fresh=true才全新50题，两参数互斥，无UI重构。
+- 2026-10-21入口更新：API仍是POST /api/evaluations/run，但已禁止默认选择历史Run。GET /api/evaluation/preflight与实际事务共用严格身份校验；恢复必须显式resume_source_id，新建必须fresh=true，两参数互斥。Golden/Corpus不满足时前端禁用，身份不符显示新版本新建。旧Run/Checkpoint保留，仍无UI重构。
 
 进程中断后未知是否收到的请求结果不可推断；只保证不重复调用**已持久化**的成功题/生成步骤。响应成功但落库前进程死亡的窗口仍可能未知，须用户再次授权，不能保证外部服务恰好一次。生成失败前未返回的Token用量不得估计成零。
 

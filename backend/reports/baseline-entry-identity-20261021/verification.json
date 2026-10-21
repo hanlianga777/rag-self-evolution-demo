@@ -1,0 +1,39 @@
+{
+  "old_source_preflight": {
+    "can_start": true,
+    "can_resume": false,
+    "resume_source_id": null,
+    "reason": null,
+    "resume_reason": "Golden/Corpus/Judge/Evaluation Identity或配置不同，禁止混合；请明确fresh新建完整评测",
+    "entry_code_sha256": {
+      "preflight": "16b5f7f789ded1a47a561cbdc11c857c73bbdc24f1936f6e6b38d58ead842387",
+      "start_guard": "3702a9864e24b5025a5d59288dcce6681c30d450f0b7096da43f972452bf1980",
+      "resume_guard": "f3beb23a6993c543c97488a8cf50e0d37e3de074d15927af55912b529de5c04d"
+    }
+  },
+  "fresh_preflight": {
+    "can_start": true,
+    "can_resume": false,
+    "resume_source_id": null,
+    "reason": null,
+    "resume_reason": null,
+    "entry_code_sha256": {
+      "preflight": "16b5f7f789ded1a47a561cbdc11c857c73bbdc24f1936f6e6b38d58ead842387",
+      "start_guard": "3702a9864e24b5025a5d59288dcce6681c30d450f0b7096da43f972452bf1980",
+      "resume_guard": "f3beb23a6993c543c97488a8cf50e0d37e3de074d15927af55912b529de5c04d"
+    }
+  },
+  "judge_negative_gate_contract_unchanged": true,
+  "frontend_serves_preflight_code": true,
+  "all_production_tables_and_checkpoints_unchanged": true,
+  "provider_calls": 0,
+  "formal_runs_started": 0,
+  "three_judges_not_authorized": true,
+  "runtime_loaded": true,
+  "final_backend_tests": 49,
+  "frontend_tests": 11,
+  "independent_backend_tests": 32,
+  "ui_button": "重新运行 Baseline（新版本）",
+  "ui_dialog": "完整真实 Baseline 重评",
+  "ui_authorization": "cancelled; no Provider POST"
+}

@@ -120,7 +120,7 @@ class ResumeTests(unittest.TestCase):
         self.assertEqual(load_settings({},empty).timeout_seconds,240)
         self.assertEqual(load_settings({'DEEPSEEK_TIMEOUT_SECONDS':'180'},empty).timeout_seconds,180)
 
-    def test_existing_api_button_resumes_latest_partial(self):
+    def test_existing_api_button_resumes_explicit_partial(self):
         import time
         from fastapi.testclient import TestClient
         from api_fixture import main
@@ -128,7 +128,7 @@ class ResumeTests(unittest.TestCase):
         manager=type('Manager',(),{'state':lambda _:None})()
         with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime),patch.object(main,'corpus_manager',manager):
             with TestClient(main.app) as client:
-                response=client.post('/api/evaluations/run',headers={'Origin':'http://127.0.0.1:5174'})
+                response=client.post('/api/evaluations/run',json={'resume_source_id':old['id']},headers={'Origin':'http://127.0.0.1:5174'})
                 self.assertEqual(response.status_code,201,response.text);child=response.json()['id']
                 for _ in range(100):
                     if self.store.evaluation_run(child)['status']!='running':break
