@@ -10,7 +10,7 @@ import {VerificationPage} from './pages/VerificationPage';
 let root:ReturnType<typeof createRoot>;
 afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';sessionStorage.clear();localStorage.clear();vi.unstubAllGlobals();});
 const view={is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Retrieval',optimization_directions:['candidate_recall'],phenomena:[{name:'检索失败'}]};
-const rows=['Q71','Q72'].map((question_id,i)=>({question_id,question:`问题${i}`,passed:false,diagnostic_view:{...view,primary_root_cause:i?'Generation':'Retrieval'}}));
+const rows=['Q71','Q72'].map((question_id,i)=>({question_id,question:`问题${i}`,passed:false,diagnostic_view:{...view,primary_root_cause:i?'Generation':'Retrieval',phenomena:[{name:i?'模型过度拒答':'检索失败'}]}}));
 const evaluation={id:'BASE',status:'completed',config:{candidate_k:12},cases:rows,result:{bad_case_count:2,gates:{passed:true,passed_count:11,total:11}}};
 const badCases=rows.map(row=>({id:'BC-'+row.question_id,question_id:row.question_id,run_id:'BASE',result:row}));
 const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));};
@@ -19,7 +19,7 @@ it('uses one finite filter per dimension, real counts and resets on returning to
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/bad-cases')?badCases:evaluation))));
  await mount(<EvaluationPage data={{evaluation,badCases}}/>);await click('Bad Case 诊断');
  expect(document.querySelector('.diagnosis-filters [role=combobox]')).toBeNull();
- const retrieval=[...document.querySelectorAll<HTMLButtonElement>('[aria-label="技术根因"] button')].find(b=>b.textContent?.includes('Retrieval'))!;
+ const retrieval=[...document.querySelectorAll<HTMLButtonElement>('[aria-label="失败现象"] button')].find(b=>b.textContent?.includes('检索失败'))!;
  await act(async()=>retrieval.click());expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
  await click('Hard Gate');await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
  expect(document.body.textContent).not.toContain('恢复全部');expect(document.body.textContent).not.toContain('每类首例');

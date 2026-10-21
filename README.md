@@ -1,5 +1,7 @@
 # RAG Evolution
 
+2026-10-21 诊断更新：既有评测Identity不变，通过独立审计记录的Case/Snapshot/Corpus/全阶段溯源校验解释已保存业务FAIL；部分Final支持不冒充完整规范、Critical不等于Safety。Ranking仅允许保存Trace验证可恢复且保留既有事实的上下文干预；无可用策略可零候选。Baseline主表保留全部业务FAIL，根因和完整证据在案例抽屉。当前最新Run仍Partial，Q18未恢复，本轮Provider0。[实现与验收](docs/BASELINE_DIAGNOSTIC_EVIDENCE_FIX_REPORT.md)，只读验证：`python3 scripts/verify_baseline_diagnostics.py`。
+
 2026-10-20 Baseline中断修复：当前Parser `business-output-3-evidence-roles`，严格区分实际Final的回答证据与候选中遗漏要求的规范证据；旧V2 Partial不可直接续跑。已重载服务，刷新Baseline页使用“重新运行 Baseline（新版本）”，保留旧3题与检查点；本轮无Provider调用。[根因、验证及操作说明](docs/BASELINE50_INTERRUPTION_FIX_REPORT.md)。
 
 2026-10-20 评测合同收口：保持Judge V3 Prompt与Safety Guard，新增Parser `business-output-2-scope`及新Evaluation Identity。严格必要事实/安全证据与可核清的辅助资料范围分开，原响应保留，技术异常不作业务Bad Case。统一离线验收及[Baseline50准备/预算](docs/RAG_EVALUATION_CONTRACT_CLOSEOUT_REPORT.md)完成后可直接申请正式运行授权；不默认追加单题付费测试，本轮Provider0。

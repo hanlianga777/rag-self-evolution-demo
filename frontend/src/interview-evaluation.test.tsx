@@ -32,8 +32,8 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
   expect(document.querySelector("tbody")?.textContent).toContain("≥ 90.00%");
   expect(new Set([...document.querySelectorAll("tbody tr td:nth-child(2)")].map(cell => cell.textContent)).size).toBe(4);
   await click("Bad Case 诊断");
-  expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "优化方向", "详情"]);
-  expect(document.querySelector("tbody tr td:nth-child(3)")?.textContent).toContain("Retrieval");
+  expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "失败现象", "业务结论", "优化方向", "详情"]);
+  expect(document.querySelector("tbody tr td:nth-child(3)")?.textContent).toBe("FAIL");
   await click("查看案例");
   expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["案例结论", "业务问题", "预期与实际回答", "证据依据", "诊断与优化方向"]);
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Retrieval");

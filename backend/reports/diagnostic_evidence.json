@@ -1,0 +1,1140 @@
+{
+  "schema": "offline-diagnostic-evidence-1",
+  "reviewer": "Codex source audit; Owner authorized independent diagnostic validation on 2026-10-21",
+  "scope": "Independent normative and whole-stage equivalence observations only; not historical Judge input, verdict or approval.",
+  "audit_sources": {
+    "outputs/medium50_baseline_readonly_audit_20261021/A_逐题证据审计报告.md": "8bdd68bfb9aecea81c82fdc7667d5247fe0fbe1f1d1318933d742b290e5b1c31",
+    "outputs/medium50_baseline_readonly_audit_20261021/B_通用代码问题与修复建议.md": "92f1d5363ea13eff5eaa2bb7737b13fb13e5f8c6eed671c46b19009326420f00"
+  },
+  "records": [
+    {
+      "run_id": "EVAL-20261021013401711966",
+      "question_id": "V1G-110926448917-03",
+      "case_sha256": "29526c773c8dfa777ed92a86e9ba981e3749abdb877a50e1339f588d958e357d",
+      "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+      "stages_sha256": {
+        "candidates": "8841513994bbd8c714852bb932ef976c9da4ff3639c60857f0b41d02b2ab5f91",
+        "reranked": "6863a0275537ef102fde54ceb2d12df59cc8b20786793bee5b998f8643cc997b",
+        "final": "20c7a974531afd1ac9ee1512fe5bd6787a7ab230c1752e101dc25b3f7b870c91"
+      },
+      "facts": [
+        {
+          "check_index": 0,
+          "golden_quote": "按主菜单中按下设置按钮",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00132",
+              "quote": "按主菜单中按下设置按钮"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "设置菜单内流程、开机和封面不能替代主菜单设置入口。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00132",
+                  "quote": "按主菜单中按下设置按钮"
+                }
+              ],
+              "equivalence_review": "设置菜单内流程、开机和封面不能替代主菜单设置入口。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00132",
+                  "quote": "按主菜单中按下设置按钮"
+                }
+              ],
+              "equivalence_review": "设置菜单内流程、开机和封面不能替代主菜单设置入口。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "设置菜单内流程、开机和封面不能替代主菜单设置入口。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run_id": "EVAL-20261021013401711966",
+      "question_id": "V1G-110926448917-04",
+      "case_sha256": "d40a79d035e5d48822194ef8c7ebb153cd5b37c0f93028aa96dfd00470541537",
+      "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+      "stages_sha256": {
+        "candidates": "4a26dcee3e6905448c4b4571098ace5753daf2268e128fca87994f349be2ae96",
+        "reranked": "fc575cb277145f390d6c3f446aa375bc2ed4873b10f370c780ca96bed89849d6",
+        "final": "e9a4eebd0267675d3ab5c69486f5cd889e1cf4dac01ba1f07ea98369b8237f4e"
+      },
+      "facts": [
+        {
+          "check_index": 2,
+          "golden_quote": "只在室内存放设备",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00180",
+              "quote": "只在室内存放设备"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "B2存放/电池规范属于其他产品；KIRA本次Final无室内和重量等价规范。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00180",
+                  "quote": "只在室内存放设备"
+                }
+              ],
+              "equivalence_review": "B2存放/电池规范属于其他产品；KIRA本次Final无室内和重量等价规范。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00180",
+                  "quote": "只在室内存放设备"
+                }
+              ],
+              "equivalence_review": "B2存放/电池规范属于其他产品；KIRA本次Final无室内和重量等价规范。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "B2存放/电池规范属于其他产品；KIRA本次Final无室内和重量等价规范。"
+            }
+          }
+        },
+        {
+          "check_index": 3,
+          "golden_quote": "运输和存放时注意设备的重量",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00180",
+              "quote": "运输和存放时注意设备的重量"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "B2存放/电池规范属于其他产品；KIRA本次Final无室内和重量等价规范。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00180",
+                  "quote": "运输和存放时注意设备的重量"
+                }
+              ],
+              "equivalence_review": "B2存放/电池规范属于其他产品；KIRA本次Final无室内和重量等价规范。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00180",
+                  "quote": "运输和存放时注意设备的重量"
+                }
+              ],
+              "equivalence_review": "B2存放/电池规范属于其他产品；KIRA本次Final无室内和重量等价规范。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "B2存放/电池规范属于其他产品；KIRA本次Final无室内和重量等价规范。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run_id": "EVAL-20261021013401711966",
+      "question_id": "V1G-110926448917-06",
+      "case_sha256": "a50d9ae742fbc1642903bcd617b93b18395b217231671c28aa6c0f69582f733d",
+      "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+      "stages_sha256": {
+        "candidates": "4ba4e96ab9549c0e8e9abc577713d994dac78cb7a4624fc23e7f1db752e28ffa",
+        "reranked": "1779906289bc295020f2d7668a2719b59ac4cf78d5e42d56065f4c1d438ec03d",
+        "final": "bfcaef3fe88955d60077294f5e5a7e6b627a1e3871343238454ae5e3056dc87d"
+      },
+      "facts": [
+        {
+          "check_index": 2,
+          "golden_quote": "对于电池供电的设备，请拔出电池插头或断开电池连接",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00026",
+              "quote": "对于电池供电的设备，请拔出电池插头或断开电池连接"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "对接站拔插头不能替代设备电池隔离，也不等于湿手触插头禁令。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00026",
+                  "quote": "对于电池供电的设备，请拔出电池插头或断开电池连接"
+                }
+              ],
+              "equivalence_review": "对接站拔插头不能替代设备电池隔离，也不等于湿手触插头禁令。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00026",
+                  "quote": "对于电池供电的设备，请拔出电池插头或断开电池连接"
+                }
+              ],
+              "equivalence_review": "对接站拔插头不能替代设备电池隔离，也不等于湿手触插头禁令。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "对接站拔插头不能替代设备电池隔离，也不等于湿手触插头禁令。"
+            }
+          }
+        },
+        {
+          "check_index": 3,
+          "golden_quote": "决不能用湿手触及电源插头或者插座",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00017",
+              "quote": "决不能用湿手触及电源插头或者插座"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "对接站拔插头不能替代设备电池隔离，也不等于湿手触插头禁令。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00017",
+                  "quote": "决不能用湿手触及电源插头或者插座"
+                }
+              ],
+              "equivalence_review": "对接站拔插头不能替代设备电池隔离，也不等于湿手触插头禁令。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00017",
+                  "quote": "决不能用湿手触及电源插头或者插座"
+                }
+              ],
+              "equivalence_review": "对接站拔插头不能替代设备电池隔离，也不等于湿手触插头禁令。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "对接站拔插头不能替代设备电池隔离，也不等于湿手触插头禁令。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run_id": "EVAL-20261021013401711966",
+      "question_id": "V1G-110926448917-07",
+      "case_sha256": "436e1e0167153fb5d6f5941aee2f4f6bb9efcf276ccbede5f75eb27341287923",
+      "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+      "stages_sha256": {
+        "candidates": "008df57c628a584a5b82b81ca9ffd34bdf137340375569c5a40b944c46e6fc3d",
+        "reranked": "3af0b96a5614238ee3130439e2d21847ae89360f26cc23968d85dac8021d1a71",
+        "final": "0a1a1cac1d2cfe9b83b4dbd0a47135fe6b7c540cecc2315d9465628154b9d0f7"
+      },
+      "facts": [
+        {
+          "check_index": 1,
+          "golden_quote": "在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00026",
+              "quote": "在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "滤网机械流程、运行后保养与对接站拔电源未覆盖维护总则的关整机和电池隔离；完整12候选和Final已审。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "滤网机械流程、运行后保养与对接站拔电源未覆盖维护总则的关整机和电池隔离；完整12候选和Final已审。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "滤网机械流程、运行后保养与对接站拔电源未覆盖维护总则的关整机和电池隔离；完整12候选和Final已审。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "滤网机械流程、运行后保养与对接站拔电源未覆盖维护总则的关整机和电池隔离；完整12候选和Final已审。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run_id": "EVAL-20261021013401711966",
+      "question_id": "V1G-110926448917-08",
+      "case_sha256": "e793a3746c0d94025bf8bc46ee2b376360e0f028c566122f5fd2e5b6df90d40d",
+      "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+      "stages_sha256": {
+        "candidates": "6c81b6b178e14afdca2f8f8a7ac7161a8490b1e97a2a4b39faa32179f78a214a",
+        "reranked": "951d68944b9966c125ca2f3e6ac4c001685c3dce2796ba219a947acf9d5bedd4",
+        "final": "8e90884a09787a5c10b04c10b016a395442f7702885981652f6f5a924d924822"
+      },
+      "facts": [
+        {
+          "check_index": 3,
+          "golden_quote": "当长时间未使用接触式充电器，在使用前请先清洁充电板表面。",
+          "reference_support": [
+            {
+              "source_id": "DOC-004-C-00032",
+              "quote": "当长时间未使用接触式充电器，在使用前请先清洁充电板表面。"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-004",
+            "product": "B2 电池与充电器",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "电极擦拭只部分相关；B2机身清洁不是充电器板面清洁，接口金属工具提醒不等于板面金属刷/砂纸禁令。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-004-C-00032",
+                  "quote": "当长时间未使用接触式充电器，在使用前请先清洁充电板表面。"
+                }
+              ],
+              "equivalence_review": "电极擦拭只部分相关；B2机身清洁不是充电器板面清洁，接口金属工具提醒不等于板面金属刷/砂纸禁令。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-004-C-00032",
+                  "quote": "当长时间未使用接触式充电器，在使用前请先清洁充电板表面。"
+                }
+              ],
+              "equivalence_review": "电极擦拭只部分相关；B2机身清洁不是充电器板面清洁，接口金属工具提醒不等于板面金属刷/砂纸禁令。"
+            },
+            "final": {
+              "coverage": "partial",
+              "support": [
+                {
+                  "quote": "请使用干燥抹布擦拭充电电极表面，确保充电过程中良好接触。",
+                  "source_id": "DOC-004-C-00017"
+                }
+              ],
+              "equivalence_review": "电极擦拭只部分相关；B2机身清洁不是充电器板面清洁，接口金属工具提醒不等于板面金属刷/砂纸禁令。"
+            }
+          }
+        },
+        {
+          "check_index": 5,
+          "golden_quote": "清洁时严禁使用金属刷、砂纸等，以免刮伤表面。",
+          "reference_support": [
+            {
+              "source_id": "DOC-004-C-00032",
+              "quote": "清洁时严禁使用金属刷、砂纸等，以免刮伤表面。"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-004",
+            "product": "B2 电池与充电器",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "电极擦拭只部分相关；B2机身清洁不是充电器板面清洁，接口金属工具提醒不等于板面金属刷/砂纸禁令。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-004-C-00032",
+                  "quote": "清洁时严禁使用金属刷、砂纸等，以免刮伤表面。"
+                }
+              ],
+              "equivalence_review": "电极擦拭只部分相关；B2机身清洁不是充电器板面清洁，接口金属工具提醒不等于板面金属刷/砂纸禁令。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-004-C-00032",
+                  "quote": "清洁时严禁使用金属刷、砂纸等，以免刮伤表面。"
+                }
+              ],
+              "equivalence_review": "电极擦拭只部分相关；B2机身清洁不是充电器板面清洁，接口金属工具提醒不等于板面金属刷/砂纸禁令。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "电极擦拭只部分相关；B2机身清洁不是充电器板面清洁，接口金属工具提醒不等于板面金属刷/砂纸禁令。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run_id": "EVAL-20261021013401711966",
+      "question_id": "V1G-110926448917-17",
+      "case_sha256": "b916c92b67d9c2a58a60a7e551edee8b0b528e63faff13747aa0b4b59b7a86c2",
+      "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+      "stages_sha256": {
+        "candidates": "ff45e7d2be279a9ccf661c8dfe705d6547259970539577ddd0def242a4170665",
+        "reranked": "5a06692876c2fc418fa36bf5cf68e922f76084857c1d607193abcff7add41f2d",
+        "final": "d912040fe29b1c2c8549d4ee877e6ed38ad7c7383cfe2e72233c653454de6c1a"
+      },
+      "facts": [
+        {
+          "check_index": 2,
+          "golden_quote": "首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控器设置】-打开遥控器开关，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。",
+          "reference_support": [
+            {
+              "source_id": "DOC-003-C-00015",
+              "quote": "首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控器设置】-打开遥控器开关，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-003",
+            "product": "B2 遥控器",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "B2手册R3分支范围已由标题和正文核清；现场备件未知仍需分型号，不授权未知现场执行。R1左侧灯和R3简介不能替代R3完整路径/右DL灯。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "B2手册R3分支范围已由标题和正文核清；现场备件未知仍需分型号，不授权未知现场执行。R1左侧灯和R3简介不能替代R3完整路径/右DL灯。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "B2手册R3分支范围已由标题和正文核清；现场备件未知仍需分型号，不授权未知现场执行。R1左侧灯和R3简介不能替代R3完整路径/右DL灯。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "B2手册R3分支范围已由标题和正文核清；现场备件未知仍需分型号，不授权未知现场执行。R1左侧灯和R3简介不能替代R3完整路径/右DL灯。"
+            }
+          }
+        },
+        {
+          "check_index": 3,
+          "golden_quote": "遥控器开机并且与 B2 连接成功后，右侧 DL 指示灯亮，这就意味着遥控器与 B2 数传模块已连接，此时可通过遥控器控制 B2。",
+          "reference_support": [
+            {
+              "source_id": "DOC-003-C-00015",
+              "quote": "遥控器开机并且与 B2 连接成功后，右侧 DL 指示灯亮，这就意味着遥控器与 B2 数传模块已连接，此时可通过遥控器控制 B2。"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-003",
+            "product": "B2 遥控器",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "B2手册R3分支范围已由标题和正文核清；现场备件未知仍需分型号，不授权未知现场执行。R1左侧灯和R3简介不能替代R3完整路径/右DL灯。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "B2手册R3分支范围已由标题和正文核清；现场备件未知仍需分型号，不授权未知现场执行。R1左侧灯和R3简介不能替代R3完整路径/右DL灯。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "B2手册R3分支范围已由标题和正文核清；现场备件未知仍需分型号，不授权未知现场执行。R1左侧灯和R3简介不能替代R3完整路径/右DL灯。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "B2手册R3分支范围已由标题和正文核清；现场备件未知仍需分型号，不授权未知现场执行。R1左侧灯和R3简介不能替代R3完整路径/右DL灯。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run_id": "EVAL-20261021013401711966",
+      "question_id": "V1G-110926448917-24",
+      "case_sha256": "04d4e2e31b9eb5a700e4027a0bf687942e915d25d4b2c78bf891bd0690fa7c6e",
+      "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+      "stages_sha256": {
+        "candidates": "172989ab98fe8c2e3d9d53f3ce66a2350c9182abbd27b8c9c9db088e55c9b09f",
+        "reranked": "cecc3265cdfd40a25af6868b7836f213354aa22c78b4f78b97d01dface3f886b",
+        "final": "95680b074fdb5d9a465af0a85a1543a9ea043b940904a7a519d6473b502b2e2a"
+      },
+      "facts": [
+        {
+          "check_index": 5,
+          "golden_quote": "洗涤剂应远离孩童妥善保管",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00022",
+              "quote": "洗涤剂应远离孩童妥善保管"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+            }
+          }
+        },
+        {
+          "check_index": 6,
+          "golden_quote": "不得未稀释使用推荐的洗涤剂",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00022",
+              "quote": "不得未稀释使用推荐的洗涤剂"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+            }
+          }
+        },
+        {
+          "check_index": 7,
+          "golden_quote": "洗涤剂若是不小心溅入眼睛，必须立即用水彻底冲洗并且若不慎吞咽则应立即就医",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00022",
+              "quote": "洗涤剂若是不小心溅入眼睛，必须立即用水彻底冲洗并且若不慎吞咽则应立即就医"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "手动模式计量和禁成分/强发泡条款不等于孩童保管、必须稀释、急救规范。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run_id": "EVAL-20261021013401711966",
+      "question_id": "V1G-110926448917-27-R123429216749",
+      "case_sha256": "a50ff6625b0bdd4e312470d18160148a96aa2b1e4ae5ca6f82709dacba834c35",
+      "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+      "stages_sha256": {
+        "candidates": "992b519698e62b7dc19cf2fe7f293b819a0bb7d74e25d48ddba98823bf44e67b",
+        "reranked": "098135cc945d31ae7f422bf8ba7abf4656082477783cd6c9faaa2d633792562e",
+        "final": "50f7e96d2e56a9c4b8a3a65c13f04c1088c2602ff79369a6a792f652f37214a8"
+      },
+      "facts": [
+        {
+          "check_index": 0,
+          "golden_quote": "不，地图不具备自学习功能",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00096",
+              "quote": "不，地图不具备自学习功能"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00096",
+                  "quote": "不，地图不具备自学习功能"
+                }
+              ],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00096",
+                  "quote": "不，地图不具备自学习功能"
+                }
+              ],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            }
+          }
+        },
+        {
+          "check_index": 1,
+          "golden_quote": "对原始布局进行细微改动不成问题",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00096",
+              "quote": "对原始布局进行细微改动不成问题"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00096",
+                  "quote": "对原始布局进行细微改动不成问题"
+                }
+              ],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00096",
+                  "quote": "对原始布局进行细微改动不成问题"
+                }
+              ],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            }
+          }
+        },
+        {
+          "check_index": 2,
+          "golden_quote": "对布局的改动越大，则设备的效率就越低",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00096",
+              "quote": "对布局的改动越大，则设备的效率就越低"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00096",
+                  "quote": "对布局的改动越大，则设备的效率就越低"
+                }
+              ],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00096",
+                  "quote": "对布局的改动越大，则设备的效率就越低"
+                }
+              ],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            }
+          }
+        },
+        {
+          "check_index": 3,
+          "golden_quote": "如果布局发生了重大变化，则必须重新示教该路线",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00096",
+              "quote": "如果布局发生了重大变化，则必须重新示教该路线"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00096",
+                  "quote": "如果布局发生了重大变化，则必须重新示教该路线"
+                }
+              ],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            },
+            "reranked": {
+              "coverage": "complete",
+              "support": [
+                {
+                  "source_id": "DOC-001-C-00096",
+                  "quote": "如果布局发生了重大变化，则必须重新示教该路线"
+                }
+              ],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "大量桌椅区域手动清洁与示教时间不等于地图自学习/布局变化四项规范。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run_id": "EVAL-20261021013401711966",
+      "question_id": "V1G-110926448917-28",
+      "case_sha256": "561ff8b92ca52ba496ca09372abd5325e68d1565e8e3528b676bdeb57beb652d",
+      "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+      "stages_sha256": {
+        "candidates": "4b2f289d2ce9ab8892813bad1c0740dbc7547281364bb2cbf6e10f778f7b6604",
+        "reranked": "c77721316f8ef1ce1f49f0ef4616cc66191f638c1c806c36d45c354d10c07970",
+        "final": "891ea3d688b2bf8ea570624aca068641ae1d70ccb231b0319d5c782498a9391d"
+      },
+      "facts": [
+        {
+          "check_index": 0,
+          "golden_quote": "在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接",
+          "reference_support": [
+            {
+              "source_id": "DOC-001-C-00026",
+              "quote": "在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-001",
+            "product": "KIRA B 50",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "停清洁头/边刷/抽吸不等于维护前关闭整机并断电池；错误C00026引用仍拒绝，采用独立真实规范。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "停清洁头/边刷/抽吸不等于维护前关闭整机并断电池；错误C00026引用仍拒绝，采用独立真实规范。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "停清洁头/边刷/抽吸不等于维护前关闭整机并断电池；错误C00026引用仍拒绝，采用独立真实规范。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "停清洁头/边刷/抽吸不等于维护前关闭整机并断电池；错误C00026引用仍拒绝，采用独立真实规范。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "run_id": "EVAL-20261021013401711966",
+      "question_id": "V1G-110926448917-29",
+      "case_sha256": "0c94af754229819e0dc3becf2828212bf3ab33cf97f9a633dc666eb82da9cfef",
+      "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+      "stages_sha256": {
+        "candidates": "c7cf1f389b3766b082e72198ab1a0ab480c10e86d54da485585f71a5323c7cc1",
+        "reranked": "d3d32c0e7ef405462cd0ae1eb27a09ae05a20e7ff328740c2b295dc173fc3e6b",
+        "final": "3cdf038048c0ae3fdde55fafb37875219f172585c7764465a962c4f5416028bb"
+      },
+      "facts": [
+        {
+          "check_index": 1,
+          "golden_quote": "机身外观是否清洁、无破损或变形痕迹",
+          "reference_support": [
+            {
+              "source_id": "DOC-002-C-00056",
+              "quote": "机身外观是否清洁、无破损或变形痕迹"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-002",
+            "product": "B2 四足机器人",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            }
+          }
+        },
+        {
+          "check_index": 1,
+          "golden_quote": "相机表面镜片有无异物",
+          "reference_support": [
+            {
+              "source_id": "DOC-002-C-00056",
+              "quote": "相机表面镜片有无异物"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-002",
+            "product": "B2 四足机器人",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            }
+          }
+        },
+        {
+          "check_index": 1,
+          "golden_quote": "头部激光雷达周围有无异物遮挡",
+          "reference_support": [
+            {
+              "source_id": "DOC-002-C-00056",
+              "quote": "头部激光雷达周围有无异物遮挡"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-002",
+            "product": "B2 四足机器人",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            }
+          }
+        },
+        {
+          "check_index": 2,
+          "golden_quote": "散热风扇进出口有无异物阻塞",
+          "reference_support": [
+            {
+              "source_id": "DOC-002-C-00056",
+              "quote": "散热风扇进出口有无异物阻塞"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-002",
+            "product": "B2 四足机器人",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            }
+          }
+        },
+        {
+          "check_index": 3,
+          "golden_quote": "检查有无明显的足垫破损,若有破损请及时更换",
+          "reference_support": [
+            {
+              "source_id": "DOC-002-C-00056",
+              "quote": "检查有无明显的足垫破损,若有破损请及时更换"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-002",
+            "product": "B2 四足机器人",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            }
+          }
+        },
+        {
+          "check_index": 4,
+          "golden_quote": "机身的电池包接口有无异物,变形",
+          "reference_support": [
+            {
+              "source_id": "DOC-002-C-00056",
+              "quote": "机身的电池包接口有无异物,变形"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-002",
+            "product": "B2 四足机器人",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            }
+          }
+        },
+        {
+          "check_index": 5,
+          "golden_quote": "电池包外壳是否有明显损伤,有明显损伤的电池包禁止用于使用",
+          "reference_support": [
+            {
+              "source_id": "DOC-002-C-00056",
+              "quote": "电池包外壳是否有明显损伤,有明显损伤的电池包禁止用于使用"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-002",
+            "product": "B2 四足机器人",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            }
+          }
+        },
+        {
+          "check_index": 6,
+          "golden_quote": "遥控器的各个按键是否存在卡顿",
+          "reference_support": [
+            {
+              "source_id": "DOC-002-C-00056",
+              "quote": "遥控器的各个按键是否存在卡顿"
+            }
+          ],
+          "source_applicability": {
+            "document_id": "DOC-002",
+            "product": "B2 四足机器人",
+            "version": null,
+            "purpose": "normative_requirement_only",
+            "reason": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+          },
+          "stages": {
+            "candidates": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "reranked": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            },
+            "final": {
+              "coverage": "absent",
+              "support": [],
+              "equivalence_review": "整机同页清洁段、关机、安全须知与充电器两项例检均不等价完整不带电检查表；使用完整Canonical表而非160字摘要。"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

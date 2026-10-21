@@ -283,6 +283,8 @@ def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
         phenomena.pop('安全边界失守',None)
     from .optimization import INTERVENTIONS
     directions=[name for name,(_,required_observations) in INTERVENTIONS.items() if set(observations)&required_observations]
+    if 'context_selection_options' in analysis and not analysis['context_selection_options']:
+        directions=[name for name in directions if name!='context_selection']
     technical=analysis['target_eligible'] and root in {'Retrieval','Ranking','Generation','Safety','Performance'} and bool(directions)
     issues=[{'type':g.get('type','evaluation_audit'),'evidence':g.get('evidence',g)} for g in governance]
     if not technical and case.get('passed') is False:
@@ -300,43 +302,92 @@ def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
 
 
 def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
-    """Locate the single Judge's fact-level findings in canonical stage evidence."""
-    from .evaluation_contract import business_verdict, validate_business_judgment
-    result={'analysis_category':'insufficient_evidence','analysis_reason':'未形成完整、适用且可定位的技术证据。','primary_root_cause':'Unknown','target_eligible':False,'retrieval_failure_stage':None,'evidence_checks':[]}
-    if business_verdict(case) != 'FAIL':return result
+    """Derive diagnosis only; immutable Judge output is never repaired or rescored."""
+    from .evaluation_contract import business_verdict, validate_business_judgment, normalize_display
+    from .diagnostic_evidence import saved_review, review_findings, context_selection_options
+    result={'analysis_category':'insufficient_evidence','analysis_reason':'未形成完整、适用且可定位的技术证据。','primary_root_cause':'Unknown','target_eligible':False,'retrieval_failure_stage':None,'evidence_checks':[],'diagnostic_gaps':[]}
+    gaps=result['diagnostic_gaps']
+    def blocked(condition):
+        gaps.append({'condition':condition});result['analysis_reason']=condition;return result
+    if business_verdict(case) != 'FAIL':return blocked('需要已完成的真实业务FAIL；技术异常不能作为业务目标')
     trace=(case.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
-    if trace.get('status') != 'completed' or any(not isinstance(trace.get(k),list) for k in ('candidates','final')):return result
+    if trace.get('status') != 'completed' or any(not isinstance(trace.get(k),list) for k in ('candidates','final')):
+        return blocked('retrieval_trace.status/candidates/final未完整采集')
     judge=case.get('judge_result') or {}
-    try:validate_business_judgment(judge,case.get('model_answer',''),trace['final'],category=case.get('test_category'),question=case.get('question'),reference=case.get('reference_answer'),candidates=trace.get('candidates'))
-    except ValueError:return result
+    constraints=(case.get('programmatic_metrics',{}).get('evidence_sufficiency') or {}).get('source_constraints') or {}
+    try:validate_business_judgment(judge,case.get('model_answer',''),trace['final'],category=case.get('test_category'),constraints=constraints,question=case.get('question'),reference=case.get('reference_answer'),candidates=trace.get('candidates'))
+    except ValueError as error:return blocked('原始Judge合同校验失败：'+str(error))
     if corpus_chunks is None:corpus_chunks,corpus_fingerprint=_current_corpus(trace)
-    if not corpus_fingerprint or trace.get('corpus_fingerprint') != corpus_fingerprint:return result
+    if not corpus_fingerprint or trace.get('corpus_fingerprint') != corpus_fingerprint:return blocked('当前Canonical Corpus身份不匹配')
     by_id={c['chunk_id']:c for c in corpus_chunks or []}
-    if not _canonical_final(trace,by_id):return result
-    if not _canonical_final({'final':trace['candidates'],'parent_expand':False},by_id):return result
+    if not _canonical_final(trace,by_id):return blocked('Final完整正文/Parent/来源元数据与Canonical不符')
+    if not _canonical_final({'final':trace['candidates'],'parent_expand':False},by_id):return blocked('Candidate完整正文/来源元数据与Canonical不符')
+    if not isinstance(trace.get('reranked'),list) or not _canonical_final({'final':trace['reranked'],'parent_expand':False},by_id):
+        return blocked('Rerank完整正文/来源元数据与Canonical不符或未采集')
     sources=[{**c,'content':c.get('chunk_text') or c.get('text') or c.get('content','')} for c in corpus_chunks or []]
     def verified(support,entries):return isinstance(support,list) and bool(support) and all(quote_present(q,entries,display=True) for q in support)
-    findings=[]
+    def applicable(reference,support,entries):
+        origins=[e for e in sources if any(quote_present(q,[e],display=True) for q in reference or [])]
+        matched=[e for e in entries if any(quote_present(q,[e],display=True) for q in support or [])]
+        return bool(origins) and all(any(all(e.get(k)==o.get(k) for k in ('document_id','product','version')) for o in origins) for e in matched)
+    def full_in_stage(reference,entries):
+        return bool(reference) and all(any(quote_present({'source_id':e.get('chunk_id'),'quote':q['quote']},[e],display=True) and applicable(reference,[{'source_id':e.get('chunk_id'),'quote':q['quote']}],[e]) for e in entries) for q in reference)
+    def complete(reference,support):
+        # This proves literal full coverage only; partial matches never infer semantic completeness.
+        return bool(reference) and all(any(normalize_display(q['quote']) in normalize_display(s['quote']) for s in support or []) for q in reference)
+    review,frozen=saved_review(case)
+    findings,review_gaps=review_findings(case,trace,corpus_chunks,review,frozen)
+    gaps.extend(review_gaps)
     from .safety_guard import check_safety
     guard=check_safety(case.get('question',''),case.get('model_answer',''),trace['final'],constraints=(case.get('programmatic_metrics',{}).get('evidence_sufficiency') or {}).get('source_constraints'))
-    for finding in guard['findings']:
-        findings.append(('Safety',None,finding))
-    for check in judge['checks']:
-        if check['met'] or check.get('scope_resolved') is not True:continue
+    findings.extend(('Safety',None,f) for f in guard['findings'])
+    for index,check in enumerate(judge['checks']):
+        if check['met']:continue
+        reference=check.get('reference_support')
+        if reference and not verified(reference,sources):
+            gaps.append({'check_index':index,'condition':'reference_support原始来源绑定错误，拒绝自动跨源更正'});continue
+        origins=[c for c in sources if any(quote_present(q,[c],display=True) for q in reference or [])]
+        if any(constraints.get(k) and c.get(k)!=constraints[k] for c in origins for k in ('product','version')):
+            gaps.append({'check_index':index,'condition':'reference_support产品或版本与保存约束冲突'});continue
+        if check.get('scope_resolved') is not True:
+            gaps.append({'check_index':index,'condition':'原Judge.scope_resolved未闭合；独立规范审查不改变该字段'});continue
         if verified(check['support'],trace['final']):
-            findings.append(('Generation',None,{**check,'candidate_missing':False}))
-        elif verified(check.get('reference_support'),sources) and isinstance(check.get('candidate_support'),list):
-            candidate=verified(check.get('candidate_support'),trace['candidates'])
-            if check['candidate_support'] and not candidate:continue  # Invalid diagnostic quote is not evidence of absence.
-            findings.append(('Ranking' if candidate else 'Retrieval','ranking_context_selection' if candidate else 'candidate_recall',{**check,'candidate_missing':not candidate}))
-    for issue in judge['issues']:
+            if not applicable(reference,check['support'],trace['final']):
+                gaps.append({'check_index':index,'condition':'Final support来源产品/版本/文档范围与必要规范不符'});continue
+            if not verified(reference,sources) or not complete(reference,check['support']):
+                gaps.append({'check_index':index,'coverage':'partial' if reference else 'unresolved','condition':'Final support仅部分相关或缺少完整规范，不能推断Generation'});continue
+            findings.append(('Generation',None,{**check,'check_index':index,'candidate_missing':False,
+                'stage_coverage':{'final':'complete'},'provenance':{'kind':'original_judge'}}))
+        elif verified(reference,sources) and isinstance(check.get('candidate_support'),list):
+            if full_in_stage(reference,trace['final']) or (not check['candidate_support'] and full_in_stage(reference,trace['candidates'])):
+                gaps.append({'check_index':index,'condition':'阶段缺失声明与实际适用完整规范矛盾，拒绝推导检索根因'});continue
+            if check['candidate_support'] and not applicable(reference,check['candidate_support'],trace['candidates']):
+                gaps.append({'check_index':index,'condition':'candidate_support来源产品/版本/文档范围与必要规范不符'});continue
+            candidate=verified(check['candidate_support'],trace['candidates'])
+            if check['candidate_support'] and (not candidate or not complete(reference,check['candidate_support'])):
+                gaps.append({'check_index':index,'condition':'candidate_support未定位或仅部分支持，不能推断完整召回'});continue
+            findings.append(('Ranking' if candidate else 'Retrieval','ranking_context_selection' if candidate else 'candidate_recall',
+                {**check,'check_index':index,'candidate_missing':not candidate,'stage_coverage':{'candidates':'complete' if candidate else 'absent','final':'absent'},'provenance':{'kind':'original_judge'}}))
+        else:gaps.append({'check_index':index,'condition':'需要有效reference_support与显式candidate_support阶段核验，missing不等于[]'})
+    for index,issue in enumerate(judge['issues']):
         if issue.get('scope_resolved') is not True:continue
-        if verified(issue['support'],trace['final']) or issue['critical'] and verified(issue.get('reference_support'),sources):
-            findings.append(('Safety' if issue.get('safety_violation') is True or issue['critical'] else 'Generation',None,issue))
+        if verified(issue['support'],trace['final']):
+            # Seriousness and safety type are independent. Corpus-only norms cannot prove an unsafe answer.
+            findings.append(('Safety' if issue.get('safety_violation') is True else 'Generation',None,{**issue,'issue_index':index,'provenance':{'kind':'original_judge'}}))
     metrics=case.get('programmatic_metrics') or {}
     if not findings and type(metrics.get('latency_ms')) in (int,float) and metrics['latency_ms']>60000 and any(type(s.get('duration_ms')) in (int,float) and s['duration_ms']>0 for s in metrics.get('stages',[]) if isinstance(s,dict)):
         findings.append(('Performance',None,{'latency_ms':metrics['latency_ms'],'stages':metrics['stages']}))
     if findings:
-        root,stage,_=findings[0]
-        result.update(analysis_category='rag_failure',analysis_reason=next((f[2]['description'] for f in findings if f[2].get('rule_id')),judge['reason']),primary_root_cause=root,target_eligible=True,retrieval_failure_stage=stage,evidence_checks=[f[2] for f in findings])
+        # A source-verified Guard dominates; otherwise use the earliest missing required stage.
+        priority={'Retrieval':0,'Ranking':1,'Safety':2,'Generation':3,'Performance':4}
+        root='Safety' if guard['findings'] else min((f[0] for f in findings),key=priority.__getitem__)
+        stage=next((f[1] for f in findings if f[0]==root),None)
+        result.update(analysis_category='rag_failure',analysis_reason=judge['reason'],primary_root_cause=root,
+            target_eligible=True,retrieval_failure_stage=stage,evidence_checks=[{**f[2],'technical_root':f[0]} for f in findings])
+        if root=='Ranking':
+            result['context_selection_options'],unavailable=context_selection_options(trace,findings,corpus_chunks,judge['checks'])
+            if unavailable:result['optimization_blockers']=[unavailable]
+            if result['context_selection_options']==[]:
+                result['optimization_blockers']=['已枚举现有TopK/Rerank/阈值组合；固定候选池无法恢复必要规范，不生成该方向Candidate。']
+    elif gaps:result['analysis_reason']='；'.join(dict.fromkeys(g['condition'] for g in gaps))
     return result

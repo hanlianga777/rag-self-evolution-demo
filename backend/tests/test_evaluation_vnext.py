@@ -153,6 +153,12 @@ class AgentAndRiskTests(VNextStageTests):
         from app.optimization import validate_intervention
         from unittest.mock import patch
         c,chunks=self.case('candidate')
+        # A scored saved pool must actually need TopK=6 to recover the norm.
+        trace=c['programmatic_metrics']['retrieval_trace']
+        noise=[{**chunks[1],'chunk_id':f'noise-{i}','parent_chunk_id':f'np-{i}'} for i in range(3)]
+        chunks.extend(noise)
+        trace['candidates']=trace['reranked']=[chunks[1],*noise,chunks[0]]
+        for entry in trace['candidates']:entry['score']=.5
         proposal={'intervention_direction':'context_selection','config_diff':{'top_k':6},'root_cause':'Ranking','target_bad_cases':['case'],'evidence_assertions':[{'target_id':'case','observation':'ranking_omission'}],'parameter_dependencies':[],'hypothesis':'必要前提被截断','why':'候选有据而Final缺失','expected_improvement':'补入必要上下文','risk':'可能引入噪声'}
         with patch('app.diagnostics._current_corpus',return_value=(chunks,'fixture-corpus')):
             validate_intervention(proposal,{'case':c},{'top_k':4})

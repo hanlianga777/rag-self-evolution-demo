@@ -1,3 +1,10 @@
+## 2026-10-21 · Baseline只读证据诊断与Agent合法干预
+
+- 独立审计事实记录经Case/Snapshot/Corpus/全阶段/审计文件SHA及规范来源验证后，只用于诊断；不改历史Judge、Frozen Golden、Corpus或评分Identity。新题缺证据仍阻断，不以missing当候选空集，不回填scope=false。
+- 修复部分Final支持误归Generation、checks顺序决定主因、Critical/Safety混用；保留错误来源拒绝及具体诊断缺口。
+- Ranking干预复用保存候选/重排/完整Parent演算，恢复缺失规范同时保留已满足事实；无合法组合保留根因但不给Agent目标，不扩Search Space。
+- Baseline列表保留业务FAIL，技术根因/证据进原Drawer；五类典型模式、独立技术异常、11 Gate及人工发布流程保持。Provider0，详见[验收报告](BASELINE_DIAGNOSTIC_EVIDENCE_FIX_REPORT.md)。
+
 ## 2026-10-20 · Baseline3/50中断与证据角色修复
 
 - 真实Q04引用在候选而非Final，另一次遗漏issue无答案原句；新增严格FAIL-only遗漏规范证据关联，不能为PASS借用候选或全库材料。新Parser `business-output-3-evidence-roles`，原响应和Final身份保留；模型/Prompt/Guard/Gate不变。

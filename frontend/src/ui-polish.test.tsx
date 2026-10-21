@@ -59,7 +59,7 @@ it("keeps the Baseline Bad Case table compact and detail ready", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["题号 / 问题", "失败现象", "主要技术根因", "优化方向", "详情"]);
+  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["题号 / 问题", "失败现象", "业务结论", "优化方向", "详情"]);
   expect(document.querySelector("tbody")?.textContent).toContain("无依据生成");
   expect(document.querySelector("tbody")?.textContent).not.toContain("Hallucination");
   expect(document.querySelector("tbody")?.textContent).toContain("发生故障后如何恢复运行？");

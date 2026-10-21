@@ -1,3 +1,9 @@
+## 2026-10-21 · 既有诊断节点内部证据校验
+
+产品节点及关系维持Golden → Baseline → Bad Case → Agent → Sandbox → Regression → Recommendation → 人工发布，正式图源及导出不改。原诊断模块增加独立只读审计事实校验：持久化Case/冻结Snapshot/Canonical Corpus/完整阶段/审计文件SHA闭合后推导阶段根因；独立审查与同次Judge字段分别溯源，不成为第二Judge或人工Gate，不写成绩或修正历史JSON。未知新证据仍阻断，Critical不充当Safety类别。
+
+既有Optimization Agent只接收有真实来源和合法干预的目标；上下文选择在保存候选/重排/Parent上验证必要事实覆盖及已满足事实保留。能力不可达时保留技术根因而不产生该干预目标；不扩大Search Space。Baseline业务FAIL列表与可优化子集分开，现有Drawer展示技术证据。评测身份、11 Gate及发布治理保持。细节见[验收报告](docs/BASELINE_DIAGNOSTIC_EVIDENCE_FIX_REPORT.md)。
+
 # 架构说明（V1.4 目标 / Phase 1 实现边界）
 
 > **V1.4 业务实施（2026-10-02）：** 用户已批准完整代码实施与 GitHub 同步。唯一规则源为 [SPEC V1.4](docs/RAG_SELF_EVOLUTION_SPEC.md)，阶段证据见 [实施与验收记录](docs/V1_4_IMPLEMENTATION_VERIFICATION.md)。P0、Golden V2、Probe / FullText 引擎与成本已通过隔离后端回归和代码复审；最终 296 项后端、121 项前端、构建和四尺寸 Chromium 208 检查通过；整体审查及一次修复后的限定复审通过，保留一个 Drawer 换材后误提示的非阻断 Minor；其他运行边界按 SPEC 第 3 节记录。真实 Provider、评测与发布不自动执行；下方 Phase 1 / V1.3 为历史记录，不能替代 V1.4 验收。

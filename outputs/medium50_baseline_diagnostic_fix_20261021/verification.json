@@ -1,0 +1,233 @@
+{
+  "kind": "readonly_saved_diagnosis_NOT_Baseline_or_Agent_run",
+  "provider_calls": 0,
+  "run_id": "EVAL-20261021013401711966",
+  "identity": "d18aab6365a63c6de63e295866a7036e0fe6a25f1f74c2afbb4782bbab73ae3e",
+  "database_sha256": "983488ce11505c8d1e8e94677a6619a8b48f0bed23ecf57cccc869f0629d0e46",
+  "completed_unchanged": 49,
+  "business_pass_unchanged": 39,
+  "business_fail_unchanged": 10,
+  "q18": "technical_error; same-identity explicit resume guards pass, not executed; repeated title-support failure remains possible",
+  "gate_definitions_sha256": "fca7f54ef0a925ee3a6d14a376c142809a240cfb47268621e3ee5ccb21085d1c",
+  "search_space_sha256": "2de9b18dba650ff1a7be56edefba0da4e288f73b8353b01d26f54ff06fc23b22",
+  "diagnoses": {
+    "Q03": {
+      "primary_root_cause": "Ranking",
+      "target_eligible": true,
+      "optimization_directions": [
+        "context_selection"
+      ],
+      "context_selection_options": [
+        {
+          "top_k": 6,
+          "rerank": false
+        }
+      ],
+      "optimization_blockers": null,
+      "diagnostic_gaps": []
+    },
+    "Q04": {
+      "primary_root_cause": "Ranking",
+      "target_eligible": true,
+      "optimization_directions": [
+        "context_selection"
+      ],
+      "context_selection_options": [
+        {
+          "top_k": 6
+        }
+      ],
+      "optimization_blockers": null,
+      "diagnostic_gaps": []
+    },
+    "Q06": {
+      "primary_root_cause": "Ranking",
+      "target_eligible": true,
+      "optimization_directions": [
+        "context_selection"
+      ],
+      "context_selection_options": [
+        {
+          "top_k": 6
+        }
+      ],
+      "optimization_blockers": null,
+      "diagnostic_gaps": []
+    },
+    "Q07": {
+      "primary_root_cause": "Retrieval",
+      "target_eligible": true,
+      "optimization_directions": [
+        "query_expansion",
+        "candidate_recall"
+      ],
+      "context_selection_options": null,
+      "optimization_blockers": null,
+      "diagnostic_gaps": [
+        {
+          "check_index": 0,
+          "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+        },
+        {
+          "check_index": 1,
+          "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+        }
+      ]
+    },
+    "Q08": {
+      "primary_root_cause": "Ranking",
+      "target_eligible": true,
+      "optimization_directions": [
+        "context_selection"
+      ],
+      "context_selection_options": [
+        {
+          "top_k": 6
+        }
+      ],
+      "optimization_blockers": null,
+      "diagnostic_gaps": [
+        {
+          "check_index": 3,
+          "coverage": "partial",
+          "condition": "Final support仅部分相关或缺少完整规范，不能推断Generation"
+        }
+      ]
+    },
+    "Q17": {
+      "primary_root_cause": "Retrieval",
+      "target_eligible": true,
+      "optimization_directions": [
+        "query_expansion",
+        "candidate_recall"
+      ],
+      "context_selection_options": null,
+      "optimization_blockers": null,
+      "diagnostic_gaps": [
+        {
+          "check_index": 2,
+          "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+        },
+        {
+          "check_index": 3,
+          "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+        }
+      ]
+    },
+    "Q24": {
+      "primary_root_cause": "Retrieval",
+      "target_eligible": true,
+      "optimization_directions": [
+        "query_expansion",
+        "candidate_recall"
+      ],
+      "context_selection_options": null,
+      "optimization_blockers": null,
+      "diagnostic_gaps": [
+        {
+          "check_index": 5,
+          "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+        },
+        {
+          "check_index": 6,
+          "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+        },
+        {
+          "check_index": 7,
+          "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+        },
+        {
+          "check_index": 8,
+          "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+        },
+        {
+          "check_index": 9,
+          "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+        }
+      ]
+    },
+    "Q27": {
+      "primary_root_cause": "Ranking",
+      "target_eligible": false,
+      "optimization_directions": [],
+      "context_selection_options": [],
+      "optimization_blockers": [
+        "已枚举现有TopK/Rerank/阈值组合；固定候选池无法恢复必要规范，不生成该方向Candidate。"
+      ],
+      "diagnostic_gaps": [
+        {
+          "check_index": 4,
+          "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+        }
+      ]
+    },
+    "Q28": {
+      "primary_root_cause": "Retrieval",
+      "target_eligible": true,
+      "optimization_directions": [
+        "query_expansion",
+        "candidate_recall"
+      ],
+      "context_selection_options": null,
+      "optimization_blockers": null,
+      "diagnostic_gaps": [
+        {
+          "check_index": 0,
+          "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+        },
+        {
+          "check_index": 1,
+          "condition": "reference_support原始来源绑定错误，拒绝自动跨源更正"
+        },
+        {
+          "check_index": 4,
+          "condition": "reference_support原始来源绑定错误，拒绝自动跨源更正"
+        },
+        {
+          "check_index": 5,
+          "condition": "reference_support原始来源绑定错误，拒绝自动跨源更正"
+        }
+      ]
+    },
+    "Q29": {
+      "primary_root_cause": "Retrieval",
+      "target_eligible": true,
+      "optimization_directions": [
+        "query_expansion",
+        "candidate_recall"
+      ],
+      "context_selection_options": null,
+      "optimization_blockers": null,
+      "diagnostic_gaps": [
+        {
+          "check_index": 0,
+          "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+        },
+        {
+          "check_index": 1,
+          "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+        },
+        {
+          "check_index": 2,
+          "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+        },
+        {
+          "check_index": 3,
+          "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+        },
+        {
+          "check_index": 4,
+          "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+        },
+        {
+          "check_index": 5,
+          "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+        },
+        {
+          "check_index": 6,
+          "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+        }
+      ]
+    }
+  }
+}

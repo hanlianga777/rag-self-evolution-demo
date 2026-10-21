@@ -49,6 +49,9 @@ def validate_intervention(candidate, targets, baseline):
             raise ValueError('目标缺少实际候选/Final Trace')
         if not view['target_eligible'] or candidate['root_cause']!=view['primary_root_cause']:
             raise ValueError('全部目标必须具有一致且证据充分的主要根因')
+        options=view.get('context_selection_options')
+        if direction=='context_selection' and 'context_selection_options' in view and (not options or candidate['config_diff'] not in options):
+            raise ValueError('上下文干预不能在保存的候选/排序/Parent中恢复目标必要规范')
         if direction=='stage_performance':
             stage=candidate.get('performance_stage')
             stage_parameters={'query_processing':INTERVENTIONS['query_expansion'][0],
@@ -80,7 +83,7 @@ def strategy_case(row):
             'result':{key:case.get(key) for key in ('question','reference_answer','model_answer','test_category','negative_subtype')} | {'primary_root_cause':view['primary_root_cause']},
             'retrieval_trace':(case.get('programmatic_metrics') or {}).get('retrieval_trace'),
             'golden_evidence':{key:(case.get('programmatic_metrics') or {}).get('evidence_sufficiency',{}).get(key) for key in ('source_constraints','facts')},
-            'diagnostic_view':{key:view[key] for key in ('analysis_category','analysis_reason','primary_root_cause','target_eligible','is_technical_bad_case','evidence_checks','optimization_directions','trace_observations','retrieval_failure_stage')}}
+            'diagnostic_view':{key:view.get(key) for key in ('analysis_category','analysis_reason','primary_root_cause','target_eligible','is_technical_bad_case','evidence_checks','optimization_directions','trace_observations','retrieval_failure_stage','context_selection_options','optimization_blockers')}}
 
 
 def strategy_candidate(candidate):

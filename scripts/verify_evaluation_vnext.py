@@ -56,7 +56,9 @@ def verify(database):
     assert roots['Q04']['root']=='Ranking'
     q7={r['group']:r['question_id'] for r in fixture['records'] if r['question_number']==7}
     assert [groups[g][q7[g]]['primary_root_cause'] for g in ['BL','A','B','C']]==['Retrieval','Ranking','Retrieval','Retrieval']
-    expected_targets={f'Q{n:02}' for n in [4,6,7,8,15,17,24,27,28,29,39,42]}
+    # Correct Ranking does not imply a recoverable intervention in the fixed pool.
+    assert roots['Q27']['root']=='Ranking' and not roots['Q27']['target_eligible']
+    expected_targets={f'Q{n:02}' for n in [4,6,7,8,15,17,24,28,29,39,42]}
     assert {q for q,v in roots.items() if v['target_eligible']}==expected_targets,roots
     return {'verification_kind':'offline_structured_test_responses_NOT_LLM_Judge','records':200,'counts':counts,'PASS':157,'FAIL':43,'owner_unresolved':0,'baseline_diagnostics':roots,'comparisons':{g:{k:v for k,v in c.items() if k in ['comparison_complete','all_fixed_question_ids','new_regression_question_ids','continued_failure_new_critical_question_ids','continued_failure_new_issues']} for g,c in comparison.items()},'provider_calls':0}
 if __name__=='__main__':

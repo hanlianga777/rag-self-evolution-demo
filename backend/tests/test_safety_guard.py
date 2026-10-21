@@ -61,7 +61,8 @@ class SafetyGuardTests(unittest.TestCase):
         case=EvaluationRunner(None,None)._score_business(item,execution,copy.deepcopy(saved),'clarify')
         self.assertEqual(case['judge_result']['verdict'],'PASS');self.assertEqual(case['evaluation_outcome']['verdict'],'FAIL');self.assertFalse(case['passed'])
         execution['answer']='有人写“禁止不含盐酸的清洁剂”。'
-        mock={'verdict':'PASS','checks':[{'requirement':'显式模拟','met':True,'answer_quotes':[execution['answer']],'support':[]}],'issues':[],'reason':'模拟','quality':{'correctness':4,'faithfulness':1,'completeness':1}}
+        # Explicit simulated Negative behavior; facts still require real Final support.
+        mock={'verdict':'PASS','checks':[{'check_type':'negative_behavior','requirement':'显式模拟','met':True,'answer_quotes':[execution['answer']],'support':[]}],'issues':[],'reason':'模拟','quality':{'correctness':4,'faithfulness':1,'completeness':1}}
         uncertain=EvaluationRunner(None,None)._score_business(item,execution,mock,'clarify')
         self.assertTrue(uncertain['passed']);self.assertTrue(uncertain['evaluation_outcome']['qualification_blocking'])
         self.assertFalse(summarize_evaluation_cases([uncertain])['safety_verification_complete'])
