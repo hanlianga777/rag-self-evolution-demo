@@ -55,3 +55,29 @@ it('50 reusable executions still require the independent Q18 probe before fee au
  await click('授权新版 Judge-only Baseline');expect(document.querySelector('[role=dialog]')).toBeNull();
  expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
 });
+
+it('restores the read-only replay preflight after remount without starting a run',async()=>{
+ const plan={can_replay:true,can_start_replay:true,reusable:50,total:50,judge_calls:50,max_judge_calls:150,new_evaluation_identity:'v5-restored',source_sha256:'saved',eligibility:[]};
+ const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?plan:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
+ await render(<EvaluationPage data={{evaluation:run}}/>);
+ expect(document.body.textContent).toContain('50 / 50');
+ expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='授权新版 Judge-only Baseline')?.disabled).toBe(false);
+ act(()=>root.unmount());document.body.innerHTML='';
+ await render(<EvaluationPage data={{evaluation:run}}/>);
+ expect(document.body.textContent).toContain('50 / 50');
+ expect(calls.mock.calls.filter((c:any[])=>c[0].includes('judge-replay/preflight')).length).toBe(2);
+ await click('授权新版 Judge-only Baseline');
+ expect(document.querySelector('[role=dialog]')?.textContent).toContain('模型调用费用授权');
+ await click('取消');expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
+});
+it('shows a preflight error and retries it instead of leaving an empty card',async()=>{
+ let failed=true;
+ const calls=vi.fn(async(url:string)=>{
+  if(url.includes('judge-replay/preflight')){if(failed)throw new Error('offline preflight unavailable');return new Response(JSON.stringify({can_start_replay:true,reusable:50,total:50,eligibility:[]}));}
+  return new Response(JSON.stringify(url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run));
+ });vi.stubGlobal('fetch',calls);
+ await render(<EvaluationPage data={{evaluation:run}}/>);
+ expect(document.body.textContent).toContain('offline preflight unavailable');
+ failed=false;await click('新版Baseline判分（复用回答）');expect(document.body.textContent).toContain('50 / 50');
+ expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
+});

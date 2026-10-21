@@ -1,6 +1,8 @@
 # RAG Evolution
 
 2026-10-21 当前为V5.1：实质性Fact/Behavior检查阻止Scope-only PASS；独立Q18 Judge探针复用正式合同，但不会写Baseline成绩。数据仍50/50可复用；未通过同身份真实探针与人工业务复核，后端禁止正式Judge-only Replay。当前仅离线实施，Provider0。[V5.1验收/费用与启动说明](docs/V51_PREFLIGHT_CLOSEOUT_ACCEPTANCE.md)。只读预检：`python3 scripts/q18_judge_probe.py preflight`；隔离假HTTP验收：`python3 scripts/verify_q18_probe_offline.py`。真实探针、50Replay各需另行授权。原[V5第一阶段成果](docs/CONTRACT_RESOLVER_REPLAY_V5_ACCEPTANCE.md)保留；Resolver、Golden、Corpus及历史成绩不改。
+Baseline复用预检现在会在刷新后自动重新查询；卡片完整显示资格、Identity及费用授权入口，最终确认前不启动评测。[前端交互修复验收](outputs/v51_replay_ui_fix_20261021/验收报告.md)。
+
 
 2026-10-21 前轮诊断更新（V4历史）：既有评测Identity不变，通过独立审计记录的Case/Snapshot/Corpus/全阶段溯源校验解释已保存业务FAIL；部分Final支持不冒充完整规范、Critical不等于Safety。Ranking仅允许保存Trace验证可恢复且保留既有事实的上下文干预；无可用策略可零候选。Baseline主表保留全部业务FAIL，根因和完整证据在案例抽屉。当前最新Run仍Partial，Q18未恢复，本轮Provider0。[实现与验收](docs/BASELINE_DIAGNOSTIC_EVIDENCE_FIX_REPORT.md)，只读验证：`python3 scripts/verify_baseline_diagnostics.py`。
 

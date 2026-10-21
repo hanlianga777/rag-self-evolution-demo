@@ -1,3 +1,9 @@
+## 2026-10-21 · V5.1 Baseline复用预检前端交互修复
+
+- 预检卡片覆盖全局候选摘要的固定高度/overflow，授权按钮置于逐题明细前，加载/失败/历史结果边界明确。
+- 刷新/Run或状态变化时重新执行只读预检，取消旧响应更新；复用原费用弹窗，最终确认前不启动Replay。
+- 后端、Judge合同/Identity、Golden/Corpus/历史成绩与11 Gate均不变，Provider0；见[定向验收](../outputs/v51_replay_ui_fix_20261021/验收报告.md)。
+
 ## 2026-10-21 · V5.1 Scope实质检查与独立Q18探针
 
 - Parser升级`business-output-5.1-substantive-checks`，各题型必须有必要Fact/Negative行为；Scope-only无法形成合法判分，Fact引用标准不改。

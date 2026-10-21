@@ -230,3 +230,7 @@
 .diagnosis-list.with-evidence table :is(th,td):nth-child(5) {width:15%;}
 .diagnosis-list.with-evidence table :is(th,td):last-child {width:8%;}
 .workbench-drawer .candidate-release-row > .badge {justify-self:start;}
+
+/* Replay preflight grows with its content; candidate summaries use a fixed height. */
+.evaluation-page .page-content .judge-replay-preflight {height:auto;min-height:0;flex:none;overflow:visible;}
+.evaluation-page .judge-replay-preflight > button {align-self:flex-start;white-space:normal;}

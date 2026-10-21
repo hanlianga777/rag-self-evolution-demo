@@ -1,0 +1,41 @@
+{
+  "provider_calls": 0,
+  "replay_runs_created": 0,
+  "existing_replay_runs": [],
+  "database_sha256": "983488ce11505c8d1e8e94677a6619a8b48f0bed23ecf57cccc869f0629d0e46",
+  "database_unchanged": true,
+  "identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+  "backend_can_start_replay": true,
+  "reusable": 50,
+  "total": 50,
+  "before_layout": {
+    "card_height_px": 112,
+    "card_scroll_height_px": 213,
+    "button_top_px": 417.2265625,
+    "card_bottom_px": 339.296875
+  },
+  "after_layout": {
+    "card_height_px": 272.367,
+    "overflow": "visible",
+    "button_top_px": 348.6796875,
+    "button_bottom_px": 363.5234375,
+    "card_bottom_px": 499.6640625
+  },
+  "real_browser": {
+    "refresh_restores_preflight": true,
+    "authorization_button_visible": true,
+    "provider_fee_dialog_opened": true,
+    "final_paid_confirmation_clicked": false,
+    "dialog_cancelled": true
+  },
+  "tests": {
+    "targeted": 8,
+    "full_frontend": 253,
+    "files": 44,
+    "build_passed": true,
+    "backend_tests": "not rerun; frontend-only change"
+  },
+  "review": "independent review: no blocking findings",
+  "history": "49/50 original technical error preserved; no new score",
+  "scope": "frontend only; no Judge/Golden/Corpus/Gate/database code changes"
+}

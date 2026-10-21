@@ -2,6 +2,8 @@
 
 本节及以下安全语义补充依据Owner当前指令生效；覆盖下文所有冲突的旧评测、Claim分类、诊断准入、Regression及自动恢复语义；旧条款保留为历史，不得同时执行。既有Golden/Knowledge生产治理、50题20/10/20、11项Hard Gate阈值、三个人工Gate、Search Space及Production保护保持。
 
+- **2026-10-21 V5.1 Baseline复用预检展示修复（仅前端）**：页面挂载/刷新、切换Run或状态变化后重新GET只读Replay资格；加载/失败明确显示，失败可手动重查，旧Run未完成请求回包不得覆盖新Run。预检卡片按内容自适应高度，资格/Identity/授权入口不受候选摘要固定高度裁切。can_start_replay严格为true才允许打开原费用确认窗口，最终付费确认前不POST启动；保留最终确认后的实时身份/源摘要/门禁重查。历史49/50与技术异常继续按保存Run展示，预检不冒充新成绩。Judge/Golden/Corpus/Gate/Identity及后端合同不变；不新增页面或重构布局，架构节点/连线不变。
+
 - **2026-10-21 V5.1执行前收口（当前，覆盖下条V5 Parser及Replay执行前置）**：Parser升级为`business-output-5.1-substantive-checks`进入新Evaluation Identity；Positive/Ablation至少有一项必要fact，Negative至少有必要fact或negative_behavior，只有scope或辅助范围项的响应均技术异常。真实正文引用与Scope绑定、原始checks/verdict、Judge Prompt、Matcher、Guard、11 Gate不改，不由Parser补写业务结论。新Identity为`4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf`；旧V5与V4历史只读。
 - **独立Q18探针及Replay门禁**：最小CLI复用正式judge_context/输入构造/score_execution及共用有限重试循环，限定已保存Q18执行，禁止generation；同一授权编号以独占文件阻止重入，最多3次Judge、合同错误最多1次纠正、600秒；Unknown或未结算请求停止且不自动重发。仅已知已结算可恢复响应允许按共用规则有限重试。执行前重新核最新身份、全50复用资格、Golden/Corpus/配置及实际加载Provider配置，价格核查不超过24小时、冻结USD硬预算并逐请求预留。结果/原始响应/引用定位/Usage/费用/审批独立sidecar，不写正式Baseline。绑定源Run摘要、Q18 execution、冻结题目、官方请求、Judge配置/身份；重读验证Canonical引用和原始响应，变更即失效。
 - **业务复核与独立授权**：Parser完成状态为judge_complete，必须人工逐项核必要事实/安全及Scope与Fact分离，并显式留下actor、决定和证据说明后，才可放行同身份Replay。正确业务FAIL的Judge也可通过复核；不以PASS或Parser合法自动批准。Mock不解锁。Replay预检区分can_replay（数据可复用）和can_start_replay（含探针门禁），后台start、创建事务、执行及显式恢复都复核，不只禁用前端按钮；正式50题费用授权始终独立，探针不覆盖批量。本轮Provider0，仅离线实施，完成后停止；详见[V5.1验收与授权边界](V51_PREFLIGHT_CLOSEOUT_ACCEPTANCE.md)。架构沿原Baseline Evaluation节点内部增加执行前守卫，不新增业务阶段或工作台，原图节点与连线保持。
