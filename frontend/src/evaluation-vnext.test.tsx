@@ -10,7 +10,7 @@ it.each(['PASS','FAIL'])('shows explicit binary business %s without legacy quali
  root=createRoot(document.body.appendChild(document.createElement('div')));
  act(()=>root.render(<BaselineCaseDetails item={{question:'操作问题',model_answer:'保存回答',evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict},judge_result:{reason:'整体业务核验依据'}}} snapshot={{}} config={{}} gates={[]}/>));
  const section=document.querySelector('.bad-case-details > section')!;
- expect(section.textContent).toContain(`业务${verdict}`);expect(section.textContent).toContain('整体业务核验依据');expect(section.textContent).not.toContain('历史保存判定');
+ expect(section.textContent).toContain(verdict);expect(section.textContent).toContain('整体业务核验依据');expect(section.textContent).not.toContain('历史保存判定');
 });
 it('execution failure has no invented business FAIL',()=>{
  root=createRoot(document.body.appendChild(document.createElement('div')));
@@ -29,7 +29,7 @@ it('does not present old contract findings as current optimization targets',asyn
  const {EvolutionPage}=await import('./pages/EvolutionPage');
  root=createRoot(document.body.appendChild(document.createElement('div')));
  await act(async()=>root.render(<EvolutionPage data={{evaluation:{id:'old',requires_policy_upgrade:true},badCases:[{id:'legacy',run_id:'old',question_id:'old-case',result:{question:'旧规则误归因',diagnostic_view:{is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Retrieval',optimization_directions:['candidate_recall']}}}]}}/>));
- expect(document.body.textContent).toContain('新版目标尚未形成');
+ expect(document.body.textContent).toContain('评测版本身份与运行代码不兼容');
  expect(document.querySelector('.diagnosis-list tbody')?.textContent || '').not.toContain('旧规则误归因');
 });
 it('preserves VNext context-selection root while keeping legacy root grouping',async()=>{
@@ -42,5 +42,5 @@ it('shows original Judge PASS and guarded FAIL separately without hiding unresol
  root=createRoot(document.body.appendChild(document.createElement('div')));
  act(()=>root.render(<BaselineCaseDetails item={{evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL',raw_judge_verdict:'PASS',safety_review_required:true,reason:'待核验'},judge_result:{reason:'模型认为通过'},programmatic_metrics:{safety_guard:{status:'confirmed_violation',findings:[{description:'生效禁令与规范相反'}]}}}} snapshot={{}} config={{}} gates={[]}/>));
  const section=document.querySelector('.bad-case-details > section')!;
- expect(section.textContent).toContain('业务FAIL');expect(section.textContent).toContain('LLM原始判定：PASS');expect(section.textContent).toContain('确认违规');expect(section.textContent).toContain('禁止自动资格与发布');expect(section.textContent).toContain('生效禁令与规范相反');
+ expect(section.textContent).toContain('FAIL · Bad Case');expect(section.textContent).toContain('LLM原始判定：PASS');expect(section.textContent).toContain('确认违规');expect(section.textContent).toContain('禁止自动资格与发布');expect(section.textContent).toContain('生效禁令与规范相反');
 });

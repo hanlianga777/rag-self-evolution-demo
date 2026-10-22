@@ -25,6 +25,19 @@ class ClosedLoopTests(unittest.TestCase):
         self.assertIn('new-missing-diagnosis',provider.prompt['target_reference_map'])
         self.assertFalse(self.store.candidates())
 
+    def test_pass_is_not_an_agent_target_even_with_old_technical_flag(self):
+        case,_=example()
+        case['evaluation_outcome']={'contract_version':'business-vnext-1','execution_complete':True,'verdict':'PASS'}
+        case['passed']=True
+        self.store.record_bad_case('EVAL-test','old-pass','Ranking','ordinary',case)
+        provider=FixedProvider('{"candidates":[],"insufficient_evidence":"offline"}')
+        from app.diagnostics import diagnostic_view
+        def stale_view(case):
+            return {**diagnostic_view(case),'target_eligible':True}
+        with patch('app.optimization.diagnostic_view',side_effect=stale_view):
+            OptimizationAgent(self.store,provider).generate('EVAL-test')
+        self.assertNotIn('old-pass',[c['question_id'] for c in provider.prompt['bad_cases']])
+
 
 class ActionContractTests(unittest.TestCase):
     def test_evidence_backed_two_stage_dependency_is_executable(self):

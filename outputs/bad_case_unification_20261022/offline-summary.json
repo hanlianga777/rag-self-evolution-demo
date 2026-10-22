@@ -1,0 +1,763 @@
+{
+  "run_id": "EVAL-20261021141811373593",
+  "kind": "offline_isolated_copy_NOT_real_agent_or_repair",
+  "provider_calls": 0,
+  "business_failures": 10,
+  "failures_in_agent_input": 10,
+  "legal_exploration_count": 10,
+  "real_verified_repairs": 0,
+  "original_database_unchanged": true,
+  "original_database_sha256": "ef4941e2229969257e086f35e45898e20c743003d9053d359bbef63aafd7d154",
+  "question_paths": [
+    {
+      "question_id": "V1G-110926448917-29",
+      "path": {
+        "status": "exploratory",
+        "observations": [
+          "candidate_pool_gap"
+        ],
+        "directions": [
+          "query_expansion",
+          "candidate_recall"
+        ],
+        "next_action": "controlled_sandbox",
+        "blockers": [],
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "failed_requirements": [
+          {
+            "check_index": 0,
+            "requirement": "重新使用B2前不带电检查应覆盖整机外观：机身外观清洁、无破损或变形痕迹，相机表面镜片无异物，头部激光雷达周围无异物遮挡。"
+          },
+          {
+            "check_index": 1,
+            "requirement": "重新使用B2前不带电检查应覆盖结构：目视及触摸检查机身、各个关节及连接处、足端组件是否完好，有裂纹或破损需及时更换并联系Unitree售后；各连接部件螺丝是否锁紧，尤其关节连接件和电池锁紧旋钮螺丝；散热风扇进出口无异物阻塞。"
+          },
+          {
+            "check_index": 2,
+            "requirement": "重新使用B2前不带电检查应覆盖足端组件：检查有无明显足垫破损，若有破损请及时更换。"
+          },
+          {
+            "check_index": 3,
+            "requirement": "重新使用B2前不带电检查应覆盖电池包接口与安装：机身电池包接口无异物、变形，电池包安装可靠，确保运行时不会松脱。"
+          },
+          {
+            "check_index": 4,
+            "requirement": "必要安全前提：电池包外壳无明显损伤，有明显损伤的电池包禁止用于使用。"
+          },
+          {
+            "check_index": 5,
+            "requirement": "重新使用B2前不带电检查应覆盖遥控器：摇杆都在中位、摇杆是否进入沙土等异物，各按键是否存在卡顿。"
+          },
+          {
+            "check_index": 6,
+            "requirement": "当前操作适用性：对象为B2整机，目的是重新使用前不带电检查；答案确认了B2电池与充电器手册V1.0及遥控器V2.1，但未确认B2四足机器人用户手册中“检查保养/不带电检查表”章节及其适用版本，必要适用前提缺失。"
+          }
+        ],
+        "required_source_ids": [
+          "DOC-002-C-00056"
+        ],
+        "missing_candidate_source_ids": [
+          "DOC-002-C-00056"
+        ],
+        "omitted_final_source_ids": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      },
+      "candidate_legal": true,
+      "proposal": {
+        "experiment_kind": "exploratory",
+        "root_cause": "Unknown",
+        "target_bad_cases": [
+          "V1G-110926448917-29"
+        ],
+        "root_cause_evidence": [
+          "V1G-110926448917-29"
+        ],
+        "target_group": "offline material audit",
+        "intervention_direction": "candidate_recall",
+        "config_diff": {
+          "candidate_k": 24
+        },
+        "evidence_assertions": [
+          {
+            "target_id": "V1G-110926448917-29",
+            "observation": "candidate_pool_gap"
+          }
+        ],
+        "parameter_dependencies": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "why": "只读真实冻结材料的结构覆盖差异，语义与现场适用性仍未知",
+        "expected_improvement": "需要真实新答及完整50题验证，不预先宣称改善",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      }
+    },
+    {
+      "question_id": "V1G-110926448917-28",
+      "path": {
+        "status": "exploratory",
+        "observations": [
+          "candidate_pool_gap"
+        ],
+        "directions": [
+          "query_expansion",
+          "candidate_recall"
+        ],
+        "next_action": "controlled_sandbox",
+        "blockers": [],
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "failed_requirements": [
+          {
+            "check_index": 0,
+            "requirement": "更换刷辊属维护换件：更换前必须关闭设备；电池供电的设备必须拔出电池插头或断开电池连接；执行任何工作前必须将设备与对接站断开，或拔出电源插头。当前现场仅知清洁机组已打开，未确认整机停机、断开电池/电源及对接状态，不能把机械拆装步骤作为当前可执行授权。"
+          }
+        ],
+        "required_source_ids": [
+          "DOC-001-C-00026",
+          "DOC-001-C-00181",
+          "DOC-001-C-00200"
+        ],
+        "missing_candidate_source_ids": [
+          "DOC-001-C-00026",
+          "DOC-001-C-00181"
+        ],
+        "omitted_final_source_ids": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      },
+      "candidate_legal": true,
+      "proposal": {
+        "experiment_kind": "exploratory",
+        "root_cause": "Unknown",
+        "target_bad_cases": [
+          "V1G-110926448917-28"
+        ],
+        "root_cause_evidence": [
+          "V1G-110926448917-28"
+        ],
+        "target_group": "offline material audit",
+        "intervention_direction": "candidate_recall",
+        "config_diff": {
+          "candidate_k": 24
+        },
+        "evidence_assertions": [
+          {
+            "target_id": "V1G-110926448917-28",
+            "observation": "candidate_pool_gap"
+          }
+        ],
+        "parameter_dependencies": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "why": "只读真实冻结材料的结构覆盖差异，语义与现场适用性仍未知",
+        "expected_improvement": "需要真实新答及完整50题验证，不预先宣称改善",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      }
+    },
+    {
+      "question_id": "V1G-110926448917-27-R123429216749",
+      "path": {
+        "status": "exploratory",
+        "observations": [
+          "context_pool_gap"
+        ],
+        "directions": [
+          "context_selection"
+        ],
+        "next_action": "controlled_sandbox",
+        "blockers": [],
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "failed_requirements": [
+          {
+            "check_index": 0,
+            "requirement": "KIRA B 50 的地图不具备自学习功能，不能自动补充新障碍物或吸收布局变化。"
+          },
+          {
+            "check_index": 1,
+            "requirement": "对原始布局进行细微改动通常不成问题。"
+          },
+          {
+            "check_index": 2,
+            "requirement": "布局改动越大，设备清洁效率越低。"
+          },
+          {
+            "check_index": 3,
+            "requirement": "如果布局发生重大变化，必须重新示教该路线。"
+          },
+          {
+            "check_index": 7,
+            "requirement": "当前场地重摆桌椅的规模及是否构成重大布局变化尚未核实；只有在确认属于“大量桌椅区域”时才应避免进入并手动清洁，若为重大变化则必须重新示教，不能未核实就按大量桌椅区域给出完整处理方案。"
+          }
+        ],
+        "required_source_ids": [
+          "DOC-001-C-00096"
+        ],
+        "missing_candidate_source_ids": [],
+        "omitted_final_source_ids": [
+          "DOC-001-C-00096"
+        ],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      },
+      "candidate_legal": true,
+      "proposal": {
+        "experiment_kind": "exploratory",
+        "root_cause": "Unknown",
+        "target_bad_cases": [
+          "V1G-110926448917-27-R123429216749"
+        ],
+        "root_cause_evidence": [
+          "V1G-110926448917-27-R123429216749"
+        ],
+        "target_group": "offline material audit",
+        "intervention_direction": "context_selection",
+        "config_diff": {
+          "rerank": "query_only"
+        },
+        "evidence_assertions": [
+          {
+            "target_id": "V1G-110926448917-27-R123429216749",
+            "observation": "context_pool_gap"
+          }
+        ],
+        "parameter_dependencies": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "why": "只读真实冻结材料的结构覆盖差异，语义与现场适用性仍未知",
+        "expected_improvement": "需要真实新答及完整50题验证，不预先宣称改善",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      }
+    },
+    {
+      "question_id": "V1G-110926448917-24",
+      "path": {
+        "status": "exploratory",
+        "observations": [
+          "candidate_pool_gap"
+        ],
+        "directions": [
+          "query_expansion",
+          "candidate_recall"
+        ],
+        "next_action": "controlled_sandbox",
+        "blockers": [],
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "failed_requirements": [
+          {
+            "check_index": 0,
+            "requirement": "使用清洁剂运行时，洗涤剂应远离孩童妥善保管。"
+          },
+          {
+            "check_index": 1,
+            "requirement": "不得未稀释使用推荐的洗涤剂（应按要求稀释使用）。"
+          },
+          {
+            "check_index": 2,
+            "requirement": "洗涤剂不慎溅入眼睛时必须立即用水彻底冲洗；若不慎吞咽应立即就医。"
+          },
+          {
+            "check_index": 7,
+            "requirement": "遵守清洁剂制造商的使用、处置和警告说明，而不仅是笼统的包装安全提示。"
+          },
+          {
+            "check_index": 10,
+            "requirement": "当前现场为操作员准备向 KIRA B 50 加注清洁剂；回答应明确不得把未知清洁剂视为安全可用，并要求核对推荐性、禁用成分、非强发泡、正确稀释/计量及接触或误服后的安全处置。已确认推荐、禁用成分、非强发泡和计量；尚缺不得未稀释使用及眼部/吞咽急救等安全前提。"
+          }
+        ],
+        "required_source_ids": [
+          "DOC-001-C-00022",
+          "DOC-001-C-00118"
+        ],
+        "missing_candidate_source_ids": [
+          "DOC-001-C-00022"
+        ],
+        "omitted_final_source_ids": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      },
+      "candidate_legal": true,
+      "proposal": {
+        "experiment_kind": "exploratory",
+        "root_cause": "Unknown",
+        "target_bad_cases": [
+          "V1G-110926448917-24"
+        ],
+        "root_cause_evidence": [
+          "V1G-110926448917-24"
+        ],
+        "target_group": "offline material audit",
+        "intervention_direction": "candidate_recall",
+        "config_diff": {
+          "candidate_k": 24
+        },
+        "evidence_assertions": [
+          {
+            "target_id": "V1G-110926448917-24",
+            "observation": "candidate_pool_gap"
+          }
+        ],
+        "parameter_dependencies": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "why": "只读真实冻结材料的结构覆盖差异，语义与现场适用性仍未知",
+        "expected_improvement": "需要真实新答及完整50题验证，不预先宣称改善",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      }
+    },
+    {
+      "question_id": "V1G-110926448917-17",
+      "path": {
+        "status": "exploratory",
+        "observations": [
+          "candidate_pool_gap"
+        ],
+        "directions": [
+          "query_expansion",
+          "candidate_recall"
+        ],
+        "next_action": "controlled_sandbox",
+        "blockers": [],
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "failed_requirements": [
+          {
+            "check_index": 1,
+            "requirement": "R3 遥控器首次绑定的具体步骤：在 Unitree Explore App 中进入【设置】->【遥控器设置】，打开遥控器开关，输入对应的遥控器编码，与机器狗上的数传模块绑定。"
+          },
+          {
+            "check_index": 2,
+            "requirement": "R3 遥控器配对成功后的确认标志：遥控器开机且与 B2 连接成功后，右侧 DL 指示灯亮，表示遥控器与 B2 数传模块已连接。"
+          }
+        ],
+        "required_source_ids": [
+          "DOC-003-C-00015",
+          "DOC-003-C-00025"
+        ],
+        "missing_candidate_source_ids": [
+          "DOC-003-C-00015"
+        ],
+        "omitted_final_source_ids": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      },
+      "candidate_legal": true,
+      "proposal": {
+        "experiment_kind": "exploratory",
+        "root_cause": "Unknown",
+        "target_bad_cases": [
+          "V1G-110926448917-17"
+        ],
+        "root_cause_evidence": [
+          "V1G-110926448917-17"
+        ],
+        "target_group": "offline material audit",
+        "intervention_direction": "candidate_recall",
+        "config_diff": {
+          "candidate_k": 24
+        },
+        "evidence_assertions": [
+          {
+            "target_id": "V1G-110926448917-17",
+            "observation": "candidate_pool_gap"
+          }
+        ],
+        "parameter_dependencies": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "why": "只读真实冻结材料的结构覆盖差异，语义与现场适用性仍未知",
+        "expected_improvement": "需要真实新答及完整50题验证，不预先宣称改善",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      }
+    },
+    {
+      "question_id": "V1G-110926448917-08",
+      "path": {
+        "status": "exploratory",
+        "observations": [
+          "context_pool_gap"
+        ],
+        "directions": [
+          "context_selection"
+        ],
+        "next_action": "controlled_sandbox",
+        "blockers": [],
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "failed_requirements": [
+          {
+            "check_index": 5,
+            "requirement": "长时间未使用接触式充电器，使用前先清洁充电板表面；擦拭时先关闭电源，使用干燥软布擦拭充电板表面和机身底部充电电极，尤其确保擦拭干净。"
+          },
+          {
+            "check_index": 6,
+            "requirement": "清洁充电板表面/充电电极时严禁使用金属刷、砂纸等，以免刮伤表面。"
+          },
+          {
+            "check_index": 8,
+            "requirement": "当前B2充电器定期保养/清洁操作适用性：对象为DOC-004 B2电池与充电器手册中的B2接触式充电器，已确认；清洁电极前确保充电板未上电已说明；但长时间未使用先清洁充电板表面、用干燥软布擦拭充电板表面、禁止金属刷/砂纸等必要手册条件未完整覆盖，Final缺少C32适用原文，不能认定完整可执行。"
+          }
+        ],
+        "required_source_ids": [
+          "DOC-004-C-00030",
+          "DOC-004-C-00032",
+          "DOC-004-C-00034"
+        ],
+        "missing_candidate_source_ids": [],
+        "omitted_final_source_ids": [
+          "DOC-004-C-00032"
+        ],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      },
+      "candidate_legal": true,
+      "proposal": {
+        "experiment_kind": "exploratory",
+        "root_cause": "Ranking",
+        "target_bad_cases": [
+          "V1G-110926448917-08"
+        ],
+        "root_cause_evidence": [
+          "V1G-110926448917-08"
+        ],
+        "target_group": "offline material audit",
+        "intervention_direction": "context_selection",
+        "config_diff": {
+          "top_k": 6
+        },
+        "evidence_assertions": [
+          {
+            "target_id": "V1G-110926448917-08",
+            "observation": "context_pool_gap"
+          }
+        ],
+        "parameter_dependencies": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "why": "只读真实冻结材料的结构覆盖差异，语义与现场适用性仍未知",
+        "expected_improvement": "需要真实新答及完整50题验证，不预先宣称改善",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      }
+    },
+    {
+      "question_id": "V1G-110926448917-07",
+      "path": {
+        "status": "exploratory",
+        "observations": [
+          "candidate_pool_gap"
+        ],
+        "directions": [
+          "query_expansion",
+          "candidate_recall"
+        ],
+        "next_action": "controlled_sandbox",
+        "blockers": [],
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "failed_requirements": [
+          {
+            "check_index": 0,
+            "requirement": "清洗/保养 KIRA B 50 前必须关闭设备；对于电池供电设备，必须拔出电池插头或断开电池连接。"
+          },
+          {
+            "check_index": 2,
+            "requirement": "对当前 KIRA B 50 停在对接站上、清洗污水箱粗大污染物滤网的现场操作，开始前必须确认设备已关机、电池已断开/拔电池插头，以及作业前断开对接站或拔电源；不能只拔对接站电源就批准执行。"
+          }
+        ],
+        "required_source_ids": [
+          "DOC-001-C-00026",
+          "DOC-001-C-00181",
+          "DOC-001-C-00191"
+        ],
+        "missing_candidate_source_ids": [
+          "DOC-001-C-00026",
+          "DOC-001-C-00181"
+        ],
+        "omitted_final_source_ids": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      },
+      "candidate_legal": true,
+      "proposal": {
+        "experiment_kind": "exploratory",
+        "root_cause": "Unknown",
+        "target_bad_cases": [
+          "V1G-110926448917-07"
+        ],
+        "root_cause_evidence": [
+          "V1G-110926448917-07"
+        ],
+        "target_group": "offline material audit",
+        "intervention_direction": "candidate_recall",
+        "config_diff": {
+          "candidate_k": 24
+        },
+        "evidence_assertions": [
+          {
+            "target_id": "V1G-110926448917-07",
+            "observation": "candidate_pool_gap"
+          }
+        ],
+        "parameter_dependencies": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "why": "只读真实冻结材料的结构覆盖差异，语义与现场适用性仍未知",
+        "expected_improvement": "需要真实新答及完整50题验证，不预先宣称改善",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      }
+    },
+    {
+      "question_id": "V1G-110926448917-06",
+      "path": {
+        "status": "exploratory",
+        "observations": [
+          "context_pool_gap"
+        ],
+        "directions": [
+          "context_selection"
+        ],
+        "next_action": "controlled_sandbox",
+        "blockers": [],
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "failed_requirements": [
+          {
+            "check_index": 1,
+            "requirement": "对于电池供电的设备，清洁前必须拔出电池插头或断开电池连接。"
+          },
+          {
+            "check_index": 3,
+            "requirement": "决不能用湿手触及电源插头或者插座。"
+          }
+        ],
+        "required_source_ids": [
+          "DOC-001-C-00017",
+          "DOC-001-C-00026",
+          "DOC-001-C-00181",
+          "DOC-001-C-00204"
+        ],
+        "missing_candidate_source_ids": [],
+        "omitted_final_source_ids": [
+          "DOC-001-C-00017",
+          "DOC-001-C-00026"
+        ],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      },
+      "candidate_legal": true,
+      "proposal": {
+        "experiment_kind": "exploratory",
+        "root_cause": "Unknown",
+        "target_bad_cases": [
+          "V1G-110926448917-06"
+        ],
+        "root_cause_evidence": [
+          "V1G-110926448917-06"
+        ],
+        "target_group": "offline material audit",
+        "intervention_direction": "context_selection",
+        "config_diff": {
+          "rerank": "query_only"
+        },
+        "evidence_assertions": [
+          {
+            "target_id": "V1G-110926448917-06",
+            "observation": "context_pool_gap"
+          }
+        ],
+        "parameter_dependencies": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "why": "只读真实冻结材料的结构覆盖差异，语义与现场适用性仍未知",
+        "expected_improvement": "需要真实新答及完整50题验证，不预先宣称改善",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      }
+    },
+    {
+      "question_id": "V1G-110926448917-04",
+      "path": {
+        "status": "exploratory",
+        "observations": [
+          "candidate_pool_gap",
+          "context_pool_gap"
+        ],
+        "directions": [
+          "query_expansion",
+          "candidate_recall",
+          "context_selection"
+        ],
+        "next_action": "controlled_sandbox",
+        "blockers": [],
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "failed_requirements": [
+          {
+            "check_index": 0,
+            "requirement": "长期存放/运输时应注意设备重量（手册存放/运输注意事项）。"
+          },
+          {
+            "check_index": 1,
+            "requirement": "设备只能在室内存放。"
+          },
+          {
+            "check_index": 4,
+            "requirement": "当前操作适用性：对 KIRA B 50 停用三个月存放，执行前需确认型号、只在室内存放及设备重量安全前提；回答确认了 KIRA B 50 型号和电池满电/每月补电，但未确认或列明只在室内存放及重量前提。"
+          }
+        ],
+        "required_source_ids": [
+          "DOC-001-C-00179",
+          "DOC-001-C-00180",
+          "DOC-001-C-00185"
+        ],
+        "missing_candidate_source_ids": [
+          "DOC-001-C-00179"
+        ],
+        "omitted_final_source_ids": [
+          "DOC-001-C-00180"
+        ],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      },
+      "candidate_legal": true,
+      "proposal": {
+        "experiment_kind": "exploratory",
+        "root_cause": "Unknown",
+        "target_bad_cases": [
+          "V1G-110926448917-04"
+        ],
+        "root_cause_evidence": [
+          "V1G-110926448917-04"
+        ],
+        "target_group": "offline material audit",
+        "intervention_direction": "candidate_recall",
+        "config_diff": {
+          "candidate_k": 24
+        },
+        "evidence_assertions": [
+          {
+            "target_id": "V1G-110926448917-04",
+            "observation": "candidate_pool_gap"
+          }
+        ],
+        "parameter_dependencies": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "why": "只读真实冻结材料的结构覆盖差异，语义与现场适用性仍未知",
+        "expected_improvement": "需要真实新答及完整50题验证，不预先宣称改善",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      }
+    },
+    {
+      "question_id": "V1G-110926448917-03",
+      "path": {
+        "status": "exploratory",
+        "observations": [
+          "context_pool_gap"
+        ],
+        "directions": [
+          "context_selection"
+        ],
+        "next_action": "controlled_sandbox",
+        "blockers": [],
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "failed_requirements": [
+          {
+            "check_index": 0,
+            "requirement": "创建用户前需从KIRA B 50主菜单按下设置按钮，显示并进入设置菜单。"
+          }
+        ],
+        "required_source_ids": [
+          "DOC-001-C-00132",
+          "DOC-001-C-00134"
+        ],
+        "missing_candidate_source_ids": [],
+        "omitted_final_source_ids": [
+          "DOC-001-C-00132"
+        ],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      },
+      "candidate_legal": true,
+      "proposal": {
+        "experiment_kind": "exploratory",
+        "root_cause": "Ranking",
+        "target_bad_cases": [
+          "V1G-110926448917-03"
+        ],
+        "root_cause_evidence": [
+          "V1G-110926448917-03"
+        ],
+        "target_group": "offline material audit",
+        "intervention_direction": "context_selection",
+        "config_diff": {
+          "top_k": 6
+        },
+        "evidence_assertions": [
+          {
+            "target_id": "V1G-110926448917-03",
+            "observation": "context_pool_gap"
+          }
+        ],
+        "parameter_dependencies": [],
+        "hypothesis": "冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。",
+        "falsification": "同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。",
+        "why": "只读真实冻结材料的结构覆盖差异，语义与现场适用性仍未知",
+        "expected_improvement": "需要真实新答及完整50题验证，不预先宣称改善",
+        "risk": "扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。"
+      }
+    }
+  ],
+  "sandboxes": [
+    {
+      "candidate_id": "EXP-20261022043046347303-R1-A",
+      "status": "evaluated",
+      "completed": 50,
+      "kind": "synthetic vector/rerank/answer/Judge; REAL frozen 50 + production retrieval/executor; NOT efficacy",
+      "comparison_complete": true,
+      "regression_passed": false,
+      "qualification": {
+        "bad_case_reduction": -40,
+        "checks": {
+          "hard_gates": false,
+          "regression": false,
+          "target_bad_case_fixed": false,
+          "total_bad_cases_reduced": false
+        },
+        "qualified": false,
+        "status": "NOT_QUALIFIED"
+      }
+    },
+    {
+      "candidate_id": "EXP-20261022043046347303-R1-B",
+      "status": "evaluated",
+      "completed": 50,
+      "kind": "synthetic vector/rerank/answer/Judge; REAL frozen 50 + production retrieval/executor; NOT efficacy",
+      "comparison_complete": true,
+      "regression_passed": false,
+      "qualification": {
+        "bad_case_reduction": -40,
+        "checks": {
+          "hard_gates": false,
+          "regression": false,
+          "target_bad_case_fixed": false,
+          "total_bad_cases_reduced": false
+        },
+        "qualified": false,
+        "status": "NOT_QUALIFIED"
+      }
+    },
+    {
+      "candidate_id": "EXP-20261022043046347303-R1-C",
+      "status": "evaluated",
+      "completed": 50,
+      "kind": "synthetic vector/rerank/answer/Judge; REAL frozen 50 + production retrieval/executor; NOT efficacy",
+      "comparison_complete": true,
+      "regression_passed": false,
+      "qualification": {
+        "bad_case_reduction": -40,
+        "checks": {
+          "hard_gates": false,
+          "regression": false,
+          "target_bad_case_fixed": false,
+          "total_bad_cases_reduced": false
+        },
+        "qualified": false,
+        "status": "NOT_QUALIFIED"
+      }
+    }
+  ]
+}

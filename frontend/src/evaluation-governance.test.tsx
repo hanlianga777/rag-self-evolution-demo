@@ -15,8 +15,8 @@ it('keeps report summary out of gate/case tabs and separates symptoms and causes
  await mount(<EvaluationPage data={{evaluation:run}}/>);
  await click('Hard Gate');expect(document.querySelector('.baseline-metrics')).toBeNull();expect(document.querySelector('.stage-stepper')).toBeNull();
  await click('Bad Case 诊断');expect(document.querySelector('.baseline-conclusion')).toBeNull();
- expect(document.body.textContent).toContain('失败现象');expect(document.body.textContent).toContain('业务结论');expect(document.body.textContent).not.toContain('诊断可信度');
- expect(document.querySelector('tbody')?.textContent).toContain('版本尚未核实');expect(document.querySelector('tbody')?.textContent).toContain('FAIL');expect(document.querySelector('.quality-audit')?.textContent).toContain('版本尚未核实');expect(document.querySelector('tbody')?.textContent).not.toContain('评测争议');
+ expect(document.body.textContent).toContain('失败现象');expect(document.body.textContent).toContain('评测结果');expect(document.body.textContent).not.toContain('诊断可信度');
+ expect(document.querySelector('tbody')?.textContent).toContain('版本尚未核实');expect(document.querySelector('tbody')?.textContent).toContain('FAIL');expect(document.querySelector('.quality-audit')).toBeNull();expect(document.querySelector('tbody')?.textContent).not.toContain('评测争议');
  expect(document.body.textContent).not.toMatch(/\bNone\b|undefined|null/);
 });
 it('retains six workstation stages and forbids old-rule candidate actions',async()=>{

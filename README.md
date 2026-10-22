@@ -1,3 +1,5 @@
+> 2026-10-22 产品收口：正式业务 FAIL 均为 Bad Case，全部进入 Agent 处理；根因在诊断与受控实验中验证。前端保留原布局，内部审计默认折叠。运行版本、零调用离线验证与操作入口见 [验收报告](docs/BAD_CASE_UNIFICATION_ACCEPTANCE.md)。
+
 # RAG Evolution
 
 > 2026-10-22 `agent-closure-3`：10道业务FAIL全量承接，Unknown可基于真实阶段观察提出可证伪探索实验；缺材料/执行身份进入能力修复任务。10/10离线合法探索，50题Fixture闭环不代表真实优化效果，Provider0。原11 Gate/Regression/人工发布保持。详见[中文整改报告、复现命令与下一轮统一预算](docs/AGENT_EXPLORATION_E2E_REPORT.md)。

@@ -5,6 +5,7 @@ from test_automatic_diagnostics import recall_case
 
 def retrieval_case():
     case,chunks=recall_case()
+    case['passed']=False
     case['primary_root_cause']='Retrieval'
     case['diagnosis']={'status':'confirmed','reason':'离线结构化事实定位'}
     trace=case['programmatic_metrics']['retrieval_trace']
@@ -22,7 +23,7 @@ def retrieval_case():
 def generation_case(root='Generation'):
     claim={'kind':'unsupported_instruction','claim':'请拆开设备测量电压。','changes_operation':True,
            'operation_basis':{'effect':'technical_change','source_applicable':False},'support':[],'reason':'无来源技术操作'}
-    case={'primary_root_cause':root,'model_answer':claim['claim'],'diagnosis':{'status':'confirmed','findings':[claim]},
+    case={'passed':False,'primary_root_cause':root,'model_answer':claim['claim'],'diagnosis':{'status':'confirmed','findings':[claim]},
           'test_category':'negative' if root=='Safety' else 'positive',
           'programmatic_metrics':{'claim_assessment':{'confirmed':[claim]},'evidence_coverage':{'required_chunk_ids':['c']},
             'evidence_sufficiency':{'sufficient':True},'retrieval_trace':{'candidates':[{'chunk_id':'c'}],'final':[{'chunk_id':'c'}]}}}

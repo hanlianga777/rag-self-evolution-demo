@@ -41,7 +41,8 @@ from .retrieval import RetrievalUnavailable
 EVALUATION_RUNTIME_CONTRACT = {**VERSIONS, 'judge_prompt_sha256':hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(),
     'loaded_code_sha256':{name:hashlib.sha256(marshal.dumps(fn.__code__)).hexdigest() for name,fn in {
         'validator':validate_business_judgment, 'provider_parser':DeepSeekProvider._judge_business,
-        'scorer':EvaluationRunner.score_execution, 'batch_runner':EvaluationRunner._execute_baseline}.items()}}
+        'scorer':EvaluationRunner.score_execution, 'batch_runner':EvaluationRunner._execute_baseline,
+        'diagnostic_view':diagnostic_view, 'agent_generate':OptimizationAgent.generate.__wrapped__}.items()}}
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
 app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1] / "documents"), name="documents")

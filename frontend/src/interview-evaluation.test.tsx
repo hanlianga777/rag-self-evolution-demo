@@ -22,7 +22,7 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(0);
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("10 / 11");
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("未通过 Hard Gate");
-  expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("仍有 1 个逐题失败");
+  expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("有 1 道 Bad Case");
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("Ablation Correctness");
   expect(document.querySelector(".baseline-run-summary")?.textContent).not.toContain("judge-only-model");
   expect(document.body.textContent).not.toContain("Run ID");
@@ -32,8 +32,8 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
   expect(document.querySelector("tbody")?.textContent).toContain("≥ 90.00%");
   expect(new Set([...document.querySelectorAll("tbody tr td:nth-child(2)")].map(cell => cell.textContent)).size).toBe(4);
   await click("Bad Case 诊断");
-  expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "失败现象", "业务结论", "优化方向", "详情"]);
-  expect(document.querySelector("tbody tr td:nth-child(3)")?.textContent).toBe("FAIL");
+  expect([...document.querySelectorAll("thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "失败现象", "评测结果", "诊断依据", "优化方向", "详情"]);
+  expect(document.querySelector("tbody tr td:nth-child(3)")?.textContent).toBe("FAIL · Bad Case");
   await click("查看案例");
   expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["案例结论", "业务问题", "预期与实际回答", "证据依据", "诊断与优化方向"]);
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Retrieval");
@@ -58,7 +58,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space }))));
   await render(<EvolutionPage data={input} />);
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
-  expect(document.querySelector(".diagnosis-list")?.textContent).toContain("Retrieval · 检索");
+  expect(document.querySelector(".diagnosis-list")?.textContent).toContain("候选召回覆盖");
   expect(document.querySelector(".diagnosis-filters")).toBeNull();
   expect(document.querySelector(".diagnosis-list")?.textContent).toContain("Candidate A");
   expect(document.querySelector(".diagnosis-list")?.textContent).not.toContain("Evidence Miss");

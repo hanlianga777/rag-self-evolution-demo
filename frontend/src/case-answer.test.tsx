@@ -40,11 +40,11 @@ it('keeps raw answers and all technical records in a closed audit while presenti
   expect([...document.querySelectorAll('.bad-case-details > section')].map(el => el.textContent).join('')).not.toContain('claim_assessment.pending');
   expect(JSON.stringify(item)).toBe(before);
 });
-it('uses automatic evidence assessment instead of historical confidence for the business conclusion', () => {
+it('keeps FAIL as Bad Case while diagnosis remains part of Agent processing', () => {
   render(<BaselineCaseDetails item={{ passed: false, question_id: 'offline', diagnosis: { status: 'disputed' }, primary_root_cause: 'Unknown', diagnostic_view: { analysis_category: 'evaluation_issue', analysis_reason: '安全拒答正确，但评测规则存在兼容问题。', target_eligible: false } }} snapshot={{}} config={{}} gates={[]} />);
   const cards = document.querySelectorAll('.bad-case-details > section');
-  expect(cards[0].textContent).toContain('评测核验未闭合');
-  expect(cards[4].textContent).toContain('原失败与资格阻断保持，不形成 RAG 调参目标');
+  expect(cards[0].textContent).toContain('FAIL · Bad Case');
+  expect(cards[4].textContent).toContain('核验来源覆盖并提出优化假设');
   expect(cards[3].textContent).toContain('最终上下文 未采集');
 });
 it('formats mixed HTML and markdown lists and turns behavior enums into the saved business expectation', () => {
