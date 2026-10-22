@@ -1,0 +1,133 @@
+{
+  "currency": "CNY",
+  "source": "real Provider Usage × official peak CNY rates; account debit not queried",
+  "price_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "rates_per_million": {
+    "cache_miss": "2",
+    "cache_hit": "0.04",
+    "output": "8"
+  },
+  "provider_calls": 9,
+  "automatic_retries": 0,
+  "usage_fee_cny": "2.31690904",
+  "conservative_fee_cny": "2.321174",
+  "calls": [
+    {
+      "question_id": "V1G-110926448917-03",
+      "call_number": 1,
+      "status": "ok",
+      "started_at": "2026-10-22T01:46:11.835142+00:00",
+      "prompt_tokens": 71448,
+      "cache_hit_tokens": 0,
+      "cache_miss_tokens": 71448,
+      "completion_tokens_including_reasoning": 16334,
+      "usage_fee_cny": "0.273568",
+      "conservative_fee_cny": "0.273568",
+      "raw_response_sha256": "311c618917ddd543df1c3074219305bd6e43d580cbeab18e99e8b2d962641fa3"
+    },
+    {
+      "question_id": "V1G-110926448917-04",
+      "call_number": 2,
+      "status": "ok",
+      "started_at": "2026-10-22T01:47:13.412529+00:00",
+      "prompt_tokens": 72418,
+      "cache_hit_tokens": 256,
+      "cache_miss_tokens": 72162,
+      "completion_tokens_including_reasoning": 13262,
+      "usage_fee_cny": "0.25043024",
+      "conservative_fee_cny": "0.250932",
+      "raw_response_sha256": "8e7c372dfe6f69923af629551054dc9a76c824af7a8252ba595bcdb49bbc5a1a"
+    },
+    {
+      "question_id": "V1G-110926448917-06",
+      "call_number": 3,
+      "status": "ok",
+      "started_at": "2026-10-22T01:48:11.185720+00:00",
+      "prompt_tokens": 75751,
+      "cache_hit_tokens": 256,
+      "cache_miss_tokens": 75495,
+      "completion_tokens_including_reasoning": 8170,
+      "usage_fee_cny": "0.21636024",
+      "conservative_fee_cny": "0.216862",
+      "raw_response_sha256": "457639e7d82230d4eca83d6c86c168e55cd887b71246cf910cf7bcfd0eaf94d4"
+    },
+    {
+      "question_id": "V1G-110926448917-07",
+      "call_number": 4,
+      "status": "ok",
+      "started_at": "2026-10-22T01:48:46.330143+00:00",
+      "prompt_tokens": 75064,
+      "cache_hit_tokens": 384,
+      "cache_miss_tokens": 74680,
+      "completion_tokens_including_reasoning": 13331,
+      "usage_fee_cny": "0.25602336",
+      "conservative_fee_cny": "0.256776",
+      "raw_response_sha256": "22e4ec72d3b953c6c8909e53df0bbd8d0de2820629ddac719321f4cf867de8a3"
+    },
+    {
+      "question_id": "V1G-110926448917-17",
+      "call_number": 5,
+      "status": "ok",
+      "started_at": "2026-10-22T01:49:45.667348+00:00",
+      "prompt_tokens": 79031,
+      "cache_hit_tokens": 256,
+      "cache_miss_tokens": 78775,
+      "completion_tokens_including_reasoning": 12918,
+      "usage_fee_cny": "0.26090424",
+      "conservative_fee_cny": "0.261406",
+      "raw_response_sha256": "4561b3c8a9bba77b4cd2381cf1c8ac283aedefcc887210db9b78951999ff2bf0"
+    },
+    {
+      "question_id": "V1G-110926448917-24",
+      "call_number": 6,
+      "status": "ok",
+      "started_at": "2026-10-22T01:50:37.315714+00:00",
+      "prompt_tokens": 74438,
+      "cache_hit_tokens": 256,
+      "cache_miss_tokens": 74182,
+      "completion_tokens_including_reasoning": 17576,
+      "usage_fee_cny": "0.28898224",
+      "conservative_fee_cny": "0.289484",
+      "raw_response_sha256": "3eb7f67e9acd00872705dd933f8f836641d1344179bb899b4932958526f170e1"
+    },
+    {
+      "question_id": "V1G-110926448917-27-R123429216749",
+      "call_number": 7,
+      "status": "ok",
+      "started_at": "2026-10-22T01:51:46.961023+00:00",
+      "prompt_tokens": 70859,
+      "cache_hit_tokens": 256,
+      "cache_miss_tokens": 70603,
+      "completion_tokens_including_reasoning": 20676,
+      "usage_fee_cny": "0.30662424",
+      "conservative_fee_cny": "0.307126",
+      "raw_response_sha256": "ba94b1fd26953d7a9515dc1388ec021e40a805cd7a42d412d518f0a3e513eb5c"
+    },
+    {
+      "question_id": "V1G-110926448917-28",
+      "call_number": 8,
+      "status": "ok",
+      "started_at": "2026-10-22T01:53:17.994628+00:00",
+      "prompt_tokens": 73403,
+      "cache_hit_tokens": 256,
+      "cache_miss_tokens": 73147,
+      "completion_tokens_including_reasoning": 10356,
+      "usage_fee_cny": "0.22915224",
+      "conservative_fee_cny": "0.229654",
+      "raw_response_sha256": "004a33d29ad21ee4bca8be91cf0da8c18255c681022f35f8a689cd2c933e996b"
+    },
+    {
+      "question_id": "V1G-110926448917-29",
+      "call_number": 9,
+      "status": "ok",
+      "started_at": "2026-10-22T01:54:02.024793+00:00",
+      "prompt_tokens": 72791,
+      "cache_hit_tokens": 256,
+      "cache_miss_tokens": 72535,
+      "completion_tokens_including_reasoning": 11223,
+      "usage_fee_cny": "0.23486424",
+      "conservative_fee_cny": "0.235366",
+      "raw_response_sha256": "41437f072bcf1bd85820b4ec24577ec00a2699d0a39f600a36c1ec76736889f1"
+    }
+  ]
+}

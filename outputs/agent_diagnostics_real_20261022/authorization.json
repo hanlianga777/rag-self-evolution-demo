@@ -1,0 +1,37 @@
+{
+  "status": "explicitly_authorized_by_user",
+  "run_id": "EVAL-20261021141811373593",
+  "question_ids": [
+    "V1G-110926448917-03",
+    "V1G-110926448917-04",
+    "V1G-110926448917-06",
+    "V1G-110926448917-07",
+    "V1G-110926448917-17",
+    "V1G-110926448917-24",
+    "V1G-110926448917-27-R123429216749",
+    "V1G-110926448917-28",
+    "V1G-110926448917-29"
+  ],
+  "expected_binding": "202e07ff0880c217ec787affce94bd9d4b16b159f26b3f67cb94110f305b3244",
+  "max_calls": 9,
+  "budget_yuan_hard_cap_requested": 10,
+  "price_snapshot": "must reverify within 24 hours before execution; no historical authorization reused",
+  "scope": "diagnostic_semantic_only",
+  "generation_calls": 0,
+  "agent_strategy_calls": 0,
+  "sandbox_calls": 0,
+  "automatic_approval_or_release": false,
+  "stop_conditions": [
+    "Unknown/unsettled Usage",
+    "identity changed",
+    "budget or call cap exhausted"
+  ],
+  "unresolved_is_not_repaired": true,
+  "authorization_id": "agent-diagnostic-20261022-owner-nine-no-retry",
+  "authorized_at_recorded_utc": "2026-10-22T01:45:18.418125+00:00",
+  "authorization_source": "current user message: 正式批准执行其余9题统一补证。最多9次真实Provider调用，累计费用不超过人民币10元，禁止自动重试。仅补证与诊断闭合；不启动Agent策略、Sandbox、Regression或发布。",
+  "budget_yuan": 10,
+  "automatic_retries": 0,
+  "model": "deepseek-v4-flash",
+  "timeout_seconds": 240.0
+}

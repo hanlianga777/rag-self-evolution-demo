@@ -1,0 +1,318 @@
+{
+  "binding_sha256": "202e07ff0880c217ec787affce94bd9d4b16b159f26b3f67cb94110f305b3244",
+  "question_ids": [
+    "V1G-110926448917-03",
+    "V1G-110926448917-04",
+    "V1G-110926448917-06",
+    "V1G-110926448917-07",
+    "V1G-110926448917-17",
+    "V1G-110926448917-24",
+    "V1G-110926448917-27-R123429216749",
+    "V1G-110926448917-28",
+    "V1G-110926448917-29"
+  ],
+  "requests": [
+    {
+      "question_id": "V1G-110926448917-03",
+      "request": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 32768,
+        "request_sha256": "89a1bebdb113d7405c50c3bbfb97e5f34ccf11719abaf172d75012c709b8e120",
+        "body_bytes": 397214,
+        "roles": [
+          "system",
+          "user"
+        ],
+        "message_characters": 152401,
+        "input_token_estimate": 59525,
+        "token_estimate_method": "approximate_character_ratio_not_model_tokenizer",
+        "token_estimate_source": "https://api-docs.deepseek.com/quick_start/token_usage/",
+        "user_field_characters": {
+          "question": 5663,
+          "golden_norms": 1703,
+          "answer": 558,
+          "checks": 2772,
+          "canonical_norms": 121380,
+          "stages": 18177,
+          "identity": 949,
+          "request_sha256": 66
+        }
+      },
+      "first_reservation_upper_yuan": 1.05862
+    },
+    {
+      "question_id": "V1G-110926448917-04",
+      "request": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 32768,
+        "request_sha256": "031bd2549c7583f762da8881bae880f32191138a60d2e464f3ee8921b3350803",
+        "body_bytes": 411383,
+        "roles": [
+          "system",
+          "user"
+        ],
+        "message_characters": 153475,
+        "input_token_estimate": 60640,
+        "token_estimate_method": "approximate_character_ratio_not_model_tokenizer",
+        "token_estimate_source": "https://api-docs.deepseek.com/quick_start/token_usage/",
+        "user_field_characters": {
+          "question": 5993,
+          "golden_norms": 1737,
+          "answer": 416,
+          "checks": 1454,
+          "canonical_norms": 121380,
+          "stages": 20347,
+          "identity": 949,
+          "request_sha256": 66
+        }
+      },
+      "first_reservation_upper_yuan": 1.086958
+    },
+    {
+      "question_id": "V1G-110926448917-06",
+      "request": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 32768,
+        "request_sha256": "4ad0a485ab18105a7f333bffcd211efb20eca88fb595f862501332a454b74240",
+        "body_bytes": 441183,
+        "roles": [
+          "system",
+          "user"
+        ],
+        "message_characters": 158987,
+        "input_token_estimate": 63731,
+        "token_estimate_method": "approximate_character_ratio_not_model_tokenizer",
+        "token_estimate_source": "https://api-docs.deepseek.com/quick_start/token_usage/",
+        "user_field_characters": {
+          "question": 6963,
+          "golden_norms": 3306,
+          "answer": 569,
+          "checks": 1482,
+          "canonical_norms": 121380,
+          "stages": 23139,
+          "identity": 949,
+          "request_sha256": 66
+        }
+      },
+      "first_reservation_upper_yuan": 1.146558
+    },
+    {
+      "question_id": "V1G-110926448917-07",
+      "request": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 32768,
+        "request_sha256": "14944ec1e79c3c5a1a6b95b5494f6d1b67f98614527049a555ec276575b4ba64",
+        "body_bytes": 423091,
+        "roles": [
+          "system",
+          "user"
+        ],
+        "message_characters": 157034,
+        "input_token_estimate": 62178,
+        "token_estimate_method": "approximate_character_ratio_not_model_tokenizer",
+        "token_estimate_source": "https://api-docs.deepseek.com/quick_start/token_usage/",
+        "user_field_characters": {
+          "question": 6994,
+          "golden_norms": 2076,
+          "answer": 503,
+          "checks": 1924,
+          "canonical_norms": 121380,
+          "stages": 22009,
+          "identity": 949,
+          "request_sha256": 66
+        }
+      },
+      "first_reservation_upper_yuan": 1.110374
+    },
+    {
+      "question_id": "V1G-110926448917-17",
+      "request": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 32768,
+        "request_sha256": "ae1b2896639398a5b504b466d73f82f3ed38e22d35bc6d546951b3538dedbca3",
+        "body_bytes": 456760,
+        "roles": [
+          "system",
+          "user"
+        ],
+        "message_characters": 165030,
+        "input_token_estimate": 66124,
+        "token_estimate_method": "approximate_character_ratio_not_model_tokenizer",
+        "token_estimate_source": "https://api-docs.deepseek.com/quick_start/token_usage/",
+        "user_field_characters": {
+          "question": 10215,
+          "golden_norms": 2203,
+          "answer": 607,
+          "checks": 1982,
+          "canonical_norms": 121380,
+          "stages": 26495,
+          "identity": 949,
+          "request_sha256": 66
+        }
+      },
+      "first_reservation_upper_yuan": 1.177712
+    },
+    {
+      "question_id": "V1G-110926448917-24",
+      "request": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 32768,
+        "request_sha256": "10490a99516e403104b26085a75df29f1467b3c628c644df1b977a3bdea689eb",
+        "body_bytes": 421274,
+        "roles": [
+          "system",
+          "user"
+        ],
+        "message_characters": 156477,
+        "input_token_estimate": 61943,
+        "token_estimate_method": "approximate_character_ratio_not_model_tokenizer",
+        "token_estimate_source": "https://api-docs.deepseek.com/quick_start/token_usage/",
+        "user_field_characters": {
+          "question": 6467,
+          "golden_norms": 1721,
+          "answer": 539,
+          "checks": 2698,
+          "canonical_norms": 121380,
+          "stages": 21524,
+          "identity": 949,
+          "request_sha256": 66
+        }
+      },
+      "first_reservation_upper_yuan": 1.10674
+    },
+    {
+      "question_id": "V1G-110926448917-27-R123429216749",
+      "request": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 32768,
+        "request_sha256": "f16b569ebf273de936ac075f7781267e60b3ec34efef63cd635bc950c2a12cd0",
+        "body_bytes": 401473,
+        "roles": [
+          "system",
+          "user"
+        ],
+        "message_characters": 151125,
+        "input_token_estimate": 59495,
+        "token_estimate_method": "approximate_character_ratio_not_model_tokenizer",
+        "token_estimate_source": "https://api-docs.deepseek.com/quick_start/token_usage/",
+        "user_field_characters": {
+          "question": 6278,
+          "golden_norms": 435,
+          "answer": 452,
+          "checks": 1933,
+          "canonical_norms": 121380,
+          "stages": 18485,
+          "identity": 963,
+          "request_sha256": 66
+        }
+      },
+      "first_reservation_upper_yuan": 1.067138
+    },
+    {
+      "question_id": "V1G-110926448917-28",
+      "request": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 32768,
+        "request_sha256": "e7bc3c0d8e354f5cf36c3beeac12e7dba21c9130da0cb53d0440e892d0f12277",
+        "body_bytes": 410478,
+        "roles": [
+          "system",
+          "user"
+        ],
+        "message_characters": 153075,
+        "input_token_estimate": 60490,
+        "token_estimate_method": "approximate_character_ratio_not_model_tokenizer",
+        "token_estimate_source": "https://api-docs.deepseek.com/quick_start/token_usage/",
+        "user_field_characters": {
+          "question": 6343,
+          "golden_norms": 2407,
+          "answer": 557,
+          "checks": 1536,
+          "canonical_norms": 121380,
+          "stages": 18704,
+          "identity": 949,
+          "request_sha256": 66
+        }
+      },
+      "first_reservation_upper_yuan": 1.085148
+    },
+    {
+      "question_id": "V1G-110926448917-29",
+      "request": {
+        "model": "deepseek-v4-flash",
+        "temperature": 0,
+        "stream": false,
+        "response_format": {
+          "type": "json_object"
+        },
+        "max_tokens": 32768,
+        "request_sha256": "8798ea20022b0f77f204e69ba644f4a86e731bc4d279df4492e92035428d221f",
+        "body_bytes": 418914,
+        "roles": [
+          "system",
+          "user"
+        ],
+        "message_characters": 153325,
+        "input_token_estimate": 61072,
+        "token_estimate_method": "approximate_character_ratio_not_model_tokenizer",
+        "token_estimate_source": "https://api-docs.deepseek.com/quick_start/token_usage/",
+        "user_field_characters": {
+          "question": 5407,
+          "golden_norms": 824,
+          "answer": 488,
+          "checks": 2342,
+          "canonical_norms": 121380,
+          "stages": 20736,
+          "identity": 949,
+          "request_sha256": 66
+        }
+      },
+      "first_reservation_upper_yuan": 1.10202
+    }
+  ],
+  "provider_calls": 0,
+  "configured": true,
+  "model": "deepseek-v4-flash",
+  "formal_database_open_mode": "ro",
+  "backup": "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/data/judge_probes/agent-diagnostic-20261022-owner-nine-no-retry/backup/demo.db"
+}

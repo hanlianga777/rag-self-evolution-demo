@@ -1,5 +1,7 @@
 # 当前有效评测合同 — 2026-10-21 VNext V5.1 `[CONFIRMED]`
 
+- **2026-10-22 9题授权补证实录（不改变产品合同）**：Owner限定9次/10元/不重试，仅补证。实际9次已结算、重试0；诊断闭合0/9，新增实验资格0/9（7题完整审查声明未满足、2题JSON无效）。Usage费用核算2.31690904元，保守账本2.321174元；正式DB/Corpus/索引等保护哈希未变，未进入Agent策略/Sandbox/Regression/发布。原Provider0表述为此前离线阶段记录；本次已停止，后续须再次授权。详见[执行报告](../outputs/agent_diagnostics_real_20261022/9题真实补证执行报告.md)。
+
 本节及以下安全语义补充依据Owner当前指令生效；覆盖下文所有冲突的旧评测、Claim分类、诊断准入、Regression及自动恢复语义；旧条款保留为历史，不得同时执行。既有Golden/Knowledge生产治理、50题20/10/20、11项Hard Gate阈值、三个人工Gate、Search Space及Production保护保持。
 
 - **2026-10-22 Agent 闭环合同 `agent-closure-2`（当前，覆盖下文永久排除、单参数组及发现Qualified即停止的旧限制）**：全部已完成真实业务FAIL进入单一Agent的处理输入、目标映射和逐题diagnostic_tasks；技术异常仍独立，不产生业务FAIL。诊断未闭合不等于没有优化能力，先沿既有Resolver补证；具体Candidate仍须已核验根因/真实Trace、合法参数和完整Sandbox，不强制准入。页面展示全量当前业务问题、待补证及同一个已验证配置的剩余题；不同候选的修复数量不得相加，历史合同仍只读。

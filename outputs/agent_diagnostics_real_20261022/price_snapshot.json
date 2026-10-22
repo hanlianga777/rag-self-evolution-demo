@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-10-22T01:45:18.417386+00:00",
+  "currency": "CNY",
+  "source_url": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "basis": "official peak cache-miss/output conservative bound; not actual account debit; no FX conversion",
+  "requested_model": "deepseek-v4-flash",
+  "served_model_notice": "official legacy alias serves DeepSeek-V4.1-Flash-1017",
+  "models": {
+    "deepseek-v4-flash": {
+      "provider": "DeepSeek",
+      "input": 2.0,
+      "output": 8.0,
+      "max_output": 32768,
+      "currency": "CNY"
+    }
+  }
+}

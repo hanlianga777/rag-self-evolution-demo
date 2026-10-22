@@ -1,0 +1,320 @@
+[
+  {
+    "question_id": "V1G-110926448917-03",
+    "supplement_status": "blocked",
+    "blockers": [
+      "semantic_requirements_not_complete"
+    ],
+    "primary_root_cause": "Ranking",
+    "diagnosis_complete": false,
+    "target_eligible": false,
+    "context_selection_options": [],
+    "diagnostic_gaps": [
+      {
+        "source": "resolver",
+        "condition": "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      }
+    ],
+    "offline_resolver_status": "needs_semantic",
+    "next_stage_authorized": false,
+    "call_number": 1,
+    "usage_fee_cny": "0.273568",
+    "saved_sidecar_sha256": "6fda666fc152d08d52bbe5012fa7e99b515ee3d6a26d6c0a129fb0e9f78c9f17"
+  },
+  {
+    "question_id": "V1G-110926448917-04",
+    "supplement_status": "blocked",
+    "blockers": [
+      "semantic_requirements_not_complete"
+    ],
+    "primary_root_cause": "Unknown",
+    "diagnosis_complete": false,
+    "target_eligible": false,
+    "context_selection_options": null,
+    "diagnostic_gaps": [
+      {
+        "source": "resolver",
+        "condition": "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      },
+      {
+        "check_index": 0,
+        "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+      },
+      {
+        "check_index": 1,
+        "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+      },
+      {
+        "check_index": 4,
+        "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+      }
+    ],
+    "offline_resolver_status": "needs_semantic",
+    "next_stage_authorized": false,
+    "call_number": 2,
+    "usage_fee_cny": "0.25043024",
+    "saved_sidecar_sha256": "fc5d60e7ecf77589db8811050d75c2d441e74a27524b39d8f5d6e417fee72505"
+  },
+  {
+    "question_id": "V1G-110926448917-06",
+    "supplement_status": "blocked",
+    "blockers": [
+      "semantic_execution_failed: 诊断语义JSON无效"
+    ],
+    "primary_root_cause": "Unknown",
+    "diagnosis_complete": false,
+    "target_eligible": false,
+    "context_selection_options": null,
+    "diagnostic_gaps": [
+      {
+        "source": "resolver",
+        "condition": "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      },
+      {
+        "check_index": 1,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 3,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      }
+    ],
+    "offline_resolver_status": "needs_semantic",
+    "next_stage_authorized": false,
+    "call_number": 3,
+    "usage_fee_cny": "0.21636024",
+    "saved_sidecar_sha256": "926c49a0fb58753e47bff61f7e72f0299c4af0aaf757a45d82db8d3bac52cc61",
+    "json_parse_error": {
+      "message": "Expecting ',' delimiter",
+      "line": 1,
+      "column": 8030,
+      "offset": 8029
+    }
+  },
+  {
+    "question_id": "V1G-110926448917-07",
+    "supplement_status": "blocked",
+    "blockers": [
+      "semantic_requirements_not_complete"
+    ],
+    "primary_root_cause": "Unknown",
+    "diagnosis_complete": false,
+    "target_eligible": false,
+    "context_selection_options": null,
+    "diagnostic_gaps": [
+      {
+        "source": "resolver",
+        "condition": "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      },
+      {
+        "check_index": 0,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 2,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      }
+    ],
+    "offline_resolver_status": "needs_semantic",
+    "next_stage_authorized": false,
+    "call_number": 4,
+    "usage_fee_cny": "0.25602336",
+    "saved_sidecar_sha256": "7af82449469bdf0415d46f202684d7e0597a797a63e42445de45622a3849dc15"
+  },
+  {
+    "question_id": "V1G-110926448917-17",
+    "supplement_status": "blocked",
+    "blockers": [
+      "semantic_requirements_not_complete"
+    ],
+    "primary_root_cause": "Unknown",
+    "diagnosis_complete": false,
+    "target_eligible": false,
+    "context_selection_options": null,
+    "diagnostic_gaps": [
+      {
+        "source": "resolver",
+        "condition": "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      },
+      {
+        "check_index": 1,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 2,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      }
+    ],
+    "offline_resolver_status": "needs_semantic",
+    "next_stage_authorized": false,
+    "call_number": 5,
+    "usage_fee_cny": "0.26090424",
+    "saved_sidecar_sha256": "3f6979f0e8be881d7f50f3e2f4171b7de6ae9a022ece14a0a9249206a964b1a7"
+  },
+  {
+    "question_id": "V1G-110926448917-24",
+    "supplement_status": "blocked",
+    "blockers": [
+      "semantic_execution_failed: 诊断语义JSON无效"
+    ],
+    "primary_root_cause": "Unknown",
+    "diagnosis_complete": false,
+    "target_eligible": false,
+    "context_selection_options": null,
+    "diagnostic_gaps": [
+      {
+        "source": "resolver",
+        "condition": "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      },
+      {
+        "check_index": 0,
+        "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+      },
+      {
+        "check_index": 1,
+        "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+      },
+      {
+        "check_index": 2,
+        "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+      },
+      {
+        "check_index": 7,
+        "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+      },
+      {
+        "check_index": 10,
+        "condition": "需要有效reference_support与显式candidate_support阶段核验，missing不等于[]"
+      }
+    ],
+    "offline_resolver_status": "needs_semantic",
+    "next_stage_authorized": false,
+    "call_number": 6,
+    "usage_fee_cny": "0.28898224",
+    "saved_sidecar_sha256": "0362747967bed295b01e158b30a49fd9c9fb21dc520db8630823e5024001c2fe",
+    "json_parse_error": {
+      "message": "Expecting ',' delimiter",
+      "line": 1,
+      "column": 16254,
+      "offset": 16253
+    }
+  },
+  {
+    "question_id": "V1G-110926448917-27-R123429216749",
+    "supplement_status": "blocked",
+    "blockers": [
+      "semantic_requirements_not_complete"
+    ],
+    "primary_root_cause": "Unknown",
+    "diagnosis_complete": false,
+    "target_eligible": false,
+    "context_selection_options": null,
+    "diagnostic_gaps": [
+      {
+        "source": "resolver",
+        "condition": "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      },
+      {
+        "check_index": 0,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 1,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 2,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 3,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 7,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      }
+    ],
+    "offline_resolver_status": "needs_semantic",
+    "next_stage_authorized": false,
+    "call_number": 7,
+    "usage_fee_cny": "0.30662424",
+    "saved_sidecar_sha256": "6ba43cd74f09bceefb3ccf33eefd653670f1c41bf853446460a034b3fb13bca4"
+  },
+  {
+    "question_id": "V1G-110926448917-28",
+    "supplement_status": "blocked",
+    "blockers": [
+      "semantic_requirements_not_complete"
+    ],
+    "primary_root_cause": "Unknown",
+    "diagnosis_complete": false,
+    "target_eligible": false,
+    "context_selection_options": null,
+    "diagnostic_gaps": [
+      {
+        "source": "resolver",
+        "condition": "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      },
+      {
+        "check_index": 0,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      }
+    ],
+    "offline_resolver_status": "needs_semantic",
+    "next_stage_authorized": false,
+    "call_number": 8,
+    "usage_fee_cny": "0.22915224",
+    "saved_sidecar_sha256": "6a0320030587f4fa7b39ff46e4079cbbbe89d0a54220f1b575dc06ef28991f99"
+  },
+  {
+    "question_id": "V1G-110926448917-29",
+    "supplement_status": "blocked",
+    "blockers": [
+      "semantic_requirements_not_complete"
+    ],
+    "primary_root_cause": "Unknown",
+    "diagnosis_complete": false,
+    "target_eligible": false,
+    "context_selection_options": null,
+    "diagnostic_gaps": [
+      {
+        "source": "resolver",
+        "condition": "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      },
+      {
+        "check_index": 0,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 1,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 2,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 3,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 4,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 5,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      },
+      {
+        "check_index": 6,
+        "condition": "原Judge.scope_resolved未闭合；独立规范审查不改变该字段"
+      }
+    ],
+    "offline_resolver_status": "needs_semantic",
+    "next_stage_authorized": false,
+    "call_number": 9,
+    "usage_fee_cny": "0.23486424",
+    "saved_sidecar_sha256": "87e6b78bb293837bf14c547e69b3f04d0fd4dea3a0faf8e3660828a96e7459da"
+  }
+]
