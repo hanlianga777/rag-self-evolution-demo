@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import numpy as np
 
 PLANNER_VERSION = 'golden-planner-v2.1'
-VALIDATOR_VERSION = 'golden-validator-v2.1'
+VALIDATOR_VERSION = 'golden-validator-v2.2-optimization-readiness'
 PARAMETERS = {'target_cluster_size': 40, 'min_cluster_size': 3, 'seed': 42, 'n_init': 10, 'max_iter': 100, 'distance': 'squared_euclidean_on_l2_normalized_vectors'}
 SPECIAL_LIMITS = {'mini': 2, 'medium': 4, 'full': 8}
 GROUPS = ('positive', 'ablation', 'negative')
@@ -427,7 +427,10 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
         if requested in context.get('occupied_slots', []):
             errors.append('Coverage Slot 已占用')
     normalized = {**c, 'question': question, 'test_category': group, 'evaluation_group': group, 'construction_type': kind, 'evidence': resolved_evidence, 'source_chunk_ids': source_ids, 'evidence_locations': locations, 'coverage_match': coverage}
-    return {'valid': not errors, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'duplicate_checks': duplicate_checks, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION, 'original_table_evidence': context.get('original_tables', {})}
+    from .canonical_evidence import optimization_preflight
+    readiness=optimization_preflight(normalized,corpus)
+    errors.extend(readiness['blocking_errors'])
+    return {'optimization_readiness':readiness,'valid': not errors, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'duplicate_checks': duplicate_checks, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION, 'original_table_evidence': context.get('original_tables', {})}
 
 
 def match_pool(plan, validations, preferred_ids=()):

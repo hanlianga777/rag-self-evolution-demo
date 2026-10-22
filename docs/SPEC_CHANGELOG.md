@@ -1,5 +1,13 @@
 ## 2026-10-21 · V5.1 Baseline复用预检前端交互修复
 
+## 2026-10-22 — Agent 闭环合同 agent-closure-2（代码与离线阶段）
+
+- 全量业务FAIL承接与具体执行资格分离，批量诊断独立范围/调用/预算/身份授权；已足够诊断跳过付费。
+- Resolver2观察按执行内容复验及新评分重新关联，必要事实与补充项分开保护、核验等价来源；默认保护保持。
+- 最小增加rerank=query_only，必要联动按各方向真实观察验证；D可组合不同阶段的真实有效来源，仍完整重评。
+- Qualified不自动结束剩余处理；新Golden/新Baseline材料能力预检、运行时工具视图与既有界面同步。
+- V5.1 Judge/Parser/Matcher/11 Gate/Regression及人工发布保护不变。Provider0、历史只读；[验收与真实授权范围](AGENT_CLOSED_LOOP_ACCEPTANCE.md)。
+
 - 预检卡片覆盖全局候选摘要的固定高度/overflow，授权按钮置于逐题明细前，加载/失败/历史结果边界明确。
 - 刷新/Run或状态变化时重新执行只读预检，取消旧响应更新；复用原费用弹窗，最终确认前不启动Replay。
 - 后端、Judge合同/Identity、Golden/Corpus/历史成绩与11 Gate均不变，Provider0；见[定向验收](../outputs/v51_replay_ui_fix_20261021/验收报告.md)。

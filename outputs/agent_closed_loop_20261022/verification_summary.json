@@ -1,0 +1,43 @@
+{
+  "kind": "offline_checks_NOT_provider_acceptance",
+  "backend_full": {
+    "total": 843,
+    "passed": 837,
+    "failures": 5,
+    "errors": 1,
+    "preexisting_failed_tests": [
+      "test_baseline_requires_frozen_snapshot_with_current_corpus_identity (test_machine_gate.MachineGateTests.test_baseline_requires_frozen_snapshot_with_current_corpus_identity)",
+      "test_documents_remain_the_four_formal_pdfs (test_api.GovernanceApiTests.test_documents_remain_the_four_formal_pdfs)",
+      "test_mini_generation_returns_run_before_worker_finishes_and_persists_progress (test_api.GovernanceApiTests.test_mini_generation_returns_run_before_worker_finishes_and_persists_progress)",
+      "test_partial_run_blocks_a_new_full_generation (test_api.GovernanceApiTests.test_partial_run_blocks_a_new_full_generation)",
+      "test_real_invalid_response_is_persisted_and_batch_continues (test_baseline_resilience.BaselineResilienceTests.test_real_invalid_response_is_persisted_and_batch_continues)",
+      "test_both_actual_responses_produce_fail_without_fabricating_final (test_judge_evidence_roles.EvidenceRoleTests.test_both_actual_responses_produce_fail_without_fabricating_final)"
+    ],
+    "same_failures_verified_on_original_commit": "59e4f42eecc3ee3ab74b9f666a8df0923b0611b8"
+  },
+  "targeted_200": "passed; overlaps other checks",
+  "final_diagnostic_guard_tests": {
+    "total": 73,
+    "passed": 73
+  },
+  "new_closed_loop_tests": 14,
+  "frontend": {
+    "files": 44,
+    "tests": 254,
+    "passed": 254,
+    "build": "TypeScript/Vite passed"
+  },
+  "browser": {
+    "mode": "temporary frontend/all API fixture intercepted",
+    "current_fail_rows": 10,
+    "page_errors": 0,
+    "formal_service_restarted": false
+  },
+  "architecture": "exported from unique TSX source using offline API fixture; SVG/PNG visually checked",
+  "formal_db_sha256": "ef4941e2229969257e086f35e45898e20c743003d9053d359bbef63aafd7d154",
+  "formal_db_unchanged": true,
+  "real_provider_calls": 0,
+  "real_new_answers": 0,
+  "real_verified_repairs": 0,
+  "remaining_unverified_business_failures": 10
+}

@@ -184,6 +184,7 @@ class AiService:
         return {**result, "stages": stages, "token_usage": usage, **cost_fields(self.model, usage)}
 
     @provider_task('judge')
+    @provider_task('judge')
     def resolve_diagnostic(self,payload):
         from .evidence_resolver import SEMANTIC_PROMPT
         with collect_usage() as usage:

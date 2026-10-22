@@ -1,0 +1,1305 @@
+{
+  "run_id": "EVAL-20261021141811373593",
+  "results": [
+    {
+      "question_id": "V1G-110926448917-03",
+      "version": "evidence-resolver-2",
+      "identity": {
+        "run_id": "EVAL-20261021141811373593",
+        "question_id": "V1G-110926448917-03",
+        "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+        "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+        "config_sha256": "13d1d73160723f8a1fb1a8170f08639558dccc34c77ad78e0af9d673f00809bb",
+        "corpus_fingerprint": {
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+          },
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+        }
+      },
+      "request_sha256": "0690a5c63d7b7f013c6cc95d5ff3f84178134feb4bab7290b286014a936e7641",
+      "status": "needs_semantic",
+      "findings": [],
+      "blockers": [
+        "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      ],
+      "semantic_response": null,
+      "observation_sha256": "d0376d231cf600ff87704a9ca77d546ac6078903864ed40e1fa6066295f4095c",
+      "checks": [
+        {
+          "answer_quotes": [
+            "1. 在设置菜单中按“用户配置”。",
+            "但证据未说明从登录界面进入“设置菜单”的具体方法，不能补造。"
+          ],
+          "candidate_support": [
+            {
+              "quote": "设置\n1. 按主菜单中按下设置按钮\nLorem ipsum dolor sit\nLorem ipsum dolor sit\nLorem ipsum dolor sit\n\n1 “用户配置”按钮\n显示设置菜单。",
+              "source_id": "DOC-001-C-00132"
+            }
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "设置\n1. 按主菜单中按下设置按钮\nLorem ipsum dolor sit\nLorem ipsum dolor sit\nLorem ipsum dolor sit\n\n1 “用户配置”按钮\n显示设置菜单。",
+              "source_id": "DOC-001-C-00132"
+            }
+          ],
+          "requirement": "创建用户前需从KIRA B 50主菜单按下设置按钮，显示并进入设置菜单。",
+          "scope_resolved": true,
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "1. 在设置菜单中按“用户配置”。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "在设置菜单中按下“用户配置”按钮。",
+          "support": [
+            {
+              "quote": "1. 在设置菜单中按下“用户配置”按钮",
+              "source_id": "DOC-001-C-00134"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "2. 按“新用户”。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "按下“新用户”按钮。",
+          "support": [
+            {
+              "quote": "2. 按下“新用户”按钮",
+              "source_id": "DOC-001-C-00134"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "3. 选择所需语言。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "选择所需语言。",
+          "support": [
+            {
+              "quote": "3. 选择所需语言",
+              "source_id": "DOC-001-C-00134"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "4. 点击用户名输入栏，用屏幕键盘输入其用户名，按回车完成。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "点击用户名输入栏，利用屏幕键盘输入用户名，并按回车完成。",
+          "support": [
+            {
+              "quote": "4. 点击用户名的输入栏\n5. 利用屏幕上的键盘输入用户名，点击回车键完成",
+              "source_id": "DOC-001-C-00134"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "5. 按“密码”，在“密码输入”栏输入密码；再在“密码确认”栏重复输入确认。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "设置密码：按下“密码”按钮，在“密码输入”栏输入密码，并在“密码确认”栏再次输入确认。",
+          "support": [
+            {
+              "quote": "6. 按下“密码”按钮\n7. 点击“密码输入”输入栏\n8. 利用屏幕上的键盘输入密码\n9. 在“密码确认”输入栏中再次输入密码进行确认",
+              "source_id": "DOC-001-C-00134"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "6. 按操作按钮。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "密码确认后按下操作按钮。",
+          "support": [
+            {
+              "quote": "10. 按下操作按钮",
+              "source_id": "DOC-001-C-00134"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "7. 按“权限”。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "按下“权限”按钮进入权限设置。",
+          "support": [
+            {
+              "quote": "11. 按下“权限”按钮-",
+              "source_id": "DOC-001-C-00134"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "8. 在权限列表中选择所需用户组的出厂设置按钮“主管”（不要选“操作人员”，除非实际权限不是主管）。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "在权限列表中选择所需用户组的出厂设置按钮“主管”。",
+          "support": [
+            {
+              "quote": "12. 按下所需用户组的出厂设置按钮 操作人员 或 主管",
+              "source_id": "DOC-001-C-00134"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "9. 如有必要，在列表中调整个别权限。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "如有必要，更改权限列表中的个别权限。",
+          "support": [
+            {
+              "quote": "13. 如有必要，可以更改列表中的个别权限",
+              "source_id": "DOC-001-C-00134"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "10. 按操作按钮完成。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "完成设置后按下操作按钮。",
+          "support": [
+            {
+              "quote": "14. 按下操作按钮",
+              "source_id": "DOC-001-C-00134"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "设备接通后需等待触摸屏出现登录界面"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "设备接通后需等待触摸屏出现登录界面。",
+          "support": [
+            {
+              "quote": "3. 请等待，直到触摸屏上出现登录界面",
+              "source_id": "DOC-001-C-00129"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-04",
+      "version": "evidence-resolver-2",
+      "identity": {
+        "run_id": "EVAL-20261021141811373593",
+        "question_id": "V1G-110926448917-04",
+        "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+        "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+        "config_sha256": "13d1d73160723f8a1fb1a8170f08639558dccc34c77ad78e0af9d673f00809bb",
+        "corpus_fingerprint": {
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+          },
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+        }
+      },
+      "request_sha256": "f39fd114549cd28726b290b2e2dc5c3731489276852673c660551d450850ac8b",
+      "status": "needs_semantic",
+      "findings": [],
+      "blockers": [
+        "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      ],
+      "semantic_response": null,
+      "observation_sha256": "9c280d033a9d0ca1c73dd125cb1ce41fd50eeed904870951ab03347b0cef007b",
+      "checks": [
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+              "source_id": "DOC-001-C-00180"
+            }
+          ],
+          "requirement": "长期存放/运输时应注意设备重量（手册存放/运输注意事项）。",
+          "scope_resolved": true,
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "现有 KIRA B 50 证据未给出长期存放的环境温度、湿度、是否拆卸电池、具体存放位置等要求。"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+              "source_id": "DOC-001-C-00180"
+            }
+          ],
+          "requirement": "设备只能在室内存放。",
+          "scope_resolved": true,
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "1. **存放前：必须先将蓄电池完全充满，才能存储设备。**"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "较长时间停机时，只有给蓄电池完全充电后才能存储设备。",
+          "scope_resolved": true,
+          "support": [
+            {
+              "quote": "较长时间停机时，只有给电池完全充电后才能存储设备",
+              "source_id": "DOC-001-C-00185"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "2. **存放期间：至少每月一次给蓄电池重新完全充电。**"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "存放期间至少每月一次给蓄电池重新完全充电。",
+          "scope_resolved": true,
+          "support": [
+            {
+              "quote": "至少每月一次给蓄电池重新完全充电",
+              "source_id": "DOC-001-C-00185"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "按 **KIRA B 50 操作说明**中“每月一次/较长时间停机”条款，停用三个月可按以下要求执行：",
+            "现有 KIRA B 50 证据未给出长期存放的环境温度、湿度、是否拆卸电池、具体存放位置等要求。"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "存放\n小心\n忽略重量受伤与损坏危险运输和存放时注意设备的重量\n只在室内存放设备",
+              "source_id": "DOC-001-C-00180"
+            }
+          ],
+          "requirement": "当前操作适用性：对 KIRA B 50 停用三个月存放，执行前需确认型号、只在室内存放及设备重量安全前提；回答确认了 KIRA B 50 型号和电池满电/每月补电，但未确认或列明只在室内存放及重量前提。",
+          "scope_resolved": true,
+          "support": []
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-06",
+      "version": "evidence-resolver-2",
+      "identity": {
+        "run_id": "EVAL-20261021141811373593",
+        "question_id": "V1G-110926448917-06",
+        "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+        "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+        "config_sha256": "13d1d73160723f8a1fb1a8170f08639558dccc34c77ad78e0af9d673f00809bb",
+        "corpus_fingerprint": {
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+          },
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+        }
+      },
+      "request_sha256": "d33bb1f92b3d5c6b5698b3c5fdb7fa2fdc347956dbe45e1210b6468465540a61",
+      "status": "needs_semantic",
+      "findings": [],
+      "blockers": [
+        "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      ],
+      "semantic_response": null,
+      "observation_sha256": "63b248859f32086d1d9bf7aa18d847523bd0dc8026b053ccc82ce66eec897f3b",
+      "checks": [
+        {
+          "answer_quotes": [
+            "结论：**是，清洁前必须先做电气隔离；对接站作业前必须拔掉对接站电源插头，不能只关机带电擦。**",
+            "**清洁/维护前先断开电气连接**：执行任何工作前，将 KIRA B 50 与对接站断开，**或拔出电源插头**；目的是防止无意启动、接触导电部件导致触电。[DOC-001-C-00181]"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "按说明书，清洁/维护前必须关闭设备并做电气隔离：将设备与对接站断开，或拔出电源插头；目的是防止无意启动、接触导电部件导致触电。",
+          "support": [
+            {
+              "quote": "保养和维护\n危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+              "source_id": "DOC-001-C-00181"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "**清洁/维护前先断开电气连接**：执行任何工作前，将 KIRA B 50 与对接站断开，**或拔出电源插头**；目的是防止无意启动、接触导电部件导致触电。[DOC-001-C-00181]"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "requirement": "对于电池供电的设备，清洁前必须拔出电池插头或断开电池连接。",
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "**在对接站上作业前**：必须将**对接站电源插头从插座中拔下**，说明书明确标注“触电危险”。[DOC-001-C-00204][DOC-001-C-00036]"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "在对接站上作业前必须将对接站电源插头从插座中拔下，因存在触电危险。",
+          "support": [
+            {
+              "quote": "触电危险在对接站上作业前将电源插头从插座中拔下",
+              "source_id": "DOC-001-C-00204"
+            },
+            {
+              "quote": "执行任何维护工作之前，请将对接站的电源插头从插座中拔出",
+              "source_id": "DOC-001-C-00036"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "requirement": "决不能用湿手触及电源插头或者插座。",
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "关于“直接拿湿抹布擦机身和对接站”：**不要直接照做。** 说明书只明确提到对接站的**位置码可用湿布清洁**，并未确认机身和对接站外壳可整体用湿抹布擦拭，也未给出相应防水条件。[DOC-001-C-00204] 因此应先断电/拔插头，并就不明确部位向主管或卡赫官方确认允许的清洁方式；在确认前不要湿擦机身和对接站外壳。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "当前现场适用性：说明书只明确对接站位置码可用湿布清洁，未确认机身和对接站外壳可整体用湿抹布擦拭；不得在未确认前授权湿擦，应先断电/拔插头并咨询主管或官方确认。",
+          "support": [
+            {
+              "quote": "5. 用湿布清洁位置码",
+              "source_id": "DOC-001-C-00204"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-07",
+      "version": "evidence-resolver-2",
+      "identity": {
+        "run_id": "EVAL-20261021141811373593",
+        "question_id": "V1G-110926448917-07",
+        "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+        "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+        "config_sha256": "13d1d73160723f8a1fb1a8170f08639558dccc34c77ad78e0af9d673f00809bb",
+        "corpus_fingerprint": {
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+          },
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+        }
+      },
+      "request_sha256": "02b480cd51f9dfbf804ce67bc5c2871758e26ed5c4e3c335ebe31d6a6b595cd7",
+      "status": "needs_semantic",
+      "findings": [],
+      "blockers": [
+        "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      ],
+      "semantic_response": null,
+      "observation_sha256": "79396b63ee6d514e62b82e6b6ce1c65f2b14c51d50ba2e81b237b2a0ea7b194e",
+      "checks": [
+        {
+          "answer_quotes": [
+            "现有资料未单独规定“仅取滤网”是否必须关闭设备主电源或拔设备端插头，不能补造；但在未拔对接站电源前，不要开始在该区域操作。"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接",
+              "source_id": "DOC-001-C-00026"
+            }
+          ],
+          "requirement": "清洗/保养 KIRA B 50 前必须关闭设备；对于电池供电设备，必须拔出电池插头或断开电池连接。",
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "设备停在对接站上时，资料中明确的电气安全前提是：**在对接站上作业前，将电源插头从插座中拔下** [DOC-001-C-00204 | S1 | 页97–98]。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "在对接站区域作业前，应将电源插头从插座中拔下。",
+          "support": [
+            {
+              "quote": "清洁对接站（选项）\n警告\n触电危险在对接站上作业前将电源插头从插座中拔下",
+              "source_id": "DOC-001-C-00204"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "**结论：先按对接站警告断电，再取洗滤网。**",
+            "现有资料未单独规定“仅取滤网”是否必须关闭设备主电源或拔设备端插头，不能补造；但在未拔对接站电源前，不要开始在该区域操作。"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接",
+              "source_id": "DOC-001-C-00026"
+            },
+            {
+              "quote": "在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+              "source_id": "DOC-001-C-00181"
+            }
+          ],
+          "requirement": "对当前 KIRA B 50 停在对接站上、清洗污水箱粗大污染物滤网的现场操作，开始前必须确认设备已关机、电池已断开/拔电池插头，以及作业前断开对接站或拔电源；不能只拔对接站电源就批准执行。",
+          "scope_resolved": false,
+          "support": [
+            {
+              "quote": "清洁对接站（选项）\n警告\n触电危险在对接站上作业前将电源插头从插座中拔下",
+              "source_id": "DOC-001-C-00204"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "1. 打开污水箱盖罩。  \n2. 向上拉出粗大污染物滤网。  \n3. 将粗大污染物滤网放到自来水下冲洗。  \n4. 将粗大污染物滤网装入污水箱中。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "粗大污染物滤网应按以下步骤取出、冲洗并装回：打开污水箱盖罩；向上拉出粗大污染物滤网；将滤网放到自来水下冲洗；将滤网装入污水箱中。",
+          "support": [
+            {
+              "quote": "清洗粗大污染物滤网\n1. 打开污水箱盖罩\n\n2. 向上拉出粗大污染物滤网\n3. 将粗大污染物滤网放到自来水下冲洗\n4. 将粗大污染物滤网装入污水箱中",
+              "source_id": "DOC-001-C-00191"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "资料将“从污水箱中取出粗大污染物滤网并清洗”列在排放污水、冲洗污水箱、清洁涡轮机防护网之后 [DOC-001-C-00183 | S1 | 页86]；"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "清洗粗大污染物滤网属于每次运行后的保养，列在排放污水、冲洗污水箱、清洁涡轮机防护网之后。",
+          "support": [
+            {
+              "quote": "在每次运行之后\n1. ## 排放污水<sub>。</sub>\n2. ## 冲洗污水箱\n3. 清洁涡轮机防护网\n4. 从污水箱中取出粗大污染物滤网并清洗",
+              "source_id": "DOC-001-C-00183"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-08",
+      "status": "ready_for_experiment",
+      "findings": [
+        {
+          "answer_quotes": [
+            "1. **先确保未上电**：进行电极接触清洁前，应确保充电板未上电；手册明确“上电后请勿触摸充电板电极”，且表面勿放置导电金属物品。",
+            "2. **电极清洁**：对充电电极表面使用**干燥抹布**擦拭，保持无水滴、无异物遮挡。"
+          ],
+          "candidate_support": [
+            {
+              "quote": "- 清洁\n当长时间未使用接触式充电器，在使用前请先清洁充电板表面。擦拭表面时请先关闭电源，使用干燥的软布对充电板表面和机身底部充电电极进行擦拭，尤其关注表面是否擦拭干净；清洁时严禁使用金属刷、砂纸等，以免刮伤表面。",
+              "source_id": "DOC-004-C-00032"
+            }
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "- 清洁\n当长时间未使用接触式充电器，在使用前请先清洁充电板表面。擦拭表面时请先关闭电源，使用干燥的软布对充电板表面和机身底部充电电极进行擦拭，尤其关注表面是否擦拭干净；清洁时严禁使用金属刷、砂纸等，以免刮伤表面。",
+              "source_id": "DOC-004-C-00032"
+            }
+          ],
+          "requirement": "长时间未使用接触式充电器，使用前先清洁充电板表面；擦拭时先关闭电源，使用干燥软布擦拭充电板表面和机身底部充电电极，尤其确保擦拭干净。",
+          "scope_resolved": true,
+          "support": [],
+          "check_index": 5,
+          "candidate_missing": false,
+          "stage_coverage": {
+            "candidates": "complete",
+            "final": "absent"
+          },
+          "provenance": {
+            "kind": "original_judge"
+          },
+          "technical_root": "Ranking"
+        },
+        {
+          "answer_quotes": [
+            "不要自行用液体冲洗、金属工具清理或通电测试；无法确认干燥/清洁时停用并求助宇树官方。"
+          ],
+          "candidate_support": [
+            {
+              "quote": "- 清洁\n当长时间未使用接触式充电器，在使用前请先清洁充电板表面。擦拭表面时请先关闭电源，使用干燥的软布对充电板表面和机身底部充电电极进行擦拭，尤其关注表面是否擦拭干净；清洁时严禁使用金属刷、砂纸等，以免刮伤表面。",
+              "source_id": "DOC-004-C-00032"
+            }
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "- 清洁\n当长时间未使用接触式充电器，在使用前请先清洁充电板表面。擦拭表面时请先关闭电源，使用干燥的软布对充电板表面和机身底部充电电极进行擦拭，尤其关注表面是否擦拭干净；清洁时严禁使用金属刷、砂纸等，以免刮伤表面。",
+              "source_id": "DOC-004-C-00032"
+            }
+          ],
+          "requirement": "清洁充电板表面/充电电极时严禁使用金属刷、砂纸等，以免刮伤表面。",
+          "scope_resolved": true,
+          "support": [],
+          "check_index": 6,
+          "candidate_missing": false,
+          "stage_coverage": {
+            "candidates": "complete",
+            "final": "absent"
+          },
+          "provenance": {
+            "kind": "original_judge"
+          },
+          "technical_root": "Ranking"
+        },
+        {
+          "answer_quotes": [
+            "按《宇树_B2电池与充电器使用说明_中文版》（DOC-004）可确认的 B2 充电器保养内容如下；具体保养周期手册未规定，不能自行给“每周/每月”频次。",
+            "1. **先确保未上电**：进行电极接触清洁前，应确保充电板未上电；手册明确“上电后请勿触摸充电板电极”，且表面勿放置导电金属物品。",
+            "2. **电极清洁**：对充电电极表面使用**干燥抹布**擦拭，保持无水滴、无异物遮挡。"
+          ],
+          "candidate_support": [
+            {
+              "quote": "- 清洁\n当长时间未使用接触式充电器，在使用前请先清洁充电板表面。擦拭表面时请先关闭电源，使用干燥的软布对充电板表面和机身底部充电电极进行擦拭，尤其关注表面是否擦拭干净；清洁时严禁使用金属刷、砂纸等，以免刮伤表面。",
+              "source_id": "DOC-004-C-00032"
+            }
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "- 清洁\n当长时间未使用接触式充电器，在使用前请先清洁充电板表面。擦拭表面时请先关闭电源，使用干燥的软布对充电板表面和机身底部充电电极进行擦拭，尤其关注表面是否擦拭干净；清洁时严禁使用金属刷、砂纸等，以免刮伤表面。",
+              "source_id": "DOC-004-C-00032"
+            }
+          ],
+          "requirement": "当前B2充电器定期保养/清洁操作适用性：对象为DOC-004 B2电池与充电器手册中的B2接触式充电器，已确认；清洁电极前确保充电板未上电已说明；但长时间未使用先清洁充电板表面、用干燥软布擦拭充电板表面、禁止金属刷/砂纸等必要手册条件未完整覆盖，Final缺少C32适用原文，不能认定完整可执行。",
+          "scope_resolved": true,
+          "support": [],
+          "check_index": 8,
+          "candidate_missing": false,
+          "stage_coverage": {
+            "candidates": "complete",
+            "final": "absent"
+          },
+          "provenance": {
+            "kind": "original_judge"
+          },
+          "technical_root": "Ranking"
+        }
+      ],
+      "context_selection_options": [
+        {
+          "top_k": 6
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-17",
+      "version": "evidence-resolver-2",
+      "identity": {
+        "run_id": "EVAL-20261021141811373593",
+        "question_id": "V1G-110926448917-17",
+        "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+        "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+        "config_sha256": "13d1d73160723f8a1fb1a8170f08639558dccc34c77ad78e0af9d673f00809bb",
+        "corpus_fingerprint": {
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+          },
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+        }
+      },
+      "request_sha256": "b2e73b97d3e7a8711c47e3068af5ca4be50b8ebeef92799566a2f5346a6b05ce",
+      "status": "needs_semantic",
+      "findings": [],
+      "blockers": [
+        "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      ],
+      "semantic_response": null,
+      "observation_sha256": "ef03ff28691e7c0b1fbc12eaba4040e2c2b304fa13a97f2af3e63d5c9c45500d",
+      "checks": [
+        {
+          "answer_quotes": [
+            "证据仅说明 R3 可通过 Unitree Explore App 绑定，绑定成功后开机即可自动连接。[DOC-003-C-00005]"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "R3 遥控器可通过 Unitree Explore App 与机器狗绑定，绑定成功后开机即可自动连接。",
+          "support": [
+            {
+              "quote": "机器狗与遥控器可以通过 Unitree Explore App 进行绑定，绑定成功后开机即可自动连接。",
+              "source_id": "DOC-003-C-00005"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "手册 V2.1 中只有 R1 给出了完整绑定菜单和连接确认灯；R3 仅说明可通过 App 绑定，未给出同样的确认细节。",
+            "但未提供具体菜单路径和“左侧数据传输灯全亮”的确认描述，因此不能把 R1 的确认方法直接套用到 R3。请补充/确认 R3 型号及对应章节后再按该型号操作。"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控器设置】-打开遥控器开关，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。",
+              "source_id": "DOC-003-C-00015"
+            }
+          ],
+          "requirement": "R3 遥控器首次绑定的具体步骤：在 Unitree Explore App 中进入【设置】->【遥控器设置】，打开遥控器开关，输入对应的遥控器编码，与机器狗上的数传模块绑定。",
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "手册 V2.1 中只有 R1 给出了完整绑定菜单和连接确认灯；R3 仅说明可通过 App 绑定，未给出同样的确认细节。",
+            "但未提供具体菜单路径和“左侧数据传输灯全亮”的确认描述，因此不能把 R1 的确认方法直接套用到 R3。请补充/确认 R3 型号及对应章节后再按该型号操作。"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "遥控器开机并且与 B2 连接成功后，右侧 DL 指示灯亮，这就意味着遥控器与 B2 数传模块已连接，此时可通过遥控器控制 B2。",
+              "source_id": "DOC-003-C-00015"
+            }
+          ],
+          "requirement": "R3 遥控器配对成功后的确认标志：遥控器开机且与 B2 连接成功后，右侧 DL 指示灯亮，表示遥控器与 B2 数传模块已连接。",
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "打开 **Unitree Explore App**，进入 **【设置】→【遥控器设置】**。",
+            "输入新遥控器对应的**遥控器编码**，与机器狗上的数传模块进行绑定。[DOC-003-C-00025]"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "R1 遥控器首次绑定的具体步骤：在 Unitree Explore App 中进入【设置】->【遥控器设置】，输入对应的遥控器编码，与机器狗上的数传模块绑定。",
+          "support": [
+            {
+              "quote": "首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控器设置】，输入对应的遥控器编码，即可和机器狗上的数传模块进行绑定。",
+              "source_id": "DOC-003-C-00025"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "**确认连接成功**：遥控器开机并与 B2 连接成功后，**左侧面数据传输灯全亮**，表示遥控器与 B2 数传模块已连接，此时可通过遥控器控制 B2。[DOC-003-C-00025]"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "R1 遥控器配对成功后的确认标志：遥控器开机且与 B2 连接成功后，左侧面数据传输灯全亮，表示遥控器与 B2 数传模块已连接。",
+          "support": [
+            {
+              "quote": "遥控器开机并且与 B2 连接成功后，左侧面数据传输灯全亮，这就意味着遥控器与 B2 数传模块已连接，此时可通过遥控器控制 B2。",
+              "source_id": "DOC-003-C-00025"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-24",
+      "version": "evidence-resolver-2",
+      "identity": {
+        "run_id": "EVAL-20261021141811373593",
+        "question_id": "V1G-110926448917-24",
+        "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+        "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+        "config_sha256": "13d1d73160723f8a1fb1a8170f08639558dccc34c77ad78e0af9d673f00809bb",
+        "corpus_fingerprint": {
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+          },
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+        }
+      },
+      "request_sha256": "61ca4fbfa9ca8bb247197bc16b0710f9ba82caf1ce5dc01db30a59e2c28378f1",
+      "status": "needs_semantic",
+      "findings": [],
+      "blockers": [
+        "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      ],
+      "semantic_response": null,
+      "observation_sha256": "53b0ef67f9494c794484adfedddd8d988e2064d6d78ddd7b339e7d2e720da8c5",
+      "checks": [
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "洗涤剂应远离孩童妥善保管",
+              "source_id": "DOC-001-C-00022"
+            }
+          ],
+          "requirement": "使用清洁剂运行时，洗涤剂应远离孩童妥善保管。",
+          "scope_resolved": true,
+          "support": []
+        },
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "不得未稀释使用推荐的洗涤剂",
+              "source_id": "DOC-001-C-00022"
+            }
+          ],
+          "requirement": "不得未稀释使用推荐的洗涤剂（应按要求稀释使用）。",
+          "scope_resolved": true,
+          "support": []
+        },
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "洗涤剂若是不小心溅入眼睛，必须立即用水彻底冲洗并且若不慎吞咽则应立即就医",
+              "source_id": "DOC-001-C-00022"
+            }
+          ],
+          "requirement": "洗涤剂不慎溅入眼睛时必须立即用水彻底冲洗；若不慎吞咽应立即就医。",
+          "scope_resolved": true,
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "**仅限使用推荐的清洁剂**；使用其他清洁剂时，操作安全、事故风险和设备使用寿命缩短的风险由使用者自行承担。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "仅使用制造商推荐的清洁剂。",
+          "scope_resolved": true,
+          "support": [
+            {
+              "quote": "仅限使用推荐的清洁剂",
+              "source_id": "DOC-001-C-00118"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "**仅限使用推荐的清洁剂**；使用其他清洁剂时，操作安全、事故风险和设备使用寿命缩短的风险由使用者自行承担。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "使用其他清洁剂时，操作安全、事故风险和设备使用寿命缩短的风险由使用者自行承担。",
+          "scope_resolved": true,
+          "support": [
+            {
+              "quote": "仅限使用推荐的清洁剂 如果使用其他清洁剂，您要自 己承担有关操作安全 事故风险和设备使用寿命缩短的风险",
+              "source_id": "DOC-001-C-00118"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "清洁剂**不得含稀释剂、盐酸和氢氟酸成分**。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "仅限使用不含稀释剂、盐酸和氢氟酸成分的清洁剂。",
+          "scope_resolved": true,
+          "support": [
+            {
+              "quote": "仅限使用不含稀释剂 盐酸和氢氟酸成分的清洁剂",
+              "source_id": "DOC-001-C-00118"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "必须**遵守清洁剂包装上的安全提示**。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "遵守清洁剂上的安全提示。",
+          "scope_resolved": true,
+          "support": [
+            {
+              "quote": "遵守清洁剂上的安全提示",
+              "source_id": "DOC-001-C-00118"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "必须**遵守清洁剂包装上的安全提示**。",
+            "并按清洁剂安全提示和计量要求操作"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "仅使用制造商推荐的清洁剂，并遵守清洁剂制造商的使用 处置和警告说明",
+              "source_id": "DOC-001-C-00022"
+            }
+          ],
+          "requirement": "遵守清洁剂制造商的使用、处置和警告说明，而不仅是笼统的包装安全提示。",
+          "scope_resolved": true,
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "**不要使用强发泡型清洁剂**。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "请勿使用强发泡型清洁剂。",
+          "scope_resolved": true,
+          "support": [
+            {
+              "quote": "请勿使用强发泡型清洁剂",
+              "source_id": "DOC-001-C-00118"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "必须**遵守计量提示**。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "请遵守计量提示。",
+          "scope_resolved": true,
+          "support": [
+            {
+              "quote": "请遵守计量提示",
+              "source_id": "DOC-001-C-00118"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "因此，加注前应先核对：是否为手册推荐清洁剂、是否不含上述禁用成分、是否非强发泡，并按清洁剂安全提示和计量要求操作；不在推荐范围内的清洁剂不能视为安全可用。"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "requirement": "当前现场为操作员准备向 KIRA B 50 加注清洁剂；回答应明确不得把未知清洁剂视为安全可用，并要求核对推荐性、禁用成分、非强发泡、正确稀释/计量及接触或误服后的安全处置。已确认推荐、禁用成分、非强发泡和计量；尚缺不得未稀释使用及眼部/吞咽急救等安全前提。",
+          "scope_resolved": true,
+          "support": []
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-27-R123429216749",
+      "version": "evidence-resolver-2",
+      "identity": {
+        "run_id": "EVAL-20261021141811373593",
+        "question_id": "V1G-110926448917-27-R123429216749",
+        "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+        "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+        "config_sha256": "13d1d73160723f8a1fb1a8170f08639558dccc34c77ad78e0af9d673f00809bb",
+        "corpus_fingerprint": {
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+          },
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+        }
+      },
+      "request_sha256": "520c4b4691b7ac462ca40d0a89c339b8fb69fbca308447e35be9b7f90912d9b1",
+      "status": "needs_semantic",
+      "findings": [],
+      "blockers": [
+        "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      ],
+      "semantic_response": null,
+      "observation_sha256": "b09f6f15b6b7eb232cf450d1c28f7a457114c134f17d00da26a33bc9d5b3faf9",
+      "checks": [
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "requirement": "KIRA B 50 的地图不具备自学习功能，不能自动补充新障碍物或吸收布局变化。",
+          "support": []
+        },
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "requirement": "对原始布局进行细微改动通常不成问题。",
+          "support": []
+        },
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "requirement": "布局改动越大，设备清洁效率越低。",
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "2. **如需进行示教/路径设置**：应在**正常营业时间之外**进行，或**封锁相应子区域**后再做。[DOC-001-C-00085 | S1 | 页26–27]",
+            "未确认条件：给定证据没有提供 KIRA B 50 重新示教、地图更新或路径修改的具体操作步骤，因此不能据此给出具体按键/界面操作；需查阅对应版本的官方操作说明或联系官方支持。"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "requirement": "如果布局发生重大变化，必须重新示教该路线。",
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "1. **把重新摆过桌椅的区域按“大量桌椅区域”处理**：应避免设备进入，改为**手动清洁这些区域**。[DOC-001-C-00085 | S1 | 页26–27]"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "对确实摆放了大量桌椅的区域，应避免设备进入并改为手动清洁。",
+          "support": [
+            {
+              "quote": "避免摆放了大量桌椅的区域（如美食广场），并手动清洁这些区域",
+              "source_id": "DOC-001-C-00085"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "2. **如需进行示教/路径设置**：应在**正常营业时间之外**进行，或**封锁相应子区域**后再做。[DOC-001-C-00085 | S1 | 页26–27]"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "示教活动应在正常营业时间之外进行，或封锁相应子区域后再进行。",
+          "support": [
+            {
+              "quote": "请在正常营业时间之外进行示教活动，或封锁子区域",
+              "source_id": "DOC-001-C-00085"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "3. 同时确认该区域内没有会妨碍 Smart Fill 覆盖的**低于 15 cm 的扁平物体**。[DOC-001-C-00085 | S1 | 页26–27]"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "涉及 Smart Fill 的场地内不应有低于 15 cm 的扁平物体，以便设备覆盖内部场地。",
+          "support": [
+            {
+              "quote": "请确保智能填充 (Smart Fill) 场地内不含扁平物体（高度低于 15 cm），以便设备能够覆盖整个内部场地",
+              "source_id": "DOC-001-C-00085"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "1. **把重新摆过桌椅的区域按“大量桌椅区域”处理**：应避免设备进入，改为**手动清洁这些区域**。[DOC-001-C-00085 | S1 | 页26–27]",
+            "可执行做法：**先封锁或手动清洁重新摆桌椅的区域，暂停该区域自主清洁；在非营业时间或封锁状态下按官方流程进行示教/路径处理。**"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "requirement": "当前场地重摆桌椅的规模及是否构成重大布局变化尚未核实；只有在确认属于“大量桌椅区域”时才应避免进入并手动清洁，若为重大变化则必须重新示教，不能未核实就按大量桌椅区域给出完整处理方案。",
+          "support": [
+            {
+              "quote": "避免摆放了大量桌椅的区域（如美食广场），并手动清洁这些区域",
+              "source_id": "DOC-001-C-00085"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-28",
+      "version": "evidence-resolver-2",
+      "identity": {
+        "run_id": "EVAL-20261021141811373593",
+        "question_id": "V1G-110926448917-28",
+        "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+        "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+        "config_sha256": "13d1d73160723f8a1fb1a8170f08639558dccc34c77ad78e0af9d673f00809bb",
+        "corpus_fingerprint": {
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+          },
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+        }
+      },
+      "request_sha256": "909810b043ddfa64f9490480eb681cb9051e09bd33036c82b5474a322cf65bd3",
+      "status": "needs_semantic",
+      "findings": [],
+      "blockers": [
+        "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      ],
+      "semantic_response": null,
+      "observation_sha256": "69d002fa75c95a826b6e6ce205f3ab70a80bc1541346a06caf4f6a2163db7f06",
+      "checks": [
+        {
+          "answer_quotes": [
+            "不能直接按“清洁机组已打开”的状态拆装刷辊。资料只给出了更换刷辊的机械步骤，**未说明清洁机组开启时可否进行更换，也未提供维护停用、断电或防意外启动步骤**；这些关键安全条件未确认前，不应把下列步骤当作当前可直接执行的授权。请先按官方维护停用程序停用设备并确认不会意外启动；该程序本证据未覆盖，需查对应版本官方手册或联系官方支持。",
+            "在完成上述停用确认后，资料中的机械拆装步骤为："
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "在清洁，维护，更换零件和转换为其他功能之前，必须关闭设备，对于电源供电的设备，请拔出电源插头，对于电池供电的设备，请拔出电池插头或断开电池连接",
+              "source_id": "DOC-001-C-00026"
+            },
+            {
+              "quote": "在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+              "source_id": "DOC-001-C-00181"
+            }
+          ],
+          "requirement": "更换刷辊属维护换件：更换前必须关闭设备；电池供电的设备必须拔出电池插头或断开电池连接；执行任何工作前必须将设备与对接站断开，或拔出电源插头。当前现场仅知清洁机组已打开，未确认整机停机、断开电池/电源及对接状态，不能把机械拆装步骤作为当前可执行授权。",
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "1. 按下按钮，将防撞保护板转到一侧。  \n2. 按下解锁按钮。  \n3. 转出轴承盖。",
+            "4. 拉出旧刷辊。  \n5. 装入新刷辊，并来回转动刷辊，使其在从动件上方居中。  \n6. 摆回轴承盖，将刷辊的端盖卡入轴承盖。  \n7. 抬起削刮胶条，摆回防撞保护板并将其卡入。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "拆装刷辊的机械步骤应为：按下按钮将防撞保护板转到一侧，按解锁按钮，转出轴承盖，拉出刷辊，装入新刷辊并来回转动使其在从动件上方居中，摆回轴承盖并将刷辊端盖卡入轴承盖，抬起削刮胶条、摆回防撞保护板并卡入。",
+          "support": [
+            {
+              "quote": "更换刷辊\n1. 按下按钮，将防撞保护板转到一侧\n2. 按下解锁按钮\n3. 转出轴承盖\n4. 拉出刷辊\n提示：如果黄色指示器刷毛与其他刷毛长度相同，则说明刷辊已磨损\n5. 装入新刷辊，并来回转动刷辊，使其在从动件上方居中\n6. 摆回轴承盖，将刷辊的端盖卡入轴承盖\n7. 抬起削刮胶条，摆回防撞保护板并将其卡入",
+              "source_id": "DOC-001-C-00200"
+            }
+          ]
+        },
+        {
+          "answer_quotes": [
+            "关于方向和卡扣：资料明确要求的是**新刷辊在从动件上方居中**、**刷辊端盖卡入轴承盖**、**防撞保护板摆回并卡入**；资料未提及刷辊左右方向标记或箭头方向，不能补充猜测。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "安装方向和卡扣要求：新刷辊须在从动件上方居中，刷辊端盖须卡入轴承盖，防撞保护板须摆回并卡入；资料未给左右方向标记或箭头时不得猜测补充。",
+          "support": [
+            {
+              "quote": "5. 装入新刷辊，并来回转动刷辊，使其在从动件上方居中\n6. 摆回轴承盖，将刷辊的端盖卡入轴承盖\n7. 抬起削刮胶条，摆回防撞保护板并将其卡入",
+              "source_id": "DOC-001-C-00200"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "V1G-110926448917-29",
+      "version": "evidence-resolver-2",
+      "identity": {
+        "run_id": "EVAL-20261021141811373593",
+        "question_id": "V1G-110926448917-29",
+        "snapshot_sha256": "eaecc679f77c92cf13a5ee05369c23c04ddfa909296148648d30f341a85e2f0a",
+        "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+        "config_sha256": "13d1d73160723f8a1fb1a8170f08639558dccc34c77ad78e0af9d673f00809bb",
+        "corpus_fingerprint": {
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+          },
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+        }
+      },
+      "request_sha256": "b3f7ff5cb1984678a0761474cae935d7648fdf97e1c12fe4c31df27bf9530b69",
+      "status": "needs_semantic",
+      "findings": [],
+      "blockers": [
+        "whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved"
+      ],
+      "semantic_response": null,
+      "observation_sha256": "26d334c10febc2ec5a6de3b5588ab3d25fe4c3d9c4dda5d2cf7ab603c25f55b0",
+      "checks": [
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "不带电检查表\n类型=整机外观；要点=1. 机身外观是否清洁、无破损或变形痕迹2. 相机表面镜片有无异物3. 头部激光雷达周围有无异物遮挡",
+              "source_id": "DOC-002-C-00056"
+            }
+          ],
+          "requirement": "重新使用B2前不带电检查应覆盖整机外观：机身外观清洁、无破损或变形痕迹，相机表面镜片无异物，头部激光雷达周围无异物遮挡。",
+          "support": []
+        },
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "类型=结构；要点=1. 目视及触摸检查机身、各个关节及连接处、足端组件是否完好,有裂纹或者有破损需及时更换和联系 Unitree 售后2. 各个连接部件螺丝是否锁紧,尤其关注关节连接件和电池锁紧旋钮的螺丝3. 散热风扇进出口有无异物阻塞",
+              "source_id": "DOC-002-C-00056"
+            }
+          ],
+          "requirement": "重新使用B2前不带电检查应覆盖结构：目视及触摸检查机身、各个关节及连接处、足端组件是否完好，有裂纹或破损需及时更换并联系Unitree售后；各连接部件螺丝是否锁紧，尤其关节连接件和电池锁紧旋钮螺丝；散热风扇进出口无异物阻塞。",
+          "support": []
+        },
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "类型=足端组件；要点=检查有无明显的足垫破损,若有破损请及时更换",
+              "source_id": "DOC-002-C-00056"
+            }
+          ],
+          "requirement": "重新使用B2前不带电检查应覆盖足端组件：检查有无明显足垫破损，若有破损请及时更换。",
+          "support": []
+        },
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "类型=电池包；要点=1. 机身的电池包接口有无异物,变形2. 电池包安装是否可靠,确保运行时不会松脱",
+              "source_id": "DOC-002-C-00056"
+            }
+          ],
+          "requirement": "重新使用B2前不带电检查应覆盖电池包接口与安装：机身电池包接口无异物、变形，电池包安装可靠，确保运行时不会松脱。",
+          "support": []
+        },
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "3. 电池包外壳是否有明显损伤,有明显损伤的电池包禁止用于使用",
+              "source_id": "DOC-002-C-00056"
+            }
+          ],
+          "requirement": "必要安全前提：电池包外壳无明显损伤，有明显损伤的电池包禁止用于使用。",
+          "support": []
+        },
+        {
+          "answer_quotes": [],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "类型=遥控器；要点=1. 遥控器摇杆是都在中位,摇杆是否进入沙土等异物2. 遥控器的各个按键是否存在卡顿",
+              "source_id": "DOC-002-C-00056"
+            }
+          ],
+          "requirement": "重新使用B2前不带电检查应覆盖遥控器：摇杆都在中位、摇杆是否进入沙土等异物，各按键是否存在卡顿。",
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "- B2 四足机器人用户手册仅提供“清洁”章节，要求清洗前先关闭电源，未列出重新启用前的不带电检查项目；依据：DOC-002-C-00054（S2，页18）"
+          ],
+          "check_type": "fact",
+          "met": false,
+          "reference_support": [
+            {
+              "quote": "检查保养\n在使用前后开展例行检查，可大幅度提升产品可靠性能，降低安全隐患，延长使用寿命。不带电检查表",
+              "source_id": "DOC-002-C-00056"
+            }
+          ],
+          "requirement": "当前操作适用性：对象为B2整机，目的是重新使用前不带电检查；答案确认了B2电池与充电器手册V1.0及遥控器V2.1，但未确认B2四足机器人用户手册中“检查保养/不带电检查表”章节及其适用版本，必要适用前提缺失。",
+          "support": []
+        },
+        {
+          "answer_quotes": [
+            "1. 检查充电器表面有无变形、鼓包等；  \n2. 检查充电接口有无水渍、异物等。"
+          ],
+          "check_type": "fact",
+          "met": true,
+          "requirement": "充电器相关不带电例行检查包括检查充电器表面有无变形、鼓包，检查充电接口有无水渍、异物。",
+          "support": [
+            {
+              "quote": "1. 检查充电器表面有无变形、鼓包等；\n2. 检查充电接口有无水渍、异物等。",
+              "source_id": "DOC-004-C-00034"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "calls_attempted": 0,
+  "max_calls": 0,
+  "unprocessed_question_ids": [],
+  "business_results_modified": false,
+  "binding_sha256": "bcfd440a0bd9b3f1101d74c11acec03dc5ade880d3a7d3aa3cab334d3b7d4b90",
+  "provider_calls": 0
+}

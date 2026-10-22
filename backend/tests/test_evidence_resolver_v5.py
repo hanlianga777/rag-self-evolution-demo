@@ -18,7 +18,7 @@ class ResolverTests(unittest.TestCase):
             found=[{'source_id':e['chunk_id'],'quote':fact} for e in entries if fact in e['content']]
             observations[stage]={'coverage':'complete' if found else 'absent','support':found,'reviewed_source_ids':[e['chunk_id'] for e in entries],'reason':'reviewed every supplied entry including equivalents'}
         observations['answer']={'coverage':'absent','answer_quotes':[],'reason':'necessary instruction omitted'}
-        return {'requirements_complete':True,'facts':[{'check_index':0,'golden_quote':fact,'reference_support':[{'source_id':payload['golden_norms'][0]['chunk_id'],'quote':fact}],'source_applicability':{'resolved':True,'purpose':'normative_requirement_only','reason':'same manual normative requirement; no authorization of unknown field condition'},'stages':observations}]}
+        return {'requirements_complete':True,'check_roles':[{'check_index':i,'role':'required','reason':'retain required context'} for i,c in enumerate(payload['checks']) if c.get('met') is True],'facts':[{'check_index':0,'golden_quote':fact,'reference_support':[{'source_id':payload['golden_norms'][0]['chunk_id'],'quote':fact}],'source_applicability':{'resolved':True,'purpose':'normative_requirement_only','reason':'same manual normative requirement; no authorization of unknown field condition'},'stages':observations}]}
     def test_new_retrieval_ranking_generation_cases_without_manual_json(self):
         for expected in ['Retrieval','Ranking','Generation']:
             q,c,chunks,hit,identity=self.example();trace=c['programmatic_metrics']['retrieval_trace']
@@ -26,6 +26,23 @@ class ResolverTests(unittest.TestCase):
             if expected=='Generation':trace['final'].append(hit)
             r=resolve_case(c,q,chunks,identity,semantic=self.semantic)
             self.assertEqual(r['findings'][0][0],expected);self.assertEqual(r['status'],'resolved')
+    def test_negative_fact_failure_uses_canonical_norm_without_promoting_anchor(self):
+        q,c,chunks,hit,identity=self.example()
+        q.update(test_category='negative',expected_behavior='safe_rejection');c['test_category']='negative'
+        result=resolve_case(c,q,chunks,identity,semantic=self.semantic)
+        self.assertEqual(result['status'],'resolved',result['blockers'])
+        self.assertEqual(result['findings'][0][0],'Retrieval')
+        self.assertFalse(result['findings'][0][2]['support'])
+
+    def test_negative_mixed_behavior_and_fact_failures_keep_distinct_evidence(self):
+        q,c,chunks,hit,identity=self.example()
+        q.update(test_category='negative',expected_behavior='safe_rejection');c['test_category']='negative'
+        c['judge_result'].update(verdict='FAIL',issues=[],reason='offline mixed failure')
+        c['judge_result']['checks'].append({'requirement':'拒绝越权指令','check_type':'negative_behavior','met':False,'answer_quotes':[c['model_answer']],'support':[]})
+        result=resolve_case(c,q,chunks,identity,semantic=self.semantic)
+        self.assertEqual(result['status'],'resolved',result['blockers'])
+        self.assertEqual({f[0] for f in result['findings']},{'Safety','Retrieval'})
+
     def test_no_semantic_authorization_does_not_infer_absence(self):
         q,c,chunks,hit,identity=self.example();r=resolve_case(c,q,chunks,identity)
         self.assertEqual(r['status'],'needs_semantic');self.assertFalse(r['findings'])
@@ -86,7 +103,7 @@ class ResolverTests(unittest.TestCase):
             changed={**identity,key:'different'};self.assertNotEqual(old,request_identity(c,q,chunks,changed))
 
 class PersistedResolverTests(ResolverTests):
-    def test_independent_persistence_invalidation_and_no_cross_run_reuse(self):
+    def test_independent_persistence_revalidated_cross_run_reuse_and_invalidation(self):
         import tempfile,os
         from pathlib import Path
         from unittest.mock import patch
@@ -106,7 +123,7 @@ class PersistedResolverTests(ResolverTests):
             self.assertEqual(again['status'],'resolved')
             another=store.create_evaluation_run(snapshot,{'top_k':4},{'evaluation_identity':'new-eval'})
             store.record_evaluation_case(another,q['id'],c)
-            self.assertFalse(saved_findings({**actual,'run_id':another},chunks,'new-corpus')[0])
+            self.assertEqual(saved_findings({**actual,'run_id':another},chunks,'new-corpus')[0][0][0],'Retrieval')
             with store.connection() as connection:connection.execute('UPDATE evaluation_runs SET config_json=? WHERE id=?',('{"top_k":6}',run))
             findings,gaps=saved_findings(actual,chunks,'new-corpus');self.assertFalse(findings);self.assertTrue(gaps)
     def test_model_root_label_is_not_a_program_decision(self):

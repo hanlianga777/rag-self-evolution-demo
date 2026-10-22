@@ -1,5 +1,7 @@
 # RAG Evolution
 
+2026-10-22 Agent闭环代码与离线修复：全部真实业务FAIL交给同一Agent处理，补证与方案执行资格分开；批量补证独立冻结预算，已有证据复用后再关联新评分。增加仅原问题的候选BM25排序、有证据的必要联动与跨阶段D；Qualified后仍可处理剩余问题。原11 Gate/Regression/人工确认保持。正式Run仍40 PASS/10 FAIL，真实修复0题，未进行新Provider/Sandbox或正式服务重载。[验收单与下一步授权](docs/AGENT_CLOSED_LOOP_ACCEPTANCE.md)。只读核验：`python3 scripts/agent_diagnostics.py --run EVAL-20261021141811373593`。
+
 2026-10-21 当前为V5.1：实质性Fact/Behavior检查阻止Scope-only PASS；独立Q18 Judge探针复用正式合同，但不会写Baseline成绩。数据仍50/50可复用；未通过同身份真实探针与人工业务复核，后端禁止正式Judge-only Replay。当前仅离线实施，Provider0。[V5.1验收/费用与启动说明](docs/V51_PREFLIGHT_CLOSEOUT_ACCEPTANCE.md)。只读预检：`python3 scripts/q18_judge_probe.py preflight`；隔离假HTTP验收：`python3 scripts/verify_q18_probe_offline.py`。真实探针、50Replay各需另行授权。原[V5第一阶段成果](docs/CONTRACT_RESOLVER_REPLAY_V5_ACCEPTANCE.md)保留；Resolver、Golden、Corpus及历史成绩不改。
 Baseline复用预检现在会在刷新后自动重新查询；卡片完整显示资格、Identity及费用授权入口，最终确认前不启动评测。[前端交互修复验收](outputs/v51_replay_ui_fix_20261021/验收报告.md)。
 

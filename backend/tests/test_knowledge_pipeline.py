@@ -152,6 +152,12 @@ class BundleTests(unittest.TestCase):
                 self.assertEqual(len({h['parent_chunk_id'] for h in hits}), len(hits))
                 self.assertTrue(all(h['matched_child_ids'] for h in hits))
                 self.assertTrue(retriever.full_text_probe('机器人电池')['matches'])
+                with patch.object(kp.AlibabaProvider,'rerank',side_effect=AssertionError('query-only cannot call remote rerank')):
+                    query_trace={}
+                    query_hits=retriever.retrieve('机器人电池',{**DEFAULT_PIPELINE_CONFIG,'rerank':'query_only','knowledge_identity':bundle['manifest']['knowledge_identity']},trace=query_trace)
+                    self.assertTrue(query_hits)
+                    self.assertEqual(query_trace['config']['rerank'],'query_only')
+                    self.assertTrue(all(h['matched_child_ids'] for h in query_hits))
                 from app.retrieval import RetrievalUnavailable
                 with self.assertRaises(RetrievalUnavailable):
                     retriever.retrieve('机器人电池', {**DEFAULT_PIPELINE_CONFIG, 'knowledge_identity': {'pipeline_version_id': 'another'}})

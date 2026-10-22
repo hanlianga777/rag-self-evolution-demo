@@ -180,6 +180,12 @@ class EvaluationRunner:
         if index_info.get('knowledge_identity'):
             if snapshot.get('corpus_fingerprint') != index_info['knowledge_identity']:
                 raise ValueError('Golden Snapshot does not belong to active Knowledge Pipeline')
+            from .canonical_evidence import optimization_preflight
+            if not resume_source_id:
+                chunks=self.runtime.corpus.chunks()
+                for item in approved:
+                    readiness=optimization_preflight(item,chunks)
+                    if not readiness['ready']:raise ValueError(item['id']+': '+'; '.join(readiness['blocking_errors']))
             config['knowledge_identity'] = index_info['knowledge_identity']
             config['candidate_k'] = index_info['knowledge_config']['candidate_k']
             config['top_k'] = index_info['knowledge_config']['top_k']

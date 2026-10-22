@@ -79,3 +79,11 @@ it('keeps all hundred saved Candidate report cases accessible in the existing Dr
  expect(document.querySelectorAll('.drawer tbody tr')).toHaveLength(50);await click('下一页');expect(document.querySelectorAll('.drawer tbody tr')).toHaveLength(50);expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目100');
  await click('上一页');expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目1');expect(cases).toHaveLength(100);
 });
+it('shows every current business failure in Agent including pending diagnoses',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
+ const badCases=Array.from({length:10},(_,i)=>({run_id:'offline',question_id:`fresh-${i}`,result:{question:`真实问题${i}`,passed:false,evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL'},diagnostic_view:{primary_root_cause:i?'Unknown':'Ranking',target_eligible:!i,is_technical_bad_case:!i,analysis_category:i?'insufficient_evidence':'rag_failure',optimization_directions:i?[]:['context_selection']}}}));
+ await render(<EvolutionPage data={{evaluation,badCases}}/>);
+ expect(document.querySelectorAll('tbody tr')).toHaveLength(10);
+ expect([...document.querySelectorAll('button')].find(button=>button.textContent?.includes('生成 A / B / C'))?.disabled).toBe(false);
+ expect(document.body.textContent).toContain('全部业务失败由 Agent 接手');
+});

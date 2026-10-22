@@ -125,11 +125,16 @@ def context_selection_options(trace,findings,chunks,checks):
     from itertools import product
     from .policy import ALLOWED_SEARCH_SPACE
     from .knowledge_pipeline import expand_parents
-    required=[f['candidate_support'] for root,_,f in findings if root=='Ranking' and f.get('candidate_support')]
+    required=[[f['candidate_support']] for root,_,f in findings if root=='Ranking' and f.get('candidate_support')]
     if not required:return None,'未定位待恢复的完整必要事实支持'
     if not isinstance(trace.get('reranked'),list):return None,'未采集完整reranked列表'
-    required.extend(c['support'] for c in checks if c['met'] and c.get('support'))
-    required.extend(f['preserve_support'] for _,_,f in findings if f.get('preserve_support'))
+    supplemental={i for _,_,f in findings for i in f.get('supplemental_check_indices',[])}
+    preservation=[r for _,_,f in findings for r in f.get('preservation_requirements',[])]
+    reviewed={r['check_index'] for r in preservation}
+    required.extend(r['alternatives'] for r in preservation)
+    required.extend([c['support']] for i,c in enumerate(checks) if i not in supplemental|reviewed and c['met'] and c.get('support'))
+    required.extend([f['preserve_support']] for _,_,f in findings if f.get('preserve_support'))
+    required_scopes=[q for c in checks if c['met'] for q in c.get('scope_support',[])]
     baseline={k:trace.get('config',{}).get(k,default) for k,default in [('top_k',4),('rerank',True),('min_score',0)]}
     parents={c['canonical_parent']['chunk_id']:c['canonical_parent'] for c in chunks if c.get('canonical_parent')}
     options=[]
@@ -137,12 +142,18 @@ def context_selection_options(trace,findings,chunks,checks):
         config={'top_k':top_k,'rerank':rerank,'min_score':min_score}
         diff={k:v for k,v in config.items() if v!=baseline[k]}
         if not diff:continue
-        hits=trace['reranked' if rerank else 'candidates']
+        if rerank=='query_only':
+            from .retrieval import query_only_order
+            hits=query_only_order(trace.get('question',''),trace['candidates'])
+        else:hits=trace['reranked' if rerank else 'candidates']
         if any(type(e.get('score')) not in (int,float) for e in hits):return None,'保存阶段缺少数值score，无法验证阈值选择'
         hits=[e for e in hits if e['score']>=min_score]
         if trace.get('parent_expand'):
             if any(e.get('parent_chunk_id') not in parents for e in hits):return None,'Canonical Parent缺失，无法回放上下文展开'
             final=expand_parents(hits,list(parents.values()),top_k)
         else:final=hits[:top_k]
-        if all(all(quote_present(q,final,display=True) for q in quotes) for quotes in required):options.append(diff)
+        from .ai_service import attach_heading_scopes
+        scoped=attach_heading_scopes(final,chunks) if required_scopes else []
+        scopes_preserved=all(any((e.get('source_scope') or {}).get('source_id')==q.get('heading_source_id') for e in scoped) for q in required_scopes)
+        if scopes_preserved and all(any(all(quote_present(q,final,display=True) for q in quotes) for quotes in alternatives) for alternatives in required):options.append(diff)
     return [o for o in options if not any(other!=o and all(o.get(k)==v for k,v in other.items()) for other in options)],None

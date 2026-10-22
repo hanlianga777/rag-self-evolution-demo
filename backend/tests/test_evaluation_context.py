@@ -134,15 +134,14 @@ class CompositeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'授权'):self.store.create_composite(self.experiment,provider,False)
         provider.complete.assert_not_called()
 
-    def test_cross_stage_source_union_is_rejected_before_provider(self):
+    def test_cross_stage_source_union_still_requires_provider_authorization(self):
         with self.store.connection() as connection:
             connection.execute('UPDATE candidate_configs SET config_json=? WHERE id=?',(json.dumps({**self.winner['config'],'prompt_strategy':'Abstention'}),self.winner['id']))
         provider=self.provider()
-        value=self.store.create_composite(self.experiment,provider,False)
-        self.assertEqual(value['status'],'no_effective_composite')
-        self.assertEqual(value['provider_calls'],0)
+        with self.assertRaisesRegex(ValueError,'授权'):
+            self.store.create_composite(self.experiment,provider,False)
         provider.complete.assert_not_called()
-        self.assertEqual(self.store.recommendation(self.experiment)['result']['recommended_candidate'],self.winner['id'])
+        self.assertEqual(self.store.experiment(self.experiment)['result']['report_confirmation']['winner_id'],self.winner['id'])
 
     def test_coherent_multi_parameter_d_needs_saved_evidence_and_dependencies(self):
         with self.store.connection() as connection:

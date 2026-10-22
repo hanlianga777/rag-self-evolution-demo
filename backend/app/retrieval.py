@@ -22,6 +22,16 @@ def _terms(text: str) -> set[str]:
     return set(re.findall(r"[A-Za-z0-9]+|[\u4e00-\u9fff]", text.lower()))
 
 
+def query_only_order(question, hits):
+    """Rank the saved pool using only the original query and source bodies."""
+    from types import SimpleNamespace
+    retriever=VectorRetriever(SimpleNamespace(chunks=lambda:[{**h,'chunk_text':h['content']} for h in hits]))
+    raw=retriever._bm25(question)
+    scores=retriever._normalize(raw) if any(v>0 for v in raw.values()) else raw
+    return sorted([{**h,'score':scores.get(h['chunk_id'],0.),'rerank_score':scores.get(h['chunk_id'],0.)} for h in hits],
+                  key=lambda h:(-h['score'],h['chunk_id']))
+
+
 class LocalRetriever:
     """Legacy token retriever retained only for isolated tests/debugging."""
     def __init__(self, documents: list[dict]):
@@ -277,7 +287,7 @@ class VectorRetriever:
             import json
             hits = [self._materialize(by_id[item['chunk_id']], item['combined']) for item in ranked]
             with measure(stages, 'rerank', 'retrieval'):
-                reranked = AlibabaProvider().rerank(question, hits) if config.get('rerank', True) else hits
+                reranked = query_only_order(question,hits) if config.get('rerank')=='query_only' else AlibabaProvider().rerank(question, hits) if config.get('rerank', True) else hits
             minimum = config.get('min_score')
             if minimum is not None: reranked = [h for h in reranked if h['score'] >= minimum]
             with measure(stages, 'parent_expand', 'retrieval'):
@@ -297,6 +307,9 @@ class VectorRetriever:
                     rerank_score = 0.8 * item["combined"] + 0.2 * lexical_coverage
             final_score = rerank_score if rerank_score is not None else item["combined"]
             output.append({**self._materialize(chunk, final_score), "vector_normalized": round(item["vector_score"], 4), "bm25_normalized": round(item["bm25_score"], 4), "hybrid_score": round(item["combined"], 4), "rerank_score": round(rerank_score, 4) if rerank_score is not None else None, "final_score": round(final_score, 4)})
+        if config.get("rerank")=="query_only":
+            output=query_only_order(question,output)
+            output=[{**h,"final_score":h["score"]} for h in output]
         minimum = float(config.get("min_score", 0))
         with measure(stages, 'threshold_top_k', 'retrieval'):
             final = [item for item in sorted(output, key=lambda item: (-item['final_score'], item['chunk_id'])) if item['final_score'] >= minimum][:int(config.get('top_k', 4))]

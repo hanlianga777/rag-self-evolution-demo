@@ -45,7 +45,7 @@ ALLOWED_SEARCH_SPACE = {
     "min_score": (0, 0.1, 0.2, 0.3),
     "hybrid_search": (True, False),
     "hybrid_alpha": (0.3, 0.5, 0.7),
-    "rerank": (True, False),
+    "rerank": (True, False, "query_only"),
     "query_rewrite": (True, False),
     "multi_query": (False, 2, 4, 6),
     "hyde": (True, False),
@@ -124,6 +124,8 @@ def search_space_contract() -> dict:
         kinds = {type(value) for value in allowed}
         if kinds == {bool, int}:
             expected = "boolean false or integer"
+        elif kinds == {bool,str}:
+            expected = "boolean or string"
         elif kinds == {bool}:
             expected = "boolean"
         elif kinds == {int}:
@@ -140,6 +142,8 @@ def _matches_search_value(value, rule: dict) -> bool:
     expected = rule["type"]
     if expected == "boolean false or integer":
         return value is False or (type(value) is int and any(type(option) is int and value == option for option in rule["allowed"]))
+    if expected == "boolean or string":
+        return type(value) in (bool,str) and value in rule["allowed"]
     if expected == "boolean":
         return type(value) is bool and value in rule["allowed"]
     if expected == "integer":

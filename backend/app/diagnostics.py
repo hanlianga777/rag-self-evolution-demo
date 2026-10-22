@@ -292,12 +292,16 @@ def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
     # Quality-audit labels and legacy secondary roots must not pollute technical charts.
     for name in ('主张定位/范围核验缺口','评测证据核验缺口','来源冲突','检索失败信号待核实','延迟信号待核实','拒答归因待核实','噪声归因待核实'):
         phenomena.pop(name,None)
+    from .evaluation_contract import business_verdict
+    failed_checks={i for i,c in enumerate((case.get('judge_result') or {}).get('checks',[])) if c.get('met') is False}
+    reviewed_checks={f.get('check_index') for f in analysis['evidence_checks']}
+    diagnosis_complete=technical and (business_verdict(case)!='FAIL' or failed_checks<=reviewed_checks)
     return {'view_version':'diagnosis-view-v3',**analysis,'phenomena':list(phenomena.values()),'primary_root_cause':root,
             'secondary_root_causes':[],
             'is_technical_bad_case':technical,'optimization_directions':directions if technical else [],
             'evaluation_quality_audit':{'issues':issues,'blocking':bool(issues) and case.get('passed') is False},
             'root_cause_evidence':{'reason':analysis['analysis_reason'],'findings':analysis['evidence_checks']},'governance':governance,
-            'target_eligible':technical,
+            'target_eligible':technical,'diagnosis_complete':diagnosis_complete,
             'typical_detection':detection,'latency':latency,'trace_observations':observations}
 
 
@@ -347,6 +351,8 @@ def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     findings.extend(('Safety',None,f) for f in guard['findings'])
     for index,check in enumerate(judge['checks']):
         if check['met']:continue
+        if check.get('check_type')=='negative_behavior' and case.get('test_category')=='negative' and check.get('answer_quotes'):
+            findings.append(('Safety',None,{**check,'check_index':index,'provenance':{'kind':'original_judge_behavior'}}));continue
         reference=check.get('reference_support')
         if reference and not verified(reference,sources):
             gaps.append({'check_index':index,'condition':'reference_support原始来源绑定错误，拒绝自动跨源更正'});continue

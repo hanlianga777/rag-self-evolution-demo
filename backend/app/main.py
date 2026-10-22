@@ -1554,6 +1554,33 @@ def judge_replay(source_id: str,payload: PaidActionRequest):
     return {'id':run_id,'status':'running','execution_kind':'judge_only_baseline','generation_calls':0}
 
 
+class DiagnosticBatchRequest(BaseModel):
+    authorize_provider: bool = False
+    question_ids: list[str] | None = None
+    expected_binding: str
+    authorization_id: str
+    max_calls: int
+    budget_yuan: float
+    price_snapshot: dict
+
+
+@app.get('/api/evaluations/{run_id}/diagnostic-plan')
+def get_diagnostic_plan(run_id: str):
+    from .evidence_resolver import diagnostic_plan
+    try:return diagnostic_plan(store,run_id)
+    except ValueError as error:raise HTTPException(409,str(error)) from error
+
+
+@app.post('/api/evaluations/{run_id}/resolve-diagnostics',dependencies=[Depends(require_trusted_origin)])
+def resolve_diagnostic_batch(run_id: str,payload: DiagnosticBatchRequest):
+    if not payload.authorize_provider:raise HTTPException(409,'批量补证需要独立费用授权，不能沿用Agent或Baseline授权')
+    from .evidence_resolver import execute_diagnostic_batch
+    try:
+        return execute_diagnostic_batch(store,run_id,ai_service,question_ids=payload.question_ids,expected_binding=payload.expected_binding,
+            authorization_id=payload.authorization_id,max_calls=payload.max_calls,budget_yuan=payload.budget_yuan,price_snapshot=payload.price_snapshot)
+    except (ValueError,KeyError,TypeError,RuntimeError) as error:raise HTTPException(409,str(error)) from error
+
+
 @app.get('/api/evaluations/{run_id}/cases/{question_id}/diagnostic-evidence')
 def diagnostic_evidence_preflight(run_id: str,question_id: str):
     from .evidence_resolver import resolve_persisted
@@ -1567,7 +1594,9 @@ def diagnostic_evidence_preflight(run_id: str,question_id: str):
 
 @app.post('/api/evaluations/{run_id}/cases/{question_id}/resolve-diagnostics',dependencies=[Depends(require_trusted_origin)])
 def resolve_diagnostics(run_id: str,question_id: str,payload: PaidActionRequest):
-    if not payload.authorize_provider:raise HTTPException(409,'语义补证最多一次Judge调用，必须明确授权；不会修改历史成绩')
+    if not payload.authorize_provider:raise HTTPException(409,'语义补证必须明确授权；不会修改历史成绩')
+    from .paid_run import current_paid_run
+    if current_paid_run() is None:raise HTTPException(409,'请使用批量补证入口冻结题目、调用上限及独立费用预算')
     from .evidence_resolver import resolve_persisted
     from .diagnostics import _current_corpus
     run=store.evaluation_run(run_id)

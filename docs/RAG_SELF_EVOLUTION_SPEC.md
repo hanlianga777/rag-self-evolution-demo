@@ -2,6 +2,15 @@
 
 本节及以下安全语义补充依据Owner当前指令生效；覆盖下文所有冲突的旧评测、Claim分类、诊断准入、Regression及自动恢复语义；旧条款保留为历史，不得同时执行。既有Golden/Knowledge生产治理、50题20/10/20、11项Hard Gate阈值、三个人工Gate、Search Space及Production保护保持。
 
+- **2026-10-22 Agent 闭环合同 `agent-closure-2`（当前，覆盖下文永久排除、单参数组及发现Qualified即停止的旧限制）**：全部已完成真实业务FAIL进入单一Agent的处理输入、目标映射和逐题diagnostic_tasks；技术异常仍独立，不产生业务FAIL。诊断未闭合不等于没有优化能力，先沿既有Resolver补证；具体Candidate仍须已核验根因/真实Trace、合法参数和完整Sandbox，不强制准入。页面展示全量当前业务问题、待补证及同一个已验证配置的剩余题；不同候选的修复数量不得相加，历史合同仍只读。
+- **前置保障**：新Golden采用`golden-validator-v2.2-optimization-readiness`，在共用Hard Validation中检查Canonical完整来源、产品/版本及正向必要要求/负向预期行为；新正式Baseline复用同一材料预检，原Probe/QC/业务审查与人工确认保持。预检不预知模型错误，不删题、降难度或追改历史；运行中新缺口进入同一诊断/资料修订流程，资料修订仍经过既有Revision/Knowledge身份及人工治理。
+- **证据与评分分开**：Resolver升级`evidence-resolver-2`。来源、完整三阶段、答案、冻结问题、生成配置与Corpus及审查方法组成观察身份；Run/Snapshot评分身份独立。保存的观察跨同执行重评可重新核验并按requirement/check_type唯一关联新checks；新增/改写且无法唯一关联的要求须重新补证，不继承旧met/verdict/根因。答案、来源/全文/范围、配置、题目、Trace或Resolver方法变化即不能复用。补证明确审查复合要求、等价适用来源和全部失败checks；候选partial表示必要事实尚未完整覆盖，不推断整个候选为空。行为失败用已通过原合同校验的Negative原答片段形成Safety依据；不可用Anchor冒充事实支持。
+- **必要事实保护与排序**：默认保留所有已满足检查。仅独立语义核验明确标为有据无害的非必要补充时才解除其旧引用保留；安全、范围、行为与必要规范不得降级。已核验的等价且适用来源可作为必要事实的替代载体，复合必要事实仍逐项保留。`rerank`在既有bool开关外新增`query_only`：仅原始问题与真实候选正文作BM25排序（相对分数；零词面匹配保持0），不读取Golden/目标Chunk/缺失事实；默认排序、模型、TopK上限及其他参数不改，保存完整Trace，独立配置必须全冻结题集评测。无可恢复配置只限制该项干预，不排除整题。
+- **必要联动与D**：Candidate继续单一可验证假设/最少必要参数；可声明supporting_directions，每个辅助方向都必须有实际改动、保存观察及覆盖全部改动的依赖说明。性能仍严格对应实测瓶颈。D保留Gate2、同身份真实完整实验、Regression/修复来源、参数值来源与调用后重验；单方向沿原全量验证，跨方向分别重验实际来源的干预证据，不机械按参数组否决。组合后仍完整Sandbox与11 Gate/Regression；不得把单项有效当作组合有效。
+- **剩余问题与授权**：出现Qualified可保留供人工选择的改善，但只要仍有问题且未确认报告、预算允许，可显式继续新一轮；各轮仍须完成、禁止重复配置/假设，12次含D预留1不改。只以一个真实验证配置的all_fixed_question_ids计算修复及剩余，不合并不同配置。报告确认与发布不自动执行。
+- **受控批量补证**：GET `/api/evaluations/{run_id}/diagnostic-plan`及`python3 scripts/agent_diagnostics.py --run <id>`只读、Provider0；已有足够证据的题跳过付费补证。POST同Run的`resolve-diagnostics`或CLI显式授权必须冻结完整题目范围、预检binding、唯一授权ID、max_calls、独立预算及24小时内核价快照；复用PaidRun逐请求预留/真实Usage/Unknown停止。没有授权不调用；相同请求独占claim，原始响应与方法/身份存sidecar，归档保留；同输入未结算请求禁止新批次重发。原逐题付费入口不得绕过独立预算。预算/调用不足保留未完成与未处理题；补证不生成答案、不改Judge或正式库。Agent/ABC/Sandbox/Replay费用授权均不继承。
+- **本轮边界**：仅代码与离线验收，真实Provider0；正式`EVAL-20261021141811373593`及旧评分/答案/引用、Golden/Corpus/Checkpoint不回填，不重启正式服务。V5.1评分身份、11 Gate与发布资格不变；新增诊断/优化合同及新排序配置另行留版本。当前10题全量承接不等于已修复，真实新回答/全部冻结题集验证仍待独立授权。详见[闭环修复验收单](AGENT_CLOSED_LOOP_ACCEPTANCE.md)。
+
 - **2026-10-21 V5.1 Baseline复用预检展示修复（仅前端）**：页面挂载/刷新、切换Run或状态变化后重新GET只读Replay资格；加载/失败明确显示，失败可手动重查，旧Run未完成请求回包不得覆盖新Run。预检卡片按内容自适应高度，资格/Identity/授权入口不受候选摘要固定高度裁切。can_start_replay严格为true才允许打开原费用确认窗口，最终付费确认前不POST启动；保留最终确认后的实时身份/源摘要/门禁重查。历史49/50与技术异常继续按保存Run展示，预检不冒充新成绩。Judge/Golden/Corpus/Gate/Identity及后端合同不变；不新增页面或重构布局，架构节点/连线不变。
 
 - **2026-10-21 V5.1执行前收口（当前，覆盖下条V5 Parser及Replay执行前置）**：Parser升级为`business-output-5.1-substantive-checks`进入新Evaluation Identity；Positive/Ablation至少有一项必要fact，Negative至少有必要fact或negative_behavior，只有scope或辅助范围项的响应均技术异常。真实正文引用与Scope绑定、原始checks/verdict、Judge Prompt、Matcher、Guard、11 Gate不改，不由Parser补写业务结论。新Identity为`4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf`；旧V5与V4历史只读。
