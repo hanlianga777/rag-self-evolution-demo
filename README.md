@@ -1,3 +1,5 @@
+> Agent 已付费响应恢复：允许1–3个合法候选，逐项校验保留合法部分；缺少可选说明不再整批失败。零网络预检与追加恢复方式见 [响应合同](docs/AGENT_RESPONSE_CONTRACT.md)。
+
 > 2026-10-22 产品收口：正式业务 FAIL 均为 Bad Case，全部进入 Agent 处理；根因在诊断与受控实验中验证。前端保留原布局，内部审计默认折叠。运行版本、零调用离线验证与操作入口见 [验收报告](docs/BAD_CASE_UNIFICATION_ACCEPTANCE.md)。
 
 # RAG Evolution

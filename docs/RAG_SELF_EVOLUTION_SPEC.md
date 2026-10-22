@@ -1,5 +1,8 @@
 # 当前有效评测合同 — 2026-10-21 VNext V5.1 `[CONFIRMED]`
 
+- **2026-10-22 已付费 Agent 响应恢复与输出合同 `agent-response-2`（当前）**：允许0–3个合法候选，不强求A/B/C齐备；不足说明与分组标签是可选展示元数据，缺失只记系统警告，不编造模型理由。JSON重复键/非有限数值/错误包结构拒绝；候选逐项验证标签、真实目标及别名重复、类型/搜索空间、已有/本轮重复配置、根因、证据断言、方向、参数依赖和可证伪条件。非法项逐项记录原值与原因，合法部分事务保存；零合法候选不得声明优化成功。Unknown探索仍沿现有证据约束；禁止改写假设、参数、根因或证据来放行。新生成与已付费响应共用同一离线验证路径；持久化失败复用须保留既有Usage与费用，未知费用不改成0。恢复入口仅显式CLI：只读预检冻结绑定，再SQLite Backup与当前身份复核，在BEGIN IMMEDIATE内追加关联来源的新Experiment/Candidate/Trace；原失败行与费用审计不覆盖，重复恢复幂等。恢复不运行Baseline/Judge/补证/Sandbox；Sandbox启动仍重新核完整干预与冻结身份，11 Gate、Regression与人工发布不变。架构节点/连线不变；详见[响应合同与恢复方式](AGENT_RESPONSE_CONTRACT.md)。
+
+
 - **2026-10-22 Baseline / Agent 产品统一收口（当前）**：正式逐题业务结果仅 PASS / FAIL，FAIL 即 Bad Case，全部进入 Agent 诊断、优化规划及受控实验处理输入；`target_eligible`、根因及 `experiment_plan.status` 仅约束具体方案，不是业务分类或整题准入条件。PASS 与未完成评分不因旧技术标记进入 Agent。Baseline 主展示 Overall、11 Hard Gate、Bad Case 数量、失败要求与下一步行动；Agent 展示同一批问题和最新 `experiment_plan` 方向。未知根因保留，来源/Trace/合法 Diff、证伪条件、全冻结题集 Sandbox、Regression、Recommendation 及人工发布保护不变。版本身份阻断只限制真实执行，不隐藏已有 FAIL 及规划；不得修改冻结身份来解除阻断。内部程序字段、阶段校验与 JSON 收入默认折叠审计，复用既有导航、卡片和 800px Drawer；架构节点、连线及评分身份均不变。本轮禁止 Provider 与正式数据写入，仅离线副本验证及真实服务只读 UI 验收；详见 [收口验收报告](BAD_CASE_UNIFICATION_ACCEPTANCE.md)。
 
 

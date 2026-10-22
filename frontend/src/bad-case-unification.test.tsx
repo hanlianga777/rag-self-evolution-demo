@@ -36,3 +36,11 @@ it('shows a single business count and agent entry in Baseline',async()=>{
  await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(10);
  await click('进入 Agent 处理');expect(navigate).toHaveBeenCalledWith('evolution');
 });
+it('offers Sandbox for one valid candidate while disclosing rejected candidates',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
+ await render(<EvolutionPage data={{evaluation,badCases:rows,optimization:{id:'partial',candidates:[{id:'valid-a',status:'generated',reasoning:{candidate_label:'A',round:1,hypothesis:'原始合法假设'}}],result:{generation_status:'partial',rejected_candidates:[{id:'B',reason:'参数类型错误'}]}}}}/>);
+ expect(document.body.textContent).toContain('保留 1 个合法候选，拒绝 1 个候选');
+ expect([...document.querySelectorAll('button')].find(b=>b.textContent?.includes('运行本轮 A/B/C Sandbox'))?.disabled).toBe(false);
+ expect(document.body.textContent).toContain('1 个候选已生成（最多3个）');
+ expect(document.querySelector('details[open]')).toBeNull();
+});

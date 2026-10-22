@@ -89,12 +89,13 @@ class OptimizationContractTests(unittest.TestCase):
             result = drafts()
             result['candidates'][1]['target_bad_cases'] = [target]
             experiment, trace, audit, _, _ = self.run_drafts(result)
-            self.assertEqual(trace['status'], 'failed')
-            self.assertEqual(experiment['candidates'], [])
-            self.assertEqual(audit['failed_candidate_id'], 'B')
-            self.assertEqual(audit['failed_field'], 'target_bad_cases')
-            self.assertEqual(audit['actual_value'], [target])
-            self.assertEqual(set(audit['allowed_values']), {'Q1', 'BC-EVAL-test-Q1'})
+            self.assertEqual(trace['status'], 'completed')
+            self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']], ['A','C'])
+            rejected=audit['rejected_candidates'][0]
+            self.assertEqual(rejected['id'], 'B')
+            self.assertEqual(rejected['field'], 'target_bad_cases')
+            self.assertEqual(rejected['actual_value'], [target])
+            self.assertEqual(set(rejected['allowed_values']), {'Q1', 'BC-EVAL-test-Q1'})
         result = drafts()
         result['candidates'][0]['target_bad_cases'] = ['BC-EVAL-test-Q1']
         result['candidates'][0]['root_cause_evidence'] = ['BC-EVAL-test-Q1']
@@ -122,25 +123,18 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(retry.prompt['evaluation_budget'], {'used': 3, 'max': 12, 'reserved_for_d': 1})
         self.assertEqual(retry.prompt['failed_gates'], [gates['gates'][0]])
 
-    def test_bad_candidate_k_preserves_full_failed_trace_without_partial_candidates(self):
-        result = drafts()
-        result["candidates"][1]["config_diff"]["candidate_k"] = "32"
-        experiment, trace, audit, _, raw = self.run_drafts(result)
-        self.assertEqual(trace["status"], "failed")
-        self.assertEqual(experiment["candidates"], [])
-        self.assertEqual(audit["optimization_run_id"], experiment["id"])
-        self.assertEqual(audit["baseline_id"], "EVAL-test")
-        self.assertEqual(audit["provider_raw_text"], raw)
-        self.assertEqual(audit["parsed_json"], result)
-        self.assertEqual(audit["parsed_candidates"], result["candidates"])
-        self.assertEqual(audit["validation_stage"], "search_space")
-        self.assertEqual(audit["failed_candidate_id"], "B")
-        self.assertEqual(audit["failed_field"], "candidate_k")
-        self.assertEqual(audit["actual_value"], "32")
-        self.assertEqual(audit["expected_type"], "integer")
-        self.assertEqual(audit["allowed_values"], [12, 24])
-        self.assertIn("invalid candidate_k", audit["validation_error"])
-        self.assertTrue(audit["timestamp"])
+    def test_bad_candidate_k_rejects_only_bad_candidate_and_preserves_full_raw_trace(self):
+        result=drafts();result['candidates'][1]['config_diff']['candidate_k']='32'
+        experiment,trace,audit,_,raw=self.run_drafts(result)
+        self.assertEqual(trace['status'],'completed')
+        self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['A','C'])
+        self.assertEqual(audit['provider_raw_text'],raw)
+        self.assertEqual(audit['parsed_json'],result)
+        rejected=audit['rejected_candidates'][0]
+        self.assertEqual(rejected['stage'],'search_space');self.assertEqual(rejected['id'],'B')
+        self.assertEqual(rejected['field'],'candidate_k');self.assertEqual(rejected['actual_value'],'32')
+        self.assertEqual(rejected['expected_type'],'integer');self.assertEqual(rejected['allowed_values'],[12,24])
+        self.assertIn('invalid candidate_k',rejected['reason'])
 
     def test_insufficient_evidence_can_persist_zero_or_fewer_candidates(self):
         for count in (0,1,2):
@@ -150,7 +144,7 @@ class OptimizationContractTests(unittest.TestCase):
             experiment,trace,audit,_,_=self.run_drafts(response)
             self.assertEqual(trace['status'],'completed')
             self.assertEqual(len(experiment['candidates']),count)
-            self.assertEqual(experiment['result']['generation_status'],'insufficient_evidence')
+            self.assertEqual(experiment['result']['generation_status'],'completed' if count else 'no_candidates')
             self.assertEqual(audit['generated_candidate_count'],count)
             self.assertEqual(audit['insufficient_evidence'],response['insufficient_evidence'])
 
@@ -163,14 +157,13 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertFalse(result['result']['provider_called'])
         self.assertEqual(result['result']['generation_status'],'insufficient_evidence')
 
-    def test_intervention_failure_is_atomic_and_retains_raw_audit(self):
-        response=drafts()
-        response['candidates'][1]['config_diff']['prompt_strategy']='Abstention'
+    def test_intervention_failure_retains_valid_part_and_raw_audit_atomically(self):
+        response=drafts();response['candidates'][1]['config_diff']['prompt_strategy']='Abstention'
         experiment,trace,audit,_,raw=self.run_drafts(response)
-        self.assertEqual(trace['status'],'failed')
-        self.assertEqual(experiment['candidates'],[])
-        self.assertEqual(audit['validation_stage'],'intervention')
-        self.assertEqual(audit['failed_candidate_id'],'B')
+        self.assertEqual(trace['status'],'completed')
+        self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['A','C'])
+        self.assertEqual(audit['rejected_candidates'][0]['stage'],'intervention')
+        self.assertEqual(audit['rejected_candidates'][0]['id'],'B')
         self.assertEqual(audit['provider_raw_text'],raw)
 
     def test_strict_types_and_discrete_values(self):
@@ -199,8 +192,8 @@ class OptimizationContractTests(unittest.TestCase):
         result = drafts()
         result["candidates"][0]["config_diff"] = {"hybrid_search": False, "hybrid_alpha": 0.5}
         _, trace, audit, _, _ = self.run_drafts(result)
-        self.assertEqual(trace["status"], "failed")
-        self.assertEqual(audit["failed_field"], "hybrid_alpha")
+        self.assertEqual(trace["status"], "completed")
+        self.assertEqual(audit["rejected_candidates"][0]["field"], "hybrid_alpha")
 
     def test_cross_field_duplicate_and_excluded_checks(self):
         for diff, expected in (
@@ -212,15 +205,15 @@ class OptimizationContractTests(unittest.TestCase):
                 result = drafts()
                 result["candidates"][0]["config_diff"] = diff
                 experiment, trace, audit, _, _ = self.run_drafts(result)
-                self.assertEqual(trace["status"], "failed")
-                self.assertEqual(experiment["candidates"], [])
-                self.assertIn(expected, audit["validation_error"])
+                self.assertEqual(trace["status"], "completed")
+                self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['B','C'])
+                self.assertIn(expected, audit['rejected_candidates'][0]['reason'])
         result = drafts()
         result["candidates"][1]["config_diff"] = {"top_k": 6}
         experiment, trace, audit, _, _ = self.run_drafts(result)
-        self.assertEqual(trace["status"], "failed")
-        self.assertEqual(experiment["candidates"], [])
-        self.assertIn("duplicate candidate configuration", audit["validation_error"])
+        self.assertEqual(trace["status"], "completed")
+        self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['A','C'])
+        self.assertIn("duplicate candidate configuration", audit['rejected_candidates'][0]['reason'])
 
     def test_json_parse_failure_retains_raw_text(self):
         provider = FixedProvider("{broken")
@@ -234,10 +227,11 @@ class OptimizationContractTests(unittest.TestCase):
     def test_prompt_and_root_cause_rejection_expose_persisted_mapping(self):
         result=drafts();result['candidates'][1]['root_cause']='Generation'
         experiment,trace,audit,provider,raw=self.run_drafts(result)
-        self.assertEqual(trace['status'],'failed')
-        self.assertEqual(audit['failed_candidate_id'],'B')
-        self.assertEqual(audit['failed_field'],'root_cause')
-        self.assertEqual(audit['allowed_values'],['Retrieval'])
+        self.assertEqual(trace['status'],'completed')
+        self.assertEqual(audit['rejected_candidates'][0]['id'],'B')
+        self.assertEqual(audit['rejected_candidates'][0]['field'],'root_cause')
+        self.assertEqual(audit['rejected_candidates'][0]['allowed_values'],['Retrieval'])
+        self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['A','C'])
         self.assertEqual(provider.prompt['target_reference_map']['Q1']['primary_root_cause'],'Retrieval')
         self.assertIn('参数干预环节',provider.prompt['rule'])
 

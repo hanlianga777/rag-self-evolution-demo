@@ -103,7 +103,7 @@ class CurrentIdentityTests(unittest.TestCase):
     def test_failed_first_round_reuses_context_and_unknown_experiment_is_readable(self):
         trigger = self.trigger()
         context = self.store.confirm_optimization_trigger(trigger, 'reviewer')['optimization_run_id']
-        for response in ('{bad', json.dumps({**drafts(), 'candidates': drafts()['candidates'][:2]})):
+        for response in ('{bad', json.dumps({**drafts(), 'candidates': {}})):
             with self.assertRaises(ValueError):
                 OptimizationAgent(self.store, FixedProvider(response)).generate(self.baseline, trigger)
             self.assertEqual(self.store.experiment(context)['candidates'], [])
