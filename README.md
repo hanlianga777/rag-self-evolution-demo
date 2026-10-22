@@ -1,5 +1,7 @@
 # RAG Evolution
 
+2026-10-22 零费用补证系统审计：Resolver3明确审查完成与回答完整的区别、冻结参考/来源引文及角色/原子事实合同；确定性解析仅恢复一个缺失fact闭合符，不改语义或资格门槛。9份旧响应仅2份恢复语法，仍0/9闭合；64项离线通过、56份保护哈希未变。本轮Provider0/费用0，未进入后续阶段。[逐题审计与限制](outputs/agent_diagnostic_system_audit_20261022/9题系统根因审计与最小修复.md)。只读回放：`python3 scripts/audit_saved_diagnostics.py`。
+
 2026-10-22 Agent闭环代码与离线修复：全部真实业务FAIL交给同一Agent处理，补证与方案执行资格分开；批量补证独立冻结预算，已有证据复用后再关联新评分。增加仅原问题的候选BM25排序、有证据的必要联动与跨阶段D；Qualified后仍可处理剩余问题。原11 Gate/Regression/人工确认保持。正式Run仍40 PASS/10 FAIL，真实修复0题，未进行新Provider/Sandbox或正式服务重载。[验收单与下一步授权](docs/AGENT_CLOSED_LOOP_ACCEPTANCE.md)。只读核验：`python3 scripts/agent_diagnostics.py --run EVAL-20261021141811373593`。
 
 2026-10-21 当前为V5.1：实质性Fact/Behavior检查阻止Scope-only PASS；独立Q18 Judge探针复用正式合同，但不会写Baseline成绩。数据仍50/50可复用；未通过同身份真实探针与人工业务复核，后端禁止正式Judge-only Replay。当前仅离线实施，Provider0。[V5.1验收/费用与启动说明](docs/V51_PREFLIGHT_CLOSEOUT_ACCEPTANCE.md)。只读预检：`python3 scripts/q18_judge_probe.py preflight`；隔离假HTTP验收：`python3 scripts/verify_q18_probe_offline.py`。真实探针、50Replay各需另行授权。原[V5第一阶段成果](docs/CONTRACT_RESOLVER_REPLAY_V5_ACCEPTANCE.md)保留；Resolver、Golden、Corpus及历史成绩不改。

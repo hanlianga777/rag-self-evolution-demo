@@ -1,0 +1,14 @@
+{
+  "base_commit": "23cb8b2",
+  "real_provider_calls": 0,
+  "api_fee_cny": 0,
+  "requests_reconstructed_hash_matched": 9,
+  "saved_responses_replayed": 9,
+  "syntax_recovered": 2,
+  "semantically_resolved": 0,
+  "new_eligibility_granted": 0,
+  "protected_file_count": 56,
+  "protected_files_changed": [],
+  "historical_records_rewritten": false,
+  "agent_sandbox_regression_release_started": false
+}

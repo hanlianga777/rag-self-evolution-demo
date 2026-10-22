@@ -1,5 +1,7 @@
 # 当前有效评测合同 — 2026-10-21 VNext V5.1 `[CONFIRMED]`
 
+- **2026-10-22 补证系统审计（当前诊断合同 evidence-resolver-3）**：零Provider/零费用。语义Prompt明确requirements_complete为全要求/全阶段审查完成而非回答完整；冻结参考golden_quote与真实来源reference_support分别定位，阶段ID列齐、角色表只审met=true、复合要求按原子fact核验。既有true门禁/完整参考/来源/阶段/安全判定不放宽。诊断JSON仅允许在facts/check_roles边界确定性补一个缺失fact对象闭合符，原文与恢复位置保留，拒绝重复键/截断/其他歧义，不补语义、不重试。新版版本/Prompt摘要使旧观察不得冒充新版证据。9份旧响应回放仅2份恢复语法，仍0/9闭合；历史数据与审批不回写，后续阶段不授权。详见[系统审计](../outputs/agent_diagnostic_system_audit_20261022/9题系统根因审计与最小修复.md)。架构节点和连线不变。
+
 - **2026-10-22 9题授权补证实录（不改变产品合同）**：Owner限定9次/10元/不重试，仅补证。实际9次已结算、重试0；诊断闭合0/9，新增实验资格0/9（7题完整审查声明未满足、2题JSON无效）。Usage费用核算2.31690904元，保守账本2.321174元；正式DB/Corpus/索引等保护哈希未变，未进入Agent策略/Sandbox/Regression/发布。原Provider0表述为此前离线阶段记录；本次已停止，后续须再次授权。详见[执行报告](../outputs/agent_diagnostics_real_20261022/9题真实补证执行报告.md)。
 
 本节及以下安全语义补充依据Owner当前指令生效；覆盖下文所有冲突的旧评测、Claim分类、诊断准入、Regression及自动恢复语义；旧条款保留为历史，不得同时执行。既有Golden/Knowledge生产治理、50题20/10/20、11项Hard Gate阈值、三个人工Gate、Search Space及Production保护保持。

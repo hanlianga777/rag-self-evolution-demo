@@ -75,6 +75,35 @@ def generation_context(entries):
 NEGATIVE_EXPECTED_BEHAVIORS = {"clarify", "insufficient_evidence", "safe_rejection", "prompt_injection_resistance"}
 
 
+
+def parse_diagnostic_json(raw):
+    """Recover only a missing final fact-object closer, never semantic values."""
+    def unique_object(pairs):
+        result={}
+        for key,value in pairs:
+            if key in result:raise ValueError('duplicate diagnostic JSON key: '+key)
+            result[key]=value
+        return result
+    def load(text):return json.loads(text,object_pairs_hook=unique_object)
+    recovery=None
+    try:response=load(raw)
+    except json.JSONDecodeError as error:
+        # One unambiguous delimiter at the facts/check_roles boundary; no truncation repair.
+        if error.msg!="Expecting ',' delimiter" or not re.match(r'\]\s*,\s*"check_roles"\s*:',raw[error.pos:]):raise
+        response=load(raw[:error.pos]+'}'+raw[error.pos:])
+        if (not isinstance(response,dict) or not {'requirements_complete','facts','check_roles'}<=response.keys()
+            or response.keys()-{'requirements_complete','requirements_complete_reason','facts','check_roles'}
+            or not isinstance(response['facts'],list) or not response['facts']
+            or not isinstance(response['facts'][-1],dict)
+            or set(response['facts'][-1])!={'check_index','golden_quote','reference_support','source_applicability','stages'}
+            or not isinstance(response['facts'][-1].get('stages'),dict)
+            or set(response['facts'][-1]['stages'])!={'candidates','reranked','final','answer'}):
+            raise ValueError('ambiguous diagnostic JSON structure')
+        recovery={'method':'single_missing_fact_object_closer','offset':error.pos,'inserted':'}'}
+    if not isinstance(response,dict):raise ValueError('diagnostic JSON must be an object')
+    return response,recovery
+
+
 class AiService:
     def __init__(self, store, corpus, provider, force_mock: bool):
         self.store = store
@@ -189,11 +218,11 @@ class AiService:
         from .evidence_resolver import SEMANTIC_PROMPT
         with collect_usage() as usage:
             raw=self.provider.complete(SEMANTIC_PROMPT,json.dumps(payload,ensure_ascii=False),json_mode=True,temperature=0)
-        try:response=json.loads(raw)
+        try:response,recovery=parse_diagnostic_json(raw)
         except ValueError as error:
             from .providers import ProviderInvalidResponse
             raise ProviderInvalidResponse('诊断语义JSON无效',raw_provider_response=raw) from error
-        return {**response,'_raw_response':raw,'_usage':usage,'_model':self.model}
+        return {**response,'_raw_response':raw,'_json_recovery':recovery,'_usage':usage,'_model':self.model}
 
     @provider_task('qc')
     def quality_check(self, item: dict) -> dict:

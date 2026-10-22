@@ -1,0 +1,15 @@
+{
+  "tests": 64,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "network_blocked": true,
+  "isolated_database_corpus_env": true,
+  "suite_patterns": [
+    "test_diagnostic_response_parsing.py",
+    "test_evidence_resolver_v5.py",
+    "test_diagnostic_evidence.py",
+    "test_diagnostic_view.py",
+    "test_automatic_diagnostics.py"
+  ]
+}
