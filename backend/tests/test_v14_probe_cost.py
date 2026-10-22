@@ -490,7 +490,7 @@ class ProbeCostTests(unittest.TestCase):
         self.assertTrue(result['passed'])
         self.assertEqual(result['classification'], 'NEGATIVE_VALID')
         self.assertEqual(result['probe_details']['probe_execution_status'], 'completed')
-        self.assertEqual(result['probe_details']['retrieval_trace']['status'], 'collected')
+        self.assertEqual(result['probe_details']['retrieval_trace']['status'], 'completed')
         self.assertEqual(result['probe_details']['retrieval_trace']['final'], [])
 
     def test_r1_bm25_execution_failure_blocks_probe_and_evaluation_without_judge(self):

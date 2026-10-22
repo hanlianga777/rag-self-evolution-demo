@@ -87,3 +87,14 @@ it('shows every current business failure in Agent including pending diagnoses',a
  expect([...document.querySelectorAll('button')].find(button=>button.textContent?.includes('生成 A / B / C'))?.disabled).toBe(false);
  expect(document.body.textContent).toContain('全部业务失败由 Agent 接手');
 });
+it('connects an unknown exploratory target to its saved candidate without calling it confirmed',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
+ const badCases=[{run_id:'offline',question_id:'new-explore',result:{question:'未知原因的维护遗漏',passed:false,evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL'},diagnostic_view:{primary_root_cause:'Unknown',target_eligible:false,is_technical_bad_case:false,analysis_category:'insufficient_evidence',optimization_directions:[],experiment_plan:{status:'exploratory',directions:['candidate_recall'],next_action:'controlled_sandbox'}}}}];
+ const optimization={id:'exp',result:{diagnostic_tasks:[{question_id:'new-explore',status:'exploratory',experiment_plan:{directions:['candidate_recall']}}]},candidates:[{id:'a',status:'generated',config:{candidate_k:24},reasoning:{candidate_label:'A',observed_evidence:['new-explore'],experiment_kind:'exploratory',hypothesis:'扩大候选池验证缺失来源',falsification:'目标仍失败则不支持'}}]};
+ await render(<EvolutionPage data={{evaluation,badCases,optimization}}/>);
+ expect(document.body.textContent).toContain('探索实验');
+ await click('优化 Agent');
+ expect(document.querySelector('.strategy-relations')?.textContent).toContain('未知原因的维护遗漏');
+ expect(document.querySelector('.strategy-relations')?.textContent).toContain('扩大候选池验证缺失来源');
+ expect(document.body.textContent).not.toContain('诊断待完成的先补证');
+});

@@ -1,0 +1,19 @@
+F
+======================================================================
+FAIL: test_local_pipeline_records_real_rerank_before_threshold_and_completed_status (test_agent_exploration.TraceCompletenessTests.test_local_pipeline_records_real_rerank_before_threshold_and_completed_status)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/tests/test_agent_exploration.py", line 99, in test_local_pipeline_records_real_rerank_before_threshold_and_completed_status
+    self.assertEqual(trace['status'],'completed')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'collected' != 'completed'
+- collected
+?   ^  -
++ completed
+?   ^^
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.003s
+
+FAILED (failures=1)

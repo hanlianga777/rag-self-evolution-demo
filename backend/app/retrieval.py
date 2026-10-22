@@ -314,6 +314,7 @@ class VectorRetriever:
         with measure(stages, 'threshold_top_k', 'retrieval'):
             final = [item for item in sorted(output, key=lambda item: (-item['final_score'], item['chunk_id'])) if item['final_score'] >= minimum][:int(config.get('top_k', 4))]
         if trace is not None:
+            trace.update(status='completed',reranked=sorted(output,key=lambda item:(-item['final_score'],item['chunk_id'])))
             trace['final'] = [{**item, 'rank': rank} for rank, item in enumerate(final, 1)]
             trace['timings'] = deepcopy(stages[stage_start:])
             trace['timing_unit'] = 'ms'

@@ -1,0 +1,14 @@
+.F.
+======================================================================
+FAIL: test_tampered_exploration_is_rejected_before_sandbox_budget_or_calls (test_agent_exploration_e2e.Sandbox50Tests.test_tampered_exploration_is_rejected_before_sandbox_budget_or_calls)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/tests/test_agent_exploration_e2e.py", line 102, in test_tampered_exploration_is_rejected_before_sandbox_budget_or_calls
+    with self.assertRaises(ValueError):self.runner.start_candidate(candidate['id'])
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 3 tests in 3.092s
+
+FAILED (failures=1)

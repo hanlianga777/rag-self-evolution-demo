@@ -1,0 +1,62 @@
+EE.EE
+======================================================================
+ERROR: test_unknown_is_persisted_as_exploration_instead_of_repeated_paid_diagnosis (test_agent_exploration.AgentExplorationTests.test_unknown_is_persisted_as_exploration_instead_of_repeated_paid_diagnosis)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/tests/test_agent_exploration.py", line 84, in test_unknown_is_persisted_as_exploration_instead_of_repeated_paid_diagnosis
+    result=OptimizationAgent(self.store,provider).generate('EVAL-test')
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py", line 85, in inner
+    return func(*args, **kwds)
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/app/optimization.py", line 113, in generate
+    audited_cases = [{**item, 'diagnostic_view':diagnostic_view(item.get('result', {}))} for item in bad_cases]
+                                                ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/app/diagnostics.py", line 271, in diagnostic_view
+    analysis=automatic_analysis(case,corpus_chunks=corpus_chunks,corpus_fingerprint=corpus_fingerprint)
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/app/diagnostics.py", line 62, in automatic_analysis
+    return business_analysis(case,corpus_chunks=corpus_chunks,corpus_fingerprint=corpus_fingerprint)
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/app/diagnostics.py", line 347, in business_analysis
+    resolved,resolver_gaps=saved_findings(case,corpus_chunks,corpus_fingerprint)
+                           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/app/evidence_resolver.py", line 234, in saved_findings
+    actual,question,identity=persisted_inputs(store,run_id,question_id,chunks,fingerprint)
+                             ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/app/evidence_resolver.py", line 168, in persisted_inputs
+    run=store.evaluation_run(run_id)
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/app/governance.py", line 1905, in evaluation_run
+    row=connection.execute('SELECT * FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
+        ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: no such table: evaluation_runs
+
+======================================================================
+ERROR: test_context_and_generation_explore_without_claiming_semantic_sufficiency (test_agent_exploration.ExplorationTests.test_context_and_generation_explore_without_claiming_semantic_sufficiency)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/tests/test_agent_exploration.py", line 60, in test_context_and_generation_explore_without_claiming_semantic_sufficiency
+    validate_intervention(proposal(c,direction,observation,diff),{q['id']:c},DEFAULT_PIPELINE_CONFIG)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/app/optimization.py", line 56, in validate_intervention
+    raise ValueError('全部目标必须具有一致且证据充分的主要根因')
+ValueError: 全部目标必须具有一致且证据充分的主要根因
+
+======================================================================
+ERROR: test_missing_source_and_invalid_judge_are_repair_tasks_not_parameter_candidates (test_agent_exploration.ExplorationTests.test_missing_source_and_invalid_judge_are_repair_tasks_not_parameter_candidates)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/tests/test_agent_exploration.py", line 70, in test_missing_source_and_invalid_judge_are_repair_tasks_not_parameter_candidates
+    plan=diagnostic_view(c)['experiment_plan']
+         ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+KeyError: 'experiment_plan'
+
+======================================================================
+ERROR: test_unknown_has_falsifiable_plan_and_legal_candidate (test_agent_exploration.ExplorationTests.test_unknown_has_falsifiable_plan_and_legal_candidate)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/zhanghaohan/.codex/.chatgpt-projects/g-p-6a9830ea7da08191a4ac4550225e407c/rag-agent-remediation/backend/tests/test_agent_exploration.py", line 42, in test_unknown_has_falsifiable_plan_and_legal_candidate
+    self.assertEqual(view['experiment_plan']['status'],'exploratory')
+                     ~~~~^^^^^^^^^^^^^^^^^^^
+KeyError: 'experiment_plan'
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.095s
+
+FAILED (errors=4)

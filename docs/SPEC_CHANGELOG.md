@@ -1,3 +1,10 @@
+## 2026-10-22 · agent-closure-3 假设驱动探索与完整离线闭环
+
+- 确诊与实验资格分离：真实业务FAIL可按Canonical完整执行的结构观察形成探索计划，Unknown不冒充已确认技术根因；能力缺口带具体修复原因/缺失来源ID。
+- Candidate保留confirmed/exploratory、证伪条件、逐目标观察与最小Diff；Sandbox预留前重验配置和干预，D重验独立完整实测来源。全部50题Regression及11 Gate/人工发布保持。
+- 原工作台展示全量业务FAIL与真实目标关联，八导航不变；旧本地检索补齐完整重排/完成状态；唯一架构源及导出同步。
+- 真实Provider0/费用0，10题历史只读+离线候选/50题Fixture验收；不宣称真实修复。见[报告](AGENT_EXPLORATION_E2E_REPORT.md)。
+
 ## 2026-10-22 · evidence-resolver-3 零费用系统审计
 
 - 明确全要求审查完成、参考与来源引文、完整阶段ID/角色及原子事实的共用Prompt合同，不降低既有校验。

@@ -1,5 +1,9 @@
 ## 2026-10-21 · 当前V5合同与既有节点内部流程
 
+## 2026-10-22 当前Agent内部合同
+
+保持原业务节点和八导航。诊断输出分为严格技术根因与独立experiment_plan：Canonical完整性验证后，结构观察可支持exploratory Candidate，Unknown不改写。缺材料/执行进入明确修复任务；Resolver补证为辅助。confirmed沿原合同；两类候选都在Sandbox创建前重验真实Diff/当前目标，D逐来源复验。全量50题同尺Sandbox/Regression、11 Gate、推荐与三个人工Gate保持。旧本地检索补齐完整重排Trace与完成状态。详见[当前验收报告](docs/AGENT_EXPLORATION_E2E_REPORT.md)。下文互斥的“只有确诊可作实验目标”条款为历史。
+
 沿用Golden → Baseline → Bad Case → Agent → Sandbox → Regression → Recommendation → 人工发布，四维指标与五类典型Bad Case不改。评测节点内部区分Final正文Fact与经Canonical标题/页序/结构绑定的Scope，完整冻结规范作为独立Judge输入，版本纳入新Identity。Diagnostic复用现有Provider做显式授权的一次语义补证，真实来源/覆盖经程序校验后单独保存sidecar；没有第二Agent，读取不调用模型。
 
 Judge-only Baseline逐题核验旧生成执行，在同一创建事务核源并只种入execution，后续走原Baseline逐题保存、重试/异常、Gate及当前身份守卫。生成禁止条件随Checkpoint恢复保留；旧Judge/成绩不复制。前端只在原Baseline页/Drawer增补预检、费用授权及证据读取。正式图的节点、关系与图源不变，故无另画架构图或导出差异。[当前合同与离线验收](docs/CONTRACT_RESOLVER_REPLAY_V5_ACCEPTANCE.md)。

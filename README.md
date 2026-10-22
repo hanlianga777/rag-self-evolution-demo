@@ -1,5 +1,7 @@
 # RAG Evolution
 
+> 2026-10-22 `agent-closure-3`：10道业务FAIL全量承接，Unknown可基于真实阶段观察提出可证伪探索实验；缺材料/执行身份进入能力修复任务。10/10离线合法探索，50题Fixture闭环不代表真实优化效果，Provider0。原11 Gate/Regression/人工发布保持。详见[中文整改报告、复现命令与下一轮统一预算](docs/AGENT_EXPLORATION_E2E_REPORT.md)。
+
 2026-10-22 零费用补证系统审计：Resolver3明确审查完成与回答完整的区别、冻结参考/来源引文及角色/原子事实合同；确定性解析仅恢复一个缺失fact闭合符，不改语义或资格门槛。9份旧响应仅2份恢复语法，仍0/9闭合；64项离线通过、56份保护哈希未变。本轮Provider0/费用0，未进入后续阶段。[逐题审计与限制](outputs/agent_diagnostic_system_audit_20261022/9题系统根因审计与最小修复.md)。只读回放：`python3 scripts/audit_saved_diagnostics.py`。
 
 2026-10-22 Agent闭环代码与离线修复：全部真实业务FAIL交给同一Agent处理，补证与方案执行资格分开；批量补证独立冻结预算，已有证据复用后再关联新评分。增加仅原问题的候选BM25排序、有证据的必要联动与跨阶段D；Qualified后仍可处理剩余问题。原11 Gate/Regression/人工确认保持。正式Run仍40 PASS/10 FAIL，真实修复0题，未进行新Provider/Sandbox或正式服务重载。[验收单与下一步授权](docs/AGENT_CLOSED_LOOP_ACCEPTANCE.md)。只读核验：`python3 scripts/agent_diagnostics.py --run EVAL-20261021141811373593`。

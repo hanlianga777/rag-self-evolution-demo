@@ -296,7 +296,7 @@ def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
     failed_checks={i for i,c in enumerate((case.get('judge_result') or {}).get('checks',[])) if c.get('met') is False}
     reviewed_checks={f.get('check_index') for f in analysis['evidence_checks']}
     diagnosis_complete=technical and (business_verdict(case)!='FAIL' or failed_checks<=reviewed_checks)
-    return {'view_version':'diagnosis-view-v3',**analysis,'phenomena':list(phenomena.values()),'primary_root_cause':root,
+    return {'view_version':'diagnosis-view-v4','experiment_plan':experiment_plan(case,analysis,corpus_chunks=corpus_chunks,corpus_fingerprint=corpus_fingerprint),**analysis,'phenomena':list(phenomena.values()),'primary_root_cause':root,
             'secondary_root_causes':[],
             'is_technical_bad_case':technical,'optimization_directions':directions if technical else [],
             'evaluation_quality_audit':{'issues':issues,'blocking':bool(issues) and case.get('passed') is False},
@@ -329,6 +329,7 @@ def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     if not _canonical_final({'final':trace['candidates'],'parent_expand':False},by_id):return blocked('Candidate完整正文/来源元数据与Canonical不符')
     if not isinstance(trace.get('reranked'),list) or not _canonical_final({'final':trace['reranked'],'parent_expand':False},by_id):
         return blocked('Rerank完整正文/来源元数据与Canonical不符或未采集')
+    result['execution_verified']=True
     sources=[{**c,'content':c.get('chunk_text') or c.get('text') or c.get('content','')} for c in corpus_chunks or []]
     def verified(support,entries):return isinstance(support,list) and bool(support) and all(quote_present(q,entries,display=True) for q in support)
     def applicable(reference,support,entries):
@@ -401,3 +402,56 @@ def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
                 result['optimization_blockers']=['已枚举现有TopK/Rerank/阈值组合；固定候选池无法恢复必要规范，不生成该方向Candidate。']
     elif gaps:result['analysis_reason']='；'.join(dict.fromkeys(g['condition'] for g in gaps))
     return result
+
+
+def experiment_plan(case, analysis, *, corpus_chunks=None, corpus_fingerprint=None):
+    """Structural observations permit experiments; they never prove semantic causes."""
+    from .evaluation_contract import business_verdict
+    trace=(case.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
+    plan={'status':'capability_gap','observations':[], 'directions':[],
+          'next_action':'repair_sources_or_trace', 'blockers':[],
+          'falsification':'同一冻结题集上目标要求仍失败则假设未获支持；全部50题Regression及11 Gate决定资格。'}
+    if business_verdict(case)!='FAIL':
+        plan.update(next_action='review_evaluation',blockers=['没有已完成的业务FAIL，不生成技术实验'])
+        return plan
+    if analysis.get('analysis_category')=='evaluation_issue':
+        plan.update(next_action='review_evaluation',blockers=[analysis['analysis_reason']])
+        return plan
+    if not analysis.get('execution_verified'):
+        plan['blockers']=[analysis['analysis_reason']]
+        return plan
+    if corpus_chunks is None:corpus_chunks,corpus_fingerprint=_current_corpus(trace)
+    by_id={c['chunk_id']:c for c in corpus_chunks or []}
+    required=set((case.get('programmatic_metrics') or {}).get('evidence_coverage',{}).get('required_chunk_ids') or [])
+    missing_sources=sorted(i for i in required if i not in by_id or not (by_id[i].get('chunk_text') or by_id[i].get('text')))
+    if not required or missing_sources:
+        plan.update(next_action='repair_canonical_sources',required_source_ids=sorted(required),missing_source_ids=missing_sources)
+        plan['blockers']=['冻结规范来源缺失或正文不可用：'+', '.join(missing_sources)+'；需修复解析、切片或来源绑定，经原人工治理重建身份后验证']
+        return plan
+    checks=(case.get('judge_result') or {}).get('checks',[])
+    plan['failed_requirements']=[{'check_index':i,'requirement':c['requirement']} for i,c in enumerate(checks) if c.get('met') is False]
+    if not plan['failed_requirements']:
+        plan.update(next_action='review_evaluation',blockers=['缺少可定位失败要求，先审查原始Judge'])
+        return plan
+    # IDs describe frozen material coverage only, never fact equivalence or field applicability.
+    candidate_ids={e['chunk_id'] for e in trace['candidates']}
+    final_ids={i for e in trace['final'] for i in e.get('matched_child_ids',[e['chunk_id']])}
+    missing_candidates=sorted(required-candidate_ids)
+    missing_final=sorted((required & candidate_ids)-final_ids)
+    plan.update(required_source_ids=sorted(required),missing_candidate_source_ids=missing_candidates,omitted_final_source_ids=missing_final)
+    if missing_candidates:
+        plan['observations'].append('candidate_pool_gap')
+        plan['directions'].extend(['query_expansion','candidate_recall'])
+    if missing_final:
+        plan['observations'].append('context_pool_gap')
+        plan['directions'].append('context_selection')
+    if required<=final_ids:
+        plan['observations'].append('answer_requirement_gap')
+        plan['directions'].append('grounded_generation')
+    if not plan['directions']:
+        plan.update(next_action='review_evaluation',blockers=['现有结构观察不足以支持参数实验；需核查来源适用性及失败要求'])
+        return plan
+    plan.update(status='exploratory',next_action='controlled_sandbox',
+        hypothesis='冻结规范来源在候选/Final的结构缺口可能导致当前失败；对照实验核验因果，保留未知语义与现场适用性。',
+        risk='扩召回/重排可能带来噪声、丢失已满足事实或安全退化；不向生成器注入Golden、题号或目标Chunk。')
+    return plan

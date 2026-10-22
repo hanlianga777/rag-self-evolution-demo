@@ -593,6 +593,24 @@ class EvaluationRunner:
         from .policy import validate_candidate_config
         if not validate_candidate_config(candidate["config"])["valid"]:
             raise ValueError("Candidate 参数超出 Search Space")
+        if candidate['reasoning'].get('intervention_contract_version')=='agent-closure-3':
+            from .optimization import validate_intervention
+            base={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}
+            for key in ('run_target','knowledge_identity'):base.pop(key,None)
+            targets={ref:row['result'] for row in self.store.bad_case_rows() if row['run_id']==baseline['id'] for ref in (row['id'],row['question_id'])}
+            reasoning=candidate['reasoning']
+            actual={k:v for k,v in candidate['config'].items() if v!=base.get(k)}
+            if actual!=reasoning.get('changed_parameters'):raise ValueError('Candidate配置与已审查干预不一致')
+            sources=[candidate]
+            if reasoning.get('candidate_label')=='D':
+                sources=[self.store.candidate(s['candidate_id']) for s in reasoning.get('sources',[])]
+                if len(sources)<2 or any(not c or c['status']!='evaluated' or c['result'].get('evaluation_identity')!=baseline['judge'].get('evaluation_identity') or not c['result'].get('regression',{}).get('passed') or not c['result'].get('all_fixed_question_ids') for c in sources):
+                    raise ValueError('D缺少同身份完整验证来源')
+                if any(not any(c['config'].get(k)==v for c in sources) for k,v in actual.items()):raise ValueError('D参数缺少已验证来源')
+            for source in sources:
+                r=source['reasoning']
+                validate_intervention({**r,'target_bad_cases':r.get('observed_evidence',[]),'why':r.get('proposal'),
+                    'config_diff':{k:v for k,v in source['config'].items() if v!=base.get(k)}},targets,base)
         snapshot = json.loads(baseline["dataset_snapshot_json"])
         from .paid_run import current_paid_run
         limits = baseline['judge'].get('execution_snapshot',{}).get('request_limits')

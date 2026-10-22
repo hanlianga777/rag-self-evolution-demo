@@ -1,0 +1,10 @@
+{
+  "kind": "offline_fixture_preview_NOT_formal_service",
+  "navigation_count": 8,
+  "business_rows": 10,
+  "exploratory_rows": 9,
+  "strategy_branches": 10,
+  "linked_targets": 10,
+  "page_errors": [],
+  "mutation_requests": []
+}
