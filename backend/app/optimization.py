@@ -55,6 +55,12 @@ def validate_intervention(candidate, targets, baseline):
     if not isinstance(dependencies,list):raise ValueError('参数依赖必须是数组')
     if len(changed)>1 and not any(isinstance(d,dict) and isinstance(d.get('parameters'),list) and set(d['parameters'])==changed and isinstance(d.get('reason'),str) and d['reason'].strip() for d in dependencies):
         raise ValueError('多参数联动必须解释全部修改的必要依赖')
+    roots=candidate.get('target_root_causes')
+    if roots is not None:
+        if not exploratory or not isinstance(roots,dict) or set(roots)!=set(candidate['target_bad_cases']):
+            raise ValueError('逐目标根因映射仅供探索实验且必须完整对应目标')
+        aggregate=next(iter(set(roots.values()))) if len(set(roots.values()))==1 else 'Unknown'
+        if candidate['root_cause']!=aggregate:raise ValueError('聚合根因必须保留逐目标诊断，混合组为Unknown')
     assertions=candidate.get('evidence_assertions')
     if not isinstance(assertions,list):raise ValueError('必须提供实际Trace证据断言')
     for target_id in candidate['target_bad_cases']:
@@ -68,7 +74,7 @@ def validate_intervention(candidate, targets, baseline):
         if exploratory:
             if plan.get('status')!='exploratory' or not set(directions)<=set(plan.get('directions',[])):
                 raise ValueError('探索干预缺少保存材料的结构观察，需先完成能力修复任务')
-            if candidate['root_cause']!=view['primary_root_cause']:
+            if (roots[target_id] if roots is not None else candidate['root_cause'])!=view['primary_root_cause']:
                 raise ValueError('探索假设不能伪装成已确认根因；Unknown必须保留')
         elif not view['target_eligible'] or candidate['root_cause']!=view['primary_root_cause']:
             raise ValueError('全部目标必须具有一致且证据充分的主要根因')
@@ -191,7 +197,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
                 audit.update(failed_field='root_cause_evidence', actual_value=evidence_refs, expected_type='all target references', allowed_values=candidate['target_bad_cases'])
                 raise ValueError('根因依据必须对应全部目标引用')
             causes = {item['diagnostic_view']['primary_root_cause'] for item in bad_cases if item['id'] in candidate['target_bad_cases'] or item['question_id'] in candidate['target_bad_cases']}
-            if candidate['root_cause'] not in ({'Retrieval', 'Ranking', 'Generation', 'Safety', 'Performance','Unknown'} if candidate.get('experiment_kind')=='exploratory' else {'Retrieval', 'Ranking', 'Generation', 'Safety', 'Performance'}) or causes and candidate['root_cause'] not in causes:
+            if candidate['root_cause'] not in ({'Retrieval', 'Ranking', 'Generation', 'Safety', 'Performance','Unknown'} if candidate.get('experiment_kind')=='exploratory' else {'Retrieval', 'Ranking', 'Generation', 'Safety', 'Performance'}) or causes and candidate['root_cause'] not in causes and not (candidate.get('experiment_kind')=='exploratory' and isinstance(candidate.get('target_root_causes'),dict) and candidate['root_cause']=='Unknown'):
                 audit.update(failed_field='root_cause', actual_value=candidate['root_cause'], expected_type='evidence-based target root cause, not intervention stage', allowed_values=sorted(causes) if causes else ['Retrieval','Ranking','Generation','Safety','Performance'])
                 raise ValueError('候选根因与可信目标不对应')
             if candidate["hypothesis"].strip() in {item.get("reasoning", {}).get("hypothesis", "").strip() for item in prior_candidates}:
@@ -229,7 +235,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
     for candidate, config in staged:
         batch.append((f"R{round_number}-{candidate['id']}", config, {
             "intervention_direction":candidate['intervention_direction'], "supporting_directions":candidate.get('supporting_directions',[]), "intervention_contract_version":"agent-closure-3", "experiment_kind":candidate.get("experiment_kind","confirmed"), "falsification":candidate.get("falsification"), "parameter_dependencies":candidate.get('parameter_dependencies',[]), "evidence_assertions":candidate['evidence_assertions'], "performance_stage":candidate.get('performance_stage'),
-            "target_group": candidate.get("target_group") if isinstance(candidate.get("target_group"),str) else None, "root_cause": candidate["root_cause"], "root_cause_evidence": candidate["root_cause_evidence"], "expected_improvement": candidate["expected_improvement"], "target_diagnosis": [strategy_case(item) for item in bad_cases if item["id"] in candidate["target_bad_cases"] or item["question_id"] in candidate["target_bad_cases"]], "root_cause_cluster": result.get("root_cause_cluster"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
+            "target_root_causes": candidate.get("target_root_causes"), "provenance": candidate.get("provenance"), "target_group": candidate.get("target_group") if isinstance(candidate.get("target_group"),str) else None, "root_cause": candidate["root_cause"], "root_cause_evidence": candidate["root_cause_evidence"], "expected_improvement": candidate["expected_improvement"], "target_diagnosis": [strategy_case(item) for item in bad_cases if item["id"] in candidate["target_bad_cases"] or item["question_id"] in candidate["target_bad_cases"]], "root_cause_cluster": result.get("root_cause_cluster"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
             "changed_parameters": {key: value for key, value in config.items() if value != base_config.get(key)}, "source_trigger_id": trigger_id, "monitoring_target_event_ids": monitoring_target_event_ids, "round": round_number, "candidate_label": candidate["id"],
         }))
     audit.update(generated_candidate_count=len(batch),returned_candidate_count=len(candidates),requested_candidate_count=len(labels),
@@ -305,7 +311,10 @@ class OptimizationAgent:
         failed_gates = [gate for gate in persisted_gates if gate.get("passed") is False] if isinstance(persisted_gates, list) else None
         labels = ['A', 'B', 'C'][:min(3, MAX_EVALS - 1 - completed)]
         audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "diagnostic_tasks":diagnostic_tasks, "processing_progress":processing_progress, "all_bad_case_audit": [{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases], "root_cause_counts": dict(Counter(item['diagnostic_view']['primary_root_cause'] for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases], "monitoring_context": monitoring_context, "monitoring_target_event_ids": monitoring_target_event_ids, "target_reference_map": target_reference_map, "evaluation_budget": evaluation_budget, "baseline_gate_results": gate_results, "failed_gates": failed_gates}
+        from .agent_coverage import plan_coverage
+        coverage_obligations=plan_coverage(bad_cases,base_config,prior_candidates,round_number=round_number)
         prompt = {
+            "coverage_obligations":coverage_obligations,
             "baseline_id": baseline_run_id,
             "diagnostic_tasks": diagnostic_tasks,
             "processing_progress":processing_progress,
@@ -326,7 +335,7 @@ class OptimizationAgent:
             "intervention_contract": {key:{'parameters':sorted(parameters),'required_observations':sorted(observations)} for key,(parameters,observations) in INTERVENTIONS.items()},
             "evidence_contract": "必须输出intervention_direction、evidence_assertions:[{target_id,observation}]、parameter_dependencies:[{parameters,reason}]。confirmed每目标断言只能取保存diagnostic_view.trace_observations；exploratory每目标断言只能取该目标experiment_plan.observations，方向取experiment_plan.directions；结构观察不是技术根因证明。recall_missing须候选未完整覆盖已核验必要事实，ranking_omission须候选已含但Final遗漏。禁止完整召回却声称召回失败。必要跨阶段联动声明supporting_directions，各方向必须有真实观察、实际参数和覆盖全部修改的必要依赖。stage_performance须performance_stage对应保存的独立瓶颈stage_name，参数与该阶段对应。",
 
-            "rule": f"当前为 Round {round_number}。最多返回 {','.join(labels)} 并列、可解释 Candidate；允许返回0至3个合法候选，不强求凑满。insufficient_evidence仅记录模型实际提供的说明，缺失不使合法候选失效。每个候选独立校验，非法项记录并拒绝；Unknown可依据experiment_plan提出exploratory假设。One Candidate = One Verifiable Hypothesis + One Coherent Intervention Direction + Minimum Necessary Parameters。target_bad_cases 必须是 target_reference_map 中的实际标识符，禁止描述文本或未知 ID。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。root_cause保留目标当前根因，Unknown表示尚未证实，必须属于所引用Baseline目标在target_reference_map中的primary_root_cause集合，不能将参数干预环节当作根因。Generation问题可以提出检索参数干预，但须保持Generation根因并在why中引用实际答案/证据/Trace说明跨环节假设；不得把缺证据的检索遗漏猜测写成已确认Retrieval。confirmed方案仍由diagnostic_view.target_eligible、primary_root_cause和实际证据确定；result中的旧根因/diagnosis/status只作历史原始审计，不作为当前优化依据；诊断待完成的业务FAIL可按experiment_plan提出experiment_kind=exploratory及falsification。探索root_cause保留当前Unknown或已知根因，绝不填猜测根因；仅用该计划observations和directions，允许分组但逐目标均须有观察。结构覆盖不证明语义、来源适用性或现场授权，不要求实验前证明因果；能力缺口按next_action修复，不能编造参数。技术异常不能冒充业务目标。diagnostic_view的phenomena仅说明失败现象，不能一一映射技术根因；治理争议仅作风险背景，不作为目标。阶段耗时区分question_stages与judge_stages，不猜测未采集占比。根据 prior_sandbox_results 的真实修复/退化/Regression调整假设，不能重复已失败配置。",
+            "rule": f"当前为 Round {round_number}。最多返回 {','.join(labels)} 并列、可解释 Candidate；允许返回0至3个合法候选，不强求凑满。insufficient_evidence仅记录模型实际提供的说明，缺失不使合法候选失效。每个候选独立校验，非法项记录并拒绝；Unknown可依据experiment_plan提出exploratory假设。One Candidate = One Verifiable Hypothesis + One Coherent Intervention Direction + Minimum Necessary Parameters。target_bad_cases 必须是 target_reference_map 中的实际标识符，禁止描述文本或未知 ID。Monitoring 目标使用 monitoring_target_event_ids 中持久化的事件 ID，不能冒充 Baseline Case ID；事件证据与 Baseline bad_cases 分开解释。config_diff 只写相对 Baseline 的实际改动，且只允许 allowed_parameter_values 中的字段和值；禁止所有其他字段。hybrid_alpha 只在 hybrid_search=true 时有效；若关闭 Hybrid，不要在 config_diff 中提供 hybrid_alpha。root_cause保留目标当前根因，Unknown表示尚未证实，必须属于所引用Baseline目标在target_reference_map中的primary_root_cause集合，不能将参数干预环节当作根因。Generation问题可以提出检索参数干预，但须保持Generation根因并在why中引用实际答案/证据/Trace说明跨环节假设；不得把缺证据的检索遗漏猜测写成已确认Retrieval。confirmed方案仍由diagnostic_view.target_eligible、primary_root_cause和实际证据确定；result中的旧根因/diagnosis/status只作历史原始审计，不作为当前优化依据；诊断待完成的业务FAIL可按experiment_plan提出experiment_kind=exploratory及falsification。探索root_cause保留当前Unknown或已知根因，绝不填猜测根因；仅用该计划observations和directions，允许分组但逐目标均须有观察。跨根因探索组必须提供target_root_causes完整逐目标映射且保持原诊断，聚合root_cause为Unknown。coverage_obligations是规则规划参考，不是模型已生成的方案；模型负责假设和策略推理，不能遗漏目标或把未覆盖宣称完成。结构覆盖不证明语义、来源适用性或现场授权，不要求实验前证明因果；能力缺口按next_action修复，不能编造参数。技术异常不能冒充业务目标。diagnostic_view的phenomena仅说明失败现象，不能一一映射技术根因；治理争议仅作风险背景，不作为目标。阶段耗时区分question_stages与judge_stages，不猜测未采集占比。根据 prior_sandbox_results 的真实修复/退化/Regression调整假设，不能重复已失败配置。",
         }
         try:
             stages = []

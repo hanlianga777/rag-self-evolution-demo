@@ -56,3 +56,14 @@ it("offers failed Sandbox continuation only through the existing paid confirmati
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("另占一次预算");
   expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);
 });
+
+it("keeps incomplete coverage out of Sandbox and offers same-round zero-call completion", async () => {
+  await mount({ ...data, optimization:{...data.optimization,candidates:[candidates[0]],coverage_plan:{status:"incomplete",covered_count:1,total:10,binding:"reviewed",matrix:[{question_id:"Q1",candidates:[],gap:"缺口待记录"}]}}});
+  expect(document.body.textContent).toContain("补齐本轮规划（不收费）");
+  expect(document.body.textContent).not.toContain("运行本轮 A/B/C Sandbox");
+  await click("优化 Agent");
+  expect(document.body.textContent).toContain("规划未完成");
+  await click("A/B/C/D");
+  expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="运行 Sandbox")?.disabled).toBe(true);
+  expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);
+});

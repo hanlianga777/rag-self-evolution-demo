@@ -37,12 +37,14 @@ from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
 from .retrieval import RetrievalUnavailable
 
 
+from .agent_coverage import plan_coverage, complete_coverage
+
 # Fingerprint loaded objects, not source files that may have changed under a live process.
 EVALUATION_RUNTIME_CONTRACT = {**VERSIONS, 'judge_prompt_sha256':hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(),
     'loaded_code_sha256':{name:hashlib.sha256(marshal.dumps(fn.__code__)).hexdigest() for name,fn in {
         'validator':validate_business_judgment, 'provider_parser':DeepSeekProvider._judge_business,
         'scorer':EvaluationRunner.score_execution, 'batch_runner':EvaluationRunner._execute_baseline,
-        'diagnostic_view':diagnostic_view, 'agent_generate':OptimizationAgent.generate.__wrapped__}.items()}}
+        'diagnostic_view':diagnostic_view, 'agent_generate':OptimizationAgent.generate.__wrapped__, 'coverage_planner':plan_coverage, 'coverage_apply':complete_coverage}.items()}}
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
 app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1] / "documents"), name="documents")
@@ -1281,7 +1283,9 @@ def optimization():
     experiment = store.experiment(identity["current_experiment_id"]) if identity["current_experiment_id"] else None
     if experiment is None:
         return {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"] or "当前 Baseline 尚未运行 Optimization Agent", **identity}
-    return {**experiment, "data_source": "real", "recommendation": store.recommendation(experiment["id"]), **identity}
+    from .agent_coverage import coverage_inputs
+    coverage=coverage_inputs(store,experiment["id"])[-1]
+    return {**experiment, "coverage_plan":coverage, "data_source": "real", "recommendation": store.recommendation(experiment["id"]), **identity}
 
 
 @app.get("/api/versions")
@@ -1409,6 +1413,20 @@ def experiment(run_id: str):
     if result is None:
         raise HTTPException(status_code=404, detail="Experiment not found")
     return result
+
+
+class CoveragePlanRequest(BaseModel):
+    binding: str
+
+
+@app.post("/api/experiments/{run_id}/complete-plan", dependencies=[Depends(require_trusted_origin)])
+def complete_experiment_plan(run_id: str, payload: CoveragePlanRequest):
+    from .agent_coverage import complete_coverage
+    try:
+        backup=store.database_path.parent/'audit_backups'/f"coverage-{datetime.now().strftime('%Y%m%d%H%M%S%f')}.db"
+        return complete_coverage(store,run_id,expected_binding=payload.binding,backup_path=backup)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.post("/api/experiments/{run_id}/continue", dependencies=[Depends(require_trusted_origin)])

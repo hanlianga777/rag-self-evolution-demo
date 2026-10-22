@@ -2332,6 +2332,10 @@ class GovernanceStore:
                 raise ValueError('Candidate 不属于当前 Optimization Run；旧实验仅供历史查看')
             result = _load(experiment['result_json'], {})
             is_d = candidate['reasoning'].get('candidate_label') == 'D'
+            if not is_d and candidate['reasoning'].get('intervention_contract_version')=='agent-closure-3':
+                from .agent_coverage import coverage_inputs
+                if coverage_inputs(self,candidate['experiment_id'])[-1]['status']=='incomplete':
+                    raise ValueError('本轮优化规划未完成：先补齐同轮候选或明确能力缺口')
             if result.get('report_confirmation') and not is_d:
                 raise ValueError('报告已确认，不能改变已确认的实验结果')
             items = connection.execute("SELECT status, reasoning_json FROM candidate_configs WHERE experiment_id=?", (candidate['experiment_id'],)).fetchall()

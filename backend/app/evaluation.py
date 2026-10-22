@@ -594,6 +594,9 @@ class EvaluationRunner:
         if not validate_candidate_config(candidate["config"])["valid"]:
             raise ValueError("Candidate 参数超出 Search Space")
         if candidate['reasoning'].get('intervention_contract_version')=='agent-closure-3':
+            from .agent_coverage import coverage_inputs
+            if candidate['reasoning'].get('candidate_label')!='D' and coverage_inputs(self.store,experiment['id'])[-1]['status']=='incomplete':
+                raise ValueError('本轮优化规划未完成：请先零调用补齐合法候选或明确能力缺口')
             from .optimization import validate_intervention
             base={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}
             for key in ('run_target','knowledge_identity'):base.pop(key,None)
