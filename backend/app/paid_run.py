@@ -59,7 +59,7 @@ class PaidRun:
         continuations=data.get('continuation_authorizations',[])
         held=set(continuations[-1]['held_call_indices']) if continuations else set()
         if prior:held.add(prior['unknown_call_index'])
-        unresolved=[i for i,c in enumerate(data['calls']) if c['status']!='ok' and i not in held]
+        unresolved=[i for i,c in enumerate(data['calls']) if c['status'] not in {'ok','rejected'} and i not in held]
         if authorization and authorization.get('scope')=='finite_checkpoint_resume':
             reserved=[i for i,c in enumerate(data['calls']) if c['status']=='reserved']
             if (authorization.get('source')!='direct_user_instruction' or authorization.get('max_missing_request_retries')!=1
@@ -161,6 +161,9 @@ class PaidRun:
         return call
 
     def settle(self, call, usage):
+        if usage.get('status')=='rejected' and usage.get('request_execution_unknown') is False:
+            call.update(status='rejected',usage=usage,upper_estimate_yuan=0.,settlement='provider_confirmed_rejection')
+            self.save();return
         if call.get('accounting_only'):
             call['usage']=usage
             prompt=usage.get('prompt_tokens',usage.get('total_tokens'));output=usage.get('completion_tokens',0 if call['provider']=='Alibaba' else None)
@@ -238,11 +241,12 @@ def paid_request(provider, model, payload):
         if _accounting.get() and call['status']!='ok':
             if call['status']=='reserved':call['status']='unknown';run.save()
             raise RuntimeError('Payment Usage missing or invalid')
-        elif not _accounting.get() and call['status']!='ok':raise RuntimeError('Payment Usage missing')
+        elif not _accounting.get() and call['status'] not in {'ok','rejected'}:raise RuntimeError('Payment Usage missing')
     except Exception as error:
         if _accounting.get():
             if token is not None and call['status']=='reserved':call.update(status='unknown',error_type=type(error).__name__);run.save()
-        run.stop(type(error).__name__)
+        from .providers import retryable_error
+        if token is None or call['status']!='rejected' or not retryable_error(error):run.stop(type(error).__name__)
         raise
     finally:
         if token is not None: _ticket.reset(token)
@@ -272,3 +276,28 @@ def accounting_only():
     token=_accounting.set(True)
     try:yield
     finally:_accounting.reset(token)
+
+
+def unsettled_usage(usage):
+    if usage.get('status')=='rejected' and usage.get('request_execution_unknown') is False:return False
+    return usage.get('provider') in {'Alibaba','DeepSeek'} and (usage.get('status')!='ok'
+        or type(usage.get('prompt_tokens',usage.get('total_tokens'))) is not int
+        or usage.get('provider')=='DeepSeek' and type(usage.get('completion_tokens')) is not int)
+
+
+def require_reconciled_execution(result):
+    """Read-only: an approval to continue does not settle an unknown earlier charge."""
+    for question,checkpoint in result.get('checkpoints',{}).items():
+        if checkpoint.get('inflight') or any(checkpoint.get('unknown_execution',{}).values()) or any(checkpoint.get('unsettled_usage',{}).values()):
+            raise ValueError('需先对账：'+question+' 存在Unknown request execution；禁止重复调用或预约续跑')
+        if any(a.get('request_execution_unknown') is True or a.get('billing_unknown') is True or any(unsettled_usage(u) for u in a.get('usage',[])) for a in checkpoint.get('attempts',[])):
+            raise ValueError('需先对账：'+question+' 请求结果或Usage未知')
+    path=result.get('auto_recovery',{}).get('ledger_path')
+    if path:
+        try:data=json.loads(Path(path).read_text())
+        except (OSError,ValueError):raise ValueError('费用账本缺失或无效，禁止续跑') from None
+        if not isinstance(data,dict) or not isinstance(data.get('calls'),list) or any(not isinstance(c,dict) for c in data['calls']):raise ValueError('费用账本格式无效')
+        if data.get('identity')!=result.get('auto_recovery',{}).get('ledger_identity'):
+            raise ValueError('费用账本身份不匹配')
+        if any(c.get('status') not in {'ok','rejected'} for c in data.get('calls',[])):
+            raise ValueError('费用账本存在unknown/reserved/未结算请求，须先对账')

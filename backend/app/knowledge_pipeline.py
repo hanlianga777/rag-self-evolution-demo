@@ -21,7 +21,8 @@ import numpy as np
 
 from .corpus import EMBEDDING_MODEL, source_fingerprint, _split_long_part
 from .full_text import CORPUS_LOCK, checksum, validate_bundle, write_full_text
-from .providers import ProviderUnavailable, request_timeout
+from .providers import (ProviderUnavailable, ProviderAPIError, ProviderTimeout, ProviderNetworkError,
+                        ProviderRequestError, ProviderInvalidResponse, redact_provider_error, request_timeout)
 
 CONFIG = {'parser': 'MinerU', 'parser_mode': 'vlm', 'table_normalize': 'table-kv-v1',
           'chunk_strategy': 'Parent-Child', 'parent_tokens': 1400, 'child_tokens': 400,
@@ -151,8 +152,27 @@ class AlibabaProvider:
 
     def _post(self, path, payload):
         from .paid_run import paid_request
-        with paid_request('Alibaba',payload['model'],payload):
-            return self._post_request(path,payload)
+        from .providers import _stage_control
+        if not self.values.get('DASHSCOPE_API_KEY','').strip() or not self.values.get('DASHSCOPE_BASE_URL','').strip():
+            raise ProviderRequestError('Alibaba Key / business-space endpoint missing')
+        def send():
+            request_timeout(60)  # Deadline check precedes any payment reservation.
+            with paid_request('Alibaba',payload['model'],payload):return self._post_request(path,payload)
+        control=_stage_control.get()
+        if control is None:return send()
+        # Reuse the finite stage loop per RPC; do not repeat an earlier paid Embedding when Rerank rejects.
+        from .evaluation_stage import perform_stage
+        checkpoint={'attempts':[]}
+        try:
+            return perform_stage(checkpoint,'alibaba_request',send,'provider-request',automatic=control[0],
+                check_stop=control[1],on_state=lambda *args,**kwargs:None)
+        except Exception as error:
+            from .providers import retryable_error
+            error.provider_retry_exhausted=retryable_error(error)
+            if getattr(error,'billing_unknown',False) and 'scored_result' in checkpoint:
+                error.raw_provider_response=redact_provider_error(json.dumps(checkpoint['scored_result'],ensure_ascii=False),self.values.get('DASHSCOPE_API_KEY',''))
+            error.response_metadata={**(getattr(error,'response_metadata',None) or {}),'request_attempt_count':len(checkpoint['attempts'])}
+            raise
 
     def _post_request(self, path, payload):
         key = self.values.get('DASHSCOPE_API_KEY', '').strip()
@@ -163,14 +183,38 @@ class AlibabaProvider:
         started = time.perf_counter()
         call_started_at = datetime.now(timezone.utc).isoformat()
         try:
-            with urllib.request.urlopen(request, timeout=request_timeout(60)) as response: body = json.load(response)
+            with urllib.request.urlopen(request, timeout=request_timeout(60)) as response:
+                response_text=response.read().decode('utf-8')
+                body=json.loads(response_text)
+                if not isinstance(body,dict):raise ProviderInvalidResponse('阿里云响应不是对象',raw_provider_response=redact_provider_error(response_text,key))
             from .paid_run import current_paid_run
             if current_paid_run(): current_paid_run().response(body)
             record_usage({**body.get('usage', {}), 'provider':'Alibaba', 'requested_model':payload['model'], 'call_started_at':call_started_at, 'status':'ok', 'latency_ms':round((time.perf_counter()-started)*1000)})
             return body
-        except (urllib.error.URLError, TimeoutError) as error:
-            record_usage({'provider':'Alibaba','requested_model':payload['model'],'call_started_at':call_started_at,'status':'failed','latency_ms':round((time.perf_counter()-started)*1000)})
-            raise ProviderUnavailable(f'Alibaba request failed ({type(error).__name__})') from None
+        except (urllib.error.URLError, TimeoutError, http.client.HTTPException, json.JSONDecodeError, ProviderInvalidResponse) as error:
+            status=error.code if isinstance(error,urllib.error.HTTPError) else None
+            raw=redact_provider_error(error.read(65536).decode('utf-8',errors='replace'),key) if status else None
+            # Only explicit rejection responses prove that no request result was produced.
+            rejected=status in {400,401,403,404,413,422,429}
+            metadata={'provider':'Alibaba','model':payload['model'],'http_status':status,
+                      'request_id':error.headers.get('x-request-id') if status and error.headers else None,
+                      'transport_error_type':type(error).__name__,'request_execution_unknown':not rejected}
+            if status:
+                failure=ProviderAPIError('阿里云请求被拒绝' if rejected else '阿里云服务请求失败',status_code=status,
+                    retry_after=error.headers.get('Retry-After') if error.headers else None,raw_provider_response=raw)
+                try:metadata['request_id']=metadata['request_id'] or json.loads(raw).get('request_id')
+                except (ValueError,AttributeError):pass
+            elif isinstance(error,TimeoutError) or isinstance(getattr(error,'reason',None),TimeoutError):
+                failure=ProviderTimeout('阿里云请求超时，执行与费用状态未知')
+            elif isinstance(error,ProviderInvalidResponse):failure=error
+            elif isinstance(error,json.JSONDecodeError):
+                failure=ProviderInvalidResponse('阿里云响应无法解析，费用状态未知',raw_provider_response=redact_provider_error(response_text,key))
+            else:failure=ProviderNetworkError('阿里云传输异常：'+redact_provider_error(str(error),key)[:500])
+            failure.response_metadata=metadata;failure.request_execution_unknown=not rejected
+            record_usage({'provider':'Alibaba','requested_model':payload['model'],'call_started_at':call_started_at,
+                'status':'rejected' if rejected else 'unknown','latency_ms':round((time.perf_counter()-started)*1000),
+                **metadata,'provider_code':getattr(failure,'provider_code',None),'detail':str(failure)})
+            raise failure from None
 
     def embed(self, texts, dimension):
         vectors = []

@@ -1987,6 +1987,8 @@ class GovernanceStore:
         source = connection.execute('SELECT * FROM evaluation_runs WHERE id=?', (source_id,)).fetchone()
         if source is None or source['status'] not in {'partial','failed'} or _load(source['config_json'], {}).get('run_target') != ('sandbox_candidate' if candidate_id else 'baseline'):
             raise ValueError('仅中断的同身份评测可以授权续跑')
+        from .paid_run import require_reconciled_execution
+        if candidate_id:require_reconciled_execution(_load(source['result_json'], {}))
         source_judge = _load(source['judge_json'], {})
         if (_load(source['dataset_snapshot_json'], {}) != snapshot or _load(source['config_json'], {}) != config or not policy_current(source_judge)
             or source_judge.get('evaluation_identity') != evaluation_identity(snapshot, judge) or (candidate_id and source_judge != judge)
@@ -2254,6 +2256,11 @@ class GovernanceStore:
                     except ProcessLookupError:pass
                     except PermissionError:live.add(run['id'])
                     else:live.add(run['id'])
+                config=_load(connection.execute('SELECT config_json FROM evaluation_runs WHERE id=?',(run['id'],)).fetchone()[0],{})
+                if config.get('candidate_id') and run['id'] not in live:
+                    result=_load(run['result_json'],{});result.setdefault('auto_recovery',{}).update(authorized=False,state='awaiting_authorization')
+                    connection.execute("UPDATE evaluation_runs SET status='partial',result_json=?,error_message=?,completed_at=? WHERE id=?",(_json(result),'进程中断，断点已保留；须重新付费授权',_now(),run['id']))
+                    continue
                 if _load(run['result_json'],{}).get('auto_recovery',{}).get('authorized') and run['id'] not in live:
                     connection.execute("UPDATE evaluation_runs SET status='queued' WHERE id=?",(run['id'],));live.add(run['id'])
                 if run['id'] not in live:
@@ -2299,7 +2306,7 @@ class GovernanceStore:
     @staticmethod
     def _round_summary(candidates: list[dict], number: int) -> dict:
         items = [item for item in candidates if item.get("reasoning", {}).get("round") == number]
-        evaluated = sum(item["status"] in {'evaluated', 'failed'} for item in items)
+        evaluated = sum(item["status"]=='evaluated' and item["result"].get('evaluation_complete') is not False for item in items)
         return {"round": number, "candidate_ids": [item["id"] for item in items], "evaluated": evaluated, "total": len(items), "complete": bool(items) and evaluated == len(items)}
 
     def round_completion(self, candidate: dict) -> dict:
@@ -2362,7 +2369,7 @@ class GovernanceStore:
                 raise ValueError('报告已确认')
             self.require_current_baseline(experiment['baseline_run_id'], connection)
             candidates = experiment['candidates']
-            if any(item['status'] == 'generated' for item in candidates):
+            if any(item['status']!='evaluated' or item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label')!='D'):
                 raise ValueError('仍有未完成实验，不能确认Gate 2')
             if any(item['status'] == 'running' for item in candidates):
                 raise ValueError('仍有 Sandbox 运行中')
@@ -2503,7 +2510,7 @@ class GovernanceStore:
             identity = baseline.get('judge', {}).get('evaluation_identity')
             qualified = rank_qualified([item for item in candidates if item['status'] == 'evaluated' and item['result'].get('qualification', {}).get('qualified') and policy_current(baseline.get('judge', {})) and identity and item['result'].get('evaluation_identity') == identity])
             selected = None
-            if any(item['status'] in {'running', 'generated'} for item in candidates if item['reasoning'].get('candidate_label') != 'D'):
+            if any(item['status'] in {'running', 'generated'} or item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label') != 'D'):
                 status = 'WAITING_FOR_ROUND_COMPLETION'
             elif not confirmation:
                 status = 'Needs Report Confirmation' if qualified else 'No Qualified Candidate'

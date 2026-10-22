@@ -38,13 +38,17 @@ from .retrieval import RetrievalUnavailable
 
 
 from .agent_coverage import plan_coverage, complete_coverage
+from .knowledge_pipeline import AlibabaProvider
+from .evaluation_stage import perform_stage
 
 # Fingerprint loaded objects, not source files that may have changed under a live process.
 EVALUATION_RUNTIME_CONTRACT = {**VERSIONS, 'judge_prompt_sha256':hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(),
     'loaded_code_sha256':{name:hashlib.sha256(marshal.dumps(fn.__code__)).hexdigest() for name,fn in {
         'validator':validate_business_judgment, 'provider_parser':DeepSeekProvider._judge_business,
         'scorer':EvaluationRunner.score_execution, 'batch_runner':EvaluationRunner._execute_baseline,
-        'diagnostic_view':diagnostic_view, 'agent_generate':OptimizationAgent.generate.__wrapped__, 'coverage_planner':plan_coverage, 'coverage_apply':complete_coverage}.items()}}
+        'diagnostic_view':diagnostic_view, 'agent_generate':OptimizationAgent.generate.__wrapped__, 'coverage_planner':plan_coverage, 'coverage_apply':complete_coverage, 'alibaba_transport':AlibabaProvider._post_request,
+        'alibaba_request':AlibabaProvider._post,'provider_stage':perform_stage,
+        'sandbox_resume_guard':GovernanceStore.validate_evaluation_resume,'sandbox_preflight':EvaluationRunner.candidate_resume_plan}.items()}}
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
 app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1] / "documents"), name="documents")
@@ -1277,6 +1281,18 @@ def bad_case(case_id: str):
     raise HTTPException(status_code=404, detail="Bad case not found")
 
 
+def experiment_resume_view(experiment):
+    runner=EvaluationRunner(store,ai_service)
+    candidates=[]
+    for candidate in experiment['candidates']:
+        if candidate['status']=='failed':
+            try:plan=runner.candidate_resume_plan(candidate['id'])
+            except ValueError as error:plan={'can_resume':False,'reason':str(error)}
+            candidate={**candidate,'resume_plan':plan}
+        candidates.append(candidate)
+    return {**experiment,'candidates':candidates}
+
+
 @app.get("/api/optimization")
 def optimization():
     identity = store.current_baseline_identity()
@@ -1285,7 +1301,7 @@ def optimization():
         return {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"] or "当前 Baseline 尚未运行 Optimization Agent", **identity}
     from .agent_coverage import coverage_inputs
     coverage=coverage_inputs(store,experiment["id"])[-1]
-    return {**experiment, "coverage_plan":coverage, "data_source": "real", "recommendation": store.recommendation(experiment["id"]), **identity}
+    return {**experiment_resume_view(experiment), "coverage_plan":coverage, "data_source": "real", "recommendation": store.recommendation(experiment["id"]), **identity}
 
 
 @app.get("/api/versions")
@@ -1474,14 +1490,17 @@ def candidate_preflight(candidate_id: str):
         approved, config, candidate, baseline = EvaluationRunner(store, ai_service).candidate_inputs(candidate_id)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    return {"candidate_id": candidate["id"], "baseline_run_id": baseline["id"],
+    resume=EvaluationRunner(store,ai_service).candidate_resume_plan(candidate_id)
+    return {"resume_plan":resume,"can_start":resume["can_resume"],"candidate_id": candidate["id"], "baseline_run_id": baseline["id"],
             "snapshot_id": baseline["dataset_version_id"], "question_count": len(approved),
             "evaluation_identity": baseline["judge"]["evaluation_identity"], "judge": baseline["judge"],
             "request_limits": baseline["judge"].get("execution_snapshot", {}).get("request_limits"), "config": config}
 
 
 @app.post("/api/candidates/{candidate_id}/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
-def run_candidate(candidate_id: str):
+def run_candidate(candidate_id: str, payload: PaidActionRequest | None = None):
+    if not payload or not payload.authorize_provider:
+        raise HTTPException(409,detail="Sandbox启动与续跑须重新明确付费授权；预检不产生费用")
     candidate = store.candidate(candidate_id)
     if candidate:
         experiment = store.experiment(candidate["experiment_id"])

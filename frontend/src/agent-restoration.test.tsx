@@ -67,3 +67,21 @@ it("keeps incomplete coverage out of Sandbox and offers same-round zero-call com
   expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="运行 Sandbox")?.disabled).toBe(true);
   expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);
 });
+
+it("suppresses incomplete final scores, preserves progress and blocks unreconciled paid continuation", async () => {
+  const incomplete={evaluation_complete:false,completed:38,total:50,gates:{passed_count:0,total:11,passed:null},bad_case_count:6,regression:{status:"FAIL",new_critical_failures:12,new_ordinary_failures:3},qualification:{qualified:false},request_accounting:{call_events:156,unknown_usage_events:1}};
+  await mount({...data,optimization:{...data.optimization,candidates:[{...candidates[0],status:"failed",result:incomplete,resume_plan:{can_resume:false,reusable:38,completed:38,total:50,next_question_id:"Q39",reason:"需先对账：Embedding请求结果未知"}},candidates[1],candidates[2]],recommendation:{status:"No Qualified Candidate"}}});
+  await click("Sandbox");
+  expect(document.body.textContent).toContain("已完成 38/50");
+  expect(document.body.textContent).toContain("需先对账");
+  expect(document.querySelector('.sandbox-core-table')?.textContent).toContain("未完成");
+  expect(document.querySelector('.sandbox-core-table')?.textContent).toContain("待完成");
+  expect(document.querySelector('.sandbox-core-table')?.textContent).not.toContain("0 / 11");
+  expect(document.querySelector('.sandbox-core-table')?.textContent).not.toContain("严重 12");
+  await click("Recommendation");
+  expect(document.body.textContent).toContain("本轮实验尚未完成");
+  expect(document.body.textContent).not.toContain("保存结论：本轮暂无合格候选方案");
+  await click("A/B/C/D");
+  expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='继续 Sandbox')?.disabled).toBe(true);
+  expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);
+});

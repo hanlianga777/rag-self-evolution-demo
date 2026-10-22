@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import json
 import time
 import math
@@ -116,7 +117,7 @@ def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:
         "bad_case_count": sum(not item.get("passed", False) for item in cases),
     }
     if not complete:
-        result.update(overall_score=None, overall_score_status='NOT_EVALUABLE', gates={**evaluate_gates({}), 'passed':None})
+        result.update(overall_score=None, overall_score_status='NOT_EVALUABLE',partial_bad_case_count=result['bad_case_count'],bad_case_count=None, gates={**evaluate_gates({}), 'passed':None,'passed_count':None})
     return result
 
 
@@ -454,9 +455,10 @@ class EvaluationRunner:
         lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay') if k in run['result']}
         def progress(*, complete=False):
             from .telemetry import cost_fields
+            from .paid_run import unsettled_usage
             events=[u for cp in checkpoints.values() for attempt in cp.get('attempts',[]) for u in attempt.get('usage',[])]
             accounting={'provenance':'logical_task_including_resume_history','call_events':len(events),
-                'unknown_usage_events':sum(type(u.get('prompt_tokens',u.get('total_tokens'))) is not int or u.get('provider')!='Alibaba' and type(u.get('completion_tokens')) is not int for u in events),
+                'unknown_usage_events':sum(unsettled_usage(u) for u in events),
                 'known_input_tokens':sum(u.get('prompt_tokens',u.get('total_tokens',0)) for u in events if type(u.get('prompt_tokens',u.get('total_tokens'))) is int),
                 'known_output_tokens':sum(u['completion_tokens'] for u in events if type(u.get('completion_tokens')) is int),
                 **cost_fields(self.runtime.model,events)}
@@ -547,7 +549,9 @@ class EvaluationRunner:
             if item is not None:
                 checkpoint = checkpoints.setdefault(item['id'], {'attempts':[]})
                 checkpoint.pop('inflight', None)
-                if not isinstance(error,InterruptedError):checkpoint.setdefault('technical_error',{'phase':phase,'error_type':type(error).__name__,'error':str(error)})
+                if not isinstance(error,InterruptedError):
+                    from .providers import provider_error_details
+                    checkpoint.setdefault('technical_error',{'phase':phase,'error_type':type(error).__name__,'error':str(error),'provider_error':provider_error_details(error,phase)})
                 if not checkpoint['attempts'] or checkpoint['attempts'][-1].get('status')!='error':checkpoint['attempts'].append({'phase':phase, 'status':'error', 'error_type':type(error).__name__, 'cause_type':type(error.__cause__).__name__ if error.__cause__ else None, 'error':str(error), 'usage':locals().get('usage', []), 'elapsed_ms':round((time.perf_counter()-started)*1000) if 'started' in locals() else None})
                 checkpoint['attempts'][-1]['cause_message'] = str(error.__cause__) if error.__cause__ else None
                 if isinstance(getattr(error, 'raw_provider_response', None), str):
@@ -562,6 +566,8 @@ class EvaluationRunner:
         if not auto.get('authorized') or auto.get('state')=='stopped' or run['result'].get('stop_request'):return
         snapshot=json.loads(run['dataset_snapshot_json'])
         if run['judge'].get('evaluation_identity')!=evaluation_identity(snapshot,run['judge']) or not policy_current(run['judge']):raise ValueError('自动恢复Evaluation Identity不匹配')
+        if run['config'].get('candidate_id') and run['result'].get('execution_owner_pid')!=os.getpid():
+            raise ValueError('Sandbox进程重启后须重新明确付费授权，断点保留')
         if run['config'].get('candidate_id'):
             items,config,candidate,baseline=self.candidate_inputs(run['config']['candidate_id'])
             if config!=run['config'] or baseline['judge']!=run['judge']:raise ValueError('自动恢复Candidate身份不匹配')
@@ -632,6 +638,28 @@ class EvaluationRunner:
         config = {**candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
         return approved, config, candidate, baseline
 
+    def candidate_resume_plan(self,candidate_id):
+        approved,config,candidate,baseline=self.candidate_inputs(candidate_id)
+        with self.store.connection() as connection:
+            row=connection.execute("SELECT id FROM evaluation_runs WHERE json_extract(config_json,'$.candidate_id')=? ORDER BY created_at DESC,rowid DESC LIMIT 1",(candidate_id,)).fetchone()
+            source=self.store.evaluation_run(row['id']) if row else None
+            cases=self.store.evaluation_case_results(source['id']) if source else []
+            saved={c['question_id'] for c in cases};checkpoints=(source or {}).get('result',{}).get('checkpoints',{})
+            pending=[a['id'] for a in approved if a['id'] not in saved]
+            answers=sum('execution' not in checkpoints.get(q,{}) for q in pending)
+            judges=sum('scored_result' not in checkpoints.get(q,{}) for q in pending)
+            plan={'source_run_id':source['id'] if source else None,'completed':len(saved),'reusable':len(saved),
+                  'total':len(approved),'pending_answers':answers,'pending_judges':judges,
+                  'saved_answers_waiting_judge':sum('execution' in checkpoints.get(q,{}) and 'scored_result' not in checkpoints.get(q,{}) for q in pending),
+                  'next_question_id':pending[0] if pending else None,'can_resume':True,'reason':None,
+                  'request_accounting':(source or {}).get('result',{}).get('request_accounting',{})}
+            if source:
+                try:self.store.validate_evaluation_resume(connection,json.loads(baseline['dataset_snapshot_json']),config,baseline['judge'],source['id'],candidate_id=candidate_id)
+                except ValueError as error:plan.update(can_resume=False,reason=str(error))
+            query_expansion=any(config.get(k) for k in ('query_rewrite','multi_query','hyde'))
+            plan['estimated_calls_without_retries']=None if query_expansion else answers*(2+int(config.get('rerank') is True))+judges
+            return plan
+
     def start_candidate(self, candidate_id: str, *, automatic=False):
         approved, config, candidate, baseline = self.candidate_inputs(candidate_id)
         snapshot = json.loads(baseline["dataset_snapshot_json"])
@@ -644,6 +672,12 @@ class EvaluationRunner:
     def execute_candidate(self, run_id, approved, config, candidate, baseline):
         run = self.execute_baseline(run_id, approved, config)
         if run['status'] in {'queued','running'}:return self.store.candidate(candidate['id'])
+        if run['status']!='completed':
+            result={**run['result'],'evaluation_run_id':run_id,'baseline_run_id':baseline['id'],'error':run.get('error_message'),
+                    'evaluation_identity':run['judge'].get('evaluation_identity'),'regression':{'status':'NOT_EVALUABLE','passed':None},
+                    'qualification':{'qualified':None,'blocking_reason':'Sandbox未完成'},'recommendation':None}
+            finished=self.store.finish_candidate(candidate['id'],'failed',result)
+            return {**finished,'recommendation':self.store.refresh_recommendation(candidate['experiment_id'])}
         baseline_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(baseline["id"])}
         candidate_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(run_id)}
         failed = [question_id for question_id, item in baseline_cases.items() if not item.get("passed")]

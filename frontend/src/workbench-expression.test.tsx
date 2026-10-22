@@ -37,10 +37,10 @@ it.each(['evaluated','failed'])('does not infer a final recommendation from %s r
  expect(document.querySelector('.page-content .conclusion-card')?.textContent).not.toContain('暂无合格候选方案');
  expect(document.querySelector('.page-content .conclusion-card')?.textContent).toContain(status==='failed'?'运行失败':'未采集');
 });
-it('preserves the saved no-qualified decision even when a run failed',async()=>{
+it('keeps a historical no-qualified record from becoming the current final decision while incomplete',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  await mount(<EvolutionPage data={{evaluation,optimization:{id:'EXP',candidates:[{id:'A',status:'failed',reasoning:{candidate_label:'A'},result:{}}],recommendation:{status:'No Qualified Candidate',reason:'保存的未推荐原因'}}}}/>);await click('Recommendation');
- expect(document.querySelector('.page-content .conclusion-card')?.textContent).toContain('暂无合格候选方案');expect(document.body.textContent).toContain('保存的未推荐原因');
+ expect(document.querySelector('.page-content .conclusion-card')?.textContent).toContain('本轮实验尚未完成');expect(document.querySelector('.page-content .conclusion-card')?.textContent).not.toContain('暂无合格候选方案');expect(document.body.textContent).toContain('保存的未推荐原因');
 });
 it('does not promote a failed candidate checkpoint into a completed Regression comparison',async()=>{
  const {CandidateCaseComparison}=await import('./components/CandidateCaseComparison');

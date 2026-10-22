@@ -17,12 +17,16 @@ from .evaluation_contract import abstention_valid, claim_consistent, normalize, 
 
 
 _stage_deadline = ContextVar('evaluation_stage_deadline', default=None)
+_stage_control = ContextVar('evaluation_stage_control',default=None)
 
 @contextmanager
-def stage_deadline(deadline):
-    token=_stage_deadline.set(deadline)
+def stage_deadline(deadline, *, automatic=False, check_stop=lambda:None):
+    prior=_stage_deadline.get()
+    token=_stage_deadline.set(min(deadline,prior) if prior is not None else deadline)
+    control=_stage_control.set((automatic,check_stop))
     try:yield
-    finally:_stage_deadline.reset(token)
+    finally:
+        _stage_deadline.reset(token);_stage_control.reset(control)
 
 def request_timeout(default):
     deadline=_stage_deadline.get()
@@ -63,9 +67,16 @@ def redact_provider_error(raw, api_key):
 
 
 def provider_error_details(error, stage):
+    original=error;seen=set()
+    while error.__cause__ is not None and id(error) not in seen and not isinstance(error,ProviderUnavailable):
+        seen.add(id(error));error=error.__cause__
     return {'http_status':getattr(error,'status_code',None),'provider_code':getattr(error,'provider_code',None),
             'detail':getattr(error,'detail',None) or str(error),'raw_response':getattr(error,'raw_provider_response',None),
-            'stage':stage,'retryable':retryable_error(error),'error_type':type(error).__name__}
+            'stage':stage,'retrieval_stage':getattr(original,'detail',{}).get('stage') if isinstance(getattr(original,'detail',None),dict) else None,
+            'retryable':retryable_error(original) and getattr(error,'request_execution_unknown',None) is not True,'error_type':type(error).__name__,
+            'failure_class':'request_result_unknown' if getattr(error,'request_execution_unknown',None) is True else 'usage_unsettled' if getattr(error,'billing_unknown',False) else 'bounded_retry_stopped' if getattr(error,'provider_retry_exhausted',False) else 'retryable_rejection' if retryable_error(original) else 'permanent_or_unclassified',
+            'request_execution_unknown':getattr(error,'request_execution_unknown',None),
+            'response_metadata':getattr(error,'response_metadata',None)}
 
 class ProviderInvalidResponse(ProviderUnavailable):
     def __init__(self,message,*,raw_provider_response=None,metadata=None):
@@ -84,10 +95,13 @@ def retryable_error(error):
     seen=set()
     while error is not None and id(error) not in seen:
         seen.add(id(error))
+        if getattr(error,'provider_retry_exhausted',False):return False
         if isinstance(error,ProviderAPIError):
             try:code=json.loads(error.raw_provider_response or '{}').get('error',{}).get('code')
             except (ValueError,AttributeError):code=None
-            return error.status_code in {408,429,500,502,503,504} and (not isinstance(code,str) or code not in {'insufficient_balance','insufficient_quota','invalid_api_key'})
+            code=getattr(error,'provider_code',None) or code
+            permanent=any(term in str(code).lower().replace('_','') for term in ('insufficientbalance','insufficientquota','invalidapikey','arrearage','accessdenied'))
+            return error.status_code in {408,429,500,502,503,504} and not permanent
         if isinstance(error,urllib.error.HTTPError):return error.code in {408,429,500,502,503,504}
         if isinstance(error,(ProviderTimeout,ProviderInvalidResponse,TimeoutError,http.client.IncompleteRead,ConnectionError)):return True
         if isinstance(error,urllib.error.URLError):

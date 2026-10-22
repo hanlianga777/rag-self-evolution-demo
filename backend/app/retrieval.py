@@ -13,9 +13,13 @@ from .full_text import CORPUS_LOCK, validate_bundle, search_full_text
 class RetrievalUnavailable(RuntimeError):
     """An unexecuted/failed stage is never an empty retrieval observation."""
     def __init__(self, stage, error):
-        self.detail = {'code': 'RETRIEVAL_EXECUTION_FAILED', 'stage': stage, 'error_type': type(error).__name__}
+        from .providers import provider_error_details
+        details=provider_error_details(error,stage)
+        self.status_code=details['http_status'];self.raw_provider_response=details['raw_response']
+        self.response_metadata=details['response_metadata'];self.request_execution_unknown=details['request_execution_unknown']
+        self.detail = {**details,'code':'RETRIEVAL_EXECUTION_FAILED'}
         self.trace = {'status': 'failed', 'candidates': None, 'final': None, 'error': self.detail}
-        super().__init__(f"本地检索执行失败（{stage}/{type(error).__name__}）；请检查索引与本地模型")
+        super().__init__(f"检索阶段执行失败（{stage}/{type(error).__name__}）：{details['detail']}")
 
 
 def _terms(text: str) -> set[str]:
@@ -103,10 +107,10 @@ class VectorRetriever:
             raise RetrievalUnavailable('vector_load', FileNotFoundError('FAISS index missing'))
         try:
             import faiss
-            from sentence_transformers import SentenceTransformer
 
             self._index = faiss.read_index(str(index_file))
             if not (self._bundle or {}).get('manifest', {}).get('knowledge_identity'):
+                from sentence_transformers import SentenceTransformer
                 self._model = SentenceTransformer(EMBEDDING_MODEL, local_files_only=True)
             return True
         except Exception as error:

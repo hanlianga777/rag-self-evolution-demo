@@ -51,7 +51,7 @@ class CandidateResumeTests(unittest.TestCase):
             with TestClient(main.app) as client:
                 for label,config in zip('ABC',configs):
                     cid=self.exp+'-R1-'+label
-                    response=client.post('/api/candidates/'+cid+'/run',headers={'Origin':'http://127.0.0.1:5174'})
+                    response=client.post('/api/candidates/'+cid+'/run',headers={'Origin':'http://127.0.0.1:5174'},json={'authorize_provider':True})
                     self.assertEqual(response.status_code,201,response.text)
                     for _ in range(100):
                         candidate=self.store.candidate(cid)
@@ -122,10 +122,11 @@ class CandidateResumeTests(unittest.TestCase):
         execution=self.runtime.answer('Q1',config)
         self.store.update_evaluation_progress(run,{'checkpoints':{'Q1':{'execution':execution,'attempts':[],'inflight':'judge'}}})
         self.store.interrupt_evaluation_runs()
-        result=self.runner.run_candidate(self.cid, automatic=False)
-        self.assertEqual(result['status'],'failed');self.assertEqual(self.runtime.answers.count('Q1'),1)
-        self.assertIn('Unknown request',result['result']['error'])
-        self.assertEqual(result['result']['resume_source_id'],run)
+        before=self.store.experiment(self.exp)['evaluation_budget']['used']
+        with self.assertRaisesRegex(ValueError,'Unknown request'):self.runner.run_candidate(self.cid,automatic=False)
+        self.assertEqual(self.runtime.answers.count('Q1'),1)
+        self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'],before)
+        self.assertIn('execution',self.store.evaluation_run(run)['result']['checkpoints']['Q1'])
     def test_resume_identity_budget_and_duplicate_guards_are_atomic(self):
         self.runtime.fail='judge';first=self.runner.run_candidate(self.cid, automatic=False)
         source=first['result']['evaluation_run_id'];old=self.store.evaluation_run(source)
@@ -161,7 +162,7 @@ class CandidateResumeTests(unittest.TestCase):
         self.runtime.fail=None
         with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime):
             with TestClient(main.app) as client:
-                response=client.post('/api/candidates/'+self.cid+'/run',headers={'Origin':'http://127.0.0.1:5174'})
+                response=client.post('/api/candidates/'+self.cid+'/run',headers={'Origin':'http://127.0.0.1:5174'},json={'authorize_provider':True})
                 self.assertEqual(response.status_code,201,response.text)
                 for _ in range(100):
                     saved=self.store.candidate(self.cid)
@@ -228,3 +229,15 @@ class CandidateResumeTests(unittest.TestCase):
         self.assertEqual(store.evaluation_case_results(source['id']),rows_before)
         self.assertEqual([store.candidate(cid[:-1]+x) for x in ('A','B')],a_b)
         self.assertEqual(store.experiment(candidate['experiment_id'])['evaluation_budget']['used'],budget_before+1)
+
+    def test_api_requires_fresh_explicit_payment_authorization_before_reserving(self):
+        from fastapi.testclient import TestClient
+        from api_fixture import main
+        before=self.store.experiment(self.exp)['evaluation_budget']['used']
+        with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime),TestClient(main.app) as client:
+            response=client.post('/api/candidates/'+self.cid+'/run',headers={'Origin':'http://127.0.0.1:5174'})
+        self.assertEqual(response.status_code,409)
+        self.assertIn('付费授权',response.text)
+        self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'],before)
+        self.assertEqual(self.runtime.answers,[])
+        self.assertEqual(self.runtime.judges,[])

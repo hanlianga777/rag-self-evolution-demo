@@ -1,5 +1,8 @@
 # 当前有效评测合同 — 2026-10-21 VNext V5.1 `[CONFIRMED]`
 
+- **2026-10-22 Sandbox中断与续跑保护（当前）**：Alibaba远程错误保留脱敏HTTP/Provider/请求ID及阶段，不归咎本地模型；明确拒绝的429在单RPC内最多3次/600秒，避免重复已付费Embedding，Unknown/超时/未结算先对账；永久拒绝不重试。Sandbox预约提交前重验身份、完整配置及Checkpoint/账本，未知请求不消耗新次数；已有结果原样复用，已有回答仅补Judge。重启不继承旧Sandbox付费授权，HTTP启动与续跑须明确付费授权，授权不能代替对账。部分结果不产生最终Gate/Bad Case/Regression/Recommendation与Gate 2，历史记录仅只读展示，完整50题后按原11 Gate及人工发布规则判定。评分版本、Golden/Baseline/Judge/Corpus/索引不变，详见[中断与续跑](SANDBOX_INTERRUPTION_RECOVERY.md)。
+
+
 - **2026-10-22 同轮完整覆盖规划 `coverage-planner-1`（当前）**：先按全部业务FAIL真实结构观察/允许方向分组，再向模型提供覆盖义务；模型候选优先复用，零调用结构规划可同轮补齐空余B/C。规则来源显式标注，不能冒充模型响应；跨根因探索使用完整逐目标根因映射，保持Unknown与原诊断。实际保存且严格合法的目标才计入覆盖，草案不计；能力缺口逐题说明，容量不足保持未完成。Sandbox预检与事务预留阻止未完成规划直接付费运行。补齐前当前身份/预览绑定/运行状态校验、SQLite Backup、原子追加候选/Trace及独立coverage_plan；原A/响应/Usage/费用及所有正式评测不覆盖。11 Gate、Regression和人工发布保持。架构节点/连线不变，规划属既有Agent内部阶段，详见[完整覆盖规划](AGENT_COVERAGE_PLANNING.md)。
 
 

@@ -2,10 +2,11 @@
 import time
 import math
 from .telemetry import collect_usage
+from .paid_run import unsettled_usage
 
 
 def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state):
-    from .providers import ProviderAPIError,ProviderInvalidResponse,ProviderTimeout,retryable_error,stage_deadline
+    from .providers import ProviderAPIError,ProviderInvalidResponse,ProviderTimeout,ProviderUnavailable,retryable_error,provider_error_details,stage_deadline
     # Explicit Resume starts a new retry window; process recovery of this Run keeps its failures.
     prior=[a for a in checkpoint['attempts'] if a.get('phase')==phase and a.get('recorded_by_run_id')==run_id]
     failures=0;invalid_failures=0
@@ -34,7 +35,12 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
         on_state('running',phase=phase)
         started=time.perf_counter();usage=[]
         try:
-            with collect_usage() as usage,stage_deadline(deadline):value=action()
+            with collect_usage() as usage,stage_deadline(deadline,automatic=automatic,check_stop=check_stop):value=action()
+            if any(unsettled_usage(u) for u in usage):
+                checkpoint['execution' if phase=='generation' else 'scored_result']=value
+                failure=ProviderUnavailable('有效结果已保存，但Usage/费用未知，须先对账；不得重复生成')
+                failure.request_execution_unknown=False;failure.billing_unknown=True
+                raise failure
             if time.monotonic()>deadline:
                 checkpoint['execution' if phase=='generation' else 'scored_result']=value
                 raise ProviderTimeout('Known complete Provider response exceeded 600 seconds')
@@ -46,8 +52,13 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
                      'elapsed_ms':round((time.perf_counter()-started)*1000),
                      'raw_provider_response':getattr(error,'raw_provider_response',None),
                      'response_metadata':getattr(error,'response_metadata',None),'provider_status_code':getattr(error,'status_code',None),'recorded_by_run_id':run_id}
-            unknown=any(u.get('status')=='unknown' or u.get('provider') in {'DeepSeek','Alibaba'} and type(u.get('prompt_tokens',u.get('total_tokens'))) is not int for u in usage)
-            retry=retryable_error(error) and not unknown and failures<3 and time.monotonic()<deadline
+            attempt['provider_error']=provider_error_details(error,phase)
+            explicit=getattr(error,'request_execution_unknown',None)
+            unknown=explicit if explicit is not None else any(unsettled_usage(u) for u in usage if u.get('request_execution_unknown') is not False)
+            billing_unknown=getattr(error,'billing_unknown',False) or any(unsettled_usage(u) for u in usage)
+            if billing_unknown:checkpoint.setdefault('unsettled_usage',{})[phase]=True
+            attempt['billing_unknown']=billing_unknown
+            retry=retryable_error(error) and not unknown and not billing_unknown and failures<3 and time.monotonic()<deadline
             # Repeated structurally invalid Judge replies are a terminal contract failure.
             if isinstance(error,ProviderInvalidResponse):
                 invalid_failures+=1
@@ -57,12 +68,14 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
             attempt['retryable']=retry;checkpoint['attempts'].append(attempt);checkpoint.pop('inflight',None)
             if automatic and retry:
                 delay=min(60,2**min(failures-1,6))
-                if isinstance(error,ProviderAPIError):
-                    try:delay=max(delay,float(error.retry_after or 0))
+                retry_error=error
+                while retry_error.__cause__ is not None and not isinstance(retry_error,ProviderAPIError):retry_error=retry_error.__cause__
+                if isinstance(retry_error,ProviderAPIError):
+                    try:delay=max(delay,float(retry_error.retry_after or 0))
                     except (TypeError,ValueError):
                         try:
                             from email.utils import parsedate_to_datetime
-                            delay=max(delay,parsedate_to_datetime(error.retry_after).timestamp()-time.time())
+                            delay=max(delay,parsedate_to_datetime(retry_error.retry_after).timestamp()-time.time())
                         except (TypeError,ValueError,OverflowError):pass
                 if not isinstance(delay,(int,float)) or not math.isfinite(delay):delay=60
                 delay=min(delay,max(0,deadline-time.monotonic()))
