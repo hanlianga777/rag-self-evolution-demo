@@ -51,7 +51,7 @@ it('50 reusable executions still require the independent Q18 probe before fee au
  const plan={can_replay:true,can_start_replay:false,reusable:50,total:50,probe_blocker:'Q18 independent real probe and explicit business review required',eligibility:[]};
  const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?plan:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
  await render(<EvaluationPage data={{evaluation:run}}/>);await click('新版Baseline判分（复用回答）');
- expect(document.body.textContent).toContain('50 / 50');expect(document.body.textContent).toContain('请先独立验证Q18');
+ expect(document.body.textContent).toContain('50 / 50');expect(document.body.textContent).toContain('先验证 Q18');
  await click('授权新版 Judge-only Baseline');expect(document.querySelector('[role=dialog]')).toBeNull();
  expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
 });

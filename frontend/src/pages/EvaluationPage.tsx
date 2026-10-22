@@ -170,24 +170,24 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   return <PageShell className="page evaluation-page" header={<div className="page-title"><div><h1>Baseline</h1><p>用冻结 Golden 评测当前版本，识别质量门槛、单题失败及可优化问题。</p></div><button className="secondary" disabled={busy || preflight?.can_start !== true} onClick={() => void prepareStart()}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "重新运行 Baseline（新版本）" : "运行 Baseline 评测"}</button></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>Hard Gate</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
 
     <ProviderAuthorization request={paid} onClose={() => setPaid(null)} />
-    {run.id && <section className="candidate-card judge-replay-preflight" aria-label="新版Baseline复用预检" aria-busy={replayLoading}>
+    {run.id && <StoryDisclosure label="高级详情 · 独立重新评分预检" open={historicalPolicy}><section className="candidate-card judge-replay-preflight" aria-label="新版Baseline复用预检" aria-busy={replayLoading}>
       <button className="text-button" disabled={busy || replayLoading || ["running","queued"].includes(run.status)} onClick={inspectJudgeReplay}>新版Baseline判分（复用回答）</button>
       {replayLoading && <p role="status">正在查询已保存回答的复用资格…</p>}
       {replayError && <p role="alert">复用预检失败：{replayError}；请点击上方按钮重试。</p>}
       {replayPlan && <>
         <p>逐题复用资格：{replayPlan.reusable} / {replayPlan.total}；生成调用0，Judge预计{replayPlan.judge_calls}次、最多{replayPlan.max_judge_calls}次。</p>
         <p>新评测身份：<ShortId value={replayPlan.new_evaluation_identity} /></p>
-        {replayPlan.probe_blocker && <p role="alert">{replayPlan.probe_blocker}；请先独立验证Q18并完成业务复核。</p>}
-        {replayPlan.start_blocker && <p role="alert">{replayPlan.start_blocker}</p>}
+        {replayPlan.probe_blocker && <p role="alert">新版独立评分须先验证 Q18 并完成人工业务复核；不影响当前有效 Baseline 进入 Agent。</p>}
+        {replayPlan.start_blocker && <p role="alert">新版独立评分启动条件未满足，请展开来源摘要核对；当前 Baseline 仍保留原结果。</p>}
         <button disabled={busy || replayLoading || replayPlan.can_start_replay!==true} onClick={authorizeJudgeReplay}>授权新版 Judge-only Baseline</button>
         <p className="muted">此预检不会启动判分；下方仍是历史Run报告。新版判分须在费用窗口中单独确认。</p>
-        <StoryDisclosure label={<>逐题复用资格与来源摘要</>}>{replayPlan.eligibility?.map((row:Row)=><p key={row.question_id}>{row.question_id}：{row.eligible?'可复用':row.blockers?.join('；')} · {row.origin}</p>)}</StoryDisclosure>
+        <StoryDisclosure label={<>逐题复用资格与来源摘要</>}><pre className="technical-record">{JSON.stringify({probe_blocker:replayPlan.probe_blocker,start_blocker:replayPlan.start_blocker},null,2)}</pre>{replayPlan.eligibility?.map((row:Row)=><p key={row.question_id}>{row.question_id}：{row.eligible?'可复用':row.blockers?.join('；')} · {row.origin}</p>)}</StoryDisclosure>
       </>}
-    </section>}
+    </section></StoryDisclosure>}
 
     {run.result?.judge_replay && <p className="muted">新版Judge判分；生成回答与检索耗时来自已核验历史执行，不代表本次重新生成或当前性能实测。</p>}
     {preflight?.reason && <p className="error-notice" role="alert">无法启动 Baseline：{preflight.reason}</p>}
-    {preflight?.can_start && preflight.resume_reason && <p className="muted">原任务不能恢复：{preflight.resume_reason}；请明确新建完整评测，历史断点保留。</p>}
+    {["partial","failed"].includes(run.status) && preflight?.can_start && preflight.resume_reason && <p className="muted">原任务不能恢复：{preflight.resume_reason}；请明确新建完整评测，历史断点保留。</p>}
 
 
     <Drawer className="workbench-drawer" open={historyOpen} onOpenChange={setHistoryOpen} title="历史评测 · 原记录只读"><div className="drawer-body"><div className="review-batch"><button disabled={historyBusy || historyPage===1} onClick={()=>void loadHistory(historyPage-1)}>上一页</button><span>第 {historyPage} 页 · 每页最多50条</span><button disabled={historyBusy || history.length<50} onClick={()=>void loadHistory(historyPage+1)}>下一页</button></div>{!history.length && <p>暂无历史评测记录。</p>}{history.map(row => <section key={row.id}><h3>{row.config?.run_target === 'answer_replay' ? '历史答案评分（非完整重评）' : row.config?.run_target === 'sandbox_candidate' ? '候选Sandbox' : '正式Baseline'}</h3><p>{localTime(row.created_at)} · {displayText(row.status || "未采集")} · {row.judge?.scoring_policy || '历史规则'} · Bad Case {row.result?.bad_case_count ?? '未采集'}</p><button className="text-button" onClick={() => { void getJson<Row>(`/api/evaluations/${row.id}`).then(value => { if (value.config?.run_target === 'answer_replay') { setReplay(value); setReplayOpen(true); } else { setRun(value); } setHistoryOpen(false); }).catch(reason => setError(errorMessage(reason))); }}>查看只读报告</button></section>)}</div></Drawer>

@@ -132,7 +132,7 @@ class OptimizationAgent:
         audited_cases = [{**item, 'diagnostic_view':diagnostic_view(item.get('result', {}))} for item in bad_cases]
         audited_cases = [{**item, 'category':item['diagnostic_view']['primary_root_cause']} for item in audited_cases]
         from .evaluation_contract import business_verdict
-        bad_cases = [item for item in audited_cases if business_verdict(item['result'])=='FAIL' or not item['result'].get('evaluation_outcome') and item['result'].get('passed') is False]
+        bad_cases = [item for item in audited_cases if business_verdict(item['result'])=='FAIL' or (item['result'].get('evaluation_outcome') or {}).get('contract_version')!='business-vnext-1' and item['result'].get('passed') is False]
         diagnostic_tasks=[]
         for item in bad_cases:
             view=item['diagnostic_view'];plan=view.get('experiment_plan',{})

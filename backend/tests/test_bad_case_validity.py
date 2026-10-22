@@ -1,4 +1,4 @@
-"""Isolated Mock acceptance: validity audits cannot become optimization targets."""
+"""Isolated Mock acceptance: every FAIL reaches Agent, specific interventions keep evidence constraints."""
 import os
 import tempfile
 from pathlib import Path
@@ -30,7 +30,7 @@ class EvidenceMock:
     """Deterministic local strategies chosen from observed roots; no network client."""
     def complete(self,system,user,**kwargs):
         self.prompt=json.loads(user)
-        row=self.prompt['bad_cases'][0];root=row['diagnostic_view']['primary_root_cause'];qid=row['question_id']
+        row=next(row for row in self.prompt['bad_cases'] if row['diagnostic_view']['target_eligible']);root=row['diagnostic_view']['primary_root_cause'];qid=row['question_id']
         direction,diff,observation={
             'Retrieval':('candidate_recall',{'candidate_k':24},'recall_missing'),
             'Generation':('grounded_generation',{'prompt_strategy':'Completeness'},'confirmed_claim'),
@@ -75,10 +75,10 @@ class BadCaseValidityTests(unittest.TestCase):
                 store.record_bad_case('mock','Q-audit','Unknown','ordinary',audit_only())
                 provider=EvidenceMock();result=OptimizationAgent(store,provider).generate('mock')
                 self.assertEqual(len(result['candidates']),1)
-                self.assertNotIn('Q-audit',provider.prompt['target_reference_map'])
-                self.assertNotIn('Q-audit',json.dumps(provider.prompt,ensure_ascii=False))
+                self.assertIn('Q-audit',provider.prompt['target_reference_map'])
+                self.assertEqual(len(provider.prompt['bad_cases']),2)
                 self.assertNotIn('all_bad_case_audit',provider.prompt)
-                self.assertNotIn('evaluation_quality_audit',provider.prompt['bad_cases'][0]['diagnostic_view'])
+                self.assertNotIn('evaluation_quality_audit',next(row for row in provider.prompt['bad_cases'] if row['question_id']=='Q1')['diagnostic_view'])
                 self.assertEqual(len(store.bad_case_rows()),2)
                 plans.append(result['candidates'][0]['reasoning']['changed_parameters'])
         self.assertEqual(len({json.dumps(plan,sort_keys=True) for plan in plans}),4)
