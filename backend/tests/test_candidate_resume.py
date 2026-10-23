@@ -30,9 +30,6 @@ class CandidateResumeTests(unittest.TestCase):
     def test_abc_api_inherits_frozen_limits_and_keeps_optimization_parameters(self):
         import time
         from fastapi.testclient import TestClient
-        from types import SimpleNamespace
-        self.runtime.provider=SimpleNamespace(settings=SimpleNamespace(base_url='https://api.deepseek.com'))
-        endpoint=patch.dict('os.environ',{'DASHSCOPE_BASE_URL':'https://fixture.cn-beijing.maas.aliyuncs.com'});endpoint.start();self.addCleanup(endpoint.stop)
         from api_fixture import main
         from app.paid_run import current_request_limit,provider_task
         baseline=self.freeze_request_limits();limits=baseline['judge']['execution_snapshot']['request_limits']
@@ -54,11 +51,8 @@ class CandidateResumeTests(unittest.TestCase):
             with TestClient(main.app) as client:
                 for label,config in zip('ABC',configs):
                     cid=self.exp+'-R1-'+label
-                    response=client.post('/api/candidates/'+cid+'/run',headers={'Origin':'http://127.0.0.1:5174'},json={'authorize_provider':True,'budget_yuan':10})
+                    response=client.post('/api/candidates/'+cid+'/run',headers={'Origin':'http://127.0.0.1:5174'},json={'authorize_provider':True})
                     self.assertEqual(response.status_code,201,response.text)
-                    import threading
-                    for worker in threading.enumerate():
-                        if worker.name.endswith('(work)'):worker.join(5)
                     for _ in range(100):
                         candidate=self.store.candidate(cid)
                         if candidate['status']!='running':break
@@ -163,19 +157,13 @@ class CandidateResumeTests(unittest.TestCase):
     def test_existing_candidate_api_resumes_after_explicit_request(self):
         import time
         from fastapi.testclient import TestClient
-        from types import SimpleNamespace
-        self.runtime.provider=SimpleNamespace(settings=SimpleNamespace(base_url='https://api.deepseek.com'))
-        endpoint=patch.dict('os.environ',{'DASHSCOPE_BASE_URL':'https://fixture.cn-beijing.maas.aliyuncs.com'});endpoint.start();self.addCleanup(endpoint.stop)
         from api_fixture import main
         self.runtime.fail='judge';first=self.runner.run_candidate(self.cid, automatic=False)
         self.runtime.fail=None
         with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime):
             with TestClient(main.app) as client:
-                response=client.post('/api/candidates/'+self.cid+'/run',headers={'Origin':'http://127.0.0.1:5174'},json={'authorize_provider':True,'budget_yuan':10})
+                response=client.post('/api/candidates/'+self.cid+'/run',headers={'Origin':'http://127.0.0.1:5174'},json={'authorize_provider':True})
                 self.assertEqual(response.status_code,201,response.text)
-                import threading
-                for worker in threading.enumerate():
-                    if worker.name.endswith('(work)'):worker.join(5)
                 for _ in range(100):
                     saved=self.store.candidate(self.cid)
                     if saved['status']!='running':break
@@ -244,16 +232,10 @@ class CandidateResumeTests(unittest.TestCase):
 
     def test_api_requires_fresh_explicit_payment_authorization_before_reserving(self):
         from fastapi.testclient import TestClient
-        from types import SimpleNamespace
-        self.runtime.provider=SimpleNamespace(settings=SimpleNamespace(base_url='https://api.deepseek.com'))
-        endpoint=patch.dict('os.environ',{'DASHSCOPE_BASE_URL':'https://fixture.cn-beijing.maas.aliyuncs.com'});endpoint.start();self.addCleanup(endpoint.stop)
         from api_fixture import main
         before=self.store.experiment(self.exp)['evaluation_budget']['used']
         with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime),TestClient(main.app) as client:
             response=client.post('/api/candidates/'+self.cid+'/run',headers={'Origin':'http://127.0.0.1:5174'})
-            missing_budget=client.post('/api/candidates/'+self.cid+'/run',headers={'Origin':'http://127.0.0.1:5174'},json={'authorize_provider':True})
-            self.assertEqual(missing_budget.status_code,409)
-            self.assertIn('人民币',missing_budget.text)
         self.assertEqual(response.status_code,409)
         self.assertIn('付费授权',response.text)
         self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'],before)

@@ -1,0 +1,76 @@
+{
+  "checks": [
+    {
+      "name": "C-confirm",
+      "passed": true
+    },
+    {
+      "name": "B-resume",
+      "passed": true
+    },
+    {
+      "name": "A-explicit-unknown-reason",
+      "passed": true
+    },
+    {
+      "name": "tab-问题诊断",
+      "passed": true
+    },
+    {
+      "name": "tab-优化 Agent",
+      "passed": true
+    },
+    {
+      "name": "tab-Sandbox",
+      "passed": true
+    },
+    {
+      "name": "tab-Regression",
+      "passed": true
+    },
+    {
+      "name": "tab-Recommendation",
+      "passed": true
+    },
+    {
+      "name": "tab-A/B/C/D",
+      "passed": true
+    },
+    {
+      "name": "batch-confirm",
+      "passed": true
+    },
+    {
+      "name": "generate-fixture-confirm",
+      "passed": true
+    },
+    {
+      "name": "baseline-fee-cancel",
+      "passed": true
+    },
+    {
+      "name": "baseline-tab-Baseline 报告",
+      "passed": true
+    },
+    {
+      "name": "baseline-tab-Hard Gate",
+      "passed": true
+    },
+    {
+      "name": "baseline-tab-Bad Case 诊断",
+      "passed": true
+    }
+  ],
+  "intercepted_fixture_posts": [
+    {
+      "path": "/api/candidates/EXP-RECOVERY-20261022T0649135884120000-R1-C/run",
+      "body": {
+        "authorize_provider": true
+      }
+    }
+  ],
+  "real_api_posts": 0,
+  "provider_calls": 0,
+  "page_errors": [],
+  "empty_experiment_variant": "GET fixture only; formal candidates unchanged"
+}

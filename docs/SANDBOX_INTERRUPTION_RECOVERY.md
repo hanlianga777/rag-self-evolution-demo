@@ -1,6 +1,8 @@
 # Sandbox 中断、费用安全与续跑
 
-2026-10-23最新：Sandbox已接入同Experiment的新授权人民币累计硬预算，接口需要authorize_provider与budget_yuan；同一费用范围不因候选/失败/刷新/重启重置。全Provider发送前预留，费率过期/缺失、输入费用上界、预算不足、未知费用或身份漂移停止。历史费用单列，A仍需先对账；B/C可独立授权。本轮Provider0。详见[统一费用与续跑准备](../outputs/sandbox_cost_preflight_20261023/Sandbox费用与续跑执行前验收.md)。
+2026-10-23最新：Owner要求撤销上轮新增人民币累计上限及相关强制费用门禁，恢复点击→费用确认→执行。原身份/断点/Unknown对账/停止/人工发布保护保持，不恢复未知请求重试。A点击明确提示对账，B/C沿原链执行；本轮零调用。下文费用上限内容仅为历史，不是当前运行要求。
+
+2026-10-23历史费用审计（累计硬预算已撤销）：Sandbox曾接入同Experiment的新授权人民币累计硬预算，接口需要authorize_provider与budget_yuan；同一费用范围不因候选/失败/刷新/重启重置。全Provider发送前预留，费率过期/缺失、输入费用上界、预算不足、未知费用或身份漂移停止。历史费用单列，A仍需先对账；B/C可独立授权。本轮Provider0。详见[统一费用与续跑准备](../outputs/sandbox_cost_preflight_20261023/Sandbox费用与续跑执行前验收.md)。
 
 远程 Alibaba Embedding / Rerank 的超时不等于本地模型故障。检索包装保留阶段、异常类别、HTTP状态、Provider代码、请求ID、重试次数及脱敏正文。历史包装若已吞掉HTTP状态或请求ID，只能报告保存材料能证明的超时/网络类别；不能反推限流、余额、授权错误或伪造云端账单。
 

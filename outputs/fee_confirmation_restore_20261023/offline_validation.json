@@ -1,0 +1,13 @@
+{
+  "provider_calls": 0,
+  "fee": 0,
+  "backend_tests": 57,
+  "frontend_tests": 263,
+  "frontend_test_files": 45,
+  "build": "passed",
+  "saved_results_reused_unchanged": {
+    "A": 38,
+    "B": 1
+  },
+  "baseline_or_candidate_execution_started": false
+}

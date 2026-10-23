@@ -98,3 +98,24 @@ it('connects an unknown exploratory target to its saved candidate without callin
  expect(document.querySelector('.strategy-relations')?.textContent).toContain('扩大候选池验证缺失来源');
  expect(document.body.textContent).not.toContain('诊断待完成的先补证');
 });
+it('opens Sandbox fee confirmation without a budget and submits only explicit consent',async()=>{
+ const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/run')?{id:'offline-run'}:url.includes('/optimization')?{id:'exp',candidates:[]}:{})));
+ vi.stubGlobal('fetch',fetcher);
+ const candidate={id:'c',status:'generated',config:{rerank:'query_only'},reasoning:{candidate_label:'C',round:1},resume_plan:{can_resume:true,completed:0,total:50}};
+ await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[candidate],evaluation_budget:{used:2,max:12,reserved_for_d:1}}}}/>);
+ await click('A/B/C/D');
+ expect(document.querySelector('input[aria-label="Sandbox人民币累计硬上限"]')).toBeNull();
+ await click('运行 Sandbox');
+ expect(document.querySelector('[role="dialog"]')?.textContent).toContain('模型调用费用授权');
+ await click('授权并运行此操作');
+ const request=fetcher.mock.calls.find(([url])=>url.endsWith('/api/candidates/c/run')) as any;
+ expect(request).toBeTruthy();expect(JSON.parse(request[1].body)).toEqual({authorize_provider:true});
+});
+it('shows the saved unknown-charge reason when A cannot resume',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response('{}')));
+ const candidate={id:'a',status:'failed',config:{},reasoning:{candidate_label:'A'},resume_plan:{can_resume:false,reason:'需先对账：历史请求执行结果未知'}};
+ await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[candidate]}}}/>);await click('A/B/C/D');await click('继续 Sandbox');
+ expect(document.querySelector('[role="alert"]')?.textContent).toContain('需先对账');
+ expect(document.activeElement).toBe(document.querySelector('[role="alert"]'));
+ expect(document.querySelector('[role="dialog"]')).toBeNull();
+});

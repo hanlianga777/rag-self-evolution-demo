@@ -1,6 +1,8 @@
 # 当前有效评测合同 — 2026-10-21 VNext V5.1 `[CONFIRMED]`
 
-- **2026-10-23 Sandbox人民币硬预算（当前）**：HTTP启动/续跑除authorize_provider必须提供budget_yuan；同Experiment的新授权Sandbox共用持久化CNY累计账本，包含DeepSeek回答/Judge/额外查询及Alibaba Embedding/Rerank。发送前按输入字节/重复query/冻结输出预留，真实Usage结算；仅记账上下文不得覆盖硬预算，费率24小时/端点/身份/来源/并发锁/输入费用上界与预算不足失败即停止，未知保留预留并先对账。页面刷新、候选失败、重启不清零也不自动续跑，不能扩大原上限。历史费用独立保留且未知不当0。A的未知Embedding仍阻断；B/C同身份可独立重新授权，已有39题结果原样复用。未完成不产生最终统计，50题后仍原11 Gate/Regression/人工发布。本轮Provider0/费用0，未启动实验。[统一执行前验收](../outputs/sandbox_cost_preflight_20261023/Sandbox费用与续跑执行前验收.md)。费用保护属于现有Sandbox内部，架构节点/连线不变。
+- **2026-10-23 费用确认与按钮恢复（当前，覆盖上轮Sandbox累计硬预算）**：按Owner要求撤销595de38新增的人民币输入、budget_yuan强制参数、累计上限/费率时效/端点/额外输入字节及相关运行门禁。Sandbox恢复authorize_provider人工确认后沿原运行/续跑链执行，不额外限制Token；保留原冻结单请求技术限制、异常/停止/断点、身份一致性与Unknown先对账。A历史未知请求不伪造结算；点击明确显示并聚焦阻断原因，不静默禁用。未知费用不报确定金额；真实Usage与适用费率核算不冒充账户实扣。Golden/Baseline/Judge/策略/参数/11 Gate及人工发布不改。Provider0、费用0；[零调用验收](../outputs/fee_confirmation_restore_20261023/验收记录.md)。无架构节点/连线变化。
+
+- **2026-10-23 Sandbox人民币硬预算（历史，已按Owner要求撤销）**：HTTP启动/续跑除authorize_provider必须提供budget_yuan；同Experiment的新授权Sandbox共用持久化CNY累计账本，包含DeepSeek回答/Judge/额外查询及Alibaba Embedding/Rerank。发送前按输入字节/重复query/冻结输出预留，真实Usage结算；仅记账上下文不得覆盖硬预算，费率24小时/端点/身份/来源/并发锁/输入费用上界与预算不足失败即停止，未知保留预留并先对账。页面刷新、候选失败、重启不清零也不自动续跑，不能扩大原上限。历史费用独立保留且未知不当0。A的未知Embedding仍阻断；B/C同身份可独立重新授权，已有39题结果原样复用。未完成不产生最终统计，50题后仍原11 Gate/Regression/人工发布。本轮Provider0/费用0，未启动实验。[统一执行前验收](../outputs/sandbox_cost_preflight_20261023/Sandbox费用与续跑执行前验收.md)。费用保护属于现有Sandbox内部，架构节点/连线不变。
 
 - **2026-10-22 Sandbox中断与续跑保护（当前）**：Alibaba远程错误保留脱敏HTTP/Provider/请求ID及阶段，不归咎本地模型；明确拒绝的429在单RPC内最多3次/600秒，避免重复已付费Embedding，Unknown/超时/未结算先对账；永久拒绝不重试。Sandbox预约提交前重验身份、完整配置及Checkpoint/账本，未知请求不消耗新次数；已有结果原样复用，已有回答仅补Judge。重启不继承旧Sandbox付费授权，HTTP启动与续跑须明确付费授权，授权不能代替对账。部分结果不产生最终Gate/Bad Case/Regression/Recommendation与Gate 2，历史记录仅只读展示，完整50题后按原11 Gate及人工发布规则判定。评分版本、Golden/Baseline/Judge/Corpus/索引不变，详见[中断与续跑](SANDBOX_INTERRUPTION_RECOVERY.md)。
 

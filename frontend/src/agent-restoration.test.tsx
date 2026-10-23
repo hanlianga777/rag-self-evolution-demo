@@ -53,7 +53,7 @@ it("offers failed Sandbox continuation only through the existing paid confirmati
   expect(button.disabled).toBe(false);
   await click("继续 Sandbox");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("仅补未完成题目或Judge");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("另占一次预算");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("计入既有评测次数");
   expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);
 });
 
@@ -82,6 +82,9 @@ it("suppresses incomplete final scores, preserves progress and blocks unreconcil
   expect(document.body.textContent).toContain("本轮实验尚未完成");
   expect(document.body.textContent).not.toContain("保存结论：本轮暂无合格候选方案");
   await click("A/B/C/D");
-  expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='继续 Sandbox')?.disabled).toBe(true);
+  expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='继续 Sandbox')?.disabled).toBe(false);
+  await click('继续 Sandbox');
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('对账');
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);
 });

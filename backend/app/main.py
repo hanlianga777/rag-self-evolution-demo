@@ -34,8 +34,6 @@ from .diagnostics import diagnostic_view
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
 from .telemetry import price_config
 from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
-from .sandbox_budget import sandbox_budget, budget_view
-from .paid_run import PaidRun, accounting_only
 from .retrieval import RetrievalUnavailable
 
 
@@ -50,7 +48,6 @@ EVALUATION_RUNTIME_CONTRACT = {**VERSIONS, 'judge_prompt_sha256':hashlib.sha256(
         'scorer':EvaluationRunner.score_execution, 'batch_runner':EvaluationRunner._execute_baseline,
         'diagnostic_view':diagnostic_view, 'agent_generate':OptimizationAgent.generate.__wrapped__, 'coverage_planner':plan_coverage, 'coverage_apply':complete_coverage, 'alibaba_transport':AlibabaProvider._post_request,
         'alibaba_request':AlibabaProvider._post,'provider_stage':perform_stage,
-        'sandbox_budget':sandbox_budget.__wrapped__,'payment_begin':PaidRun.begin,'payment_accounting':accounting_only.__wrapped__,
         'sandbox_resume_guard':GovernanceStore.validate_evaluation_resume,'sandbox_preflight':EvaluationRunner.candidate_resume_plan}.items()}}
 
 app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
@@ -1474,7 +1471,6 @@ def select_recommendation(run_id: str, payload: RecommendationRequest):
 
 class PaidActionRequest(BaseModel):
     authorize_provider: bool = False
-    budget_yuan: float | None = Field(default=None,gt=0,allow_inf_nan=False)
 
 
 @app.post('/api/experiments/{run_id}/composite', dependencies=[Depends(require_trusted_origin)])
@@ -1495,10 +1491,7 @@ def candidate_preflight(candidate_id: str):
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     resume=EvaluationRunner(store,ai_service).candidate_resume_plan(candidate_id)
-    from .sandbox_budget import budget_view
-    try:cost_budget=budget_view(store,candidate_id)
-    except (ValueError,OSError,KeyError) as error:raise HTTPException(409,detail=str(error)) from error
-    return {"cost_budget":cost_budget,"resume_plan":resume,"can_start":resume["can_resume"],"candidate_id": candidate["id"], "baseline_run_id": baseline["id"],
+    return {"resume_plan":resume,"can_start":resume["can_resume"],"candidate_id": candidate["id"], "baseline_run_id": baseline["id"],
             "snapshot_id": baseline["dataset_version_id"], "question_count": len(approved),
             "evaluation_identity": baseline["judge"]["evaluation_identity"], "judge": baseline["judge"],
             "request_limits": baseline["judge"].get("execution_snapshot", {}).get("request_limits"), "config": config}
@@ -1514,32 +1507,12 @@ def run_candidate(candidate_id: str, payload: PaidActionRequest | None = None):
         if experiment:
             require_current_baseline(experiment["baseline_run_id"])
     runner = EvaluationRunner(store, ai_service)
-    from .sandbox_budget import sandbox_budget
-    from .paid_run import controlled_run
-    from .config import load_values
-    from urllib.parse import urlparse
-    lease=None
     try:
-        plan=runner.candidate_resume_plan(candidate_id)
-        if not plan['can_resume']:raise ValueError(plan['reason'])
-        values=load_values();alibaba=urlparse(values.get('DASHSCOPE_BASE_URL','')).hostname or ''
-        if (urlparse(ai_service.provider.settings.base_url).hostname!='api.deepseek.com'
-            or not (alibaba=='dashscope.aliyuncs.com' or alibaba.endswith('.cn-beijing.maas.aliyuncs.com'))):
-            raise ValueError('Sandbox费率仅核实官方DeepSeek与Alibaba北京端点；当前端点需重新核价')
-        lease=sandbox_budget(store,candidate_id,payload.budget_yuan)
-        paid=lease.__enter__()
-        with controlled_run(paid):
-            run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id,automatic=True)
-    except (ValueError,RuntimeError,OSError,KeyError) as error:
-        if lease:lease.__exit__(None,None,None)
-        raise HTTPException(status_code=409,detail=str(error)) from error
-    def work():
-        try:
-            with controlled_run(paid):runner.execute_candidate(run_id,approved,config,candidate,baseline)
-        finally:lease.__exit__(None,None,None)
-    threading.Thread(target=work,daemon=True).start()
-    return {"id":run_id,"candidate_id":candidate_id,"status":"running","run_mode":"real","data_source":"real","budget_yuan":paid.budget}
-
+        run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id,automatic=True)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    threading.Thread(target=contextvars.copy_context().run, args=(runner.execute_candidate,run_id, approved, config, candidate, baseline), daemon=True).start()
+    return {"id": run_id, "candidate_id": candidate_id, "status": "running", "run_mode": "real", "data_source": "real"}
 
 
 @app.post("/api/candidates/{candidate_id}/publish", status_code=201, dependencies=[Depends(require_trusted_origin)])

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { getJson, postJson, identityKey } from "./api";
 
 type Operation = { id: string; runId?: string; candidateId?: string; title: string; status: "running" | "completed" | "failed" | "stopped"; stopping?: boolean; stopError?: string; kind?: "evaluation" | "revision"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
-type BatchRequest = { experimentId: string; baselineId: string; round: number; candidateIds: string[]; budgetYuan?: number; identity?: string };
+type BatchRequest = { experimentId: string; baselineId: string; round: number; candidateIds: string[]; identity?: string };
 type OperationContextValue = {
   runCandidateBatch: (request: BatchRequest) => Promise<void>;
   operations: Operation[];
@@ -119,7 +119,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
         if (!budget || budget.used >= budget.max - (budget.reserved_for_d ?? 1)) throw new Error("Sandbox 预算不足，保留 D 额度");
         const itemId = start(`Candidate ${candidate.reasoning.candidate_label} · Sandbox`, { candidateId, stage: "正在预约评测" });
         try {
-          const started = await postJson<{ id: string }>(`/api/candidates/${candidateId}/run`, { authorize_provider: true, ...(request.budgetYuan === undefined ? {} : { budget_yuan: request.budgetYuan }) });
+          const started = await postJson<{ id: string }>(`/api/candidates/${candidateId}/run`, { authorize_provider: true });
           update(itemId, { runId: started.id });
           // ponytail: browser-owned serial queue; refresh requires a new explicit click for unstarted candidates.
           let result: any;

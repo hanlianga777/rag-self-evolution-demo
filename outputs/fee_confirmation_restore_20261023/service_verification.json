@@ -1,0 +1,34 @@
+{
+  "ports": [
+    5174,
+    8010
+  ],
+  "required_paid_action_fields": [
+    "authorize_provider"
+  ],
+  "budget_input_absent": true,
+  "old_budget_runtime_absent": true,
+  "protected_files_unchanged": 19,
+  "active_evaluations": 0,
+  "provider_calls": 0,
+  "candidate_preflights": [
+    {
+      "label": "A",
+      "completed": 38,
+      "can_resume": false,
+      "reason": "需先对账：V1G-110926448917-39 存在Unknown request execution；禁止重复调用或预约续跑"
+    },
+    {
+      "label": "B",
+      "completed": 1,
+      "can_resume": true,
+      "reason": null
+    },
+    {
+      "label": "C",
+      "completed": 0,
+      "can_resume": true,
+      "reason": null
+    }
+  ]
+}
