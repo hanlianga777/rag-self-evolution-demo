@@ -1,0 +1,738 @@
+{
+  "provider_calls_this_audit": 0,
+  "fee_this_audit_cny": 0,
+  "base_commit": "4d061bc",
+  "baseline_id": "EVAL-20261021141811373593",
+  "baseline_completed": 50,
+  "baseline_bad_cases": 10,
+  "candidates": [
+    {
+      "label": "A",
+      "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-A",
+      "config": {
+        "alias_mapping": false,
+        "candidate_k": 12,
+        "hybrid_alpha": 0.5,
+        "hybrid_search": true,
+        "hyde": false,
+        "metadata_filter": "OFF",
+        "min_score": 0,
+        "multi_query": false,
+        "prompt_strategy": "Abstention",
+        "query_rewrite": false,
+        "rerank": true,
+        "top_k": 6
+      },
+      "config_sha256": "41b85364f966d872a9cec0c6cc7dc95c3fdec482bbff509dfe6bea107f49fe99",
+      "reasoning_sha256": "c4952f3aace203165900688db360c0349e585e2e978c101e76f0f888da9449cc",
+      "run_id": "EVAL-20261022140653311827",
+      "plan": {
+        "source_run_id": "EVAL-20261022140653311827",
+        "completed": 38,
+        "reusable": 38,
+        "total": 50,
+        "pending_answers": 12,
+        "pending_judges": 12,
+        "saved_answers_waiting_judge": 0,
+        "next_question_id": "V1G-110926448917-39",
+        "can_resume": false,
+        "reason": "需先对账：V1G-110926448917-39 存在Unknown request execution；禁止重复调用或预约续跑",
+        "request_accounting": {
+          "call_events": 156,
+          "cost_estimation": {
+            "amount": null,
+            "calculated_at": "2026-10-22T14:27:54.674153+00:00",
+            "cost_config_version": "deepseek-flash-2026-09-30",
+            "price_snapshot": {
+              "aliases": [
+                "deepseek-v4-flash"
+              ],
+              "billing_mode": "provider_hit_counter",
+              "checked_at": "2026-09-30",
+              "cost_config_version": "deepseek-flash-2026-09-30",
+              "currency": "USD",
+              "effective_date": "2026-09-30",
+              "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+              "model": "deepseek-flash",
+              "peak_hours_utc": [
+                [
+                  1,
+                  4
+                ],
+                [
+                  6,
+                  10
+                ]
+              ],
+              "peak_weekdays": [
+                0,
+                1,
+                2,
+                3,
+                4
+              ],
+              "periods": {
+                "off_peak": {
+                  "cached_input_per_million": 0.003,
+                  "input_per_million": 0.15,
+                  "output_per_million": 0.6
+                },
+                "peak": {
+                  "cached_input_per_million": 0.006,
+                  "input_per_million": 0.3,
+                  "output_per_million": 1.2
+                }
+              },
+              "price_config_version": "deepseek-flash-2026-09-30",
+              "provider": "DeepSeek",
+              "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "unit": 1000000
+            },
+            "reason": "model_mismatch",
+            "requested_model": "deepseek-v4-flash",
+            "status": "unavailable"
+          },
+          "estimated_cost": null,
+          "known_input_tokens": 567709,
+          "known_output_tokens": 367068,
+          "provenance": "logical_task_including_resume_history",
+          "unknown_usage_events": 1
+        },
+        "estimated_calls_without_retries": 48
+      },
+      "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+      "completed_question_ids": [
+        "V1G-110926448917-01",
+        "V1G-110926448917-02",
+        "V1G-110926448917-03",
+        "V1G-110926448917-04",
+        "V1G-110926448917-05",
+        "V1G-110926448917-06",
+        "V1G-110926448917-07",
+        "V1G-110926448917-08",
+        "V1G-110926448917-09-R121605382144",
+        "V1G-110926448917-10",
+        "V1G-110926448917-11",
+        "V1G-110926448917-12",
+        "V1G-110926448917-13",
+        "V1G-110926448917-14-R121644121082-R123334431505",
+        "V1G-110926448917-15",
+        "V1G-110926448917-16-R123410142321",
+        "V1G-110926448917-17",
+        "V1G-110926448917-18",
+        "V1G-110926448917-19",
+        "V1G-110926448917-20",
+        "V1G-110926448917-21",
+        "V1G-110926448917-22",
+        "V1G-110926448917-23",
+        "V1G-110926448917-24",
+        "V1G-110926448917-25",
+        "V1G-110926448917-26",
+        "V1G-110926448917-27-R123429216749",
+        "V1G-110926448917-28",
+        "V1G-110926448917-29",
+        "V1G-110926448917-30-R131552256939",
+        "V1G-110926448917-31",
+        "V1G-110926448917-32",
+        "V1G-110926448917-33",
+        "V1G-110926448917-34-R122000134985-R124446127201",
+        "V1G-110926448917-35",
+        "V1G-110926448917-36-R122036474962",
+        "V1G-110926448917-37",
+        "V1G-110926448917-38"
+      ],
+      "pending_question_ids": [
+        "V1G-110926448917-39",
+        "V1G-110926448917-40",
+        "V1G-110926448917-41",
+        "V1G-110926448917-42-R122110917880-R124502591488",
+        "V1G-110926448917-43",
+        "V1G-110926448917-44-R122200100987-R124516421396",
+        "V1G-110926448917-45-R122231403350-R124530599411",
+        "V1G-110926448917-46-R122330616323-R124558701867",
+        "V1G-110926448917-47",
+        "V1G-110926448917-48",
+        "V1G-110926448917-49",
+        "V1G-110926448917-50-R122406390043-R124544152999"
+      ],
+      "case_sha256": "b7d9734f0c4f17640daf035fc54b04c65cb7892670c50b47b5fa8368801d9206",
+      "checkpoint_sha256": "4acee18a2caa37baccaceb5743ca602495276469d6693f24dc4e9a41d64f87bc",
+      "checkpoint_states": {
+        "V1G-110926448917-01": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-02": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-03": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-04": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-05": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-06": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-07": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-08": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-09-R121605382144": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-10": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-11": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-12": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-13": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-14-R121644121082-R123334431505": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-15": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-16-R123410142321": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-17": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-18": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-19": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-20": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-21": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-22": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-23": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-24": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-25": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-26": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-27-R123429216749": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-28": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-29": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-30-R131552256939": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-31": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-32": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-33": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-34-R122000134985-R124446127201": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-35": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-36-R122036474962": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-37": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-38": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-39": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": {
+            "generation": true
+          },
+          "inflight": null
+        }
+      }
+    },
+    {
+      "label": "B",
+      "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-B",
+      "config": {
+        "alias_mapping": false,
+        "candidate_k": 24,
+        "hybrid_alpha": 0.5,
+        "hybrid_search": true,
+        "hyde": false,
+        "metadata_filter": "OFF",
+        "min_score": 0,
+        "multi_query": false,
+        "prompt_strategy": "Abstention",
+        "query_rewrite": false,
+        "rerank": true,
+        "top_k": 4
+      },
+      "config_sha256": "8a06067e78c958b859b82f431d372ae5645055bae6d8553a68cb165e35ea5f1d",
+      "reasoning_sha256": "49d34403058f26659d46360554ea26640e2e897671a6e74021b663d0873b7100",
+      "run_id": "EVAL-20261022140551248087",
+      "plan": {
+        "source_run_id": "EVAL-20261022140551248087",
+        "completed": 1,
+        "reusable": 1,
+        "total": 50,
+        "pending_answers": 49,
+        "pending_judges": 49,
+        "saved_answers_waiting_judge": 0,
+        "next_question_id": "V1G-110926448917-02",
+        "can_resume": true,
+        "reason": null,
+        "request_accounting": {
+          "call_events": 4,
+          "cost_estimation": {
+            "amount": null,
+            "calculated_at": "2026-10-22T14:06:30.070539+00:00",
+            "cost_config_version": "deepseek-flash-2026-09-30",
+            "price_snapshot": {
+              "aliases": [
+                "deepseek-v4-flash"
+              ],
+              "billing_mode": "provider_hit_counter",
+              "checked_at": "2026-09-30",
+              "cost_config_version": "deepseek-flash-2026-09-30",
+              "currency": "USD",
+              "effective_date": "2026-09-30",
+              "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+              "model": "deepseek-flash",
+              "peak_hours_utc": [
+                [
+                  1,
+                  4
+                ],
+                [
+                  6,
+                  10
+                ]
+              ],
+              "peak_weekdays": [
+                0,
+                1,
+                2,
+                3,
+                4
+              ],
+              "periods": {
+                "off_peak": {
+                  "cached_input_per_million": 0.003,
+                  "input_per_million": 0.15,
+                  "output_per_million": 0.6
+                },
+                "peak": {
+                  "cached_input_per_million": 0.006,
+                  "input_per_million": 0.3,
+                  "output_per_million": 1.2
+                }
+              },
+              "price_config_version": "deepseek-flash-2026-09-30",
+              "provider": "DeepSeek",
+              "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "unit": 1000000
+            },
+            "reason": "model_mismatch",
+            "requested_model": "deepseek-v4-flash",
+            "status": "unavailable"
+          },
+          "estimated_cost": null,
+          "known_input_tokens": 14852,
+          "known_output_tokens": 6998,
+          "provenance": "logical_task_including_resume_history",
+          "unknown_usage_events": 0
+        },
+        "estimated_calls_without_retries": 196
+      },
+      "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+      "completed_question_ids": [
+        "V1G-110926448917-01"
+      ],
+      "pending_question_ids": [
+        "V1G-110926448917-02",
+        "V1G-110926448917-03",
+        "V1G-110926448917-04",
+        "V1G-110926448917-05",
+        "V1G-110926448917-06",
+        "V1G-110926448917-07",
+        "V1G-110926448917-08",
+        "V1G-110926448917-09-R121605382144",
+        "V1G-110926448917-10",
+        "V1G-110926448917-11",
+        "V1G-110926448917-12",
+        "V1G-110926448917-13",
+        "V1G-110926448917-14-R121644121082-R123334431505",
+        "V1G-110926448917-15",
+        "V1G-110926448917-16-R123410142321",
+        "V1G-110926448917-17",
+        "V1G-110926448917-18",
+        "V1G-110926448917-19",
+        "V1G-110926448917-20",
+        "V1G-110926448917-21",
+        "V1G-110926448917-22",
+        "V1G-110926448917-23",
+        "V1G-110926448917-24",
+        "V1G-110926448917-25",
+        "V1G-110926448917-26",
+        "V1G-110926448917-27-R123429216749",
+        "V1G-110926448917-28",
+        "V1G-110926448917-29",
+        "V1G-110926448917-30-R131552256939",
+        "V1G-110926448917-31",
+        "V1G-110926448917-32",
+        "V1G-110926448917-33",
+        "V1G-110926448917-34-R122000134985-R124446127201",
+        "V1G-110926448917-35",
+        "V1G-110926448917-36-R122036474962",
+        "V1G-110926448917-37",
+        "V1G-110926448917-38",
+        "V1G-110926448917-39",
+        "V1G-110926448917-40",
+        "V1G-110926448917-41",
+        "V1G-110926448917-42-R122110917880-R124502591488",
+        "V1G-110926448917-43",
+        "V1G-110926448917-44-R122200100987-R124516421396",
+        "V1G-110926448917-45-R122231403350-R124530599411",
+        "V1G-110926448917-46-R122330616323-R124558701867",
+        "V1G-110926448917-47",
+        "V1G-110926448917-48",
+        "V1G-110926448917-49",
+        "V1G-110926448917-50-R122406390043-R124544152999"
+      ],
+      "case_sha256": "983fcc61f6351bd6ccd8189f1b3e2caa573d119c2af12ff5bc03129dfabf9382",
+      "checkpoint_sha256": "64c2902218c9aed3ec901cbbcd6c0c513dcfe45b01b8e89a3955458eef551a62",
+      "checkpoint_states": {
+        "V1G-110926448917-01": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        },
+        "V1G-110926448917-02": {
+          "answer_saved": false,
+          "judge_saved": false,
+          "unknown": null,
+          "inflight": null
+        }
+      }
+    },
+    {
+      "label": "C",
+      "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-C",
+      "config": {
+        "alias_mapping": false,
+        "candidate_k": 12,
+        "hybrid_alpha": 0.5,
+        "hybrid_search": true,
+        "hyde": false,
+        "metadata_filter": "OFF",
+        "min_score": 0,
+        "multi_query": false,
+        "prompt_strategy": "Abstention",
+        "query_rewrite": false,
+        "rerank": "query_only",
+        "top_k": 4
+      },
+      "config_sha256": "9b43e96d41226ca20849bfd71be8cc834e058fbd328d81ded947d0a44875bc76",
+      "reasoning_sha256": "55606e46d50736c2e76ca388096fc643206433fba2630d32f67ec6b7dfbd1dd2",
+      "run_id": null,
+      "plan": {
+        "source_run_id": null,
+        "completed": 0,
+        "reusable": 0,
+        "total": 50,
+        "pending_answers": 50,
+        "pending_judges": 50,
+        "saved_answers_waiting_judge": 0,
+        "next_question_id": "V1G-110926448917-01",
+        "can_resume": true,
+        "reason": null,
+        "request_accounting": {},
+        "estimated_calls_without_retries": 150
+      },
+      "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+      "completed_question_ids": [],
+      "pending_question_ids": [
+        "V1G-110926448917-01",
+        "V1G-110926448917-02",
+        "V1G-110926448917-03",
+        "V1G-110926448917-04",
+        "V1G-110926448917-05",
+        "V1G-110926448917-06",
+        "V1G-110926448917-07",
+        "V1G-110926448917-08",
+        "V1G-110926448917-09-R121605382144",
+        "V1G-110926448917-10",
+        "V1G-110926448917-11",
+        "V1G-110926448917-12",
+        "V1G-110926448917-13",
+        "V1G-110926448917-14-R121644121082-R123334431505",
+        "V1G-110926448917-15",
+        "V1G-110926448917-16-R123410142321",
+        "V1G-110926448917-17",
+        "V1G-110926448917-18",
+        "V1G-110926448917-19",
+        "V1G-110926448917-20",
+        "V1G-110926448917-21",
+        "V1G-110926448917-22",
+        "V1G-110926448917-23",
+        "V1G-110926448917-24",
+        "V1G-110926448917-25",
+        "V1G-110926448917-26",
+        "V1G-110926448917-27-R123429216749",
+        "V1G-110926448917-28",
+        "V1G-110926448917-29",
+        "V1G-110926448917-30-R131552256939",
+        "V1G-110926448917-31",
+        "V1G-110926448917-32",
+        "V1G-110926448917-33",
+        "V1G-110926448917-34-R122000134985-R124446127201",
+        "V1G-110926448917-35",
+        "V1G-110926448917-36-R122036474962",
+        "V1G-110926448917-37",
+        "V1G-110926448917-38",
+        "V1G-110926448917-39",
+        "V1G-110926448917-40",
+        "V1G-110926448917-41",
+        "V1G-110926448917-42-R122110917880-R124502591488",
+        "V1G-110926448917-43",
+        "V1G-110926448917-44-R122200100987-R124516421396",
+        "V1G-110926448917-45-R122231403350-R124530599411",
+        "V1G-110926448917-46-R122330616323-R124558701867",
+        "V1G-110926448917-47",
+        "V1G-110926448917-48",
+        "V1G-110926448917-49",
+        "V1G-110926448917-50-R122406390043-R124544152999"
+      ],
+      "case_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "checkpoint_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "checkpoint_states": {}
+    }
+  ],
+  "normal_request_counts": {
+    "answer": 111,
+    "judge": 111,
+    "embedding": 111,
+    "rerank": 61
+  },
+  "normal_total": 394,
+  "historical_known_usage_by_stage": [
+    {
+      "provider": "Alibaba",
+      "model": "text-embedding-v4",
+      "phase": "generation",
+      "successful_usage_events": 39,
+      "conservative_usage_cost_cny": 0.000757
+    },
+    {
+      "provider": "Alibaba",
+      "model": "qwen3-rerank",
+      "phase": "generation",
+      "successful_usage_events": 39,
+      "conservative_usage_cost_cny": 0.037527
+    },
+    {
+      "provider": "DeepSeek",
+      "model": "deepseek-v4-flash",
+      "phase": "generation",
+      "successful_usage_events": 39,
+      "conservative_usage_cost_cny": 0.421292
+    },
+    {
+      "provider": "DeepSeek",
+      "model": "deepseek-v4-flash",
+      "phase": "judge",
+      "successful_usage_events": 42,
+      "conservative_usage_cost_cny": 3.583222
+    }
+  ],
+  "historical_cost_is_not_account_debit": true,
+  "history_contains_paid_judge_recoveries": true,
+  "historical_call_classes": {
+    "normal": {
+      "events": 156,
+      "known_fee_cny": 3.7330579999999993
+    },
+    "retry": {
+      "events": 3,
+      "known_fee_cny": 0.30974
+    },
+    "unknown": {
+      "events": 1,
+      "known_fee_cny": 0.0
+    }
+  },
+  "unknown_A_reconciled": false,
+  "unknown_A_amount_cny": null,
+  "mean_token_projection_peak_cny": {
+    "embedding": 0.002154538461538461,
+    "rerank": 0.05869607692307692,
+    "answer": 1.1990618461538463,
+    "judge": 9.469943857142857
+  },
+  "mean_token_projection_total_peak_cny": 10.72985631868132,
+  "mean_projection_offpeak_deepseek_cny": 5.395353467032967,
+  "normal_bound_by_stage_cny": {
+    "answer": 21.823488,
+    "judge": 58.195968,
+    "embedding": 1.818624,
+    "rerank": 7.995392
+  },
+  "normal_bound_total_cny": 89.833472,
+  "max_three_attempt_bound_cny": 269.500416,
+  "recommended_new_authorization_ceiling_cny": 300,
+  "ceiling_scope": "future shared Experiment Sandbox; historical charges including unknown A are separate and not zero",
+  "assumptions": [
+    "official Beijing Alibaba endpoints and DeepSeek peak cache miss",
+    "no config or frozen output-limit changes",
+    "request UTF8+repeated rerank query+1024 <= enforced byte ceilings",
+    "three-attempt conservative envelope; unknown stops rather than retries",
+    "current rates expire after 24h; recheck required"
+  ]
+}

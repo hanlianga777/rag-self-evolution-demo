@@ -1,5 +1,7 @@
 > Agent 已付费响应恢复：允许1–3个合法候选，逐项校验保留合法部分；缺少可选说明不再整批失败。零网络预检与追加恢复方式见 [响应合同](docs/AGENT_RESPONSE_CONTRACT.md)。
 
+2026-10-23 Sandbox费用执行前检查：同Experiment的新授权请求已受后端人民币累计硬预算约束；A未知费用继续阻断，B从Q02、C从Q01可独立明确授权，已完成39题复用。仅零费用审计与离线验收，未启动Sandbox。[费用、上界、账单核对及按钮顺序](outputs/sandbox_cost_preflight_20261023/Sandbox费用与续跑执行前验收.md)。
+
 2026-10-22 Sandbox中断保护：区分远程Embedding错误与本地索引故障，单请求有限恢复、未知费用先对账；同身份续跑复用已保存结果，未完成不显示最终成绩，重启/续跑须重新付费授权。[验收规则与离线审计](docs/SANDBOX_INTERRUPTION_RECOVERY.md)。
 
 2026-10-22 Agent完整覆盖规划：按真实观察形成覆盖义务，优先复用模型方案，同轮零调用补齐合法B/C；实际保存目标计数，未完成规划阻止直接Sandbox。规则来源、逐目标根因、能力缺口与历史费用审计保留。[说明与离线入口](docs/AGENT_COVERAGE_PLANNING.md)。

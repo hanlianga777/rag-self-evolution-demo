@@ -1,0 +1,517 @@
+{
+  "provider_calls": 0,
+  "baseline_id": "EVAL-20261021141811373593",
+  "baseline_unchanged": true,
+  "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+  "index_valid": true,
+  "knowledge_identity": {
+    "sources": {
+      "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+      "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+      "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+      "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+    },
+    "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+    "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+    "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+    "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+    "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+  },
+  "candidates": [
+    {
+      "label": "A",
+      "status": "failed",
+      "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-A",
+      "resume_plan": {
+        "source_run_id": "EVAL-20261022140653311827",
+        "completed": 38,
+        "reusable": 38,
+        "total": 50,
+        "pending_answers": 12,
+        "pending_judges": 12,
+        "saved_answers_waiting_judge": 0,
+        "next_question_id": "V1G-110926448917-39",
+        "can_resume": false,
+        "reason": "需先对账：V1G-110926448917-39 存在Unknown request execution；禁止重复调用或预约续跑",
+        "request_accounting": {
+          "call_events": 156,
+          "cost_estimation": {
+            "amount": null,
+            "calculated_at": "2026-10-22T14:27:54.674153+00:00",
+            "cost_config_version": "deepseek-flash-2026-09-30",
+            "price_snapshot": {
+              "aliases": [
+                "deepseek-v4-flash"
+              ],
+              "billing_mode": "provider_hit_counter",
+              "checked_at": "2026-09-30",
+              "cost_config_version": "deepseek-flash-2026-09-30",
+              "currency": "USD",
+              "effective_date": "2026-09-30",
+              "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+              "model": "deepseek-flash",
+              "peak_hours_utc": [
+                [
+                  1,
+                  4
+                ],
+                [
+                  6,
+                  10
+                ]
+              ],
+              "peak_weekdays": [
+                0,
+                1,
+                2,
+                3,
+                4
+              ],
+              "periods": {
+                "off_peak": {
+                  "cached_input_per_million": 0.003,
+                  "input_per_million": 0.15,
+                  "output_per_million": 0.6
+                },
+                "peak": {
+                  "cached_input_per_million": 0.006,
+                  "input_per_million": 0.3,
+                  "output_per_million": 1.2
+                }
+              },
+              "price_config_version": "deepseek-flash-2026-09-30",
+              "provider": "DeepSeek",
+              "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "unit": 1000000
+            },
+            "reason": "model_mismatch",
+            "requested_model": "deepseek-v4-flash",
+            "status": "unavailable"
+          },
+          "estimated_cost": null,
+          "known_input_tokens": 567709,
+          "known_output_tokens": 367068,
+          "provenance": "logical_task_including_resume_history",
+          "unknown_usage_events": 1
+        },
+        "estimated_calls_without_retries": 48,
+        "ancestor_results_byte_identical": 13
+      },
+      "error": "本地检索执行失败（vector_search/ProviderUnavailable）；请检查索引与本地模型",
+      "stop_request": null,
+      "failed_attempts": [
+        {
+          "question_id": "V1G-110926448917-09-R121605382144",
+          "cause_message": null,
+          "cause_type": null,
+          "elapsed_ms": 16130,
+          "error": "DeepSeek 返回的内容必须是非空字符串",
+          "error_type": "ProviderInvalidResponse",
+          "phase": "judge",
+          "provider_status_code": null,
+          "recorded_by_run_id": "EVAL-20261022093004691607",
+          "request_execution_unknown": false,
+          "response_metadata": {
+            "usage": {
+              "call_started_at": "2026-10-22T09:36:20.514936+00:00",
+              "completion_tokens": 3267,
+              "completion_tokens_details": {
+                "reasoning_tokens": 3267
+              },
+              "latency_ms": 16101,
+              "prompt_cache_hit_tokens": 1920,
+              "prompt_cache_miss_tokens": 8921,
+              "prompt_tokens": 10841,
+              "prompt_tokens_details": {
+                "cached_tokens": 1920
+              },
+              "provider": "DeepSeek",
+              "request_sha256": "47a7c1b56ea764a8f9b654b0b883bf801273f257ccea9c48da69ba40238cb475",
+              "requested_model": "deepseek-v4-flash",
+              "status": "ok",
+              "total_tokens": 14108
+            }
+          },
+          "retry_delay_seconds": 1,
+          "retryable": true,
+          "status": "error",
+          "usage": [
+            {
+              "call_started_at": "2026-10-22T09:36:20.514936+00:00",
+              "completion_tokens": 3267,
+              "completion_tokens_details": {
+                "reasoning_tokens": 3267
+              },
+              "latency_ms": 16101,
+              "prompt_cache_hit_tokens": 1920,
+              "prompt_cache_miss_tokens": 8921,
+              "prompt_tokens": 10841,
+              "prompt_tokens_details": {
+                "cached_tokens": 1920
+              },
+              "provider": "DeepSeek",
+              "request_sha256": "47a7c1b56ea764a8f9b654b0b883bf801273f257ccea9c48da69ba40238cb475",
+              "requested_model": "deepseek-v4-flash",
+              "status": "ok",
+              "total_tokens": 14108
+            }
+          ],
+          "raw_provider_response_saved_locally": true
+        },
+        {
+          "question_id": "V1G-110926448917-14-R121644121082-R123334431505",
+          "cause_message": null,
+          "cause_type": null,
+          "elapsed_ms": null,
+          "error": "用户停止运行，断点已保存",
+          "error_type": "InterruptedError",
+          "phase": "judge",
+          "status": "error",
+          "usage": []
+        },
+        {
+          "question_id": "V1G-110926448917-30-R131552256939",
+          "cause_message": "support is not located in actual full Final",
+          "cause_type": "ValueError",
+          "elapsed_ms": 33616,
+          "error": "VNext Judge合同无效：support is not located in actual full Final",
+          "error_type": "ProviderInvalidResponse",
+          "phase": "judge",
+          "provider_status_code": null,
+          "recorded_by_run_id": "EVAL-20261022140653311827",
+          "request_execution_unknown": false,
+          "response_metadata": {
+            "finish_reason": "stop",
+            "request_id": "2d767d01-6aa8-4a9a-a745-d2e78464d32b",
+            "transport_recovery": null,
+            "usage": {
+              "call_started_at": "2026-10-22T14:18:53.384798+00:00",
+              "completion_tokens": 7335,
+              "completion_tokens_details": {
+                "reasoning_tokens": 6292
+              },
+              "latency_ms": 33555,
+              "prompt_cache_hit_tokens": 1920,
+              "prompt_cache_miss_tokens": 7122,
+              "prompt_tokens": 9042,
+              "prompt_tokens_details": {
+                "cached_tokens": 1920
+              },
+              "provider": "DeepSeek",
+              "request_sha256": "d1f563a23a55c55f9c1c6942b03a10b2068377b5ad4c8bffea85b9821d1ff08d",
+              "requested_model": "deepseek-v4-flash",
+              "status": "ok",
+              "total_tokens": 16377
+            },
+            "validation_error": {
+              "category": "business_contract",
+              "message": "support is not located in actual full Final"
+            }
+          },
+          "retry_delay_seconds": 1,
+          "retryable": true,
+          "status": "error",
+          "usage": [
+            {
+              "call_started_at": "2026-10-22T14:18:53.384798+00:00",
+              "completion_tokens": 7335,
+              "completion_tokens_details": {
+                "reasoning_tokens": 6292
+              },
+              "latency_ms": 33555,
+              "prompt_cache_hit_tokens": 1920,
+              "prompt_cache_miss_tokens": 7122,
+              "prompt_tokens": 9042,
+              "prompt_tokens_details": {
+                "cached_tokens": 1920
+              },
+              "provider": "DeepSeek",
+              "request_sha256": "d1f563a23a55c55f9c1c6942b03a10b2068377b5ad4c8bffea85b9821d1ff08d",
+              "requested_model": "deepseek-v4-flash",
+              "status": "ok",
+              "total_tokens": 16377
+            }
+          ],
+          "raw_provider_response_saved_locally": true
+        },
+        {
+          "question_id": "V1G-110926448917-31",
+          "cause_message": "support is not located in actual full Final",
+          "cause_type": "ValueError",
+          "elapsed_ms": 42496,
+          "error": "VNext Judge合同无效：support is not located in actual full Final",
+          "error_type": "ProviderInvalidResponse",
+          "phase": "judge",
+          "provider_status_code": null,
+          "recorded_by_run_id": "EVAL-20261022140653311827",
+          "request_execution_unknown": false,
+          "response_metadata": {
+            "finish_reason": "stop",
+            "request_id": "0aebea5f-299d-4322-9c3f-bc1b6cafa48f",
+            "transport_recovery": null,
+            "usage": {
+              "call_started_at": "2026-10-22T14:20:19.478355+00:00",
+              "completion_tokens": 9560,
+              "completion_tokens_details": {
+                "reasoning_tokens": 8898
+              },
+              "latency_ms": 42469,
+              "prompt_cache_hit_tokens": 1920,
+              "prompt_cache_miss_tokens": 9263,
+              "prompt_tokens": 11183,
+              "prompt_tokens_details": {
+                "cached_tokens": 1920
+              },
+              "provider": "DeepSeek",
+              "request_sha256": "b2c28439b5709bed0f3bf8b1a4f66a533eac9b7b5091c1230ee2bcb468c94072",
+              "requested_model": "deepseek-v4-flash",
+              "status": "ok",
+              "total_tokens": 20743
+            },
+            "validation_error": {
+              "category": "business_contract",
+              "message": "support is not located in actual full Final"
+            }
+          },
+          "retry_delay_seconds": 1,
+          "retryable": true,
+          "status": "error",
+          "usage": [
+            {
+              "call_started_at": "2026-10-22T14:20:19.478355+00:00",
+              "completion_tokens": 9560,
+              "completion_tokens_details": {
+                "reasoning_tokens": 8898
+              },
+              "latency_ms": 42469,
+              "prompt_cache_hit_tokens": 1920,
+              "prompt_cache_miss_tokens": 9263,
+              "prompt_tokens": 11183,
+              "prompt_tokens_details": {
+                "cached_tokens": 1920
+              },
+              "provider": "DeepSeek",
+              "request_sha256": "b2c28439b5709bed0f3bf8b1a4f66a533eac9b7b5091c1230ee2bcb468c94072",
+              "requested_model": "deepseek-v4-flash",
+              "status": "ok",
+              "total_tokens": 20743
+            }
+          ],
+          "raw_provider_response_saved_locally": true
+        },
+        {
+          "question_id": "V1G-110926448917-39",
+          "cause_message": "Alibaba request failed (TimeoutError)",
+          "cause_type": "ProviderUnavailable",
+          "elapsed_ms": 62110,
+          "error": "本地检索执行失败（vector_search/ProviderUnavailable）；请检查索引与本地模型",
+          "error_type": "RetrievalUnavailable",
+          "phase": "generation",
+          "provider_status_code": null,
+          "recorded_by_run_id": "EVAL-20261022140653311827",
+          "request_execution_unknown": true,
+          "response_metadata": null,
+          "retryable": false,
+          "status": "error",
+          "usage": [
+            {
+              "call_started_at": "2026-10-22T14:26:52.696248+00:00",
+              "latency_ms": 61974,
+              "provider": "Alibaba",
+              "requested_model": "text-embedding-v4",
+              "status": "failed"
+            }
+          ],
+          "raw_provider_response_saved_locally": true
+        }
+      ],
+      "completed_results_sha256": "b7d9734f0c4f17640daf035fc54b04c65cb7892670c50b47b5fa8368801d9206"
+    },
+    {
+      "label": "B",
+      "status": "failed",
+      "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-B",
+      "resume_plan": {
+        "source_run_id": "EVAL-20261022140551248087",
+        "completed": 1,
+        "reusable": 1,
+        "total": 50,
+        "pending_answers": 49,
+        "pending_judges": 49,
+        "saved_answers_waiting_judge": 0,
+        "next_question_id": "V1G-110926448917-02",
+        "can_resume": true,
+        "reason": null,
+        "request_accounting": {
+          "call_events": 4,
+          "cost_estimation": {
+            "amount": null,
+            "calculated_at": "2026-10-22T14:06:30.070539+00:00",
+            "cost_config_version": "deepseek-flash-2026-09-30",
+            "price_snapshot": {
+              "aliases": [
+                "deepseek-v4-flash"
+              ],
+              "billing_mode": "provider_hit_counter",
+              "checked_at": "2026-09-30",
+              "cost_config_version": "deepseek-flash-2026-09-30",
+              "currency": "USD",
+              "effective_date": "2026-09-30",
+              "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+              "model": "deepseek-flash",
+              "peak_hours_utc": [
+                [
+                  1,
+                  4
+                ],
+                [
+                  6,
+                  10
+                ]
+              ],
+              "peak_weekdays": [
+                0,
+                1,
+                2,
+                3,
+                4
+              ],
+              "periods": {
+                "off_peak": {
+                  "cached_input_per_million": 0.003,
+                  "input_per_million": 0.15,
+                  "output_per_million": 0.6
+                },
+                "peak": {
+                  "cached_input_per_million": 0.006,
+                  "input_per_million": 0.3,
+                  "output_per_million": 1.2
+                }
+              },
+              "price_config_version": "deepseek-flash-2026-09-30",
+              "provider": "DeepSeek",
+              "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "unit": 1000000
+            },
+            "reason": "model_mismatch",
+            "requested_model": "deepseek-v4-flash",
+            "status": "unavailable"
+          },
+          "estimated_cost": null,
+          "known_input_tokens": 14852,
+          "known_output_tokens": 6998,
+          "provenance": "logical_task_including_resume_history",
+          "unknown_usage_events": 0
+        },
+        "estimated_calls_without_retries": 196
+      },
+      "error": "用户停止运行",
+      "stop_request": {
+        "reason": "用户停止运行",
+        "requested_at": "2026-10-22T14:06:26.683124+00:00"
+      },
+      "failed_attempts": [
+        {
+          "question_id": "V1G-110926448917-02",
+          "cause_message": null,
+          "cause_type": null,
+          "elapsed_ms": null,
+          "error": "用户停止运行，断点已保存",
+          "error_type": "InterruptedError",
+          "phase": "judge",
+          "status": "error",
+          "usage": []
+        }
+      ],
+      "completed_results_sha256": "983fcc61f6351bd6ccd8189f1b3e2caa573d119c2af12ff5bc03129dfabf9382"
+    },
+    {
+      "label": "C",
+      "status": "generated",
+      "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-C",
+      "resume_plan": {
+        "source_run_id": null,
+        "completed": 0,
+        "reusable": 0,
+        "total": 50,
+        "pending_answers": 50,
+        "pending_judges": 50,
+        "saved_answers_waiting_judge": 0,
+        "next_question_id": "V1G-110926448917-01",
+        "can_resume": true,
+        "reason": null,
+        "request_accounting": {},
+        "estimated_calls_without_retries": 150
+      },
+      "error": null,
+      "stop_request": null,
+      "failed_attempts": [],
+      "completed_results_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  ],
+  "budget": {
+    "estimated_calls_without_retries": 394,
+    "historical_deepseek": {
+      "status": "unavailable",
+      "amount": null,
+      "reason": "billing_period_ambiguous",
+      "requested_model": "deepseek-v4-flash",
+      "cost_config_version": "deepseek-flash-2026-09-30",
+      "price_snapshot": {
+        "provider": "DeepSeek",
+        "model": "deepseek-flash",
+        "aliases": [
+          "deepseek-v4-flash"
+        ],
+        "currency": "USD",
+        "unit": 1000000,
+        "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+        "checked_at": "2026-09-30",
+        "effective_date": "2026-09-30",
+        "billing_mode": "provider_hit_counter",
+        "price_config_version": "deepseek-flash-2026-09-30",
+        "periods": {
+          "peak": {
+            "input_per_million": 0.3,
+            "cached_input_per_million": 0.006,
+            "output_per_million": 1.2
+          },
+          "off_peak": {
+            "input_per_million": 0.15,
+            "cached_input_per_million": 0.003,
+            "output_per_million": 0.6
+          }
+        },
+        "peak_hours_utc": [
+          [
+            1,
+            4
+          ],
+          [
+            6,
+            10
+          ]
+        ],
+        "peak_weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+        "cost_config_version": "deepseek-flash-2026-09-30"
+      },
+      "calculated_at": "2026-10-23T03:03:30.302697+00:00"
+    },
+    "projected_deepseek_calls": 222,
+    "projection_is_not_hard_budget": true,
+    "alibaba_price_and_unknown_charge": "需按账号真实账单对账；不将未知费用当0",
+    "historical_sample_projection_range": {
+      "lower": 0.7817395684444444,
+      "upper": 1.5634791368888887,
+      "currency": "USD",
+      "basis": "保存的峰谷费率与实际Token样本外推；非承诺、非硬预算，不含Alibaba和未知请求"
+    }
+  }
+}

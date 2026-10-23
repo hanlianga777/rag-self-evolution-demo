@@ -1,0 +1,14 @@
+{
+  "provider_calls": 0,
+  "fee_cny": 0,
+  "backend_offline_tests": 61,
+  "backend_result": "passed",
+  "frontend_test_files": 3,
+  "frontend_tests": 34,
+  "frontend_result": "passed",
+  "typescript_vite_build": "passed",
+  "A_unknown_reconciled": false,
+  "sandbox_started": false,
+  "baseline_rerun": false,
+  "candidate_generation": false
+}

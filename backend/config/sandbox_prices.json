@@ -1,0 +1,36 @@
+{
+  "checked_at": "2026-10-23T03:07:38.228054+00:00",
+  "currency": "CNY",
+  "scope": "official peak, cache-miss, Beijing public pay-as-you-go; excludes historical charges",
+  "sources": [
+    "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+    "https://help.aliyun.com/zh/model-studio/model-pricing"
+  ],
+  "models": {
+    "deepseek-v4-flash": {
+      "provider": "DeepSeek",
+      "input": 2.0,
+      "output": 8.0,
+      "max_output": 32768
+    },
+    "text-embedding-v4": {
+      "provider": "Alibaba",
+      "input": 0.5,
+      "output": 0.0,
+      "max_output": 0,
+      "max_input_bytes": 32768
+    },
+    "qwen3-rerank": {
+      "provider": "Alibaba",
+      "input": 0.5,
+      "output": 0.0,
+      "max_output": 0,
+      "max_input_bytes": 262144
+    }
+  },
+  "request_byte_limits": {
+    "answer": 65536,
+    "judge": 131072,
+    "query": 16384
+  }
+}

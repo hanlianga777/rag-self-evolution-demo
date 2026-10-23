@@ -439,6 +439,9 @@ class EvaluationRunner:
         from .paid_run import execution_limits,accounting_only
         run=self.store.evaluation_run(run_id)
         if run['status']=='completed':return run
+        from .paid_run import current_paid_run
+        if run['config'].get('candidate_id') and getattr(self.runtime,'live_enabled',False) and not getattr(current_paid_run(),'enforce_budget',False):
+            raise ValueError('真实Sandbox必须绑定后端人民币硬预算')
         if run['result'].get('judge_replay'):
             from .q18_probe import require_reviewed_probe
             require_reviewed_probe(self.store.database_path,{**run['result']['judge_replay'],'new_judge':run['judge']})
@@ -563,7 +566,7 @@ class EvaluationRunner:
         from .paid_run import PaidRun,controlled_run,accounting_only
         run=self.store.evaluation_run(run_id)
         auto=run['result'].get('auto_recovery',{})
-        if not auto.get('authorized') or auto.get('state')=='stopped' or run['result'].get('stop_request'):return
+        if not auto.get('authorized') or auto.get('state')=='stopped' or run['result'].get('stop_request') or auto.get('hard_budget'):return
         snapshot=json.loads(run['dataset_snapshot_json'])
         if run['judge'].get('evaluation_identity')!=evaluation_identity(snapshot,run['judge']) or not policy_current(run['judge']):raise ValueError('自动恢复Evaluation Identity不匹配')
         if run['config'].get('candidate_id') and run['result'].get('execution_owner_pid')!=os.getpid():
@@ -661,6 +664,9 @@ class EvaluationRunner:
             return plan
 
     def start_candidate(self, candidate_id: str, *, automatic=False):
+        from .paid_run import current_paid_run
+        if getattr(self.runtime,'live_enabled',False) and not getattr(current_paid_run(),'enforce_budget',False):
+            raise ValueError('真实Sandbox预约前必须绑定人民币硬预算')
         approved, config, candidate, baseline = self.candidate_inputs(candidate_id)
         snapshot = json.loads(baseline["dataset_snapshot_json"])
         from .full_text import CORPUS_LOCK

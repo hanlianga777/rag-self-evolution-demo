@@ -36,8 +36,8 @@ class PaidRun:
     def save(self):
         temporary = self.path.with_suffix(self.path.suffix+'.tmp')
         data = {'identity':self.identity, 'budget_yuan':self.budget, 'price_snapshot':self.prices,
-                'spent_yuan':self.spent, 'budget_enforcement':not _accounting.get(), 'available_yuan':None if _accounting.get() else max(0.,self.budget-self.spent-sum(c['reserved_yuan'] for c in self.calls if c['status']=='reserved')),
-                'resume_authorization':getattr(self,'resume_authorization',None), 'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
+                'spent_yuan':self.spent, 'currency':getattr(self,'currency',None),'hard_budget':getattr(self,'enforce_budget',False), 'budget_enforcement':not _accounting.get(), 'available_yuan':None if _accounting.get() else max(0.,self.budget-self.spent-sum(c['reserved_yuan'] for c in self.calls if c['status']=='reserved')),
+                'request_byte_limits':getattr(self,'request_byte_limits',None),'resume_authorization':getattr(self,'resume_authorization',None), 'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
         data['continuation_authorizations']=getattr(self,'continuation_authorizations',[])
         data['accounting_retry_authorization']=getattr(self,'accounting_retry_authorization',None)
         with temporary.open('w') as stream:
@@ -141,6 +141,9 @@ class PaidRun:
         encoded = json.dumps(payload,ensure_ascii=False).encode()
         repeated_query = (max(0,len(payload.get('documents',[]))-1)*len(str(payload.get('query','')).encode())) if provider=='Alibaba' else 0
         # UTF-8 bytes plus framing allowance conservatively bound input tokens.
+        byte_limit=rate.get('max_input_bytes') if provider=='Alibaba' else (getattr(self,'request_byte_limits',None) or {}).get(_task.get())
+        if getattr(self,'enforce_budget',False) and (type(byte_limit) is not int or len(encoded)+repeated_query+1024>byte_limit):
+            raise RuntimeError('Sandbox请求超过已授权输入费用上界，未发送Provider')
         bound = payload.get('max_tokens',rate['max_output'])
         if type(bound) is not int or not 0<=bound<=rate['max_output']: raise RuntimeError('Invalid output budget bound')
         reserved = ((len(encoded)+repeated_query+1024)*rate['input'] + bound*rate['output'])/1_000_000
@@ -273,7 +276,8 @@ def current_request_limit():
 
 @contextmanager
 def accounting_only():
-    token=_accounting.set(True)
+    run=current_paid_run()
+    token=_accounting.set(not bool(run and getattr(run,'enforce_budget',False)))
     try:yield
     finally:_accounting.reset(token)
 

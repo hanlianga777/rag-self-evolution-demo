@@ -2039,7 +2039,7 @@ class GovernanceStore:
             if automatic:
                 from .paid_run import current_paid_run
                 paid=current_paid_run()
-                result['auto_recovery']={'authorized':True,'state':'ready','ledger_path':str(paid.path) if paid else None,'ledger_identity':paid.identity if paid else None}
+                result['auto_recovery']={'authorized':True,'state':'ready','hard_budget':bool(paid and getattr(paid,'enforce_budget',False)),'ledger_path':str(paid.path) if paid else None,'ledger_identity':paid.identity if paid else None}
             result['execution_owner_pid']=os.getpid()
             connection.execute('INSERT INTO evaluation_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (run_id,'running','real','real',snapshot['id'],_json(snapshot),_json(config),_json(judge),_json(result),None,_now(),None))
             if candidate_id:

@@ -1,0 +1,21 @@
+{
+  "backend/data/demo.db": "5e295223c56869f55e1f159e435c4aff5d9627f81084bab3d78b9ac9df26eeb4",
+  "backend/data/corpus_state.json": "aab9aa411c229550f052370014a3b39c559f9bdbe1f0b49d40c796779c45087a",
+  "backend/data/index/DOC-004-blocks.json": "6d6dc775ac632ccda93b0ebc2f65954d53572f5e23417779b04f961afcf1b7eb",
+  "backend/data/index/DOC-001-mineru.zip": "b3bb83c6a306c70e4d77fae31771918562015416e26cc3aa65bad2ef6e3a64d2",
+  "backend/data/index/source-manifest.json": "dc6aad86c333db4042343d77ec8a34867deb3c59be0f35ecea0748c016099a9a",
+  "backend/data/index/faiss.index": "ee5bb4977dcf28f8e2f8d1dfe92dee43e2106797710216958c05654eaacc2164",
+  "backend/data/index/DOC-004-mineru.zip": "ab056366a908ed5e3ef3195797fe705e1977848b324c97d2bf6900d7a6841fe6",
+  "backend/data/index/DOC-001-blocks.json": "86d6f4ef5bfa8bc329cd1376d420e4c22a8de5af81ac933f536412e5f36a1462",
+  "backend/data/index/DOC-002-blocks.json": "365ea72cfa8c75a7d3848e667c47548c0496134057705aed67b8ff390f91d6f0",
+  "backend/data/index/DOC-003-mineru.zip": "d848327ef6572c742063bc593f147c952b96f531700a8d4b82c01c61e048f7d0",
+  "backend/data/index/parents.json": "3ea4832bda1cc1bf446ba92d8bdd972ce6c399650fc36e033151504a3253b928",
+  "backend/data/index/embeddings.npy": "a9ddcb7468286082a6f16ea754281c926cd269ef5c7d0aaa74df42103ac65448",
+  "backend/data/index/documents.json": "056335fb99b5f180e24edef54316be1e5aa2d887f3d6bf7884227e147e6de054",
+  "backend/data/index/manifest.json": "edef3a1b3d56fe91fc29c3df89db3712ba90c788db47cf794dbebf33d18c7131",
+  "backend/data/index/coverage.json": "a4b1bb92692ea804f533a798d426d17b9b685729d7905fb20f418d24ace73551",
+  "backend/data/index/chunks.json": "ed52f56b622f8b5d677d1828ec0dd745713f568c71e5412618e34f4131ee3ddd",
+  "backend/data/index/full_text.json": "314eab3323aea22036f80fc30053420960ce7e96fd6d0163ee23fde37136c197",
+  "backend/data/index/DOC-002-mineru.zip": "4a0045c922154bda52c3acec9167de5307c72c0ee3fc9702b7323f9e6884fa62",
+  "backend/data/index/DOC-003-blocks.json": "06ee9785ad508838a90dd1a5bc280258cfd1219fb7ba47664ffb37bcc5a0b7de"
+}

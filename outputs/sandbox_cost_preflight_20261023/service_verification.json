@@ -1,0 +1,61 @@
+{
+  "api_port": 8010,
+  "frontend_port": 5174,
+  "loaded_code_matches_final_source": {
+    "sandbox_budget": true,
+    "payment_begin": true,
+    "payment_accounting": true
+  },
+  "served_ui_budget_input_present": true,
+  "active_evaluations": 0,
+  "provider_calls": 0,
+  "provider_ledger_created": false,
+  "formal_data_hashes_unchanged": true,
+  "candidate_preflights": [
+    {
+      "label": "A",
+      "completed": 38,
+      "can_resume": false,
+      "cost_budget": {
+        "currency": "CNY",
+        "scope": "本Experiment新授权Sandbox请求累计（历史费用另列，不视为0）",
+        "hard_limit_yuan": null,
+        "spent_yuan": 0,
+        "held_yuan": 0,
+        "requires_explicit_budget": true,
+        "price_checked_at": "2026-10-23T03:07:38.228054+00:00",
+        "ledger_path": "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/data/sandbox-budgets/6f00e6e700d8e79c1a9e46d0a065b418581245db6a11768fb32fd3edf68c8a5e.json"
+      }
+    },
+    {
+      "label": "B",
+      "completed": 1,
+      "can_resume": true,
+      "cost_budget": {
+        "currency": "CNY",
+        "scope": "本Experiment新授权Sandbox请求累计（历史费用另列，不视为0）",
+        "hard_limit_yuan": null,
+        "spent_yuan": 0,
+        "held_yuan": 0,
+        "requires_explicit_budget": true,
+        "price_checked_at": "2026-10-23T03:07:38.228054+00:00",
+        "ledger_path": "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/data/sandbox-budgets/6f00e6e700d8e79c1a9e46d0a065b418581245db6a11768fb32fd3edf68c8a5e.json"
+      }
+    },
+    {
+      "label": "C",
+      "completed": 0,
+      "can_resume": true,
+      "cost_budget": {
+        "currency": "CNY",
+        "scope": "本Experiment新授权Sandbox请求累计（历史费用另列，不视为0）",
+        "hard_limit_yuan": null,
+        "spent_yuan": 0,
+        "held_yuan": 0,
+        "requires_explicit_budget": true,
+        "price_checked_at": "2026-10-23T03:07:38.228054+00:00",
+        "ledger_path": "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/data/sandbox-budgets/6f00e6e700d8e79c1a9e46d0a065b418581245db6a11768fb32fd3edf68c8a5e.json"
+      }
+    }
+  ]
+}
