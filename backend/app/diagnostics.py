@@ -1,5 +1,6 @@
 """Read-only explanation of saved evidence; never rescore or rewrite a Run."""
 from .evaluation_contract import normalize, quote_present, assess_claims, claim_consistent
+from .read_view import memoized_view
 
 TYPICAL = ('检索失败', '检索噪声', '模型过度拒答', '安全边界误伤', '延迟黑洞')
 TAG_NAMES = {'Retrieval Failure':'检索失败','Ranking Failure':'排序失败','Query Failure':'查询表达偏差',
@@ -17,6 +18,7 @@ def _fact_text(value):
     return normalize(re.sub(r'^\s*\d+[.、)]\s*', '', value or '')).strip('。；;，,')
 
 
+@memoized_view
 def _current_corpus(trace):
     """Read persisted chunks only after their manifest/source identities are verified."""
     import hashlib
@@ -211,6 +213,7 @@ def automatic_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     # is inferred from their display state or free-form diagnosis prose.
     return result
 
+@memoized_view
 def diagnostic_view(case, *, corpus_chunks=None, corpus_fingerprint=None):
     metrics=case.get('programmatic_metrics') or {}
     audit=case.get('diagnosis') or {};coverage=metrics.get('evidence_coverage') or {}

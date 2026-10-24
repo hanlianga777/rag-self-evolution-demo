@@ -106,7 +106,7 @@ def coverage_inputs(store,experiment_id):
     experiment=store.experiment(experiment_id)
     if not experiment:raise ValueError('Experiment不存在')
     baseline=store.evaluation_run(experiment['baseline_run_id'])
-    rows=[{**r,'diagnostic_view':diagnostic_view(r['result'])} for r in store.bad_case_rows() if r['run_id']==baseline['id']]
+    rows=[{**r,'diagnostic_view':diagnostic_view(r['result'])} for r in store.bad_case_rows(baseline['id']) if r['run_id']==baseline['id']]
     from .evaluation_contract import business_verdict
     rows=[r for r in rows if business_verdict(r['result'])=='FAIL' or (r['result'].get('evaluation_outcome') or {}).get('contract_version')!='business-vnext-1' and r['result'].get('passed') is False]
     base={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}

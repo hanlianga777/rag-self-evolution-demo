@@ -159,14 +159,17 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   useEffect(() => {
     if (!restore) return;
     let cancelled = false;
-    getJson<any[]>("/api/evaluations").then(evaluations => {
+    void Promise.resolve().then(()=>{
+    if(cancelled)return;
+    getJson<any[]>("/api/evaluations?active_only=true").then(evaluations => {
       if (cancelled) return;
       for (const item of evaluations.filter(item => item.status === "running")) start(item.config?.candidate_id ? `Candidate ${item.config.candidate_id} Sandbox` : "Baseline Evaluation", { id: item.id, runId: item.id, candidateId: item.config?.candidate_id, kind: "evaluation", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
     }).catch(() => {});
-    getJson<any[]>("/api/governance/revisions").then(revisions => {
+    getJson<any[]>("/api/governance/revisions?active_only=true").then(revisions => {
       if (cancelled) return;
       for (const item of revisions.filter(item => ["queued", "generating", "validating", "probing", "qc"].includes(item.status))) start("局部修订", { id: item.id, kind: "revision", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
     }).catch(() => {});
+    });
     return () => { cancelled = true; };
   }, [restore, start]);
 

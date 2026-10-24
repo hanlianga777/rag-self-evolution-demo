@@ -1,0 +1,41 @@
+         3095173 function calls (2035137 primitive calls) in 2.881 seconds
+
+   Ordered by: cumulative time
+   List reduced from 996 to 35 due to restriction <35>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    71/31    0.005    0.000    2.733    0.088 read_view.py:19(read)
+       20    0.003    0.000    2.713    0.136 diagnostics.py:216(diagnostic_view)
+       20    0.003    0.000    2.501    0.125 diagnostics.py:61(automatic_analysis)
+       20    0.015    0.001    2.498    0.125 diagnostics.py:311(business_analysis)
+        1    0.000    0.000    1.546    1.546 agent_coverage.py:105(coverage_inputs)
+       20    0.009    0.000    0.889    0.044 evidence_resolver.py:224(saved_findings)
+      500    0.009    0.000    0.609    0.001 diagnostic_evidence.py:17(digest)
+       20    0.008    0.000    0.578    0.029 evidence_resolver.py:180(resolve_persisted)
+    22376    0.035    0.000    0.573    0.000 evaluation_contract.py:99(quote_present)
+       20    0.005    0.000    0.562    0.028 diagnostics.py:21(_current_corpus)
+       40    0.001    0.000    0.559    0.014 evidence_resolver.py:167(persisted_inputs)
+      605    0.001    0.000    0.545    0.001 __init__.py:185(dumps)
+      605    0.001    0.000    0.544    0.001 encoder.py:185(encode)
+      545    0.542    0.001    0.542    0.001 encoder.py:207(iterencode)
+    24268    0.011    0.000    0.527    0.000 evaluation_contract.py:39(normalize_display)
+       20    0.003    0.000    0.467    0.023 corpus.py:210(current_manifest)
+       80    0.006    0.000    0.459    0.006 corpus.py:199(source_fingerprint)
+    24268    0.025    0.000    0.432    0.000 evaluation_contract.py:30(normalize)
+1013320/71    0.151    0.000    0.407    0.006 copy.py:110(deepcopy)
+    41212    0.008    0.000    0.407    0.000 diagnostics.py:363(<genexpr>)
+29347/576    0.051    0.000    0.404    0.001 copy.py:172(_deepcopy_list)
+       40    0.000    0.000    0.401    0.010 copy.py:181(_deepcopy_tuple)
+29694/14791    0.139    0.000    0.378    0.000 copy.py:198(_deepcopy_dict)
+      363    0.001    0.000    0.372    0.001 __init__.py:304(loads)
+      820    0.364    0.000    0.364    0.000 {method 'update' of '_hashlib.HASH' objects}
+      363    0.001    0.000    0.355    0.001 decoder.py:340(decode)
+      363    0.354    0.001    0.354    0.001 decoder.py:351(raw_decode)
+   121340    0.040    0.000    0.251    0.000 __init__.py:183(sub)
+    24288    0.223    0.000    0.223    0.000 {built-in method unicodedata.normalize}
+       20    0.002    0.000    0.209    0.010 diagnostics.py:410(experiment_plan)
+       20    0.009    0.000    0.204    0.010 evidence_resolver.py:48(resolve_case)
+       40    0.000    0.000    0.172    0.004 evidence_resolver.py:25(observation_identity)
+       10    0.000    0.000    0.165    0.016 __init__.py:1(<module>)
+   121394    0.155    0.000    0.155    0.000 {method 'sub' of 're.Pattern' objects}
+      223    0.000    0.000    0.125    0.001 governance.py:38(_load)

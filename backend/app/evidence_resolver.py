@@ -169,7 +169,7 @@ def persisted_inputs(store,run_id,question_id,chunks,fingerprint):
     if not run:raise ValueError('diagnostic_run_not_found')
     snapshot=json.loads(run['dataset_snapshot_json'])
     question=next((q for q in snapshot['questions'] if q['id']==question_id),None)
-    case=next((c for c in store.evaluation_case_results(run_id) if c['question_id']==question_id),None)
+    case=store.evaluation_case_result(run_id,question_id)
     if not question or not case:raise ValueError('persisted_frozen_case_not_found')
     if snapshot['corpus_fingerprint']!=fingerprint:raise ValueError('diagnostic_corpus_changed')
     identity={'run_id':run_id,'question_id':question_id,'snapshot_sha256':digest(snapshot),'evaluation_identity':run['judge'].get('evaluation_identity'),

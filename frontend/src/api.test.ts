@@ -1,7 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import { apiUrl, getJson, postJson } from "./api";
+import { apiUrl, getJson, postJson, loadAppData } from "./api";
 
 describe("getJson", () => {
+  it("loads only the current page inputs and leaves full Agent details for its page", async () => {
+    const fetcher=vi.fn(async (url: string) => new Response(JSON.stringify(url.includes('/api/documents') ? [] : {})));
+    vi.stubGlobal('fetch',fetcher);
+    try {
+      await loadAppData(true,'knowledge');
+      expect(fetcher.mock.calls.map(call=>call[0])).not.toContain(apiUrl('/api/optimization'));
+      expect(fetcher.mock.calls.map(call=>call[0])).not.toContain(apiUrl('/api/bad-cases'));
+      fetcher.mockClear();
+      await loadAppData(true,'evolution');
+      expect(fetcher.mock.calls.map(call=>call[0])).toContain(apiUrl('/api/optimization'));
+      expect(fetcher.mock.calls.map(call=>call[0])).toContain(apiUrl('/api/bad-cases'));
+      expect(fetcher.mock.calls.map(call=>call[0])).not.toContain(apiUrl('/api/dataset?light=true'));
+    } finally { vi.unstubAllGlobals(); }
+  });
   it("builds PDF asset URLs on the API origin instead of the Vite origin", () => {
     expect(apiUrl("/documents/宇树_B2电池与充电器使用说明_中文版.pdf")).toBe("http://localhost:8010/documents/宇树_B2电池与充电器使用说明_中文版.pdf");
   });

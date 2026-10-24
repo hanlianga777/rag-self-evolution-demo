@@ -1,0 +1,41 @@
+         2194935 function calls (2191686 primitive calls) in 5.862 seconds
+
+   Ordered by: cumulative time
+   List reduced from 989 to 35 due to restriction <35>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       31    0.007    0.000    5.411    0.175 diagnostics.py:214(diagnostic_view)
+       31    0.007    0.000    4.599    0.148 diagnostics.py:59(automatic_analysis)
+       31    0.024    0.001    4.591    0.148 diagnostics.py:308(business_analysis)
+        1    0.009    0.009    3.996    3.996 agent_coverage.py:105(coverage_inputs)
+       31    0.012    0.000    2.541    0.082 evidence_resolver.py:224(saved_findings)
+       62    0.086    0.001    2.064    0.033 evidence_resolver.py:167(persisted_inputs)
+        1    0.000    0.000    1.861    1.861 agent_coverage.py:18(plan_coverage)
+        3    0.000    0.000    1.861    0.620 optimization.py:33(validate_intervention)
+     4058    0.003    0.000    1.691    0.000 __init__.py:304(loads)
+     4058    0.005    0.000    1.644    0.000 decoder.py:340(decode)
+     4058    1.635    0.000    1.635    0.000 decoder.py:351(raw_decode)
+       62    0.013    0.000    1.613    0.026 diagnostics.py:20(_current_corpus)
+       31    0.011    0.000    1.464    0.047 evidence_resolver.py:180(resolve_persisted)
+       62    0.005    0.000    1.351    0.022 corpus.py:210(current_manifest)
+      248    0.010    0.000    1.335    0.005 corpus.py:199(source_fingerprint)
+       62    0.003    0.000    1.244    0.020 governance.py:2149(evaluation_case_results)
+     3717    0.001    0.000    1.214    0.000 governance.py:38(_load)
+     2542    1.088    0.000    1.088    0.000 {method 'update' of '_hashlib.HASH' objects}
+      775    0.009    0.000    0.886    0.001 diagnostic_evidence.py:17(digest)
+    34684    0.051    0.000    0.830    0.000 evaluation_contract.py:99(quote_present)
+       31    0.004    0.000    0.805    0.026 diagnostics.py:407(experiment_plan)
+    37572    0.016    0.000    0.763    0.000 evaluation_contract.py:39(normalize_display)
+      809    0.002    0.000    0.755    0.001 __init__.py:185(dumps)
+      809    0.001    0.000    0.753    0.001 encoder.py:185(encode)
+      716    0.751    0.001    0.751    0.001 encoder.py:207(iterencode)
+    37572    0.036    0.000    0.623    0.000 evaluation_contract.py:30(normalize)
+    64026    0.011    0.000    0.591    0.000 diagnostics.py:360(<genexpr>)
+   187860    0.058    0.000    0.365    0.000 __init__.py:183(sub)
+        2    0.001    0.000    0.325    0.163 governance.py:1956(bad_case_rows)
+    37603    0.322    0.000    0.322    0.000 {built-in method unicodedata.normalize}
+       31    0.014    0.000    0.296    0.010 evidence_resolver.py:48(resolve_case)
+       68    0.283    0.004    0.283    0.004 {method 'fetchall' of 'sqlite3.Cursor' objects}
+       62    0.000    0.000    0.251    0.004 evidence_resolver.py:25(observation_identity)
+       10    0.000    0.000    0.231    0.023 __init__.py:1(<module>)
+   187941    0.224    0.000    0.224    0.000 {method 'sub' of 're.Pattern' objects}

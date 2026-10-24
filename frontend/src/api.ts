@@ -1,4 +1,4 @@
-import type { AppData, Json } from "./types";
+import type { AppData, Page } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8010";
 
@@ -37,14 +37,29 @@ export async function postJson<T>(path: string, body?: unknown): Promise<T> {
 
 export const identityKey = (value: any) => JSON.stringify([value?.current_baseline_id, value?.current_experiment_id, value?.current_golden_id, value?.current_corpus_fingerprint]);
 
-export async function loadAppData(retry = true): Promise<AppData> {
-  const [workspace, overview, documents, dataset, evaluation, badCases, optimization, versions, readiness, monitoring] = await Promise.all([
-    getJson("/api/workspace"), getJson("/api/overview"), getJson("/api/documents"), getJson("/api/dataset?light=true"), getJson("/api/evaluation"), getJson("/api/bad-cases"), getJson("/api/optimization"), getJson("/api/versions"), getJson("/api/readiness"), getJson("/api/monitoring"),
-  ]);
+const pageInputs: Record<Page, (keyof AppData)[]> = {
+  overview: ['workspace','overview','documents','dataset','evaluation','optimization'],
+  knowledge: ['workspace','overview','documents'], settings: ['workspace','documents'],
+  governance: ['workspace','dataset'], evaluation: ['workspace','evaluation','badCases','optimization'],
+  evolution: ['workspace','evaluation','badCases','optimization'],
+  versions: ['workspace','evaluation','optimization','versions'],
+  verification: ['workspace','badCases','versions','readiness','monitoring'],
+};
+
+export async function loadAppData(retry = true, page?: Page): Promise<AppData> {
+  const paths: Record<keyof AppData,string> = { workspace:'/api/workspace',overview:'/api/overview',documents:'/api/documents',dataset:'/api/dataset?light=true',evaluation:'/api/evaluation',badCases:'/api/bad-cases',optimization:'/api/optimization',versions:'/api/versions',readiness:'/api/readiness',monitoring:'/api/monitoring' };
+  if (page) {
+    paths.overview += '?light=true'; paths.evaluation += '?light=true';
+    if (page === 'overview') paths.optimization += '?light=true';
+  }
+  const data: AppData = {workspace:{},overview:{},documents:[],dataset:[],evaluation:{},badCases:[],optimization:{},versions:[],readiness:{},monitoring:{}};
+  const keys=page ? pageInputs[page] : Object.keys(paths) as (keyof AppData)[];
+  await Promise.all(keys.map(async key => { (data as Record<string,unknown>)[key]=await getJson(paths[key]); }));
+  const {workspace,overview,evaluation,optimization,monitoring}=data;
   const identities = [workspace, overview, evaluation, optimization, monitoring].filter((value: any) => value && "current_baseline_id" in value);
   if (new Set(identities.map(identityKey)).size > 1) {
-    if (retry) return loadAppData(false);
+    if (retry) return loadAppData(false,page);
     throw new Error("工作区身份正在变化，请重试刷新当前 Baseline");
   }
-  return { workspace: workspace as Json, overview: overview as Json, documents: documents as Json[], dataset: dataset as Json[], evaluation: evaluation as Json, badCases: badCases as Json[], optimization: optimization as Json, versions: versions as Json[], readiness: readiness as Json, monitoring: monitoring as Json };
+  return data;
 }

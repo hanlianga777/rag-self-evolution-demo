@@ -40,6 +40,7 @@ from .retrieval import RetrievalUnavailable
 from .agent_coverage import plan_coverage, complete_coverage
 from .knowledge_pipeline import AlibabaProvider
 from .evaluation_stage import perform_stage
+from .read_view import read_view
 
 # Fingerprint loaded objects, not source files that may have changed under a live process.
 EVALUATION_RUNTIME_CONTRACT = {**VERSIONS, 'judge_prompt_sha256':hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(),
@@ -270,12 +271,20 @@ def architecture_delete(slot: Literal["business", "technical"]):
     return architecture_metadata(slot)
 
 
+def light_run(run):
+    if not run:return run
+    return {**{k:v for k,v in run.items() if not k.endswith('_json')},
+            'dataset_snapshot':json.loads(run['dataset_snapshot_json']) if 'dataset_snapshot_json' in run else run.get('dataset_snapshot'),
+            'result':{k:v for k,v in run.get('result',{}).items() if k!='checkpoints'}}
+
+
 @app.get("/api/overview")
-def overview():
+def overview(light: bool = False):
     summary = store.dataset_summary()
     production = store.active_production()
     identity = store.current_baseline_identity()
     baseline = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
+    if light:baseline=light_run(baseline)
     triggers = store.optimization_triggers()
     return {"generation_profiles": GENERATION_PROFILES, "data_source": "real", "production": production, "dataset": summary, "latest_evaluation": baseline, "knowledge": knowledge(), **identity, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
 
@@ -935,8 +944,8 @@ def review_question(question_id: str, payload: ReviewRequest):
 
 
 @app.get("/api/governance/revisions")
-def revision_runs(generation_run_id: str | None = None):
-    return store.revision_runs(generation_run_id)
+def revision_runs(generation_run_id: str | None = None, active_only: bool = False):
+    return store.revision_runs(generation_run_id,active_only=active_only)
 
 
 @app.get("/api/governance/revisions/{revision_id}")
@@ -1253,7 +1262,7 @@ def persisted_evaluation_progress(run):
 
 
 @app.get("/api/evaluation")
-def evaluation(active_task: bool = False):
+def evaluation(active_task: bool = False, light: bool = False):
     identity = store.current_baseline_identity()
     run = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
     if active_task:
@@ -1264,13 +1273,15 @@ def evaluation(active_task: bool = False):
         snapshots=store.dataset_snapshots()
         snapshot_id=snapshots[0]['id'] if snapshots else None
         run=next((r for r in store.evaluation_runs() if r['config'].get('run_target')=='baseline' and r['status'] in {'running','partial','failed'} and r['dataset_version_id']==snapshot_id),None)
+    if light:run=light_run(run)
     return {"runtime_contract":EVALUATION_RUNTIME_CONTRACT, **(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":not policy_current(run.get("judge",{}))} if run else {})}
 
 
 @app.get("/api/bad-cases")
+@read_view()
 def bad_cases():
     current=store.current_baseline_identity()['current_baseline_id']
-    return [{**row, "result": {**row["result"], "diagnostic_view": diagnostic_view(row["result"])}} for row in store.bad_case_rows() if row["run_id"]==current]
+    return [{**row, "result": {**row["result"], "diagnostic_view": diagnostic_view(row["result"])}} for row in store.bad_case_rows(current) if row["run_id"]==current]
 
 
 @app.get("/api/bad-cases/{case_id}")
@@ -1294,11 +1305,16 @@ def experiment_resume_view(experiment):
 
 
 @app.get("/api/optimization")
-def optimization():
+@read_view()
+def optimization(light: bool = False):
     identity = store.current_baseline_identity()
     experiment = store.experiment(identity["current_experiment_id"]) if identity["current_experiment_id"] else None
     if experiment is None:
         return {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"] or "当前 Baseline 尚未运行 Optimization Agent", **identity}
+    if light:
+        return {**{k:v for k,v in experiment.items() if not k.endswith('_json')},
+                'candidates':[{**{k:v for k,v in c.items() if not k.endswith('_json')},'result':{k:v for k,v in c.get('result',{}).items() if k!='checkpoints'}} for c in experiment['candidates']],
+                'data_source':'real','recommendation':store.recommendation(experiment['id']),**identity}
     from .agent_coverage import coverage_inputs
     coverage=coverage_inputs(store,experiment["id"])[-1]
     return {**experiment_resume_view(experiment), "coverage_plan":coverage, "data_source": "real", "recommendation": store.recommendation(experiment["id"]), **identity}
@@ -1553,11 +1569,12 @@ def activate_version(version_id: str):
 
 
 @app.get("/api/evaluations")
-def evaluation_runs(page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=50)):
-    return store.evaluation_history(page,limit)
+def evaluation_runs(page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=50), active_only: bool = False):
+    return store.evaluation_history(page,limit,active_only=active_only)
 
 
 @app.get("/api/evaluations/{run_id}")
+@read_view()
 def evaluation_run(run_id: str):
     run = store.evaluation_run(run_id)
     if run is None:

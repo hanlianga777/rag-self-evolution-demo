@@ -1,0 +1,50 @@
+{
+  "seconds": 2.884,
+  "select_count": 99,
+  "frequent_queries": [
+    [
+      "SELECT * FROM evaluation_runs",
+      42
+    ],
+    [
+      "SELECT question_id,result_json FROM evaluation_case_results",
+      40
+    ],
+    [
+      "SELECT * FROM candidate_configs",
+      4
+    ],
+    [
+      "SELECT * FROM recommendations",
+      3
+    ],
+    [
+      "SELECT * FROM approvals",
+      3
+    ],
+    [
+      "SELECT * FROM bad_cases",
+      2
+    ],
+    [
+      "SELECT * FROM dataset_versions",
+      1
+    ],
+    [
+      "SELECT 1 FROM candidate_configs",
+      1
+    ],
+    [
+      "SELECT question_id FROM evaluation_case_results",
+      1
+    ],
+    [
+      "SELECT id FROM experiments",
+      1
+    ],
+    [
+      "SELECT * FROM experiments",
+      1
+    ]
+  ]
+}

@@ -75,7 +75,7 @@ it("does not restore a Golden Generation toast for a running or recoverable run"
 
 it("uses persisted evaluation cases for progress while short operations complete", async () => {
   const evaluation = { id: "EVAL-1", status: "running", dataset_snapshot_json: JSON.stringify({ question_ids: ["Q1", "Q2", "Q3"] }), cases: [{ question_id: "Q1" }] };
-  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [evaluation] : url.endsWith("EVAL-1") ? evaluation : []), { status: 200 }))));
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [evaluation] : url.endsWith("EVAL-1") ? evaluation : []), { status: 200 }))));
   let finish!: () => void;
   function Harness() { const operation = useOperation(); finish = () => operation.succeed(operation.start("短操作")); return <button onClick={finish}>执行短操作</button>; }
   const root = createRoot(document.body.appendChild(document.createElement("div")));
@@ -129,7 +129,7 @@ it("shows up to three concurrent operations and closing one does not stop its tr
 
 it("keeps polling a persisted evaluation after its running bar is closed", async () => {
   const evaluation = { id: "EVAL-live", status: "running", dataset_snapshot_json: JSON.stringify({ question_ids: ["Q1"] }), cases: [] };
-  const fetcher = vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [evaluation] : evaluation), { status: 200 })));
+  const fetcher = vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [evaluation] : evaluation), { status: 200 })));
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
@@ -170,7 +170,7 @@ it("reopens a dismissed running bar if that operation later fails", async () => 
 
 it("shows the persisted QC stage without an invented percentage for one Revision", async () => {
   const run = { id: "REV-q15", status: "qc", stage: "qc", question_ids: ["Q15"], progress: { current: 1, total: 1 } };
-  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [run] : run), { status: 200 }))));
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [] : new URL(url).pathname.endsWith("/api/governance/revisions") ? [run] : run), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
@@ -187,7 +187,7 @@ it("marks a completed Revision only after the visible Candidate state refreshes"
   const completed = { ...running, status: "completed", stage: "completed", progress: { current: 1, total: 1 } };
   let finishRefresh!: () => void;
   const pending = new Promise<void>(resolve => { finishRefresh = resolve; });
-  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [running] : completed), { status: 200 }))));
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [] : new URL(url).pathname.endsWith("/api/governance/revisions") ? [running] : completed), { status: 200 }))));
   function Harness() {
     const operation = useOperation();
     const [state, setState] = useState("未运行");
@@ -211,7 +211,7 @@ it("marks a completed Revision only after the visible Candidate state refreshes"
 
 it("reports a completed Revision as unsynced when Candidate refresh fails", async () => {
   const running = { id: "REV-unsynced", status: "qc", stage: "qc", progress: { current: 0, total: 1 } };
-  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [running] : { ...running, status: "completed" }), { status: 200 }))));
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [] : new URL(url).pathname.endsWith("/api/governance/revisions") ? [running] : { ...running, status: "completed" }), { status: 200 }))));
   function Harness() {
     const operation = useOperation();
     useEffect(() => {
@@ -231,7 +231,7 @@ it("reports a completed Revision as unsynced when Candidate refresh fails", asyn
 
 it("uses real counts for paired Revision and exposes failed details before removing its card", async () => {
   let run: any = { id: "REV-pair", status: "qc", stage: "qc", question_ids: ["Q1", "Q9"], progress: { current: 1, total: 2 } };
-  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [run] : run), { status: 200 }))));
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [] : new URL(url).pathname.endsWith("/api/governance/revisions") ? [run] : run), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));

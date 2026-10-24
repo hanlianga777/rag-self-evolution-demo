@@ -1,5 +1,7 @@
 # 当前有效评测合同 — 2026-10-21 VNext V5.1 `[CONFIRMED]`
 
+- **2026-10-25 页面加载性能：后台任务恢复只查活动评测/修订，历史列表及详情仍完整保留；初始化按当前八导航读取必要数据，概览/初始评测用light摘要，已有详情入口仍读完整记录；StrictMode卸载清理后不发送重复初始化/评测读取。诊断只读响应内复用纯计算，请求结束失效，不缓存执行/审批保护；逐题Resolver只读目标Case，Bad Case按Run过滤，Baseline身份扫描跳过Sandbox并按原规则校验。默认完整API、身份一致性重试、全部历史/评分/策略与模型索引保持，无新增导航或架构节点。Provider0、费用0，实测见[加载验收](../outputs/page_loading_perf_20261025/页面加载验收.md)。**
+
 - **2026-10-24 手动Sandbox续跑：用户点击既有「继续 Sandbox」并确认费用，即明确接受历史未知请求可能重复计费，允许新Run重新请求缺失结果；不再以历史超时/未对账阻断手动续跑。原Run/历史Usage和未知标记只读保留，子Run记录本次授权及继承的未知审计，完整Case/已保存阶段结果复用；本次新Unknown仍停止，不自动重发。非手动路径、身份/配置、Judge、11 Gate、Regression及发布保护不变。无新费用/Token限制、表单或架构节点。**
 
 - **2026-10-24 Sandbox执行稳定性（当前）**：沿现有题目/阶段Checkpoint持久化Provider请求身份、完整成功结果及Usage；同身份显式续跑可复用成功Embedding/Rerank/回答RPC，按端点/模型/完整请求摘要绑定，禁止跨题、跨Candidate共享。Judge无效结构或引用仍严格拒绝，完整合格评分沿原scored_result复用。Usage按本地请求身份去重，Worker中断时已保存RPC仍可审计；inflight/Unknown/Usage缺失继续先人工核对，不自动重发或伪造结算。DeepSeek明确拒绝429按原3次/600秒有限恢复，永久鉴权拒绝不重试，超时/不明5xx停止。请求时限、Token、模型、冻结数据、评分身份、11 Gate及人工确认均不变；无新导航或架构节点/连线。真实Provider0、费用0，详见[统一验收](../outputs/sandbox_stability_20261024/统一审计与验收.md)。

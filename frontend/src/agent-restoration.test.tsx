@@ -52,7 +52,7 @@ it("offers failed Sandbox continuation only through the existing paid confirmati
   const button=[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="继续 Sandbox")!;
   expect(button.disabled).toBe(false);
   await click("继续 Sandbox");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("仅补未完成题目或Judge");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("仅补缺失结果");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("计入既有评测次数");
   expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);
 });

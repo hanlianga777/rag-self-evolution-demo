@@ -1,0 +1,34 @@
+{
+  "all_19_file_hashes_unchanged": true,
+  "full_view_hashes_equal": true,
+  "candidates": [
+    {
+      "label": "A",
+      "run_id": "EVAL-20261024152730246813",
+      "status": "completed",
+      "completed": 50,
+      "cases_sha256": "270576a77e30e96565c9320a4ae9a8a53bef163a7d234deed73ec4e5da0ad12a",
+      "config_sha256": "78dfb42285df37bf737e8dc9845e7ad5febed0fcce95bd89b9c225760cc421fb",
+      "judge_sha256": "972c3291556b9ec14402996a2fba01c88a75cb8fa96557591890e97da0edc18b"
+    },
+    {
+      "label": "B",
+      "run_id": "EVAL-20261024152307535168",
+      "status": "completed",
+      "completed": 50,
+      "cases_sha256": "8f56f84c87d0d91d246492578c7db1486e1e7794ab966574115d43e2ba17c2e4",
+      "config_sha256": "202cdd599c266b07d278776d6f29907e495c909e13fba7ae711b8dbf7ab5a4bb",
+      "judge_sha256": "972c3291556b9ec14402996a2fba01c88a75cb8fa96557591890e97da0edc18b"
+    },
+    {
+      "label": "C",
+      "run_id": "EVAL-20261024134037398356",
+      "status": "completed",
+      "completed": 50,
+      "cases_sha256": "90bb1831b19a1737e92e818b1fd67cd973d9b8d38d069c4a7d187071d7ea6ab1",
+      "config_sha256": "1becf69148cc2b143685ff24b51bf3acbe8b4c24361f67a8033090e6898643bd",
+      "judge_sha256": "972c3291556b9ec14402996a2fba01c88a75cb8fa96557591890e97da0edc18b"
+    }
+  ],
+  "provider_calls": 0
+}

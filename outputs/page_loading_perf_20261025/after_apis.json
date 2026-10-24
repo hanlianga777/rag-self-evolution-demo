@@ -1,0 +1,77 @@
+{
+  "phase": "after",
+  "mode": "10 concurrent initialization GETs",
+  "total_seconds": 2.672,
+  "requests": [
+    {
+      "path": "/api/workspace",
+      "seconds": 0.209,
+      "first_headers_seconds": 0.209,
+      "bytes": 1120,
+      "status": 200
+    },
+    {
+      "path": "/api/overview",
+      "seconds": 0.904,
+      "first_headers_seconds": 0.904,
+      "bytes": 1851033,
+      "status": 200
+    },
+    {
+      "path": "/api/documents",
+      "seconds": 0.036,
+      "first_headers_seconds": 0.036,
+      "bytes": 2174,
+      "status": 200
+    },
+    {
+      "path": "/api/dataset?light=true",
+      "seconds": 0.7,
+      "first_headers_seconds": 0.7,
+      "bytes": 262652,
+      "status": 200
+    },
+    {
+      "path": "/api/evaluation",
+      "seconds": 0.262,
+      "first_headers_seconds": 0.261,
+      "bytes": 1272866,
+      "status": 200
+    },
+    {
+      "path": "/api/bad-cases",
+      "seconds": 2.425,
+      "first_headers_seconds": 2.424,
+      "bytes": 1737227,
+      "status": 200
+    },
+    {
+      "path": "/api/optimization",
+      "seconds": 2.669,
+      "first_headers_seconds": 2.667,
+      "bytes": 6692907,
+      "status": 200
+    },
+    {
+      "path": "/api/versions",
+      "seconds": 0.035,
+      "first_headers_seconds": 0.035,
+      "bytes": 1137,
+      "status": 200
+    },
+    {
+      "path": "/api/readiness",
+      "seconds": 0.031,
+      "first_headers_seconds": 0.031,
+      "bytes": 118,
+      "status": 200
+    },
+    {
+      "path": "/api/monitoring",
+      "seconds": 0.24,
+      "first_headers_seconds": 0.24,
+      "bytes": 63856,
+      "status": 200
+    }
+  ]
+}

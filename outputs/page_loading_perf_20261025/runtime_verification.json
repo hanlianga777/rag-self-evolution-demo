@@ -1,0 +1,12 @@
+{
+  "frontend_port": 5174,
+  "api_port": 8010,
+  "loaded_diagnostic_code": "12def8f78abc04fd39429e9c5ac22d59019747e1a84bed5b61e75dd44ba1d6b0",
+  "active_tasks": 0,
+  "active_list_bytes": {
+    "/api/evaluations?active_only=true": 2,
+    "/api/governance/revisions?active_only=true": 2
+  },
+  "baseline_id": "EVAL-20261021141811373593",
+  "provider_calls": 0
+}

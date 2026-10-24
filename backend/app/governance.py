@@ -1044,9 +1044,11 @@ class GovernanceStore:
             raise KeyError(revision_id)
         return {**dict(row), **_load(row["audit_json"], {})}
 
-    def revision_runs(self, generation_run_id: str | None = None):
+    def revision_runs(self, generation_run_id: str | None = None, *, active_only=False):
         with self.connection() as connection:
-            rows = connection.execute("SELECT * FROM candidate_revision_runs WHERE generation_run_id = ? ORDER BY created_at DESC", (generation_run_id,)).fetchall() if generation_run_id else connection.execute("SELECT * FROM candidate_revision_runs ORDER BY created_at DESC").fetchall()
+            where=['generation_run_id=?'] if generation_run_id else []
+            if active_only:where.append("coalesce(CASE WHEN json_valid(audit_json) THEN json_extract(audit_json,'$.status') END,status) IN ('queued','generating','validating','probing','qc')")
+            rows=connection.execute('SELECT * FROM candidate_revision_runs'+(' WHERE '+' AND '.join(where) if where else '')+' ORDER BY created_at DESC',(generation_run_id,) if generation_run_id else ()).fetchall()
         return [{**dict(row), **_load(row["audit_json"], {})} for row in rows]
 
     def revision_history(self, question_id: str):
@@ -1893,11 +1895,11 @@ class GovernanceStore:
             rows = connection.execute("SELECT * FROM evaluation_runs"+where+" ORDER BY created_at DESC").fetchall()
         return [{**dict(row), "result": _load(row["result_json"], {}), "config": _load(row["config_json"], {}), "judge": _load(row["judge_json"], {})} for row in rows]
 
-    def evaluation_history(self, page=1, limit=50):
+    def evaluation_history(self, page=1, limit=50, *, active_only=False):
         if type(page) is not int or page<1 or type(limit) is not int or not 1<=limit<=50:
             raise ValueError('history page/limit invalid')
         with self.connection() as connection:
-            rows=connection.execute("SELECT id,status,run_mode,data_source,dataset_version_id,config_json,judge_json,json_remove(result_json,'$.checkpoints') result_json,error_message,created_at,completed_at FROM evaluation_runs ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?",(limit,(page-1)*limit)).fetchall()
+            rows=connection.execute("SELECT id,status,run_mode,data_source,dataset_version_id,config_json,judge_json,json_remove(result_json,'$.checkpoints') result_json,error_message,created_at,completed_at FROM evaluation_runs"+(" WHERE status IN ('queued','running')" if active_only else '')+" ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?",(limit,(page-1)*limit)).fetchall()
         return [{**{k:row[k] for k in row.keys() if not k.endswith('_json')},'config':_load(row['config_json'],{}),'judge':_load(row['judge_json'],{}),'result':_load(row['result_json'],{})} for row in rows]
 
     def evaluation_run(self, run_id: str):
@@ -1920,7 +1922,7 @@ class GovernanceStore:
             return {**identity, "baseline_unavailable_reason": "Corpus 已变化；请创建并确认新的 Golden 测试集及 Baseline"}
         identity["requires_new_golden"] = False
         # Missing run_target is classified by persisted execution evidence, never by NULL alone.
-        rows = connection.execute("SELECT * FROM evaluation_runs WHERE status='completed' AND run_mode='real' AND data_source='real' AND dataset_version_id=? ORDER BY created_at DESC, rowid DESC", (golden["id"],)).fetchall()
+        rows = connection.execute("SELECT * FROM evaluation_runs WHERE status='completed' AND run_mode='real' AND data_source='real' AND dataset_version_id=? AND coalesce(CASE WHEN json_valid(config_json) THEN json_extract(config_json,'$.run_target') END,'baseline')!='sandbox_candidate' ORDER BY created_at DESC, rowid DESC", (golden["id"],))
         for row in rows:
             config, judge, result = _load(row["config_json"], {}), _load(row["judge_json"], {}), _load(row["result_json"], {})
             frozen = _load(row["dataset_snapshot_json"], {})
@@ -1953,9 +1955,9 @@ class GovernanceStore:
         row = connection.execute("SELECT * FROM evaluation_runs WHERE id=?", (identity["current_baseline_id"],)).fetchone()
         return {**dict(row), "result": _load(row["result_json"], {}), "config": _load(row["config_json"], {}), "judge": _load(row["judge_json"], {})}
 
-    def bad_case_rows(self):
+    def bad_case_rows(self, run_id=None):
         with self.connection() as connection:
-            rows = connection.execute("SELECT * FROM bad_cases ORDER BY created_at DESC").fetchall()
+            rows = connection.execute("SELECT * FROM bad_cases"+(' WHERE run_id=?' if run_id is not None else '')+" ORDER BY created_at DESC",(run_id,) if run_id is not None else ()).fetchall()
         return [{**dict(row), "result": {**_load(row["result_json"], {}), "run_id":row["run_id"], "question_id":row["question_id"]}} for row in rows]
 
     def create_evaluation_run(self, snapshot: dict, config: dict, judge: dict):
@@ -2150,6 +2152,11 @@ class GovernanceStore:
         with self.connection() as connection:
             rows = connection.execute("SELECT question_id, result_json FROM evaluation_case_results WHERE run_id = ? ORDER BY id", (run_id,)).fetchall()
         return [{"question_id": row["question_id"], **_load(row["result_json"], {}), "run_id":run_id} for row in rows]
+
+    def evaluation_case_result(self, run_id, question_id):
+        with self.connection() as connection:
+            row=connection.execute('SELECT question_id,result_json FROM evaluation_case_results WHERE run_id=? AND question_id=? ORDER BY id LIMIT 1',(run_id,question_id)).fetchone()
+        return {"question_id":row['question_id'],**_load(row['result_json'],{}),'run_id':run_id} if row else None
 
     def record_bad_case(self, run_id: str, question_id: str, category: str, severity: str, result: dict):
         case_id = f"BC-{run_id}-{question_id}"

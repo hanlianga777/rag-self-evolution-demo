@@ -1,0 +1,5 @@
+{
+  "phase": "before",
+  "restart_to_ready_seconds": 6.423,
+  "note": "includes existing supervisor 5s restart interval; no OS cache clear; no index rebuild"
+}

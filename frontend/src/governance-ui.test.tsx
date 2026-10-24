@@ -86,7 +86,7 @@ it("refreshes the open Drawer and table before reporting Revision complete", asy
   let finished = false;
   vi.stubGlobal("fetch", vi.fn((url: string) => {
     if (url.endsWith("/api/governance/revisions/REV-sync")) { finished = true; return Promise.resolve(new Response(JSON.stringify({ ...revision, status: "completed", stage: "completed", progress: { current: 1, total: 1 } }), { status: 200 })); }
-    const data = url.endsWith("/api/evaluations") ? [] : url.endsWith("/api/governance/revisions") ? [revision] : url.endsWith("/api/dataset") ? [finished ? updated : old] : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, [{ ...(finished ? updated : old), revision_history:[revision] }]) : [];
+    const data = url.endsWith("/api/evaluations") ? [] : new URL(url).pathname.endsWith("/api/governance/revisions") ? [revision] : url.endsWith("/api/dataset") ? [finished ? updated : old] : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, [{ ...(finished ? updated : old), revision_history:[revision] }]) : [];
     return Promise.resolve(new Response(JSON.stringify(data), { status: 200 }));
   }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
@@ -256,7 +256,7 @@ it("restores a running generation and reads persisted slot progress", async () =
 
 it("shows the current automatic refill round and remaining slots", async () => {
   const run = { id: "GGEN-refill", status: "generating", profile: { expected_count: 20 }, question_ids: [], operation_progress: { phase: "generating", phase_label: "补齐失败题", phase_processed: 4, phase_total: 10, phase_percent: 40, hard_valid_completed: 14, hard_valid_total: 20, failed_count: 6, probe_processed: 0, qc_processed: 0, refill_round: 2, refill_max_rounds: 3 }, artifacts: { hard_validation: { slot_persistence_v1: true, progress: {} } } };
-  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : url.endsWith("/GGEN-refill") ? run : url.endsWith("/api/dataset") || url.endsWith("/api/governance/revisions") || url.endsWith("/api/governance/snapshots") ? [] : goldenFixture(url, [])), { status: 200 }))));
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : url.endsWith("/GGEN-refill") ? run : url.endsWith("/api/dataset") || new URL(url).pathname.endsWith("/api/governance/revisions") || url.endsWith("/api/governance/snapshots") ? [] : goldenFixture(url, [])), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
@@ -336,7 +336,7 @@ it("starts Q09 independently and keeps Q01 as read-only context", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
     requests.push({ url, init });
-    const body = url.endsWith("/revision") ? { id: "REV-new" } : url.includes("/api/governance/revisions/REV-new") ? { id: "REV-new", status: "preview_ready", question_ids: ["V1-9"], drafts: {} } : url.endsWith("/api/governance/revisions") ? [] : url.endsWith("/api/documents") ? [{ id: "DOC-001", name: "设备说明.pdf", product: "KIRA B 50", chunks: 2 }] : url.includes("/api/documents/") ? { id: "DOC-001", name: "设备说明.pdf", product: "KIRA B 50", chunks: [{ chunk_id: "C1", document_id: "DOC-001", section_path: "操作", page_start: 2, chunk_text: "急停按钮检查步骤，启动前需确认按钮可以正常按下和复位。" }, { chunk_id: "C2", document_id: "DOC-001", section_path: "其他操作", page_start: 3, chunk_text: "打开设备并检查刷盘状态。" }] } : (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, questions) : [];
+    const body = url.endsWith("/revision") ? { id: "REV-new" } : url.includes("/api/governance/revisions/REV-new") ? { id: "REV-new", status: "preview_ready", question_ids: ["V1-9"], drafts: {} } : new URL(url).pathname.endsWith("/api/governance/revisions") ? [] : url.endsWith("/api/documents") ? [{ id: "DOC-001", name: "设备说明.pdf", product: "KIRA B 50", chunks: 2 }] : url.includes("/api/documents/") ? { id: "DOC-001", name: "设备说明.pdf", product: "KIRA B 50", chunks: [{ chunk_id: "C1", document_id: "DOC-001", section_path: "操作", page_start: 2, chunk_text: "急停按钮检查步骤，启动前需确认按钮可以正常按下和复位。" }, { chunk_id: "C2", document_id: "DOC-001", section_path: "其他操作", page_start: 3, chunk_text: "打开设备并检查刷盘状态。" }] } : (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, questions) : [];
     return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
   }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
@@ -377,7 +377,7 @@ it("lets a paired preview regenerate only Q09 and discard without applying", asy
   vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
     requests.push({ url, init });
     if (url.endsWith("/edit-draft")) { revision.status = "failed"; revision.apply_blocked = true; revision.error = "Q09: Chunk 不存在于当前索引"; }
-    const body = url.includes("/api/governance/revisions/REV-pair") ? revision : url.endsWith("/api/governance/revisions") ? [revision] : url.includes("/api/documents/") ? { chunks: [{ chunk_id: "C1", document_id: "DOC-001", section_path: "操作", page_start: 2, chunk_text: "正确操作" }] } : (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, questions.map(row => ({ ...row, revision_history:[revision] }))) : url.endsWith("/api/dataset") ? questions : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }] : [];
+    const body = url.includes("/api/governance/revisions/REV-pair") ? revision : new URL(url).pathname.endsWith("/api/governance/revisions") ? [revision] : url.includes("/api/documents/") ? { chunks: [{ chunk_id: "C1", document_id: "DOC-001", section_path: "操作", page_start: 2, chunk_text: "正确操作" }] } : (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, questions.map(row => ({ ...row, revision_history:[revision] }))) : url.endsWith("/api/dataset") ? questions : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }] : [];
     return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
   }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));

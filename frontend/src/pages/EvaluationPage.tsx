@@ -71,12 +71,12 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
         if(!cancelled)setPreflight(value);
       } catch(reason) {if(!cancelled)setPreflight({can_start:false,reason:errorMessage(reason)});}
     };
-    void load();window.addEventListener('focus',load);
+    void Promise.resolve().then(()=>{if(!cancelled)void load();});window.addEventListener('focus',load);
     return()=>{cancelled=true;window.removeEventListener('focus',load);};
   },[run.id,run.status]);
 
 
-  useEffect(()=>{let cancelled=false;void getJson<Row>('/api/evaluation?active_task=true').then(value=>{if(!cancelled && value.id)setRun(value)}).catch(()=>{});return()=>{cancelled=true};},[]);
+  useEffect(()=>{let cancelled=false;void Promise.resolve().then(()=>{if(!cancelled)return getJson<Row>('/api/evaluation?active_task=true').then(value=>{if(!cancelled && value.id)setRun(value)}).catch(()=>{});});return()=>{cancelled=true};},[]);
   useEffect(() => {
     if (!run.id) return;
     let cancelled = false;
@@ -90,7 +90,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
         if (next.status !== "running") { const rows = await getJson<Row[]>("/api/bad-cases"); if (!cancelled) setBadCases(rows); }
       } catch (reason) { if (!cancelled) { setError(errorMessage(reason)); window.setTimeout(poll,2000); } }
     };
-    void poll();
+    void Promise.resolve().then(poll);
     return () => { cancelled = true; };
   }, [run.id]);
 
