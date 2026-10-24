@@ -162,15 +162,27 @@ class DeepSeekProvider:
         """Return provider usage and measured first-content latency when streaming is enabled."""
         _response_metadata.set({})
         request = self._request(system, user, json_mode, stream, temperature)
-        from .paid_run import paid_request
+        from .paid_run import paid_request, _task
+        from .evaluation_stage import checkpoint_request
         started=datetime.now(timezone.utc).isoformat()
-        try:
+        def send():
+            request_timeout(self.settings.timeout_seconds)
             with paid_request('DeepSeek',self.settings.model,json.loads(request.data)):
-                return self._complete_request(request,stream)
-        except ProviderUnavailable:
-            if not _response_metadata.get().get('usage'):
-                record_usage({'provider':'DeepSeek','requested_model':self.settings.model,'status':'failed','call_started_at':started,'request_sha256':hashlib.sha256(request.data).hexdigest()})
-            raise
+                try:
+                    return self._complete_request(request,stream)
+                except ProviderUnavailable as error:
+                    if not _response_metadata.get().get('usage'):
+                        rejected=isinstance(error,ProviderAPIError) and error.status_code in {400,401,403,404,413,422,429}
+                        error.request_execution_unknown=not rejected
+                        received=_response_metadata.get()
+                        error.response_metadata={**received,**(getattr(error,'response_metadata',None) or {}),
+                            'provider':'DeepSeek','model':self.settings.model,'http_status':getattr(error,'status_code',None) or received.get('http_status'),
+                            'http_response_received':bool(getattr(error,'status_code',None)) or received.get('http_response_received',False),
+                            'request_execution_unknown':not rejected,'request_sha256':hashlib.sha256(request.data).hexdigest()}
+                        record_usage({'provider':'DeepSeek','requested_model':self.settings.model,'status':'rejected' if rejected else 'unknown',
+                            'call_started_at':started,**error.response_metadata})
+                    raise
+        return checkpoint_request('DeepSeek',self.settings.model,request.full_url,json.loads(request.data),send,reuse=_task.get()!='judge')
 
     def _complete_request(self, request, stream):
         from .paid_run import current_paid_run
@@ -179,6 +191,8 @@ class DeepSeekProvider:
         call_started_at = datetime.now(timezone.utc).isoformat()
         try:
             with urllib.request.urlopen(request, timeout=request_timeout(self.settings.timeout_seconds)) as response:
+                _response_metadata.set({'http_response_received':True,'http_status':getattr(response,'status',None),
+                    'request_id':(getattr(response,'headers',None) or {}).get('x-request-id')})
                 if stream:
                     content, usage, ttft_started, raw_events, finish_reason = [], {}, None, [], None
                     for raw_line in response:
@@ -205,14 +219,18 @@ class DeepSeekProvider:
                     except json.JSONDecodeError as error:raise ProviderInvalidResponse("DeepSeek返回无效响应JSON",raw_provider_response=raw_body) from error
                     ttft_ms = None
         except urllib.error.HTTPError as error:
-            raise ProviderAPIError(f"DeepSeek API 错误（HTTP {error.code}）",status_code=error.code,retry_after=(error.headers or {}).get("Retry-After"),raw_provider_response=redact_provider_error(error.read().decode("utf-8",errors="replace"),self.settings.api_key)) from error
+            try:raw=redact_provider_error(error.read(65536).decode("utf-8",errors="replace"),self.settings.api_key)
+            finally:error.close()
+            failure=ProviderAPIError(f"DeepSeek API 错误（HTTP {error.code}）",status_code=error.code,retry_after=(error.headers or {}).get("Retry-After"),raw_provider_response=raw)
+            failure.response_metadata={'request_id':(error.headers or {}).get('x-request-id'),'transport_error_type':'HTTPError'}
+            raise failure from error
         except urllib.error.URLError as error:
             if isinstance(error.reason, (TimeoutError, socket.timeout)):
                 raise ProviderTimeout("DeepSeek 请求超时，请重试") from error
             raise ProviderNetworkError(f"DeepSeek 网络错误（{type(error.reason).__name__}）") from error
         except (TimeoutError, socket.timeout) as error:
             raise ProviderTimeout("DeepSeek 请求超时，请重试") from error
-        except (http.client.HTTPException, ConnectionError) as error:
+        except (http.client.HTTPException, OSError) as error:
             partial=getattr(error,'partial',b'')
             raw=partial.decode('utf-8',errors='replace') if isinstance(partial,bytes) else str(partial)
             if not stream:
@@ -226,7 +244,7 @@ class DeepSeekProvider:
         if not isinstance(body,dict):raise ProviderInvalidResponse('DeepSeek响应不是对象',raw_provider_response=json.dumps(body,ensure_ascii=False))
         usage = body.get('usage') if isinstance(body.get('usage'),dict) else {}
         elapsed_ms = round((time.perf_counter()-started_at)*1000)
-        usage = {**usage,'requested_model':self.settings.model,'call_started_at':call_started_at,'provider':'DeepSeek','status':'ok','latency_ms':elapsed_ms,'request_sha256':hashlib.sha256(request.data).hexdigest()}
+        usage = {**usage,'requested_model':self.settings.model,'call_started_at':call_started_at,'provider':'DeepSeek','status':'ok','latency_ms':elapsed_ms,'request_sha256':hashlib.sha256(request.data).hexdigest(),'request_id':body.get('id')}
         if run is not None:run.response(body)
         record_usage(usage)
         _response_metadata.set({'usage':usage,'request_id':body.get('id')})

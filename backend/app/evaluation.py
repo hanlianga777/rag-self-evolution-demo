@@ -456,7 +456,8 @@ class EvaluationRunner:
         def progress(*, complete=False):
             from .telemetry import cost_fields
             from .paid_run import unsettled_usage
-            events=[u for cp in checkpoints.values() for attempt in cp.get('attempts',[]) for u in attempt.get('usage',[])]
+            from .evaluation_stage import checkpoint_usage
+            events=[u for cp in checkpoints.values() for u in checkpoint_usage(cp)]
             accounting={'provenance':'logical_task_including_resume_history','call_events':len(events),
                 'unknown_usage_events':sum(unsettled_usage(u) for u in events),
                 'known_input_tokens':sum(u.get('prompt_tokens',u.get('total_tokens',0)) for u in events if type(u.get('prompt_tokens',u.get('total_tokens'))) is int),

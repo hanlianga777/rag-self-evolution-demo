@@ -83,16 +83,16 @@ class KnowledgePipelineTests(unittest.TestCase):
 
     def test_remote_embedding_rejects_wrong_dimension(self):
         provider = kp.AlibabaProvider({'DASHSCOPE_API_KEY': 'fixture', 'DASHSCOPE_BASE_URL': 'https://fixture.invalid'})
-        with patch.object(provider, '_post', return_value={'data': [{'index': 0, 'embedding': [1, 2]}]}):
-            with self.assertRaises(ValueError): provider.embed(['input'], 3)
+        with patch.object(provider, '_post_request', return_value={'data': [{'index': 0, 'embedding': [1, 2]}]}):
+            with self.assertRaises(kp.ProviderInvalidResponse): provider.embed(['input'], 3)
 
     def test_remote_rerank_maps_indices_and_rejects_duplicate_indices(self):
-        provider = kp.AlibabaProvider({})
+        provider = kp.AlibabaProvider({'DASHSCOPE_API_KEY':'fixture','DASHSCOPE_BASE_URL':'https://fixture.invalid'})
         hits = [{'chunk_id': 'C1', 'content': 'first'}, {'chunk_id': 'C2', 'content': 'second'}]
-        with patch.object(provider, '_post', return_value={'results': [{'index': 0, 'relevance_score': .2}, {'index': 1, 'relevance_score': .9}]}):
+        with patch.object(provider, '_post_request', return_value={'results': [{'index': 0, 'relevance_score': .2}, {'index': 1, 'relevance_score': .9}]}):
             self.assertEqual([h['chunk_id'] for h in provider.rerank('query', hits)], ['C2', 'C1'])
-        with patch.object(provider, '_post', return_value={'results': [{'index': 0, 'relevance_score': .2}, {'index': 0, 'relevance_score': .9}]}):
-            with self.assertRaises(ValueError): provider.rerank('query', hits)
+        with patch.object(provider, '_post_request', return_value={'results': [{'index': 0, 'relevance_score': .2}, {'index': 0, 'relevance_score': .9}]}):
+            with self.assertRaises(kp.ProviderInvalidResponse): provider.rerank('query', hits)
 
     def test_restart_reports_interrupted_operation_without_switching_index(self):
         from app.corpus_management import CorpusManager
@@ -141,9 +141,11 @@ class BundleTests(unittest.TestCase):
             self.assertEqual(matches[0]['parser'], 'MinerU/vlm')
             retriever = VectorRetriever(CorpusStore(staging))
             from app.policy import DEFAULT_PIPELINE_CONFIG
-            def remote_response(provider, path, payload):
+            def remote_response(provider, path, payload, *, validate=None):
                 if 'embeddings' in path:
-                    return {'data': [{'index': 0, 'embedding': [1.] * 1024}]}
+                    body = {'data': [{'index': 0, 'embedding': [1.] * 1024}]}
+                    if validate:validate(body)
+                    return body
                 return {'results': [{'index': i, 'relevance_score': 1 - i * .01} for i in reversed(range(len(payload['documents'])))]}
             with patch.object(kp.AlibabaProvider, '_post', remote_response):
                 trace = {}

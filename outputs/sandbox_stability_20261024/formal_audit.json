@@ -1,0 +1,265 @@
+{
+  "provider_calls": 0,
+  "candidates": [
+    {
+      "label": "A",
+      "run_id": "EVAL-20261022140653311827",
+      "status": "partial",
+      "completed": 38,
+      "config": {
+        "alias_mapping": false,
+        "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-A",
+        "candidate_k": 12,
+        "hybrid_alpha": 0.5,
+        "hybrid_search": true,
+        "hyde": false,
+        "knowledge_identity": {
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+          }
+        },
+        "metadata_filter": "OFF",
+        "min_score": 0,
+        "multi_query": false,
+        "prompt_strategy": "Abstention",
+        "query_rewrite": false,
+        "rerank": true,
+        "run_target": "sandbox_candidate",
+        "top_k": 6
+      },
+      "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+      "case_sha256": "5b37a4bbf295159e88dbeb1bcb4e8de16b94b9629fb153d80691d2b552aca0c6",
+      "pending": [
+        "V1G-110926448917-39",
+        "V1G-110926448917-40",
+        "V1G-110926448917-41",
+        "V1G-110926448917-42-R122110917880-R124502591488",
+        "V1G-110926448917-43",
+        "V1G-110926448917-44-R122200100987-R124516421396",
+        "V1G-110926448917-45-R122231403350-R124530599411",
+        "V1G-110926448917-46-R122330616323-R124558701867",
+        "V1G-110926448917-47",
+        "V1G-110926448917-48",
+        "V1G-110926448917-49",
+        "V1G-110926448917-50-R122406390043-R124544152999"
+      ],
+      "errors": [
+        {
+          "question_id": "V1G-110926448917-39",
+          "checkpoint_keys": [
+            "attempts",
+            "phase_windows",
+            "technical_error",
+            "unknown_execution"
+          ],
+          "technical_error": {
+            "error": "本地检索执行失败（vector_search/ProviderUnavailable）；请检查索引与本地模型",
+            "error_type": "RetrievalUnavailable",
+            "phase": "generation"
+          },
+          "attempts": [
+            {
+              "cause_message": "Alibaba request failed (TimeoutError)",
+              "cause_type": "ProviderUnavailable",
+              "elapsed_ms": 62110,
+              "error": "本地检索执行失败（vector_search/ProviderUnavailable）；请检查索引与本地模型",
+              "error_type": "RetrievalUnavailable",
+              "phase": "generation",
+              "provider_status_code": null,
+              "recorded_by_run_id": "EVAL-20261022140653311827",
+              "request_execution_unknown": true,
+              "response_metadata": null,
+              "retryable": false,
+              "status": "error",
+              "usage": [
+                {
+                  "call_started_at": "2026-10-22T14:26:52.696248+00:00",
+                  "latency_ms": 61974,
+                  "provider": "Alibaba",
+                  "requested_model": "text-embedding-v4",
+                  "status": "failed"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "B",
+      "run_id": "EVAL-20261024134228711907",
+      "status": "partial",
+      "completed": 48,
+      "config": {
+        "alias_mapping": false,
+        "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-B",
+        "candidate_k": 24,
+        "hybrid_alpha": 0.5,
+        "hybrid_search": true,
+        "hyde": false,
+        "knowledge_identity": {
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+          }
+        },
+        "metadata_filter": "OFF",
+        "min_score": 0,
+        "multi_query": false,
+        "prompt_strategy": "Abstention",
+        "query_rewrite": false,
+        "rerank": true,
+        "run_target": "sandbox_candidate",
+        "top_k": 4
+      },
+      "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+      "case_sha256": "c35809ac8395793bbda1d02f5777a1a66d57ed8fd99cdf2b824e19bf11c4112c",
+      "pending": [
+        "V1G-110926448917-49",
+        "V1G-110926448917-50-R122406390043-R124544152999"
+      ],
+      "errors": [
+        {
+          "question_id": "V1G-110926448917-49",
+          "checkpoint_keys": [
+            "attempts",
+            "phase_windows",
+            "technical_error",
+            "unknown_execution",
+            "unsettled_usage"
+          ],
+          "technical_error": {
+            "error": "检索阶段执行失败（retrieval_pipeline/ProviderTimeout）：阿里云请求超时，执行与费用状态未知",
+            "error_type": "RetrievalUnavailable",
+            "phase": "generation",
+            "provider_error": {
+              "detail": "阿里云请求超时，执行与费用状态未知",
+              "error_type": "ProviderTimeout",
+              "failure_class": "request_result_unknown",
+              "http_status": null,
+              "provider_code": null,
+              "raw_response": null,
+              "request_execution_unknown": true,
+              "response_metadata": {
+                "http_status": null,
+                "model": "qwen3-rerank",
+                "provider": "Alibaba",
+                "request_attempt_count": 1,
+                "request_execution_unknown": true,
+                "request_id": null,
+                "transport_error_type": "URLError"
+              },
+              "retrieval_stage": "retrieval_pipeline",
+              "retryable": false,
+              "stage": "generation"
+            }
+          },
+          "attempts": [
+            {
+              "billing_unknown": true,
+              "cause_message": "阿里云请求超时，执行与费用状态未知",
+              "cause_type": "ProviderTimeout",
+              "elapsed_ms": 60416,
+              "error": "检索阶段执行失败（retrieval_pipeline/ProviderTimeout）：阿里云请求超时，执行与费用状态未知",
+              "error_type": "RetrievalUnavailable",
+              "phase": "generation",
+              "provider_status_code": null,
+              "recorded_by_run_id": "EVAL-20261024134228711907",
+              "request_execution_unknown": true,
+              "response_metadata": {
+                "http_status": null,
+                "model": "qwen3-rerank",
+                "provider": "Alibaba",
+                "request_attempt_count": 1,
+                "request_execution_unknown": true,
+                "request_id": null,
+                "transport_error_type": "URLError"
+              },
+              "retryable": false,
+              "status": "error",
+              "usage": [
+                {
+                  "call_started_at": "2026-10-24T14:25:31.555178+00:00",
+                  "latency_ms": 245,
+                  "prompt_tokens": 46,
+                  "provider": "Alibaba",
+                  "requested_model": "text-embedding-v4",
+                  "status": "ok",
+                  "total_tokens": 46
+                },
+                {
+                  "call_started_at": "2026-10-24T14:25:31.826839+00:00",
+                  "detail": "阿里云请求超时，执行与费用状态未知",
+                  "http_status": null,
+                  "latency_ms": 60003,
+                  "model": "qwen3-rerank",
+                  "provider": "Alibaba",
+                  "provider_code": null,
+                  "request_execution_unknown": true,
+                  "request_id": null,
+                  "requested_model": "qwen3-rerank",
+                  "status": "unknown",
+                  "transport_error_type": "URLError"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "C",
+      "run_id": "EVAL-20261024134037398356",
+      "status": "completed",
+      "completed": 50,
+      "config": {
+        "alias_mapping": false,
+        "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-C",
+        "candidate_k": 12,
+        "hybrid_alpha": 0.5,
+        "hybrid_search": true,
+        "hyde": false,
+        "knowledge_identity": {
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+          }
+        },
+        "metadata_filter": "OFF",
+        "min_score": 0,
+        "multi_query": false,
+        "prompt_strategy": "Abstention",
+        "query_rewrite": false,
+        "rerank": "query_only",
+        "run_target": "sandbox_candidate",
+        "top_k": 4
+      },
+      "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+      "case_sha256": "90bb1831b19a1737e92e818b1fd67cd973d9b8d38d069c4a7d187071d7ea6ab1",
+      "pending": [],
+      "errors": []
+    }
+  ]
+}

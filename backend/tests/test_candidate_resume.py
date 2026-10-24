@@ -1,5 +1,5 @@
 """Candidate recovery uses Baseline checkpoints; all calls are offline stubs."""
-import json,ssl,unittest
+import json,ssl,unittest,threading
 from copy import deepcopy
 from unittest.mock import patch
 import test_baseline_resume as baseline_fixture
@@ -7,6 +7,7 @@ from app.providers import ProviderTimeout
 
 class CandidateResumeTests(unittest.TestCase):
     def setUp(self):
+        self.existing_threads=set(threading.enumerate())
         baseline_fixture.ResumeTests.setUp(self)
         self.runtime.fail=None
         self.baseline=self.runner.execute_baseline(*self.runner.start_baseline())
@@ -16,7 +17,13 @@ class CandidateResumeTests(unittest.TestCase):
         self.store.save_candidate(self.exp,'R1-A',config,{'round':1,'candidate_label':'A','observed_evidence':['Q2']})
         self.cid=self.exp+'-R1-A'
         self.runtime.answers=[];self.runtime.judges=[]
-    def tearDown(self):baseline_fixture.ResumeTests.tearDown(self)
+    def tearDown(self):
+        # API status is saved before the worker finishes Recommendation persistence.
+        for worker in set(threading.enumerate())-self.existing_threads:
+            if worker.name.endswith('(run)'):
+                worker.join(5)
+                self.assertFalse(worker.is_alive(),'Fixture worker must finish before deleting its SQLite directory')
+        baseline_fixture.ResumeTests.tearDown(self)
     def freeze_request_limits(self):
         from app.paid_run import REQUEST_LIMITS
         from app.evaluation_contract import evaluation_identity

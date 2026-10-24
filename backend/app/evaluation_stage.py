@@ -1,8 +1,62 @@
 """Shared finite Provider stage: Baseline and independent probes use one retry loop."""
 import time
 import math
+import hashlib
+import json
+import uuid
+from contextvars import ContextVar
+from copy import deepcopy
 from .telemetry import collect_usage
 from .paid_run import unsettled_usage
+
+_request_checkpoint = ContextVar('evaluation_request_checkpoint', default=None)
+
+
+def checkpoint_request(provider, model, endpoint, payload, action, *, reuse=True):
+    """Persist a serial RPC inside its owning question/phase, never across Candidates."""
+    context = _request_checkpoint.get()
+    if context is None:
+        return action()
+    checkpoint, phase, run_id, on_state, check_stop = context
+    check_stop()
+    key = hashlib.sha256(json.dumps([phase, provider, model, endpoint, payload], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    saved = checkpoint.setdefault('provider_requests', {}).setdefault(key, {'phase':phase, 'provider':provider, 'model':model, 'attempts':[]})
+    if saved.get('status') in {'inflight', 'unknown'} or any(unsettled_usage(u) for a in saved['attempts'] for u in a.get('usage', [])):
+        failure = RuntimeError('RPC执行或Usage未知，须先对账，禁止重复发送')
+        failure.request_execution_unknown = True
+        raise failure
+    if reuse and saved.get('status') == 'completed':
+        return deepcopy(saved['result'])
+    attempt = {'id':uuid.uuid4().hex, 'recorded_by_run_id':run_id, 'status':'inflight', 'usage':[]}
+    saved['attempts'].append(attempt);saved['status'] = 'inflight'
+    on_state('running', phase=phase)
+    try:
+        with collect_usage() as usage:
+            try:
+                value = action()
+            finally:
+                for event in usage:event['checkpoint_request_id'] = attempt['id']
+                attempt['usage'] = usage
+    except Exception as error:
+        unknown = getattr(error, 'request_execution_unknown', None) is True or any(unsettled_usage(u) for u in attempt['usage'])
+        attempt.update(status='unknown' if unknown else 'error', error_type=type(error).__name__)
+        saved['status'] = attempt['status']
+        on_state('running', phase=phase)
+        raise
+    saved.update(status='completed', result=deepcopy(value))
+    attempt['status'] = 'completed'
+    on_state('running', phase=phase)
+    return value
+
+
+def checkpoint_usage(checkpoint):
+    """RPC events also survive a worker dying before its outer stage attempt saves."""
+    events = [u for a in checkpoint.get('attempts', []) for u in a.get('usage', [])]
+    seen = {u.get('checkpoint_request_id') for u in events if u.get('checkpoint_request_id')}
+    for request in checkpoint.get('provider_requests', {}).values():
+        for attempt in request['attempts']:
+            if attempt['id'] not in seen:events.extend(attempt.get('usage', []));seen.add(attempt['id'])
+    return events
 
 
 def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state):
@@ -35,7 +89,11 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
         on_state('running',phase=phase)
         started=time.perf_counter();usage=[]
         try:
-            with collect_usage() as usage,stage_deadline(deadline,automatic=automatic,check_stop=check_stop):value=action()
+            token = _request_checkpoint.set(_request_checkpoint.get() or (checkpoint,phase,run_id,on_state,check_stop))
+            try:
+                with collect_usage() as usage,stage_deadline(deadline,automatic=automatic,check_stop=check_stop):value=action()
+            finally:
+                _request_checkpoint.reset(token)
             if any(unsettled_usage(u) for u in usage):
                 checkpoint['execution' if phase=='generation' else 'scored_result']=value
                 failure=ProviderUnavailable('有效结果已保存，但Usage/费用未知，须先对账；不得重复生成')

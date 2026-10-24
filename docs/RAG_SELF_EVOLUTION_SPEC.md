@@ -1,5 +1,7 @@
 # 当前有效评测合同 — 2026-10-21 VNext V5.1 `[CONFIRMED]`
 
+- **2026-10-24 Sandbox执行稳定性（当前）**：沿现有题目/阶段Checkpoint持久化Provider请求身份、完整成功结果及Usage；同身份显式续跑可复用成功Embedding/Rerank/回答RPC，按端点/模型/完整请求摘要绑定，禁止跨题、跨Candidate共享。Judge无效结构或引用仍严格拒绝，完整合格评分沿原scored_result复用。Usage按本地请求身份去重，Worker中断时已保存RPC仍可审计；inflight/Unknown/Usage缺失继续先人工核对，不自动重发或伪造结算。DeepSeek明确拒绝429按原3次/600秒有限恢复，永久鉴权拒绝不重试，超时/不明5xx停止。请求时限、Token、模型、冻结数据、评分身份、11 Gate及人工确认均不变；无新导航或架构节点/连线。真实Provider0、费用0，详见[统一验收](../outputs/sandbox_stability_20261024/统一审计与验收.md)。
+
 - **2026-10-23 费用确认与按钮恢复（当前，覆盖上轮Sandbox累计硬预算）**：按Owner要求撤销595de38新增的人民币输入、budget_yuan强制参数、累计上限/费率时效/端点/额外输入字节及相关运行门禁。Sandbox恢复authorize_provider人工确认后沿原运行/续跑链执行，不额外限制Token；保留原冻结单请求技术限制、异常/停止/断点、身份一致性与Unknown先对账。A历史未知请求不伪造结算；点击明确显示并聚焦阻断原因，不静默禁用。未知费用不报确定金额；真实Usage与适用费率核算不冒充账户实扣。Golden/Baseline/Judge/策略/参数/11 Gate及人工发布不改。Provider0、费用0；[零调用验收](../outputs/fee_confirmation_restore_20261023/验收记录.md)。无架构节点/连线变化。
 
 - **2026-10-23 Sandbox人民币硬预算（历史，已按Owner要求撤销）**：HTTP启动/续跑除authorize_provider必须提供budget_yuan；同Experiment的新授权Sandbox共用持久化CNY累计账本，包含DeepSeek回答/Judge/额外查询及Alibaba Embedding/Rerank。发送前按输入字节/重复query/冻结输出预留，真实Usage结算；仅记账上下文不得覆盖硬预算，费率24小时/端点/身份/来源/并发锁/输入费用上界与预算不足失败即停止，未知保留预留并先对账。页面刷新、候选失败、重启不清零也不自动续跑，不能扩大原上限。历史费用独立保留且未知不当0。A的未知Embedding仍阻断；B/C同身份可独立重新授权，已有39题结果原样复用。未完成不产生最终统计，50题后仍原11 Gate/Regression/人工发布。本轮Provider0/费用0，未启动实验。[统一执行前验收](../outputs/sandbox_cost_preflight_20261023/Sandbox费用与续跑执行前验收.md)。费用保护属于现有Sandbox内部，架构节点/连线不变。

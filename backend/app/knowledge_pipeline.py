@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 from io import BytesIO
 import json
+import hashlib
 import http.client
 import ipaddress
 import socket
@@ -150,14 +151,25 @@ def expand_parents(hits, parents, top_k):
 class AlibabaProvider:
     def __init__(self, values=None): self.values = settings() if values is None else values
 
-    def _post(self, path, payload):
+    def _post(self, path, payload, *, validate=None):
         from .paid_run import paid_request
         from .providers import _stage_control
         if not self.values.get('DASHSCOPE_API_KEY','').strip() or not self.values.get('DASHSCOPE_BASE_URL','').strip():
             raise ProviderRequestError('Alibaba Key / business-space endpoint missing')
-        def send():
+        def send_request():
             request_timeout(60)  # Deadline check precedes any payment reservation.
-            with paid_request('Alibaba',payload['model'],payload):return self._post_request(path,payload)
+            with paid_request('Alibaba',payload['model'],payload):
+                body=self._post_request(path,payload)
+                if validate:
+                    try:validate(body)
+                    except (ValueError,KeyError,TypeError) as error:
+                        failure=ProviderInvalidResponse(str(error),raw_provider_response=redact_provider_error(json.dumps(body,ensure_ascii=False),self.values['DASHSCOPE_API_KEY']))
+                        failure.request_execution_unknown=False
+                        raise failure from error
+                return body
+        from .evaluation_stage import checkpoint_request
+        def send():
+            return checkpoint_request('Alibaba',payload['model'],self.values['DASHSCOPE_BASE_URL'].rstrip('/')+path,payload,send_request)
         control=_stage_control.get()
         if control is None:return send()
         # Reuse the finite stage loop per RPC; do not repeat an earlier paid Embedding when Rerank rejects.
@@ -182,23 +194,33 @@ class AlibabaProvider:
         from .telemetry import record_usage
         started = time.perf_counter()
         call_started_at = datetime.now(timezone.utc).isoformat()
+        received_status=None;request_id=None;response_received=False
         try:
             with urllib.request.urlopen(request, timeout=request_timeout(60)) as response:
+                response_received=True;received_status=getattr(response,'status',None)
+                request_id=(getattr(response,'headers',None) or {}).get('x-request-id')
                 response_text=response.read().decode('utf-8')
                 body=json.loads(response_text)
                 if not isinstance(body,dict):raise ProviderInvalidResponse('阿里云响应不是对象',raw_provider_response=redact_provider_error(response_text,key))
             from .paid_run import current_paid_run
             if current_paid_run(): current_paid_run().response(body)
-            record_usage({**body.get('usage', {}), 'provider':'Alibaba', 'requested_model':payload['model'], 'call_started_at':call_started_at, 'status':'ok', 'latency_ms':round((time.perf_counter()-started)*1000)})
+            record_usage({**body.get('usage', {}), 'provider':'Alibaba', 'requested_model':payload['model'], 'call_started_at':call_started_at, 'status':'ok', 'latency_ms':round((time.perf_counter()-started)*1000),
+                'request_sha256':hashlib.sha256(request.data).hexdigest(),'request_id':body.get('request_id') or request_id})
             return body
-        except (urllib.error.URLError, TimeoutError, http.client.HTTPException, json.JSONDecodeError, ProviderInvalidResponse) as error:
+        except (OSError, http.client.HTTPException, json.JSONDecodeError, ProviderInvalidResponse) as error:
             status=error.code if isinstance(error,urllib.error.HTTPError) else None
-            raw=redact_provider_error(error.read(65536).decode('utf-8',errors='replace'),key) if status else None
+            raw=None
+            if status:
+                try:raw=redact_provider_error(error.read(65536).decode('utf-8',errors='replace'),key)
+                finally:error.close()
             # Only explicit rejection responses prove that no request result was produced.
             rejected=status in {400,401,403,404,413,422,429}
-            metadata={'provider':'Alibaba','model':payload['model'],'http_status':status,
-                      'request_id':error.headers.get('x-request-id') if status and error.headers else None,
+            metadata={'provider':'Alibaba','model':payload['model'],'http_status':status or received_status,
+                      'http_response_received':bool(status) or response_received,
+                      'request_id':error.headers.get('x-request-id') if status and error.headers else request_id,
                       'transport_error_type':type(error).__name__,'request_execution_unknown':not rejected}
+            metadata.update(request_sha256=hashlib.sha256(request.data).hexdigest(),
+                            transport_cause_type=type(getattr(error,'reason',None)).__name__ if getattr(error,'reason',None) is not None else None)
             if status:
                 failure=ProviderAPIError('阿里云请求被拒绝' if rejected else '阿里云服务请求失败',status_code=status,
                     retry_after=error.headers.get('Retry-After') if error.headers else None,raw_provider_response=raw)
@@ -220,9 +242,13 @@ class AlibabaProvider:
         vectors = []
         for offset in range(0, len(texts), 10):
             batch = texts[offset:offset + 10]
-            body = self._post('/compatible-mode/v1/embeddings', {'model': 'text-embedding-v4', 'input': batch, 'dimensions': dimension})
+            def validate(body):
+                rows=sorted(body.get('data',[]),key=lambda r:r['index'])
+                if [r['index'] for r in rows]!=list(range(len(batch))):raise ValueError('Embedding response count/order mismatch')
+                array=np.asarray([r['embedding'] for r in rows],dtype='float32')
+                if array.shape!=(len(batch),dimension) or not np.isfinite(array).all() or np.any(np.linalg.norm(array,axis=1)==0):raise ValueError('Embedding response dimension/value mismatch')
+            body = self._post('/compatible-mode/v1/embeddings', {'model': 'text-embedding-v4', 'input': batch, 'dimensions': dimension},validate=validate)
             rows = sorted(body.get('data', []), key=lambda r: r['index'])
-            if [r['index'] for r in rows] != list(range(len(batch))): raise ValueError('Embedding response count/order mismatch')
             vectors.extend(r['embedding'] for r in rows)
         array = np.asarray(vectors, dtype='float32')
         if array.shape != (len(texts), dimension) or not np.isfinite(array).all() or np.any(np.linalg.norm(array, axis=1) == 0):
@@ -231,10 +257,12 @@ class AlibabaProvider:
 
     def rerank(self, query, hits):
         if not hits: return []
-        body = self._post('/compatible-api/v1/reranks', {'model': 'qwen3-rerank', 'query': query, 'documents': [h['content'] for h in hits], 'top_n': len(hits)})
+        def validate(body):
+            rows=body.get('results',[])
+            if sorted(r['index'] for r in rows)!=list(range(len(hits))):raise ValueError('Rerank response count/index mismatch')
+            if any(not np.isfinite(float(r['relevance_score'])) for r in rows):raise ValueError('Invalid Rerank score')
+        body = self._post('/compatible-api/v1/reranks', {'model': 'qwen3-rerank', 'query': query, 'documents': [h['content'] for h in hits], 'top_n': len(hits)},validate=validate)
         rows = body.get('results', [])
-        if sorted(r['index'] for r in rows) != list(range(len(hits))): raise ValueError('Rerank response count/index mismatch')
-        if any(not np.isfinite(float(r['relevance_score'])) for r in rows): raise ValueError('Invalid Rerank score')
         return [{**hits[r['index']], 'score': float(r['relevance_score']), 'rerank_score': float(r['relevance_score'])}
                 for r in sorted(rows, key=lambda r: (-r['relevance_score'], r['index']))]
 

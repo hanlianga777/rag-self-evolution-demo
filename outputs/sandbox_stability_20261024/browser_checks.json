@@ -1,0 +1,13 @@
+{
+  "checks": [
+    "A clickable; explicit Unknown reconciliation block",
+    "B clickable; explicit Unknown reconciliation block",
+    "C evaluated, no accidental rerun",
+    "refresh preserves persisted candidate status",
+    "390px layout has no document overflow"
+  ],
+  "page_errors": [],
+  "blocked_requests": [],
+  "provider_calls": 0,
+  "mode": "formal GET only; no run confirmation"
+}

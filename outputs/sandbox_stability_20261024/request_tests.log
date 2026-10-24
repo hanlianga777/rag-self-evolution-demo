@@ -1,0 +1,13 @@
+test_5xx_or_timeout_is_unknown_never_retried (test_sandbox_stability.RequestCheckpointTests.test_5xx_or_timeout_is_unknown_never_retried) ... ok
+test_answer_rpc_reuses_full_response_without_recharging_usage (test_sandbox_stability.RequestCheckpointTests.test_answer_rpc_reuses_full_response_without_recharging_usage) ... ok
+test_body_timeout_preserves_received_http_headers_without_claiming_completion (test_sandbox_stability.RequestCheckpointTests.test_body_timeout_preserves_received_http_headers_without_claiming_completion) ... ok
+test_completed_embedding_survives_failed_rerank_and_explicit_resume (test_sandbox_stability.RequestCheckpointTests.test_completed_embedding_survives_failed_rerank_and_explicit_resume) ... ok
+test_deepseek_rejection_is_known_and_retries_only_three_times (test_sandbox_stability.RequestCheckpointTests.test_deepseek_rejection_is_known_and_retries_only_three_times) ... ok
+test_invalid_embedding_is_audited_but_never_reused_as_success (test_sandbox_stability.RequestCheckpointTests.test_invalid_embedding_is_audited_but_never_reused_as_success) ... ok
+test_missing_usage_saves_rpc_result_and_blocks_another_request (test_sandbox_stability.RequestCheckpointTests.test_missing_usage_saves_rpc_result_and_blocks_another_request) ... ok
+test_successful_rpc_is_durable_before_next_request_and_survives_worker_loss (test_sandbox_stability.RequestCheckpointTests.test_successful_rpc_is_durable_before_next_request_and_survives_worker_loss) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.005s
+
+OK

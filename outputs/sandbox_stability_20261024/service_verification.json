@@ -1,0 +1,338 @@
+{
+  "frontend_port": 5174,
+  "api_port": 8010,
+  "loaded_code_matches": {
+    "provider_stage": "26d49fc12cef54ab3ca58a3d37bbc1cca63e78a8de016ee7bcfae4633a00c8fb",
+    "alibaba_request": "623a1f0c22df311146d6e457e63e416c751c96cb94f7a5f62e74cec0f8705318",
+    "alibaba_transport": "d575067565bd95b6952cb53c0e313db7a7e95720778163ba3443c2d041e8330b",
+    "batch_runner": "236b88f3be0d40d9422493702166f079f9bc8e19fabcbeb88ef339bed63b0bc5",
+    "provider_parser": "2df1ad63a41ef3568a81b1faa9adf7cefaab44a27069d618f9602fd9a1a62202"
+  },
+  "plans": [
+    {
+      "label": "A",
+      "baseline": "EVAL-20261021141811373593",
+      "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+      "config": {
+        "alias_mapping": false,
+        "candidate_k": 12,
+        "hybrid_alpha": 0.5,
+        "hybrid_search": true,
+        "hyde": false,
+        "metadata_filter": "OFF",
+        "min_score": 0,
+        "multi_query": false,
+        "prompt_strategy": "Abstention",
+        "query_rewrite": false,
+        "rerank": true,
+        "top_k": 6,
+        "knowledge_identity": {
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+          }
+        },
+        "run_target": "sandbox_candidate",
+        "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-A"
+      },
+      "plan": {
+        "source_run_id": "EVAL-20261022140653311827",
+        "completed": 38,
+        "reusable": 38,
+        "total": 50,
+        "pending_answers": 12,
+        "pending_judges": 12,
+        "saved_answers_waiting_judge": 0,
+        "next_question_id": "V1G-110926448917-39",
+        "can_resume": false,
+        "reason": "需先对账：V1G-110926448917-39 存在Unknown request execution；禁止重复调用或预约续跑",
+        "request_accounting": {
+          "call_events": 156,
+          "cost_estimation": {
+            "amount": null,
+            "calculated_at": "2026-10-22T14:27:54.674153+00:00",
+            "cost_config_version": "deepseek-flash-2026-09-30",
+            "price_snapshot": {
+              "aliases": [
+                "deepseek-v4-flash"
+              ],
+              "billing_mode": "provider_hit_counter",
+              "checked_at": "2026-09-30",
+              "cost_config_version": "deepseek-flash-2026-09-30",
+              "currency": "USD",
+              "effective_date": "2026-09-30",
+              "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+              "model": "deepseek-flash",
+              "peak_hours_utc": [
+                [
+                  1,
+                  4
+                ],
+                [
+                  6,
+                  10
+                ]
+              ],
+              "peak_weekdays": [
+                0,
+                1,
+                2,
+                3,
+                4
+              ],
+              "periods": {
+                "off_peak": {
+                  "cached_input_per_million": 0.003,
+                  "input_per_million": 0.15,
+                  "output_per_million": 0.6
+                },
+                "peak": {
+                  "cached_input_per_million": 0.006,
+                  "input_per_million": 0.3,
+                  "output_per_million": 1.2
+                }
+              },
+              "price_config_version": "deepseek-flash-2026-09-30",
+              "provider": "DeepSeek",
+              "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "unit": 1000000
+            },
+            "reason": "model_mismatch",
+            "requested_model": "deepseek-v4-flash",
+            "status": "unavailable"
+          },
+          "estimated_cost": null,
+          "known_input_tokens": 567709,
+          "known_output_tokens": 367068,
+          "provenance": "logical_task_including_resume_history",
+          "unknown_usage_events": 1
+        },
+        "estimated_calls_without_retries": 48
+      }
+    },
+    {
+      "label": "B",
+      "baseline": "EVAL-20261021141811373593",
+      "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+      "config": {
+        "alias_mapping": false,
+        "candidate_k": 24,
+        "hybrid_alpha": 0.5,
+        "hybrid_search": true,
+        "hyde": false,
+        "metadata_filter": "OFF",
+        "min_score": 0,
+        "multi_query": false,
+        "prompt_strategy": "Abstention",
+        "query_rewrite": false,
+        "rerank": true,
+        "top_k": 4,
+        "knowledge_identity": {
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+          }
+        },
+        "run_target": "sandbox_candidate",
+        "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-B"
+      },
+      "plan": {
+        "source_run_id": "EVAL-20261024134228711907",
+        "completed": 48,
+        "reusable": 48,
+        "total": 50,
+        "pending_answers": 2,
+        "pending_judges": 2,
+        "saved_answers_waiting_judge": 0,
+        "next_question_id": "V1G-110926448917-49",
+        "can_resume": false,
+        "reason": "需先对账：V1G-110926448917-49 存在Unknown request execution；禁止重复调用或预约续跑",
+        "request_accounting": {
+          "call_events": 195,
+          "cost_estimation": {
+            "amount": null,
+            "calculated_at": "2026-10-24T14:26:31.829496+00:00",
+            "cost_config_version": "deepseek-flash-2026-09-30",
+            "price_snapshot": {
+              "aliases": [
+                "deepseek-v4-flash"
+              ],
+              "billing_mode": "provider_hit_counter",
+              "checked_at": "2026-09-30",
+              "cost_config_version": "deepseek-flash-2026-09-30",
+              "currency": "USD",
+              "effective_date": "2026-09-30",
+              "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+              "model": "deepseek-flash",
+              "peak_hours_utc": [
+                [
+                  1,
+                  4
+                ],
+                [
+                  6,
+                  10
+                ]
+              ],
+              "peak_weekdays": [
+                0,
+                1,
+                2,
+                3,
+                4
+              ],
+              "periods": {
+                "off_peak": {
+                  "cached_input_per_million": 0.003,
+                  "input_per_million": 0.15,
+                  "output_per_million": 0.6
+                },
+                "peak": {
+                  "cached_input_per_million": 0.006,
+                  "input_per_million": 0.3,
+                  "output_per_million": 1.2
+                }
+              },
+              "price_config_version": "deepseek-flash-2026-09-30",
+              "provider": "DeepSeek",
+              "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "unit": 1000000
+            },
+            "reason": "model_mismatch",
+            "requested_model": "deepseek-v4-flash",
+            "status": "unavailable"
+          },
+          "estimated_cost": null,
+          "known_input_tokens": 936606,
+          "known_output_tokens": 457982,
+          "provenance": "logical_task_including_resume_history",
+          "unknown_usage_events": 1
+        },
+        "estimated_calls_without_retries": 8
+      }
+    },
+    {
+      "label": "C",
+      "baseline": "EVAL-20261021141811373593",
+      "evaluation_identity": "4c6e8a2da0f2e23deb6200551dc79f9894370ef01b15d4c914b1e78a1a66dccf",
+      "config": {
+        "alias_mapping": false,
+        "candidate_k": 12,
+        "hybrid_alpha": 0.5,
+        "hybrid_search": true,
+        "hyde": false,
+        "metadata_filter": "OFF",
+        "min_score": 0,
+        "multi_query": false,
+        "prompt_strategy": "Abstention",
+        "query_rewrite": false,
+        "rerank": "query_only",
+        "top_k": 4,
+        "knowledge_identity": {
+          "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+          "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+          "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+          "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+          "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+          "sources": {
+            "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+            "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+            "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+            "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+          }
+        },
+        "run_target": "sandbox_candidate",
+        "candidate_id": "EXP-RECOVERY-20261022T0649135884120000-R1-C"
+      },
+      "plan": {
+        "source_run_id": "EVAL-20261024134037398356",
+        "completed": 50,
+        "reusable": 50,
+        "total": 50,
+        "pending_answers": 0,
+        "pending_judges": 0,
+        "saved_answers_waiting_judge": 0,
+        "next_question_id": null,
+        "can_resume": false,
+        "reason": "仅中断的同身份评测可以授权续跑",
+        "request_accounting": {
+          "call_events": 154,
+          "cost_estimation": {
+            "amount": null,
+            "calculated_at": "2026-10-24T13:41:29.573864+00:00",
+            "cost_config_version": "deepseek-flash-2026-09-30",
+            "price_snapshot": {
+              "aliases": [
+                "deepseek-v4-flash"
+              ],
+              "billing_mode": "provider_hit_counter",
+              "checked_at": "2026-09-30",
+              "cost_config_version": "deepseek-flash-2026-09-30",
+              "currency": "USD",
+              "effective_date": "2026-09-30",
+              "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+              "model": "deepseek-flash",
+              "peak_hours_utc": [
+                [
+                  1,
+                  4
+                ],
+                [
+                  6,
+                  10
+                ]
+              ],
+              "peak_weekdays": [
+                0,
+                1,
+                2,
+                3,
+                4
+              ],
+              "periods": {
+                "off_peak": {
+                  "cached_input_per_million": 0.003,
+                  "input_per_million": 0.15,
+                  "output_per_million": 0.6
+                },
+                "peak": {
+                  "cached_input_per_million": 0.006,
+                  "input_per_million": 0.3,
+                  "output_per_million": 1.2
+                }
+              },
+              "price_config_version": "deepseek-flash-2026-09-30",
+              "provider": "DeepSeek",
+              "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "unit": 1000000
+            },
+            "reason": "model_mismatch",
+            "requested_model": "deepseek-v4-flash",
+            "status": "unavailable"
+          },
+          "estimated_cost": null,
+          "known_input_tokens": 602655,
+          "known_output_tokens": 492901,
+          "provenance": "logical_task_including_resume_history",
+          "unknown_usage_events": 0
+        },
+        "estimated_calls_without_retries": 0
+      }
+    }
+  ],
+  "provider_calls": 0
+}

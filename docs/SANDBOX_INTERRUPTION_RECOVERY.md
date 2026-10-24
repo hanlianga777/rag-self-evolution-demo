@@ -1,5 +1,7 @@
 # Sandbox 中断、费用安全与续跑
 
+2026-10-24：成功RPC结果及Usage直接写入原题目Checkpoint（provider_requests），按阶段、Provider、模型、端点及完整payload摘要复用；不跨Candidate/题目共用。Judge原始响应无效时不得复用为合格评分，仍沿原合同纠正与有限重试。请求事件去重，已收到结果但Usage缺失仍保留结果并阻断后续调用。Worker丢失时inflight保守视为未知；本轮未新增对账操作或清除历史Unknown，人工核对前不能续跑。DeepSeek明确429拒绝按原有限重试，鉴权不重试，5xx无未执行证明不重发。详细证据见[统一审计](../outputs/sandbox_stability_20261024/统一审计与验收.md)。
+
 2026-10-23最新：Owner要求撤销上轮新增人民币累计上限及相关强制费用门禁，恢复点击→费用确认→执行。原身份/断点/Unknown对账/停止/人工发布保护保持，不恢复未知请求重试。A点击明确提示对账，B/C沿原链执行；本轮零调用。下文费用上限内容仅为历史，不是当前运行要求。
 
 2026-10-23历史费用审计（累计硬预算已撤销）：Sandbox曾接入同Experiment的新授权人民币累计硬预算，接口需要authorize_provider与budget_yuan；同一费用范围不因候选/失败/刷新/重启重置。全Provider发送前预留，费率过期/缺失、输入费用上界、预算不足、未知费用或身份漂移停止。历史费用单列，A仍需先对账；B/C可独立授权。本轮Provider0。详见[统一费用与续跑准备](../outputs/sandbox_cost_preflight_20261023/Sandbox费用与续跑执行前验收.md)。

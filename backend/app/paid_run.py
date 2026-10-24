@@ -288,6 +288,8 @@ def unsettled_usage(usage):
 def require_reconciled_execution(result):
     """Read-only: an approval to continue does not settle an unknown earlier charge."""
     for question,checkpoint in result.get('checkpoints',{}).items():
+        if any(r.get('status') in {'inflight','unknown'} or any(unsettled_usage(u) for a in r.get('attempts',[]) for u in a.get('usage',[])) for r in checkpoint.get('provider_requests',{}).values()):
+            raise ValueError('需先对账：'+question+' RPC执行或Usage未知，禁止重复发送')
         if checkpoint.get('inflight') or any(checkpoint.get('unknown_execution',{}).values()) or any(checkpoint.get('unsettled_usage',{}).values()):
             raise ValueError('需先对账：'+question+' 存在Unknown request execution；禁止重复调用或预约续跑')
         if any(a.get('request_execution_unknown') is True or a.get('billing_unknown') is True or any(unsettled_usage(u) for u in a.get('usage',[])) for a in checkpoint.get('attempts',[])):
