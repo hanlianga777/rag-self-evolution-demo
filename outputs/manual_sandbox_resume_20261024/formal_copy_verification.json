@@ -1,0 +1,18 @@
+[
+  {
+    "label": "A",
+    "reused": 38,
+    "next_question": "V1G-110926448917-39",
+    "source_unchanged": true,
+    "C50_unchanged": true,
+    "provider_calls": 0
+  },
+  {
+    "label": "B",
+    "reused": 48,
+    "next_question": "V1G-110926448917-49",
+    "source_unchanged": true,
+    "C50_unchanged": true,
+    "provider_calls": 0
+  }
+]

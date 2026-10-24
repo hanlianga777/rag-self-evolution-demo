@@ -1,5 +1,7 @@
 # 当前有效评测合同 — 2026-10-21 VNext V5.1 `[CONFIRMED]`
 
+- **2026-10-24 手动Sandbox续跑：用户点击既有「继续 Sandbox」并确认费用，即明确接受历史未知请求可能重复计费，允许新Run重新请求缺失结果；不再以历史超时/未对账阻断手动续跑。原Run/历史Usage和未知标记只读保留，子Run记录本次授权及继承的未知审计，完整Case/已保存阶段结果复用；本次新Unknown仍停止，不自动重发。非手动路径、身份/配置、Judge、11 Gate、Regression及发布保护不变。无新费用/Token限制、表单或架构节点。**
+
 - **2026-10-24 Sandbox执行稳定性（当前）**：沿现有题目/阶段Checkpoint持久化Provider请求身份、完整成功结果及Usage；同身份显式续跑可复用成功Embedding/Rerank/回答RPC，按端点/模型/完整请求摘要绑定，禁止跨题、跨Candidate共享。Judge无效结构或引用仍严格拒绝，完整合格评分沿原scored_result复用。Usage按本地请求身份去重，Worker中断时已保存RPC仍可审计；inflight/Unknown/Usage缺失继续先人工核对，不自动重发或伪造结算。DeepSeek明确拒绝429按原3次/600秒有限恢复，永久鉴权拒绝不重试，超时/不明5xx停止。请求时限、Token、模型、冻结数据、评分身份、11 Gate及人工确认均不变；无新导航或架构节点/连线。真实Provider0、费用0，详见[统一验收](../outputs/sandbox_stability_20261024/统一审计与验收.md)。
 
 - **2026-10-23 费用确认与按钮恢复（当前，覆盖上轮Sandbox累计硬预算）**：按Owner要求撤销595de38新增的人民币输入、budget_yuan强制参数、累计上限/费率时效/端点/额外输入字节及相关运行门禁。Sandbox恢复authorize_provider人工确认后沿原运行/续跑链执行，不额外限制Token；保留原冻结单请求技术限制、异常/停止/断点、身份一致性与Unknown先对账。A历史未知请求不伪造结算；点击明确显示并聚焦阻断原因，不静默禁用。未知费用不报确定金额；真实Usage与适用费率核算不冒充账户实扣。Golden/Baseline/Judge/策略/参数/11 Gate及人工发布不改。Provider0、费用0；[零调用验收](../outputs/fee_confirmation_restore_20261023/验收记录.md)。无架构节点/连线变化。

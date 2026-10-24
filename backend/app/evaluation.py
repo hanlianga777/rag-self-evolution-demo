@@ -452,7 +452,7 @@ class EvaluationRunner:
         frozen_ids = set(json.loads(run['dataset_snapshot_json'])['question_ids'])
         cases = self.store.evaluation_case_results(run_id)
         checkpoints = run['result'].get('checkpoints', {})
-        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay') if k in run['result']}
+        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume') if k in run['result']}
         def progress(*, complete=False):
             from .telemetry import cost_fields
             from .paid_run import unsettled_usage
@@ -639,7 +639,7 @@ class EvaluationRunner:
         config = {**candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
         return approved, config, candidate, baseline
 
-    def candidate_resume_plan(self,candidate_id):
+    def candidate_resume_plan(self,candidate_id, *, manual_resume=False):
         approved,config,candidate,baseline=self.candidate_inputs(candidate_id)
         with self.store.connection() as connection:
             row=connection.execute("SELECT id FROM evaluation_runs WHERE json_extract(config_json,'$.candidate_id')=? ORDER BY created_at DESC,rowid DESC LIMIT 1",(candidate_id,)).fetchone()
@@ -655,18 +655,18 @@ class EvaluationRunner:
                   'next_question_id':pending[0] if pending else None,'can_resume':True,'reason':None,
                   'request_accounting':(source or {}).get('result',{}).get('request_accounting',{})}
             if source:
-                try:self.store.validate_evaluation_resume(connection,json.loads(baseline['dataset_snapshot_json']),config,baseline['judge'],source['id'],candidate_id=candidate_id)
+                try:self.store.validate_evaluation_resume(connection,json.loads(baseline['dataset_snapshot_json']),config,baseline['judge'],source['id'],candidate_id=candidate_id,manual_resume=manual_resume)
                 except ValueError as error:plan.update(can_resume=False,reason=str(error))
             query_expansion=any(config.get(k) for k in ('query_rewrite','multi_query','hyde'))
             plan['estimated_calls_without_retries']=None if query_expansion else answers*(2+int(config.get('rerank') is True))+judges
             return plan
 
-    def start_candidate(self, candidate_id: str, *, automatic=False):
+    def start_candidate(self, candidate_id: str, *, automatic=False, manual_resume=False):
         approved, config, candidate, baseline = self.candidate_inputs(candidate_id)
         snapshot = json.loads(baseline["dataset_snapshot_json"])
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:
-            run_id = self.store.create_baseline_run(snapshot, config, baseline['judge'], candidate_id=candidate_id, automatic=automatic)
+            run_id = self.store.create_baseline_run(snapshot, config, baseline['judge'], candidate_id=candidate_id, automatic=automatic,manual_resume=manual_resume)
             candidate = self.store.candidate(candidate_id)
         return run_id, approved, config, candidate, baseline
 

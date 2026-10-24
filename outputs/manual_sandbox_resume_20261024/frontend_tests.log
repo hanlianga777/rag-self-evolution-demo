@@ -1,0 +1,22 @@
+
+> rag-evolution-frontend@0.1.0 test
+> vitest run --run src/experiment-schemes.test.tsx src/sandbox-batch.test.tsx src/operation.test.tsx
+
+
+ RUN  v2.1.9 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/frontend
+
+ ✓ src/sandbox-batch.test.tsx (6 tests) 50ms
+ ✓ src/experiment-schemes.test.tsx (4 tests) 79ms
+ ✓ src/operation.test.tsx (17 tests) 11652ms
+   ✓ uses persisted evaluation cases for progress while short operations complete 4310ms
+   ✓ keeps polling a persisted evaluation after its running bar is closed 1159ms
+   ✓ stops the elapsed clock when a short operation completes 554ms
+   ✓ shows the persisted QC stage without an invented percentage for one Revision 1102ms
+   ✓ marks a completed Revision only after the visible Candidate state refreshes 1104ms
+   ✓ reports a completed Revision as unsynced when Candidate refresh fails 1104ms
+   ✓ uses real counts for paired Revision and exposes failed details before removing its card 2208ms
+
+ Test Files  3 passed (3)
+      Tests  27 passed (27)
+   Start at  23:14:13
+   Duration  12.58s (transform 215ms, setup 0ms, collect 603ms, tests 11.78s, environment 1.31s, prepare 193ms)

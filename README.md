@@ -1,5 +1,7 @@
 > Agent 已付费响应恢复：允许1–3个合法候选，逐项校验保留合法部分；缺少可选说明不再整批失败。零网络预检与追加恢复方式见 [响应合同](docs/AGENT_RESPONSE_CONTRACT.md)。
 
+2026-10-24 手动Sandbox续跑：用户点击既有「继续 Sandbox」并确认费用，即明确接受历史未知请求可能重复计费，允许新Run重新请求缺失结果；不再以历史超时/未对账阻断手动续跑。原Run/历史Usage和未知标记只读保留，子Run记录本次授权及继承的未知审计，完整Case/已保存阶段结果复用；本次新Unknown仍停止，不自动重发。非手动路径、身份/配置、Judge、11 Gate、Regression及发布保护不变。无新费用/Token限制、表单或架构节点。 [零调用验收](outputs/manual_sandbox_resume_20261024/验收.md)。
+
 2026-10-24 Sandbox稳定性整改：成功RPC随题目Checkpoint保存并按完整请求身份复用，DeepSeek明确拒绝与未知执行分开，HTTP响应头/正文超时分开留痕。A38/B48/C50保持；A/B未知请求仍须对账，不能自动续跑。模型、超时、Token、费用确认及Judge标准不改。本轮Provider0/费用0。[统一审计与离线验收](outputs/sandbox_stability_20261024/统一审计与验收.md)。
 
 2026-10-23当前：已按Owner要求撤销额外Sandbox人民币累计硬上限、强制预算参数及附加费用限制，恢复原人工费用确认与运行/续跑。A历史未知费用仍需对账，点击明确显示原因；其他符合条件的按钮正常响应。本轮Provider0/费用0，历史数据不变。[验收记录](outputs/fee_confirmation_restore_20261023/验收记录.md)。

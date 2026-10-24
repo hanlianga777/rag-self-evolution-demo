@@ -1980,7 +1980,7 @@ class GovernanceStore:
             if judge.get('baseline_version') != (production['id'] if production else None):
                 raise ValueError('当前Production配置身份已变化')
 
-    def validate_evaluation_resume(self, connection, snapshot, config, judge, source_id, *, candidate_id=None):
+    def validate_evaluation_resume(self, connection, snapshot, config, judge, source_id, *, candidate_id=None, manual_resume=False):
         from .evaluation_contract import evaluation_identity, policy_current
         if snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest()):
             raise ValueError('续跑Corpus身份不匹配，禁止混合结果')
@@ -1988,7 +1988,7 @@ class GovernanceStore:
         if source is None or source['status'] not in {'partial','failed'} or _load(source['config_json'], {}).get('run_target') != ('sandbox_candidate' if candidate_id else 'baseline'):
             raise ValueError('仅中断的同身份评测可以授权续跑')
         from .paid_run import require_reconciled_execution
-        if candidate_id:require_reconciled_execution(_load(source['result_json'], {}))
+        if candidate_id and not manual_resume:require_reconciled_execution(_load(source['result_json'], {}))
         source_judge = _load(source['judge_json'], {})
         if (_load(source['dataset_snapshot_json'], {}) != snapshot or _load(source['config_json'], {}) != config or not policy_current(source_judge)
             or source_judge.get('evaluation_identity') != evaluation_identity(snapshot, judge) or (candidate_id and source_judge != judge)
@@ -2002,7 +2002,7 @@ class GovernanceStore:
             raise ValueError('历史结果题号重复或不属于冻结Snapshot')
         return source, rows
 
-    def create_baseline_run(self, snapshot, config, judge, source_id=None, candidate_id=None, automatic=False, judge_replay=None):
+    def create_baseline_run(self, snapshot, config, judge, source_id=None, candidate_id=None, automatic=False, judge_replay=None, manual_resume=False):
         run_id = f"EVAL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
@@ -2017,8 +2017,22 @@ class GovernanceStore:
                 source_id = previous['id'] if previous else None
             result, rows = {}, []
             if source_id:
-                source, rows = self.validate_evaluation_resume(connection, snapshot, config, judge, source_id, candidate_id=candidate_id)
+                source, rows = self.validate_evaluation_resume(connection, snapshot, config, judge, source_id, candidate_id=candidate_id, manual_resume=manual_resume)
                 result = {'resume_source_id':source_id, 'checkpoints':_load(source['result_json'], {}).get('checkpoints', {})}
+                if candidate_id and manual_resume:
+                    from .paid_run import unsettled_usage
+                    result['manual_resume']={'source_run_id':source_id,'accepted_possible_duplicate_billing':True,'authorized_at':_now()}
+                    saved={row['question_id'] for row in rows}
+                    for question,checkpoint in result['checkpoints'].items():
+                        if question in saved:continue
+                        historical={key:checkpoint.pop(key) for key in ('inflight','unknown_execution','unsettled_usage') if key in checkpoint}
+                        requests={key:request for key,request in checkpoint.get('provider_requests',{}).items()
+                                  if request.get('status') in {'inflight','unknown'} or any(unsettled_usage(u) for a in request.get('attempts',[]) for u in a.get('usage',[]))}
+                        if historical or requests:
+                            checkpoint.setdefault('manual_resume_history',[]).append({'source_run_id':source_id,**historical,'provider_requests':_load(_json(requests),{})})
+                        for request in requests.values():
+                            request['attempts']=[]
+                            if request.get('status')!='completed' or 'result' not in request:request['status']='retry_authorized'
                 if _load(source['result_json'], {}).get('judge_replay'):result['judge_replay']=_load(source['result_json'], {})['judge_replay']
             if judge_replay:
                 from .judge_replay import source_digest

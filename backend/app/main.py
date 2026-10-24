@@ -1286,7 +1286,7 @@ def experiment_resume_view(experiment):
     candidates=[]
     for candidate in experiment['candidates']:
         if candidate['status']=='failed':
-            try:plan=runner.candidate_resume_plan(candidate['id'])
+            try:plan=runner.candidate_resume_plan(candidate['id'],manual_resume=True)
             except ValueError as error:plan={'can_resume':False,'reason':str(error)}
             candidate={**candidate,'resume_plan':plan}
         candidates.append(candidate)
@@ -1490,7 +1490,7 @@ def candidate_preflight(candidate_id: str):
         approved, config, candidate, baseline = EvaluationRunner(store, ai_service).candidate_inputs(candidate_id)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    resume=EvaluationRunner(store,ai_service).candidate_resume_plan(candidate_id)
+    resume=EvaluationRunner(store,ai_service).candidate_resume_plan(candidate_id,manual_resume=True)
     return {"resume_plan":resume,"can_start":resume["can_resume"],"candidate_id": candidate["id"], "baseline_run_id": baseline["id"],
             "snapshot_id": baseline["dataset_version_id"], "question_count": len(approved),
             "evaluation_identity": baseline["judge"]["evaluation_identity"], "judge": baseline["judge"],
@@ -1508,7 +1508,7 @@ def run_candidate(candidate_id: str, payload: PaidActionRequest | None = None):
             require_current_baseline(experiment["baseline_run_id"])
     runner = EvaluationRunner(store, ai_service)
     try:
-        run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id,automatic=True)
+        run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id,automatic=True,manual_resume=payload.authorize_provider)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     threading.Thread(target=contextvars.copy_context().run, args=(runner.execute_candidate,run_id, approved, config, candidate, baseline), daemon=True).start()

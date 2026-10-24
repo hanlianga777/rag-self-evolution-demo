@@ -53,9 +53,11 @@ def checkpoint_usage(checkpoint):
     """RPC events also survive a worker dying before its outer stage attempt saves."""
     events = [u for a in checkpoint.get('attempts', []) for u in a.get('usage', [])]
     seen = {u.get('checkpoint_request_id') for u in events if u.get('checkpoint_request_id')}
-    for request in checkpoint.get('provider_requests', {}).values():
-        for attempt in request['attempts']:
-            if attempt['id'] not in seen:events.extend(attempt.get('usage', []));seen.add(attempt['id'])
+    requests=[checkpoint.get('provider_requests',{}),*[h.get('provider_requests',{}) for h in checkpoint.get('manual_resume_history',[])]]
+    for group in requests:
+        for request in group.values():
+            for attempt in request['attempts']:
+                if attempt['id'] not in seen:events.extend(attempt.get('usage', []));seen.add(attempt['id'])
     return events
 
 

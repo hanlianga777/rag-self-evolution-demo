@@ -1,0 +1,12 @@
+{
+  "checks": [
+    "A Continue opens existing fee confirmation, accepts duplicate billing risk, cancellation sends no run request",
+    "B Continue opens existing fee confirmation, accepts duplicate billing risk, cancellation sends no run request",
+    "C remains evaluated; rerun disabled",
+    "refresh preserves formal candidate status"
+  ],
+  "page_errors": [],
+  "write_or_external_requests": [],
+  "provider_calls": 0,
+  "confirmation_execution_clicked": false
+}
