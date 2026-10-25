@@ -1,0 +1,29 @@
+{
+  "page_seconds": [
+    0.582,
+    0.3945,
+    0.3629
+  ],
+  "median_seconds": 0.3945,
+  "workspace_bytes": 1411,
+  "profiles": {
+    "mini": {
+      "positive_count": 8,
+      "ablation_count": 4,
+      "negative_count": 8,
+      "expected_count": 20
+    },
+    "medium": {
+      "positive_count": 20,
+      "ablation_count": 10,
+      "negative_count": 20,
+      "expected_count": 50
+    },
+    "full": {
+      "positive_count": 40,
+      "ablation_count": 20,
+      "negative_count": 40,
+      "expected_count": 100
+    }
+  }
+}

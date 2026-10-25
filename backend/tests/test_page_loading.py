@@ -53,3 +53,13 @@ class PageLoadingTests(unittest.TestCase):
         self.assertEqual(result['candidates'][0]['result']['completed'],50)
         self.assertNotIn('checkpoints',result['candidates'][0]['result'])
         self.assertNotIn('result_json',result['candidates'][0])
+
+    def test_workspace_profiles_reuse_backend_config_without_another_query(self):
+        from api_fixture import main
+        store=Mock();store.current_baseline_identity.return_value={'requires_new_golden':False,'current_baseline_id':'baseline'}
+        store.active_production.return_value={'id':'active'}
+        with patch.object(main,'store',store),patch.object(main.corpus,'documents',return_value=[]),patch.object(main.corpus_manager,'state',return_value={}):
+            result=main.workspace()
+        self.assertIs(result['generation_profiles'],main.GENERATION_PROFILES)
+        self.assertEqual([result['generation_profiles'][key]['expected_count'] for key in ('mini','medium','full')],[20,50,100])
+        store.connection.assert_not_called()

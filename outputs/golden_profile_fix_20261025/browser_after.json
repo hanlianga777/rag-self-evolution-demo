@@ -1,0 +1,198 @@
+{
+  "page_seconds": [
+    0.5909,
+    0.4068,
+    0.4131
+  ],
+  "intercepted_generation_requests": [
+    {
+      "profile": "mini",
+      "strategy": "evidence_v1"
+    },
+    {
+      "profile": "medium",
+      "strategy": "business_v2"
+    },
+    {
+      "profile": "full",
+      "strategy": "evidence_v1"
+    }
+  ],
+  "unexpected_writes": [],
+  "errors": [],
+  "choices": [
+    "MINI · 20题（8 / 4 / 8）",
+    "MEDIUM · 50题（20 / 10 / 20）",
+    "FULL · 100题（40 / 20 / 40）"
+  ],
+  "api_requests": [
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/dataset?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/revisions?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/generation-runs?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/snapshots?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=attention&group=all&limit=30&offset=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/dataset?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/revisions?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/generation-runs?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/snapshots?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=attention&group=all&limit=30&offset=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/dataset?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/revisions?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/generation-runs?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/snapshots?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=attention&group=all&limit=30&offset=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/generate",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/generate",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/generate",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/dataset?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/revisions?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/generation-runs?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/snapshots?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=attention&group=all&limit=30&offset=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/overview?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/documents",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/pipeline",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/pipeline",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=attention&group=all&limit=30&offset=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/generation-runs?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/snapshots?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/dataset?light=true",
+      "method": "GET"
+    }
+  ],
+  "menu_height": 112,
+  "default": "MEDIUM · 50题（20 / 10 / 20）",
+  "initial_overview_requests": 0,
+  "server_generation_requests": 0
+}

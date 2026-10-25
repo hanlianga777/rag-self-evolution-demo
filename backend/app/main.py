@@ -299,7 +299,7 @@ def workspace():
     state = corpus_manager.state()
     identity = store.current_baseline_identity()
     stale = identity["requires_new_golden"]
-    return {"name": "机器人智能问答评测与优化 Agent", "environment": "Production Baseline", "document_count": len(documents), "chunk_count": sum(item["chunks"] for item in documents), "active_version": (store.active_production() or {}).get("id"), "corpus_changed_at": state.get("changed_at"), "requires_new_golden": stale, "requires_new_baseline": not stale and identity["current_baseline_id"] is None, **identity}
+    return {"generation_profiles": GENERATION_PROFILES, "name": "机器人智能问答评测与优化 Agent", "environment": "Production Baseline", "document_count": len(documents), "chunk_count": sum(item["chunks"] for item in documents), "active_version": (store.active_production() or {}).get("id"), "corpus_changed_at": state.get("changed_at"), "requires_new_golden": stale, "requires_new_baseline": not stale and identity["current_baseline_id"] is None, **identity}
 
 
 def require_current_baseline(run_id: str | None = None):
