@@ -1,0 +1,260 @@
+{
+  "warm_navigation": [
+    {
+      "hash": "#overview",
+      "label": "RAG 自进化项目概览",
+      "seconds": 0.0195
+    },
+    {
+      "hash": "#knowledge",
+      "label": "知识库",
+      "seconds": 0.0517
+    },
+    {
+      "hash": "#settings",
+      "label": "Pipeline 配置",
+      "seconds": 0.0425
+    },
+    {
+      "hash": "#governance",
+      "label": "Golden Dataset",
+      "seconds": 0.0463
+    },
+    {
+      "hash": "#evaluation",
+      "label": "Baseline",
+      "seconds": 0.0413
+    },
+    {
+      "hash": "#evolution",
+      "label": "Agent 工作台",
+      "seconds": 0.0416
+    },
+    {
+      "hash": "#versions",
+      "label": "发布",
+      "seconds": 0.0485
+    },
+    {
+      "hash": "#verification",
+      "label": "问答验证",
+      "seconds": 0.0504
+    }
+  ],
+  "filters": [
+    {
+      "label": "正向",
+      "count": 20,
+      "seconds": 1.2389
+    },
+    {
+      "label": "消融题",
+      "count": 10,
+      "seconds": 0.3966
+    },
+    {
+      "label": "负向",
+      "count": 20,
+      "seconds": 0.4175
+    },
+    {
+      "label": "全部",
+      "count": 50,
+      "seconds": 0.9319
+    }
+  ],
+  "errors": [],
+  "requests": [
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/overview?light=true",
+    "http://localhost:8010/api/documents",
+    "http://localhost:8010/api/optimization?light=true",
+    "http://localhost:8010/api/evaluations?active_only=true",
+    "http://localhost:8010/api/governance/revisions?active_only=true",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/overview?light=true",
+    "http://localhost:8010/api/documents",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/documents",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/dataset?light=true",
+    "http://localhost:8010/api/governance/generation-runs?light=true",
+    "http://localhost:8010/api/governance/snapshots?light=true",
+    "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=attention&group=all&limit=30&offset=0",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/evaluation?light=true",
+    "http://localhost:8010/api/bad-cases?light=true",
+    "http://localhost:8010/api/optimization?light=true",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593/judge-replay/preflight",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593/judge-replay/preflight",
+    "http://localhost:8010/api/evaluation/preflight?resume_source_id=EVAL-20261021141811373593",
+    "http://localhost:8010/api/evaluation?active_task=true&light=true",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/evaluation?light=true",
+    "http://localhost:8010/api/optimization?light=true&planning=true",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/evaluation?light=true",
+    "http://localhost:8010/api/optimization?light=true",
+    "http://localhost:8010/api/versions",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/bad-cases?light=true",
+    "http://localhost:8010/api/versions",
+    "http://localhost:8010/api/readiness",
+    "http://localhost:8010/api/monitoring",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/overview?light=true",
+    "http://localhost:8010/api/documents",
+    "http://localhost:8010/api/optimization?light=true",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/overview?light=true",
+    "http://localhost:8010/api/documents",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/documents",
+    "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=attention&group=all&limit=30&offset=0",
+    "http://localhost:8010/api/governance/generation-runs?light=true",
+    "http://localhost:8010/api/governance/snapshots?light=true",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/dataset?light=true",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593/judge-replay/preflight",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593/judge-replay/preflight",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/evaluation?light=true",
+    "http://localhost:8010/api/bad-cases?light=true",
+    "http://localhost:8010/api/optimization?light=true",
+    "http://localhost:8010/api/evaluation/preflight?resume_source_id=EVAL-20261021141811373593",
+    "http://localhost:8010/api/evaluation?active_task=true&light=true",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/evaluation?light=true",
+    "http://localhost:8010/api/optimization?light=true&planning=true",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/evaluation?light=true",
+    "http://localhost:8010/api/optimization?light=true",
+    "http://localhost:8010/api/versions",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/bad-cases?light=true",
+    "http://localhost:8010/api/versions",
+    "http://localhost:8010/api/readiness",
+    "http://localhost:8010/api/monitoring",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/dataset?light=true",
+    "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=attention&group=all&limit=30&offset=0",
+    "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=all&group=positive&limit=30&offset=0",
+    "http://localhost:8010/api/governance/generation-runs?light=true",
+    "http://localhost:8010/api/governance/snapshots?light=true",
+    "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=all&group=ablation&limit=30&offset=0",
+    "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=all&group=negative&limit=30&offset=0",
+    "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=all&group=all&limit=30&offset=0",
+    "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=all&group=all&limit=30&offset=30",
+    "http://localhost:8010/api/governance/questions/V1G-110926448917-01",
+    "http://localhost:8010/api/documents",
+    "http://localhost:8010/api/documents/DOC-001",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593/judge-replay/preflight",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593/judge-replay/preflight",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/evaluation?light=true",
+    "http://localhost:8010/api/bad-cases?light=true",
+    "http://localhost:8010/api/optimization?light=true",
+    "http://localhost:8010/api/evaluation/preflight?resume_source_id=EVAL-20261021141811373593",
+    "http://localhost:8010/api/evaluation?active_task=true&light=true",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/evaluation?light=true",
+    "http://localhost:8010/api/optimization?light=true&planning=true",
+    "http://localhost:8010/api/bad-cases/BC-EVAL-20261021141811373593-V1G-110926448917-29",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593",
+    "http://localhost:8010/api/evaluations/EVAL-20261024152730246813",
+    "http://localhost:8010/api/evaluations/EVAL-20261021141811373593",
+    "http://localhost:8010/api/evaluations/EVAL-20261024152730246813",
+    "http://localhost:8010/api/workspace",
+    "http://localhost:8010/api/evaluation?light=true",
+    "http://localhost:8010/api/optimization?light=true&planning=true",
+    "http://localhost:8010/api/evaluations?active_only=true",
+    "http://localhost:8010/api/governance/revisions?active_only=true",
+    "http://localhost:8010/api/pipeline",
+    "http://localhost:8010/api/pipeline"
+  ],
+  "blocked_writes": [],
+  "golden_detail_seconds": 1.8712,
+  "golden_detail_requests": [
+    "http://localhost:8010/api/governance/questions/V1G-110926448917-01",
+    "http://localhost:8010/api/documents",
+    "http://localhost:8010/api/documents/DOC-001"
+  ],
+  "golden_detail_text": "Q01 · 正向题（Positive）\n\n详情内容；正文可独立滚动，按 Esc 关闭。\n\n⋯\n已批准\n所有者委托 AI 审核\n正向题（Positive）\n业务场景\n\n售后工程师 / 现场运维 · 基础\n\n售后工程师在客户现场进行设备巡检时，发现 KIRA B 50 的日期和时间与本地时间不一致，导致设备日志时间戳错误，需要调整时区设置。\n\n用户意图：了解如何在 KIRA B 50 上进入一般设置并修改时区，使设备时间与本地时间同步。\n\n构造题型：Ordinary · 来源：AI 生成\n\n问题\n\n我在客户现场发现 KIRA B 50 显示的时间不对，怎么修改时区？\n\n参考答案\n\n1. 按下“设置”菜单中的“一般设置”按钮 2. 按下“一般设置”按钮 可以在“设定时区”下设置相应时区\n\n核心证据\n\n卡赫_KIRA_B_50完整操作说明_中文版.pdf · P.54 · 一般设置 · DOC-001-C-00138\n\n一般设置；1. 按下“设置”菜单中的“一般设置”按钮；“一般设置”按钮；2. 按下“一般设置”按钮；显示当前的一般设置；可以在“设定时区”下设置相应时区\n\n查看完整证据\n自动质量检查\nProbe · 100\n通过\n\n预期证据命中第 2 位\n\n运行 Probe\nQC · 95\n通过\n\n参考答案逐字来源于 Golden Evidence DOC-001-C-00138，证据完整",
+  "baseline_gate_rows": 11,
+  "baseline_bad_rows": 10,
+  "agent_detail_requests": [
+    "http://localhost:8010/api/bad-cases/BC-EVAL-20261021141811373593-V1G-110926448917-29"
+  ],
+  "agent_detail_text": "Bad Case 诊断\n\n详情内容；正文可独立滚动，按 Esc 关闭。\n\n案例结论\n\nFAIL · Bad Case\n\n评分与安全核验\n\n失败现象：业务回答缺陷\n\n技术归属：尚待证据定位\n\n证据结论：重新使用B2前不带电检查应覆盖整机外观：机身外观清洁、无破损或变形痕迹，相机表面镜片无异物，头部激光雷达周围无异物遮挡。；重新使用B2前不带电检查应覆盖结构：目视及触摸检查机身、各个关节及连接处、足端组件是否完好，有裂纹或破损需及时更换并联系Unitree售后；各连接部件螺丝是否锁紧，尤其关节连接件和电池锁紧旋钮螺丝；散热风扇进出口无异物阻塞。；重新使用B2前不带电检查应覆盖足端组件：检查有无明显足垫破损，若有破损请及时更换。；重新使用B2前不带电检查应覆盖电池包接口与安装：机身电池包接口无异物、变形，电池包安装可靠，确保运行时不会松脱。；必要安全前提：电池包外壳无明显损伤，有明显损伤的电池包禁止用于使用。；重新使用B2前不带电检查应覆盖遥控器：摇杆都在中位、摇杆是否进入沙土等异物，各按键是否存在卡顿。；当前操作适用性：对象为B2整机，目的是重新使用前不带电检查；答案确认了B2电池与充电器",
+  "agent_tabs": [
+    {
+      "label": "A/B/C/D",
+      "seconds": 0.1464
+    },
+    {
+      "label": "Sandbox",
+      "seconds": 0.128
+    },
+    {
+      "label": "Regression",
+      "seconds": 0.1328
+    },
+    {
+      "label": "Recommendation",
+      "seconds": 0.1282
+    }
+  ],
+  "refreshed_agent_text": "跳转到主内容\nRAG Evolution\nRAG 自进化项目概览\n知识库\nPipeline 配置\nGolden Dataset\nBaseline\nAgent 工作台\n发布\n问答验证\nAgent 工作台\n\n读取问题证据，提出 A/B/C 假设，用 Sandbox 验证改善与副作用。\n\n继续优化下一轮\n实验与人工Gate进度\n问题诊断\n优化 Agent\nA/B/C/D\nSandbox\nRegression\nRecommendation\n高级详情 · 逐题实验约束与补证预检\n\n当前 Baseline：EVAL-20…1373593 · 群组Gate通过（11/11） · Bad Case 10 题 · 全部进入 Agent 诊断与优化规划\n\n已验证配置 尚无 · 修复 0 题 · 待处理 10 题。不同候选的修复不相加，组合须重新完整评测。\n\n本轮 Bad Case\n\n本轮 10 道 Bad Case。全部业务失败由 Agent 接手，逐题分析原因、提出优化假设，再用真实 Sandbox 验证；根因未知不会排除问题。\n\n题号 / 问题\t失败现象\t评测结果\t诊断依据\t优化方向\t详情\nQ29\n客户准备重新使用B2，我要按用户手册做一次不带电检查。具体要检查哪些项目？\n\t业务回答缺陷\tFAIL · Bad Case\t\n重新使用B2前不带电检查应覆盖整机外观：机身外观清洁、无破损或变形痕迹，相机表面镜片无异物，头部激光雷达周围无异物遮挡。；重新使用B2前不带电检查应覆盖结构：目视及触摸检查机身、各个关节及连接处、足端组件是否完好，有裂纹或破损需及时更换并联系Unitree售后；各连接部件螺丝是否锁紧，尤其关节连接件和电池锁紧旋钮螺丝；散热风扇进出口无异物阻塞。；重新使用B2前不带电检查应覆盖足端组件：检查有无明显足垫破损，若有破损请及时更换。；重新使用B2前不带电检查应覆盖电池包接口与安装：机身电池包接口无异物、变形，电池包安装可靠，确保运行时不会松脱。；必要安全前提：电池包外壳无明显损伤，有明显损伤的电池包禁止用于使用。；重新使用B2前不带电检查应覆盖遥控器：摇杆都在中位、摇杆是否",
+  "resources": [
+    {
+      "url": "http://localhost:8010/api/evaluation?light=true",
+      "duration_ms": 173.80000001192093,
+      "bytes": 0
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "duration_ms": 174.7000000178814,
+      "bytes": 0
+    },
+    {
+      "url": "http://localhost:8010/api/optimization?light=true&planning=true",
+      "duration_ms": 5719.9000000059605,
+      "bytes": 0
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations?active_only=true",
+      "duration_ms": 16.400000005960464,
+      "bytes": 0
+    },
+    {
+      "url": "http://localhost:8010/api/governance/revisions?active_only=true",
+      "duration_ms": 137.80000001192093,
+      "bytes": 0
+    },
+    {
+      "url": "http://localhost:8010/api/pipeline",
+      "duration_ms": 223.80000001192093,
+      "bytes": 0
+    },
+    {
+      "url": "http://localhost:8010/api/pipeline",
+      "duration_ms": 346.90000000596046,
+      "bytes": 0
+    }
+  ]
+}

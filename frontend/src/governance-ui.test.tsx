@@ -51,6 +51,7 @@ it.each([false, true])("closes the Drawer after %s QC P0 acceptance and updates 
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [base] }} />));
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody button")!.click());
+  expect((fetch as any).mock.calls.filter(([url]: any[]) => String(url).endsWith("/api/governance/questions/V1-Q01"))).toHaveLength(1);
   await act(async () => ([...document.querySelectorAll<HTMLButtonElement>(".candidate-actionbar button")].find(button => button.textContent === "批准")!).click());
   if (requiresQcAcceptance) {
     const input = document.querySelector<HTMLTextAreaElement>("textarea[aria-label='接受 QC P0 的理由']")!;
@@ -245,7 +246,7 @@ it("restores a running generation and reads persisted slot progress", async () =
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-live", status: "queued", question_ids: [], artifacts: {} }], dataset: [] }} />); });
-  expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-live"));
+  expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-live"), expect.objectContaining({ signal: expect.any(AbortSignal) }));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.body.textContent).toContain("Q03");
@@ -307,7 +308,7 @@ it("shows persisted quality rerun progress and resumes polling after refresh", a
   expect(document.body.textContent).toContain("4 / 20");
   expect(document.body.textContent).toContain("运行中");
   expect((([...(document.querySelectorAll("button"))].find(button => button.textContent === "批量重跑异常项")) as HTMLButtonElement).disabled).toBe(true);
-  expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-quality"));
+  expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-quality"), expect.objectContaining({ signal: expect.any(AbortSignal) }));
   await act(async () => { ([...document.querySelectorAll("button")].find(button => button.textContent === "查看详情") as HTMLButtonElement).click(); });
   expect(document.body.textContent).toContain("本次 Probe 未通过，QC 已跳过");
   await act(async () => root.unmount());

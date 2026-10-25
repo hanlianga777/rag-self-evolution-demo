@@ -1,0 +1,25 @@
+{
+  "case_membership_query_ms": [
+    0.26029100990854204,
+    0.028000009479001164,
+    0.02066700835712254,
+    0.019458006136119366,
+    0.019583996618166566,
+    0.019292026991024613,
+    0.019417027942836285,
+    0.0189170241355896,
+    0.019249971956014633,
+    0.019208004232496023
+  ],
+  "median_ms": 0.019437517039477825,
+  "busy_timeout_ms": 0,
+  "busy_or_locked_errors": 0,
+  "query_plan": [
+    [
+      2,
+      0,
+      55,
+      "SEARCH evaluation_case_results USING COVERING INDEX evaluation_case_run_question (run_id=?)"
+    ]
+  ]
+}

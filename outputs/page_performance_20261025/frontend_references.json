@@ -1,0 +1,7 @@
+{
+  "reachable_count": 34,
+  "files": 35,
+  "outside_main_graph": [
+    "frontend/src/golden-test-fixture.ts"
+  ]
+}

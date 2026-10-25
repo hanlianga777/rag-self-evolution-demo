@@ -80,7 +80,7 @@ it("sends one atomic Gate 1 review request and shows the frozen version after re
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === "POST") requests.push({ url, body: JSON.parse(init.body as string) });
     const reviewed = rows.map(row => ({ ...row, review_status: "approved", stage: "golden" }));
-    const body = (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, requests.length ? reviewed : rows) : url.endsWith("/api/dataset") ? reviewed : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : url.endsWith("/api/governance/snapshots") ? [{ id: "GOLDEN-v1", snapshot: { generation_run_id: "G1", question_ids: run.question_ids } }] : [];
+    const body = (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, requests.length ? reviewed : rows) : url.endsWith("/api/dataset") ? reviewed : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : new URL(url).pathname.endsWith("/api/governance/snapshots") ? [{ id: "GOLDEN-v1", snapshot: { generation_run_id: "G1", question_ids: run.question_ids } }] : [];
     return new Response(JSON.stringify(body), { status: 200 });
   }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));

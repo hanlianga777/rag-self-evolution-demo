@@ -121,10 +121,12 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
   useEffect(() => {
     const documentIds = [...new Set([row, linked].map(item => item?.evidence_details?.[0]?.chunks?.[0]?.document_id).filter(Boolean))];
     setChunks([]);
-    void getJson<Candidate[]>("/api/documents").then(setDocuments).catch(() => setDocuments([]));
-    if (!documentIds.length) return;
     let cancelled = false;
-    Promise.all(documentIds.map(id => getJson<Candidate>(`/api/documents/${id}`))).then(details => { if (!cancelled) setChunks(details.flatMap(document => document.chunks || [])); }).catch(() => { if (!cancelled) setChunks([]); });
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      void getJson<Candidate[]>("/api/documents").then(value => { if (!cancelled) setDocuments(value); }).catch(() => { if (!cancelled) setDocuments([]); });
+      if (documentIds.length) void Promise.all(documentIds.map(id => getJson<Candidate>(`/api/documents/${id}`))).then(details => { if (!cancelled) setChunks(details.flatMap(document => document.chunks || [])); }).catch(() => { if (!cancelled) setChunks([]); });
+    });
     return () => { cancelled = true; };
   }, [row?.id, linked?.id]);
   useEffect(() => {

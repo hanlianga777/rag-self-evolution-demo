@@ -1,0 +1,110 @@
+[
+  {
+    "path": "/api/workspace",
+    "seconds": 0.0894,
+    "bytes": 1120,
+    "status": 200
+  },
+  {
+    "path": "/api/overview?light=true",
+    "seconds": 0.2671,
+    "bytes": 89069,
+    "status": 200
+  },
+  {
+    "path": "/api/documents",
+    "seconds": 0.0013,
+    "bytes": 2174,
+    "status": 200
+  },
+  {
+    "path": "/api/dataset?light=true",
+    "seconds": 0.2439,
+    "bytes": 71118,
+    "status": 200
+  },
+  {
+    "path": "/api/evaluation?light=true",
+    "seconds": 0.0523,
+    "bytes": 84816,
+    "status": 200
+  },
+  {
+    "path": "/api/bad-cases",
+    "seconds": 1.1602,
+    "bytes": 866539,
+    "status": 200
+  },
+  {
+    "path": "/api/optimization?light=true",
+    "seconds": 0.1297,
+    "bytes": 84500,
+    "status": 200
+  },
+  {
+    "path": "/api/optimization",
+    "seconds": 1.3167,
+    "bytes": 6692907,
+    "status": 200
+  },
+  {
+    "path": "/api/versions",
+    "seconds": 0.002,
+    "bytes": 1137,
+    "status": 200
+  },
+  {
+    "path": "/api/readiness",
+    "seconds": 0.0008,
+    "bytes": 118,
+    "status": 200
+  },
+  {
+    "path": "/api/monitoring",
+    "seconds": 0.0462,
+    "bytes": 63856,
+    "status": 200
+  },
+  {
+    "path": "/api/governance/summary",
+    "seconds": 0.0296,
+    "bytes": 839,
+    "status": 200
+  },
+  {
+    "path": "/api/governance/generation-runs?light=true",
+    "seconds": 0.1535,
+    "bytes": 67326,
+    "status": 200
+  },
+  {
+    "path": "/api/governance/candidates",
+    "seconds": 0.1323,
+    "bytes": 55487,
+    "status": 200
+  },
+  {
+    "path": "/api/bad-cases?light=true",
+    "seconds": 1.2157,
+    "bytes": 132420,
+    "status": 200
+  },
+  {
+    "path": "/api/optimization?light=true&planning=true",
+    "seconds": 1.1934,
+    "bytes": 224270,
+    "status": 200
+  },
+  {
+    "path": "/api/evaluation?active_task=true&light=true",
+    "seconds": 0.0788,
+    "bytes": 84816,
+    "status": 200
+  },
+  {
+    "path": "/api/governance/snapshots?light=true",
+    "seconds": 0.0105,
+    "bytes": 13466,
+    "status": 200
+  }
+]

@@ -231,6 +231,7 @@ class GovernanceStore:
             connection.execute("INSERT OR IGNORE INTO schema_migrations (name, applied_at) VALUES (?, ?)", ("phase1-monitoring-metrics", _now()))
             if "source_json" not in {row[1] for row in connection.execute("PRAGMA table_info(monitoring_events)")}:
                 connection.execute("ALTER TABLE monitoring_events ADD COLUMN source_json TEXT")
+            connection.execute("CREATE INDEX IF NOT EXISTS evaluation_case_run_question ON evaluation_case_results(run_id,question_id)")
             connection.execute("CREATE INDEX IF NOT EXISTS probe_question_latest ON probe_results(question_id,id)")
             connection.execute("CREATE INDEX IF NOT EXISTS qc_question_latest ON qc_results(question_id,id)")
             connection.execute("CREATE INDEX IF NOT EXISTS quality_audit_latest ON question_quality_audits(question_id,id)")
@@ -381,6 +382,27 @@ class GovernanceStore:
                 'attention_reasons':remaining if delegated else reasons, 'attention_categories':self.attention_categories(remaining if delegated else reasons),
                 'disclosed_retrieval_risk':accepted_retrieval if delegated else None,'quality_audit':audit,'quality_audit_created_at':item['audit_created_at']})
         return result
+
+    def working_generation_run(self):
+        """Resolve the working version by persisted membership and Corpus, never row age."""
+        fingerprint = manifest_identity(current_manifest())
+        with self.connection() as connection:
+            rows = connection.execute("""SELECT r.id,r.status,r.profile_json,r.question_ids_json,
+                json_extract(a.hard_validation_json,'$.corpus_fingerprint') AS fingerprint,
+                json_extract(a.hard_validation_json,'$.slot_persistence_v1') AS slots
+                FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id
+                ORDER BY r.created_at DESC,r.rowid DESC""").fetchall()
+        for row in rows:
+            run = {**dict(row), 'profile':_load(row['profile_json'],{}), 'question_ids':_load(row['question_ids_json'],[])}
+            if row['fingerprint'] and _load(row['fingerprint'],{}) != fingerprint:
+                continue
+            if row['slots'] or row['status']=='completed' and len(run['question_ids'])==self._expected_count(run):
+                return run
+        return None
+
+    def working_pool_rows(self):
+        run = self.working_generation_run()
+        return self.candidate_rows(run['question_ids']) if run else []
 
     def active_pool_rows(self):
         rows = self.candidate_rows()
@@ -612,24 +634,24 @@ class GovernanceStore:
             raise ValueError("本轮测试集与 Probe / QC 尚未完成，部分 Candidate 仅可查看")
 
     def dataset_summary(self):
-        runs = [run for run in self.generation_runs(qualification=False) if run["artifacts"]["hard_validation"].get("slot_persistence_v1") or run["status"] == "completed" and len(run["question_ids"]) == self._expected_count(run)]
-        current = runs[0] if runs else None
-        rows = [self.question(question_id) for question_id in current["question_ids"]] if current else []
-        all_questions = self.questions()
+        current = self.working_generation_run()
+        ids = current['question_ids'] if current else []
+        with self.connection() as connection:
+            rows = connection.execute(f"SELECT stage,review_status,test_category FROM questions WHERE id IN ({','.join('?' for _ in ids)})",ids).fetchall() if ids else []
+            legacy, historical = connection.execute("""SELECT
+                sum(json_extract(raw_json,'$.generation_run_id') IS NULL),
+                sum(json_extract(raw_json,'$.generation_run_id') IS NOT NULL AND json_extract(raw_json,'$.generation_run_id') != ?)
+                FROM questions""",(current['id'] if current else '',)).fetchone()
         return {
-            "generation_run_id": current["id"] if current else None,
-            "corpus_fingerprint": current["artifacts"]["hard_validation"].get("corpus_fingerprint") if current else None,
-            "total": len(rows),
-            "expected_count": self._expected_count(current) if current else 0,
-            "generation_status": current["status"] if current else None,
-            "positive": sum(row["test_category"] == "positive" for row in rows),
-            "negative": sum(row["test_category"] == "negative" for row in rows),
-            "ablation": sum(row["test_category"] == "ablation" for row in rows),
-            "approved": sum(row["stage"] == "golden" for row in rows),
-            "pending_review": sum(row["review_status"] == "human_review_pending" for row in rows),
-            "needs_revision": sum(row["review_status"] == "needs_revision" for row in rows),
-            "legacy_total": sum(row["raw"].get("generation_run_id") is None for row in all_questions),
-            "historical_run_total": sum(row["raw"].get("generation_run_id") not in {None, current["id"] if current else None} for row in all_questions),
+            'generation_run_id':current['id'] if current else None,
+            'corpus_fingerprint':_load(current['fingerprint'],None) if current else None,
+            'total':len(rows), 'expected_count':self._expected_count(current) if current else 0,
+            'generation_status':current['status'] if current else None,
+            **{group:sum(row['test_category']==group for row in rows) for group in ('positive','negative','ablation')},
+            'approved':sum(row['stage']=='golden' for row in rows),
+            'pending_review':sum(row['review_status']=='human_review_pending' for row in rows),
+            'needs_revision':sum(row['review_status']=='needs_revision' for row in rows),
+            'legacy_total':legacy or 0, 'historical_run_total':historical or 0,
         }
 
     @staticmethod
@@ -1541,9 +1563,18 @@ class GovernanceStore:
             connection.execute("INSERT INTO dataset_versions (id, status, source, snapshot_json, created_at) VALUES (?, ?, ?, ?, ?)", (version_id, "approved", "human_review", _json(snapshot), _now()))
         return {"id": version_id, **snapshot}
 
-    def dataset_snapshots(self):
+    @staticmethod
+    def snapshot_summary(snapshot):
+        return {**{key:value for key,value in snapshot.items() if key not in {'questions','coverage_plan'}},
+            'questions':[{key:q[key] for key in ('id','test_category','evaluation_group') if key in q} for q in snapshot.get('questions',[])],
+            'coverage_plan':{'planner_version':snapshot.get('coverage_plan',{}).get('planner_version')} if snapshot.get('coverage_plan') else None}
+
+    def dataset_snapshots(self, *, light=False):
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM dataset_versions WHERE status = 'approved' ORDER BY created_at DESC").fetchall()
+        if light:
+            return [{**{key:row[key] for key in row.keys() if key!='snapshot_json'},
+                'snapshot':{'id':row['id'],**self.snapshot_summary(_load(row['snapshot_json'],{}))}} for row in rows]
         return [{**dict(row), "snapshot": {"id": row["id"], **_load(row["snapshot_json"], {})}} for row in rows]
 
     def create_generation_snapshot(self, generation_run_id: str):
@@ -1902,7 +1933,17 @@ class GovernanceStore:
             rows=connection.execute("SELECT id,status,run_mode,data_source,dataset_version_id,config_json,judge_json,json_remove(result_json,'$.checkpoints') result_json,error_message,created_at,completed_at FROM evaluation_runs"+(" WHERE status IN ('queued','running')" if active_only else '')+" ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?",(limit,(page-1)*limit)).fetchall()
         return [{**{k:row[k] for k in row.keys() if not k.endswith('_json')},'config':_load(row['config_json'],{}),'judge':_load(row['judge_json'],{}),'result':_load(row['result_json'],{})} for row in rows]
 
-    def evaluation_run(self, run_id: str):
+    def evaluation_run(self, run_id: str, *, light=False):
+        if light:
+            with self.connection() as connection:
+                row = connection.execute("""SELECT id,status,run_mode,data_source,dataset_version_id,config_json,judge_json,
+                    json_remove(result_json,'$.checkpoints') AS result_json,
+                    dataset_snapshot_json,error_message,created_at,completed_at FROM evaluation_runs WHERE id=?""",(run_id,)).fetchone()
+            if row is None:return None
+            snapshot = self.snapshot_summary(_load(row['dataset_snapshot_json'],{}))
+            return {**{k:row[k] for k in row.keys() if not k.endswith('_json')},
+                'result':_load(row['result_json'],{}),'config':_load(row['config_json'],{}),
+                'judge':_load(row['judge_json'],{}),'dataset_snapshot':snapshot}
         with self.connection() as connection:
             row=connection.execute('SELECT * FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
         return {**dict(row), 'result':_load(row['result_json'],{}), 'config':_load(row['config_json'],{}), 'judge':_load(row['judge_json'],{})} if row else None
@@ -1922,7 +1963,7 @@ class GovernanceStore:
             return {**identity, "baseline_unavailable_reason": "Corpus 已变化；请创建并确认新的 Golden 测试集及 Baseline"}
         identity["requires_new_golden"] = False
         # Missing run_target is classified by persisted execution evidence, never by NULL alone.
-        rows = connection.execute("SELECT * FROM evaluation_runs WHERE status='completed' AND run_mode='real' AND data_source='real' AND dataset_version_id=? AND coalesce(CASE WHEN json_valid(config_json) THEN json_extract(config_json,'$.run_target') END,'baseline')!='sandbox_candidate' ORDER BY created_at DESC, rowid DESC", (golden["id"],))
+        rows = connection.execute("SELECT id,config_json,judge_json,json_remove(result_json,'$.checkpoints') AS result_json,dataset_snapshot_json,error_message,completed_at FROM evaluation_runs WHERE status='completed' AND run_mode='real' AND data_source='real' AND dataset_version_id=? AND coalesce(CASE WHEN json_valid(config_json) THEN json_extract(config_json,'$.run_target') END,'baseline')!='sandbox_candidate' ORDER BY created_at DESC, rowid DESC", (golden["id"],))
         for row in rows:
             config, judge, result = _load(row["config_json"], {}), _load(row["judge_json"], {}), _load(row["result_json"], {})
             frozen = _load(row["dataset_snapshot_json"], {})

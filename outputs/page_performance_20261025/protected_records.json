@@ -1,0 +1,55 @@
+{
+  "snapshot": {
+    "id": "GD-20261015135415953347",
+    "sha256": "31ad9c589d18b4d7d046a06374a0f1896a587a507fee585e0080c9a966a91a82",
+    "same_as_backup": true,
+    "question_count": 50,
+    "working_run_id": "GGEN-20261015110926448917",
+    "same_working_members": true
+  },
+  "baseline": {
+    "id": "EVAL-20261021141811373593",
+    "overall": 91.5,
+    "bad_case_count": 10,
+    "gates_passed": 11,
+    "case_count": 50
+  },
+  "candidates": [
+    {
+      "id": "EXP-RECOVERY-20261022T0649135884120000-R1-A",
+      "status": "evaluated",
+      "completed": 50,
+      "total": 50,
+      "case_count": 50,
+      "config_sha256": "41b85364f966d872a9cec0c6cc7dc95c3fdec482bbff509dfe6bea107f49fe99",
+      "reasoning_sha256": "8e7868415bd6f3079c1cc9ab00c78fc8485d80fa2247b0d37c21b354099abb54",
+      "result_sha256": "5dd410f9c12cd9a299dea87da0842a452b3ca3c4b5b15d1eceb264d7d1b4a967",
+      "regression_sha256": "e9330d8a4791cb0d5f6f6f851ab44541750c1527998c7c543627060a9f424fcf",
+      "same_as_backup": true
+    },
+    {
+      "id": "EXP-RECOVERY-20261022T0649135884120000-R1-B",
+      "status": "evaluated",
+      "completed": 50,
+      "total": 50,
+      "case_count": 50,
+      "config_sha256": "8a06067e78c958b859b82f431d372ae5645055bae6d8553a68cb165e35ea5f1d",
+      "reasoning_sha256": "1f7dd2f9b4fa610185c861c1e45c0ea9f62650e388e6ab7958e37309ab966221",
+      "result_sha256": "40bd47656a75b433f5a7a324e1bed83da00b80389e3ae1841f3fcb8fd51543b7",
+      "regression_sha256": "f76cd0b9002a1e29b229382dc4797f6115c6b0830cdffa5a9673cb82ed2f2d5b",
+      "same_as_backup": true
+    },
+    {
+      "id": "EXP-RECOVERY-20261022T0649135884120000-R1-C",
+      "status": "evaluated",
+      "completed": 50,
+      "total": 50,
+      "case_count": 50,
+      "config_sha256": "9b43e96d41226ca20849bfd71be8cc834e058fbd328d81ded947d0a44875bc76",
+      "reasoning_sha256": "b0fb450d3d23b397b9944dfb0e0eaec812dbca9ce80259b419e9f16a95e1944a",
+      "result_sha256": "9b756d0768eb2b0d47ffd9c6cd70707ab77c5fad423609863235fa1fc754dab5",
+      "regression_sha256": "7dd1b0020d0a1a837ac509ca4e3f59a1a5a978a71391db6928511ab7705849e9",
+      "same_as_backup": true
+    }
+  ]
+}

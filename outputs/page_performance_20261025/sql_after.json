@@ -1,0 +1,69 @@
+[
+  {
+    "name": "current_baseline_identity",
+    "seconds": 0.05090366702643223,
+    "queries": 5,
+    "result": {
+      "current_baseline_id": "EVAL-20261021141811373593",
+      "current_experiment_id": "EXP-RECOVERY-20261022T0649135884120000",
+      "current_golden_id": "GD-20261015135415953347",
+      "current_corpus_fingerprint": {
+        "sources": {
+          "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+          "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+          "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b",
+          "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+        },
+        "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+        "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+        "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+        "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+        "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e"
+      },
+      "baseline_unavailable_reason": null,
+      "requires_new_golden": false,
+      "requires_policy_upgrade": false
+    },
+    "profile": "         5320 function calls (5116 primitive calls) in 0.051 seconds\n\n   Ordered by: cumulative time\n   List reduced from 278 to 18 due to restriction <18>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n      2/1    0.001    0.001    0.051    0.051 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:1944(current_baseline_identity)\n        1    0.000    0.000    0.023    0.023 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/corpus.py:210(current_manifest)\n        4    0.000    0.000    0.022    0.005 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/corpus.py:199(source_fingerprint)\n       41    0.017    0.000    0.017    0.000 {method 'update' of '_hashlib.HASH' objects}\n        7    0.000    0.000    0.015    0.002 /Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/__init__.py:304(loads)\n        6    0.000    0.000    0.015    0.002 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:38(_load)\n        7    0.000    0.000    0.015    0.002 /Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:340(decode)\n        7    0.015    0.002    0.015    0.002 /Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:351(raw_decode)\n        5    0.007    0.001    0.007    0.001 {method 'execute' of 'sqlite3.Connection' objects}\n       49    0.005    0.000    0.005    0.000 {method 'read' of '_io.BufferedReader' objects}\n      5/1    0.000    0.000    0.004    0.004 <frozen importlib._bootstrap>:1360(_find_and_load)\n      5/1    0.000    0.000    0.004    0.004 <frozen importlib._bootstrap>:1308(_find_and_load_unlocked)\n      5/1    0.000    0.000    0.004    0.004 <frozen importlib._bootstrap>:914(_load_unlocked)\n      4/1    0.000    0.000    0.004    0.004 <frozen importlib._bootstrap_external>:753(exec_module)\n       45    0.000    0.000    0.004    0.000 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/corpus.py:205(<lambda>)\n     12/2    0.000    0.000    0.004    0.002 <frozen importlib._bootstrap>:483(_call_with_frames_removed)\n      4/1    0.000    0.000    0.004    0.004 {built-in method builtins.exec}\n        1    0.000    0.000    0.004    0.004 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/evaluation_contract.py:1(<module>)\n\n\n"
+  },
+  {
+    "name": "dataset_summary",
+    "seconds": 0.043212874996243045,
+    "queries": 3,
+    "result": {
+      "generation_run_id": "GGEN-20261015110926448917",
+      "corpus_fingerprint": {
+        "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+        "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+        "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+        "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+        "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+        "sources": {
+          "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+          "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+          "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+          "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+        }
+      },
+      "total": 50,
+      "expected_count": 50,
+      "generation_status": "completed",
+      "positive": 20,
+      "negative": 20,
+      "ablation": 10,
+      "approved": 50,
+      "pending_review": 0,
+      "needs_revision": 0,
+      "legacy_total": 0,
+      "historical_run_total": 156
+    },
+    "profile": "         1015 function calls in 0.043 seconds\n\n   Ordered by: cumulative time\n   List reduced from 105 to 18 due to restriction <18>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n        1    0.000    0.000    0.043    0.043 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:636(dataset_summary)\n        1    0.000    0.000    0.040    0.040 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:386(working_generation_run)\n        1    0.000    0.000    0.035    0.035 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/corpus.py:210(current_manifest)\n        4    0.000    0.000    0.034    0.009 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/corpus.py:199(source_fingerprint)\n       41    0.018    0.000    0.018    0.000 {method 'update' of '_hashlib.HASH' objects}\n       45    0.000    0.000    0.014    0.000 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/corpus.py:205(<lambda>)\n       45    0.014    0.000    0.014    0.000 {method 'read' of '_io.BufferedReader' objects}\n        3    0.007    0.002    0.007    0.002 {method 'execute' of 'sqlite3.Connection' objects}\n        5    0.002    0.000    0.002    0.000 {method '__exit__' of '_io._IOBase' objects}\n        4    0.000    0.000    0.001    0.000 {built-in method builtins.next}\n        4    0.000    0.000    0.001    0.000 /tmp/rag_profile.py:8(connection)\n        2    0.000    0.000    0.001    0.000 /Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py:136(__enter__)\n        2    0.001    0.000    0.001    0.000 {built-in method _sqlite3.connect}\n        2    0.000    0.000    0.000    0.000 {method 'fetchall' of 'sqlite3.Cursor' objects}\n        2    0.000    0.000    0.000    0.000 /Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py:145(__exit__)\n        2    0.000    0.000    0.000    0.000 {method 'close' of 'sqlite3.Connection' objects}\n        5    0.000    0.000    0.000    0.000 /Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py:763(open)\n        5    0.000    0.000    0.000    0.000 {built-in method _io.open}\n\n\n"
+  },
+  {
+    "name": "working_pool_rows",
+    "seconds": 0.1472870419966057,
+    "queries": 5,
+    "result": 50,
+    "profile": "         8836 function calls in 0.147 seconds\n\n   Ordered by: cumulative time\n   List reduced from 113 to 18 due to restriction <18>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n        1    0.000    0.000    0.147    0.147 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:403(working_pool_rows)\n        1    0.014    0.014    0.119    0.119 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:301(candidate_rows)\n        5    0.055    0.011    0.055    0.011 {method 'execute' of 'sqlite3.Connection' objects}\n        2    0.000    0.000    0.052    0.026 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/corpus.py:210(current_manifest)\n        8    0.000    0.000    0.051    0.006 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/corpus.py:199(source_fingerprint)\n       82    0.040    0.000    0.040    0.000 {method 'update' of '_hashlib.HASH' objects}\n        1    0.000    0.000    0.028    0.028 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:386(working_generation_run)\n        2    0.012    0.006    0.012    0.006 {method 'fetchall' of 'sqlite3.Cursor' objects}\n       90    0.000    0.000    0.010    0.000 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/corpus.py:205(<lambda>)\n       90    0.010    0.000    0.010    0.000 {method 'read' of '_io.BufferedReader' objects}\n      357    0.000    0.000    0.009    0.000 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:38(_load)\n      359    0.000    0.000    0.008    0.000 /Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/__init__.py:304(loads)\n      359    0.001    0.000    0.008    0.000 /Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:340(decode)\n      359    0.007    0.000    0.007    0.000 /Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:351(raw_decode)\n       50    0.000    0.000    0.004    0.000 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:1725(_quality_content)\n       50    0.001    0.000    0.003    0.000 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:247(_row)\n       50    0.000    0.000    0.003    0.000 /Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/app/governance.py:34(_json)\n       50    0.000    0.000    0.003    0.000 /Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/__init__.py:185(dumps)\n\n\n"
+  }
+]

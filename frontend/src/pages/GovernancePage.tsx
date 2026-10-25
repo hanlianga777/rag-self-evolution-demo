@@ -28,7 +28,7 @@ export function GovernancePage({ data }: { data: any }) {
   const refreshTicket = useRef(0);
   const [profile, setProfile] = useState<"mini" | "medium" | "full">("mini");
   const [historyPage, setHistoryPage] = useState(0);
-  const [items, setItems] = useState<Candidate[]>(data.dataset || []);
+  const items: Candidate[] = data.dataset || [];
   const [runs, setRuns] = useState<Candidate[]>(goldenCached<Candidate[]>(cacheIdentity, "/api/governance/generation-runs?light=true") || data.generationRuns || []);
   const [snapshots, setSnapshots] = useState<Candidate[]>(data.snapshots || []);
   const [revisions, setRevisions] = useState<Candidate[]>([]);
@@ -89,7 +89,7 @@ export function GovernancePage({ data }: { data: any }) {
     setSyncing(true);
     try {
       const [generationRuns, goldenSnapshots] = await Promise.all([
-        goldenFetch<Candidate[]>(cacheIdentity, "/api/governance/generation-runs?light=true"), goldenFetch<Candidate[]>(cacheIdentity, "/api/governance/snapshots"),
+        goldenFetch<Candidate[]>(cacheIdentity, "/api/governance/generation-runs?light=true"), goldenFetch<Candidate[]>(cacheIdentity, "/api/governance/snapshots?light=true"),
       ]);
       if (ticket !== refreshTicket.current) return;
       setRuns(generationRuns); setSnapshots(goldenSnapshots);
@@ -106,7 +106,7 @@ export function GovernancePage({ data }: { data: any }) {
   useEffect(() => {
     if (!data.generationRuns) void reload().catch(reason => setError(errorMessage(reason)));
     else { void loadReview(data.generationRuns[0]).catch(reason => setError(errorMessage(reason))); if (data.generationRuns[0]?.question_ids?.length === (data.generationRuns[0]?.profile?.expected_count || 20)) void getJson<Candidate[]>("/api/governance/revisions").then(value => setRevisions(Array.isArray(value) ? value : [])).catch(() => {}); }
-  }, [data.generationRuns]);
+  }, [data.generationRuns, data.dataset]);
   useEffect(() => {
     if ((!running && !qualityRunning) || !workRun?.id) return;
     let cancelled = false;
@@ -249,5 +249,5 @@ export function GovernancePage({ data }: { data: any }) {
 }
 
 function QuestionTable({ rows, onDetail, paging, resetKey }: { rows: Candidate[]; onDetail: (row: Candidate) => void; paging?: any; resetKey?: string }) {
-  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><table><thead><tr><th>#</th><th>类型</th><th>问题</th><th>Probe</th><th>QC</th><th>资格 / 关注原因</th><th>操作</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} tabIndex={0} onClick={() => onDetail(row)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); onDetail(row); } }}><td>{row.slot || row.id}</td><td><Badge tone={row.test_category === "negative" ? "warning" : "neutral"}>{row.test_category ? displayText(row.test_category) : "未记录"}</Badge><small className="question-provenance">{(row.construction_type || row.raw?.construction_type) && `${row.construction_type || row.raw?.construction_type} · `}{row.raw?.source === "business_import" ? "业务导入" : row.raw?.generation_run_id ? "AI 生成" : "历史来源"}</small></td><td><TruncatedText lines={2}>{row.question}</TruncatedText></td><td>{probeLabel(row.probe_status)}</td><td>{qcLabel(row.qc_status)}{row.qc?.priority === "P1" ? " · P1" : ""}</td><td>{row.qualification_status === "machine_qualified" ? "机器合格" : row.qualification_status === "human_approved" ? "人工通过" : row.qualification_status === "owner_delegated_approved" ? "所有者委托 AI 审核" : row.attention_reasons?.[0] || reviewLabel(row)}</td><td><button className="secondary" onClick={() => onDetail(row)}>{row.failed ? "查看错误" : "查看详情"}</button></td></tr>)}{!rows.length && <tr><td colSpan={7} className="empty-state">暂无对应数据。</td></tr>}</tbody></table></ScrollablePagedTable>;
+  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><table><thead><tr><th>#</th><th>类型</th><th>问题</th><th>Probe</th><th>QC</th><th>资格 / 关注原因</th><th>操作</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} tabIndex={0} onClick={() => onDetail(row)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); onDetail(row); } }}><td>{row.slot || row.id}</td><td><Badge tone={row.test_category === "negative" ? "warning" : "neutral"}>{row.test_category ? displayText(row.test_category) : "未记录"}</Badge><small className="question-provenance">{(row.construction_type || row.raw?.construction_type) && `${row.construction_type || row.raw?.construction_type} · `}{row.raw?.source === "business_import" ? "业务导入" : row.raw?.generation_run_id ? "AI 生成" : "历史来源"}</small></td><td><TruncatedText lines={2}>{row.question}</TruncatedText></td><td>{probeLabel(row.probe_status)}</td><td>{qcLabel(row.qc_status)}{row.qc?.priority === "P1" ? " · P1" : ""}</td><td>{row.qualification_status === "machine_qualified" ? "机器合格" : row.qualification_status === "human_approved" ? "人工通过" : row.qualification_status === "owner_delegated_approved" ? "所有者委托 AI 审核" : row.attention_reasons?.[0] || reviewLabel(row)}</td><td><button className="secondary" onClick={event => { event.stopPropagation(); onDetail(row); }}>{row.failed ? "查看错误" : "查看详情"}</button></td></tr>)}{!rows.length && <tr><td colSpan={7} className="empty-state">暂无对应数据。</td></tr>}</tbody></table></ScrollablePagedTable>;
 }

@@ -1,0 +1,5 @@
+Frontend: 46 files, 266 tests passed (vitest run).
+Backend: 32 tests passed (test_page_performance, test_page_loading, test_v14_identity, test_pool_business_closure).
+Build: tsc -b && vite build passed.
+Backend test environment: isolated /tmp/rag-perf-test index/documents/uploads, missing .env; api_fixture creates temporary RAG_DEMO_DB_PATH before app import.
+No Provider calls or formal business writes.

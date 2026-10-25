@@ -156,7 +156,6 @@ button, a, summary { touch-action: manipulation; }
 .release-actions button { white-space: nowrap; }
 .release-list .empty-state p { margin: 0 0 12px; }
 .chart { height: 220px; }
-.recharts-rectangle { fill: #263c57 !important; }
 
 table { border-collapse: collapse; font-size: 12px; width: 100%; }
 th { border-bottom: 1px solid var(--line); color: #7a8797; font-size: 12px; font-weight: 650; letter-spacing: .01em; padding: 0 10px 10px; text-align: left; text-transform: none; vertical-align: top; }

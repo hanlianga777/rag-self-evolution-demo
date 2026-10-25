@@ -1,0 +1,286 @@
+{
+  "navigation": [
+    {
+      "hash": "#knowledge",
+      "label": "知识库",
+      "seconds": 0.3922
+    },
+    {
+      "hash": "#settings",
+      "label": "Pipeline 配置",
+      "seconds": 0.1992
+    },
+    {
+      "hash": "#governance",
+      "label": "Golden Dataset",
+      "seconds": 0.2967
+    },
+    {
+      "hash": "#evaluation",
+      "label": "Baseline",
+      "seconds": 2.8144
+    },
+    {
+      "hash": "#evolution",
+      "label": "Agent 工作台",
+      "seconds": 4.3357
+    },
+    {
+      "hash": "#versions",
+      "label": "发布",
+      "seconds": 1.8039
+    },
+    {
+      "hash": "#verification",
+      "label": "问答验证",
+      "seconds": 1.2932
+    },
+    {
+      "hash": "#overview",
+      "label": "RAG 自进化项目概览",
+      "seconds": 0.7959
+    }
+  ],
+  "requests": [
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/overview?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/documents",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/dataset?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluation?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/optimization?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/revisions?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/overview?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/documents",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/dataset?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluation?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/optimization?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/revisions?active_only=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/overview?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/documents",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/pipeline",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/pipeline",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/documents",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/pipeline",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/dataset?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/generation-runs?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/snapshots",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/governance/candidates?run_id=GGEN-20261015110926448917&status=attention&group=all&limit=30&offset=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluation?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/bad-cases",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/optimization",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations/EVAL-20261021141811373593/judge-replay/preflight",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations/EVAL-20261021141811373593/judge-replay/preflight",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluation/preflight?resume_source_id=EVAL-20261021141811373593",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluation?active_task=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations/EVAL-20261021141811373593",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluation?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/bad-cases",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/optimization",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/pipeline",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/pipeline",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluation?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/optimization",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/versions",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/bad-cases",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/versions",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/readiness",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/monitoring",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/workspace",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/overview?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/documents",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/dataset?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/evaluation?light=true",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:8010/api/optimization?light=true",
+      "method": "GET"
+    }
+  ],
+  "errors": [],
+  "first": 1.2241,
+  "refresh": 0.8509,
+  "body": "跳转到主内容\nRAG Evolution\nRAG 自进化项目概览\n知识库\nPipeline 配置\nGolden Dataset\nBaseline\nAgent 工作台\n发布\n问答验证\nRAG 自进化项目概览\n\n评测驱动的 RAG 持续优化与版本决策系统\n\n稳定 Golden Dataset 评测 Baseline，Optimization Agent 基于 Bad Case 生成受控实验，通过 Sandbox / Regression 后人工发布。\n\n项目概览\n业务架构\n技术架构\n当前下一步\n完成调优决策\n\n查看 Sandbox、Gate 2 与 Composite D 的结果。\n\n完成调优决策\n全链路阶段\n\n当前新版本链路\n\n知识库\n4 Documents · 368 Child Chunks\n已完成\nPipeline\nKnowledge Pipeline V2 · MinerU · Parent-Child · text-embedding-v4 · qwen3-rerank\n已完成\nGolden Dataset\n已冻结 · 50 题 · 正向 20 / 消融 10 / 负向 20\n已完成\nBaseline\n评测完成 · 11/11 Hard Gate · 群组门槛通过 · 10 Bad Case\n已完成\nOptimization Agent\n进行中\n当前阶段\nRelease\n待确认\n待开始\nLegacy Production · 当前线上旧版本\n仍在服务 · 尚未迁移至新 Knowledge Pipeline\n查看线上版本"
+}

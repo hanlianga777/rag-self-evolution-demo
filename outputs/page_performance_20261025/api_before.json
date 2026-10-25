@@ -1,0 +1,86 @@
+[
+  {
+    "path": "/api/workspace",
+    "seconds": 0.2494,
+    "bytes": 1120,
+    "status": 200
+  },
+  {
+    "path": "/api/overview?light=true",
+    "seconds": 0.5012,
+    "bytes": 1308420,
+    "status": 200
+  },
+  {
+    "path": "/api/documents",
+    "seconds": 0.0024,
+    "bytes": 2174,
+    "status": 200
+  },
+  {
+    "path": "/api/dataset?light=true",
+    "seconds": 0.733,
+    "bytes": 262652,
+    "status": 200
+  },
+  {
+    "path": "/api/evaluation?light=true",
+    "seconds": 0.0766,
+    "bytes": 730253,
+    "status": 200
+  },
+  {
+    "path": "/api/bad-cases",
+    "seconds": 1.2579,
+    "bytes": 1737227,
+    "status": 200
+  },
+  {
+    "path": "/api/optimization?light=true",
+    "seconds": 0.2071,
+    "bytes": 3305808,
+    "status": 200
+  },
+  {
+    "path": "/api/optimization",
+    "seconds": 1.5763,
+    "bytes": 6692907,
+    "status": 200
+  },
+  {
+    "path": "/api/versions",
+    "seconds": 0.0064,
+    "bytes": 1137,
+    "status": 200
+  },
+  {
+    "path": "/api/readiness",
+    "seconds": 0.0015,
+    "bytes": 118,
+    "status": 200
+  },
+  {
+    "path": "/api/monitoring",
+    "seconds": 0.0567,
+    "bytes": 63856,
+    "status": 200
+  },
+  {
+    "path": "/api/governance/summary",
+    "seconds": 0.0515,
+    "bytes": 839,
+    "status": 200
+  },
+  {
+    "path": "/api/governance/generation-runs?light=true",
+    "seconds": 0.1513,
+    "bytes": 67326,
+    "status": 200
+  },
+  {
+    "path": "/api/governance/candidates",
+    "seconds": 0.1986,
+    "bytes": 42167,
+    "status": 200
+  }
+]

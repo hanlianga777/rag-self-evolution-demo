@@ -271,11 +271,12 @@ def architecture_delete(slot: Literal["business", "technical"]):
     return architecture_metadata(slot)
 
 
-def light_run(run):
-    if not run:return run
-    return {**{k:v for k,v in run.items() if not k.endswith('_json')},
-            'dataset_snapshot':json.loads(run['dataset_snapshot_json']) if 'dataset_snapshot_json' in run else run.get('dataset_snapshot'),
-            'result':{k:v for k,v in run.get('result',{}).items() if k!='checkpoints'}}
+def light_value(value):
+    """List projection only; full audit/detail endpoints keep persisted payloads."""
+    if isinstance(value, list):return [light_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key:light_value(item) for key,item in value.items() if not key.endswith('_json') and key not in {'checkpoints','all_bad_case_audit','target_reference_map','target_diagnosis','comparison'}}
+    return value
 
 
 @app.get("/api/overview")
@@ -283,10 +284,13 @@ def overview(light: bool = False):
     summary = store.dataset_summary()
     production = store.active_production()
     identity = store.current_baseline_identity()
-    baseline = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
-    if light:baseline=light_run(baseline)
+    baseline = store.evaluation_run(identity["current_baseline_id"], light=light) if identity["current_baseline_id"] else None
     triggers = store.optimization_triggers()
-    return {"generation_profiles": GENERATION_PROFILES, "data_source": "real", "production": production, "dataset": summary, "latest_evaluation": baseline, "knowledge": knowledge(), **identity, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
+    knowledge_state = knowledge()
+    if light:
+        knowledge_state = {**knowledge_state, 'index':{key:value for key,value in knowledge_state['index'].items() if key!='coverage'},
+            'coverage':{'profile':knowledge_state['coverage']['profile']} if knowledge_state.get('coverage') else None, 'sample_children':[]}
+    return {"generation_profiles": GENERATION_PROFILES, "data_source": "real", "production": production, "dataset": summary, "latest_evaluation": baseline, "knowledge": knowledge_state, **identity, "monitoring": {"events": len(store.monitoring_events()), "pending_triggers": sum(item["status"] == "pending_human_confirm" for item in triggers)}}
 
 
 @app.get("/api/workspace")
@@ -439,7 +443,8 @@ def document_detail(document_id: str):
 
 @app.get("/api/dataset")
 def dataset(light: bool = False):
-    return [{key:value for key,value in row.items() if key not in {'quality_audit','question'}} for row in store.candidate_rows()] if light else store.questions()
+    rows = store.working_pool_rows()
+    return [{key:value for key,value in row.items() if key not in {'quality_audit','question'}} for row in rows] if light else [store.question(row['id']) for row in rows]
 
 
 @app.get("/api/governance/summary")
@@ -556,7 +561,7 @@ def candidate_list(run_id: str | None = None, offset: int = Query(0, ge=0), limi
     run = store.generation_run(run_id, qualification=False) if run_id else None
     if run_id and run is None:
         raise HTTPException(status_code=404, detail="Generation run not found")
-    rows = store.candidate_rows(run['question_ids']) if run else store.active_pool_rows()
+    rows = store.candidate_rows(run['question_ids']) if run else store.working_pool_rows()
     summary = {'total':len(rows), 'ai':sum(row['raw'].get('source')!='business_import' for row in rows), 'business':sum(row['raw'].get('source')=='business_import' for row in rows),
         'machine_qualified':sum(row['qualification_status'] in {'machine_qualified','human_approved','owner_delegated_approved'} for row in rows),
         'needs_processing':sum(row['qualification_status']=='needs_human_review' and row['probe_status']!='probe_pending' and row['qc_status']!='qc_pending' for row in rows),
@@ -586,9 +591,8 @@ def candidate_detail(question_id: str):
 def generation_runs(light: bool = False):
     if not light:
         return store.generation_runs()
-    with store.connection() as connection:
-        latest = connection.execute("SELECT id FROM golden_generation_runs ORDER BY created_at DESC LIMIT 1").fetchone()
-    runs = [store.generation_run(latest[0])] if latest else []
+    current = store.working_generation_run()
+    runs = [store.generation_run(current['id'])] if current else []
     result = []
     for run in runs[:1]:
         audit = run['artifacts']['hard_validation']
@@ -664,8 +668,8 @@ def export_generation_run(run_id: str, format: Literal["json", "csv", "markdown"
 
 
 @app.get("/api/governance/snapshots")
-def governance_snapshots():
-    return store.dataset_snapshots()
+def governance_snapshots(light: bool = False):
+    return store.dataset_snapshots(light=light)
 
 
 @app.post("/api/governance/aliases", status_code=201, dependencies=[Depends(require_trusted_origin)])
@@ -1256,7 +1260,7 @@ def persisted_evaluation_progress(run):
     if run and run['status']!='completed':
         with store.connection() as connection:
             completed=connection.execute('SELECT count(DISTINCT question_id) FROM evaluation_case_results WHERE run_id=?',(run['id'],)).fetchone()[0]
-        result={**run.get('result',{}),'completed':completed,'total':len(json.loads(run['dataset_snapshot_json']).get('question_ids',[]))}
+        result={**run.get('result',{}),'completed':completed,'total':len((run.get('dataset_snapshot') or json.loads(run.get('dataset_snapshot_json','{}'))).get('question_ids',[]))}
         return {**run,'result':result}
     return run
 
@@ -1264,32 +1268,44 @@ def persisted_evaluation_progress(run):
 @app.get("/api/evaluation")
 def evaluation(active_task: bool = False, light: bool = False):
     identity = store.current_baseline_identity()
-    run = store.evaluation_run(identity["current_baseline_id"]) if identity["current_baseline_id"] else None
-    if active_task:
-        snapshots=store.dataset_snapshots()
-        latest=next((r for r in store.evaluation_runs() if r['config'].get('run_target')=='baseline' and snapshots and r['dataset_version_id']==snapshots[0]['id']),None)
-        if latest:run=persisted_evaluation_progress(latest)
-    if run is None:
-        snapshots=store.dataset_snapshots()
-        snapshot_id=snapshots[0]['id'] if snapshots else None
-        run=next((r for r in store.evaluation_runs() if r['config'].get('run_target')=='baseline' and r['status'] in {'running','partial','failed'} and r['dataset_version_id']==snapshot_id),None)
-    if light:run=light_run(run)
+    run = store.evaluation_run(identity["current_baseline_id"], light=light) if identity["current_baseline_id"] else None
+    if active_task or run is None:
+        with store.connection() as connection:
+            latest = connection.execute("""SELECT id FROM evaluation_runs WHERE dataset_version_id=?
+                AND json_extract(config_json,'$.run_target')='baseline'""" +
+                ("" if active_task else " AND status IN ('running','partial','failed')") +
+                " ORDER BY created_at DESC,rowid DESC LIMIT 1",(identity['current_golden_id'],)).fetchone()
+        if latest:run=persisted_evaluation_progress(store.evaluation_run(latest['id'],light=light))
     return {"runtime_contract":EVALUATION_RUNTIME_CONTRACT, **(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":not policy_current(run.get("judge",{}))} if run else {})}
+
+
+def case_list_row(row, *, light=False):
+    result = {**row['result'],'diagnostic_view':row.get('diagnostic_view') or diagnostic_view(row['result'])}
+    if light:
+        result = {key:value for key,value in result.items() if key!='retrieved_chunks'}
+        result['programmatic_metrics'] = {key:value for key,value in result.get('programmatic_metrics',{}).items() if not isinstance(value,(dict,list)) or key=='evidence_coverage'}
+        judge = result.get('judge_result',{})
+        result['judge_result'] = {key:judge[key] for key in ('correctness','faithfulness','completeness','reason','verdict','behavior_pass') if key in judge}
+        result['judge_result']['checks'] = [{key:check[key] for key in ('requirement','met') if key in check} for check in judge.get('checks',[])]
+    return {**{k:v for k,v in row.items() if k not in {'result_json','diagnostic_view'}},'result':result, **({'details_loaded':False} if light else {})}
 
 
 @app.get("/api/bad-cases")
 @read_view()
-def bad_cases():
+def bad_cases(light: bool = False):
     current=store.current_baseline_identity()['current_baseline_id']
-    return [{**row, "result": {**row["result"], "diagnostic_view": diagnostic_view(row["result"])}} for row in store.bad_case_rows(current) if row["run_id"]==current]
+    return [case_list_row(row,light=light) for row in store.bad_case_rows(current) if row["run_id"]==current]
 
 
 @app.get("/api/bad-cases/{case_id}")
+@read_view()
 def bad_case(case_id: str):
-    for item in store.bad_case_rows():
-        if item["id"] == case_id:
-            return {**item,"result":{**item["result"],"diagnostic_view":diagnostic_view(item["result"])}}
-    raise HTTPException(status_code=404, detail="Bad case not found")
+    with store.connection() as connection:
+        row = connection.execute('SELECT * FROM bad_cases WHERE id=?',(case_id,)).fetchone()
+    if row is None:raise HTTPException(status_code=404, detail="Bad case not found")
+    item = {**dict(row),'result':{**json.loads(row['result_json']),'run_id':row['run_id'],'question_id':row['question_id']}}
+    run = store.evaluation_run(row['run_id'])
+    return {**case_list_row(item),'dataset_snapshot':json.loads(run['dataset_snapshot_json']) if run else {}}
 
 
 def experiment_resume_view(experiment):
@@ -1306,17 +1322,23 @@ def experiment_resume_view(experiment):
 
 @app.get("/api/optimization")
 @read_view()
-def optimization(light: bool = False):
+def optimization(light: bool = False, planning: bool = False):
     identity = store.current_baseline_identity()
-    experiment = store.experiment(identity["current_experiment_id"]) if identity["current_experiment_id"] else None
+    experiment, coverage, rows = None, None, []
+    if identity['current_experiment_id']:
+        if planning or not light:
+            from .agent_coverage import coverage_inputs
+            experiment, _, rows, _, coverage = coverage_inputs(store, identity['current_experiment_id'])
+        else:
+            experiment = store.experiment(identity['current_experiment_id'])
     if experiment is None:
-        return {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"] or "当前 Baseline 尚未运行 Optimization Agent", **identity}
+        return {"status": "not_run", **({"bad_cases":bad_cases(light=True)} if planning else {}), "data_source": "real", "message": identity["baseline_unavailable_reason"] or "当前 Baseline 尚未运行 Optimization Agent", **identity}
     if light:
-        return {**{k:v for k,v in experiment.items() if not k.endswith('_json')},
-                'candidates':[{**{k:v for k,v in c.items() if not k.endswith('_json')},'result':{k:v for k,v in c.get('result',{}).items() if k!='checkpoints'}} for c in experiment['candidates']],
-                'data_source':'real','recommendation':store.recommendation(experiment['id']),**identity}
-    from .agent_coverage import coverage_inputs
-    coverage=coverage_inputs(store,experiment["id"])[-1]
+        result = light_value({**(experiment_resume_view(experiment) if planning else experiment),
+            'data_source':'real','recommendation':store.recommendation(experiment['id']),**identity})
+        if planning:
+            result.update(coverage_plan=coverage, bad_cases=[case_list_row(row,light=True) for row in rows])
+        return result
     return {**experiment_resume_view(experiment), "coverage_plan":coverage, "data_source": "real", "recommendation": store.recommendation(experiment["id"]), **identity}
 
 

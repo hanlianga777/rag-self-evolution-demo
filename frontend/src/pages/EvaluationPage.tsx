@@ -55,6 +55,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   useEffect(()=>{setDiagnosisFilter(allDiagnosis);},[tab]);
   const [run, setRun] = useState<Row>(data.evaluation || {});
   const [badCases, setBadCases] = useState<Row[]>(data.badCases || []);
+  useEffect(() => { setRun(data.evaluation || {}); setBadCases(data.badCases || []); }, [data.evaluation, data.badCases]);
   const [selectedGate, setSelectedGate] = useState<Row | null>(null);
   const [selectedCase, setSelectedCase] = useState<Row | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
@@ -76,9 +77,9 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   },[run.id,run.status]);
 
 
-  useEffect(()=>{let cancelled=false;void Promise.resolve().then(()=>{if(!cancelled)return getJson<Row>('/api/evaluation?active_task=true').then(value=>{if(!cancelled && value.id)setRun(value)}).catch(()=>{});});return()=>{cancelled=true};},[]);
+  useEffect(()=>{let cancelled=false;void Promise.resolve().then(()=>{if(!cancelled)return getJson<Row>('/api/evaluation?active_task=true&light=true').then(value=>{if(!cancelled && value.id)setRun(value)}).catch(()=>{});});return()=>{cancelled=true};},[]);
   useEffect(() => {
-    if (!run.id) return;
+    if (!run.id || run.status === "completed" && tab === "report" && !configOpen && !technicalOpen) return;
     let cancelled = false;
     const poll = async () => {
       if(cancelled)return;
@@ -87,12 +88,12 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
         if (cancelled) return;
         setRun(next);
         if (["queued","running"].includes(next.status)) window.setTimeout(poll, 1000);
-        if (next.status !== "running") { const rows = await getJson<Row[]>("/api/bad-cases"); if (!cancelled) setBadCases(rows); }
+        if (next.status !== "running" && ["queued","running"].includes(run.status)) { const rows = await getJson<Row[]>("/api/bad-cases"); if (!cancelled) setBadCases(rows); }
       } catch (reason) { if (!cancelled) { setError(errorMessage(reason)); window.setTimeout(poll,2000); } }
     };
     void Promise.resolve().then(poll);
     return () => { cancelled = true; };
-  }, [run.id]);
+  }, [run.id, tab, configOpen, technicalOpen, data.evaluation]);
 
   const loadHistory = async (page: number) => {
     setHistoryBusy(true);

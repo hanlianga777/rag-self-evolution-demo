@@ -7,12 +7,12 @@ describe("getJson", () => {
     vi.stubGlobal('fetch',fetcher);
     try {
       await loadAppData(true,'knowledge');
-      expect(fetcher.mock.calls.map(call=>call[0])).not.toContain(apiUrl('/api/optimization'));
+      expect(fetcher.mock.calls.map(call=>call[0])).not.toContain(apiUrl('/api/optimization?light=true&planning=true'));
       expect(fetcher.mock.calls.map(call=>call[0])).not.toContain(apiUrl('/api/bad-cases'));
       fetcher.mockClear();
       await loadAppData(true,'evolution');
-      expect(fetcher.mock.calls.map(call=>call[0])).toContain(apiUrl('/api/optimization'));
-      expect(fetcher.mock.calls.map(call=>call[0])).toContain(apiUrl('/api/bad-cases'));
+      expect(fetcher.mock.calls.map(call=>call[0])).toContain(apiUrl('/api/optimization?light=true&planning=true'));
+      expect(fetcher.mock.calls.map(call=>call[0])).not.toContain(apiUrl('/api/bad-cases'));
       expect(fetcher.mock.calls.map(call=>call[0])).not.toContain(apiUrl('/api/dataset?light=true'));
     } finally { vi.unstubAllGlobals(); }
   });
