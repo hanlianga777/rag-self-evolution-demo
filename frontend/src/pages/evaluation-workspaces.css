@@ -8,14 +8,22 @@
 :is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div {display:grid;grid-template-columns:minmax(130px,1fr) 2fr 60px;gap:12px;align-items:center;}
 :is(.evaluation-page,.evolution-page) meter {width:100%;height:14px;accent-color:var(--card-good-ink);}
 :is(.evaluation-page,.evolution-page) .workbench-status {display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:var(--card-support);}
-.evolution-page .candidate-card-body {display:grid;grid-template-rows:minmax(68px,auto) minmax(95px,auto) minmax(84px,auto) minmax(65px,auto) minmax(65px,auto) minmax(155px,auto);flex:1;overflow:visible;}
-.evolution-page .candidate-story-block {line-height:1.5;min-height:0;overflow:visible;padding:10px 0;border-bottom:1px solid var(--line-soft);}
-.evolution-page .candidate-story-block .truncated-text {overflow:hidden;}
+:is(.evolution-page,.workbench-drawer) .candidate-cards > .candidate-card { height:auto; min-height:0; overflow:hidden; margin-bottom:0; }
+:is(.evolution-page,.workbench-drawer) .candidate-card-header { height:84px; flex:none; gap:8px; overflow:auto; }
+:is(.evolution-page,.workbench-drawer) .candidate-card-body { display:grid; grid-template-rows:90px 150px 90px 80px 80px 190px; flex:none; overflow:visible; margin-top:0; }
+:is(.evolution-page,.workbench-drawer) .candidate-story-block { display:flex; flex-direction:column; min-height:0; min-width:0; border-top:1px solid var(--line-soft); padding:8px 0; line-height:1.5; }
+:is(.evolution-page,.workbench-drawer) .candidate-story-block > .field-label { flex:none; margin:0 0 6px; font-size:var(--card-title); font-weight:700; line-height:1.5; color:var(--ink); }
+:is(.evolution-page,.workbench-drawer) .candidate-field-content { min-height:0; overflow:auto; scrollbar-width:thin; overflow-wrap:anywhere; font-size:var(--card-body); font-weight:400; }
+:is(.evolution-page,.workbench-drawer) .candidate-story-block .candidate-field-content p { line-height:1.5; margin:0 0 4px; }
+:is(.evolution-page,.workbench-drawer) .candidate-field-content p:last-child { margin-bottom:0; }
+:is(.evolution-page,.workbench-drawer) .candidate-card-footer { display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; height:84px; flex:none; border-top:1px solid var(--line-soft); padding-top:8px; }
+:is(.evolution-page,.workbench-drawer) .candidate-card-footer .candidate-card-action { margin:0; padding:0; }
+.workbench-drawer .candidate-cards { grid-template-columns:1fr; }
 .evolution-page .experiment-plan {align-items:stretch;}
 .evolution-page .experiment-plan article {display:flex;flex-direction:column;min-width:0;}
 .evolution-page .experiment-plan article > button {margin-top:auto;}
 :is(.evaluation-page,.evolution-page) .technical-record {white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;font-size:var(--card-body);}
-@media(max-width:700px){.evaluation-page .baseline-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}:is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div{grid-template-columns:minmax(95px,1fr) 1fr 50px;gap:6px;}.evolution-page .candidate-card-body{grid-template-rows:none;}}
+@media(max-width:700px){.evaluation-page .baseline-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}:is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div{grid-template-columns:minmax(95px,1fr) 1fr 50px;gap:6px;}}
 :is(.evaluation-page,.evolution-page) .diagnosis-filters {display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:12px 0 18px;}
 :is(.evaluation-page,.evolution-page) .diagnosis-filters label {display:grid;gap:6px;min-width:150px;flex:1;}
 :is(.evaluation-page,.evolution-page) .detection-notice {margin-top:16px;color:var(--muted);font-size:var(--card-support);}
@@ -129,8 +137,6 @@
 .strategy-hypotheses p {margin:6px 0;}
 .strategy-hypotheses .section-head {margin-bottom:6px;flex-wrap:wrap;gap:8px;}
 .strategy-hypotheses .compact-config-diff {padding:8px 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);}
-.evolution-page.page-shell .candidate-card-body {grid-template-rows:none;}
-.evolution-page.page-shell .candidate-story-block {padding:10px 0;}
 .evolution-page.page-shell .candidate-story-block p {line-height:1.5;}
 .regression-cases-table table {min-width:760px;table-layout:fixed;}
 .regression-cases-table th:first-child {width:34%;}

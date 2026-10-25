@@ -134,7 +134,7 @@ with sync_playwright() as p:
                 assert f'Why：{why}' in page.get_by_role('dialog').inner_text()
                 page.keyboard.press('Escape'); page.get_by_role('dialog').wait_for(state='hidden')
                 checks.append({'name': f'{width}-persisted-why', 'backend_proposal_displayed': True})
-                detail_check(page, 'button:has-text("查看 D 完整报告与 Decision")', f'{width}-d-report-drawer')
+                detail_check(page, 'button:has-text("查看方案与完整报告") >> nth=-1', f'{width}-d-report-drawer')
                 page.get_by_role('button', name='Sandbox', exact=True).click()
                 d_card = page.locator('.sandbox-status-grid article').filter(has_text='Candidate D')
                 assert '不合格' in d_card.inner_text() and 'Hard Gate 11/11' in d_card.inner_text()

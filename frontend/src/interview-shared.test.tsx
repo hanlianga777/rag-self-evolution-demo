@@ -8,7 +8,7 @@ afterEach(() => { document.body.innerHTML = ""; });
 it("compact metrics keeps measured zero tokens and hides absent costs and TTFT", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<ExecutionMetrics compact metrics={{ latency_ms: 0, input_tokens: 0, output_tokens: 2, token_cost: 9 }} />));
-  expect(document.body.textContent).toContain("Input Tokens0");
+  expect(document.body.textContent).toContain("输入 Token0");
   expect(document.body.textContent).not.toContain("未采集");
   expect(document.body.textContent).not.toContain("费用");
   expect(document.body.textContent).not.toContain("TTFT");

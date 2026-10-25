@@ -1,6 +1,10 @@
 const translations: Record<string, string> = {
   "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "所有者委托 AI 审核通过", "ai_agent": "AI 代理",
-  "unclassified": "待分类",
+  "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "query_only": "仅基于查询的重排序", "ON": "开启", "OFF": "关闭",
+  "Grounded": "有据生成", "Completeness": "完整性优先", "Abstention": "谨慎拒答",
+  "Query": "查询处理", "Retrieval": "检索", "Generation": "回答生成",
+  "Pending": "待处理", "pending": "待处理", "needs_human_review": "待人工复核", "machine_qualified": "机器合格",
+  "expected_improvement": "预期收益", "root_cause": "技术根因", "new_failures": "新增失败",
   "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
   "completed": "已完成", "running": "运行中", "queued": "排队中", "evaluating": "评测中",
   "live": "服务回答", "mock": "本地响应", "Ready": "已验证可用", "Configured (Unverified)": "已配置（未验证）", "Unavailable": "不可用", "passed": "通过", "failed": "未通过", "skipped": "未执行",
@@ -45,4 +49,19 @@ const translations: Record<string, string> = {
 
 export function displayText(value: string): string {
   return translations[value] || value.replace("Demo", "运营系统");
+}
+
+// Exact whole-record translations only. Unknown prose stays explicitly marked; originals remain in the audit.
+const savedNarratives: Record<string, string> = {
+  "Increasing top_k from 4 to 6 during context selection will recover the omitted DOC-004-C-00032 requirement for V1G-110926448917-08 and reduce its Ranking omission without changing retrieval or generation stages.": "在上下文选择阶段将 TopK 从 4 调整为 6，假设可以补回 Q08 遗漏的 DOC-004-C-00032 要求，减少排序阶段遗漏；不改变检索和回答生成阶段。",
+  "Recover DOC-004-C-00032 in Final for V1G-110926448917-08, satisfy checks 5, 6, and 8, and preserve baseline gate results.": "预期在 Q08 的最终上下文中补回 DOC-004-C-00032，满足检查项 5、6、8，并保持 Baseline 的 Gate 结果。",
+  "May add noisy context and increase latency; only V1G-110926448113-08 is confirmed eligible, and the remaining 50-question regression plus 11 gates must still pass.": "可能引入上下文噪声并增加延迟；原文仅确认 V1G-110926448113-08 具备资格，仍须通过 50 题 Regression 与 11 项 Gate。",
+  "If V1G-110926448917-08 still fails checks 5/6/8 with DOC-004-C-00032 absent from Final under top_k=6, or if any of the 50-question regression or 11 gates fail, this hypothesis is not supported.": "若 TopK 为 6 时，Q08 的最终上下文仍缺少 DOC-004-C-00032 且检查项 5、6、8 仍失败，或 50 题 Regression、11 项 Gate 中任一项未通过，则该假设不获支持。",
+};
+
+export function narrativeText(value: string): string {
+  const translated = savedNarratives[value] || translations[value];
+  if (translated) return translated;
+  return /[a-z]+(?:[ ,;]+[a-z]+){3}/i.test(value)
+    ? `历史英文原文（未翻译）：${value}` : value;
 }

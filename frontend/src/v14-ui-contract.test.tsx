@@ -234,7 +234,7 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "Regression")?.lastElementChild?.textContent).toBe("未通过");
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "正式资格")?.lastElementChild?.textContent).toBe("不合格");
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "A/B/C/D")!.click());
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "查看 D 完整报告与 Decision")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-cards button")].filter(x => x.textContent === "查看方案与完整报告").at(-1)!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不合格 · Hard Gate：通过");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Regression：未通过");
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayText } from "./display";
+import { displayText, narrativeText } from "./display";
 
 describe("displayText", () => {
   it("keeps API values stable while presenting Chinese UI text", () => {
@@ -27,4 +27,13 @@ describe("displayText", () => {
   it("does not alter an unknown API value", () => {
     expect(displayText("future_status")).toBe("future_status");
   });
+});
+
+it("uses exact saved narrative translations and explicitly retains unfamiliar originals",()=>{
+ const original="Recover DOC-004-C-00032 in Final for V1G-110926448917-08, satisfy checks 5, 6, and 8, and preserve baseline gate results.";
+ expect(narrativeText(original)).toBe("预期在 Q08 的最终上下文中补回 DOC-004-C-00032，满足检查项 5、6、8，并保持 Baseline 的 Gate 结果。");
+ const unseen="A different saved hypothesis must never receive an invented translation.";
+ expect(narrativeText(unseen)).toBe(`历史英文原文（未翻译）：${unseen}`);
+ expect(narrativeText("历史说明："+unseen)).toContain(unseen);
+ expect(narrativeText("扩大候选池，尚未验证。")).toBe("扩大候选池，尚未验证。");
 });

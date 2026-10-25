@@ -281,7 +281,7 @@ def route_acceptance(page, route, width, engine):
         if width >= 1024: attempt(name + '-abc-equal', lambda: equal_boxes(page.locator('.candidate-cards .candidate-card'), footer='.candidate-card-action'), page)
         attempt(name + '-candidate', lambda: drawer_check(page, page.get_by_role('button', name='查看方案与完整报告', exact=True), name + '-candidate'), page)
         attempt(name + '-d-decision', lambda: require('10 / 11' in page.locator('.composite-decision').inner_text() and '保留 Candidate C' in page.locator('.composite-decision').inner_text(), 'Actual saved D failure must retain C'), page)
-        attempt(name + '-d-report', lambda: drawer_check(page, page.get_by_role('button', name='查看 D 完整报告与 Decision', exact=True), name + '-d-report'), page)
+        attempt(name + '-d-report', lambda: drawer_check(page, page.get_by_role('button', name='查看方案与完整报告', exact=True).last, name + '-d-report'), page)
         page.get_by_role('button', name='Sandbox', exact=True).click()
         attempt(name + '-sandbox-four', lambda: require(page.locator('.sandbox-core-table tbody tr').count() == 4 and page.locator('.sandbox-core-table tbody tr td:first-child').all_text_contents() == ['Hard Gate', 'Bad Case', 'Regression', 'Qualification'], 'Sandbox main table has exactly four core rows'), page)
         attempt(name + '-advanced', lambda: drawer_check(page, page.get_by_role('button', name='查看高级指标', exact=True), name + '-advanced'), page)

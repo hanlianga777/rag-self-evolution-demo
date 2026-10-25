@@ -52,7 +52,7 @@ it("captures the same question, shows config inside each answer, and keeps one-s
   expect(document.querySelectorAll(".answer-config")).toHaveLength(0);expect(document.querySelectorAll(".answer-audit details")).toHaveLength(2);
   expect(document.querySelector(".answer-markdown strong")?.textContent).toBe("停机");
   expect(document.body.textContent).toContain("模拟失败");
-  expect(document.querySelectorAll(".answer-metrics-footer")[1].textContent).not.toContain("Input Tokens");expect(document.querySelectorAll(".answer-audit")[1].textContent).toContain("Input Tokens：0");
+  expect(document.querySelectorAll(".answer-metrics-footer")[1].textContent).not.toContain("Input Tokens");expect(document.querySelectorAll(".answer-audit")[1].textContent).toContain("输入 Token：0");
   expect(document.querySelectorAll(".answer-metrics-footer")[1].textContent).not.toContain("历史费用未采集");
   await act(async () => root.unmount());
 });

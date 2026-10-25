@@ -18,7 +18,7 @@ it("Pipeline serves verified memory during revalidation, partitions identities a
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={data} />));
   expect(document.querySelector('[data-parameter="top_k"]')).not.toBeNull();
-  expect(document.body.textContent).not.toContain("Frozen Baseline Snapshot");
+  expect(document.body.textContent).not.toContain("Baseline 冻结快照");
   expect(document.body.textContent).not.toContain("当前 Baseline Strategy");
 });
 it("Frozen Baseline parameters come from the actual evaluation and Draft shows only changed values", async () => {
@@ -26,7 +26,7 @@ it("Frozen Baseline parameters come from the actual evaluation and Draft shows o
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(payload))));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={{}} />));
-  const section = [...document.querySelectorAll('section')].find(node => node.textContent?.includes('Baseline → Draft Diff'))!;
+  const section = [...document.querySelectorAll('section')].find(node => node.textContent?.includes('Baseline → 草稿参数变化'))!;
   expect(section.textContent).toContain('4 → 6');
   expect(section.textContent).not.toContain('CandidateK');
 });

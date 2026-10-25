@@ -22,8 +22,8 @@ it("uses persisted corpus totals and actual index dimensions in six asset cards 
   expect(document.querySelectorAll(".knowledge-strategy-card")).toHaveLength(0);
   expect(document.querySelector(".asset-summary")?.textContent).toContain("384d");
   expect(document.querySelector(".knowledge-notice")?.textContent).toContain("Legacy");
-  expect(document.querySelector(".asset-summary")?.textContent).toContain("9 Pages");
-  expect(document.querySelector(".asset-summary")?.textContent).toContain("检索索引6 Indexed");
+  expect(document.querySelector(".asset-summary")?.textContent).toContain("9 页");
+  expect(document.querySelector(".asset-summary")?.textContent).toContain("检索索引6 已索引");
   expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["文档名", "页数", "Parent Chunks", "Child Chunks", "解析状态", "索引状态", "操作"]);
   expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
   await act(async () => root.unmount());
@@ -33,7 +33,7 @@ it("hides missing index measurements instead of deriving them from chunks", asyn
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: null, indexed_count: null } }), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<KnowledgePage data={{ documents: [{ id: "DOC-1", name: "说明.pdf", pages: 9, chunks: 7, parser: "PyMuPDF", status: "Indexed" }] }} />));
-  expect(document.querySelector(".asset-summary")?.textContent).toContain("检索索引— Indexed");
+  expect(document.querySelector(".asset-summary")?.textContent).toContain("检索索引— 已索引");
   expect(document.querySelector(".asset-summary")?.textContent).not.toContain("512");
   expect(document.querySelector(".asset-summary")?.textContent).toContain("维度未采集");
   await act(async () => root.unmount());

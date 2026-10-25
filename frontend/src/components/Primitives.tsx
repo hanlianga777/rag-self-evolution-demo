@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { displayText } from "../display";
@@ -23,7 +23,8 @@ export function Status({ value }: { value: string }) {
 export function TruncatedText({ children, lines = 3 }: { children: ReactNode; lines?: 2 | 3 }) {
   const id = useId(), ref = useRef<HTMLSpanElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
-  const show = () => { const box = ref.current?.getBoundingClientRect(); if (box) setPosition({ left: Math.max(8, Math.min(box.left, window.innerWidth - 368)), top: Math.max(8, Math.min(box.bottom + 6, window.innerHeight - 210)) }); };
+  const show = () => { const node=ref.current; if (!node || node.scrollHeight<=node.clientHeight && node.scrollWidth<=node.clientWidth) return; const box = node.getBoundingClientRect(); if (box) setPosition({ left: Math.max(8, Math.min(box.left, window.innerWidth - 368)), top: Math.max(8, Math.min(box.bottom + 6, window.innerHeight - 210)) }); };
+  useEffect(()=>{ if(!position)return; const close=(event:Event)=>{if(!(event.target instanceof Element && event.target.closest('[role="tooltip"]')))setPosition(null);}; window.addEventListener("resize",close); document.addEventListener("scroll",close,true); return ()=>{window.removeEventListener("resize",close);document.removeEventListener("scroll",close,true);}; },[position]);
   return <><span ref={ref} tabIndex={0} className={`truncated-text line-clamp-${lines}`} aria-describedby={position ? id : undefined} onMouseEnter={show} onMouseLeave={() => setPosition(null)} onFocus={show} onBlur={() => setPosition(null)} onKeyDown={event => { if (event.key === "Escape") setPosition(null); }}>{children}</span>{position && createPortal(<div id={id} role="tooltip" className="text-tooltip" style={position}>{children}</div>, document.body)}</>;
 }
 
@@ -31,7 +32,7 @@ export function TagList({ tags }: { tags: string[] }) {
   const id = useId(), button = useRef<HTMLButtonElement>(null), popup = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   useEffect(() => { if (!position) return; const close = (event: PointerEvent) => { if (!button.current?.contains(event.target as Node) && !popup.current?.contains(event.target as Node)) setPosition(null); }; const escape = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") setPosition(null); }; document.addEventListener("pointerdown", close); document.addEventListener("keydown", escape); return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", escape); }; }, [position]);
-  return <div className="tag-list">{tags.slice(0, 2).map(tag => <Badge key={tag} tone="warning">{tag}</Badge>)}{tags.length > 2 && <button ref={button} className="badge neutral" aria-expanded={!!position} aria-controls={position ? id : undefined} aria-label={`${tags.length - 2} 个其他标签`} onClick={event => { event.stopPropagation(); const box = button.current?.getBoundingClientRect(); setPosition(position || !box ? null : { left: Math.max(8, Math.min(box.left, window.innerWidth - 368)), top: Math.min(box.bottom + 6, window.innerHeight - 160) }); }}>+{tags.length - 2}</button>}{position && createPortal(<div id={id} ref={popup} role="group" aria-label="其他标签" className="text-tooltip tag-popover" style={position}>{tags.slice(2).map(tag => <p key={tag}>{tag}</p>)}</div>, document.body)}</div>;
+  return <div className="tag-list">{tags.slice(0, 2).map(tag => <Badge key={tag} tone="warning">{tag}</Badge>)}{tags.length > 2 && <button ref={button} className="badge neutral" aria-expanded={!!position} aria-controls={position ? id : undefined} aria-label={`${tags.length - 2} 个其他标签`} onClick={event => { event.stopPropagation(); const box = button.current?.getBoundingClientRect(); setPosition(position || !box ? null : { left: Math.max(8, Math.min(box.left, window.innerWidth - 368)), top: Math.max(8, Math.min(box.bottom + 6, window.innerHeight - 210)) }); }}>+{tags.length - 2}</button>}{position && createPortal(<div id={id} ref={popup} role="group" aria-label="其他标签" className="text-tooltip tag-popover" style={position}>{tags.slice(2).map(tag => <p key={tag}>{tag}</p>)}</div>, document.body)}</div>;
 }
 
 export function FixedTableCard({ children }: { children: ReactNode }) { return <div className="table-scroll fixed-table">{children}</div>; }
@@ -44,6 +45,7 @@ export function CustomSelect({ ariaLabel, value, options, onChange, disabled = f
   const id = useId();
   const host = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(Math.max(0, options.findIndex(option => option.value === value)));
   useEffect(() => {
@@ -56,6 +58,20 @@ export function CustomSelect({ ariaLabel, value, options, onChange, disabled = f
     document.addEventListener("pointerdown", outside); document.addEventListener("keydown", close);
     return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", close); document.removeEventListener("custom-select-open", another); };
   }, [open, id]);
+  useLayoutEffect(()=>{
+    const popup=list.current, button=trigger.current;
+    if(!open || !popup || !button)return;
+    popup.showPopover?.();
+    const box=button.getBoundingClientRect(), below=innerHeight-box.bottom-8, above=box.top-8;
+    const upward=below<Math.min(280,popup.scrollHeight) && above>below;
+    popup.style.width=`${Math.min(Math.max(box.width,180),innerWidth-16)}px`;
+    popup.style.maxHeight=`${Math.min(280,Math.max(40,upward?above:below))}px`;
+    popup.style.left=`${Math.max(8,Math.min(box.left,innerWidth-popup.offsetWidth-8))}px`;
+    popup.style.top=`${upward?Math.max(8,box.top-popup.offsetHeight-4):box.bottom+4}px`;
+    const close=(event:Event)=>{if(!popup.contains(event.target as Node))setOpen(false);};
+    document.addEventListener("scroll",close,true);window.addEventListener("resize",close);
+    return ()=>{document.removeEventListener("scroll",close,true);window.removeEventListener("resize",close);};
+  },[open]);
   const selected = options.find(option => option.value === value);
   const move = (index: number) => setActive(Math.max(0, Math.min(options.length - 1, index)));
   const choose = (option: SelectOption) => { setOpen(false); trigger.current?.focus(); onChange(option.value); };
@@ -73,7 +89,7 @@ export function CustomSelect({ ariaLabel, value, options, onChange, disabled = f
     <button ref={trigger} type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-listbox`} aria-activedescendant={open ? `${id}-option-${active}` : undefined} disabled={disabled} className="custom-select-trigger" onClick={() => { setActive(Math.max(0, options.findIndex(option => option.value === value))); setOpen(current => !current); }} onKeyDown={onKeyDown}>
       <span title={selected?.title || selected?.label}>{selected?.label || placeholder || "请选择"}</span><ChevronDown size={15} aria-hidden="true" />
     </button>
-    {open && <div role="listbox" id={`${id}-listbox`} aria-label={ariaLabel} className="custom-select-listbox">{options.map((option, index) => <div id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value === value} data-value={option.value} className={index === active ? "active" : ""} title={option.title || option.label} onMouseEnter={() => move(index)} onMouseDown={event => event.preventDefault()} onClick={event => { event.preventDefault(); event.stopPropagation(); choose(option); }}><span>{option.label}</span>{option.description && <small>{option.description}</small>}</div>)}</div>}
+    {open && <div ref={list} {...{popover:"manual"}} role="listbox" id={`${id}-listbox`} aria-label={ariaLabel} className="custom-select-listbox">{options.map((option, index) => <div id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value === value} data-value={option.value} className={index === active ? "active" : ""} title={option.title || option.label} onMouseEnter={() => move(index)} onMouseDown={event => event.preventDefault()} onClick={event => { event.preventDefault(); event.stopPropagation(); choose(option); }}><span>{option.label}</span>{option.description && <small>{option.description}</small>}</div>)}</div>}
   </div>;
 }
 

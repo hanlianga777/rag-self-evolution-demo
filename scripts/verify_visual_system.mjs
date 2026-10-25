@@ -112,7 +112,7 @@ try{
  await drawer('agent-history',width,()=>page.getByRole('button',{name:/^历史实验 ·/}).click());
  await click('优化 Agent');await expand();await snap('agent-plan',width);
  await click('A/B/C/D');await snap('candidate-abcd',width);
- await drawer('composite-d-report',width,()=>click('查看 D 完整报告与 Decision'));
+ await drawer('composite-d-report',width,()=>page.getByRole('button',{name:'查看方案与完整报告',exact:true}).last().click());
  await click('Regression');await page.locator('[aria-label="对照Candidate"] button').filter({hasText:'Candidate B'}).click();await page.getByRole('button',{name:'前后对比',exact:true}).waitFor();await snap('regression',width);
  for(const label of ['前后对比','Baseline证据','Candidate证据'])await drawer('regression-'+label,width,()=>click(label));
  await click('Recommendation');await expand();await snap('recommendation',width);

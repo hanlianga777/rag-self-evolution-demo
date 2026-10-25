@@ -1,0 +1,14 @@
+[
+  {
+    "route": "governance",
+    "tab": 0,
+    "label": "测试集 Profile",
+    "box": {
+      "height": 112,
+      "topLayer": true,
+      "width": 250,
+      "x": 1061,
+      "y": 62
+    }
+  }
+]

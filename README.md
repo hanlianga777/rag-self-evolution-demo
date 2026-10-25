@@ -1,3 +1,5 @@
+2026-10-25 UI 整改：Candidate A/B/C/D 与历史方案同构等高、长字段内部滚动；中文枚举/完整英文对照、Hard Gate 贡献题目行及共享浮层统一，正式数据只读、Provider0。见[验收与截图](docs/UI_CONSISTENCY_ACCEPTANCE.md)。
+
 2026-10-25 导航与候选池专项：侧栏常驻、页面快照后台重验、轻量初始化；当前Golden候选管理严格使用Medium50持久化成员，历史数据保留。Provider0，正式Baseline与A/B/C原始结果不变。[性能整改验收](outputs/page_performance_20261025/性能整改验收.md)。
 
 2026-10-25 视觉统一：Baseline、Agent工作台、发布及问答验证的Tab/表格/卡片/Drawer继承Pipeline配置与Golden Dataset现有字体与Card规范；移除后台核对顶部提示，刷新与实际错误保持。Provider0、正式数据只读；见[逐页视觉验收](docs/VISUAL_SYSTEM_ACCEPTANCE.md)。

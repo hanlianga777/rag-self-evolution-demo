@@ -1,0 +1,3545 @@
+{
+  "source": "CUA真实浏览器；fixture前缀为隔离UI数据，不是真实成绩",
+  "checks": [
+    {
+      "name": "candidate-aligned-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "candidate-alignment",
+      "cardMetrics": [
+        {
+          "fields": [
+            {
+              "height": 90,
+              "label": "优化目标",
+              "top": 371.8984375
+            },
+            {
+              "height": 150,
+              "label": "优化策略",
+              "top": 461.8984375
+            },
+            {
+              "height": 90,
+              "label": "参数变化",
+              "top": 611.8984375
+            },
+            {
+              "height": 80,
+              "label": "预期收益",
+              "top": 701.8984375
+            },
+            {
+              "height": 80,
+              "label": "潜在风险",
+              "top": 781.8984375
+            },
+            {
+              "height": 190,
+              "label": "实验结果",
+              "top": 861.8984375
+            }
+          ],
+          "footer": 1059.8984375,
+          "height": 884,
+          "top": 269.8984375
+        },
+        {
+          "fields": [
+            {
+              "height": 90,
+              "label": "优化目标",
+              "top": 371.8984375
+            },
+            {
+              "height": 150,
+              "label": "优化策略",
+              "top": 461.8984375
+            },
+            {
+              "height": 90,
+              "label": "参数变化",
+              "top": 611.8984375
+            },
+            {
+              "height": 80,
+              "label": "预期收益",
+              "top": 701.8984375
+            },
+            {
+              "height": 80,
+              "label": "潜在风险",
+              "top": 781.8984375
+            },
+            {
+              "height": 190,
+              "label": "实验结果",
+              "top": 861.8984375
+            }
+          ],
+          "footer": 1059.8984375,
+          "height": 884,
+          "top": 269.8984375
+        },
+        {
+          "fields": [
+            {
+              "height": 90,
+              "label": "优化目标",
+              "top": 371.8984375
+            },
+            {
+              "height": 150,
+              "label": "优化策略",
+              "top": 461.8984375
+            },
+            {
+              "height": 90,
+              "label": "参数变化",
+              "top": 611.8984375
+            },
+            {
+              "height": 80,
+              "label": "预期收益",
+              "top": 701.8984375
+            },
+            {
+              "height": 80,
+              "label": "潜在风险",
+              "top": 781.8984375
+            },
+            {
+              "height": 190,
+              "label": "实验结果",
+              "top": 861.8984375
+            }
+          ],
+          "footer": 1059.8984375,
+          "height": 884,
+          "top": 269.8984375
+        }
+      ]
+    },
+    {
+      "name": "candidate-b-internal-scroll",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "overview-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "RAG 自进化项目概览",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "overview-tab-0-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "RAG 自进化项目概览",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "overview-tab-1-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "RAG 自进化项目概览",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "overview-tab-2-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "RAG 自进化项目概览",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "knowledge-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "知识库",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "knowledge-tab-0-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "知识库",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "knowledge-tab-1-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "知识库",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "settings-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Frozen",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "0 项受控参数",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Pipeline 配置",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "governance-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Human Gate 1 · 待处理",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "governance-tab-0-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Human Gate 1 · 已确认",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "机器检查完成",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "governance-tab-1-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evaluation-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evaluation-tab-0-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evaluation-tab-1-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evaluation-tab-2-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evolution-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evolution-tab-0-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evolution-tab-1-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evolution-tab-2-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evolution-tab-3-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evolution-tab-4-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "evolution-tab-5-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "versions-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "发布",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "verification-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "verification-问答验证-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "verification-方案对比-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "verification-Monitoring-1440",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "faithfulness-drawer-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "未通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-0-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-1-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "未通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-2-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "未通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-3-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-4-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-5-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-6-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-7-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-8-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-9-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "未通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "gate-10-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "未通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-完整配置快照",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-查看评测依据",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-历史评测",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-case-0",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-case-1",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-case-2",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-case-3",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-case-4",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-case-5",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-case-6",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-case-7",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-case-8",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "baseline-case-9",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "candidate-report-0",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "parameter-drawer-0",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "candidate-report-1",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "parameter-drawer-1",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "candidate-report-2",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "parameter-drawer-2",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-search-space",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-diagnosis-0",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-diagnosis-1",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-diagnosis-2",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-diagnosis-3",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-diagnosis-4",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-diagnosis-5",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-diagnosis-6",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-diagnosis-7",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-diagnosis-8",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "agent-diagnosis-9",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "sandbox-metrics",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "regression-前后对比",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "regression-Baseline证据",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "regression-Candidate证据",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "pipeline-search-space",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Frozen",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "12 项受控参数",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Pipeline 配置",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "golden-profile-dropdown",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Human Gate 1 · 已确认",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "机器检查完成",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "golden-question-drawer",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Human Gate 1 · 已确认",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "机器检查完成",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "hidden",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "golden-history",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Human Gate 1 · 已确认",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "机器检查完成",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "production-config",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "发布",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "release-qualification",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "发布",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "candidate-aligned-1280",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1280,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "name": "candidate-mobile-390",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "candidate-mobile-geometry",
+      "geometry": [
+        {
+          "fields": [
+            "优化目标",
+            "优化策略",
+            "参数变化",
+            "预期收益",
+            "潜在风险",
+            "实验结果"
+          ],
+          "height": 884,
+          "width": 326,
+          "x": 32
+        },
+        {
+          "fields": [
+            "优化目标",
+            "优化策略",
+            "参数变化",
+            "预期收益",
+            "潜在风险",
+            "实验结果"
+          ],
+          "height": 884,
+          "width": 326,
+          "x": 32
+        },
+        {
+          "fields": [
+            "优化目标",
+            "优化策略",
+            "参数变化",
+            "预期收益",
+            "潜在风险",
+            "实验结果"
+          ],
+          "height": 884,
+          "width": 326,
+          "x": 32
+        }
+      ]
+    },
+    {
+      "name": "overview-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "RAG 自进化项目概览",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "overview-tab-0-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "RAG 自进化项目概览",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "overview-tab-1-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "RAG 自进化项目概览",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "overview-tab-2-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "RAG 自进化项目概览",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "knowledge-390",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "知识库",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "knowledge-tab-0-390",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "知识库",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "knowledge-tab-1-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "知识库",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "settings-390",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Frozen",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "0 项受控参数",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Pipeline 配置",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "governance-390",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Human Gate 1 · 已就绪 · 待确认",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "机器检查完成",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "governance-tab-0-390",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Human Gate 1 · 已确认",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "机器检查完成",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "governance-tab-1-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evaluation-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evaluation-tab-0-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evaluation-tab-1-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evaluation-tab-2-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evolution-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evolution-tab-0-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evolution-tab-1-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evolution-tab-2-390",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evolution-tab-3-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evolution-tab-4-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "evolution-tab-5-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "versions-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "发布",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "verification-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "verification-问答验证-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "verification-方案对比-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "verification-Monitoring-390",
+      "badges": [],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "faithfulness-drawer-390-confirmed",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "未通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 844,
+        "overflow": "auto",
+        "width": 390
+      },
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "faithfulness-drawer-390",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "未通过",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 844,
+        "overflow": "auto",
+        "width": 390
+      },
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Baseline",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "fixture-abcd-fields",
+      "source": "isolated-fixture",
+      "fields": [
+        {
+          "fields": [
+            "优化目标",
+            "优化策略",
+            "参数变化",
+            "预期收益",
+            "潜在风险",
+            "实验结果"
+          ],
+          "height": 884,
+          "name": "Candidate A"
+        },
+        {
+          "fields": [
+            "优化目标",
+            "优化策略",
+            "参数变化",
+            "预期收益",
+            "潜在风险",
+            "实验结果"
+          ],
+          "height": 884,
+          "name": "Candidate B"
+        },
+        {
+          "fields": [
+            "优化目标",
+            "优化策略",
+            "参数变化",
+            "预期收益",
+            "潜在风险",
+            "实验结果"
+          ],
+          "height": 884,
+          "name": "Candidate C"
+        },
+        {
+          "fields": [
+            "优化目标",
+            "优化策略",
+            "参数变化",
+            "预期收益",
+            "潜在风险",
+            "实验结果"
+          ],
+          "height": 884,
+          "name": "Candidate D"
+        }
+      ]
+    },
+    {
+      "name": "fixture-history-candidate",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "未通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "history-fields",
+      "source": "isolated-fixture",
+      "fields": [
+        "优化目标",
+        "优化策略",
+        "参数变化",
+        "预期收益",
+        "潜在风险",
+        "实验结果"
+      ]
+    },
+    {
+      "name": "fixture-rollback-confirm",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "已发布",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "生产中",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已归档",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "发布",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "fixture-feedback-drawer",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "fixture-publish-confirm",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "已发布",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "生产中",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已归档",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "发布",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "fixture-provider-authorization",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "未通过",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "fixture-qa-audit",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "fixture-citation-drawer",
+      "badges": [],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "fixture-citation-390",
+      "badges": [],
+      "dialog": {
+        "height": 844,
+        "overflow": "auto",
+        "width": 390
+      },
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "问答验证",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "fixture-publish-confirm-390",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "已发布",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "生产中",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已归档",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "发布",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "candidate-final-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "knowledge-document-drawer",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "知识库",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "knowledge-topic-drawer",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "已索引",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "知识库",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "golden-coverage-drawer",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Human Gate 1 · 已确认",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "机器检查完成",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "golden-coverage-drawer-confirmed",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Human Gate 1 · 已确认",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "机器检查完成",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "auto",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "golden-scroll-body",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "Human Gate 1 · 已确认",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "机器检查完成",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "正向题（Positive）",
+          "weight": "600"
+        }
+      ],
+      "dialog": {
+        "height": 1200,
+        "overflow": "hidden",
+        "width": 800
+      },
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Golden Dataset",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "candidate-final-1440",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "candidate-final-1280",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1280,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "name": "candidate-final-390",
+      "badges": [
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        },
+        {
+          "size": "11px",
+          "text": "不合格",
+          "weight": "600"
+        }
+      ],
+      "dialog": null,
+      "height": 844,
+      "scroll": 390,
+      "title": [
+        {
+          "size": "22px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "name": "tooltip-final",
+      "badges": [],
+      "dialog": null,
+      "height": 1200,
+      "scroll": 1440,
+      "title": [
+        {
+          "size": "30px",
+          "text": "Agent 工作台",
+          "weight": "700"
+        }
+      ],
+      "width": 1440
+    },
+    {
+      "name": "fixture-tag-popover-390",
+      "source": "isolated-fixture",
+      "tagBox": {
+        "clientHeight": 198,
+        "height": 200,
+        "scrollHeight": 222,
+        "width": 360,
+        "x": 22,
+        "y": 634
+      }
+    }
+  ],
+  "finalCards": [
+    {
+      "fields": [
+        {
+          "height": 90,
+          "y": 371.8984375
+        },
+        {
+          "height": 150,
+          "y": 461.8984375
+        },
+        {
+          "height": 90,
+          "y": 611.8984375
+        },
+        {
+          "height": 80,
+          "y": 701.8984375
+        },
+        {
+          "height": 80,
+          "y": 781.8984375
+        },
+        {
+          "height": 190,
+          "y": 861.8984375
+        }
+      ],
+      "footer": 1059.8984375,
+      "height": 884
+    },
+    {
+      "fields": [
+        {
+          "height": 90,
+          "y": 371.8984375
+        },
+        {
+          "height": 150,
+          "y": 461.8984375
+        },
+        {
+          "height": 90,
+          "y": 611.8984375
+        },
+        {
+          "height": 80,
+          "y": 701.8984375
+        },
+        {
+          "height": 80,
+          "y": 781.8984375
+        },
+        {
+          "height": 190,
+          "y": 861.8984375
+        }
+      ],
+      "footer": 1059.8984375,
+      "height": 884
+    },
+    {
+      "fields": [
+        {
+          "height": 90,
+          "y": 371.8984375
+        },
+        {
+          "height": 150,
+          "y": 461.8984375
+        },
+        {
+          "height": 90,
+          "y": 611.8984375
+        },
+        {
+          "height": 80,
+          "y": 701.8984375
+        },
+        {
+          "height": 80,
+          "y": 781.8984375
+        },
+        {
+          "height": 190,
+          "y": 861.8984375
+        }
+      ],
+      "footer": 1059.8984375,
+      "height": 884
+    }
+  ],
+  "mobile": [
+    {
+      "height": 884,
+      "width": 326,
+      "x": 32
+    },
+    {
+      "height": 884,
+      "width": 326,
+      "x": 32
+    },
+    {
+      "height": 884,
+      "width": 326,
+      "x": 32
+    }
+  ],
+  "providerCalls": 0
+}
