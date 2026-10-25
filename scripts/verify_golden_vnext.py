@@ -79,7 +79,8 @@ def validate(draft, snapshot, chunks, manifest):
         check(len({v['id'] for v in checks}) == len(checks), label + ': duplicate checkpoint')
         for value in checks + new['answer_support']:
             refs = value['source_chunk_ids']
-            check(bool(refs) and set(refs) <= set(sources), label + ': checkpoint/answer references')
+            behavior_basis = record['test_category'] == 'negative' and value.get('basis') in {'instruction_boundary', 'corpus_boundary_review', 'missing_information'}
+            check((bool(refs) or behavior_basis) and set(refs) <= set(sources), label + ': checkpoint/answer references')
         for value in new['conditional_checks']:
             check(bool(value['trigger']) and bool(value['requirement']), label + ': empty condition')
         check(record['validation']['human_review'] == 'pending' and record['validation']['probe_qc'] == 'not_run', label + ': review not granted')
@@ -101,7 +102,7 @@ def render_review(draft):
                   '**旧版参考答案／预期行为：**', '', '```text', old['reference_answer'] or old['expected_behavior'], '```', '',
                   '**VNext参考答案：**' if v['reference_answer'] else '**VNext预期行为（无普通参考答案）：**', '',
                   v['reference_answer'] or (v['expected_behavior'] + '：' + r['governed_intent']), '', '**必答检查点：**', '']
-        lines += ['- ' + c['id'] + '：' + c['requirement'] + '（来源：' + '、'.join(c['source_chunk_ids']) + '）' for c in v['required_checks']]
+        lines += ['- ' + c['id'] + '：' + c['requirement'] + '（依据：' + ('、'.join(c['source_chunk_ids']) or c.get('basis', '待复核')) + '）' for c in v['required_checks']]
         lines += ['', '**条件必答项：**', '']
         lines += ['- ' + c['trigger'] + ' → ' + c['requirement'] for c in v['conditional_checks']] or ['无额外条件项；适用安全约束仍按下列禁用操作检查。']
         for title, values in [('辅助信息', v['auxiliary_information']), ('禁止错误／不安全操作', v['prohibited']), ('同义／等价表达示例', v['acceptable_equivalents'])]:
@@ -113,9 +114,11 @@ def render_review(draft):
                   '**校验与审核状态：** 结构与引文验证通过；离线内容审阅已形成草案；人工待审；Probe/QC未执行。原题审核状态：' + json.dumps(old['review_state'], ensure_ascii=False), '',
                   '**待人工复核：** ' + ('；'.join(r['validation']['issues']) if r['validation']['issues'] else '复核新版语义完整性、必答项分级及等价表达；本轮不自动批准。'), '']
         if 'existing_hard_validation' in r['validation']:
-            lines += ['**现有Hard Validation原样执行结果：**', '', '```json', json.dumps(r['validation']['existing_hard_validation'], ensure_ascii=False, indent=2), '```', '']
+            lines += ['**首轮历史Hard Validation结果（本轮新结果见后）：**', '', '```json', json.dumps(r['validation']['existing_hard_validation'], ensure_ascii=False, indent=2), '```', '']
         if 'corpus_boundary_observation' in r['validation']:
             lines += ['**全Corpus边界检索观察：**', '', '```json', json.dumps(r['validation']['corpus_boundary_observation'], ensure_ascii=False, indent=2), '```', '']
+        if 'final_content_audit' in r:
+            lines += ['**本轮最终内容复核：** ' + r['final_content_audit']['change'], '', '**本轮验证与待审：**', '', '```json', json.dumps(r.get('replacement_validation', {}), ensure_ascii=False, indent=2), '```', '']
     return '\n'.join(line.rstrip() for line in '\n'.join(lines).splitlines()).rstrip() + '\n'
 
 

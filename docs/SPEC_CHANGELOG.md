@@ -1,3 +1,10 @@
+## 2026-10-25 · Golden答案正式工作集替换与历史实验归档
+
+- 保留原Medium50题目和ID，仅替换30份参考答案并持久化50题独立业务要求；纠正字段角色与分级，不把Topic Anchor当答案Evidence。
+- Golden Validator v2.3分开严格来源与人工语义复核；可信上下文中的绑定人工记录可确认改写，原始候选自称审核无效，未知继续待审。Judge、11 Gate与评测机制不改。
+- Backup API完整备份、完整性与逻辑摘要验证后更新唯一当前工作集，创建待审内容快照并归档旧Snapshot；旧实验/质量/中间结果移出活动库，独立审计在备份中完整留存。
+- 本轮不运行Provider、Probe/QC、Baseline/Candidate、冻结或发布；默认生成Prompt、Pipeline/知识库和前端零改动。详见[验收报告](GOLDEN_CONTENT_REPLACEMENT_REPORT.md)。
+
 ## 2026-10-25 · Golden VNext内容草案与显式生成版本准备
 
 - 独立治理Medium50原50题：30份结构化参考答案与20份负向行为规范，必答/条件必答/辅助及禁止操作分离；保留全部旧版对照与Canonical来源。

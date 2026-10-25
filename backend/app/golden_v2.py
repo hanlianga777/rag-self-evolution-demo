@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import numpy as np
 
 PLANNER_VERSION = 'golden-planner-v2.1'
-VALIDATOR_VERSION = 'golden-validator-v2.2-optimization-readiness'
+VALIDATOR_VERSION = 'golden-validator-v2.3-content-review'
 PARAMETERS = {'target_cluster_size': 40, 'min_cluster_size': 3, 'seed': 42, 'n_init': 10, 'max_iter': 100, 'distance': 'squared_euclidean_on_l2_normalized_vectors'}
 SPECIAL_LIMITS = {'mini': 2, 'medium': 4, 'full': 8}
 GROUPS = ('positive', 'ablation', 'negative')
@@ -183,6 +183,79 @@ def answer_supported(answer, sources):
     return False
 
 
+def content_review_identity(candidate, sources):
+    """Bind a trusted human review to the entire content and actual source bodies."""
+    return digest({'content': {k: candidate.get(k) for k in ('question', 'reference_answer', 'expected_behavior',
+        'test_category', 'negative_subtype', 'product', 'version', 'evidence', 'business_requirements')},
+        'sources': sorted([{k: s.get(k) for k in ('chunk_id', 'document_id', 'product', 'version', 'chunk_text', 'text')}
+                           for s in sources], key=lambda s: s['chunk_id'])})
+
+
+def validate_content_sources(candidate, corpus):
+    """Exact provenance, never a claim that located text proves semantic equivalence."""
+    known = {s['chunk_id']: s for s in corpus}
+    requirements = candidate.get('business_requirements')
+    if not isinstance(requirements, dict):
+        return {'status': 'failed', 'errors': ['invalid business requirements']}
+    errors = []
+    sources = requirements.get('sources', [])
+    if not isinstance(sources, list) or (not sources and candidate.get('test_category') != 'negative') or any(not isinstance(s, dict) for s in sources):
+        return {'status': 'failed', 'errors': ['missing governed source records']}
+    def strict(value):
+        return re.sub(r'\s+', '', unicodedata.normalize('NFKC', value))
+    for item in [*sources, *(candidate.get('evidence') or [])]:
+        ids = [item['chunk_id']] if 'chunk_id' in item else item.get('source_chunk_ids', [])
+        quotes = [item.get('quote')] if 'chunk_id' in item else item.get('evidence_key_points', [])
+        if not isinstance(ids, list) or not ids or any(not isinstance(i, str) for i in ids) or not isinstance(quotes, list) or not quotes or any(not isinstance(q, str) or not q.strip() for q in quotes):
+            errors.append('missing source identity or quote')
+            continue
+        if any(i not in known for i in ids):
+            errors.append('governed source missing')
+            continue
+        for quote in quotes:
+            if not any(strict(quote) in strict(text(known[i])) for i in ids):
+                errors.append('governed quote not located verbatim')
+        for field in ('document_id', 'product', 'version', 'page_start', 'page_end', 'parent_chunk_id'):
+            if field in item and any(item[field] != known[i].get(field) for i in ids):
+                errors.append('governed source scope mismatch: ' + field)
+        if 'pages' in item and any(item['pages'] != [known[i].get('page_start'), known[i].get('page_end')] for i in ids):
+            errors.append('governed source page mismatch')
+    keys = {s['chunk_id'] for s in sources if isinstance(s.get('chunk_id'), str)}
+    required, conditional = requirements.get('required_checks', []), requirements.get('conditional_checks', [])
+    if not isinstance(required, list) or not isinstance(conditional, list):
+        return {'status': 'failed', 'errors': ['invalid checkpoint lists']}
+    checks = required + conditional
+    if not required or any(not isinstance(c, dict) or not isinstance(c.get('id'), str) or not c['id'] or not isinstance(c.get('requirement'), str) or not c['requirement'] or
+                         not isinstance(c.get('source_chunk_ids'), list) or any(not isinstance(i, str) for i in c['source_chunk_ids']) or not set(c['source_chunk_ids']) <= keys or
+                         (not c['source_chunk_ids'] and not (candidate.get('test_category') == 'negative' and isinstance(c.get('basis'), str) and c['basis'] in {'instruction_boundary', 'corpus_boundary_review', 'missing_information'})) for c in checks):
+        errors.append('unlocated business checkpoint')
+    if len({c['id'] for c in checks if isinstance(c, dict) and isinstance(c.get('id'), str)}) != len(checks):
+        errors.append('duplicate business checkpoint')
+    if any(not isinstance(c, dict) or not isinstance(c.get('trigger'), str) or not c['trigger'].strip() for c in conditional):
+        errors.append('missing checkpoint condition')
+    return {'status': 'failed' if errors else 'passed', 'errors': list(dict.fromkeys(errors))}
+
+
+def validate_answer_content(candidate, sources, review=None):
+    """Review is backend-trusted context, never candidate-supplied self-approval."""
+    requirements = candidate.get('business_requirements')
+    if requirements is None:
+        supported = candidate.get('test_category') == 'negative' or answer_supported(candidate.get('reference_answer') or '', sources)
+        return {'status': 'supported_anchor' if supported else 'unsupported_anchor'}
+    binding = content_review_identity(candidate, sources)
+    checks = []
+    if isinstance(requirements, dict) and all(isinstance(requirements.get(k, []), list) for k in ('required_checks', 'conditional_checks')):
+        checks = requirements.get('required_checks', []) + requirements.get('conditional_checks', [])
+    ids = {c['id'] for c in checks if isinstance(c, dict) and isinstance(c.get('id'), str) and c['id']}
+    approved = (isinstance(review, dict) and review.get('reviewer_type') == 'human' and
+                bool(review.get('reviewer')) and review.get('decision') == 'approved' and
+                review.get('binding_sha256') == binding and review.get('safety_valid') is True and
+                review.get('scope_valid') is True and isinstance(review.get('reviewed_checks'), list) and
+                all(isinstance(i, str) for i in review['reviewed_checks']) and set(review['reviewed_checks']) == ids and bool(ids))
+    return {'status': 'human_reviewed' if approved else 'needs_human_review', 'binding_sha256': binding,
+            'reason': '完整要求及安全适用性已由绑定的人工记录确认' if approved else '语义改写、必答完整性、安全条件及负向整库边界需人工核对；不要求逐字复制'}
+
+
 def construction_checks(kind, answer, sources, candidate):
     checks = {'type': kind, 'status': 'passed', 'nodes': [c['chunk_id'] for c in sources]}
     if kind == 'Fact' and not any(facts(c) for c in sources):
@@ -331,6 +404,13 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
     source_ids = list(dict.fromkeys(source_ids))
     sources = [known[i] for i in source_ids if i in known]
     sources = [{**source, 'original_tables':context.get('original_tables', {}).get(source['chunk_id'], [])} for source in sources]
+    governed = c.get('business_requirements') is not None
+    source_validation = validate_content_sources(c, corpus) if governed else {'status': 'legacy_checks', 'errors': []}
+    errors.extend(source_validation['errors'])
+    review_sources = [known[s['chunk_id']] for s in c['business_requirements']['sources'] if isinstance(s, dict) and isinstance(s.get('chunk_id'), str) and s['chunk_id'] in known] if governed and isinstance(c.get('business_requirements'), dict) and isinstance(c['business_requirements'].get('sources'), list) else sources
+    content_validation = validate_answer_content(c, review_sources, context.get('content_review'))
+    if governed and content_validation['status'] != 'human_reviewed':
+        errors.append('answer content requires human review')
     answer = c.get('reference_answer') or ''
     if not isinstance(answer, str):
         errors.append('invalid reference_answer')
@@ -343,7 +423,7 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
     else:
         if not answer.strip() or not source_ids or any(i not in known for i in source_ids):
             errors.append('missing answer or valid evidence')
-        elif not answer_supported(answer, sources):
+        elif not governed and content_validation['status'] == 'unsupported_anchor':
             errors.append('unsupported answer anchor')
         for field in ('product', 'version'):
             declared = c.get(field) or (c.get('import_fields') or {}).get(field.title())
@@ -430,7 +510,7 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
     from .canonical_evidence import optimization_preflight
     readiness=optimization_preflight(normalized,corpus)
     errors.extend(readiness['blocking_errors'])
-    return {'optimization_readiness':readiness,'valid': not errors, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'duplicate_checks': duplicate_checks, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION, 'original_table_evidence': context.get('original_tables', {})}
+    return {'source_validation':source_validation,'answer_content_validation':content_validation,'optimization_readiness':readiness,'valid': not errors, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'duplicate_checks': duplicate_checks, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION, 'original_table_evidence': context.get('original_tables', {})}
 
 
 def match_pool(plan, validations, preferred_ids=()):
