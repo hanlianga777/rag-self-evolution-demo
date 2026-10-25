@@ -116,7 +116,7 @@ def render_review(draft):
             lines += ['**现有Hard Validation原样执行结果：**', '', '```json', json.dumps(r['validation']['existing_hard_validation'], ensure_ascii=False, indent=2), '```', '']
         if 'corpus_boundary_observation' in r['validation']:
             lines += ['**全Corpus边界检索观察：**', '', '```json', json.dumps(r['validation']['corpus_boundary_observation'], ensure_ascii=False, indent=2), '```', '']
-    return '\n'.join(line.rstrip() for line in lines).rstrip() + '\n'
+    return '\n'.join(line.rstrip() for line in '\n'.join(lines).splitlines()).rstrip() + '\n'
 
 
 def main():
@@ -145,6 +145,7 @@ def main():
             broken = copy.deepcopy(draft)
             mutation(broken)
             assert validate(broken, snapshot, chunks, manifest), 'corruption was not detected'
+        assert all(line == line.rstrip() for line in render_review(draft).splitlines()), 'rendered trailing whitespace'
     if args.render_review:
         (ROOT / 'docs/GOLDEN_VNEXT_50_REVIEW.md').write_text(render_review(draft))
     print(json.dumps({'questions': 50, 'answerable': 30, 'negative': 20, 'quota': '20/10/20', 'structural_and_quote_validation': 'passed', 'corruption_checks': 6 if args.self_test else 0, 'semantic_human_review': 'pending', 'provider_calls': 0}, ensure_ascii=False))

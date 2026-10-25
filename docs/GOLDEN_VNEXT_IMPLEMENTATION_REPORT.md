@@ -276,7 +276,7 @@ env -u DEEPSEEK_API_KEY -u DASHSCOPE_API_KEY HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLI
 
 ## 提交与尚未执行的正式步骤
 
-本轮范围内文件与SPEC同一次Commit；提交说明：`feat: prepare Golden VNext draft and opt-in answer contract`。最终Commit SHA在交付消息及`git log -1`可查。提交中的JSON仍为draft_pending_human_review，推送代码/文档不代表批准、冻结、启用或生产发布。工作区开始前已有的存储审计、历史输出、backend/data与verify_self_evolution.py等改动均不纳入本轮提交。
+本轮内容、产品代码与SPEC同一次Commit：`4e34b0f`，提交说明：`feat: prepare Golden VNext draft and opt-in answer contract`。后续仅修正阅读稿源文展示的尾随空白，并加入渲染自检（No SPEC Change）；JSON逐字原文保持。最终Commit SHA在交付消息及`git log -1`可查。提交中的JSON仍为draft_pending_human_review，推送代码/文档不代表批准、冻结、启用或生产发布。工作区开始前已有的存储审计、历史输出、backend/data与verify_self_evolution.py等改动均不纳入本轮提交。
 
 人工下一步：逐题复核30份语义改写与20份行为要求，确认安全隔离、型号、数值/单位/否定方向及辅助项划分；处理来源差异和上列争议；另行审查改写式参考答案的版本化证据真实性校验及检查点消费合同。
 
