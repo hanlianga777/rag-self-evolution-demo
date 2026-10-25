@@ -1,0 +1,12 @@
+{
+  "backend/data/q02-before.db": "e615b5eae61478628d3a7a1b2d9bced4ff3ef14c6b48688b373cadd1cf6aee30",
+  "backend/data/sandbox-stability-before-reload-20261024.db": "58f141ddc1bf3e418a9fc68634d327fee19ec8a22e861803af82d9d34812591c",
+  "backend/data/demo.db": "c67c1fa41f55576333de6f39b9ef8555b1c28afa47d08d38af6bf14d16a58c1b",
+  "backend/data/page-perf-before-reload-20261025.db": "6b58c33bf73ff13ef4aee5c12eb0bd235fb0ed7d17d23d1e298dc02844402d90",
+  "backend/data/manual-sandbox-resume-before-reload-20261024.db": "58f141ddc1bf3e418a9fc68634d327fee19ec8a22e861803af82d9d34812591c",
+  "backend/data/audit_backups/golden-profile-before-reload-20261025.db": "b3b6db29712d6a8fbb56bd7b104c6b9114d2c89392646c86698de23c390644fe",
+  "backend/data/audit_backups/page-performance-20261025.db": "6b58c33bf73ff13ef4aee5c12eb0bd235fb0ed7d17d23d1e298dc02844402d90",
+  "backend/data/judge_probes/q44-resume-20261021T141624Z/database_before.sqlite": "32b74b97fca170e76cc8b72a70a7bf32760b1e323bf9058404685a8687dab477",
+  "backend/data/judge_probes/sandbox-cost-20261023/demo.db": "b627133c54ae3113791a8b3db80ae29e8f84785930b8a1a0c4b877907dfc11a8",
+  "backend/data/judge_probes/agent-diagnostic-20261022-owner-nine-no-retry/backup/demo.db": "f9a56e651f4ba2ec4e590dae19835726ea9bb08aac37e0b9641fb5e029e248dc"
+}

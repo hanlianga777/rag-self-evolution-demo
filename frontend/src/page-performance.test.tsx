@@ -8,10 +8,11 @@ import { CandidateWorkspace } from './pages/CandidateWorkspace';
 
 it('keeps navigation visible while a new page loads and revalidates cached pages', async () => {
   const root = createRoot(document.body.appendChild(document.createElement('div')));
-  let blocked = false;
+  let blocked = false, failRefresh = false;
   let release!: () => void;
   const fetcher = vi.fn(async (input: RequestInfo | URL) => {
     const path = new URL(String(input)).pathname;
+    if (failRefresh && path === '/api/workspace') throw new Error('Fixture refresh failed');
     if (blocked && path === '/api/workspace') await new Promise<void>(resolve => { release = resolve; });
     const value = path === '/api/documents' || path === '/api/dataset' ? [] : path === '/api/evaluation' || path === '/api/optimization' ? {status:'not_run'} : {};
     return new Response(JSON.stringify(value));
@@ -29,6 +30,19 @@ it('keeps navigation visible while a new page loads and revalidates cached pages
     await act(async () => { (document.querySelector('a[href="#overview"]') as HTMLAnchorElement).click(); });
     expect(fetcher.mock.calls.length).toBeGreaterThan(count);
     expect(document.querySelector('.main h1')?.textContent).toContain('概览');
+    blocked = true;
+    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    expect(document.body.textContent).not.toContain('正在核对最新状态');
+    expect(document.querySelector('.main h1')?.textContent).toContain('概览');
+    expect(document.querySelector('.main > .state')).toBeNull();
+    blocked = false;
+    await act(async () => { release(); });
+    failRefresh = true;
+    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    expect(document.querySelector('.main > [role=alert]')?.textContent).toContain('Fixture refresh failed');
+    failRefresh = false;
+    await act(async () => { (document.querySelector('.main > [role=alert] button') as HTMLButtonElement).click(); });
+    expect(document.querySelector('.main > [role=alert]')).toBeNull();
   } finally { root.unmount(); document.body.innerHTML=''; location.hash=''; vi.unstubAllGlobals(); }
 });
 

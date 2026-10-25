@@ -1,0 +1,493 @@
+{
+  "settings": {
+    ".page-title h1": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "30px",
+      "fontWeight": "700",
+      "lineHeight": "36px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".page-title p": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "22.4px",
+      "color": "rgb(89, 105, 125)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".tabs button": null,
+    ".section-head h2": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "lineHeight": "18px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".search-space-control strong": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "lineHeight": "18px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".frozen-facts dd": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "lineHeight": "16.5px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".badge": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "11px",
+      "fontWeight": "600",
+      "lineHeight": "16.5px",
+      "color": "rgb(64, 87, 118)",
+      "backgroundColor": "rgb(238, 242, 245)",
+      "borderRadius": "999px",
+      "padding": "4px 8px"
+    },
+    ".secondary": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "lineHeight": "19.5px",
+      "color": "rgb(49, 64, 84)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "12px",
+      "padding": "8px 12px"
+    },
+    ".review-table th": null,
+    ".review-table td": null,
+    ".candidate-pool-table th": null,
+    ".candidate-pool-table td": null,
+    ".panel": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "21px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "9px",
+      "padding": "9px"
+    },
+    ".muted": null
+  },
+  "drawer": {
+    ".drawer-head h2": {
+      "size": "14px",
+      "weight": "750",
+      "line": "21px",
+      "color": "rgb(28, 39, 56)"
+    },
+    ".drawer-body": {
+      "size": "13px",
+      "weight": "400",
+      "line": "21.45px",
+      "color": "rgb(28, 39, 56)"
+    },
+    "th": {
+      "size": "11px",
+      "weight": "650",
+      "line": "18.15px",
+      "color": "rgb(122, 135, 151)"
+    },
+    "td": {
+      "size": "11px",
+      "weight": "600",
+      "line": "18.15px",
+      "color": "rgb(28, 39, 56)"
+    }
+  },
+  "governance": {
+    ".page-title h1": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "30px",
+      "fontWeight": "700",
+      "lineHeight": "36px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".page-title p": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "22.4px",
+      "color": "rgb(89, 105, 125)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".tabs button": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "700",
+      "lineHeight": "21px",
+      "color": "rgb(16, 24, 39)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "10px 2px"
+    },
+    ".section-head h2": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "lineHeight": "18px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".search-space-control strong": null,
+    ".frozen-facts dd": null,
+    ".badge": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "11px",
+      "fontWeight": "600",
+      "lineHeight": "16.5px",
+      "color": "rgb(117, 82, 26)",
+      "backgroundColor": "rgb(250, 240, 216)",
+      "borderRadius": "999px",
+      "padding": "4px 8px"
+    },
+    ".secondary": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "lineHeight": "19.5px",
+      "color": "rgb(49, 64, 84)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "12px",
+      "padding": "8px 12px"
+    },
+    ".review-table th": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "12px",
+      "fontWeight": "650",
+      "lineHeight": "18px",
+      "color": "rgb(122, 135, 151)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "0px",
+      "padding": "8px"
+    },
+    ".review-table td": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "12px",
+      "fontWeight": "600",
+      "lineHeight": "18px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "0px",
+      "padding": "4px 8px"
+    },
+    ".candidate-pool-table th": null,
+    ".candidate-pool-table td": null,
+    ".panel": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "21px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "12px",
+      "padding": "9px"
+    },
+    ".muted": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "10px",
+      "fontWeight": "400",
+      "lineHeight": "16px",
+      "color": "rgb(89, 105, 125)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    }
+  },
+  "evaluation": {
+    ".page-title h1": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "30px",
+      "fontWeight": "600",
+      "lineHeight": "36px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".page-title p": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "22.4px",
+      "color": "rgb(89, 105, 125)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".tabs button": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "700",
+      "lineHeight": "21px",
+      "color": "rgb(16, 24, 39)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "10px 2px"
+    },
+    ".section-head h2": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".search-space-control strong": null,
+    ".frozen-facts dd": null,
+    ".badge": null,
+    ".secondary": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "lineHeight": "19.5px",
+      "color": "rgb(49, 64, 84)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "12px",
+      "padding": "8px 12px"
+    },
+    ".review-table th": null,
+    ".review-table td": null,
+    ".candidate-pool-table th": null,
+    ".candidate-pool-table td": null,
+    ".panel": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "22.4px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "9px",
+      "padding": "20px 22px"
+    },
+    ".muted": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "lineHeight": "20.8px",
+      "color": "rgb(89, 105, 125)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    }
+  },
+  "evolution": {
+    ".page-title h1": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "30px",
+      "fontWeight": "600",
+      "lineHeight": "36px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".page-title p": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "22.4px",
+      "color": "rgb(89, 105, 125)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".tabs button": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "700",
+      "lineHeight": "21px",
+      "color": "rgb(16, 24, 39)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "10px 2px"
+    },
+    ".section-head h2": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".search-space-control strong": null,
+    ".frozen-facts dd": null,
+    ".badge": null,
+    ".secondary": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "lineHeight": "19.5px",
+      "color": "rgb(49, 64, 84)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "12px",
+      "padding": "8px 12px"
+    },
+    ".review-table th": null,
+    ".review-table td": null,
+    ".candidate-pool-table th": null,
+    ".candidate-pool-table td": null,
+    ".panel": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "22.4px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "9px",
+      "padding": "20px 22px"
+    },
+    ".muted": null
+  },
+  "versions": {
+    ".page-title h1": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "30px",
+      "fontWeight": "600",
+      "lineHeight": "36px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".page-title p": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "22.4px",
+      "color": "rgb(89, 105, 125)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".tabs button": null,
+    ".section-head h2": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "18px",
+      "fontWeight": "600",
+      "lineHeight": "27px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".search-space-control strong": null,
+    ".frozen-facts dd": null,
+    ".badge": null,
+    ".secondary": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "lineHeight": "19.5px",
+      "color": "rgb(49, 64, 84)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "12px",
+      "padding": "8px 12px"
+    },
+    ".review-table th": null,
+    ".review-table td": null,
+    ".candidate-pool-table th": null,
+    ".candidate-pool-table td": null,
+    ".panel": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "22.4px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "9px",
+      "padding": "20px 22px"
+    },
+    ".muted": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "lineHeight": "20.8px",
+      "color": "rgb(89, 105, 125)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    }
+  },
+  "verification": {
+    ".page-title h1": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "30px",
+      "fontWeight": "600",
+      "lineHeight": "36px",
+      "color": "rgb(28, 39, 56)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".page-title p": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "22.4px",
+      "color": "rgb(89, 105, 125)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "0px"
+    },
+    ".tabs button": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "700",
+      "lineHeight": "21px",
+      "color": "rgb(16, 24, 39)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderRadius": "0px",
+      "padding": "10px 2px"
+    },
+    ".section-head h2": null,
+    ".search-space-control strong": null,
+    ".frozen-facts dd": null,
+    ".badge": null,
+    ".secondary": {
+      "fontFamily": "-apple-system, \"system-ui\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "lineHeight": "19.5px",
+      "color": "rgb(49, 64, 84)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": "12px",
+      "padding": "8px 12px"
+    },
+    ".review-table th": null,
+    ".review-table td": null,
+    ".candidate-pool-table th": null,
+    ".candidate-pool-table td": null,
+    ".panel": null,
+    ".muted": null
+  }
+}

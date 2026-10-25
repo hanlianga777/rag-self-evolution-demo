@@ -9,5 +9,5 @@ it("all Drawers share the Candidate width and Search Space keeps wrapping withou
   expect(css).toContain('max-width:100vw');
   expect(css).toContain('height:100dvh');
   expect(css).toContain('overflow-wrap: anywhere');
-  expect(css).toContain('.drawer .table-scroll { height:auto; max-height:none; overflow:visible !important; }');
+  expect(css).toContain('.drawer .table-scroll { height:auto; max-height:none; overflow-x:auto; }');
 });

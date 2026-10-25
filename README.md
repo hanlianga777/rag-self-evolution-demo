@@ -1,5 +1,8 @@
 2026-10-25 导航与候选池专项：侧栏常驻、页面快照后台重验、轻量初始化；当前Golden候选管理严格使用Medium50持久化成员，历史数据保留。Provider0，正式Baseline与A/B/C原始结果不变。[性能整改验收](outputs/page_performance_20261025/性能整改验收.md)。
 
+2026-10-25 视觉统一：Baseline、Agent工作台、发布及问答验证的Tab/表格/卡片/Drawer继承Pipeline配置与Golden Dataset现有字体与Card规范；移除后台核对顶部提示，刷新与实际错误保持。Provider0、正式数据只读；见[逐页视觉验收](docs/VISUAL_SYSTEM_ACCEPTANCE.md)。
+
+
 > Agent 已付费响应恢复：允许1–3个合法候选，逐项校验保留合法部分；缺少可选说明不再整批失败。零网络预检与追加恢复方式见 [响应合同](docs/AGENT_RESPONSE_CONTRACT.md)。
 
 2026-10-25 页面加载性能修复：按当前页取必要数据，详情保留原入口；减少重复诊断和历史JSON解析，不改评分、策略、冻结数据或模型索引。[优化前后实测](outputs/page_loading_perf_20261025/页面加载验收.md)。

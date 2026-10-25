@@ -24,11 +24,10 @@ const pageFromHash = (): Page => items.find(item => `#${item.id}` === location.h
 export default function App() {
   const [pages, setPages] = useState<Partial<Record<Page, AppData>>>({}); const [error, setError] = useState(""); const [page, setPage] = useState<Page>(pageFromHash);
   const data = pages[page];
-  const [loading, setLoading] = useState(false);
   const [openedDocument, setOpenedDocument] = useState<{ name?: string; citation?: Citation }>(); const [menuOpen, setMenuOpen] = useState(false);
   const requests = useRef(0); const completed = useRef(new Set<string>()); const operation = useOperation();
   const refresh = useCallback(async () => {
-    const request = ++requests.current; setLoading(true); setError("");
+    const request = ++requests.current; setError("");
     try {
       const next = await loadAppData(true, page);
       if (request === requests.current) setPages(previous => {
@@ -36,7 +35,6 @@ export default function App() {
         return { ...(old && identityKey(old.workspace) !== identityKey(next.workspace) ? {} : previous), [page]: next };
       });
     } catch (reason) { if (request === requests.current) setError((reason as Error).message); }
-    finally { if (request === requests.current) setLoading(false); }
   }, [page]);
   useEffect(() => { let cancelled=false; void Promise.resolve().then(()=>{if(!cancelled)void refresh();}); return()=>{cancelled=true;}; }, [refresh]);
   useEffect(() => { if (operation.operations.some(item => item.status !== "running" && !completed.current.has(item.id) && (completed.current.add(item.id), true))) void refresh(); }, [operation.operations, refresh]);
@@ -46,7 +44,7 @@ export default function App() {
   const navigate = (next: Page) => { if (location.hash !== `#${next}`) location.hash = next; setPage(next); setMenuOpen(false); };
   const openCitation = (citation: Citation) => { setOpenedDocument({ citation }); navigate("knowledge"); };
   const content = !data ? <div className="state" role={error ? "alert" : "status"}>{error ? <><h1>无法加载当前页面</h1><p>{error}</p><button className="primary" onClick={() => void refresh()}>重试</button></> : <><LoaderCircle className="spin" size={28} /><h1>正在加载页面内容</h1><p>正在连接本地服务。</p></>}</div> : page === "overview" ? <OverviewPage data={data} navigate={navigate} /> : page === "knowledge" ? <KnowledgePage data={data} onChanged={refresh} openedDocument={openedDocument} onOpenedDocument={() => setOpenedDocument(undefined)} /> : page === "governance" ? <GovernancePage data={data} /> : page === "evaluation" ? <EvaluationPage data={data} navigate={navigate} /> : page === "evolution" ? <EvolutionPage data={data} /> : page === "versions" ? <VersionsPage data={data} /> : page === "verification" ? <VerificationPage data={data} onOpenCitation={openCitation} onOpenDocument={name => { setOpenedDocument({ name }); navigate("knowledge"); }} /> : <SettingsPage data={data} />;
-  return <div className="app-shell"><a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>跳转到主内容</a><aside><div className="brand"><Bot size={21} aria-hidden="true" /><span>RAG Evolution</span></div><nav aria-label="主导航">{navigation.map(item => <NavigationLink key={item.id} item={item} page={page} navigate={navigate} />)}</nav></aside><main id="main-content" className="main" tabIndex={-1}><button className="secondary mobile-menu" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} aria-hidden="true" />菜单</button>{menuOpen && <nav id="mobile-navigation" className="mobile-navigation" aria-label="移动导航">{items.map(item => <a key={item.id} href={`#${item.id}`} aria-current={page === item.id ? "page" : undefined} onClick={() => navigate(item.id)}>{item.label}</a>)}</nav>}{data && loading && <p className="muted" role="status">正在核对最新状态…</p>}{data && error && <p className="error-notice" role="alert">{error}<button onClick={() => void refresh()}>重试</button></p>}<PageErrorBoundary key={`${page}:${identityKey(data?.workspace)}`}>{content}</PageErrorBoundary></main></div>;
+  return <div className="app-shell"><a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>跳转到主内容</a><aside><div className="brand"><Bot size={21} aria-hidden="true" /><span>RAG Evolution</span></div><nav aria-label="主导航">{navigation.map(item => <NavigationLink key={item.id} item={item} page={page} navigate={navigate} />)}</nav></aside><main id="main-content" className="main" tabIndex={-1}><button className="secondary mobile-menu" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} aria-hidden="true" />菜单</button>{menuOpen && <nav id="mobile-navigation" className="mobile-navigation" aria-label="移动导航">{items.map(item => <a key={item.id} href={`#${item.id}`} aria-current={page === item.id ? "page" : undefined} onClick={() => navigate(item.id)}>{item.label}</a>)}</nav>}{data && error && <p className="error-notice" role="alert">{error}<button onClick={() => void refresh()}>重试</button></p>}<PageErrorBoundary key={`${page}:${identityKey(data?.workspace)}`}>{content}</PageErrorBoundary></main></div>;
 }
 
 export class PageErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
