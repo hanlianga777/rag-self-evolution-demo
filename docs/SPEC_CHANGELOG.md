@@ -1,3 +1,10 @@
+## 2026-10-25 · Golden VNext内容草案与显式生成版本准备
+
+- 独立治理Medium50原50题：30份结构化参考答案与20份负向行为规范，必答/条件必答/辅助及禁止操作分离；保留全部旧版对照与Canonical来源。
+- 共享表达规范`generation-vnext-2`仅显式构造AiService时采用；默认旧版Prompt及当前服务配置保持。生成版本/边界摘要纳入现有Evaluation Identity，Candidate预约及执行前核对，重放不可跨生成合同。
+- 不改Judge、Gate、Search Space、索引、审批或历史数据。原Hard Validation50/50通过；30份改写被逐字Anchor规则阻断，未放宽原规则，不自动导入或冻结。
+- 零Provider；完整离线结果、历史完整性、来源争议和冻结前置见[实施报告](GOLDEN_VNEXT_IMPLEMENTATION_REPORT.md)。架构图源无变化。
+
 ## 2026-10-25 · 导航常驻、轻量读取与当前Medium50候选池
 
 2026-10-25：Candidate A/B/C/D 与历史卡片统一字段/固定行高/正文滚动；枚举、完整历史英文对照及参数对象中文展示；Hard Gate 贡献题目同排，Dropdown 原生顶层浮层，Tooltip 仅截断时显示。仅 UI Contract，业务合同/原始数据/架构图不变，Provider0。见 [验收](UI_CONSISTENCY_ACCEPTANCE.md)。

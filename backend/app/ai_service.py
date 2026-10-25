@@ -2,6 +2,7 @@ from .corpus import manifest_identity
 import time
 import json
 import re
+import hashlib
 from contextlib import nullcontext
 from datetime import datetime, timezone
 
@@ -29,6 +30,24 @@ GENERATION_BOUNDARY = (
     "正确拒答不豁免后续操作；条件式资料摘录不等于直接授权。"
     "有据正常回答并引用Chunk；无据说明边界，不断言未知能力不存在。"
 )
+
+
+GENERATION_EXPRESSION = (
+    "准确优先、结论前置、按需分点、语言简洁、安全完整。"
+    "简单事实问题优先一句话直接给结论；操作问题按执行顺序使用编号步骤；复合问题按实际事项分组。"
+    "必要安全条件前置且醒目，按设备状态、型号和适用条件完整保留；不为简短省略关键事实、参数、单位和操作顺序。"
+    "负向问题简洁拒答或澄清；拒答后的补充内容同样必须安全且适用。"
+    "删除无关背景、手册堆砌、重复解释、过度免责套话和无意义总结；不设置固定字数上限或条目数量。"
+    "引用使用简洁Chunk标识，避免打断正文；证据不足时明确缺少哪些信息，不把未知说成不存在。"
+)
+
+
+def generation_contract(version=GENERATION_PROMPT_VERSION):
+    if version not in {GENERATION_PROMPT_VERSION, 'generation-vnext-2'}:
+        raise ValueError('Unknown Generation prompt version: ' + str(version))
+    boundary = GENERATION_BOUNDARY + (GENERATION_EXPRESSION if version == 'generation-vnext-2' else '')
+    return {'generation_prompt_version': version,
+            'generation_boundary_sha256': hashlib.sha256(boundary.encode()).hexdigest()}
 
 
 def attach_heading_scopes(entries, chunks):
@@ -105,13 +124,19 @@ def parse_diagnostic_json(raw):
 
 
 class AiService:
-    def __init__(self, store, corpus, provider, force_mock: bool):
+    def __init__(self, store, corpus, provider, force_mock: bool, *, generation_prompt_version=GENERATION_PROMPT_VERSION):
+        generation_contract(generation_prompt_version)
+        self.generation_prompt_version = generation_prompt_version
         self.store = store
         self.corpus = corpus
         self.provider = provider
         self.force_mock = force_mock
         self.retriever = VectorRetriever(corpus)
         self.last_probe = None
+
+    @property
+    def generation_contract(self):
+        return generation_contract(self.generation_prompt_version)
 
     @property
     def live_enabled(self) -> bool:
@@ -161,6 +186,7 @@ class AiService:
                 evidence=attach_heading_scopes(evidence,bundle['chunks'])
                 if 'final' in trace:trace['final']=evidence
         retrieval_fields = {"retrieval_trace": trace or {"status": "not_collected"}, "corpus_fingerprint": trace.get("corpus_fingerprint"), "timing_unit": "ms", "timing_semantics": {"generation_includes_ttft": True, "stages_are_nested_not_additive": True, "ttft": "request_to_first_content"}}
+        retrieval_fields.update(self.generation_contract)
         citations = [{key: value for key, value in item.items() if key != "content"} for item in evidence]
         if not evidence:
             return {
@@ -182,9 +208,10 @@ class AiService:
             "Completeness": "在不超出证据的前提下覆盖用户问题的所有必要步骤；证据不足时明确说明。",
             "Abstention": "证据不足、风险不明或问题应拒答时，明确拒答或要求澄清；不得补造事实。",
         }[config["prompt_strategy"]]
+        expression = GENERATION_EXPRESSION if self.generation_prompt_version == 'generation-vnext-2' else ''
         with measure(stages, "generation"):
             response = self.provider.complete_with_metrics(
-                f"你是机器人官方 PDF 知识助手。{strategy}{GENERATION_BOUNDARY}回答使用中文，简洁、可执行。",
+                f"你是机器人官方 PDF 知识助手。{strategy}{GENERATION_BOUNDARY}{expression}回答使用中文，简洁、可执行。",
                 f"问题：{question}\n证据：\n{context}",
                 stream=True,
             )

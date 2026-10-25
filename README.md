@@ -225,3 +225,12 @@ Mini20支持显式Business V2业务出题与十维审计，保留原Coverage/Con
 Baseline框架稳定性：Judge V4明确必要Final事实与非必要行为审查的输出边界；非法响应不改判。单题已知可恢复错误耗尽保留Checkpoint后继续，连续两题耗尽熔断；Partial禁止形成正式Overall/Gate，显式恢复复用成功结果。运行版本可由`GET /api/evaluation`的`runtime_contract`核对。详见[修复与离线验证报告](docs/BASELINE_RESILIENCE_FIX_REPORT.md)。
 
 V4最终合同：`check_type`默认`fact`，Negative附加事实同样必须有真实适用Final；仅显式`negative_behavior`纯拒答/澄清免support。Parser `business-output-4-negative-facts`进入身份。历史回放Partial/Failed与Baseline共用未完成聚合屏蔽。三题Q01/Q21/Q40已准备，真实Judge仍待授权。
+
+
+### Golden内容VNext（离线草案，未启用）
+
+[50题旧新对照](docs/GOLDEN_VNEXT_50_REVIEW.md)、[机器草案](docs/GOLDEN_VNEXT_50_DRAFT.json)、[实施与验证报告](docs/GOLDEN_VNEXT_IMPLEMENTATION_REPORT.md)。这些文件不会替代Frozen Snapshot，也不被当前Judge读取。原逐字Anchor校验不接受语义改写，正式冻结前需另行审查证据验证衔接与人工批准。
+
+`AiService(..., generation_prompt_version="generation-vnext-2")`用于后续明确采用新版表达的独立执行环境；默认仍为`generation-vnext-1`。Baseline和Candidate共用该运行时与基础规则，生成合同纳入既有Evaluation Identity；禁止跨版本混合。当前服务未切换，本轮不调用Provider或执行正式评测。
+
+只读离线核验：`python3 scripts/verify_golden_vnext.py --source-database backend/data/demo.db --self-test`。加`--render-review`可从JSON重建逐题阅读文件，不写数据库。

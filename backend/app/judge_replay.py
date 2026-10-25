@@ -33,8 +33,7 @@ def saved_selection_error(trace,chunks):
 def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint):
     from .diagnostics import _canonical_final
     from .canonical_evidence import full_norms
-    from .ai_service import GENERATION_PROMPT_VERSION,GENERATION_BOUNDARY
-    import hashlib
+    from .ai_service import generation_contract
     frozen=json.loads(source['dataset_snapshot_json']);checks=[];executions={};rows={c['question_id']:c for c in cases}
     shared=[]
     if source.get('run_mode')!='real' or source.get('data_source')!='real' or source.get('status') not in {'partial','failed','completed'}:shared.append('source_not_inactive_real_execution')
@@ -42,7 +41,11 @@ def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint):
     if source['config']!=config or config.get('run_target')!='baseline':shared.append('pipeline_or_generation_config_changed')
     if snapshot['corpus_fingerprint']!=fingerprint or source['config'].get('knowledge_identity')!=config.get('knowledge_identity'):shared.append('corpus_or_pipeline_identity_changed')
     original=source['judge']
-    if original.get('generation_prompt_version')!=GENERATION_PROMPT_VERSION or original.get('generation_boundary_sha256')!=hashlib.sha256(GENERATION_BOUNDARY.encode()).hexdigest():shared.append('generation_contract_changed')
+    try:
+        contract = generation_contract(original.get('generation_prompt_version'))
+    except ValueError:
+        contract = {}
+    if not contract or any(original.get(k)!=v or judge.get(k)!=v for k,v in contract.items()):shared.append('generation_contract_changed')
     if original.get('baseline_version')!=judge.get('baseline_version') or any(original.get('execution_snapshot',{}).get(k)!=judge.get('execution_snapshot',{}).get(k) for k in ('embedding_model','vector_index','generation_model','temperature')):shared.append('generation_model_embedding_or_configuration_changed')
     if original.get('evaluation_identity')==evaluation_identity(snapshot,judge):shared.append('new_evaluation_identity_required; use_same_identity_resume_instead')
     if original.get('model')!=judge.get('execution_snapshot',{}).get('generation_model'):shared.append('generation_model_not_verified')

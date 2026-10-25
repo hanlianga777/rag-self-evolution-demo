@@ -149,6 +149,11 @@ class EvaluationRunner:
     def __init__(self, store, runtime):
         self.store, self.runtime = store, runtime
 
+    def _require_generation_contract(self, judge):
+        contract = getattr(self.runtime, 'generation_contract', None)
+        if isinstance(contract, dict) and any(judge.get(k) != v for k, v in contract.items()):
+            raise ValueError('Generation contract不匹配，禁止跨版本生成或续跑')
+
     def snapshot_items(self, snapshot):
         frozen = {item['id']: item for item in snapshot.get('questions', [])}
         items = []
@@ -200,9 +205,10 @@ class EvaluationRunner:
         if limits:
             judge_meta['execution_snapshot']['request_limits'] = {key:limits[key] for key in ('answer','judge','query')}
         from .evaluation_contract import BUSINESS_JUDGE_PROMPT
-        from .ai_service import GENERATION_BOUNDARY, GENERATION_PROMPT_VERSION
+        from .ai_service import generation_contract
         import hashlib
-        judge_meta.update(judge_prompt_sha256=hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(),generation_prompt_version=GENERATION_PROMPT_VERSION,generation_boundary_sha256=hashlib.sha256(GENERATION_BOUNDARY.encode()).hexdigest())
+        contract = getattr(self.runtime, 'generation_contract', None)
+        judge_meta.update(judge_prompt_sha256=hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(), **(contract if isinstance(contract, dict) else generation_contract()))
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
         return snapshot, approved, config, judge_meta
 
@@ -439,6 +445,7 @@ class EvaluationRunner:
         from .paid_run import execution_limits,accounting_only
         run=self.store.evaluation_run(run_id)
         if run['status']=='completed':return run
+        self._require_generation_contract(run['judge'])
         if run['result'].get('judge_replay'):
             from .q18_probe import require_reviewed_probe
             require_reviewed_probe(self.store.database_path,{**run['result']['judge_replay'],'new_judge':run['judge']})
@@ -595,6 +602,7 @@ class EvaluationRunner:
         baseline = self.store.evaluation_run(experiment["baseline_run_id"]) if experiment else None
         if baseline is None or baseline["status"] != "completed":
             raise ValueError("Candidate 必须基于已完成的 Baseline 运行")
+        self._require_generation_contract(baseline['judge'])
         if not policy_current(baseline['judge']):
             raise ValueError('评测规则已升级，请授权建立新Baseline；旧Candidate只读')
         from .policy import validate_candidate_config
