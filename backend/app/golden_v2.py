@@ -236,6 +236,55 @@ def validate_content_sources(candidate, corpus):
     return {'status': 'failed' if errors else 'passed', 'errors': list(dict.fromkeys(errors))}
 
 
+def golden_fact_coverage(item, probe, qc, chunks):
+    """Locate current QC-cited facts in the saved Final; never rewrite a Probe.
+
+    Exact quote presence is sufficient for this observation. Missing/paraphrased
+    text stays unresolved; semantic correctness remains the QC/review contract.
+    """
+    req = item.get('raw', {}).get('business_requirements')
+    if not req or item.get('test_category') == 'negative':
+        return {'status':'not_applicable'}
+    trace = probe.get('probe_details', {}).get('retrieval_trace', {})
+    if trace.get('status') != 'completed' or not isinstance(trace.get('final'), list):
+        return {'status':'not_collected'}
+    by_id = {c['chunk_id']:c for c in chunks}
+    reviewed = {c['id']:c for c in (qc.get('content_review') or {}).get('checks', [])}
+    strict = lambda value: re.sub(r'\s+', '', unicodedata.normalize('NFKC', value))
+    checks = []
+    for kind in ('required_checks','conditional_checks'):
+        for check in req[kind]:
+            review = reviewed.get(check['id'], {})
+            applicable = True if kind == 'required_checks' else review.get('applicable')
+            supports = review.get('support', [])
+            located = []
+            valid = bool(supports) and review.get('met') is True
+            for support in supports:
+                source = by_id.get(support.get('chunk_id'))
+                quote = support.get('quote')
+                verified = (source and source['chunk_id'] in check['source_chunk_ids'] and
+                            isinstance(quote,str) and bool(quote.strip()) and strict(quote) in strict(text(source)))
+                matching = [h.get('chunk_id') for h in trace['final'] if verified and
+                            h.get('document_id') == source.get('document_id') and
+                            h.get('product') == source.get('product') and
+                            strict(quote) in strict(h.get('content',''))]
+                valid = valid and bool(verified)
+                located.append({**support,'final_chunk_ids':matching,'canonical_quote_valid':bool(verified)})
+            status = ('not_triggered' if applicable is False else 'needs_review' if applicable is None or not valid
+                      else 'cited_facts_located' if all(c['final_chunk_ids'] for c in located) else 'citation_not_located')
+            checks.append({'id':check['id'],'kind':kind,'requirement':check['requirement'],
+                           'trigger':check.get('trigger'),'applicable':applicable,'status':status,'support':located})
+    required = [c for c in checks if c['kind']=='required_checks']
+    conditional = [c for c in checks if c['kind']=='conditional_checks']
+    required_complete = bool(required) and all(c['status']=='cited_facts_located' for c in required)
+    conditional_complete = all(c['status'] in {'not_triggered','cited_facts_located'} for c in conditional)
+    return {'status':'necessary_facts_located' if required_complete and conditional_complete else
+                    'conditional_citation_gap' if required_complete else 'required_citation_gap',
+            'required_complete':required_complete,'conditional_complete':conditional_complete,'checks':checks,
+            'basis':'current QC citations located in recorded Final with canonical quote and document/product checks',
+            'historical_probe_unchanged':True,'semantic_equivalence_not_located':'requires independent review'}
+
+
 def validate_answer_content(candidate, sources, review=None):
     """Review is backend-trusted context, never candidate-supplied self-approval."""
     requirements = candidate.get('business_requirements')

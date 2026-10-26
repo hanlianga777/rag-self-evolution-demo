@@ -240,9 +240,12 @@ class CloseoutTests(unittest.TestCase):
         self.assertEqual(self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']['status'],'failed')
 
     def test_current_50_with_documented_exceptions_reaches_gate_after_review(self):
-        with closing(sqlite3.connect((ROOT/'backend/data/demo.db').resolve().as_uri()+'?mode=ro',uri=True)) as source,self.store.connection() as target:
-            for row in source.execute("SELECT question_id,gate,decision,actor,created_at,metadata_json FROM review_events WHERE decision='content_review_required'"):
-                target.execute('INSERT INTO review_events(question_id,gate,decision,actor,created_at,metadata_json) VALUES (?,?,?,?,?,?)',row)
+        # Explicit current-identity fixture; production's historical notes may be stale after revisions.
+        with self.store.connection() as target:
+            for item in self.store.questions()[:2]:
+                metadata = {'content_hash':self.store._quality_content(item),'issues':['offline fixture needs explicit review']}
+                target.execute('INSERT INTO review_events(question_id,gate,decision,actor,created_at,metadata_json) VALUES (?,?,?,?,?,?)',
+                               (item['id'],'dataset','content_review_required','fixture-AI','2026-01-01T00:00:00+00:00',json.dumps(metadata)))
         self.complete_quality();rows=self.store.candidate_rows()
         exceptions=[row for row in rows if row['qualification_status']=='needs_human_review']
         self.assertEqual(len(exceptions),2)

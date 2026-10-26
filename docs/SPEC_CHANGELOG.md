@@ -1,3 +1,9 @@
+## 2026-10-26 · Golden逐事实最终治理
+
+- 完整核查50题，集中通过既有Revision修正15题（Q09表述、Q15能力边界，其余证据对应），移除96条错误关联，按新单题身份仅复验受影响阶段。
+- 新增Golden只读逐事实覆盖诊断：当前QC引用→真实Final正文→文档/产品范围；保留历史Probe和Trace，不把任一指定Chunk缺失等同于所有事实缺失。
+- QC85/P0/P1内容规则保持，Pipeline缺口独立披露；不冒充人工批准或冻结，无新架构，正式Judge及其他模块不改。详见[GOLDEN_FINAL_GOVERNANCE_REPORT.md](GOLDEN_FINAL_GOVERNANCE_REPORT.md)。
+
 ## 2026-10-26 — Golden真实批量恢复
 
 - **2026-10-26 Golden真实批量恢复（当前）**：异常批量入口只选择缺失、过期或技术中断阶段；已有效完成的业务审计、Probe和QC复用，低分/P0/P1、检索风险及人工待审不自动触发重复付费。单题已知技术失败保留错误与Checkpoint后继续其他题，Unknown/Usage未结算、鉴权/配置错误仍停止；业务Probe失败不进入QC。Golden QC将JSON/Schema/来源合同错误明确记录为带原始响应的`ProviderInvalidResponse`，仅对已知响应最多进行一次纠正，纠正携原响应和错误且保留真实质量判断；不盲重试网络未知请求。无源负向检查点support必须为空，背景材料不能冒充答案Evidence。Golden Probe逐项核对对象、用途、前提与验收范围，局部参数不能代表整题可答；仅对已发现的范围争议作明确、有限复核。未执行状态不再显示为QC低于85。QC85、P0阻断、P1显式复核及Human Gate最终确认保持。用户已授权必要真实调用、不设额外金额封顶，并确认现用DeepSeek与阿里云目的地及题目/手册/审核载荷范围；保留请求、Usage和费用可用性，不将估算冒充实际扣费。原50题、ID、配额与工作集身份保持；Q36通过既有Revision最小补齐负向范围和真实背景来源，按新单题内容身份重新检查，其余49题业务内容不改。归档审计只作为修订谱系证据，不复用旧批准。无新服务/表/架构节点；Judge、11 Gate、Baseline/Candidate、Agent、Pipeline、知识库与前端不改。详见[真实批量收口](GOLDEN_BATCH_RECOVERY_REPORT.md)。

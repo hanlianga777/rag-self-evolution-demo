@@ -331,7 +331,7 @@ class GovernanceStore:
         return raw,proof
 
     def candidate_rows(self, ids=None):
-        # Lists read only latest quality signals, never evidence or retrieval traces.
+        # Only retrieval-risk rows load full saved traces for current fact coverage.
         where, args = (f"WHERE q.id IN ({','.join('?' for _ in ids)})", ids) if ids else ("", [])
         if ids == []:
             return []
@@ -346,6 +346,8 @@ class GovernanceStore:
                 json_extract(c.result_json,'$.score') AS qc_score,
                 json_object('score',json_extract(c.result_json,'$.score'),'priority',json_extract(c.result_json,'$.priority'),'ablation_valid',json_extract(c.result_json,'$.ablation_valid'),'content_validation',json_extract(c.result_json,'$.content_validation'),'rule_version',json_extract(c.result_json,'$.rule_version')) AS qc_summary_json,
                 json_extract(c.result_json,'$.execution_identity') AS qc_identity_json,
+                CASE WHEN json_extract(p.result_json,'$.probe_details.classification')='RETRIEVAL_INCOHERENT' THEN p.result_json END AS retrieval_probe_json,
+                CASE WHEN json_extract(p.result_json,'$.probe_details.classification')='RETRIEVAL_INCOHERENT' THEN c.result_json END AS retrieval_qc_json,
                 p.id AS probe_id, c.id AS qc_id, c.created_at AS qc_created_at, a.content_hash AS audit_hash, a.audit_json, a.created_at AS audit_created_at
                 FROM questions q
                 LEFT JOIN probe_results p ON p.id=(SELECT MAX(id) FROM probe_results WHERE question_id=q.id)
@@ -378,7 +380,11 @@ class GovernanceStore:
             qc_state = self._golden_qc_state(item, qc)
             if item['qc_id'] and not qc_state['passed']: reasons.append('QC 分数未达85或存在阻断')
             if qc_state['needs_review']: reasons.append('QC P1' if item['priority']=='P1' else '语义/安全争议待复核')
-            if item['classification'] not in {None, 'EVIDENCE_VALID','NEGATIVE_VALID'}:
+            fact_coverage = None
+            if item['classification']=='RETRIEVAL_INCOHERENT' and qc_state['passed'] and item['probe_hash']==content_hash and item['qc_hash']==content_hash:
+                from .golden_v2 import golden_fact_coverage
+                fact_coverage = {**golden_fact_coverage(item, _load(item['retrieval_probe_json'],{}), _load(item['retrieval_qc_json'],{}), CorpusStore().chunks()), 'content_hash':content_hash, 'probe_id':item['probe_id'], 'qc_id':item['qc_id']}
+            if item['classification'] not in {None, 'EVIDENCE_VALID','NEGATIVE_VALID'} and (fact_coverage or {}).get('status')!='necessary_facts_located':
                 reasons.append({'RETRIEVAL_INCOHERENT':'检索不连贯','FAKE_NEGATIVE_RISK':'负向证据需复核'}.get(item['classification'], '证据需复核'))
             if item['execution_status'] in {'failed','uncertain'}:
                 reasons.append('检索执行失败或无法判定')
@@ -426,6 +432,7 @@ class GovernanceStore:
                 'slot':item['raw'].get('coverage_slot'), 'topic_cluster':item['raw'].get('topic_cluster'),
                 'probe':{'id':item['probe_id'],'probe_details':{'classification':item['classification']}}, 'qc':{'id':item['qc_id'],'priority':item['priority'],'score':item['qc_score'],'threshold':85},
                 'qualification_status':status,'qualification_source':'owner_delegated' if delegated else 'human' if human else 'machine' if status=='machine_qualified' else None,
+                'retrieval_fact_coverage':fact_coverage,
                 'attention_reasons':remaining if delegated else reasons, 'attention_categories':self.attention_categories(remaining if delegated else reasons),
                 'disclosed_retrieval_risk':accepted_retrieval if delegated else None,'quality_audit':audit,'quality_audit_created_at':item['audit_created_at']})
         return result

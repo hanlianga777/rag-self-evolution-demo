@@ -1,0 +1,67 @@
+{
+  "workset_identity": "GCONTENT-10c6ab67b1ef279d70b4f361",
+  "run_id": "GGEN-GCONTENT-10c6ab67b1ef279d70b4f361",
+  "question_count": 50,
+  "counts": {
+    "machine_qualified": 40,
+    "needs_human_review": 10
+  },
+  "probe": {
+    "passed": 50
+  },
+  "qc": {
+    "qc_passed": 50
+  },
+  "qc_priorities": {
+    "P2": 50
+  },
+  "human_gate": {
+    "gate": 1,
+    "status": "pending",
+    "expected": 50,
+    "generated": 50,
+    "machine_qualified": 40,
+    "needs_human_review": 10,
+    "human_approved": 0,
+    "owner_delegated_approved": 0,
+    "approved": 0,
+    "human_review_pending": 10,
+    "profile_complete": true,
+    "coverage_complete": true,
+    "probe_passed": 50,
+    "qc_completed": 50,
+    "qc_passed": 50
+  },
+  "quality_missing": 0,
+  "backup_sha256": "1b8579954f80770dc651075021518b827501ee291cfe9b6002b56e1a4881e81f",
+  "protected_assets_unchanged": 21,
+  "unchanged_quality_reused": 35,
+  "revised": 15,
+  "rpc_count": 33,
+  "rpc_models": {
+    "deepseek-v4-flash": 31,
+    "qwen3-rerank": 1,
+    "text-embedding-v4": 1
+  },
+  "prompt_tokens": 560586,
+  "completion_tokens": 130316,
+  "no_budget_cap": true,
+  "history_approvals_snapshots_experiments_unchanged": true,
+  "tests": {
+    "core_modules": 10,
+    "core_passed": 136,
+    "extended_total": 181,
+    "extended_passed": 179,
+    "extended_errors": 2,
+    "same_errors_reproduced_on_ec77f59": true,
+    "affected_current_identity_fixture_corrected": true
+  },
+  "page_verified": {
+    "questions": 50,
+    "probe_passed": 50,
+    "qc_passed": 50,
+    "machine_qualified": 40,
+    "attention": 10,
+    "freeze_disabled": true
+  }
+}
