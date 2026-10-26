@@ -39,6 +39,13 @@ class CloseoutTests(unittest.TestCase):
             for table in ('questions','golden_generation_runs','golden_generation_artifacts'):
                 rows = source.execute('SELECT * FROM '+table).fetchall()
                 columns=[r[1] for r in source.execute('PRAGMA table_info('+table+')')]
+                if table == 'golden_generation_artifacts':
+                    position=columns.index('hard_validation_json')
+                    clean=[]
+                    for saved in rows:
+                        values=list(saved);audit=json.loads(values[position]);audit.pop('quality_rerun',None)
+                        values[position]=json.dumps(audit);clean.append(values)
+                    rows=clean
                 target.executemany('INSERT INTO '+table+' ('+','.join(columns)+') VALUES ('+','.join('?' for _ in rows[0])+')', rows)
         self.chunks = json.loads((ROOT/'backend/data/index/chunks.json').read_text())
         self.manifest = json.loads((ROOT/'backend/data/index/manifest.json').read_text())
@@ -254,3 +261,104 @@ class CloseoutTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.store.create_dataset_snapshot(self.store.questions(),self.run_id)
         self.store.record_qc(key,semantic_reply(self.store.question(key),self.chunks,90,'P2'),'passed')
         with self.assertRaises(ValueError):self.store.create_dataset_snapshot(self.store.questions(),self.run_id)
+
+    def test_batch_failure_isolated_and_missing_scope_excludes_reviews(self):
+        original=self.service.quality_check;ids=[q['id'] for q in self.store.questions()]
+        def fail(item):
+            if item['id']==ids[1]:raise ValueError('known invalid response')
+            return original(item)
+        self.service.quality_check=fail;self.complete_quality()
+        state=self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']
+        self.assertEqual(state['completed'],50)
+        self.assertEqual(state['technical_failed'],1)
+        self.assertEqual(len(self.store.qc_history(ids[-1])),1)
+        self.store.record_qc(ids[0],semantic_reply(self.store.question(ids[0]),self.chunks,90,'P1'),'passed')
+        self.store.record_qc(ids[2],semantic_reply(self.store.question(ids[2]),self.chunks,84,'P2'),'failed')
+        selected=self.store.update_quality_rerun(self.run_id,{'status':'running'},start=True,anomalies_only=True)
+        self.assertEqual(selected,[ids[1]])
+        self.service.quality_check=original
+        main._run_quality_rerun(self.run_id,selected,self.store,self.service,self.corpus)
+        self.assertFalse(self.store.missing_quality_stages(ids[0]))
+        self.assertFalse(self.store.missing_quality_stages(ids[2]))
+
+    def test_pending_qc_is_not_reported_as_low_score(self):
+        row=self.store.candidate_rows([self.store.questions()[0]['id']])[0]
+        self.assertIn('QC 未执行',row['attention_reasons'])
+        self.assertNotIn('QC 分数未达85或存在阻断',row['attention_reasons'])
+
+    def test_negative_background_citation_gets_one_explicit_correction(self):
+        from app.ai_service import AiService
+        from app.providers import ProviderInvalidResponse
+        item=next(q for q in self.store.questions() if q['test_category']=='negative' and q['raw']['business_requirements']['sources'])
+        sent=[]
+        def complete(system,user,**kwargs):
+            sent.append(json.loads(user));reply=semantic_reply(item,self.chunks)
+            if len(sent)==1:
+                source=item['raw']['business_requirements']['sources'][0]
+                reply['content_review']['checks'][0]['support']=[{'chunk_id':source['chunk_id'],'quote':source['quote']}]
+            return json.dumps(reply)
+        service=AiService(self.store,self.corpus,SimpleNamespace(complete=complete,settings=SimpleNamespace(configured=True,model='offline-fixture')),False)
+        reply=service.quality_check(item)
+        self.assertEqual(len(sent),2)
+        self.assertIn('citation',sent[1]['response_correction']['error'])
+        self.assertTrue(reply['response_recovery'][0]['previous_response'])
+        self.assertEqual(reply['content_validation']['status'],'supported')
+        sent.clear()
+        service.provider.complete=lambda *args,**kwargs:'{}'
+        with self.assertRaises(ProviderInvalidResponse):service.quality_check(item)
+
+    def test_unknown_request_stops_batch_without_repeating_or_running_next(self):
+        from app.providers import ProviderUnavailable
+        keys=[q['id'] for q in self.store.questions()];calls=[]
+        def unknown(item):
+            calls.append(item['id']);error=ProviderUnavailable('unknown provider execution')
+            error.request_execution_unknown=True
+            raise error
+        self.service.quality_check=unknown;self.complete_quality()
+        self.assertEqual(calls,[keys[0]])
+        state=self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']
+        self.assertEqual(state['status'],'failed')
+        self.assertIn('对账',state['error'])
+        with self.assertRaises(ValueError):self.store.update_quality_rerun(self.run_id,{'status':'running'},start=True,anomalies_only=True)
+
+    def test_negative_probe_requires_complete_scope_not_partial_parameter(self):
+        from app.ai_service import AiService
+        prompts=[]
+        def complete(system,user,**kwargs):
+            prompts.append(system)
+            return json.dumps({'answerable':False,'confidence':.9,'reason':'partial scope only','supporting_chunk_ids':[],'supporting_pages':[],'category':'missing_details'})
+        service=AiService(self.store,self.corpus,SimpleNamespace(complete=complete,settings=SimpleNamespace(configured=True,model='offline-fixture')),False)
+        self.assertFalse(service._answerability_check('fixture question',[],{'full_text_hits':[]})['answerable'])
+        self.assertIn('局部流程有参数不等于整题可答',prompts[0])
+
+    def test_retrieval_technical_failure_is_not_qc_failure_and_batch_continues(self):
+        from app.retrieval import RetrievalUnavailable
+        original=self.service.retriever.search;first=self.store.questions()[0]
+        def search(question,limit):
+            if question==first['question']:raise RetrievalUnavailable('fixture_retrieval',RuntimeError('known local failure'))
+            return original(question,limit)
+        self.service.retriever.search=search;self.complete_quality()
+        state=self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']
+        self.assertEqual(state['technical_failed'],1)
+        self.assertEqual(state['completed'],50)
+        self.assertEqual(self.store.qc_history(first['id']),[])
+        self.assertIn('probe',self.store.missing_quality_stages(first['id']))
+        self.assertEqual(len(self.store.qc_history(self.store.questions()[-1]['id'])),1)
+
+    def test_governed_revision_preserves_id_and_invalidates_quality(self):
+        import copy
+        self.complete_quality();item=next(q for q in self.store.questions() if q['test_category']=='negative')
+        req=copy.deepcopy(item['raw']['business_requirements']);req['auxiliary_information'].append('fixture clarified scope')
+        revision=self.store.start_revision(item['id'],'manual_edit','fixture scope clarification',False,{item['id']:{'business_requirements':req,'expected_response':'fixture expected behavior'}},self.chunks,actor='fixture')
+        for invalid in (None, {}):
+            _,errors,_,_=self.store._validate_revision_drafts(revision,self.chunks,None,{item['id']:{'business_requirements':invalid}})
+            self.assertTrue(errors, 'governed contract cannot be removed')
+        self.store.prepare_revision(revision['id'],self.chunks,similarity=None)
+        ready=self.store.revision_run(revision['id']);self.assertEqual(ready['status'],'preview_ready',ready.get('validation_errors'))
+        self.store.apply_revision(revision['id'],self.chunks,similarity=None)
+        changed=self.store.question(item['id'])
+        self.assertEqual(changed['question'],item['question']);self.assertEqual(changed['id'],item['id'])
+        self.assertEqual(changed['raw']['business_requirements'],req)
+        self.assertEqual(changed['qc_status'],'qc_pending')
+        self.assertIn('probe',self.store.missing_quality_stages(item['id']))
+        self.assertEqual(len(self.store.qc_history(item['id'])),1)

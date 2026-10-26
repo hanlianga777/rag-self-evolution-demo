@@ -1,0 +1,126 @@
+{
+  "content_identity": "GCONTENT-10c6ab67b1ef279d70b4f361",
+  "question_count": 50,
+  "counts": {
+    "machine_qualified": 36,
+    "needs_human_review": 14
+  },
+  "probe": {
+    "passed": 50
+  },
+  "qc": {
+    "qc_passed": 50
+  },
+  "audit": {
+    "passed": 50
+  },
+  "missing": {},
+  "human_gate": {
+    "gate": 1,
+    "status": "pending",
+    "expected": 50,
+    "generated": 50,
+    "machine_qualified": 36,
+    "needs_human_review": 14,
+    "human_approved": 0,
+    "owner_delegated_approved": 0,
+    "approved": 0,
+    "human_review_pending": 14,
+    "profile_complete": true,
+    "coverage_complete": true,
+    "probe_passed": 50,
+    "qc_completed": 50,
+    "qc_passed": 50
+  },
+  "questions_ids_categories_answers_unchanged": true,
+  "minimal_scope_revision": [
+    "Q36"
+  ],
+  "other_49_business_content_unchanged": true,
+  "all_prior_quality_records_preserved": true,
+  "snapshots_experiments_production_unchanged": true,
+  "new_approval_count": 0,
+  "protected_assets_hashes_unchanged": 21,
+  "modified_functions": {
+    "backend/app/ai_service.py": [
+      "quality_check",
+      "_quality_check",
+      "_answerability_check"
+    ],
+    "backend/app/main.py": [
+      "_run_quality_rerun",
+      "perform"
+    ],
+    "backend/app/governance.py": [
+      "candidate_rows",
+      "missing_quality_stages",
+      "update_quality_rerun",
+      "_validate_revision_drafts",
+      "_draft_change"
+    ]
+  },
+  "new_rpc_count": 95,
+  "new_rpc_by_model": {
+    "deepseek-v4-flash": 59,
+    "text-embedding-v4": 18,
+    "qwen3-rerank": 18
+  },
+  "prompt_tokens": 1657967,
+  "completion_tokens": 168045,
+  "deepseek_cost": {
+    "status": "unavailable",
+    "amount": null,
+    "reason": "billing_period_ambiguous",
+    "requested_model": "deepseek-v4-flash",
+    "cost_config_version": "deepseek-flash-2026-09-30",
+    "price_snapshot": {
+      "provider": "DeepSeek",
+      "model": "deepseek-flash",
+      "aliases": [
+        "deepseek-v4-flash"
+      ],
+      "currency": "USD",
+      "unit": 1000000,
+      "source_url": "https://api-docs.deepseek.com/quick_start/pricing",
+      "checked_at": "2026-09-30",
+      "effective_date": "2026-09-30",
+      "billing_mode": "provider_hit_counter",
+      "price_config_version": "deepseek-flash-2026-09-30",
+      "periods": {
+        "peak": {
+          "input_per_million": 0.3,
+          "cached_input_per_million": 0.006,
+          "output_per_million": 1.2
+        },
+        "off_peak": {
+          "input_per_million": 0.15,
+          "cached_input_per_million": 0.003,
+          "output_per_million": 0.6
+        }
+      },
+      "peak_hours_utc": [
+        [
+          1,
+          4
+        ],
+        [
+          6,
+          10
+        ]
+      ],
+      "peak_weekdays": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "holiday_exclusion": "Chinese public holidays; cannot infer weekday peak without verified holiday calendar. Nonpeak hours/weekends unambiguous.",
+      "cost_config_version": "deepseek-flash-2026-09-30"
+    },
+    "calculated_at": "2026-10-26T06:49:07.812988+00:00"
+  },
+  "budget_cap": null,
+  "unknown_requests": false,
+  "offline_tests": "131 passed"
+}

@@ -147,7 +147,7 @@ class PaidRunTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'exists'):
             PaidRun(self.path,20.,self.prices,{'corpus':'new'})
 
-    def test_qc_and_answerability_fail_once_without_changing_normal_defaults(self):
+    def test_qc_network_failure_is_not_blindly_retried(self):
         service = AiService(None,None,SimpleNamespace(settings=SimpleNamespace(model='deepseek-v4-flash')),False)
         for name,args in [('quality_check',({},)),('answerability_check',('q',[],{}))]:
             with patch.object(service,'_'+name,side_effect=ProviderNetworkError('offline')) as call:
@@ -156,7 +156,7 @@ class PaidRunTests(unittest.TestCase):
                 self.assertEqual(call.call_count,1)
             with patch.object(service,'_'+name,side_effect=ProviderNetworkError('offline')) as call:
                 with self.assertRaises(ProviderNetworkError): getattr(service,name)(*args)
-                self.assertEqual(call.call_count,2)
+                self.assertEqual(call.call_count,1 if name=='quality_check' else 2)
 
     def test_parser_failure_is_not_retried(self):
         service = AiService(None,None,SimpleNamespace(settings=SimpleNamespace(model='deepseek-v4-flash')),False)

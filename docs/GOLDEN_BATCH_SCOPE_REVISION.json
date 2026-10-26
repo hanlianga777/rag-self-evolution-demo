@@ -1,0 +1,98 @@
+{
+  "revision_id": "REV-20261026063831330005",
+  "question_id": "V1G-110926448917-36-R122036474962",
+  "before_quality_content_hash": "313303ab3aaab53a97c4d6d860f80865d101962cb07dc137b54b2b738946f0be",
+  "after_quality_content_hash": "a055e45ead5c5993b80a9b1398f7a5fc21231f301876202970e7ac003cc37e19",
+  "backup_sha256": "0c22a32e5852e79ca2be2e95723d85e3b5854bf79a10a47df6c5e7055d980bd0",
+  "question_unchanged": true,
+  "changes": {
+    "business_requirements": {
+      "acceptable_equivalents": [
+        "未找到明确量化标准／需厂家补充"
+      ],
+      "answer_support": [],
+      "auxiliary_information": [
+        "可补充污水箱冲洗步骤，必须保留适用条件；不能将局部流程参数扩用为整体残留达标标准"
+      ],
+      "business_verdicts": [
+        "PASS",
+        "FAIL"
+      ],
+      "conditional_checks": [],
+      "corpus_review_scope": {
+        "chunk_artifact_id": "CHUNK-2df5162a379082558b36",
+        "corpus_snapshot_id": "CORPUS-38c90d5628b68c76d53e",
+        "embedding_artifact_id": "EMB-586ab413e6f5e2e075ce",
+        "index_artifact_id": "IDX-ee5bb4977dcf28f8e2f8",
+        "pipeline_version_id": "KP-c39f689648f5a7cf3a4f",
+        "sources": {
+          "DOC-001": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2",
+          "DOC-002": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb",
+          "DOC-003": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0",
+          "DOC-004": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+        }
+      },
+      "format_is_failure_criterion": false,
+      "prohibited": [
+        "编造冲洗5分钟或若干升水",
+        "宣称随便冲一下就达标",
+        "断言手册完全没有冲洗时长，或把污水箱约30秒扩大为清洁剂管路与污水箱残留均已冲净的保证"
+      ],
+      "required_checks": [
+        {
+          "basis": "corpus_boundary_review",
+          "id": "Q36-R1",
+          "matching": "semantic_equivalence_not_exact_text",
+          "requirement": "说明资料不足以确认清洁剂管路及污水箱残留已完全清除的统一冲洗时长、水量或验收标准，不提供无据的分钟数或升数",
+          "source_chunk_ids": []
+        },
+        {
+          "id": "Q36-R2",
+          "requirement": "如实说明手册的污水箱“水箱冲洗”流程约30秒；该局部流程参数不能作为清洁剂管路或残留已清除的达标保证",
+          "source_chunk_ids": [
+            "DOC-001-C-00197"
+          ],
+          "matching": "semantic_equivalence_not_exact_text"
+        }
+      ],
+      "sources": [
+        {
+          "body_sha256": "86dae936a3563ec12b7efd1fe7ad4cce7abfa591dbae2a309d1e44848d0f382b",
+          "chunk_id": "DOC-001-C-00196",
+          "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+          "document_id": "DOC-001",
+          "pages": [
+            92,
+            92
+          ],
+          "parent_chunk_id": "DOC-001-P-00194",
+          "product": "KIRA B 50",
+          "quote": "冲洗污水箱，结合冲洗系统\n1. 清空污水箱 在盖子打开的情况下将排水管置于排水口上\n2. 在触摸屏上打开菜单“日常护理”\n3. 启动功能“水箱冲洗”",
+          "role": "draft_supplement_only",
+          "section": "冲洗污水箱，结合冲洗系统",
+          "version": null,
+          "version_status": "not_provided"
+        },
+        {
+          "chunk_id": "DOC-001-C-00197",
+          "document_id": "DOC-001",
+          "document": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+          "product": "KIRA B 50",
+          "version": null,
+          "version_status": "not_provided",
+          "pages": [
+            92,
+            93
+          ],
+          "parent_chunk_id": "DOC-001-P-00195",
+          "section": "警告",
+          "quote": "警告\n水箱盖导致受伤危险！\n由于水箱盖意外关闭而导致肢体受挤压的危险\n请打开水箱盖直到止挡位置，以免意外关闭\n当没有任何肢体部位处在水箱和水箱盖之间时，才能关闭水箱盖\n4. 打开污水箱盖罩\n\n5. 将压缩空气软管连接到设备上的压缩空气接口\n6. 盖上污水箱盖\n7. 打开进水口<sub>。</sub>\n8. 进行大约 30 秒的冲洗过程<sub>。</sub>\n9. 关闭进水<sub>。</sub>\n10. 退出功能“水箱冲洗”<sub>。</sub>\n11. 从设备上脱开进水软管\n12. 关闭污水排放软管，然后将其压入支架中\n13. 关闭设备舱的门<sub>。</sub>",
+          "body_sha256": "74f0986954f2897399bc8b5f015d6a3b466da8f1f7bd5b4124fc7293def81635",
+          "role": "partial_fact_context_not_complete_answer"
+        }
+      ]
+    },
+    "expected_response": "手册的污水箱“水箱冲洗”流程写明约30秒，但这只是该功能的流程时长，不能据此保证清洁剂管路及污水箱残留已经完全冲净。现有说明未给出这一整体目标的统一时长、水量或验收标准，相关要求需向厂家确认，不能编造数值。"
+  },
+  "reason": "真实QC82/P1：补齐同章污水箱冲洗约30秒的部分事实及来源，区分局部流程参数与清洁剂管路/残留达标标准；原题和Negative意图不改。"
+}

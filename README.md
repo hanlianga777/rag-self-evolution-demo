@@ -238,3 +238,5 @@ Golden验证分离来源真实性与内容语义：严格核对真实Chunk、原
 50题Probe/QC及人工审核均未完成，本轮没有Provider、正式评测或发布。默认生成版本仍为generation-vnext-1；未改Judge、11 Gate、Agent、Pipeline、知识库或前端。
 
 只读内容核验：`python3 scripts/verify_golden_vnext.py --source-database backend/data/demo.db --self-test`。`scripts/replace_golden_content.py`是本轮一次性替换工具，默认仅prepare，显式--apply先完整备份再事务写入；已应用内容不能重复执行。
+
+Golden 批量恢复与真实结果见 [收口报告](docs/GOLDEN_BATCH_RECOVERY_REPORT.md)：只补缺失/技术中断阶段，已完成质量争议进入审核，Human Gate不自动确认。

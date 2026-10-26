@@ -1,0 +1,836 @@
+[
+  {
+    "QID": "Q01",
+    "id": "V1G-110926448917-01",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 100.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以售后现场口吻描述时区不一致，意图单一明确；答案两步可由 DOC-001-C-00138 的“一般设置”和“设定时区”支持，未引入自动校时等编造步骤；问题自包含、正向可答，与既有问题无实质重复，主题和场景具备业务价值且角色/场景有区分。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q02",
+    "id": "V1G-110926448917-02",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 96.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以现场口吻询问在 KIRA B 50 设置菜单中进入用户配置界面的按钮，意图单一明确；参考答案直接对应来源步骤“在设置菜单中按下‘用户配置’按钮”，语义等价且未引导先新建账号。问题自包含，与既往问题不属于同一核心任务重复，正向可答，主题和场景与材料及业务角色匹配。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q03",
+    "id": "V1G-110926448917-03",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 93.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以售后现场口吻询问如何在 KIRA B 50 上为新清洁主管创建独立账号，意图单一清晰；回答按 DOC-001-C-00134 给出用户配置入口、新建用户、设置并确认密码、选择“主管”用户组及按需调整个别权限的完整步骤，满足 Q03-R1/R2/R3 的必答要求，未触犯禁止项（未只建操作人员账号、未共享既有账号）。答案与问题自包含，未机械枚举或逐字搬运原文；与既有 peer 问题相比，场景和意图不同，无重复。难度仅为观察项，不影响通过。",
+    "reasons": [
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q04",
+    "id": "V1G-110926448917-04",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 88.0,
+    "priority": "P1",
+    "audit_fail": [],
+    "audit_reason": "该问题围绕 KIRA B 50 停用三个月后的长期存放及电池维护，口吻自然，属于单一现场工作任务；答案依据 DOC-001-C-00180 与 DOC-001-C-00185，覆盖室内存放、存放前完全充满、存放期间至少每月重新完全充满，符合必答要求；问题自包含，正问可答，与既往问题无实质重复，主题与材料匹配且场景有区分；未发现机械枚举或依据答案反推改写问题的证据。",
+    "reasons": [
+      "QC P1",
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q05",
+    "id": "V1G-110926448917-05",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 96.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以客服首次交付场景自然询问KIRA B 50操作人员的防护用品；手册个人防护装备段仅要求佩戴合适手套，答案与来源一致，意图单一且正向可答。问题自包含，业务设计先于证据且未见反推改写；与既有安全鞋等级咨询等负向问题不构成语义重复，主题覆盖和场景多样性可接受。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q06",
+    "id": "V1G-110926448917-06",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 90.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "该问题以现场售后维护指导口吻提出，业务目标是确认 KIRA B 50 日常外部清洁前的电气安全要求，意图单一且可验收。参考答案完整覆盖关机、按供电方式断开电源或电池、对接站断开及作业前拔电源、湿手不得触碰插头插座等要点，均有对应说明书依据；未发现语义重复、机械枚举或依赖上文的问题。",
+    "reasons": [
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q07",
+    "id": "V1G-110926448917-07",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 90.0,
+    "priority": "P1",
+    "audit_fail": [],
+    "audit_reason": "样本聚焦 KIRA B 50 粗大污染物滤网的日常保养，问题口语化且意图单一：在安全前提下取出、冲洗并回装滤网。答案覆盖关机并隔离电池、与对接站断开、必要时拔对接站电源、打开盖罩上拉滤网、自来水冲洗和装回污水箱，均有维修保养及滤网清洗章节支撑；未采用对接充电状态下直接拆洗或整机冲洗，条件项处理正确。问题自包含，与既有问题无实质语义重复，属于正向可答，主题和场景匹配，角色与维护意图具有现场多样性。",
+    "reasons": [
+      "QC P1",
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q08",
+    "id": "V1G-110926448917-08",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 90.0,
+    "priority": "P1",
+    "audit_fail": [],
+    "audit_reason": "该题是售后工程师现场维护B2充电器的真实业务问法，要求按手册说明定期保养中的检查与清洁方法，意图单一且自包含。答案覆盖充电器/电池外观与接口检查、损坏充电器禁用、禁用酒精及其他可燃剂，并以“接触式充电器长期未使用”为条件说明断电、干燥软布清洁充电板和机身底部电极、禁用金属刷砂纸，未将长期闲置清洁扩大为所有充电器必做步骤，符合手册适用范围。题面自然，正向可答，与持久化business_design的设计先后关系一致，未见机械搬运、语义重复或主题偏离。",
+    "reasons": [
+      "QC P1",
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q09",
+    "id": "V1G-110926448917-09-R121605382144",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 88.0,
+    "priority": "P1",
+    "audit_fail": [],
+    "audit_reason": "问题围绕终端客户仓库中停用B2电池的报废处置这一单一核心意图，问法自然且具有现场任务价值；答案依据DOC-004废弃章节，覆盖不得丢入普通垃圾、彻底放电后放入指定电池回收箱并遵循当地规定，同时对受损电池要求报废、不擅自放电，符合条件触发要求。问题自包含，非机械搬运或重复，主题与来源匹配，业务场景和角色具有多样性。持久化记录显示业务设计先于证据核验，未发现按证据反推改写问题。",
+    "reasons": [
+      "QC P1",
+      "语义/安全争议待复核"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q10",
+    "id": "V1G-110926448917-10",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 90.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以技术支持现场口吻提出，核心意图单一：确认B2电池包充满后充电器是否需断开、能否继续连接。答案依据DOC-002-C-00023中“充满电后手动断电”“请取下电池包和充电器”等要求，明确应手动断电并断开连接，同时否定“自动停止充电即可一直连接”的误解；未声称必然发生无据事故。问题自包含，非机械枚举或逐字搬运；与既有B2充电流程问题相比聚焦充满后的连接状态，粒度不同，不构成语义重复。正向可答，主题与材料匹配，整体业务场景和角色具有多样性。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q11",
+    "id": "V1G-110926448917-11",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 96.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "该问题以现场安装 KIRA B 50 位置码为真实业务场景，单一意图是确认同一清洁对象内两个位置码能否使用相同代码；答案明确否定重复代码并限定在同一清洁对象内，直接得到来源块 DOC-001-C-00144 中“在一个清洁对象中，所有位置码必须拥有不同的代码”的支持，且未扩大为全球唯一。问题自包含、可正向作答，与既有位置码相关问法在意图上不同，未发现语义重复或机械枚举。辅助信息中“不同路线可包含相同位置码”的遗漏不单独构成失败。整体通过。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q12",
+    "id": "V1G-110926448917-12",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 95.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "该问题以售后工程师现场查看清洁报告为真实业务场景，用户意图单一明确；答案按手册说明先进入“清洁报告”，再按执行日期和时间选择对应已完成任务查看详情，可支持核对清洁面积与时长，未编造远程导出或自动选中最新任务等功能。问题自包含，表达自然，非机械枚举或与既有问题语义重复，正向可答且与所给清洁报告材料主题匹配。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q13",
+    "id": "V1G-110926448917-13",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 95.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以售后工程师在仓库规划 KIRA B 50 清洁区为场景，围绕位置码布置获取可执行规则，意图单一且可验收。答案关于起点/终点复用、垂直表面 66 cm、不覆膜、同清洁对象代码不同、同设备不得重复 ID、不同路线可共用、靠近待清洁区域及启动前置于位置码前等均有对应原文支持，未把共用位置码误写成增贴重复标签，也未遗漏高度等禁止项。问题自包含且为正向可答，与既有位置码问答相比是清洁区整体布置意图，非语义重复；材料主题匹配，角色和场景具有实际业务多样性。",
+    "reasons": [
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q14",
+    "id": "V1G-110926448917-14-R121644121082-R123334431505",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 92.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题为KIRA B50紧急停机单一操作意图，答案与安全提示及紧急停机章节一致；未主动补充恢复运行，故条件检查不触发；与既有问题无语义重复，主题、角色和场景有区分，全部检查通过。",
+    "reasons": [
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q15",
+    "id": "V1G-110926448917-15",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 93.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以现场客服口吻询问手动模式下启用清洁头的操作，意图单一且任务价值明确；回答依据手动模式与清洁头激活的原文步骤，覆盖进入手动清洁、激活清洁头、握紧安全开关推行，并正确说明手册未给出原地静止刷洗条件，未编造强制下降或转刷；问题自包含，与既有问题无实质重复，主题材料匹配，场景与意图具有区分度。",
+    "reasons": [
+      "语义/安全争议待复核"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q16",
+    "id": "V1G-110926448917-16-R123410142321",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 96.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "该问题为B2外接设备接口清单查询，单一意图明确且自包含；答案覆盖1000M-Base-Ethernet、USB 3.0、12V/5V/24V/BAT及机身侧面SDK扩展口，均有DOC-002-C-00020与DOC-002-C-00021依据，未编造协议、针脚或兼容性结论。business_design先于evidence保存，问题非机械搬运或反向改写；现有前序问题中未见同义重复，部署核查外部设备接入条件的场景真实且与B2接口资料匹配。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q17",
+    "id": "V1G-110926448917-17",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 90.0,
+    "priority": "P1",
+    "audit_fail": [],
+    "audit_reason": "样本是B2遥控器更换后的绑定操作，用户意图单一明确；答案按R1/R3区分，给出App设置入口、编码输入及对应指示灯确认，与两段手册依据一致；无重复、无机械搬运，且可独立回答。",
+    "reasons": [
+      "QC P1",
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q18",
+    "id": "V1G-110926448917-18",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 98.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "样本为B2遥控器更换摇杆后的校准操作咨询，场景真实，核心意图单一。答案覆盖进入校准前不碰摇杆、F1+F3同时按下并同时松开、左右摇杆满行程旋转至提示声停止、单按F3生效及App查看状态，均有手册依据。business_question_first设计先于证据，问题为场景化改写而非机械枚举；与既有问题无实质重复，主题与材料匹配。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q19",
+    "id": "V1G-110926448917-19",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 98.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "该问题符合真实操作员确认悬崖提示先行处置的场景；答案依据 DOC-001-C-00236，要求使用个人资料登录，并将登录限定为悬崖附近手动操作的条件，没有授权绕过悬崖保护或登录后自动恢复运行；问题与持久化 business_design 同源且设计时间早于证据核验，未见机械搬运或语义重复；问题自包含、正向可答，材料主题匹配，角色与场景明确。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q20",
+    "id": "V1G-110926448917-20",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 96.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题符合技术支持现场口吻，业务价值明确；核心意图单一，即按手册处理“内部错误”。参考答案与说明书原文一致：先重启机器人，若错误仍存在则联系售后服务部，未承诺带故障继续作业，也未编造拆机维修流程。问题自包含，与已有问题无实质重复，属于正向可答，主题和材料匹配，场景与角色具备区分度。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q21",
+    "id": "V1G-110926448917-21",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 100.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题为售后现场解释R1与R3遥控器升级及发货关系，意图单一明确；答案由DOC-003-C-00003完整支持，覆盖升级时间、操作方式一致、新旧随机发货并以实物为准；未违反禁止项，正向可答，且与既有问题无实质重复，场景、角色和业务意图具有实际价值与区分度。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q22",
+    "id": "V1G-110926448917-22",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 95.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题聚焦R3遥控器开机这一单一任务，答案按DOC-003-C-00010给出短按后长按2秒以上及两声提示，未混入关机三声；用户口吻自然、自包含，且与既有问题无实质重复。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q23",
+    "id": "V1G-110926448917-23",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 95.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以客户现场安全培训口吻询问 KIRA B 50 手册中危险等级定义，意图单一明确；答案按危险、警告、小心、注意四级给出严重程度，与 DOC-001-P-00008/P-00009 原文语义一致，注意项明确为财产损失、未混入人身伤害等级。问题自包含，非机械搬运或与既有问题重复，属正向可答且材料主题匹配，场景和角色也具业务多样性。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q24",
+    "id": "V1G-110926448917-24",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 96.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以现场操作员口吻询问 KIRA B 50 使用清洁剂运行的一般安全提示，意图单一且可答；答案各条均有 DOC-001-C-00022 和 DOC-001-C-00118 支撑，覆盖推荐清洁剂、禁用成分、强发泡限制、稀释要求、厂家说明、儿童保管及溅眼/误吞处置。与既有清洁剂残留冲洗、能否加入某瓶清洁剂等问题语义不同，不属于重复；主题、场景和角色与资料范围匹配，未发现机械搬运、证据反推或安全边界错误。",
+    "reasons": [
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q25",
+    "id": "V1G-110926448917-25",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 100.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "题目以客户现场首次使用B2插入式充电器为场景，核心意图是安全完成充电；答案依据源文覆盖电池关闭并取出、电源匹配、先接交流电源再接电池、1Hz指示灯状态、充满后断开，以及刚运行后待降至室温等要求，未出现带电插拔或连接顺序颠倒，且与既有题目无实质重复。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q26",
+    "id": "V1G-110926448917-26",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 96.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "该题是KIRA B 50现场按位置码查找路线的可答操作问题，用户口吻自然，工作任务明确。答案两步均有DOC-001-C-00154支持：点击位置码开关按起点位置码排序，再打开包含目标位置码的文件夹查找路线；未擅自断定位置码只对应唯一路线。题目自包含、正向可答，材料主题匹配，且与既有位置码设置、路线选择澄清等意图不同，未发现语义重复或机械枚举。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q27",
+    "id": "V1G-110926448917-27-R123429216749",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 92.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以现场桌椅布局变化为场景，询问 KIRA B50 自动清洁前的处理方式；答案依据原文区分细微与重大变化，说明重大变化需重新示教路线，并明确地图不具备自学习功能，未违反禁止项。问题自包含、为正向可答，与既有问题无实质重复，业务意图和场景具有独立性。",
+    "reasons": [
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q28",
+    "id": "V1G-110926448917-28",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 96.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "问题以售后现场更换 KIRA B 50 刷辊为真实场景，意图单一明确且自包含。答案先给出断电、断开电池/对接站的安全前提，再按手册覆盖拆旧刷辊、装新刷辊、转动居中、端盖卡入轴承盖及防撞板复位，未编造左右旋方向。business_design 先于 evidence 保存且未见反推改写；问题非机械搬运，与既有刷子/对接站澄清题不重复，正向可答且材料主题匹配。",
+    "reasons": [
+      "检索不连贯"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q29",
+    "id": "V1G-110926448917-29",
+    "probe": "probe_passed",
+    "classification": "RETRIEVAL_INCOHERENT",
+    "qc": "qc_passed",
+    "score": 92.0,
+    "priority": "P2",
+    "audit_fail": [
+      "copying"
+    ],
+    "audit_reason": "除 copying 外其余项通过。答案与来源不带电检查表逐项对应，五类检查完整，未把不带电检查扩展为安全故障恢复授权；但持久化 business_design 要求的是全面保养（清洁方法、电池维护、安全注意事项），当前问题却收窄为不带电检查清单，答案也基本复述该表，且元数据无修订谱系或来源证明设计先于证据，故 copying 不通过。",
+    "reasons": [
+      "检索不连贯",
+      "题目质量需修订"
+    ],
+    "missing": []
+  },
+  {
+    "QID": "Q30",
+    "id": "V1G-110926448917-30-R131552256939",
+    "probe": "probe_passed",
+    "classification": "EVIDENCE_VALID",
+    "qc": "qc_passed",
+    "score": 100.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "该题为现场技术支持场景下的单一报警处置意图，问题自包含产品型号与报警文本，口吻自然；答案依据 DOC-001-C-00233 解释报警原因并给出“两轮之间红色杠杆向右推使制动器接合”的处置，符合必答点且未出现向左推、释放制动器或编造上电试跑等禁止内容；business_design 先于证据保存，问题未被证据反推改写；与 prior_questions 中其他报警或维护问题无语义重复，主题与材料匹配，正向可答。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q31",
+    "id": "V1G-110926448917-31",
+    "probe": "probe_passed",
+    "classification": "NEGATIVE_VALID",
+    "qc": "qc_passed",
+    "score": 95.0,
+    "priority": "P2",
+    "audit_fail": [],
+    "audit_reason": "该问题面向售后现场，核心意图单一：确认现有资料能否提供B2遥控器官方强制复位按键组合。元数据按资料未覆盖处理为insufficient_evidence，并明确禁止编造按键组合，负向边界合理。问题自包含、口吻自然，与既有配对、校准、开机等主题语义不重复，具有实际排查价值。",
+    "reasons": [],
+    "missing": []
+  },
+  {
+    "QID": "Q32",
+    "id": "V1G-110926448917-32",
+    "probe": "probe_passed",
+    "classification": "NEGATIVE_VALID",
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": "该题以售后现场确认医院感染控制平台接口对接可行性为真实任务，核心意图单一：确认操作说明书中是否提供 HL7/FHIR 接口协议或字段说明。现有资料仅覆盖清洁报告查看功能，未提供接口协议或上传字段，按语料边界应判 insufficient_evidence，且未断言产品绝不支持接口、未编造协议字段。问题自包含、非机械枚举搬运，与 prior_questions 无语义重复；负向类型、材料主题和角色场景多样性均符合要求。",
+    "reasons": [
+      "QC 未执行"
+    ],
+    "missing": [
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q33",
+    "id": "V1G-110926448917-33",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q34",
+    "id": "V1G-110926448917-34-R122000134985-R124446127201",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q35",
+    "id": "V1G-110926448917-35",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q36",
+    "id": "V1G-110926448917-36-R122036474962",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q37",
+    "id": "V1G-110926448917-37",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q38",
+    "id": "V1G-110926448917-38",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q39",
+    "id": "V1G-110926448917-39",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q40",
+    "id": "V1G-110926448917-40",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q41",
+    "id": "V1G-110926448917-41",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q42",
+    "id": "V1G-110926448917-42-R122110917880-R124502591488",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q43",
+    "id": "V1G-110926448917-43",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q44",
+    "id": "V1G-110926448917-44-R122200100987-R124516421396",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q45",
+    "id": "V1G-110926448917-45-R122231403350-R124530599411",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q46",
+    "id": "V1G-110926448917-46-R122330616323-R124558701867",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q47",
+    "id": "V1G-110926448917-47",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q48",
+    "id": "V1G-110926448917-48",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q49",
+    "id": "V1G-110926448917-49",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  },
+  {
+    "QID": "Q50",
+    "id": "V1G-110926448917-50-R122406390043-R124544152999",
+    "probe": "probe_pending",
+    "classification": null,
+    "qc": "qc_pending",
+    "score": null,
+    "priority": null,
+    "audit_fail": [],
+    "audit_reason": null,
+    "reasons": [
+      "Probe 未执行",
+      "QC 未执行",
+      "题目质量审计待执行"
+    ],
+    "missing": [
+      "business_audit",
+      "probe",
+      "qc"
+    ]
+  }
+]

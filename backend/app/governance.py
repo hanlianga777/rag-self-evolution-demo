@@ -371,12 +371,12 @@ class GovernanceStore:
             content_hash = self._quality_content(item)
             reasons = []
             if item['probe_status'] != 'probe_passed' or not item['probe_id']:
-                reasons.append('Probe 未通过')
+                reasons.append('Probe 未执行' if not item['probe_id'] else 'Probe 未通过')
             if item['qc_status'] != 'qc_passed' or not item['qc_id']:
-                reasons.append('QC 未通过')
+                reasons.append('QC 未执行' if not item['qc_id'] else 'QC 未通过')
             qc = _load(item.get('qc_summary_json'), {})
             qc_state = self._golden_qc_state(item, qc)
-            if not qc_state['passed']: reasons.append('QC 分数未达85或存在阻断')
+            if item['qc_id'] and not qc_state['passed']: reasons.append('QC 分数未达85或存在阻断')
             if qc_state['needs_review']: reasons.append('QC P1' if item['priority']=='P1' else '语义/安全争议待复核')
             if item['classification'] not in {None, 'EVIDENCE_VALID','NEGATIVE_VALID'}:
                 reasons.append({'RETRIEVAL_INCOHERENT':'检索不连贯','FAKE_NEGATIVE_RISK':'负向证据需复核'}.get(item['classification'], '证据需复核'))
@@ -969,6 +969,22 @@ class GovernanceStore:
                 connection.execute("INSERT OR REPLACE INTO pipeline_config_draft VALUES (1, ?)", (_json({**draft, "updated_at": _now()}),))
         return self.pipeline_draft()
 
+    def missing_quality_stages(self, question_id):
+        """Only missing/stale/technical stages need execution; quality disputes need review."""
+        item, identity = self.capture_quality(question_id)
+        binding = {k:v for k,v in identity.items() if k != 'probe_id'}
+        row = self.candidate_rows([question_id])[0]
+        missing = ['business_audit'] if item['raw'].get('generation_strategy') == 'business_v2' and not row['quality_audit'] else []
+        probes = self.probe_history(question_id)
+        probe = probes[0] if probes else None
+        if not probe or any(probe.get('execution_identity',{}).get(k) != v for k,v in binding.items()) or probe.get('probe_details',{}).get('probe_execution_status') in {'failed','uncertain'}:
+            return missing + ['probe', 'qc']
+        if probe['status'] == 'passed':
+            qc = self.qc_history(question_id)
+            if not qc or qc[0]['result'].get('execution_identity') != identity:
+                missing.append('qc')
+        return missing
+
     def update_quality_rerun(self, run_id: str, changes: dict, *, start: bool = False, anomalies_only: bool = False):
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -991,12 +1007,12 @@ class GovernanceStore:
             if start and previous.get("status") == "running":
                 raise ValueError("本轮 Probe / QC 已在运行")
             if start and anomalies_only:
-                eligible = {item['id'] for item in self.candidate_rows(ids) if item['qualification_status']=='needs_human_review'}
+                eligible = {key for key in ids if self.missing_quality_stages(key)}
                 ids = [question_id for question_id in ids if question_id in eligible]
                 if not ids:
-                    raise ValueError("没有需要重跑的异常项")
+                    raise ValueError("没有缺失或技术中断的检查阶段；已完成的质量争议请进入审核")
                 changes = {**changes, "total": len(ids), "question_ids": ids, "scope": "anomalies"}
-            audit["quality_rerun"] = {**previous, **changes, **({"attempt_id":uuid.uuid4().hex} if start else {})}
+            audit["quality_rerun"] = {**previous, **changes, **({"attempt_id":uuid.uuid4().hex, "error":None, "finished_at":None} if start else {})}
             connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json = ? WHERE generation_run_id = ?", (_json(audit), run_id))
             if changes.get("status")=="completed":
                 connection.execute("UPDATE golden_generation_runs SET status='completed' WHERE id=?",(run_id,))
@@ -1249,9 +1265,14 @@ class GovernanceStore:
                 continue
             allowed = {"question", "reference_answer", "source_chunk_ids", "ablation_metadata"}
             business_fields = ('business_scenario', 'user_intent', 'difficulty', 'expected_response') if old['raw'].get('generation_strategy') == 'business_v2' else ()
+            if old['raw'].get('business_requirements'):
+                business_fields += ('business_requirements',)
             allowed.update(business_fields)
             if set(change) - allowed:
                 errors.append(f"{item_id}: 包含不可修改字段")
+                continue
+            if 'business_requirements' in change and not isinstance(change['business_requirements'], dict):
+                errors.append(f'{item_id}: 不可移除已治理的业务检查点合同')
                 continue
             source_ids = change.get("source_chunk_ids", [key for evidence in old["evidence"] for key in evidence.get("source_chunk_ids", [])])
             if not isinstance(source_ids, list) or any(not isinstance(key, str) or key not in by_chunk for key in source_ids):
@@ -1294,7 +1315,7 @@ class GovernanceStore:
             service = getattr(similarity, '__self__', None)
             if source_ids and service and isinstance(getattr(service, 'corpus', None), CorpusStore):
                 context['original_tables'] = service.corpus.original_tables([by_chunk[key] for key in source_ids])
-            if frozen and old['test_category'] == 'negative':
+            if frozen and old['test_category'] == 'negative' and candidate['question'] != old['question']:
                 try:
                     context['question_embedding'] = AiService(self, CorpusStore(), None, True).negative_topic_embedding(candidate['question'])
                 except (OSError, ValueError, RuntimeError):
@@ -1333,6 +1354,8 @@ class GovernanceStore:
     @staticmethod
     def _draft_change(draft: dict):
         business = {key:draft['raw'].get(key) for key in ('business_scenario','user_intent','difficulty','expected_response')} if draft['raw'].get('generation_strategy') == 'business_v2' else {}
+        if draft['raw'].get('business_requirements'):
+            business['business_requirements'] = draft['raw']['business_requirements']
         return {**business, "question": draft["question"], "reference_answer": draft["reference_answer"], "source_chunk_ids": [key for evidence in draft["evidence"] for key in evidence.get("source_chunk_ids", [])], "ablation_metadata": draft["raw"].get("ablation_metadata", {})}
 
     def _begin_preview_attempt(self, revision_id: str, question_ids: list[str], expected_hashes: dict, kind: str, changes: dict | None = None, **intent):
