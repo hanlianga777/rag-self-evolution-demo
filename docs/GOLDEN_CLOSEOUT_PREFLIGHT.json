@@ -1,0 +1,650 @@
+{
+  "kind": "offline preflight; no Provider calls or formal quality writes",
+  "content_identity": "GCONTENT-10c6ab67b1ef279d70b4f361",
+  "questions": 50,
+  "counts": {
+    "business_audit": 50,
+    "qc": 50,
+    "answerability": 18,
+    "negative_subtype": 2
+  },
+  "deepseek_model": "deepseek-v4-flash",
+  "embedding_model": "text-embedding-v4",
+  "rerank_model": "qwen3-rerank",
+  "input_token_estimate_method": "UTF-8 payload bytes +128 framing per call; negative uses four largest canonical chunks; runtime full retrieval trace may vary, require final budget reservation",
+  "deepseek_input_byte_token_estimate": 5372995,
+  "deepseek_max_output_tokens": 1875968,
+  "embedding_input_byte_token_bound": 13998,
+  "rerank_input_byte_token_bound": 1920898,
+  "nominal_calls_upper": 220,
+  "transport_attempts_upper": 220,
+  "outer_automatic_retries": 0,
+  "peak_deepseek_yuan_payload_estimate": 25.7537,
+  "payloads": [
+    {
+      "question_id": "V1G-110926448917-01",
+      "phase": "business_audit",
+      "input_bytes_bound": 50597
+    },
+    {
+      "question_id": "V1G-110926448917-01",
+      "phase": "qc",
+      "input_bytes_bound": 11895
+    },
+    {
+      "question_id": "V1G-110926448917-02",
+      "phase": "business_audit",
+      "input_bytes_bound": 52075
+    },
+    {
+      "question_id": "V1G-110926448917-02",
+      "phase": "qc",
+      "input_bytes_bound": 14924
+    },
+    {
+      "question_id": "V1G-110926448917-03",
+      "phase": "business_audit",
+      "input_bytes_bound": 56803
+    },
+    {
+      "question_id": "V1G-110926448917-03",
+      "phase": "qc",
+      "input_bytes_bound": 21895
+    },
+    {
+      "question_id": "V1G-110926448917-04",
+      "phase": "business_audit",
+      "input_bytes_bound": 56187
+    },
+    {
+      "question_id": "V1G-110926448917-04",
+      "phase": "qc",
+      "input_bytes_bound": 18040
+    },
+    {
+      "question_id": "V1G-110926448917-05",
+      "phase": "business_audit",
+      "input_bytes_bound": 48655
+    },
+    {
+      "question_id": "V1G-110926448917-05",
+      "phase": "qc",
+      "input_bytes_bound": 7569
+    },
+    {
+      "question_id": "V1G-110926448917-06",
+      "phase": "business_audit",
+      "input_bytes_bound": 65322
+    },
+    {
+      "question_id": "V1G-110926448917-06",
+      "phase": "qc",
+      "input_bytes_bound": 29730
+    },
+    {
+      "question_id": "V1G-110926448917-07",
+      "phase": "business_audit",
+      "input_bytes_bound": 64693
+    },
+    {
+      "question_id": "V1G-110926448917-07",
+      "phase": "qc",
+      "input_bytes_bound": 29990
+    },
+    {
+      "question_id": "V1G-110926448917-08",
+      "phase": "business_audit",
+      "input_bytes_bound": 61091
+    },
+    {
+      "question_id": "V1G-110926448917-08",
+      "phase": "qc",
+      "input_bytes_bound": 26325
+    },
+    {
+      "question_id": "V1G-110926448917-09-R121605382144",
+      "phase": "business_audit",
+      "input_bytes_bound": 55488
+    },
+    {
+      "question_id": "V1G-110926448917-09-R121605382144",
+      "phase": "qc",
+      "input_bytes_bound": 13177
+    },
+    {
+      "question_id": "V1G-110926448917-10",
+      "phase": "business_audit",
+      "input_bytes_bound": 55991
+    },
+    {
+      "question_id": "V1G-110926448917-10",
+      "phase": "qc",
+      "input_bytes_bound": 19491
+    },
+    {
+      "question_id": "V1G-110926448917-11",
+      "phase": "business_audit",
+      "input_bytes_bound": 53255
+    },
+    {
+      "question_id": "V1G-110926448917-11",
+      "phase": "qc",
+      "input_bytes_bound": 12836
+    },
+    {
+      "question_id": "V1G-110926448917-12",
+      "phase": "business_audit",
+      "input_bytes_bound": 51966
+    },
+    {
+      "question_id": "V1G-110926448917-12",
+      "phase": "qc",
+      "input_bytes_bound": 13783
+    },
+    {
+      "question_id": "V1G-110926448917-13",
+      "phase": "business_audit",
+      "input_bytes_bound": 67378
+    },
+    {
+      "question_id": "V1G-110926448917-13",
+      "phase": "qc",
+      "input_bytes_bound": 33758
+    },
+    {
+      "question_id": "V1G-110926448917-14-R121644121082-R123334431505",
+      "phase": "business_audit",
+      "input_bytes_bound": 60699
+    },
+    {
+      "question_id": "V1G-110926448917-14-R121644121082-R123334431505",
+      "phase": "qc",
+      "input_bytes_bound": 21124
+    },
+    {
+      "question_id": "V1G-110926448917-15",
+      "phase": "business_audit",
+      "input_bytes_bound": 55051
+    },
+    {
+      "question_id": "V1G-110926448917-15",
+      "phase": "qc",
+      "input_bytes_bound": 18068
+    },
+    {
+      "question_id": "V1G-110926448917-16-R123410142321",
+      "phase": "business_audit",
+      "input_bytes_bound": 56221
+    },
+    {
+      "question_id": "V1G-110926448917-16-R123410142321",
+      "phase": "qc",
+      "input_bytes_bound": 16789
+    },
+    {
+      "question_id": "V1G-110926448917-17",
+      "phase": "business_audit",
+      "input_bytes_bound": 65967
+    },
+    {
+      "question_id": "V1G-110926448917-17",
+      "phase": "qc",
+      "input_bytes_bound": 39836
+    },
+    {
+      "question_id": "V1G-110926448917-18",
+      "phase": "business_audit",
+      "input_bytes_bound": 57166
+    },
+    {
+      "question_id": "V1G-110926448917-18",
+      "phase": "qc",
+      "input_bytes_bound": 21456
+    },
+    {
+      "question_id": "V1G-110926448917-19",
+      "phase": "business_audit",
+      "input_bytes_bound": 50436
+    },
+    {
+      "question_id": "V1G-110926448917-19",
+      "phase": "qc",
+      "input_bytes_bound": 9855
+    },
+    {
+      "question_id": "V1G-110926448917-20",
+      "phase": "business_audit",
+      "input_bytes_bound": 49416
+    },
+    {
+      "question_id": "V1G-110926448917-20",
+      "phase": "qc",
+      "input_bytes_bound": 8621
+    },
+    {
+      "question_id": "V1G-110926448917-21",
+      "phase": "business_audit",
+      "input_bytes_bound": 50727
+    },
+    {
+      "question_id": "V1G-110926448917-21",
+      "phase": "qc",
+      "input_bytes_bound": 10156
+    },
+    {
+      "question_id": "V1G-110926448917-22",
+      "phase": "business_audit",
+      "input_bytes_bound": 55218
+    },
+    {
+      "question_id": "V1G-110926448917-22",
+      "phase": "qc",
+      "input_bytes_bound": 17849
+    },
+    {
+      "question_id": "V1G-110926448917-23",
+      "phase": "business_audit",
+      "input_bytes_bound": 53690
+    },
+    {
+      "question_id": "V1G-110926448917-23",
+      "phase": "qc",
+      "input_bytes_bound": 12822
+    },
+    {
+      "question_id": "V1G-110926448917-24",
+      "phase": "business_audit",
+      "input_bytes_bound": 60187
+    },
+    {
+      "question_id": "V1G-110926448917-24",
+      "phase": "qc",
+      "input_bytes_bound": 27632
+    },
+    {
+      "question_id": "V1G-110926448917-25",
+      "phase": "business_audit",
+      "input_bytes_bound": 54353
+    },
+    {
+      "question_id": "V1G-110926448917-25",
+      "phase": "qc",
+      "input_bytes_bound": 18177
+    },
+    {
+      "question_id": "V1G-110926448917-26",
+      "phase": "business_audit",
+      "input_bytes_bound": 50165
+    },
+    {
+      "question_id": "V1G-110926448917-26",
+      "phase": "qc",
+      "input_bytes_bound": 9772
+    },
+    {
+      "question_id": "V1G-110926448917-27-R123429216749",
+      "phase": "business_audit",
+      "input_bytes_bound": 51884
+    },
+    {
+      "question_id": "V1G-110926448917-27-R123429216749",
+      "phase": "qc",
+      "input_bytes_bound": 10684
+    },
+    {
+      "question_id": "V1G-110926448917-28",
+      "phase": "business_audit",
+      "input_bytes_bound": 66311
+    },
+    {
+      "question_id": "V1G-110926448917-28",
+      "phase": "qc",
+      "input_bytes_bound": 33538
+    },
+    {
+      "question_id": "V1G-110926448917-29",
+      "phase": "business_audit",
+      "input_bytes_bound": 57271
+    },
+    {
+      "question_id": "V1G-110926448917-29",
+      "phase": "qc",
+      "input_bytes_bound": 21874
+    },
+    {
+      "question_id": "V1G-110926448917-30-R131552256939",
+      "phase": "business_audit",
+      "input_bytes_bound": 50000
+    },
+    {
+      "question_id": "V1G-110926448917-30-R131552256939",
+      "phase": "qc",
+      "input_bytes_bound": 10032
+    },
+    {
+      "question_id": "V1G-110926448917-31",
+      "phase": "business_audit",
+      "input_bytes_bound": 46475
+    },
+    {
+      "question_id": "V1G-110926448917-31",
+      "phase": "qc",
+      "input_bytes_bound": 5294
+    },
+    {
+      "question_id": "V1G-110926448917-31",
+      "phase": "answerability",
+      "input_bytes_bound": 85853
+    },
+    {
+      "question_id": "V1G-110926448917-32",
+      "phase": "business_audit",
+      "input_bytes_bound": 51697
+    },
+    {
+      "question_id": "V1G-110926448917-32",
+      "phase": "qc",
+      "input_bytes_bound": 18338
+    },
+    {
+      "question_id": "V1G-110926448917-32",
+      "phase": "answerability",
+      "input_bytes_bound": 147499
+    },
+    {
+      "question_id": "V1G-110926448917-33",
+      "phase": "business_audit",
+      "input_bytes_bound": 46485
+    },
+    {
+      "question_id": "V1G-110926448917-33",
+      "phase": "qc",
+      "input_bytes_bound": 5620
+    },
+    {
+      "question_id": "V1G-110926448917-33",
+      "phase": "answerability",
+      "input_bytes_bound": 155998
+    },
+    {
+      "question_id": "V1G-110926448917-34-R122000134985-R124446127201",
+      "phase": "business_audit",
+      "input_bytes_bound": 46887
+    },
+    {
+      "question_id": "V1G-110926448917-34-R122000134985-R124446127201",
+      "phase": "qc",
+      "input_bytes_bound": 5168
+    },
+    {
+      "question_id": "V1G-110926448917-34-R122000134985-R124446127201",
+      "phase": "answerability",
+      "input_bytes_bound": 16343
+    },
+    {
+      "question_id": "V1G-110926448917-35",
+      "phase": "business_audit",
+      "input_bytes_bound": 48673
+    },
+    {
+      "question_id": "V1G-110926448917-35",
+      "phase": "qc",
+      "input_bytes_bound": 17439
+    },
+    {
+      "question_id": "V1G-110926448917-35",
+      "phase": "answerability",
+      "input_bytes_bound": 147535
+    },
+    {
+      "question_id": "V1G-110926448917-36-R122036474962",
+      "phase": "business_audit",
+      "input_bytes_bound": 49449
+    },
+    {
+      "question_id": "V1G-110926448917-36-R122036474962",
+      "phase": "qc",
+      "input_bytes_bound": 17749
+    },
+    {
+      "question_id": "V1G-110926448917-36-R122036474962",
+      "phase": "answerability",
+      "input_bytes_bound": 147534
+    },
+    {
+      "question_id": "V1G-110926448917-37",
+      "phase": "business_audit",
+      "input_bytes_bound": 46682
+    },
+    {
+      "question_id": "V1G-110926448917-37",
+      "phase": "qc",
+      "input_bytes_bound": 16869
+    },
+    {
+      "question_id": "V1G-110926448917-37",
+      "phase": "answerability",
+      "input_bytes_bound": 147553
+    },
+    {
+      "question_id": "V1G-110926448917-38",
+      "phase": "business_audit",
+      "input_bytes_bound": 55341
+    },
+    {
+      "question_id": "V1G-110926448917-38",
+      "phase": "qc",
+      "input_bytes_bound": 36613
+    },
+    {
+      "question_id": "V1G-110926448917-38",
+      "phase": "answerability",
+      "input_bytes_bound": 85919
+    },
+    {
+      "question_id": "V1G-110926448917-39",
+      "phase": "business_audit",
+      "input_bytes_bound": 52901
+    },
+    {
+      "question_id": "V1G-110926448917-39",
+      "phase": "qc",
+      "input_bytes_bound": 35393
+    },
+    {
+      "question_id": "V1G-110926448917-39",
+      "phase": "answerability",
+      "input_bytes_bound": 85817
+    },
+    {
+      "question_id": "V1G-110926448917-40",
+      "phase": "business_audit",
+      "input_bytes_bound": 46783
+    },
+    {
+      "question_id": "V1G-110926448917-40",
+      "phase": "qc",
+      "input_bytes_bound": 5594
+    },
+    {
+      "question_id": "V1G-110926448917-40",
+      "phase": "answerability",
+      "input_bytes_bound": 155912
+    },
+    {
+      "question_id": "V1G-110926448917-41",
+      "phase": "business_audit",
+      "input_bytes_bound": 59720
+    },
+    {
+      "question_id": "V1G-110926448917-41",
+      "phase": "qc",
+      "input_bytes_bound": 20928
+    },
+    {
+      "question_id": "V1G-110926448917-41",
+      "phase": "answerability",
+      "input_bytes_bound": 147461
+    },
+    {
+      "question_id": "V1G-110926448917-42-R122110917880-R124502591488",
+      "phase": "business_audit",
+      "input_bytes_bound": 58786
+    },
+    {
+      "question_id": "V1G-110926448917-42-R122110917880-R124502591488",
+      "phase": "qc",
+      "input_bytes_bound": 10842
+    },
+    {
+      "question_id": "V1G-110926448917-42-R122110917880-R124502591488",
+      "phase": "answerability",
+      "input_bytes_bound": 16344
+    },
+    {
+      "question_id": "V1G-110926448917-43",
+      "phase": "business_audit",
+      "input_bytes_bound": 46760
+    },
+    {
+      "question_id": "V1G-110926448917-43",
+      "phase": "qc",
+      "input_bytes_bound": 5492
+    },
+    {
+      "question_id": "V1G-110926448917-43",
+      "phase": "answerability",
+      "input_bytes_bound": 155951
+    },
+    {
+      "question_id": "V1G-110926448917-44-R122200100987-R124516421396",
+      "phase": "business_audit",
+      "input_bytes_bound": 47293
+    },
+    {
+      "question_id": "V1G-110926448917-44-R122200100987-R124516421396",
+      "phase": "qc",
+      "input_bytes_bound": 5382
+    },
+    {
+      "question_id": "V1G-110926448917-44-R122200100987-R124516421396",
+      "phase": "answerability",
+      "input_bytes_bound": 16006
+    },
+    {
+      "question_id": "V1G-110926448917-45-R122231403350-R124530599411",
+      "phase": "business_audit",
+      "input_bytes_bound": 47317
+    },
+    {
+      "question_id": "V1G-110926448917-45-R122231403350-R124530599411",
+      "phase": "qc",
+      "input_bytes_bound": 5400
+    },
+    {
+      "question_id": "V1G-110926448917-45-R122231403350-R124530599411",
+      "phase": "answerability",
+      "input_bytes_bound": 16012
+    },
+    {
+      "question_id": "V1G-110926448917-46-R122330616323-R124558701867",
+      "phase": "business_audit",
+      "input_bytes_bound": 53183
+    },
+    {
+      "question_id": "V1G-110926448917-46-R122330616323-R124558701867",
+      "phase": "qc",
+      "input_bytes_bound": 7739
+    },
+    {
+      "question_id": "V1G-110926448917-46-R122330616323-R124558701867",
+      "phase": "answerability",
+      "input_bytes_bound": 92529
+    },
+    {
+      "question_id": "V1G-110926448917-47",
+      "phase": "business_audit",
+      "input_bytes_bound": 46703
+    },
+    {
+      "question_id": "V1G-110926448917-47",
+      "phase": "qc",
+      "input_bytes_bound": 5336
+    },
+    {
+      "question_id": "V1G-110926448917-47",
+      "phase": "answerability",
+      "input_bytes_bound": 85865
+    },
+    {
+      "question_id": "V1G-110926448917-48",
+      "phase": "business_audit",
+      "input_bytes_bound": 54850
+    },
+    {
+      "question_id": "V1G-110926448917-48",
+      "phase": "qc",
+      "input_bytes_bound": 36450
+    },
+    {
+      "question_id": "V1G-110926448917-48",
+      "phase": "answerability",
+      "input_bytes_bound": 85868
+    },
+    {
+      "question_id": "V1G-110926448917-49",
+      "phase": "business_audit",
+      "input_bytes_bound": 62691
+    },
+    {
+      "question_id": "V1G-110926448917-49",
+      "phase": "qc",
+      "input_bytes_bound": 22129
+    },
+    {
+      "question_id": "V1G-110926448917-49",
+      "phase": "negative_subtype",
+      "input_bytes_bound": 14672
+    },
+    {
+      "question_id": "V1G-110926448917-50-R122406390043-R124544152999",
+      "phase": "business_audit",
+      "input_bytes_bound": 47420
+    },
+    {
+      "question_id": "V1G-110926448917-50-R122406390043-R124544152999",
+      "phase": "qc",
+      "input_bytes_bound": 5839
+    },
+    {
+      "question_id": "V1G-110926448917-50-R122406390043-R124544152999",
+      "phase": "negative_subtype",
+      "input_bytes_bound": 14653
+    }
+  ],
+  "not_reusable": [
+    "historical Probe/QC",
+    "old approvals/delegation",
+    "old semantic review",
+    "old frozen Snapshot"
+  ],
+  "current_reusable_quality": 0,
+  "recommended_separate_budget_yuan": 40,
+  "execution_authorized": false,
+  "retry_policy": "controlled_run: one attempt per RPC; no automatic retry; unknown execution/usage stops; explicit future retry requires reconciliation and separate authorization",
+  "execution_mode": "existing _run_quality_rerun under existing controlled_run/PaidRun; browser thread alone does not carry fee budget context",
+  "price_checked_date": "2026-10-26",
+  "price_sources": [
+    "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+    "https://help.aliyun.com/zh/model-studio/billing-for-knowledge-base"
+  ],
+  "rates_cny_per_million": {
+    "deepseek_peak_input_uncached": 2,
+    "deepseek_peak_output": 8,
+    "embedding": 0.5,
+    "rerank": 0.5
+  },
+  "embedding_rerank_yuan_byte_estimate": 0.967448,
+  "total_peak_payload_estimate_yuan": 26.7211,
+  "estimate_limitations": "Payloads captured offline with explicit fixture Probe observations; actual vector/rerank context and QC Probe trace differ. Byte-based estimate is intentionally conservative for captured texts, not a hard runtime token bound. Output assumes every call reaches frozen cap; reserve actual request input and output against 40 CNY before sending. No cached discounts/free quota assumed."
+}

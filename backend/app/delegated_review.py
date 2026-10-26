@@ -67,6 +67,9 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
     # Legacy Medium authorization had no profile; it never authorizes Mini.
     if auth.get('profile')!=scope and not (name=='medium' and 'profile' not in auth):
         raise ValueError('Owner authorization Profile changed or unavailable')
+    governed=any(item['raw'].get('business_requirements') for item in items.values())
+    if governed and (auth.get('content_identity')!=state.get('content_identity') or auth.get('content_hashes')!={key:content_hash(items[key]) for key in run['question_ids']}):
+        raise ValueError('Owner authorization current content identity unavailable or changed')
     count=scope['expected_count']
     ids=run['question_ids']
     if len(ids)!=count or len(set(ids))!=count or len(reviews)!=count or {r['question_id'] for r in reviews}!=set(ids):
@@ -74,8 +77,9 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
     if Counter(items[key]['test_category'] for key in ids)!=Counter({group:scope[f'{group}_count'] for group in ('positive','ablation','negative')}) or len(state['frozen_plan'].get('clusters',[]))!=9:
         raise ValueError('Owner delegation Profile groups/Topics changed')
     def reviewable(row):
+        if (row.get('qc',{}).get('score',0)<85 or row.get('qc',{}).get('priority')=='P0') and governed:return False
         if row['qualification_status'] in {'machine_qualified','owner_delegated_approved'}: return True
-        return set(row.get('attention_reasons',[])) in ({'检索不连贯'},{'QC P1','检索不连贯'}) and row.get('probe_status')=='probe_passed' and row.get('qc_status')=='qc_passed'
+        return bool(row.get('attention_reasons')) and set(row.get('attention_reasons',[])) <= {'检索不连贯','QC P1','语义/安全争议待复核'} and row.get('probe_status')=='probe_passed' and row.get('qc_status')=='qc_passed'
     if run['status']!='completed' or any(not reviewable(r) for r in rows) or {r['id'] for r in rows}!=set(ids):
         raise ValueError('Owner delegation cannot waive machine quality')
     from .business_golden import CHECKS as BUSINESS_CHECKS, QUALITY_CONTRACT
@@ -106,12 +110,18 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
                 raise ValueError('Delegated retrieval risk requires explicit independent acceptance')
             if 'QC P1' in row.get('attention_reasons',[]) and (not row.get('qc',{}).get('id') or accepted.get('qc_id')!=row['qc']['id'] or not accepted.get('qc_issue_disposition')):
                 raise ValueError('QC P1 requires a current independent issue disposition')
+        if governed and set(row.get('attention_reasons',[])) & {'QC P1','语义/安全争议待复核'} and not review.get('issue_disposition'):
+            raise ValueError('Delegated semantic/safety dispute requires explicit current disposition')
         if review.get('content_hash')!=content_hash(item) or review.get('decision')!='A' or review.get('risk')!='none':
             raise ValueError('Delegated review stale or has unresolved risk')
         if set(review.get('checks',{}))!=set(CHECKS) or any(v is not True for v in review['checks'].values()) or not isinstance(review.get('basis'),str) or not review['basis'].strip():
             raise ValueError('Delegated review lacks independent checklist/basis')
         sources=review.get('sources')
-        allowed=set(item['raw'].get('coverage_anchor_chunk_ids',[])) if item['test_category']=='negative' else {key for evidence in item['evidence'] for key in evidence.get('source_chunk_ids',[])}
+        answer_sources={source['chunk_id'] for source in item['raw'].get('business_requirements',{}).get('sources',[])}
+        material_sources=set(item['raw'].get('coverage_anchor_chunk_ids',[])) if item['test_category']=='negative' else set()
+        allowed=answer_sources|material_sources if governed else material_sources if item['test_category']=='negative' else {key for evidence in item['evidence'] for key in evidence.get('source_chunk_ids',[])}
+        if governed and isinstance(sources,list) and any(source.get('chunk_id') not in answer_sources and source.get('role')!='material_context_only' for source in sources):
+            raise ValueError('Negative Topic source must be labelled material context, not answer evidence')
         if not isinstance(sources,list) or any(source.get('chunk_id') not in allowed for source in sources):
             raise ValueError('Delegated evidence is outside question source scope')
         if not isinstance(sources,list) or not sources or not verify_sources(sources):

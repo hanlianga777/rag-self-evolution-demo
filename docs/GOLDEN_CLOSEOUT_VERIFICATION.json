@@ -1,0 +1,73 @@
+{
+  "base_commit": "075cb51",
+  "content_identity": "GCONTENT-10c6ab67b1ef279d70b4f361",
+  "backup_sha256": "47656e70fe26296587d8f14c628a757ae4018d131373821067c4bc9a10648c45",
+  "backup_integrity": "ok",
+  "changed_tables": [
+    "questions",
+    "review_events",
+    "golden_generation_runs",
+    "golden_generation_artifacts"
+  ],
+  "all_50_business_content_unchanged": true,
+  "sources_checkpoints_unchanged": true,
+  "snapshot_archive_tables_unchanged": true,
+  "counts": {
+    "questions": 50,
+    "probe_results": 0,
+    "qc_results": 0,
+    "question_quality_audits": 0,
+    "approvals": 70,
+    "review_events": 136,
+    "evaluation_runs": 0,
+    "experiments": 0,
+    "candidate_configs": 0
+  },
+  "current_run_status": "completed",
+  "current_run_status_scope": "candidate generation and precheck completed, NOT quality approval",
+  "approved_snapshots": 0,
+  "precheck_passed": 50,
+  "source_passed": 50,
+  "freeze_valid": 0,
+  "formal_provider_calls_this_task": 0,
+  "pending_content_reviews": [
+    "Q09",
+    "Q15"
+  ],
+  "protected_files_checked": 111,
+  "golden_only_method_changes": {
+    "ai_service": [
+      "_quality_check",
+      "business_quality_audit"
+    ],
+    "main": [
+      "_run_quality_rerun"
+    ]
+  },
+  "corpus_index_assets_unchanged": 21,
+  "offline_suite": {
+    "total": 280,
+    "passed": 278,
+    "errors": 2,
+    "introduced_failures": 0,
+    "historical_errors_reproduced_at_base": true
+  },
+  "core_suite": {
+    "total": 96,
+    "passed": 96,
+    "errors": 0
+  },
+  "historical_errors": [
+    "test_governance.GovernanceApiTests.test_governance_endpoints_block_review_until_probe_and_qc_pass",
+    "test_v14_probe_cost.ProbeCostTests.test_r1_bm25_execution_failure_blocks_probe_and_evaluation_without_judge"
+  ],
+  "browser_check": {
+    "profile": "MEDIUM 50 (20/10/20)",
+    "hard_validation": "completed",
+    "probe": 0,
+    "qc": 0,
+    "human_gate": "pending",
+    "existing_batch_button_enabled": true,
+    "Q01_current_rewritten_answer_visible": true
+  }
+}

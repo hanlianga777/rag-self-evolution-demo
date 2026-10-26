@@ -26,7 +26,8 @@ class ContentValidationTests(unittest.TestCase):
         result = self.validate()
         self.assertEqual(result['source_validation']['status'], 'passed')
         self.assertEqual(result['answer_content_validation']['status'], 'needs_human_review')
-        self.assertFalse(result['valid'])
+        self.assertTrue(result['valid'])
+        self.assertFalse(result['freeze_valid'])
         self.assertNotIn('unsupported answer anchor', result['blocking_errors'])
 
     def test_bound_human_review_allows_semantic_rewrite(self):
@@ -38,10 +39,10 @@ class ContentValidationTests(unittest.TestCase):
         review = self.review()
         q = copy.deepcopy(self.q)
         q['content_review'] = review
-        self.assertFalse(self.validate(q)['valid'])
+        self.assertFalse(self.validate(q)['freeze_valid'])
         for field, value in [('reference_answer', '关闭设备即可，不必断电。'), ('question', '设备B怎么办？')]:
             q = copy.deepcopy(self.q); q[field] = value
-            self.assertFalse(self.validate(q, {'content_review': review})['valid'])
+            self.assertFalse(self.validate(q, {'content_review': review})['freeze_valid'])
 
     def test_fake_quote_wrong_scope_and_lost_minus_sign_are_rejected(self):
         review = self.review()
@@ -57,14 +58,14 @@ class ContentValidationTests(unittest.TestCase):
     def test_incomplete_safety_review_or_changed_sources_never_pass(self):
         for field, value in [('reviewed_checks', []), ('safety_valid', False), ('scope_valid', False), ('reviewer_type', 'ai')]:
             review = self.review(); review[field] = value
-            self.assertFalse(self.validate(context={'content_review': review})['valid'])
+            self.assertFalse(self.validate(context={'content_review': review})['freeze_valid'])
         review = self.review()
         self.chunks[0]['chunk_text'] += '新版安全限制。'
-        self.assertFalse(self.validate(context={'content_review': review})['valid'])
+        self.assertFalse(self.validate(context={'content_review': review})['freeze_valid'])
 
     def test_verbatim_answer_does_not_bypass_governed_requirements(self):
         self.q['reference_answer'] = '维护前关闭设备并断开电池连接。'
-        self.assertFalse(self.validate()['valid'])
+        self.assertFalse(self.validate()['freeze_valid'])
 
     def test_negative_instruction_boundary_does_not_invent_manual_evidence(self):
         self.q.update(test_category='negative', reference_answer=None, evidence=[], expected_behavior='prompt_injection_resistance')
@@ -72,7 +73,8 @@ class ContentValidationTests(unittest.TestCase):
         result = self.validate()
         self.assertEqual(result['source_validation']['status'], 'passed')
         self.assertEqual(result['answer_content_validation']['status'], 'needs_human_review')
-        self.assertFalse(result['valid'])
+        self.assertTrue(result['valid'])
+        self.assertFalse(result['freeze_valid'])
 
     def test_malformed_governance_metadata_is_invalid_instead_of_crashing(self):
         for mutate in [lambda q: q['business_requirements'].update(required_checks='invalid'),

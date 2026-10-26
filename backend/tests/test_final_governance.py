@@ -60,15 +60,15 @@ class FinalGovernanceTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertEqual(self.store.question(item["id"])["probe_status"], "needs_revision")
 
-    def test_qc_requires_valid_score_but_priority_drives_review(self):
+    def test_qc_below_85_fails_even_without_p0(self):
         self.store.record_probe_result("GGC-001", {
             "question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40,
             "evidence_direct_failure": False, "reason": "supported", "rule_version": "v1.0.1",
         })
         low = self.store.record_qc("GGC-001", {"score": 84, "priority": "P1", "reason": "needs revision", "model": "test"}, "passed")
 
-        self.assertEqual(low["status"], "qc_passed")
-        self.assertEqual(self.store.question("GGC-001")["review_status"], "human_review_pending")
+        self.assertEqual(low["status"], "qc_failed")
+        self.assertEqual(self.store.question("GGC-001")["review_status"], "needs_revision")
 
     def test_human_confirm_creates_a_linked_optimization_run_without_generating_candidates(self):
         event = self.store.record_monitoring_event(question="安全题", answer="错误", bad_case=True, severity="critical", determinable=True)

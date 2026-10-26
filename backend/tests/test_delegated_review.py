@@ -101,6 +101,23 @@ class DelegatedReviewTests(unittest.TestCase):
         self.auth['profile']=dict(self.run['profile'])
         self.path.write_text(json.dumps(self.auth))
 
+    def test_governed_content_requires_current_scoped_authorization(self):
+        self.run['artifacts']['hard_validation']['content_identity']='new-content'
+        for item in self.items.values():item['raw']['business_requirements']={'sources':[{'chunk_id':'C'}]}
+        for row in self.rows:row['qc']={'score':90,'priority':'P2'}
+        with self.assertRaisesRegex(ValueError,'content identity'):self.check()
+        self.auth.update(content_identity='new-content',content_hashes={key:'fixture-hash' for key in self.items})
+        self.path.write_text(json.dumps(self.auth))
+        self.assertEqual(self.check()['review_actor_type'],'ai_agent')
+        negative=next(item for item in self.items.values() if item['test_category']=='negative')
+        negative['raw']['business_requirements']['sources']=[]
+        with self.assertRaisesRegex(ValueError,'material context'):self.check()
+        review=next(r for r in self.reviews if r['question_id']==negative['id'])
+        review['sources'][0]['role']='material_context_only'
+        self.assertEqual(self.check()['review_actor_type'],'ai_agent')
+        self.rows[0]['qc']['score']=84
+        with self.assertRaises(ValueError):self.check()
+
     def test_twenty_scoped_reviews_require_explicit_matching_mini_profile(self):
         self.mini()
         result=self.check()

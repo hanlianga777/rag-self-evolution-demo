@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import numpy as np
 
 PLANNER_VERSION = 'golden-planner-v2.1'
-VALIDATOR_VERSION = 'golden-validator-v2.3-content-review'
+VALIDATOR_VERSION = 'golden-validator-v2.4-precheck-freeze'
 PARAMETERS = {'target_cluster_size': 40, 'min_cluster_size': 3, 'seed': 42, 'n_init': 10, 'max_iter': 100, 'distance': 'squared_euclidean_on_l2_normalized_vectors'}
 SPECIAL_LIMITS = {'mini': 2, 'medium': 4, 'full': 8}
 GROUPS = ('positive', 'ablation', 'negative')
@@ -247,13 +247,71 @@ def validate_answer_content(candidate, sources, review=None):
     if isinstance(requirements, dict) and all(isinstance(requirements.get(k, []), list) for k in ('required_checks', 'conditional_checks')):
         checks = requirements.get('required_checks', []) + requirements.get('conditional_checks', [])
     ids = {c['id'] for c in checks if isinstance(c, dict) and isinstance(c.get('id'), str) and c['id']}
-    approved = (isinstance(review, dict) and review.get('reviewer_type') == 'human' and
+    approved = (isinstance(review, dict) and (review.get('reviewer_type') == 'human' or review.get('reviewer_type') == 'owner_delegated_ai' and bool(review.get('authorization_id'))) and
                 bool(review.get('reviewer')) and review.get('decision') == 'approved' and
                 review.get('binding_sha256') == binding and review.get('safety_valid') is True and
                 review.get('scope_valid') is True and isinstance(review.get('reviewed_checks'), list) and
                 all(isinstance(i, str) for i in review['reviewed_checks']) and set(review['reviewed_checks']) == ids and bool(ids))
     return {'status': 'human_reviewed' if approved else 'needs_human_review', 'binding_sha256': binding,
             'reason': '完整要求及安全适用性已由绑定的人工记录确认' if approved else '语义改写、必答完整性、安全条件及负向整库边界需人工核对；不要求逐字复制'}
+
+
+QC_THRESHOLD = 85
+QC_CONTRACT = 'golden-quality-85-v1'
+
+
+def qc_outcome(result):
+    score, priority = result.get('score'), result.get('priority')
+    passed = (type(score) in (int, float) and math.isfinite(score) and QC_THRESHOLD <= score <= 100
+              and priority in {'P1', 'P2'} and result.get('ablation_valid') is not False)
+    review = result.get('content_validation') or {}
+    return {'passed': passed, 'needs_review': priority == 'P1' or bool(review) and review.get('status') != 'supported',
+            'threshold': QC_THRESHOLD}
+
+
+def validate_qc_content(item, result, chunks):
+    """Validate QC coverage/citations; semantic decisions remain the QC model's work."""
+    raw = {**item.get('raw', {}), **{k: item.get(k) for k in ('question','reference_answer','evidence','test_category','negative_subtype')}}
+    req = raw.get('business_requirements')
+    if req is None:
+        return None
+    source_check = validate_content_sources(raw, chunks)
+    if source_check['status'] != 'passed':
+        raise ValueError('QC source validation: ' + '; '.join(source_check['errors']))
+    review = result.get('content_review')
+    checks = req['required_checks'] + req['conditional_checks']
+    if not isinstance(review, dict) or not isinstance(review.get('checks'), list) or any(type(review.get(k)) is not bool for k in ('scope_valid','safety_valid','prohibited_clear')) or not isinstance(review.get('disputes'), list):
+        raise ValueError('QC requires explicit content review')
+    observed = review['checks']
+    if any(not isinstance(c, dict) or not isinstance(c.get('id'), str) for c in observed):
+        raise ValueError('QC malformed checkpoint')
+    if len(observed) != len(checks) or {c['id'] for c in observed} != {c['id'] for c in checks}:
+        raise ValueError('QC must cover required and conditional checks exactly once')
+    by_id = {c['chunk_id']: c for c in chunks}
+    required = {c['id'] for c in req['required_checks']}
+    supported = all(review[k] for k in ('scope_valid','safety_valid','prohibited_clear')) and not review['disputes']
+    for check in checks:
+        value = next(c for c in observed if c['id'] == check['id'])
+        if type(value.get('applicable')) is not bool or type(value.get('met')) is not bool or not isinstance(value.get('reason'), str) or not value['reason'].strip():
+            raise ValueError('QC checkpoint requires applicability, decision and reason')
+        if check['id'] in required and not value['applicable']:
+            raise ValueError('QC cannot mark a required check inapplicable')
+        if value['applicable'] and not value['met']:
+            supported = False
+        proof = value.get('support', [])
+        if not isinstance(proof, list):
+            raise ValueError('QC support must be a list')
+        if value['applicable'] and value['met'] and check['source_chunk_ids'] and not proof:
+            raise ValueError('QC supported fact needs a real citation')
+        for location in proof:
+            key = location.get('chunk_id') if isinstance(location, dict) else None
+            quote = location.get('quote') if isinstance(location, dict) else None
+            if key not in check['source_chunk_ids'] or key not in by_id or not isinstance(quote, str) or not quote.strip() or re.sub(r'\s+', '', unicodedata.normalize('NFKC', quote)) not in re.sub(r'\s+', '', unicodedata.normalize('NFKC', text(by_id[key]))):
+                raise ValueError('QC citation is not in applicable canonical evidence')
+    sources = [by_id[s['chunk_id']] for s in req['sources']]
+    return {'status': 'supported' if supported else 'needs_review', 'binding_sha256': content_review_identity(raw, sources),
+            'checks_complete': True, 'scope_valid': review['scope_valid'], 'safety_valid': review['safety_valid'],
+            'prohibited_clear': review['prohibited_clear'], 'disputes': review['disputes']}
 
 
 def construction_checks(kind, answer, sources, candidate):
@@ -409,8 +467,9 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
     errors.extend(source_validation['errors'])
     review_sources = [known[s['chunk_id']] for s in c['business_requirements']['sources'] if isinstance(s, dict) and isinstance(s.get('chunk_id'), str) and s['chunk_id'] in known] if governed and isinstance(c.get('business_requirements'), dict) and isinstance(c['business_requirements'].get('sources'), list) else sources
     content_validation = validate_answer_content(c, review_sources, context.get('content_review'))
-    if governed and content_validation['status'] != 'human_reviewed':
-        errors.append('answer content requires human review')
+    semantic_pending = governed and content_validation['status'] != 'human_reviewed'
+    if semantic_pending:
+        warnings.append('answer content requires final semantic review; precheck is not semantic approval')
     answer = c.get('reference_answer') or ''
     if not isinstance(answer, str):
         errors.append('invalid reference_answer')
@@ -510,7 +569,7 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
     from .canonical_evidence import optimization_preflight
     readiness=optimization_preflight(normalized,corpus)
     errors.extend(readiness['blocking_errors'])
-    return {'source_validation':source_validation,'answer_content_validation':content_validation,'optimization_readiness':readiness,'valid': not errors, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'duplicate_checks': duplicate_checks, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION, 'original_table_evidence': context.get('original_tables', {})}
+    return {'source_validation':source_validation,'answer_content_validation':content_validation,'optimization_readiness':readiness,'valid': not errors, 'freeze_valid': not errors and not semantic_pending, 'blocking_errors': list(dict.fromkeys(errors)), 'warnings': warnings, 'duplicate_checks': duplicate_checks, 'normalized_candidate': normalized, 'evidence_locations': locations, 'construction_checks': construction, 'coverage_match': coverage, 'validator_version': VALIDATOR_VERSION, 'original_table_evidence': context.get('original_tables', {})}
 
 
 def match_pool(plan, validations, preferred_ids=()):

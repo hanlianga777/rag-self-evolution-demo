@@ -64,7 +64,7 @@ class FinalQualityTests(unittest.TestCase):
                     def search(_self, *_args, **_kwargs):
                         started.set(); self.assertTrue(finish.wait(3))
                         if fail:
-                            raise RetrievalUnavailable('Stub retrieval failure', {'status': 'failed'})
+                            raise RetrievalUnavailable('search', RuntimeError('Stub retrieval failure'))
                         return [{'chunk_id': 'C1', 'score': 1}]
                     def full_text_probe(_self, *_args):
                         return {'coverage': {'status': 'complete'}, 'matches': []}

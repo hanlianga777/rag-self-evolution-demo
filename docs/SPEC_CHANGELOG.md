@@ -1,3 +1,11 @@
+## 2026-10-26 · Golden审核闭环与统一QC85
+
+- 分离预检与冻结语义，修复新版答案进入Probe/QC的循环阻断及Probe逐字校验；来源/真实检索/负向整库保护保留。
+- QC85统一保存、资格、批量筛选与Human Gate；P0不能人工豁免，P1/语义安全争议须明确处置，P2建议不独立阻断。QC逐项读取当前业务要求并校验真实引用。
+- 复用既有请求Checkpoint/PaidRun；成功不重发、已知失败显式重试、Unknown待对账。委托绑定新版内容，冻结入口验证完整当前成员、资格与语义证明。
+- 原50题业务内容无改动；Backup API备份后仅更新预检/生成阶段衔接及Q09/Q15两条AI待审事件。真实质量/审批/冻结均未执行。
+- Judge、Baseline/Candidate、11 Gate、Agent、Pipeline/Corpus/索引、前端和既有归档不改；架构图源不变。详见[集中验收](GOLDEN_FINAL_CLOSEOUT_REPORT.md)。
+
 ## 2026-10-25 · Golden答案正式工作集替换与历史实验归档
 
 - 保留原Medium50题目和ID，仅替换30份参考答案并持久化50题独立业务要求；纠正字段角色与分级，不把Topic Anchor当答案Evidence。

@@ -1,4 +1,4 @@
-"""V1.2 gates: machine evidence cannot be waived, model severity can be acknowledged."""
+"""V1.2 gates: machine evidence cannot be waived, QC85 and P0 cannot be waived."""
 import tempfile
 import unittest
 from pathlib import Path
@@ -22,19 +22,20 @@ class V12GovernanceTests(unittest.TestCase):
         if not evidence_failure:
             self.store.record_qc(item['id'], {'priority': priority, 'score': score, 'reason': 'human must inspect', 'issues': []}, 'failed')
 
-    def test_positive_numeric_scores_do_not_override_valid_evidence_or_qc_priority(self):
+    def test_low_qc_score_cannot_be_approved(self):
         item = self.items[0]
-        self.quality(item)
-        approved = self.store.review_question(item['id'], 'approved', 'test_human')
-        self.assertEqual(approved['review_status'], 'approved')
-
-    def test_p0_requires_explicit_acknowledgement_and_reason(self):
-        item = self.items[0]
-        self.quality(item, 'P0')
-        with self.assertRaisesRegex(ValueError, 'P0'):
+        self.quality(item, score=84)
+        with self.assertRaisesRegex(ValueError, '85'):
             self.store.review_question(item['id'], 'approved', 'test_human')
-        self.store.review_question(item['id'], 'approved', 'test_human', accept_qc_p0=True, reason='已核对完整原文，接受该机器风险判断')
-        self.assertTrue(self.store.review_history(item['id'])[0]['accept_qc_p0'])
+        self.quality(item, score=85)
+        self.assertEqual(self.store.review_question(item['id'], 'approved', 'test_human')['review_status'], 'approved')
+
+    def test_p0_cannot_be_waived_even_with_acknowledgement(self):
+        item = self.items[0]
+        self.quality(item, 'P0', score=95)
+        for acceptance in (False, True):
+            with self.assertRaisesRegex(ValueError, 'P0'):
+                self.store.review_question(item['id'], 'approved', 'test_human', accept_qc_p0=acceptance, reason='不能豁免')
 
     def test_evidence_failure_cannot_be_waived(self):
         item = self.items[0]

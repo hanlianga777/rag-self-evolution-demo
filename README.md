@@ -1,3 +1,5 @@
+2026-10-26 Golden审核闭环：原50题保持，结构/来源预检与冻结语义分开，Golden QC统一85分（P0阻断、P1争议复核）；现有批量入口与断点恢复已离线验证。真实Probe/QC及Human Gate尚未执行，Q09/Q15待复核；不改Judge、11 Gate、Baseline/Candidate或前端。[集中验收及费用预检](docs/GOLDEN_FINAL_CLOSEOUT_REPORT.md)。
+
 2026-10-25 UI 整改：Candidate A/B/C/D 与历史方案同构等高、长字段内部滚动；中文枚举/完整英文对照、Hard Gate 贡献题目行及共享浮层统一，正式数据只读、Provider0。见[验收与截图](docs/UI_CONSISTENCY_ACCEPTANCE.md)。
 
 2026-10-25 导航与候选池专项：侧栏常驻、页面快照后台重验、轻量初始化；当前Golden候选管理严格使用Medium50持久化成员，历史数据保留。Provider0，正式Baseline与A/B/C原始结果不变。[性能整改验收](outputs/page_performance_20261025/性能整改验收.md)。

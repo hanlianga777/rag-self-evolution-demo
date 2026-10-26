@@ -298,6 +298,38 @@ class GovernanceStore:
                 categories.append({'code': code, 'label': label, 'action': action})
         return categories
 
+    def _golden_qc_state(self, item, qc):
+        from .golden_v2 import qc_outcome, content_review_identity, validate_content_sources
+        state = qc_outcome(qc)
+        if item['raw'].get('business_requirements'):
+            chunks = CorpusStore().chunks()
+            raw = {**item['raw'], 'question':item['question'], 'reference_answer':item['reference_answer'], 'evidence':item['evidence']}
+            by_id = {c['chunk_id']:c for c in chunks}
+            sources = [by_id[s['chunk_id']] for s in raw['business_requirements']['sources'] if s['chunk_id'] in by_id]
+            content = qc.get('content_validation') or {}
+            valid = (qc.get('rule_version') == 'golden-quality-85-v1' and validate_content_sources(raw, chunks)['status']=='passed'
+                     and content.get('binding_sha256') == content_review_identity(raw,sources) and content.get('checks_complete') is True)
+            state['passed'] = state['passed'] and valid
+            state['needs_review'] = state['needs_review'] or bool(content) and content.get('status') != 'supported'
+        return state
+
+    def _finalize_golden_validation(self, item, actor, *, delegated=None):
+        from .golden_v2 import content_review_identity, validate_golden_candidate
+        if not item['raw'].get('business_requirements'):
+            return item['raw'], None
+        chunks = CorpusStore().chunks(); by_id = {c['chunk_id']:c for c in chunks}
+        raw = {**item['raw'], 'question':item['question'], 'reference_answer':item['reference_answer'], 'evidence':item['evidence']}
+        req = raw['business_requirements']
+        proof = {'reviewer_type':'owner_delegated_ai' if delegated else 'human', 'reviewer':actor, 'decision':'approved',
+                 'binding_sha256':content_review_identity(raw,[by_id[s['chunk_id']] for s in req['sources']]),
+                 'reviewed_checks':[c['id'] for c in req['required_checks']+req['conditional_checks']],
+                 'safety_valid':True,'scope_valid':True}
+        if delegated: proof['authorization_id']=delegated['authorization_id']
+        result = validate_golden_candidate(raw,chunks,validation_context={'content_review':proof})
+        if not result['freeze_valid']:raise ValueError('冻结前内容/来源检查失败：'+'; '.join(result['blocking_errors']))
+        raw['validation'] = {**{k:v for k,v in result.items() if k!='normalized_candidate'},'content_review':proof}
+        return raw,proof
+
     def candidate_rows(self, ids=None):
         # Lists read only latest quality signals, never evidence or retrieval traces.
         where, args = (f"WHERE q.id IN ({','.join('?' for _ in ids)})", ids) if ids else ("", [])
@@ -312,6 +344,8 @@ class GovernanceStore:
                 json_extract(c.result_json,'$.execution_identity.content_hash') AS qc_hash,
                 json_extract(c.result_json,'$.priority') AS priority,
                 json_extract(c.result_json,'$.score') AS qc_score,
+                json_object('score',json_extract(c.result_json,'$.score'),'priority',json_extract(c.result_json,'$.priority'),'ablation_valid',json_extract(c.result_json,'$.ablation_valid'),'content_validation',json_extract(c.result_json,'$.content_validation'),'rule_version',json_extract(c.result_json,'$.rule_version')) AS qc_summary_json,
+                json_extract(c.result_json,'$.execution_identity') AS qc_identity_json,
                 p.id AS probe_id, c.id AS qc_id, c.created_at AS qc_created_at, a.content_hash AS audit_hash, a.audit_json, a.created_at AS audit_created_at
                 FROM questions q
                 LEFT JOIN probe_results p ON p.id=(SELECT MAX(id) FROM probe_results WHERE question_id=q.id)
@@ -340,8 +374,10 @@ class GovernanceStore:
                 reasons.append('Probe 未通过')
             if item['qc_status'] != 'qc_passed' or not item['qc_id']:
                 reasons.append('QC 未通过')
-            if item['priority'] in {'P0','P1'}:
-                reasons.append('QC ' + item['priority'])
+            qc = _load(item.get('qc_summary_json'), {})
+            qc_state = self._golden_qc_state(item, qc)
+            if not qc_state['passed']: reasons.append('QC 分数未达85或存在阻断')
+            if qc_state['needs_review']: reasons.append('QC P1' if item['priority']=='P1' else '语义/安全争议待复核')
             if item['classification'] not in {None, 'EVIDENCE_VALID','NEGATIVE_VALID'}:
                 reasons.append({'RETRIEVAL_INCOHERENT':'检索不连贯','FAKE_NEGATIVE_RISK':'负向证据需复核'}.get(item['classification'], '证据需复核'))
             if item['execution_status'] in {'failed','uncertain'}:
@@ -358,13 +394,24 @@ class GovernanceStore:
             if item['probe_corpus'] and _load(item['probe_corpus'], None) != fingerprint:
                 reasons.append('Corpus 身份已变化')
             validation = item['raw'].get('validation') or {}
-            if validation.get('valid') is False or validation.get('blocking_errors'):
+            errors=[e for e in validation.get('blocking_errors',[]) if e!='answer content requires human review']
+            if errors or validation.get('valid') is False and validation.get('source_validation',{}).get('status')!='passed':
                 reasons.append('Hard Validation 未通过')
+            with self.connection() as quality_connection:
+                identity=self._quality_identity(item,quality_connection)
+            if item['qc_id'] and _load(item.get('qc_identity_json'),{}) != identity:
+                reasons.append('质量记录已过期')
+            decision=decisions.get(item['id'],{})
+            if manual.get(item['id'])=='content_review_required' and decision.get('content_hash')==content_hash:
+                reasons.append('语义/安全争议待复核')
+            closed = decision.get('quality_identity') == identity and decision.get('review_qc_id')==item['qc_id'] and manual.get(item['id']) in {'approved','dataset_confirmed','owner_delegated_confirmed'}
+            if closed:
+                reasons=[r for r in reasons if r not in {'QC P1','语义/安全争议待复核','检索不连贯'}]
             if item['id'] in active:
                 reasons.append('局部修订未完成')
             if item['review_status'] in {'needs_revision','rejected'} or (manual.get(item['id']) in {'needs_revision','rejected'} and (revalidated.get(item['id']) or '') <= manual_at[item['id']]):
                 reasons.append('人工标记需修订')
-            human = item['stage'] == 'golden' and item['review_status'] == 'approved' and (manual.get(item['id'])!='dataset_confirmed' or provenance.get(item['id'])=='human') and item['probe_status']=='probe_passed' and item['qc_id'] is not None and not any(reason in reasons for reason in ('质量记录已过期','Corpus 身份已变化','局部修订未完成','Hard Validation 未通过')) and (not decisions.get(item['id'], {}).get('qc_created_at') or decisions[item['id']]['qc_created_at']==item['qc_created_at'])
+            human = qc_state['passed'] and (closed or not item['raw'].get('business_requirements')) and item['stage'] == 'golden' and item['review_status'] == 'approved' and (manual.get(item['id'])!='dataset_confirmed' or provenance.get(item['id'])=='human') and item['probe_status']=='probe_passed' and item['qc_id'] is not None and not any(reason in reasons for reason in ('质量记录已过期','Corpus 身份已变化','局部修订未完成','Hard Validation 未通过')) and (not decisions.get(item['id'], {}).get('qc_created_at') or decisions[item['id']]['qc_created_at']==item['qc_created_at'])
             delegated_mode = decisions.get(item['id'],{}).get('approval_mode')=='owner_delegated'
             accepted_retrieval=decisions.get(item['id'],{}).get('review',{}).get('retrieval_risk_acceptance',{})
             remaining=[reason for reason in reasons if not (reason=='检索不连贯' and accepted_retrieval.get('classification')=='RETRIEVAL_INCOHERENT' and accepted_retrieval.get('retrieval_not_fixed') is True and accepted_retrieval.get('probe_id')==item['probe_id'])]
@@ -377,7 +424,7 @@ class GovernanceStore:
             result.append({**{key:item.get(key) for key in ('id','stage','review_status','probe_status','qc_status','question','test_category','negative_subtype','construction_type','created_at','updated_at')},
                 'raw': {key:item['raw'].get(key) for key in ('generation_run_id','coverage_slot','topic_cluster','source','source_positive_id','source_reference','replaces_question_id','classification_status')},
                 'slot':item['raw'].get('coverage_slot'), 'topic_cluster':item['raw'].get('topic_cluster'),
-                'probe':{'id':item['probe_id'],'probe_details':{'classification':item['classification']}}, 'qc':{'id':item['qc_id'],'priority':item['priority'],'score':item['qc_score']},
+                'probe':{'id':item['probe_id'],'probe_details':{'classification':item['classification']}}, 'qc':{'id':item['qc_id'],'priority':item['priority'],'score':item['qc_score'],'threshold':85},
                 'qualification_status':status,'qualification_source':'owner_delegated' if delegated else 'human' if human else 'machine' if status=='machine_qualified' else None,
                 'attention_reasons':remaining if delegated else reasons, 'attention_categories':self.attention_categories(remaining if delegated else reasons),
                 'disclosed_retrieval_risk':accepted_retrieval if delegated else None,'quality_audit':audit,'quality_audit_created_at':item['audit_created_at']})
@@ -590,7 +637,7 @@ class GovernanceStore:
         for key in source['question_ids']:
             item, identity = self.capture_quality(key)
             probe, qc = self.probe_history(key), self.qc_history(key)
-            if item['probe_status'] != 'probe_passed' or item['qc_status'] != 'qc_passed' or not probe or not qc or any(probe[0].get('execution_identity', {}).get(field) != identity[field] for field in ('content_hash', 'active_candidate', 'corpus_fingerprint')) or qc[0]['result'].get('execution_identity') != identity:
+            if item['probe_status'] != 'probe_passed' or item['qc_status'] != 'qc_passed' or not probe or not qc or any(probe[0].get('execution_identity', {}).get(field) != identity[field] for field in ('content_hash', 'active_candidate', 'corpus_fingerprint')) or qc[0]['result'].get('execution_identity') != identity or not self._golden_qc_state(item,qc[0]['result'])['passed']:
                 excluded[key] = 'Failed/P0 or stale quality identity'
                 continue
             eligible.append(key)
@@ -720,7 +767,7 @@ class GovernanceStore:
             ids = _load(row['question_ids_json'], [])
             pending = connection.execute(f"SELECT 1 FROM questions WHERE id IN ({','.join('?' for _ in ids)}) AND (probe_status!='probe_passed' OR qc_status NOT IN ('qc_passed','qc_failed')) LIMIT 1", ids).fetchone() if ids else None
             interrupted = row['status'] == 'failed' and audit.get('failed_stage') in {'qc', 'probing'}
-            if not (interrupted or row['status'] == 'completed' and pending) or len(ids) != expected or not expected:
+            if not (interrupted or row['status'] in {'completed','candidate_generated'} and pending) or len(ids) != expected or not expected:
                 raise ValueError('仅完整入库且质量中断或仍有未完成质量项的 Run 可以恢复')
             if audit.get('corpus_fingerprint') != corpus_fingerprint:
                 raise ValueError('Corpus 已变化，不能复用旧质量结果')
@@ -893,8 +940,7 @@ class GovernanceStore:
         expected = self._expected_count(run)
         probe_passed = sum(q['probe_status'] == 'probe_passed' and q['has_probe'] for q in quality)
         qc_completed = sum(q['qc_status'] in {'qc_passed', 'qc_failed'} and q['has_qc'] for q in quality)
-        ready = expected > 0 and len(quality) == expected and run['status'] == 'completed' and probe_passed == expected and qc_completed == expected
-        run['human_gate'] = self.gate_summary(run, self.candidate_rows(ids)) if qualification else {'gate':1,'status':'ready' if ready else 'pending','expected':expected,'generated':len(quality),'probe_passed':probe_passed,'qc_completed':qc_completed,'qc_passed':sum(q['qc_status']=='qc_passed' and q['has_qc'] for q in quality),'approved':sum(q['stage']=='golden' for q in quality)}
+        run['human_gate'] = self.gate_summary(run, self.candidate_rows(ids)) if qualification else {'gate':1,'status':'pending','qualification_evaluated':False,'expected':expected,'generated':len(quality),'probe_passed':probe_passed,'qc_completed':qc_completed,'qc_passed':sum(q['qc_status']=='qc_passed' and q['has_qc'] for q in quality),'approved':sum(q['stage']=='golden' for q in quality)}
         if audit.get("slot_persistence_v1"):
             progress = audit.get("progress", {})
             valid, probe, qc = len(run["question_ids"]), progress.get("probe_completed", 0), progress.get("qc_completed", 0) + progress.get("qc_skipped", 0)
@@ -931,24 +977,29 @@ class GovernanceStore:
                 raise KeyError(run_id)
             ids = _load(row["question_ids_json"], [])
             expected = self._expected_count({"profile": _load(row["profile_json"], {})})
-            if not expected or len(ids) != expected or len(set(ids)) != expected or row["status"] != "completed":
-                raise ValueError("本轮尚未完整入库 20 道 Candidate")
+            if not expected or len(ids) != expected or len(set(ids)) != expected or row["status"] not in {"completed","candidate_generated","failed"}:
+                raise ValueError("本轮候选尚未完整入库或任务仍在运行")
             marks = ",".join("?" for _ in ids)
             candidates = connection.execute(f"SELECT id, legacy_question_type, raw_json, stage, probe_status, qc_status FROM questions WHERE id IN ({marks})", ids).fetchall()
             if len(candidates) != expected or any(item["legacy_question_type"] != "v1_mini" or _load(item["raw_json"], {}).get("generation_run_id") != run_id for item in candidates):
                 raise ValueError("本轮 Candidate 归属或数量不一致")
             audit = _load(row["hard_validation_json"], {})
             previous = audit.get("quality_rerun", {})
+            if start:
+                from .paid_run import require_reconciled_execution
+                require_reconciled_execution(previous)
             if start and previous.get("status") == "running":
                 raise ValueError("本轮 Probe / QC 已在运行")
             if start and anomalies_only:
-                eligible = {item["id"] for item in candidates if item["stage"] != "golden" and (item["probe_status"] != "probe_passed" or item["qc_status"] != "qc_passed")}
+                eligible = {item['id'] for item in self.candidate_rows(ids) if item['qualification_status']=='needs_human_review'}
                 ids = [question_id for question_id in ids if question_id in eligible]
                 if not ids:
                     raise ValueError("没有需要重跑的异常项")
                 changes = {**changes, "total": len(ids), "question_ids": ids, "scope": "anomalies"}
-            audit["quality_rerun"] = {**({} if start else previous), **changes}
+            audit["quality_rerun"] = {**previous, **changes, **({"attempt_id":uuid.uuid4().hex} if start else {})}
             connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json = ? WHERE generation_run_id = ?", (_json(audit), run_id))
+            if changes.get("status")=="completed":
+                connection.execute("UPDATE golden_generation_runs SET status='completed' WHERE id=?",(run_id,))
         return ids
 
     def generation_review(self, run_id: str, chunks: list[dict], *, allow_partial: bool = False, question_id: str | None = None):
@@ -1004,7 +1055,8 @@ class GovernanceStore:
         probes, qcs = self.probe_history(question_id), self.qc_history(question_id)
         blockers = []
         validation = item['raw'].get('validation') or {}
-        if validation.get('valid') is False or validation.get('blocking_errors'):
+        errors=[e for e in validation.get('blocking_errors',[]) if e!='answer content requires human review']
+        if errors or validation.get('valid') is False and validation.get('source_validation',{}).get('status')!='passed':
             blockers.append('Hard Validation / Structural / Duplicate 尚未通过')
         generation = self.generation_run(item["raw"].get("generation_run_id"), qualification=False) if item["raw"].get("generation_run_id") else None
         if generation and generation["artifacts"]["hard_validation"].get("slot_persistence_v1") and generation["status"] != "completed":
@@ -1016,9 +1068,16 @@ class GovernanceStore:
         if any(question_id in run.get('question_ids', []) for run in self.revision_runs(item['raw'].get('generation_run_id')) if run['status'] in {'queued', 'generating', 'validating', 'preview_ready', 'probing', 'qc', 'interrupted'}):
             blockers.append('局部修订未完成')
         qc = qcs[0]['result'] if qcs else {}
-        requires_acceptance = qc.get('priority') == 'P0'
-        accepted = any(event.get('decision') == 'approved' and event.get('accept_qc_p0') and (event.get('reason') or '').strip() and event.get('qc_created_at') == qcs[0]['created_at'] for event in self.review_history(question_id)) if qcs else False
-        return {'can_approve': not blockers and (not requires_acceptance or accepted), 'blocking_reasons': blockers, 'requires_qc_p0_acceptance': requires_acceptance and not accepted, 'qc_reason': qc.get('reason'), 'qc_created_at': qcs[0]['created_at'] if qcs else None}
+        state = self._golden_qc_state(item,qc)
+        if not state['passed']: blockers.append('QC 必须达到85且无P0/内容阻断')
+        if qcs:
+            with self.connection() as connection: identity=self._quality_identity(item,connection)
+            if qc.get('execution_identity') != identity: blockers.append('质量结果已过期')
+        history=self.review_history(question_id)
+        known_issue=history and history[0]['decision']=='content_review_required' and history[0].get('content_hash')==self._quality_content(item)
+        return {'can_approve':not blockers,'blocking_reasons':blockers,'requires_qc_p0_acceptance':False,
+                'requires_issue_resolution':state['needs_review'] or bool(known_issue),'qc_reason':qc.get('reason'),
+                'qc_created_at':qcs[0]['created_at'] if qcs else None}
 
     def review_question(self, question_id: str, decision: str, actor: str, *, reason: str | None = None, tags: list[str] | None = None, accept_qc_p0: bool = False):
         if decision not in {"approved", "rejected", "needs_revision"}:
@@ -1045,8 +1104,13 @@ class GovernanceStore:
                     raise ValueError('；'.join(eligibility['blocking_reasons']))
                 if eligibility['requires_qc_p0_acceptance'] and not (accept_qc_p0 and (reason or '').strip()):
                     raise ValueError('QC P0 必须明确接受并填写原因')
+            if decision=='approved' and eligibility.get('requires_issue_resolution') and not (reason or '').strip():
+                raise ValueError('P1/语义或安全争议须明确填写复核结论')
+            raw,proof=self._finalize_golden_validation(current,actor) if decision=='approved' else (current['raw'],None)
+            identity=self._quality_identity(current,connection)
+            connection.execute('UPDATE questions SET raw_json=? WHERE id=?',(_json(raw),question_id))
             connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", (stage, status, _now(), question_id))
-            connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at, metadata_json) VALUES (?, ?, ?, ?, ?, ?)", (question_id, "dataset", decision, actor, _now(), _json({'reason': (reason or '').strip(), 'tags': tags or [], 'accept_qc_p0': accept_qc_p0, 'qc_created_at': eligibility['qc_created_at']})))
+            connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at, metadata_json) VALUES (?, ?, ?, ?, ?, ?)", (question_id, "dataset", decision, actor, _now(), _json({'reason': (reason or '').strip(), 'tags': tags or [], 'accept_qc_p0': False, 'qc_created_at': eligibility['qc_created_at'],'review_qc_id':connection.execute('SELECT MAX(id) FROM qc_results WHERE question_id=?',(question_id,)).fetchone()[0],'quality_identity':identity,'content_review':proof})))
             connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, decision, actor, _now()))
         return self.question(question_id)
 
@@ -1548,6 +1612,26 @@ class GovernanceStore:
 
     def _create_dataset_snapshot(self, approved=None, generation_run_id=None):
         approved = approved if approved is not None else self.questions("golden")
+        if not approved:raise ValueError('Snapshot requires approved Golden questions')
+        for supplied in approved:
+            item=self.question(supplied['id'])
+            if item['stage']!='golden' or item['review_status']!='approved' or not self.approval_eligibility(item['id'])['can_approve']:
+                raise ValueError('Snapshot requires current approved Golden quality')
+            if item['raw'].get('business_requirements'):
+                run_id=item['raw'].get('generation_run_id')
+                members=(self.generation_run(run_id,qualification=False) or {}).get('question_ids',[])
+                if not members or {q['id'] for q in approved}!=set(members):
+                    raise ValueError('Snapshot requires the complete current Golden run')
+                from .golden_v2 import validate_golden_candidate
+                rows=self.candidate_rows([item['id']])
+                history=self.review_history(item['id'])
+                with self.connection() as quality_connection:identity=self._quality_identity(item,quality_connection)
+                if rows[0]['qualification_status']=='needs_human_review' or not history or history[0].get('quality_identity')!=identity or history[0].get('review_qc_id')!=rows[0]['qc']['id']:
+                    raise ValueError('Snapshot requires current Human Gate/issue disposition')
+                proof=item['raw'].get('validation',{}).get('content_review')
+                result=validate_golden_candidate({**item['raw'],**item},CorpusStore().chunks(),validation_context={'content_review':proof})
+                if not result['freeze_valid'] or supplied['raw']!=item['raw']:
+                    raise ValueError('Snapshot semantic review is stale or unavailable')
         from .corpus import current_manifest
         fingerprint = manifest_identity(current_manifest())
         run = self.generation_run(generation_run_id, qualification=False) if generation_run_id else None
@@ -1665,9 +1749,11 @@ class GovernanceStore:
         sources = [chunk for chunk in chunks if chunk.get('chunk_id') in expected_chunks]
         corpus = getattr(retriever, 'corpus', None)
         tables = corpus.original_tables(sources) if positive and isinstance(corpus, CorpusStore) else {}
-        programmatic['answer_anchor'] = answer_supported(item['reference_answer'] or '', [{**chunk,'original_tables':tables.get(chunk['chunk_id'], [])} for chunk in sources]) if positive else True
+        governed = bool(item['raw'].get('business_requirements'))
+        validation = validate_golden_candidate({**item['raw'],**item},chunks,validation_context={'original_tables':tables}) if governed else None
+        programmatic['answer_anchor'] = validation['valid'] if governed else answer_supported(item['reference_answer'] or '', [{**chunk,'original_tables':tables.get(chunk['chunk_id'], [])} for chunk in sources]) if positive else True
         if positive and (item.get('planner_version') or item['raw'].get('construction_type')):
-            programmatic['candidate_legality'] = validate_golden_candidate(item, chunks, validation_context={'original_tables':tables})['valid']
+            programmatic['candidate_legality'] = validate_golden_candidate({**item['raw'],**item}, chunks, validation_context={'original_tables':tables})['valid']
         haystack = " ".join(source_texts.values())
         phrases = [point for source in evidence for point in source.get("evidence_key_points", [])]
         matched = [phrase for phrase in phrases if phrase and phrase in haystack]
@@ -1707,7 +1793,8 @@ class GovernanceStore:
         negative_passed = behavior == expected_behavior and not subtype_mismatch and not uncertain and (not ambiguous_negative or answerability.get("answerable") is False)
         full_text = {"mode": "evidence" if positive else "fake_negative_check", "phrases": phrases, "matched_phrases": matched, "source_checks": source_checks, "normalized_query": normalized_query, "corpus_match_chunk_ids": corpus_matches, "entity_match_chunk_ids": entity_matches, "passed": bool(source_checks) and all(check["text_available"] for check in source_checks) if positive else negative_passed}
         evidence_valid = all(programmatic.values()) and full_text["passed"]
-        full_text['answer_anchor_supported'] = programmatic['answer_anchor'] if positive else None
+        full_text['answer_anchor_supported'] = None if governed else programmatic['answer_anchor'] if positive else None
+        full_text['content_semantics'] = 'pending_qc_and_human_gate' if governed else 'legacy_anchor_observation'
         recalled = coverage["final_context"]["all_hit"] if positive else None
         classification = "RETRIEVAL_INCOHERENT" if positive and evidence_valid and not recalled else "EVIDENCE_VALID" if positive and evidence_valid else "EVIDENCE_INVALID" if positive else "NEGATIVE_VALID" if evidence_valid else "NEGATIVE_SUBTYPE_MISMATCH" if subtype_mismatch else "FAKE_NEGATIVE_RISK" if answerability and answerability.get("answerable") is True else "NEGATIVE_UNDETERMINED"
         exact_matches = [{"chunk_id": chunk_id, "document_id": next((chunk.get("document_id") for chunk in chunks if chunk.get("chunk_id") == chunk_id), None), "matched_terms": [term for term in entity_tokens if term.lower() in source_texts[chunk_id].lower()], "content_preview": source_texts[chunk_id][:240]} for chunk_id in dict.fromkeys(corpus_matches + entity_matches)]
@@ -1735,12 +1822,15 @@ class GovernanceStore:
     def _quality_content(item):
         # Review/stage/timestamps can change without changing the evaluated content.
         fields = ('question', 'reference_answer', 'evidence', 'test_category', 'negative_subtype', 'legacy_question_type', 'raw')
-        return hashlib.sha256(_json({key: item.get(key) for key in fields}).encode()).hexdigest()
+        payload = {key:item.get(key) for key in fields}
+        if (item.get('raw') or {}).get('business_requirements'):
+            payload['raw']={k:v for k,v in item['raw'].items() if k!='validation'}
+        return hashlib.sha256(_json(payload).encode()).hexdigest()
 
     def _quality_identity(self, item, connection):
         probe = connection.execute('SELECT id FROM probe_results WHERE question_id=? ORDER BY id DESC LIMIT 1', (item['id'],)).fetchone()
         return {'content_hash': self._quality_content(item), 'active_candidate': item.get('stage') != 'superseded', 'corpus_fingerprint': manifest_identity(current_manifest()),
-                'probe_id': probe['id'] if probe else None}
+                'probe_id': probe['id'] if probe else None, 'quality_contract':'golden-quality-85-v1'}
 
     def capture_quality(self, question_id, *, qc=False):
         from .full_text import CORPUS_LOCK
@@ -1854,20 +1944,27 @@ class GovernanceStore:
                     self.generation_run(run['id'],qualification=False),qualified,{q['id']:q for q in candidates},
                     list(delegated['reviews'].values()),self._quality_content)
                 qualified=[{**row,'qualification_status':'owner_delegated_approved','qualification_source':'owner_delegated'}
-                           if set(row.get('attention_reasons',[])) in ({'检索不连贯'},{'QC P1','检索不连贯'}) else row for row in qualified]
+                           if row.get('attention_reasons') and set(row['attention_reasons']) <= {'检索不连贯','QC P1','语义/安全争议待复核'} else row for row in qualified]
             gate = self.gate_summary(run, qualified)
             if gate['status'] != 'ready':
                 blockers = [f"{row['id']}: {'、'.join(row['attention_reasons'])}" for row in qualified if row['qualification_status'] not in {'machine_qualified', 'human_approved', 'owner_delegated_approved'}]
                 raise ValueError(f"人工异常、Probe / QC、Profile 或 Coverage 尚未完成，Gate 1 Pending：{gate['generated']}/{gate['expected']}题，Profile {'完整' if gate['profile_complete'] else '不完整'}，Coverage {'完整' if gate['coverage_complete'] else '不完整'}；" + '；'.join(blockers or ['Generation Run 尚未完成']))
             sources = {row['id']:row['qualification_source'] for row in qualified}
             for question_id in question_ids:
-                if next(item for item in candidates if item["id"] == question_id)["stage"] == "golden":
+                existing=next(item for item in candidates if item['id']==question_id)
+                history=self.review_history(question_id)
+                if existing['stage']=='golden' and history and history[0].get('quality_identity')==self._quality_identity(existing,connection) and history[0].get('review_qc_id')==connection.execute('SELECT MAX(id) FROM qc_results WHERE question_id=?',(question_id,)).fetchone()[0]:
                     continue
                 connection.execute("UPDATE questions SET stage = ?, review_status = ?, updated_at = ? WHERE id = ?", ("golden", "approved", now, question_id))
-                metadata={'qualification_source':sources[question_id]}
+                item=next(q for q in candidates if q['id']==question_id)
+                raw,proof=self._finalize_golden_validation(item,actor,delegated=delegated)
+                identity=self._quality_identity(item,connection)
+                connection.execute('UPDATE questions SET raw_json=? WHERE id=?',(_json(raw),question_id))
+                item['raw']=raw
+                metadata={'qualification_source':sources[question_id],'quality_identity':identity,'content_review':proof,'review_qc_id':connection.execute('SELECT MAX(id) FROM qc_results WHERE question_id=?',(question_id,)).fetchone()[0]}
                 if delegated is not None:
                     metadata={**{k:v for k,v in delegated.items() if k!='reviews'},'qualification_source':'owner_delegated','review':delegated['reviews'][question_id],
-                              'qc_created_at':self.qc_history(question_id)[0]['created_at']}
+                              'qc_created_at':self.qc_history(question_id)[0]['created_at'],'quality_identity':identity,'content_review':proof,'review_qc_id':metadata['review_qc_id']}
                 decision='owner_delegated_confirmed' if delegated is not None else 'dataset_confirmed'
                 connection.execute("INSERT INTO review_events(question_id, gate, decision, actor, created_at,metadata_json) VALUES (?, ?, ?, ?, ?, ?)", (question_id, "dataset", decision, actor, now, _json(metadata)))
                 connection.execute("INSERT INTO approvals(gate, target_id, decision, actor, created_at) VALUES (?, ?, ?, ?, ?)", ("dataset", question_id, decision if delegated is not None else 'confirmed', actor, now))
@@ -1894,8 +1991,12 @@ class GovernanceStore:
             raise ValueError("QC score must be between 0 and 100")
         if priority not in {"P0", "P1", "P2"}:
             raise ValueError("QC priority must be P0, P1, or P2")
-        qc_status = 'qc_failed' if priority == 'P0' else 'qc_passed'
-        result = {**result, "score": float(score), "priority": priority, "threshold": None, "status": qc_status, "rule_version": 'v1.2', "execution_identity": execution}
+        from .golden_v2 import qc_outcome, validate_qc_content, QC_CONTRACT, QC_THRESHOLD
+        item,_ = self.capture_quality(question_id,qc=True)
+        content = validate_qc_content(item,result,CorpusStore().chunks()) if item['raw'].get('business_requirements') else None
+        result = {**result, 'content_validation':content}
+        qc_status = 'qc_passed' if qc_outcome(result)['passed'] else 'qc_failed'
+        result = {**result, 'score':float(score),'priority':priority,'threshold':QC_THRESHOLD,'status':qc_status,'rule_version':QC_CONTRACT,'execution_identity':execution}
         with CORPUS_LOCK, self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             item = self._require_quality_current(question_id, execution, connection)
