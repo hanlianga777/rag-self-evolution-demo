@@ -1,4 +1,6 @@
-2026-10-26 Golden审核闭环：原50题保持，结构/来源预检与冻结语义分开，Golden QC统一85分（P0阻断、P1争议复核）；现有批量入口与断点恢复已离线验证。真实Probe/QC及Human Gate尚未执行，Q09/Q15待复核；不改Judge、11 Gate、Baseline/Candidate或前端。[集中验收及费用预检](docs/GOLDEN_FINAL_CLOSEOUT_REPORT.md)。
+2026-10-27 Golden电气范围复核：Q06/Q07按厂家原文区分对接站/插头替代路径与独立电气安全要求，已完成两题定向真实复验；Q28/Q49同类判分争议及Q07条件适用性仍待处理，未批准或冻结。[复核及负责人清单](docs/GOLDEN_ELECTRICAL_CLOSEOUT_20261027.md)。
+
+2026-10-26 Golden审核闭环（离线交付时历史状态）：原50题保持，结构/来源预检与冻结语义分开，Golden QC统一85分（P0阻断、P1争议复核）；现有批量入口与断点恢复已离线验证。真实Probe/QC及Human Gate尚未执行，Q09/Q15待复核；不改Judge、11 Gate、Baseline/Candidate或前端。[集中验收及费用预检](docs/GOLDEN_FINAL_CLOSEOUT_REPORT.md)。
 
 2026-10-25 UI 整改：Candidate A/B/C/D 与历史方案同构等高、长字段内部滚动；中文枚举/完整英文对照、Hard Gate 贡献题目行及共享浮层统一，正式数据只读、Provider0。见[验收与截图](docs/UI_CONSISTENCY_ACCEPTANCE.md)。
 
