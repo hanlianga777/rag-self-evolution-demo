@@ -59,3 +59,15 @@ class DispositionTests(unittest.TestCase):
         with patch.object(main.store,'generation_run',return_value={'question_ids':[r['id'] for r in rows],'profile':{}}),patch.object(main.store,'candidate_rows',return_value=rows),patch('app.main.current_manifest',return_value={}),patch('app.main.manifest_identity',return_value={}):
             result=main.candidate_list('fixture',0,30,status='machine')
         self.assertEqual([r['id'] for r in result['rows']],['0','1'])
+
+    def test_machine_filter_paginates_48_49_50_without_detail_reads(self):
+        from unittest.mock import patch
+        from app import main
+        for count in (48,49,50):
+            rows=[{'id':str(i),'stage':'golden','review_status':'approved','probe_status':'probe_passed','qc_status':'qc_passed','test_category':'positive','raw':{},'slot':str(i),'topic_cluster':'t','qualification_status':('owner_delegated_approved' if i%2 else 'machine_qualified') if i<count else 'needs_human_review','qualification_source':'machine','attention_reasons':[],'attention_categories':[],'probe':{},'qc':{},'construction_type':'Ordinary','question':'fixture','updated_at':'fixture','quality_audit':None} for i in range(50)]
+            with self.subTest(count=count), patch.object(main.store,'generation_run',return_value={'question_ids':[r['id'] for r in rows],'profile':{}}), patch.object(main.store,'candidate_rows',return_value=rows), patch('app.main.current_manifest',return_value={}), patch('app.main.manifest_identity',return_value={}):
+                first=main.candidate_list('fixture',0,30,status='machine');second=main.candidate_list('fixture',30,30,status='machine')
+                self.assertEqual(first['total'],count)
+                self.assertEqual(len(first['rows']),30)
+                self.assertEqual(len(first['rows']+second['rows']),count)
+                self.assertEqual(len({r['id'] for r in first['rows']+second['rows']}),count)

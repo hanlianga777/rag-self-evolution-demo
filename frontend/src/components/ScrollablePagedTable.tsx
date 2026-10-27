@@ -17,6 +17,9 @@ export function usePagedCandidates(identity: string, path: string, enabled = tru
     try {
       const value = await goldenFetch<any>(identity, url);
       if (!Array.isArray(value.rows)) throw new Error("候选列表响应格式无效");
+      const params = new URLSearchParams(path.split("?")[1] || "");
+      if (params.get("status") === "machine" && (!params.get("group") || params.get("group") === "all") && !params.get("search") && value.total === 0 && Array.isArray(value.candidate_index) && value.candidate_index.some((row: any) => ["machine_qualified", "owner_delegated_approved"].includes(row.qualification_status)))
+        throw new Error("机器合格统计与列表不一致，请重试或重启后端");
       if (ticket !== request.current || key !== activeKey.current) return;
       setState((previous: any) => {
         // A changed version must restart pagination rather than mix two datasets.
@@ -24,11 +27,11 @@ export function usePagedCandidates(identity: string, path: string, enabled = tru
         const rows = offset ? [...(previous.key === key ? previous.rows || [] : []), ...value.rows] : value.rows;
         return { key, ...value, rows: [...new Map(rows.map((row: any) => [row.id, row])).values()] };
       });
-    } catch (reason) { if (ticket === request.current) setError(reason instanceof Error ? reason.message : "读取失败"); }
+    } catch (reason) { if (ticket === request.current && key === activeKey.current) setError(reason instanceof Error ? reason.message : "读取失败"); }
     finally { if (ticket === request.current) { pending.current = false; setLoading(false); } }
   };
   useEffect(() => {
-    request.current++; pending.current = false;
+    request.current++; pending.current = false; setError("");
     setState({ key, ...goldenCached<any>(identity, firstPath) });
     void read();
     return () => { request.current++; pending.current = false; };

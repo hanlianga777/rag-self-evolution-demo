@@ -76,3 +76,41 @@ it("shows a loading state instead of missing Evidence until lazy detail arrives"
   await act(async()=>resolve(new Response(JSON.stringify({...row,reference_answer:'先关闭电池电源。',evidence:[],raw:{},probe:{score:95},qc:{score:90}}))));
   expect(document.querySelector('.candidate-answer')?.textContent).toContain('先关闭电池电源');expect(document.querySelector('.quality-grid')).not.toBeNull();
 });
+
+it.each([48,49,50])('machine filter paginates %i qualified rows and survives filter changes', async count => {
+  const calls: string[] = [];
+  const rows = Array.from({length:50},(_,i)=>({id:`Q${i}`, qualification_status:i<count?(i%2?'owner_delegated_approved':'machine_qualified'):'needs_human_review'}));
+  vi.stubGlobal('fetch',vi.fn(async (url:string)=>{
+    calls.push(url); const p=new URL(url).searchParams, status=p.get('status'), offset=Number(p.get('offset'));
+    const selected=status==='machine'?rows.filter(r=>r.qualification_status!=='needs_human_review'):rows;
+    return new Response(JSON.stringify({rows:selected.slice(offset,offset+30),total:selected.length,data_version:'fixture'}));
+  }));
+  function List({status}:{status:string}) { const page=usePagedCandidates('fixture',`/api/governance/candidates?status=${status}`); return <><span>{page.rows.length}/{page.total}</span><button onClick={page.loadMore}>more</button><table><tbody>{page.rows.map((r:any)=><tr key={r.id}><td>{r.id}</td></tr>)}</tbody></table></>; }
+  root=createRoot(document.body.appendChild(document.createElement('div')));
+  await act(async()=>root.render(<List status="machine"/>));
+  expect(document.body.textContent).toContain(`30/${count}`);
+  await act(async()=>document.querySelector('button')!.click());
+  expect(document.querySelectorAll('tr')).toHaveLength(count);
+  await act(async()=>root.render(<List status="all"/>));
+  expect(document.body.textContent).toContain('30/50');
+  await act(async()=>root.render(<List status="machine"/>));
+  expect(document.body.textContent).toContain(`30/${count}`);
+  expect(calls.some(url=>url.includes('status=machine')&&url.includes('offset=30'))).toBe(true);
+  expect(calls.some(url=>url.includes('/questions/'))).toBe(false);
+});
+
+it('keeps an explicit request error and allows retry instead of a false empty list', async () => {
+  let fail=true;
+  vi.stubGlobal('fetch',vi.fn(async()=> fail ? new Response(JSON.stringify({detail:'读取失败'}),{status:503}) : new Response(JSON.stringify({rows:[{id:'Q1'}],total:1,data_version:'v1'}))));
+  function List(){const page=usePagedCandidates('failure','/api/governance/candidates?status=machine');return <>{page.error ? <p role="alert">{page.error}<button onClick={()=>void page.refresh()}>重试</button></p>:page.rows.map((r:any)=><p key={r.id}>{r.id}</p>)}</>;}
+  root=createRoot(document.body.appendChild(document.createElement('div')));
+  await act(async()=>root.render(<List/>));expect(document.querySelector('[role=alert]')).not.toBeNull();
+  fail=false;await act(async()=>document.querySelector('button')!.click());expect(document.body.textContent).toContain('Q1');
+});
+
+it('reports a stale backend machine-filter mismatch rather than an empty success', async () => {
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({rows:[],total:0,candidate_index:[{id:'Q1',qualification_status:'owner_delegated_approved'}],data_version:'v1'}))));
+  function List(){const page=usePagedCandidates('stale','/api/governance/candidates?status=machine&group=all');return <p>{page.error || (page.rows.length ? 'ok' : '暂无数据')}</p>;}
+  root=createRoot(document.body.appendChild(document.createElement('div')));
+  await act(async()=>root.render(<List/>));expect(document.body.textContent).toContain('机器合格统计与列表不一致');
+});

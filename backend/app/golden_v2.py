@@ -30,6 +30,20 @@ def normalize(value):
     return ''.join(c.lower() for c in unicodedata.normalize('NFKC', value) if c.isalnum())
 
 
+def related_product_sources(first, second):
+    """Admit matching device/component procedures for semantic review, never prove safety."""
+    from difflib import SequenceMatcher
+    first_model = re.match(r'^\s*([A-Za-z]+\d+)\b', str(first.get('product') or ''))
+    second_model = re.match(r'^\s*([A-Za-z]+\d+)\b', str(second.get('product') or ''))
+    if not first_model or not second_model or first_model.group(1).casefold() != second_model.group(1).casefold(): return False
+    if not first.get('vendor') or first.get('vendor') != second.get('vendor'): return False
+    if first.get('version') and second.get('version') and first['version'] != second['version']: return False
+    # ponytail: exact shared procedure is conservative; replace with explicit vendor scope metadata when available.
+    left = re.sub(r'\s+', '', unicodedata.normalize('NFKC', text(first)))
+    right = re.sub(r'\s+', '', unicodedata.normalize('NFKC', text(second)))
+    return SequenceMatcher(None, left, right, autojunk=False).find_longest_match().size >= 150
+
+
 def facts(chunk):
     return [(key.strip(), value.strip()) for key, value in re.findall(r'(?m)^\s*([^：:\n]{2,60})[：:]\s*([^。；\n]{1,150})', text(chunk))]
 
@@ -561,7 +575,7 @@ def validate_golden_candidate(candidate, corpus, coverage_plan=None, validation_
             evidence_values = {str(chunk[field]) for chunk in sources if chunk.get(field)}
             if mentioned and evidence_values and not mentioned.issubset(evidence_values):
                 errors.append(f'Question/Evidence {field} 实体范围不一致')
-        if len(products) > 1 and not all(str(p) in question for p in products):
+        if len(products) > 1 and not all(str(p) in question for p in products) and not (governed and all(a.get('product') == b.get('product') or related_product_sources(a, b) for a in sources for b in sources)):
             errors.append('跨产品证据缺少明确实体范围')
         if len(versions) > 1 and not all(str(v) in question for v in versions):
             errors.append('跨版本证据缺少明确版本范围')

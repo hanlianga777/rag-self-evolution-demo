@@ -1294,6 +1294,7 @@ class GovernanceStore:
 
     def _validate_revision_drafts(self, run: dict, chunks: list[dict], similarity, changes: dict):
         from .ai_service import AiService
+        from .golden_v2 import related_product_sources
         by_chunk = {chunk["chunk_id"]: chunk for chunk in chunks}
         drafts, errors = {}, []
         for item_id in run["question_ids"]:
@@ -1323,7 +1324,7 @@ class GovernanceStore:
             if not original_product:
                 coverage = (self.generation_run(run["generation_run_id"], qualification=False).get("artifacts") or {}).get("coverage_plan", [])
                 original_product = next((entry.get("product") for entry in coverage if entry.get("slot") == old["raw"].get("coverage_slot")), None)
-            if old["test_category"] != "negative" and original_product and any(by_chunk[key]["document_id"] not in old_documents and by_chunk[key].get("product") not in {None, original_product} for key in source_ids):
+            if old["test_category"] != "negative" and original_product and any(by_chunk[key]["document_id"] not in old_documents and by_chunk[key].get("product") not in {None, original_product} and not (old['raw'].get('business_requirements') and any(related_product_sources(original, by_chunk[key]) for original in original_chunks)) for key in source_ids):
                 errors.append(f"{item_id}: 证据只能在当前产品文档内改选")
                 continue
             if old["test_category"] == "negative" and source_ids:
@@ -1744,7 +1745,7 @@ class GovernanceStore:
         run = self.generation_run(generation_run_id, qualification=False)
         expected = self._expected_count(run)
         if self.gate_summary(run, self.candidate_rows(question_ids))['status'] != 'ready':
-            raise ValueError('Human Gate 尚未满足当前完整审核及质量条件')
+            raise ValueError(f'Human Gate 尚未满足 {expected} 题的当前完整审核及质量条件')
         if len(approved) != expected or len(set(question_ids)) != expected or any(item["stage"] != "golden" or item["review_status"] != "approved" or not self.approval_eligibility(item['id'])['can_approve'] for item in approved):
             raise ValueError(f"同一 Generation Run 的 {expected} 道题必须全部完成人工批准后才能创建 Snapshot")
         if any(set(item["question_ids"]) & set(question_ids) for item in self.revision_runs(generation_run_id) if item["status"] in {"queued", "generating", "validating", "preview_ready", "probing", "qc", "interrupted"}):

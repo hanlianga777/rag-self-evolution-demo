@@ -407,3 +407,23 @@ it("lets a paired preview regenerate only Q09 and discard without applying", asy
   expect(requests.some(item => item.url.endsWith("/apply"))).toBe(false);
   await act(async () => root.unmount());
 });
+
+it.each([48,49,50])('machine filter shows first page of %i qualified candidates and keeps failure visible', async count => {
+  const rows=Array.from({length:50},(_,i)=>({id:`Q${i}`,slot:`Q${i}`,question:`问题${i}`,test_category:'positive',stage:i<count?'golden':'candidate',review_status:i<count?'approved':'human_review_pending',probe_status:'probe_passed',qc_status:'qc_passed',qualification_status:i<count?'owner_delegated_approved':'needs_human_review',raw:{}}));
+  const run={id:'GGEN-list',status:'completed',profile:{name:'medium',expected_count:50},question_ids:rows.map(r=>r.id),artifacts:{}};
+  let fail=false;
+  vi.stubGlobal('fetch',vi.fn(async(url:string)=>{
+    if(url.includes('/candidates?')){const p=new URL(url).searchParams;const selected=p.get('status')==='machine'?rows.filter(r=>r.qualification_status==='owner_delegated_approved'):rows.filter(r=>r.qualification_status==='needs_human_review');if(fail)return new Response(JSON.stringify({detail:'列表服务不可用'}),{status:503});return new Response(JSON.stringify({rows:selected.slice(Number(p.get('offset')),Number(p.get('offset'))+30),candidate_index:rows,total:selected.length,data_version:'v1'}));}
+    return new Response(JSON.stringify([]));
+  }));
+  const root=createRoot(document.body.appendChild(document.createElement('div')));
+  await act(async()=>root.render(<GovernancePage data={{generationRuns:[run],dataset:rows}}/>));
+  const button=[...document.querySelectorAll<HTMLButtonElement>('.review-filters button')].find(b=>b.textContent?.startsWith('机器合格'))!;
+  expect(button.textContent).toContain(String(count));
+  await act(async()=>button.click());expect(document.querySelectorAll('.review-table tbody tr')).toHaveLength(30);
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('.review-filters button')].find(b=>b.textContent?.startsWith('需要人工关注'))!.click());
+  fail=true;invalidateGolden();await act(async()=>button.click());
+  expect(document.querySelector('[role=alert]')?.textContent).toContain('列表服务不可用');
+  expect(document.querySelector('.review-table')?.textContent).not.toContain('暂无对应数据');
+  await act(async()=>root.unmount());
+});
