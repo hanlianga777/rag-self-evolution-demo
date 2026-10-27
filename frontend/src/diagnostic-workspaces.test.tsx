@@ -106,8 +106,7 @@ it('opens Sandbox fee confirmation without a budget and submits only explicit co
  await click('A/B/C/D');
  expect(document.querySelector('input[aria-label="Sandbox人民币累计硬上限"]')).toBeNull();
  await click('运行 Sandbox');
- expect(document.querySelector('[role="dialog"]')?.textContent).toContain('模型调用费用授权');
- await click('授权并运行此操作');
+ expect(document.querySelector('[role="dialog"]')).toBeNull();
  const request=fetcher.mock.calls.find(([url])=>url.endsWith('/api/candidates/c/run')) as any;
  expect(request).toBeTruthy();expect(JSON.parse(request[1].body)).toEqual({authorize_provider:true});
 });

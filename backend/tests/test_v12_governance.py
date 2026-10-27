@@ -78,9 +78,18 @@ class V12GovernanceTests(unittest.TestCase):
             self.store.record_probe_result(item['id'], {'question_quality': 30, 'golden_answer_quality': 30, 'evidence_support': 40})
             self.store.record_qc(item['id'], {'score': 99, 'priority': 'P2'}, 'passed')
         result = self.store.review_generation_batch([i['id'] for i in self.items], 'test_human', confirmed_manual_review=True)
-        self.assertEqual(len(result['snapshot']['question_ids']), 20)
+        self.assertNotIn('snapshot', result)
+        self.assertEqual(self.store.dataset_snapshots(), [])
         again = self.store.review_generation_batch([i['id'] for i in self.items], 'test_human', confirmed_manual_review=True)
-        self.assertEqual(result['snapshot']['id'], again['snapshot']['id'])
+        self.assertNotIn('snapshot', again)
+        run_id=self.items[0]['raw']['generation_run_id']
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            snapshots=list(pool.map(self.store.create_generation_snapshot,[run_id,run_id]))
+        snapshot=snapshots[0]
+        self.assertEqual(snapshots[0]['id'],snapshots[1]['id'])
+        self.assertEqual(len(snapshot['question_ids']),20)
+        self.assertEqual(snapshot['id'],self.store.create_generation_snapshot(run_id)['id'])
         self.assertEqual(len(self.store.review_history(self.items[0]['id'])), 1)
 
     def test_gate1_failure_writes_neither_approval_nor_snapshot(self):

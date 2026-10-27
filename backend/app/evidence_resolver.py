@@ -206,7 +206,7 @@ def resolve_persisted(store,run_id,question_id,chunks,fingerprint,*,semantic=Non
     except Exception as error:
         if not persist:raise
         result={'version':RESOLVER_VERSION,'identity':identity,'request_sha256':request_identity(case,question,chunks,identity),
-            'status':'pending_budget' if str(error)=='Payment budget insufficient' else 'blocked','findings':[],'blockers':['semantic_execution_failed: '+str(error)],'semantic_response':None,
+            'status':'blocked','findings':[],'blockers':['semantic_execution_failed: '+str(error)],'semantic_response':None,
             'error_type':type(error).__name__,'raw_provider_response':getattr(error,'raw_provider_response',None)}
     if reused:result['reused_observation_from']=reused
     if persist:
@@ -242,7 +242,7 @@ def resolve_batch(store,run_id,question_ids,chunks,fingerprint,*,semantic=None,m
     """Serial diagnostic stage; exact question scope and existing paid ledger bound calls."""
     from .paid_run import current_paid_run
     if len(set(question_ids))!=len(question_ids) or type(max_calls) is not int or max_calls<0:raise ValueError('invalid_diagnostic_scope_or_limit')
-    if semantic is not None and (not persist or current_paid_run() is None):raise ValueError('诊断批次必须冻结独立PaidRun预算并保存结果')
+    if semantic is not None and (not persist or current_paid_run() is None):raise ValueError('诊断批次必须使用独立PaidRun并保存结果')
     results=[];calls=0
     # Validate the entire scope before the first possible request.
     for question_id in question_ids:persisted_inputs(store,run_id,question_id,chunks,fingerprint)
@@ -255,11 +255,10 @@ def resolve_batch(store,run_id,question_ids,chunks,fingerprint,*,semantic=None,m
         result=resolve_persisted(store,run_id,question_id,chunks,fingerprint)
         if result['status']=='needs_semantic' and semantic is not None:
             if calls>=max_calls:
-                results.append({'question_id':question_id,'status':'pending_budget','findings':[]});continue
+                results.append({'question_id':question_id,'status':'pending_call_limit','findings':[]});continue
             calls+=1
             result=resolve_persisted(store,run_id,question_id,chunks,fingerprint,semantic=semantic,persist=persist,authorization_id=current_paid_run().path.stem)
         results.append({'question_id':question_id,**result})
-        if result['status']=='pending_budget':break
         ledger=current_paid_run()
         if ledger and ledger.identity_check()!=ledger.identity:
             results[-1].update(status='blocked',findings=[],blockers=['diagnostic_identity_changed_after_request']);break
@@ -289,25 +288,32 @@ def diagnostic_plan(store,run_id,question_ids=None):
     return {**resolve_batch(store,run_id,selected,chunks,fingerprint),'binding_sha256':digest(binding),'provider_calls':0}
 
 
-def execute_diagnostic_batch(store,run_id,runtime,*,question_ids=None,expected_binding,authorization_id,max_calls,budget_yuan,price_snapshot):
+def execute_diagnostic_batch(store,run_id,runtime,*,question_ids=None,expected_binding,authorization_id=None,max_calls,price_snapshot=None,budget_yuan=None):
     """One explicit authorization; no generation, scoring, approval or DB writes."""
     from datetime import datetime,timezone
     from .paid_run import PaidRun,controlled_run,REQUEST_LIMITS
     selected,chunks,fingerprint,binding=batch_inputs(store,run_id,question_ids)
     if expected_binding!=digest(binding):raise ValueError('诊断输入已变化，请刷新批量预检')
+    if authorization_id is None:
+        from uuid import uuid4
+        authorization_id=uuid4().hex
     if not authorization_id or not authorization_id.replace('-','').replace('_','').isalnum():raise ValueError('无效授权编号')
     if type(max_calls) is not int or not 0<max_calls<=len(selected):raise ValueError('必须冻结本次调用上限')
-    age=(datetime.now(timezone.utc)-datetime.fromisoformat(price_snapshot['checked_at'])).total_seconds()
-    if not 0<=age<=86400 or price_snapshot.get('currency')!='CNY':raise ValueError('需24小时内核验的人民币价格快照')
-    rate=price_snapshot.get('models',{}).get(runtime.model,{})
-    if rate.get('provider')!='DeepSeek' or rate.get('max_output')!=REQUEST_LIMITS['judge']:raise ValueError('价格/模型/输出上限与当前诊断配置不符')
+    if price_snapshot:
+        try:
+            age=(datetime.now(timezone.utc)-datetime.fromisoformat(price_snapshot['checked_at'])).total_seconds()
+            rate=price_snapshot.get('models',{}).get(runtime.model,{})
+            if not 0<=age<=86400 or price_snapshot.get('currency')!='CNY' or rate.get('provider')!='DeepSeek' or rate.get('max_output')!=REQUEST_LIMITS['judge']:
+                price_snapshot=None
+        except (KeyError,TypeError,ValueError):
+            price_snapshot=None
     directory=Path(store.database_path).parent/'diagnostic-batches';directory.mkdir(parents=True,exist_ok=True)
     for previous in directory.glob('*.json'):
         record=json.loads(previous.read_text())
         if set(record.get('identity',{}).get('requests',[])) & set(binding['requests']) and any(c['status']!='ok' for c in record.get('calls',[])):
             raise ValueError('同一诊断输入存在未结算请求；先核查原账本，不自动重发')
     authorization={'authorization_id':authorization_id,'max_calls':max_calls,'price_snapshot_sha256':digest(price_snapshot)}
-    ledger=PaidRun(directory/(authorization_id+'.json'),budget_yuan,price_snapshot['models'],{**binding,**authorization},
+    ledger=PaidRun(directory/(authorization_id+'.json'),budget_yuan,(price_snapshot or {}).get('models',{}),{**binding,**authorization},
         identity_check=lambda:{**batch_inputs(store,run_id,selected)[3],**authorization},output_limits=REQUEST_LIMITS)
     with controlled_run(ledger):
         result=resolve_batch(store,run_id,selected,chunks,fingerprint,semantic=runtime.resolve_diagnostic,max_calls=max_calls,persist=True)

@@ -1585,8 +1585,6 @@ def candidate_preflight(candidate_id: str):
 
 @app.post("/api/candidates/{candidate_id}/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def run_candidate(candidate_id: str, payload: PaidActionRequest | None = None):
-    if not payload or not payload.authorize_provider:
-        raise HTTPException(409,detail="Sandbox启动与续跑须重新明确付费授权；预检不产生费用")
     candidate = store.candidate(candidate_id)
     if candidate:
         experiment = store.experiment(candidate["experiment_id"])
@@ -1594,7 +1592,7 @@ def run_candidate(candidate_id: str, payload: PaidActionRequest | None = None):
             require_current_baseline(experiment["baseline_run_id"])
     runner = EvaluationRunner(store, ai_service)
     try:
-        run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id,automatic=True,manual_resume=payload.authorize_provider)
+        run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id,automatic=True)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     threading.Thread(target=contextvars.copy_context().run, args=(runner.execute_candidate,run_id, approved, config, candidate, baseline), daemon=True).start()
@@ -1669,8 +1667,7 @@ def judge_replay_preflight(source_id: str):
 
 
 @app.post('/api/evaluations/{source_id}/judge-replay',status_code=201,dependencies=[Depends(require_trusted_origin)])
-def judge_replay(source_id: str,payload: PaidActionRequest):
-    if not payload.authorize_provider:raise HTTPException(409,'新版Judge-only Baseline会产生Judge费用，必须明确授权；禁止生成模型调用')
+def judge_replay(source_id: str,payload: PaidActionRequest | None = None):
     try:
         runner=EvaluationRunner(store,ai_service)
         run_id,items,config=runner.start_judge_replay(source_id)
@@ -1683,10 +1680,10 @@ class DiagnosticBatchRequest(BaseModel):
     authorize_provider: bool = False
     question_ids: list[str] | None = None
     expected_binding: str
-    authorization_id: str
+    authorization_id: str | None = None
     max_calls: int
-    budget_yuan: float
-    price_snapshot: dict
+    budget_yuan: float | None = None
+    price_snapshot: dict | None = None
 
 
 @app.get('/api/evaluations/{run_id}/diagnostic-plan')
@@ -1698,7 +1695,6 @@ def get_diagnostic_plan(run_id: str):
 
 @app.post('/api/evaluations/{run_id}/resolve-diagnostics',dependencies=[Depends(require_trusted_origin)])
 def resolve_diagnostic_batch(run_id: str,payload: DiagnosticBatchRequest):
-    if not payload.authorize_provider:raise HTTPException(409,'批量补证需要独立费用授权，不能沿用Agent或Baseline授权')
     from .evidence_resolver import execute_diagnostic_batch
     try:
         return execute_diagnostic_batch(store,run_id,ai_service,question_ids=payload.question_ids,expected_binding=payload.expected_binding,
@@ -1721,7 +1717,7 @@ def diagnostic_evidence_preflight(run_id: str,question_id: str):
 def resolve_diagnostics(run_id: str,question_id: str,payload: PaidActionRequest):
     if not payload.authorize_provider:raise HTTPException(409,'语义补证必须明确授权；不会修改历史成绩')
     from .paid_run import current_paid_run
-    if current_paid_run() is None:raise HTTPException(409,'请使用批量补证入口冻结题目、调用上限及独立费用预算')
+    if current_paid_run() is None:raise HTTPException(409,'请使用批量补证入口冻结题目及调用上限')
     from .evidence_resolver import resolve_persisted
     from .diagnostics import _current_corpus
     run=store.evaluation_run(run_id)
@@ -1732,9 +1728,7 @@ def resolve_diagnostics(run_id: str,question_id: str,payload: PaidActionRequest)
 
 
 @app.post('/api/evaluations/{source_id}/replay', dependencies=[Depends(require_trusted_origin)])
-def replay_evaluation(source_id: str, payload: PaidActionRequest):
-    if not payload.authorize_provider:
-        raise HTTPException(409, '历史答案评分会调用Judge产生Token费用，请明确授权')
+def replay_evaluation(source_id: str, payload: PaidActionRequest | None = None):
     try:
         runner = EvaluationRunner(store, ai_service)
         run_id, items, executions = runner.start_replay(source_id)

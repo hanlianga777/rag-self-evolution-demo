@@ -58,12 +58,15 @@ class DelegatedReviewTests(unittest.TestCase):
             item['raw'].update(coverage_slot=slot,difficulty=level)
             item['updated_at'] = (datetime.now(timezone.utc)-timedelta(minutes=1)).isoformat()
             self.rows[index]['quality_audit_created_at'] = item['updated_at']
-            self.rows[index]['quality_audit'] = {'audit_version':QUALITY_CONTRACT}
+            self.rows[index]['quality_audit'] = {'audit_version':QUALITY_CONTRACT,'checks':dict.fromkeys(BUSINESS_CHECKS,True)}
             plan['slots'].append({'slot':slot,'difficulty':level})
             review.update(actual_difficulty=level,difficulty_basis='Offline independent conditional evidence review',
                           business_checks=dict.fromkeys(BUSINESS_CHECKS,True),
                           actor='Codex AI Agent / Owner Delegated AI Review',reviewed_at=datetime.now(timezone.utc).isoformat())
         self.assertEqual(self.check()['review_actor_type'],'ai_agent')
+        self.rows[0]['quality_audit']['checks']['grounding']=False
+        with self.assertRaises(ValueError):self.check()
+        self.rows[0]['quality_audit']['checks']['grounding']=True
         original = copy.deepcopy(self.reviews)
         for field,value in [('business_checks',{}),
                             ('actor','project_owner'),('reviewed_at',None),
@@ -118,6 +121,21 @@ class DelegatedReviewTests(unittest.TestCase):
         self.rows[0]['qc']['score']=84
         with self.assertRaises(ValueError):self.check()
 
+    def test_scoped_delegation_accepts_one_current_review_without_waiving_other_checks(self):
+        self.reviews = self.reviews[:1]
+        self.assertEqual(len(self.check()['reviews']), 1)
+        self.rows[0]['qualification_status'] = 'needs_human_review'
+        with self.assertRaises(ValueError): self.check()
+
+    def test_retrieval_acceptance_is_required_even_with_another_issue(self):
+        self.rows[0].update(qualification_status='needs_human_review',
+                            attention_reasons=['检索不连贯','语义/安全争议待复核'],
+                            probe_status='probe_passed',qc_status='qc_passed',probe={'id':123})
+        self.reviews[0]['issue_disposition']='reviewed issue'
+        with self.assertRaisesRegex(ValueError,'retrieval risk'): self.check()
+        self.reviews[0]['retrieval_risk_acceptance']={'classification':'RETRIEVAL_INCOHERENT','retrieval_not_fixed':True,'probe_id':123,'reason':'reviewed evidence'}
+        self.assertEqual(len(self.check()['reviews']),50)
+
     def test_twenty_scoped_reviews_require_explicit_matching_mini_profile(self):
         self.mini()
         result=self.check()
@@ -167,7 +185,7 @@ class DelegatedReviewTests(unittest.TestCase):
         self.rows[0]['qualification_status']='needs_human_review'
         with self.assertRaises(ValueError):self.check()
         self.rows[0]['qualification_status']='machine_qualified'
-        self.reviews.pop()
+        self.reviews[0]['question_id']='outside-scope'
         with self.assertRaises(ValueError):self.check()
 
     def test_expiry_wrong_corpus_and_altered_authorization_rejected(self):
@@ -280,14 +298,18 @@ class DelegatedReviewTests(unittest.TestCase):
             db.execute("INSERT INTO golden_generation_artifacts VALUES ('fixture-run','[]','[]',?)",(json.dumps(artifact),))
         delegated={'approval_mode':'owner_delegated','review_actor_type':'ai_agent','delegated_by':'project_owner','actor':'Codex',
                    'authorization_id':'fixture-owner','reviews':{r['question_id']:r for r in self.reviews}}
-        with patch('app.delegated_review.validate_delegation',return_value=delegated),patch.object(store,'candidate_rows',return_value=qualified),patch('app.governance.current_manifest',return_value={}),patch('app.governance.manifest_identity',return_value=self.auth['corpus']),patch.object(store,'qc_history',return_value=[{'created_at':'fixture'}]):
-            first=store.review_owner_delegated_batch('fixture-run','fixture-owner',self.reviews)
+        def validated(path, authorization_id, run, rows, items, reviews, content_hash):
+            return {**delegated, 'reviews':{r['question_id']:r for r in reviews}}
+        with patch('app.delegated_review.validate_delegation',side_effect=validated),patch.object(store,'candidate_rows',return_value=qualified),patch('app.governance.current_manifest',return_value={}),patch('app.governance.manifest_identity',return_value=self.auth['corpus']),patch.object(store,'qc_history',return_value=[{'created_at':'fixture'}]):
+            first=store.review_owner_delegated_batch('fixture-run','fixture-owner',self.reviews[:1])
+            self.assertEqual(len(first['reviewed']),1)
             second=store.review_owner_delegated_batch('fixture-run','fixture-owner',self.reviews)
-        self.assertEqual(first['snapshot']['id'],second['snapshot']['id'])
+        self.assertNotIn('snapshot', first)
+        self.assertNotIn('snapshot', second)
         with store.connection() as db:
             events=db.execute("SELECT decision,actor,metadata_json FROM review_events WHERE decision='owner_delegated_confirmed'").fetchall()
             self.assertEqual(len(events),50)
-            self.assertEqual(db.execute("SELECT source FROM dataset_versions WHERE id=?",(first['snapshot']['id'],)).fetchone()[0],'owner_delegated')
+            self.assertEqual(db.execute("SELECT count(*) FROM dataset_versions WHERE status='approved'").fetchone()[0],0)
             self.assertTrue(all(r[1]=='Codex' and json.loads(r[2])['review_actor_type']=='ai_agent' for r in events))
 
 

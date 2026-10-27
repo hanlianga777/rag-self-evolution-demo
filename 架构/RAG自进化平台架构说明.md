@@ -2,6 +2,8 @@
 
 > 当前正式架构同源于概览页面，2026-10-08同步；唯一规则见[SPEC当前合同](../docs/RAG_SELF_EVOLUTION_SPEC.md)。图表达流程设计，不表达当前阶段已执行；实际Full由用户冻结，新Medium业务V2独立停在人工治理，Legacy Production独立。
 
+2026-10-27：Golden人工或有效Owner委托审核与负责人冻结为独立动作；完整题集审核及当前质量身份满足后Human Gate Ready，负责人再创建Snapshot。模型费用记账不按金额阻断，未知费用先对账；Sandbox次数限制保持。
+
 ![当前业务架构](业务流程图.svg)
 
 ![当前技术架构](技术架构图.svg)

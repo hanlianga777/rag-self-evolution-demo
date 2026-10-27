@@ -200,8 +200,10 @@ class FinalGovernanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "confirmation"):
             self.store.review_generation_batch([item["id"] for item in generated], "reviewer", confirmed_manual_review=False)
 
+        prior_snapshots = self.store.dataset_snapshots()
         reviewed = self.store.review_generation_batch([item["id"] for item in generated], "reviewer", confirmed_manual_review=True)
-        self.assertIn("snapshot", reviewed)
+        self.assertNotIn("snapshot", reviewed)
+        self.assertEqual(self.store.dataset_snapshots(), prior_snapshots)
         snapshot = self.store.create_generation_snapshot(generated[0]["raw"]["generation_run_id"])
         self.assertEqual(len(snapshot["question_ids"]), 20)
         self.assertEqual(snapshot["generation_run_id"], generated[0]["raw"]["generation_run_id"])

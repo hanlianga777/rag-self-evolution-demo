@@ -3,7 +3,6 @@ import { FilterButtons } from "../components/Storytelling";
 import './evaluation-workspaces.css';
 import {DiagnosisTable, questionLabel, optimizationDirection, savedDirections, coreEvidence, caseData, currentRoot, rootName, symptoms, agentDiagnosisRows} from '../components/EvaluationDiagnosis';
 import { CandidateCaseComparison } from "../components/CandidateCaseComparison";
-import { ProviderAuthorization, type PaidRequest } from "../components/ProviderAuthorization";
 import { PageShell } from "../components/PageShell";
 import { RetrievalEvidence } from "../components/RetrievalEvidence";
 import { useEffect, useRef, useState } from "react";
@@ -21,7 +20,6 @@ const rootCause = currentRoot;
 
 export function EvolutionPage({ data }: { data: any }) {
   const operation = useOperation();
-  const [paid, setPaid] = useState<PaidRequest | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [stage, setStage] = useState<"bad" | "agent" | "candidates" | "sandbox" | "regression" | "recommendation">("bad");
   const [experiment, setExperiment] = useState<any>(data.optimization?.id ? data.optimization : null);
@@ -102,7 +100,7 @@ export function EvolutionPage({ data }: { data: any }) {
     try { await operation.runCandidateBatch({ experimentId: experiment.id, baselineId: evaluation.id, round: roundNumber, candidateIds: pending.map(item => item.id), identity: data.workspace ? identity : undefined }); await refresh(); }
     catch (reason) { if (currentIdentity.current === captured) { setError(errorMessage(reason)); await refresh(); } }
   };
-  const requestPaid = (title: string, description: string, execute: () => void) => setPaid({ title, description, execute });
+  const requestPaid = (_title: string, _description: string, execute: () => void) => execute();
   const runBatch = () => requestPaid('运行本轮 A/B/C Sandbox', `Golden ${evaluation.dataset_snapshot?.question_ids?.length ?? evaluation.cases?.length ?? '未采集'} 题，待运行 ${pending.length} 个Candidate；每题回答+Judge；评测次数 ${budget.used}/${budget.max}，D预留1次。Rewrite/MultiQuery/HyDE启用时有额外模型调用。`, () => void executeBatch());
   const activeOperation = (candidateId: string) => operation.operations.find(item => item.candidateId === candidateId && item.status === "running");
   const processingCases=agentDiagnosisRows(badCases);
@@ -137,7 +135,7 @@ export function EvolutionPage({ data }: { data: any }) {
   };
   const generate = () => requestPaid('生成A/B/C优化建议', '一次Agent策略分析调用；不自动执行Sandbox。', () => void executeGenerate());
   const continueRound = () => requestPaid('生成下一轮建议', '读取已保存历史实验反馈，一次Agent分析；不自动评测。', () => void action('生成下一轮A/B/C', () => postJson(`/api/experiments/${experiment.id}/continue`)));
-  const run = (candidate: any) => candidate.resume_plan?.can_resume === false ? setError(candidate.resume_plan.reason || '当前断点不可续跑，请查看预检原因') : requestPaid(`${candidateName(candidate)} · Sandbox`, `Golden ${evaluation.cases?.length ?? '未采集'}题；${candidate.status === 'failed' ? '同身份续跑，仅补缺失结果；确认即允许重新请求并接受可能重复计费，历史未知费用保留。本次启动计入既有评测次数。' : '每题生成回答+Judge，可能有额外改写/检索调用。'}评测次数${budget.used}/${budget.max}，D预留1次。`, () => void executeCandidate(candidate));
+  const run = (candidate: any) => candidate.resume_plan?.can_resume === false ? setError(candidate.resume_plan.reason || '当前断点不可续跑，请查看预检原因') : void executeCandidate(candidate);
   const executeCandidate = async (candidate: any) => {
     if (!["generated", "failed"].includes(candidate.status) || activeOperation(candidate.id)) return;
     const captured = identity;
@@ -161,7 +159,6 @@ export function EvolutionPage({ data }: { data: any }) {
   return <PageShell className="page evolution-page" header={<><div className="page-title"><div><h1>Agent 工作台</h1><p>读取问题证据，提出 A/B/C 假设，用 Sandbox 验证改善与副作用。</p></div>{planningIncomplete ? <button className="primary" disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button> : pending.length ? <button className="primary" disabled={busy || !canBatch} onClick={() => void runBatch()}><Play size={15} />{batchRunning ? "本轮 Sandbox 运行中" : "运行本轮 A/B/C Sandbox"}</button> : <button className="primary" disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed" || (!!abc.length && !canContinue) || (!badCases.length && !experiment?.result?.monitoring_context)} onClick={() => void (canContinue ? continueRound() : generate())}><Play size={15} />{busy ? "处理中…" : canContinue ? "继续优化下一轮" : abc.length ? "本轮方案已生成" : "生成 A / B / C"}</button>}</div><StoryDisclosure label={<>实验与人工Gate进度</>}><StageStepper compact ariaLabel="Agent 实验阶段" steps={[...steps]} /></StoryDisclosure></>} tabs={<div className="tabs"><button aria-pressed={stage === "bad"} className={stage === "bad" ? "active" : ""} onClick={() => setStage("bad")}>问题诊断</button><button aria-pressed={stage === "agent"} className={stage === "agent" ? "active" : ""} onClick={() => setStage("agent")}>优化 Agent</button><button aria-pressed={stage === "candidates"} className={stage === "candidates" ? "active" : ""} onClick={() => setStage("candidates")}>A/B/C/D</button><button aria-pressed={stage === "sandbox"} className={stage === "sandbox" ? "active" : ""} onClick={() => setStage("sandbox")}>Sandbox</button><button aria-pressed={stage === "regression"} className={stage === "regression" ? "active" : ""} onClick={()=>setStage("regression")}>Regression</button><button aria-pressed={stage === "recommendation"} className={stage === "recommendation" ? "active" : ""} onClick={()=>setStage("recommendation")}>Recommendation</button></div>} resetKey={stage}>
 
 
-    <ProviderAuthorization request={paid} onClose={() => setPaid(null)} />
     {policyBlocked && <p className="error-notice">当前 Baseline 评测版本身份与运行代码不兼容，真实 Agent 启动已阻断，旧实验只读。全部 Bad Case 保留在优化规划中；请先到 Baseline 查看身份预检，按原 Q18 复核与独立授权流程处理，不自动重评。</p>}
     {abc.some(item => (item.reasoning?.round || 1) < roundNumber) && <button className="text-button" onClick={() => setHistoryOpen(true)}>历史实验 · {new Set(abc.filter(item => (item.reasoning?.round || 1) < roundNumber).map(item => item.reasoning?.round || 1)).size}轮</button>}
     <Drawer className="workbench-drawer" open={historyOpen} onOpenChange={setHistoryOpen} title="历史实验 · 原方案与结果只读"><div className="drawer-body"><div className="candidate-cards">{abc.filter(item => (item.reasoning?.round || 1) < roundNumber).map(candidate => <CandidateCard key={candidate.id} candidate={candidate} baseline={evaluation.config || {}} busy={true} onDetail={()=>{setHistoryOpen(false);setSelectedCandidate(candidate);}} targets={targetRows(candidate,badCases)} onTargets={()=>{setHistoryOpen(false);setTargetCandidate(candidate);}} onRun={()=>void run(candidate)} />)}</div></div></Drawer>

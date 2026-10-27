@@ -47,13 +47,13 @@ it("accepts a reviewable QC P0 with a recorded reason even when scores are low",
   await act(async () => root.unmount());
 });
 
-it("uses one Gate 1 confirmation and never offers a separate Snapshot action", async () => {
+it("offers review before freezing", async () => {
   const rows = Array.from({ length: 20 }, (_, index) => ({ id: `Q${index}`, slot: `Q${index}`, question: "问题", test_category: "positive", review_status: "human_review_pending", stage: "candidate", approval_eligibility: { can_approve: true, blocking_reasons: [] } }));
   const requests: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") requests.push(url); return new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : []), { status: 200 }); }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [{ id: "G1", status: "completed", question_ids: rows.map(row => row.id), profile: { expected_count: 20 }, artifacts: {} }], snapshots: [] }} />));
-  expect(document.body.textContent).toContain("确认并冻结 Golden Dataset");
+  expect(document.body.textContent).toContain("确认人工审核");
   expect(document.body.textContent).not.toContain("创建 Golden Snapshot");
   await act(async () => root.unmount());
   expect(requests).not.toContain(expect.stringContaining("/snapshot"));
@@ -61,35 +61,34 @@ it("uses one Gate 1 confirmation and never offers a separate Snapshot action", a
 
 it("keeps Gate 1 available when every question is approved but the current run has no matching snapshot", async () => {
   const rows = Array.from({ length: 20 }, (_, index) => ({ id: `Q${index}`, slot: `Q${index}`, question: "问题", test_category: "positive", review_status: "approved", stage: "golden", approval_eligibility: { can_approve: true, blocking_reasons: [] } }));
-  const run = { id: "G1", status: "completed", question_ids: rows.map(row => row.id), profile: { expected_count: 20 }, artifacts: {} };
+  const run = { id: "G1", status: "completed", question_ids: rows.map(row => row.id), profile: { expected_count: 20 }, artifacts: {}, human_gate: { status: "ready" } };
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [{ id: "OLD", snapshot: { generation_run_id: "G1", question_ids: ["old-question"] } }] }} />));
   expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("Human Gate 1");
-  const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "确认并冻结 Golden Dataset")!;
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "冻结 Golden Dataset")!;
   expect(confirm).toBeTruthy();
   await act(async () => document.querySelector<HTMLInputElement>(".review-batch input")!.click());
   expect(confirm.disabled).toBe(false);
   await act(async () => root.unmount());
 });
 
-it("sends one atomic Gate 1 review request and shows the frozen version after refresh", async () => {
+it("sends a review request before a separate freeze action", async () => {
   const rows = Array.from({ length: 20 }, (_, index) => ({ id: `Q${index}`, slot: `Q${index}`, question: "问题", test_category: "positive", review_status: "human_review_pending", stage: "candidate", approval_eligibility: { can_approve: true, blocking_reasons: [] } }));
   const run = { id: "G1", status: "completed", question_ids: rows.map(row => row.id), profile: { expected_count: 20 }, artifacts: {} };
   const requests: Array<{ url: string; body: any }> = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === "POST") requests.push({ url, body: JSON.parse(init.body as string) });
     const reviewed = rows.map(row => ({ ...row, review_status: "approved", stage: "golden" }));
-    const body = (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, requests.length ? reviewed : rows) : url.endsWith("/api/dataset") ? reviewed : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : new URL(url).pathname.endsWith("/api/governance/snapshots") ? [{ id: "GOLDEN-v1", snapshot: { generation_run_id: "G1", question_ids: run.question_ids } }] : [];
+    const body = (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, requests.length ? reviewed : rows) : url.endsWith("/api/dataset") ? reviewed : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [{...run, human_gate: {status: requests.length ? "ready" : "pending"}}] : [];
     return new Response(JSON.stringify(body), { status: 200 });
   }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
   await act(async () => document.querySelector<HTMLInputElement>(".review-batch input")!.click());
-  await act(async () => { const button = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "确认并冻结 Golden Dataset")!; button.click(); button.click(); });
+  await act(async () => { const button = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "确认人工审核")!; button.click(); button.click(); });
   expect(requests).toEqual([{ url: expect.stringContaining("/api/governance/review-batch"), body: { question_ids: rows.map(row => row.id), confirmed_manual_review: true } }]);
-  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("Human Gate 1 · 已确认");
-  expect(document.querySelector(".review-batch")).toBeNull();
+  expect(requests.some(item => item.url.includes('/snapshot'))).toBe(false);
   await act(async () => root.unmount());
 });
 

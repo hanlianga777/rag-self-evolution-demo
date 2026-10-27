@@ -1,7 +1,6 @@
 import { StoryDisclosure } from "../components/Storytelling";
 import './evaluation-workspaces.css';
 import {DiagnosisFilters, DiagnosisTable, DetectionNotice, allDiagnosis, filterDiagnosis, savedDirections, currentRoot, rootName, symptoms, businessDiagnosisRows, coreEvidence} from '../components/EvaluationDiagnosis';
-import { ProviderAuthorization, type PaidRequest } from "../components/ProviderAuthorization";
 import { PageShell } from "../components/PageShell";
 import { RetrievalEvidence } from "../components/RetrievalEvidence";
 import { useEffect, useState } from "react";
@@ -38,7 +37,6 @@ const baselinePreflight = (runId?: string) => getJson<Row>(`/api/evaluation/pref
 
 export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page: any) => void }) {
   const operation = useOperation();
-  const [paid, setPaid] = useState<PaidRequest | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
   const [replayPlan,setReplayPlan]=useState<Row | null>(null);
   const [replayLoading,setReplayLoading]=useState(false);
@@ -119,9 +117,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
       if(current.can_start !== true)return;
       const resume=current.can_resume === true && !!current.resume_source_id;
       const request=resume ? {resume_source_id:current.resume_source_id} : {fresh:true};
-      setPaid({title:resume ? "恢复 Baseline 断点评测" : "完整真实 Baseline 重评",
-        description:resume ? "复用已完成结果与保存回答，仅处理缺失请求。每阶段最多3次尝试、600秒；Unknown请求停止，成功回答复用。" : "完整真实Baseline重评；每题生成回答及Judge，另含检索/改写调用。新建保留旧Run及Checkpoint。",
-        execute:()=>void start(request)});
+      await start(request);
     } catch(reason) {setPreflight({can_start:false,reason:errorMessage(reason)});}
     finally {setBusy(false);}
   };
@@ -140,12 +136,11 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const inspectJudgeReplay = () => setReplayRefresh(value=>value+1);
   const authorizeJudgeReplay = () => {
     const sourceId=run.id;
-    setPaid({title:"新版 Judge-only Baseline",description:"复用逐题核验通过的回答及完整Trace，仅按新身份重新判分50题。每题Judge最多3次、600秒；禁止重新生成。旧成绩只读保留。",
-      execute:()=>{void operation.startEvaluation("新版Baseline判分",async()=>{
+    void operation.startEvaluation("新版Baseline判分",async()=>{
         const latest=await getJson<Row>(`/api/evaluations/${sourceId}/judge-replay/preflight`);
         if(latest.can_start_replay!==true || latest.new_evaluation_identity!==replayPlan?.new_evaluation_identity || latest.source_sha256!==replayPlan?.source_sha256)throw new Error("Replay资格或身份已变化，请重新预检");
         const started=await postJson<Row>(`/api/evaluations/${sourceId}/judge-replay`,{authorize_provider:true});setReplayPlan(null);setRun(started);return started as {id:string};
-      }).catch(reason=>setError(errorMessage(reason)));}});
+      }).catch(reason=>setError(errorMessage(reason)));
   };
 
   const result = run.result || {};
@@ -170,7 +165,6 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
 
   return <PageShell className="page evaluation-page" header={<div className="page-title"><div><h1>Baseline</h1><p>用冻结 Golden 评测当前版本，识别质量门槛、单题失败及可优化问题。</p></div><button className="secondary" disabled={busy || preflight?.can_start !== true} onClick={() => void prepareStart()}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "重新运行 Baseline（新版本）" : "运行 Baseline 评测"}</button></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>Hard Gate</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
 
-    <ProviderAuthorization request={paid} onClose={() => setPaid(null)} />
     {run.id && <StoryDisclosure label="高级详情 · 独立重新评分预检" open={historicalPolicy}><section className="candidate-card judge-replay-preflight" aria-label="新版Baseline复用预检" aria-busy={replayLoading}>
       <button className="text-button" disabled={busy || replayLoading || ["running","queued"].includes(run.status)} onClick={inspectJudgeReplay}>新版Baseline判分（复用回答）</button>
       {replayLoading && <p role="status">正在查询已保存回答的复用资格…</p>}
@@ -224,7 +218,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
             <div><dt>首字延迟 TTFT</dt><dd>{format(comparison.ttft_seconds ?? result.metrics?.ttft_seconds," s")}</dd></div><div><dt>身份状态</dt><dd>{stale ? "已失效 · 历史 Run" : "使用本次保存快照"}</dd></div>
           </dl>
         </Section>
-    {run.id && <div className="review-batch"><span>{historicalPolicy ? "历史评测规则；新实验需先建立新版Baseline" : "正式Baseline与历史答案评分分开保存"}</span><button className="text-button" onClick={() => setPaid({ title: '历史答案重新评分', description: `复用 ${snapshot.question_ids?.length ?? '未采集'} 题已保存回答，仅调用新版Judge，不生成RAG回答；不成为正式Baseline或Sandbox。`, execute: () => { void operation.startEvaluation('历史答案评分（回放）', async () => { const result = await postJson<Row>(`/api/evaluations/${run.id}/replay`, { authorize_provider: true }); setReplay(result); return result as { id: string }; }).catch(reason => setError(errorMessage(reason))); } })}>评测规则升级验证</button><button className="text-button" onClick={() => { setHistoryOpen(true); void loadHistory(1); }}>历史评测</button>{replay && <button className="text-button" onClick={() => { void getJson<Row>(`/api/evaluations/${replay.id}`).then(value => { setReplay(value); setReplayOpen(true); }).catch(reason => setError(errorMessage(reason))); }}>查看独立回放进度：{replay.status}</button>}</div>}
+    {run.id && <div className="review-batch"><span>{historicalPolicy ? "历史评测规则；新实验需先建立新版Baseline" : "正式Baseline与历史答案评分分开保存"}</span><button className="text-button" onClick={() => { void operation.startEvaluation('历史答案评分（回放）', async () => { const result = await postJson<Row>(`/api/evaluations/${run.id}/replay`, { authorize_provider: true }); setReplay(result); return result as { id: string }; }).catch(reason => setError(errorMessage(reason))); }}>评测规则升级验证</button><button className="text-button" onClick={() => { setHistoryOpen(true); void loadHistory(1); }}>历史评测</button>{replay && <button className="text-button" onClick={() => { void getJson<Row>(`/api/evaluations/${replay.id}`).then(value => { setReplay(value); setReplayOpen(true); }).catch(reason => setError(errorMessage(reason))); }}>查看独立回放进度：{replay.status}</button>}</div>}
         <div className="workbench-status"><button className="text-button" onClick={()=>setConfigOpen(true)}>完整配置快照</button><button className="text-button" onClick={()=>setTechnicalOpen(true)}>查看评测依据</button></div>
 
       </div>}

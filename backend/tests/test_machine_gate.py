@@ -31,12 +31,14 @@ class MachineGateTests(unittest.TestCase):
     def test_a_safe_machines_require_one_explicit_dataset_confirmation(self):
         self.assertEqual(self.gate()['machine_qualified'],100)
         self.assertEqual(self.gate()['needs_human_review'],0)
-        self.assertEqual(self.gate()['status'],'ready')
+        self.assertEqual(self.gate()['status'],'pending')
         self.assertEqual(self.store.dataset_snapshots(),[])
         with self.assertRaises(ValueError): self.store.review_generation_batch(self.ids,'fixture')
         result=self.store.review_generation_batch(self.ids,'fixture',confirmed_manual_review=True)
-        self.assertEqual(set(result['snapshot']['qualification_sources'].values()),{'machine'})
-        self.assertEqual(self.store.candidate_rows(self.ids)[0]['qualification_source'],'machine')
+        self.assertNotIn('snapshot', result)
+        self.assertEqual(self.store.dataset_snapshots(), [])
+        self.assertEqual(self.gate()['status'],'ready')
+        self.assertEqual(self.store.candidate_rows(self.ids)[0]['qualification_source'],'human')
 
     def test_b_p1_exceptions_require_individual_human_decisions(self):
         for key in self.ids[:14]: self.store.record_qc(key,{'score':75,'priority':'P1'},'passed')
@@ -44,9 +46,10 @@ class MachineGateTests(unittest.TestCase):
         self.assertEqual(self.gate()['status'],'pending')
         with self.assertRaises(ValueError):self.store.review_generation_batch(self.ids,'fixture',confirmed_manual_review=True)
         for key in self.ids[:14]:self.store.review_question(key,'approved','fixture human',reason='reviewed P1 evidence')
-        self.assertEqual(self.gate()['status'],'ready')
+        self.assertEqual(self.gate()['status'],'pending')
         result=self.store.review_generation_batch(self.ids,'fixture',confirmed_manual_review=True)
-        self.assertEqual(sum(source=='human' for source in result['snapshot']['qualification_sources'].values()),14)
+        self.assertNotIn('snapshot', result)
+        self.assertEqual(self.gate()['status'],'ready')
 
     def test_c_quality_blocker_and_changed_content_cannot_pass(self):
         self.store.save_quality_audit(self.ids[0],{'checks':{key:key!='naturalness' for key in CHECKS},'attention_reason':'提问口吻需优化'})
@@ -78,8 +81,12 @@ class MachineGateTests(unittest.TestCase):
         with patch('app.governance.sqlite3.connect', side_effect=limited_cache):
             first = self.store.review_generation_batch(self.ids, 'fixture', confirmed_manual_review=True)
             second = self.store.review_generation_batch(self.ids, 'fixture', confirmed_manual_review=True)
-        self.assertEqual(first['snapshot'], second['snapshot'])
-        self.assertEqual(len(first['snapshot']['questions']), 100)
+        self.assertNotIn('snapshot', first)
+        self.assertNotIn('snapshot', second)
+        first_snapshot = self.store.create_generation_snapshot(self.run)
+        second_snapshot = self.store.create_generation_snapshot(self.run)
+        self.assertEqual(first_snapshot, second_snapshot)
+        self.assertEqual(len(first_snapshot['questions']), 100)
         self.assertEqual(len(self.store.dataset_snapshots()), 1)
         with self.store.connection() as connection:
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM approvals WHERE gate='dataset'").fetchone()[0], 100)
@@ -108,7 +115,10 @@ class MachineGateTests(unittest.TestCase):
             ready = client.post('/api/governance/review-batch', json=payload, headers=headers)
             self.assertEqual(ready.status_code, 200)
             repeated = client.post('/api/governance/review-batch', json=payload, headers=headers)
-            self.assertEqual(ready.json()['snapshot'], repeated.json()['snapshot'])
+            self.assertNotIn('snapshot', ready.json())
+            self.assertNotIn('snapshot', repeated.json())
+            self.assertEqual(len(client.get('/api/governance/snapshots').json()), 0)
+            self.assertEqual(client.post(f'/api/governance/generation-runs/{self.run}/snapshot', headers=headers).status_code, 201)
             self.assertEqual(len(client.get('/api/governance/snapshots').json()), 1)
 
     def test_baseline_requires_frozen_snapshot_with_current_corpus_identity(self):
@@ -120,7 +130,8 @@ class MachineGateTests(unittest.TestCase):
         runner = EvaluationRunner(self.store, runtime)
         with self.assertRaisesRegex(ValueError, 'Snapshot'):
             runner.start_baseline()
-        frozen = self.store.review_generation_batch(self.ids, 'fixture', confirmed_manual_review=True)['snapshot']
+        self.store.review_generation_batch(self.ids, 'fixture', confirmed_manual_review=True)
+        frozen = self.store.create_generation_snapshot(self.run)
         evaluation_id, approved, config = runner.start_baseline()
         self.assertEqual(len(approved), 100)
         self.assertEqual(self.store.evaluation_run(evaluation_id)['dataset_version_id'], frozen['id'])
@@ -136,13 +147,14 @@ class MachineGateTests(unittest.TestCase):
             connection.execute("CREATE TRIGGER fail_snapshot BEFORE INSERT ON dataset_versions BEGIN SELECT RAISE(ABORT, 'fixture snapshot failure'); END")
             approvals = connection.execute('SELECT COUNT(*) FROM approvals').fetchone()[0]
             reviews = connection.execute('SELECT COUNT(*) FROM review_events').fetchone()[0]
+        self.store.review_generation_batch(self.ids, 'fixture', confirmed_manual_review=True)
         with self.assertRaises(sqlite3.IntegrityError):
-            self.store.review_generation_batch(self.ids, 'fixture', confirmed_manual_review=True)
+            self.store.create_generation_snapshot(self.run)
         self.assertEqual(self.store.dataset_snapshots(), [])
-        self.assertEqual(self.store.candidate_rows(self.ids), before)
+        self.assertNotEqual(self.store.candidate_rows(self.ids), before)
         with self.store.connection() as connection:
-            self.assertEqual(connection.execute('SELECT COUNT(*) FROM approvals').fetchone()[0], approvals)
-            self.assertEqual(connection.execute('SELECT COUNT(*) FROM review_events').fetchone()[0], reviews)
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM approvals').fetchone()[0], approvals + 100)
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM review_events').fetchone()[0], reviews + 100)
         self.assertTrue(self.store.current_baseline_identity()['requires_new_golden'])
 
     def test_paginated_list_keeps_summary_and_lazy_detail_contract(self):

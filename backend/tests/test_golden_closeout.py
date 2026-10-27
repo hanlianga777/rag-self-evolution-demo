@@ -96,6 +96,15 @@ class CloseoutTests(unittest.TestCase):
             if expected=='qc_failed' or priority=='P1':self.assertEqual(row['qualification_status'],'needs_human_review')
         with self.assertRaises(ValueError):self.store.review_generation_batch([key],'fixture',confirmed_manual_review=True)
 
+    def test_individual_review_cannot_bypass_failed_business_audit(self):
+        self.complete_quality()
+        key=self.store.questions()[0]['id']
+        from app.business_golden import CHECKS,QUALITY_CONTRACT
+        checks=dict.fromkeys(CHECKS,True);checks['grounding']=False
+        self.store.save_quality_audit(key,{'checks':checks,'reason':'offline fixture', 'audit_version':QUALITY_CONTRACT})
+        with self.assertRaises(ValueError):
+            self.store.review_question(key,'approved','fixture-human',reason='must not bypass audit')
+
     def test_50_batch_quality_recovers_then_freezes_only_with_explicit_gate(self):
         self.store.update_quality_rerun(self.run_id,{'status':'running'},start=True)
         main._run_quality_rerun(self.run_id,[q['id'] for q in self.store.questions()],self.store,self.service,self.corpus)
@@ -109,7 +118,9 @@ class CloseoutTests(unittest.TestCase):
         self.assertEqual(self.calls,before,'successful paid phases repeated')
         with self.assertRaises(ValueError):self.store.review_generation_batch(run['question_ids'],'fixture')
         result=self.store.review_generation_batch(run['question_ids'],'fixture-human',confirmed_manual_review=True)
-        snapshot=result['snapshot']
+        self.assertNotIn('snapshot', result)
+        self.assertEqual(self.store.dataset_snapshots(), [])
+        snapshot=self.store.create_generation_snapshot(self.run_id)
         self.assertEqual(set(snapshot['question_ids']),set(run['question_ids']))
         self.assertEqual({q['id']:q['reference_answer'] for q in snapshot['questions']},{q['id']:q['reference_answer'] for q in self.store.questions()})
         self.assertEqual(len(self.store.dataset_snapshots()),1)
@@ -252,7 +263,9 @@ class CloseoutTests(unittest.TestCase):
         ids=[q['id'] for q in self.store.questions()]
         with self.assertRaises(ValueError):self.store.review_generation_batch(ids,'fixture-human',confirmed_manual_review=True)
         for row in exceptions:self.store.review_question(row['id'],'approved','fixture-human',reason='explicit offline fixture resolution, not actual review')
-        snapshot=self.store.review_generation_batch(ids,'fixture-human',confirmed_manual_review=True)['snapshot']
+        self.store.review_generation_batch(ids,'fixture-human',confirmed_manual_review=True)
+        self.assertEqual(self.store.dataset_snapshots(), [])
+        snapshot=self.store.create_generation_snapshot(self.run_id)
         self.assertEqual(len(snapshot['questions']),50)
         self.assertTrue(all(q['validation']['freeze_valid'] for q in snapshot['questions']))
 

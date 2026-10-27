@@ -237,14 +237,15 @@ class CandidateResumeTests(unittest.TestCase):
         self.assertEqual([store.candidate(cid[:-1]+x) for x in ('A','B')],a_b)
         self.assertEqual(store.experiment(candidate['experiment_id'])['evaluation_budget']['used'],budget_before+1)
 
-    def test_api_requires_fresh_explicit_payment_authorization_before_reserving(self):
+    def test_api_checks_candidate_eligibility_without_extra_fee_authorization(self):
         from fastapi.testclient import TestClient
         from api_fixture import main
         before=self.store.experiment(self.exp)['evaluation_budget']['used']
-        with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime),TestClient(main.app) as client:
+        with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime),patch.object(main.EvaluationRunner,'start_candidate',side_effect=ValueError('ineligible')) as start,TestClient(main.app) as client:
             response=client.post('/api/candidates/'+self.cid+'/run',headers={'Origin':'http://127.0.0.1:5174'})
         self.assertEqual(response.status_code,409)
-        self.assertIn('付费授权',response.text)
+        self.assertIn('ineligible',response.text)
+        start.assert_called_once()
         self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'],before)
         self.assertEqual(self.runtime.answers,[])
         self.assertEqual(self.runtime.judges,[])

@@ -13,7 +13,6 @@ async function render(preflight:any,versionFlag=false){
 }
 async function authorize(label:string){
  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label)!.click());
- await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='授权并运行此操作')!.click());
 }
 it('uses server full eligibility and sends the explicit resume ID',async()=>{
  const f=await render({can_start:true,can_resume:true,resume_source_id:'explicit-old',reason:null});

@@ -89,7 +89,7 @@ class ApiLifecycleTests(unittest.TestCase):
         self.fail('Fixture candidate evaluation finished but decision did not settle')
 
     def test_complete_v2_http_lifecycle_d_regression_keeps_winner_monitoring_round_one(self):
-        self.assertTrue(self.client.get('/api/dataset').json(), 'Legacy seed is loaded')
+        self.assertEqual(self.client.get('/api/dataset').json(), [], 'No generated working set exists yet')
         initial_version = self.store.active_production()
         initial_versions = self.store.production_versions()
         plan = self.post('governance/coverage-preview', {'profile': 'mini'})
@@ -105,6 +105,8 @@ class ApiLifecycleTests(unittest.TestCase):
             self.assertEqual(qc['status'], 'qc_passed')
         frozen = self.post('governance/review-batch', {'question_ids': run['question_ids'], 'confirmed_manual_review': True})
         self.assertEqual(self.store.dataset_summary()['approved'], 20)
+        self.assertEqual(self.store.dataset_snapshots(), [])
+        frozen = self.post('governance/generation-runs/' + started['run_id'] + '/snapshot', {})
         snapshot = self.store.dataset_snapshots()[0]
         snapshot_before = json.dumps(snapshot, sort_keys=True)
         baseline = self.post('evaluations/run',{'fresh':True})

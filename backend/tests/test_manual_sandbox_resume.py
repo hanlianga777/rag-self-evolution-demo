@@ -1,4 +1,4 @@
-"""Manual consent may retry missing results; inherited unknown charges stay unknown."""
+"""Unknown requests require reconciliation even for a manual continuation."""
 import json
 import unittest
 from copy import deepcopy
@@ -27,17 +27,14 @@ class ManualSandboxResumeTests(unittest.TestCase):
             return judge(q,*args,**kwargs)
         with patch.object(self.runtime,'judge',side_effect=unknown):
             first=self.runner.run_candidate(cid,automatic=True)
-            second=self.runner.execute_candidate(*self.runner.start_candidate(cid,automatic=True,manual_resume=True))
-            self.assertEqual(len(calls),2)
-            self.assertEqual(second['result']['completed'],1)
+            with self.assertRaisesRegex(ValueError,'对账'):
+                self.runner.start_candidate(cid,automatic=True,manual_resume=True)
+            self.assertEqual(len(calls),1)
             self.assertFalse(self.runner.candidate_resume_plan(cid)['can_resume'])
-            self.assertTrue(self.runner.candidate_resume_plan(cid,manual_resume=True)['can_resume'])
-            self.assertTrue(second['result']['checkpoints']['Q2']['unknown_execution']['judge'])
-            fault[0]=False
-            completed=self.runner.execute_candidate(*self.runner.start_candidate(cid,automatic=True,manual_resume=True))
-        self.assertEqual(completed['result']['completed'],4)
+            self.assertFalse(self.runner.candidate_resume_plan(cid,manual_resume=True)['can_resume'])
+            self.assertTrue(first['result']['checkpoints']['Q2']['unknown_execution']['judge'])
         self.assertEqual(self.runtime.answers.count('Q2'),2)  # one Baseline, one Candidate answer
-        self.assertGreater(completed['result']['request_accounting']['unknown_usage_events'],0)
+        self.assertGreater(first['result']['request_accounting']['unknown_usage_events'],0)
         self.assertEqual(self.store.evaluation_run(first['result']['evaluation_run_id'])['status'],'partial')
 
     def test_a38_b48_manual_consent_completes_only_missing_work(self):
@@ -82,29 +79,16 @@ class ManualSandboxResumeTests(unittest.TestCase):
                     threads=set(threading.enumerate())
                     with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime),TestClient(main.app) as client:
                         preview=client.get('/api/candidates/'+cid+'/preflight').json()
-                        self.assertTrue(preview['can_start'])
+                        self.assertFalse(preview['can_start'])
                         self.assertEqual(preview['resume_plan']['next_question_id'],f'Q{missing}')
                         denied=client.post('/api/candidates/'+cid+'/run',headers={'Origin':'http://127.0.0.1:5174'})
                         self.assertEqual(denied.status_code,409)
                         response=client.post('/api/candidates/'+cid+'/run',headers={'Origin':'http://127.0.0.1:5174'},json={'authorize_provider':True})
-                        self.assertEqual(response.status_code,201,response.text)
+                        self.assertEqual(response.status_code,409,response.text)
                         for worker in set(threading.enumerate())-threads:
                             if worker.name.endswith('(run)'):worker.join(10);self.assertFalse(worker.is_alive())
-                    finished=self.store.evaluation_run(response.json()['id'])
-                    self.assertEqual(finished['status'],'completed')
-                    self.assertEqual(finished['result']['completed'],50)
-                    candidate=self.store.candidate(cid)
-                    self.assertEqual(candidate['status'],'evaluated')
-                    self.assertIsInstance(candidate['result']['qualification']['qualified'],bool)
-                    self.assertEqual(finished['result']['gates']['passed_count'],11)
-                    self.assertEqual(finished['result']['manual_resume']['source_run_id'],source['id'])
-                    self.assertGreater(finished['result']['request_accounting']['unknown_usage_events'],0)
                     self.assertEqual(self.store.evaluation_run(source['id']),old)
-                    new=self.store.evaluation_case_results(finished['id'])
                     for case in cases:
-                        saved=next(c for c in new if c['question_id']==case['question_id'])
-                        self.assertEqual({k:v for k,v in saved.items() if k!='run_id'},{k:v for k,v in case.items() if k!='run_id'})
                         self.assertEqual(answers.count(case['question_id']),1)
                     if label=='B':self.assertEqual(rpc.count(('Q49','embedding')),1)
-                    self.assertEqual(len(new),50)
         self.assertEqual(self.store.evaluation_run(baseline['id']),baseline)

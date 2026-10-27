@@ -18,10 +18,10 @@ REQUEST_LIMITS = {'business_audit':16384,'qc':16384,'answerability':12288,'negat
 
 
 class PaidRun:
-    def __init__(self, path, budget_yuan, prices, identity, *, identity_check=None, output_limits=None):
-        if not math.isfinite(budget_yuan) or budget_yuan <= 0:
-            raise ValueError('Invalid payment budget')
-        self.path, self.budget, self.prices = Path(path), budget_yuan, prices
+    def __init__(self, path, budget_yuan=None, prices=None, identity=None, *, identity_check=None, output_limits=None):
+        if type(budget_yuan) not in (int, float) or not math.isfinite(budget_yuan):
+            budget_yuan = None
+        self.path, self.budget, self.prices = Path(path), budget_yuan, prices or {}
         self.identity, self.identity_check = identity, identity_check
         self.output_limits = output_limits
         self.calls, self.spent, self.stopped = [], 0., None
@@ -36,7 +36,8 @@ class PaidRun:
     def save(self):
         temporary = self.path.with_suffix(self.path.suffix+'.tmp')
         data = {'identity':self.identity, 'budget_yuan':self.budget, 'price_snapshot':self.prices,
-                'spent_yuan':self.spent, 'budget_enforcement':not _accounting.get(), 'available_yuan':None if _accounting.get() else max(0.,self.budget-self.spent-sum(c['reserved_yuan'] for c in self.calls if c['status']=='reserved')),
+                'spent_yuan':self.spent, 'budget_enforcement':False, 'available_yuan':None,
+                'cost_unknown':any(c['status'] not in {'ok','rejected'} or c['status']=='ok' and c.get('upper_estimate_yuan') is None for c in self.calls),
                 'resume_authorization':getattr(self,'resume_authorization',None), 'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
         data['continuation_authorizations']=getattr(self,'continuation_authorizations',[])
         data['accounting_retry_authorization']=getattr(self,'accounting_retry_authorization',None)
@@ -55,6 +56,8 @@ class PaidRun:
     def next_stage(cls,path,stage,identity_check,*,authorization=None,budget_yuan=None):
         """Explicit authorized continuation; unknown charges remain reserved."""
         path=Path(path);data=json.loads(path.read_text())
+        if any(call.get('status') not in {'ok','rejected'} for call in data['calls']):
+            raise RuntimeError('Paid stage has uncertain Usage; reconcile before continuation')
         prior=data.get('resume_authorization')
         continuations=data.get('continuation_authorizations',[])
         held=set(continuations[-1]['held_call_indices']) if continuations else set()
@@ -86,9 +89,6 @@ class PaidRun:
         run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],None
         run.resume_authorization=prior
         run.continuation_authorizations=continuations
-        if budget_yuan is not None:
-            if not math.isfinite(budget_yuan) or not 0<budget_yuan<=run.budget: raise ValueError('Resume budget must tighten existing limit')
-            run.budget=budget_yuan
         run.output_limits=data['output_limits'];run.stages=[*stages,{'stage':stage,'claimed_at':datetime.now(timezone.utc).isoformat()}]
         run.save();return run
 
@@ -109,20 +109,13 @@ class PaidRun:
             if any(call['status']=='reserved' for call in self.calls):
                 raise RuntimeError('Serial paid run already has an in-flight request')
             unknown = [i for i, call in enumerate(self.calls) if call['status']=='unknown' and call['provider']==provider and call['model']==model and call['request_sha256']==request_hash]
-            retry_of = None
             if unknown:
-                auth = getattr(self, 'accounting_retry_authorization', None) or {}
-                if (auth.get('source') != 'direct_user_instruction' or auth.get('max_request_retries') != 1
-                    or unknown != [auth.get('unknown_call_index')] or auth.get('request_sha256') != request_hash
-                    or any(call.get('retry_of_call_index') == unknown[0] for call in self.calls)):
-                    raise RuntimeError('Cannot repeat an unknown request without unused exact authorization')
-                retry_of = unknown[0]
+                raise RuntimeError('Cannot repeat an unknown request before reconciliation')
             if self.identity_check is None or self.identity_check()!=self.identity:raise RuntimeError('Paid run identity unavailable or changed')
             call={'provider':provider,'model':model,'status':'reserved','reserved_yuan':0.,'upper_estimate_yuan':None,
                   'request_sha256':request_hash,'request_payload':payload,
                   'started_at':datetime.now(timezone.utc).isoformat(),'task':_task.get(),'max_tokens':payload.get('max_tokens'),
                   'accounting_only':True}
-            if retry_of is not None: call['retry_of_call_index'] = retry_of
             self.calls.append(call);self.save();return call
         if self.stopped: raise RuntimeError('Paid run stopped: '+self.stopped)
         auth=getattr(self,'resume_authorization',None)
@@ -134,16 +127,16 @@ class PaidRun:
         if self.identity_check is None or self.identity_check() != self.identity:
             raise RuntimeError('Paid run identity unavailable or changed')
         rate = self.prices.get(model)
-        if not rate or rate.get('provider') != provider:
-            raise RuntimeError('Payment price/model/provider unavailable')
-        if any(type(rate.get(key)) not in (int,float) or not math.isfinite(rate[key]) or rate[key]<0 for key in ('input','output','max_output')):
-            raise RuntimeError('Payment rate or output bound invalid')
+        if rate and (rate.get('provider') != provider or any(type(rate.get(key)) not in (int,float) or not math.isfinite(rate[key]) or rate[key]<0 for key in ('input','output','max_output'))):
+            rate = None
         encoded = json.dumps(payload,ensure_ascii=False).encode()
         repeated_query = (max(0,len(payload.get('documents',[]))-1)*len(str(payload.get('query','')).encode())) if provider=='Alibaba' else 0
         # UTF-8 bytes plus framing allowance conservatively bound input tokens.
-        bound = payload.get('max_tokens',rate['max_output'])
-        if type(bound) is not int or not 0<=bound<=rate['max_output']: raise RuntimeError('Invalid output budget bound')
-        reserved = ((len(encoded)+repeated_query+1024)*rate['input'] + bound*rate['output'])/1_000_000
+        bound = payload.get('max_tokens',rate['max_output'] if rate else None)
+        if bound is not None and (type(bound) is not int or bound<0 or rate and bound>rate['max_output']): raise RuntimeError('Invalid output budget bound')
+        if bound is not None and self.output_limits and _task.get() in self.output_limits and bound>self.output_limits[_task.get()]:
+            raise RuntimeError('Frozen task output limit exceeded')
+        reserved = ((len(encoded)+repeated_query+1024)*rate['input'] + bound*rate['output'])/1_000_000 if rate else None
         request_sha=hashlib.sha256(encoded).hexdigest()
         if auth:
             index=auth['unknown_call_index']
@@ -151,9 +144,9 @@ class PaidRun:
                 raise RuntimeError('Resume must first reuse saved answer and retry only missing Judge')
             if not self.stages[-1]['stage'].startswith(('agent-','candidate-')) and request_sha==auth.get('retry_request_sha256',auth['request_sha256']) and any(c['request_sha256']==request_sha for c in self.calls[index+1:]):
                 raise RuntimeError('Authorized Judge retry already consumed')
-        held=sum(c['reserved_yuan'] for c in self.calls if c['status']=='reserved')
-        if self.spent + held + reserved > self.budget: raise RuntimeError('Payment budget insufficient')
-        call = {'provider':provider,'model':model,'status':'reserved','reserved_yuan':reserved,
+        currency=rate.get('currency','CNY') if rate else None
+        call = {'provider':provider,'model':model,'status':'reserved','reserved_yuan':reserved if currency=='CNY' else None,
+                'reservation_estimate':{'amount':reserved,'currency':currency} if reserved is not None else None,
                 'request_sha256':hashlib.sha256(encoded).hexdigest(),'started_at':datetime.now(timezone.utc).isoformat(),
                 'task':_task.get(),'max_tokens':payload.get('max_tokens')}
         if auth and not self.stages[-1]['stage'].startswith(('agent-','candidate-')) and request_sha==auth.get('retry_request_sha256',auth['request_sha256']):call['retry_of_request_sha256']=auth['request_sha256']
@@ -171,8 +164,10 @@ class PaidRun:
             rate=self.prices.get(call['model'],{})
             priced=valid and rate.get('provider')==call['provider'] and all(type(rate.get(k)) in (int,float) and math.isfinite(rate[k]) and rate[k]>=0 for k in ('input','output'))
             amount=(prompt*rate['input']+output*rate['output'])/1_000_000 if priced else None
-            call.update(status='ok' if valid else 'unknown',upper_estimate_yuan=amount)
-            if amount is not None:self.spent+=amount
+            currency=rate.get('currency','CNY')
+            call.update(status='ok' if valid else 'unknown',upper_estimate_yuan=amount if currency=='CNY' else None,
+                        estimated_cost={'amount':amount,'currency':currency} if amount is not None else None)
+            if amount is not None and currency=='CNY':self.spent+=amount
             self.save();return
         if call['status'] != 'reserved': raise RuntimeError('Duplicate payment Usage')
         call['usage'] = usage
@@ -182,14 +177,16 @@ class PaidRun:
         output = usage.get('completion_tokens',0 if call['provider']=='Alibaba' else None)
         if any(type(n) is not int or n<0 for n in (prompt,output)):
             raise RuntimeError('Payment Usage missing or invalid')
-        rate = self.prices[call['model']]
+        rate = self.prices.get(call['model'])
+        if rate and (rate.get('provider') != call['provider'] or any(type(rate.get(key)) not in (int,float) or not math.isfinite(rate[key]) or rate[key]<0 for key in ('input','output'))):
+            rate = None
         # Cache misses and peak prices bound the estimate; never claim account debit.
-        amount = (prompt*rate['input']+output*rate['output'])/1_000_000
-        self.spent += amount
-        call.update(status='ok',usage=usage,upper_estimate_yuan=amount)
+        amount = (prompt*rate['input']+output*rate['output'])/1_000_000 if rate else None
+        currency=rate.get('currency','CNY') if rate else None
+        if amount is not None and currency=='CNY':self.spent += amount
+        call.update(status='ok',usage=usage,upper_estimate_yuan=amount if currency=='CNY' else None,
+                    estimated_cost={'amount':amount,'currency':currency} if amount is not None else None)
         self.save()
-        if amount>call['reserved_yuan'] or self.spent>self.budget:
-            raise RuntimeError('Payment budget/Usage bound exceeded')
 
     def limit(self):
         task = _task.get()

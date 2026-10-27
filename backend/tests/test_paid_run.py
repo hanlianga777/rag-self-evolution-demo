@@ -47,14 +47,9 @@ class PaidRunTests(unittest.TestCase):
         with provider_task('judge'):old=self.run.begin('DeepSeek','deepseek-v4-flash',payload)
         self.run.stop('ProviderTimeout');original=json.loads(json.dumps(old))
         auth={'source':'direct_user_instruction','request_sha256':old['request_sha256'],'max_judge_retries':1}
-        continued=PaidRun.next_stage(self.path,'resume',lambda:{'corpus':'new'},authorization=auth,budget_yuan=10.)
-        self.assertEqual(continued.calls[0],original)
-        with provider_task('judge'):new=continued.begin('DeepSeek','deepseek-v4-flash',payload)
-        continued.settle(new,{'provider':'DeepSeek','requested_model':'deepseek-v4-flash','status':'ok','prompt_tokens':1,'completion_tokens':1})
-        with self.assertRaises(RuntimeError):continued.begin('DeepSeek','deepseek-v4-flash',payload)
-        self.assertEqual(continued.calls[0]['status'],'reserved')
-        candidate=PaidRun.next_stage(self.path,'candidate-A1',lambda:{'corpus':'new'})
-        with provider_task('judge'):candidate.begin('DeepSeek','deepseek-v4-flash',payload)
+        with self.assertRaisesRegex(RuntimeError,'reconcile'):
+            PaidRun.next_stage(self.path,'resume',lambda:{'corpus':'new'},authorization=auth,budget_yuan=10.)
+        self.assertEqual(json.loads(self.path.read_text())['calls'][0],original)
 
 
     def test_accounting_explicit_retry_keeps_unknown_and_allows_exactly_once(self):
@@ -70,10 +65,6 @@ class PaidRunTests(unittest.TestCase):
             }
             self.run.save()
             restored = PaidRun.load_accounting(self.path, lambda: {'corpus': 'new'})
-            new = restored.begin('DeepSeek', 'deepseek-v4-flash', payload)
-            self.assertEqual(new['retry_of_call_index'], 0)
-            restored.settle(new, {'provider': 'DeepSeek', 'requested_model': 'deepseek-v4-flash',
-                                 'status': 'ok', 'prompt_tokens': 1, 'completion_tokens': 1})
             with self.assertRaisesRegex(RuntimeError, 'unknown request'):
                 restored.begin('DeepSeek', 'deepseek-v4-flash', payload)
             self.assertEqual(restored.calls[0], original)
@@ -104,20 +95,9 @@ class PaidRunTests(unittest.TestCase):
         auth={'source':'direct_user_instruction','scope':'finite_checkpoint_resume',
               'max_missing_request_retries':1,'source_evaluation_id':'partial-fixture',
               'evaluation_identity':'frozen-fixture','held_request_sha256':[old['request_sha256']]}
-        resumed=PaidRun.next_stage(self.path,'baseline-recovery-1',lambda:{'corpus':'new'},authorization=auth)
-        self.assertEqual(resumed.calls,[old])
-        self.assertEqual(resumed.spent,0)
-        new=resumed.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':11})
-        resumed.stop('ProviderNetworkError')
-        with self.assertRaises(RuntimeError):
-            PaidRun.next_stage(self.path,'baseline-recovery-2',lambda:{'corpus':'new'},authorization=auth)
-        auth['held_request_sha256'].append(new['request_sha256'])
-        again=PaidRun.next_stage(self.path,'baseline-recovery-2',lambda:{'corpus':'new'},authorization=auth)
-        self.assertEqual(again.calls,[old,new])
-        self.assertEqual(len(again.continuation_authorizations),2)
-        with self.assertRaisesRegex(RuntimeError,'budget'):
-            again.budget=0.00001
-            again.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':12})
+        with self.assertRaisesRegex(RuntimeError,'reconcile'):
+            PaidRun.next_stage(self.path,'baseline-recovery-1',lambda:{'corpus':'new'},authorization=auth)
+        self.assertEqual(json.loads(self.path.read_text())['calls'],[old])
 
     def test_network_failure_and_missing_usage_stop_next_request(self):
         for missing in (False, True):
@@ -137,9 +117,9 @@ class PaidRunTests(unittest.TestCase):
                 record_usage({'provider':'DeepSeek','requested_model':'deepseek-v4-flash','status':'ok','prompt_tokens':100,'completion_tokens':100})
         self.assertAlmostEqual(self.run.spent,0.001)
         low = self.make_run(Path(self.temp.name)/'low.json',.01)
-        with controlled_run(low), self.assertRaisesRegex(RuntimeError,'budget'):
-            with paid_request('DeepSeek','deepseek-v4-flash',{}): pass
-        self.assertEqual(low.calls,[])
+        with controlled_run(low), paid_request('DeepSeek','deepseek-v4-flash',{}):
+            record_usage({'provider':'DeepSeek','requested_model':'deepseek-v4-flash','status':'ok','prompt_tokens':100,'completion_tokens':100})
+        self.assertEqual(low.calls[0]['status'], 'ok')
 
     def test_reopening_ledger_is_not_automatic_resume(self):
         with controlled_run(self.run):
@@ -223,13 +203,14 @@ class PaidRunTests(unittest.TestCase):
         saved = json.loads(self.path.read_text())
         self.assertEqual(len(saved['calls']),1)
         self.assertEqual(saved['calls'][0]['usage']['status'],'ok')
-        self.assertLess(saved['available_yuan'],saved['budget_yuan'])
+        self.assertIsNone(saved['available_yuan'])
 
     def test_unknown_model_provider_or_usage_aborts(self):
         with controlled_run(self.run):
-            with self.assertRaises(RuntimeError):
-                with paid_request('Alibaba','unknown',{}): pass
-        self.assertEqual(self.run.calls,[])
+            with paid_request('Alibaba','deepseek-v4-flash',{}):
+                record_usage({'provider':'Alibaba','requested_model':'deepseek-v4-flash','status':'ok','total_tokens':100})
+        self.assertIsNone(self.run.calls[0]['upper_estimate_yuan'])
+        self.assertTrue(json.loads(self.path.read_text())['cost_unknown'])
 
     def test_identity_change_and_ledger_write_failure_prevent_request(self):
         self.run.identity_check = lambda:{'corpus':'changed'}
@@ -295,16 +276,17 @@ class PaidRunTests(unittest.TestCase):
         from app.providers import DeepSeekProvider
         from app.config import Settings
         deepseek = DeepSeekProvider(Settings('fixture','https://fixture.invalid','deepseek-v4-flash'))
-        with controlled_run(low), patch('urllib.request.urlopen') as network:
-            with self.assertRaisesRegex(RuntimeError,'budget'): deepseek.complete('s','u')
-        network.assert_not_called()
+        body = {'choices':[{'message':{'content':'fixture'}}], 'usage':{'prompt_tokens':100,'completion_tokens':100}}
+        with controlled_run(low), patch('urllib.request.urlopen',return_value=io.BytesIO(json.dumps(body).encode())) as network:
+            deepseek.complete('s','u')
+        network.assert_called_once()
 
     def test_rerank_budget_accounts_for_query_per_document(self):
         prices = {'qwen3-rerank':{'provider':'Alibaba','input':.5,'output':0,'max_output':0}}
         run = PaidRun(Path(self.temp.name)/'rerank-limit.json',.004,prices,{},identity_check=lambda:{})
-        with controlled_run(run), self.assertRaisesRegex(RuntimeError,'budget'):
-            with paid_request('Alibaba','qwen3-rerank',{'query':'Q'*1000,'documents':['D']*12}):
-                self.fail('Repeated query billing must be reserved before network')
+        with controlled_run(run), paid_request('Alibaba','qwen3-rerank',{'query':'Q'*1000,'documents':['D']*12}):
+            record_usage({'provider':'Alibaba','requested_model':'qwen3-rerank','status':'ok','total_tokens':100})
+        self.assertGreater(run.calls[0]['reserved_yuan'], .004)
 
     def test_accounting_stops_after_network_failure_and_never_repeats_unknown_payload(self):
         from app.paid_run import accounting_only

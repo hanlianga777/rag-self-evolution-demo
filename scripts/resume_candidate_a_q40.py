@@ -113,14 +113,7 @@ def execute(ledger,audit,run=False):
     identity=lambda:{'candidate_id':CID,'baseline_id':main.store.experiment(main.store.candidate(CID)['experiment_id'])['baseline_run_id'],
         'judge':main.store.require_current_baseline(baseline['id'])['judge'],'config':main.store.candidate(CID)['config'],
         'snapshot':main.store.evaluation_run(baseline['id'])['dataset_snapshot_json'],'corpus':manifest_identity(current_manifest())}
-    request=urllib.request.Request(settings.base_url+'/user/balance',headers={'Authorization':'Bearer '+settings.api_key})
-    with urllib.request.urlopen(request,timeout=30) as response:balance=json.load(response)
-    cash=sum(float(b['total_balance']) for b in balance['balance_infos'] if b['currency']=='CNY')
-    historical=json.loads((ledger.parent/'initial-balance.json').read_text())['historical_unknown_reserve_cny']
-    assert balance['is_available'] and cash>3+historical
-    (audit/'resume-balance.json').write_text(json.dumps(balance))
-    paid=PaidRun.next_stage(ledger,'candidate-A-Q40-local-format-resume',identity,
-        budget_yuan=min(data['budget_yuan'],data['spent_yuan']+cash-3-historical))
+    paid=PaidRun.next_stage(ledger,'candidate-A-Q40-local-format-resume',identity)
     provider.used=False;provider.validation=False
     old_cases=main.store.evaluation_case_results(SOURCE)
     with controlled_run(paid):

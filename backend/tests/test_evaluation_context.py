@@ -246,9 +246,9 @@ class ReplayTests(unittest.TestCase):
             self.assertFalse(value['result']['release_eligible']);self.assertEqual(value['config']['run_target'],'answer_replay')
             self.assertEqual((store.evaluation_run(source),store.evaluation_case_results(source),store.bad_case_rows(),store.production_versions()),before)
 
-    def test_replay_api_requires_explicit_fee_authorization(self):
+    def test_replay_api_checks_eligibility_without_fee_authorization(self):
         from api_fixture import main
         from fastapi.testclient import TestClient
-        with patch.object(main.EvaluationRunner,'start_replay') as start:
+        with patch.object(main.EvaluationRunner,'start_replay',side_effect=ValueError('ineligible')) as start:
             response=TestClient(main.app).post('/api/evaluations/fixture/replay',json={'authorize_provider':False})
-        self.assertEqual(response.status_code,409);start.assert_not_called()
+        self.assertEqual(response.status_code,409);start.assert_called_once_with('fixture')

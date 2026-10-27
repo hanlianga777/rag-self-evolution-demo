@@ -77,7 +77,7 @@ def validate_artifact(record,plan,database):
     ledger=json.loads(Path(record['ledger_path']).read_text())
     calls=ledger['calls']
     if ledger['identity']!=record['binding'] or ledger.get('stopped') or not 1<=len(calls)<=3:raise ValueError('Q18 payment identity/state invalid')
-    if ledger.get('output_limits')!=plan['new_judge']['execution_snapshot']['request_limits'] or ledger.get('budget_enforcement') is not True:raise ValueError('Q18 frozen request/budget limits changed')
+    if ledger.get('output_limits')!=plan['new_judge']['execution_snapshot']['request_limits']:raise ValueError('Q18 frozen request limits changed')
     if any(c.get('max_tokens')!=ledger['output_limits']['judge'] or c.get('status')!='ok' or c.get('task')!='judge' or c.get('provider')!='DeepSeek' or c.get('model')!=plan['new_judge']['model'] for c in calls):raise ValueError('Q18 unknown/non-Judge request')
     for call in calls:
         usage=call.get('usage',{})
@@ -115,7 +115,7 @@ def require_reviewed_probe(database,plan):
     raise ValueError('Q18 independent real probe and explicit business review required for this Evaluation Identity')
 
 
-def run_probe(runner,source_id,*,expected_binding,authorize_provider,authorization_id,budget_usd,price_snapshot):
+def run_probe(runner,source_id,*,expected_binding,authorize_provider,authorization_id,price_snapshot=None,budget_usd=None):
     from .paid_run import PaidRun,controlled_run,execution_limits
     from .evaluation_stage import perform_stage,correction_for
     from .full_text import CORPUS_LOCK
@@ -123,11 +123,16 @@ def run_probe(runner,source_id,*,expected_binding,authorize_provider,authorizati
         preflight=probe_preflight(runner,source_id)
         if not authorize_provider or not authorization_id or preflight['binding']!=expected_binding:raise ValueError('Explicit Q18-only authorization with current binding required')
         if not getattr(runner.runtime,'live_enabled',False):raise ValueError('Q18 real probe requires configured real Provider')
-        price=json.loads(Path(price_snapshot).read_text());age=(datetime.now(timezone.utc)-datetime.fromisoformat(price['checked_at'])).total_seconds()
         model=preflight['plan']['new_judge']['model']
-        if (not 0<=age<=86400 or price.get('currency')!='USD' or price.get('model')!=model
-            or price.get('source_url')!='https://api-docs.deepseek.com/quick_start/pricing/'
-            or not 0<budget_usd<=price.get('authorization_budget_cap_usd',0)):raise ValueError('Fresh verified Q18 pricing and bounded USD budget required')
+        price=json.loads(Path(price_snapshot).read_text()) if price_snapshot else None
+        if price:
+            try:
+                age=(datetime.now(timezone.utc)-datetime.fromisoformat(price['checked_at'])).total_seconds()
+                if (not 0<=age<=86400 or price.get('currency')!='USD' or price.get('model')!=model
+                    or price.get('source_url')!='https://api-docs.deepseek.com/quick_start/pricing/'):
+                    price=None
+            except (KeyError,TypeError,ValueError):
+                price=None
         directory=probe_directory(runner.store.database_path);directory.mkdir(parents=True,exist_ok=True)
         path=directory/(digest(authorization_id)+'.probe.json')
         descriptor=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.close(descriptor)
@@ -138,7 +143,8 @@ def run_probe(runner,source_id,*,expected_binding,authorize_provider,authorizati
         def current_binding():
             if len(record['checkpoint']['attempts'])>=3:raise ValueError('Q18 authorization exhausted')
             return probe_preflight(runner,source_id)['binding']
-        ledger=PaidRun(record['ledger_path'],budget_usd,{model:{'provider':'DeepSeek','input':price['input_per_million'],'output':price['output_per_million'],'max_output':preflight['limits']['judge'],'currency':'USD'}},expected_binding,identity_check=current_binding,output_limits=preflight['limits'])
+        prices={model:{'provider':'DeepSeek','input':price['input_per_million'],'output':price['output_per_million'],'max_output':preflight['limits']['judge'],'currency':'USD'}} if price else {}
+        ledger=PaidRun(record['ledger_path'],budget_usd,prices,expected_binding,identity_check=current_binding,output_limits=preflight['limits'])
         def persist(state,**details):
             if state=='retrying' and ledger.stopped:
                 last=record['checkpoint']['attempts'][-1]

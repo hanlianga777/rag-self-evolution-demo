@@ -48,7 +48,6 @@ def main():
             'correction_input':'actual payload bytes checked against remaining budget before every attempt',
             'authorization_budget_cap_usd':price['authorization_budget_cap_usd'],'automatic_real_calls':0}
     elif args.action=='run':
-        if not args.price_snapshot or args.budget_usd is None:parser.error('run requires explicit fresh price snapshot and budget')
         result=run_probe(runner,args.source,expected_binding=args.expected_binding,authorize_provider=args.authorize_provider,authorization_id=args.authorization_id,budget_usd=args.budget_usd,price_snapshot=args.price_snapshot)
     else:
         if not args.artifact:parser.error('review requires an existing real probe artifact')

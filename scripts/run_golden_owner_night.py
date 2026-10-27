@@ -27,14 +27,14 @@ def quality(authorization):
     if current['knowledge']['corpus_snapshot_id']!=CORPUS or current['plan']!=PLAN:
         raise RuntimeError('Owner scope identity changed')
     text = authorization.read_text()
-    if RUN not in text or '50元' not in text or '所有者委托' not in text:
+    if RUN not in text or '所有者委托' not in text:
         raise ValueError('Explicit owner authorization attachment required')
     output = ROOT/'output/playwright/golden-delegated-20261012'
     output.mkdir(exist_ok=True)
     prices = {'deepseek-v4-flash':{'provider':'DeepSeek','input':2.1,'output':8.4,'max_output':32768},
               'text-embedding-v4':{'provider':'Alibaba','input':.5,'output':0,'max_output':0},
               'qwen3-rerank':{'provider':'Alibaba','input':.5,'output':0,'max_output':0}}
-    run = PaidRun(output/'paid-calls.json',50.,prices,current,identity_check=identity,output_limits=REQUEST_LIMITS)
+    run = PaidRun(output/'paid-calls.json',None,prices,current,identity_check=identity,output_limits=REQUEST_LIMITS)
     (output/'owner-authorization.json').write_text(json.dumps({'source':'direct_user_instruction','attachment_sha256':hashlib.sha256(authorization.read_bytes()).hexdigest(),
         'delegated_by':'project_owner','review_actor_type':'ai_agent','review_actor':'Codex','generation_run':RUN,
         'output_limits':REQUEST_LIMITS,'price_basis':'2026-10-12 official peak rates, CNY conversion 6.7313 with planning buffer; not account debit'},ensure_ascii=False,indent=2))

@@ -180,7 +180,7 @@ class BatchAndReplayTests(unittest.TestCase):
         store,run,snapshot,q,c,chunks,fixture=self.setup_saved()
         def exhausted(payload):raise RuntimeError('Payment budget insufficient')
         result=resolve_persisted(store,run,q['id'],chunks,'new-corpus',semantic=exhausted,persist=True)
-        self.assertEqual(result['status'],'pending_budget')
+        self.assertEqual(result['status'],'blocked')
         self.assertFalse(result['findings'])
 
     def test_identity_drift_after_response_stops_batch(self):

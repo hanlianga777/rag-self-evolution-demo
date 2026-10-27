@@ -59,20 +59,11 @@ def execute():
 
     def claim(name,reason=None):
         data=json.loads(LEDGER.read_text())
-        settings=main.ai_service.provider.settings
-        request=urllib.request.Request(settings.base_url+'/user/balance',headers={'Authorization':'Bearer '+settings.api_key})
-        with urllib.request.urlopen(request,timeout=30) as response:balance=json.load(response)
-        cash=sum(float(b['total_balance']) for b in balance['balance_infos'] if b['currency']=='CNY')
-        assert balance['is_available'] and cash>3
-        save(name+'-balance',balance)
-        # External Q22 timeout and Q27 in-flight Usage are absent from the original ledger.
-        # Hold 0.50 CNY each; never invent ledger requests or release unknown charges.
-        budget=min(data['budget_yuan'],data['spent_yuan']+cash-3-1.)
         authorization={'source':'direct_user_instruction','scope':'finite_checkpoint_resume',
             'max_missing_request_retries':1,'source_evaluation_id':active_id or SOURCE,
             'evaluation_identity':FROZEN,'held_request_sha256':[c['request_sha256'] for c in data['calls'] if c['status']=='reserved'],
             'reason':reason or 'Explicit continuous recovery authorization','external_unknown_reserve_yuan':1.}
-        return PaidRun.next_stage(LEDGER,name,identity,authorization=authorization,budget_yuan=budget)
+        return PaidRun.next_stage(LEDGER,name,identity,authorization=authorization)
 
     class FiniteProvider(DeepSeekProvider):
         def complete_with_metrics(self,*args,**kwargs):

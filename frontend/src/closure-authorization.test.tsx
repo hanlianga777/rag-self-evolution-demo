@@ -10,12 +10,11 @@ afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';vi.uns
 async function render(node:any){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));}
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
 const run={id:'fixture-B',status:'completed',config:{top_k:3},cases:[],result:{gates:{passed:true,passed_count:11,total:11},bad_case_count:0},dataset_snapshot:{id:'fixture-g',question_ids:['q']}};
-it('Baseline fee preview and cancellation never start a provider request',async()=>{
+it('starts an eligible Baseline without a separate fee prompt',async()=>{
  const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
  await render(<EvaluationPage data={{evaluation:run}}/>);await click('重新运行 Baseline（新版本）');
- expect(document.querySelector('[role=dialog]')?.textContent).toContain('预计金额无法估算');
- await click('取消');expect(document.querySelector('[role=dialog]')).toBeNull();
- expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
+ expect(document.querySelector('[role=dialog]')).toBeNull();
+ expect(calls.mock.calls.some((c:any[])=>c[1]?.method==='POST')).toBe(true);
 });
 it('old policy blocks batch execution and preserves historical data',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
@@ -32,13 +31,13 @@ it('latest candidate cards and history Drawer keep round provenance',async()=>{
  await click('历史实验 · 1轮');expect(document.querySelector('[role=dialog]')?.textContent).toContain('saved 1-A');
  expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('saved 2-A');
 });
-it('new Judge-only baseline inspects each eligibility before explicit fee authorization',async()=>{
+it('new Judge-only baseline checks eligibility before starting',async()=>{
  const plan={can_replay:true,can_start_replay:true,reusable:50,total:50,judge_calls:50,max_judge_calls:150,new_evaluation_identity:'v5-identity',source_sha256:'source-sha',eligibility:[{question_id:'new-q',eligible:true,origin:'generation_checkpoint'}]};
  const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?plan:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
  await render(<EvaluationPage data={{evaluation:run}}/>);await click('新版Baseline判分（复用回答）');
  expect(document.body.textContent).toContain('50 / 50');expect(document.body.textContent).not.toContain('恢复 Baseline');
- await click('授权新版 Judge-only Baseline');expect(document.querySelector('[role=dialog]')?.textContent).toContain('禁止重新生成');
- await click('取消');expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
+ await click('授权新版 Judge-only Baseline');expect(document.querySelector('[role=dialog]')).toBeNull();
+ expect(calls.mock.calls.some((c:any[])=>c[1]?.method==='POST')).toBe(true);
 });
 it('ineligible saved execution blocks Judge-only baseline without falling back to generation',async()=>{
  const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?{can_replay:false,reusable:49,total:50,eligibility:[{question_id:'missing-q',eligible:false,blockers:['complete_generated_answer_missing']}]}:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
@@ -67,8 +66,8 @@ it('restores the read-only replay preflight after remount without starting a run
  expect(document.body.textContent).toContain('50 / 50');
  expect(calls.mock.calls.filter((c:any[])=>c[0].includes('judge-replay/preflight')).length).toBe(2);
  await click('授权新版 Judge-only Baseline');
- expect(document.querySelector('[role=dialog]')?.textContent).toContain('模型调用费用授权');
- await click('取消');expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
+ expect(document.querySelector('[role=dialog]')).toBeNull();
+ expect(calls.mock.calls.some((c:any[])=>c[1]?.method==='POST')).toBe(true);
 });
 it('shows a preflight error and retries it instead of leaving an empty card',async()=>{
  let failed=true;

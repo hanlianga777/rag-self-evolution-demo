@@ -95,7 +95,7 @@ def execute(stage):
         if auth_path.exists(): shutil.copy2(auth_path, OUTPUT / 'previous-owner-delegation.json')
         auth_path.write_text(json.dumps(auth,ensure_ascii=False,indent=2)); auth_path.chmod(0o600)
         save('owner-delegation.json', auth)
-        ledger = PaidRun(OUTPUT / 'provider-ledger.json', 1, {}, identity, identity_check=lambda:identity if manifest_identity(current_manifest())==current else None, output_limits=REQUEST_LIMITS)
+        ledger = PaidRun(OUTPUT / 'provider-ledger.json', None, {}, identity, identity_check=lambda:identity if manifest_identity(current_manifest())==current else None, output_limits=REQUEST_LIMITS)
         print('GENERATION_STARTED '+run_id,flush=True)
         with accounting_only(), controlled_run(ledger):
             main._run_mini_generation_work(run_id,main.store,main.ai_service,main.corpus)
