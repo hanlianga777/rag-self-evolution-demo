@@ -4,7 +4,7 @@
 
 - Golden 是评测考卷：每题保存问题、标准答案或负向预期、适用原文及文档/页码/Chunk 身份、必答与条件触发、辅助、禁止项及等价表达。建设时可使用真实完整手册、Canonical Child/Parent；不受当前 CandidateK、TopK 命中限制。负向无据结论须有真实全 Corpus 范围核验，材料 Anchor 不是答案 Evidence。
 - 内容有效性、Probe 检索风险、后续回答能力是不同结论：真实事实有适用来源但 Pipeline 未召回时保留轨迹和风险，可经绑定当前 Probe 的合法审核接受；不声称检索已修复，也不因缺指定 Chunk 机械改写正确答案。真正缺失来源、事实或安全前提仍须阻断。
-- 必须复用当前内容、Corpus 和质量身份有效的 Hard Validation、Probe、QC、业务审计及独立审核。内容真实修改须走 Revision 留史，旧身份审核和检查不得复用；只对变化或技术缺失部分复验，不通过重复付费碰运气。QC 至少85分，P0 阻断，P1及实质安全/来源歧义须真实解决；业务审计必须恰有十项检查且每项为布尔 true，缺失、额外项及非布尔真值不能视作通过。
+- 必须复用当前内容、Corpus 和质量身份有效的 Hard Validation、Probe、QC、业务审计及独立审核。内容真实修改须走 Revision 留史，旧身份审核和检查不得复用；只对变化或技术缺失部分复验，不通过重复付费碰运气。QC 至少85分，P0 阻断，P1及实质安全/来源歧义须真实解决；业务审计必须恰有十项检查且每项为布尔 true，缺失、额外项及非布尔真值不能视作通过；候选资格、单题批准和委托审核复用同一判定。
 - Owner Delegated AI 审核仅在真实授权、当前来源、质量身份和证据齐备时记录实际 AI 审阅主体；不得冒充负责人逐题人工审核。复用已有当前有效审核。机器合格不等于人工/委托审核；完整题集通过当前审核与质量条件后 Human Gate Ready。审核不创建正式 Snapshot，负责人通过独立入口冻结；冻结重校当前成员、审核、Corpus 和内容身份。
 - Golden → Judge → Baseline → Agent → Candidate → Sandbox → Regression → 发布沿现有身份、人工 Gate、11 Hard Gate 与回滚流程执行。Golden 标准答案及标准证据不得泄漏至 Baseline/Candidate 回答生成；Judge 应依据冻结 Golden 判分。当前 Snapshot 保存 business_requirements，但现有正式 Judge 尚未完整直接消费该合同，不能宣称逐项判分能力已实现；本轮不修改该评分体系、不提前运行正式实验。
 - 正常授权业务执行不设项目自定义人民币金额或累计费用硬上限，不要求 budget_yuan；历史预算字段只为兼容。保留真实 Provider、Token、Usage、可计算费用及未知费用，未知不等于零；保留 API 技术限额、并发、请求身份、有限重试、失败停止和 Unknown 对账。Sandbox 轮次/D 预留是执行次数控制，不是人民币预算。

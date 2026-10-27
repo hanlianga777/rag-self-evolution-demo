@@ -1117,9 +1117,8 @@ class GovernanceStore:
         if audit and audit['content_hash'] != self._quality_content(item):
             blockers.append('题目质量审计待更新')
         elif audit:
-            from .business_golden import CHECKS as BUSINESS_CHECKS
-            checks=_load(audit['audit_json'],{}).get('checks',{})
-            if set(checks)!=set(BUSINESS_CHECKS) or any(value is not True for value in checks.values()):
+            from .business_golden import audit_passed
+            if not audit_passed(_load(audit['audit_json'],{})):
                 blockers.append('题目质量审计未通过')
         elif not audit and (item['raw'].get('replaces_question_id') or item['raw'].get('generation_strategy')=='business_v2'):
             blockers.append('题目质量审计待执行')
