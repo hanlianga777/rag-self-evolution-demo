@@ -13,3 +13,13 @@ class DispositionTests(unittest.TestCase):
         self.assertEqual(route(['语义/安全争议待复核']), 'resolve_source_or_safety')
         self.assertEqual(route(['质量记录已过期']), 'revalidate')
         self.assertEqual(route(['任意业务审计原因'], {'checks': {'grounding': False}}), 'investigate_and_revalidate')
+
+    def test_business_audit_requires_all_ten_explicit_true_checks(self):
+        from app.business_golden import CHECKS, audit_passed
+        self.assertTrue(audit_passed({'checks': dict.fromkeys(CHECKS, True)}))
+        for checks in ({}, {'grounding': True}, {**dict.fromkeys(CHECKS, True), 'extra': True},
+                       {**dict.fromkeys(CHECKS, True), 'grounding': 1},
+                       {**dict.fromkeys(CHECKS, True), 'grounding': False}):
+            with self.subTest(checks=checks):
+                self.assertFalse(audit_passed({'checks': checks}))
+                self.assertEqual(GovernanceStore.golden_disposition([], {'checks': checks}), 'investigate_and_revalidate')

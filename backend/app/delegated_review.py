@@ -83,7 +83,7 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
         return bool(row.get('attention_reasons')) and set(row.get('attention_reasons',[])) <= {'检索不连贯','QC P1','语义/安全争议待复核'} and row.get('probe_status')=='probe_passed' and row.get('qc_status')=='qc_passed'
     if run['status']!='completed' or any(not reviewable(r) for r in rows if r['id'] in selected) or {r['id'] for r in rows}!=set(ids):
         raise ValueError('Owner delegation cannot waive machine quality')
-    from .business_golden import CHECKS as BUSINESS_CHECKS, QUALITY_CONTRACT
+    from .business_golden import CHECKS as BUSINESS_CHECKS, QUALITY_CONTRACT, audit_passed
     plan = state['frozen_plan']
     current_contract = plan.get('quality_contract') in {'business-quality-v3', QUALITY_CONTRACT}
     for review in reviews:
@@ -94,8 +94,7 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
                 raise ValueError('Independent review frozen Slot scope unavailable')
             if plan.get('quality_contract') == QUALITY_CONTRACT and (row.get('quality_audit') or {}).get('audit_version') != QUALITY_CONTRACT:
                 raise ValueError('Current business quality contract audit unavailable')
-            audit_checks=(row.get('quality_audit') or {}).get('checks',{})
-            if set(audit_checks)!=set(BUSINESS_CHECKS) or any(value is not True for value in audit_checks.values()):
+            if not audit_passed(row.get('quality_audit')):
                 raise ValueError('Business quality audit must pass all checks')
             if (not isinstance(review.get('business_checks'),dict) or set(review['business_checks']) != set(BUSINESS_CHECKS)
                 or any(v is not True for v in review['business_checks'].values())

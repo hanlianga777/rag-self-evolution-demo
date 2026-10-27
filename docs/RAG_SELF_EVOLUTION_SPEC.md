@@ -1,12 +1,25 @@
+# 当前权威合同 — 2026-10-27 Golden、审核与费用
+
+本节是当前规则的优先解释；后文按日期保存变更和溯源。后文带“当前”的旧表述仅在与本节及较新条款不冲突时适用；旧运行状态、旧金额授权、旧自动冻结及允许未对账续跑的表述均为历史，不是当前合同。具体能力须以对应实现和有效记录核实，历史报告不是当前状态。
+
+- Golden 是评测考卷：每题保存问题、标准答案或负向预期、适用原文及文档/页码/Chunk 身份、必答与条件触发、辅助、禁止项及等价表达。建设时可使用真实完整手册、Canonical Child/Parent；不受当前 CandidateK、TopK 命中限制。负向无据结论须有真实全 Corpus 范围核验，材料 Anchor 不是答案 Evidence。
+- 内容有效性、Probe 检索风险、后续回答能力是不同结论：真实事实有适用来源但 Pipeline 未召回时保留轨迹和风险，可经绑定当前 Probe 的合法审核接受；不声称检索已修复，也不因缺指定 Chunk 机械改写正确答案。真正缺失来源、事实或安全前提仍须阻断。
+- 必须复用当前内容、Corpus 和质量身份有效的 Hard Validation、Probe、QC、业务审计及独立审核。内容真实修改须走 Revision 留史，旧身份审核和检查不得复用；只对变化或技术缺失部分复验，不通过重复付费碰运气。QC 至少85分，P0 阻断，P1及实质安全/来源歧义须真实解决；业务审计必须恰有十项检查且每项为布尔 true，缺失、额外项及非布尔真值不能视作通过。
+- Owner Delegated AI 审核仅在真实授权、当前来源、质量身份和证据齐备时记录实际 AI 审阅主体；不得冒充负责人逐题人工审核。复用已有当前有效审核。机器合格不等于人工/委托审核；完整题集通过当前审核与质量条件后 Human Gate Ready。审核不创建正式 Snapshot，负责人通过独立入口冻结；冻结重校当前成员、审核、Corpus 和内容身份。
+- Golden → Judge → Baseline → Agent → Candidate → Sandbox → Regression → 发布沿现有身份、人工 Gate、11 Hard Gate 与回滚流程执行。Golden 标准答案及标准证据不得泄漏至 Baseline/Candidate 回答生成；Judge 应依据冻结 Golden 判分。当前 Snapshot 保存 business_requirements，但现有正式 Judge 尚未完整直接消费该合同，不能宣称逐项判分能力已实现；本轮不修改该评分体系、不提前运行正式实验。
+- 正常授权业务执行不设项目自定义人民币金额或累计费用硬上限，不要求 budget_yuan；历史预算字段只为兼容。保留真实 Provider、Token、Usage、可计算费用及未知费用，未知不等于零；保留 API 技术限额、并发、请求身份、有限重试、失败停止和 Unknown 对账。Sandbox 轮次/D 预留是执行次数控制，不是人民币预算。
+
+以下为历次合同及执行记录；与以上当前权威条款冲突的历史规则已被替代，历史审核、结果和 Snapshot 不因此改写。
+
 # 当前有效评测合同 — 2026-10-21 VNext V5.1 `[CONFIRMED]`
 
 - **2026-10-27 审核、冻结与费用机制调整**：批量人工或Owner委托审核只保存逐题审核记录，不创建Snapshot；Human Gate Ready要求完整题集均有当前身份有效的人工或委托审核，机器合格本身不等于Ready。负责人通过独立Snapshot入口冻结，入口再次检查Gate与质量身份。PaidRun保留历史预算字段但不按人民币金额阻断，未知Usage和请求身份、停止及有限重试保护保持；Baseline及Candidate续跑均先对账，不再用手动续跑确认绕过Unknown；诊断入口不再强制填写金额。Golden候选增加基于现有阻断原因的处置方向，输出不自动修订或豁免质量检查。Sandbox评测次数上限与D预留属于次数控制，保持不变。委托审核按完整授权范围校验并允许提交其中的单题或批次；历史记录与Snapshot不回写。本次未调用Provider或修改正式题集。
 
-- **2026-10-27 Golden统一业务合同治理（当前、未收口）**：新增已提供文档名、正文摘要和答案行来源的确定性验证；Golden QC补充对并列/替代、独立安全前提、条件、对象版本和实质歧义的通用语义审查。Q04/Q07/Q28/Q49通过Revision修订并定向真实复验，46题复用已有质量记录；Probe 50/50，QC 49/50（Q49 82/P1失败），Q07业务审计copying未通过，Q28 88/P1。C181插头归属、Q09受损电池放电及Q25跨文档范围仍待审；相关待审事件绑定内容身份。14例真实隔离模型样例通过，但不证明所有语义均正确；50题外部独立语义审核未获自动审批，未执行。原快照保存business_requirements，现有Judge未直接消费它，按用户范围未改Judge，不能承诺后续逐项评分；Human Gate pending，不自动批准或冻结。详见[统一合同报告](GOLDEN_UNIFIED_BUSINESS_CONTRACT_20261027.md)。
+- **2026-10-27 Golden统一业务合同治理（历史记录，当时未收口）**：新增已提供文档名、正文摘要和答案行来源的确定性验证；Golden QC补充对并列/替代、独立安全前提、条件、对象版本和实质歧义的通用语义审查。Q04/Q07/Q28/Q49通过Revision修订并定向真实复验，46题复用已有质量记录；Probe 50/50，QC 49/50（Q49 82/P1失败），Q07业务审计copying未通过，Q28 88/P1。C181插头归属、Q09受损电池放电及Q25跨文档范围仍待审；相关待审事件绑定内容身份。14例真实隔离模型样例通过，但不证明所有语义均正确；50题外部独立语义审核未获自动审批，未执行。原快照保存business_requirements，现有Judge未直接消费它，按用户范围未改Judge，不能承诺后续逐项评分；Human Gate pending，不自动批准或冻结。详见[统一合同报告](GOLDEN_UNIFIED_BUSINESS_CONTRACT_20261027.md)。
 
-- **2026-10-27 Golden电气范围复核（当前）**：Q06/Q07 按厂家手册第85页保留“设备与对接站断开，或拔出电源插头”，并独立保留关机、设备电池隔离及对接站作业前拔插头；该页未明确插头所属，不推断其可代替电池隔离。仅两题经Revision及新身份Hard Validation/业务审计/Probe/QC复验，其他48题复用有效记录。Q28-C2、Q49-C1仍是同类单一路径争议，Q07-C1适用性及QC引文需复核，未经处置不得宣称全部可批准；现有系统资格不自动反映新发现。不改Pipeline/Judge等，未批准、冻结或启动Baseline；详见[电气复核](GOLDEN_ELECTRICAL_CLOSEOUT_20261027.md)和[50题质量矩阵](GOLDEN_ELECTRICAL_50_MATRIX_20261027.md)。
+- **2026-10-27 Golden电气范围复核（历史记录）**：Q06/Q07 按厂家手册第85页保留“设备与对接站断开，或拔出电源插头”，并独立保留关机、设备电池隔离及对接站作业前拔插头；该页未明确插头所属，不推断其可代替电池隔离。仅两题经Revision及新身份Hard Validation/业务审计/Probe/QC复验，其他48题复用有效记录。Q28-C2、Q49-C1仍是同类单一路径争议，Q07-C1适用性及QC引文需复核，未经处置不得宣称全部可批准；现有系统资格不自动反映新发现。不改Pipeline/Judge等，未批准、冻结或启动Baseline；详见[电气复核](GOLDEN_ELECTRICAL_CLOSEOUT_20261027.md)和[50题质量矩阵](GOLDEN_ELECTRICAL_50_MATRIX_20261027.md)。
 
-- **2026-10-26 Golden逐事实最终治理（当前）**：完整核查50题后集中修订15题；Q09将厂家废弃要求与谨慎建议显式分开，Q15将题目限定为手动启用清洁头、握安全开关推行及未证实的静止能力边界，其余修订仅精确证据映射/角色。原50 ID及20/10/20保持；每次Revision改变单题内容哈希，旧质量结果不跨身份复用，原记录不删；相同检索RPC仅按完整请求哈希复用，新内容业务审计和QC真实重新执行。Golden新增只读逐事实诊断，绑定当前内容/Probe/QC：用已验证QC逐项引用核对实际Final的真实正文及同文档/产品范围，缺指定ID但全部当前必要事实已定位不再仅以旧Chunk缺失增加检索关注；条件未触发不扩大、辅助缺失不阻断，缺引用/范围冲突/未定位改写保持未解决，不自动推断语义等价。原始Probe、Trace、Coverage和分类只读保留；真正必要事实缺失、条件缺口与跨产品混入单独披露。Golden QC的85/P0/P1内容规则保持，纯Pipeline检索缺口不作为Golden内容P1或扣分依据，历史P1不篡改。机器合格仍不是人工批准，负责人最终Human Gate不代行。无架构节点/服务/表/前端变化，Judge/11 Gate、Baseline/Candidate/Agent、Pipeline/Corpus/Embedding/FAISS及生产发布不改。验收见[GOLDEN_FINAL_GOVERNANCE_REPORT.md](GOLDEN_FINAL_GOVERNANCE_REPORT.md)及[50题核查](GOLDEN_FINAL_GOVERNANCE_50_AUDIT.md)。
+- **2026-10-26 Golden逐事实最终治理（历史记录）**：完整核查50题后集中修订15题；Q09将厂家废弃要求与谨慎建议显式分开，Q15将题目限定为手动启用清洁头、握安全开关推行及未证实的静止能力边界，其余修订仅精确证据映射/角色。原50 ID及20/10/20保持；每次Revision改变单题内容哈希，旧质量结果不跨身份复用，原记录不删；相同检索RPC仅按完整请求哈希复用，新内容业务审计和QC真实重新执行。Golden新增只读逐事实诊断，绑定当前内容/Probe/QC：用已验证QC逐项引用核对实际Final的真实正文及同文档/产品范围，缺指定ID但全部当前必要事实已定位不再仅以旧Chunk缺失增加检索关注；条件未触发不扩大、辅助缺失不阻断，缺引用/范围冲突/未定位改写保持未解决，不自动推断语义等价。原始Probe、Trace、Coverage和分类只读保留；真正必要事实缺失、条件缺口与跨产品混入单独披露。Golden QC的85/P0/P1内容规则保持，纯Pipeline检索缺口不作为Golden内容P1或扣分依据，历史P1不篡改。机器合格仍不是人工批准，负责人最终Human Gate不代行。无架构节点/服务/表/前端变化，Judge/11 Gate、Baseline/Candidate/Agent、Pipeline/Corpus/Embedding/FAISS及生产发布不改。验收见[GOLDEN_FINAL_GOVERNANCE_REPORT.md](GOLDEN_FINAL_GOVERNANCE_REPORT.md)及[50题核查](GOLDEN_FINAL_GOVERNANCE_50_AUDIT.md)。
 
 - **2026-10-26 Golden真实批量恢复（当前）**：异常批量入口只选择缺失、过期或技术中断阶段；已有效完成的业务审计、Probe和QC复用，低分/P0/P1、检索风险及人工待审不自动触发重复付费。单题已知技术失败保留错误与Checkpoint后继续其他题，Unknown/Usage未结算、鉴权/配置错误仍停止；业务Probe失败不进入QC。Golden QC将JSON/Schema/来源合同错误明确记录为带原始响应的`ProviderInvalidResponse`，仅对已知响应最多进行一次纠正，纠正携原响应和错误且保留真实质量判断；不盲重试网络未知请求。无源负向检查点support必须为空，背景材料不能冒充答案Evidence。Golden Probe逐项核对对象、用途、前提与验收范围，局部参数不能代表整题可答；仅对已发现的范围争议作明确、有限复核。未执行状态不再显示为QC低于85。QC85、P0阻断、P1显式复核及Human Gate最终确认保持。用户已授权必要真实调用、不设额外金额封顶，并确认现用DeepSeek与阿里云目的地及题目/手册/审核载荷范围；保留请求、Usage和费用可用性，不将估算冒充实际扣费。原50题、ID、配额与工作集身份保持；Q36通过既有Revision最小补齐负向范围和真实背景来源，按新单题内容身份重新检查，其余49题业务内容不改。归档审计只作为修订谱系证据，不复用旧批准。无新服务/表/架构节点；Judge、11 Gate、Baseline/Candidate、Agent、Pipeline、知识库与前端不改。详见[真实批量收口](GOLDEN_BATCH_RECOVERY_REPORT.md)。
 

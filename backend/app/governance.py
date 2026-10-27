@@ -333,7 +333,8 @@ class GovernanceStore:
     @staticmethod
     def golden_disposition(reasons, audit=None):
         reasons = set(reasons)
-        if audit and not all(audit.get('checks',{}).values()):
+        from .business_golden import audit_passed
+        if audit is not None and not audit_passed(audit):
             return 'investigate_and_revalidate'
         if any('QC 未通过' in r or 'QC 分数未达' in r or '题目质量需修订' in r or '人工标记需修订' in r for r in reasons):
             return 'investigate_and_revalidate'
@@ -379,6 +380,7 @@ class GovernanceStore:
             active = set()
             for row in connection.execute("SELECT audit_json FROM candidate_revision_runs WHERE status IN ('queued','generating','validating','preview_ready','probing','qc','interrupted')"):
                 active.update(_load(row[0], {}).get('question_ids', []))
+        from .business_golden import audit_passed
         result = []
         fingerprint = manifest_identity(current_manifest())
         for saved in rows:
@@ -404,8 +406,8 @@ class GovernanceStore:
             if any(item[key] and item[key] != content_hash for key in ('probe_hash','qc_hash')):
                 reasons.append('质量记录已过期')
             audit = _load(item['audit_json'], None) if item['audit_hash'] == content_hash else None
-            if audit and not all(audit['checks'].values()):
-                reasons.append(audit.get('attention_reason') or '题目质量需修订')
+            if audit is not None and not audit_passed(audit):
+                reasons.append((audit.get('attention_reason') if isinstance(audit, dict) else None) or '题目质量需修订')
             if item['audit_hash'] and not audit:
                 reasons.append('题目质量审计待更新')
             elif not audit and (item['raw'].get('replaces_question_id') or item['raw'].get('generation_strategy') == 'business_v2'):

@@ -8,6 +8,11 @@ from .golden_v2 import digest, facts, largest_remainder, text
 
 CHECKS = ('naturalness', 'business_value', 'intent', 'grounding', 'independence', 'copying', 'duplicates', 'type', 'coverage', 'diversity')
 QUALITY_CONTRACT = 'business-quality-v4'
+
+
+def audit_passed(audit):
+    checks = audit.get('checks') if isinstance(audit, dict) else None
+    return isinstance(checks, dict) and set(checks) == set(CHECKS) and all(value is True for value in checks.values())
 NEGATIVE_BUSINESS = ([('知识库无答案', 'insufficient_evidence', 'insufficient_evidence')] * 6 +
                      [('关键条件不足', 'clarify', 'clarify')] * 5 +
                      [('产品/版本混淆', 'clarify', 'clarify')] * 5 +

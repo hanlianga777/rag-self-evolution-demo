@@ -71,6 +71,12 @@ class BusinessAuditTests(unittest.TestCase):
             self.assertIn('题目质量审计待执行',store.candidate_rows([key])[0]['attention_reasons'])
             store.save_quality_audit(key,{'checks':dict.fromkeys(CHECKS,True),'reason':'offline fixture'})
             self.assertEqual(store.candidate_rows([key])[0]['qualification_status'],'machine_qualified')
+            with store.connection() as db:
+                db.execute('UPDATE question_quality_audits SET audit_json=? WHERE question_id=?', (json.dumps({'checks': {}, 'reason': 'incomplete'}), key))
+            self.assertEqual(store.candidate_rows([key])[0]['qualification_status'],'needs_human_review')
+            with store.connection() as db:
+                db.execute('UPDATE question_quality_audits SET audit_json=? WHERE question_id=?', (json.dumps(['invalid']), key))
+            self.assertEqual(store.candidate_rows([key])[0]['qualification_status'],'needs_human_review')
             store.save_quality_audit(key,{'checks':{k:k!='business_value' for k in CHECKS},'reason':'offline fixture'})
             self.assertEqual(store.candidate_rows([key])[0]['qualification_status'],'needs_human_review')
             self.assertEqual(store.dataset_snapshots(),[])
