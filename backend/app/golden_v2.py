@@ -220,7 +220,20 @@ def validate_content_sources(candidate, corpus):
                 errors.append('governed source scope mismatch: ' + field)
         if 'pages' in item and any(item['pages'] != [known[i].get('page_start'), known[i].get('page_end')] for i in ids):
             errors.append('governed source page mismatch')
+        if 'document' in item and any(item['document'] != known[i].get('document_name') for i in ids):
+            errors.append('governed source document mismatch')
+        if 'body_sha256' in item and any(item['body_sha256'] != hashlib.sha256(text(known[i]).encode('utf-8')).hexdigest() for i in ids):
+            errors.append('governed source body digest mismatch')
     keys = {s['chunk_id'] for s in sources if isinstance(s.get('chunk_id'), str)}
+    answer_support = requirements.get('answer_support', [])
+    answer = candidate.get('reference_answer') or candidate.get('expected_response') or ''
+    if not isinstance(answer_support, list) or not isinstance(answer, str) or any(
+        not isinstance(line, dict) or not isinstance(line.get('answer_line'), str) or not line['answer_line'].strip()
+        or line['answer_line'] not in answer or not isinstance(line.get('source_chunk_ids'), list)
+        or not line['source_chunk_ids'] or any(not isinstance(i, str) or i not in keys for i in line['source_chunk_ids'])
+        for line in answer_support
+    ):
+        errors.append('invalid answer support mapping')
     required, conditional = requirements.get('required_checks', []), requirements.get('conditional_checks', [])
     if not isinstance(required, list) or not isinstance(conditional, list):
         return {'status': 'failed', 'errors': ['invalid checkpoint lists']}

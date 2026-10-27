@@ -1,3 +1,5 @@
+2026-10-27 Golden统一业务判分合同：补强来源身份、答案来源及通用语义审查，4题定向修订；Q49 QC失败、Q07业务审计未通过，安全/来源争议及50题独立语义审阅仍未收口。未批准或冻结。[报告与当前状态](docs/GOLDEN_UNIFIED_BUSINESS_CONTRACT_20261027.md)。
+
 2026-10-27 Golden电气范围复核：Q06/Q07按厂家原文区分对接站/插头替代路径与独立电气安全要求，已完成两题定向真实复验；Q28/Q49同类判分争议及Q07条件适用性仍待处理，未批准或冻结。[复核及负责人清单](docs/GOLDEN_ELECTRICAL_CLOSEOUT_20261027.md)。
 
 2026-10-26 Golden审核闭环（离线交付时历史状态）：原50题保持，结构/来源预检与冻结语义分开，Golden QC统一85分（P0阻断、P1争议复核）；现有批量入口与断点恢复已离线验证。真实Probe/QC及Human Gate尚未执行，Q09/Q15待复核；不改Judge、11 Gate、Baseline/Candidate或前端。[集中验收及费用预检](docs/GOLDEN_FINAL_CLOSEOUT_REPORT.md)。

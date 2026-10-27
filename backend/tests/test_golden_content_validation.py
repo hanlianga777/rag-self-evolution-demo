@@ -55,6 +55,26 @@ class ContentValidationTests(unittest.TestCase):
             self.assertFalse(result['valid'])
             self.assertEqual(result['source_validation']['status'], 'failed')
 
+    def test_answer_support_must_reference_current_answer_and_known_sources(self):
+        q = copy.deepcopy(self.q)
+        q['business_requirements']['answer_support'] = [{'answer_line': '先关机', 'source_chunk_ids': ['C1']}]
+        self.assertTrue(self.validate(q)['valid'])
+        for update in ({'answer_line': '不属于当前答案'}, {'source_chunk_ids': ['other']}):
+            changed = copy.deepcopy(q)
+            changed['business_requirements']['answer_support'][0].update(update)
+            self.assertFalse(self.validate(changed)['valid'])
+
+    def test_source_document_and_body_digest_must_match_canonical_chunk(self):
+        import hashlib
+        self.chunks[0].update(document_name='manual-A.pdf')
+        source = self.q['business_requirements']['sources'][0]
+        source.update(document='manual-A.pdf', body_sha256=hashlib.sha256(self.chunks[0]['chunk_text'].encode()).hexdigest())
+        self.assertEqual(self.validate()['source_validation']['status'], 'passed')
+        for field, wrong in [('document', 'manual-B.pdf'), ('body_sha256', '0' * 64)]:
+            q = copy.deepcopy(self.q)
+            q['business_requirements']['sources'][0][field] = wrong
+            self.assertEqual(self.validate(q)['source_validation']['status'], 'failed')
+
     def test_incomplete_safety_review_or_changed_sources_never_pass(self):
         for field, value in [('reviewed_checks', []), ('safety_valid', False), ('scope_valid', False), ('reviewer_type', 'ai')]:
             review = self.review(); review[field] = value
