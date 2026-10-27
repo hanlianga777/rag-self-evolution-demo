@@ -428,6 +428,8 @@ class GovernanceStore:
             closed = decision.get('quality_identity') == identity and decision.get('review_qc_id')==item['qc_id'] and manual.get(item['id']) in {'approved','dataset_confirmed','owner_delegated_confirmed'}
             if closed:
                 reasons=[r for r in reasons if r not in {'QC P1','语义/安全争议待复核','检索不连贯'}]
+                if decision.get('approval_mode') == 'owner_delegated' and audit_passed(audit, decision.get('review',{}).get('non_content_audit_disposition')):
+                    reasons=[r for r in reasons if r != (audit or {}).get('attention_reason', '题目质量需修订') and r != '题目质量需修订']
             if item['id'] in active:
                 reasons.append('局部修订未完成')
             if item['review_status'] in {'needs_revision','rejected'} or (manual.get(item['id']) in {'needs_revision','rejected'} and (revalidated.get(item['id']) or '') <= manual_at[item['id']]):
@@ -510,7 +512,7 @@ class GovernanceStore:
         fingerprint = run['artifacts']['hard_validation'].get('corpus_fingerprint')
         identity_ok = fingerprint is None or fingerprint == manifest_identity(current_manifest())
         ready = identity_ok and (run['status']=='completed' or run['status']=='candidate_generated' and not run['artifacts']['hard_validation'].get('slot_persistence_v1')) and len(rows)==expected and len({row['id'] for row in rows})==expected and counts_ok and coverage_ok and human+delegated+(machine if for_review else 0)==expected
-        return {'gate':1,'status':'ready' if ready else 'pending','expected':expected,'generated':len(rows),'machine_qualified':machine,'needs_human_review':len(rows)-machine-human-delegated,'human_approved':human,'owner_delegated_approved':delegated,'approved':human+delegated,'human_review_pending':len(rows)-machine-human-delegated,'profile_complete':counts_ok,'coverage_complete':coverage_ok,
+        return {'gate':1,'status':'ready' if ready else 'pending','expected':expected,'generated':len(rows),'machine_qualified':machine+delegated,'needs_human_review':len(rows)-machine-human-delegated,'human_approved':human,'owner_delegated_approved':delegated,'approved':human+delegated,'human_review_pending':len(rows)-machine-human-delegated,'profile_complete':counts_ok,'coverage_complete':coverage_ok,
             'probe_passed':sum(row['probe_status']=='probe_passed' for row in rows),'qc_completed':sum(row['qc_status'] in {'qc_passed','qc_failed'} for row in rows),'qc_passed':sum(row['qc_status']=='qc_passed' for row in rows)}
 
     def save_business_candidates(self, candidates: list[dict], filename: str, file_hash: str, errors=None):
@@ -1112,17 +1114,21 @@ class GovernanceStore:
         if qcs:
             with self.connection() as connection: identity=self._quality_identity(item,connection)
             if qc.get('execution_identity') != identity: blockers.append('质量结果已过期')
+        history=self.review_history(question_id)
+        current_review=next((event for event in history if event.get('gate') == 'dataset'), {})
         with self.connection() as connection:
+            latest_qc_id=connection.execute('SELECT MAX(id) FROM qc_results WHERE question_id=?',(question_id,)).fetchone()[0]
             audit=connection.execute('SELECT content_hash,audit_json FROM question_quality_audits WHERE question_id=? ORDER BY id DESC LIMIT 1',(question_id,)).fetchone()
         if audit and audit['content_hash'] != self._quality_content(item):
             blockers.append('题目质量审计待更新')
         elif audit:
             from .business_golden import audit_passed
-            if not audit_passed(_load(audit['audit_json'],{})):
+            resolved=(current_review.get('approval_mode') == 'owner_delegated' and qcs and current_review.get('quality_identity') == identity and current_review.get('review_qc_id') == latest_qc_id)
+            disposition=current_review.get('review',{}).get('non_content_audit_disposition') if resolved else None
+            if not audit_passed(_load(audit['audit_json'],{}), disposition):
                 blockers.append('题目质量审计未通过')
         elif not audit and (item['raw'].get('replaces_question_id') or item['raw'].get('generation_strategy')=='business_v2'):
             blockers.append('题目质量审计待执行')
-        history=self.review_history(question_id)
         known_issue=history and history[0]['decision']=='content_review_required' and history[0].get('content_hash')==self._quality_content(item)
         return {'can_approve':not blockers,'blocking_reasons':blockers,'requires_qc_p0_acceptance':False,
                 'requires_issue_resolution':state['needs_review'] or bool(known_issue),'qc_reason':qc.get('reason'),

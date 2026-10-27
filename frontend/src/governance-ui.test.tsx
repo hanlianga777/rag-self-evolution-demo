@@ -11,14 +11,15 @@ import { OperationProvider } from "./operation";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it("distinguishes owner delegated AI approval from human review", async () => {
+it("counts delegated AI approval as machine qualified without claiming human review", async () => {
   const run = { id: "GGEN-owner-fixture", status: "completed", profile: { expected_count: 1 }, question_ids: ["owner-Q01"], artifacts: {} };
   const row = { id: "owner-Q01", slot: "Q01", question: "fixture", test_category: "positive", stage: "golden", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", qualification_status: "owner_delegated_approved" };
   const snapshot = { id: "GD-owner-fixture", source: "owner_delegated", snapshot: { generation_run_id: run.id, question_ids: [row.id], approval_mode: "owner_delegated" } };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.includes("/candidates?") ? goldenFixture(url, [row]) : url.includes("snapshots") ? [snapshot] : [])))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [row], snapshots: [snapshot] }} />));
-  expect(document.body.textContent).toContain("所有者委托 AI 审核");
+  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("机器合格 1");
+  expect(document.querySelector(".review-table")?.textContent).toContain("机器合格");
   expect(document.querySelector('.golden-summary-strip')?.textContent).toContain("Human Gate 1 · 已确认");
   expect(document.body.textContent).not.toContain("已人工确认");
   await act(async () => root.unmount());
@@ -29,7 +30,7 @@ it("labels delegated review details accurately without claiming human review", a
   const row = { id: "owner-Q01", question: "fixture", test_category: "positive", stage: "golden", review_status: "approved", qualification_status: "owner_delegated_approved", evidence: [], review_history: [{ actor: "Codex", decision: "owner_delegated_confirmed" }] };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<CandidateWorkspace row={row} peers={[row]} operation={{ watchRevision: () => {} } as any} busy={false} onReview={vi.fn()} onRun={vi.fn()} onRefresh={vi.fn()} />));
-  expect(document.querySelector(".review-workspace")?.textContent).toContain("所有者委托 AI 审核");
+  expect(document.querySelector(".review-workspace")?.textContent).toContain("机器合格");
   await act(async () => ([...document.querySelectorAll(".candidate-menu button")].find(button => button.textContent === "质量审计记录") as HTMLButtonElement).click());
   await act(async () => ([...document.querySelectorAll(".audit-tabs button")].find(button => button.textContent === "修订") as HTMLButtonElement).click());
   expect(document.querySelector(".audit-workspace")?.textContent).toContain("审核历史");

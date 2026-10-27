@@ -10,9 +10,10 @@ CHECKS = ('naturalness', 'business_value', 'intent', 'grounding', 'independence'
 QUALITY_CONTRACT = 'business-quality-v4'
 
 
-def audit_passed(audit):
+def audit_passed(audit, non_content_resolution=None):
     checks = audit.get('checks') if isinstance(audit, dict) else None
-    return isinstance(checks, dict) and set(checks) == set(CHECKS) and all(value is True for value in checks.values())
+    return (isinstance(checks, dict) and set(checks) == set(CHECKS)
+            and all(value is True or key in {'naturalness', 'business_value', 'independence', 'copying', 'duplicates', 'coverage', 'diversity'} and value is False and isinstance(non_content_resolution, str) and non_content_resolution.strip() for key, value in checks.items()))
 NEGATIVE_BUSINESS = ([('知识库无答案', 'insufficient_evidence', 'insufficient_evidence')] * 6 +
                      [('关键条件不足', 'clarify', 'clarify')] * 5 +
                      [('产品/版本混淆', 'clarify', 'clarify')] * 5 +

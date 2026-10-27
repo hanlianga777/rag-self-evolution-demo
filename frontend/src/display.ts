@@ -1,5 +1,7 @@
+export const isMachineQualified = (status?: string) => status === "machine_qualified" || status === "owner_delegated_approved";
+
 const translations: Record<string, string> = {
-  "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "所有者委托 AI 审核通过", "ai_agent": "AI 代理",
+  "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "机器合格", "ai_agent": "AI 代理",
   "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "query_only": "仅基于查询的重排序", "ON": "开启", "OFF": "关闭",
   "Grounded": "有据生成", "Completeness": "完整性优先", "Abstention": "谨慎拒答",
   "Query": "查询处理", "Retrieval": "检索", "Generation": "回答生成",

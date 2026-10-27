@@ -3,7 +3,7 @@ import { RetrievalEvidence } from "../components/RetrievalEvidence";
 import { useEffect, useRef, useState } from "react";
 import { ActionMenu, CustomSelect } from "../components/Primitives";
 import { errorMessage, getJson, postJson } from "../api";
-import { displayText } from "../display";
+import { displayText, isMachineQualified } from "../display";
 import { shortError, useOperation } from "../operation";
 
 type Candidate = Record<string, any>;
@@ -299,8 +299,8 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
         {view === "revision" && row.test_category === "negative" && <section className="candidate-card"><h3>负向题生成上下文</h3><p className="muted">所选材料只供生成草案参考，不成为 Golden Evidence。</p><p>{selectedChunks(row.id, false).join("、") || "未手动指定；AI 将按修订意图选材"}</p><button className="secondary" onClick={() => { openChunkPicker(row.id); }}>手动选材</button></section>}
         {view === "draft" && currentDraftId && revisionRun?.material_selection?.[currentDraftId] && <section className="candidate-card"><h3>材料决策</h3><p>{revisionRun.active_draft?.kind === "reselect" ? "正在重新选材，旧草案暂不变化" : revisionRun.material_selection[currentDraftId].method === "manual" ? "人工指定材料" : revisionRun.material_selection[currentDraftId].method === "retained" ? "沿用证据 · 保留原 Evidence" : "重新选材 · 系统按最新修订意图自动选材"} · {revisionRun.material_selection[currentDraftId].reason}</p><p>{revisionRun.material_selection[currentDraftId].chunk_ids?.map((id: string) => { const chunk = chunks.find(value => value.chunk_id === id); return `${chunk?.document_name || chunk?.document_id || "当前索引未匹配"} · ${chunk?.section_path || "未标注章节"} · P.${chunk?.page_start ?? "—"} · ${id}`; }).join("；")}</p>{currentBefore?.test_category === "negative" && <p className="muted">仅作生成上下文，不写入 Golden Evidence。</p>}</section>}
         {view === "review" && <div className="review-workspace">
-          <div className="workspace-badges"><span>{reviewLabel(row)}</span>{row.qualification_status === "owner_delegated_approved" && <span>所有者委托 AI 审核</span>}<span>{displayText(row.test_category)}</span>{row.raw?.ablation_attribute && <span>{displayText(row.raw.ablation_attribute)}</span>}{linked && <span>关联 {linked.test_category === "positive" ? "Positive" : "Ablation"}：{linked.slot}</span>}</div>
-          {revisionRun?.status === "completed" && ready && <p className="success-notice">✓ 修订已完成 · {row.qualification_status === "machine_qualified" ? "机器合格" : "等待人工复审"}</p>}
+          <div className="workspace-badges"><span>{isMachineQualified(row.qualification_status) ? "机器合格" : reviewLabel(row)}</span><span>{displayText(row.test_category)}</span>{row.raw?.ablation_attribute && <span>{displayText(row.raw.ablation_attribute)}</span>}{linked && <span>关联 {linked.test_category === "positive" ? "Positive" : "Ablation"}：{linked.slot}</span>}</div>
+          {revisionRun?.status === "completed" && ready && <p className="success-notice">✓ 修订已完成 · {isMachineQualified(row.qualification_status) ? "机器合格" : "等待人工复审"}</p>}
           {canResumeQuality && <p className="error-notice">修订已应用，{revisionRun.failed_stage === "qc" || row.probe_status === "probe_passed" && row.qc_status === "qc_pending" ? "QC" : "Probe"} 运行中断：{revisionRun.error ? shortError(revisionRun.error) : "进程重启后需手动继续"}。<button className="secondary" disabled={revisionBusy} onClick={() => void resume()}>继续校验 / 重试失败步骤</button></p>}
           {activeRevision && !revisionRun?.applied_at && <p className="success-notice">当前有未完成的修订草案。<button className="text-button" onClick={() => setView("draft")}>继续查看草案</button></p>}
           {activeRevision && revisionRun?.applied_at && revisionRun.status !== "interrupted" && <p className="success-notice">修订已应用，正在运行 Probe / QC。</p>}

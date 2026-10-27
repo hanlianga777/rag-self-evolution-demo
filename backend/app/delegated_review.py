@@ -80,7 +80,7 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
     def reviewable(row):
         if (row.get('qc',{}).get('score',0)<85 or row.get('qc',{}).get('priority')=='P0') and governed:return False
         if row['qualification_status'] in {'machine_qualified','owner_delegated_approved'}: return True
-        return bool(row.get('attention_reasons')) and set(row.get('attention_reasons',[])) <= {'检索不连贯','QC P1','语义/安全争议待复核'} and row.get('probe_status')=='probe_passed' and row.get('qc_status')=='qc_passed'
+        return bool(row.get('attention_reasons')) and set(row.get('attention_reasons',[])) <= {'检索不连贯','QC P1','语义/安全争议待复核','题目质量需修订','人工标记需修订'} and row.get('probe_status')=='probe_passed' and row.get('qc_status')=='qc_passed'
     if run['status']!='completed' or any(not reviewable(r) for r in rows if r['id'] in selected) or {r['id'] for r in rows}!=set(ids):
         raise ValueError('Owner delegation cannot waive machine quality')
     from .business_golden import CHECKS as BUSINESS_CHECKS, QUALITY_CONTRACT, audit_passed
@@ -94,7 +94,7 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
                 raise ValueError('Independent review frozen Slot scope unavailable')
             if plan.get('quality_contract') == QUALITY_CONTRACT and (row.get('quality_audit') or {}).get('audit_version') != QUALITY_CONTRACT:
                 raise ValueError('Current business quality contract audit unavailable')
-            if not audit_passed(row.get('quality_audit')):
+            if not audit_passed(row.get('quality_audit'), review.get('non_content_audit_disposition')):
                 raise ValueError('Business quality audit must pass all checks')
             if (not isinstance(review.get('business_checks'),dict) or set(review['business_checks']) != set(BUSINESS_CHECKS)
                 or any(v is not True for v in review['business_checks'].values())
@@ -113,7 +113,7 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
                 raise ValueError('Delegated retrieval risk requires explicit independent acceptance')
             if 'QC P1' in row.get('attention_reasons',[]) and (not row.get('qc',{}).get('id') or accepted.get('qc_id')!=row['qc']['id'] or not accepted.get('qc_issue_disposition')):
                 raise ValueError('QC P1 requires a current independent issue disposition')
-        if governed and set(row.get('attention_reasons',[])) & {'QC P1','语义/安全争议待复核'} and not review.get('issue_disposition'):
+        if governed and set(row.get('attention_reasons',[])) & {'QC P1','语义/安全争议待复核','题目质量需修订','人工标记需修订'} and (not isinstance(review.get('issue_disposition'), str) or not review['issue_disposition'].strip()):
             raise ValueError('Delegated semantic/safety dispute requires explicit current disposition')
         if review.get('content_hash')!=content_hash(item) or review.get('decision')!='A' or review.get('risk')!='none':
             raise ValueError('Delegated review stale or has unresolved risk')

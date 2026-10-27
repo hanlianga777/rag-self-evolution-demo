@@ -64,6 +64,19 @@ class DelegatedReviewTests(unittest.TestCase):
                           business_checks=dict.fromkeys(BUSINESS_CHECKS,True),
                           actor='Codex AI Agent / Owner Delegated AI Review',reviewed_at=datetime.now(timezone.utc).isoformat())
         self.assertEqual(self.check()['review_actor_type'],'ai_agent')
+        self.rows[0]['qualification_status']='needs_human_review'
+        self.rows[0]['attention_reasons']=['题目质量需修订','人工标记需修订']
+        self.rows[0]['probe_status']='probe_passed';self.rows[0]['qc_status']='qc_passed'
+        self.rows[0]['quality_audit']['checks']['copying']=False
+        with self.assertRaises(ValueError): self.check()
+        self.reviews[0]['issue_disposition']='Current content and safety independently verified'
+        self.reviews[0]['non_content_audit_disposition']='Earlier design lineage is not a content defect'
+        self.assertEqual(self.check()['review_actor_type'],'ai_agent')
+        self.rows[0]['quality_audit']['checks']['grounding']=False
+        with self.assertRaises(ValueError): self.check()
+        self.rows[0]['quality_audit']['checks']['grounding']=True
+        self.rows[0]['quality_audit']['checks']['copying']=True
+        self.rows[0]['qualification_status']='machine_qualified';self.rows[0].pop('attention_reasons')
         self.rows[0]['quality_audit']['checks']['grounding']=False
         with self.assertRaises(ValueError):self.check()
         self.rows[0]['quality_audit']['checks']['grounding']=True
