@@ -130,7 +130,7 @@ class ThinkingTests(unittest.TestCase):
             self.assertNotIn('PRIVATE THINKING', failure.exception.raw_provider_response)
             self.assertNotIn('PRIVATE THINKING', str(failure.exception))
 
-    def test_baseline_max_and_judge_max_cannot_inherit_candidate_off(self):
+    def test_baseline_explicit_high_and_judge_max_cannot_inherit_candidate_off(self):
         calls = []
         class Provider:
             settings = SimpleNamespace(configured=True, model='fixture')
@@ -143,9 +143,9 @@ class ThinkingTests(unittest.TestCase):
         service = AiService(object(),object(),Provider(),False)
         service.retriever = SimpleNamespace(retrieve=lambda *a,**kw:[{'chunk_id':'C1','content':'source'}])
         with providers.thinking_task('candidate','off'):
-            service.answer('question', {'run_target':'baseline','generation_thinking':'off'})
+            service.answer('question', {'run_target':'baseline','generation_thinking':'high'})
             service.judge('question','golden','answer','positive')
-        self.assertEqual([c['reasoning_effort'] for c in calls], ['max','max'])
+        self.assertEqual([c['reasoning_effort'] for c in calls], ['high','max'])
 
     def test_decompose_strict_bounded_json_and_high_effort(self):
         class Provider:

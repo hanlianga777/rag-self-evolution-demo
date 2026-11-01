@@ -39,7 +39,7 @@ def thinking_config(task=None, effort=None):
     if task is None:
         task, effort = selected or (_task.get() or 'auxiliary', None)
         if _task.get() in {'judge', 'agent'}: task, effort = _task.get(), None
-    if task in {'baseline', 'judge'}: effort = 'max'
+    if task == 'judge': effort = 'max'
     effort = DEFAULT_TASK_THINKING.get(task, 'high') if effort is None else effort
     if effort not in {'off', 'low', 'high', 'max'}:
         raise ProviderRequestError('请求本地校验：Thinking必须为off/low/high/max')

@@ -241,8 +241,9 @@ class EvaluationRunner:
                     raise ValueError('Config Draft参数非法：' + '; '.join(validation['errors']))
                 config.update(draft['config'])
                 if config.get('hybrid_search') is False: config.pop('hybrid_alpha', None)
-            if config.get('generation_thinking') != 'max':
-                raise ValueError('Baseline Thinking必须为Max；其他档位仅用于Candidate实验')
+            config['generation_thinking'] = getattr(getattr(getattr(self.runtime, 'provider', None), 'settings', None), 'baseline_thinking', 'max')
+            if config['generation_thinking'] not in {'off', 'low', 'high', 'max'}:
+                raise ValueError('BASELINE_THINKING必须为off/low/high/max')
         index_info = self.runtime.corpus.index_info() if hasattr(self.runtime, "corpus") and hasattr(self.runtime.corpus, "index_info") else {}
         if not isinstance(index_info, dict):
             index_info = {}
@@ -278,7 +279,7 @@ class EvaluationRunner:
         judge_meta.update(common_identity_version='round0-common-1', judge_thinking=thinking_config('judge'),
             generation_model_constraint=self.runtime.model,
             frozen_business_rules={'source':'docs/RAG_SELF_EVOLUTION_SPEC.md','contract':'round0-20261028'})
-        judge_meta['execution_snapshot'].update(generation_thinking=thinking_config('generation'),
+        judge_meta['execution_snapshot'].update(generation_thinking=thinking_config('baseline', config['generation_thinking']),
             effective_temperature=None, temperature_ignored=True)
         judge_meta['execution_snapshot'].pop('temperature', None)
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
@@ -442,7 +443,7 @@ class EvaluationRunner:
                  'pending_findings':claims['pending'], 'unresolved_conflicts':sufficiency.get('unresolved_conflicts',[]),
                  'confirmation_basis':'saved_structural_findings_not_independent_semantic_proof'}
         basis = 'verified_answer_claim' if primary == 'Generation' and located_failure else 'measured_latency' if primary == 'Performance' else 'explicit_safety_failure' if primary == 'Safety' else analysis['retrieval_failure_stage'] if primary == 'Retrieval' else 'unresolved_evaluation_evidence' if primary == 'Unknown' else coverage['diagnostic_basis']
-        case = {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
+        case = {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"generation_thinking": execution.get("generation_thinking"), "behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
 
         return self._finalize_diagnosis(case, item)
 
@@ -469,7 +470,7 @@ class EvaluationRunner:
         severity = 'critical' if any(i['critical'] for i in judge['issues']) or item.get('negative_subtype') == 'safety_critical' or item.get('raw',{}).get('criticality') == 'high' else 'ordinary'
         required={c for e in item.get('evidence',[]) for c in e.get('source_chunk_ids',[])}
         coverage=evidence_coverage(trace,required)
-        metrics={k:execution.get(k) for k in ('latency_ms','ttft_ms','input_tokens','output_tokens','provider_cost','stages','token_usage','estimated_cost','cost_estimation')}
+        metrics={k:execution.get(k) for k in ('generation_thinking','latency_ms','ttft_ms','input_tokens','output_tokens','provider_cost','stages','token_usage','estimated_cost','cost_estimation')}
         retrieved=[c for e in execution.get('retrieval',[]) for c in e.get('matched_child_ids',[e.get('chunk_id')])]
         matching=[i+1 for i,c in enumerate(retrieved) if c in required]
         roles=business_check_roles(judge,question=item['question'],reference=expected)

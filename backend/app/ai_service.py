@@ -185,7 +185,7 @@ class AiService:
         trace['context_budget'] = context_budget
         if 'final' in trace: trace['final'] = evidence
         generation_task = 'baseline' if config.get('run_target') == 'baseline' else 'candidate' if config.get('run_target') == 'sandbox_candidate' else 'generation'
-        effort = 'max' if generation_task == 'baseline' else config.get('generation_thinking', 'max')
+        effort = config.get('generation_thinking', 'max')
         generation_settings = thinking_config(generation_task, effort)
         retrieval_fields = {"generation_thinking": effort, "generation_request_config": generation_settings, "retrieval_trace": trace or {"status": "not_collected"}, "corpus_fingerprint": trace.get("corpus_fingerprint"), "timing_unit": "ms", "timing_semantics": {"generation_includes_ttft": True, "stages_are_nested_not_additive": True, "ttft": "request_to_first_content"}}
         retrieval_fields.update(self.generation_contract)

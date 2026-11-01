@@ -2152,7 +2152,7 @@ class GovernanceStore:
                 item=next(q for q in candidates if q['id']==question_id)
                 raw,proof=self._finalize_golden_validation(item,actor,delegated=delegated)
                 identity=self._quality_identity(item,connection)
-                metadata={'qualification_source':'human','quality_identity':identity,'content_review':proof,'review_qc_id':connection.execute('SELECT MAX(id) FROM qc_results WHERE question_id=?',(question_id,)).fetchone()[0]}
+                metadata={'qualification_source':'human','reason':reason,'quality_identity':identity,'content_review':proof,'review_qc_id':connection.execute('SELECT MAX(id) FROM qc_results WHERE question_id=?',(question_id,)).fetchone()[0]}
                 if delegated is not None:
                     metadata={**{k:v for k,v in delegated.items() if k!='reviews'},'qualification_source':'owner_delegated','review':delegated['reviews'][question_id],
                               'qc_created_at':self.qc_history(question_id)[0]['created_at'],'quality_identity':identity,'content_review':proof,'review_qc_id':metadata['review_qc_id']}
