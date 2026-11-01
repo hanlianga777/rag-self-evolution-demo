@@ -49,19 +49,27 @@ class Task004PolicyTests(unittest.TestCase):
                 # Re-entering a saved review must not regenerate or rejudge.
                 self.assertEqual(runner.review_regression({'id': 'q'}, {'passed': False}, {}, checkpoint, 'run', lambda: None, lambda *_a, **_kw: None), review)
 
-    def test_review_unknown_request_errors_without_duplicate(self):
+    def test_review_unknown_request_keeps_failed_attempts_on_reentry(self):
         class Runtime:
             model = 'fixture'
+            calls = 0
             def answer(self, *args):
+                self.calls += 1
                 error = RuntimeError('unknown request')
                 error.request_execution_unknown = True
                 raise error
         runner = EvaluationRunner(None, Runtime())
         checkpoint = {'attempts': []}
-        with self.assertRaisesRegex(RuntimeError, 'unknown request'):
-            runner.review_regression({'id': 'q', 'question': 'Q'}, {'passed': False}, {}, checkpoint, 'run', lambda: None, lambda *_a, **_kw: None)
-        with self.assertRaisesRegex(RuntimeError, 'Unknown request'):
-            runner.review_regression({'id': 'q', 'question': 'Q'}, {'passed': False}, {}, checkpoint, 'run', lambda: None, lambda *_a, **_kw: None)
+        # Decision 14 permits reentry after transport uncertainty, preserving history.
+        for _ in range(2):
+            with self.assertRaisesRegex(RuntimeError, 'unknown request'):
+                runner.review_regression({'id': 'q', 'question': 'Q'}, {'passed': False}, {}, checkpoint, 'run', lambda: None, lambda *_a, **_kw: None)
+        self.assertEqual(runner.runtime.calls, 2)
+        stages = checkpoint['regression_review']['runs']
+        self.assertEqual(len(stages), 1)
+        self.assertNotIn('execution', stages[0])
+        self.assertEqual(len(stages[0]['attempts']), 2)
+        self.assertTrue(all(a['request_execution_unknown'] and a['status'] == 'error' for a in stages[0]['attempts']))
 
 class Task004ComparisonTests(unittest.TestCase):
     def test_injection_is_critical_and_fluctuation_not_new_failure(self):

@@ -171,7 +171,7 @@ class ThinkingTests(unittest.TestCase):
                 OptimizationAgent(store,self.provider).generate('old-baseline')
         store.claim_agent_generation.assert_not_called()
 
-    def test_agent_new_parameters_keep_evidence_and_direction_contract(self):
+    def test_agent_new_parameters_allow_advisory_directions_but_require_saved_targets(self):
         from app.optimization import validate_intervention
         from app.policy import DEFAULT_PIPELINE_CONFIG
         case = {'programmatic_metrics':{'retrieval_trace':{'candidates':[],'final':[]}}}
@@ -184,10 +184,14 @@ class ThinkingTests(unittest.TestCase):
                         'hypothesis':'test one intervention','why':'saved trace','expected_improvement':'regression check','risk':'latency and evidence completeness'}
             with patch('app.optimization.diagnostic_view', return_value=view):
                 validate_intervention(proposal, {'Q1':case}, DEFAULT_PIPELINE_CONFIG)
+                # Task 004 E: directions are advice; saved targets remain required.
                 proposal['evidence_assertions']=[]
-                with self.assertRaises(ValueError): validate_intervention(proposal, {'Q1':case}, DEFAULT_PIPELINE_CONFIG)
+                validate_intervention(proposal, {'Q1':case}, DEFAULT_PIPELINE_CONFIG)
+                proposal['target_bad_cases']=['missing']
+                with self.assertRaisesRegex(ValueError, '目标不是本次运行保存的错题'):
+                    validate_intervention(proposal, {'Q1':case}, DEFAULT_PIPELINE_CONFIG)
 
-    def test_agent_new_stage_parameters_require_measured_bottleneck(self):
+    def test_agent_new_stage_parameters_allow_advisory_bottleneck_but_reject_illegal_values(self):
         from app.optimization import validate_intervention
         from app.policy import DEFAULT_PIPELINE_CONFIG
         for stage, diff in [('query_decompose', {'query_decompose':True}), ('context_budget', {'retrieval_max_tokens':16384})]:
@@ -199,7 +203,10 @@ class ThinkingTests(unittest.TestCase):
             with patch('app.optimization.diagnostic_view', return_value=view):
                 validate_intervention(proposal, {'Q1':case}, DEFAULT_PIPELINE_CONFIG)
                 proposal['performance_stage']='unknown'
-                with self.assertRaises(ValueError): validate_intervention(proposal, {'Q1':case}, DEFAULT_PIPELINE_CONFIG)
+                validate_intervention(proposal, {'Q1':case}, DEFAULT_PIPELINE_CONFIG)
+                proposal['config_diff']={next(iter(diff)): 'invalid'}
+                with self.assertRaisesRegex(ValueError, '非法参数'):
+                    validate_intervention(proposal, {'Q1':case}, DEFAULT_PIPELINE_CONFIG)
 
     def test_incomplete_sse_drops_unframed_transport_fragment(self):
         import http.client
