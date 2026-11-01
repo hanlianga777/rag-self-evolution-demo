@@ -15,7 +15,7 @@ const caseRow = { question_id: "Q-stored", question: "持久化问题", test_cat
 const run = { id: "EVAL-stored", status: "completed", dataset_version_id: "GD-stored", created_at: "2026-09-27T14:04:23Z", judge: { model: "judge-only-model" }, config: { candidate_k: 8, top_k: 3, prompt_strategy: "grounded" }, dataset_snapshot: { id: "GD-stored", question_ids: ["Q-stored"], questions: [{ id: "Q-stored", acceptable_evidence: [{ source_chunk_ids: ["CH-stored"], evidence_key_points: ["冻结证据"] }] }] }, cases: [caseRow], gate_details: gates.map(gate => ({ ...gate, contributing_cases: gate.status === "FAIL" ? [{ question_id: "Q-stored", value: 72, passed: false }] : [] })), result: { gates: { gates, total: 11, passed_count: 10, passed: false }, bad_case_count: 1, comparison_metrics: { input_tokens: 17, output_tokens: 9, recall_at_k: 50 } } };
 const bad = { id: "BC-stored", run_id: run.id, question_id: caseRow.question_id, category: "Query", result: caseRow };
 
-it("keeps Baseline conclusions inside the report, hides technical identity, and preserves the stored Primary separately from signals", async () => {
+it("keeps Baseline conclusions and saved identity inside the report, and preserves the stored Primary separately from signals", async () => {
   const input = { evaluation: run, badCases: [bad] }, frozen = JSON.stringify(input);
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/api/bad-cases") ? [bad] : run))));
   await render(<EvaluationPage data={input} />);
@@ -24,8 +24,8 @@ it("keeps Baseline conclusions inside the report, hides technical identity, and 
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("未通过 Hard Gate");
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("有 1 道 Bad Case");
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("Ablation Correctness");
-  expect(document.querySelector(".baseline-run-summary")?.textContent).not.toContain("judge-only-model");
-  expect(document.body.textContent).not.toContain("Run ID");
+  expect(document.querySelector(".baseline-run-summary")?.textContent).toContain("judge-only-model");
+  expect(document.querySelector(".baseline-run-summary")?.textContent).toContain("Baseline Run ID");
   await click("Hard Gate");
   expect(document.querySelectorAll("tbody tr")).toHaveLength(11);
   expect(document.querySelector("tbody")?.textContent).toContain("72.00%");

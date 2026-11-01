@@ -31,9 +31,11 @@ def load_settings(env: dict[str, str] | None = None, env_file: Path | None = Non
     timeout = float(values.get("DEEPSEEK_TIMEOUT_SECONDS", "240"))
     if not 0 < timeout <= 600:
         raise ValueError("DEEPSEEK_TIMEOUT_SECONDS must be between 0 and 600")
+    model = values.get("DEEPSEEK_MODEL", "deepseek-flash")
+    if model == "deepseek-v4-flash": model = "deepseek-flash"
     return Settings(
         api_key=values.get("DEEPSEEK_API_KEY", "").strip(),
         base_url=values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/"),
-        model=values.get("DEEPSEEK_MODEL", "deepseek-v4-flash"),
+        model=model,
         timeout_seconds=timeout,
     )

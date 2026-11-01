@@ -58,13 +58,15 @@ TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
 app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 corpus = CorpusStore()
 require_consistent_switch(corpus.index_dir, os.getenv("RAG_DEMO_DB_PATH") or None)
-store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None)
+safe_start = os.getenv("RAG_SAFE_START", "1") == "1"
+store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None, migrate=not safe_start)
 ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")
 corpus_manager = CorpusManager(ai_service.retriever, knowledge_pipeline=True, on_knowledge_activated=lambda: start_knowledge_golden())
-store.interrupt_revision_runs()
-store.interrupt_generation_runs()
-store.interrupt_evaluation_runs()
-store.interrupt_agent_generations()
+if not safe_start:
+    store.interrupt_revision_runs()
+    store.interrupt_generation_runs()
+    store.interrupt_evaluation_runs()
+    store.interrupt_agent_generations()
 
 
 _recovery_stop=threading.Event()
@@ -98,6 +100,7 @@ def recover_authorized_evaluations():
 
 @app.on_event('startup')
 def start_recovery_monitor():
+    if safe_start: return
     _recovery_stop.clear()
     def monitor():
         last_retention=0.0
@@ -1313,6 +1316,15 @@ def persisted_evaluation_progress(run):
     return run
 
 
+def requires_foundation_upgrade(judge):
+    if not policy_current(judge): return True
+    try:
+        EvaluationRunner(store, ai_service)._require_generation_contract(judge)
+    except ValueError:
+        return True
+    return False
+
+
 @app.get("/api/evaluation")
 def evaluation(active_task: bool = False, light: bool = False):
     identity = store.current_baseline_identity()
@@ -1324,7 +1336,7 @@ def evaluation(active_task: bool = False, light: bool = False):
                 ("" if active_task else " AND status IN ('running','partial','failed')") +
                 " ORDER BY created_at DESC,rowid DESC LIMIT 1",(identity['current_golden_id'],)).fetchone()
         if latest:run=persisted_evaluation_progress(store.evaluation_run(latest['id'],light=light))
-    return {"runtime_contract":EVALUATION_RUNTIME_CONTRACT, **(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":not policy_current(run.get("judge",{}))} if run else {})}
+    return {"runtime_contract":EVALUATION_RUNTIME_CONTRACT, **(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":bool(identity.get("requires_policy_upgrade")) or requires_foundation_upgrade(run.get("judge",{}))} if run else {})}
 
 
 def case_list_row(row, *, light=False):
@@ -1406,6 +1418,7 @@ def pipeline():
     return {
         **identity,
         "config_draft": draft,
+        "baseline_defaults": DEFAULT_PIPELINE_CONFIG,
         "data_version": hashlib.sha256(json.dumps([identity, draft, active["id"] if active else None, knowledge_state["identity"], knowledge_state["coverage_status"]], sort_keys=True).encode()).hexdigest(),
         "draft_identity": identity,
         "frozen_models": {"generation": ai_service.provider.settings.model, "judge": ai_service.provider.settings.model},
@@ -1434,6 +1447,8 @@ def save_pipeline_draft(payload: PipelineDraftRequest):
     if payload.identity != identity:
         raise HTTPException(status_code=409, detail="配置基准已变化，请刷新后保存草稿")
     if payload.config is not None:
+        if payload.config.get("generation_thinking", "max") != "max":
+            raise HTTPException(status_code=422, detail="Baseline Thinking 固定为 Max；Candidate 可独立选择其他档位")
         validation = validate_candidate_config(payload.config)
         if not validation["valid"]:
             raise HTTPException(status_code=422, detail="；".join(validation["errors"]))
@@ -1649,7 +1664,7 @@ def evaluation_run(run_id: str):
         raise HTTPException(status_code=404, detail="Evaluation run not found")
     run=persisted_evaluation_progress(run)
     cases = [{**case,"diagnostic_view":diagnostic_view(case)} for case in store.evaluation_case_results(run_id)]
-    return {**run, "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":not policy_current(run.get("judge",{})), "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []))}
+    return {**run, "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":requires_foundation_upgrade(run.get("judge",{})), "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []), statistics_version=run.get("judge", {}).get("gate_statistics_version"))}
 
 
 @app.post('/api/evaluations/{run_id}/stop', dependencies=[Depends(require_trusted_origin)])

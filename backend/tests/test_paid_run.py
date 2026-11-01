@@ -258,8 +258,9 @@ class PaidRunTests(unittest.TestCase):
         self.assertEqual(result['content'],'fixture')
         payload = json.loads(network.call_args.args[0].data)
         self.assertNotIn('max_tokens',payload)
-        self.assertNotIn('thinking',payload)
-        self.assertEqual(payload['temperature'],0)
+        self.assertEqual(payload['thinking'],{'type':'enabled'})
+        self.assertEqual(payload['reasoning_effort'],'high')
+        self.assertNotIn('temperature',payload)
         self.assertEqual(len(self.run.calls),1)
         self.assertNotIn('fixture-secret',self.path.read_text())
 

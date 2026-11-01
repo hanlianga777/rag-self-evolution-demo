@@ -1,3 +1,13 @@
+> Judge VNext：`BASELINE_READY=true`。新Golden `GD-20261031071527` 已冻结，当前Judge6.4协议已验证，当前1124项完整离线回归无新增P0/P1（13项已知P2保留）。历史技术NE及费用Unknown按实记录，见[最终实施与验收](docs/JUDGE_VNEXT_FINAL_CLOSEOUT_20261101.md)。正式新版Baseline仍须用户本人在前端点击。
+
+> 普通 Uvicorn 启动默认安全加载已有数据库（`RAG_SAFE_START=1`）；该模式不自动迁移、清理、中断或恢复任务，不调用索引构建脚本。详细合同见 SPEC。
+
+> 2026-10-28 Round 0：基础模型/Thinking、V2生成、Query Decompose及Retrieval MaxTokens已接入；仅离线验收，真实API与正式新Baseline未运行。当前合同见[唯一SPEC](docs/RAG_SELF_EVOLUTION_SPEC.md)，交付及限制见[Round0验收](docs/ROUND0_ACCEPTANCE_20261028.md)。历史合同与成绩保留，不代表新默认配置已实测。
+
+Baseline 与 Candidate 同身份断点续跑保留未完成题的 Judge 原始响应与合同错误作为纠错反馈；未知请求或费用仍先对账，详见[当前合同](docs/RAG_SELF_EVOLUTION_SPEC.md)。
+
+Baseline 启动预检使用冻结 Snapshot 中的负向预期行为；缺失或非法行为仍会阻断，详见[当前合同](docs/RAG_SELF_EVOLUTION_SPEC.md)。
+
 2026-10-27 Golden：支持有一致原文证据的同厂家同型号设备与配套部件跨文档候选来源，仍须独立质量审核；机器合格列表支持分页及失败重试。详见[当前合同](docs/RAG_SELF_EVOLUTION_SPEC.md)。
 
 2026-10-27 Golden 简化口径：以问题、答案、真实证据、评分点及安全边界判断考卷；前端将有效 AI 委托审核与机器合格去重合并，检索风险和真实质量阻断仍可追溯。最终冻结由负责人执行。详见[当前合同](docs/RAG_SELF_EVOLUTION_SPEC.md)。

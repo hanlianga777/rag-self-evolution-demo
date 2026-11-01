@@ -159,4 +159,4 @@ class JudgeOperationSafetyTests(unittest.TestCase):
 
     def test_existing_output_limit_is_not_reduced_to_hide_reasoning_cost(self):
         from app.paid_run import REQUEST_LIMITS
-        self.assertEqual(REQUEST_LIMITS['judge'],32768)
+        self.assertEqual(REQUEST_LIMITS['judge'],65536)

@@ -44,13 +44,19 @@ class ResumeTests(unittest.TestCase):
         self.assertEqual(self.store.evaluation_run(run)['judge']['evaluation_identity'],old['judge']['evaluation_identity'])
 
     def test_display_returns_partial_without_granting_current_baseline_eligibility(self):
-        from unittest.mock import Mock
         from api_fixture import main
-        store=Mock();store.current_baseline_identity.return_value={'current_baseline_id':None,'baseline_unavailable_reason':'not complete'}
-        store.dataset_snapshots.return_value=[{'id':'fixture-golden'}]
-        store.evaluation_runs.return_value=[{'id':'partial','status':'partial','dataset_version_id':'fixture-golden','config':{'run_target':'baseline'},'result':{'completed':8}}]
-        with patch.object(main,'store',store):result=main.evaluation()
-        self.assertEqual(result['id'],'partial');self.assertEqual(result['result']['completed'],8)
+        with self.store.connection() as db:
+            snapshot = json.loads(db.execute("SELECT snapshot_json FROM dataset_versions WHERE id='fixture-golden'").fetchone()[0])
+            snapshot['questions'] = [{**snapshot['questions'][i % 4], 'id': f'fixture-{i}', 'question': f'fixture-{i}'} for i in range(10)]
+            snapshot['question_ids'] = [q['id'] for q in snapshot['questions']]
+            db.execute("UPDATE dataset_versions SET snapshot_json=? WHERE id='fixture-golden'", (json.dumps(snapshot),))
+        key, items, _config = self.runner.start_baseline()
+        for item in items[:8]:
+            self.store.record_evaluation_case(key, item['id'], {'passed': True})
+        self.store.finish_evaluation_run(key, 'partial', {'completed': 8}, 'fixture interruption')
+        with patch.object(main, 'store', self.store):
+            result = main.evaluation()
+        self.assertEqual(result['id'], key);self.assertEqual(result['result']['completed'], 8)
         self.assertIsNone(result['current_baseline_id'])
 
     def test_startup_keeps_a_live_worker_and_interrupts_dead_owner(self):

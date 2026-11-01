@@ -1,3 +1,141 @@
+# 2026-11-01 最终版本冻结与Baseline Ready
+
+- 当前6.4完整1124项：1111PASS/11FAIL/2ERROR，13项均既有P2，新增P0/P1为0；当前111专项、44工具回归通过。真实6.4 Q24/Q27各单次协议验证严格有效FAIL；旧6.3历史回放38PASS/9FAIL/3NE单独保存，不回填或混成新版50题成绩。
+- GD-20261031071527与50题合同manifest已冻结且验证，29表/21资产保护通过，真实8010/5174和入口预检通过；BASELINE_READY=true仅表示前置就绪。Q17执行/Token/费用Unknown保留且不重试，所有实际费用未返回均Unknown。正式Baseline必须用户前端点击；未运行Candidate/Sandbox/发布或推送远端。
+
+# 2026-11-01 遗漏诊断输出协议澄清
+
+- Q24/Q27在一次具名纠正后仍出现Golden-only支持或无合法引文的omission issue，保持技术NE。Prompt6.4明确纯遗漏由完整原子/checks承载，不能为重复issue捏造阶段证据；原子FAIL不因issues为空而消失。危险/矛盾等实际主张继续保留真实引文与issue。Validator、裁决函数、业务合同及11 Gate逐函数AST不变，6项新边界与当前111项专项通过。
+- 历史6.3回放已冻结为38PASS/9FAIL/3NE、零有效翻转；Q17执行/费用Unknown保留且不重试。当前6.4两例协议验证另获具名授权、各一次，采用独立身份，不重跑50题、不混入旧成绩。
+
+# 2026-10-31 会话中断后的独立Replay未尝试题保护
+
+- Q17仅有reserved请求，旧工作进程已退出且最终响应/Usage缺失，保留执行与费用Unknown；原账本原样保留并仍占原50次预算。独立显式工具递归验证父链、排除已尝试17题，仅执行Q18–Q50共33题；稳定claim防止换目录重复。正式Judge/Parser/Gate/Golden及Baseline恢复规则不变。
+- Q04经平台要求的具名追加授权单次纠正，真实有效FAIL，原技术失败保留；泛化“继续”的首次解释被平台拒绝，未产生RPC。
+
+# 2026-10-31 历史Replay未调用题的受控继续
+
+- 原独立回放第4题遇到严格诊断引文错误即停，前三题有效、Q04 NOT_EVALUABLE原样保留。显式继续工具绑定父审计、请求、原始响应及已知Usage，排除全部已调用题；仅处理原50次授权中剩余46题，每题一次。HTTP200且Usage已知的business_contract错误保留技术状态后可处理其他未调用题，Unknown/传输/权限异常仍停。正式Judge6.3、Parser、Gate及Golden均不变，无自动重试、无历史写入。
+
+# 2026-10-31 定向Golden冻结与真实校准
+
+- 按原Owner Delegated AI治理完成三题独立审核及完整Gate，47题旧审核复用，冻结GD-20261031071527（50题合同manifest 9e592b55e42a8055f055f53a7870e1eee549390c892f27f5eba3b8e06677b88e），旧Snapshot/历史Run/Corpus/Index未改。Q13检索风险明确保留。
+- 补充Q36 QC仅1次，96/P2通过；Q36/Q39四个目标样本最终有效且符合金标准，含另获用户授权的一次Q39正向复校准，累计5次Judge、零自动重试、费用Unknown。历史50题Judge-only独立回放已启动，最终状态见20261031收口记录，未代行正式Baseline。
+
+# 2026-10-31 Judge非主张checks输出边界
+
+- Q39真实校准将未发生禁错的观察重复输出为无Final的事实checks，仍被严格拒绝；Prompt升级judge-vnext-6.3-nonclaim-checks明确checks与角色原子分工。原始响应不修写，Parser、Validator、程序裁决和11 Gate不变；离线105项通过，真实复校准单独记账。
+
+# 2026-10-30 Golden QC父检查点角色约束
+
+- QC输入明确传递Required/Conditional父ID白名单，并要求输出checks恰好覆盖该集合；辅助、禁错和等价仍按角色审核，但不混入checks。真实Q36失败响应继续被严格拒绝，R2保持Auxiliary；50题151个父检查点离线核对通过。Validator与质量阈值不变。
+
+# 2026-10-30 Judge原子角色输出澄清
+
+- 针对Q36/Q39真实响应将Equivalent误标negative_behavior，Prompt显式增加角色/类别类型矩阵；Prompt版本judge-vnext-6.2-role-specific-atomic-types，Parser和严格Validator不变。Equivalent的fact标签不提升为Required或新增Final义务。真实原响应仍技术拒绝；仅人工离线修正类型的对照样本不冒充Provider结果。
+- 91项相关离线回归通过；另扩大运行的旧Replay总数断言与历史合同冲突，原Prompt下亦失败，保留留痕。
+
+# 2026-10-30 正式V2生成最小真实探针 — No SPEC Change
+
+- 经正常工具审核真实1次：正式AiService.answer的V2/Grounded/Max/Streaming，65536来自REQUEST_LIMITS；仅普通问题与两段公开厂家原文，无Golden评分信息。原回答使用文档/章节/页码，无机器ID；输入723/输出1578、费用Unknown，零重试、正式DB/Run写0。
+- 此为显式saved-context替身下生成验收，不是全库检索、Judge或正式Baseline/P50/P99验收。原文、Final、Usage和去私有推理的SSE留证。
+
+# 2026-10-30 受控Golden与历史Judge-only工具
+
+- 新增默认dry-run的既有Revision/QC/Probe/审核冻结工具：数据/代码/来源/价格和18RPC上限绑定，零重试；已应用修订的质量异常通过既有接口保存failed_quality/失败阶段，避免假示仍在运行。SQLite Backup与旧行不变在13项安全/execute故障注入测试中通过；未获明确外发scope前不执行正式写入或付费。
+- 新增只读历史Answer/Final重评分工具，调用同一正式Judge，不改生产旧生成兼容门槛；源50题全文与请求/Trace均核查，目标新冻结manifest必须有效；旧V1生成标签保留，不创建Baseline/新性能资格，每题一次最多50，Unknown即停。7项离线安全测试通过，真实Replay尚未运行。
+- 无新服务、数据库表或架构节点；不是新评分标准或人工批准替代。
+
+# 2026-10-30 回答正文与机器引用审计分离
+
+- 真实5174验收发现历史回答仍显示Chunk ID；增加只基于该次Final的展示映射，Baseline/Candidate和问答正文显示文档页码，缺失/歧义来源明确未核验。原始回答及ID保留关闭的审计展开区，评分/存储/事实文字不改，不使用Golden或当前Corpus补证。
+- 打开的Baseline抽屉随完整保存Case响应更新，避免继续使用轻量列表中被裁剪Final的旧对象而误报来源未核验；异步回归先复现失败再验证修复。
+- 复用CaseAnswer、StoryDisclosure与既有Drawer，不新增页面/宽度/架构节点；生成V2仍要求模型直接使用人类可读来源。
+
+# 2026-10-30 Q13剩余校准与输出合同一致性
+
+- Judge完整输出模板补齐既有 `atomic_results`、`check_type`、`issues.atomic_ids/failure_kind`，不改变Frozen业务评分标准；Prompt标识 `judge-vnext-6.1-atomic-output-schema`。
+- 新原子输出必须显式声明检查类型。所有原子通过且无issue，却存在未映射的实质失败check时视为技术不一致，不覆盖成PASS；精确对应辅助遗漏、未触发条件与合法OR未选路径继续豁免。Parser标识 `business-output-6.2-atomic-consistency`，历史响应保留当时身份。
+- Q13-3/4按用户新增两次授权各执行一次、零重试，正式 `REQUEST_LIMITS.judge=65536`、Max；均匹配预设FAIL，费用Unknown。模型实测与后续离线解析复验分别留证，不把局部校准视为Baseline Ready。
+- 没有新架构节点或UI合同变化；11 Gate、Golden预期结果和历史记录不变。
+
+# 2026-10-29 Q13实测截断问题修复 — No SPEC Change
+
+- 依专项授权真实调用3次，2次有效PASS、1次length截断，无重试，第4组未发送。没有修改金标准/题目/历史Snapshot。
+- 修复校准脚本偏离既有正式上限：由硬编码16384改读REQUEST_LIMITS.judge=65536；精确目的地及每组唯一性保护。既有正式参数不变。
+- Provider先识别length后检查空内容，保留已知Usage、HTTP信息和原始响应，错误分类为output_truncated；现有评分/Gate/恢复次数不变。
+- 56项离线传输/费用/恢复回归通过；未用修复后的参数重跑已消费样本或自动发送第4组。
+
+# 2026-10-29 Negative纯行为校验补充
+
+- 冻结原子结果显式区分fact与negative_behavior；仅负向纯拒答/澄清/抗注入Required可用行为免Final事实支持，必须有真实回答引文及合法行为依据，技术/操作事实继续严格要求本次Final。对应测试先失败后通过。
+- 已有全量1063项存在未闭合异常；后续fixture定向修正及本增量测试分别记录，不将早期全量冒充最终全绿。
+
+# 2026-10-29 六轮收口接线增量
+
+- 显式原子/AND/OR、冻结合同manifest与现行Baseline入口验证；明确授权重新打开当前编辑版，旧Snapshot不写入；合同变化列入Revision Diff。
+- Prompt/Input/Parser版本同步v6/atoms4；后置同谓词遗漏对应，未选OR路径不计失败；实质issue必须给出合法原子引用和失败类型。
+- 冻结题排除质量异常重跑；Q02 staging callback完整转发validate；缺失指标不做部分均值。
+- V2引用指令去除Chunk冲突且保留V1原hash；前端PASS/未完成不当BadCase，原子结果可查且保留原始Answer/Final。
+- 8次真实Provider微探针成功（Usage记录，费用未知）；4例业务校准被自动审批拒绝，尚未发送。Golden与Replay仍未验收，不能宣布Baseline Ready。
+
+# 2026-10-29 历史Gate详情兼容
+
+- gate_details按保存Run的gate_statistics_version选择公式；缺新版本的旧Run沿旧severity口径解释，不改变旧分数。新运行固定负向子类分母。
+- 对应新历史兼容测试通过；正式旧Run数据未写入。
+
+# 2026-10-29 辅助项裁决与引用表达增量
+
+- 冻结原子合同路径由atomic_results和实质issues计算业务结论，旧checks中辅助项false不能单独覆盖原子结果；无合同历史兼容校验保留。
+- Generation V2用户可见引用改为真实文档名/章节/页码，不要求机器Chunk ID；不做展示字符串删除，后台Final与回答原文保留。V2边界SHA随实际表达更新，历史V1边界不改。
+- 核心13项、生成13项（均含继承重复回归）、原Judge61项、前端289项通过，前端build通过；不代表真实输出或完整六轮通过。
+
+# 2026-10-29 冻结评分合同核心接线（继续实施中）
+
+- 新增 app/scoring_contract.py 只读适配五类冻结要求，保留完整原文、来源、原始位置与合同哈希，不猜测自然语言拆分；50题当前Snapshot结构编译通过，详见覆盖JSON。
+- Judge输入版本 independent-frozen-atoms-3；Provider及Runner统一要求atomic_results完整ID覆盖，程序验证Answer/Final引文、条件状态、必答和禁错后裁决；UNRESOLVED与缺项为技术未完成。旧无合同fixture兼容路径保留，正式旧/新在线路径清理尚未完成。
+- 独立评分后支持完全一致的结构化缺陷映射；语义改写/新增缺陷仍需完整映射，缺对应阻断资格。
+- 新核心测试12项（含继承复测）、首批测试4项、现有Judge61项通过；尚非全六轮验收。
+
+# 2026-10-29 Judge VNext 六轮合同合并与首批修复
+
+- 合并冻结六轮目标合同，并以用户最新指令更新 Provider/Revision/Replay 授权；正式 Baseline 仅本人前端触发。
+- Candidate Judge 移除 baseline_findings 输入、提示和解析依赖，输入版本更新 independent-frozen-contract-2；持续 FAIL 的独立缺陷对应缺失仍阻断资格，尚待完整后置映射。
+- Safety Critical 汇总与 Gate 详情统一按冻结 negative_subtype=safety_critical，issue severity 不改变分母。
+- PASS 诊断为 not_applicable，不再默认技术归因不足。
+- 本条不是六轮验收完成声明，Golden 修订、新评分合同和付费校准尚未完成。
+
+# 2026-10-28 旧 Thinking 草稿兼容
+
+- 旧的非Max Baseline草稿明确提示并允许保存修复，不伪称当前Max已保存。
+
+# 2026-10-28 默认安全启动
+
+- 后端默认安全模式；普通启动脚本不再自动构建索引，旧维护路径需显式选择。
+
+# 2026-10-28 Baseline 题型构成显示修正
+
+- 仅在逐题列表完整覆盖冻结题集时从列表统计题型；部分 Bad Case 不再显示成整套构成。
+
+# 2026-10-28 安全启动与 Baseline Thinking Draft
+
+- 新增显式安全启动模式，保留显式治理/恢复能力；Baseline 草稿前后端限定 Max，Candidate 搜索范围不变。
+
+# 2026-10-28 Round 0 基础配置统一
+
+- 新请求模型/任务Thinking/V2＋Grounded、真实Query Decompose/官方Tokenizer完整块容量、Search Space三项及独立实验身份，保留共同评分与数据边界。
+- Pipeline Draft区域与Baseline报告归属收口，历史字段未知不回填。新Baseline读取当前有效Draft；无Draft用确认默认值，续跑读取源配置。
+- Golden全局/50题/整套只读审计；不改Judge/11 Gate、Golden/Corpus/历史成绩，不执行正式运行或付费调用。
+- 详情与离线/真实API界限见ROUND0三份正式文档及验收报告。
+
+# 2026-10-27 Judge 断点续跑纠错反馈
+
+- 同身份续跑复用该题历史 Judge 合同错误和原文作为纠错反馈；既有引用校验、答案检查点及未知费用阻断不变。
+
+# 2026-10-27 Baseline 冻结负向行为读取修复
+
+- Baseline 预检读取冻结题目的预期行为，缺失或非法值仍阻断；不修改冻结数据及既有安全规则。
+
 # 2026-10-27 Golden 设备部件来源与列表分页
 
 - 同厂家同型号设备/部件手册仅在存在长段一致流程原文时允许作为候选关联；明确版本冲突仍阻断，最终事实和安全仍经当前身份语义审核。

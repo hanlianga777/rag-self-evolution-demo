@@ -71,9 +71,10 @@ if __name__ == '__main__':
     sys.path.insert(0, str(ROOT / 'backend'))
     with tempfile.TemporaryDirectory(prefix='rag-v14-offline-') as directory, patch.dict(os.environ, {
         'RAG_DEMO_DB_PATH': str(Path(directory) / 'test.db'),
-        'RAG_FORCE_MOCK': '1', 'DEEPSEEK_API_KEY': '', 'DASHSCOPE_API_KEY': '', 'MINERU_API_KEY': '',
+        'RAG_SAFE_START': '0', 'RAG_FORCE_MOCK': '1', 'DEEPSEEK_API_KEY': '', 'DASHSCOPE_API_KEY': '', 'MINERU_API_KEY': '',
         'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1',
     }), patch.object(socket.socket, 'connect', offline_connect), patch.object(socket.socket, 'connect_ex', offline_connect_ex), isolated_corpus(directory, legacy_fixture=True):
-        suite = unittest.defaultTestLoader.discover(str(ROOT / 'backend/tests'))
+        sys.path.insert(0, str(ROOT / 'backend/tests'))
+        suite = unittest.defaultTestLoader.loadTestsFromNames(sys.argv[1:]) if sys.argv[1:] else unittest.defaultTestLoader.discover(str(ROOT / 'backend/tests'))
         result = unittest.TextTestRunner(verbosity=2).run(suite)
     sys.exit(0 if result.wasSuccessful() else 1)

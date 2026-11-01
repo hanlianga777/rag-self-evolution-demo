@@ -100,6 +100,37 @@ class BaselineResilienceTests(unittest.TestCase):
         self.assertEqual(result['status'],'completed')
         self.assertEqual(contexts[1]['judge_correction']['previous_response'],'{"invalid":true}')
 
+    def test_resume_reuses_failed_judge_feedback_with_saved_answer(self):
+        runtime=fixture.Runtime(fail=None); original=runtime.judge; contexts=[]
+        def judge(q,*args,context=None,**kw):
+            if q=='Q2':
+                contexts.append(context)
+                if len(contexts)<=2: raise ProviderInvalidResponse('missing quote',raw_provider_response='{"verdict":"FAIL"}')
+            return original(q,*args,context=context,**kw)
+        runtime.judge=judge; runner=EvaluationRunner(self.store,runtime)
+        old=self.execute(runner); self.assertEqual(old['status'],'partial')
+        result=self.execute(runner,old['id'])
+        self.assertEqual(result['status'],'completed')
+        self.assertEqual(runtime.answers.count('Q2'),1)
+        self.assertEqual(contexts[2]['judge_correction'],{'error':'missing quote','previous_response':'{"verdict":"FAIL"}'})
+
+    def test_fifty_case_recovery_at_boundaries_for_judge_and_timeout(self):
+        for index in (0,3,24,48,49):
+            for failure in (ProviderInvalidResponse('contract',raw_provider_response='{}'), ProviderTimeout('timeout')):
+                with self.subTest(index=index, failure=type(failure).__name__):
+                    self.tearDown(); self.setUp()
+                    runtime,runner,items=self.fifty(); target=items[index]; original=runtime.judge
+                    def judge(q,*args,context=None,**kw):
+                        if q==target['question']: raise failure
+                        return original(q,*args,context=context,**kw)
+                    runtime.judge=judge; old=self.execute(runner)
+                    self.assertEqual(old['status'],'partial'); self.assertEqual(old['result']['completed'],49)
+                    self.assertIn('execution',old['result']['checkpoints'][target['id']])
+                    self.assertIsNone(old['result']['overall_score'])
+                    runtime.judge=original; result=self.execute(runner,old['id'])
+                    self.assertEqual(result['status'],'completed'); self.assertEqual(result['result']['completed'],50)
+                    self.assertEqual(len(runtime.answers),50); self.assertEqual(len(set(runtime.answers)),50)
+
     def test_missing_final_and_conflict_business_fail_still_scored_for_all_categories(self):
         from app.evaluation_contract import validate_business_judgment
         for category in ['positive','ablation','negative']:

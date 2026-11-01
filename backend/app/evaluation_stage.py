@@ -149,5 +149,5 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
         checkpoint.pop('inflight',None);return value
 
 def correction_for(checkpoint,run_id):
-    previous=next((a for a in reversed(checkpoint['attempts']) if a.get('phase')=='judge' and a.get('recorded_by_run_id')==run_id and a.get('error_type')=='ProviderInvalidResponse'),None)
+    previous=next((a for a in reversed(checkpoint['attempts']) if a.get('phase')=='judge' and a.get('error_type')=='ProviderInvalidResponse'),None)
     return {'error':previous['error'],'previous_response':previous.get('raw_provider_response')} if previous else None

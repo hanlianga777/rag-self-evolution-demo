@@ -20,9 +20,6 @@ if [ ! -d frontend/node_modules ]; then
   (cd frontend && npm install --cache .npm-cache)
 fi
 
-echo "检查本地机器人 PDF 索引…"
-PYTHONPATH=backend python3 -m app.build_index --if-needed
-
 python3 -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8010 &
 backend_pid=$!
 cleanup() { kill "$backend_pid" 2>/dev/null || true; }

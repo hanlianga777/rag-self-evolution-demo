@@ -429,6 +429,36 @@ class ProbeCostTests(unittest.TestCase):
                     store.review_generation_batch([row['id'] for row in rows], 'fixture reviewer', confirmed_manual_review=True)
             self.assertEqual(store.dataset_snapshots(), before)
 
+    def test_current_freeze_uses_bound_quality_and_preserves_snapshot_after_corpus_change(self):
+        store, rows = self.store()
+        run_id = rows[0]['raw']['generation_run_id']
+        old, new = {'sources':{'D':'old'}}, {'sources':{'D':'new'}}
+        with patch('app.corpus.current_manifest', return_value=old), patch('app.governance.current_manifest', return_value=old):
+            store.update_generation_run(run_id, status='completed', validation={'corpus_fingerprint':{'D':'old'}})
+            for row in rows:
+                _, execution = store.capture_quality(row['id'])
+                store.record_probe_result(row['id'], {'question_quality':30,'golden_answer_quality':30,'evidence_support':40,
+                    'probe_details':{'classification':'EVIDENCE_VALID'}}, execution=execution)
+                _, execution = store.capture_quality(row['id'], qc=True)
+                store.record_qc(row['id'], {'score':95,'priority':'P2','ablation_valid':True}, 'passed', execution=execution)
+            store.review_generation_batch([r['id'] for r in rows], 'offline reviewer', confirmed_manual_review=True)
+            frozen = store.create_generation_snapshot(run_id)
+            self.assertEqual(store.create_generation_snapshot(run_id), frozen)
+            before = store.dataset_snapshots()
+            history = {r['id']:(store.probe_history(r['id']), store.qc_history(r['id'])) for r in rows}
+            with patch('app.corpus.current_manifest', return_value=new), patch('app.governance.current_manifest', return_value=new):
+                with self.assertRaisesRegex(ValueError, 'Human Gate'):
+                    store.create_generation_snapshot(run_id)
+                with self.assertRaisesRegex(ValueError, 'current approved Golden quality'):
+                    store.create_dataset_snapshot(store.questions(), run_id)
+                self.assertEqual(store.dataset_snapshots(), before)
+                self.assertEqual({r['id']:(store.probe_history(r['id']), store.qc_history(r['id'])) for r in rows}, history)
+            self.assertEqual(store.create_generation_snapshot(run_id), frozen)
+            with patch('app.corpus.current_manifest', side_effect=[old, new]):
+                with self.assertRaisesRegex(ValueError, 'Corpus 已变化'):
+                    store.review_generation_batch([r['id'] for r in rows], 'offline reviewer', confirmed_manual_review=True)
+            self.assertEqual(store.dataset_snapshots(), before)
+
     def test_r1_model_load_and_encoder_failure_persist_failed_probe_and_block_quality_api(self):
         import sys
         from fastapi.testclient import TestClient
@@ -510,12 +540,26 @@ class ProbeCostTests(unittest.TestCase):
             self.assertEqual(trace['error']['stage'], 'retrieval_pipeline')
             self.assertEqual(trace['corpus_fingerprint'], {'D': 'old'})
             self.assertTrue(any(stage['stage_name'] == 'bm25' for stage in trace['timings']))
+            from app.evaluation_contract import VERSIONS, evaluation_identity
+            from app.providers import thinking_config
+            from app.policy import DEFAULT_PIPELINE_CONFIG
+            from offline_contract_fixture import bind_snapshot
+            item = store.question(rows[0]['id'])
+            raw = {**copy.deepcopy(item['raw']), 'id':item['id'], 'test_category':item['test_category'],
+                'question':item['question'], 'reference_answer':item['reference_answer'], 'evidence':copy.deepcopy(item['evidence'])}
+            snapshot = bind_snapshot({'question_ids':[item['id']], 'questions':[raw]}, corpus.chunks())
+            item['raw'] = snapshot['questions'][0]
+            config = {**DEFAULT_PIPELINE_CONFIG, 'run_target':'baseline'}
+            judge = {**VERSIONS, **service.generation_contract, 'model':service.model,
+                'common_identity_version':'round0-common-1','judge_thinking':thinking_config('judge'), 'generation_model_constraint':service.model}
+            judge['evaluation_identity'] = evaluation_identity(snapshot, judge)
             evaluation_store = Mock()
-            evaluation_store.evaluation_run.return_value = {"status":"running", "judge": {}, "result": {}, "dataset_snapshot_json": json.dumps({"question_ids":[rows[0]["id"]]})}
+            evaluation_store.evaluation_run.return_value = {"status":"running", "judge":judge, "result":{}, "dataset_snapshot_json":json.dumps(snapshot)}
             evaluation_store.evaluation_case_results.return_value = []
-            EvaluationRunner(evaluation_store, service).execute_baseline('fixture-run', [store.question(rows[0]['id'])], {})
+            EvaluationRunner(evaluation_store, service).execute_baseline('fixture-run', [item], config)
             self.assertEqual(evaluation_store.finish_evaluation_run.call_args.args[1], 'failed')
             evaluation_store.record_evaluation_case.assert_not_called()
             evaluation_store.record_bad_case.assert_not_called()
             service.judge.assert_not_called()
+            self.assertEqual(service.retriever._bm25.call_count, 2)
         provider.complete_with_metrics.assert_not_called()

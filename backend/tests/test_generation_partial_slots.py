@@ -21,7 +21,7 @@ class PartialGenerationTests(unittest.TestCase):
         self.corpus = Mock()
         self.corpus.chunks.return_value = self.chunks
         self.calls = []
-        self.fail = set()
+        self.failing_slots = set()
         self.provider = Mock()
         self.provider.settings.configured = True
         self.provider.settings.model = "mock-provider"
@@ -96,12 +96,12 @@ class PartialGenerationTests(unittest.TestCase):
             self.store.update_question(question_id, 'Q01 再次断电维护？', row['reference_answer'], row['evidence'], 'auto-fixture', chunks=self.chunks, auto_repair=True)
 
     def test_qc_response_retry_is_bounded_and_does_not_retry_other_provider_errors(self):
-        from app.providers import ProviderUnavailable
-        self.service._quality_check = Mock(side_effect=[ProviderUnavailable('DeepSeek QC 未返回有效 JSON'), {'score': 95, 'priority': 'P2', 'reason': 'fixture'}])
+        from app.providers import ProviderUnavailable, ProviderInvalidResponse
+        self.service._quality_check = Mock(side_effect=[ProviderInvalidResponse('DeepSeek QC 未返回有效 JSON', raw_provider_response='{'), {'score': 95, 'priority': 'P2', 'reason': 'fixture'}])
         result = AiService.quality_check(self.service, {})
         self.assertEqual(result['response_retries'], 1)
         self.assertEqual(self.service._quality_check.call_count, 2)
-        self.service._quality_check = Mock(side_effect=ProviderUnavailable('DeepSeek QC 未返回有效 JSON'))
+        self.service._quality_check = Mock(side_effect=ProviderInvalidResponse('DeepSeek QC 未返回有效 JSON', raw_provider_response='{'))
         with self.assertRaises(ProviderUnavailable):
             AiService.quality_check(self.service, {})
         self.assertEqual(self.service._quality_check.call_count, 2)
@@ -141,7 +141,7 @@ class PartialGenerationTests(unittest.TestCase):
         self.calls.append(slot)
         value = {"question": f"{slot} 如何维护设备？"}
         if data["category"] != "negative":
-            value["reference_answer"] = "越界答案" if slot in self.fail else "设备可断电维护"
+            value["reference_answer"] = "越界答案" if slot in self.failing_slots else "设备可断电维护"
         return json.dumps(value, ensure_ascii=False)
 
     def test_medium_and_full_refill_use_frozen_profile(self):
@@ -155,7 +155,7 @@ class PartialGenerationTests(unittest.TestCase):
                     {"slot": f"Q{i:02d}", "test_category": category, "document_id": "D", "product": "P", "evidence_chunk_ids": [chunks[i - 1]["chunk_id"]] if category != "negative" else [], "ablation_attribute": "weak_keywords" if category == "ablation" else None, "negative_subtype": "safe_rejection" if category == "negative" else None, "expected_behavior": "safe_rejection" if category == "negative" else None, "sources": [chunks[i - 1]]}
                     for i, category in enumerate(["positive"] * counts[0] + ["ablation"] * counts[1] + ["negative"] * counts[2], 1)
                 ]
-                self.fail = {"Q01"}
+                self.failing_slots = {"Q01"}
                 run_id = self.store.start_generation_run("mock-provider", name)
                 _run_mini_generation(run_id, self.store, self.service, self.corpus)
                 partial = self.store.generation_run(run_id)
@@ -163,7 +163,7 @@ class PartialGenerationTests(unittest.TestCase):
                 self.assertEqual(len(partial["question_ids"]), sum(counts) - 1)
                 self.assertEqual(partial["operation_progress"]["phase_total"], sum(counts))
                 self.store.claim_regeneration(run_id, partial["artifacts"]["hard_validation"]["corpus_fingerprint"])
-                self.fail.clear()
+                self.failing_slots.clear()
                 self.calls.clear()
                 with patch.object(self.store, "run_probe", side_effect=self.passed_probe), patch.object(self.store, "record_qc"):
                     _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
@@ -176,7 +176,7 @@ class PartialGenerationTests(unittest.TestCase):
     def test_partial_slots_persist_and_refill_only_failures(self):
         for missing in (1, 8):
             with self.subTest(missing=missing):
-                self.fail = {f"Q{i:02d}" for i in range(1, missing + 1)}
+                self.failing_slots = {f"Q{i:02d}" for i in range(1, missing + 1)}
                 self.calls.clear()
                 run_id = self.store.start_generation_run("mock-provider")
                 _run_mini_generation(run_id, self.store, self.service, self.corpus)
@@ -200,7 +200,7 @@ class PartialGenerationTests(unittest.TestCase):
                 self.assertEqual(self.store.generation_run(run_id)["operation_progress"]["phase_processed"], 0)
                 with self.assertRaisesRegex(ValueError, "仅待补题"):
                     self.store.claim_regeneration(run_id, run["artifacts"]["hard_validation"]["corpus_fingerprint"])
-                self.fail.clear()
+                self.failing_slots.clear()
                 self.calls.clear()
                 with patch.object(self.store, "run_probe", side_effect=self.passed_probe), patch.object(self.store, "record_qc"):
                     _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
@@ -211,7 +211,7 @@ class PartialGenerationTests(unittest.TestCase):
                 self.assertEqual(len(set(complete["question_ids"])), 20)
 
     def test_processed_slots_advance_after_failed_attempts_without_valid_candidates(self):
-        self.fail = {"Q01", "Q02", "Q03", "Q04"}
+        self.failing_slots = {"Q01", "Q02", "Q03", "Q04"}
         run_id = self.store.start_generation_run("mock-provider")
         seen = []
         original = self.store.persist_generation_attempt
@@ -229,12 +229,12 @@ class PartialGenerationTests(unittest.TestCase):
         self.assertEqual((seen[1]["phase_processed"], seen[1]["phase_percent"], seen[1]["hard_valid_completed"]), (12, 60, 8))
 
     def test_regeneration_phase_counts_only_missing_slots(self):
-        self.fail = {f"Q{i:02d}" for i in range(1, 11)}
+        self.failing_slots = {f"Q{i:02d}" for i in range(1, 11)}
         run_id = self.store.start_generation_run("mock-provider")
         _run_mini_generation(run_id, self.store, self.service, self.corpus)
         run = self.store.generation_run(run_id)
         self.store.claim_regeneration(run_id, run["artifacts"]["hard_validation"]["corpus_fingerprint"])
-        self.fail.clear()
+        self.failing_slots.clear()
         seen = []
         original = self.store.persist_generation_attempt
 
@@ -249,7 +249,7 @@ class PartialGenerationTests(unittest.TestCase):
         self.assertEqual(seen[0]["processed_slots"], 20)
 
     def test_second_refill_switches_real_material_after_original_fails_again(self):
-        self.fail = {"Q01"}
+        self.failing_slots = {"Q01"}
         run_id = self.store.start_generation_run("mock-provider")
         _run_mini_generation(run_id, self.store, self.service, self.corpus)
         fingerprint = self.store.generation_run(run_id)["artifacts"]["hard_validation"]["corpus_fingerprint"]
@@ -257,7 +257,7 @@ class PartialGenerationTests(unittest.TestCase):
         _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
         self.assertEqual(self.store.generation_run(run_id)["status"], "needs_regeneration")
         self.assertEqual([item["attempt"] for item in self.store.generation_run(run_id)["artifacts"]["slot_audit"]["Q01"]], [1, 2, 3, 4])
-        self.fail.clear()
+        self.failing_slots.clear()
         self.store.claim_regeneration(run_id, fingerprint)
         with patch.object(self.store, "run_probe", side_effect=self.passed_probe), patch.object(self.store, "record_qc"):
             _run_mini_generation(run_id, self.store, self.service, self.corpus, regenerate=True)
@@ -265,7 +265,7 @@ class PartialGenerationTests(unittest.TestCase):
         self.assertEqual(self.store.generation_run(run_id)["artifacts"]["slot_audit"]["Q01"][-1]["source_chunk_ids"], ["C02"])
 
     def test_one_click_refills_only_remaining_slots_for_at_most_three_rounds(self):
-        self.fail = {f"Q{i:02d}" for i in range(1, 11)}
+        self.failing_slots = {f"Q{i:02d}" for i in range(1, 11)}
         run_id = self.store.start_generation_run("mock-provider")
         _run_mini_generation(run_id, self.store, self.service, self.corpus)
         fingerprint = self.store.generation_run(run_id)["artifacts"]["hard_validation"]["corpus_fingerprint"]
@@ -292,7 +292,7 @@ class PartialGenerationTests(unittest.TestCase):
         self.assertEqual(len(set(run["question_ids"])), 20)
 
     def test_auto_refill_stops_after_a_round_without_improvement(self):
-        self.fail = {"Q01"}
+        self.failing_slots = {"Q01"}
         run_id = self.store.start_generation_run("mock-provider")
         _run_mini_generation(run_id, self.store, self.service, self.corpus)
         run = self.store.generation_run(run_id)
@@ -306,7 +306,7 @@ class PartialGenerationTests(unittest.TestCase):
         self.assertEqual(run["operation_progress"]["refill_remaining"], 1)
 
     def test_auto_refill_stops_at_three_rounds_even_when_some_slots_improve(self):
-        self.fail = {"Q01", "Q02", "Q03"}
+        self.failing_slots = {"Q01", "Q02", "Q03"}
         run_id = self.store.start_generation_run("mock-provider")
         _run_mini_generation(run_id, self.store, self.service, self.corpus)
         fingerprint = self.store.generation_run(run_id)["artifacts"]["hard_validation"]["corpus_fingerprint"]

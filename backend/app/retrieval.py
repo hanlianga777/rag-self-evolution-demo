@@ -1,4 +1,5 @@
 import math
+import time
 from contextlib import contextmanager
 from copy import deepcopy
 import re
@@ -24,6 +25,47 @@ class RetrievalUnavailable(RuntimeError):
 
 def _terms(text: str) -> set[str]:
     return set(re.findall(r"[A-Za-z0-9]+|[\u4e00-\u9fff]", text.lower()))
+
+
+def prepare_decomposed_queries(question, raw_queries):
+    """Bound independent retrieval intents and carry every original constraint.
+
+New model/number identifiers are rejected. Semantic equivalence is not claimed:
+subqueries remain untrusted retrieval hints; the original query and original
+question used for rerank and generation remain authoritative.
+"""
+    if not isinstance(raw_queries, list) or any(not isinstance(q, str) for q in raw_queries):
+        raise ValueError('subquestions must be a list of strings')
+    # Exact opposite permission hints are contradictory retrieval instructions.
+    # Broader semantic conflicts cannot be certified by this lexical guard.
+    permissions = {}
+    for raw in raw_queries:
+        match = re.match(r'^(允许|可以|禁止|不得|不能)(.+)$', raw.strip())
+        if match:
+            stem = re.sub(r'[？?。!！\s]', '', match[2])
+            permissions.setdefault(stem, set()).add(match[1] in {'允许', '可以'})
+    conflicts = {stem for stem, states in permissions.items() if len(states) > 1}
+    original_ids = set(re.findall(r'[A-Za-z]+[-_ ]?\d+[A-Za-z0-9_-]*|\d+(?:\.\d+)?', question.lower()))
+    accepted = []; discarded = []; seen = {re.sub(r'\s+', '', question).casefold()}
+    for raw in raw_queries:
+        query = raw.strip()
+        normalized = re.sub(r'\s+', '', query).casefold()
+        identifiers = set(re.findall(r'[A-Za-z]+[-_ ]?\d+[A-Za-z0-9_-]*|\d+(?:\.\d+)?', query.lower()))
+        match = re.match(r'^(允许|可以|禁止|不得|不能)(.+)$', query)
+        conflict = match and re.sub(r'[？?。!！\s]', '', match[2]) in conflicts
+        reason = ('conflicting_permission_hints' if conflict else
+                  'empty_or_duplicate' if not normalized or normalized in seen else
+                  'new_model_or_numeric_constraint' if identifiers - original_ids else
+                  'subquery_too_long' if len(query) > max(512, len(question) * 2) else
+                  'max_subqueries' if len(accepted) >= 3 else None)
+        if reason:
+            discarded.append({'subquestion': raw, 'reason': reason})
+            continue
+        seen.add(normalized); accepted.append(query)
+    queries = [f'原始问题及全部约束：{question}\n独立检索子问题：{q}' for q in accepted]
+    return queries, {'original_question': question, 'subquestions': accepted,
+                     'retrieval_queries': queries, 'discarded': discarded, 'max_subqueries': 3,
+                     'constraint_policy': 'original_question_verbatim'}
 
 
 def query_only_order(question, hits):
@@ -256,15 +298,27 @@ class VectorRetriever:
             chunks = self._metadata_candidates(rewritten, config.get("metadata_filter", "OFF"), self._chunks())
         by_id = {chunk["chunk_id"]: chunk for chunk in chunks}
         vector_scores, bm25_scores = {}, {}
+        query_sources = []
         for query in query_list:
+            query_started = time.perf_counter()
+            query_hits = {"vector": [], "bm25": []}
             with measure(stages, "vector_search", "retrieval"):
                 for hit in self.vector_candidates(query, candidate_k, stages=stages):
                     if hit["chunk_id"] in by_id:
+                        query_hits["vector"].append(hit["chunk_id"])
                         vector_scores[hit["chunk_id"]] = max(vector_scores.get(hit["chunk_id"], float("-inf")), float(hit["score"]))
             with measure(stages, "bm25", "retrieval"):
                 for chunk_id, score in sorted(self._bm25(query).items(), key=lambda item: item[1], reverse=True)[:candidate_k]:
                     if chunk_id in by_id:
+                        query_hits["bm25"].append(chunk_id)
                         bm25_scores[chunk_id] = max(bm25_scores.get(chunk_id, float("-inf")), score)
+            if config.get('query_decompose'):
+                query_sources.append({'query': query, 'source': 'original' if len(query_sources) == 0 else 'auxiliary',
+                                      'chunk_ids': query_hits, 'latency_ms': round((time.perf_counter()-query_started)*1000, 3)})
+        if trace is not None and config.get('query_decompose'):
+            trace['query_sources'] = query_sources
+            trace['query_merge'] = {'method': 'max_score_per_chunk_then_shared_fusion_candidate_cap',
+                                    'candidate_k': candidate_k, 'rerank_question': question}
         with measure(stages, "hybrid_fusion" if config.get("hybrid_search", True) else "candidate_selection", "retrieval"):
             candidate_ids = set(vector_scores) | set(bm25_scores)
             vector_normalized = self._normalize({key: vector_scores.get(key, 0.0) for key in candidate_ids})

@@ -26,7 +26,7 @@ it("Frozen Baseline parameters come from the actual evaluation and Draft shows o
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(payload))));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={{}} />));
-  const section = [...document.querySelectorAll('section')].find(node => node.textContent?.includes('Baseline → 草稿参数变化'))!;
+  const section = document.querySelector('.pipeline-draft-diff')!;
   expect(section.textContent).toContain('4 → 6');
   expect(section.textContent).not.toContain('CandidateK');
 });

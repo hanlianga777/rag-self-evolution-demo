@@ -36,3 +36,25 @@ output/evaluation-autorecovery-*/
 
 # External read-only audit exports; never restore into the active experiment database.
 output/baseline-ab-root-cause-audit-20261014/
+
+# Local data, run evidence, exports, and backup bundles
+/backend/data/
+/output/
+/outputs/
+/review_exports/
+/docs/judge_vnext_20261029/
+/docs/judge_vnext_20261030/
+/docs/judge_vnext_20261101/
+/docs/round0/
+/docs/JUDGE_VNEXT_BASELINE_AUDIT/
+/docs/JUDGE_VNEXT_INPUT/
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.log
+*.zip
+*.tar
+*.tar.gz
+*.ses
+/*STORAGE*

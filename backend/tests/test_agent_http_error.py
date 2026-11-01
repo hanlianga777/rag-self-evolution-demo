@@ -8,10 +8,20 @@ from app.config import Settings
 from app.optimization import OptimizationAgent
 
 class AgentHttpErrorTests(unittest.TestCase):
-    setUp=fixture.OptimizationContractTests.setUp
+    def setUp(self):
+        fixture.OptimizationContractTests.setUp(self)
+        from app.ai_service import generation_contract
+        from app.evaluation_contract import evaluation_identity
+        run = self.store.evaluation_run('EVAL-test')
+        judge = {**run['judge'], **generation_contract(), 'common_identity_version':'round0-common-1',
+                 'judge_thinking':{'task':'judge','thinking':{'type':'enabled'},'reasoning_effort':'max'},
+                 'generation_model_constraint':'fixture'}
+        judge['evaluation_identity'] = evaluation_identity(json.loads(run['dataset_snapshot_json']), judge)
+        with self.store.connection() as connection:
+            connection.execute('UPDATE evaluation_runs SET judge_json=? WHERE id=?', (json.dumps(judge), 'EVAL-test'))
     def test_agent_records_sanitized_body_and_detailed_error(self):
         secret='fixture-secret-do-not-log'
-        provider=DeepSeekProvider(Settings(secret,'https://invalid','deepseek-v4-flash'))
+        provider=DeepSeekProvider(Settings(secret,'https://invalid','fixture'))
         body=json.dumps({'error':{'code':'context_length_exceeded','message':f'too long; api_key={secret}; Authorization: Bearer unknown-secret'}})
         error=urllib.error.HTTPError('https://invalid',400,'bad request',{},io.BytesIO(body.encode()))
         with patch('app.providers.urllib.request.urlopen',side_effect=error) as http:
@@ -24,7 +34,7 @@ class AgentHttpErrorTests(unittest.TestCase):
         self.assertEqual(detail['provider_code'],'context_length_exceeded');self.assertEqual(detail['stage'],'provider')
         self.assertNotIn(secret,json.dumps(audit));self.assertNotIn('unknown-secret',json.dumps(audit))
         self.assertIn('too long',detail['detail']);self.assertIn('error',detail['raw_response'])
-        summary=audit['request_summary'];self.assertEqual(summary['model'],'deepseek-v4-flash');self.assertEqual(summary['roles'],['system','user']);self.assertEqual(summary['response_format'],{'type':'json_object'})
+        summary=audit['request_summary'];self.assertEqual(summary['model'],'fixture');self.assertEqual(summary['roles'],['system','user']);self.assertEqual(summary['response_format'],{'type':'json_object'})
         self.assertNotIn('messages',summary);self.assertNotIn('Authorization',json.dumps(summary))
 
     def test_invalid_request_stops_before_http_with_local_stage(self):
@@ -42,7 +52,8 @@ class AgentHttpErrorTests(unittest.TestCase):
         from app.paid_run import execution_limits,provider_task
         provider=DeepSeekProvider(Settings('fixture','https://invalid','fixture'))
         summary=provider.request_summary('return JSON','{}',json_mode=True)
-        self.assertIsNone(summary['max_tokens']);self.assertEqual(summary['temperature'],.2)
+        self.assertIsNone(summary['max_tokens']);self.assertIsNone(summary['temperature'])
+        self.assertEqual(summary['thinking'], {'type':'enabled'});self.assertEqual(summary['reasoning_effort'],'high')
         with execution_limits({'agent':16384}),provider_task('agent'):
             self.assertEqual(provider.request_summary('return JSON','{}',json_mode=True)['max_tokens'],16384)
         with patch('app.providers.urllib.request.urlopen') as http:

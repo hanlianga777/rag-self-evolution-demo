@@ -98,10 +98,13 @@ def _answer_anchor_supported(answer: str, evidence_texts: list[str]) -> bool:
 class GovernanceStore:
     """Small persistence boundary; JSON keeps evidence and run snapshots immutable."""
 
-    def __init__(self, database_path: Path | str | None = None):
+    def __init__(self, database_path: Path | str | None = None, *, migrate=True):
         self.database_path = Path(database_path or DEFAULT_DATABASE)
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        self.migrate()
+        if migrate:
+            self.database_path.parent.mkdir(parents=True, exist_ok=True)
+            self.migrate()
+        elif not self.database_path.is_file():
+            raise FileNotFoundError("安全启动要求已有数据库")
 
     @contextmanager
     def connection(self):
@@ -1032,7 +1035,7 @@ class GovernanceStore:
             if start and previous.get("status") == "running":
                 raise ValueError("本轮 Probe / QC 已在运行")
             if start and anomalies_only:
-                eligible = {key for key in ids if self.missing_quality_stages(key)}
+                eligible = {item["id"] for item in candidates if item["stage"] == "candidate" and self.missing_quality_stages(item["id"])}
                 ids = [question_id for question_id in ids if question_id in eligible]
                 if not ids:
                     raise ValueError("没有缺失或技术中断的检查阶段；已完成的质量争议请进入审核")
@@ -1236,6 +1239,31 @@ class GovernanceStore:
                 audit = {**_load(row["audit_json"], {}), "interrupted_at": _now(), "interrupted_stage": _load(row["audit_json"], {}).get("stage"), "stage": "interrupted"}
                 connection.execute("UPDATE candidate_revision_runs SET status='interrupted', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), row["id"]))
 
+    def reopen_snapshot_question(self, question_id, snapshot_id, *, actor, reason, authorization):
+        """Explicitly reopen the active edition; saved Snapshots remain immutable.
+
+        This grants no approval or quality exemption. Revision/QC/review/freeze
+        must still run with the new content identity.
+        """
+        if not all(isinstance(v,str) and v.strip() for v in (actor,reason,authorization)):
+            raise ValueError('Explicit revision authorization, actor and reason required')
+        with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            row=connection.execute('SELECT * FROM questions WHERE id=?',(question_id,)).fetchone()
+            snapshot=connection.execute('SELECT snapshot_json FROM dataset_versions WHERE id=?',(snapshot_id,)).fetchone()
+            if row is None or snapshot is None:
+                raise ValueError('Saved source Snapshot and current question required')
+            current=self._row(row)
+            frozen=next((q for q in _load(snapshot[0],{}).get('questions',[]) if q.get('id')==question_id),None)
+            if frozen != current['raw'] or current['stage']!='golden':
+                raise ValueError('Source Snapshot does not match current approved edition')
+            metadata={'source_snapshot_id':snapshot_id,'reason':reason,'authorization':authorization,
+                      'content_before_sha256':self._revision_hash(current),'human_approval':False}
+            connection.execute("UPDATE questions SET stage='candidate',review_status='needs_revision',updated_at=? WHERE id=?",(_now(),question_id))
+            connection.execute("INSERT INTO review_events(question_id,gate,decision,actor,created_at,metadata_json) VALUES (?,?,?,?,?,?)",
+                (question_id,'revision','reopened_for_revision',actor,_now(),_json(metadata)))
+        return self.question(question_id)
+
     def start_revision(self, question_id: str, mode: str, reason: str, paired: bool, changes_by_id: dict, chunks: list[dict], *, tags: list[str] | None = None, replacement: bool = False, actor: str = 'local_user'):
         if mode not in {"manual_edit", "ai_regenerate"} or not reason.strip():
             raise ValueError("请选择修订方式并填写原因")
@@ -1387,7 +1415,7 @@ class GovernanceStore:
                 audit['warnings'] = list(dict.fromkeys([*audit['warnings'], *validation['warnings']]))
                 audit['duplicate_checks'] = validation['duplicate_checks']
                 audit['valid'] = not audit['blocking_errors']
-        changed_fields = {item_id: [field for field in ("question", "reference_answer", "evidence") if draft[field] != run["before"][item_id][field]] for item_id, draft in drafts.items()}
+        changed_fields = {item_id: [field for field in ("question", "reference_answer", "evidence") if draft[field] != run["before"][item_id][field]] + (["business_requirements"] if draft["raw"].get("business_requirements") != run["before"][item_id]["raw"].get("business_requirements") else []) for item_id, draft in drafts.items()}
         new_hash = {item_id: self._revision_hash(draft) for item_id, draft in drafts.items()}
         return drafts, errors, new_hash, changed_fields
 
@@ -1706,6 +1734,9 @@ class GovernanceStore:
             snapshot["generation_run_id"] = generation_run_id
             snapshot['coverage_plan'] = self.generation_run(generation_run_id, qualification=False)['artifacts']['hard_validation'].get('frozen_plan')
             snapshot['qualification_sources'] = {row['id']:row['qualification_source'] for row in self.candidate_rows(snapshot['question_ids'])}
+        if all(q.get("business_requirements") is not None for q in snapshot["questions"]):
+            from .scoring_contract import snapshot_manifest
+            snapshot["scoring_contract_manifest"] = snapshot_manifest(snapshot)
         version_id = f"GD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
         from contextlib import nullcontext
         with (nullcontext(writer) if writer is not None else self.connection()) as connection:
@@ -2156,6 +2187,9 @@ class GovernanceStore:
         for row in rows:
             config, judge, result = _load(row["config_json"], {}), _load(row["judge_json"], {}), _load(row["result_json"], {})
             frozen = _load(row["dataset_snapshot_json"], {})
+            from .evaluation_contract import experiment_config_identity
+            if judge.get('common_identity_version') == 'round0-common-1' and result.get('experiment_config_identity') != experiment_config_identity(config):
+                continue
             if config.get("run_target") not in (None, "baseline") or config.get("candidate_id") or result.get("invalidated") or config.get("invalidated"):
                 continue
             if connection.execute("SELECT 1 FROM candidate_configs WHERE json_extract(result_json, '$.evaluation_run_id')=? LIMIT 1", (row["id"],)).fetchone():
@@ -2169,7 +2203,10 @@ class GovernanceStore:
                 continue
             experiment = connection.execute("SELECT id FROM experiments WHERE baseline_run_id=? AND status!='direct_release' ORDER BY created_at DESC, rowid DESC LIMIT 1", (row["id"],)).fetchone()
             from .evaluation_contract import policy_current, evaluation_identity
-            return {**identity, "current_baseline_id": row["id"], "current_experiment_id": experiment["id"] if experiment else None, 'requires_policy_upgrade': not policy_current(judge) or judge.get('evaluation_identity') != evaluation_identity(_load(row['dataset_snapshot_json'], {}), judge)}
+            from .ai_service import generation_contract
+            current_generation = generation_contract()
+            generation_changed = 'generation_prompt_version' in judge and (any(judge.get(k) != v for k,v in current_generation.items()) or judge.get('common_identity_version') != 'round0-common-1')
+            return {**identity, "current_baseline_id": row["id"], "current_experiment_id": experiment["id"] if experiment else None, 'requires_policy_upgrade': generation_changed or not policy_current(judge) or judge.get('evaluation_identity') != evaluation_identity(_load(row['dataset_snapshot_json'], {}), judge)}
         return {**identity, "baseline_unavailable_reason": "当前 Golden/Corpus 需要新的有效 Baseline；旧实验仅供历史查看"}
 
     def require_current_baseline(self, run_id=None, connection=None):
@@ -2191,11 +2228,12 @@ class GovernanceStore:
         return [{**dict(row), "result": {**_load(row["result_json"], {}), "run_id":row["run_id"], "question_id":row["question_id"]}} for row in rows]
 
     def create_evaluation_run(self, snapshot: dict, config: dict, judge: dict):
+        from .evaluation_contract import experiment_config_identity
         run_id = f"EVAL-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         with self.connection() as connection:
             connection.execute(
                 "INSERT INTO evaluation_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (run_id, "running", "real", "real", snapshot["id"], _json(snapshot), _json(config), _json(judge), _json({}), None, _now(), None),
+                (run_id, "running", "real", "real", snapshot["id"], _json(snapshot), _json(config), _json(judge), _json({"experiment_config_identity":experiment_config_identity(config)}), None, _now(), None),
             )
         return run_id
 
@@ -2222,6 +2260,9 @@ class GovernanceStore:
         from .paid_run import require_reconciled_execution
         require_reconciled_execution(_load(source['result_json'], {}))
         source_judge = _load(source['judge_json'], {})
+        from .evaluation_contract import experiment_config_identity
+        if source_judge.get('common_identity_version') == 'round0-common-1' and _load(source['result_json'],{}).get('experiment_config_identity') != experiment_config_identity(_load(source['config_json'],{})):
+            raise ValueError('实验配置身份不匹配，禁止复用或续跑')
         if (_load(source['dataset_snapshot_json'], {}) != snapshot or _load(source['config_json'], {}) != config or not policy_current(source_judge)
             or source_judge.get('evaluation_identity') != evaluation_identity(snapshot, judge) or (candidate_id and source_judge != judge)
             or any(source_judge.get(k) != judge.get(k) for k in ('model','temperature','execution_snapshot','baseline_version'))):
@@ -2242,15 +2283,16 @@ class GovernanceStore:
             if candidate_id:
                 candidate = self.reserve_candidate_evaluation(candidate_id, connection)
                 baseline = self.require_current_baseline(self.experiment(candidate['experiment_id'])['baseline_run_id'], connection)
-                expected_config = {**candidate['config'], **({'knowledge_identity':baseline['config']['knowledge_identity']} if baseline['config'].get('knowledge_identity') else {}), 'run_target':'sandbox_candidate', 'candidate_id':candidate_id}
+                expected_config = {**{k:DEFAULT_PIPELINE_CONFIG[k] for k in ('generation_thinking','query_decompose','retrieval_max_tokens')}, **candidate['config'], **({'knowledge_identity':baseline['config']['knowledge_identity']} if baseline['config'].get('knowledge_identity') else {}), 'run_target':'sandbox_candidate', 'candidate_id':candidate_id}
                 if config != expected_config or judge != baseline['judge'] or snapshot != _load(baseline['dataset_snapshot_json'], {}):
                     raise ValueError('Candidate/Baseline身份或配置已变化')
                 previous = connection.execute("SELECT id FROM evaluation_runs WHERE json_extract(config_json,'$.candidate_id')=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (candidate_id,)).fetchone()
                 source_id = previous['id'] if previous else None
-            result, rows = {}, []
+            from .evaluation_contract import experiment_config_identity
+            result, rows = {'experiment_config_identity':experiment_config_identity(config)}, []
             if source_id:
                 source, rows = self.validate_evaluation_resume(connection, snapshot, config, judge, source_id, candidate_id=candidate_id, manual_resume=manual_resume)
-                result = {'resume_source_id':source_id, 'checkpoints':_load(source['result_json'], {}).get('checkpoints', {})}
+                result.update(resume_source_id=source_id, checkpoints=_load(source['result_json'], {}).get('checkpoints', {}))
                 if _load(source['result_json'], {}).get('judge_replay'):result['judge_replay']=_load(source['result_json'], {})['judge_replay']
             if judge_replay:
                 from .judge_replay import source_digest
@@ -2336,6 +2378,8 @@ class GovernanceStore:
             connection.execute('BEGIN IMMEDIATE')
             row=connection.execute('SELECT result_json FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
             stop=_load(row['result_json'],{}).get('stop_request') if row else None
+            stored=_load(row['result_json'],{}) if row else {}
+            if 'experiment_config_identity' in stored: result['experiment_config_identity']=stored['experiment_config_identity']
             if stop:result['stop_request']=stop
             changed = connection.execute("UPDATE evaluation_runs SET result_json=? WHERE id=? AND status='running'", (_json(result),run_id)).rowcount
             if not changed:
@@ -2357,6 +2401,8 @@ class GovernanceStore:
             connection.execute('BEGIN IMMEDIATE')
             row=connection.execute('SELECT result_json FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
             stop=_load(row['result_json'],{}).get('stop_request') if row else None
+            stored=_load(row['result_json'],{}) if row else {}
+            if 'experiment_config_identity' in stored: result['experiment_config_identity']=stored['experiment_config_identity']
             if stop:
                 result['stop_request']=stop;result['evaluation_complete']=False
                 result.setdefault('auto_recovery',{}).update(state='stopped',error='用户停止运行')

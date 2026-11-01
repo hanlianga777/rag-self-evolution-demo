@@ -41,7 +41,7 @@ class MachineGateTests(unittest.TestCase):
         self.assertEqual(self.store.candidate_rows(self.ids)[0]['qualification_source'],'human')
 
     def test_b_p1_exceptions_require_individual_human_decisions(self):
-        for key in self.ids[:14]: self.store.record_qc(key,{'score':75,'priority':'P1'},'passed')
+        for key in self.ids[:14]: self.store.record_qc(key,{'score':90,'priority':'P1'},'passed')
         self.assertEqual((self.gate()['machine_qualified'],self.gate()['needs_human_review']),(86,14))
         self.assertEqual(self.gate()['status'],'pending')
         with self.assertRaises(ValueError):self.store.review_generation_batch(self.ids,'fixture',confirmed_manual_review=True)
@@ -50,6 +50,18 @@ class MachineGateTests(unittest.TestCase):
         result=self.store.review_generation_batch(self.ids,'fixture',confirmed_manual_review=True)
         self.assertNotIn('snapshot', result)
         self.assertEqual(self.gate()['status'],'ready')
+
+    def test_owner_reason_cannot_waive_qc_85_or_p0(self):
+        key = self.ids[0]
+        for score, priority in ((75, 'P1'), (84, 'P2'), (95, 'P0')):
+            with self.subTest(score=score, priority=priority):
+                self.store.record_qc(key, {'score':score,'priority':priority}, 'passed')
+                before = self.store.review_history(key)
+                with self.assertRaisesRegex(ValueError, 'QC 必须达到85且无P0'):
+                    self.store.review_question(key, 'approved', 'offline Owner', reason='explicit fixture Owner disposition')
+                self.assertEqual(self.store.review_history(key), before)
+                self.assertEqual(self.store.question(key)['stage'], 'candidate')
+                self.assertEqual(self.store.dataset_snapshots(), [])
 
     def test_c_quality_blocker_and_changed_content_cannot_pass(self):
         self.store.save_quality_audit(self.ids[0],{'checks':{key:key!='naturalness' for key in CHECKS},'attention_reason':'提问口吻需优化'})
@@ -101,7 +113,7 @@ class MachineGateTests(unittest.TestCase):
             client = TestClient(main.app, raise_server_exceptions=False)
             payload = {'question_ids': self.ids, 'confirmed_manual_review': True}
             headers = {'Origin': 'http://localhost:5174'}
-            self.store.record_qc(self.ids[0], {'score':75, 'priority':'P1'}, 'passed')
+            self.store.record_qc(self.ids[0], {'score':90, 'priority':'P1'}, 'passed')
             pending = client.post('/api/governance/review-batch', json=payload, headers=headers)
             self.assertEqual(pending.status_code, 409)
             self.assertIn(self.ids[0], pending.json()['detail'])
@@ -126,7 +138,7 @@ class MachineGateTests(unittest.TestCase):
         from app.corpus import current_manifest, manifest_identity
         from types import SimpleNamespace
         identity = manifest_identity(current_manifest())
-        runtime = SimpleNamespace(model='fixture', corpus=SimpleNamespace(index_info=lambda: {'knowledge_identity':identity, 'knowledge_config':{'candidate_k':12, 'top_k':4}}))
+        runtime = SimpleNamespace(model='fixture', corpus=SimpleNamespace(chunks=lambda: [{'chunk_id':'C1','chunk_text':'先断电'}], index_info=lambda: {'knowledge_identity':identity, 'knowledge_config':{'candidate_k':12, 'top_k':4}}))
         runner = EvaluationRunner(self.store, runtime)
         with self.assertRaisesRegex(ValueError, 'Snapshot'):
             runner.start_baseline()

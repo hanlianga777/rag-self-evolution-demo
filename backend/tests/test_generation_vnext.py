@@ -42,8 +42,8 @@ class GenerationVNextTests(unittest.TestCase):
             self.assertNotIn('required_checks', user)
             self.assertNotIn('历史Judge', user)
 
-    def test_default_remains_legacy_and_identity_changes_only_on_opt_in(self):
-        old, provider = self.service()
+    def test_explicit_legacy_remains_readable_and_new_default_uses_v2(self):
+        old, provider = self.service(generation_prompt_version='generation-vnext-1')
         new, _ = self.service(generation_prompt_version='generation-vnext-2')
         old.answer('问题')
         self.assertEqual(provider.requests[0][0], '你是机器人官方 PDF 知识助手。只能基于给定证据回答；证据不足时明确说明。' + GENERATION_BOUNDARY + '回答使用中文，简洁、可执行。')
@@ -63,7 +63,7 @@ class GenerationVNextTests(unittest.TestCase):
         args[0]['judge'].update(generation_contract('generation-vnext-2'))
         args[4].update(generation_contract('generation-vnext-2'))
         self.assertTrue(replay_eligibility(*args, 'fp')['can_replay'])
-        args[4].update(generation_contract())
+        args[4].update(generation_contract('generation-vnext-1'))
         result = replay_eligibility(*args, 'fp')
         self.assertFalse(result['can_replay'])
         self.assertIn('generation_contract_changed', result['eligibility'][0]['blockers'])
@@ -91,3 +91,13 @@ class GenerationVNextTests(unittest.TestCase):
             EvaluationRunner(store, service).start_candidate('candidate')
         store.create_baseline_run.assert_not_called()
         self.assertEqual(provider.requests, [])
+
+class UserFacingCitationTests(GenerationVNextTests):
+    def test_v2_requests_human_readable_sources_without_machine_ids(self):
+        service, provider = self.service()
+        service.answer('问题')
+        self.assertIn('不要输出机器Chunk ID', provider.requests[0][0])
+    def test_v2_does_not_retain_conflicting_chunk_instruction(self):
+        service, provider = self.service()
+        service.answer('问题')
+        self.assertNotIn('有据正常回答并引用Chunk', provider.requests[0][0])

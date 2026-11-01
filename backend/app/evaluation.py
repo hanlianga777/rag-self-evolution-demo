@@ -75,8 +75,9 @@ def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:
         values = []
         for item in groups[group]:
             value = item.get("judge_result", {}).get(key)
-            if isinstance(value, (int, float)):
-                values.append(float(value) * (25 if key == "correctness" else 100))
+            if type(value) not in (int, float) or not math.isfinite(value):
+                return None
+            values.append(float(value) * (25 if key == "correctness" else 100))
         return _mean(values)
 
     metrics = {
@@ -92,10 +93,12 @@ def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:
     safe = lambda item: None if policy_behavior(item) is None else 100.0 if policy_behavior(item) else 0.0
     metrics.update({
         "safe_rejection_rate": _mean([safe(item) for item in negatives]) if all(policy_behavior(item) is not None for item in negatives) else None,
-        "safety_critical_accuracy": _mean([safe(item) for item in negatives if item.get("severity") == "critical"]) if all(policy_behavior(item) is not None for item in negatives if item.get("severity") == "critical") else None,
+        "safety_critical_accuracy": _mean([safe(item) for item in negatives if item.get("negative_subtype") == "safety_critical"]) if all(policy_behavior(item) is not None for item in negatives if item.get("negative_subtype") == "safety_critical") else None,
         "prompt_injection_resistance": _mean([safe(item) for item in negatives if item.get("negative_subtype") == "prompt_injection"]) if all(policy_behavior(item) is not None for item in negatives if item.get("negative_subtype") == "prompt_injection") else None,
     })
     latency_seconds = [item["programmatic_metrics"]["latency_ms"] / 1000 for item in cases if isinstance(item.get("programmatic_metrics", {}).get("latency_ms"), (int, float))]
+    if len(latency_seconds) != len(cases):
+        latency_seconds=[]
     metrics["latency_p50_seconds"] = _percentile(latency_seconds, .5)
     metrics["latency_p99_seconds"] = _percentile(latency_seconds, .99)
     hits = [item["programmatic_metrics"]["retrieval_hit"] for item in cases if item.get("programmatic_metrics", {}).get("retrieval_hit") is not None]
@@ -121,7 +124,7 @@ def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:
     return result
 
 
-def gate_details(cases: list[dict], gates: list[dict]) -> list[dict]:
+def gate_details(cases: list[dict], gates: list[dict], *, statistics_version='frozen-negative-subtype-2') -> list[dict]:
     """Explain stored gates from the same persisted case inputs used by aggregation."""
     details = []
     for gate in gates:
@@ -134,7 +137,7 @@ def gate_details(cases: list[dict], gates: list[dict]) -> list[dict]:
             contributions = [{"question_id": item.get("question_id"), "value": round(float(value) * (25 if field == "correctness" else 100), 2), "passed": item.get("passed")} for item, value in values if isinstance(value, (int, float))]
             formula = "算术平均；Correctness 原始 0–4 分乘以 25" if field == "correctness" else "逐题 0–1 分乘以 100 后算术平均"
         elif metric in {"safe_rejection_rate", "safety_critical_accuracy", "prompt_injection_resistance"}:
-            selected = [item for item in cases if item.get("test_category") == "negative" and (metric != "safety_critical_accuracy" or item.get("severity") == "critical") and (metric != "prompt_injection_resistance" or item.get("negative_subtype") == "prompt_injection")]
+            selected = [item for item in cases if item.get("test_category") == "negative" and (metric != "safety_critical_accuracy" or (item.get("negative_subtype") == "safety_critical" if statistics_version == "frozen-negative-subtype-2" else item.get("severity") == "critical")) and (metric != "prompt_injection_resistance" or item.get("negative_subtype") == "prompt_injection")]
             contributions = [{"question_id": item.get("question_id"), "value": None if policy_behavior(item) is None else 100.0 if policy_behavior(item) else 0.0, "passed": item.get("passed")} for item in selected]
             formula = "适用负向题政策行为通过比例；旧记录使用保存的 behavior_pass"
         else:
@@ -153,6 +156,14 @@ class EvaluationRunner:
         contract = getattr(self.runtime, 'generation_contract', None)
         if isinstance(contract, dict) and any(judge.get(k) != v for k, v in contract.items()):
             raise ValueError('Generation contract不匹配，禁止跨版本生成或续跑')
+        if isinstance(contract, dict) and judge.get('common_identity_version') != 'round0-common-1':
+            raise ValueError('Generation/Thinking共同合同缺失（历史未知），禁止新生成或比较')
+        if judge.get('common_identity_version') == 'round0-common-1':
+            from .providers import thinking_config
+            if judge.get('judge_thinking') != thinking_config('judge'):
+                raise ValueError('Judge Thinking合同不匹配，禁止跨身份比较或续跑')
+            if judge.get('generation_model_constraint') != self.runtime.model or judge.get('model') != self.runtime.model:
+                raise ValueError('共同模型合同不匹配，禁止跨身份比较或续跑')
 
     def snapshot_items(self, snapshot):
         frozen = {item['id']: item for item in snapshot.get('questions', [])}
@@ -165,7 +176,7 @@ class EvaluationRunner:
                     raise ValueError('历史Snapshot缺少完整题目/类别，不能按当前题目补造')
                 current = {'id':key, **frozen[key], 'raw':frozen[key]}
             raw = frozen.get(key, current['raw'])
-            items.append({**current, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'), 'evidence': raw.get('evidence', raw.get('acceptable_evidence', [])), 'raw': raw, 'test_category': raw.get('test_category', current['test_category']), 'negative_subtype': raw.get('negative_subtype', current.get('negative_subtype'))})
+            items.append({**current, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'), 'expected_behavior': raw.get('expected_behavior'), 'evidence': raw.get('evidence', raw.get('acceptable_evidence', [])), 'raw': raw, 'test_category': raw.get('test_category', current['test_category']), 'negative_subtype': raw.get('negative_subtype', current.get('negative_subtype'))})
         return items
 
     def baseline_inputs(self, resume_source_id=None):
@@ -173,13 +184,37 @@ class EvaluationRunner:
         if not snapshots:
             raise ValueError("正式评测需要已批准（approved）且显式创建的 Golden Snapshot")
         snapshot = snapshots[0]["snapshot"]
+        from .scoring_contract import validate_snapshot_manifest
+        if isinstance(getattr(self.runtime, "generation_contract", None), dict):
+            validate_snapshot_manifest(snapshot)
         approved = self.snapshot_items(snapshot)
         categories = {item["test_category"] for item in approved}
         negative_subtypes = {item.get("negative_subtype") for item in approved if item["test_category"] == "negative"}
         if not {"positive", "ablation", "negative"}.issubset(categories) or not {"safety_critical", "prompt_injection"}.issubset(negative_subtypes):
             raise ValueError("正式评测需要完整 approved Golden：Positive、Ablation、Negative、Safety Critical 与 Prompt Injection")
         production = self.store.active_production() or {"config": {}}
-        config = {**DEFAULT_PIPELINE_CONFIG, **production["config"], "run_target": "baseline"}
+        source = self.store.evaluation_run(resume_source_id) if resume_source_id else None
+        config = {**DEFAULT_PIPELINE_CONFIG, "run_target": "baseline"}
+        if source:
+            self._require_generation_contract(source['judge'])
+            from .evaluation_contract import experiment_config_identity
+            if source['judge'].get('common_identity_version') == 'round0-common-1' and source.get('result',{}).get('experiment_config_identity') != experiment_config_identity(source['config']):
+                raise ValueError('实验配置身份不匹配，禁止复用已保存答案或续跑')
+            config = dict(source['config'])
+        else:
+            draft_reader = getattr(self.store, 'pipeline_draft', None)
+            draft = draft_reader() if callable(draft_reader) else None
+            if isinstance(draft, dict) and isinstance(draft.get('config'), dict):
+                if draft.get('identity') != self.store.current_baseline_identity():
+                    raise ValueError('Config Draft基准已变化，请刷新核对后重新保存')
+                from .policy import validate_candidate_config
+                validation = validate_candidate_config(draft['config'])
+                if not validation['valid']:
+                    raise ValueError('Config Draft参数非法：' + '; '.join(validation['errors']))
+                config.update(draft['config'])
+                if config.get('hybrid_search') is False: config.pop('hybrid_alpha', None)
+            if config.get('generation_thinking') != 'max':
+                raise ValueError('Baseline Thinking必须为Max；其他档位仅用于Candidate实验')
         index_info = self.runtime.corpus.index_info() if hasattr(self.runtime, "corpus") and hasattr(self.runtime.corpus, "index_info") else {}
         if not isinstance(index_info, dict):
             index_info = {}
@@ -193,11 +228,10 @@ class EvaluationRunner:
                     readiness=optimization_preflight(item,chunks)
                     if not readiness['ready']:raise ValueError(item['id']+': '+'; '.join(readiness['blocking_errors']))
             config['knowledge_identity'] = index_info['knowledge_identity']
-            config['candidate_k'] = index_info['knowledge_config']['candidate_k']
-            config['top_k'] = index_info['knowledge_config']['top_k']
+            config.setdefault('candidate_k', index_info['knowledge_config']['candidate_k'])
+            config.setdefault('top_k', index_info['knowledge_config']['top_k'])
         judge_meta = {"model": self.runtime.model, **VERSIONS, "temperature":0, "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
         from .paid_run import current_paid_run
-        source=self.store.evaluation_run(resume_source_id) if resume_source_id else None
         limits=current_paid_run().output_limits if current_paid_run() else (source or {}).get('judge',{}).get('execution_snapshot',{}).get('request_limits')
         if not limits:
             from .paid_run import REQUEST_LIMITS
@@ -209,6 +243,16 @@ class EvaluationRunner:
         import hashlib
         contract = getattr(self.runtime, 'generation_contract', None)
         judge_meta.update(judge_prompt_sha256=hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(), **(contract if isinstance(contract, dict) else generation_contract()))
+        # Every newly created run records the configured common contract. This
+        # never rewrites persisted runs; concrete Provider responses remain
+        # independent execution evidence (including for offline runtimes).
+        from .providers import thinking_config
+        judge_meta.update(common_identity_version='round0-common-1', judge_thinking=thinking_config('judge'),
+            generation_model_constraint=self.runtime.model,
+            frozen_business_rules={'source':'docs/RAG_SELF_EVOLUTION_SPEC.md','contract':'round0-20261028'})
+        judge_meta['execution_snapshot'].update(generation_thinking=thinking_config('generation'),
+            effective_temperature=None, temperature_ignored=True)
+        judge_meta['execution_snapshot'].pop('temperature', None)
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
         return snapshot, approved, config, judge_meta
 
@@ -216,22 +260,24 @@ class EvaluationRunner:
         """Read-only snapshot of the exact transactional start/resume guards."""
         from .full_text import CORPUS_LOCK
         result={'can_start':False, 'can_resume':False, 'resume_source_id':None, 'reason':None, 'resume_reason':None}
-        try:
-            with CORPUS_LOCK:
-                snapshot, _, config, judge = self.baseline_inputs(resume_source_id)
-                with self.store.connection() as connection:
-                    connection.execute('BEGIN')
+        with CORPUS_LOCK:
+            with self.store.connection() as connection:
+                connection.execute('BEGIN')
+                try:
+                    snapshot, _, _, judge = self.baseline_inputs()
                     self.store.validate_evaluation_start(connection,snapshot,judge)
                     result['can_start']=True
-                    if resume_source_id:
-                        try:
-                            self.store.validate_evaluation_resume(connection,snapshot,config,judge,resume_source_id)
-                        except ValueError as error:
-                            result['resume_reason']=str(error)
-                        else:
-                            result.update(can_resume=True,resume_source_id=resume_source_id)
-        except ValueError as error:
-            result.update(can_start=False,reason=str(error))
+                except ValueError as error:
+                    result['reason']=str(error)
+                if resume_source_id:
+                    try:
+                        snapshot, _, config, judge = self.baseline_inputs(resume_source_id)
+                        self.store.validate_evaluation_start(connection,snapshot,judge)
+                        self.store.validate_evaluation_resume(connection,snapshot,config,judge,resume_source_id)
+                    except ValueError as error:
+                        result['resume_reason']=str(error)
+                    else:
+                        result.update(can_resume=True,resume_source_id=resume_source_id)
         return result
 
     def start_baseline(self, resume_source_id=None, *, automatic=False):
@@ -256,7 +302,9 @@ class EvaluationRunner:
         if trace.get('status')=='completed' and trace.get('corpus_fingerprint') and not fingerprint:
             raise ValueError('Judge输入Canonical Corpus身份无法验证')
         from .ai_service import generation_context
-        return {**({'judge_correction':judge_correction} if judge_correction else {}), 'contract_version':VERSIONS['scoring_policy'], 'retrieval_candidates':trace.get('candidates',[]), 'baseline_findings':item.get('baseline_findings'), 'sources_legend':json.loads(generation_context(final).split('\n',1)[0])['sources'], 'golden_evidence': item['evidence'], 'golden_norms':norms, '_canonical_chunks':chunks, 'scope_sources':[{**c,'content':c.get('chunk_text',c.get('text',''))} for c in chunks if c['chunk_id'] in {(e.get('source_scope') or {}).get('source_id') for e in final}], 'final_context': final, 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'), 'expected_behavior': item['raw'].get('expected_behavior'), 'source_constraints': observation['source_constraints'], 'programmatic_evidence_observation': observation}
+        from .scoring_contract import compile_contract
+        frozen_contract = compile_contract(item) if item.get('raw', {}).get('business_requirements') is not None else None
+        return {**({'scoring_contract':frozen_contract} if frozen_contract else {}),**({'judge_correction':judge_correction} if judge_correction else {}), 'contract_version':VERSIONS['scoring_policy'], 'retrieval_candidates':trace.get('candidates',[]), 'sources_legend':json.loads(generation_context(final).split('\n',1)[0])['sources'], 'golden_evidence': item['evidence'], 'golden_norms':norms, '_canonical_chunks':chunks, 'scope_sources':[{**c,'content':c.get('chunk_text',c.get('text',''))} for c in chunks if c['chunk_id'] in {(e.get('source_scope') or {}).get('source_id') for e in final}], 'final_context': final, 'category': item['test_category'], 'negative_subtype': item.get('negative_subtype'), 'expected_behavior': item['raw'].get('expected_behavior'), 'source_constraints': observation['source_constraints'], 'programmatic_evidence_observation': observation}
 
     def score_execution(self, item, execution, *, judge_correction=None):
         expected = item["reference_answer"] or item["raw"].get("expected_behavior", "拒答或澄清")
@@ -335,11 +383,12 @@ class EvaluationRunner:
 
     def _score_business(self, item, execution, judge, expected, *, canonical_chunks=None):
         from .providers import ProviderInvalidResponse
+        from .scoring_contract import compile_contract
         from .diagnostics import automatic_analysis
         from .retrieval import evidence_coverage
         trace = execution.get('retrieval_trace') or {}
         try:
-            validate_business_judgment(judge, execution['answer'], trace.get('final'), category=item['test_category'], constraints=item.get('raw'), question=item['question'], reference=expected, candidates=trace.get('candidates'),canonical_chunks=canonical_chunks)
+            validate_business_judgment(judge, execution['answer'], trace.get('final'), category=item['test_category'], constraints=item.get('raw'), question=item['question'], reference=expected, candidates=trace.get('candidates'),canonical_chunks=canonical_chunks, scoring_contract=compile_contract(item) if item.get('raw',{}).get('business_requirements') is not None else None)
             quality = judge['quality']
             if not isinstance(quality,dict):raise ValueError('quality metrics must be an object')
             if (type(quality.get('correctness')) is not int or not 0 <= quality['correctness'] <= 4
@@ -459,7 +508,7 @@ class EvaluationRunner:
         frozen_ids = set(json.loads(run['dataset_snapshot_json'])['question_ids'])
         cases = self.store.evaluation_case_results(run_id)
         checkpoints = run['result'].get('checkpoints', {})
-        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume') if k in run['result']}
+        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity') if k in run['result']}
         def progress(*, complete=False):
             from .telemetry import cost_fields
             from .paid_run import unsettled_usage
@@ -640,11 +689,9 @@ class EvaluationRunner:
             raise ValueError('Evaluation身份不匹配')
         self.store.require_current_baseline(baseline["id"])
         approved = self.snapshot_items(snapshot)
-        baseline_cases={c['question_id']:c for c in self.store.evaluation_case_results(baseline['id'])}
-        approved=[{**item,'baseline_findings':baseline_cases.get(item['id'],{}).get('judge_result',{}).get('issues',[])} for item in approved]
         if baseline['judge'].get('model') != self.runtime.model:
             raise ValueError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
-        config = {**candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
+        config = {**{k:DEFAULT_PIPELINE_CONFIG[k] for k in ("generation_thinking","query_decompose","retrieval_max_tokens")}, **candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
         return approved, config, candidate, baseline
 
     def candidate_resume_plan(self,candidate_id, *, manual_resume=False):
@@ -665,7 +712,7 @@ class EvaluationRunner:
             if source:
                 try:self.store.validate_evaluation_resume(connection,json.loads(baseline['dataset_snapshot_json']),config,baseline['judge'],source['id'],candidate_id=candidate_id,manual_resume=manual_resume)
                 except ValueError as error:plan.update(can_resume=False,reason=str(error))
-            query_expansion=any(config.get(k) for k in ('query_rewrite','multi_query','hyde'))
+            query_expansion=any(config.get(k) for k in ('query_rewrite','multi_query','hyde','query_decompose'))
             plan['estimated_calls_without_retries']=None if query_expansion else answers*(2+int(config.get('rerank') is True))+judges
             return plan
 

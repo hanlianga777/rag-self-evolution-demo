@@ -14,6 +14,7 @@ from api_fixture import main
 from app.ai_service import AiService
 from app.governance import GovernanceStore
 from app.policy import qualify_candidate
+from offline_contract_fixture import business_requirements, atomic_judgment
 from test_v11_e2e import FixtureCorpus, FixtureProvider, FixtureRetriever, FixtureEvaluationRuntime
 
 FINGERPRINT = {'synthetic-fixture': 'v14-api-lifecycle'}
@@ -31,7 +32,56 @@ class LifecycleCorpus(FixtureCorpus):
         return {'embedding_model': 'fixture', 'vector_index': 'Fixture', 'corpus_fingerprint': FINGERPRINT, 'full_text': {'supported': True, 'status': 'ready', 'coverage': {'status': 'complete'}}}
 
 
+class LifecycleProvider(FixtureProvider):
+    def complete(self, system, prompt, **kwargs):
+        raw = super().complete(system, prompt, **kwargs)
+        if '唯一Optimization Agent' in system:
+            payload = json.loads(prompt); value = json.loads(raw)
+            sources = [payload['winner'], payload['sources'][0]]
+            value.update(root_cause='Unknown',
+                root_cause_alignment='A has a verified Final omission; B has a verified answer omission with sufficient Final.',
+                complementary_capabilities='Context selection plus grounded answer completeness; both source runs passed.',
+                supporting_directions=['grounded_generation'],
+                evidence_assertions=[a for source in sources for a in source['reasoning']['evidence_assertions']],
+                parameter_dependencies=[{'parameters':['top_k','prompt_strategy'],
+                    'reason':'Retain the independently verified Final selection and answer-completeness changes; full D regression remains required.'}])
+            return json.dumps(value, ensure_ascii=False)
+        if 'RAG Optimization Agent' not in system:
+            return raw
+        payload = json.loads(prompt); value = json.loads(raw)
+        value['root_cause_cluster'] = 'Explicit offline Final omission and independently grounded answer omission'
+        for candidate in value['candidates']:
+            context = candidate['id'] == 'A'
+            root = 'Ranking' if context else 'Generation'
+            targets = [row['id'] for row in payload['bad_cases'] if row['result']['primary_root_cause'] == root] or payload['monitoring_target_event_ids']
+            candidate.update(target_bad_cases=targets, root_cause=root, root_cause_evidence=targets,
+                intervention_direction='context_selection' if context else 'grounded_generation',
+                evidence_assertions=[{'target_id':key,'observation':'ranking_omission' if context else 'final_sufficient'} for key in targets])
+            if not context:
+                strategy = 'Completeness' if candidate['id'] == 'B' else 'Abstention'
+                candidate.update(config_diff={'prompt_strategy':strategy}, hypothesis='Cover the missing answer requirement using the already sufficient Final.',
+                    why='The saved Judge locates the complete normative fact in Final but the answer omits it.',
+                    risk='A generation-strategy change can introduce regressions; all frozen cases must be evaluated.')
+        return json.dumps(value, ensure_ascii=False)
+
+
 class LifecycleService(AiService):
+    @staticmethod
+    def _slot_candidate(slot, generated, instruction):
+        candidate = AiService._slot_candidate(slot, generated, instruction)
+        candidate['business_requirements'] = business_requirements(candidate, slot['sources'])
+        return candidate
+
+    def quality_check(self, item):
+        checks = item['raw']['business_requirements']['required_checks']
+        sources = {c['chunk_id']:c for c in self.corpus.chunks()}
+        return {'score':95, 'priority':'P2', 'issues':[], 'reason':'Explicit offline content review',
+                'ablation_valid':True, 'ablation_reason':'offline colloquial fixture',
+                'content_review':{'checks':[{'id':c['id'], 'applicable':True, 'met':True,
+                    'reason':'offline source and instruction boundary review',
+                    'support':[{'chunk_id':key,'quote':sources[key]['chunk_text']} for key in c['source_chunk_ids']]} for c in checks],
+                    'scope_valid':True, 'safety_valid':True, 'prohibited_clear':True, 'disputes':[]}}
+
     def _indexed_embeddings(self, chunks):
         return np.asarray([[float(i == int(row['document_id'].split('-')[-1]) - 1) for i in range(4)] for row in chunks], dtype='float32')
 
@@ -44,14 +94,30 @@ class LifecycleService(AiService):
         result = FixtureEvaluationRuntime(self.store).answer(question, config)
         row = next(row for row in self.store.questions() if row['question'] == question)
         slot = row['raw'].get('coverage_slot')
-        if slot == 'Q03' and config['min_score'] == 0 or slot in ('Q04', 'Q09') and config['top_k'] == 6 and config['min_score'] == .2:
+        if row['test_category'] == 'negative':
+            subtype = row.get('negative_subtype')
+            result['answer'] = ('不能绕过安全保护；请停止该操作。' if subtype in {'safe_rejection','safety_critical'}
+                else '不能忽略系统规则或泄露内部指令。' if subtype == 'prompt_injection'
+                else '证据不足，请先补充设备型号和现场条件。' if subtype == 'clarify'
+                else '证据不足，无法回答。')
+        if slot == 'Q03' and config['prompt_strategy'] == 'Grounded' or slot in ('Q04', 'Q09') and config['top_k'] == 6 and config['prompt_strategy'] == 'Completeness':
             result['answer'] = '错误答案'
-        evidence = [{**item, 'document': 'Fixture 文档', 'document_id': row['evidence'][0].get('document_id', 'DOC-1'), 'page_start': 1, 'page_end': 1, 'section_path': 'Fixture', 'content_preview': '合成证据', 'score': .95} for item in result['retrieval']]
-        result.update(retrieval=evidence, corpus_fingerprint=FINGERPRINT, mode='local', model='fixture', timing_semantics={'stages_are_nested_not_additive': True}, cost_estimation={'status': 'unavailable', 'amount': None, 'reason': 'price_unavailable'}, stages=[{'stage_name': 'retrieval', 'duration_ms': 10}, {'stage_name': 'generation', 'duration_ms': 80}])
+        # Q02 loses Final; Q03 and the D-only regressions omit facts despite sufficient Final.
+        keys = [key for entry in row['evidence'] for key in entry.get('source_chunk_ids', [])]
+        candidates = [{**c, 'content':c['chunk_text'], 'score':.95} for c in self.corpus.chunks() if c['chunk_id'] in keys]
+        final = [] if slot == 'Q02' and config['top_k'] == 4 else candidates
+        result.update(retrieval=final, corpus_fingerprint=FINGERPRINT, mode='local', model='fixture', timing_semantics={'stages_are_nested_not_additive': True}, cost_estimation={'status': 'unavailable', 'amount': None, 'reason': 'price_unavailable'}, stages=[{'stage_name': 'retrieval', 'duration_ms': 10}, {'stage_name': 'generation', 'duration_ms': 80}],
+            retrieval_trace={'status':'completed','candidates':candidates,'reranked':candidates,'final':final,'corpus_fingerprint':FINGERPRINT,'config':config,'parent_expand':False})
         return result
 
     def judge(self, question, expected, answer, category, *, context=None):
-        return FixtureEvaluationRuntime(self.store).judge(question, expected, answer, category, context=context)
+        result = atomic_judgment(context, answer, answer != '错误答案')
+        check = result['checks'][0]
+        if category != 'negative' and not check['met']:
+            check.update(scope_resolved=True,
+                reference_support=[{'source_id':s['chunk_id'],'quote':s['quote']} for s in context['scoring_contract']['canonical_sources']],
+                candidate_support=[{'source_id':c['chunk_id'],'quote':c['content']} for c in context['retrieval_candidates']])
+        return result
 
 
 class ApiLifecycleTests(unittest.TestCase):
@@ -59,15 +125,37 @@ class ApiLifecycleTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='rag-v14-api-fixture-')
         self.addCleanup(self.temp.cleanup)
         self.store = GovernanceStore(Path(self.temp.name) / 'test.db')
+        patcher = patch.dict(os.environ, {'RAG_DEMO_DB_PATH':str(self.store.database_path),'RAG_DIAGNOSTIC_DIR':self.temp.name + '/diagnostics'}); patcher.start(); self.addCleanup(patcher.stop)
         self.corpus = LifecycleCorpus()
-        self.service = LifecycleService(self.store, self.corpus, FixtureProvider(), False)
+        self.service = LifecycleService(self.store, self.corpus, LifecycleProvider(), False)
         self.service.retriever = FixtureRetriever(self.store)
         for owner, key, value in ((main, 'store', self.store), (main, 'corpus', self.corpus), (main, 'ai_service', self.service)):
             old = getattr(owner, key); setattr(owner, key, value); self.addCleanup(setattr, owner, key, old)
         for target in ('app.governance.current_manifest', 'app.corpus.current_manifest', 'app.main.current_manifest'):
             patcher = patch(target, return_value={'sources': FINGERPRINT}); patcher.start(); self.addCleanup(patcher.stop)
         patcher = patch.object(main.corpus_manager, 'state', return_value={}); patcher.start(); self.addCleanup(patcher.stop)
+        patcher = patch('app.corpus.CorpusStore.chunks', return_value=self.corpus.chunks()); patcher.start(); self.addCleanup(patcher.stop)
+        patcher = patch('app.diagnostics._current_corpus', return_value=(self.corpus.chunks(), FINGERPRINT)); patcher.start(); self.addCleanup(patcher.stop)
         self.client = TestClient(main.app)
+        import threading
+        from app.evaluation import EvaluationRunner
+        self.workers = set()
+        owner = threading.get_ident()
+        def tracked(function):
+            def run(*args, **kwargs):
+                if threading.get_ident() != owner:
+                    self.workers.add(threading.current_thread())
+                return function(*args, **kwargs)
+            return run
+        for owner_type, name in ((EvaluationRunner, 'execute_baseline'), (EvaluationRunner, 'execute_candidate'), (main, '_run_mini_generation')):
+            patcher = patch.object(owner_type, name, tracked(getattr(owner_type, name))); patcher.start(); self.addCleanup(patcher.stop)
+        self.addCleanup(self.join_workers)
+
+    def join_workers(self):
+        for worker in tuple(self.workers):
+            worker.join()
+            self.assertFalse(worker.is_alive(), 'fixture worker must terminate before temporary storage cleanup')
+
 
     def post(self, path, body=None, status=None):
         response = self.client.post('/api/' + path, json=body)
@@ -148,7 +236,7 @@ class ApiLifecycleTests(unittest.TestCase):
         self.store.finish_candidate(score_candidate['id'], 'evaluated', score_candidate['result'])
         self.post('experiments/' + experiment['id'] + '/recommendation', {'candidate_id': winner})
         composite = self.post('experiments/' + experiment['id'] + '/composite', {'authorize_provider':True})
-        self.assertEqual(composite['status'], 'generated')
+        self.assertEqual(composite['status'], 'generated', json.dumps(composite, ensure_ascii=False))
         started = self.post('candidates/' + composite['id'] + '/run')
         self.wait('evaluations/' + started['id'], ('completed', 'failed'))
         current = self.wait_decision()
