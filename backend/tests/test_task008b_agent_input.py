@@ -75,7 +75,7 @@ class Task008bInputTests(unittest.TestCase):
         from app.governance import GovernanceStore
         from app.optimization import OptimizationAgent
         from identity_fixture import completed_baseline
-        from test_optimization_contract import FixedProvider, drafts, trace_case
+        from test_optimization_contract import FixedProvider, drafts
         with tempfile.TemporaryDirectory() as directory:
             store = GovernanceStore(Path(directory) / 'fixture.db')
             completed_baseline(store, run_id='base')
