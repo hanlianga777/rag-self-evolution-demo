@@ -9,6 +9,7 @@ from collections import Counter
 
 from .providers import ProviderRequestError, provider_error_details
 from .diagnostics import diagnostic_view
+from .agent_inputs import prepare_baseline_rows, retrieval_facts
 from .paid_run import provider_task
 from .telemetry import collect_usage, measure, cost_fields
 from .policy import DEFAULT_PIPELINE_CONFIG, MAX_EVALS, search_space_contract, validate_candidate_config
@@ -76,7 +77,8 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         rows.append({'id':row['id'],'question_id':row['question_id'],
                      'question':row['result'].get('question'),
                      'diagnosis_category':view.get('diagnosis_category',view['primary_root_cause']),
-                     'reason':view['analysis_reason']})
+                     'reason':view['analysis_reason'],
+                     'retrieval_facts':row.get('retrieval_facts') or retrieval_facts(row['result'])})
     prompt={
         'goal':{'objective':'通过11项门槛、错题总数少于Baseline、至少修好1道目标错题，安全关键题和提示注入题无新错。普通新错留给方案D处理。',
                 'failed_gates':failed_gates,'candidate_labels':labels,'baseline_configuration':base_config},
@@ -245,12 +247,8 @@ class OptimizationAgent:
             runtime = SimpleNamespace(generation_contract=generation_contract(), model=settings.model)
             EvaluationRunner(self.store, runtime)._require_generation_contract(self.store.evaluation_run(baseline_run_id)['judge'])
         baseline = self.store.evaluation_run(baseline_run_id)
-        questions={q['id']:q for q in json.loads(baseline['dataset_snapshot_json']).get('questions',[])}
-        from .diagnostics import standard_evidence
         bad_cases = [item for item in self.store.bad_case_rows(baseline_run_id) if item["run_id"] == baseline_run_id]
-        # The standard excerpts come from this run's frozen snapshot, never the live KB.
-        bad_cases = [{**item,'result':{**item['result'],'standard_evidence':standard_evidence(questions.get(item['question_id'],{})) or item['result'].get('standard_evidence',[])}} for item in bad_cases]
-        audited_cases = [{**item, 'diagnostic_view':diagnostic_view(item.get('result', {}))} for item in bad_cases]
+        audited_cases = prepare_baseline_rows(baseline, bad_cases)
         audited_cases = [{**item, 'category':item['diagnostic_view']['primary_root_cause']} for item in audited_cases]
         from .evaluation_contract import business_verdict
         bad_cases = [item for item in audited_cases if business_verdict(item['result'])=='FAIL' or (item['result'].get('evaluation_outcome') or {}).get('contract_version')!='business-vnext-1' and item['result'].get('passed') is False]

@@ -1363,10 +1363,11 @@ def evaluation(active_task: bool = False, light: bool = False):
 
 
 def case_list_row(row, *, light=False):
-    run = store.evaluation_run(row['run_id']) if row.get('run_id') else None
-    questions = json.loads(run['dataset_snapshot_json']).get('questions', []) if run else []
-    item = next((q for q in questions if q.get('id') == row.get('question_id')), None)
-    result = {**row['result'],'diagnostic_view':diagnostic_view(row['result'], golden_item=item)}
+    if not row.get('diagnostic_view'):
+        from .agent_inputs import prepare_baseline_rows
+        run = store.evaluation_run(row['run_id']) if row.get('run_id') else None
+        row = prepare_baseline_rows(run, [row])[0]
+    result = {**row['result'],'diagnostic_view':row['diagnostic_view']}
     if light:
         result = {key:value for key,value in result.items() if key!='retrieved_chunks'}
         result['programmatic_metrics'] = {key:value for key,value in result.get('programmatic_metrics',{}).items() if not isinstance(value,(dict,list)) or key=='evidence_coverage'}

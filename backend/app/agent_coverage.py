@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .agent_recovery import digest
 from .diagnostics import diagnostic_view
+from .agent_inputs import prepare_baseline_rows
 from .full_text import CORPUS_LOCK
 from .governance import _json, _now
 from .optimization import prepare_response, validate_intervention
@@ -53,7 +54,7 @@ def plan_coverage(rows,base,candidates,*,round_number=1,labels=None):
             valid=[]
             for row in rows:
                 q=row['question_id'];view=views[q];plan=view.get('experiment_plan',{})
-                if q not in uncovered or plan.get('status')!='exploratory' or direction not in plan.get('directions',[]):continue
+                if q not in uncovered or plan.get('status') not in {'ready','exploratory'} or direction not in plan.get('directions',[]):continue
                 p=_proposal('?',direction,diff,[row],views)
                 try:validate_intervention(p,targets,base)
                 except (ValueError,KeyError,TypeError):continue
@@ -106,7 +107,7 @@ def coverage_inputs(store,experiment_id):
     experiment=store.experiment(experiment_id)
     if not experiment:raise ValueError('Experiment不存在')
     baseline=store.evaluation_run(experiment['baseline_run_id'])
-    rows=[{**r,'diagnostic_view':diagnostic_view(r['result'])} for r in store.bad_case_rows(baseline['id']) if r['run_id']==baseline['id']]
+    rows=prepare_baseline_rows(baseline, [r for r in store.bad_case_rows(baseline['id']) if r['run_id']==baseline['id']])
     from .evaluation_contract import business_verdict
     rows=[r for r in rows if business_verdict(r['result'])=='FAIL' or (r['result'].get('evaluation_outcome') or {}).get('contract_version')!='business-vnext-1' and r['result'].get('passed') is False]
     base={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}
