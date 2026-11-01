@@ -192,7 +192,7 @@ run_task() {
     # 额度恢复后接回同一个 Codex 对话，它记得做到哪了
     local rprompt="额度已经恢复。请从中断的地方继续完成任务单 $task，已经做完的不要重做。规则和之前一样：不要用 git 修改仓库；全部完成后用 mv 把任务单移到 指挥/历史任务/；做不完就把进度写进报告。"
     echo "[值班脚本] 接回上次的 Codex 对话：$RESUME_ID" > "$RUN_LOG"
-    ( cd "$REPO" && exec codex exec resume "${CODEX_ARGS[@]}" "$RESUME_ID" "$rprompt" </dev/null >>"$RUN_LOG" 2>&1 ) &
+    ( cd "$REPO" && exec codex exec "${CODEX_ARGS[@]}" resume "$RESUME_ID" "$rprompt" </dev/null >>"$RUN_LOG" 2>&1 ) &
   else
     ( cd "$REPO" && exec codex exec "${CODEX_ARGS[@]}" "$prompt" </dev/null >"$RUN_LOG" 2>&1 ) &
   fi
@@ -241,10 +241,19 @@ if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK" 2>/dev/null)" 2>/dev/null; then
   exit 1
 fi
 
+# 普通终端里找不到 codex 时，用 ChatGPT 桌面应用自带的那个（和桌面版共用登录）
 if ! command -v codex >/dev/null 2>&1; then
-  say "找不到 Codex 命令行版（codex），请先完成安装。"
+  for d in "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS" \
+           "/Applications/Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS" \
+           "/Applications/Codex.app/Contents/Resources"; do
+    [ -x "$d/codex" ] && { PATH="$d:$PATH"; export PATH; break; }
+  done
+fi
+if ! command -v codex >/dev/null 2>&1; then
+  say "找不到 Codex 命令行版（codex），请把这条提示发给总指挥。"
   exit 1
 fi
+say "使用的 Codex：$(command -v codex)（$(codex --version 2>/dev/null)）；登录状态：$(codex login status 2>&1 | head -1)"
 
 # 开工前检查：项目里如果有没保存的改动（通常是桌面版做了一半的任务），先不开工，免得混在一起
 if [ -n "$(g status --porcelain)" ]; then
