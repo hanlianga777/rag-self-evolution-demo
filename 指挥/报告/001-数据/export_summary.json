@@ -1,0 +1,1 @@
+{"bad_count": 240, "baseline_count": 35, "baseline_fail_classes": {"Generation": 75, "Ranking": 10, "Retrieval": 17, "Safety": 11, "Unknown/未确诊": 127}, "candidate_count": 28, "case_count": 50, "database_bytes": 9144631296, "database_count": 59, "golden_count": 22, "latest": "EVAL-20261027122116244939", "run_count": 64}

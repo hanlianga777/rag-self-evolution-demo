@@ -1,0 +1,2952 @@
+[
+  {
+    "path": ":memory:.ses",
+    "size": 51,
+    "sha256": "ef0652dad870c7bca41889bc823962926f8266a88906389f66c4a85ef9cbaaa9"
+  },
+  {
+    "path": "JUDGE_VNEXT_BASELINE_AUDIT.zip",
+    "size": 2627800,
+    "sha256": "5268af2625a93eeef7f9b844ee8426013bf9b72b0aea0747e1a1846a4a88ad99"
+  },
+  {
+    "path": "JUDGE_VNEXT_BASELINE_AUDIT_V2.zip",
+    "size": 2658677,
+    "sha256": "c7e116b0947c3a39d2c09688208a65b2acd349c17178f95d0110812b66bf0baa"
+  },
+  {
+    "path": "JUDGE_VNEXT_FINAL_SEMANTIC_AUDIT.zip",
+    "size": 58724,
+    "sha256": "19f74e13deeec3e1e9240b19da6c42530f950f2d5b3808cc0a74715d930cd1dd"
+  },
+  {
+    "path": "JUDGE_VNEXT_INPUT_COMPLETE.zip",
+    "size": 1441447,
+    "sha256": "625b502f578c221e97e4c6de5c070603b468fc79f343b96f9c9bf3e79d6ecef6"
+  },
+  {
+    "path": "MAC_STORAGE_AUDIT.md",
+    "size": 23202,
+    "sha256": "efacbdfdc22f26451547eccce0bb189220d65b491cc4510f4bbcf322b3918123"
+  },
+  {
+    "path": "MAC_STORAGE_CLEANUP_MANIFEST.json",
+    "size": 1361163,
+    "sha256": "51a5adfd0f0e08c4ce4f6378172246a27e4f337f0ae16686ecc1c00e2a332dba"
+  },
+  {
+    "path": "RAG_STORAGE_DEEP_CLEANUP.md",
+    "size": 25010,
+    "sha256": "a35104a0b284e978987a2cd991741ef6b56d59e2d99ea6451fad769b5a29761a"
+  },
+  {
+    "path": "RAG_STORAGE_DEEP_CLEANUP_MANIFEST.json",
+    "size": 1701711,
+    "sha256": "7ffc3e44fa6ab9989ad19fa51eee3e0cdb68cb545b42911b58e28781fa7488e5"
+  },
+  {
+    "path": "STORAGE_CLEANUP_EXECUTION.json",
+    "size": 109758,
+    "sha256": "fc8a59b2eff4c84612d67fc8c8aaad093fdbaffcb19139a32ef462ace8d689fd"
+  },
+  {
+    "path": "STORAGE_CLEANUP_REPORT.md",
+    "size": 104901,
+    "sha256": "bf0e622125dc16098f08082be6d24e5496086231f7ac606783d1063bbea13956"
+  },
+  {
+    "path": "backend/data/audit_backups/golden-profile-before-reload-20261025.db",
+    "size": 195096576,
+    "sha256": "b3b6db29712d6a8fbb56bd7b104c6b9114d2c89392646c86698de23c390644fe"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_batch_recovery_20261026/before.db",
+    "size": 195096576,
+    "sha256": "c4974a3bf94a09de835965a6991b9e9a54acf9ab4aedbbeea3959e763a70cbc4"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_batch_recovery_20261026/before_scope_content_revision.db",
+    "size": 195096576,
+    "sha256": "0c22a32e5852e79ca2be2e95723d85e3b5854bf79a10a47df6c5e7055d980bd0"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_batch_recovery_20261026/final_usage.json",
+    "size": 197129,
+    "sha256": "b745b9cecf899861e036d29b6b8d488bc361e64b2e4ab85c066248d6158a8ad5"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_batch_recovery_20261026/lineage-review.log",
+    "size": 4811,
+    "sha256": "37f9a026f303dcf2b81a03a11fea706dfb12bd18d961dfefd6c0d4ec6a6c0008"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_batch_recovery_20261026/resume.log",
+    "size": 2936,
+    "sha256": "85b684c176e903a6e2dea4cc45a74f2ad948708b1225582bb08331942905b2cf"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_batch_recovery_20261026/scope-content-revision.log",
+    "size": 594,
+    "sha256": "383654a8af3858e13a19d2d2b609801977666606f7e5bb6831dad2d20880f600"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_batch_recovery_20261026/scope-review.log",
+    "size": 30,
+    "sha256": "cfb2a86d1d183a2261a49ac22fa13b512c622a389106ffdf8ba0a4979f27fb67"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_batch_recovery_20261026/usage.json",
+    "size": 137376,
+    "sha256": "c5bc24a1ba4a9444b708a0a3c91ba5105f129e1f67034f3b242547943fd3be90"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_batch_recovery_20261026/verification.json",
+    "size": 949,
+    "sha256": "e360a123305dc8b7197ee0f28a91a76fd3d98c01c69eca055a43bb90ce3e9f4b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/backup-sha256.txt",
+    "size": 65,
+    "sha256": "2209c4750f5d9c0051a928e0c6048fd76d43fc7fb1d836ededfab5da4808cf35"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/before-tables.json",
+    "size": 2618,
+    "sha256": "72d3c7f1e1254a686ee91593a9d916544d3d86d3540c7c0b939e1425fe17542b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/before.db",
+    "size": 195096576,
+    "sha256": "47656e70fe26296587d8f14c628a757ae4018d131373821067c4bc9a10648c45"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/corpus_state.json",
+    "size": 1079,
+    "sha256": "aab9aa411c229550f052370014a3b39c559f9bdbe1f0b49d40c796779c45087a"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/final-verification.json",
+    "size": 2009,
+    "sha256": "a4e27cd3ef21cbd01d0ad6ddb80778f662272d93a6614ef19386188adc95aa2d"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/golden-closeout-core-96.log",
+    "size": 2941,
+    "sha256": "79f9b8b24f5cbe2b260f98bc593629a4b797deb1814231a42b8eea22df8fa6d8"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/golden-closeout-final-result.log",
+    "size": 6278,
+    "sha256": "f54c6761b00d282bfaf96e8fd607f58ddf7a2c8c32afd54d1d3000a7b8b3a82d"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/golden-closeout-head-errors3.log",
+    "size": 2369,
+    "sha256": "11408b63fed815f4fb143b7840e1371a10c9c806ac6784fb5e3621f145af1f9c"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/owner-delegated-review.json",
+    "size": 1336,
+    "sha256": "55a28224fead498c77a08f3280d613debf391aea1efdd5529f7b119759fbaec5"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/q02-switch.json",
+    "size": 2968,
+    "sha256": "d0207e29eaa6abe19d6026de87164bc1a9c1da98b5586543fbbe53cffd9d43d8"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261026/verification.json",
+    "size": 6871,
+    "sha256": "3e6be5c6569ee891fe1b654645e7aa5caee166053d42f0fd4c050fde39b7b5f5"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/additional-owner-reviews-2.json",
+    "size": 3922,
+    "sha256": "2d0a41cfcedd7a2127e1250e4060574e4a567eb8e7aeae8850a927de33e291d7"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/additional-owner-reviews-3.json",
+    "size": 3347,
+    "sha256": "81420fe87a6dcb526fdbd301422445436c477240cd343a969acfb03c3106c369"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/additional-owner-reviews-4.json",
+    "size": 8022,
+    "sha256": "897da4e13d90d114c9d12d09aa0a3519c8eecd4a0cb93fbf74527e9e17b4c209"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/additional-owner-reviews-5.json",
+    "size": 11902,
+    "sha256": "70bf38f83fbf178d2199b16d4f6f9ad66e612a3eaec7ff874685383c4b86f0f2"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/additional-owner-reviews-6.json",
+    "size": 9944,
+    "sha256": "845a6a522eea5a6a42774cd28e7c8d4259f522c4a44d01a48b3266372c8ae98f"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/additional-owner-reviews-7.json",
+    "size": 1560,
+    "sha256": "00f58577e2d63486f47bde124402bf435a59a8cf220253d425b9646d6c5d0bc1"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/additional-owner-reviews.json",
+    "size": 5761,
+    "sha256": "be43fa591900d31d24c567324d00fa82690a5a9dc5fe3dc5198f454ee6bb5767"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/backup-manifest.json",
+    "size": 143,
+    "sha256": "50b9b3c040dee6ca309a7da1c7b693f668df3487ece6d847ca03f22a41092b43"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/before.db",
+    "size": 195096576,
+    "sha256": "d740b83365cc6527dd26bd96ca4adc8a104b738ea751f5cf8fb21d9025c18c3f"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/owner-delegated-review.before.json",
+    "size": 6488,
+    "sha256": "5cf6dc3fb46370deec01d85e380ce923e8a85e300acb7338afb4067bd009400b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/owner-delegation-before-q49.json",
+    "size": 6430,
+    "sha256": "5bc08b358c6239a7161ffb840b2cfbcd82cdf2b49dfe20fbc3613f0c74457992"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/owner-delegation-before-renewal.json",
+    "size": 6488,
+    "sha256": "5cf6dc3fb46370deec01d85e380ce923e8a85e300acb7338afb4067bd009400b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/owner-delegation-current-q49.json",
+    "size": 6428,
+    "sha256": "8ea5ae64a2b8d597918bb106682bfc74ccb0dd2a5d9f1ec5020e20587a603d14"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/owner-delegation-current.json",
+    "size": 6430,
+    "sha256": "5bc08b358c6239a7161ffb840b2cfbcd82cdf2b49dfe20fbc3613f0c74457992"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q06-owner-review.json",
+    "size": 2390,
+    "sha256": "febd764d5460cfa0747655907dedce2b294b19167b023ad1f5205a130512a1d0"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q09-owner-review.json",
+    "size": 1856,
+    "sha256": "04f7e101130f680d777da96c73cd77562425977b8c5c0a5b0aec81cab220de32"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-final-quality-ledger-response-0001.json",
+    "size": 6527,
+    "sha256": "7d983454c2548dbf30a40c535230290bbf8cb63cdd6c4107693023bf732c7af6"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-final-quality-ledger-response-0002.json",
+    "size": 9674,
+    "sha256": "7caee8a749ecf176ec86fe882ac4a4a683fd2522664141ab45a4ada20b544d9b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-final-quality-ledger-response-0003.json",
+    "size": 30481,
+    "sha256": "ec08dc5c6fc800f92d6bf87335042a15fe9853a4be1040207a44e2d4996dbae0"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-final-quality-ledger.json",
+    "size": 5066,
+    "sha256": "9c8f17858fb415bec6b3bcfe9bca36766f27078236b36cd92c9be5eeb3e8e63d"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-owner-review.json",
+    "size": 2114,
+    "sha256": "2f300e9b975f9c2f14d517b5ea0d7609ce4e32df735991f5b4071cedb8fb39e1"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-prepare-ledger-response-0001.json",
+    "size": 227820,
+    "sha256": "de43d5c3be24adf7b109824334c0e939b3e1be051695c90f6219cdac947bc5f4"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-prepare-ledger-response-0002.json",
+    "size": 227895,
+    "sha256": "6b74ed1f8010716a62a4c29d2025db8fd8f64edab14926305bd2fc2f5ea19985"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-prepare-ledger-response-0003.json",
+    "size": 227870,
+    "sha256": "2a4e5990291d55c688f9940cb3883f8b6da7968f244ebdae80cc2038e1bd7788"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-prepare-ledger-response-0004.json",
+    "size": 227818,
+    "sha256": "34751dd2ee418f913b844e12ccc09b03fd925a90bd6b679812ce877d13b520d7"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-prepare-ledger-response-0005.json",
+    "size": 227812,
+    "sha256": "d9682afeaf31f5c8ed2964872c3cbb3d8e0039dc4a37bceaf32d8e254d3699d7"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-prepare-ledger.json",
+    "size": 6164,
+    "sha256": "6c852cdebc6f5bf686175092ac949ac9148d7fc573be3565c2d14e0638b02ce8"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-quality-ledger-response-0001.json",
+    "size": 17518,
+    "sha256": "a7b905a6e7d3e1473957e74e1453138dd352383c73f83e67f1b39541d2d936b3"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-quality-ledger-response-0002.json",
+    "size": 22918,
+    "sha256": "af305dd938eea4b68476d347a85b3e32c81a6912a05bd1c351f034d3f1a2ba16"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-quality-ledger-response-0003.json",
+    "size": 776,
+    "sha256": "db5c70ed2ac0e222c4e58d77f5781fc4e3a6e10c3a7964cb017569b0f98b6f90"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-quality-ledger.json",
+    "size": 4522,
+    "sha256": "a61c19c2e8ed211699a55b5a8fd8c7f05da83f61d98b73b51c1760b950ba6623"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-recovery-ledger-response-0001.json",
+    "size": 7310,
+    "sha256": "64a2016f353af154dd89c271f5a373f8eba8ea38d45e37befb42d41855dfd651"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-recovery-ledger-response-0002.json",
+    "size": 53813,
+    "sha256": "2dafaee704e961b9903791b614356526cf0b703de2a978456c8f4cbe8cf2620e"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-recovery-ledger-response-0003.json",
+    "size": 49310,
+    "sha256": "527bd39b839786be59dcbb3748246d4b1c600dec5fa7c387f4d5cebfd88df7b6"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-revision-recovery-ledger.json",
+    "size": 5090,
+    "sha256": "4efd72f8d4bcbc8d9827f53e9215a9f9a377c298675e73d85a3dd0fbad0e2507"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-source-quality-ledger-response-0001.json",
+    "size": 10126,
+    "sha256": "c9e5317471ff717401b747aba255fca73439f0b95c1a58162b5d0880c59c994f"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-source-quality-ledger-response-0002.json",
+    "size": 4093,
+    "sha256": "571dc47aa743d7fa79c767edf7c82017e4c9e8f64532633103e7775e6c95898b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-source-quality-ledger-response-0003.json",
+    "size": 21003,
+    "sha256": "456c3a1e0b5eb84512845801b6edb73b4205776413f675b6ee12e524fe8acd9e"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q36-source-quality-ledger.json",
+    "size": 5067,
+    "sha256": "ed83ffc2cb15f3800b65abbd9b19ea81c5f48ed98cfd3510df785494c6871054"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q49-owner-review.json",
+    "size": 1885,
+    "sha256": "72aa84483fa6d70aa863fe3f207eb9bc28f37e737e9bbab9621bc5440ca4434c"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q49-quality-ledger-response-0001.json",
+    "size": 15801,
+    "sha256": "e5d0573b2c3f1110db483e053498fd6d9f3858893e18274b54f0f1a4d0e651a0"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q49-quality-ledger-response-0002.json",
+    "size": 2476,
+    "sha256": "2e772fadd1d17c4707a92b88e77843dadc320e13b4d82c5798cc22328da8c80e"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q49-quality-ledger-response-0003.json",
+    "size": 23024,
+    "sha256": "57771d36dc8b5fbc1f42633c194928175db3c1f14b10b60c3f659aeed20aa2b3"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/q49-quality-ledger.json",
+    "size": 5030,
+    "sha256": "2923b9dd5755641d08d17b2fab2a168067ca71c2ec2caf3bdfd76adba36d1ac0"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_closeout_20261027/本轮验收与未完成事项.md",
+    "size": 3937,
+    "sha256": "e9690cd1db0b895bbdf41e1fe7a3a6ce09f2268ad7f20b463db73fd6bb2588a2"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/api-verification.json",
+    "size": 393,
+    "sha256": "9606e92a83d315bee55b436966001ff48b499429a6c1280433c9dc87f7c9f42f"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/backup-manifest.json",
+    "size": 4167,
+    "sha256": "4b5ae1029c02dcda5b4d096c937a61985545fc47c78004408fe4dd97732bc5dc"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/before.db",
+    "size": 195096576,
+    "sha256": "b3b6db29712d6a8fbb56bd7b104c6b9114d2c89392646c86698de23c390644fe"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/execution.json",
+    "size": 5885,
+    "sha256": "256c3c18db715da82ee55dcf3f5177cd5de606b461e5d52767fdb69aa9701461"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/final-verification.json",
+    "size": 4186,
+    "sha256": "d2f355a15fcfecdd90a8f3946b8dfc543a7211ed5d7d47c6ca0290f7547da0ff"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/historical-audit-records.json",
+    "size": 601135,
+    "sha256": "3c09ad4b5cc0a23560048d46856cb605d4bb530d9aca6740e5ad735a14448b8c"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/original-audit-records.json",
+    "size": 530636,
+    "sha256": "04cda8de7862cf126069e23f37b6dca654ce49755819ebc817c3aa896a82d550"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/prepared.json",
+    "size": 2235925,
+    "sha256": "ef4719d6ec82299a1fc9f8537d9a814d7b7c5c9c477433e2457ae4a52d779cb8"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/runtime-after.json",
+    "size": 1754,
+    "sha256": "c82ebeb244ae016b2d04a2522f8fe8bc683f34d73126939e70a1e9f3fb43281b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/runtime-before.json",
+    "size": 1754,
+    "sha256": "36e76fbee8c6f3078b51916c581919506fa46b522ccea39a816ce4c05cc9312b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/runtime-final.json",
+    "size": 1754,
+    "sha256": "c82ebeb244ae016b2d04a2522f8fe8bc683f34d73126939e70a1e9f3fb43281b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_content_replacement_20261025/runtime-identity-explanation.json",
+    "size": 792,
+    "sha256": "fd2571b14ccd258f129cdfbe540c52ddf773bed18f25792e1543a7ca52d439fe"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_electrical_closeout_20261027/applied.json",
+    "size": 17738,
+    "sha256": "e9fb205c5e306125b20800d855dd729d221b7cc4f95ff70254e8dd20bbecf0e9"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_electrical_closeout_20261027/before.db",
+    "size": 195096576,
+    "sha256": "beac6038f8e1df0ab564395d09ded79992913a408e4ab137c6f9358c6b9e3ef4"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_electrical_closeout_20261027/plan.json",
+    "size": 17472,
+    "sha256": "1a140b4646b7ffc724e4fbd0d9eaf83853388fc54289b61f017013ea8f0c2d4c"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_electrical_closeout_20261027/usage.json",
+    "size": 139775,
+    "sha256": "e1a7d68dabe9ef93412e947c416588b05b7e40087a5c012d4cc7046bf29a3304"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_electrical_closeout_20261027/verification.json",
+    "size": 610971,
+    "sha256": "79c4d66602b80d6b367b6b433c73dd3214a4a3a21bd829fff77699cd670bc20d"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_governance_20261026/applied_revisions.json",
+    "size": 4618,
+    "sha256": "0523394aae0fba6c59497075df74b9300c7e7b0abe81e4a3184d231a9c7242ef"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_governance_20261026/backup_verification.json",
+    "size": 2628,
+    "sha256": "e35e0ced1c5a699aa75a45b8c3351b9cfd6fa41c2fcb549433223bd92673b468"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_governance_20261026/before.db",
+    "size": 195096576,
+    "sha256": "1b8579954f80770dc651075021518b827501ee291cfe9b6002b56e1a4881e81f"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_governance_20261026/execution.log",
+    "size": 1905,
+    "sha256": "069e2b134b5f6836786f7414e0cea77af619e05a5b57567b85713c575cb5c6e2"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_governance_20261026/fact_diagnostics.json",
+    "size": 138395,
+    "sha256": "7291d97daf8fdb9282048d4160ba31601ac806fa086a880f8e6db2bf716b78d9"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_governance_20261026/full_review_and_plan.json",
+    "size": 136880,
+    "sha256": "fd8208ace66d5f4a3d4c567cff676299617009a360572320757671ab4e392cec"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_governance_20261026/new_usage.json",
+    "size": 22455,
+    "sha256": "8a8acfa084ce5fdb9c230204ae6b872d72460c88fb4324408803f5a2627f2742"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_governance_20261026/usage.json",
+    "size": 139036,
+    "sha256": "cd18f212be50ccdf41343150556a25044031a6e673dce10d99df0385ea22248d"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/archived-lineage.json",
+    "size": 707556,
+    "sha256": "40b9ed87bd0eef8ecba709ef0f86dfb9360da8ed54e872da32bc6d7ec6028f33"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/backup-manifest.json",
+    "size": 196,
+    "sha256": "fe3f0ddd0019a9a9e867606cfecf9881bf42e6d8b4e10fdae78f45884b72d13a"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/batch-01.json",
+    "size": 9463,
+    "sha256": "81900cc90dd3b195ff5e6a76eb185d5684637781e163c94c1347c2f70360af48"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/batch-02.json",
+    "size": 6414,
+    "sha256": "36494317da96b0a32517a7d2131f425b7e8c233d06749022772963f7c0b598f5"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/batch-03.json",
+    "size": 7342,
+    "sha256": "b969b59f28d6a6a89e3039e2c87578ebaa78a929c1d181ad38eda0361f82d245"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/batch-04.json",
+    "size": 9015,
+    "sha256": "ecef2c2d2f70e860c13623f76242d11c800b91878c9241e416384296d5cf63f5"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/batch-05.json",
+    "size": 8385,
+    "sha256": "680e145e85bd1dd1c760a084817f80120d9e98c77b95b405e11cf94116b4d918"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/before.db",
+    "size": 195096576,
+    "sha256": "02e63f0f4b5eceecaf61a6f8589e13e6d3ea3af0ee0a3360a9c635009feb2f52"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/final-supplement-input.json",
+    "size": 272291,
+    "sha256": "bbd13f4cf93016237017c93621eb43e7b32268043e5695df93c4b3c80e3b3cfc"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/final-supplement-ledger-response-0001.json",
+    "size": 85792,
+    "sha256": "10832b86c6e3f48e6b74bd3f703a3ff970dc70814941b7704543946ee1af620e"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/final-supplement-ledger.json",
+    "size": 9388,
+    "sha256": "bc15e98819504daed82decf1838cd8fb5f80fd4b1af3de74fb19509a4f102a87"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/final-supplement-review.json",
+    "size": 14659,
+    "sha256": "7b6175b4bf2d46fcd30d55c5e45c0581222bd5d2cd97275c4e0a4cbc640253fd"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/lineage-ledger-response-0001.json",
+    "size": 73452,
+    "sha256": "590410d47da42fa84b111ba93726436fbfeb89e2a7633d0f13dfe3714df48a2b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/lineage-ledger.json",
+    "size": 9372,
+    "sha256": "c69d2a9c6bea4d68a5b0a869f2b97ee72a8fe75652e95d39ed34da7537ecff2b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/lineage-review-input.json",
+    "size": 525860,
+    "sha256": "5c1b1494d416cf451e9b850dd56fa68ce15dfb3090164b0b3c6276e255b48db9"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/lineage-review-selected.json",
+    "size": 135406,
+    "sha256": "0e6cec3e18f680f94a2f029ad9b8e6c6a87a10df067da925ac6675a9858750be"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/lineage-review.json",
+    "size": 10082,
+    "sha256": "78e9d7af840b30dee8392f395bf471716da848180f41c54b3e45e0937568cc9f"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/negative-material-input.json",
+    "size": 145514,
+    "sha256": "b5f42366310a2ff6077da6a6d68c74f58c2b534903acd08e25d347d4e1a7ee68"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/owner-authorization-20261027.json",
+    "size": 6488,
+    "sha256": "5cf6dc3fb46370deec01d85e380ce923e8a85e300acb7338afb4067bd009400b"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/owner-authorization-20261027.txt",
+    "size": 343,
+    "sha256": "95a35a5dd0a858c5863a62cb8f9b0dc5ed49d86e3ced7d4599665acd12fa835c"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/partial-review-20261027.json",
+    "size": 3569,
+    "sha256": "518247597029ab530c64a27df8b7ae9c105f7241b03ef8fecd1958456b7698f4"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/pdf-source-preflight-refined.json",
+    "size": 33246,
+    "sha256": "f4177d73b3e34ce5a570d8836893a7e02e7a2f2c0ccedeac8f7558c449e945a8"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/pdf-source-preflight.json",
+    "size": 30592,
+    "sha256": "19aea49b1e39e20e7965b6acfd21b3e11ea5920d0f11c9b6d96d38c1effa3f55"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/preflight.json",
+    "size": 697490,
+    "sha256": "6cc96e772fec321bd0e4db21d3c8f2ae61c3a8011e4c85b3740910661dad6003"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/previous-owner-delegation.json",
+    "size": 1336,
+    "sha256": "55a28224fead498c77a08f3280d613debf391aea1efdd5529f7b119759fbaec5"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/provider-ledger-response-0001.json",
+    "size": 80740,
+    "sha256": "fc05d5a7679d650a8056a4cada68657de5efd2cfd322a8ad8259c42d9920cda7"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/provider-ledger-response-0002.json",
+    "size": 93894,
+    "sha256": "1edb850b3d3303a70a8f83df198b54c735cd19189450770520a3cc23610e798c"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/provider-ledger-response-0003.json",
+    "size": 71739,
+    "sha256": "5f98ba609a97305bef770adf9bfa34b7b29a50f5349966695714c2dca3729e6c"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/provider-ledger-response-0004.json",
+    "size": 70226,
+    "sha256": "2385d6f69a234fc8c7ab14e0517b1b58837c90f7e821f825083346a69f08a105"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/provider-ledger-response-0005.json",
+    "size": 88019,
+    "sha256": "e085b03b8c191048f12cf826cbc9db88c8a2c26dc8e3fcfc7e943280413db406"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/provider-ledger.json",
+    "size": 14412,
+    "sha256": "cea1d1acdea478c4a3aa93f06c5ffa356779590853abd27a68b8ed0ef344890a"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/risk-reviews-20261027-2.json",
+    "size": 6668,
+    "sha256": "8656b0316a7ecac7035d97f494b8bf6313d6a6abf365a05ff3c9b99a3f5c1bb1"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/risk-reviews-20261027.json",
+    "size": 6444,
+    "sha256": "4fc81d6a902116eeb1d92ec51e5de166508c756f064b4f9c994afabeb5facb37"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_final_semantic_20261027/本轮结果与剩余阻断.md",
+    "size": 2420,
+    "sha256": "9a8059052ab65047e2af93ec1ee459c516e298f390af43b1535b9cc082f232ef"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_q25_list_20261027/before.db",
+    "size": 195096576,
+    "sha256": "27eee23ac1d3a0c6ed0644f66eacc9b147dd28c254b8040422dfb31a3cf12078"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_q25_list_20261027/manifest.json",
+    "size": 127,
+    "sha256": "9cf2a02b8b4a8e97f7d35ac329410e66826b25a09d5454d778252c893b13de40"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_q25_list_20261027/owner-delegation-before-q25.json",
+    "size": 6428,
+    "sha256": "8ea5ae64a2b8d597918bb106682bfc74ccb0dd2a5d9f1ec5020e20587a603d14"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_q25_list_20261027/owner-delegation-current-q25.json",
+    "size": 6427,
+    "sha256": "546ded33b09b8d70546f295eb125a04c4fc90df7e6761824949415f7228238e2"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_q25_list_20261027/q25-owner-review.json",
+    "size": 1666,
+    "sha256": "9804fd72f01614315b84df12741cab0842fff8cbfdd0e97521f407e73993239c"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_q25_list_20261027/q25-quality-ledger-response-0001.json",
+    "size": 15855,
+    "sha256": "786d4baa9ce0e7314c6d94639571b9504d4de20b53c029c2a5845a2c182cce03"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_q25_list_20261027/q25-quality-ledger-response-0002.json",
+    "size": 21674,
+    "sha256": "f63e7e13930d3b3fa5b5c137b064657c0e4db613be3ca4e00db94017e42e738f"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_q25_list_20261027/q25-quality-ledger.json",
+    "size": 3756,
+    "sha256": "a2921ead1bac788884ebc094a95a4c85a1d9971b41463fe3a92b0f54da88f34f"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_service_restart_20261027/before.db",
+    "size": 195096576,
+    "sha256": "c2cabc160b19ec5e96357ee13818d748d1dc02aafb207688c5e5c919b03d0d6e"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_service_restart_20261027/manifest.json",
+    "size": 127,
+    "sha256": "6d43e9ef377f902b5f77eeb6f64241c6503a1dbe83512d805a8817de23d7f405"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_simple_20261027/before.db",
+    "size": 195096576,
+    "sha256": "ce0734642d31f31a7861c5c4daffaa1daa315b1d6f1776a8f6abb4ba1da3559c"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_simple_20261027/manifest.json",
+    "size": 127,
+    "sha256": "6fb0d357024e750ea64b7d7950e2b8101952f4051bf05b2050a93ce2f68d9dcc"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_simple_20261027/q07-q28-reviews.json",
+    "size": 5320,
+    "sha256": "9b8ce283b0be8eb1aba4d8c5d191eb0b761f2f2ffc46bb703ca42022487d5609"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_simple_20261027/reviews.json",
+    "size": 11786,
+    "sha256": "2b517bd90dd83c2c788717bb2289e2c1529c154269ed7bc1b52c3a6fd9b6b7a9"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_unified_contract_20261027/50题独立语义审核_拟发送载荷.json",
+    "size": 398744,
+    "sha256": "b76bff4b581a7a3c9fd0fc584fbce26da70e94cd0e68eaa118c3444dbf9dc2d2"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_unified_contract_20261027/applied.json",
+    "size": 31922,
+    "sha256": "9ad0df33cf5e9150238b1209fe2c496929c8e6503cdbd922170fa7b5747273af"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_unified_contract_20261027/before.db",
+    "size": 195096576,
+    "sha256": "a1495ea017946bdf79ea80ebd9d9ad55d5dc1e494ac5b48842bd7082c8d83334"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_unified_contract_20261027/pending_issues.json",
+    "size": 1269,
+    "sha256": "6a4397459defb0edcff2bd268cb7103a40800633f10caf24d9d06ab8659e9a7e"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_unified_contract_20261027/plan.json",
+    "size": 31390,
+    "sha256": "fe14acd995314165e718d934cbfce3bde7c24ee5184e634b43247235d3285fe6"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_unified_contract_20261027/synthetic_model_checks.json",
+    "size": 161455,
+    "sha256": "bbf9752b345de3dae55d5c9d03d4754806dba55393be0e3da30bda719c81e6ab"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_unified_contract_20261027/synthetic_model_checks_runner.py",
+    "size": 5749,
+    "sha256": "9eea4d9ba05f7c65d42eee50d232f27fabcf4736017d3413dad9113ed19c5748"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_unified_contract_20261027/usage.json",
+    "size": 139035,
+    "sha256": "a736fb35c2cb010d2d0798634b1fda0959378410496c9afc28f8ad2b4b2521e1"
+  },
+  {
+    "path": "backend/data/audit_backups/golden_unified_contract_20261027/verification.json",
+    "size": 559509,
+    "sha256": "2986ee7093bc1cecd5b5e7be84a304d81288717744f65a566a6e66270fe89b13"
+  },
+  {
+    "path": "backend/data/audit_backups/judge_vnext_20261029_before_reload/before.db",
+    "size": 195096576,
+    "sha256": "6b8da42b3963bb9109f85e668b6469297f9276e1d30670c97cf777ebeffe1807"
+  },
+  {
+    "path": "backend/data/audit_backups/judge_vnext_20261030_reload/before.db",
+    "size": 195096576,
+    "sha256": "6b8da42b3963bb9109f85e668b6469297f9276e1d30670c97cf777ebeffe1807"
+  },
+  {
+    "path": "backend/data/audit_backups/page-performance-20261025.db",
+    "size": 195096576,
+    "sha256": "6b58c33bf73ff13ef4aee5c12eb0bd235fb0ed7d17d23d1e298dc02844402d90"
+  },
+  {
+    "path": "backend/data/diagnostic-batches/agent-diagnostic-20261022-owner-nine-no-retry-response-0001.json",
+    "size": 64384,
+    "sha256": "311c618917ddd543df1c3074219305bd6e43d580cbeab18e99e8b2d962641fa3"
+  },
+  {
+    "path": "backend/data/diagnostic-batches/agent-diagnostic-20261022-owner-nine-no-retry-response-0002.json",
+    "size": 57074,
+    "sha256": "8e7c372dfe6f69923af629551054dc9a76c824af7a8252ba595bcdb49bbc5a1a"
+  },
+  {
+    "path": "backend/data/diagnostic-batches/agent-diagnostic-20261022-owner-nine-no-retry-response-0003.json",
+    "size": 32940,
+    "sha256": "457639e7d82230d4eca83d6c86c168e55cd887b71246cf910cf7bcfd0eaf94d4"
+  },
+  {
+    "path": "backend/data/diagnostic-batches/agent-diagnostic-20261022-owner-nine-no-retry-response-0004.json",
+    "size": 56838,
+    "sha256": "22e4ec72d3b953c6c8909e53df0bbd8d0de2820629ddac719321f4cf867de8a3"
+  },
+  {
+    "path": "backend/data/diagnostic-batches/agent-diagnostic-20261022-owner-nine-no-retry-response-0005.json",
+    "size": 52162,
+    "sha256": "4561b3c8a9bba77b4cd2381cf1c8ac283aedefcc887210db9b78951999ff2bf0"
+  },
+  {
+    "path": "backend/data/diagnostic-batches/agent-diagnostic-20261022-owner-nine-no-retry-response-0006.json",
+    "size": 71975,
+    "sha256": "3eb7f67e9acd00872705dd933f8f836641d1344179bb899b4932958526f170e1"
+  },
+  {
+    "path": "backend/data/diagnostic-batches/agent-diagnostic-20261022-owner-nine-no-retry-response-0007.json",
+    "size": 87509,
+    "sha256": "ba94b1fd26953d7a9515dc1388ec021e40a805cd7a42d412d518f0a3e513eb5c"
+  },
+  {
+    "path": "backend/data/diagnostic-batches/agent-diagnostic-20261022-owner-nine-no-retry-response-0008.json",
+    "size": 42408,
+    "sha256": "004a33d29ad21ee4bca8be91cf0da8c18255c681022f35f8a689cd2c933e996b"
+  },
+  {
+    "path": "backend/data/diagnostic-batches/agent-diagnostic-20261022-owner-nine-no-retry-response-0009.json",
+    "size": 44041,
+    "sha256": "41437f072bcf1bd85820b4ec24577ec00a2699d0a39f600a36c1ec76736889f1"
+  },
+  {
+    "path": "backend/data/diagnostic-batches/agent-diagnostic-20261022-owner-nine-no-retry.json",
+    "size": 12945,
+    "sha256": "dc9afdc8c0b635fc153cc7e6b2475ec3fa882585e356497627eeede68315e7f7"
+  },
+  {
+    "path": "backend/data/diagnostics/0b47b0687a27d4d37294ea06496eb241bee78d5fd4bbb421219645e1794f7716.claim",
+    "size": 998,
+    "sha256": "343782dc0d03a24696be7e1cadce3c235c7de381df728c3d14d7b4692d4dcd25"
+  },
+  {
+    "path": "backend/data/diagnostics/0b47b0687a27d4d37294ea06496eb241bee78d5fd4bbb421219645e1794f7716.json",
+    "size": 51108,
+    "sha256": "c9c2f4c8c43f988d607b5f065c51a9898772684aa418e6f6399dca3708f2048e"
+  },
+  {
+    "path": "backend/data/diagnostics/173795ef311979ca627b5aa5e17592d903cdfbb5410d5ac3d2815fb3ca5ccd71.json",
+    "size": 45136,
+    "sha256": "fc5d60e7ecf77589db8811050d75c2d441e74a27524b39d8f5d6e417fee72505"
+  },
+  {
+    "path": "backend/data/diagnostics/2e3669e0373b092a29c5a3d9a0dc281dffaa4df71e0c274e5a40b1cfed953f1a.json",
+    "size": 41627,
+    "sha256": "3f6979f0e8be881d7f50f3e2f4171b7de6ae9a022ece14a0a9249206a964b1a7"
+  },
+  {
+    "path": "backend/data/diagnostics/4be5693aaec5e440147230fe571f1eb7b511ab10f79a54c263b5610e2724207b.json",
+    "size": 51037,
+    "sha256": "6ba43cd74f09bceefb3ccf33eefd653670f1c41bf853446460a034b3fb13bca4"
+  },
+  {
+    "path": "backend/data/diagnostics/726b5840ab6ef3ed650298c493ffa5630369bb5af8bc01b6f08c0cd58762760b.claim",
+    "size": 984,
+    "sha256": "5619cddc9282a07491359b2a58737c2bf0a96d9700755ab43a77fb7780aa84ee"
+  },
+  {
+    "path": "backend/data/diagnostics/726b5840ab6ef3ed650298c493ffa5630369bb5af8bc01b6f08c0cd58762760b.json",
+    "size": 26813,
+    "sha256": "19a2bd02090e5a558de4260c3903e45c64e92037d19ef09d51c212e2474ff8ea"
+  },
+  {
+    "path": "backend/data/diagnostics/84184e22d5fcd7e4c860b9711b8151c6f8ec8c01ab80e3ccdd42def8cfaee554.claim",
+    "size": 984,
+    "sha256": "3d175cae19102b3627580dfb262645439e059d82beb8b4d430f96077255a8766"
+  },
+  {
+    "path": "backend/data/diagnostics/84184e22d5fcd7e4c860b9711b8151c6f8ec8c01ab80e3ccdd42def8cfaee554.json",
+    "size": 14414,
+    "sha256": "a9875283b1c6c6336056674c161a62a99f5fd1bf66637df3ba4e92ea795ac611"
+  },
+  {
+    "path": "backend/data/diagnostics/88e39853a6a9c9bffc7163b168f48b22f71cf9ca6b216a5241a3c683850a4295.claim",
+    "size": 984,
+    "sha256": "36530f2aacb85e4f2fed9e5f2e301f3b2db9d6082ee809c4e644faf2e4dc0811"
+  },
+  {
+    "path": "backend/data/diagnostics/88e39853a6a9c9bffc7163b168f48b22f71cf9ca6b216a5241a3c683850a4295.json",
+    "size": 33798,
+    "sha256": "f84c52be8cffb5018c2ba2a557968ec942c33080905ced4a9eedde7608decf28"
+  },
+  {
+    "path": "backend/data/diagnostics/9dac3c16da66278b1674e291b0c318d5782e5bc14c0de8ea97fa4832ce6ef55a.json",
+    "size": 33727,
+    "sha256": "7af82449469bdf0415d46f202684d7e0597a797a63e42445de45622a3849dc15"
+  },
+  {
+    "path": "backend/data/diagnostics/a7917f27bfda076c30a4e302b28bd5b60ce5acf9e1a049463673130dd72dc732.claim",
+    "size": 984,
+    "sha256": "445334a0154a37c602e71a3f005469f18de9d229b4bc279d359e91caf1770921"
+  },
+  {
+    "path": "backend/data/diagnostics/a7917f27bfda076c30a4e302b28bd5b60ce5acf9e1a049463673130dd72dc732.json",
+    "size": 38827,
+    "sha256": "05ab72b6aca01c05527a564f990b51895e027bb2f33bebf22c19792019c25912"
+  },
+  {
+    "path": "backend/data/diagnostics/ac61b4f74337acb9d6ce8d10f712d89c5002221332eefea4ed46fbcb27618e7e.json",
+    "size": 26742,
+    "sha256": "0362747967bed295b01e158b30a49fd9c9fb21dc520db8630823e5024001c2fe"
+  },
+  {
+    "path": "backend/data/diagnostics/b413b7111acb542b08b52759e6ff115052bc83644a216a00ba94707132bc9e2f.json",
+    "size": 72532,
+    "sha256": "6fda666fc152d08d52bbe5012fa7e99b515ee3d6a26d6c0a129fb0e9f78c9f17"
+  },
+  {
+    "path": "backend/data/diagnostics/bf0176006ea098a28b9811d0b3ac26944f7759c8269373d2ac9ac16d5653958b.claim",
+    "size": 984,
+    "sha256": "9c84deccb8f276b323b87d341c202ecc526f8a1800e2778fbeeb9733c59daf5b"
+  },
+  {
+    "path": "backend/data/diagnostics/bf0176006ea098a28b9811d0b3ac26944f7759c8269373d2ac9ac16d5653958b.json",
+    "size": 41698,
+    "sha256": "ee67aa655d721f9bb18814d345f2ae89317491ff51ee4df0d0f531707aa031ea"
+  },
+  {
+    "path": "backend/data/diagnostics/c3f340a017c0ba4086f17522c4a74090850e6804174083e12a852ea800e0f332.claim",
+    "size": 984,
+    "sha256": "2dd73c8a16e5d1763b278e472349e89b470bba11de8f48d2d9eebc2905ad4e0f"
+  },
+  {
+    "path": "backend/data/diagnostics/c3f340a017c0ba4086f17522c4a74090850e6804174083e12a852ea800e0f332.json",
+    "size": 72603,
+    "sha256": "ee5ac31373f1101d7b0082ac4f9025c892724528ffdaef8c5db4847f02bc722f"
+  },
+  {
+    "path": "backend/data/diagnostics/d6f5cf643d3d2ae133ab11d6e4199177c9da976e3a9d698533d26b9d0dc89c4d.json",
+    "size": 38756,
+    "sha256": "6a0320030587f4fa7b39ff46e4079cbbbe89d0a54220f1b575dc06ef28991f99"
+  },
+  {
+    "path": "backend/data/diagnostics/d96129b99d266ed11c66c1f6c3605812363a9fb10baf25affc3ff939cd312c50.json",
+    "size": 14343,
+    "sha256": "926c49a0fb58753e47bff61f7e72f0299c4af0aaf757a45d82db8d3bac52cc61"
+  },
+  {
+    "path": "backend/data/diagnostics/dffd12b4184d959e51d2187736c0869c12f570824a990867688cf64e538d5b81.claim",
+    "size": 984,
+    "sha256": "9195b4d538526d16c87558592978bb37e6db3cb8aab7d93fe800e5e7fd4d44b8"
+  },
+  {
+    "path": "backend/data/diagnostics/dffd12b4184d959e51d2187736c0869c12f570824a990867688cf64e538d5b81.json",
+    "size": 48274,
+    "sha256": "d60d9ce7234bac8a8d0b405281122672ea62e3d4ddc8bd927f48aff3cfd6d2f0"
+  },
+  {
+    "path": "backend/data/diagnostics/eb26838d36bfed8c993e7a722ea9090ff702e21d5a8e7122e554411f8751b0a2.claim",
+    "size": 984,
+    "sha256": "0d41ccf7f964f59d0abad4fc2f9db5bbb736d449c507c05d06d25e1ce874a71f"
+  },
+  {
+    "path": "backend/data/diagnostics/eb26838d36bfed8c993e7a722ea9090ff702e21d5a8e7122e554411f8751b0a2.json",
+    "size": 45207,
+    "sha256": "e9871adadfc8febc2003e36ca7efa96dbcf6c307c9dccbe9990696eb2d6a61a7"
+  },
+  {
+    "path": "backend/data/diagnostics/fd31b51956008dcb1c5b324df0a4db1dd1dae7bf3c0bf064b20d5a2b720a1348.json",
+    "size": 48203,
+    "sha256": "87e6b78bb293837bf14c547e69b3f04d0fd4dea3a0faf8e3660828a96e7459da"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/00_README.md",
+    "size": 2016,
+    "sha256": "dfc7bd1351bc92533d6c57cfadce8531908911f5f3a0219e51ef81ce26ff2228"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/01_BASELINE_50_JUDGE_MATRIX.md",
+    "size": 25428,
+    "sha256": "a9f61b02d5e0e297e0f91fe7b16e318ccdb64c8c3a21328986b0c79c962dad37"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/02_JUDGE_ERROR_AUDIT.md",
+    "size": 3207,
+    "sha256": "598fbc19a7b01c7f2c619390383ada69074b1bea4d736a8f97cf671ff60b6745"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/03_RETRIEVAL_AND_GENERATION_AUDIT.md",
+    "size": 2983,
+    "sha256": "3063378f39ec5682824198e7e6c51412b99f515d565b7c15ec13fd5dfabf001e"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/04_SCORING_AND_GATE_AUDIT.md",
+    "size": 7203,
+    "sha256": "f9a86fa8913c964202d3d6a2bd6994e1ad4b935d082b2fc9697700ae18b5c7b3"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/05_HISTORICAL_JUDGE_COMPARISON.md",
+    "size": 1592,
+    "sha256": "f0f1f8ae01d7c422a6ac2c64f4a41ca841880d34d1e84f796492d168d107b112"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/06_JUDGE_VNEXT_DISCUSSION_INPUT.md",
+    "size": 1794,
+    "sha256": "4936493e9a245e022eccf2b518eb70fb05691011ecba60a1fa9045abccf0ac30"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/07_50_CASE_SEMANTIC_AUDIT.md",
+    "size": 38169,
+    "sha256": "7e8be78136dd47896631bb5f136d16d8759c56da8550284accc5d5c9a1a76f88"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/08_12_FAIL_ROOT_CAUSE_AUDIT.md",
+    "size": 34580,
+    "sha256": "77003f4cc04b173085d42394d9710c1503618a1dd72575fc896dfd24149926a5"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/09_NEGATIVE_AND_SAFETY_AUDIT.md",
+    "size": 31841,
+    "sha256": "fddba366738904ac173572d233c7a1b833ec14d77ba557074dfc8586491cd286"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/10_RUNTIME_AND_FAIRNESS_AUDIT.md",
+    "size": 2775,
+    "sha256": "9bd510503d72c0421d4f204fd5f7d1eddde07ea19914c957c917e10a53821012"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/11_JUDGE_ACCEPTANCE_REVIEW.md",
+    "size": 2865,
+    "sha256": "c34f311a0bc3c2b420f090fa804a61ffcdd4af4bbc87b5ac09e7fe62228dc0ed"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/12_JUDGE_EVIDENCE_CLOSEOUT.md",
+    "size": 1583,
+    "sha256": "965fd5771d6d4db2e3e371f34889912838b4f9e9688b73a235ad5107656659ca"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/13_JUDGE_FINAL_AUDIT_SUMMARY.md",
+    "size": 4717,
+    "sha256": "860a8a1dc6d5e981101655af546ab1672bc0fd366743aa77df5915b9efd885ea"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/50_case_semantic_audit.json",
+    "size": 248375,
+    "sha256": "d3fad09cbcb56e32459d196e32d18371390c4c32c93570be6b519e1e4c466d5e"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/audit_manifest.json",
+    "size": 2802,
+    "sha256": "d95bc470c1a753cd7b36e48cc1fca14e587026e55cf5dc07beb74fb6445eaec0"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/audit_manifest_v2.json",
+    "size": 3464,
+    "sha256": "9dc32b873e8e855904cff3a50a569ff712e56138dc3f7e9fc2c4e6199e9002ea"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/baseline_50_audit_matrix.json",
+    "size": 115866,
+    "sha256": "0086851f29d5a7c24f14a02daf9680b381d40b464e2511aaf1140d66fbfa5975"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/baseline_50_full_records.json",
+    "size": 15141087,
+    "sha256": "970ee6e3f496e183c6597c2330c877d8f8a6f2ece29b9bd1dfed17dd84dbd3b2"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/baseline_run_identity.json",
+    "size": 11680,
+    "sha256": "befc36d2fbe859d78efd00f783be090b4655b0518ecc76f114df16011dade349"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_BASELINE_AUDIT/judge_acceptance_review.json",
+    "size": 7975,
+    "sha256": "d9d107f90446b7c9d48edafd38b8fb2b4bfb28ed85b26255f069c607727d0b70"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/00_README.md",
+    "size": 2308,
+    "sha256": "9218c5d4d36ce7dc56445a5316679d35f10c7f250b58a5933a99e979d0685df4"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/01_GOLDEN_FINAL_IDENTITY.md",
+    "size": 1449,
+    "sha256": "1fb756e39775e76809e83bfd2b2734aa973f56e4c078724117e05f3a72417265"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/02_GOLDEN_50_JUDGE_MATRIX.md",
+    "size": 146674,
+    "sha256": "4c6a61a0fdbb729d59527decf6fea657cecbbae84e24aae28cc58dbb95069faa"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/03_GOLDEN_PROBE_QC_AUDIT.md",
+    "size": 11248,
+    "sha256": "1022154a03716d051c6fd2501822244e77af13e868b1b6c21ad00497245fb315"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/04_EVIDENCE_AND_SAFETY_AUDIT.md",
+    "size": 62012,
+    "sha256": "4fe45ea4a60c2f99d73941d877c0ac493f4701d97dd6afdbcd3715a42dfffcf8"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/05_CURRENT_JUDGE_IMPLEMENTATION_AUDIT.md",
+    "size": 4204,
+    "sha256": "aaf63712ab37062cda9578079209009287f1ad0737e937cdbf9e29a2b610fff8"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/06_HISTORICAL_FAILURE_AUDIT.md",
+    "size": 163247,
+    "sha256": "dfa670fbfeb1e08dac33e8024df85f80a9152c8a290a57c1c8b48ea046729ba5"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/07_SCORING_AND_GATE_AUDIT.md",
+    "size": 3216,
+    "sha256": "c55ceaf16043c03bbce7aa3ff3fb8788ac14177d72c6f03bdebacca0f6527e5a"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/08_JUDGE_ACCEPTANCE_CASEBOOK.md",
+    "size": 26022,
+    "sha256": "bcc8853514cf6c00e8bf4859cc63f8686aa3d855996c0231be14045d37d8bcc6"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/09_JUDGE_DESIGN_HANDOFF.md",
+    "size": 4599,
+    "sha256": "0dd828c936ceb193ea707446fcd6f020875f0661257e465fce2a848b836d8c79"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/golden_50_judge_matrix.json",
+    "size": 1267232,
+    "sha256": "58cb6afc42d6caf1a443242531447eda09ba4e61d37f16b0302a4df0a475032d"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_INPUT/judge_acceptance_cases.json",
+    "size": 7573340,
+    "sha256": "72017b6556ee2e52b99da98c7cd98671ec96f92f21b0ef31fd8aff0f188d8510"
+  },
+  {
+    "path": "docs/JUDGE_VNEXT_PRE_IMPLEMENTATION_AUDIT_20261029.md",
+    "size": 2351,
+    "sha256": "6b98437a5eb74734a1a7a9904ee0ee3fb1c94b08b89ba35aee4d6e93e3d395d5"
+  },
+  {
+    "path": "docs/MEDIUM50_12_RETRIEVAL_RISK_AUDIT.md",
+    "size": 101310,
+    "sha256": "6adc27be2931978c68ef548a20f213c189158136238d5351fda6e6ba33a42f22"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/documents/卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+    "size": 15204744,
+    "sha256": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/documents/宇树_B2四足机器人用户手册_中文版.pdf",
+    "size": 12845747,
+    "sha256": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/documents/宇树_B2电池与充电器使用说明_中文版.pdf",
+    "size": 4348552,
+    "sha256": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/documents/宇树_B2遥控器使用说明_中文版.pdf",
+    "size": 7613198,
+    "sha256": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/empty.env",
+    "size": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/DOC-001-blocks.json",
+    "size": 427362,
+    "sha256": "86d6f4ef5bfa8bc329cd1376d420e4c22a8de5af81ac933f536412e5f36a1462"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/DOC-001-mineru.zip",
+    "size": 18198627,
+    "sha256": "b3bb83c6a306c70e4d77fae31771918562015416e26cc3aa65bad2ef6e3a64d2"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/DOC-002-blocks.json",
+    "size": 112627,
+    "sha256": "365ea72cfa8c75a7d3848e667c47548c0496134057705aed67b8ff390f91d6f0"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/DOC-002-mineru.zip",
+    "size": 11582685,
+    "sha256": "4a0045c922154bda52c3acec9167de5307c72c0ee3fc9702b7323f9e6884fa62"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/DOC-003-blocks.json",
+    "size": 59486,
+    "sha256": "06ee9785ad508838a90dd1a5bc280258cfd1219fb7ba47664ffb37bcc5a0b7de"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/DOC-003-mineru.zip",
+    "size": 8282125,
+    "sha256": "d848327ef6572c742063bc593f147c952b96f531700a8d4b82c01c61e048f7d0"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/DOC-004-blocks.json",
+    "size": 70195,
+    "sha256": "6d6dc775ac632ccda93b0ebc2f65954d53572f5e23417779b04f961afcf1b7eb"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/DOC-004-mineru.zip",
+    "size": 4507830,
+    "sha256": "ab056366a908ed5e3ef3195797fe705e1977848b324c97d2bf6900d7a6841fe6"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/chunks.json",
+    "size": 489780,
+    "sha256": "ed52f56b622f8b5d677d1828ec0dd745713f568c71e5412618e34f4131ee3ddd"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/coverage.json",
+    "size": 405570,
+    "sha256": "a4b1bb92692ea804f533a798d426d17b9b685729d7905fb20f418d24ace73551"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/documents.json",
+    "size": 1822,
+    "sha256": "056335fb99b5f180e24edef54316be1e5aa2d887f3d6bf7884227e147e6de054"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/embeddings.npy",
+    "size": 1507456,
+    "sha256": "a9ddcb7468286082a6f16ea754281c926cd269ef5c7d0aaa74df42103ac65448"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/faiss.index",
+    "size": 1507373,
+    "sha256": "ee5bb4977dcf28f8e2f8d1dfe92dee43e2106797710216958c05654eaacc2164"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/full_text.json",
+    "size": 164056,
+    "sha256": "314eab3323aea22036f80fc30053420960ce7e96fd6d0163ee23fde37136c197"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/manifest.json",
+    "size": 3276,
+    "sha256": "edef3a1b3d56fe91fc29c3df89db3712ba90c788db47cf794dbebf33d18c7131"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/parents.json",
+    "size": 410000,
+    "sha256": "3ea4832bda1cc1bf446ba92d8bdd972ce6c399650fc36e033151504a3253b928"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/index/source-manifest.json",
+    "size": 2953,
+    "sha256": "dc6aad86c333db4042343d77ec8a34867deb3c59be0f35ecea0748c016099a9a"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/assets/owner-delegated-review.json",
+    "size": 6427,
+    "sha256": "546ded33b09b8d70546f295eb125a04c4fc90df7e6761824949415f7228238e2"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/before.db",
+    "size": 195096576,
+    "sha256": "67538db90bb249388675cf86873d99ec893499d6fe84947d07a9187bb2180306"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/execute-before.db",
+    "size": 195096576,
+    "sha256": "67538db90bb249388675cf86873d99ec893499d6fe84947d07a9187bb2180306"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/README.md",
+    "size": 897,
+    "sha256": "27eb860edd4bdac6984465434b211a44e20f6594ae1f2922d71cf34fa81e35d9"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-13-audit.json",
+    "size": 611,
+    "sha256": "97c52f52cbbe7bcd3a8c22284c068f73d4570c7393dbcc88640df2a0ce367587"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-13-probe.json",
+    "size": 763,
+    "sha256": "cb1f541ec1c7609a78e6f0b14ad45efa1ee5181218f2df9d1122684e4f69bab6"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-13-qc.json",
+    "size": 801,
+    "sha256": "e008a7b7a098182b5e4ed67992d6baa7da948789b9e9a6ecf87e4745cde66927"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-13-revision.json",
+    "size": 520,
+    "sha256": "94d7433b323adaea2e1f9729061f2782e9ccfce879161846d0faf15f8157de0c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-15-audit.json",
+    "size": 877,
+    "sha256": "f4d035a4e8789087550028bfc32203c74686ab2558b81f11ec7928d06e3ec109"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-15-probe.json",
+    "size": 1029,
+    "sha256": "29b15f8ff231c99e8cc4bfdfb8318fdc274cbda67434611be7b8381aa13abc42"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-15-qc.json",
+    "size": 1078,
+    "sha256": "1044a02b8cf8933206fa4003908f1d6aeb3f95c2a2c6a7490ef0c6678163039c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-15-revision.json",
+    "size": 774,
+    "sha256": "f393fda86fcf9ec7e713550cd3ebc69037e456b3a83b05d21938920da4925bde"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-36-R122036474962-audit.json",
+    "size": 1142,
+    "sha256": "05182e948915b8ebe8858fcae34e54f5f81cdf325c6eb77251a801aa011b7eac"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-36-R122036474962-probe.json",
+    "size": 1391,
+    "sha256": "8ba0c0917b0481f740ab27bc5f2ef6a25e7225a0afec5100537a69b95a8d2779"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/V1G-110926448917-36-R122036474962-revision.json",
+    "size": 1051,
+    "sha256": "0b4d665bb95d35dda4018f8918691b362ec40983d68974a3bb62ad9d67a75b36"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/execution_summary.json",
+    "size": 8196,
+    "sha256": "7758c2053cfb89af1969c1f6e5d7270567d00e4a21d69c7def64bf51cc5b1f7c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/frozen-prices.json",
+    "size": 1104,
+    "sha256": "18a56ab81a5b96ec39a04f81bab3b5bf455529e7fcb5491dfd46d3a43a931a8c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0001.json",
+    "size": 227822,
+    "sha256": "fcfd74cb633d3e42f9e62d14f187d185a1d5cabf49aed4ed5c1842cb118807de"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0002.json",
+    "size": 227875,
+    "sha256": "43cac6b447dc972044cb7caa5977fb877c4a44c8d48506f40085c98e5dd5bd7f"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0003.json",
+    "size": 227838,
+    "sha256": "6f7310d98481c062c8924b8de19f8f33b560a47e7356c57e31b895b8fe34b405"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0004.json",
+    "size": 227783,
+    "sha256": "207de620d581bf48e445a9bbc8632eee72970cb19f7fe475c461690295663b94"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0005.json",
+    "size": 227812,
+    "sha256": "25bad9b1a61393de579cfec90d5e8617064275f922c5c89595c6c09771672501"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0006.json",
+    "size": 1402,
+    "sha256": "42a0b789b401e500e237135c4322124247d669a371a53289ef0fce776b454f91"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0007.json",
+    "size": 22901,
+    "sha256": "237b9f4aef13f1babcca8ac667beaf7eac3adf9b16d51a53b58f335c2971bb70"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0008.json",
+    "size": 772,
+    "sha256": "0843bab9987aae68d119afdd470c4730edc2d15d58644994a1dab1290e4f3fff"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0009.json",
+    "size": 3855,
+    "sha256": "8a6b3dfe17009ddae9a5688169326bf8a225ffa291fd19a12e2cf36496deabe6"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0010.json",
+    "size": 1322,
+    "sha256": "c594c290e1e21633b6dc6bba78a9229c4fa0f4324485c97ba60da3f7200d19df"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0011.json",
+    "size": 22949,
+    "sha256": "9197053babb4bafd34105c5970c07fb03c8a0d227bd32a5479fcc468dea54bec"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0012.json",
+    "size": 778,
+    "sha256": "2530f52a7217ebf15bf840785450cb781afce0a49acd03eef9054c1d30f5e201"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0013.json",
+    "size": 3722,
+    "sha256": "20f6a917038372d7852a1481c9bb6eb948fca26db408344021c17b322f9b1b11"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0014.json",
+    "size": 1821,
+    "sha256": "5c096d89731727a95cba4a485b2e60aebe52fceffe744b6e78555cdec71b94bf"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0015.json",
+    "size": 22918,
+    "sha256": "5bf57567f8c805a68af0f69bdd05a82ba83cb2b0a7b85b2fc7335345f7b59e4e"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0016.json",
+    "size": 776,
+    "sha256": "f7fba7a13a2a1c2fcb0cf4adb08ebbb27baf7539f90ee3d49249f70317548d93"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0017.json",
+    "size": 1227,
+    "sha256": "dbc240c603c931a7d80f46ffea68f62c306fb18e2b4d44c70ce5a9107680a965"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger-response-0018.json",
+    "size": 2166,
+    "sha256": "bfa0038a2e30ada98e6e6f196a637807c153c69457f349a87bb5929a80101d6f"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/ledger.json",
+    "size": 792509,
+    "sha256": "73fc3b208612a77f789d01068701a0ff8fe3315c665cf4bb5f5b0b88202d484f"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/plan.json",
+    "size": 325801,
+    "sha256": "556d364dab33165c267a5f0fced2c6a9ac405577e12c08b6c9def9e3f8d26b81"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/original-execution/similarity.json",
+    "size": 550,
+    "sha256": "59489a32775bf6a8424ecbe57be6e6f61a0159fa3e222bc8f13672b590c3762a"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_final/resume-check.db",
+    "size": 195096576,
+    "sha256": "850f081249b27c94c4852be3de4285c8e1bab7d3168d7b9b9271abbd0bceb988"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan.log",
+    "size": 261,
+    "sha256": "fea7e2722b3c8c03d5032d8b26cfb2ba5f80b4fff7eed4fd1d18aae17964662f"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/documents/卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+    "size": 15204744,
+    "sha256": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/documents/宇树_B2四足机器人用户手册_中文版.pdf",
+    "size": 12845747,
+    "sha256": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/documents/宇树_B2电池与充电器使用说明_中文版.pdf",
+    "size": 4348552,
+    "sha256": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/documents/宇树_B2遥控器使用说明_中文版.pdf",
+    "size": 7613198,
+    "sha256": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/empty.env",
+    "size": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/DOC-001-blocks.json",
+    "size": 427362,
+    "sha256": "86d6f4ef5bfa8bc329cd1376d420e4c22a8de5af81ac933f536412e5f36a1462"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/DOC-001-mineru.zip",
+    "size": 18198627,
+    "sha256": "b3bb83c6a306c70e4d77fae31771918562015416e26cc3aa65bad2ef6e3a64d2"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/DOC-002-blocks.json",
+    "size": 112627,
+    "sha256": "365ea72cfa8c75a7d3848e667c47548c0496134057705aed67b8ff390f91d6f0"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/DOC-002-mineru.zip",
+    "size": 11582685,
+    "sha256": "4a0045c922154bda52c3acec9167de5307c72c0ee3fc9702b7323f9e6884fa62"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/DOC-003-blocks.json",
+    "size": 59486,
+    "sha256": "06ee9785ad508838a90dd1a5bc280258cfd1219fb7ba47664ffb37bcc5a0b7de"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/DOC-003-mineru.zip",
+    "size": 8282125,
+    "sha256": "d848327ef6572c742063bc593f147c952b96f531700a8d4b82c01c61e048f7d0"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/DOC-004-blocks.json",
+    "size": 70195,
+    "sha256": "6d6dc775ac632ccda93b0ebc2f65954d53572f5e23417779b04f961afcf1b7eb"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/DOC-004-mineru.zip",
+    "size": 4507830,
+    "sha256": "ab056366a908ed5e3ef3195797fe705e1977848b324c97d2bf6900d7a6841fe6"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/chunks.json",
+    "size": 489780,
+    "sha256": "ed52f56b622f8b5d677d1828ec0dd745713f568c71e5412618e34f4131ee3ddd"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/coverage.json",
+    "size": 405570,
+    "sha256": "a4b1bb92692ea804f533a798d426d17b9b685729d7905fb20f418d24ace73551"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/documents.json",
+    "size": 1822,
+    "sha256": "056335fb99b5f180e24edef54316be1e5aa2d887f3d6bf7884227e147e6de054"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/embeddings.npy",
+    "size": 1507456,
+    "sha256": "a9ddcb7468286082a6f16ea754281c926cd269ef5c7d0aaa74df42103ac65448"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/faiss.index",
+    "size": 1507373,
+    "sha256": "ee5bb4977dcf28f8e2f8d1dfe92dee43e2106797710216958c05654eaacc2164"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/full_text.json",
+    "size": 164056,
+    "sha256": "314eab3323aea22036f80fc30053420960ce7e96fd6d0163ee23fde37136c197"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/manifest.json",
+    "size": 3276,
+    "sha256": "edef3a1b3d56fe91fc29c3df89db3712ba90c788db47cf794dbebf33d18c7131"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/parents.json",
+    "size": 410000,
+    "sha256": "3ea4832bda1cc1bf446ba92d8bdd972ce6c399650fc36e033151504a3253b928"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/index/source-manifest.json",
+    "size": 2953,
+    "sha256": "dc6aad86c333db4042343d77ec8a34867deb3c59be0f35ecea0748c016099a9a"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/assets/owner-delegated-review.json",
+    "size": 6427,
+    "sha256": "546ded33b09b8d70546f295eb125a04c4fc90df7e6761824949415f7228238e2"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/before.db",
+    "size": 195096576,
+    "sha256": "67538db90bb249388675cf86873d99ec893499d6fe84947d07a9187bb2180306"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/execute-before.db",
+    "size": 195096576,
+    "sha256": "67538db90bb249388675cf86873d99ec893499d6fe84947d07a9187bb2180306"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/execution-authorization.json",
+    "size": 378,
+    "sha256": "2d94f407f68ae337b8b8d15ea09950d422108410fcb5ee406717af6925dcf3e2"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/README.md",
+    "size": 897,
+    "sha256": "27eb860edd4bdac6984465434b211a44e20f6594ae1f2922d71cf34fa81e35d9"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-13-audit.json",
+    "size": 611,
+    "sha256": "97c52f52cbbe7bcd3a8c22284c068f73d4570c7393dbcc88640df2a0ce367587"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-13-probe.json",
+    "size": 763,
+    "sha256": "cb1f541ec1c7609a78e6f0b14ad45efa1ee5181218f2df9d1122684e4f69bab6"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-13-qc.json",
+    "size": 801,
+    "sha256": "e008a7b7a098182b5e4ed67992d6baa7da948789b9e9a6ecf87e4745cde66927"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-13-revision.json",
+    "size": 520,
+    "sha256": "94d7433b323adaea2e1f9729061f2782e9ccfce879161846d0faf15f8157de0c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-15-audit.json",
+    "size": 877,
+    "sha256": "f4d035a4e8789087550028bfc32203c74686ab2558b81f11ec7928d06e3ec109"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-15-probe.json",
+    "size": 1029,
+    "sha256": "29b15f8ff231c99e8cc4bfdfb8318fdc274cbda67434611be7b8381aa13abc42"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-15-qc.json",
+    "size": 1078,
+    "sha256": "1044a02b8cf8933206fa4003908f1d6aeb3f95c2a2c6a7490ef0c6678163039c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-15-revision.json",
+    "size": 774,
+    "sha256": "f393fda86fcf9ec7e713550cd3ebc69037e456b3a83b05d21938920da4925bde"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-36-R122036474962-audit.json",
+    "size": 1142,
+    "sha256": "05182e948915b8ebe8858fcae34e54f5f81cdf325c6eb77251a801aa011b7eac"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-36-R122036474962-probe.json",
+    "size": 1391,
+    "sha256": "8ba0c0917b0481f740ab27bc5f2ef6a25e7225a0afec5100537a69b95a8d2779"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/V1G-110926448917-36-R122036474962-revision.json",
+    "size": 1051,
+    "sha256": "0b4d665bb95d35dda4018f8918691b362ec40983d68974a3bb62ad9d67a75b36"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/execution_summary.json",
+    "size": 8196,
+    "sha256": "7758c2053cfb89af1969c1f6e5d7270567d00e4a21d69c7def64bf51cc5b1f7c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/frozen-prices.json",
+    "size": 1104,
+    "sha256": "18a56ab81a5b96ec39a04f81bab3b5bf455529e7fcb5491dfd46d3a43a931a8c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0001.json",
+    "size": 227822,
+    "sha256": "fcfd74cb633d3e42f9e62d14f187d185a1d5cabf49aed4ed5c1842cb118807de"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0002.json",
+    "size": 227875,
+    "sha256": "43cac6b447dc972044cb7caa5977fb877c4a44c8d48506f40085c98e5dd5bd7f"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0003.json",
+    "size": 227838,
+    "sha256": "6f7310d98481c062c8924b8de19f8f33b560a47e7356c57e31b895b8fe34b405"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0004.json",
+    "size": 227783,
+    "sha256": "207de620d581bf48e445a9bbc8632eee72970cb19f7fe475c461690295663b94"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0005.json",
+    "size": 227812,
+    "sha256": "25bad9b1a61393de579cfec90d5e8617064275f922c5c89595c6c09771672501"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0006.json",
+    "size": 1402,
+    "sha256": "42a0b789b401e500e237135c4322124247d669a371a53289ef0fce776b454f91"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0007.json",
+    "size": 22901,
+    "sha256": "237b9f4aef13f1babcca8ac667beaf7eac3adf9b16d51a53b58f335c2971bb70"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0008.json",
+    "size": 772,
+    "sha256": "0843bab9987aae68d119afdd470c4730edc2d15d58644994a1dab1290e4f3fff"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0009.json",
+    "size": 3855,
+    "sha256": "8a6b3dfe17009ddae9a5688169326bf8a225ffa291fd19a12e2cf36496deabe6"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0010.json",
+    "size": 1322,
+    "sha256": "c594c290e1e21633b6dc6bba78a9229c4fa0f4324485c97ba60da3f7200d19df"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0011.json",
+    "size": 22949,
+    "sha256": "9197053babb4bafd34105c5970c07fb03c8a0d227bd32a5479fcc468dea54bec"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0012.json",
+    "size": 778,
+    "sha256": "2530f52a7217ebf15bf840785450cb781afce0a49acd03eef9054c1d30f5e201"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0013.json",
+    "size": 3722,
+    "sha256": "20f6a917038372d7852a1481c9bb6eb948fca26db408344021c17b322f9b1b11"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0014.json",
+    "size": 1821,
+    "sha256": "5c096d89731727a95cba4a485b2e60aebe52fceffe744b6e78555cdec71b94bf"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0015.json",
+    "size": 22918,
+    "sha256": "5bf57567f8c805a68af0f69bdd05a82ba83cb2b0a7b85b2fc7335345f7b59e4e"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0016.json",
+    "size": 776,
+    "sha256": "f7fba7a13a2a1c2fcb0cf4adb08ebbb27baf7539f90ee3d49249f70317548d93"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0017.json",
+    "size": 1227,
+    "sha256": "dbc240c603c931a7d80f46ffea68f62c306fb18e2b4d44c70ce5a9107680a965"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger-response-0018.json",
+    "size": 2166,
+    "sha256": "bfa0038a2e30ada98e6e6f196a637807c153c69457f349a87bb5929a80101d6f"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/ledger.json",
+    "size": 792509,
+    "sha256": "73fc3b208612a77f789d01068701a0ff8fe3315c665cf4bb5f5b0b88202d484f"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/plan.json",
+    "size": 325801,
+    "sha256": "556d364dab33165c267a5f0fced2c6a9ac405577e12c08b6c9def9e3f8d26b81"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/original-execution/similarity.json",
+    "size": 550,
+    "sha256": "59489a32775bf6a8424ecbe57be6e6f61a0159fa3e222bc8f13672b590c3762a"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/plan.json",
+    "size": 189494,
+    "sha256": "a1d5dd34fdcf0e32061dcdec0ddeea2eb0a1d52fa3727aa3a6e19677c216ba70"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/request.json",
+    "size": 25344,
+    "sha256": "0032e02c0153883cc033569e59f409a19ba1a3b3b5a53483cc7cd1c79f52b394"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/resume-check.db",
+    "size": 195096576,
+    "sha256": "5d1ddbf96bb677e1c2c7dbe368a11a7858c1767b560819d5588f639442a9438a"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_plan/wire_payload.json",
+    "size": 25581,
+    "sha256": "c3296063ebeb95cb4cda202b8632ae2050fdaf7cc746c5a7725805d9bb8d51a7"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight.log",
+    "size": 261,
+    "sha256": "42f07f54341f8bcfe315107eae1ebea4920f74b6eea11f4263543387e0a6ce65"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/documents/卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+    "size": 15204744,
+    "sha256": "453ac9da8f24b1bbec2245b7017e95038e390093c12edf5eced094dc775f3be2"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/documents/宇树_B2四足机器人用户手册_中文版.pdf",
+    "size": 12845747,
+    "sha256": "b2dea9e4a93ba9e6e398a01bfb6e50d2369ee2b8227130215cb9ff7fdd12cceb"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/documents/宇树_B2电池与充电器使用说明_中文版.pdf",
+    "size": 4348552,
+    "sha256": "e9206d046f2641c4a2b144abde5b742905cb22d7927688f6caed564d3482960b"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/documents/宇树_B2遥控器使用说明_中文版.pdf",
+    "size": 7613198,
+    "sha256": "7c99af0259045dcc49d7c12533605fad9fa8b65e3f2aebbce16dcfb4e5809ab0"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/empty.env",
+    "size": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/DOC-001-blocks.json",
+    "size": 427362,
+    "sha256": "86d6f4ef5bfa8bc329cd1376d420e4c22a8de5af81ac933f536412e5f36a1462"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/DOC-001-mineru.zip",
+    "size": 18198627,
+    "sha256": "b3bb83c6a306c70e4d77fae31771918562015416e26cc3aa65bad2ef6e3a64d2"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/DOC-002-blocks.json",
+    "size": 112627,
+    "sha256": "365ea72cfa8c75a7d3848e667c47548c0496134057705aed67b8ff390f91d6f0"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/DOC-002-mineru.zip",
+    "size": 11582685,
+    "sha256": "4a0045c922154bda52c3acec9167de5307c72c0ee3fc9702b7323f9e6884fa62"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/DOC-003-blocks.json",
+    "size": 59486,
+    "sha256": "06ee9785ad508838a90dd1a5bc280258cfd1219fb7ba47664ffb37bcc5a0b7de"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/DOC-003-mineru.zip",
+    "size": 8282125,
+    "sha256": "d848327ef6572c742063bc593f147c952b96f531700a8d4b82c01c61e048f7d0"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/DOC-004-blocks.json",
+    "size": 70195,
+    "sha256": "6d6dc775ac632ccda93b0ebc2f65954d53572f5e23417779b04f961afcf1b7eb"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/DOC-004-mineru.zip",
+    "size": 4507830,
+    "sha256": "ab056366a908ed5e3ef3195797fe705e1977848b324c97d2bf6900d7a6841fe6"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/chunks.json",
+    "size": 489780,
+    "sha256": "ed52f56b622f8b5d677d1828ec0dd745713f568c71e5412618e34f4131ee3ddd"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/coverage.json",
+    "size": 405570,
+    "sha256": "a4b1bb92692ea804f533a798d426d17b9b685729d7905fb20f418d24ace73551"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/documents.json",
+    "size": 1822,
+    "sha256": "056335fb99b5f180e24edef54316be1e5aa2d887f3d6bf7884227e147e6de054"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/embeddings.npy",
+    "size": 1507456,
+    "sha256": "a9ddcb7468286082a6f16ea754281c926cd269ef5c7d0aaa74df42103ac65448"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/faiss.index",
+    "size": 1507373,
+    "sha256": "ee5bb4977dcf28f8e2f8d1dfe92dee43e2106797710216958c05654eaacc2164"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/full_text.json",
+    "size": 164056,
+    "sha256": "314eab3323aea22036f80fc30053420960ce7e96fd6d0163ee23fde37136c197"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/manifest.json",
+    "size": 3276,
+    "sha256": "edef3a1b3d56fe91fc29c3df89db3712ba90c788db47cf794dbebf33d18c7131"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/parents.json",
+    "size": 410000,
+    "sha256": "3ea4832bda1cc1bf446ba92d8bdd972ce6c399650fc36e033151504a3253b928"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/index/source-manifest.json",
+    "size": 2953,
+    "sha256": "dc6aad86c333db4042343d77ec8a34867deb3c59be0f35ecea0748c016099a9a"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/assets/owner-delegated-review.json",
+    "size": 6427,
+    "sha256": "546ded33b09b8d70546f295eb125a04c4fc90df7e6761824949415f7228238e2"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/before.db",
+    "size": 195096576,
+    "sha256": "67538db90bb249388675cf86873d99ec893499d6fe84947d07a9187bb2180306"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/README.md",
+    "size": 897,
+    "sha256": "27eb860edd4bdac6984465434b211a44e20f6594ae1f2922d71cf34fa81e35d9"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-13-audit.json",
+    "size": 611,
+    "sha256": "97c52f52cbbe7bcd3a8c22284c068f73d4570c7393dbcc88640df2a0ce367587"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-13-probe.json",
+    "size": 763,
+    "sha256": "cb1f541ec1c7609a78e6f0b14ad45efa1ee5181218f2df9d1122684e4f69bab6"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-13-qc.json",
+    "size": 801,
+    "sha256": "e008a7b7a098182b5e4ed67992d6baa7da948789b9e9a6ecf87e4745cde66927"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-13-revision.json",
+    "size": 520,
+    "sha256": "94d7433b323adaea2e1f9729061f2782e9ccfce879161846d0faf15f8157de0c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-15-audit.json",
+    "size": 877,
+    "sha256": "f4d035a4e8789087550028bfc32203c74686ab2558b81f11ec7928d06e3ec109"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-15-probe.json",
+    "size": 1029,
+    "sha256": "29b15f8ff231c99e8cc4bfdfb8318fdc274cbda67434611be7b8381aa13abc42"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-15-qc.json",
+    "size": 1078,
+    "sha256": "1044a02b8cf8933206fa4003908f1d6aeb3f95c2a2c6a7490ef0c6678163039c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-15-revision.json",
+    "size": 774,
+    "sha256": "f393fda86fcf9ec7e713550cd3ebc69037e456b3a83b05d21938920da4925bde"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-36-R122036474962-audit.json",
+    "size": 1142,
+    "sha256": "05182e948915b8ebe8858fcae34e54f5f81cdf325c6eb77251a801aa011b7eac"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-36-R122036474962-probe.json",
+    "size": 1391,
+    "sha256": "8ba0c0917b0481f740ab27bc5f2ef6a25e7225a0afec5100537a69b95a8d2779"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/V1G-110926448917-36-R122036474962-revision.json",
+    "size": 1051,
+    "sha256": "0b4d665bb95d35dda4018f8918691b362ec40983d68974a3bb62ad9d67a75b36"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/execution_summary.json",
+    "size": 8196,
+    "sha256": "7758c2053cfb89af1969c1f6e5d7270567d00e4a21d69c7def64bf51cc5b1f7c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/frozen-prices.json",
+    "size": 1104,
+    "sha256": "18a56ab81a5b96ec39a04f81bab3b5bf455529e7fcb5491dfd46d3a43a931a8c"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0001.json",
+    "size": 227822,
+    "sha256": "fcfd74cb633d3e42f9e62d14f187d185a1d5cabf49aed4ed5c1842cb118807de"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0002.json",
+    "size": 227875,
+    "sha256": "43cac6b447dc972044cb7caa5977fb877c4a44c8d48506f40085c98e5dd5bd7f"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0003.json",
+    "size": 227838,
+    "sha256": "6f7310d98481c062c8924b8de19f8f33b560a47e7356c57e31b895b8fe34b405"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0004.json",
+    "size": 227783,
+    "sha256": "207de620d581bf48e445a9bbc8632eee72970cb19f7fe475c461690295663b94"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0005.json",
+    "size": 227812,
+    "sha256": "25bad9b1a61393de579cfec90d5e8617064275f922c5c89595c6c09771672501"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0006.json",
+    "size": 1402,
+    "sha256": "42a0b789b401e500e237135c4322124247d669a371a53289ef0fce776b454f91"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0007.json",
+    "size": 22901,
+    "sha256": "237b9f4aef13f1babcca8ac667beaf7eac3adf9b16d51a53b58f335c2971bb70"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0008.json",
+    "size": 772,
+    "sha256": "0843bab9987aae68d119afdd470c4730edc2d15d58644994a1dab1290e4f3fff"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0009.json",
+    "size": 3855,
+    "sha256": "8a6b3dfe17009ddae9a5688169326bf8a225ffa291fd19a12e2cf36496deabe6"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0010.json",
+    "size": 1322,
+    "sha256": "c594c290e1e21633b6dc6bba78a9229c4fa0f4324485c97ba60da3f7200d19df"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0011.json",
+    "size": 22949,
+    "sha256": "9197053babb4bafd34105c5970c07fb03c8a0d227bd32a5479fcc468dea54bec"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0012.json",
+    "size": 778,
+    "sha256": "2530f52a7217ebf15bf840785450cb781afce0a49acd03eef9054c1d30f5e201"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0013.json",
+    "size": 3722,
+    "sha256": "20f6a917038372d7852a1481c9bb6eb948fca26db408344021c17b322f9b1b11"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0014.json",
+    "size": 1821,
+    "sha256": "5c096d89731727a95cba4a485b2e60aebe52fceffe744b6e78555cdec71b94bf"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0015.json",
+    "size": 22918,
+    "sha256": "5bf57567f8c805a68af0f69bdd05a82ba83cb2b0a7b85b2fc7335345f7b59e4e"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0016.json",
+    "size": 776,
+    "sha256": "f7fba7a13a2a1c2fcb0cf4adb08ebbb27baf7539f90ee3d49249f70317548d93"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0017.json",
+    "size": 1227,
+    "sha256": "dbc240c603c931a7d80f46ffea68f62c306fb18e2b4d44c70ce5a9107680a965"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger-response-0018.json",
+    "size": 2166,
+    "sha256": "bfa0038a2e30ada98e6e6f196a637807c153c69457f349a87bb5929a80101d6f"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/ledger.json",
+    "size": 792509,
+    "sha256": "73fc3b208612a77f789d01068701a0ff8fe3315c665cf4bb5f5b0b88202d484f"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/plan.json",
+    "size": 325801,
+    "sha256": "556d364dab33165c267a5f0fced2c6a9ac405577e12c08b6c9def9e3f8d26b81"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/original-execution/similarity.json",
+    "size": 550,
+    "sha256": "59489a32775bf6a8424ecbe57be6e6f61a0159fa3e222bc8f13672b590c3762a"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/plan.json",
+    "size": 162864,
+    "sha256": "9ff4ee057fddd316fa51413d557d28743d8133d467a4912768ad135eb1da2e03"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/request.json",
+    "size": 24801,
+    "sha256": "d9a9838dc69b19390ebae0ba4e4c9094430c28eb476a89139b126e93eb259434"
+  },
+  {
+    "path": "docs/judge_vnext_20261030/q36_qc_recovery_preflight/resume-check.db",
+    "size": 195096576,
+    "sha256": "5b6d62a990e590db260a8f75a031041cabdd283e3f943402f9517bd5299212fd"
+  },
+  {
+    "path": "outputs/agent_diagnostics_real_20261022/execution.log",
+    "size": 394410,
+    "sha256": "8700414593bd56f554e4925965f192af5bc62c6e9e1d06523b151df7da4e4331"
+  },
+  {
+    "path": "outputs/agent_diagnostics_real_20261022/invocation.json",
+    "size": 1015,
+    "sha256": "96176fa1151457191ff8ec47f3d98a2c998f12e25d336ee1f02c166e2e4dbd1d"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/50题索引.md",
+    "size": 10660,
+    "sha256": "57d6800ead37956bf44a7efe57319af804a360d5aeb96ea20fa8af485a63fb95"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/Q42证据冲突.json",
+    "size": 3119,
+    "sha256": "2358f82fb44e07866f1ba1da0bc4cee07ef4e26f9f78ea036fa29fd1ec3ea02d"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/agent_trace.json",
+    "size": 4657697,
+    "sha256": "20c1a9f1256f499447429897e652eb9f4adedfd8b04816a9fb8d4a678a77ae29"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/audit_required_chunks.json",
+    "size": 1123,
+    "sha256": "ee20ea26ba0da5659507976c21e255a00b69cd3b9394b171e7925f7bc85f8d62"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/build_evidence.py",
+    "size": 12690,
+    "sha256": "cee3628d9f10a849e97b4fd3748e7e312cd0dd6eb57854d3c490f737bb01bec0"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/candidates.json",
+    "size": 2161957,
+    "sha256": "fbcf7472b993fb9eb47febe7946fd81b8ecbb3f8831ae89db46b66bd377d0e6e"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/canonical_sources.md",
+    "size": 305232,
+    "sha256": "8c70b4acd59749fb245ac323e0191962979c56e0d629b20365cc6a413170c3e6"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases.json",
+    "size": 22165943,
+    "sha256": "8e09ea3a54410b7c6cc6d7fd079bb06e13c7ecb0b6d2debbffddaecf3a59132d"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q01.md",
+    "size": 49805,
+    "sha256": "541020e402ab165f10466e5197f64bb232d87f640ceab901a489c52c999297c3"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q02.md",
+    "size": 39330,
+    "sha256": "a815da5d7dcaa3b0f73195ccda1c5805f5ac89140cabd82638af757c9fd17402"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q03.md",
+    "size": 67106,
+    "sha256": "99e7039da6e0f5faa30ae54058b5e3ecf076102952f8d7b1ea5c39d5205b2371"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q04.md",
+    "size": 60446,
+    "sha256": "57c18fc17ca32fb17d2732c5b687ce228e642ea5e5e015434360babe07f2c491"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q05.md",
+    "size": 46452,
+    "sha256": "edfbd44190386367bcb7e6b775f33ac5e5daeaa7e7703b0d5c6b7fae5391af1b"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q06.md",
+    "size": 78269,
+    "sha256": "388d0524473788d7480e4e79698c044147121262fc33319f6d886b27925650c8"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q07.md",
+    "size": 74067,
+    "sha256": "70ffb993813a4a03c8a22bc7823a144cba74a69c04b19560583830da3db5ef6d"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q08.md",
+    "size": 104469,
+    "sha256": "95271828217aea9b727f7b839b7fe30401d7cbcd5fd7494d92d9b3bfe0423384"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q09.md",
+    "size": 60503,
+    "sha256": "ef40b9e54011aa8dfb597b794db6953321ce1345aaf25ad75a8e6f4fe0a30608"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q10.md",
+    "size": 71557,
+    "sha256": "f00f04a29f7ebc1b8b2419699fc9d964fefedad3c4a9f98648d33ae9c2bb3360"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q11.md",
+    "size": 50095,
+    "sha256": "a916a5623c2979ad0d61f6707c53ddfcb7c21b1e08ee7fd663e123ddf4d7c0b8"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q12.md",
+    "size": 58134,
+    "sha256": "495ee7d33b8c46acba818ae13f256e41af21dc9ebb8c511abd1ed14c0bd9ef41"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q13.md",
+    "size": 80634,
+    "sha256": "67b1f01dcfce5cf5b179e3a203fade51fd023d9d0313abe5fe18fdabd0440c91"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q14.md",
+    "size": 54378,
+    "sha256": "bd32e5035d477760118d1fa043a31499e5767a5b30197ad46780cda418c4fe3c"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q15.md",
+    "size": 73054,
+    "sha256": "123738d86ed1ff0439f08bc8fd731788bf305f60f9103676d12e040741adf400"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q16.md",
+    "size": 59710,
+    "sha256": "b0a882a919e085abced91fef9b3d7f919ca2dff177249903b97aa6fee72bb280"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q17.md",
+    "size": 95681,
+    "sha256": "f46f25312ce3317e15931312ec8041585bec96f0e6ee8d062524208511200a1d"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q18.md",
+    "size": 99119,
+    "sha256": "77af468980bbbd016fde47162873464ea8817c8c4b0f147f83781cde17b09faa"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q19.md",
+    "size": 45655,
+    "sha256": "d4b3e39b4e60ea6963983232241cb4c1c444efb94f5e42bd0a063c8918507d14"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q20.md",
+    "size": 50627,
+    "sha256": "339a7d81d5a3f6b335d62e7521741b00cd94fef92a59a2704599413a47c8f6a6"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q21.md",
+    "size": 51373,
+    "sha256": "e1ffc2885682fd384ccdd4369bf7fead27e79f701736dd9b1b91bbeca904e2a1"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q22.md",
+    "size": 54525,
+    "sha256": "24422b3eca447a6f322fe14e5a7f642e817739bea05955f05c9fdfa72a3d6b3a"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q23.md",
+    "size": 56954,
+    "sha256": "6982461ab801e48e373dee7db5dc2e6b2d6a3cb4c69477c7c929d8d5b3fb29c7"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q24.md",
+    "size": 71578,
+    "sha256": "24886122360944b7ab578072133321b047e0bbe625d79920ae6a79aa72e1aa5e"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q25.md",
+    "size": 95158,
+    "sha256": "deb6ef175787b390e6b8fd6f3167e14b7bf781100702ee5365838c69110d2175"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q26.md",
+    "size": 54623,
+    "sha256": "6014a3826b810593e594f8a5da4059e67497a8dab935a9a532fa5dae8acb1d26"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q27.md",
+    "size": 72999,
+    "sha256": "d9166d8ca2d5913ec34b91d6a2f73c5f6f18614d606a814367ea5cfb0fc4e168"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q28.md",
+    "size": 69951,
+    "sha256": "0acbc10dfbe08d20f215f720b14d05a4ea8618b5b19b1d7955d09887ea345118"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q29.md",
+    "size": 77461,
+    "sha256": "c9d1a91172220dc32d393efe3dc8c49ee25ca8b964a9b2ff3f0b24073a994dc8"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q30.md",
+    "size": 55903,
+    "sha256": "b56603bb79e18cbb10b369abf38e7a7fe76c33597e14459f142392b4e31a2dac"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q31.md",
+    "size": 69384,
+    "sha256": "46bb81af23b5d6980710def60161c9b33c817f33b8f7d29ddb45a967be57d943"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q32.md",
+    "size": 58893,
+    "sha256": "94e76de65a6c99d14be457fc90907827d3489b6395dbc53d9fdfcc31abdc6287"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q33.md",
+    "size": 57772,
+    "sha256": "3238e2df89ef62ab6a7faeaa28eb2d076e6a82462e5d9d9755e320bd5cb4eaf8"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q34.md",
+    "size": 39835,
+    "sha256": "1df169627a536322b4cebf68b533590b2fc33ad6062ffa434e9115d53bdeaac7"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q35.md",
+    "size": 53427,
+    "sha256": "27bedc1b9f813af12f6971271db7e7610ec5933e80abb1a85844455049db84b8"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q36.md",
+    "size": 61533,
+    "sha256": "2ea63bf542158ebf4c52c7d59022407fc2b508a4ee1ac3c9fb23cf90b07c7266"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q37.md",
+    "size": 61314,
+    "sha256": "49981ae6b873bc3fa40de98b575e3d216266aa3dec8a788dbe0154336f9402da"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q38.md",
+    "size": 65308,
+    "sha256": "eaf5a575965c96a981261426ea68615ad6fb52d3480e92bc165437dee605cbde"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q39.md",
+    "size": 66804,
+    "sha256": "9ae369d148aa97c76fe0cd3db0ff0ba14e4e3a99945171a7afb5fadaa6297adc"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q40.md",
+    "size": 45138,
+    "sha256": "8a1922b196ae3f813a571f3fb2d95b36b31802c2f355c3fb2fffe47060728b53"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q41.md",
+    "size": 64033,
+    "sha256": "3c1bc77ce01eea48ac4ae995388c3683f273f1c6e212866ecdc626fa8ac53bb1"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q42.md",
+    "size": 54775,
+    "sha256": "ed2b22d74fe5366fc122670205b76a1f5f089c4f2bd6b8c6732d12ed1832a1d5"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q43.md",
+    "size": 60742,
+    "sha256": "ac0baf8f854f18553158e3ca0bb2375ca470b0556674d5567ced8ef788c30420"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q44.md",
+    "size": 54097,
+    "sha256": "f1e9c65b371df59f82d7bbbf0b42629202334ae69a8a8d9ed13f597ce450abfc"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q45.md",
+    "size": 60266,
+    "sha256": "a1e6f5e59e0b79a3092092c8b138c01406e6cb129325f459e3ae14eb6ff73579"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q46.md",
+    "size": 64263,
+    "sha256": "e96bc3c600a7cedbfc3eb8285bd710b43daee9af3192b0c7f7f6db2866d02eb6"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q47.md",
+    "size": 52116,
+    "sha256": "4fc0d82a8585856f53ee9da14ac4409d60db6bdfd5eaf69dfe0b4a01d3b379e2"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q48.md",
+    "size": 62563,
+    "sha256": "e830b5a278fc978eca722c491ae86ea1b14d36db37febf87df58c0c7ce48b58e"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q49.md",
+    "size": 54848,
+    "sha256": "ee7db15140e5baf0023746d1debdd4e02e4619014be3765cad5846751f69e132"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/cases/Q50.md",
+    "size": 59251,
+    "sha256": "b800e5571dc7ac266b0ae6c7eb094561201f2275b2ba517e4d4dbf044507efde"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/agent_coverage.py.txt",
+    "size": 12485,
+    "sha256": "3af76f8775175cf3a0e643bc5aaae6196654c2c79969e02c6fbcc8a7624cc5a8"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/ai_service.py.txt",
+    "size": 94588,
+    "sha256": "cd11231877dc21834890eb382ab8048a074c92e610e34b4c4801460786659239"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/canonical_evidence.py.txt",
+    "size": 2880,
+    "sha256": "d0c5065d4db905b8578b7aa50e494c0ed284497aa0049dd3de5fe03737188a39"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/diagnostics.py.txt",
+    "size": 43277,
+    "sha256": "43fd89204609cacc3e495b33d3d7a7e56a4ad0046b01b7e4778c59b8fcc83c13"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/evaluation.py.txt",
+    "size": 65855,
+    "sha256": "8d4572f47cce9d0cb950ec5272ef5171e22e1197096172ca444a74ccfc525594"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/evaluation_contract.py.txt",
+    "size": 45158,
+    "sha256": "1574814d149e7da24261115c78d9faef3328d08fd1dd3c3ac7e96fa43a605f48"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/evaluation_stage.py.txt",
+    "size": 10518,
+    "sha256": "33ab665a69430e904e12f8b7fd6dfea9fb436f87ccecfd1ac8cda97396a0a97c"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/governance.py.txt",
+    "size": 271377,
+    "sha256": "064c0dcd7197b6abae15e5c322ad62e651e3df640b371bbc603ab53ed0a73254"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/knowledge_pipeline.py.txt",
+    "size": 32187,
+    "sha256": "aa3d14b8fb277f64ebc490418dfdd1203a349cd85b97e8ed0047ff26b66d110a"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/optimization.py.txt",
+    "size": 39374,
+    "sha256": "7da231c1d734ab91a2e358cbd254b4decd3a3e34acaaa892e231d352f6a5483b"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/paid_run.py.txt",
+    "size": 20565,
+    "sha256": "8001d0948d0b3c30779985701f6dba11a24c59ac729736497eaac75046c7ceb6"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/policy.py.txt",
+    "size": 11834,
+    "sha256": "21775150a247086641d37ec85dbf247ba4aee77fa7e8a59624549d87daf750c8"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/providers.py.txt",
+    "size": 38779,
+    "sha256": "1babdca118b6039693b44e2fce10b9107c202f6eb1f8f1dfeefeec723a58d49d"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/retrieval.py.txt",
+    "size": 22325,
+    "sha256": "cfaed2ae0511f8bd07fcd553f5ac9405a1ae90a7ac3878876896360505634f28"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code/telemetry.py.txt",
+    "size": 8099,
+    "sha256": "d02955e6c2a5d4ce2bff1e63d5c2ca86bcde0b2c4eb0cc6a141d166c8e99e357"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/code_index.json",
+    "size": 40343,
+    "sha256": "e1430f3d62afc4f673a8c92cb5de0f8496d38dd52e9a36dd8131b713c222714a"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/extract_readonly.py",
+    "size": 4107,
+    "sha256": "7f01211270d86ff82a0bb35e476e4b1e1ee7c97648cc80c9c6f85e36991078a6"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/finalize_report.py",
+    "size": 6037,
+    "sha256": "0cc20ed233eead9ec5472d5e759f0d6ef29ed2b2c69b76075ff9620ede13a9a4"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/financial_analysis.json",
+    "size": 119272,
+    "sha256": "e1b6acc04c1337c5867bcc202134aa6192d30f5689a836a93e168d174496e593"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/frozen_source_pages.json",
+    "size": 160833,
+    "sha256": "669130cd48e12b2116e758097b268aa25a18457821b28da566c7d65635454c53"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/golden_literal_coverage.json",
+    "size": 25373,
+    "sha256": "9b8b18b64e832ac01935a983bd2a2c474bf921bb8161112282eb9fd0ca5629b4"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/protected_before.json",
+    "size": 2051,
+    "sha256": "8c6c6237900f1880d1e1f220bb2aa385192074d72e93091f043e796e506b1eab"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/read_checks.json",
+    "size": 332,
+    "sha256": "60cbee20caa4fc3d958752deeccee43e9019e0039db8f582771271ecc078fde3"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/request_events.json",
+    "size": 342726,
+    "sha256": "e3f126bb5fbcfe9148720933d282f3cf4bdf4a26dcc515625c872eebbe079555"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/runs.json",
+    "size": 5474976,
+    "sha256": "5ccbae307fedc98d0d20352bbcfd5293ad6f3d95175b5e2ada411e8e68f00156"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/stage_positions.csv",
+    "size": 7324,
+    "sha256": "ccba3ac7615751ff60f6ffaaefa1607593a9b45c3a3795a97cca1a3bc1ead9c6"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/summary.json",
+    "size": 71777,
+    "sha256": "e558f1a8bb61edb195053b75b36d3c5146c1db33d300244c1fd3243cd53e973f"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/代码证据索引.md",
+    "size": 17369,
+    "sha256": "429b9d8bcbbdca1eec74223380bdef88bd8a3a0ff19169219fcab472fa6d06a7"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/保护核查.json",
+    "size": 4466,
+    "sha256": "e9af88540820ce29cf06e150f8f872f16874edf052bc49cedd63fb77008b5139"
+  },
+  {
+    "path": "outputs/round1_audit_20261025/审计报告.md",
+    "size": 50077,
+    "sha256": "4cba6b65c41473ab7dd026fb0e12cb1779a6a7a5c79d74e2ce84aa55dfe18d9a"
+  },
+  {
+    "path": "outputs/v51_replay_partial_readonly_20261021/Q44_Judge_attempt_1_raw.txt",
+    "size": 3212,
+    "sha256": "84e912197dbb12a09b5c8829fdb27134159d7b07978e0b8903e20639de34944c"
+  },
+  {
+    "path": "outputs/v51_replay_partial_readonly_20261021/Q44_Judge_attempt_2_raw.txt",
+    "size": 3351,
+    "sha256": "267267fd7954d26903cfe919ca3e3e9961b42c04672d028da580b232b8e039c8"
+  },
+  {
+    "path": "outputs/v51_replay_partial_readonly_20261021/Q44_checkpoint.json",
+    "size": 56187,
+    "sha256": "5d2f4ca68903b73d5321d09117efd8cf828050cc868db346a9c64439f4402cf8"
+  },
+  {
+    "path": "outputs/v51_replay_partial_readonly_20261021/judge_usage_52_calls.json",
+    "size": 35867,
+    "sha256": "74d95ffba33b35f64ce73d248ae9537e9fd5fb8a023ac2b3211f7ea4b6ca6f63"
+  },
+  {
+    "path": "outputs/v51_replay_partial_readonly_20261021/readonly_preflights.json",
+    "size": 234574,
+    "sha256": "cce7420ae967b8c3aa2407b4c506cd2ad16de3f87d4bd083679fac0f427ad26c"
+  },
+  {
+    "path": "outputs/v51_replay_partial_readonly_20261021/summary.json",
+    "size": 2655,
+    "sha256": "40f7fd3211514a8123f2466eec9f35b79f0b1a5ae15a43b0e7b17e608527f362"
+  },
+  {
+    "path": "outputs/v51_replay_partial_readonly_20261021/只读故障诊断报告.md",
+    "size": 11444,
+    "sha256": "b7970c63743bacfcc396e0e99404dd5f084214860eaa23debded20abb32109ca"
+  },
+  {
+    "path": "review_exports/GOLDEN_10_INDEPENDENT_REVIEW_20261027.zip",
+    "size": 354760,
+    "sha256": "e09290de8f2b025e6dddd926496b2df9bde60d012f884f343e8ae02704fde912"
+  },
+  {
+    "path": "review_exports/GOLDEN_10_INDEPENDENT_REVIEW_20261027/10题独立审核.md",
+    "size": 622234,
+    "sha256": "72d4b6ec77e7d7c1e706326aba88a26db04aac33bbdcee2dbcd2926313d350a6"
+  },
+  {
+    "path": "review_exports/GOLDEN_10_INDEPENDENT_REVIEW_20261027/完整数据.json",
+    "size": 2042726,
+    "sha256": "787a6d99415786735af00c31fd2117f33ffe5cb6cd3435e0b0cd297e12046707"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW.zip",
+    "size": 19087507,
+    "sha256": "d0228ad919c6f2a39d9e0f27ed23c103be9527f1ea42d936b1ffa8614b0db599"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/00_REVIEW_INDEX.md",
+    "size": 31563,
+    "sha256": "dce5dda9c5021392c2fb4cad565780ca29fd39f0c0b7a6bc97e0715d66eb6e59"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/01_GOLDEN_50_SUMMARY.md",
+    "size": 11875,
+    "sha256": "1f342cd6c26fed528c1e97ebbf0849a662242b3b7ef9cbd2db115dd5399dbe48"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/02_RETRIEVAL_GAPS.md",
+    "size": 152958,
+    "sha256": "d8ee7a1264969f42854fbd99fc0440c84b5309815f78d2f327c690136fa431a5"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/03_QC_AND_REVIEW_ISSUES.md",
+    "size": 17268956,
+    "sha256": "081525a1d25192a72f154a2ee6fb619a6b31ac566474e9e5846dc2a4a329b888"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/EVIDENCE_CHUNKS.json",
+    "size": 2414106,
+    "sha256": "d69c49e506d5560fa4cd3ec9f073048d93d77dfba7f25d3403af7734e3dae384"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/MANIFEST.json",
+    "size": 62346,
+    "sha256": "5851e338b53a2a63318a26fd0551ae5ca944b95bf46d09e31cbdc76e35aeaf31"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/Q01_Q10_FULL_REVIEW.md",
+    "size": 3528035,
+    "sha256": "6f276d86408c66527cf2c19e432d2a9419ec1dee2c387945480d0217c5724263"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/Q11_Q20_FULL_REVIEW.md",
+    "size": 3755991,
+    "sha256": "16abb515890563df1d4ce88f2c67373bf2ffdab62b4562a56c374bca5867e3c5"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/Q21_Q30_FULL_REVIEW.md",
+    "size": 3392070,
+    "sha256": "aaecb283e6da82c4944725e6b38c981ee398597125aa61b793080336d7ce006a"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/Q31_Q40_FULL_REVIEW.md",
+    "size": 11883796,
+    "sha256": "6fd2b90cb9405d9f1c2bcc21b0047650a73d23dc01ad1518773bfa004a390a2e"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/Q41_Q50_FULL_REVIEW.md",
+    "size": 7955503,
+    "sha256": "ce07cda0041ad1eee6ed5846d9e7fd39b0ee565c99be0cb0061f39a871d6e0e6"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/FIELD_COMPLETENESS.json",
+    "size": 21242,
+    "sha256": "5684baf81eedcfe812737dd80076e9500b5bf5cc6fb3d1fd2c17a1b12518bc3d"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q01.json",
+    "size": 758316,
+    "sha256": "428226d39cdb1008a709f6dbd43b55fdccff6519b39448d25c88be54793075c4"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q02.json",
+    "size": 811487,
+    "sha256": "023a85ad5932124f2582920c93ca002e3568ff212d9b903c03d774039a4a0275"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q03.json",
+    "size": 858571,
+    "sha256": "ebdba7c67ec0d1e1ea4fcf10e914a17012904cb0ccd3aa7eb70fded5e7824c9d"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q04.json",
+    "size": 763471,
+    "sha256": "cc72cc9dedd6fc34396a69f4826e112e7eea5d9120fed62fe1326c4103499248"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q05.json",
+    "size": 670227,
+    "sha256": "a988c3076bb2eb70df601170b986475f16e0c3c45239da21aab3c002583eadb1"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q06.json",
+    "size": 1106233,
+    "sha256": "843e62cfda483b901b143b7d914c121950198d541611a38341b6fed3144c04a4"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q07.json",
+    "size": 875184,
+    "sha256": "1ed1f7b2120e8e7280effee2fc820ea8c730fce6b3bfd9c0d27417392fc253bd"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q08.json",
+    "size": 902914,
+    "sha256": "ab42a4966279bbd592124d1dc6d237a59f000ff7034a87424e5d540d0ba03425"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q09.json",
+    "size": 1203271,
+    "sha256": "5081ccb8f92750acc98ad593e444585f6b6fc77f4c462ad38ef6874d7c267f9a"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q10.json",
+    "size": 1251290,
+    "sha256": "c7e09ca6910be1766057e9a02331e5d9144f0343dcbcdd8830a1d5a09247c0bc"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q11.json",
+    "size": 757822,
+    "sha256": "ec6c646bc7d180dc1abc9438cbe35e9e99b9a71127f0ef448a7ce8033fb14053"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q12.json",
+    "size": 952715,
+    "sha256": "d530507501f784d1fd469416b136acd9437261c8bc96d2e75edc9eb0c5c869d7"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q13.json",
+    "size": 1147583,
+    "sha256": "3932ea61e494551cf9e27c04d83169c6039966a06b8650567dea8f3ba15bfdf1"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q14.json",
+    "size": 708683,
+    "sha256": "8d415596334500631397c4d29d59cb7837e3b24f177c4d80c2d29753d14daeae"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q15.json",
+    "size": 784718,
+    "sha256": "65f41adc3cf80d19e6bcd2a1185d15308397ef23e418c43e0bd3ef0c8ae4470b"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q16.json",
+    "size": 852019,
+    "sha256": "42a86d26158971c56d79ea1750e60941f217de8b28f62f1abcb6f03b0aa49324"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q17.json",
+    "size": 1374509,
+    "sha256": "c2c82761f4ba75ef58dc6ed3291dc6d6ab52507b81fd972abf279612d187c86d"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q18.json",
+    "size": 1297002,
+    "sha256": "945565338beeec24d80f63b6e5420abd073d0ce563bfeced6587b22501fd6e15"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q19.json",
+    "size": 714147,
+    "sha256": "6c817090735b1d4e2a24ccd841369c271a0be70f8b61d7c0c6bf6befc2c70880"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q20.json",
+    "size": 793690,
+    "sha256": "20f741a9635e5079bc01b8504a150a9f70c31ee1f750d9e4ac86ac6f18ff4f63"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q21.json",
+    "size": 633871,
+    "sha256": "df511e52bea355845193a046eef51156199350a16191b67bbda3ff2c7a6f434b"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q22.json",
+    "size": 667112,
+    "sha256": "bafc3c12bc93e598f668ad19566ee5374eec4c22b485c17a038b65c22f3d8819"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q23.json",
+    "size": 836198,
+    "sha256": "a8c1fc7a7945f371df16e6abe3de74c84e81d4f65b7fe4a56030b3d48ffd36ea"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q24.json",
+    "size": 1024498,
+    "sha256": "caa3d88fa02ee246f152cb0b71d83a22686e72009628f7bcc1e43b3e1508abc8"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q25.json",
+    "size": 944734,
+    "sha256": "0a2d173f1f3d34fee12d6a6f5870a674fd821d4f8390fb4b931034ceeace28ad"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q26.json",
+    "size": 684241,
+    "sha256": "d9f07b6decccc77606261f067195a52f2da35b9838d5a3e96988394b3964b92a"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q27.json",
+    "size": 673533,
+    "sha256": "229eb016205a3619adca015291d5c6fe8b8a6e5facadff9c118d06343e8c557c"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q28.json",
+    "size": 1000323,
+    "sha256": "0cb3b3b060085148d9760849eaadca06911fac6ff6f54c9c76d2949e0b8e603b"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q29.json",
+    "size": 837556,
+    "sha256": "8863631483807ec4c6430215695d2d61f171cb21de6c4916f18eba5032133139"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q30.json",
+    "size": 704963,
+    "sha256": "cc1e5782c5076175fd4f20ff2a709851cdc59ec1f094fb90605464ee193b59c7"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q31.json",
+    "size": 1447474,
+    "sha256": "f51844d6b62895c39cffd158d29fc88eed261b8ee393cc78d917c9888dede328"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q32.json",
+    "size": 2248634,
+    "sha256": "e3790b4a7a8505dedf8c37a19716bf96d57c8f791144b66e23220b668c4b51f5"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q33.json",
+    "size": 1913254,
+    "sha256": "eb6f03dc3d7cf0caa58bbb8f72a2ce7351fc06f0b5f2ea2fb7f044266826a84b"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q34.json",
+    "size": 685520,
+    "sha256": "291d2972af30a6a1b5ab9ab280e301f4dcd2deb6c5972c8bd76e6d654eea608e"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q35.json",
+    "size": 2150906,
+    "sha256": "d297cc36f7679dece16944ee69c1c09cd95fefeb81cb719a29a3da3558d76300"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q36.json",
+    "size": 3680469,
+    "sha256": "b3c6740e404dec453b19624642ccd047483bccea01ad98c2d58918fffde247df"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q37.json",
+    "size": 2274142,
+    "sha256": "75a590cbfbaecbba9775aa217158723b0460bef5bb44d9d9213058662e5a107b"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q38.json",
+    "size": 2060906,
+    "sha256": "b0e32485a8aa828a271edff5b2fef0cf9f5b86c2b69d047c1257242c5f00356e"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q39.json",
+    "size": 2091804,
+    "sha256": "704c2958c9f4c8472d2e3a54d0335775b5f6a246f9e6b2a501caa3ae84ea3948"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q40.json",
+    "size": 1857613,
+    "sha256": "7fa30a6f1260292fea08891083f2d6534bdb7d425f4b4e7d5d19526e5476e58e"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q41.json",
+    "size": 2314930,
+    "sha256": "bc741bf715b4f30bb57223469c3f21d5c4acbfcb8edb1fa20da2270d628012da"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q42.json",
+    "size": 779754,
+    "sha256": "4f70a7b76c55d2ef408f82cb9c924394e6f01a507d6a15ed0c99e180bcd590aa"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q43.json",
+    "size": 1939023,
+    "sha256": "6a59db4f7c6cedb2f84a1304ef9320b9723a0a422b3569f35c42a0195c4104ba"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q44.json",
+    "size": 647073,
+    "sha256": "d7e4cf84e8d77253b6ad37836340fcc919e1800d6693531779ff90e4aa6e6246"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q45.json",
+    "size": 699811,
+    "sha256": "d0603c5cc8b23679620c9d766a794c44885c44932c6b784299032a0efbb2e10a"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q46.json",
+    "size": 1518239,
+    "sha256": "6374399259aca451f2919cb92c2e04a931f16e0e3a568f9e5080e380736918bd"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q47.json",
+    "size": 1333284,
+    "sha256": "3459490ff96ca024628473d2c81dc13a76c1ec8403546f5a0b6a3589940127d1"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q48.json",
+    "size": 2132564,
+    "sha256": "ba49c5fbfb240a23536442593d421f10841801ca285ec6036087f170b1b1fde3"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q49.json",
+    "size": 2257316,
+    "sha256": "d3c83bbdadc51c79ae03581c7b160b8a3360ee2b81ffb8b97dd93be0ee350244"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/Q50.json",
+    "size": 758323,
+    "sha256": "27b0d2df1f74429bf3d68b8bc732f5fcbb58d0ecba7b1e011b8265c2f9a921d4"
+  },
+  {
+    "path": "review_exports/GOLDEN_50_FULL_REVIEW_20261026/raw/WORKSET_AND_RUN.json",
+    "size": 2809163,
+    "sha256": "caedaa4c07430422b95d1fc72ab71ffd4803c985df3353140ff479f49431b884"
+  },
+  {
+    "path": "scripts/test_verify_self_evolution_cleanup.py",
+    "size": 2513,
+    "sha256": "3ae58df0743e716f71724bfa2051da8e3fdf64c22a00296de48082a7473f4797"
+  },
+  {
+    "path": "tools/review_export/export_golden_50.py",
+    "size": 34100,
+    "sha256": "486ddef9aa8a5ef9355429c181de87d7892ae294ee6649de4dcb24d5c42ea6b2"
+  }
+]

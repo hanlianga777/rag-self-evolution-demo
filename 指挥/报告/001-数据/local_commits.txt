@@ -1,0 +1,19 @@
+fb15504 fix: finalize Judge omission protocol and Baseline readiness
+c2ede01 fix: enforce Golden QC and Judge role output contracts
+7597ff6 docs: record authorized Golden and Judge calibration outcomes
+bc447e6 feat: add guarded Golden revision and saved-answer replay tools
+b2e4b20 fix: display saved Final citations without changing raw answers
+693d9ca fix: enforce explicit consistent Judge atomic outputs
+cbe9157 docs: verify Q13 fix runtime and unchanged official data
+6dc2c58 fix: honor formal Judge limits and preserve truncation evidence
+524a320 docs: record final loaded Judge fingerprints and readiness blockers
+08eddb8 feat: complete frozen logic wiring and verify bounded Provider probes
+8cfdfc5 fix: preserve historical gate details and atomic auxiliary semantics
+b213fec feat: wire frozen atomic Judge contract and independent scoring
+2403e63 fix: make legacy thinking drafts visibly repairable
+55b52fc fix: make ordinary service startup safe by default
+ebf6cfe fix: avoid displaying partial cases as dataset totals
+14380bf fix: add safe runtime startup and constrain baseline thinking
+4e55747 feat: unify Round 0 RAG foundation and offline contracts
+2a0f99c fix: carry judge feedback across checkpoint resume
+cd2aa7b fix: use frozen negative behavior in baseline preflight
