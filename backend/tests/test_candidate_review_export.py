@@ -332,11 +332,12 @@ class CandidateReviewExportTests(unittest.TestCase):
         service = SimpleNamespace(quality_check=Mock(side_effect=ProviderInvalidResponse('offline invalid QC', raw_provider_response='{')))
         with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')):
             main._run_quality_rerun(self.run_id, selected, self.store, service, main.corpus)
-        self.assertEqual(service.quality_check.call_count, 1)
+        self.assertEqual(service.quality_check.call_count, 2)
         self.assertEqual(self.store.qc_history(target), [])
         self.assertEqual(self.store.probe_history(target), before)
         audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
-        self.assertEqual(audit['status'], 'failed')
+        self.assertEqual(audit['status'], 'completed')
+        self.assertEqual(audit['technical_failed'], 1)
         self.assertEqual(audit['slots']['Q09']['failed_stage'], 'qc')
         selected = self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
         self.assertEqual(selected, [target])
@@ -409,16 +410,16 @@ class CandidateReviewExportTests(unittest.TestCase):
         with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')):
             main._run_quality_rerun(self.run_id, ids, self.store, service, main.corpus)
         audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
-        self.assertEqual(audit['status'], 'failed')
+        self.assertEqual(audit['status'], 'completed')
         self.assertEqual(audit['completed'], 20)
         self.assertEqual(audit['technical_failed'], 20)
-        self.assertEqual(service.quality_check.call_count, 20)
+        self.assertEqual(service.quality_check.call_count, 40)
         self.assertEqual(len(audit['slots']), 20)
         self.assertTrue(all(slot['failed_stage'] == 'qc' and slot['execution_status'] == 'failed' for slot in audit['slots'].values()))
         self.assertTrue(all(self.store.qc_history(key) == [] for key in ids))
         self.assertEqual({key:self.store.probe_history(key) for key in ids}, before)
 
-    def test_unknown_qc_request_stops_and_blocks_resume_without_fake_scores(self):
+    def test_unknown_qc_failures_finish_and_allow_missing_stage_resume(self):
         from app.providers import ProviderTimeout
         ids = [row['id'] for row in self.rows]
         self.store.update_generation_run(self.run_id, status='completed')
@@ -431,15 +432,14 @@ class CandidateReviewExportTests(unittest.TestCase):
         with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')):
             main._run_quality_rerun(self.run_id, ids, self.store, service, main.corpus)
         audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
-        self.assertEqual(audit['status'], 'failed')
-        self.assertEqual(audit['completed'], 1)
-        self.assertEqual(audit['technical_failed'], 1)
-        service.quality_check.assert_called_once()
-        self.assertEqual(list(audit['slots']), ['Q01'])
+        self.assertEqual(audit['status'], 'completed')
+        self.assertEqual(audit['completed'], 20)
+        self.assertEqual(audit['technical_failed'], 20)
+        self.assertEqual(service.quality_check.call_count, 40)
+        self.assertEqual(len(audit['slots']), 20)
         self.assertTrue(all(self.store.qc_history(key) == [] for key in ids))
-        with self.assertRaisesRegex(ValueError, 'Unknown request execution'):
-            self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
-        self.assertEqual(self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun'], audit)
+        selected = self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
+        self.assertEqual(selected, ids)
 
     def test_candidate_generated_quality_endpoint_starts_once_and_joins_worker(self):
         import threading
@@ -468,6 +468,7 @@ class CandidateReviewExportTests(unittest.TestCase):
     def test_quality_rerun_endpoint_checks_origin_and_missing_run(self):
         self.assertEqual(self.client.post(f"/api/governance/generation-runs/{self.run_id}/rerun-quality", headers={"Origin": "https://evil.example"}).status_code, 403)
         self.assertEqual(self.client.post("/api/governance/generation-runs/unknown/rerun-quality").status_code, 404)
+        self.store.update_generation_run(self.run_id, status='queued')
         import threading
         entered = threading.Event()
         def completed_worker(*_args):
@@ -480,7 +481,7 @@ class CandidateReviewExportTests(unittest.TestCase):
                 entered.wait(2)
                 self.join_workers()
 
-    def test_provider_error_stops_rerun_without_fake_qc_score(self):
+    def test_provider_error_isolated_without_fake_qc_score(self):
         with self.store.connection() as connection:
             connection.execute("UPDATE golden_generation_runs SET status = 'completed' WHERE id = ?", (self.run_id,))
         class Provider:
@@ -492,9 +493,10 @@ class CandidateReviewExportTests(unittest.TestCase):
         ids = self.store.update_quality_rerun(self.run_id, {"status": "running", "completed": 0}, start=True)
         main._run_quality_rerun(self.run_id, ids, self.store, service, main.corpus)
         rerun = self.store.generation_run(self.run_id)["artifacts"]["hard_validation"]["quality_rerun"]
-        self.assertEqual(rerun["status"], "failed")
-        self.assertEqual(rerun["completed"], 0)
+        self.assertEqual(rerun["status"], "completed")
+        self.assertEqual(rerun["completed"], 20)
         self.assertEqual(rerun["slots"]["Q01"]["failed_stage"], "qc")
+        self.assertEqual(rerun["technical_failed"], 20)
         self.assertEqual(self.store.qc_history(ids[0]), [])
 
 

@@ -1,4 +1,4 @@
-"""Shared finite Provider stage: Baseline and independent probes use one retry loop."""
+"""Persist stages and RPC attempts; Judge format recovery is separate from transport."""
 import time
 import math
 import hashlib
@@ -21,12 +21,14 @@ def checkpoint_request(provider, model, endpoint, payload, action, *, reuse=True
     check_stop()
     key = hashlib.sha256(json.dumps([phase, provider, model, endpoint, payload], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     saved = checkpoint.setdefault('provider_requests', {}).setdefault(key, {'phase':phase, 'provider':provider, 'model':model, 'attempts':[]})
-    if saved.get('status') in {'inflight', 'unknown'} or any(unsettled_usage(u) for a in saved['attempts'] for u in a.get('usage', [])):
-        failure = RuntimeError('RPC执行或Usage未知，本次执行失败，禁止重复发送')
-        failure.request_execution_unknown = True
-        raise failure
     if reuse and saved.get('status') == 'completed':
         return deepcopy(saved['result'])
+    # A recovered worker may leave a request in flight. Keep its billing unknown
+    # and start a separately accounted attempt under task006's revised policy.
+    if saved.get('status') == 'inflight':
+        for previous in saved['attempts']:
+            if previous.get('status') == 'inflight':
+                previous.update(status='unknown', recovery_reason='worker ended before request result was saved')
     attempt = {'id':uuid.uuid4().hex, 'recorded_by_run_id':run_id, 'status':'inflight', 'usage':[]}
     saved['attempts'].append(attempt);saved['status'] = 'inflight'
     on_state('running', phase=phase)
@@ -62,13 +64,15 @@ def checkpoint_usage(checkpoint):
 
 
 def judge_request_count(checkpoint, run_id):
-    """Count saved Judge requests across service parsing and scorer validation."""
-    return sum(max(1, len(attempt.get('usage', []))) for attempt in checkpoint.get('attempts', [])
-               if attempt.get('phase') == 'judge' and attempt.get('recorded_by_run_id') == run_id)
+    """Count semantic responses, independently of HTTP transport retry attempts."""
+    return sum(max(1, sum(u.get('status') == 'ok' for u in attempt.get('usage', [])))
+               for attempt in checkpoint.get('attempts', [])
+               if attempt.get('phase') == 'judge' and attempt.get('recorded_by_run_id') == run_id
+               and (attempt.get('status') == 'ok' or attempt.get('error_type') == 'ProviderInvalidResponse'))
 
 
 def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state):
-    from .providers import ProviderAPIError,ProviderInvalidResponse,ProviderTimeout,ProviderUnavailable,retryable_error,provider_error_details,stage_deadline
+    from .providers import ProviderAPIError,ProviderInvalidResponse,ProviderTimeout,retryable_error,provider_error_details,stage_deadline
     # Explicit Resume starts a new retry window; process recovery of this Run keeps its failures.
     prior=[a for a in checkpoint['attempts'] if a.get('phase')==phase and a.get('recorded_by_run_id')==run_id]
     failures=0;invalid_failures=0
@@ -81,8 +85,6 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
         window={'run_id':run_id,'started_at':time.time()};windows[phase]=window
     deadline=time.monotonic()+max(0,600-(time.time()-window['started_at']))
     if checkpoint.get('inflight')==phase:checkpoint.setdefault('unknown_execution',{})[phase]=True
-    if checkpoint.get('unknown_execution',{}).get(phase):
-        raise RuntimeError('Unknown request execution after worker loss; duplicate execution refused')
     while True:
         check_stop()
         if failures>=3 or invalid_failures>=2 or time.monotonic()>=deadline:
@@ -102,14 +104,7 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
                 with collect_usage() as usage,stage_deadline(deadline,automatic=automatic,check_stop=check_stop):value=action()
             finally:
                 _request_checkpoint.reset(token)
-            if any(unsettled_usage(u) for u in usage):
-                checkpoint['execution' if phase=='generation' else 'scored_result']=value
-                failure=ProviderUnavailable('有效结果已保存，但Usage/费用未知，本次执行失败；不得重复生成')
-                failure.request_execution_unknown=False;failure.billing_unknown=True
-                raise failure
-            if time.monotonic()>deadline:
-                checkpoint['execution' if phase=='generation' else 'scored_result']=value
-                raise ProviderTimeout('Known complete Provider response exceeded 600 seconds')
+            # Missing Usage remains an accounting fact; a valid result is usable.
         except Exception as error:
             failures+=1
             attempt={'phase':phase,'status':'error','error_type':type(error).__name__,'error':str(error),
@@ -124,7 +119,8 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
             billing_unknown=getattr(error,'billing_unknown',False) or any(unsettled_usage(u) for u in usage)
             if billing_unknown:checkpoint.setdefault('unsettled_usage',{})[phase]=True
             attempt['billing_unknown']=billing_unknown
-            retry=phase=='judge' and isinstance(error,ProviderInvalidResponse) and retryable_error(error) and not unknown and not billing_unknown and failures<2 and judge_request_count(checkpoint,run_id)+max(1,len(usage))<2 and time.monotonic()<deadline
+            responses=max(1,sum(u.get('status')=='ok' for u in usage))
+            retry=phase=='judge' and isinstance(error,ProviderInvalidResponse) and retryable_error(error) and failures<2 and judge_request_count(checkpoint,run_id)+responses<2 and time.monotonic()<deadline
             # Repeated structurally invalid Judge replies are a terminal contract failure.
             if isinstance(error,ProviderInvalidResponse):
                 invalid_failures+=1

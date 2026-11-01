@@ -816,56 +816,19 @@ def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regener
                 break
         if not complete:
             return
-        saved = [run_store.question(question_id) for question_id in run_store.generation_run(run_id)["question_ids"]]
-        stage = "probing"
-        run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "probe_completed": 0, "qc_skipped": 0})
-        qc_completed = qc_skipped = 0
-        probe_completed = 0
-        business_run = bool(frozen and frozen.get('generation_strategy') == 'business_v2')
-        quality_state = run_store.generation_run(run_id, qualification=False)['artifacts']['hard_validation']
-        quality_errors = dict(quality_state.get('business_quality_errors', {}))
-        business_usage = dict(quality_state.get('business_provider_usage', {}))
-        for index, candidate in enumerate(saved, start=1):
-            if business_run:
-                quality_error = None
-                try:
-                    from .telemetry import collect_usage
-                    with collect_usage() as calls:
-                        _business_quality_step(run_store, service, run_corpus, candidate, saved)
-                    quality_errors.pop(candidate['id'], None)
-                except Exception as error:
-                    quality_error = error
-                    quality_errors[candidate['id']] = str(error)
-                    extra_usage = getattr(error, 'token_usage', [])
-                    calls.extend([u for u in extra_usage if u not in calls] if current_paid_run() else extra_usage)
-                finally:
-                    business_usage[candidate['id']] = [*business_usage.get(candidate['id'], []), *calls]
-                checked = run_store.question(candidate['id'])
-                probe_completed += checked['probe_status'] != 'probe_pending'
-                qc_completed += checked['qc_status'] in {'qc_passed','qc_failed'}
-                qc_skipped += checked['probe_status'] not in {'probe_pending','probe_passed'}
-                run_store.update_generation_run(run_id, status='qc', progress={'stage':'qc','probe_completed':probe_completed,'qc_completed':qc_completed,'qc_skipped':qc_skipped,'quality_processed':index,'slot':candidate['raw']['coverage_slot']}, validation={'business_quality_errors':quality_errors,'business_provider_usage':business_usage})
-                if quality_error is not None and current_paid_run():
-                    raise quality_error
-                continue
-            stage = "probing"
-            prior_probe = run_store.probe_history(candidate["id"])[0] if (resume_quality or regenerate) and candidate["probe_status"] == "probe_passed" else None
-            _, identity = run_store.capture_quality(candidate["id"])
-            reusable = prior_probe and all(prior_probe.get("execution_identity", {}).get(key) == identity[key] for key in ('content_hash', 'active_candidate', 'corpus_fingerprint'))
-            prior_qc = run_store.qc_history(candidate["id"])
-            if reusable and prior_qc and prior_qc[0]["result"].get("execution_identity") == identity and candidate["qc_status"] == "qc_passed":
-                qc_completed += 1
-                continue
-            probe = {"status": "passed"} if reusable else run_store.run_probe(candidate["id"], service.retriever, run_corpus.chunks(), service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=bool(current_paid_run()))
-            _require_probe_execution(probe)
-            run_store.update_generation_run(run_id, status="probing", progress={"stage": "probing", "slot": candidate["raw"].get("coverage_slot"), "probe_completed": index})
-            if probe["status"] == "passed":
-                stage = "qc"
-                _quality_check(run_store, service, candidate["id"])
-                qc_completed += 1
-            else:
-                qc_skipped += 1
-            run_store.update_generation_run(run_id, status="qc", progress={"stage": "qc", "slot": candidate["raw"].get("coverage_slot"), "qc_completed": qc_completed, "qc_skipped": qc_skipped})
+        import uuid
+        ids = run_store.generation_run(run_id, qualification=False)['question_ids']
+        prior = run_store.generation_run(run_id, qualification=False)['artifacts']['hard_validation'].get('quality_rerun',{})
+        for checkpoint in prior.get('checkpoints',{}).values():checkpoint.pop('final_retry_done',None)
+        for slot in prior.get('slots',{}).values():slot.pop('final_retry_done',None)
+        stage = 'probing'
+        run_store.update_generation_run(run_id,status='probing',progress={'stage':'probing','probe_completed':0,'qc_skipped':0},
+            validation={'quality_rerun':{**prior,'status':'running','stage':'probe','attempt_id':uuid.uuid4().hex,'final_retry_started':False,
+                'error':None,'finished_at':None,'started_at':datetime.now(timezone.utc).isoformat()}})
+        _run_quality_rerun(run_id,ids,run_store,service,run_corpus,generation_progress=True)
+        outcome=run_store.generation_run(run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']
+        if outcome['status']=='failed':
+            raise ProviderUnavailable(outcome['error'])
         stage = "completed"
         run_store.update_generation_run(run_id, status="completed", progress={"stage": "completed"})
     except Exception as error:
@@ -913,93 +876,114 @@ def _quality_check(run_store, service, question_id):
     return qc, run_store.record_qc(question_id, qc, "failed" if qc.get("priority") == "P0" else "passed", execution=execution)
 
 
-def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
+def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generation_progress=False):
     from .evaluation_stage import perform_stage
     from .golden_v2 import validate_golden_candidate
-    from .paid_run import require_reconciled_execution
-    from .providers import ProviderAPIError, ProviderRequestError
+    from .providers import permanent_provider_error
     counters = {'completed':0,'probe_passed':0,'probe_failed':0,'qc_passed':0,'qc_failed':0,'qc_skipped':0,'technical_failed':0}
     validation_state = run_store.generation_run(run_id,qualification=False)['artifacts']['hard_validation']
     state = validation_state.get('quality_rerun',{})
-    stop_on_technical_error = validation_state.get('stop_on_technical_error') is True
     checkpoints = state.get('checkpoints',{}); slots = dict(state.get('slots',{}))
     attempt_id = state.get('attempt_id',run_id)
     def persist(**values):
+        selected = [value for value in slots.values() if value.get('question_id') in ids]
+        counters.update(completed=len(selected),
+            probe_passed=sum(v.get('probe')=='passed' for v in selected),
+            probe_failed=sum(v.get('probe')=='failed' for v in selected),
+            qc_passed=sum(v.get('qc')=='qc_passed' for v in selected),
+            qc_failed=sum(v.get('qc')=='qc_failed' for v in selected),
+            qc_skipped=sum(v.get('qc')=='skipped' for v in selected),
+            technical_failed=sum(v.get('execution_status')=='failed' for v in selected))
         run_store.update_quality_rerun(run_id,{**counters,'slots':slots,'checkpoints':checkpoints,**values})
+        if generation_progress:
+            status = values.get('status')
+            stage = status if status in {'completed','failed'} else 'probing' if values.get('stage') in {'probe','precheck','business_audit'} else 'qc'
+            run_store.update_generation_run(run_id,status=stage,progress={'stage':stage,'slot':values.get('slot'),
+                'probe_completed':counters['probe_passed']+counters['probe_failed'],
+                'qc_completed':counters['qc_passed']+counters['qc_failed'],'qc_skipped':counters['qc_skipped'],
+                'quality_processed':counters['completed'],'technical_failed':counters['technical_failed']})
+
     try:
         chunks=run_corpus.chunks(); peers=[run_store.question(key) for key in run_store.generation_run(run_id,qualification=False)['question_ids']]
         for item in peers:
             validation=validate_golden_candidate({**item['raw'],**item},chunks)
             if not validation['valid']:raise ValueError(item['id']+' Probe前结构/来源检查失败：'+'; '.join(validation['blocking_errors']))
-        for index,key in enumerate(ids,1):
-            item=run_store.question(key);slot=item['raw'].get('coverage_slot') or f'Q{index:02}'
-            phase = 'precheck'
-            try:
-                validation=validate_golden_candidate({**item['raw'],**item},chunks)
-                if not validation['valid']:raise ValueError('Probe前结构/来源检查失败：'+ '; '.join(validation['blocking_errors']))
-                _,identity=run_store.capture_quality(key)
-                binding={k:v for k,v in identity.items() if k!='probe_id'}
-                cp=checkpoints.setdefault(key,{'attempts':[],'identity':binding})
-                if cp.get('identity')!=binding:
-                    # Same question/Corpus: exact RPC payload hashes can reuse retrieval after a content revision.
-                    from copy import deepcopy
-                    requests={k:v for k,v in cp.get('provider_requests',{}).items() if v.get('phase')=='probe' and v.get('status')=='completed'} if cp.get('identity',{}).get('corpus_fingerprint')==binding.get('corpus_fingerprint') else {}
-                    checkpoints[key]={'attempts':[],'identity':binding,'provider_requests':deepcopy(requests),'prior_content_checkpoints':[*cp.get('prior_content_checkpoints',[]),cp]}
-                    cp=checkpoints[key]
-                def perform(stage,action):
-                    nonlocal phase
-                    phase = stage
-                    previous=[a for a in cp['attempts'] if a.get('phase')==phase]
-                    failed=previous and previous[-1].get('status')=='error'
-                    if phase in {'qc','business_audit'} and failed and previous and previous[-1].get('recorded_by_run_id')!=run_id+':'+attempt_id:
-                        requests=cp.setdefault('provider_requests',{})
-                        retired={k:v for k,v in requests.items() if v.get('phase')==phase and v.get('status')=='completed'}
-                        if retired:
-                            cp.setdefault('manual_resume_history',[]).append({'provider_requests':retired,'reason':'explicit retry of failed quality phase'})
-                            for request_key in retired:del requests[request_key]
-                            persist(stage=phase,slot=slot)
-                    return perform_stage(cp,phase,action,run_id+':'+attempt_id,automatic=False,check_stop=lambda:None,
-                                         on_state=lambda *args,**kwargs:persist(stage=phase,slot=slot))
-                row=run_store.candidate_rows([key])[0]
-                if item['raw'].get('generation_strategy')=='business_v2' and not row['quality_audit']:
-                    audit=perform('business_audit',lambda:service.business_quality_audit(item,[q['question'] for q in peers if q['id']!=key]))
-                    run_store.save_quality_audit(key,audit)
-                prior=run_store.probe_history(key)
-                reusable=prior and prior[0].get('probe_details',{}).get('probe_execution_status') not in {'failed','uncertain'} and all(prior[0].get('execution_identity',{}).get(k)==v for k,v in binding.items())
-                probe=prior[0] if reusable else perform('probe',lambda:run_store.run_probe(key,service.retriever,chunks,service.answerability_check,subtype_judge=service.negative_subtype_check,fail_on_judge_error=True))
-                if probe.get('probe_details',{}).get('probe_execution_status') == 'failed':
-                    raise ProviderUnavailable('Golden Probe 检索技术执行失败，已保存真实失败记录')
-                if stop_on_technical_error and probe.get('probe_details',{}).get('probe_execution_status') == 'uncertain':
-                    raise ProviderUnavailable('Golden Probe 判断未完成：'+json.dumps(probe['probe_details'].get('negative_checks'),ensure_ascii=False))
-                counters['probe_passed' if probe['status']=='passed' else 'probe_failed']+=1
-                slots[slot]={'question_id':key,'probe':probe['status'],'classification':probe.get('classification') or probe.get('probe_details',{}).get('classification')}
-                if probe['status']=='passed':
-                    _,identity=run_store.capture_quality(key,qc=True);prior_qc=run_store.qc_history(key)
-                    if prior_qc and prior_qc[0]['result'].get('execution_identity')==identity and prior_qc[0]['status'] in {'qc_passed','qc_failed'}:
-                        saved=prior_qc[0]
-                    else:
-                        qc=perform('qc',lambda:service.quality_check(run_store.question(key)))
-                        saved=run_store.record_qc(key,qc,'passed',execution=identity)
-                    counters['qc_passed' if saved['status']=='qc_passed' else 'qc_failed']+=1
-                    slots[slot]['qc']=saved['status'];cp['qc_status']=saved['status']
+        for final_pass in range(1 if state.get('final_retry_started') else 0,2):
+            if final_pass:
+                state['final_retry_started']=True
+                persist(final_retry_started=True)
+            stage_run_id = run_id+':'+attempt_id+(':final-retry' if final_pass else '')
+            for index,key in enumerate(ids,1):
+                item=run_store.question(key);slot=item['raw'].get('coverage_slot') or f'Q{index:02}'
+                if final_pass and (not (slots.get(slot,{}).get('execution_status') == 'failed' or slots.get(slot,{}).get('final_retry_pending')) or slots.get(slot,{}).get('final_retry_done')):
+                    continue
+                if final_pass:
+                    slots[slot]['final_retry_pending']=True
                 else:
-                    counters['qc_skipped']+=1;slots[slot]['qc']='skipped'
-                counters['completed']+=1;persist(stage='qc',slot=slot)
-            except Exception as error:
-                slots[slot] = {**slots.get(slot,{}), 'question_id':key, 'execution_status':'failed', 'failed_stage':phase, 'error':str(error)}
-                counters['technical_failed'] += 1
-                counters['completed'] += 1
-                persist(stage=phase, slot=slot)
-                if stop_on_technical_error:
-                    raise
-                # Unknown execution/billing and account/configuration errors stop the batch.
-                require_reconciled_execution({'checkpoints':checkpoints})
-                cause = error
-                while cause is not None:
-                    if isinstance(cause, ProviderRequestError) or isinstance(cause, ProviderAPIError) and cause.status_code in {401,402,403,404}:
-                        raise error
-                    cause = cause.__cause__
-        persist(status='failed' if counters['technical_failed'] else 'completed',stage='completed',error='部分题目技术执行失败，成功阶段已保留' if counters['technical_failed'] else None,finished_at=datetime.now(timezone.utc).isoformat())
+                    slots.pop(slot,None)
+                phase = 'precheck'
+                try:
+                    validation=validate_golden_candidate({**item['raw'],**item},chunks)
+                    if not validation['valid']:raise ValueError('Probe前结构/来源检查失败：'+ '; '.join(validation['blocking_errors']))
+                    _,identity=run_store.capture_quality(key)
+                    binding={k:v for k,v in identity.items() if k!='probe_id'}
+                    cp=checkpoints.setdefault(key,{'attempts':[],'identity':binding})
+                    if cp.get('identity')!=binding:
+                        # Same question/Corpus: exact RPC payload hashes can reuse retrieval after a content revision.
+                        from copy import deepcopy
+                        requests={k:v for k,v in cp.get('provider_requests',{}).items() if v.get('phase')=='probe' and v.get('status')=='completed'} if cp.get('identity',{}).get('corpus_fingerprint')==binding.get('corpus_fingerprint') else {}
+                        checkpoints[key]={'attempts':[],'identity':binding,'provider_requests':deepcopy(requests),'prior_content_checkpoints':[*cp.get('prior_content_checkpoints',[]),cp]}
+                        cp=checkpoints[key]
+                    def perform(stage,action):
+                        nonlocal phase
+                        phase = stage
+                        previous=[a for a in cp['attempts'] if a.get('phase')==phase]
+                        failed=previous and previous[-1].get('status')=='error'
+                        history=run_store.probe_history(key) if phase=='probe' else []
+                        malformed_quality = failed and (previous[-1].get('error_type') in {'ProviderInvalidResponse','ValueError','JSONDecodeError'}
+                            or previous[-1].get('cause_type') in {'ValueError','JSONDecodeError','TypeError'})
+                        malformed_probe = phase == 'probe' and (malformed_quality
+                            or history and history[0].get('probe_details',{}).get('probe_execution_status')=='uncertain')
+                        if previous and previous[-1].get('recorded_by_run_id')!=stage_run_id and (phase in {'qc','business_audit'} and malformed_quality or malformed_probe):
+                            requests=cp.setdefault('provider_requests',{})
+                            retired={k:v for k,v in requests.items() if v.get('phase')==phase and v.get('status')=='completed'
+                                     and (phase!='probe' or v.get('provider','').lower()=='deepseek')}
+                            if retired:
+                                cp.setdefault('manual_resume_history',[]).append({'provider_requests':retired,'reason':'retry of invalid quality response'})
+                                for request_key in retired:del requests[request_key]
+                                persist(stage=phase,slot=slot)
+                        return perform_stage(cp,phase,action,stage_run_id,automatic=False,check_stop=lambda:None,
+                                             on_state=lambda *args,**kwargs:persist(stage=phase,slot=slot))
+                    row=run_store.candidate_rows([key])[0]
+                    if item['raw'].get('generation_strategy')=='business_v2' and not row['quality_audit']:
+                        audit=perform('business_audit',lambda:service.business_quality_audit(item,[q['question'] for q in peers if q['id']!=key]))
+                        run_store.save_quality_audit(key,audit)
+                    prior=run_store.probe_history(key)
+                    reusable=prior and prior[0].get('probe_details',{}).get('probe_execution_status') not in {'failed','uncertain'} and all(prior[0].get('execution_identity',{}).get(k)==v for k,v in binding.items())
+                    probe=prior[0] if reusable else perform('probe',lambda:run_store.run_probe(key,service.retriever,chunks,service.answerability_check,subtype_judge=service.negative_subtype_check,fail_on_judge_error=True))
+                    if probe.get('probe_details',{}).get('probe_execution_status') == 'failed':
+                        raise ProviderUnavailable('Golden Probe 检索技术执行失败：'+json.dumps(probe.get('probe_details',{}).get('execution_error'),ensure_ascii=False))
+                    if probe.get('probe_details',{}).get('probe_execution_status') == 'uncertain':
+                        raise ProviderUnavailable('Golden Probe 判断未完成：'+json.dumps(probe['probe_details'].get('negative_checks'),ensure_ascii=False))
+                    slots[slot]={'question_id':key,'probe':probe['status'],'classification':probe.get('classification') or probe.get('probe_details',{}).get('classification'), 'final_retry_pending':bool(final_pass)}
+                    if probe['status']=='passed':
+                        _,identity=run_store.capture_quality(key,qc=True);prior_qc=run_store.qc_history(key)
+                        if prior_qc and prior_qc[0]['result'].get('execution_identity')==identity and prior_qc[0]['status'] in {'qc_passed','qc_failed'}:
+                            saved=prior_qc[0]
+                        else:
+                            qc=perform('qc',lambda:service.quality_check(run_store.question(key)))
+                            saved=run_store.record_qc(key,qc,'passed',execution=identity)
+                        slots[slot]['qc']=saved['status'];cp['qc_status']=saved['status']
+                    else:
+                        slots[slot]['qc']='skipped'
+                    slots[slot].pop('final_retry_pending',None)
+                    persist(stage='qc',slot=slot)
+                except Exception as error:
+                    slots[slot] = {**slots.get(slot,{}), 'question_id':key, 'execution_status':'failed', 'failed_stage':phase, 'error':str(error), 'final_retry_done':bool(final_pass)}
+                    persist(stage=phase, slot=slot)
+                    if isinstance(error, InterruptedError) or permanent_provider_error(error):
+                        raise
+        persist(status='completed',stage='completed',error='部分题目技术执行失败，成功阶段已保留' if counters['technical_failed'] else None,finished_at=datetime.now(timezone.utc).isoformat())
     except Exception as error:
         persist(status='failed',stage='failed',error=str(error),finished_at=datetime.now(timezone.utc).isoformat())
 
@@ -1199,56 +1183,71 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
         chunks = run_corpus.chunks()
         run = run_store.revision_run(revision_id)
         results = dict(run.get("quality_results") or {})
-        for index, item_id in enumerate(run["question_ids"], 1):
-            candidate = run_store.question(item_id)
-            if candidate['raw'].get('generation_strategy') == 'business_v2' and not run_store.candidate_rows([item_id])[0]['quality_audit']:
-                peers = [run_store.question(key)['question'] for key in run_store.generation_run(run['generation_run_id'], qualification=False)['question_ids'] if key != item_id]
-                audit = _revision_attempt(run_store, revision_id, 'business_audit', service, lambda: service.business_quality_audit(candidate, peers))
-                run_store.save_quality_audit(item_id, audit)
-            completed = run_store.revision_quality_step(run, item_id)
-            if completed == "done":
-                results[item_id] = {"probe": "passed", "qc": "qc_passed"}
-                run_store.update_revision(revision_id, progress={"current": index, "total": len(run["question_ids"])}, quality_results=results)
-                continue
-            if completed == "qc":
-                run_store.update_revision(revision_id, status="qc", stage="qc", progress={"current": index - 1, "total": len(run["question_ids"])}, quality_results=results)
-            else:
-                run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index - 1, "total": len(run["question_ids"])}, quality_results=results)
-                run_store.reset_qc_for_rerun(item_id)
-                probe = _revision_attempt(run_store, revision_id, "probe", service, lambda: run_store.run_probe(item_id, service.retriever, chunks, service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=True))
-                results[item_id] = {"probe": probe["status"], "probe_reason": probe.get("reason")}
-            if completed == "qc":
-                results[item_id] = {"probe": "passed", "probe_reason": (run.get("quality_results") or {}).get(item_id, {}).get("probe_reason")}
-            if results[item_id]["probe"] == "passed":
-                run_store.update_revision(revision_id, status="qc", stage="qc", quality_results=results)
-                qc, saved = _revision_attempt(run_store, revision_id, "qc", service, lambda: _quality_check(run_store, service, item_id))
-                results[item_id].update({"qc": saved["status"], "qc_reason": qc.get("reason")})
-            else:
-                results[item_id]["qc"] = "skipped"
-            run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index, "total": len(run["question_ids"])}, quality_results=results)
-        run_store.finish_revision_quality(revision_id, results)
+        from .providers import permanent_provider_error
+        for final_pass in range(2):
+            for index, item_id in enumerate(run["question_ids"], 1):
+                if final_pass and results.get(item_id,{}).get('execution_status')!='failed':
+                    continue
+                try:
+                    run=run_store.revision_run(revision_id)
+                    candidate = run_store.question(item_id)
+                    if candidate['raw'].get('generation_strategy') == 'business_v2' and not run_store.candidate_rows([item_id])[0]['quality_audit']:
+                        peers = [run_store.question(key)['question'] for key in run_store.generation_run(run['generation_run_id'], qualification=False)['question_ids'] if key != item_id]
+                        audit = _revision_attempt(run_store, revision_id, 'business_audit', service, lambda: service.business_quality_audit(candidate, peers))
+                        run_store.save_quality_audit(item_id, audit)
+                    completed = run_store.revision_quality_step(run, item_id)
+                    if completed == "done":
+                        results[item_id] = {"probe": "passed", "qc": candidate["qc_status"]}
+                        run_store.update_revision(revision_id, progress={"current": index, "total": len(run["question_ids"])}, quality_results=results)
+                        continue
+                    if completed == "qc":
+                        run_store.update_revision(revision_id, status="qc", stage="qc", progress={"current": index - 1, "total": len(run["question_ids"])}, quality_results=results)
+                    else:
+                        run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index - 1, "total": len(run["question_ids"])}, quality_results=results)
+                        run_store.reset_qc_for_rerun(item_id)
+                        probe = _revision_attempt(run_store, revision_id, "probe", service, lambda: run_store.run_probe(item_id, service.retriever, chunks, service.answerability_check, subtype_judge=service.negative_subtype_check, fail_on_judge_error=True))
+                        if probe.get('probe_details',{}).get('probe_execution_status') in {'failed','uncertain'}:
+                            raise ProviderUnavailable('Revision Probe 判断未完成：'+json.dumps(probe.get('probe_details',{}),ensure_ascii=False))
+                        results[item_id] = {"probe": probe["status"], "probe_reason": probe.get("reason")}
+                    if completed == "qc":
+                        results[item_id] = {"probe": "passed", "probe_reason": (run.get("quality_results") or {}).get(item_id, {}).get("probe_reason")}
+                    if results[item_id]["probe"] == "passed":
+                        run_store.update_revision(revision_id, status="qc", stage="qc", quality_results=results)
+                        qc, saved = _revision_attempt(run_store, revision_id, "qc", service, lambda: _quality_check(run_store, service, item_id))
+                        results[item_id].update({"qc": saved["status"], "qc_reason": qc.get("reason")})
+                    else:
+                        results[item_id]["qc"] = "skipped"
+                    run_store.update_revision(revision_id, status="probing", stage="probe", progress={"current": index, "total": len(run["question_ids"])}, quality_results=results)
+                except Exception as error:
+                    results[item_id]={**results.get(item_id,{}),'execution_status':'failed','error':str(error),
+                        'error_type':type(error).__name__,'error_detail':str(error.__cause__ or error)}
+                    run_store.update_revision(revision_id,quality_results=results)
+                    if isinstance(error,InterruptedError) or permanent_provider_error(error):raise
+        failures={key:value for key,value in results.items() if value.get('execution_status')=='failed'}
+        if failures:
+            message='；'.join(key+'：'+value['error'] for key,value in failures.items())
+            run_store.finish_revision_quality(revision_id,results,error=message,error_type='TechnicalFailure',error_detail=message)
+        else:
+            run_store.finish_revision_quality(revision_id, results)
     except Exception as error:
         run_store.finish_revision_quality(revision_id, results, error=str(error), error_type=type(error).__name__, error_detail=str(error.__cause__ or error))
 
 
 def _revision_attempt(run_store, revision_id, stage, service, work):
-    from .paid_run import current_paid_run
-    for attempt in ((1,) if current_paid_run() else (1,2)):
-        started = time.perf_counter()
-        error = None
-        try:
-            from .telemetry import collect_usage
-            with collect_usage() as usage:
-                return work()
-        except Exception as caught:
-            error = caught
-            if current_paid_run() or not isinstance(caught, ProviderTimeout) or attempt == 2:
-                raise
-        finally:
-            run = run_store.revision_run(revision_id)
-            history = list(run.get("runtime_attempts") or [])
-            history.append({"stage": stage, "attempt": attempt, "error_type": type(error).__name__ if error else None, "error": str(error.__cause__ or error) if error else None, "elapsed_ms": round((time.perf_counter() - started) * 1000), "result": "failed" if error else "passed", "provider": "DeepSeek" if getattr(service, "model", None) else None, "model": getattr(service, "model", None), "token_usage":usage})
-            run_store.update_revision(revision_id, runtime_attempts=history)
+    started = time.perf_counter()
+    error = None
+    try:
+        from .telemetry import collect_usage
+        with collect_usage() as usage:
+            return work()
+    except Exception as caught:
+        error = caught
+        raise
+    finally:
+        run = run_store.revision_run(revision_id)
+        history = list(run.get("runtime_attempts") or [])
+        history.append({"stage": stage, "attempt": 1, "error_type": type(error).__name__ if error else None, "error": str(error.__cause__ or error) if error else None, "elapsed_ms": round((time.perf_counter() - started) * 1000), "result": "failed" if error else "passed", "provider": "DeepSeek" if getattr(service, "model", None) else None, "model": getattr(service, "model", None), "token_usage":usage})
+        run_store.update_revision(revision_id, runtime_attempts=history)
 
 
 @app.post("/api/governance/review-batch", dependencies=[Depends(require_trusted_origin)])

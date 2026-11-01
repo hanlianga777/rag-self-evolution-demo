@@ -33,9 +33,13 @@ class StopTests(unittest.TestCase):
     def test_stop_during_backoff_prevents_retry(self):
         runtime=fixture.Runtime(fail=None);runner=EvaluationRunner(self.store,runtime)
         key,items,config=runner.start_baseline(automatic=True)
-        def judge(*args,**kw):runtime.judges.append(args[0]);raise ProviderTimeout('fixture')
+        def judge(*args,**kw):
+            from app.providers import request_with_retries
+            def attempt():
+                runtime.judges.append(args[0]);raise ProviderTimeout('fixture')
+            return request_with_retries(attempt)
         runtime.judge=judge
-        with patch('app.evaluation.time.sleep',side_effect=lambda _:self.store.request_evaluation_stop(key)):
+        with patch('app.providers.time.sleep',side_effect=lambda _:self.store.request_evaluation_stop(key)):
             result=runner.execute_baseline(key,items,config)
         self.assertEqual(runtime.judges,['Q1']);self.assertEqual(result['status'],'partial')
         self.assertIn('execution',result['result']['checkpoints']['Q1'])

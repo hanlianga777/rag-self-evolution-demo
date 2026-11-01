@@ -1,4 +1,4 @@
-"""Task006 launch failures stop the new batch without another request."""
+"""Task006 revised rule isolates technical errors, then retries them once."""
 from copy import deepcopy
 from types import SimpleNamespace
 import unittest
@@ -29,16 +29,18 @@ class Task006QualityStartTests(unittest.TestCase):
         with patch('app.golden_v2.validate_golden_candidate', return_value={'valid': True}):
             main._run_quality_rerun('fixture', ['Q01', 'Q02'], store, service,
                                     SimpleNamespace(chunks=lambda: []))
-        self.assertEqual(store.run_probe.call_count, 1)
+        self.assertEqual(store.run_probe.call_count, 4)
         service.quality_check.assert_not_called()
-        self.assertEqual(state['status'], 'failed')
-        self.assertEqual(state['technical_failed'], 1)
-        self.assertNotIn('Q02', state['slots'])
+        self.assertEqual(state['status'], 'completed')
+        self.assertEqual(state['technical_failed'], 2)
+        self.assertEqual(state['probe_failed'], 0)
+        self.assertEqual(state['completed'], 2)
+        self.assertIn('Q02', state['slots'])
         return state
 
-    def test_first_technical_error_stops_without_trying_next_question(self):
+    def test_first_technical_error_continues_and_gets_final_pass(self):
         state = self.run_failed_probe(ProviderUnavailable('fixture: provider connection unavailable'))
-        self.assertIn('fixture: provider connection unavailable', state['error'])
+        self.assertIn('fixture: provider connection unavailable', state['slots']['Q01']['error'])
 
     def test_uncertain_probe_is_not_counted_as_completed_machine_check(self):
         self.run_failed_probe({'status': 'failed', 'probe_details': {'probe_execution_status': 'uncertain',

@@ -10,7 +10,7 @@ import numpy as np
 
 from .telemetry import measure, collect_usage, cost_fields
 from .policy import DEFAULT_PIPELINE_CONFIG
-from .providers import ProviderTimeout, ProviderUnavailable, ProviderInvalidResponse, thinking_task, thinking_config
+from .providers import ProviderTimeout, ProviderUnavailable, ProviderInvalidResponse, ProviderRequestError, thinking_task, thinking_config
 from .retrieval import VectorRetriever
 from .corpus import current_manifest, CorpusStore
 from .full_text import CORPUS_LOCK, validate_bundle
@@ -204,7 +204,7 @@ class AiService:
         with measure(stages, "context_build"):
             context = generation_context(evidence)
         if not self.live_enabled:
-            raise ProviderUnavailable("未配置 DEEPSEEK_API_KEY")
+            raise ProviderRequestError("未配置 DEEPSEEK_API_KEY")
         strategy = {
             "Grounded": "只能基于给定证据回答；证据不足时明确说明。",
             "Completeness": "在不超出证据的前提下覆盖用户问题的所有必要步骤；证据不足时明确说明。",
@@ -260,7 +260,6 @@ class AiService:
     @provider_task('judge')
     def judge(self, question: str, expected: str, answer: str, category: str, *, context: dict | None = None) -> dict:
         from .providers import ProviderInvalidResponse
-        from .paid_run import unsettled_usage
         from .evaluation_stage import _request_checkpoint, judge_request_count
         checkpoint_context = _request_checkpoint.get()
         remaining = 2
@@ -281,7 +280,7 @@ class AiService:
                                      'response_metadata':dict(error.response_metadata)})
                     error.response_metadata = {**error.response_metadata, 'response_recovery':recovery}
                     error.provider_retry_exhausted = True
-                    if attempt + 1 >= remaining or getattr(error, 'request_execution_unknown', False) or getattr(error, 'billing_unknown', False) or any(unsettled_usage(event) for event in usage):
+                    if attempt + 1 >= remaining:
                         raise
         return {**result, "response_retries":2 - remaining + attempt, "response_recovery":recovery,
                 "stages": stages, "token_usage": usage, **cost_fields(self.model, usage)}
@@ -300,7 +299,6 @@ class AiService:
     @provider_task('qc')
     def quality_check(self, item: dict) -> dict:
         from .providers import ProviderInvalidResponse
-        from .paid_run import unsettled_usage
         stages, recovery = [], []
         with measure(stages, 'qc'), collect_usage() as usage:
             for attempt in range(2):
@@ -308,14 +306,14 @@ class AiService:
                     result = {**self._quality_check(item, correction=recovery[-1] if recovery else None), 'response_retries': attempt}
                     break
                 except ProviderInvalidResponse as error:
-                    if attempt or getattr(error, 'request_execution_unknown', False) or getattr(error, 'billing_unknown', False) or any(unsettled_usage(event) for event in usage):
+                    if attempt:
                         raise
                     recovery.append({'error':str(error), 'previous_response':error.raw_provider_response})
         return {**result, 'response_recovery':recovery, 'stages': stages, 'token_usage': usage, **cost_fields(self.model, usage)}
 
     def _quality_check(self, item: dict, *, correction=None) -> dict:
         if not self.live_enabled:
-            raise ProviderUnavailable("未配置 DEEPSEEK_API_KEY")
+            raise ProviderRequestError("未配置 DEEPSEEK_API_KEY")
         ablation = item.get("raw", {}).get("ablation_attribute")
         negative = item["test_category"] == "negative"
         subtype = item.get("negative_subtype") or item.get("raw", {}).get("expected_behavior")
@@ -628,7 +626,7 @@ class AiService:
     def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None, profile=None, coverage_plan=None) -> dict:
         """Generate a coverage-planned Golden set; approval remains human-only."""
         if not self.live_enabled:
-            raise ProviderUnavailable("未配置 DEEPSEEK_API_KEY，无法生成 Golden Candidate")
+            raise ProviderRequestError("未配置 DEEPSEEK_API_KEY，无法生成 Golden Candidate")
         if not chunks:
             raise ProviderUnavailable("知识库没有可用于 Golden Generation 的 Chunk")
         profile = profile or GENERATION_PROFILES["mini"]

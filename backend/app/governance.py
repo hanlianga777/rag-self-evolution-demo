@@ -1039,7 +1039,8 @@ class GovernanceStore:
                 raise KeyError(run_id)
             ids = _load(row["question_ids_json"], [])
             expected = self._expected_count({"profile": _load(row["profile_json"], {})})
-            if not expected or len(ids) != expected or len(set(ids)) != expected or row["status"] not in {"completed","candidate_generated","failed"}:
+            allowed_statuses = {"completed","candidate_generated","failed"} | ({"probing","qc"} if not start else set())
+            if not expected or len(ids) != expected or len(set(ids)) != expected or row["status"] not in allowed_statuses:
                 raise ValueError("本轮候选尚未完整入库或任务仍在运行")
             marks = ",".join("?" for _ in ids)
             candidates = connection.execute(f"SELECT id, legacy_question_type, raw_json, stage, probe_status, qc_status FROM questions WHERE id IN ({marks})", ids).fetchall()
@@ -1058,7 +1059,10 @@ class GovernanceStore:
                 if not ids:
                     raise ValueError("没有缺失或技术中断的检查阶段；已完成的质量争议请进入审核")
                 changes = {**changes, "total": len(ids), "question_ids": ids, "scope": "anomalies"}
-            audit["quality_rerun"] = {**previous, **changes, **({"attempt_id":uuid.uuid4().hex, "error":None, "finished_at":None} if start else {})}
+            if start:
+                for checkpoint in previous.get('checkpoints',{}).values():checkpoint.pop('final_retry_done',None)
+                for slot in previous.get('slots',{}).values():slot.pop('final_retry_done',None)
+            audit["quality_rerun"] = {**previous, **changes, **({"attempt_id":uuid.uuid4().hex, "error":None, "finished_at":None,"final_retry_started":False} if start else {})}
             connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json = ? WHERE generation_run_id = ?", (_json(audit), run_id))
             if changes.get("status")=="completed":
                 connection.execute("UPDATE golden_generation_runs SET status='completed' WHERE id=?",(run_id,))
@@ -1626,7 +1630,7 @@ class GovernanceStore:
         applied_at = run.get("applied_at") or ""
         item = self.question(question_id)
         qc = self.qc_history(question_id)
-        if item["qc_status"] == "qc_passed" and qc and qc[0]["created_at"] > applied_at:
+        if item["qc_status"] in {"qc_passed","qc_failed"} and qc and qc[0]["created_at"] > applied_at:
             return "done"
         probe = self.probe_history(question_id)
         if item["probe_status"] == "probe_passed" and probe and probe[0]["created_at"] > applied_at:
@@ -1838,6 +1842,9 @@ class GovernanceStore:
             result = self.record_probe_result(question_id, {'question_quality': 0, 'golden_answer_quality': 0, 'evidence_support': 0,
                                                           'evidence_direct_failure': True, 'reason': str(error), 'rule_version': 'v1.4',
                                                           'model_version': 'programmatic-probe-v2', 'probe_details': details}, execution=execution)
+            from .providers import permanent_provider_error
+            if permanent_provider_error(error):
+                raise
             return {**result, 'classification': 'RETRIEVAL_EXECUTION_FAILED', 'passed': False,
                     'programmatic': {'checks': {}, 'passed': False}, 'vector': {'top_k': None, 'best_similarity': None, 'signal': 'not_collected'}, 'full_text': None}
 
@@ -1918,6 +1925,8 @@ class GovernanceStore:
                 try:
                     subtype_semantic = subtype_judge(item["question"], hits, {"negative_subtype": subtype, "expected_behavior": expected_behavior}) if subtype_judge else {"matched": None, "reason": "Negative subtype Judge unavailable"}
                 except Exception as error:
+                    if fail_on_judge_error:
+                        raise
                     subtype_semantic = {"matched": None, "reason": str(error), "error_type": type(error).__name__}
                 if not isinstance(subtype_semantic, dict) or type(subtype_semantic.get('matched')) is not bool:
                     subtype_semantic = {'matched': None, 'reason': 'Subtype Judge unavailable or malformed', 'error_type': subtype_semantic.get('error_type') if isinstance(subtype_semantic, dict) else 'invalid_response'}
@@ -1930,6 +1939,8 @@ class GovernanceStore:
                 if not isinstance(answerability, dict) or type(answerability.get('answerable')) is not bool or not isinstance(answerability.get('reason'), str) or not answerability['reason'].strip():
                     answerability = {**(answerability if isinstance(answerability, dict) else {}), 'answerable': None, 'reason': str(answerability.get('reason') or 'Answerability Judge malformed or insufficient evidence') if isinstance(answerability, dict) else 'Answerability Judge malformed'}
             except Exception as error:
+                if fail_on_judge_error:
+                    raise
                 answerability = {"answerable": None, "reason": str(error), "error_type": type(error).__name__}
         parse_complete = (raw_full_text.get('coverage') or {}).get('status') == 'complete'
         uncertain = not positive and ((subtype_semantic is not None and subtype_semantic.get('matched') is None) or (ambiguous_negative and answerability.get('answerable') is None) or (subtype in {'insufficient_evidence', 'clarify'} and not parse_complete))
@@ -2308,7 +2319,7 @@ class GovernanceStore:
         if snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest()):
             raise ValueError('续跑Corpus身份不匹配，禁止混合结果')
         source = connection.execute('SELECT * FROM evaluation_runs WHERE id=?', (source_id,)).fetchone()
-        if source is None or source['status'] not in {'partial','failed'} or _load(source['config_json'], {}).get('run_target') != ('sandbox_candidate' if candidate_id else 'baseline'):
+        if source is None or (source['status'] not in {'partial','failed'} and not (source['status']=='completed' and _load(source['result_json'],{}).get('technical_failed'))) or _load(source['config_json'], {}).get('run_target') != ('sandbox_candidate' if candidate_id else 'baseline'):
             raise ValueError('仅中断的同身份评测可以续跑')
         from .paid_run import require_reconciled_execution
         require_reconciled_execution(_load(source['result_json'], {}))
@@ -2346,6 +2357,7 @@ class GovernanceStore:
             if source_id:
                 source, rows = self.validate_evaluation_resume(connection, snapshot, config, judge, source_id, candidate_id=candidate_id, manual_resume=manual_resume)
                 result.update(resume_source_id=source_id, checkpoints=_load(source['result_json'], {}).get('checkpoints', {}))
+                for checkpoint in result['checkpoints'].values():checkpoint.pop('final_retry_done',None)
                 if _load(source['result_json'], {}).get('judge_replay'):result['judge_replay']=_load(source['result_json'], {})['judge_replay']
             if judge_replay:
                 from .judge_replay import source_digest

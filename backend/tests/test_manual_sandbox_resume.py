@@ -1,4 +1,4 @@
-"""Unknown requests require reconciliation even for a manual continuation."""
+"""Unknown charges remain recorded while bounded retries and continuation proceed."""
 import json
 import unittest
 from copy import deepcopy
@@ -13,7 +13,7 @@ class ManualSandboxResumeTests(unittest.TestCase):
     setUp = fixture.ResumeTests.setUp
     tearDown = fixture.ResumeTests.tearDown
 
-    def test_new_unknown_still_stops_and_saved_answer_only_needs_judge(self):
+    def test_unknown_isolated_and_saved_answer_only_needs_judge_on_resume(self):
         self.runtime.fail=None
         baseline=self.runner.execute_baseline(*self.runner.start_baseline())
         exp=self.store.create_experiment(baseline['id'],'completed')
@@ -27,17 +27,27 @@ class ManualSandboxResumeTests(unittest.TestCase):
             return judge(q,*args,**kwargs)
         with patch.object(self.runtime,'judge',side_effect=unknown):
             first=self.runner.run_candidate(cid,automatic=True)
-            with self.assertRaisesRegex(ValueError,'对账'):
-                self.runner.start_candidate(cid,automatic=True,manual_resume=True)
-            self.assertEqual(len(calls),1)
-            self.assertFalse(self.runner.candidate_resume_plan(cid)['can_resume'])
-            self.assertFalse(self.runner.candidate_resume_plan(cid,manual_resume=True)['can_resume'])
+            self.assertEqual(len(calls),2)
+            self.assertTrue(self.runner.candidate_resume_plan(cid)['can_resume'])
+            self.assertTrue(self.runner.candidate_resume_plan(cid,manual_resume=True)['can_resume'])
             self.assertTrue(first['result']['checkpoints']['Q2']['unknown_execution']['judge'])
+            source=self.store.evaluation_run(first['result']['evaluation_run_id']);before=deepcopy(source)
+            self.assertEqual(source['status'],'completed')
+            self.assertEqual(first['result']['completed'],3)
+            self.assertEqual(first['result']['technical_failed'],1)
+            self.assertFalse(first['result']['evaluation_complete'])
+            self.assertIsNone(first['result']['gates']['passed'])
+            fault[0]=False
+            recovered=self.runner.execute_candidate(*self.runner.start_candidate(cid,automatic=True,manual_resume=True))
+            self.assertEqual(recovered['status'],'evaluated')
+            self.assertTrue(recovered['result']['evaluation_complete'])
+            self.assertEqual(recovered['result']['resume_source_id'],source['id'])
+            self.assertEqual(self.store.evaluation_run(source['id']),before)
         self.assertEqual(self.runtime.answers.count('Q2'),2)  # one Baseline, one Candidate answer
-        self.assertGreater(first['result']['request_accounting']['unknown_usage_events'],0)
-        self.assertEqual(self.store.evaluation_run(first['result']['evaluation_run_id'])['status'],'partial')
+        self.assertEqual(first['result']['request_accounting']['unknown_usage_events'],2)
+        self.assertEqual(recovered['result']['request_accounting']['unknown_usage_events'],2)
 
-    def test_a38_b48_manual_consent_completes_only_missing_work(self):
+    def test_unknown_embedding_or_rerank_resumes_49_completed_cases(self):
         from app.corpus import current_manifest, manifest_identity
         from fastapi.testclient import TestClient
         from api_fixture import main
@@ -72,22 +82,29 @@ class ManualSandboxResumeTests(unittest.TestCase):
                     partial=self.runner.run_candidate(cid,automatic=True)
                     source=self.store.evaluation_run(partial['result']['evaluation_run_id']);old=deepcopy(source)
                     cases=self.store.evaluation_case_results(source['id'])
-                    self.assertEqual(len(cases),missing-1)
-                    self.assertFalse(self.runner.candidate_resume_plan(cid)['can_resume'])
-                    with self.assertRaisesRegex(ValueError,'对账'):self.runner.start_candidate(cid)
+                    self.assertEqual(len(cases),49)
+                    self.assertEqual(source['status'],'completed')
+                    self.assertEqual(source['result']['technical_failed'],1)
+                    self.assertFalse(source['result']['evaluation_complete'])
+                    self.assertIsNone(source['result']['gates']['passed'])
+                    self.assertTrue(self.runner.candidate_resume_plan(cid)['can_resume'])
                     fault[0]=False
                     threads=set(threading.enumerate())
                     with patch.object(main,'store',self.store),patch.object(main,'ai_service',self.runtime),TestClient(main.app) as client:
                         preview=client.get('/api/candidates/'+cid+'/preflight').json()
-                        self.assertFalse(preview['can_start'])
+                        self.assertTrue(preview['can_start'])
                         self.assertEqual(preview['resume_plan']['next_question_id'],f'Q{missing}')
-                        denied=client.post('/api/candidates/'+cid+'/run',headers={'Origin':'http://127.0.0.1:5174'})
-                        self.assertEqual(denied.status_code,409)
                         response=client.post('/api/candidates/'+cid+'/run',headers={'Origin':'http://127.0.0.1:5174'},json={'authorize_provider':True})
-                        self.assertEqual(response.status_code,409,response.text)
+                        self.assertEqual(response.status_code,201,response.text)
                         for worker in set(threading.enumerate())-threads:
                             if worker.name.endswith('(run)'):worker.join(10);self.assertFalse(worker.is_alive())
                     self.assertEqual(self.store.evaluation_run(source['id']),old)
+                    recovered=self.store.candidate(cid)
+                    self.assertEqual(recovered['status'],'evaluated')
+                    self.assertEqual(recovered['result']['completed'],50)
+                    self.assertTrue(recovered['result']['evaluation_complete'])
+                    self.assertEqual(recovered['result']['resume_source_id'],source['id'])
+                    self.assertEqual(recovered['result']['request_accounting']['unknown_usage_events'],2)
                     for case in cases:
                         self.assertEqual(answers.count(case['question_id']),1)
                     if label=='B':self.assertEqual(rpc.count(('Q49','embedding')),1)

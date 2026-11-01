@@ -1,4 +1,4 @@
-"""Serial request accounting and duplicate unknown-request protection."""
+"""Serial request accounting, retaining unknown charges across bounded retries."""
 import hashlib
 import json
 import math
@@ -52,10 +52,8 @@ class PaidRun:
 
     @classmethod
     def next_stage(cls,path,stage,identity_check,*,authorization=None,budget_yuan=None):
-        """Continue settled requests; unknown execution is a terminal error."""
+        """Continue a new stage while preserving prior unknown billing records."""
         path=Path(path);data=json.loads(path.read_text())
-        if any(call.get('status') not in {'ok','rejected'} for call in data['calls']):
-            raise RuntimeError('Prior request result or Usage unknown; duplicate execution refused')
         if identity_check()!=data['identity']: raise RuntimeError('Paid continuation identity changed')
         stages=data.get('stages',[])
         if stage in [s['stage'] for s in stages]: raise RuntimeError('Paid stage already claimed; no duplicate execution')
@@ -64,6 +62,7 @@ class PaidRun:
         run.identity,run.identity_check=data['identity'],identity_check
         run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],None
         run.output_limits=data['output_limits'];run.stages=[*stages,{'stage':stage,'claimed_at':datetime.now(timezone.utc).isoformat()}]
+        run._retire_reserved()
         run.save();return run
 
     @classmethod
@@ -73,7 +72,13 @@ class PaidRun:
         run.identity,run.identity_check=data['identity'],identity_check
         run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],data.get('stopped')
         run.stages=data.get('stages',[]);run.output_limits=data.get('output_limits')
+        run._retire_reserved()
         return run
+
+    def _retire_reserved(self):
+        for call in self.calls:
+            if call.get('status') == 'reserved':
+                call.update(status='unknown', upper_estimate_yuan=None, recovery_reason='previous worker ended before settlement')
 
     def begin(self, provider, model, payload):
         if _accounting.get():
@@ -81,9 +86,6 @@ class PaidRun:
             request_hash = hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest()
             if any(call['status']=='reserved' for call in self.calls):
                 raise RuntimeError('Serial paid run already has an in-flight request')
-            unknown = [i for i, call in enumerate(self.calls) if call['status']=='unknown' and call['provider']==provider and call['model']==model and call['request_sha256']==request_hash]
-            if unknown:
-                raise RuntimeError('Unknown request result; duplicate execution refused')
             if self.identity_check is None or self.identity_check()!=self.identity:raise RuntimeError('Paid run identity unavailable or changed')
             call={'provider':provider,'model':model,'status':'reserved','reserved_yuan':0.,'upper_estimate_yuan':None,
                   'request_sha256':request_hash,'request_payload':payload,
@@ -94,8 +96,6 @@ class PaidRun:
         if any(call['status']=='reserved' for call in self.calls):
             raise RuntimeError('Serial paid run already has an in-flight request')
         request_hash = hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest()
-        if any(call['status']=='unknown' and call['provider']==provider and call['model']==model and call['request_sha256']==request_hash for call in self.calls):
-            raise RuntimeError('Unknown request result; duplicate execution refused')
         if self.identity_check is None or self.identity_check() != self.identity:
             raise RuntimeError('Paid run identity unavailable or changed')
         rate = self.prices.get(model)
@@ -135,12 +135,12 @@ class PaidRun:
             self.save();return
         if call['status'] != 'reserved': raise RuntimeError('Duplicate payment Usage')
         call['usage'] = usage
-        if usage.get('status')!='ok' or usage.get('provider')!=call['provider'] or usage.get('requested_model')!=call['model']:
-            raise RuntimeError('Payment Usage identity/status invalid')
         prompt = usage.get('prompt_tokens',usage.get('total_tokens'))
         output = usage.get('completion_tokens',0 if call['provider']=='Alibaba' else None)
-        if any(type(n) is not int or n<0 for n in (prompt,output)):
-            raise RuntimeError('Payment Usage missing or invalid')
+        if (usage.get('status')!='ok' or usage.get('provider')!=call['provider'] or usage.get('requested_model')!=call['model']
+            or any(type(n) is not int or n<0 for n in (prompt,output))):
+            call.update(status='unknown', upper_estimate_yuan=None, settlement='usage_unknown')
+            self.save();return
         rate = self.prices.get(call['model'])
         if rate and (rate.get('provider') != call['provider'] or any(type(rate.get(key)) not in (int,float) or not math.isfinite(rate[key]) or rate[key]<0 for key in ('input','output'))):
             rate = None
@@ -199,15 +199,13 @@ def paid_request(provider, model, payload):
         call = run.begin(provider,model,payload)
         token = _ticket.set(call)
         yield
-        if _accounting.get() and call['status']!='ok':
-            if call['status']=='reserved':call['status']='unknown';run.save()
-            raise RuntimeError('Payment Usage missing or invalid')
-        elif not _accounting.get() and call['status'] not in {'ok','rejected'}:raise RuntimeError('Payment Usage missing')
+        if call['status']=='reserved':
+            call.update(status='unknown', settlement='usage_missing');run.save()
     except Exception as error:
-        if _accounting.get():
-            if token is not None and call['status']=='reserved':call.update(status='unknown',error_type=type(error).__name__);run.save()
-        from .providers import retryable_error
-        if token is None or call['status']!='rejected' or not retryable_error(error):run.stop(type(error).__name__)
+        if token is not None and call['status']=='reserved':
+            call.update(status='unknown',error_type=type(error).__name__);run.save()
+        from .providers import permanent_provider_error
+        if permanent_provider_error(error):run.stop(type(error).__name__)
         raise
     finally:
         if token is not None: _ticket.reset(token)
@@ -247,14 +245,7 @@ def unsettled_usage(usage):
 
 
 def require_reconciled_execution(result):
-    """Read-only: reject duplicate requests with unknown execution or Usage."""
-    for question,checkpoint in result.get('checkpoints',{}).items():
-        if any(r.get('status') in {'inflight','unknown'} or any(unsettled_usage(u) for a in r.get('attempts',[]) for u in a.get('usage',[])) for r in checkpoint.get('provider_requests',{}).values()):
-            raise ValueError('执行失败：'+question+' RPC执行或Usage未知，禁止重复发送')
-        if checkpoint.get('inflight') or any(checkpoint.get('unknown_execution',{}).values()) or any(checkpoint.get('unsettled_usage',{}).values()):
-            raise ValueError('执行失败：'+question+' 存在Unknown request execution；禁止重复调用')
-        if any(a.get('request_execution_unknown') is True or a.get('billing_unknown') is True or any(unsettled_usage(u) for u in a.get('usage',[])) for a in checkpoint.get('attempts',[])):
-            raise ValueError('执行失败：'+question+' 请求结果或Usage未知')
+    """Keep ledger integrity checks; unknown billing no longer blocks recovery."""
     path=result.get('auto_recovery',{}).get('ledger_path')
     if path:
         try:data=json.loads(Path(path).read_text())
@@ -262,5 +253,3 @@ def require_reconciled_execution(result):
         if not isinstance(data,dict) or not isinstance(data.get('calls'),list) or any(not isinstance(c,dict) for c in data['calls']):raise ValueError('费用账本格式无效')
         if data.get('identity')!=result.get('auto_recovery',{}).get('ledger_identity'):
             raise ValueError('费用账本身份不匹配')
-        if any(c.get('status') not in {'ok','rejected'} for c in data.get('calls',[])):
-            raise ValueError('费用账本存在unknown/reserved/未结算请求，禁止重复发送')

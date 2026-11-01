@@ -23,7 +23,7 @@ import numpy as np
 from .corpus import EMBEDDING_MODEL, source_fingerprint, _split_long_part
 from .full_text import CORPUS_LOCK, checksum, validate_bundle, write_full_text
 from .providers import (ProviderUnavailable, ProviderAPIError, ProviderTimeout, ProviderNetworkError,
-                        ProviderRequestError, ProviderInvalidResponse, redact_provider_error, request_timeout)
+                        ProviderRequestError, ProviderInvalidResponse, redact_provider_error, request_timeout, request_with_retries)
 
 CONFIG = {'parser': 'MinerU', 'parser_mode': 'vlm', 'table_normalize': 'table-kv-v1',
           'chunk_strategy': 'Parent-Child', 'parent_tokens': 1400, 'child_tokens': 400,
@@ -153,7 +153,6 @@ class AlibabaProvider:
 
     def _post(self, path, payload, *, validate=None):
         from .paid_run import paid_request
-        from .providers import _stage_control
         if not self.values.get('DASHSCOPE_API_KEY','').strip() or not self.values.get('DASHSCOPE_BASE_URL','').strip():
             raise ProviderRequestError('Alibaba Key / business-space endpoint missing')
         def send_request():
@@ -170,26 +169,12 @@ class AlibabaProvider:
         from .evaluation_stage import checkpoint_request
         def send():
             return checkpoint_request('Alibaba',payload['model'],self.values['DASHSCOPE_BASE_URL'].rstrip('/')+path,payload,send_request)
-        control=_stage_control.get()
-        if control is None:return send()
-        # Reuse the finite stage loop per RPC; do not repeat an earlier paid Embedding when Rerank rejects.
-        from .evaluation_stage import perform_stage
-        checkpoint={'attempts':[]}
-        try:
-            return perform_stage(checkpoint,'alibaba_request',send,'provider-request',automatic=control[0],
-                check_stop=control[1],on_state=lambda *args,**kwargs:None)
-        except Exception as error:
-            from .providers import retryable_error
-            error.provider_retry_exhausted=retryable_error(error)
-            if getattr(error,'billing_unknown',False) and 'scored_result' in checkpoint:
-                error.raw_provider_response=redact_provider_error(json.dumps(checkpoint['scored_result'],ensure_ascii=False),self.values.get('DASHSCOPE_API_KEY',''))
-            error.response_metadata={**(getattr(error,'response_metadata',None) or {}),'request_attempt_count':len(checkpoint['attempts'])}
-            raise
+        return request_with_retries(send)
 
     def _post_request(self, path, payload):
         key = self.values.get('DASHSCOPE_API_KEY', '').strip()
         base = self.values.get('DASHSCOPE_BASE_URL', '').rstrip('/')
-        if not key or not base: raise ProviderUnavailable('Alibaba Key / business-space endpoint missing')
+        if not key or not base: raise ProviderRequestError('Alibaba Key / business-space endpoint missing')
         request = urllib.request.Request(base + path, data=json.dumps(payload).encode(), headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'}, method='POST')
         from .telemetry import record_usage
         started = time.perf_counter()
@@ -202,11 +187,6 @@ class AlibabaProvider:
                 response_text=response.read().decode('utf-8')
                 body=json.loads(response_text)
                 if not isinstance(body,dict):raise ProviderInvalidResponse('阿里云响应不是对象',raw_provider_response=redact_provider_error(response_text,key))
-            from .paid_run import current_paid_run
-            if current_paid_run(): current_paid_run().response(body)
-            record_usage({**body.get('usage', {}), 'provider':'Alibaba', 'requested_model':payload['model'], 'call_started_at':call_started_at, 'status':'ok', 'latency_ms':round((time.perf_counter()-started)*1000),
-                'request_sha256':hashlib.sha256(request.data).hexdigest(),'request_id':body.get('request_id') or request_id})
-            return body
         except (OSError, http.client.HTTPException, json.JSONDecodeError, ProviderInvalidResponse) as error:
             status=error.code if isinstance(error,urllib.error.HTTPError) else None
             raw=None
@@ -237,6 +217,12 @@ class AlibabaProvider:
                 'status':'rejected' if rejected else 'unknown','latency_ms':round((time.perf_counter()-started)*1000),
                 **metadata,'provider_code':getattr(failure,'provider_code',None),'detail':str(failure)})
             raise failure from None
+        # Local accounting/storage failures must never resend a successful RPC.
+        record_usage({**(body.get('usage') if isinstance(body.get('usage'),dict) else {}), 'provider':'Alibaba', 'requested_model':payload['model'], 'call_started_at':call_started_at, 'status':'ok', 'latency_ms':round((time.perf_counter()-started)*1000),
+            'request_sha256':hashlib.sha256(request.data).hexdigest(),'request_id':body.get('request_id') or request_id})
+        from .paid_run import current_paid_run
+        if current_paid_run(): current_paid_run().response(body)
+        return body
 
     def embed(self, texts, dimension):
         vectors = []

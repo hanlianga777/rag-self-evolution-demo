@@ -207,9 +207,10 @@ class ThinkingTests(unittest.TestCase):
             def __iter__(inner):
                 yield b'data: {"choices":[{"delta":{"reasoning_content":"PRIVATE START"}}],"usage":{"prompt_tokens":7}}\n\n'
                 raise http.client.IncompleteRead(b'PRIVATE REASONING CONTINUATION')
-        with patch('urllib.request.urlopen', return_value=BrokenResponse()), patch('app.paid_run.payment_usage'):
+        with patch('urllib.request.urlopen',side_effect=lambda *a,**kw:BrokenResponse()) as request, patch('app.paid_run.payment_usage'), patch('app.providers.time.sleep'):
             with self.assertRaises(providers.ProviderNetworkError) as failure:
                 self.provider.complete_with_metrics('system','user',stream=True)
+        self.assertEqual(request.call_count,3)
         self.assertNotIn('PRIVATE', failure.exception.raw_provider_response)
         self.assertIn('prompt_tokens', failure.exception.raw_provider_response)
         self.assertEqual(failure.exception.response_metadata['partial_usage'], {'prompt_tokens':7})

@@ -27,16 +27,15 @@ class AutomaticRecoveryTests(unittest.TestCase):
         self.assertEqual(result['judge']['evaluation_identity'],identity)
         self.assertEqual(result['result']['checkpoints']['Q2']['attempts'][1]['status'],'error')
 
-    def test_accounting_ignores_budget_but_stops_on_unknown_usage(self):
+    def test_accounting_ignores_budget_and_retains_unknown_usage(self):
         run=PaidRun(Path(self.tmp.name)/'audit.json',.001,{}, {},identity_check=lambda:{})
         with controlled_run(run),accounting_only():
             with paid_request('DeepSeek','fixture',{'max_tokens':999999}):record_usage({'status':'ok','provider':'DeepSeek','requested_model':'fixture','prompt_tokens':1000000,'completion_tokens':1000000})
-            with self.assertRaisesRegex(RuntimeError,'Usage missing'):
-                with paid_request('DeepSeek','fixture',{}):pass
-            with self.assertRaisesRegex(RuntimeError,'stopped'):
-                with paid_request('DeepSeek','fixture',{}):self.fail('Unknown Usage must stop before another request')
-        self.assertEqual(len(run.calls),2);self.assertIsNone(run.calls[0]['upper_estimate_yuan'])
-        self.assertEqual(run.calls[1]['status'],'unknown');self.assertTrue(run.stopped)
+            with paid_request('DeepSeek','fixture',{}):pass
+            with paid_request('DeepSeek','fixture',{}):
+                record_usage({'status':'ok','provider':'DeepSeek','requested_model':'fixture','prompt_tokens':1,'completion_tokens':1})
+        self.assertEqual(len(run.calls),3);self.assertIsNone(run.calls[0]['upper_estimate_yuan'])
+        self.assertEqual(run.calls[1]['status'],'unknown');self.assertFalse(run.stopped)
 
     def test_format_recovery_preserves_strict_judge_validation(self):
         provider=DeepSeekProvider(Settings('fixture','https://invalid','fixture'))
@@ -45,7 +44,7 @@ class AutomaticRecoveryTests(unittest.TestCase):
         with patch.object(provider,'complete',return_value='{"correctness":4'):
             with self.assertRaises(ProviderInvalidResponse):provider.judge('q','a','a')
 
-    def test_dead_worker_stops_unknown_inflight_without_replaying_completed_question(self):
+    def test_dead_worker_resumes_unknown_inflight_without_replaying_completed_question(self):
         runtime=Runtime(fail=None);runner=EvaluationRunner(self.store,runtime)
         key,items,config=runner.start_baseline(automatic=True)
         case=runner._case_result(items[0],config);self.store.record_evaluation_case(key,items[0]['id'],case)
@@ -57,10 +56,10 @@ class AutomaticRecoveryTests(unittest.TestCase):
         with patch('app.governance.os.kill',side_effect=ProcessLookupError):
             self.store.interrupt_evaluation_runs();self.assertEqual(self.store.evaluation_run(key)['status'],'queued')
             completed=runner.recover_run(key)
-        self.assertEqual(completed['status'],'partial');self.assertEqual(runtime.answers.count('Q1'),1);self.assertEqual(runtime.answers.count('Q2'),1)
-        self.assertIn('Unknown request',completed['error_message'])
-        self.assertEqual(len(self.store.evaluation_case_results(key)),1)
-        self.assertIn('execution',completed['result']['checkpoints']['Q2'])
+        self.assertEqual(completed['status'],'completed');self.assertEqual(runtime.answers.count('Q1'),1);self.assertEqual(runtime.answers.count('Q2'),1)
+        self.assertTrue(completed['result']['evaluation_complete'])
+        self.assertEqual(len(self.store.evaluation_case_results(key)),4)
+        self.assertTrue(completed['result']['checkpoints']['Q2']['unknown_execution']['judge'])
 
     def test_same_worker_cannot_claim_twice_or_rejudge_completed_run(self):
         runtime=Runtime(fail=None);runner=EvaluationRunner(self.store,runtime)
@@ -68,7 +67,7 @@ class AutomaticRecoveryTests(unittest.TestCase):
         self.assertTrue(self.store.claim_evaluation_worker(key));self.assertFalse(self.store.claim_evaluation_worker(key))
         self.assertEqual(runner.execute_baseline(key,items,config)['status'],'running');self.assertFalse(runtime.answers)
 
-    def test_network_and_provider_account_failure_are_terminal(self):
+    def test_network_isolated_but_provider_account_failure_is_terminal(self):
         from app.providers import ProviderAPIError
         for error in [ProviderTimeout('fixture timeout'),ProviderAPIError('fixture account',status_code=402)]:
             runtime=Runtime(fail=None);judge=runtime.judge;calls=[]
@@ -78,18 +77,18 @@ class AutomaticRecoveryTests(unittest.TestCase):
                 return judge(q,*args,**kw)
             runtime.judge=flaky;runner=EvaluationRunner(self.store,runtime);key,items,config=runner.start_baseline(automatic=True)
             with patch('app.evaluation.time.sleep'):result=runner.execute_baseline(key,items,config)
-            self.assertEqual(result['status'],'partial')
-            self.assertEqual(calls.count('Q2'),1)
+            self.assertEqual(result['status'],'completed' if isinstance(error,ProviderTimeout) else 'partial')
+            self.assertEqual(calls.count('Q2'),2 if isinstance(error,ProviderTimeout) else 1)
             self.assertEqual(runtime.answers.count('Q2'),1)
 
-    def test_repeated_invalid_schema_stops_with_raw_audit_not_completed(self):
+    def test_repeated_invalid_schema_finishes_with_raw_audit_and_technical_failures(self):
         runtime=Runtime(fail=None);runner=EvaluationRunner(self.store,runtime)
         runtime.judge=lambda *_a,**_kw:(_ for _ in ()).throw(ProviderInvalidResponse('fixture schema',raw_provider_response='{}'))
         key,items,config=runner.start_baseline(automatic=True)
         with patch('app.evaluation.time.sleep'):result=runner.execute_baseline(key,items,config)
-        self.assertEqual(result['status'],'partial');checkpoint=result['result']['checkpoints']['Q1']
+        self.assertEqual(result['status'],'completed');self.assertEqual(result['result']['technical_failed'],4);self.assertFalse(result['result']['evaluation_complete']);checkpoint=result['result']['checkpoints']['Q1']
         errors=[a for a in checkpoint['attempts'] if a['status']=='error']
-        self.assertEqual(len(errors),2);self.assertEqual(errors[-1]['raw_provider_response'],'{}');self.assertIn('execution',checkpoint)
+        self.assertEqual(len(errors),4);self.assertEqual(errors[-1]['raw_provider_response'],'{}');self.assertIn('execution',checkpoint)
 
     def test_long_task_is_not_stopped_by_elapsed_time(self):
         import itertools

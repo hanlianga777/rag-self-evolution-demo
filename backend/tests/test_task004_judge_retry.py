@@ -35,11 +35,11 @@ class JudgeRetryTests(unittest.TestCase):
         self.assertEqual(len(cp['attempts']),1)
         self.assertEqual(len(cp['attempts'][0]['usage']),2)
 
-    def test_unknown_request_does_not_retry(self):
+    def test_unknown_billing_does_not_cancel_format_retry(self):
         error=ProviderInvalidResponse('transport response incomplete');error.request_execution_unknown=True
         provider=SimpleNamespace(judge=Mock(side_effect=error),settings=SimpleNamespace(model='fixture'))
         with self.assertRaises(ProviderInvalidResponse):AiService(None,None,provider,False).judge('q','e','a','positive')
-        self.assertEqual(provider.judge.call_count,1)
+        self.assertEqual(provider.judge.call_count,2)
 
     def test_network_error_is_not_format_recovery(self):
         provider=SimpleNamespace(judge=Mock(side_effect=ProviderNetworkError('offline')),settings=SimpleNamespace(model='fixture'))

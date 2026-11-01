@@ -49,21 +49,27 @@ class NegativeFinalContractTests(unittest.TestCase):
         result=summarize_evaluation_cases([case],complete=False)
         self.assertIsNone(result['overall_score']);self.assertEqual(result['overall_score_status'],'NOT_EVALUABLE');self.assertIsNone(result['gates']['passed'])
         self.assertTrue(all(g['status']=='NOT_EVALUABLE' for g in result['gates']['gates']))
-    def test_partial_and_failed_replay_never_publish_aggregate_or_bad_case(self):
+    def test_replay_with_technical_failures_never_publishes_aggregate_or_bad_case(self):
         import test_baseline_resume as fixture
         holder=fixture.ResumeTests();holder.setUp()
         try:
             for completed in [0,1]:
                 runtime=fixture.Runtime(fail=None);runner=EvaluationRunner(holder.store,runtime);key,items,config=runner.start_baseline()
                 original=runner.score_execution;calls=[0]
-                def score(item,execution):
+                def score(item,execution,**kwargs):
                     calls[0]+=1
                     if calls[0]>completed:raise ProviderInvalidResponse('explicit invalid Judge')
-                    return original(item,execution)
+                    return original(item,execution,**kwargs)
                 executions={q['id']:runtime.answer(q['question'],config) for q in items}
                 with patch.object(runner,'score_execution',side_effect=score):result=runner.execute_replay(key,items,executions)
-                self.assertEqual(result['status'],'partial' if completed else 'failed')
+                self.assertEqual(result['status'],'completed')
+                self.assertEqual(result['result']['completed'],completed)
+                self.assertEqual(result['result']['technical_failed'],len(items)-completed)
+                self.assertFalse(result['result']['evaluation_complete'])
                 self.assertIsNone(result['result']['overall_score']);self.assertIsNone(result['result']['gates']['passed'])
-                self.assertEqual(result['result']['bad_case_count'],0)
+                self.assertEqual(result['result']['overall_score_status'],'NOT_EVALUABLE')
+                self.assertTrue(all(g['status']=='NOT_EVALUABLE' for g in result['result']['gates']['gates']))
+                self.assertIsNone(result['result']['bad_case_count'])
+                self.assertEqual(result['result']['partial_bad_case_count'],0)
                 self.assertFalse(any(b['run_id']==key for b in holder.store.bad_case_rows()))
         finally:holder.tearDown()

@@ -9,7 +9,7 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 from app.ai_service import AiService
-from app.providers import ProviderNetworkError, ProviderUnavailable
+from app.providers import ProviderNetworkError, ProviderUnavailable, ProviderAPIError
 from app.paid_run import PaidRun, paid_request, controlled_run
 from app.telemetry import record_usage
 
@@ -41,75 +41,66 @@ class PaidRunTests(unittest.TestCase):
         with execution_limits({'judge':32768}),provider_task('judge'):
             self.assertEqual(json.loads(provider._request('s','u',True,False,.2).data)['max_tokens'],32768)
 
-    def test_one_explicit_unknown_retry_retains_original_call_and_reserve(self):
-        from app.paid_run import provider_task
-        payload={'messages':[],'max_tokens':10}
-        with provider_task('judge'):old=self.run.begin('DeepSeek','deepseek-v4-flash',payload)
-        self.run.stop('ProviderTimeout');original=json.loads(json.dumps(old))
-        auth={'source':'direct_user_instruction','request_sha256':old['request_sha256'],'max_judge_retries':1}
-        with self.assertRaisesRegex(RuntimeError,'unknown'):
-            PaidRun.next_stage(self.path,'resume',lambda:{'corpus':'new'},authorization=auth,budget_yuan=10.)
-        self.assertEqual(json.loads(self.path.read_text())['calls'][0],original)
+    def test_next_stage_preserves_unknown_call_and_reserve(self):
+        old=self.run.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':10})
+        original_reserve=old['reserved_yuan']
+        self.run.stop('ProviderTimeout')
+        resumed=PaidRun.next_stage(self.path,'resume',lambda:{'corpus':'new'})
+        self.assertEqual(resumed.calls[0]['status'],'unknown')
+        self.assertEqual(resumed.calls[0]['reserved_yuan'],original_reserve)
+        self.assertIsNone(resumed.calls[0]['upper_estimate_yuan'])
+        self.assertIsNone(resumed.stopped)
 
-
-    def test_accounting_explicit_retry_keeps_unknown_and_allows_exactly_once(self):
+    def test_accounting_retry_preserves_unknown_attempt(self):
         from app.paid_run import accounting_only
-        payload = {'messages': [], 'max_tokens': 10}
+        payload={'messages':[], 'max_tokens':10}
         with accounting_only():
-            old = self.run.begin('DeepSeek', 'deepseek-v4-flash', payload)
-            old['status'] = 'unknown'
-            original = json.loads(json.dumps(old))
-            self.run.accounting_retry_authorization = {
-                'source': 'direct_user_instruction', 'unknown_call_index': 0,
-                'request_sha256': old['request_sha256'], 'max_request_retries': 1,
-            }
-            self.run.save()
-            restored = PaidRun.load_accounting(self.path, lambda: {'corpus': 'new'})
-            with self.assertRaisesRegex(RuntimeError, 'Unknown request'):
-                restored.begin('DeepSeek', 'deepseek-v4-flash', payload)
-            self.assertEqual(restored.calls[0], original)
+            old=self.run.begin('DeepSeek','deepseek-v4-flash',payload)
+            old['status']='unknown';self.run.save()
+            original=json.loads(json.dumps(old))
+            restored=PaidRun.load_accounting(self.path,lambda:{'corpus':'new'})
+            new=restored.begin('DeepSeek','deepseek-v4-flash',payload)
+            self.assertEqual(restored.calls[0],original)
+            self.assertIsNot(new,restored.calls[0])
+            self.assertEqual(len(restored.calls),2)
 
-    def test_accounting_retry_rejects_wrong_or_missing_authorization(self):
+    def test_unknown_billing_does_not_require_a_separate_authorization(self):
         from app.paid_run import accounting_only
-        payload = {'messages': [], 'max_tokens': 10}
+        payload={'messages':[], 'max_tokens':10}
         with accounting_only():
-            old = self.run.begin('DeepSeek', 'deepseek-v4-flash', payload)
-            old['status'] = 'unknown'
-            for auth in (None, {'source': 'direct_user_instruction', 'unknown_call_index': 1,
-                                'request_sha256': old['request_sha256'], 'max_request_retries': 1},
-                         {'source': 'direct_user_instruction', 'unknown_call_index': 0,
-                          'request_sha256': 'wrong', 'max_request_retries': 1}):
-                self.run.accounting_retry_authorization = auth
-                with self.assertRaisesRegex(RuntimeError, 'Unknown request'):
-                    self.run.begin('DeepSeek', 'deepseek-v4-flash', payload)
-            self.assertEqual(len(self.run.calls), 1)
+            old=self.run.begin('DeepSeek','deepseek-v4-flash',payload)
+            old['status']='unknown'
+            new=self.run.begin('DeepSeek','deepseek-v4-flash',payload)
+            self.assertEqual(len(self.run.calls),2)
+            self.assertEqual(old['status'],'unknown')
+            self.assertEqual(new['status'],'reserved')
 
     def test_first_stop_reason_survives_outer_stage_failure(self):
         self.run.stop('ProviderTimeout')
         self.run.stop('RuntimeError')
         self.assertEqual(json.loads(self.path.read_text())['stopped'],'ProviderTimeout')
 
-    def test_checkpoint_authorization_keeps_all_unknown_reserves_and_requires_exact_scope(self):
-        old=self.run.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':10})
-        self.run.stop('ProviderNetworkError')
-        auth={'source':'direct_user_instruction','scope':'finite_checkpoint_resume',
-              'max_missing_request_retries':1,'source_evaluation_id':'partial-fixture',
-              'evaluation_identity':'frozen-fixture','held_request_sha256':[old['request_sha256']]}
-        with self.assertRaisesRegex(RuntimeError,'unknown'):
-            PaidRun.next_stage(self.path,'baseline-recovery-1',lambda:{'corpus':'new'},authorization=auth)
-        self.assertEqual(json.loads(self.path.read_text())['calls'],[old])
+    def test_resuming_unknown_billing_still_requires_same_identity(self):
+        self.run.begin('DeepSeek','deepseek-v4-flash',{'max_tokens':10})
+        with self.assertRaisesRegex(RuntimeError,'identity'):
+            PaidRun.next_stage(self.path,'baseline-recovery-1',lambda:{'corpus':'different'})
+        resumed=PaidRun.next_stage(self.path,'baseline-recovery-1',lambda:{'corpus':'new'})
+        self.assertEqual(resumed.calls[0]['status'],'unknown')
+        self.assertEqual(len(resumed.calls),1)
 
-    def test_network_failure_and_missing_usage_stop_next_request(self):
-        for missing in (False, True):
-            path = Path(self.temp.name)/f'{missing}.json'
-            run = self.make_run(path)
+    def test_network_failure_and_missing_usage_keep_unknown_without_stopping(self):
+        for missing in (False,True):
+            path=Path(self.temp.name)/f'{missing}.json';run=self.make_run(path)
             with controlled_run(run):
-                with self.assertRaises(Exception):
-                    with paid_request('DeepSeek','deepseek-v4-flash',{'messages':[]}):
-                        if not missing: raise ProviderNetworkError('offline failure')
-                with self.assertRaisesRegex(RuntimeError,'stopped'):
-                    with paid_request('DeepSeek','deepseek-v4-flash',{}): pass
-            self.assertEqual(len(json.loads(path.read_text())['calls']),1)
+                if missing:
+                    with paid_request('DeepSeek','deepseek-v4-flash',{}):pass
+                else:
+                    with self.assertRaises(ProviderNetworkError):
+                        with paid_request('DeepSeek','deepseek-v4-flash',{}):raise ProviderNetworkError('offline')
+                with paid_request('DeepSeek','deepseek-v4-flash',{}):
+                    record_usage({'provider':'DeepSeek','requested_model':'deepseek-v4-flash','status':'ok','prompt_tokens':10,'completion_tokens':2})
+            self.assertEqual([c['status'] for c in run.calls],['unknown','ok'])
+            self.assertIsNone(run.stopped)
 
     def test_usage_is_settled_and_budget_refuses_before_request(self):
         with controlled_run(self.run):
@@ -191,19 +182,19 @@ class PaidRunTests(unittest.TestCase):
         self.assertEqual(network.call_count,1)
         self.assertEqual(self.run.calls[0]['status'],'ok')
         self.assertGreater(self.run.spent,0)
-        self.assertIsNotNone(self.run.stopped)
+        self.assertIsNone(self.run.stopped)
 
-    def test_invalid_usage_is_saved_and_aborts_following_call(self):
+    def test_invalid_usage_is_saved_without_blocking_following_call(self):
         with controlled_run(self.run):
-            with self.assertRaisesRegex(RuntimeError,'Usage'):
-                with paid_request('DeepSeek','deepseek-v4-flash',{}):
-                    record_usage({'status':'ok','provider':'DeepSeek','requested_model':'deepseek-v4-flash'})
-            with self.assertRaisesRegex(RuntimeError,'stopped'):
-                with paid_request('DeepSeek','deepseek-v4-flash',{}): pass
-        saved = json.loads(self.path.read_text())
-        self.assertEqual(len(saved['calls']),1)
+            with paid_request('DeepSeek','deepseek-v4-flash',{}):
+                record_usage({'status':'ok','provider':'DeepSeek','requested_model':'deepseek-v4-flash'})
+            with paid_request('DeepSeek','deepseek-v4-flash',{}):pass
+        saved=json.loads(self.path.read_text())
+        self.assertEqual(len(saved['calls']),2)
         self.assertEqual(saved['calls'][0]['usage']['status'],'ok')
+        self.assertTrue(all(c['status']=='unknown' for c in saved['calls']))
         self.assertIsNone(saved['available_yuan'])
+        self.assertIsNone(saved['stopped'])
 
     def test_unknown_model_provider_or_usage_aborts(self):
         with controlled_run(self.run):
@@ -223,7 +214,7 @@ class PaidRunTests(unittest.TestCase):
                 with paid_request('DeepSeek','deepseek-v4-flash',{}):
                     self.fail('Request must not start without durable reservation')
 
-    def test_background_worker_stops_after_first_business_provider_error(self):
+    def test_background_worker_stops_after_permanent_quality_error(self):
         main = self.api()
         from app.golden_v2 import digest
         from unittest.mock import Mock
@@ -232,7 +223,7 @@ class PaidRunTests(unittest.TestCase):
         store.generation_run.return_value = {'profile':{},'question_ids':['q1','q2'], 'artifacts':{'hard_validation':{'frozen_plan':frozen}}}
         store.question.side_effect = lambda key:{'id':key,'raw':{'coverage_slot':key},'probe_status':'probe_pending','qc_status':'qc_pending'}
         corpus = SimpleNamespace(chunks=lambda:[])
-        with patch.object(main,'current_manifest',return_value={'documents':[]}), patch.object(main,'manifest_identity',return_value={}), patch.object(main,'_business_quality_step',side_effect=ProviderNetworkError('offline')) as step:
+        with patch.object(main,'current_manifest',return_value={'documents':[]}), patch.object(main,'manifest_identity',return_value={}), patch.object(main,'_run_quality_rerun',side_effect=ProviderAPIError('invalid key',status_code=401)) as step:
             thread = threading.Thread(target=main._run_mini_generation,args=('fixture',store,None,corpus),kwargs={'resume_quality':True,'paid_run':self.run})
             thread.start(); thread.join(timeout=5)
             self.assertFalse(thread.is_alive())
@@ -289,19 +280,16 @@ class PaidRunTests(unittest.TestCase):
             record_usage({'provider':'Alibaba','requested_model':'qwen3-rerank','status':'ok','total_tokens':100})
         self.assertGreater(run.calls[0]['reserved_yuan'], .004)
 
-    def test_accounting_stops_after_network_failure_and_never_repeats_unknown_payload(self):
+    def test_accounting_keeps_network_failure_and_new_attempt_separate(self):
         from app.paid_run import accounting_only
-        payload = {'messages': [], 'max_tokens':10}
-        with accounting_only(), controlled_run(self.run):
-            with self.assertRaisesRegex(OSError, 'offline network'):
-                with paid_request('DeepSeek','deepseek-v4-flash',payload):
-                    raise OSError('offline network')
-            self.assertEqual(self.run.calls[0]['status'], 'unknown')
-            with self.assertRaisesRegex(RuntimeError, 'stopped'):
-                self.run.begin('DeepSeek','deepseek-v4-flash',{'messages':['another']})
-            self.run.stopped = None  # Explicit continuation may allow unrelated requests.
-            with self.assertRaisesRegex(RuntimeError, 'Unknown request'):
-                self.run.begin('DeepSeek','deepseek-v4-flash',payload)
+        payload={'messages':[], 'max_tokens':10}
+        with accounting_only(),controlled_run(self.run):
+            with self.assertRaisesRegex(OSError,'offline network'):
+                with paid_request('DeepSeek','deepseek-v4-flash',payload):raise OSError('offline network')
+            with paid_request('DeepSeek','deepseek-v4-flash',payload):
+                record_usage({'provider':'DeepSeek','requested_model':'deepseek-v4-flash','status':'ok','prompt_tokens':10,'completion_tokens':2})
+        self.assertEqual([c['status'] for c in self.run.calls],['unknown','ok'])
+        self.assertIsNone(self.run.stopped)
 
     def test_checkpoint_vectors_require_exact_successful_request_identity(self):
         import hashlib, importlib.util

@@ -7,6 +7,7 @@ import http.client
 from datetime import datetime, timezone
 import math
 import socket
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -139,24 +140,63 @@ class ProviderNetworkError(ProviderUnavailable):
 
 
 
-def retryable_error(error):
+def permanent_provider_error(error):
+    """Configuration/request failures stop a run; walk retrieval wrappers too."""
     seen=set()
     while error is not None and id(error) not in seen:
         seen.add(id(error))
-        if getattr(error,'provider_retry_exhausted',False):return False
-        if isinstance(error,ProviderAPIError):
-            try:code=json.loads(error.raw_provider_response or '{}').get('error',{}).get('code')
-            except (ValueError,AttributeError):code=None
-            code=getattr(error,'provider_code',None) or code
-            permanent=any(term in str(code).lower().replace('_','') for term in ('insufficientbalance','insufficientquota','invalidapikey','arrearage','accessdenied'))
-            return error.status_code in {408,429,500,502,503,504} and not permanent
-        if isinstance(error,urllib.error.HTTPError):return error.code in {408,429,500,502,503,504}
-        if isinstance(error,(ProviderTimeout,ProviderInvalidResponse,TimeoutError,http.client.IncompleteRead,ConnectionError)):return True
-        if isinstance(error,urllib.error.URLError):
-            return not isinstance(error.reason,socket.gaierror) or error.reason.errno!=socket.EAI_NONAME
-        if isinstance(error,ProviderNetworkError) and error.__cause__ is None:return True
+        if isinstance(error,ProviderRequestError):return True
+        if isinstance(error,(ProviderAPIError,urllib.error.HTTPError)):
+            code=getattr(error,'provider_code',None)
+            if any(term in str(code).lower().replace('_','') for term in ('insufficientbalance','insufficientquota','invalidapikey','arrearage','accessdenied')):return True
+            status=getattr(error,'status_code',None) or getattr(error,'code',None)
+            return type(status) is int and 400<=status<500 and status not in {408,429}
         error=error.__cause__
     return False
+
+
+def transient_provider_error(error):
+    """Transport retries are independent of Judge response-format recovery."""
+    if permanent_provider_error(error):return False
+    seen=set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error,ProviderInvalidResponse):return False
+        if isinstance(error,(ProviderAPIError,urllib.error.HTTPError)):
+            status=getattr(error,'status_code',None) or getattr(error,'code',None)
+            return type(status) is int and (status in {408,429} or 500<=status<600)
+        if isinstance(error,(ProviderTimeout,TimeoutError,http.client.HTTPException,ConnectionError,ssl.SSLError)):return True
+        if isinstance(error,urllib.error.URLError):
+            return not isinstance(error.reason,socket.gaierror) or error.reason.errno!=socket.EAI_NONAME
+        if isinstance(error,ProviderNetworkError):return True
+        error=error.__cause__
+    return False
+
+
+def retryable_error(error):
+    seen=set();original=error
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if getattr(error,'provider_retry_exhausted',False):return False
+        if isinstance(error,ProviderInvalidResponse):return True
+        error=error.__cause__
+    return transient_provider_error(original)
+
+
+def request_with_retries(action):
+    """One RPC, three attempts at most; each action owns its Usage/checkpoint."""
+    for attempt in range(3):
+        control=_stage_control.get()
+        if control:control[1]()
+        try:return action()
+        except Exception as error:
+            if not transient_provider_error(error):raise
+            metadata={**(getattr(error,'response_metadata',None) or {}),'request_attempt_count':attempt+1}
+            error.response_metadata=metadata
+            if attempt==2:
+                error.provider_retry_exhausted=True
+                raise
+            time.sleep((5,15)[attempt])
 
 
 class DeepSeekProvider:
@@ -165,7 +205,7 @@ class DeepSeekProvider:
 
     def _request(self, system: str, user: str, json_mode: bool, stream: bool, temperature: float = 0.2):
         if not self.settings.configured:
-            raise ProviderUnavailable("DeepSeek API Key 未配置")
+            raise ProviderRequestError("DeepSeek API Key 未配置")
         if not isinstance(self.settings.model,str) or not self.settings.model.strip():raise ProviderRequestError('请求本地校验：model必须是非空字符串')
         if not all(isinstance(value,str) and value.strip() for value in (system,user)):raise ProviderRequestError('请求本地校验：system/user消息必须是非空字符串')
         if type(json_mode) is not bool or type(stream) is not bool:raise ProviderRequestError('请求本地校验：json_mode/stream必须是布尔值')
@@ -214,9 +254,10 @@ class DeepSeekProvider:
         request = self._request(system, user, json_mode, stream, temperature)
         from .paid_run import paid_request, _task
         from .evaluation_stage import checkpoint_request
-        started=datetime.now(timezone.utc).isoformat()
         request_parameters={key:value for key,value in json.loads(request.data).items() if key != 'messages'}
         def send():
+            _response_metadata.set({})
+            started=datetime.now(timezone.utc).isoformat()
             request_timeout(self.settings.timeout_seconds)
             with paid_request('DeepSeek',self.settings.model,json.loads(request.data)):
                 try:
@@ -233,7 +274,7 @@ class DeepSeekProvider:
                         record_usage({'provider':'DeepSeek','requested_model':self.settings.model,'status':'rejected' if rejected else 'unknown',
                             'call_started_at':started,**thinking_config(),**error.response_metadata})
                     raise
-        return checkpoint_request('DeepSeek',self.settings.model,request.full_url,json.loads(request.data),send,reuse=_task.get()!='judge')
+        return request_with_retries(lambda:checkpoint_request('DeepSeek',self.settings.model,request.full_url,json.loads(request.data),send,reuse=_task.get()!='judge'))
 
     def _complete_request(self, request, stream):
         from .paid_run import current_paid_run

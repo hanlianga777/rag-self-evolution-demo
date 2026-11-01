@@ -547,16 +547,64 @@ class EvaluationRunner:
         return run_id, items, executions
 
     def execute_replay(self, run_id, items, executions):
-        cases = []
+        from .evaluation_stage import perform_stage, checkpoint_usage, correction_for
+        from .providers import permanent_provider_error, provider_error_details
+        run=self.store.evaluation_run(run_id)
+        if run['status']=='completed':return run
+        cases=self.store.evaluation_case_results(run_id)
+        saved={case['question_id'] for case in cases}
+        checkpoints=run['result'].get('checkpoints',{})
+        final_retry_started=run['result'].get('final_retry_started',False)
+        def progress(*, complete=False):
+            from .telemetry import cost_fields
+            from .paid_run import unsettled_usage
+            errors=[{'question_id':key,**cp['technical_error']} for key,cp in checkpoints.items() if cp.get('technical_error')]
+            events=[event for cp in checkpoints.values() for event in checkpoint_usage(cp)]
+            return {**summarize_evaluation_cases(cases,complete=complete),
+                'execution_kind':'answer_replay','release_eligible':False,
+                'timing_provenance':'历史生成耗时，非本次生成性能',
+                'evaluation_complete':complete,'total':len(items),'checkpoints':checkpoints,'final_retry_started':final_retry_started,
+                'technical_errors':errors,'technical_error_count':len(errors),'technical_failed':len(errors),
+                'request_accounting':{'call_events':len(events),'unknown_usage_events':sum(unsettled_usage(u) for u in events),
+                    **cost_fields(self.runtime.model,events)}}
+        def check_stop():
+            if self.store.evaluation_run(run_id)['result'].get('stop_request'):
+                raise InterruptedError('用户停止运行，断点已保存')
         try:
-            for item in items:
-                case = self.score_execution(item, executions[item['id']])
-                self.store.record_evaluation_case(run_id, item['id'], case)
-                cases.append(case)
-            result = {**summarize_evaluation_cases(cases), 'execution_kind': 'answer_replay', 'release_eligible': False, 'timing_provenance': '历史生成耗时，非本次生成性能'}
-            return self.store.finish_evaluation_run(run_id, 'completed', result)
+            for final_pass in range(1 if final_retry_started else 0,2):
+                if final_pass:
+                    final_retry_started=True
+                    self.store.update_evaluation_progress(run_id,progress())
+                stage_run_id=run_id+(':final-retry' if final_pass else '')
+                for item in items:
+                    check_stop()
+                    if item['id'] in saved:continue
+                    checkpoint=checkpoints.setdefault(item['id'],{'attempts':[]})
+                    if final_pass and (not checkpoint.get('technical_error') or checkpoint.get('final_retry_done')):continue
+                    try:
+                        if 'scored_result' not in checkpoint:
+                            checkpoint['scored_result']=perform_stage(checkpoint,'judge',
+                                lambda:self.score_execution(item,executions[item['id']],judge_correction=correction_for(checkpoint,stage_run_id)),
+                                stage_run_id,automatic=False,check_stop=check_stop,
+                                on_state=lambda *_args,**_kwargs:self.store.update_evaluation_progress(run_id,progress()))
+                    except Exception as error:
+                        checkpoint['technical_error']={'phase':'judge','error_type':type(error).__name__,'error':str(error),
+                            'provider_error':provider_error_details(error,'judge')}
+                        if final_pass:checkpoint['final_retry_done']=True
+                        self.store.update_evaluation_progress(run_id,progress())
+                        if isinstance(error,InterruptedError) or permanent_provider_error(error):raise
+                        continue
+                    case=checkpoint['scored_result']
+                    self.store.record_evaluation_case(run_id,item['id'],case)
+                    cases.append({'question_id':item['id'],**case});saved.add(item['id'])
+                    checkpoint.pop('technical_error',None);checkpoint.pop('scored_result',None)
+                    self.store.update_evaluation_progress(run_id,progress())
+            complete=len(saved)==len(items)
+            errors=progress()['technical_errors']
+            return self.store.finish_evaluation_run(run_id,'completed',progress(complete=complete),
+                f'整轮完成，末尾补跑后仍有{len(errors)}题技术失败' if errors else None)
         except Exception as error:
-            return self.store.finish_evaluation_run(run_id, 'partial' if cases else 'failed', {**summarize_evaluation_cases(cases,complete=False), 'evaluation_complete':False, 'execution_kind': 'answer_replay', 'release_eligible': False}, str(error))
+            return self.store.finish_evaluation_run(run_id,'partial' if cases else 'failed',progress(),str(error))
 
     def execute_baseline(self, run_id, approved, config):
         from .paid_run import execution_limits,accounting_only
@@ -578,7 +626,7 @@ class EvaluationRunner:
             owner = self.store.candidate(config['candidate_id'])
             experiment = self.store.experiment(owner['experiment_id'])
             baseline_cases = {c['question_id']: c for c in self.store.evaluation_case_results(experiment['baseline_run_id'])}
-        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity') if k in run['result']}
+        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity','final_retry_started') if k in run['result']}
         def progress(*, complete=False):
             from .telemetry import cost_fields
             from .paid_run import unsettled_usage
@@ -591,7 +639,7 @@ class EvaluationRunner:
                 **cost_fields(self.runtime.model,events)}
             summary=summarize_evaluation_cases(cases,complete=complete)
             errors=[{'question_id':q, **cp['technical_error']} for q,cp in checkpoints.items() if cp.get('technical_error')]
-            return {**summary, 'technical_errors':errors, 'technical_error_count':len(errors), 'attempted':len(cases)+len(errors), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints,'request_accounting':accounting, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None, 'stage_total_seconds':600, 'stage_max_attempts':3}}
+            return {**summary, 'technical_errors':errors, 'technical_error_count':len(errors), 'technical_failed':len(errors), 'attempted':len(cases)+len(errors), **lineage, 'total':len(frozen_ids), 'evaluation_complete':False, 'checkpoints':checkpoints,'request_accounting':accounting, 'runtime_limits':{'provider_request_seconds':getattr(getattr(getattr(self.runtime,'provider',None),'settings',None),'timeout_seconds',None), 'question_total_seconds':None, 'round_total_seconds':None, 'stage_total_seconds':600, 'stage_max_attempts':3}}
         try:
             if not policy_current(run['judge']) or run['judge'].get('evaluation_identity')!=evaluation_identity(json.loads(run['dataset_snapshot_json']),run['judge']):
                 raise ValueError('Evaluation Identity或加载的合同版本不一致，禁止继续Provider调用')
@@ -612,67 +660,76 @@ class EvaluationRunner:
                 def on_state(state,**details):
                     if automatic:lineage['auto_recovery'].update(state=state,question_id=item['id'],**details)
                     self.store.update_evaluation_progress(run_id,progress())
-                return perform_stage(checkpoint,phase,action,run_id,automatic=automatic,check_stop=check_stop,on_state=on_state)
-            consecutive_errors=0
-            for item in approved:
-                check_stop()
-                if item['id'] in saved:
-                    if item['id'] in checkpoints:
-                        for key in ('execution','scored_result','inflight','technical_error'):checkpoints[item['id']].pop(key,None)
-                    continue
-                checkpoint=checkpoints.setdefault(item['id'],{'attempts':[]})
-                if 'execution' in checkpoint and (not isinstance(checkpoint['execution'].get('answer'),str) or not isinstance(checkpoint['execution'].get('retrieval_trace',{}).get('final'),list)):
-                    raise ValueError('生成检查点缺少完整答案/最终上下文')
-                try:
-                    phase='generation'
-                    if 'execution' not in checkpoint and lineage.get('judge_replay'):
-                        raise ValueError('Judge-only Replay execution missing; generation is forbidden')
-                    if 'execution' not in checkpoint:
-                        checkpoint['execution']=perform(phase,lambda:self.runtime.answer(item['question'],config))
-                        self.store.update_evaluation_progress(run_id,progress())
-                    if lineage.get('judge_replay'):
-                        from .diagnostic_evidence import digest
-                        expected_execution=lineage['judge_replay']['execution_sha256'].get(item['id'])
-                        if digest(checkpoint['execution'])!=expected_execution:raise ValueError('Replay saved execution identity changed')
-                    phase='judge'
-                    if 'scored_result' not in checkpoint:
-                        def score():
-                            from .evaluation_stage import correction_for
-                            correction=correction_for(checkpoint,run_id)
-                            return self.score_execution(item,checkpoint['execution'],judge_correction=correction)
-                        checkpoint['scored_result']=perform(phase,score)
-                        self.store.update_evaluation_progress(run_id,progress())
-                except Exception as error:
-                    from .providers import retryable_error
-                    last=checkpoint['attempts'][-1] if checkpoint['attempts'] else {}
-                    # Only known, exhausted recoverable requests are isolated; auth/config/Unknown/Stop halt.
-                    if not (automatic and retryable_error(error) and last.get('status')=='error'
-                            and last.get('recorded_by_run_id')==run_id and last.get('retryable') is False
-                            and last.get('request_execution_unknown') is False):
-                        raise
-                    checkpoint['technical_error']={'phase':phase, 'error_type':type(error).__name__, 'error':str(error)}
-                    consecutive_errors+=1
+                return perform_stage(checkpoint,phase,action,stage_run_id,automatic=automatic,check_stop=check_stop,on_state=on_state)
+            for final_pass in range(1 if lineage.get('final_retry_started') else 0,2):
+                if final_pass:
+                    lineage['final_retry_started']=True
                     self.store.update_evaluation_progress(run_id,progress())
-                    # ponytail: two adjacent exhausted cases are a circuit breaker; no extra diagnostic calls.
-                    if consecutive_errors>=2:
-                        raise RuntimeError('连续两题受控重试耗尽；疑似系统性配置或合同失效，已停止Provider调用') from error
-                    continue
-                result=checkpoint['scored_result']
-                if baseline_cases.get(item['id'], {}).get('passed') is True and result.get('passed') is False:
-                    phase = 'regression_review'
-                    result['regression_review'] = self.review_regression(item, result, config, checkpoint, run_id, check_stop, lambda *_a, **_kw: self.store.update_evaluation_progress(run_id, progress()))
-                self.store.record_evaluation_case(run_id,item['id'],result,with_bad_case=True)
-                cases.append({'question_id':item['id'],**result});saved.add(item['id'])
-                consecutive_errors=0
-                checkpoint.pop('technical_error',None)
-                checkpoint.pop('execution',None);checkpoint.pop('scored_result',None);checkpoint.pop('inflight',None)
-                self.store.update_evaluation_progress(run_id,progress())
+                stage_run_id = run_id + (':final-retry' if final_pass else '')
+                for item in approved:
+                    check_stop()
+                    if item['id'] in saved:
+                        if item['id'] in checkpoints:
+                            for key in ('execution','scored_result','inflight','technical_error'):checkpoints[item['id']].pop(key,None)
+                        continue
+                    if final_pass and (not checkpoints.get(item['id'],{}).get('technical_error') or checkpoints[item['id']].get('final_retry_done')):
+                        continue
+                    checkpoint=checkpoints.setdefault(item['id'],{'attempts':[]})
+                    if 'execution' in checkpoint and (not isinstance(checkpoint['execution'].get('answer'),str) or not isinstance(checkpoint['execution'].get('retrieval_trace',{}).get('final'),list)):
+                        raise ValueError('生成检查点缺少完整答案/最终上下文')
+                    try:
+                        phase='generation'
+                        if 'execution' not in checkpoint and lineage.get('judge_replay'):
+                            raise ValueError('Judge-only Replay execution missing; generation is forbidden')
+                        if 'execution' not in checkpoint:
+                            checkpoint['execution']=perform(phase,lambda:self.runtime.answer(item['question'],config))
+                            self.store.update_evaluation_progress(run_id,progress())
+                        if lineage.get('judge_replay'):
+                            from .diagnostic_evidence import digest
+                            expected_execution=lineage['judge_replay']['execution_sha256'].get(item['id'])
+                            if digest(checkpoint['execution'])!=expected_execution:raise ValueError('Replay saved execution identity changed')
+                        phase='judge'
+                        if 'scored_result' not in checkpoint:
+                            def score():
+                                from .evaluation_stage import correction_for
+                                correction=correction_for(checkpoint,stage_run_id)
+                                return self.score_execution(item,checkpoint['execution'],judge_correction=correction)
+                            checkpoint['scored_result']=perform(phase,score)
+                            self.store.update_evaluation_progress(run_id,progress())
+                    except Exception as error:
+                        from .providers import permanent_provider_error, provider_error_details
+                        if isinstance(error, InterruptedError) or permanent_provider_error(error):
+                            raise
+                        checkpoint['technical_error']={'phase':phase, 'error_type':type(error).__name__, 'error':str(error),
+                            'provider_error':provider_error_details(error,phase)}
+                        if final_pass:checkpoint['final_retry_done']=True
+                        self.store.update_evaluation_progress(run_id,progress())
+                        continue
+                    try:
+                        result=checkpoint['scored_result']
+                        if baseline_cases.get(item['id'], {}).get('passed') is True and result.get('passed') is False:
+                            phase = 'regression_review'
+                            result['regression_review'] = self.review_regression(item, result, config, checkpoint, stage_run_id, check_stop, lambda *_a, **_kw: self.store.update_evaluation_progress(run_id, progress()))
+                    except Exception as error:
+                        from .providers import permanent_provider_error, provider_error_details
+                        if isinstance(error, InterruptedError) or permanent_provider_error(error):
+                            raise
+                        checkpoint['technical_error']={'phase':phase, 'error_type':type(error).__name__, 'error':str(error),
+                            'provider_error':provider_error_details(error,phase)}
+                        if final_pass:checkpoint['final_retry_done']=True
+                        self.store.update_evaluation_progress(run_id,progress())
+                        continue
+                    self.store.record_evaluation_case(run_id,item['id'],result,with_bad_case=True)
+                    cases.append({'question_id':item['id'],**result});saved.add(item['id'])
+                    checkpoint.pop('technical_error',None)
+                    checkpoint.pop('execution',None);checkpoint.pop('scored_result',None);checkpoint.pop('inflight',None)
+                    self.store.update_evaluation_progress(run_id,progress())
             check_stop()
             errors=progress()['technical_errors']
             if errors:
-                message=f"{len(errors)}题技术异常；已完成{len(cases)}/{len(frozen_ids)}，检查点已保存，须恢复后才能形成完整成绩"
-                if automatic:lineage['auto_recovery'].update(state='stopped',error=message)
-                return self.store.finish_evaluation_run(run_id,'partial',progress(),message)
+                message=f"整轮完成，末尾补跑后仍有{len(errors)}题技术失败；有效结果{len(cases)}/{len(frozen_ids)}，不能形成完整成绩"
+                if automatic:lineage['auto_recovery'].update(state='completed',error=message)
+                return self.store.finish_evaluation_run(run_id,'completed',progress(),message)
             if automatic:lineage['auto_recovery']['state']='completed'
             return self.store.finish_evaluation_run(run_id, 'completed', {**progress(complete=True), 'evaluation_complete':True})
         except Exception as error:
@@ -798,7 +855,7 @@ class EvaluationRunner:
     def execute_candidate(self, run_id, approved, config, candidate, baseline):
         run = self.execute_baseline(run_id, approved, config)
         if run['status'] in {'queued','running'}:return self.store.candidate(candidate['id'])
-        if run['status']!='completed':
+        if run['status']!='completed' or not run['result'].get('evaluation_complete'):
             result={**run['result'],'evaluation_run_id':run_id,'baseline_run_id':baseline['id'],'error':run.get('error_message'),
                     'evaluation_identity':run['judge'].get('evaluation_identity'),'regression':{'status':'NOT_EVALUABLE','passed':None},
                     'qualification':{'qualified':None,'blocking_reason':'Sandbox未完成'},'recommendation':None}

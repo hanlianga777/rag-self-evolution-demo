@@ -25,6 +25,7 @@ class FakeResponse:
 class ProviderTests(unittest.TestCase):
     def setUp(self):
         self.provider = DeepSeekProvider(Settings("test-key", "https://example.invalid", "test-model"))
+        sleep=patch('app.providers.time.sleep');sleep.start();self.addCleanup(sleep.stop)
 
     def test_timeout_defaults_to_four_minutes_and_env_can_override_it(self):
         self.assertEqual(self.provider.settings.timeout_seconds, 240)
@@ -33,14 +34,18 @@ class ProviderTests(unittest.TestCase):
             with self.assertRaisesRegex(ProviderTimeout, "DeepSeek 请求超时，请重试") as caught:
                 self.provider.complete("system", "question")
         self.assertEqual(request.call_args.kwargs["timeout"], 240)
+        self.assertEqual(request.call_count, 3)
         self.assertIn("The read operation timed out", str(caught.exception.__cause__))
 
     def test_api_and_network_errors_are_not_classified_as_timeout(self):
-        errors = [(urllib.error.HTTPError("https://example.invalid", 503, "busy", {}, None), ProviderAPIError), (urllib.error.URLError("connection refused"), ProviderNetworkError)]
+        errors = [(lambda:urllib.error.HTTPError("https://example.invalid",503,"busy",{},None), ProviderAPIError),
+                  (lambda:urllib.error.URLError("connection refused"), ProviderNetworkError)]
         for failure, expected in errors:
-            with self.subTest(failure=failure), patch("app.providers.urllib.request.urlopen", side_effect=failure):
+            def fail(*args, **kwargs):raise failure()
+            with self.subTest(expected=expected), patch("app.providers.urllib.request.urlopen",side_effect=fail) as request:
                 with self.assertRaises(expected):
                     self.provider.complete("system", "question")
+                self.assertEqual(request.call_count, 3)
 
     def test_wrapped_network_timeout_is_retryable_but_other_network_errors_are_not(self):
         with patch("app.providers.urllib.request.urlopen", side_effect=urllib.error.URLError(TimeoutError("timed out"))):
