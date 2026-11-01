@@ -72,6 +72,23 @@ class CloseoutTests(unittest.TestCase):
                 owner.calls.append(('qc',item['id'])); return semantic_reply(item,owner.chunks)
         self.service = Service(); self.corpus = SimpleNamespace(chunks=lambda:self.chunks)
 
+    def reopen_approved_copy(self, key):
+        """Read a matching actual saved Snapshot, then reopen only the disposable copy."""
+        item = self.store.question(key)
+        with closing(sqlite3.connect((ROOT/'backend/data/demo.db').resolve().as_uri()+'?mode=ro', uri=True)) as source:
+            saved = next((row for row in source.execute('SELECT id,status,source,snapshot_json,created_at FROM dataset_versions')
+                if any(raw == item['raw'] for raw in json.loads(row[3]).get('questions', []))), None)
+        self.assertIsNotNone(saved, 'no exact saved source Snapshot: do not fabricate approval or alter source hashes')
+        with self.store.connection() as target:
+            target.execute('INSERT OR IGNORE INTO dataset_versions VALUES (?,?,?,?,?)', saved)
+        before = self.store.dataset_snapshots()
+        reopened = self.store.reopen_snapshot_question(key, saved[0], actor='offline fixture',
+            reason='explicit disposable-copy revision test', authorization='offline fixture only; no formal change')
+        self.assertEqual(reopened['stage'], 'candidate')
+        self.assertEqual(reopened['raw'], item['raw'])
+        self.assertEqual(self.store.dataset_snapshots(), before)
+        return before
+
     def hits(self, question):
         q=next(q for q in self.store.questions() if q['question']==question)
         ids={i for e in q['evidence'] for i in e['source_chunk_ids']}
@@ -280,6 +297,7 @@ class CloseoutTests(unittest.TestCase):
 
     def test_batch_failure_isolated_and_missing_scope_excludes_reviews(self):
         original=self.service.quality_check;ids=[q['id'] for q in self.store.questions()]
+        frozen_before = self.reopen_approved_copy(ids[1])
         def fail(item):
             if item['id']==ids[1]:raise ValueError('known invalid response')
             return original(item)
@@ -296,6 +314,7 @@ class CloseoutTests(unittest.TestCase):
         main._run_quality_rerun(self.run_id,selected,self.store,self.service,self.corpus)
         self.assertFalse(self.store.missing_quality_stages(ids[0]))
         self.assertFalse(self.store.missing_quality_stages(ids[2]))
+        self.assertEqual(self.store.dataset_snapshots(), frozen_before)
 
     def test_pending_qc_is_not_reported_as_low_score(self):
         row=self.store.candidate_rows([self.store.questions()[0]['id']])[0]
@@ -363,7 +382,9 @@ class CloseoutTests(unittest.TestCase):
 
     def test_governed_revision_preserves_id_and_invalidates_quality(self):
         import copy
-        self.complete_quality();item=next(q for q in self.store.questions() if q['test_category']=='negative')
+        item=next(q for q in self.store.questions() if q['test_category']=='negative')
+        frozen_before = self.reopen_approved_copy(item['id'])
+        self.complete_quality();item=self.store.question(item['id'])
         req=copy.deepcopy(item['raw']['business_requirements']);req['auxiliary_information'].append('fixture clarified scope')
         revision=self.store.start_revision(item['id'],'manual_edit','fixture scope clarification',False,{item['id']:{'business_requirements':req,'expected_response':'fixture expected behavior'}},self.chunks,actor='fixture')
         for invalid in (None, {}):
@@ -378,3 +399,4 @@ class CloseoutTests(unittest.TestCase):
         self.assertEqual(changed['qc_status'],'qc_pending')
         self.assertIn('probe',self.store.missing_quality_stages(item['id']))
         self.assertEqual(len(self.store.qc_history(item['id'])),1)
+        self.assertEqual(self.store.dataset_snapshots(), frozen_before)

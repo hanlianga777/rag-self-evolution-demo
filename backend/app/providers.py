@@ -16,6 +16,52 @@ from .telemetry import record_usage
 from .evaluation_contract import abstention_valid, claim_consistent, normalize, scoped_reference_valid
 
 
+DEFAULT_TASK_THINKING = {
+    'baseline': 'max', 'generation': 'max', 'answer': 'max', 'candidate': 'max',
+    'judge': 'max', 'agent': 'high', 'query_rewrite': 'low', 'multi_query': 'low',
+    'hyde': 'high', 'query_decompose': 'high', 'query': 'low', 'auxiliary': 'high',
+}
+_thinking_task = ContextVar('provider_thinking_task', default=None)
+
+
+@contextmanager
+def thinking_task(task, effort=None):
+    token = _thinking_task.set((task, effort))
+    try: yield
+    finally: _thinking_task.reset(token)
+
+
+def thinking_config(task=None, effort=None):
+    """Effective request settings; Judge is independent of generation overrides."""
+    from .paid_run import _task
+    selected = _thinking_task.get()
+    if task is None:
+        task, effort = selected or (_task.get() or 'auxiliary', None)
+        if _task.get() in {'judge', 'agent'}: task, effort = _task.get(), None
+    if task in {'baseline', 'judge'}: effort = 'max'
+    effort = DEFAULT_TASK_THINKING.get(task, 'high') if effort is None else effort
+    if effort not in {'off', 'low', 'high', 'max'}:
+        raise ProviderRequestError('请求本地校验：Thinking必须为off/low/high/max')
+    return {'task': task, 'thinking': {'type': 'disabled' if effort == 'off' else 'enabled'},
+            **({'reasoning_effort': effort} if effort != 'off' else {})}
+
+
+def without_reasoning(value):
+    if isinstance(value, dict):
+        return {key: without_reasoning(item) for key, item in value.items() if key not in {'reasoning_content', 'reasoning'}}
+    if isinstance(value, list): return [without_reasoning(item) for item in value]
+    return value
+
+
+def safe_response_text(raw):
+    """Do not persist partial/invalid reasoning fields in transport errors."""
+    try: return json.dumps(without_reasoning(json.loads(raw)), ensure_ascii=False)
+    except (ValueError, TypeError):
+        if re.search(r'"(?:reasoning_content|reasoning)"\s*:', raw or ''):
+            return '[raw response omitted: reasoning field in incomplete JSON]'
+        return raw
+
+
 _stage_deadline = ContextVar('evaluation_stage_deadline', default=None)
 _stage_control = ContextVar('evaluation_stage_control',default=None)
 
@@ -61,6 +107,7 @@ class ProviderRequestError(ProviderUnavailable):
 
 
 def redact_provider_error(raw, api_key):
+    raw=safe_response_text(raw)
     if api_key:raw=raw.replace(api_key,'[REDACTED]')
     raw=re.sub(r'(?i)\bBearer\s+[^\s"\',}<>]+','Bearer [REDACTED]',raw)
     return re.sub(r"(?i)(\b(?:authorization|api[-_]?key|access[_-]?token)\b[\"']?\s*[:=]\s*[\"']?)[^\s\"',}<>]+",r'\1[REDACTED]',raw)
@@ -70,11 +117,12 @@ def provider_error_details(error, stage):
     original=error;seen=set()
     while error.__cause__ is not None and id(error) not in seen and not isinstance(error,ProviderUnavailable):
         seen.add(id(error));error=error.__cause__
-    return {'http_status':getattr(error,'status_code',None),'provider_code':getattr(error,'provider_code',None),
+    metadata=getattr(error,'response_metadata',None) or {}
+    return {'http_status':getattr(error,'status_code',None) or metadata.get('http_status'),'provider_code':getattr(error,'provider_code',None),
             'detail':getattr(error,'detail',None) or str(error),'raw_response':getattr(error,'raw_provider_response',None),
             'stage':stage,'retrieval_stage':getattr(original,'detail',{}).get('stage') if isinstance(getattr(original,'detail',None),dict) else None,
             'retryable':retryable_error(original) and getattr(error,'request_execution_unknown',None) is not True,'error_type':type(error).__name__,
-            'failure_class':'request_result_unknown' if getattr(error,'request_execution_unknown',None) is True else 'usage_unsettled' if getattr(error,'billing_unknown',False) else 'bounded_retry_stopped' if getattr(error,'provider_retry_exhausted',False) else 'retryable_rejection' if retryable_error(original) else 'permanent_or_unclassified',
+            'failure_class':'request_result_unknown' if getattr(error,'request_execution_unknown',None) is True else 'usage_unsettled' if getattr(error,'billing_unknown',False) else 'bounded_retry_stopped' if getattr(error,'provider_retry_exhausted',False) else 'output_truncated' if metadata.get('finish_reason')=='length' else 'retryable_rejection' if retryable_error(original) else 'permanent_or_unclassified',
             'request_execution_unknown':getattr(error,'request_execution_unknown',None),
             'response_metadata':getattr(error,'response_metadata',None)}
 
@@ -126,8 +174,10 @@ class DeepSeekProvider:
             "model": self.settings.model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "stream": stream,
-            "temperature": temperature,
         }
+        thinking = thinking_config()
+        payload.update({key: value for key, value in thinking.items() if key != 'task'})
+        if thinking['thinking']['type'] == 'disabled': payload['temperature'] = temperature
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
         if stream:
@@ -147,8 +197,8 @@ class DeepSeekProvider:
         request=self._request(system,user,json_mode,stream,temperature)
         payload=json.loads(request.data);text=system+user
         non_ascii=sum(ord(c)>127 for c in text)
-        summary={key:payload.get(key) for key in ('model','temperature','stream','response_format','max_tokens')}
-        summary.update(request_sha256=hashlib.sha256(request.data).hexdigest(),body_bytes=len(request.data),
+        summary={key:payload.get(key) for key in ('model','temperature','stream','response_format','max_tokens','thinking','reasoning_effort')}
+        summary.update(task=thinking_config()['task'],request_sha256=hashlib.sha256(request.data).hexdigest(),body_bytes=len(request.data),
                        roles=[m['role'] for m in payload['messages']],message_characters=len(text),
                        input_token_estimate=round((len(text)-non_ascii)*.3+non_ascii*.6),
                        token_estimate_method='approximate_character_ratio_not_model_tokenizer',
@@ -165,6 +215,7 @@ class DeepSeekProvider:
         from .paid_run import paid_request, _task
         from .evaluation_stage import checkpoint_request
         started=datetime.now(timezone.utc).isoformat()
+        request_parameters={key:value for key,value in json.loads(request.data).items() if key != 'messages'}
         def send():
             request_timeout(self.settings.timeout_seconds)
             with paid_request('DeepSeek',self.settings.model,json.loads(request.data)):
@@ -178,9 +229,9 @@ class DeepSeekProvider:
                         error.response_metadata={**received,**(getattr(error,'response_metadata',None) or {}),
                             'provider':'DeepSeek','model':self.settings.model,'http_status':getattr(error,'status_code',None) or received.get('http_status'),
                             'http_response_received':bool(getattr(error,'status_code',None)) or received.get('http_response_received',False),
-                            'request_execution_unknown':not rejected,'request_sha256':hashlib.sha256(request.data).hexdigest()}
+                            'request_execution_unknown':not rejected,'request_sha256':hashlib.sha256(request.data).hexdigest(),'request_parameters':request_parameters}
                         record_usage({'provider':'DeepSeek','requested_model':self.settings.model,'status':'rejected' if rejected else 'unknown',
-                            'call_started_at':started,**error.response_metadata})
+                            'call_started_at':started,**thinking_config(),**error.response_metadata})
                     raise
         return checkpoint_request('DeepSeek',self.settings.model,request.full_url,json.loads(request.data),send,reuse=_task.get()!='judge')
 
@@ -195,12 +246,15 @@ class DeepSeekProvider:
                     'request_id':(getattr(response,'headers',None) or {}).get('x-request-id')})
                 if stream:
                     content, usage, ttft_started, raw_events, finish_reason = [], {}, None, [], None
+                    response_model, response_id = None, None
                     for raw_line in response:
-                        raw_events.append(raw_line.decode('utf-8'))
                         line = raw_line.decode("utf-8").strip()
                         if not line.startswith("data: ") or line == "data: [DONE]":
                             continue
                         event = json.loads(line[6:])
+                        raw_events.append("data: " + json.dumps(without_reasoning(event), ensure_ascii=False) + "\n\n")
+                        response_model = event.get("model") or response_model
+                        response_id = event.get("id") or response_id
                         choice = (event.get("choices") or [{}])[0]
                         finish_reason = choice.get('finish_reason') or finish_reason
                         delta = choice.get("delta", {}).get("content")
@@ -210,13 +264,13 @@ class DeepSeekProvider:
                             content.append(delta)
                         if isinstance(event.get("usage"), dict):
                             usage = event["usage"]
-                    body = {"choices": [{"message": {"content": "".join(content)},'finish_reason':finish_reason}], "usage": usage}
+                    body = {"choices": [{"message": {"content": "".join(content)},'finish_reason':finish_reason}], "usage": usage, "model": response_model, "id": response_id}
                     if run is not None: body['_raw_sse'] = raw_events
                     ttft_ms = round((ttft_started - started_at) * 1000) if ttft_started is not None else None
                 else:
                     raw_body=response.read().decode("utf-8")
                     try:body=json.loads(raw_body)
-                    except json.JSONDecodeError as error:raise ProviderInvalidResponse("DeepSeek返回无效响应JSON",raw_provider_response=raw_body) from error
+                    except json.JSONDecodeError as error:raise ProviderInvalidResponse("DeepSeek返回无效响应JSON",raw_provider_response=safe_response_text(raw_body)) from error
                     ttft_ms = None
         except urllib.error.HTTPError as error:
             try:raw=redact_provider_error(error.read(65536).decode("utf-8",errors="replace"),self.settings.api_key)
@@ -235,29 +289,34 @@ class DeepSeekProvider:
             raw=partial.decode('utf-8',errors='replace') if isinstance(partial,bytes) else str(partial)
             if not stream:
                 try:body=json.loads(raw)
-                except (ValueError,TypeError):raise ProviderNetworkError(f"DeepSeek 连接中断（{type(error).__name__}）",raw_provider_response=raw) from error
-                if not isinstance(body,dict) or not body.get('choices'):raise ProviderNetworkError('DeepSeek连接中断，响应不完整',raw_provider_response=raw) from error
+                except (ValueError,TypeError):raise ProviderNetworkError(f"DeepSeek 连接中断（{type(error).__name__}）",raw_provider_response=safe_response_text(raw)) from error
+                if not isinstance(body,dict) or not body.get('choices'):raise ProviderNetworkError('DeepSeek连接中断，响应不完整',raw_provider_response=safe_response_text(raw)) from error
                 body['_transport_recovery']='complete_json_after_incomplete_read';ttft_ms=None
-            else:raise ProviderNetworkError(f"DeepSeek 连接中断（{type(error).__name__}）",raw_provider_response=''.join(raw_events)+raw,metadata={'partial_usage':locals().get('usage')}) from error
+            else:raise ProviderNetworkError(f"DeepSeek 连接中断（{type(error).__name__}）",raw_provider_response=''.join(raw_events),metadata={'partial_usage':locals().get('usage')}) from error
         except json.JSONDecodeError as error:
-            raise ProviderInvalidResponse("DeepSeek 返回无效 JSON",raw_provider_response="".join(raw_events) if stream else locals().get("raw_body")) from error
+            raise ProviderInvalidResponse("DeepSeek 返回无效 JSON",raw_provider_response="".join(raw_events) if stream else safe_response_text(locals().get("raw_body"))) from error
+        body = without_reasoning(body)
         if not isinstance(body,dict):raise ProviderInvalidResponse('DeepSeek响应不是对象',raw_provider_response=json.dumps(body,ensure_ascii=False))
         usage = body.get('usage') if isinstance(body.get('usage'),dict) else {}
         elapsed_ms = round((time.perf_counter()-started_at)*1000)
-        usage = {**usage,'requested_model':self.settings.model,'call_started_at':call_started_at,'provider':'DeepSeek','status':'ok','latency_ms':elapsed_ms,'request_sha256':hashlib.sha256(request.data).hexdigest(),'request_id':body.get('id')}
+        request_parameters={key:value for key,value in json.loads(request.data).items() if key != 'messages'}
+        usage = {**usage,**thinking_config(),'request_parameters':request_parameters,'response_model':body.get('model'),'requested_model':self.settings.model,'call_started_at':call_started_at,'provider':'DeepSeek','status':'ok','latency_ms':elapsed_ms,'request_sha256':hashlib.sha256(request.data).hexdigest(),'request_id':body.get('id')}
         if run is not None:run.response(body)
         record_usage(usage)
-        _response_metadata.set({'usage':usage,'request_id':body.get('id')})
+        _response_metadata.set({**_response_metadata.get(),'usage':usage,'request_id':body.get('id')})
+        metadata={**_response_metadata.get(),'response_model':body.get('model'),**thinking_config(),'finish_reason':(body.get('choices') or [{}])[0].get('finish_reason'),'usage':usage,'transport_recovery':body.get('_transport_recovery'),'request_id':body.get('id')}
+        _response_metadata.set(metadata)
+        if metadata['finish_reason']=='length':
+            partial=(body.get('choices') or [{}])[0].get('message',{}).get('content')
+            raw=partial if isinstance(partial,str) and partial else json.dumps(body,ensure_ascii=False)
+            raise ProviderInvalidResponse('DeepSeek output truncated',raw_provider_response=raw,metadata=metadata)
         try:
             content = body["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as error:
             raise ProviderInvalidResponse("DeepSeek 响应缺少内容",raw_provider_response=json.dumps(body,ensure_ascii=False),metadata={"usage":usage}) from error
         if not isinstance(content, str) or not content.strip():
             raise ProviderInvalidResponse("DeepSeek 返回的内容必须是非空字符串",raw_provider_response=json.dumps(body,ensure_ascii=False),metadata={"usage":usage})
-        metadata={'finish_reason':body.get('choices',[{}])[0].get('finish_reason'),'usage':usage,'transport_recovery':body.get('_transport_recovery'),'request_id':body.get('id')}
-        _response_metadata.set(metadata)
-        if metadata['finish_reason']=='length':raise ProviderInvalidResponse('DeepSeek output truncated',raw_provider_response=content,metadata=metadata)
-        return {"usage": usage, "content": content, "input_tokens": usage.get("prompt_tokens") if type(usage.get("prompt_tokens")) is int and usage["prompt_tokens"] >= 0 else None, "output_tokens": usage.get("completion_tokens") if type(usage.get("completion_tokens")) is int and usage["completion_tokens"] >= 0 else None, "ttft_ms": ttft_ms, "timing_unit": "ms", "generation_ms": elapsed_ms}
+        return {"usage": usage, "content": content, "response_model":body.get("model"), "reasoning_tokens":usage.get("reasoning_tokens",(usage.get("completion_tokens_details") or {}).get("reasoning_tokens")), "input_tokens": usage.get("prompt_tokens") if type(usage.get("prompt_tokens")) is int and usage["prompt_tokens"] >= 0 else None, "output_tokens": usage.get("completion_tokens") if type(usage.get("completion_tokens")) is int and usage["completion_tokens"] >= 0 else None, "ttft_ms": ttft_ms, "timing_unit": "ms", "generation_ms": elapsed_ms}
 
     def complete(self, system: str, user: str, json_mode: bool = False, *, temperature: float = 0.2) -> str:
         return self.complete_with_metrics(system,user,json_mode,temperature=temperature)['content']
@@ -272,17 +331,12 @@ class DeepSeekProvider:
             if text.startswith('```json\n') and text.endswith('\n```'):
                 text=text[8:-4];recovery='markdown_fence'
             result=json.loads(text)
-            validate_business_judgment(result,answer,context.get('final_context'),category=context.get('category'),constraints=context.get('source_constraints'),question=question,reference=expected,candidates=context.get('retrieval_candidates'),canonical_chunks=context.get('_canonical_chunks'))
-            for issue in result['issues']:
-                if context.get('baseline_findings') is not None and 'baseline_issue_index' not in issue:
-                    raise ValueError('missing baseline issue semantic correspondence')
-                index=issue.get('baseline_issue_index')
-                if index is not None and (type(index) is not int or not 0<=index<len(context.get('baseline_findings') or []) or not isinstance(issue.get('baseline_match_reason'),str) or not issue['baseline_match_reason'].strip()):
-                    raise ValueError('invalid baseline issue semantic correspondence')
+            validate_business_judgment(result,answer,context.get('final_context'),category=context.get('category'),constraints=context.get('source_constraints'),question=question,reference=expected,candidates=context.get('retrieval_candidates'),canonical_chunks=context.get('_canonical_chunks'),scoring_contract=context.get('scoring_contract'))
             return {**result,'raw_provider_response':content,'response_metadata':_response_metadata.get(),'format_recovery':recovery}
         except (ValueError, KeyError, TypeError) as error:
             raise ProviderInvalidResponse(f'VNext Judge合同无效：{error}',raw_provider_response=content,metadata={**_response_metadata.get(),'validation_error':{'category':'business_contract','message':str(error)}}) from error
 
+    @thinking_task('judge')
     def judge(self, question: str, expected: str, answer: str, *, context: dict | None = None) -> dict:
         if (context or {}).get('contract_version') == 'business-vnext-1':
             return self._judge_business(question,expected,answer,context)

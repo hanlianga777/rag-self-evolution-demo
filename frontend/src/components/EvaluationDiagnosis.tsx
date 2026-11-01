@@ -12,7 +12,8 @@ export const readableEvidence=(value?:string)=>value && /[\u3400-\u9fff]/.test(v
 export const coreEvidence=(row:any)=>{const item=caseData(row),view=item.diagnostic_view,check=view?.evidence_checks?.[0];return item.judge_result?.checks?.filter((c:any)=>c.met===false).map((c:any)=>readableEvidence(c.requirement)).filter(Boolean).join('；') || check?.answer_quote || check?.answer_quotes?.[0] || check?.claim || check?.fact || readableEvidence(item.judge_result?.reason) || readableEvidence(view?.analysis_reason) || readableEvidence(item.diagnosis?.reason) || '对照预期要求与实际回答，定位遗漏事实和引用差异';};
 
 export const technicalRoots=['Retrieval','Ranking','Generation','Safety','Performance'];
-export const isTechnicalBadCase=(row:any)=>{const view=caseData(row).diagnostic_view;return view?.is_technical_bad_case===true && view.analysis_category==='rag_failure' && technicalRoots.includes(currentRoot(row)) && view.optimization_directions?.length>0;};
+export const businessVerdict=(row:any)=>{const item=caseData(row),outcome=item.evaluation_outcome;return outcome?.contract_version==='business-vnext-1' ? outcome.execution_complete===true && ['PASS','FAIL'].includes(outcome.verdict) ? outcome.verdict : null : item.passed===true ? 'PASS' : item.passed===false ? 'FAIL' : null;};
+export const isTechnicalBadCase=(row:any)=>{const item=caseData(row),view=item.diagnostic_view;if(businessVerdict(row)==='PASS' || item.evaluation_outcome?.contract_version==='business-vnext-1' && businessVerdict(row)!=='FAIL')return false;return view?.is_technical_bad_case===true && view.analysis_category==='rag_failure' && technicalRoots.includes(currentRoot(row)) && view.optimization_directions?.length>0;};
 export const technicalDiagnosisRows=(rows:any[])=>filterDiagnosis(rows.filter(isTechnicalBadCase),allDiagnosis);
 
 export function DiagnosisDistribution({rows}:{rows:any[]}){
@@ -29,7 +30,7 @@ export const caseId=(row:any)=>row.question_id || row.result?.question_id || row
 export const questionLabel=(id:string)=>{const slot=id?.match(/^V1G-\d+-(\d{2})(?:-R\d+)?$/)?.[1];return slot?`Q${slot}`:id || '题号未采集';};
 export const optimizationDirection=(value?:string)=>({query_expansion:'查询表达与扩展',candidate_recall:'候选召回覆盖',context_selection:'排序与上下文选择',source_filter:'产品与来源筛选',grounded_generation:'有据生成与回答约束',stage_performance:'实测阶段性能'}[value || ''] || '保存方向未采集');
 export const savedDirections=(row:any)=>{const view=caseData(row).diagnostic_view,plan=view?.experiment_plan;const directions=plan?.directions?.length?plan.directions:view?.optimization_directions;return directions?.length ? `${directions.map(optimizationDirection).join('、')}；通过受控实验验证假设` : ({repair_canonical_sources:'核对冻结规范来源及正文，按原资料治理修复来源绑定',review_evaluation:'对照原始评分与失败要求核验评测依据，再确定实验假设',repair_sources_or_trace:'核对规范来源与候选、排序、最终上下文，定位遗漏环节'} as Record<string,string>)[plan?.next_action] || '对照失败要求与实际回答，核验来源覆盖并提出优化假设';};
-export const businessDiagnosisRows=(rows:any[])=>filterDiagnosis(rows.filter(row=>{const item=caseData(row),outcome=item.evaluation_outcome;return outcome?.contract_version==='business-vnext-1' ? outcome.execution_complete===true && outcome.verdict==='FAIL' : item.passed===false;}),allDiagnosis);
+export const businessDiagnosisRows=(rows:any[])=>filterDiagnosis(rows.filter(row=>businessVerdict(row)==='FAIL'),allDiagnosis);
 export const agentDiagnosisRows=businessDiagnosisRows;
 export type DiagnosisFilter={phenomenon:string;root:string;examples?:boolean};
 export const allDiagnosis:DiagnosisFilter={phenomenon:'all',root:'all'};
@@ -72,6 +73,6 @@ export function DetectionNotice({rows}:{rows:any[]}){
 }
 
 export function QualityAudit({rows,onSelect}:{rows:any[];onSelect:(row:any)=>void}){
- const audit=filterDiagnosis(rows.filter(row=>!caseData(row).passed && (!isTechnicalBadCase(row) || caseData(row).diagnostic_view?.evaluation_quality_audit?.issues?.length)),allDiagnosis);
+ const audit=filterDiagnosis(rows.filter(row=>businessVerdict(row)!=='PASS' && (!isTechnicalBadCase(row) || caseData(row).diagnostic_view?.evaluation_quality_audit?.issues?.length)),allDiagnosis);
  return <div className="quality-audit"><p className="muted">评测核验问题与证据缺口独立记录；原始失败判定、分数和回答保持只读，不进入已确认技术根因统计；有真实阶段观察的业务FAIL可由 Agent 提出探索实验。</p>{audit.length ? audit.map(row=>{const view=caseData(row).diagnostic_view;return <article key={caseId(row)}><h3>{questionLabel(caseId(row))} · {isTechnicalBadCase(row)?'附加核验缺口':view?.analysis_category==='evaluation_issue'?'评测核验问题':'证据不足'}</h3><TruncatedText lines={2}>{caseData(row).question || '问题未采集'}</TruncatedText><p>{view?.analysis_reason || '历史记录缺少回答失败定位、适用来源或完整 Trace，尚不能建立技术优化目标。'}</p>{view?.evaluation_quality_audit?.issues?.length>0 && <ul>{view.evaluation_quality_audit.issues.map((issue:any,index:number)=><li key={index}>{issue.reason || issue.evidence?.map?.((entry:any)=>entry.reason).filter(Boolean).join('；') || (issue.type==='claim_verification'?'附加主张证据或范围未闭合，保留原始阻断。':'来源或评测核验尚未闭合。')}</li>)}</ul>}{view?.evidence_gaps?.length>0 && <ul>{view.evidence_gaps.map((gap:string,index:number)=><li key={index}>{gap}</li>)}</ul>}<button className="text-button" onClick={()=>onSelect(row)}>查看原始案例与核验缺口</button></article>}) : <p>当前没有需单列的评测核验或证据缺口。</p>}</div>;
 }

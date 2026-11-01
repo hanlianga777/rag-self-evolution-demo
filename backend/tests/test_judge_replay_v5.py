@@ -1,9 +1,9 @@
 """No Provider; replay eligibility rejects missing or changed execution evidence."""
-import unittest,json,hashlib
+import unittest,json
 from copy import deepcopy
 from app.judge_replay import replay_eligibility
 from app.evaluation_contract import VERSIONS,evaluation_identity
-from app.ai_service import GENERATION_BOUNDARY,GENERATION_PROMPT_VERSION
+from app.ai_service import generation_contract
 
 class JudgeReplayTests(unittest.TestCase):
     def example(self):
@@ -13,7 +13,7 @@ class JudgeReplayTests(unittest.TestCase):
         entry={**chunk,'content':chunk['chunk_text'],'score':.8}
         trace={'status':'completed','artifact_schema_version':3,'question':q['question'],'config':config,'corpus_fingerprint':'fp','parent_expand':False,'candidates':[entry],'reranked':[entry],'final':[entry]}
         case={'question_id':q['id'],**q,'model_answer':'检查外观。','retrieved_chunks':[entry],'programmatic_metrics':{'retrieval_trace':trace,'token_usage':{'generation':{'status':'ok','provider':'DeepSeek','requested_model':'model','request_sha256':'req','prompt_tokens':12,'completion_tokens':8}}}}
-        judge={**VERSIONS,'model':'model','baseline_version':'prod','generation_prompt_version':GENERATION_PROMPT_VERSION,'generation_boundary_sha256':hashlib.sha256(GENERATION_BOUNDARY.encode()).hexdigest(),'execution_snapshot':{'generation_model':'model','temperature':.2}}
+        judge={**VERSIONS,'model':'model','baseline_version':'prod',**generation_contract('generation-vnext-1'),'execution_snapshot':{'generation_model':'model','temperature':.2}}
         judge['evaluation_identity']=evaluation_identity(snapshot,judge)
         source={'id':'old','run_mode':'real','data_source':'real','status':'partial','dataset_snapshot_json':json.dumps(snapshot),'config':config,'judge':{**judge,'prompt_version':'old','evaluation_identity':'old-identity'},'result':{'checkpoints':{}}}
         return source,[case],snapshot,config,judge,[chunk]

@@ -17,6 +17,20 @@ class EvidenceRoleTests(unittest.TestCase):
             j=json.loads(raw);before=copy.deepcopy(j);self.assertEqual(self.validate(j)['verdict'],'FAIL');self.assertEqual(j,before)
             case=EvaluationRunner(None,None)._score_business({**self.q,'raw':self.q,'evidence':self.q.get('evidence',[])},self.e,j,self.q['reference_answer'])
             self.assertFalse(case['passed']);self.assertEqual(case['primary_root_cause'],'Ranking')
+    def test_current_corpus_mismatch_keeps_actual_fail_and_root_unknown(self):
+        from app.diagnostics import _current_corpus
+        _, identity = _current_corpus(self.e['retrieval_trace'])
+        self.assertIsNone(identity, 'historical trace must not be relabeled as the current isolated Corpus')
+        original_execution = copy.deepcopy(self.e)
+        for raw in self.responses:
+            judge = json.loads(raw); original_judge = copy.deepcopy(judge)
+            case = EvaluationRunner(None,None)._score_business({**self.q,'raw':self.q,'evidence':self.q.get('evidence',[])}, self.e, judge, self.q['reference_answer'])
+            self.assertFalse(case['passed'])
+            self.assertEqual(case['primary_root_cause'], 'Unknown')
+            self.assertEqual(case['diagnosis']['reason'], '当前Canonical Corpus身份不匹配')
+            self.assertEqual(judge, original_judge)
+            self.assertEqual(self.e, original_execution)
+
     def test_positive_claim_cannot_use_only_candidate_evidence(self):
         j=json.loads(self.responses[-1]);c=copy.deepcopy(j['checks'][0]);c.update(met=True,answer_quotes=[self.e['answer']],support=c['candidate_support']);j.update(verdict='PASS',checks=[c],issues=[])
         with self.assertRaises(ValueError):self.validate(j)

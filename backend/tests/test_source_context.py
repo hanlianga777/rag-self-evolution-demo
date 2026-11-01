@@ -31,10 +31,19 @@ class SourceContextTests(unittest.TestCase):
         entries=[{'chunk_id':'C1','document':'设备说明','product':'B2','section':'操作','page_start':1,'parent_page_start':1,'parent_page_end':2,'content':'仅适用于B2。'}]
         service.retriever=SimpleNamespace(retrieve=lambda *args,**kwargs:entries)
         service.answer('普通技术问题')
-        self.assertIn(GENERATION_BOUNDARY,provider.request[0])
+        self.assertIn(GENERATION_BOUNDARY.replace('有据正常回答并引用Chunk', '有据正常回答并保留真实来源引用'),provider.request[0])
+        self.assertIn('用户可见引用使用真实文档名、章节和页码',provider.request[0])
+        self.assertIn('不要输出机器Chunk ID',provider.request[0])
+        self.assertNotIn('有据正常回答并引用Chunk',provider.request[0])
         self.assertIn('"product":"B2"',provider.request[1])
         self.assertIn('页1–2',provider.request[1])
         self.assertIn('仅适用于B2。',provider.request[1])
+
+    def test_historical_v1_boundary_remains_unchanged(self):
+        from app.ai_service import generation_boundary
+        self.assertEqual(generation_boundary('generation-vnext-1'), GENERATION_BOUNDARY)
+        self.assertIn('有据正常回答并引用Chunk', generation_boundary('generation-vnext-1'))
+        self.assertNotIn('不要输出机器Chunk ID', generation_boundary('generation-vnext-1'))
 
     def test_shared_document_identity_is_sent_once_and_body_is_not_json_escaped(self):
         entries=[{'chunk_id':str(i),'document_id':'D1','document':'很长的同一份设备手册.pdf','product':'B2','content':'第一行\n第二行'} for i in range(4)]

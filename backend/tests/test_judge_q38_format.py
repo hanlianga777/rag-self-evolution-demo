@@ -37,7 +37,7 @@ class RetryWindowTests(unittest.TestCase):
     def test_explicit_resume_keeps_history_but_does_not_charge_old_retry_window(self):
         first=self.runner.execute_baseline(*self.runner.start_baseline())
         source=self.store.evaluation_run(first['id']);cp=source['result']['checkpoints']['Q2']
-        cp['attempts'] += [{'phase':'judge','status':'error','error_type':'ProviderInvalidResponse','recorded_by_run_id':first['id']}]*6
+        cp['attempts'] += [{'phase':'judge','status':'error','error_type':'ProviderInvalidResponse','error':'fixture prior format','recorded_by_run_id':first['id']}]*6
         self.store.finish_evaluation_run(first['id'],'partial',source['result'],source['error_message'])
         old=self.store.evaluation_run(first['id']);self.runtime.fail=None
         original=self.runtime.judge;calls=[]

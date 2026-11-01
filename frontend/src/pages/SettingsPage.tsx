@@ -4,18 +4,19 @@ import { errorMessage, postJson } from "../api";
 import { Badge, CustomSelect, Section } from "../components/Primitives";
 import { pipelineCached, pipelineFetch, pipelineIdentity, invalidatePipeline } from "../pipelineCache";
 import { Drawer } from "../components/Dialog";
-import { descriptions, formatValue, parameterGroups, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
+import { descriptions, draftDefaults, formatValue, parameterGroups, parameterNames, SearchSpaceTable, thinkingLabel } from "../components/PipelineFields";
 
 export function SettingsPage({ data }: { data: any }) {
   const identity = pipelineIdentity(data);
-  const startDraft = (value: any) => { const start = value?.draft_stale ? value.baseline_config || value.config : value?.config_draft?.config || value?.baseline_config || value?.config; return Object.fromEntries(Object.keys(value?.search_space || {}).filter(key => start?.[key] !== undefined).map(key => [key, start[key]])); };
+  const startDraft = (value: any) => { const start = value?.draft_stale ? value.baseline_defaults || value.baseline_config || value.config : value?.config_draft?.config || value?.baseline_defaults || value?.baseline_config || value?.config; const merged = { ...draftDefaults, ...start, generation_thinking: "max" }; return Object.fromEntries(Object.keys(value?.search_space || {}).filter(key => merged[key] !== undefined).map(key => [key, merged[key]])); };
   const [record, setRecord] = useState<any>(() => ({ identity, value: pipelineCached(identity) }));
   const pipeline = record.identity === identity ? record.value : pipelineCached(identity);
   const [draft, setDraft] = useState<Record<string, any>>(() => startDraft(pipeline));
   const [spaceOpen, setSpaceOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   useEffect(() => { let cancelled = false; const cached = pipelineCached(identity); setRecord({ identity, value: cached }); setDraft(startDraft(cached)); void pipelineFetch(identity).then(value => { if (!cancelled && (!cached || cached.data_version !== value.data_version)) { setRecord({ identity, value }); setDraft(startDraft(value)); } }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [identity]);
   const baseline = pipeline?.baseline_config || {};
-  const base = pipeline?.baseline_config || pipeline?.config || {};
+  const base = pipeline?.baseline_config || { ...draftDefaults, ...(pipeline?.baseline_defaults || pipeline?.config) };
+  const invalidSavedThinking = pipeline?.config_draft?.config?.generation_thinking != null && pipeline.config_draft.config.generation_thinking !== "max";
   const contract = pipeline?.search_space || {};
   const changed = Object.keys(contract).filter(key => draft[key] !== base[key]);
   const index = pipeline?.index || {}, knowledge = index.knowledge_config || {};
@@ -40,18 +41,19 @@ export function SettingsPage({ data }: { data: any }) {
     {error && <p className="error-notice" role="alert">{error}</p>}
     <Section title="Frozen 技术基座" action={<Badge>Frozen</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd>{String(value)}</dd></div>)}</dl></Section>
     <Section title="Agent Search Space" action={<Badge tone="accent">{Object.keys(contract).length} 项受控参数</Badge>}>
-      {!pipeline?.baseline_config && <p className="muted">新 Baseline 待评测｜当前 Config Draft 以 Production 配置作为参考起点</p>}
+      {!pipeline?.baseline_config && <p className="muted">新 Baseline 待评测｜当前 Config Draft 以已确认的 Baseline 默认配置作为起点</p>}
       {pipeline?.draft_stale && <p className="error-notice">已保存草稿的基准已变化，请重新核对并保存。</p>}
+      {invalidSavedThinking && <p className="error-notice">旧草稿需要修复：Baseline Thinking 已调整为 Max，请保存后生效。</p>}
       <div className="search-space-groups">{Object.entries(parameterGroups).map(([group, keys]) => <section key={group}><h3>{group}</h3><div className="search-space-controls">{keys.filter(key => contract[key]).map(key => {
         const allowed: any[] = contract[key].allowed;
         const disabled = busy || key === "hybrid_alpha" && !draft.hybrid_search;
         const dependency = key === "top_k" ? "CandidateK ≥ TopK" : key === "hybrid_alpha" ? "仅 Hybrid ON 时生效" : "";
-        return <div className="search-space-control" key={key} data-parameter={key}><div><strong>{parameterNames[key]}</strong>{pipeline?.baseline_config && <small>Baseline {formatValue(baseline[key])}</small>}</div>{allowed.length <= 4 ? <div className="parameter-options" role="group" aria-label={parameterNames[key]}>{allowed.map(value => <button key={JSON.stringify(value)} className={`secondary${draft[key] === value ? " active" : ""}`} aria-pressed={draft[key] === value} disabled={disabled || key === "top_k" && value > draft.candidate_k} onClick={() => change(key, value)}>{formatValue(value)}</button>)}</div> : <CustomSelect ariaLabel={parameterNames[key]} value={JSON.stringify(draft[key])} options={allowed.map(value => ({ value: JSON.stringify(value), label: formatValue(value) }))} disabled={disabled} onChange={value => change(key, JSON.parse(value))} />}<small>{dependency || descriptions[key]}</small></div>;
+        return <div className="search-space-control" key={key} data-parameter={key}><div><strong>{parameterNames[key]}</strong>{pipeline?.baseline_config && <small>Baseline {key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key])}</small>}</div>{allowed.length <= 4 ? <div className="parameter-options" role="group" aria-label={parameterNames[key]}>{allowed.map(value => <button key={JSON.stringify(value)} className={`secondary${draft[key] === value ? " active" : ""}`} aria-pressed={draft[key] === value} disabled={disabled || key === "generation_thinking" && value !== "max" || key === "top_k" && value > draft.candidate_k} onClick={() => change(key, value)}>{formatValue(value)}</button>)}</div> : <CustomSelect ariaLabel={parameterNames[key]} value={JSON.stringify(draft[key])} options={allowed.map(value => ({ value: JSON.stringify(value), label: formatValue(value) }))} disabled={disabled} onChange={value => change(key, JSON.parse(value))} />}<small>{key === "generation_thinking" ? "Baseline 固定 Max；Candidate 可由 Agent 选择 OFF / Low / High / Max" : dependency || descriptions[key]}</small></div>;
       })}</div></section>)}</div>
-      <div className="pipeline-draft-actions"><span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · Config Draft 已保存" : ""}</span><button className="secondary" disabled={busy || !changed.length && !pipeline?.config_draft} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length} onClick={() => void save()}>保存 Config Draft</button></div>
-      {(changed.length > 0 || pipeline?.config_draft) && <p className="muted">Pipeline 配置已变化，需要重新运行 Baseline 后才能成为新的评测基线。</p>}
+      <div className="pipeline-draft-actions"><span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale && !invalidSavedThinking ? " · Config Draft 已保存" : ""}</span><button className="secondary" disabled={busy || !changed.length && !pipeline?.config_draft} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length && !invalidSavedThinking} onClick={() => void save()}>保存 Config Draft</button></div>
+      {(changed.length > 0 || pipeline?.config_draft) && <p className="muted">Config Draft 尚未生效；需显式运行新的 Baseline 才会成为评测基线。Candidate 的合法优化使用独立实验配置。</p>}
+      {pipeline?.baseline_config && (changed.length > 0 || pipeline?.config_draft) && <div className="pipeline-draft-diff"><h3>Baseline → 草稿参数变化</h3><dl className="baseline-strategy">{changed.map(key => <div key={key}><dt>{parameterNames[key] || key}</dt><dd>{formatValue(baseline[key])} → {formatValue(draft[key])}</dd></div>)}</dl>{!changed.length && <p className="muted">草稿与 Frozen Baseline 参数一致。</p>}</div>}
     </Section>
-    {pipeline?.baseline_config && <Section title={pipeline.config_draft ? "Baseline → 草稿参数变化" : "Baseline 冻结快照"}><dl className="baseline-strategy">{["query_rewrite", "multi_query", "candidate_k", "top_k", "hybrid_search", "rerank", "prompt_strategy"].filter(key => !pipeline.config_draft || pipeline.config_draft.config[key] !== baseline[key]).map(key => <div key={key}><dt>{parameterNames[key]}</dt><dd>{formatValue(baseline[key])}{pipeline.config_draft && ` → ${formatValue(pipeline.config_draft.config[key])}`}</dd></div>)}</dl>{pipeline.config_draft && !changed.length && <p className="muted">草稿与 Frozen Baseline 参数一致。</p>}</Section>}
     <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="Search Space" className="parameter-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={contract} baseline={baseline} /></div></Drawer>
   </PageShell>;
 }

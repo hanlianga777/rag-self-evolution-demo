@@ -6,3 +6,4 @@ sentence-transformers>=5,<7
 rapidocr>=3.9,<4
 onnxruntime>=1.30,<2
 openpyxl>=3.1,<4
+tokenizers>=0.23,<1

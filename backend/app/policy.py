@@ -21,6 +21,9 @@ DEFAULT_PIPELINE_CONFIG = {
     "metadata_filter": "OFF",
     "alias_mapping": False,
     "prompt_strategy": "Grounded",
+    "generation_thinking": "max",
+    "query_decompose": False,
+    "retrieval_max_tokens": False,
 }
 
 GATE_DEFINITIONS = (
@@ -52,12 +55,14 @@ ALLOWED_SEARCH_SPACE = {
     "metadata_filter": ("OFF", "STRICT", "FALLBACK"),
     "alias_mapping": (True, False),
     "prompt_strategy": ("Grounded", "Completeness", "Abstention"),
+    "generation_thinking": ("off", "low", "high", "max"),
+    "query_decompose": (False, True),
+    "retrieval_max_tokens": (False, 8192, 16384, 32768, 65536),
 }
 
 EXCLUDED_AUTOMATIC_PARAMETERS = frozenset({
     "parser", "ocr", "chunk_method", "chunk_size", "chunk_overlap", "embedding_model",
-    "generation_model", "rerank_model", "rerank_top_n", "temperature", "query_decompose",
-    "retrieval_max_tokens",
+    "generation_model", "rerank_model", "rerank_top_n", "temperature",
 })
 
 
@@ -170,6 +175,8 @@ def validate_candidate_config(config: dict, *, prior_configs=(), completed_evals
     for key, rule in contract.items():
         if key == "hybrid_alpha" and config.get("hybrid_search") is False:
             continue
+        if key not in config and key in {"generation_thinking", "query_decompose", "retrieval_max_tokens"}:
+            continue  # Read historical configs without inventing execution metadata.
         if key not in config:
             errors.append(f"missing required parameter: {key}")
             issues.append({"field": key, "actual": None, "expected_type": rule["type"], "allowed_values": rule["allowed"], "error": "missing required parameter"})

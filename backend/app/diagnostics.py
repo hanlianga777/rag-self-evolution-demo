@@ -316,6 +316,8 @@ def business_analysis(case, *, corpus_chunks=None, corpus_fingerprint=None):
     gaps=result['diagnostic_gaps']
     def blocked(condition):
         gaps.append({'condition':condition});result['analysis_reason']=condition;return result
+    if business_verdict(case) == 'PASS':
+        return {**result, 'analysis_category':'not_applicable', 'analysis_reason':'业务PASS无需失败归因。', 'primary_root_cause':'None'}
     if business_verdict(case) != 'FAIL':return blocked('需要已完成的真实业务FAIL；技术异常不能作为业务目标')
     trace=(case.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
     if trace.get('status') != 'completed' or any(not isinstance(trace.get(k),list) for k in ('candidates','final')):

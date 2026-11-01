@@ -32,6 +32,17 @@ class BaselineEntryTests(unittest.TestCase):
             result=self.runner.baseline_preflight(old['id']);self.assertFalse(result['can_resume']);self.assertTrue(result['can_start'])
             with self.assertRaises(ValueError):self.runner.start_baseline(old['id'])
             with self.store.connection() as c:c.execute(f'update evaluation_runs set {column}=? where id=?',(old[column] if column=='dataset_snapshot_json' else json.dumps(old['config']),old['id']))
+    def test_resume_keeps_frozen_configuration_when_new_defaults_change(self):
+        old = self.partial()
+        before = copy.deepcopy(old)
+        with patch.dict('app.evaluation.DEFAULT_PIPELINE_CONFIG', {'top_k': 6}):
+            eligibility = self.runner.baseline_preflight(old['id'])
+            self.assertTrue(eligibility['can_resume'])
+            child, _, config = self.runner.start_baseline(old['id'])
+        self.assertEqual(config, old['config'])
+        self.assertEqual(self.store.evaluation_run(child)['config'], old['config'])
+        self.assertEqual(self.store.evaluation_run(old['id']), before)
+
     def test_active_task_and_duplicate_resume_are_blocked(self):
         old=self.partial();child,_,_=self.runner.start_baseline(old['id'])
         active=self.runner.baseline_preflight(old['id']);self.assertFalse(active['can_start']);self.assertIn('活动',active['reason'])

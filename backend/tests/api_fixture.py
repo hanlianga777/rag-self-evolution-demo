@@ -7,5 +7,5 @@ from unittest.mock import patch
 
 _database = tempfile.TemporaryDirectory(prefix='rag-api-test-')
 atexit.register(_database.cleanup)
-with patch.dict(os.environ, {'RAG_DEMO_DB_PATH': str(Path(_database.name) / 'collection.db'), 'RAG_FORCE_MOCK': '1'}):
+with patch.dict(os.environ, {'RAG_DEMO_DB_PATH': str(Path(_database.name) / 'collection.db'), 'RAG_FORCE_MOCK': '1', 'RAG_SAFE_START': '0'}):
     from app import main

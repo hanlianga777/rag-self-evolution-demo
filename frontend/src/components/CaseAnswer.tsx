@@ -1,3 +1,5 @@
+import { answerCitationDisplay } from '../answerCitations';
+import { StoryDisclosure } from './Storytelling';
 import { createElement, Fragment, type ReactNode } from 'react';
 
 // Display only: keep the persisted answer and its exact audit copy untouched.
@@ -54,7 +56,11 @@ function markdown(text: string): ReactNode[] {
   return blocks();
 }
 
-export function CaseAnswer({ text }: { text: string }) {
+export function CaseAnswer({ text, final }: { text: string; final?: Parameters<typeof answerCitationDisplay>[1] }) {
+  if (final !== undefined) {
+    const display=answerCitationDisplay(text,final);
+    if (display.changed) return <><CaseAnswer text={display.text}/>{display.unverified > 0 && <p className="error-notice">{display.unverified}处引用未与本次保存的Final对应，不能据此认定回答有据。</p>}<StoryDisclosure label="原始回答与引用审计"><pre className="technical-record">{text}</pre></StoryDisclosure></>;
+  }
   if (!/<\/?[a-z][^>]*>/i.test(text)) return <div className="case-answer">{markdown(text)}</div>;
   const document = new DOMParser().parseFromString(text, 'text/html');
   const allowed = new Set(['p', 'div', 'br', 'ol', 'ul', 'li', 'strong', 'b', 'em', 'i', 'code', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span']);

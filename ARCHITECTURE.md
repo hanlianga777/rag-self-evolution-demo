@@ -1,3 +1,9 @@
+## 2026-10-28 Round 0 既有节点内部能力
+
+既有Provider按任务映射Thinking，AiService共用V2；查询处理节点新增有界子意图拆解，检索合并仍沿Candidate→Rerank→Parent/Final。生成前以官方本地Tokenizer执行可选完整块上下文容量检查，不完整则安全停止。共同评测身份与独立实验配置哈希分开；无新服务/数据库表/一级导航，不修改Judge/Gate核心。Pipeline Draft与Baseline报告沿既有Card/Drawer调整归属。
+
+正式图唯一源KnowledgeDiagrams.tsx及图专用样式未改，节点、关系未变，因此本轮不另画图或改写图导出。技术基座真实为MinerU VLM＋text-embedding-v4＋qwen3-rerank，以下旧BGE叙述仅为历史。详细合同见SPEC文首及Round0验收。
+
 ## 2026-10-21 · 当前V5合同与既有节点内部流程
 
 ## 2026-10-22 当前Agent内部合同

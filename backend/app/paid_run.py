@@ -14,7 +14,7 @@ _limits = ContextVar('frozen_execution_limits',default=None)
 _task = ContextVar('controlled_provider_task',default=None)
 _accounting = ContextVar('evaluation_accounting_only',default=False)
 REQUEST_LIMITS = {'business_audit':16384,'qc':16384,'answerability':12288,'negative_subtype':8192,
-                  'answer':8192,'judge':32768,'agent':16384,'query':4096,'revision':16384}
+                  'answer':65536,'judge':65536,'agent':32768,'query':16384,'revision':16384}
 
 
 class PaidRun:

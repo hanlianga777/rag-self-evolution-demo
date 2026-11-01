@@ -60,7 +60,7 @@ class PaidClient(AlibabaProvider):
         self.output, self.texts, self.authorized = output, texts, authorized
         self.calls, self.cost, self.expected_rerank = [], 0.0, None
 
-    def _post(self, path, payload):
+    def _post(self, path, payload, *, validate=None):
         model = payload.get('model')
         if not self.authorized or self.cost >= .01 or len(self.calls) >= 2:
             raise ValueError('Provider authorization/budget exhausted')
@@ -77,7 +77,7 @@ class PaidClient(AlibabaProvider):
         self.calls.append(call)
         save(self.output / 'provider-calls.json', self.calls)
         try:
-            body = super()._post(path, payload)
+            body = super()._post(path, payload, validate=validate)
             save(self.output / f'{model}-response.json', body)
             tokens = body.get('usage', {}).get('total_tokens')
             call.update(usage=body.get('usage'), request_id=body.get('request_id') or body.get('id'), response_model=body.get('model'))

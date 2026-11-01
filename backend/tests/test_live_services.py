@@ -77,11 +77,14 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(result["output_tokens"], 8)
         self.assertIsNone(result["ttft_ms"])
 
-    def test_judge_uses_zero_temperature_for_stable_governance(self):
+    def test_judge_uses_independent_max_and_omits_ignored_temperature(self):
         content = '{"correctness":4,"completeness":1,"faithfulness":1,"behavior_pass":true,"reason":"证据充分","missing_points":[],"unsupported_claims":[]}'
         with patch("app.providers.urllib.request.urlopen", return_value=FakeResponse({"choices": [{"message": {"content": content}}]})) as request:
             self.provider.judge("问题", "预期", "回答")
-        self.assertEqual(json.loads(request.call_args.args[0].data)["temperature"], 0)
+        payload = json.loads(request.call_args.args[0].data)
+        self.assertNotIn("temperature", payload)
+        self.assertEqual(payload["thinking"], {"type":"enabled"})
+        self.assertEqual(payload["reasoning_effort"], "max")
 
 
 if __name__ == "__main__":

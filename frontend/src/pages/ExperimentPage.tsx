@@ -1,3 +1,4 @@
+import { answerCitationDisplay } from "../answerCitations";
 import { StoryDisclosure } from "../components/Storytelling";
 import { StoryEmpty } from "../components/Storytelling";
 import { useEffect, useRef, useState } from "react";
@@ -75,14 +76,16 @@ function AnswerCard({ scheme, run, onOpenCitation }: { scheme: Scheme; run: Run;
   const result: any = run.result;
   return <article className={`experiment-answer-card ${scheme.id === "baseline" ? "compare-baseline" : "compare-production"}`}><div className="answer-card-header"><Badge tone="neutral">{run.label || scheme.label}</Badge><span className={run.status || "waiting"}>{run.status === "running" ? `等待 · ${elapsed}` : run.status === "completed" ? "已完成" : run.status === "failed" ? "失败" : "等待运行"}</span></div>
     <p className="muted">配置身份：{run.sourceId || scheme.version || "未记录"}</p>
-    <div className="answer-scroll">{run.error ? <p className="error-notice" role="alert">回答失败：{run.error}</p> : result ? <MarkdownAnswer text={result.answer} /> : <p className="muted">点击运行后显示实际回答。</p>}</div>
+    <div className="answer-scroll">{run.error ? <p className="error-notice" role="alert">回答失败：{run.error}</p> : result ? <MarkdownAnswer text={result.answer} final={result.retrieval_trace?.final ?? result.evidence ?? []} /> : <p className="muted">点击运行后显示实际回答。</p>}</div>
     <div className="answer-evidence">{result?.evidence?.length ? result.evidence.map((item: Citation) => <button className="document-link" key={item.chunk_id} onClick={() => onOpenCitation(item)}>{item.document} · P.{item.page_start}</button>) : result ? <span className="muted">本次回答未返回可定位 Evidence。</span> : null}</div>
     <footer className="answer-metrics-footer"><ExecutionMetrics compact metrics={{latency_ms:result?.latency_ms}} /></footer>
     <div className="answer-audit"><StoryDisclosure label={<>查看本次运行审计</>}>{result ? <><p className="muted">实时预览 · {run.sourceId} · {run.question}</p><ExecutionMetrics metrics={result} /><ParameterDiff after={result.config || scheme.config || {}} /></> : <p className="muted">运行完成后显示已采集的耗时与 Token。</p>}</StoryDisclosure></div>
   </article>;
 }
 
-function MarkdownAnswer({ text }: { text: string }) {
+function MarkdownAnswer({ text, final }: { text: string; final: Parameters<typeof answerCitationDisplay>[1] }) {
+  const display=answerCitationDisplay(text,final);
+  if (display.changed) return <><MarkdownAnswer text={display.text} final={[]}/>{display.unverified > 0 && <p className="error-notice">引用未与本次保存的Final对应，不能据此认定回答有据。</p>}<StoryDisclosure label="原始回答与引用审计"><pre className="technical-record">{text}</pre></StoryDisclosure></>;
   const inline = (value: string) => value.split(/(\*\*[^*]+\*\*)/g).map((part, index) => part.startsWith("**") && part.endsWith("**") ? <strong key={index}>{part.slice(2, -2)}</strong> : part);
   return <div className="answer-markdown">{text.split(/\n{2,}/).map((block, index) => {
     const lines = block.split("\n");

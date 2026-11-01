@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 import json
 
 from fastapi.testclient import TestClient
@@ -18,6 +19,7 @@ def candidates():
     return [
         {
             "test_category": category,
+            "ablation_attribute": "colloquial" if category == "ablation" else None,
             "coverage_slot": f"Q{number:02d}",
             "question": f"测试问题 {number}",
             "reference_answer": None if category == "negative" else "必须先确认状态",
@@ -41,9 +43,29 @@ class CandidateReviewExportTests(unittest.TestCase):
         self.client = TestClient(main.app)
         self.rows = self.store.save_mini_golden_candidates(candidates(), "test-model")
         self.run_id = self.rows[0]["raw"]["generation_run_id"]
+        self.workers = []
+        self.addCleanup(self.join_workers)
+
+    def join_workers(self):
+        for worker in self.workers:
+            worker.join()
+            self.assertFalse(worker.is_alive(), 'quality worker must finish before its fixture database is removed')
 
     def passed_probe(self, question_id):
         return self.store.record_probe_result(question_id, {"question_quality": 30, "golden_answer_quality": 30, "evidence_support": 40, "reason": "证据命中", "probe_details": {"classification": "EVIDENCE_VALID", "vector": {"top_k": [{"chunk_id": "C1", "score": .9}]}}})
+
+    def quality_history(self, question_id, *, qc=True, score=90, priority='P2'):
+        """Use real persistence bindings; SQL status flags are not quality evidence."""
+        _, execution = self.store.capture_quality(question_id)
+        self.store.record_probe_result(question_id, {'question_quality':30,'golden_answer_quality':30,'evidence_support':40,
+            'reason':'offline fixture', 'probe_details':{'classification':'EVIDENCE_VALID'}}, execution=execution)
+        if qc:
+            self.quality_result(question_id, score=score, priority=priority)
+
+    def quality_result(self, question_id, *, score=90, priority='P2'):
+        _, execution = self.store.capture_quality(question_id, qc=True)
+        return self.store.record_qc(question_id, {'score':score,'priority':priority,'reason':'offline bound fixture',
+            'ablation_valid':True}, 'passed', execution=execution)
 
     def test_json_export_contains_only_run_questions_and_full_histories(self):
         first = self.rows[0]["id"]
@@ -262,44 +284,72 @@ class CandidateReviewExportTests(unittest.TestCase):
             if subtype == "insufficient_evidence":
                 self.assertEqual(result["classification"], "FAKE_NEGATIVE_RISK")
 
-    def test_anomaly_rerun_excludes_passed_and_frozen_candidates(self):
-        ids = [row["id"] for row in self.rows]
+    def test_anomaly_rerun_never_selects_a_frozen_question_with_missing_stages(self):
+        from unittest.mock import patch
+        frozen = self.rows[0]['id']
         with self.store.connection() as connection:
             connection.execute("UPDATE golden_generation_runs SET status='completed' WHERE id=?", (self.run_id,))
-            connection.execute("UPDATE questions SET probe_status='probe_passed', qc_status='qc_passed' WHERE id IN (%s)" % ','.join('?' for _ in ids), ids)
-            connection.execute("UPDATE questions SET qc_status='qc_pending' WHERE id=?", (ids[4],))
-            connection.execute("UPDATE questions SET qc_status='qc_failed' WHERE id=?", (ids[8],))
-            connection.execute("UPDATE questions SET stage='golden', qc_status='qc_failed' WHERE id=?", (ids[0],))
-        selected = self.store.update_quality_rerun(self.run_id, {"status": "running"}, start=True, anomalies_only=True)
+            connection.execute("UPDATE questions SET stage='golden', review_status='approved' WHERE id=?", (frozen,))
+        before = self.store.question(frozen)
+        with patch.object(self.store, 'missing_quality_stages', side_effect=lambda key: ['probe'] if key == frozen else []):
+            with self.assertRaisesRegex(ValueError, '没有缺失或技术中断'):
+                self.store.update_quality_rerun(self.run_id, {'status': 'running'}, start=True, anomalies_only=True)
+        self.assertEqual(self.store.question(frozen), before)
+
+    def test_anomaly_rerun_excludes_passed_and_frozen_candidates(self):
+        ids = [row['id'] for row in self.rows]
+        self.store.update_generation_run(self.run_id, status='completed')
+        for key in ids:
+            self.quality_history(key, qc=key not in {ids[4], ids[8]})
+        self.store.review_question(ids[0], 'approved', 'offline reviewer')
+        frozen = self.store.question(ids[0])
+        histories = {key:self.store.probe_history(key) for key in ids}
+        self.store.update_quality_rerun(self.run_id, {'status':'failed','slots':{'Q09':{
+            'question_id':ids[8], 'execution_status':'failed', 'failed_stage':'qc', 'error':'offline technical interruption'}}})
+        selected = self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
         self.assertEqual(selected, [ids[4], ids[8]])
-        audit = self.store.generation_run(self.run_id)["artifacts"]["hard_validation"]["quality_rerun"]
+        audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
         self.assertEqual(audit['total'], 2)
         self.assertEqual(audit['question_ids'], selected)
-        self.store.update_quality_rerun(self.run_id, {"status": "completed"})
-        with self.store.connection() as connection:
-            connection.execute("UPDATE questions SET qc_status='qc_passed' WHERE id IN (?, ?)", selected)
-        with self.assertRaisesRegex(ValueError, "没有需要重跑"):
-            self.store.update_quality_rerun(self.run_id, {"status": "running"}, start=True, anomalies_only=True)
+        for key in selected:
+            self.quality_result(key)
+        self.store.update_quality_rerun(self.run_id, {'status':'completed'})
+        with self.assertRaisesRegex(ValueError, '没有缺失或技术中断的检查阶段'):
+            self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
+        self.assertEqual(self.store.question(ids[0]), frozen)
+        self.assertEqual({key:self.store.probe_history(key) for key in ids}, histories)
 
     def test_anomaly_rerun_reuses_current_passed_probe_for_failed_qc(self):
-        from unittest.mock import patch
-        ids = [row["id"] for row in self.rows]
-        with self.store.connection() as connection:
-            connection.execute("UPDATE golden_generation_runs SET status='completed' WHERE id=?", (self.run_id,))
-            connection.execute("UPDATE questions SET probe_status='probe_passed', qc_status='qc_passed' WHERE id IN (%s)" % ','.join('?' for _ in ids), ids)
+        from app.providers import ProviderInvalidResponse
+        ids = [row['id'] for row in self.rows]
+        self.store.update_generation_run(self.run_id, status='completed')
         target = ids[8]
-        self.passed_probe(target)
-        self.store.record_qc(target, {"score": 50, "priority": "P0", "reason": "fixture"}, "failed")
+        for key in ids:
+            self.quality_history(key, qc=key != target)
         before = self.store.probe_history(target)
-        selected = self.store.update_quality_rerun(self.run_id, {"status": "running"}, start=True, anomalies_only=True)
+        selected = self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
         self.assertEqual(selected, [target])
-        with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')), patch.object(main, '_quality_check', return_value=({'reason': 'passed'}, {'status': 'qc_passed'})) as qc:
-            main._run_quality_rerun(self.run_id, selected, self.store, SimpleNamespace(), main.corpus)
-        qc.assert_called_once()
+        service = SimpleNamespace(quality_check=Mock(side_effect=ProviderInvalidResponse('offline invalid QC', raw_provider_response='{')))
+        with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')):
+            main._run_quality_rerun(self.run_id, selected, self.store, service, main.corpus)
+        self.assertEqual(service.quality_check.call_count, 1)
+        self.assertEqual(self.store.qc_history(target), [])
+        self.assertEqual(self.store.probe_history(target), before)
+        audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
+        self.assertEqual(audit['status'], 'failed')
+        self.assertEqual(audit['slots']['Q09']['failed_stage'], 'qc')
+        selected = self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
+        self.assertEqual(selected, [target])
+        service.quality_check = Mock(return_value={'score':90,'priority':'P2','reason':'offline resumed QC','ablation_valid':True})
+        with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')):
+            main._run_quality_rerun(self.run_id, selected, self.store, service, main.corpus)
+        service.quality_check.assert_called_once()
         self.assertEqual(self.store.probe_history(target), before)
         audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
         self.assertEqual(audit['status'], 'completed')
         self.assertEqual(audit['slots']['Q09']['question_id'], target)
+        self.assertEqual(len(self.store.qc_history(target)), 1)
+        self.assertEqual(self.store.qc_history(target)[0]['result']['execution_identity'], self.store.capture_quality(target, qc=True)[1])
 
     def test_quality_rerun_validates_run_and_blocks_duplicate_start(self):
         with self.store.connection() as connection:
@@ -335,10 +385,100 @@ class CandidateReviewExportTests(unittest.TestCase):
         self.assertEqual(before, [(self.store.question(qid)["question"], self.store.question(qid)["reference_answer"], self.store.question(qid)["evidence"]) for qid in ids])
         self.assertEqual(self.store.qc_history(ids[1])[0]["result"]["qc_input_evidence"][0]["chunk_id"], "C1")
 
+    def test_completed_low_score_qc_is_not_retried_as_a_technical_anomaly(self):
+        ids = [row['id'] for row in self.rows]
+        self.store.update_generation_run(self.run_id, status='completed')
+        for key in ids:
+            self.quality_history(key, score=50 if key == ids[8] else 90, priority='P0' if key == ids[8] else 'P2')
+        before = self.store.qc_history(ids[8])
+        self.assertEqual(before[0]['status'], 'qc_failed')
+        self.assertEqual(self.store.missing_quality_stages(ids[8]), [])
+        with self.assertRaisesRegex(ValueError, '没有缺失或技术中断'):
+            self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
+        self.assertEqual(self.store.qc_history(ids[8]), before)
+        self.assertEqual(before[0]['result']['score'], 50)
+
+    def test_known_local_qc_failure_continues_without_inventing_scores(self):
+        ids = [row['id'] for row in self.rows]
+        self.store.update_generation_run(self.run_id, status='completed')
+        for key in ids:
+            self.quality_history(key, qc=False)
+        before = {key:self.store.probe_history(key) for key in ids}
+        self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
+        service = SimpleNamespace(quality_check=Mock(side_effect=RuntimeError('known offline local error')))
+        with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')):
+            main._run_quality_rerun(self.run_id, ids, self.store, service, main.corpus)
+        audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
+        self.assertEqual(audit['status'], 'failed')
+        self.assertEqual(audit['completed'], 20)
+        self.assertEqual(audit['technical_failed'], 20)
+        self.assertEqual(service.quality_check.call_count, 20)
+        self.assertEqual(len(audit['slots']), 20)
+        self.assertTrue(all(slot['failed_stage'] == 'qc' and slot['execution_status'] == 'failed' for slot in audit['slots'].values()))
+        self.assertTrue(all(self.store.qc_history(key) == [] for key in ids))
+        self.assertEqual({key:self.store.probe_history(key) for key in ids}, before)
+
+    def test_unknown_qc_request_stops_and_blocks_resume_without_fake_scores(self):
+        from app.providers import ProviderTimeout
+        ids = [row['id'] for row in self.rows]
+        self.store.update_generation_run(self.run_id, status='completed')
+        for key in ids:
+            self.quality_history(key, qc=False)
+        error = ProviderTimeout('offline unknown request outcome')
+        error.request_execution_unknown = True
+        service = SimpleNamespace(quality_check=Mock(side_effect=error))
+        self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
+        with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')):
+            main._run_quality_rerun(self.run_id, ids, self.store, service, main.corpus)
+        audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
+        self.assertEqual(audit['status'], 'failed')
+        self.assertEqual(audit['completed'], 1)
+        self.assertEqual(audit['technical_failed'], 1)
+        service.quality_check.assert_called_once()
+        self.assertEqual(list(audit['slots']), ['Q01'])
+        self.assertTrue(all(self.store.qc_history(key) == [] for key in ids))
+        with self.assertRaisesRegex(ValueError, 'Unknown request execution'):
+            self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
+        self.assertEqual(self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun'], audit)
+
+    def test_candidate_generated_quality_endpoint_starts_once_and_joins_worker(self):
+        import threading
+        entered, release = threading.Event(), threading.Event()
+        self.addCleanup(release.set)
+        observed = []
+        def controlled_worker(run_id, ids, store, service, corpus):
+            self.workers.append(threading.current_thread())
+            observed.append((run_id, ids, store.database_path))
+            entered.set(); release.wait(5)
+        self.assertEqual(self.store.generation_run(self.run_id)['status'], 'candidate_generated')
+        with patch.object(main, '_run_quality_rerun', side_effect=controlled_worker):
+            try:
+                response = self.client.post(f'/api/governance/generation-runs/{self.run_id}/rerun-quality')
+                self.assertEqual(response.status_code, 202)
+                self.assertTrue(entered.wait(2))
+                self.assertEqual(observed, [(self.run_id, [row['id'] for row in self.rows], self.store.database_path)])
+                self.assertEqual(self.client.post(f'/api/governance/generation-runs/{self.run_id}/rerun-quality').status_code, 409)
+                self.assertEqual(self.client.post(f'/api/governance/generation-runs/{self.run_id}/rerun-quality', headers={'Origin':'https://evil.example'}).status_code, 403)
+                self.assertEqual(self.client.post('/api/governance/generation-runs/unknown/rerun-quality').status_code, 404)
+            finally:
+                release.set(); self.join_workers()
+        self.assertTrue(all(not worker.is_alive() for worker in self.workers))
+        self.assertTrue(all(self.store.qc_history(row['id']) == [] for row in self.rows))
+
     def test_quality_rerun_endpoint_checks_origin_and_missing_run(self):
         self.assertEqual(self.client.post(f"/api/governance/generation-runs/{self.run_id}/rerun-quality", headers={"Origin": "https://evil.example"}).status_code, 403)
         self.assertEqual(self.client.post("/api/governance/generation-runs/unknown/rerun-quality").status_code, 404)
-        self.assertEqual(self.client.post(f"/api/governance/generation-runs/{self.run_id}/rerun-quality").status_code, 409)
+        import threading
+        entered = threading.Event()
+        def completed_worker(*_args):
+            self.workers.append(threading.current_thread())
+            entered.set()
+        with patch.object(main, '_run_quality_rerun', side_effect=completed_worker):
+            try:
+                self.assertEqual(self.client.post(f"/api/governance/generation-runs/{self.run_id}/rerun-quality").status_code, 409)
+            finally:
+                entered.wait(2)
+                self.join_workers()
 
     def test_provider_error_stops_rerun_without_fake_qc_score(self):
         with self.store.connection() as connection:

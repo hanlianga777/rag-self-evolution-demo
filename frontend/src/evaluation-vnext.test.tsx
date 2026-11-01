@@ -34,7 +34,7 @@ it('does not present old contract findings as current optimization targets',asyn
 });
 it('preserves VNext context-selection root while keeping legacy root grouping',async()=>{
  const {currentRoot,isTechnicalBadCase}=await import('./components/EvaluationDiagnosis');
- const row={evaluation_outcome:{contract_version:'business-vnext-1'},diagnostic_view:{primary_root_cause:'Ranking',analysis_category:'rag_failure',is_technical_bad_case:true,optimization_directions:['context_selection']}};
+ const row={evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL'},diagnostic_view:{primary_root_cause:'Ranking',analysis_category:'rag_failure',is_technical_bad_case:true,optimization_directions:['context_selection']}};
  expect(currentRoot(row)).toBe('Ranking');expect(isTechnicalBadCase(row)).toBe(true);
  expect(currentRoot({...row,evaluation_outcome:undefined})).toBe('Retrieval');
 });

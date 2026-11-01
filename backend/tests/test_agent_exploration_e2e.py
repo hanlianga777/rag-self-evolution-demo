@@ -16,24 +16,21 @@ from app.optimization import OptimizationAgent
 from app.retrieval import VectorRetriever
 import test_agent_exploration as exploration
 import test_optimization_contract as contracts
+from offline_contract_fixture import bind_snapshot, atomic_judgment
 
 
 class FixtureProvider:
     settings=SimpleNamespace(model='fixture',configured=True)
     def complete_with_metrics(self,system,user,**kwargs):
-        # A fixed answer, independent of Golden, proves plumbing only.
-        return {'content':'请核对手册。','ttft_ms':1,'input_tokens':10,'output_tokens':5,'usage':{}}
+        # Deterministic answer omissions depend only on the request and visible Final.
+        import re
+        n = int(re.search(r'问题：fixture-(\d+)', user).group(1))
+        changed = len(re.findall(r'^\[c\d+ \|', user, re.M)) == 6
+        passed = (n >= 10 or changed and n < 2) and not (changed and n == 20)
+        answer = '证据不足，无法回答。' if n >= 30 else '请核对手册。' if passed else '暂未给出核对步骤。'
+        return {'content':answer,'ttft_ms':1,'input_tokens':10,'output_tokens':5,'usage':{}}
     def judge(self,q,expected,answer,**kwargs):
-        n=int(q.split('-')[-1]);context=kwargs['context']
-        changed=len(context['final_context'])==6
-        # Fault injection: two repairs + one new failure under this one config.
-        passed=(n>=10 or changed and n<2) and not (changed and n==20)
-        return {'verdict':'PASS' if passed else 'FAIL',
-            'checks':[{'check_type':'negative_behavior' if context['category']=='negative' else 'fact',
-                'requirement':'核对手册','met':passed,'answer_quotes':[answer] if passed else [],
-                'support':[] if context['category']=='negative' or not passed else [{'source_id':context['final_context'][0]['chunk_id'],'quote':'请核对手册。'}]}],
-            'issues':[],'reason':'OFFLINE FIXTURE outcome, no real semantic claim',
-            'quality':{'correctness':4 if passed else 0,'faithfulness':1,'completeness':1 if passed else 0}}
+        return atomic_judgment(kwargs['context'], answer, answer in {'请核对手册。', '证据不足，无法回答。'})
 
 
 class Sandbox50Tests(unittest.TestCase):
@@ -64,7 +61,12 @@ class Sandbox50Tests(unittest.TestCase):
             'test_category':'positive' if i<20 else 'ablation' if i<30 else 'negative',
             'negative_subtype':None if i<30 else 'safety_critical' if i<40 else 'prompt_injection',
             'evidence':[{'source_chunk_ids':['c5'],'evidence_key_points':['请核对手册。']}]} for i in range(50)]
+        for item in items:
+            if item['test_category'] == 'negative':
+                item['reference_answer'] = None
+                item['expected_behavior'] = 'safe_rejection' if item['negative_subtype'] == 'safety_critical' else 'prompt_injection_resistance'
         snapshot={'id':'fixture50','question_ids':[i['id'] for i in items],'questions':items,'corpus_fingerprint':fp}
+        bind_snapshot(snapshot, self.chunks)
         with self.store.connection() as db:db.execute('INSERT INTO dataset_versions VALUES (?,?,?,?,?)',('fixture50','approved','fixture',json.dumps(snapshot),'9999'))
         handle=patch('app.diagnostics._current_corpus',return_value=(self.chunks,fp));handle.start();self.addCleanup(handle.stop)
         self.baseline=self.runner.run_baseline(automatic=False)
@@ -78,7 +80,13 @@ class Sandbox50Tests(unittest.TestCase):
         self.assertEqual(plan['status'],'exploratory',plan)
         p=exploration.proposal({'question_id':'case-0'},'context_selection','context_pool_gap',{'top_k':6})
         p.update(id='A',target_group='fixture50',root_cause_evidence=['case-0'])
-        return OptimizationAgent(self.store,contracts.FixedProvider(json.dumps({'candidates':[p],'insufficient_evidence':'single fixture experiment'}))).generate(self.baseline['id'])
+        experiment = OptimizationAgent(self.store,contracts.FixedProvider(json.dumps({'candidates':[p],'insufficient_evidence':'single fixture experiment'}))).generate(self.baseline['id'])
+        # Current preflight requires the remaining diagnostic tasks to be planned too.
+        from app.agent_coverage import coverage_inputs, complete_coverage
+        report = coverage_inputs(self.store, experiment['id'])[-1]
+        if report['status'] == 'incomplete':
+            complete_coverage(self.store, experiment['id'], expected_binding=report['binding'], backup_path=self.path.parent / 'offline-coverage-backup.db')
+        return self.store.experiment(experiment['id'])
 
     def test_agent_candidate_sandbox_all50_regression_and_no_automatic_release(self):
         before=deepcopy(self.store.evaluation_run(self.baseline['id']))
