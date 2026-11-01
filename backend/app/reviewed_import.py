@@ -12,8 +12,9 @@ from .corpus import CorpusStore, current_manifest, manifest_identity
 CONTRACT = 'human-reviewed-csv-v1'
 
 
-def receipt_key(source_sha256):
-    return hashlib.sha256(('reviewed_csv:' + source_sha256).encode()).hexdigest()
+def receipt_key(source_sha256, *, machine_checks=False):
+    mode = 'reviewed_csv_machine_checks' if machine_checks else 'reviewed_csv'
+    return hashlib.sha256((mode + ':' + source_sha256).encode()).hexdigest()
 
 
 def validate_content(candidate, chunks):
@@ -37,7 +38,7 @@ def validate_content(candidate, chunks):
             raise ValueError('负向题子类与预期行为不匹配')
 
 
-def import_batch(store, candidates, source_sha256, source, review_note):
+def import_batch(store, candidates, source_sha256, source, review_note, *, machine_checks=False):
     from .governance import _json, _now, _normalized, GENERATION_PROFILES
     from datetime import datetime, timezone
     from .full_text import CORPUS_LOCK
@@ -50,9 +51,24 @@ def import_batch(store, candidates, source_sha256, source, review_note):
     with CORPUS_LOCK, store.connection() as connection:
         connection.execute('BEGIN IMMEDIATE')
         chunks = CorpusStore().chunks()
+        if machine_checks:
+            from .golden_v2 import validate_golden_candidate
+            prepared = []
+            for candidate in candidates:
+                candidate = {**candidate}
+                # Negative expected text/norms are not positive retrieval targets.
+                if candidate['test_category'] == 'negative':
+                    candidate.update(expected_response=candidate.get('expected_response') or candidate.get('reference_answer'),
+                                     reference_answer=None, evidence=[], acceptable_evidence=[])
+                validation = validate_golden_candidate(candidate, chunks)
+                if not validation['valid']:
+                    raise ValueError('机器检查导入 ' + candidate['coverage_slot'] + '：' + '；'.join(validation['blocking_errors']))
+                candidate['validation'] = {key: value for key, value in validation.items() if key != 'normalized_candidate'}
+                prepared.append(candidate)
+            candidates = prepared
         for candidate in candidates:
             validate_content(candidate, chunks)
-        key = receipt_key(source_sha256)
+        key = receipt_key(source_sha256, machine_checks=machine_checks)
         previous = store.business_import_receipt(key)
         if previous:
             raise ValueError('该人工审定文件已导入，请使用已有Generation Run')
@@ -60,28 +76,32 @@ def import_batch(store, candidates, source_sha256, source, review_note):
         serial = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
         run_id = 'GGEN-CSV-' + serial
         ids, hashes = [], {}
+        provenance = 'reviewed_csv_machine_checks' if machine_checks else 'reviewed_csv'
+        legacy_type = 'v1_mini' if machine_checks else 'reviewed_csv'
+        contract = 'reviewed-csv-machine-checks-v1' if machine_checks else CONTRACT
         for index, candidate in enumerate(sorted(candidates, key=lambda c: c['coverage_slot']), 1):
             question_id = f'CSV-{serial}-{index:02d}'
-            raw = {**candidate, 'id': question_id, 'source': 'reviewed_csv', 'generation_run_id': run_id,
+            raw = {**candidate, 'id': question_id, 'source': provenance, 'generation_run_id': run_id,
                    'display_id': candidate['coverage_slot'], 'evaluation_group': candidate['test_category'],
                    'import_audit': {'source_sha256': source_sha256, 'source': source, 'review_note': review_note, 'imported_at': now}}
             item = {'id': question_id, 'question': raw['question'], 'reference_answer': raw.get('reference_answer'),
                     'evidence': raw.get('evidence', []), 'test_category': raw['test_category'], 'negative_subtype': raw.get('negative_subtype'),
-                    'legacy_question_type': 'reviewed_csv', 'raw': raw}
+                    'legacy_question_type': legacy_type, 'raw': raw}
             hashes[question_id] = store._quality_content(item)
             connection.execute('INSERT INTO questions (id,stage,legacy_question_type,test_category,negative_subtype,review_status,probe_status,qc_status,question,reference_answer,evidence_json,raw_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                (question_id, 'candidate', 'reviewed_csv', raw['test_category'], raw.get('negative_subtype'), 'human_review_pending',
+                (question_id, 'candidate', legacy_type, raw['test_category'], raw.get('negative_subtype'), 'human_review_pending',
                  'probe_pending', 'qc_pending', raw['question'], raw.get('reference_answer'), _json(item['evidence']), _json(raw), now, now))
             ids.append(question_id)
         fingerprint = manifest_identity(current_manifest())
-        receipt = {'kind': CONTRACT, 'source_sha256': source_sha256, 'source': source, 'review_note': review_note,
+        receipt = {'kind': contract, 'source_sha256': source_sha256, 'source': source, 'review_note': review_note,
                    'generation_run_id': run_id, 'question_ids': ids, 'content_hashes': hashes, 'corpus_fingerprint': fingerprint}
         connection.execute('INSERT INTO business_import_batches VALUES (?,?)', (key, _json(receipt)))
         connection.execute('INSERT INTO golden_generation_runs VALUES (?,?,?,?,?,?)',
-            (run_id, _json({'name': 'medium', **GENERATION_PROFILES['medium']}), CONTRACT, 'completed', _json(ids), now))
+            (run_id, _json({'name': 'medium', **GENERATION_PROFILES['medium']}), contract, 'completed', _json(ids), now))
         connection.execute('INSERT INTO golden_generation_artifacts VALUES (?,?,?,?)',
             (run_id, _json([]), _json([]), _json({'status': 'passed', 'corpus_fingerprint': fingerprint,
-              'reviewed_csv_receipt': key, 'content_hashes': hashes, 'quality_source': CONTRACT})))
+              'reviewed_csv_receipt': key, 'content_hashes': hashes, 'quality_source': contract,
+              **({'stop_on_technical_error': True} if machine_checks else {})})))
     return {'generation_run_id': run_id, 'question_ids': ids, 'source_sha256': source_sha256}
 
 

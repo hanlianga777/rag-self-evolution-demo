@@ -210,6 +210,7 @@ class ReviewedImportRequest(BaseModel):
     source_sha256: str = Field(pattern='^[0-9a-f]{64}$')
     source: str = Field(min_length=1)
     review_note: str = Field(min_length=1)
+    machine_checks: bool = False
 
 
 class OwnerDelegatedReviewRequest(BaseModel):
@@ -918,7 +919,9 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
     from .paid_run import require_reconciled_execution
     from .providers import ProviderAPIError, ProviderRequestError
     counters = {'completed':0,'probe_passed':0,'probe_failed':0,'qc_passed':0,'qc_failed':0,'qc_skipped':0,'technical_failed':0}
-    state = run_store.generation_run(run_id,qualification=False)['artifacts']['hard_validation'].get('quality_rerun',{})
+    validation_state = run_store.generation_run(run_id,qualification=False)['artifacts']['hard_validation']
+    state = validation_state.get('quality_rerun',{})
+    stop_on_technical_error = validation_state.get('stop_on_technical_error') is True
     checkpoints = state.get('checkpoints',{}); slots = dict(state.get('slots',{}))
     attempt_id = state.get('attempt_id',run_id)
     def persist(**values):
@@ -966,6 +969,8 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
                 probe=prior[0] if reusable else perform('probe',lambda:run_store.run_probe(key,service.retriever,chunks,service.answerability_check,subtype_judge=service.negative_subtype_check,fail_on_judge_error=True))
                 if probe.get('probe_details',{}).get('probe_execution_status') == 'failed':
                     raise ProviderUnavailable('Golden Probe 检索技术执行失败，已保存真实失败记录')
+                if stop_on_technical_error and probe.get('probe_details',{}).get('probe_execution_status') == 'uncertain':
+                    raise ProviderUnavailable('Golden Probe 判断未完成：'+json.dumps(probe['probe_details'].get('negative_checks'),ensure_ascii=False))
                 counters['probe_passed' if probe['status']=='passed' else 'probe_failed']+=1
                 slots[slot]={'question_id':key,'probe':probe['status'],'classification':probe.get('classification') or probe.get('probe_details',{}).get('classification')}
                 if probe['status']=='passed':
@@ -985,6 +990,8 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus):
                 counters['technical_failed'] += 1
                 counters['completed'] += 1
                 persist(stage=phase, slot=slot)
+                if stop_on_technical_error:
+                    raise
                 # Unknown execution/billing and account/configuration errors stop the batch.
                 require_reconciled_execution({'checkpoints':checkpoints})
                 cause = error
@@ -1261,7 +1268,7 @@ def review_mini_batch(payload: BatchReviewRequest):
 @app.post('/api/governance/reviewed-import', status_code=201, dependencies=[Depends(require_trusted_origin)])
 def import_reviewed_csv(payload: ReviewedImportRequest):
     try:
-        return store.import_reviewed_candidates(payload.candidates, payload.source_sha256, source=payload.source, review_note=payload.review_note)
+        return store.import_reviewed_candidates(payload.candidates, payload.source_sha256, source=payload.source, review_note=payload.review_note, machine_checks=payload.machine_checks)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 

@@ -552,9 +552,9 @@ class GovernanceStore:
             connection.execute('INSERT INTO business_import_batches VALUES (?,?)', (file_hash, _json({'question_ids': ids, 'imported_count': len(ids), 'filename': filename, 'accepted_rows': [candidate['import_row'] for candidate in candidates], 'errors': errors or []})))
         return ids
 
-    def import_reviewed_candidates(self, candidates, source_sha256, *, source, review_note):
+    def import_reviewed_candidates(self, candidates, source_sha256, *, source, review_note, machine_checks=False):
         from .reviewed_import import import_batch
-        return import_batch(self, candidates, source_sha256, source, review_note)
+        return import_batch(self, candidates, source_sha256, source, review_note, machine_checks=machine_checks)
 
     def coverage_preview(self, profile_name, chunks, embeddings, embedding_identity=None):
         from .golden_v2 import build_plan

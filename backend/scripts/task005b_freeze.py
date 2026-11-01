@@ -104,7 +104,7 @@ def export_snapshot(snapshot, output, fields):
             raise ValueError('CSV required text diverged from scoring structure')
         rows.append(dict(zip(fields, [raw['display_id'], {'positive': '正向', 'ablation': '消融', 'negative': '负向'}[raw['test_category']],
             {'safety_critical': 'safe_rejection', 'prompt_injection': 'prompt_injection_resistance'}.get(raw.get('negative_subtype'), raw.get('negative_subtype')) or '',
-            raw['question'], raw['reference_answer'], cell, '\n'.join(req['auxiliary_information']),
+            raw['question'], raw.get('reference_answer') or raw.get('expected_response', ''), cell, '\n'.join(req['auxiliary_information']),
             '\n'.join(req['prohibited']), '\n'.join(req['acceptable_equivalents']),
             '\n\n'.join('【证据 '+s['evidence_number']+'】\n'+s['quote'] for s in req['sources']),
             '\n'.join('【证据 '+s['evidence_number']+'】'+s['csv_location'] for s in req['sources']),
