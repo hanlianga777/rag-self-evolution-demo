@@ -181,7 +181,7 @@ run_task() {
   name="$(basename "$task" .md)"
   RUN_LOG="$LOGDIR/$(date +%Y%m%d-%H%M)-$name.log"
   prompt="这是无人值守的自动运行，没有人会回答你的问题，不要停下来等人确认。
-1. 先读仓库根目录的 AGENTS.md 和 指挥/README.md，再读任务单 $task，严格按任务单执行。
+1. 先读仓库根目录的 AGENTS.md 和 指挥/README.md，再读任务单 ${task}，严格按任务单执行。
 2. 如果这张任务单之前做过一半（例如上次因为额度限制半途中断，留下了半成品、写了一半的报告，或 git log 里有「已做部分」的提交），先检查已有成果，从断点接着做，不要从头重来，已经做完的步骤和已经花钱跑过的题不要重做。
 3. 遇到不清楚的地方：按任务单写明的默认做法处理，并在报告里注明「我是这样理解的」；实在没法做的那一项跳过，写进报告的「待回答问题」一节，其余照常做完。
 4. 不要运行任何 git 命令去修改仓库（git add / commit / mv / push / pull / checkout / reset / stash 都不要用；.git 在你的环境里是只读的）。保存和推送由值班脚本负责。查看用的 git log / git diff / git status 可以用。
@@ -190,7 +190,7 @@ run_task() {
 
   if [ "$task" = "$RESUME_TASK" ] && [ -n "$RESUME_ID" ]; then
     # 额度恢复后接回同一个 Codex 对话，它记得做到哪了
-    local rprompt="额度已经恢复。请从中断的地方继续完成任务单 $task，已经做完的不要重做。规则和之前一样：不要用 git 修改仓库；全部完成后用 mv 把任务单移到 指挥/历史任务/；做不完就把进度写进报告。"
+    local rprompt="额度已经恢复。请从中断的地方继续完成任务单 ${task}，已经做完的不要重做。规则和之前一样：不要用 git 修改仓库；全部完成后用 mv 把任务单移到 指挥/历史任务/；做不完就把进度写进报告。"
     echo "[值班脚本] 接回上次的 Codex 对话：$RESUME_ID" > "$RUN_LOG"
     ( cd "$REPO" && exec codex exec "${CODEX_ARGS[@]}" resume "$RESUME_ID" "$rprompt" </dev/null >>"$RUN_LOG" 2>&1 ) &
   else
@@ -319,7 +319,7 @@ while :; do
   if [ ! -e "$REPO/$task" ]; then
     # 任务单被移走 = 做完了
     RESUME_TASK=""; RESUME_ID=""; fails_limit_logged=""
-    save_work "任务 $name：自动值班完成"
+    save_work "任务 ${name}：自动值班完成"
     push_now
     CUR_TASK=""
     fails=0
@@ -327,7 +327,7 @@ while :; do
     [ "$ONCE" -eq 1 ] && break
   else
     # 没做完：已做的部分先保存推送（下次从断点接着做）
-    save_work "任务 $name：自动值班进行中（未完成，已做部分）" && push_now
+    save_work "任务 ${name}：自动值班进行中（未完成，已做部分）" && push_now
     CUR_TASK=""
     if hit_limit; then
       sid="$(grep -Eo "session id: [0-9a-fA-F-]{20,}" "$RUN_LOG" | tail -1 | awk '{print $3}')"
@@ -356,10 +356,10 @@ while :; do
     fails_limit_logged=""
     fails=$((fails + 1))
     if [ "$fails" -ge 2 ]; then
-      record "连续两次没做完，值班停止：$task（本机日志：$RUN_LOG）"
+      record "连续两次没做完，值班停止：${task}（本机日志：${RUN_LOG}）"
       break
     fi
-    [ "$ONCE" -eq 1 ] && { record "试跑没做完：$task（本机日志：$RUN_LOG）"; break; }
+    [ "$ONCE" -eq 1 ] && { record "试跑没做完：${task}（本机日志：${RUN_LOG}）"; break; }
     record "没做完，5 分钟后重试一次：$task"
     sleep "$CHECK_EVERY"
   fi
