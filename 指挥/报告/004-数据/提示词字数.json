@@ -1,0 +1,12 @@
+{
+  "source_revision": "c8d3e13",
+  "baseline": "EVAL-20261027122116244939",
+  "case_count": 12,
+  "counting": "Python len，包含空白/标点；API实际发送的system+json.dumps(user,ensure_ascii=False)，不是token数",
+  "old_fixed_instructions": 2715,
+  "new_fixed_instructions": 326,
+  "old_full_same_cases": 425999,
+  "new_full": 5453,
+  "comparison_scope": "旧版模板以同一12题和新归因重建；上一轮为空，无Monitoring事件。不是历史实际请求重放。",
+  "provider_calls": 0
+}

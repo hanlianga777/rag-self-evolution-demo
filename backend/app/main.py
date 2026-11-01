@@ -84,7 +84,7 @@ def recover_authorized_evaluations():
         auto=run['result'].get('auto_recovery',{})
         if run['result'].get('stop_request'):
             store.request_evaluation_stop(run['id']);continue
-        if not auto.get('authorized') or auto.get('state')=='stopped':continue
+        if not auto.get('enabled',auto.get('authorized')) or auto.get('state')=='stopped':continue
         if run['status']=='running' and auto.get('worker_token'):
             owner=run['result'].get('execution_owner_pid')
             if owner==os.getpid() and any(t.ident==auto.get('worker_thread') and t.is_alive() for t in threading.enumerate()):continue
@@ -206,7 +206,7 @@ class BatchReviewRequest(BaseModel):
 
 class OwnerDelegatedReviewRequest(BaseModel):
     generation_run_id: str
-    authorization_id: str
+    authorization_id: str | None = None
     reviews: list[dict] = Field(min_length=50,max_length=50)
 
 
@@ -1340,7 +1340,10 @@ def evaluation(active_task: bool = False, light: bool = False):
 
 
 def case_list_row(row, *, light=False):
-    result = {**row['result'],'diagnostic_view':row.get('diagnostic_view') or diagnostic_view(row['result'])}
+    run = store.evaluation_run(row['run_id']) if row.get('run_id') else None
+    questions = json.loads(run['dataset_snapshot_json']).get('questions', []) if run else []
+    item = next((q for q in questions if q.get('id') == row.get('question_id')), None)
+    result = {**row['result'],'diagnostic_view':diagnostic_view(row['result'], golden_item=item)}
     if light:
         result = {key:value for key,value in result.items() if key!='retrieved_chunks'}
         result['programmatic_metrics'] = {key:value for key,value in result.get('programmatic_metrics',{}).items() if not isinstance(value,(dict,list)) or key=='evidence_coverage'}
@@ -1571,7 +1574,7 @@ def select_recommendation(run_id: str, payload: RecommendationRequest):
 
 
 class PaidActionRequest(BaseModel):
-    authorize_provider: bool = False
+    pass
 
 
 @app.post('/api/experiments/{run_id}/composite', dependencies=[Depends(require_trusted_origin)])
@@ -1580,7 +1583,7 @@ def create_composite(run_id: str, payload: PaidActionRequest | None = None):
     if experiment is not None:
         require_current_baseline(experiment["baseline_run_id"])
     try:
-        return store.create_composite(run_id, ai_service.provider, bool(payload and payload.authorize_provider))
+        return store.create_composite(run_id, ai_service.provider)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -1663,7 +1666,8 @@ def evaluation_run(run_id: str):
     if run is None:
         raise HTTPException(status_code=404, detail="Evaluation run not found")
     run=persisted_evaluation_progress(run)
-    cases = [{**case,"diagnostic_view":diagnostic_view(case)} for case in store.evaluation_case_results(run_id)]
+    questions = {q['id']:q for q in json.loads(run['dataset_snapshot_json']).get('questions', [])}
+    cases = [{**case,"diagnostic_view":diagnostic_view(case, golden_item=questions.get(case.get('question_id')))} for case in store.evaluation_case_results(run_id)]
     return {**run, "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":requires_foundation_upgrade(run.get("judge",{})), "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []), statistics_version=run.get("judge", {}).get("gate_statistics_version"))}
 
 
@@ -1692,7 +1696,6 @@ def judge_replay(source_id: str,payload: PaidActionRequest | None = None):
 
 
 class DiagnosticBatchRequest(BaseModel):
-    authorize_provider: bool = False
     question_ids: list[str] | None = None
     expected_binding: str
     authorization_id: str | None = None
@@ -1729,10 +1732,7 @@ def diagnostic_evidence_preflight(run_id: str,question_id: str):
 
 
 @app.post('/api/evaluations/{run_id}/cases/{question_id}/resolve-diagnostics',dependencies=[Depends(require_trusted_origin)])
-def resolve_diagnostics(run_id: str,question_id: str,payload: PaidActionRequest):
-    if not payload.authorize_provider:raise HTTPException(409,'语义补证必须明确授权；不会修改历史成绩')
-    from .paid_run import current_paid_run
-    if current_paid_run() is None:raise HTTPException(409,'请使用批量补证入口冻结题目及调用上限')
+def resolve_diagnostics(run_id: str,question_id: str,payload: PaidActionRequest | None = None):
     from .evidence_resolver import resolve_persisted
     from .diagnostics import _current_corpus
     run=store.evaluation_run(run_id)

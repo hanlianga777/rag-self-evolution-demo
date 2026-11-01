@@ -104,7 +104,7 @@ def prepare(source,question_id,output,snapshot_path,canonical_path):
         (output/'original_real_response.json').write_text(row['error']['raw_response']+'\n')
         stable_sources=[source/'audit.json',source/'saved_execution_bundle.json',raw_path,snapshot_path,canonical_path,Path(__file__).resolve(),CORE,
             ROOT/'scripts/execute_saved_judge_correction_20261031.py']+[ROOT/p for p in ('backend/app/evaluation_contract.py','backend/app/providers.py','backend/app/scoring_contract.py','backend/app/paid_run.py')]
-        plan={'scope':'REVIEW_PLAN_ONLY_NOT_EXECUTED; requires explicit named additional one-call user authorization',
+        plan={'scope':'REVIEW_PLAN_ONLY_NOT_EXECUTED',
             'question_id':question_id,'coverage_slot':questions[0].get('coverage_slot'),'source_run_id':audit['source_run_id'],
             'target_snapshot_id':snapshot['id'],'common50_binding':audit['binding'],'original_status':'NOT_EVALUABLE',
             'original_response_error':row['error']['detail'],'original_response_sha256':core.text_sha(row['error']['raw_response']),
@@ -123,7 +123,7 @@ def prepare(source,question_id,output,snapshot_path,canonical_path):
             +f"题号：{plan['coverage_slot']} / {question_id}。原结果仍为NOT_EVALUABLE；本包不提供预期裁决。\n\n"
             +'仅新增judge_correction，携带实际原响应/错误及通用引用边界；前次verdict、原子状态、质量值均不作为真值。原Answer/Final/冻结合同/共同6.3Prompt保持不变。\n\n'
             +'单题call与row已复制为不可变审阅材料，不绑定仍在运行的整个ledger/replay。原raw、audit、bundle及正式代码/本地Canonical来源按SHA绑定。\n\n'
-            +f"请求SHA：`{summary['request_sha256']}`；审阅绑定：`{plan['review_binding']}`。最多额外1次、无重试，必须另行按题号明确授权；当前网络调用0、数据库写入0。\n")
+            +f"请求SHA：`{summary['request_sha256']}`；审阅绑定：`{plan['review_binding']}`。最多额外1次、无重试，执行时保留题号及输入绑定；当前网络调用0、数据库写入0。\n")
         return plan
 
 

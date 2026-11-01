@@ -122,25 +122,24 @@ class CompositeTests(unittest.TestCase):
         self.store.confirm_experiment_report(self.experiment,self.winner['id'],'fixture human')
 
     def result(self):
-        return {'qualification':{'qualified':True},'regression':{'passed':True,'new_critical_failures':0,'new_ordinary_failures':0},'all_fixed_question_ids':['q'],'target_bad_cases_fixed':1,'net_improvement':1,'evaluation_identity':self.meta['evaluation_identity']}
+        return {'bad_case_count':0,'qualification':{'qualified':True},'regression':{'passed':True,'new_critical_failures':0,'new_ordinary_failures':0},'all_fixed_question_ids':['q'],'target_bad_cases_fixed':1,'net_improvement':1,'evaluation_identity':self.meta['evaluation_identity']}
 
     def provider(self,generate=True,diff=None):
         from unittest.mock import Mock
         value={'should_generate_d':generate,'source_candidates':[self.winner['id'],self.other['id']], 'root_cause_alignment':'fixture根因','complementary_capabilities':'fixture互补','proposed_config_diff':diff if diff is not None else {'query_rewrite':True},'expected_improvement':'fixture覆盖','risks':'fixture延迟','explanation':'fixture建议','hypothesis':'fixture查询表达','root_cause':'Retrieval','intervention_direction':'query_expansion','evidence_assertions':[{'target_id':'q','observation':'recall_missing'}],'parameter_dependencies':[]}
         return Mock(complete=Mock(return_value=json.dumps(value)),settings=Settings('fixture','https://example.invalid','fixture'))
 
-    def test_d_requires_separate_paid_authorization(self):
+    def test_d_runs_without_separate_paid_authorization(self):
         provider=self.provider()
-        with self.assertRaisesRegex(ValueError,'授权'):self.store.create_composite(self.experiment,provider,False)
-        provider.complete.assert_not_called()
+        self.store.create_composite(self.experiment,provider,False)
+        provider.complete.assert_called_once()
 
-    def test_cross_stage_source_union_still_requires_provider_authorization(self):
+    def test_cross_stage_source_union_does_not_require_provider_authorization(self):
         with self.store.connection() as connection:
             connection.execute('UPDATE candidate_configs SET config_json=? WHERE id=?',(json.dumps({**self.winner['config'],'prompt_strategy':'Abstention'}),self.winner['id']))
         provider=self.provider()
-        with self.assertRaisesRegex(ValueError,'授权'):
-            self.store.create_composite(self.experiment,provider,False)
-        provider.complete.assert_not_called()
+        self.store.create_composite(self.experiment,provider,False)
+        provider.complete.assert_called_once()
         self.assertEqual(self.store.experiment(self.experiment)['result']['report_confirmation']['winner_id'],self.winner['id'])
 
     def test_coherent_multi_parameter_d_needs_saved_evidence_and_dependencies(self):
@@ -155,6 +154,27 @@ class CompositeTests(unittest.TestCase):
         self.assertEqual(result['reasoning']['changed_parameters'],{'query_rewrite':True,'multi_query':2})
         self.assertEqual(result['reasoning']['intervention_direction'],'query_expansion')
         self.assertEqual(result['reasoning']['root_cause_evidence'],['q'])
+
+    def test_historical_d_uses_frozen_evidence_and_saves_action_name(self):
+        from diagnostic_fixture import retrieval_case
+        case,_=retrieval_case()
+        quotes=case.pop('standard_evidence')
+        self.snapshot['questions'][0]['standard_evidence']=quotes
+        with self.store.connection() as connection:
+            connection.execute('UPDATE evaluation_runs SET dataset_snapshot_json=? WHERE id=?',(json.dumps(self.snapshot),self.baseline))
+            connection.execute('UPDATE dataset_versions SET snapshot_json=? WHERE id=?',(json.dumps(self.snapshot),self.snapshot['id']))
+            connection.execute('UPDATE bad_cases SET result_json=? WHERE run_id=?',(json.dumps(case),self.baseline))
+        provider=self.provider()
+        value=json.loads(provider.complete.return_value);value['action_name']='保留赢家 + 查询改写'
+        provider.complete.return_value=json.dumps(value)
+        result=self.store.create_composite(self.experiment,provider)
+        self.assertEqual(result['status'],'generated')
+        self.assertEqual(result['reasoning']['action_name'],'保留赢家 + 查询改写')
+        prompt=json.loads(provider.complete.call_args.args[1])
+        self.assertEqual(prompt['bad_cases'][0]['diagnostic_view']['analysis_category'],'rag_failure')
+        with self.store.connection() as connection:
+            original=json.loads(connection.execute('SELECT result_json FROM bad_cases WHERE run_id=?',(self.baseline,)).fetchone()[0])
+        self.assertNotIn('standard_evidence',original)
 
     def test_d_saved_decision_is_reused_without_call(self):
         provider=self.provider();first=self.store.create_composite(self.experiment,provider,True)

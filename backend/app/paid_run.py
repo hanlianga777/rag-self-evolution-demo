@@ -1,4 +1,4 @@
-"""Opt-in, single serial paid run. No implicit retry or continuation."""
+"""Serial request accounting and duplicate unknown-request protection."""
 import hashlib
 import json
 import math
@@ -38,9 +38,7 @@ class PaidRun:
         data = {'identity':self.identity, 'budget_yuan':self.budget, 'price_snapshot':self.prices,
                 'spent_yuan':self.spent, 'budget_enforcement':False, 'available_yuan':None,
                 'cost_unknown':any(c['status'] not in {'ok','rejected'} or c['status']=='ok' and c.get('upper_estimate_yuan') is None for c in self.calls),
-                'resume_authorization':getattr(self,'resume_authorization',None), 'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
-        data['continuation_authorizations']=getattr(self,'continuation_authorizations',[])
-        data['accounting_retry_authorization']=getattr(self,'accounting_retry_authorization',None)
+                'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
         with temporary.open('w') as stream:
             json.dump(data,stream,ensure_ascii=False,indent=2); stream.flush(); os.fsync(stream.fileno())
         os.replace(temporary,self.path)
@@ -54,32 +52,10 @@ class PaidRun:
 
     @classmethod
     def next_stage(cls,path,stage,identity_check,*,authorization=None,budget_yuan=None):
-        """Explicit authorized continuation; unknown charges remain reserved."""
+        """Continue settled requests; unknown execution is a terminal error."""
         path=Path(path);data=json.loads(path.read_text())
         if any(call.get('status') not in {'ok','rejected'} for call in data['calls']):
-            raise RuntimeError('Paid stage has uncertain Usage; reconcile before continuation')
-        prior=data.get('resume_authorization')
-        continuations=data.get('continuation_authorizations',[])
-        held=set(continuations[-1]['held_call_indices']) if continuations else set()
-        if prior:held.add(prior['unknown_call_index'])
-        unresolved=[i for i,c in enumerate(data['calls']) if c['status'] not in {'ok','rejected'} and i not in held]
-        if authorization and authorization.get('scope')=='finite_checkpoint_resume':
-            reserved=[i for i,c in enumerate(data['calls']) if c['status']=='reserved']
-            if (authorization.get('source')!='direct_user_instruction' or authorization.get('max_missing_request_retries')!=1
-                or not authorization.get('source_evaluation_id') or not authorization.get('evaluation_identity')
-                or authorization.get('held_request_sha256')!=[data['calls'][i]['request_sha256'] for i in reserved]
-                or any(c['status'] not in {'ok','reserved'} for c in data['calls'])):
-                raise RuntimeError('Exact checkpoint continuation authorization required')
-            continuations=[*continuations,{**authorization,'held_call_indices':reserved,'authorized_at':datetime.now(timezone.utc).isoformat()}]
-        elif authorization is not None:
-            if prior or len(unresolved)!=1 or authorization.get('source')!='direct_user_instruction' or authorization.get('max_judge_retries')!=1:
-                raise RuntimeError('One explicit unknown Judge retry authorization required')
-            index=unresolved[0];call=data['calls'][index]
-            if call['status']!='reserved' or call.get('task')!='judge' or call['request_sha256']!=authorization.get('request_sha256'):
-                raise RuntimeError('Unknown request does not match authorized Judge')
-            prior={**authorization,'unknown_call_index':index,'authorized_at':datetime.now(timezone.utc).isoformat()}
-        elif data['stopped'] or unresolved:
-            raise RuntimeError('Paid stage has stopped or uncertain Usage; cannot continue')
+            raise RuntimeError('Prior request result or Usage unknown; duplicate execution refused')
         if identity_check()!=data['identity']: raise RuntimeError('Paid continuation identity changed')
         stages=data.get('stages',[])
         if stage in [s['stage'] for s in stages]: raise RuntimeError('Paid stage already claimed; no duplicate execution')
@@ -87,8 +63,6 @@ class PaidRun:
         run.path,run.budget,run.prices=path,data['budget_yuan'],data['price_snapshot']
         run.identity,run.identity_check=data['identity'],identity_check
         run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],None
-        run.resume_authorization=prior
-        run.continuation_authorizations=continuations
         run.output_limits=data['output_limits'];run.stages=[*stages,{'stage':stage,'claimed_at':datetime.now(timezone.utc).isoformat()}]
         run.save();return run
 
@@ -99,7 +73,6 @@ class PaidRun:
         run.identity,run.identity_check=data['identity'],identity_check
         run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],data.get('stopped')
         run.stages=data.get('stages',[]);run.output_limits=data.get('output_limits')
-        run.accounting_retry_authorization=data.get('accounting_retry_authorization')
         return run
 
     def begin(self, provider, model, payload):
@@ -110,7 +83,7 @@ class PaidRun:
                 raise RuntimeError('Serial paid run already has an in-flight request')
             unknown = [i for i, call in enumerate(self.calls) if call['status']=='unknown' and call['provider']==provider and call['model']==model and call['request_sha256']==request_hash]
             if unknown:
-                raise RuntimeError('Cannot repeat an unknown request before reconciliation')
+                raise RuntimeError('Unknown request result; duplicate execution refused')
             if self.identity_check is None or self.identity_check()!=self.identity:raise RuntimeError('Paid run identity unavailable or changed')
             call={'provider':provider,'model':model,'status':'reserved','reserved_yuan':0.,'upper_estimate_yuan':None,
                   'request_sha256':request_hash,'request_payload':payload,
@@ -118,12 +91,11 @@ class PaidRun:
                   'accounting_only':True}
             self.calls.append(call);self.save();return call
         if self.stopped: raise RuntimeError('Paid run stopped: '+self.stopped)
-        auth=getattr(self,'resume_authorization',None)
-        continuations=getattr(self,'continuation_authorizations',[])
-        held=set(continuations[-1]['held_call_indices']) if continuations else set()
-        if auth:held.add(auth['unknown_call_index'])
-        if any(call['status']=='reserved' and i not in held for i,call in enumerate(self.calls)):
+        if any(call['status']=='reserved' for call in self.calls):
             raise RuntimeError('Serial paid run already has an in-flight request')
+        request_hash = hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest()
+        if any(call['status']=='unknown' and call['provider']==provider and call['model']==model and call['request_sha256']==request_hash for call in self.calls):
+            raise RuntimeError('Unknown request result; duplicate execution refused')
         if self.identity_check is None or self.identity_check() != self.identity:
             raise RuntimeError('Paid run identity unavailable or changed')
         rate = self.prices.get(model)
@@ -137,19 +109,11 @@ class PaidRun:
         if bound is not None and self.output_limits and _task.get() in self.output_limits and bound>self.output_limits[_task.get()]:
             raise RuntimeError('Frozen task output limit exceeded')
         reserved = ((len(encoded)+repeated_query+1024)*rate['input'] + bound*rate['output'])/1_000_000 if rate else None
-        request_sha=hashlib.sha256(encoded).hexdigest()
-        if auth:
-            index=auth['unknown_call_index']
-            if len(self.calls)==index+1 and (request_sha!=auth.get('retry_request_sha256',auth['request_sha256']) or _task.get()!='judge'):
-                raise RuntimeError('Resume must first reuse saved answer and retry only missing Judge')
-            if not self.stages[-1]['stage'].startswith(('agent-','candidate-')) and request_sha==auth.get('retry_request_sha256',auth['request_sha256']) and any(c['request_sha256']==request_sha for c in self.calls[index+1:]):
-                raise RuntimeError('Authorized Judge retry already consumed')
         currency=rate.get('currency','CNY') if rate else None
         call = {'provider':provider,'model':model,'status':'reserved','reserved_yuan':reserved if currency=='CNY' else None,
                 'reservation_estimate':{'amount':reserved,'currency':currency} if reserved is not None else None,
                 'request_sha256':hashlib.sha256(encoded).hexdigest(),'started_at':datetime.now(timezone.utc).isoformat(),
                 'task':_task.get(),'max_tokens':payload.get('max_tokens')}
-        if auth and not self.stages[-1]['stage'].startswith(('agent-','candidate-')) and request_sha==auth.get('retry_request_sha256',auth['request_sha256']):call['retry_of_request_sha256']=auth['request_sha256']
         self.calls.append(call); self.save()
         return call
 
@@ -283,14 +247,14 @@ def unsettled_usage(usage):
 
 
 def require_reconciled_execution(result):
-    """Read-only: an approval to continue does not settle an unknown earlier charge."""
+    """Read-only: reject duplicate requests with unknown execution or Usage."""
     for question,checkpoint in result.get('checkpoints',{}).items():
         if any(r.get('status') in {'inflight','unknown'} or any(unsettled_usage(u) for a in r.get('attempts',[]) for u in a.get('usage',[])) for r in checkpoint.get('provider_requests',{}).values()):
-            raise ValueError('需先对账：'+question+' RPC执行或Usage未知，禁止重复发送')
+            raise ValueError('执行失败：'+question+' RPC执行或Usage未知，禁止重复发送')
         if checkpoint.get('inflight') or any(checkpoint.get('unknown_execution',{}).values()) or any(checkpoint.get('unsettled_usage',{}).values()):
-            raise ValueError('需先对账：'+question+' 存在Unknown request execution；禁止重复调用或预约续跑')
+            raise ValueError('执行失败：'+question+' 存在Unknown request execution；禁止重复调用')
         if any(a.get('request_execution_unknown') is True or a.get('billing_unknown') is True or any(unsettled_usage(u) for u in a.get('usage',[])) for a in checkpoint.get('attempts',[])):
-            raise ValueError('需先对账：'+question+' 请求结果或Usage未知')
+            raise ValueError('执行失败：'+question+' 请求结果或Usage未知')
     path=result.get('auto_recovery',{}).get('ledger_path')
     if path:
         try:data=json.loads(Path(path).read_text())
@@ -299,4 +263,4 @@ def require_reconciled_execution(result):
         if data.get('identity')!=result.get('auto_recovery',{}).get('ledger_identity'):
             raise ValueError('费用账本身份不匹配')
         if any(c.get('status') not in {'ok','rejected'} for c in data.get('calls',[])):
-            raise ValueError('费用账本存在unknown/reserved/未结算请求，须先对账')
+            raise ValueError('费用账本存在unknown/reserved/未结算请求，禁止重复发送')

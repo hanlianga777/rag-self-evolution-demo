@@ -1,0 +1,91 @@
+{
+  "database": "新建临时测试库；未复制正式数据库",
+  "provider_calls": 0,
+  "api": {
+    "/api/workspace": 200,
+    "/api/overview?light=true": 200,
+    "/api/documents": 200,
+    "/api/dataset?light=true": 200,
+    "/api/evaluation?light=true": 200,
+    "/api/bad-cases?light=true": 200,
+    "/api/optimization?light=true&planning=true": 200,
+    "/api/pipeline": 200,
+    "/api/versions": 200,
+    "/api/readiness": 200,
+    "/api/monitoring": 200,
+    "/api/evaluations/EVAL-task004-smoke": 200
+  },
+  "pages": [
+    {
+      "page": "RAG 自进化项目概览",
+      "hash": "overview",
+      "heading": [
+        "RAG 自进化项目概览"
+      ]
+    },
+    {
+      "page": "知识库",
+      "hash": "knowledge",
+      "heading": [
+        "知识库"
+      ]
+    },
+    {
+      "page": "Pipeline 配置",
+      "hash": "settings",
+      "heading": [
+        "Pipeline 配置"
+      ]
+    },
+    {
+      "page": "Golden Dataset",
+      "hash": "governance",
+      "heading": [
+        "Golden Dataset"
+      ]
+    },
+    {
+      "page": "Baseline",
+      "hash": "evaluation",
+      "heading": [
+        "Baseline"
+      ]
+    },
+    {
+      "page": "Agent 工作台",
+      "hash": "evolution",
+      "heading": [
+        "Agent 工作台"
+      ]
+    },
+    {
+      "page": "发布",
+      "hash": "versions",
+      "heading": [
+        "发布"
+      ]
+    },
+    {
+      "page": "问答验证",
+      "hash": "verification",
+      "heading": [
+        "问答验证"
+      ]
+    }
+  ],
+  "expected_preflight_rejections": [
+    {
+      "url": "http://localhost:8010/api/evaluations/EVAL-task004-smoke/judge-replay/preflight",
+      "status": 409
+    },
+    {
+      "url": "http://localhost:8010/api/evaluations/EVAL-task004-smoke/judge-replay/preflight",
+      "status": 409
+    }
+  ],
+  "preflight_note": "临时旧合同fixture不具备Judge回放条件；预检409为页面正常禁用回放按钮，未发起模型请求",
+  "page_errors": [],
+  "http_errors": [],
+  "services_closed": true,
+  "temporary_directory_deleted": true
+}

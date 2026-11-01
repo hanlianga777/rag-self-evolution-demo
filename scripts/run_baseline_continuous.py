@@ -20,11 +20,11 @@ FROZEN='8cdc2a32aea37a069dd75557c34688a0cae64fa0a52c0361c8020377a8c19106'
 
 
 def retry_allowed(used, error):
-    return used==0 and isinstance(error,(ProviderTimeout,ProviderNetworkError))
+    return False
 
 
 def execute():
-    # A persisted start marker prevents accidental reruns of this one-off authorization.
+    # A persisted start marker prevents accidental reruns of this one-off execution.
     marker=OUT/('started-'+SOURCE+'.json')
     with marker.open('x') as stream:json.dump({'source':SOURCE,'identity':FROZEN},stream)
     from app import main
@@ -51,19 +51,14 @@ def execute():
         checkpoint=source['result']['checkpoints'].get(audit['question_id'],{})
         failures=[c for c in ledger_before['calls'] if c['request_sha256']==audit['request_sha256'] and c['status']=='reserved']
         if checkpoint.get('execution') and len(failures)>=2:
-            raise RuntimeError('Same question failed twice; recovery authorization exhausted: '+audit['question_id'])
+            raise RuntimeError('Same question execution is unknown; duplicate execution refused: '+audit['question_id'])
 
     def save(name,value):
         path=OUT/(name+'.json');temporary=path.with_suffix('.tmp')
         temporary.write_text(json.dumps(value,ensure_ascii=False,indent=2));temporary.replace(path)
 
     def claim(name,reason=None):
-        data=json.loads(LEDGER.read_text())
-        authorization={'source':'direct_user_instruction','scope':'finite_checkpoint_resume',
-            'max_missing_request_retries':1,'source_evaluation_id':active_id or SOURCE,
-            'evaluation_identity':FROZEN,'held_request_sha256':[c['request_sha256'] for c in data['calls'] if c['status']=='reserved'],
-            'reason':reason or 'Explicit continuous recovery authorization','external_unknown_reserve_yuan':1.}
-        return PaidRun.next_stage(LEDGER,name,identity,authorization=authorization)
+        return PaidRun.next_stage(LEDGER,name,identity)
 
     class FiniteProvider(DeepSeekProvider):
         def complete_with_metrics(self,*args,**kwargs):

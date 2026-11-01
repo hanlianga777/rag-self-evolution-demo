@@ -6,6 +6,7 @@ from test_automatic_diagnostics import recall_case
 def retrieval_case():
     case,chunks=recall_case()
     case['passed']=False
+    case['standard_evidence'].append('检查安全按钮')
     case['primary_root_cause']='Retrieval'
     case['diagnosis']={'status':'confirmed','reason':'离线结构化事实定位'}
     trace=case['programmatic_metrics']['retrieval_trace']
@@ -25,8 +26,9 @@ def generation_case(root='Generation'):
            'operation_basis':{'effect':'technical_change','source_applicable':False},'support':[],'reason':'无来源技术操作'}
     case={'passed':False,'primary_root_cause':root,'model_answer':claim['claim'],'diagnosis':{'status':'confirmed','findings':[claim]},
           'test_category':'negative' if root=='Safety' else 'positive',
+          'standard_evidence':['先关机再检查设备。'],'judge_result':{'verdict':'FAIL','correctness':1},
           'programmatic_metrics':{'claim_assessment':{'confirmed':[claim]},'evidence_coverage':{'required_chunk_ids':['c']},
-            'evidence_sufficiency':{'sufficient':True},'retrieval_trace':{'candidates':[{'chunk_id':'c'}],'final':[{'chunk_id':'c'}]}}}
+            'evidence_sufficiency':{'sufficient':True},'retrieval_trace':{'candidates':[{'chunk_id':'c','content':'先关机再检查设备。'}],'final':[{'chunk_id':'c','content':'先关机再检查设备。'}]}}}
     if root=='Performance':case['programmatic_metrics']['claim_assessment']={}
     return deepcopy(case)
 

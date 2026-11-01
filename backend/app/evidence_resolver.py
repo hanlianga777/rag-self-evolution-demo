@@ -77,7 +77,7 @@ def resolve_case(case,question,chunks,identity,*,semantic=None):
     payload={'question':question,'golden_norms':norms,'answer':case['model_answer'],'checks':case['judge_result']['checks'],'canonical_norms':[{**{k:c.get(k) for k in ('chunk_id','document_id','product','version','page_start','page_end')},'content':c.get('chunk_text') or c.get('text') or c.get('content',''),'role':'normative_requirement_only'} for c in chunks],
         'stages':{s:trace[s] for s in ('candidates','reranked','final')},'identity':identity,'request_sha256':result['request_sha256']}
     if semantic is None:
-        result['status']='needs_semantic';return block('whole_stage_equivalence_and_composite_fact_review_not_authorized_or_saved')
+        result['status']='needs_semantic';return block('whole_stage_equivalence_and_composite_fact_review_not_saved')
     response=semantic(payload);result['semantic_response']=response
     if result['request_sha256']!=request_identity(case,question,chunks,identity):return block('semantic_request_identity_changed')
     if not isinstance(response,dict) or response.get('requirements_complete') is not True or not isinstance(response.get('facts'),list) or not response['facts']:return block('semantic_requirements_not_complete')
@@ -197,11 +197,11 @@ def resolve_persisted(store,run_id,question_id,chunks,fingerprint,*,semantic=Non
     claim=None
     if persist and semantic is not None and reused is None:
         path.parent.mkdir(parents=True,exist_ok=True)
-        claim=path.parent/(digest([request_identity(case,question,chunks,identity),authorization_id])+'.claim')
+        claim=path.parent/(digest(request_identity(case,question,chunks,identity))+'.claim')
         try:
             with claim.open('x') as stream:stream.write(json.dumps({'identity':identity,'status':'claimed'}))
         except FileExistsError:
-            return {'status':'blocked','findings':[],'blockers':['diagnostic_request_already_claimed; inspect saved result/Usage before explicit new authorization']}
+            return {'status':'blocked','findings':[],'blockers':['diagnostic_request_already_claimed; duplicate execution refused']}
     try:result=resolve_case(case,question,chunks,identity,semantic=semantic)
     except Exception as error:
         if not persist:raise
@@ -289,7 +289,7 @@ def diagnostic_plan(store,run_id,question_ids=None):
 
 
 def execute_diagnostic_batch(store,run_id,runtime,*,question_ids=None,expected_binding,authorization_id=None,max_calls,price_snapshot=None,budget_yuan=None):
-    """One explicit authorization; no generation, scoring, approval or DB writes."""
+    """One bounded diagnostic batch; no generation, scoring, approval or DB writes."""
     from datetime import datetime,timezone
     from .paid_run import PaidRun,controlled_run,REQUEST_LIMITS
     selected,chunks,fingerprint,binding=batch_inputs(store,run_id,question_ids)
@@ -297,7 +297,7 @@ def execute_diagnostic_batch(store,run_id,runtime,*,question_ids=None,expected_b
     if authorization_id is None:
         from uuid import uuid4
         authorization_id=uuid4().hex
-    if not authorization_id or not authorization_id.replace('-','').replace('_','').isalnum():raise ValueError('无效授权编号')
+    if not authorization_id or not authorization_id.replace('-','').replace('_','').isalnum():raise ValueError('无效诊断记录编号')
     if type(max_calls) is not int or not 0<max_calls<=len(selected):raise ValueError('必须冻结本次调用上限')
     if price_snapshot:
         try:
@@ -311,7 +311,7 @@ def execute_diagnostic_batch(store,run_id,runtime,*,question_ids=None,expected_b
     for previous in directory.glob('*.json'):
         record=json.loads(previous.read_text())
         if set(record.get('identity',{}).get('requests',[])) & set(binding['requests']) and any(c['status']!='ok' for c in record.get('calls',[])):
-            raise ValueError('同一诊断输入存在未结算请求；先核查原账本，不自动重发')
+            raise ValueError('同一诊断输入存在结果未知的请求；执行失败，不自动重发')
     authorization={'authorization_id':authorization_id,'max_calls':max_calls,'price_snapshot_sha256':digest(price_snapshot)}
     ledger=PaidRun(directory/(authorization_id+'.json'),budget_yuan,(price_snapshot or {}).get('models',{}),{**binding,**authorization},
         identity_check=lambda:{**batch_inputs(store,run_id,selected)[3],**authorization},output_limits=REQUEST_LIMITS)

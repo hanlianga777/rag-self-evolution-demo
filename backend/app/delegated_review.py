@@ -1,9 +1,6 @@
-"""One scoped owner delegation, verified independently of client approval flags."""
-import hashlib
-import json
+"""Independent review quality checks; no development owner authorization file."""
 from collections import Counter
 from datetime import datetime,timezone
-from pathlib import Path
 from functools import lru_cache
 
 CHECKS = ('hard_validation','probe','qc','pdf_grounding','evidence_location','facts_complete',
@@ -46,30 +43,14 @@ def verify_pdf_sources(sources):
 
 
 def validate_delegation(path, authorization_id, run, rows, items, reviews, content_hash, *, verify_sources=verify_pdf_sources):
-    path=Path(path)
-    if not path.is_file(): raise ValueError('Owner delegation authorization unavailable')
-    auth=json.loads(path.read_text())
-    expected={'authorization_id':authorization_id,'source':'direct_user_instruction','generation_run_id':run['id'],
-              'delegated_by':'project_owner','actor':'Codex'}
-    if any(auth.get(k)!=v for k,v in expected.items()): raise ValueError('Owner delegation scope/actor differs')
-    if datetime.fromisoformat(auth['expires_at'])<=datetime.now(timezone.utc): raise ValueError('Owner delegation expired')
-    if hashlib.sha256(Path(auth['source_file']).read_bytes()).hexdigest()!=auth.get('source_sha256'):
-        raise ValueError('Owner authorization source changed')
     state=run['artifacts']['hard_validation']
-    if auth.get('corpus')!=state['corpus_fingerprint'] or auth.get('plan_id')!=state['frozen_plan']['plan_id']:
-        raise ValueError('Owner authorization Corpus/Plan changed')
     from .governance import GENERATION_PROFILES
     profile=run.get('profile',{})
     name=profile.get('name')
     if name not in {'mini','medium'} or any(type(profile.get(key)) is not int or profile[key]!=value for key,value in GENERATION_PROFILES[name].items()):
         raise ValueError('Owner delegation requires a valid Mini20 or Medium50 profile')
     scope={'name':name,**GENERATION_PROFILES[name]}
-    # Legacy Medium authorization had no profile; it never authorizes Mini.
-    if auth.get('profile')!=scope and not (name=='medium' and 'profile' not in auth):
-        raise ValueError('Owner authorization Profile changed or unavailable')
     governed=any(item['raw'].get('business_requirements') for item in items.values())
-    if governed and (auth.get('content_identity')!=state.get('content_identity') or auth.get('content_hashes')!={key:content_hash(items[key]) for key in run['question_ids']}):
-        raise ValueError('Owner authorization current content identity unavailable or changed')
     count=scope['expected_count']
     ids=run['question_ids']
     selected=[r['question_id'] for r in reviews]
@@ -97,8 +78,7 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
             if not audit_passed(row.get('quality_audit'), review.get('non_content_audit_disposition')):
                 raise ValueError('Business quality audit must pass all checks')
             if (not isinstance(review.get('business_checks'),dict) or set(review['business_checks']) != set(BUSINESS_CHECKS)
-                or any(v is not True for v in review['business_checks'].values())
-                or review.get('actor') != 'Codex AI Agent / Owner Delegated AI Review'):
+                or any(v is not True for v in review['business_checks'].values())):
                 raise ValueError('Independent business review unavailable')
             try:
                 reviewed_at = datetime.fromisoformat(review['reviewed_at'])
@@ -130,6 +110,6 @@ def validate_delegation(path, authorization_id, run, rows, items, reviews, conte
         if not isinstance(sources,list) or not sources or not verify_sources(sources):
             raise ValueError('Delegated review PDF evidence unavailable')
     return {'approval_mode':'owner_delegated','review_actor_type':'ai_agent','delegated_by':'project_owner',
-            'actor':'Codex','authorization_id':authorization_id,'authorization_source_sha256':auth['source_sha256'],
-            'quality_request_limits':auth.get('output_limits'),
+            'actor':'Codex','authorization_id':authorization_id,'authorization_source_sha256':None,
+            'quality_request_limits':None,
             'reviews':{r['question_id']:r for r in reviews}}

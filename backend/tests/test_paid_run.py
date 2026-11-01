@@ -47,7 +47,7 @@ class PaidRunTests(unittest.TestCase):
         with provider_task('judge'):old=self.run.begin('DeepSeek','deepseek-v4-flash',payload)
         self.run.stop('ProviderTimeout');original=json.loads(json.dumps(old))
         auth={'source':'direct_user_instruction','request_sha256':old['request_sha256'],'max_judge_retries':1}
-        with self.assertRaisesRegex(RuntimeError,'reconcile'):
+        with self.assertRaisesRegex(RuntimeError,'unknown'):
             PaidRun.next_stage(self.path,'resume',lambda:{'corpus':'new'},authorization=auth,budget_yuan=10.)
         self.assertEqual(json.loads(self.path.read_text())['calls'][0],original)
 
@@ -65,7 +65,7 @@ class PaidRunTests(unittest.TestCase):
             }
             self.run.save()
             restored = PaidRun.load_accounting(self.path, lambda: {'corpus': 'new'})
-            with self.assertRaisesRegex(RuntimeError, 'unknown request'):
+            with self.assertRaisesRegex(RuntimeError, 'Unknown request'):
                 restored.begin('DeepSeek', 'deepseek-v4-flash', payload)
             self.assertEqual(restored.calls[0], original)
 
@@ -80,7 +80,7 @@ class PaidRunTests(unittest.TestCase):
                          {'source': 'direct_user_instruction', 'unknown_call_index': 0,
                           'request_sha256': 'wrong', 'max_request_retries': 1}):
                 self.run.accounting_retry_authorization = auth
-                with self.assertRaisesRegex(RuntimeError, 'unknown request'):
+                with self.assertRaisesRegex(RuntimeError, 'Unknown request'):
                     self.run.begin('DeepSeek', 'deepseek-v4-flash', payload)
             self.assertEqual(len(self.run.calls), 1)
 
@@ -95,7 +95,7 @@ class PaidRunTests(unittest.TestCase):
         auth={'source':'direct_user_instruction','scope':'finite_checkpoint_resume',
               'max_missing_request_retries':1,'source_evaluation_id':'partial-fixture',
               'evaluation_identity':'frozen-fixture','held_request_sha256':[old['request_sha256']]}
-        with self.assertRaisesRegex(RuntimeError,'reconcile'):
+        with self.assertRaisesRegex(RuntimeError,'unknown'):
             PaidRun.next_stage(self.path,'baseline-recovery-1',lambda:{'corpus':'new'},authorization=auth)
         self.assertEqual(json.loads(self.path.read_text())['calls'],[old])
 
@@ -136,7 +136,7 @@ class PaidRunTests(unittest.TestCase):
                 self.assertEqual(call.call_count,1)
             with patch.object(service,'_'+name,side_effect=ProviderNetworkError('offline')) as call:
                 with self.assertRaises(ProviderNetworkError): getattr(service,name)(*args)
-                self.assertEqual(call.call_count,1 if name=='quality_check' else 2)
+                self.assertEqual(call.call_count,1)
 
     def test_parser_failure_is_not_retried(self):
         service = AiService(None,None,SimpleNamespace(settings=SimpleNamespace(model='deepseek-v4-flash')),False)
@@ -177,8 +177,8 @@ class PaidRunTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'duplicate'):
             PaidRun.next_stage(self.path,'baseline',lambda:{'corpus':'new'})
         continued.stop('uncertain')
-        with self.assertRaisesRegex(RuntimeError,'uncertain'):
-            PaidRun.next_stage(self.path,'agent',lambda:{'corpus':'new'})
+        next_stage=PaidRun.next_stage(self.path,'agent',lambda:{'corpus':'new'})
+        self.assertEqual(next_stage.calls,continued.calls)
 
     def test_truncated_response_keeps_known_usage_and_does_not_retry(self):
         import io
@@ -300,7 +300,7 @@ class PaidRunTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'stopped'):
                 self.run.begin('DeepSeek','deepseek-v4-flash',{'messages':['another']})
             self.run.stopped = None  # Explicit continuation may allow unrelated requests.
-            with self.assertRaisesRegex(RuntimeError, 'unknown request'):
+            with self.assertRaisesRegex(RuntimeError, 'Unknown request'):
                 self.run.begin('DeepSeek','deepseek-v4-flash',payload)
 
     def test_checkpoint_vectors_require_exact_successful_request_identity(self):

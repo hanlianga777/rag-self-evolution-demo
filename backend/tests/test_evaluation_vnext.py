@@ -55,7 +55,7 @@ class VNextStageTests(unittest.TestCase):
         final=[source] if stage=='final' else [other]
         check={'requirement':'维护前关机隔离','met':False,'answer_quotes':[],'support':[{'source_id':'safe','quote':text}] if stage=='final' else [],'reference_support':[{'source_id':'safe','quote':text}],'candidate_support':[{'source_id':'safe','quote':text}] if stage in {'candidate','final'} else [],'scope_resolved':True}
         judge={'verdict':'FAIL','checks':[check],'issues':[],'reason':'漏必要安全前提'}
-        case={'test_category':'positive','model_answer':'取出滤网冲洗','judge_result':judge,'evaluation_outcome':{'contract_version':'business-vnext-1','execution_complete':True,'verdict':'FAIL'},'programmatic_metrics':{'retrieval_trace':{'status':'completed','corpus_fingerprint':'fixture-corpus','candidates':[source,other] if stage!='missing' else [other],'reranked':[source,other],'final':final,'parent_expand':False}}}
+        case={'test_category':'positive','standard_evidence':[text],'model_answer':'取出滤网冲洗','judge_result':judge,'evaluation_outcome':{'contract_version':'business-vnext-1','execution_complete':True,'verdict':'FAIL'},'programmatic_metrics':{'retrieval_trace':{'status':'completed','corpus_fingerprint':'fixture-corpus','candidates':[source,other] if stage!='missing' else [other],'reranked':[source,other],'final':final,'parent_expand':False}}}
         chunks=[{**e,'chunk_text':e['content']} for e in [source,other]]
         return case,chunks
     def test_same_business_defect_is_classified_by_actual_stage(self):
@@ -63,7 +63,7 @@ class VNextStageTests(unittest.TestCase):
         for stage,root,detail in [('candidate','Ranking','ranking_context_selection'),('missing','Retrieval','candidate_recall'),('final','Generation',None)]:
             c,chunks=self.case(stage);r=automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')
             self.assertEqual((r['primary_root_cause'],r['retrieval_failure_stage']),(root,detail));self.assertTrue(r['target_eligible'])
-    def test_scope_unresolved_pass_execution_error_and_forged_corpus_not_targets(self):
+    def test_only_pass_or_incomplete_execution_remove_saved_text_targets(self):
         from app.diagnostics import automatic_analysis
         for change in ['scope','pass','execution','corpus']:
             c,chunks=self.case()
@@ -71,7 +71,7 @@ class VNextStageTests(unittest.TestCase):
             if change=='pass':c['evaluation_outcome']['verdict']='PASS'
             if change=='execution':c['evaluation_outcome']['execution_complete']=False
             if change=='corpus':chunks[0]['chunk_text']='其他内容'
-            self.assertFalse(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['target_eligible'])
+            self.assertEqual(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['target_eligible'],change in {'scope','corpus'})
     def test_partial_comparison_and_new_critical_issue_in_continued_fail_block(self):
         def result(v,issues=[]):return {'evaluation_outcome':{'contract_version':'business-vnext-1','execution_complete':True,'verdict':v},'judge_result':{'issues':issues}}
         baseline={'a':result('FAIL'),'b':result('PASS')};candidate={'a':result('FAIL',[{'description':'新增带电拆装','critical':True,'baseline_issue_index':None}]),'b':result('PASS')}
@@ -101,7 +101,7 @@ class ProviderBinaryTests(BinaryContractTests):
         self.assertNotIn('七类Claim强制',call.call_args.args[0]);self.assertEqual(call.call_args.kwargs['temperature'],0)
 
 class BoundedRecoveryTests(unittest.TestCase):
-    def test_network_stops_after_three_attempts_and_keeps_generation(self):
+    def test_network_failure_is_not_repeated_and_keeps_generation(self):
         import test_baseline_resume as fixture
         from app.evaluation import EvaluationRunner
         from app.providers import ProviderTimeout
@@ -115,7 +115,7 @@ class BoundedRecoveryTests(unittest.TestCase):
                 raise ProviderTimeout('offline timeout')
             runtime.judge=judge;key,items,config=runner.start_baseline(automatic=True)
             with patch('app.evaluation.time.sleep'):r=runner.execute_baseline(key,items,config)
-            self.assertEqual(len(runtime.judges),6);self.assertEqual(runtime.answers,['Q1','Q2']);self.assertEqual(r['status'],'partial');self.assertEqual(holder.store.evaluation_case_results(key),[])
+            self.assertEqual(len(runtime.judges),2);self.assertEqual(runtime.answers,['Q1','Q2']);self.assertEqual(r['status'],'partial');self.assertEqual(holder.store.evaluation_case_results(key),[])
             self.assertIn('execution',r['result']['checkpoints']['Q1'])
         finally:holder.tearDown()
 
@@ -149,8 +149,9 @@ class PersistenceAndDeadlineTests(unittest.TestCase):
             with self.assertRaises(ValueError):store.record_evaluation_case('fixture','x',{**case,'question':'changed'})
 
 class AgentAndRiskTests(VNextStageTests):
-    def test_agent_admits_only_proven_context_selection_direction(self):
+    def test_agent_priority_directions_allow_other_legal_parameters(self):
         from app.optimization import validate_intervention
+        from app.policy import DEFAULT_PIPELINE_CONFIG
         from unittest.mock import patch
         c,chunks=self.case('candidate')
         # A scored saved pool must actually need TopK=6 to recover the norm.
@@ -161,10 +162,10 @@ class AgentAndRiskTests(VNextStageTests):
         for entry in trace['candidates']:entry['score']=.5
         proposal={'intervention_direction':'context_selection','config_diff':{'top_k':6},'root_cause':'Ranking','target_bad_cases':['case'],'evidence_assertions':[{'target_id':'case','observation':'ranking_omission'}],'parameter_dependencies':[],'hypothesis':'必要前提被截断','why':'候选有据而Final缺失','expected_improvement':'补入必要上下文','risk':'可能引入噪声'}
         with patch('app.diagnostics._current_corpus',return_value=(chunks,'fixture-corpus')):
-            validate_intervention(proposal,{'case':c},{'top_k':4})
-            with self.assertRaises(ValueError):validate_intervention({**proposal,'intervention_direction':'candidate_recall','config_diff':{'candidate_k':24}}, {'case':c},{'candidate_k':12})
+            validate_intervention(proposal,{'case':c},DEFAULT_PIPELINE_CONFIG)
+            validate_intervention({**proposal,'intervention_direction':'candidate_recall','config_diff':{'candidate_k':24}}, {'case':c},DEFAULT_PIPELINE_CONFIG)
             c['evaluation_outcome']['execution_complete']=False
-            with self.assertRaises(ValueError):validate_intervention(proposal,{'case':c},{'top_k':4})
+            with self.assertRaises(ValueError):validate_intervention(proposal,{'case':c},DEFAULT_PIPELINE_CONFIG)
     def test_existing_critical_risk_paraphrase_not_a_new_regression(self):
         def c(issues):return {'evaluation_outcome':{'contract_version':'business-vnext-1','execution_complete':True,'verdict':'FAIL'},'judge_result':{'issues':issues}}
         old=[{'description':'未断电换件','critical':True}]
@@ -206,11 +207,11 @@ class DisplayIntegrityTests(unittest.TestCase):
         self.assertNotEqual(contract.normalize('2**3'),contract.normalize('23'))
 
 class PerformanceAndWriteBoundaryTests(VNextStageTests):
-    def test_performance_requires_completed_business_failure_and_real_stage_measurement(self):
+    def test_slow_question_keeps_five_category_content_cause(self):
         from app.diagnostics import automatic_analysis
         c,chunks=self.case('missing');c['judge_result']['checks'][0]['scope_resolved']=False
         c['programmatic_metrics'].update(latency_ms=61000,stages=[{'stage_name':'generation','duration_ms':60500,'parent':None}])
-        self.assertEqual(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['primary_root_cause'],'Performance')
+        self.assertEqual(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['diagnosis_category'],'检索失败')
         c['evaluation_outcome']['execution_complete']=False
         self.assertFalse(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['target_eligible'])
 
@@ -241,10 +242,10 @@ class RevisionSourceTests(unittest.TestCase):
         finally:holder.doCleanups()
 
 class DiagnosticEvidenceBoundaryTests(VNextStageTests):
-    def test_malformed_candidate_quote_is_not_proof_of_recall_failure(self):
+    def test_judge_candidate_quote_does_not_override_saved_candidate_text(self):
         from app.diagnostics import automatic_analysis
         c,chunks=self.case('candidate');c['judge_result']['checks'][0]['candidate_support']=[{'source_id':'safe','quote':'并不存在的原文'}]
-        self.assertFalse(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['target_eligible'])
+        self.assertEqual(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['diagnosis_category'],'检索噪声')
     def test_business_failure_cannot_show_a_passed_redline(self):
         from app.evaluation import EvaluationRunner
         c,chunks=self.case('final');v={**c['judge_result'],'quality':{'correctness':2,'faithfulness':.5,'completeness':.5}}
@@ -275,7 +276,7 @@ class RegressionCorrespondenceTests(unittest.TestCase):
         self.assertFalse(r['comparison_complete']);self.assertEqual(r['continued_failure_new_critical_question_ids'],[])
 
 class SandboxCriticalityTests(unittest.TestCase):
-    def test_new_critical_operation_blocks_even_on_an_ordinary_question(self):
+    def test_candidate_issue_severity_does_not_turn_an_ordinary_question_into_a_protected_one(self):
         from app.evaluation import EvaluationRunner
         from unittest.mock import MagicMock
         def case(q,verdict,issues=[]):
@@ -287,5 +288,6 @@ class SandboxCriticalityTests(unittest.TestCase):
         runner=EvaluationRunner(store,None)
         runner.execute_baseline=MagicMock(return_value={'status':'completed','result':{'gates':{'passed':True},'bad_case_count':1},'judge':{'evaluation_identity':'fixture'}})
         result=runner.execute_candidate('new',[],{}, {'id':'candidate','experiment_id':'exp','reasoning':{'observed_evidence':['a']}},{'id':'baseline'})['result']
-        self.assertEqual(result['regression']['new_critical_failures'],1)
-        self.assertFalse(result['qualification']['qualified'])
+        self.assertEqual(result['regression']['new_critical_failures'],0)
+        self.assertEqual(result['regression']['new_ordinary_failures'],1)
+        self.assertTrue(result['qualification']['qualified'])

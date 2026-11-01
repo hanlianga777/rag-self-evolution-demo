@@ -11,7 +11,7 @@ def main():
     parser.add_argument('--source',default='EVAL-20261021013401711966')
     parser.add_argument('--database',type=Path,default=ROOT/'backend/data/demo.db')
     parser.add_argument('--output',type=Path)
-    parser.add_argument('--authorization-id');parser.add_argument('--expected-binding');parser.add_argument('--authorize-provider',action='store_true')
+    parser.add_argument('--expected-binding')
     parser.add_argument('--budget-usd',type=float);parser.add_argument('--price-snapshot',type=Path)
     parser.add_argument('--artifact',type=Path);parser.add_argument('--actor');parser.add_argument('--decision',choices=['approved','rejected'])
     parser.add_argument('--facts');parser.add_argument('--safety');parser.add_argument('--scope-separation')
@@ -46,9 +46,9 @@ def main():
             'one_attempt_estimate_usd':[(estimated*price['input_per_million']+n*price['output_per_million'])/1e6 for n in [1000,6000]],
             'first_request_byte_bound_usd':((request['body_bytes']+1024)*price['input_per_million']+request['max_tokens']*price['output_per_million'])/1e6,
             'correction_input':'actual payload bytes checked against remaining budget before every attempt',
-            'authorization_budget_cap_usd':price['authorization_budget_cap_usd'],'automatic_real_calls':0}
+            'automatic_real_calls':0}
     elif args.action=='run':
-        result=run_probe(runner,args.source,expected_binding=args.expected_binding,authorize_provider=args.authorize_provider,authorization_id=args.authorization_id,budget_usd=args.budget_usd,price_snapshot=args.price_snapshot)
+        result=run_probe(runner,args.source,expected_binding=args.expected_binding,budget_usd=args.budget_usd,price_snapshot=args.price_snapshot)
     else:
         if not args.artifact:parser.error('review requires an existing real probe artifact')
         result=review_probe(runner,args.source,args.artifact,actor=args.actor,decision=args.decision,facts=args.facts,safety=args.safety,scope_separation=args.scope_separation)

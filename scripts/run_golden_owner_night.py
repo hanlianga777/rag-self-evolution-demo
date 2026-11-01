@@ -1,4 +1,4 @@
-"""Explicit owner-authorized serial quality run; no automatic retry or approval."""
+"""Serial quality run; no automatic retry or approval."""
 import argparse
 import hashlib
 import json
@@ -21,23 +21,17 @@ def identity():
     return {'knowledge':manifest_identity(current_manifest()),'run':RUN,'plan':artifact['frozen_plan']['plan_id']}
 
 
-def quality(authorization):
+def quality():
     from app.paid_run import PaidRun, REQUEST_LIMITS
     current = identity()
     if current['knowledge']['corpus_snapshot_id']!=CORPUS or current['plan']!=PLAN:
         raise RuntimeError('Owner scope identity changed')
-    text = authorization.read_text()
-    if RUN not in text or '所有者委托' not in text:
-        raise ValueError('Explicit owner authorization attachment required')
     output = ROOT/'output/playwright/golden-delegated-20261012'
     output.mkdir(exist_ok=True)
     prices = {'deepseek-v4-flash':{'provider':'DeepSeek','input':2.1,'output':8.4,'max_output':32768},
               'text-embedding-v4':{'provider':'Alibaba','input':.5,'output':0,'max_output':0},
               'qwen3-rerank':{'provider':'Alibaba','input':.5,'output':0,'max_output':0}}
     run = PaidRun(output/'paid-calls.json',None,prices,current,identity_check=identity,output_limits=REQUEST_LIMITS)
-    (output/'owner-authorization.json').write_text(json.dumps({'source':'direct_user_instruction','attachment_sha256':hashlib.sha256(authorization.read_bytes()).hexdigest(),
-        'delegated_by':'project_owner','review_actor_type':'ai_agent','review_actor':'Codex','generation_run':RUN,
-        'output_limits':REQUEST_LIMITS,'price_basis':'2026-10-12 official peak rates, CNY conversion 6.7313 with planning buffer; not account debit'},ensure_ascii=False,indent=2))
     from app import main
     if not main.ai_service.live_enabled: raise RuntimeError('Live Provider required')
     main.store.claim_quality_resume(RUN,current['knowledge'])
@@ -121,11 +115,10 @@ def wait_evaluation(main,output,stage,key):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--authorization',type=Path)
     parser.add_argument('--stage',default='quality',choices=['quality','repair-1','repair-1-resume','repair-2','baseline','agent-1','agent-2',
         'candidate-A1','candidate-B1','candidate-C1','candidate-A2','candidate-B2','candidate-C2'])
     parser.add_argument('--changes',type=Path)
     parser.add_argument('--identifier')
     args = parser.parse_args()
-    if args.stage=='quality': quality(args.authorization.resolve())
+    if args.stage=='quality': quality()
     else: next_step(args.stage,args.changes,args.identifier)

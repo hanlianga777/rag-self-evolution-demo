@@ -12,13 +12,12 @@ class AgentContextTests(unittest.TestCase):
         row=provider.prompt['bad_cases'][0]
         self.assertNotIn('result_json',row)
         self.assertNotIn('all_bad_case_audit',provider.prompt)
-        self.assertEqual(row['retrieval_trace'],before['result']['programmatic_metrics']['retrieval_trace'])
-        self.assertEqual(row['result']['model_answer'],before['result']['model_answer'])
-        self.assertEqual(row['result']['primary_root_cause'],'Retrieval')
-        self.assertNotIn('diagnosis',row['result'])
-        self.assertNotIn('governance',row['diagnostic_view'])
+        self.assertNotIn('retrieval_trace',row)
+        self.assertEqual(row['diagnosis_category'],'检索失败')
+        self.assertTrue(row['reason'])
         with self.store.connection() as connection:
             audit=json.loads(connection.execute('SELECT result_json FROM agent_traces ORDER BY id DESC LIMIT 1').fetchone()[0])
-        self.assertEqual(audit['all_bad_case_audit'][0]['result'],before['result'])
+        projected=audit['all_bad_case_audit'][0]['result']
+        self.assertEqual({k:v for k,v in projected.items() if k!='standard_evidence'}, {k:v for k,v in before['result'].items() if k!='standard_evidence'})
         self.assertEqual(self.store.bad_case_rows()[0],before)
-        self.assertTrue(provider.prompt['target_reference_map']['Q1']['diagnostic_view']['target_eligible'])
+        self.assertEqual(row['question_id'],'Q1')

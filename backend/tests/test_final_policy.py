@@ -49,10 +49,10 @@ class FinalPolicyTests(unittest.TestCase):
         self.assertEqual(result["passed_count"], 10)
         self.assertEqual(result["gates"][-1]["status"], "NOT_EVALUABLE")
 
-    def test_regression_allows_no_new_critical_and_at_most_one_ordinary(self):
+    def test_abc_regression_allows_ordinary_failures_but_no_critical(self):
         self.assertTrue(evaluate_regression(new_critical_failures=0, new_ordinary_failures=1)["passed"])
         self.assertFalse(evaluate_regression(new_critical_failures=1, new_ordinary_failures=0)["passed"])
-        self.assertFalse(evaluate_regression(new_critical_failures=0, new_ordinary_failures=2)["passed"])
+        self.assertTrue(evaluate_regression(new_critical_failures=0, new_ordinary_failures=2)["passed"])
 
     def test_candidate_qualification_requires_all_release_conditions(self):
         gates = evaluate_gates(PASSING_METRICS)

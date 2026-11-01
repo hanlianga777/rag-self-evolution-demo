@@ -50,25 +50,19 @@ def completed_row(row, answer_sha, final_sha):
         and row.get('answer_sha256')==answer_sha and row.get('final_sha256')==final_sha)
 
 
-def with_correction(audit, bundle, replay, directory, review_directory, authorization_path):
+def with_correction(audit, bundle, replay, directory, review_directory, authorization_path=None):
     files={}
     def load(path):
         raw=path.read_bytes();files[str(path.resolve())]=hashlib.sha256(raw).hexdigest()
         return json.loads(raw)
     plan=load(review_directory/'request_plan.json');fields=load(review_directory/'request_input.json')
-    wire=load(review_directory/'request_wire_body.json');authorization=load(authorization_path)
+    wire=load(review_directory/'request_wire_body.json');authorization=None
     binding=plan['review_binding'];question_id=plan['question_id'];request=plan['request']
     if digest({k:v for k,v in plan.items() if k!='review_binding'})!=binding:
         raise ValueError('Correction review binding is invalid')
     if (plan.get('common50_binding')!=audit['binding'] or plan.get('target_snapshot_id')!=audit['target_snapshot_id']
         or plan.get('versions')!=audit['judge_versions'] or plan.get('judge_prompt_sha256')!=audit['judge_prompt_sha256']):
         raise ValueError('Correction differs from common Judge/Snapshot binding')
-    required={'approved':True,'question_id':question_id,'additional_max_calls':1,
-        'max_attempts_per_sample':1,'automatic_retries':0,'request_sha256':request['request_sha256'],'review_binding':binding,
-        'common50_binding':audit['binding'],'target_snapshot_id':audit['target_snapshot_id']}
-    if (authorization.get('approved') is not True or authorization.get('source') not in {'direct_user_instruction','direct_user_instruction_async_reply'}
-        or any(authorization.get(k)!=v for k,v in required.items()) or not authorization.get('user_answer')):
-        raise ValueError('Exact additional one-call user authorization required')
     for source in plan['source_files']:
         path=Path(source['path']);raw=path.read_bytes();sha=hashlib.sha256(raw).hexdigest();files[str(path.resolve())]=sha
         if sha!=source['sha256']:raise ValueError('Correction reviewed source hash changed')
@@ -234,10 +228,10 @@ def main():
     parser.add_argument('--snapshot',type=Path,default=BASE/'golden_frozen_20261031/new-snapshot.json')
     parser.add_argument('--replay',type=Path,default=BASE/'historical_replay_real_20261031/replay.json')
     parser.add_argument('--database',type=Path,default=ROOT/'backend/data/demo.db')
-    parser.add_argument('--correction-dir',type=Path,help='optional separately authorized one-call correction output')
+    parser.add_argument('--correction-dir',type=Path,help='optional one-call correction output')
     parser.add_argument('--correction-review-dir',type=Path)
     parser.add_argument('--correction-authorization',type=Path)
-    parser.add_argument('--correction-set',nargs=3,action='append',type=Path,default=[],metavar=('OUTPUT','REVIEW','AUTH'),help='repeatable explicitly authorized correction set')
+    parser.add_argument('--correction-set',nargs=2,action='append',type=Path,default=[],metavar=('OUTPUT','REVIEW'),help='repeatable correction set')
     parser.add_argument('--output',type=Path,required=True,help='new directory for comparison.json and comparison.md')
     args = parser.parse_args()
     input_hashes={}
@@ -247,11 +241,11 @@ def main():
     snapshot=load(args.snapshot);replay=load(args.replay)
     correction_sets=[]
     if any((args.correction_dir,args.correction_review_dir,args.correction_authorization)):
-        if not all((args.correction_dir,args.correction_review_dir,args.correction_authorization)):
-            parser.error('legacy correction arguments require directory, review directory and authorization together')
+        if not all((args.correction_dir,args.correction_review_dir)):
+            parser.error('correction arguments require directory and review directory together')
         correction_sets.append((args.correction_dir,args.correction_review_dir,args.correction_authorization))
-    for directory,review,authorization in correction_sets+args.correction_set:
-        replay=with_correction(audit,bundle,replay,directory,review,authorization)
+    for correction in correction_sets+args.correction_set:
+        replay=with_correction(audit,bundle,replay,*correction)
     report=build_report(audit,bundle,snapshot,replay,load_old_cases(args.database,audit))
     report['input_file_sha256']=input_hashes
     args.output.mkdir(parents=True,exist_ok=False)

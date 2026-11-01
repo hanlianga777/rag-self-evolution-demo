@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Up to four source-bound synthetic-answer calibrations of production Judge.
 
-Default dry-run; --execute is reserved for the separately authorized sample set.
+Default dry-run; --execute runs the selected sample set.
 Input JSON: source_files:[{path,sha256}], cases:[{id,fixture_label,golden_item,
 answer,context,expected_verdict}]. Frozen golden_item and original Final are
 provided by the reviewed sample preparation, never generated in this script.

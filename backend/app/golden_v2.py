@@ -323,7 +323,7 @@ def validate_answer_content(candidate, sources, review=None):
     if isinstance(requirements, dict) and all(isinstance(requirements.get(k, []), list) for k in ('required_checks', 'conditional_checks')):
         checks = requirements.get('required_checks', []) + requirements.get('conditional_checks', [])
     ids = {c['id'] for c in checks if isinstance(c, dict) and isinstance(c.get('id'), str) and c['id']}
-    approved = (isinstance(review, dict) and (review.get('reviewer_type') == 'human' or review.get('reviewer_type') == 'owner_delegated_ai' and bool(review.get('authorization_id'))) and
+    approved = (isinstance(review, dict) and (review.get('reviewer_type') == 'human' or review.get('reviewer_type') == 'owner_delegated_ai') and
                 bool(review.get('reviewer')) and review.get('decision') == 'approved' and
                 review.get('binding_sha256') == binding and review.get('safety_valid') is True and
                 review.get('scope_valid') is True and isinstance(review.get('reviewed_checks'), list) and

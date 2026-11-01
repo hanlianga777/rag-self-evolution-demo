@@ -10,7 +10,7 @@ import numpy as np
 
 from .telemetry import measure, collect_usage, cost_fields
 from .policy import DEFAULT_PIPELINE_CONFIG
-from .providers import ProviderTimeout, ProviderUnavailable, ProviderNetworkError, ProviderInvalidResponse, thinking_task, thinking_config
+from .providers import ProviderTimeout, ProviderUnavailable, ProviderInvalidResponse, thinking_task, thinking_config
 from .retrieval import VectorRetriever
 from .corpus import current_manifest, CorpusStore
 from .full_text import CORPUS_LOCK, validate_bundle
@@ -259,10 +259,32 @@ class AiService:
 
     @provider_task('judge')
     def judge(self, question: str, expected: str, answer: str, category: str, *, context: dict | None = None) -> dict:
-        stages = []
+        from .providers import ProviderInvalidResponse
+        from .paid_run import unsettled_usage
+        from .evaluation_stage import _request_checkpoint, judge_request_count
+        checkpoint_context = _request_checkpoint.get()
+        remaining = 2
+        if checkpoint_context is not None and checkpoint_context[1] == 'judge':
+            remaining -= judge_request_count(checkpoint_context[0], checkpoint_context[2])
+        if remaining <= 0:
+            error = ProviderInvalidResponse('判分格式重判已用完，最多两次请求')
+            error.provider_retry_exhausted = True
+            raise error
+        stages, recovery = [], []
         with measure(stages, "judge"), collect_usage() as usage:
-            result = self.provider.judge(question, expected, answer, **({"context": context} if context is not None else {}))
-        return {**result, "stages": stages, "token_usage": usage, **cost_fields(self.model, usage)}
+            for attempt in range(remaining):
+                try:
+                    result = self.provider.judge(question, expected, answer, **({"context": context} if context is not None else {}))
+                    break
+                except ProviderInvalidResponse as error:
+                    recovery.append({'error':str(error), 'previous_response':error.raw_provider_response,
+                                     'response_metadata':dict(error.response_metadata)})
+                    error.response_metadata = {**error.response_metadata, 'response_recovery':recovery}
+                    error.provider_retry_exhausted = True
+                    if attempt + 1 >= remaining or getattr(error, 'request_execution_unknown', False) or getattr(error, 'billing_unknown', False) or any(unsettled_usage(event) for event in usage):
+                        raise
+        return {**result, "response_retries":2 - remaining + attempt, "response_recovery":recovery,
+                "stages": stages, "token_usage": usage, **cost_fields(self.model, usage)}
 
     @provider_task('judge')
     def resolve_diagnostic(self,payload):
@@ -361,16 +383,9 @@ class AiService:
 
     @provider_task('answerability')
     def answerability_check(self, question: str, hits: list[dict], signals: dict) -> dict:
-        from .paid_run import current_paid_run
         stages = []
         with measure(stages, 'answerability_judge'), collect_usage() as usage:
-            for attempt in range(1 if current_paid_run() else 2):
-                try:
-                    result = {**self._answerability_check(question, hits, signals), 'response_retries': attempt}
-                    break
-                except ProviderUnavailable as error:
-                    if current_paid_run() or attempt or not (isinstance(error, ProviderNetworkError) or '未返回有效 JSON' in str(error)):
-                        raise
+            result = {**self._answerability_check(question, hits, signals), 'response_retries':0}
         return {**result, 'stages': stages, 'token_usage': usage, **cost_fields(self.model, usage)}
 
     def _answerability_check(self, question: str, hits: list[dict], signals: dict) -> dict:
@@ -685,8 +700,7 @@ class AiService:
                     error_type = type(caught).__name__
                     if getattr(caught, 'business_design', None):
                         generated = {**caught.business_design, 'business_design':caught.business_design, **({'verified_sources':caught.verified_sources} if hasattr(caught,'verified_sources') else {})}
-                    from .paid_run import current_paid_run
-                    if current_paid_run() and isinstance(caught, (ProviderUnavailable, OSError, RuntimeError)):
+                    if isinstance(caught, (ProviderUnavailable, OSError, RuntimeError)):
                         raise
                 selected_sources = generated.get('verified_sources', slot['sources'])
                 if draft_revision: generated['business_draft_revision'] = draft_revision['audit']

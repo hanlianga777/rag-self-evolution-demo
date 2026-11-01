@@ -28,7 +28,7 @@ class SandboxFailureTests(unittest.TestCase):
         self.assertTrue(checkpoint['unknown_execution']['generation'])
         self.assertTrue(checkpoint['attempts'][0]['request_execution_unknown'])
     def test_confirmed_rejection_is_bounded_and_permanent_auth_not_retried(self):
-        for status,code,expected in [(429,'Throttling',3),(401,'InvalidApiKey',1),(429,'insufficient_quota',1)]:
+        for status,code,expected in [(429,'Throttling',1),(401,'InvalidApiKey',1),(429,'insufficient_quota',1)]:
             def fail(*a,**kw):raise urllib.error.HTTPError('https://fixture.invalid',status,'rejected',{},io.BytesIO(json.dumps({'code':code,'message':'fixture'}).encode()))
             cp={'attempts':[]}
             with patch('urllib.request.urlopen',side_effect=fail) as request,patch('app.evaluation_stage.time.sleep'):
@@ -49,9 +49,10 @@ class SandboxFailureTests(unittest.TestCase):
             provider.embed(['query'],2)
             return provider.rerank('query',[{'content':'fixture'}])
         with patch('urllib.request.urlopen',side_effect=network),patch('app.evaluation_stage.time.sleep'):
-            perform_stage(cp,'generation',action,'run',automatic=True,check_stop=lambda:None,on_state=lambda *a,**kw:None)
+            with self.assertRaises(ProviderAPIError):
+                perform_stage(cp,'generation',action,'run',automatic=True,check_stop=lambda:None,on_state=lambda *a,**kw:None)
         self.assertEqual(len([c for c in calls if c.endswith('/embeddings')]),1)
-        self.assertEqual(len(calls),4)
+        self.assertEqual(len(calls),2)
 
     def test_paid_rejection_retries_keep_audit_without_recharging_prior_calls(self):
         import tempfile
@@ -65,9 +66,10 @@ class SandboxFailureTests(unittest.TestCase):
                 if len(count)<3:raise urllib.error.HTTPError('https://fixture.invalid',429,'limited',{},io.BytesIO(b'{"code":"Throttling"}'))
                 return io.BytesIO(b'{"usage":{"total_tokens":2}}')
             with controlled_run(ledger),accounting_only(),patch('urllib.request.urlopen',side_effect=network),patch('app.evaluation_stage.time.sleep'):
-                perform_stage({'attempts':[]},'generation',lambda:self.provider()._post('/embeddings',{'model':'text-embedding-v4'}),'run',automatic=True,check_stop=lambda:None,on_state=lambda *a,**kw:None)
-            self.assertEqual([c['status'] for c in ledger.calls],['rejected','rejected','ok'])
-            self.assertAlmostEqual(ledger.spent,.000002)
+                with self.assertRaises(ProviderAPIError):
+                    perform_stage({'attempts':[]},'generation',lambda:self.provider()._post('/embeddings',{'model':'text-embedding-v4'}),'run',automatic=True,check_stop=lambda:None,on_state=lambda *a,**kw:None)
+            self.assertEqual([c['status'] for c in ledger.calls],['rejected'])
+            self.assertEqual(ledger.spent,0)
             self.assertIsNone(ledger.stopped)
 
     def test_unknown_or_unsettled_ledger_never_passes_resume_guard(self):
@@ -78,7 +80,7 @@ class SandboxFailureTests(unittest.TestCase):
             path=Path(directory)/'ledger.json'
             for status in ['unknown','reserved','failed']:
                 path.write_text(json.dumps({'identity':{},'calls':[{'status':status}]}))
-                with self.assertRaisesRegex(ValueError,'须先对账'):require_reconciled_execution({'auto_recovery':{'ledger_path':str(path),'ledger_identity':{}}})
+                with self.assertRaisesRegex(ValueError,'禁止重复'):require_reconciled_execution({'auto_recovery':{'ledger_path':str(path),'ledger_identity':{}}})
 
     def test_successful_result_without_settled_usage_is_saved_and_never_repeated(self):
         from app.telemetry import record_usage
@@ -93,7 +95,7 @@ class SandboxFailureTests(unittest.TestCase):
         self.assertEqual(checkpoint['execution'],result)
         self.assertFalse(checkpoint.get('unknown_execution',{}).get('generation',False))
         self.assertTrue(checkpoint['unsettled_usage']['generation'])
-        with self.assertRaisesRegex(ValueError,'对账'):require_reconciled_execution({'checkpoints':{'q':checkpoint}})
+        with self.assertRaisesRegex(ValueError,'禁止重复'):require_reconciled_execution({'checkpoints':{'q':checkpoint}})
 
 class FiftyCaseCheckpointTests(unittest.TestCase):
     def test_38_results_and_saved_39th_answer_reuse_then_only_50_forms_final_scores(self):

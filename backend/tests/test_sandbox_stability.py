@@ -25,7 +25,7 @@ class RequestCheckpointTests(unittest.TestCase):
             calls.append(request.full_url)
             if request.full_url.endswith('/embeddings'):
                 return io.BytesIO(b'{"data":[{"index":0,"embedding":[1,2]}],"usage":{"total_tokens":2}}')
-            if calls.count(request.full_url) <= 3:
+            if calls.count(request.full_url) <= 1:
                 raise urllib.error.HTTPError(request.full_url, 429, 'limited', {}, io.BytesIO(b'{}'))
             return io.BytesIO(b'{"results":[{"index":0,"relevance_score":0.9}],"usage":{"total_tokens":2}}')
         cp = {'attempts': []}; provider = self.provider()
@@ -51,7 +51,7 @@ class RequestCheckpointTests(unittest.TestCase):
         from app.evaluation_stage import checkpoint_usage
         from app.paid_run import require_reconciled_execution
         self.assertEqual(len(checkpoint_usage(saved[-1])),1)
-        with self.assertRaisesRegex(ValueError,'对账'):
+        with self.assertRaisesRegex(ValueError,'禁止重复'):
             require_reconciled_execution({'checkpoints':{'Q1':saved[-1]}})
 
     def test_answer_rpc_reuses_full_response_without_recharging_usage(self):
@@ -75,7 +75,7 @@ class RequestCheckpointTests(unittest.TestCase):
         cp = {'attempts': []}
         with patch('urllib.request.urlopen', side_effect=network) as request, patch('app.evaluation_stage.time.sleep'):
             with self.assertRaises(ProviderAPIError): self.stage(cp, lambda: provider.complete('system', 'user'))
-        self.assertEqual(request.call_count, 3)
+        self.assertEqual(request.call_count, 1)
         self.assertFalse(cp.get('unknown_execution', {}).get('generation', False))
         self.assertFalse(cp.get('unsettled_usage', {}).get('generation', False))
 
@@ -112,7 +112,7 @@ class RequestCheckpointTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Usage'):
                 self.stage(cp, lambda: self.provider().embed(['query'], 2))
             self.assertTrue(any('result' in r for r in cp['provider_requests'].values()))
-            with self.assertRaisesRegex(ValueError, '对账'):
+            with self.assertRaisesRegex(ValueError, '禁止重复'):
                 require_reconciled_execution({'checkpoints': {'Q1': cp}})
             self.assertEqual(request.call_count, 1)
 
@@ -121,13 +121,13 @@ class RequestCheckpointTests(unittest.TestCase):
         cp = {'attempts': []}; calls = []
         def network(*args, **kwargs):
             calls.append(1)
-            vector = [1] if len(calls)<=2 else [1,2]
+            vector = [1] if len(calls)<=1 else [1,2]
             return io.BytesIO(json.dumps({'data':[{'index':0,'embedding':vector}],'usage':{'total_tokens':2}}).encode())
         with patch('urllib.request.urlopen',side_effect=network),patch('app.evaluation_stage.time.sleep'):
             with self.assertRaises(ProviderInvalidResponse):self.stage(cp,lambda:self.provider().embed(['q'],2))
             self.assertFalse(any(r.get('status')=='completed' for r in cp['provider_requests'].values()))
             self.stage(json.loads(json.dumps(cp)),lambda:self.provider().embed(['q'],2),'two')
-        self.assertEqual(len(calls),3)
+        self.assertEqual(len(calls),2)
 
 
 class FiftyQuestionMatrixTests(unittest.TestCase):

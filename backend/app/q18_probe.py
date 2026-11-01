@@ -1,4 +1,4 @@
-"""Q18-only authorization; independent artifacts, never formal evaluation writes."""
+"""Q18 independent probe; independent artifacts, never formal evaluation writes."""
 import json
 import hashlib
 import sqlite3
@@ -92,9 +92,10 @@ def validate_artifact(record,plan,database):
     from .evaluation_stage import correction_for
     settings=load_settings();provider=DeepSeekProvider(Settings('offline-placeholder',settings.base_url,settings.model,settings.timeout_seconds))
     attempts=record['checkpoint']['attempts']
-    if len(attempts)!=len(calls):raise ValueError('Q18 attempt/payment records differ')
+    if not attempts or len(calls)>len(attempts)+len(judge.get('response_recovery',[])):
+        raise ValueError('Q18 attempt/payment records differ')
     for index,call in enumerate(calls):
-        correction=correction_for({'attempts':attempts[:index]},attempts[index]['recorded_by_run_id'])
+        correction=correction_for({'attempts':attempts[:index]},attempts[min(index,len(attempts)-1)]['recorded_by_run_id'])
         request_context={**({'judge_correction':correction} if correction else {}),**context}
         with execution_limits(ledger['output_limits']),provider_task('judge'):
             request=provider._request(BUSINESS_JUDGE_PROMPT,business_judge_input(item['question'],item['reference_answer'],execution['answer'],request_context),True,False,0)
@@ -115,13 +116,16 @@ def require_reviewed_probe(database,plan):
     raise ValueError('Q18 independent real probe and explicit business review required for this Evaluation Identity')
 
 
-def run_probe(runner,source_id,*,expected_binding,authorize_provider,authorization_id,price_snapshot=None,budget_usd=None):
+def run_probe(runner,source_id,*,expected_binding,authorize_provider=None,authorization_id=None,price_snapshot=None,budget_usd=None):
     from .paid_run import PaidRun,controlled_run,execution_limits
     from .evaluation_stage import perform_stage,correction_for
     from .full_text import CORPUS_LOCK
     with CORPUS_LOCK:
         preflight=probe_preflight(runner,source_id)
-        if not authorize_provider or not authorization_id or preflight['binding']!=expected_binding:raise ValueError('Explicit Q18-only authorization with current binding required')
+        if preflight['binding']!=expected_binding:raise ValueError('Q18 current input binding required')
+        if authorization_id is None:
+            from uuid import uuid4
+            authorization_id=uuid4().hex
         if not getattr(runner.runtime,'live_enabled',False):raise ValueError('Q18 real probe requires configured real Provider')
         model=preflight['plan']['new_judge']['model']
         price=json.loads(Path(price_snapshot).read_text()) if price_snapshot else None
@@ -141,7 +145,7 @@ def run_probe(runner,source_id,*,expected_binding,authorize_provider,authorizati
             'checkpoint':{'attempts':[]},'budget_currency':'USD','price_snapshot':price,'ledger_path':str(path.with_suffix('.ledger.json'))}
         save_json(path,record)
         def current_binding():
-            if len(record['checkpoint']['attempts'])>=3:raise ValueError('Q18 authorization exhausted')
+            if len(record['checkpoint']['attempts'])>=3:raise ValueError('Q18 probe attempt limit exhausted')
             return probe_preflight(runner,source_id)['binding']
         prices={model:{'provider':'DeepSeek','input':price['input_per_million'],'output':price['output_per_million'],'max_output':preflight['limits']['judge'],'currency':'USD'}} if price else {}
         ledger=PaidRun(record['ledger_path'],budget_usd,prices,expected_binding,identity_check=current_binding,output_limits=preflight['limits'])

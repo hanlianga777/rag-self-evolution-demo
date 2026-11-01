@@ -1,4 +1,4 @@
-"""New paid entrypoints require explicit authorization; GET cannot start work."""
+"""Explicit execution entrypoints; GET cannot start work."""
 import unittest
 from unittest.mock import patch,Mock
 from fastapi.testclient import TestClient
@@ -25,7 +25,7 @@ class ReplayApiTests(unittest.TestCase):
             thread.reset_mock()  # App startup monitor is separate from this explicit action.
             response=client.post('/api/evaluations/source/judge-replay',json={'authorize_provider':True},headers={'Origin':'http://127.0.0.1:5174'})
             self.assertEqual(response.status_code,409);thread.assert_not_called()
-    def test_diagnostic_enrichment_requires_explicit_authorization(self):
+    def test_diagnostic_enrichment_without_fee_flag_still_checks_run(self):
         with patch.object(main.ai_service,'resolve_diagnostic') as semantic,TestClient(main.app) as client:
             response=client.post('/api/evaluations/source/cases/q/resolve-diagnostics',json={'authorize_provider':False},headers={'Origin':'http://127.0.0.1:5174'})
-            self.assertEqual(response.status_code,409);semantic.assert_not_called()
+            self.assertEqual(response.status_code,404);semantic.assert_not_called()

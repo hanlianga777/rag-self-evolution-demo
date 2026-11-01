@@ -22,7 +22,7 @@ def checkpoint_request(provider, model, endpoint, payload, action, *, reuse=True
     key = hashlib.sha256(json.dumps([phase, provider, model, endpoint, payload], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     saved = checkpoint.setdefault('provider_requests', {}).setdefault(key, {'phase':phase, 'provider':provider, 'model':model, 'attempts':[]})
     if saved.get('status') in {'inflight', 'unknown'} or any(unsettled_usage(u) for a in saved['attempts'] for u in a.get('usage', [])):
-        failure = RuntimeError('RPC执行或Usage未知，须先对账，禁止重复发送')
+        failure = RuntimeError('RPC执行或Usage未知，本次执行失败，禁止重复发送')
         failure.request_execution_unknown = True
         raise failure
     if reuse and saved.get('status') == 'completed':
@@ -61,6 +61,12 @@ def checkpoint_usage(checkpoint):
     return events
 
 
+def judge_request_count(checkpoint, run_id):
+    """Count saved Judge requests across service parsing and scorer validation."""
+    return sum(max(1, len(attempt.get('usage', []))) for attempt in checkpoint.get('attempts', [])
+               if attempt.get('phase') == 'judge' and attempt.get('recorded_by_run_id') == run_id)
+
+
 def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state):
     from .providers import ProviderAPIError,ProviderInvalidResponse,ProviderTimeout,ProviderUnavailable,retryable_error,provider_error_details,stage_deadline
     # Explicit Resume starts a new retry window; process recovery of this Run keeps its failures.
@@ -76,7 +82,7 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
     deadline=time.monotonic()+max(0,600-(time.time()-window['started_at']))
     if checkpoint.get('inflight')==phase:checkpoint.setdefault('unknown_execution',{})[phase]=True
     if checkpoint.get('unknown_execution',{}).get(phase):
-        raise RuntimeError('Unknown request execution after worker loss; explicit request/usage reconciliation required')
+        raise RuntimeError('Unknown request execution after worker loss; duplicate execution refused')
     while True:
         check_stop()
         if failures>=3 or invalid_failures>=2 or time.monotonic()>=deadline:
@@ -98,7 +104,7 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
                 _request_checkpoint.reset(token)
             if any(unsettled_usage(u) for u in usage):
                 checkpoint['execution' if phase=='generation' else 'scored_result']=value
-                failure=ProviderUnavailable('有效结果已保存，但Usage/费用未知，须先对账；不得重复生成')
+                failure=ProviderUnavailable('有效结果已保存，但Usage/费用未知，本次执行失败；不得重复生成')
                 failure.request_execution_unknown=False;failure.billing_unknown=True
                 raise failure
             if time.monotonic()>deadline:
@@ -118,7 +124,7 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
             billing_unknown=getattr(error,'billing_unknown',False) or any(unsettled_usage(u) for u in usage)
             if billing_unknown:checkpoint.setdefault('unsettled_usage',{})[phase]=True
             attempt['billing_unknown']=billing_unknown
-            retry=retryable_error(error) and not unknown and not billing_unknown and failures<3 and time.monotonic()<deadline
+            retry=phase=='judge' and isinstance(error,ProviderInvalidResponse) and retryable_error(error) and not unknown and not billing_unknown and failures<2 and judge_request_count(checkpoint,run_id)+max(1,len(usage))<2 and time.monotonic()<deadline
             # Repeated structurally invalid Judge replies are a terminal contract failure.
             if isinstance(error,ProviderInvalidResponse):
                 invalid_failures+=1
@@ -126,7 +132,7 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
             attempt['request_execution_unknown']=unknown
             if unknown:checkpoint.setdefault('unknown_execution',{})[phase]=True
             attempt['retryable']=retry;checkpoint['attempts'].append(attempt);checkpoint.pop('inflight',None)
-            if automatic and retry:
+            if retry:
                 delay=min(60,2**min(failures-1,6))
                 retry_error=error
                 while retry_error.__cause__ is not None and not isinstance(retry_error,ProviderAPIError):retry_error=retry_error.__cause__

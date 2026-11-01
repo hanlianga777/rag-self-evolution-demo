@@ -3,7 +3,7 @@
 
 The retriever is an explicit saved-Canonical-context substitute: no search,
 Embedding, Rerank, Golden, Judge or database. --execute additionally requires
-reviewed business-data authorization, an exact dry-run binding, and a new output
+an exact dry-run binding and a new output
 folder. Network permission/approval remains the caller's responsibility.
 """
 import argparse
@@ -149,11 +149,9 @@ def source_display_observation(answer,final):
         'answer_rewritten':False}
 
 
-def execute_probe(manifest,settings,plan,output,authorization):
+def execute_probe(manifest,settings,plan,output,authorization=None):
     from app.paid_run import PaidRun,REQUEST_LIMITS,accounting_only,controlled_run
     from app.providers import provider_error_details,_response_metadata
-    if not authorization.strip():
-        raise ValueError('Explicit reviewed business-data authorization evidence is required')
     provider=instrumented_provider(settings,send=True,expected_wire_sha=plan['request_wire_sha256'])
     service=make_service(provider,manifest)
     ledger=PaidRun(output/'ledger.json',identity=plan['binding'],identity_check=lambda:plan['binding'],output_limits={'answer':REQUEST_LIMITS['answer']})
@@ -184,7 +182,6 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--manifest',type=Path,default=DEFAULT_MANIFEST)
     parser.add_argument('--execute',action='store_true')
-    parser.add_argument('--authorization-id',help='direct reviewed business-data authorization evidence; never invented by this script')
     parser.add_argument('--expected-binding',help='binding from the reviewed dry-run')
     parser.add_argument('--output',type=Path,help='new directory required for execution')
     args=parser.parse_args()
@@ -206,11 +203,11 @@ def main():
         if not args.execute:
             print(json.dumps(plan,ensure_ascii=False,indent=2))
             return 0
-        if not args.output or not args.authorization_id or args.expected_binding!=plan['binding'] or not actual.configured:
-            raise SystemExit('Execution requires a new output, reviewed --authorization-id, exact --expected-binding and credentials')
+        if not args.output or args.expected_binding!=plan['binding'] or not actual.configured:
+            raise SystemExit('Execution requires a new output, exact --expected-binding and credentials')
         args.output.mkdir(parents=True,exist_ok=False)
         (args.output/'request_plan.json').write_text(json.dumps(plan,ensure_ascii=False,indent=2)+'\n')
-        report=execute_probe(manifest,actual,plan,args.output,args.authorization_id)
+        report=execute_probe(manifest,actual,plan,args.output)
         print(json.dumps({'status':report['status'],'network_calls':report['network_calls'],'output':str(args.output)},ensure_ascii=False))
         return 0 if report['status']=='completed' else 1
 

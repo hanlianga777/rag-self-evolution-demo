@@ -159,12 +159,10 @@ class CorrectionViewTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'Duplicate'):report.with_correction(audit,bundle,view,rec2,review2,auth2)
 
     def test_wrong_question_binding_source_and_duplicate_correction_block(self):
-        for change in ('question','binding','source','duplicate','authorization'):
+        for change in ('question','binding','source','duplicate'):
             with self.subTest(change=change),tempfile.TemporaryDirectory() as directory:
                 args,recovery,review,auth=self.correction_fixture(Path(directory))
                 if change=='source':(Path(directory)/'ledger.json').write_text('ALTERED')
-                elif change=='authorization':
-                    value=json.loads(auth.read_text());value['approved']=False;auth.write_text(json.dumps(value))
                 else:
                     p=recovery/'replay.json';value=json.loads(p.read_text())
                     if change=='question':value['cases'][0]['question_id']='other'

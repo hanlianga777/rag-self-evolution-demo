@@ -68,7 +68,7 @@ class AutomaticRecoveryTests(unittest.TestCase):
         self.assertTrue(self.store.claim_evaluation_worker(key));self.assertFalse(self.store.claim_evaluation_worker(key))
         self.assertEqual(runner.execute_baseline(key,items,config)['status'],'running');self.assertFalse(runtime.answers)
 
-    def test_network_recovers_but_provider_account_failure_is_terminal(self):
+    def test_network_and_provider_account_failure_are_terminal(self):
         from app.providers import ProviderAPIError
         for error in [ProviderTimeout('fixture timeout'),ProviderAPIError('fixture account',status_code=402)]:
             runtime=Runtime(fail=None);judge=runtime.judge;calls=[]
@@ -78,7 +78,8 @@ class AutomaticRecoveryTests(unittest.TestCase):
                 return judge(q,*args,**kw)
             runtime.judge=flaky;runner=EvaluationRunner(self.store,runtime);key,items,config=runner.start_baseline(automatic=True)
             with patch('app.evaluation.time.sleep'):result=runner.execute_baseline(key,items,config)
-            self.assertEqual(result['status'],'completed' if isinstance(error,ProviderTimeout) else 'partial')
+            self.assertEqual(result['status'],'partial')
+            self.assertEqual(calls.count('Q2'),1)
             self.assertEqual(runtime.answers.count('Q2'),1)
 
     def test_repeated_invalid_schema_stops_with_raw_audit_not_completed(self):

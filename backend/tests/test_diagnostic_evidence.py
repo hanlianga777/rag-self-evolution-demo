@@ -17,7 +17,7 @@ def example():
         'scope_resolved':True,'support':[{'source_id':'related','quote':partial['content']}],
         'reference_support':[{'source_id':source['chunk_id'],'quote':full}],
         'candidate_support':[{'source_id':source['chunk_id'],'quote':full}]}
-    case={'question':'充电器怎么保养？','reference_answer':full,'test_category':'positive','model_answer':'使用干燥抹布擦拭电极。','passed':False,
+    case={'question':'充电器怎么保养？','reference_answer':full,'standard_evidence':[full],'test_category':'positive','model_answer':'使用干燥抹布擦拭电极。','passed':False,
         'judge_result':{'verdict':'FAIL','checks':[check],'issues':[],'reason':'遗漏板面规范'},
         'evaluation_outcome':{'contract_version':'business-vnext-1','execution_complete':True,'verdict':'FAIL'},
         'programmatic_metrics':{'retrieval_trace':{'status':'completed','candidate_stage':'post_metadata_filter_fusion_candidate_cap_pre_rerank','corpus_fingerprint':'isolated','parent_expand':False,'candidates':[source,partial],'reranked':[partial,source],'final':[partial]}}}
@@ -25,70 +25,45 @@ def example():
 
 
 class EvidenceDiagnosisTests(unittest.TestCase):
-    def analyze(self,c,corpus):return business_analysis(c,corpus_chunks=corpus,corpus_fingerprint='isolated')
-    def test_partial_support_is_not_complete_final_or_generation(self):
-        c,corpus=example();before=deepcopy(c);r=self.analyze(c,corpus)
-        self.assertEqual(r['primary_root_cause'],'Unknown');self.assertEqual(c,before)
-        self.assertTrue(any(g.get('coverage')=='partial' for g in r['diagnostic_gaps']))
-    def test_primary_cause_uses_missing_stage_not_judge_array_order(self):
-        c,corpus=example();first=deepcopy(c['judge_result']['checks'][0]);first.update(reference_support=[{'source_id':'related','quote':corpus[1]['content']}],candidate_support=[{'source_id':'related','quote':corpus[1]['content']}])
-        c['judge_result']['checks'][0]['support']=[]
-        c['judge_result']['checks'].insert(0,first)
-        roots=[]
-        for checks in [c['judge_result']['checks'],list(reversed(c['judge_result']['checks']))]:
-            candidate=deepcopy(c);candidate['judge_result']['checks']=checks;roots.append(self.analyze(candidate,corpus)['primary_root_cause'])
-        self.assertEqual(roots,['Ranking','Ranking'])
-    def test_critical_is_not_a_safety_type(self):
-        c,corpus=example();check=c['judge_result']['checks'][0];check.update(met=True,answer_quotes=[c['model_answer']])
-        c['judge_result']['issues']=[{'description':'严重的普通回答缺陷','answer_quotes':[c['model_answer']],'support':check['support'],'critical':True,'safety_violation':False,'scope_resolved':True}]
-        self.assertEqual(self.analyze(c,corpus)['primary_root_cause'],'Generation')
-    def test_upstream_required_norm_gap_not_overridden_by_related_safety_issue(self):
-        c,corpus=example();check=c['judge_result']['checks'][0];check.update(support=[],candidate_support=[])
-        trace=c['programmatic_metrics']['retrieval_trace'];trace.update(candidates=[corpus[1]],reranked=[corpus[1]])
-        c['judge_result']['issues']=[{'description':'未满足清洁前提','answer_quotes':[c['model_answer']],
-            'support':[{'source_id':'related','quote':corpus[1]['content']}],'critical':False,'safety_violation':True,'scope_resolved':True}]
-        self.assertEqual(self.analyze(c,corpus)['primary_root_cause'],'Retrieval')
-    def test_missing_fields_never_mean_reviewed_absence(self):
-        c,corpus=example();check=c['judge_result']['checks'][0];check['support']=[];check.pop('candidate_support')
-        r=self.analyze(c,corpus);self.assertFalse(r['target_eligible'])
-        self.assertTrue(any('candidate_support' in str(g) for g in r['diagnostic_gaps']))
-    def test_wrong_reference_and_unresolved_scope_are_not_silently_repaired(self):
-        for kind in ['scope','source']:
-            c,corpus=example();check=c['judge_result']['checks'][0];check['support']=[]
-            if kind=='scope':check['scope_resolved']=False
-            else:check['reference_support'][0]['source_id']='related'
-            r=self.analyze(c,corpus);self.assertFalse(r['target_eligible']);self.assertTrue(r['diagnostic_gaps'])
-    def test_empty_stage_claim_cannot_override_full_actual_norm(self):
-        c,corpus=example();c['judge_result']['checks'][0].update(support=[],candidate_support=[])
-        c['programmatic_metrics']['retrieval_trace']['final']=[corpus[0]]
-        r=self.analyze(c,corpus)
-        self.assertEqual(r['primary_root_cause'],'Unknown');self.assertTrue(r['diagnostic_gaps'])
-    def test_cross_product_identical_quote_does_not_prove_coverage(self):
-        c,corpus=example();wrong={**corpus[0],'chunk_id':'wrong-product','product':'other'};corpus.append(wrong)
-        c['judge_result']['checks'][0]['support']=[{'source_id':'wrong-product','quote':wrong['content']}]
-        c['programmatic_metrics']['retrieval_trace']['final']=[wrong]
-        r=self.analyze(c,corpus)
-        self.assertEqual(r['primary_root_cause'],'Unknown');self.assertTrue(r['diagnostic_gaps'])
-    def test_missing_scores_block_context_strategy_without_losing_root(self):
+    def analyze(self,case,corpus):
+        return business_analysis(case,corpus_chunks=corpus,corpus_fingerprint='changed')
+
+    def test_partial_final_text_is_noise_when_candidate_has_whole_standard(self):
+        case,corpus=example();before=deepcopy(case);result=self.analyze(case,corpus)
+        self.assertEqual(result['diagnosis_category'],'检索噪声')
+        self.assertEqual(result['retrieval_metrics']['recall_at_k'],0)
+        self.assertEqual(case,before)
+
+    def test_missing_candidate_text_dominates_judge_issue_order(self):
+        case,corpus=example();case['programmatic_metrics']['retrieval_trace']['candidates']=[corpus[1]]
+        case['judge_result']['issues']=[{'critical':True,'safety_violation':True}]
+        self.assertEqual(self.analyze(case,corpus)['diagnosis_category'],'检索失败')
+
+    def test_judge_scope_and_source_ids_are_not_text_comparison_inputs(self):
+        case,corpus=example();case['judge_result']['checks'][0].update(scope_resolved=False,candidate_support=[])
+        case['judge_result']['checks'][0]['reference_support'][0]['source_id']='different'
+        self.assertEqual(self.analyze(case,[])['diagnosis_category'],'检索噪声')
+
+    def test_missing_judge_candidate_support_is_not_a_missing_trace(self):
+        case,corpus=example();case['judge_result']['checks'][0].pop('candidate_support')
+        self.assertEqual(self.analyze(case,corpus)['diagnosis_category'],'检索噪声')
+
+    def test_actual_final_text_overrides_judge_stage_absence_claims(self):
+        case,corpus=example();case['judge_result']['checks'][0].update(support=[],candidate_support=[])
+        case['programmatic_metrics']['retrieval_trace']['final']=[corpus[0]]
+        self.assertEqual(self.analyze(case,corpus)['diagnosis_category'],'回答问题')
+
+    def test_metadata_or_corpus_drift_does_not_remove_saved_text_coverage(self):
+        case,corpus=example();wrong={**corpus[0],'chunk_id':'changed','product':'other'}
+        case['programmatic_metrics']['retrieval_trace']['final']=[wrong]
+        self.assertEqual(self.analyze(case,[])['diagnosis_category'],'回答问题')
+
+    def test_missing_scores_do_not_block_a_text_supported_noise_target(self):
         from app.diagnostics import diagnostic_view
-        from unittest.mock import patch
-        c,corpus=example();c['judge_result']['checks'][0]['support']=[]
-        with patch('app.diagnostics._current_corpus',return_value=(corpus,'isolated')):
-            r=diagnostic_view(c)
-        self.assertEqual(r['primary_root_cause'],'Ranking');self.assertFalse(r['target_eligible'])
-        self.assertIn('score',str(r['optimization_blockers']))
-    def test_context_option_preserves_already_answered_required_facts(self):
-        c,corpus=example();full,partial=corpus;c['judge_result']['checks'][0]['support']=[]
-        c['judge_result']['checks'].append({'requirement':'擦拭电极','met':True,'answer_quotes':[c['model_answer']],
-            'support':[{'source_id':partial['chunk_id'],'quote':partial['content']}]})
-        filler=[{**partial,'chunk_id':f'noise-{i}','parent_chunk_id':f'np-{i}','content':'目录','chunk_text':'目录'} for i in range(10)]
-        for entry in corpus+filler:entry['score']=.5
-        trace=c['programmatic_metrics']['retrieval_trace']
-        trace.update(candidates=[filler[0],filler[1],full,filler[2],filler[3],partial,*filler[4:]],
-            reranked=[partial,*filler[:8],full,*filler[8:]],final=[partial,*filler[:3]])
-        r=self.analyze(c,corpus+filler)
-        self.assertNotIn({'rerank':False},r['context_selection_options'])
-        self.assertIn({'rerank':False,'top_k':6},r['context_selection_options'])
+        case,corpus=example();result=diagnostic_view(case)
+        self.assertEqual(result['primary_root_cause'],'Ranking')
+        self.assertTrue(result['target_eligible'])
+        self.assertIn('context_selection',result['optimization_directions'])
 
 
 class IndependentReviewTests(unittest.TestCase):

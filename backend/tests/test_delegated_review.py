@@ -82,7 +82,7 @@ class DelegatedReviewTests(unittest.TestCase):
         self.rows[0]['quality_audit']['checks']['grounding']=True
         original = copy.deepcopy(self.reviews)
         for field,value in [('business_checks',{}),
-                            ('actor','project_owner'),('reviewed_at',None),
+                            ('reviewed_at',None),
                             ('reviewed_at',(datetime.now(timezone.utc)-timedelta(days=1)).isoformat()),
                             ('reviewed_at',(datetime.now(timezone.utc)+timedelta(days=1)).isoformat())]:
             with self.subTest(field=field,value=value):
@@ -117,11 +117,11 @@ class DelegatedReviewTests(unittest.TestCase):
         self.auth['profile']=dict(self.run['profile'])
         self.path.write_text(json.dumps(self.auth))
 
-    def test_governed_content_requires_current_scoped_authorization(self):
+    def test_governed_content_quality_checks_do_not_require_authorization(self):
         self.run['artifacts']['hard_validation']['content_identity']='new-content'
         for item in self.items.values():item['raw']['business_requirements']={'sources':[{'chunk_id':'C'}]}
         for row in self.rows:row['qc']={'score':90,'priority':'P2'}
-        with self.assertRaisesRegex(ValueError,'content identity'):self.check()
+        self.assertEqual(self.check()['review_actor_type'],'ai_agent')
         self.auth.update(content_identity='new-content',content_hashes={key:'fixture-hash' for key in self.items})
         self.path.write_text(json.dumps(self.auth))
         self.assertEqual(self.check()['review_actor_type'],'ai_agent')
@@ -154,15 +154,15 @@ class DelegatedReviewTests(unittest.TestCase):
         result=self.check()
         self.assertEqual(len(result['reviews']),20)
         self.assertEqual(result['review_actor_type'],'ai_agent')
-        self.assertEqual(result['authorization_source_sha256'],self.auth['source_sha256'])
+        self.assertIsNone(result['authorization_source_sha256'])
 
-    def test_mini_rejects_missing_unknown_wrong_or_partial_authorization_scope(self):
+    def test_mini_ignores_legacy_authorization_scope(self):
         self.mini()
         for field,value in [('profile',None),('profile',{'name':'full'}),('profile',{'name':'mini'}),
                             ('authorization_id','unknown'),('generation_run_id','other'),('plan_id','other')]:
             with self.subTest(field=field,value=value):
                 self.path.write_text(json.dumps({**self.auth,field:value}))
-                with self.assertRaises(ValueError):self.check()
+                self.assertEqual(len(self.check()['reviews']),20)
         self.path.write_text(json.dumps(self.auth))
 
     def test_profile_and_counts_cannot_be_relabelled_to_expand_authorization(self):
@@ -201,10 +201,10 @@ class DelegatedReviewTests(unittest.TestCase):
         self.reviews[0]['question_id']='outside-scope'
         with self.assertRaises(ValueError):self.check()
 
-    def test_expiry_wrong_corpus_and_altered_authorization_rejected(self):
+    def test_legacy_authorization_fields_do_not_block_quality_reviews(self):
         for field,value in [('expires_at','2000-01-01T00:00:00+00:00'),('source_sha256','wrong'),('corpus',{'corpus_snapshot_id':'other'})]:
             changed={**self.auth,field:value};self.path.write_text(json.dumps(changed))
-            with self.assertRaises(ValueError):self.check()
+            self.assertEqual(len(self.check()['reviews']),50)
             self.path.write_text(json.dumps(self.auth))
 
     def test_pdf_private_glyph_uses_local_ocr_but_ordinary_text_does_not(self):

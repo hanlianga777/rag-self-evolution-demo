@@ -99,8 +99,8 @@ def evaluate_gates(metrics: dict) -> dict:
 
 def evaluate_regression(*, new_critical_failures: int, new_ordinary_failures: int) -> dict:
     valid = all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in (new_critical_failures, new_ordinary_failures))
-    passed = valid and new_critical_failures == 0 and new_ordinary_failures <= 1
-    return {"passed": passed, "status": "PASS" if passed else ("NOT_EVALUABLE" if not valid else "FAIL"), "new_critical_failures": new_critical_failures, "new_ordinary_failures": new_ordinary_failures, "limits": {"critical": 0, "ordinary": 1}}
+    passed = valid and new_critical_failures == 0
+    return {"passed": passed, "status": "PASS" if passed else ("NOT_EVALUABLE" if not valid else "FAIL"), "new_critical_failures": new_critical_failures, "new_ordinary_failures": new_ordinary_failures, "limits": {"critical": 0, "ordinary": None}}
 
 
 def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int, baseline_bad_case_count: int, candidate_bad_case_count: int) -> dict:
@@ -113,6 +113,26 @@ def qualify_candidate(gates: dict, regression: dict, target_bad_cases_fixed: int
     }
     qualified = all(checks.values())
     return {"qualified": qualified, "status": "QUALIFIED" if qualified else "NOT_QUALIFIED", "checks": checks, "bad_case_reduction": baseline_bad_case_count - candidate_bad_case_count if counts_valid else None}
+
+
+def qualify_release(gates: dict, regression: dict, fixed_count: int) -> dict:
+    checks = {"hard_gates": gates.get("passed") is True,
+              "zero_new_failures": regression.get("passed") is True and regression.get("new_critical_failures") == 0 and regression.get("new_ordinary_failures") == 0,
+              "at_least_one_fixed": type(fixed_count) is int and fixed_count >= 1}
+    return {"qualified": all(checks.values()), "checks": checks}
+
+
+def select_final_candidate(candidates: list[dict], final_candidate: dict | None = None) -> dict:
+    if final_candidate and final_candidate.get('status') == 'evaluated' and final_candidate.get('result', {}).get('release_qualification', {}).get('qualified') is True:
+        return {'decision': '发布合格', 'candidate_id': final_candidate['id'], 'reason': '11项门槛全过、相对Baseline零新增错题且至少修好1道'}
+    qualified = [c for c in candidates if c.get('status') == 'evaluated' and c.get('reasoning', {}).get('candidate_label') != 'D' and c.get('result', {}).get('qualification', {}).get('qualified') is True]
+    if not qualified:
+        return {'decision': '保持 Baseline', 'candidate_id': None, 'reason': '没有已合格的A/B/C方案'}
+    def bad_count(candidate):
+        value = candidate['result'].get('bad_case_count')
+        return value if type(value) is int and value >= 0 else float('inf')
+    winner = min(qualified, key=lambda c: (bad_count(c), c['id']))
+    return {'decision': '保留赢家方案', 'candidate_id': winner['id'], 'reason': '最终方案未通过发布规则；保留已合格A/B/C中错题最少的方案'}
 
 
 def canonicalize_config(config: dict) -> str:

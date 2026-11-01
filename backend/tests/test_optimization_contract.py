@@ -13,7 +13,16 @@ from app.policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, EXCLUDED_A
 
 def trace_case(root='Retrieval'):
     from diagnostic_fixture import retrieval_case, generation_case
-    return retrieval_case()[0] if root=='Retrieval' else generation_case(root)
+    if root=='Retrieval':
+        case,chunks=retrieval_case()
+        required=case['programmatic_metrics']['evidence_coverage']['required_chunk_ids']
+        case['standard_evidence']=[c['chunk_text'] for c in chunks if c['chunk_id'] in required]
+    else:
+        case=generation_case(root)
+        case.update(standard_evidence=['操作前关闭设备。'],judge_result={'verdict':'FAIL','reason':'fixture failure'})
+        for stage in ('candidates','final'):
+            case['programmatic_metrics']['retrieval_trace'][stage]=[{'chunk_id':'c','content':'操作前关闭设备。'}]
+    return case
 
 
 def drafts():
@@ -73,15 +82,14 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(experiment["candidates"][0]["reasoning"]["proposal"], "more evidence")
         self.assertEqual(experiment["candidates"][0]["reasoning"]["observed_evidence"], ["Q1"])
         self.assertEqual(audit["provider_raw_text"], raw)
-        self.assertNotIn("confidence",provider.prompt["bad_cases"][0]["diagnostic_view"])
-        self.assertTrue(provider.prompt["target_reference_map"]["Q1"]["diagnostic_view"]["target_eligible"])
+        self.assertEqual(provider.prompt['bad_cases'][0]['diagnosis_category'],'检索失败')
+        self.assertTrue(provider.prompt['bad_cases'][0]['reason'])
         self.assertNotIn("all_bad_case_audit",provider.prompt)
         self.assertIn("all_bad_case_audit",audit)
-        self.assertIsNone(provider.prompt["failed_gates"])
-        self.assertEqual(provider.prompt["baseline_gate_results"], {"passed": False})
+        self.assertIsNone(provider.prompt["goal"]["failed_gates"])
         self.assertEqual(provider.prompt["allowed_parameter_values"], search_space_contract())
         self.assertEqual(set(provider.prompt["allowed_parameter_values"]), set(ALLOWED_SEARCH_SPACE))
-        self.assertEqual(provider.prompt["excluded_automatic_parameters"], sorted(EXCLUDED_AUTOMATIC_PARAMETERS))
+        self.assertNotIn("excluded_automatic_parameters",provider.prompt)
         self.assertEqual(provider.prompt["allowed_parameter_values"]["multi_query"], {"type": "boolean false or integer", "allowed": [False, 2, 4, 6]})
 
     def test_targets_require_current_persisted_ids_and_audit_unknown_references(self):
@@ -109,19 +117,17 @@ class OptimizationContractTests(unittest.TestCase):
         self.store.finish_evaluation_run('EVAL-test', 'completed', {'gates': gates})
         provider = FixedProvider(json.dumps(drafts()))
         generated = OptimizationAgent(self.store, provider).generate('EVAL-test')
-        self.assertEqual(provider.prompt['baseline_id'], 'EVAL-test')
-        self.assertEqual(provider.prompt['experiment_id'], generated['id'])
-        self.assertEqual(provider.prompt['baseline_gate_results'], gates)
-        self.assertEqual(provider.prompt['failed_gates'], [gates['gates'][0]])
-        self.assertEqual(provider.prompt['evaluation_budget'], {'used': 0, 'max': 12, 'reserved_for_d': 1})
-        self.assertEqual(provider.prompt['target_reference_map']['Q1']['bad_case_id'], 'BC-EVAL-test-Q1')
+        self.assertEqual(generated['baseline_run_id'],'EVAL-test')
+        self.assertEqual(provider.prompt['goal']['failed_gates'],[gates['gates'][0]])
+        self.assertEqual(generated['evaluation_budget']['used'],0)
+        self.assertEqual(provider.prompt['bad_cases'][0]['question_id'],'Q1')
         for candidate in generated['candidates']:
             self.store.finish_candidate(candidate['id'], 'failed', {})
         retry = FixedProvider('{bad')
         with self.assertRaises(ValueError):
             OptimizationAgent(self.store, retry).generate('EVAL-test', experiment_id=generated['id'])
-        self.assertEqual(retry.prompt['evaluation_budget'], {'used': 3, 'max': 12, 'reserved_for_d': 1})
-        self.assertEqual(retry.prompt['failed_gates'], [gates['gates'][0]])
+        self.assertEqual(self.store.experiment(generated['id'])['evaluation_budget']['used'],3)
+        self.assertEqual(retry.prompt['goal']['failed_gates'], [gates['gates'][0]])
 
     def test_bad_candidate_k_rejects_only_bad_candidate_and_preserves_full_raw_trace(self):
         result=drafts();result['candidates'][1]['config_diff']['candidate_k']='32'
@@ -157,13 +163,12 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertFalse(result['result']['provider_called'])
         self.assertEqual(result['result']['generation_status'],'insufficient_evidence')
 
-    def test_intervention_failure_retains_valid_part_and_raw_audit_atomically(self):
+    def test_cross_stage_changes_are_allowed_and_raw_audit_is_retained(self):
         response=drafts();response['candidates'][1]['config_diff']['prompt_strategy']='Abstention'
         experiment,trace,audit,_,raw=self.run_drafts(response)
         self.assertEqual(trace['status'],'completed')
-        self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['A','C'])
-        self.assertEqual(audit['rejected_candidates'][0]['stage'],'intervention')
-        self.assertEqual(audit['rejected_candidates'][0]['id'],'B')
+        self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['A','B','C'])
+        self.assertEqual(audit['rejected_candidates'],[])
         self.assertEqual(audit['provider_raw_text'],raw)
 
     def test_strict_types_and_discrete_values(self):
@@ -224,71 +229,33 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertIsNone(experiment["result"]["parsed_json"])
         self.assertEqual(experiment["result"]["validation_stage"], "json_parse")
 
-    def test_prompt_and_root_cause_rejection_expose_persisted_mapping(self):
+    def test_root_cause_is_derived_from_saved_diagnosis(self):
         result=drafts();result['candidates'][1]['root_cause']='Generation'
         experiment,trace,audit,provider,raw=self.run_drafts(result)
         self.assertEqual(trace['status'],'completed')
-        self.assertEqual(audit['rejected_candidates'][0]['id'],'B')
-        self.assertEqual(audit['rejected_candidates'][0]['field'],'root_cause')
-        self.assertEqual(audit['rejected_candidates'][0]['allowed_values'],['Retrieval'])
-        self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['A','C'])
-        self.assertEqual(provider.prompt['target_reference_map']['Q1']['primary_root_cause'],'Retrieval')
-        self.assertIn('参数干预环节',provider.prompt['rule'])
+        self.assertEqual(audit['rejected_candidates'],[])
+        self.assertEqual([c['reasoning']['root_cause'] for c in experiment['candidates']],['Retrieval']*3)
+        self.assertEqual(provider.prompt['bad_cases'][0]['diagnosis_category'],'检索失败')
 
-    def test_saved_round2_response_reproduces_b_and_accepts_truthful_cause_with_same_intervention(self):
-        import shutil
-        backup=Path(__file__).resolve().parents[2]/'output/playwright/agent-round2-audit/protected.db'
-        if not backup.exists():self.skipTest('Private audit copy not tracked')
-        copied=Path(self.directory.name)/'round2-copy.db';shutil.copy2(backup,copied)
-        store=GovernanceStore(copied)
-        with store.connection() as c:
-            row=c.execute('SELECT result_json FROM agent_traces WHERE id=8').fetchone()
-        saved=json.loads(row[0]);raw=saved['provider_raw_text']
-        baseline=saved['baseline_id'];exp=saved['optimization_run_id']
-        # This private replay is frozen to the archived baseline Corpus, not live Knowledge.
-        from unittest.mock import patch
-        old_identity=json.loads(store.evaluation_run(baseline)['dataset_snapshot_json'])['corpus_fingerprint']
-        historical=patch('app.governance.current_manifest',return_value={'knowledge_identity':old_identity,'sources':old_identity['sources']})
-        historical.start();self.addCleanup(historical.stop)
-        before=store.candidates(exp)
-        provider=FixedProvider(raw)
-        from app.evaluation_contract import policy_current
-        if not policy_current(store.evaluation_run(baseline)['judge']):
-            with self.assertRaisesRegex(ValueError,'评测规则已升级'):
-                OptimizationAgent(store,provider).generate(baseline,experiment_id=exp)
-            self.assertEqual(store.candidates(exp),before)
-            return
-        with self.assertRaisesRegex(ValueError,'候选根因与可信目标不对应'):
-            OptimizationAgent(store,provider).generate(baseline,experiment_id=exp)
-        self.assertEqual(store.candidates(exp),before)
-        self.assertEqual(store.experiment(exp)['evaluation_budget']['used'],5)
-        for target in saved['parsed_candidates'][1]['target_bad_cases']:
-            ref=provider.prompt['target_reference_map'][target]
-            self.assertEqual(ref['primary_root_cause'],'Generation')
-            self.assertNotIn('diagnosis_status',ref)
-            self.assertEqual(ref['analysis_category'],'rag_failure')
-            self.assertTrue(ref['root_cause_evidence'])
-        self.assertTrue(all('checkpoints' not in item['result'] for item in provider.prompt['prior_sandbox_results']))
-        corrected=json.loads(raw);corrected['candidates'][1]['root_cause']='Generation'
-        # Offline counterfactual only: raw history and stored roots remain unchanged.
-        result=OptimizationAgent(store,FixedProvider(json.dumps(corrected))).generate(baseline,experiment_id=exp)
-        self.assertEqual(len(result['candidates']),6)
-        new_b=next(c for c in result['candidates'] if c['reasoning'].get('round')==2 and c['reasoning']['candidate_label']=='B')
-        self.assertEqual(new_b['reasoning']['root_cause'],'Generation')
-        self.assertEqual(new_b['reasoning']['changed_parameters'],corrected['candidates'][1]['config_diff'])
-        self.assertEqual([c for c in store.candidates(exp) if c['reasoning'].get('round')==1],before)
+    def test_round2_uses_temporary_saved_results_and_new_configuration(self):
+        generated=OptimizationAgent(self.store,FixedProvider(json.dumps(drafts()))).generate('EVAL-test')
+        for c in generated['candidates']:self.store.finish_candidate(c['id'],'failed',{})
+        response=drafts();proposal=response['candidates'][0]
+        proposal.update(hypothesis='rewrite second round',config_diff={'query_rewrite':True})
+        response['candidates']=[proposal]
+        result=OptimizationAgent(self.store,FixedProvider(json.dumps(response))).generate('EVAL-test',experiment_id=generated['id'])
+        new=[c for c in result['candidates'] if c['reasoning'].get('round')==2]
+        self.assertEqual(len(new),1)
+        self.assertEqual(new[0]['config']['query_rewrite'],True)
 
-    def test_generation_target_requires_retrieval_evidence_before_cross_stage_hypothesis(self):
+    def test_generation_target_allows_retrieval_parameters(self):
         self.store.record_bad_case('EVAL-test','Q1','Generation','ordinary',trace_case('Generation'))
-        self.store.record_bad_case('EVAL-test','Q-unknown','Unknown','ordinary',{'primary_root_cause':'Unknown','diagnosis':{'status':'needs_review','reason':'fixture uncertainty'}})
-        response=drafts()
-        for candidate in response['candidates']:candidate['root_cause']='Generation'
-        provider=FixedProvider(json.dumps(response))
-        with self.assertRaisesRegex(ValueError,'Trace'):
-            OptimizationAgent(self.store,provider).generate('EVAL-test')
-        self.assertEqual(provider.prompt['target_reference_map']['Q1']['primary_root_cause'],'Generation')
-        self.assertNotIn('Q-unknown',provider.prompt['target_reference_map'])
-        self.assertFalse(self.store.candidates())
+        self.store.record_bad_case('EVAL-test','Q-unknown','Unknown','ordinary',{'primary_root_cause':'Unknown'})
+        provider=FixedProvider(json.dumps(drafts()))
+        result=OptimizationAgent(self.store,provider).generate('EVAL-test')
+        self.assertEqual(len(result['candidates']),3)
+        self.assertEqual([row['question_id'] for row in provider.prompt['bad_cases']],['Q1'])
+        self.assertEqual(result['candidates'][0]['reasoning']['root_cause'],'Generation')
 
     def test_evaluation_audit_is_local_only_not_strategy_input(self):
         self.store.record_bad_case('EVAL-test','Q-risk','Unknown','ordinary',{'failure_tags':['Evidence Pending Review'],'primary_root_cause':'Unknown','diagnosis':{'status':'disputed','reason':'fixture matcher dispute'}})
@@ -300,7 +267,7 @@ class OptimizationContractTests(unittest.TestCase):
         with self.store.connection() as connection:
             audit=json.loads(connection.execute('SELECT result_json FROM agent_traces ORDER BY id DESC LIMIT 1').fetchone()[0])
         self.assertEqual(len(audit['all_bad_case_audit']),2)
-        self.assertNotIn('Q-risk',provider.prompt['target_reference_map'])
+        self.assertNotIn('Q-risk',[r['question_id'] for r in provider.prompt['bad_cases']])
         risk=next(row for row in audit['all_bad_case_audit'] if row['question_id']=='Q-risk')
         self.assertNotIn('confidence',risk['diagnostic_view'])
         self.assertEqual(risk['diagnostic_view']['analysis_category'],'insufficient_evidence')

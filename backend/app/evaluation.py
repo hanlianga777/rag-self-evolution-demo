@@ -10,7 +10,7 @@ from .safety_guard import check_safety, adjudicate
 from statistics import mean
 from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, validate_business_judgment, business_check_roles, quote_present
 
-from .policy import DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate
+from .policy import DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate, qualify_release
 
 
 ROOT_CAUSE_BY_TAG = {
@@ -62,6 +62,34 @@ def _mean(values: list[float]):
 def policy_behavior(case):
     value=case.get('programmatic_metrics',{}).get('behavior_contract',{}).get('effective_pass',case.get('judge_result',{}).get('behavior_pass'))
     return value if type(value) is bool else None
+
+
+def protected_question(case, golden=None):
+    """Use frozen question identity, never a candidate answer's dynamic issue severity."""
+    golden = golden or {}
+    return (golden.get('negative_subtype', case.get('negative_subtype')) in {'safety_critical', 'prompt_injection'}
+            or golden.get('criticality') == 'high'
+            or golden.get('severity', case.get('severity')) == 'critical')
+
+
+def candidate_comparison(baseline, candidate, targets, golden_questions=None):
+    """Task 004 compares saved binary outcomes; only reviewed fluctuations are excluded."""
+    comparison = compare_cases(baseline, candidate, targets)
+    fluctuations = sorted(q for q, c in candidate.items() if baseline.get(q, {}).get('passed') is True and c.get('regression_review', {}).get('status') == 'fluctuation')
+    new = sorted(q for q, c in baseline.items() if c.get('passed') is True and candidate.get(q, {}).get('passed') is False and q not in fluctuations)
+    fixed = sorted(q for q, c in baseline.items() if c.get('passed') is False and candidate.get(q, {}).get('passed') is True)
+    critical = [q for q in new if protected_question(baseline[q], (golden_questions or {}).get(q))]
+    target = sorted(set(fixed) & set(targets))
+    complete = bool(baseline) and set(baseline) == set(candidate) and all(type(c.get('passed')) is bool for c in [*baseline.values(), *candidate.values()])
+    return {**comparison, 'comparison_complete': complete,
+            'new_regression_question_ids': new, 'new_regressions': len(new), 'fluctuation_question_ids': fluctuations,
+            'new_critical_failures': len(critical), 'new_ordinary_failures': len(new) - len(critical),
+            'all_fixed_question_ids': fixed, 'target_fixed_question_ids': target, 'target_bad_cases_fixed': len(target),
+            'incidental_fixed_question_ids': sorted(set(fixed) - set(target)), 'incidental_fixes': len(set(fixed) - set(target)),
+            'net_improvement': len(fixed) - len(new), 'formal_blocking_question_ids': critical,
+            'bad_case_count': sum(c.get('passed') is False for q, c in candidate.items() if q not in fluctuations),
+            'initial_bad_case_count': sum(c.get('passed') is False for c in candidate.values()),
+            'regression_interpretation': '初次新增错题复核两次，三次多数判错才计新增；普通新增只记录，关键安全及注入新增阻断ABC'}
 
 
 def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:
@@ -291,6 +319,41 @@ class EvaluationRunner:
         execution = self.runtime.answer(item["question"], config)
         return self.score_execution(item, execution)
 
+    def review_regression(self, item, initial, config, checkpoint, run_id, check_stop, on_state):
+        """Two independent answer/judge runs, with saved stages preventing duplicate RPCs."""
+        from .evaluation_stage import perform_stage, checkpoint_usage
+        from .telemetry import cost_fields
+        review = checkpoint.setdefault('regression_review', {'runs': []})
+        if review.get('status') in {'confirmed_regression', 'fluctuation'}:
+            return {k: v for k, v in review.items() if k != 'runs'}
+        for index in range(2):
+            if len(review['runs']) <= index:
+                review['runs'].append({'attempts': []})
+            stage = review['runs'][index]
+            def perform(phase, action):
+                return perform_stage(stage, phase, action, run_id, automatic=False, check_stop=check_stop, on_state=on_state)
+            if 'execution' not in stage:
+                stage['execution'] = perform('generation', lambda: self.runtime.answer(item['question'], config))
+                on_state('running', phase='regression_review')
+            if 'scored_result' not in stage:
+                stage['scored_result'] = perform('judge', lambda: self.score_execution(item, stage['execution']))
+                on_state('running', phase='regression_review')
+            if type(stage['scored_result'].get('passed')) is not bool:
+                raise ValueError('回退复核没有有效的逐题判分结果')
+        votes = [initial.get('passed') is False, *[r['scored_result']['passed'] is False for r in review['runs']]]
+        events = [u for r in review['runs'] for u in checkpoint_usage(r)]
+        confirmed = sum(votes) >= 2
+        review.update(status='confirmed_regression' if confirmed else 'fluctuation', confirmed_regression=confirmed,
+                      review_runs=2, failed_votes=sum(votes), total_votes=3, call_events=len(events),
+                      generation_runs=2, judge_runs=2,
+                      generation_calls=sum(len(a.get('usage', [])) for r in review['runs'] for a in r['attempts'] if a['phase'] == 'generation'),
+                      judge_calls=sum(len(a.get('usage', [])) for r in review['runs'] for a in r['attempts'] if a['phase'] == 'judge'),
+                      known_input_tokens=sum(u.get('prompt_tokens', 0) for u in events if type(u.get('prompt_tokens')) is int),
+                      known_output_tokens=sum(u.get('completion_tokens', 0) for u in events if type(u.get('completion_tokens')) is int),
+                      **cost_fields(getattr(self.runtime, 'model', 'unknown'), events))
+        on_state('running', phase='regression_review')
+        return {k: v for k, v in review.items() if k != 'runs'}
+
     def judge_context(self,item,execution,judge_correction=None):
         trace = execution.get('retrieval_trace') or {}
         final = trace.get('final', [])
@@ -358,7 +421,7 @@ class EvaluationRunner:
             'model_answer':execution['answer'],'judge_result':judge,'failure_tags':failure_tags,'passed':not failure_tags,
             'programmatic_metrics':{'evidence_sufficiency':sufficiency,'claim_assessment':claims,
                 'behavior_contract':behavior_contract,'evidence_coverage':coverage,'retrieval_trace':trace,
-                'latency_ms':execution['latency_ms']}})
+                'latency_ms':execution['latency_ms']}}, golden_item=item)
         primary, secondary = analysis['primary_root_cause'] if failure_tags else 'None', []
         diagnostic={'reason':analysis['analysis_reason'],
             'analysis_category':analysis['analysis_category'],'findings':analysis['evidence_checks'],
@@ -379,12 +442,13 @@ class EvaluationRunner:
                  'pending_findings':claims['pending'], 'unresolved_conflicts':sufficiency.get('unresolved_conflicts',[]),
                  'confirmation_basis':'saved_structural_findings_not_independent_semantic_proof'}
         basis = 'verified_answer_claim' if primary == 'Generation' and located_failure else 'measured_latency' if primary == 'Performance' else 'explicit_safety_failure' if primary == 'Safety' else analysis['retrieval_failure_stage'] if primary == 'Retrieval' else 'unresolved_evaluation_evidence' if primary == 'Unknown' else coverage['diagnostic_basis']
-        return {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
+        case = {"question": item["question"], "reference_answer": expected, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "severity": severity, "retrieved_chunks": execution["retrieval"], "model_answer": execution["answer"], "diagnosis": diagnostic, "evaluation_outcome":outcome, "programmatic_metrics": {"behavior_contract":behavior_contract, "evidence_sufficiency": sufficiency, "claim_assessment": claims, "retrieval_trace": trace or None, "evidence_coverage": coverage, "cost_estimation": execution.get("cost_estimation"), "judge_cost_estimation": judge.get("cost_estimation"), "retrieval_hit": hit, "retrieval_precision": precision, "retrieval_rank": matching[0] if matching else None, "latency_ms": execution["latency_ms"], "ttft_ms": execution.get("ttft_ms"), "input_tokens": execution.get("input_tokens"), "output_tokens": execution.get("output_tokens"), "provider_cost": execution.get("provider_cost"), "stages": execution.get("stages"), "token_usage": execution.get("token_usage"), "estimated_cost": execution.get("estimated_cost"), "judge_stages": judge.get("stages"), "judge_usage": judge.get("token_usage"), "judge_cost": judge.get("estimated_cost")}, "judge_result": judge, "overall_score": score, "failure_tags": failure_tags, "primary_root_cause": primary, "secondary_root_causes": secondary, "root_cause": {"primary": primary, "secondary": secondary, "evidence_match": hit, "diagnostic_basis": basis}, "passed": not failure_tags, "redline_pass": not redline}
+
+        return self._finalize_diagnosis(case, item)
 
     def _score_business(self, item, execution, judge, expected, *, canonical_chunks=None):
         from .providers import ProviderInvalidResponse
         from .scoring_contract import compile_contract
-        from .diagnostics import automatic_analysis
         from .retrieval import evidence_coverage
         trace = execution.get('retrieval_trace') or {}
         try:
@@ -395,7 +459,10 @@ class EvaluationRunner:
                 or any(type(quality.get(k)) not in (int,float) or not math.isfinite(quality[k]) or not 0 <= quality[k] <= 1 for k in ('faithfulness','completeness'))):
                 raise ValueError('quality metrics required by unchanged Hard Gates are invalid')
         except (ValueError, KeyError, TypeError) as error:
-            raise ProviderInvalidResponse(str(error),raw_provider_response=judge.get('raw_provider_response')) from error
+            failure = ProviderInvalidResponse(str(error), raw_provider_response=judge.get('raw_provider_response'), metadata={'response_recovery': judge.get('response_recovery', [])})
+            if judge.get('response_retries', 0) >= 1:
+                failure.provider_retry_exhausted = True
+            raise failure from error
         guard=check_safety(item['question'],execution['answer'],trace.get('final'),constraints=item.get('raw'))
         decision=adjudicate(judge,guard)
         passed = decision['verdict'] == 'PASS'
@@ -421,10 +488,18 @@ class EvaluationRunner:
             'evaluation_outcome':outcome,'passed':passed,'redline_pass':passed,
             'overall_score':round((quality['correctness']*25+quality['completeness']*100+quality['faithfulness']*100)/3,2),
             'failure_tags':[] if passed else ['Business Failure']}
-        analysis=automatic_analysis(case)
-        case.update(primary_root_cause=analysis['primary_root_cause'],secondary_root_causes=[],
-            diagnosis={'reason':analysis['analysis_reason'],'analysis_category':analysis['analysis_category'],'findings':analysis['evidence_checks'],'retrieval_failure_stage':analysis['retrieval_failure_stage']},
-            root_cause={'primary':analysis['primary_root_cause'],'secondary':[],'diagnostic_basis':analysis['retrieval_failure_stage'] or analysis['analysis_reason']})
+        return self._finalize_diagnosis(case, item)
+
+    def _finalize_diagnosis(self, case, item):
+        from .diagnostics import standard_evidence, automatic_analysis
+        case['standard_evidence'] = standard_evidence(item)
+        analysis = automatic_analysis(case, golden_item=item)
+        case['programmatic_metrics']['retrieval_diagnostics'] = analysis['retrieval_metrics']
+        case.update(primary_root_cause=analysis['primary_root_cause'], secondary_root_causes=[],
+            diagnosis={**case.get('diagnosis', {}), 'reason': analysis['analysis_reason'], 'analysis_category': analysis['analysis_category'],
+                       'diagnosis_category': analysis['diagnosis_category'], 'priority': analysis['priority'], 'diagnostic_gaps': analysis['diagnostic_gaps'],
+                       'findings': analysis['evidence_checks'], 'retrieval_failure_stage': analysis['retrieval_failure_stage']},
+            root_cause={'primary': analysis['primary_root_cause'], 'secondary': [], 'diagnostic_basis': analysis['analysis_reason']})
         return case
 
     def judge_replay_preflight(self,source_id,*,include_executions=False):
@@ -438,12 +513,7 @@ class EvaluationRunner:
         with self.store.connection() as connection:
             try:self.store.validate_evaluation_start(connection,snapshot,judge)
             except ValueError as error:result.update(can_replay=False,start_blocker=str(error))
-        from .q18_probe import require_reviewed_probe
-        try:
-            result['reviewed_probe']=require_reviewed_probe(self.store.database_path,result)
-            result['can_start_replay']=result['can_replay']
-        except ValueError as error:
-            result.update(can_start_replay=False,probe_blocker=str(error))
+        result['can_start_replay'] = result['can_replay']
         if not include_executions:result.pop('executions')
         return result
 
@@ -452,8 +522,6 @@ class EvaluationRunner:
         with CORPUS_LOCK:
             plan=self.judge_replay_preflight(source_id,include_executions=True)
             if not plan['can_replay']:raise ValueError('Replay eligibility blocked: '+json.dumps({k:v for k,v in plan.items() if k not in {'executions','new_judge'}},ensure_ascii=False))
-            from .q18_probe import require_reviewed_probe
-            require_reviewed_probe(self.store.database_path,plan)
             snapshot,items,config,judge=self.baseline_inputs(source_id)
             run_id=self.store.create_baseline_run(snapshot,config,judge,automatic=automatic,judge_replay=plan)
         return run_id,items,config
@@ -495,10 +563,7 @@ class EvaluationRunner:
         run=self.store.evaluation_run(run_id)
         if run['status']=='completed':return run
         self._require_generation_contract(run['judge'])
-        if run['result'].get('judge_replay'):
-            from .q18_probe import require_reviewed_probe
-            require_reviewed_probe(self.store.database_path,{**run['result']['judge_replay'],'new_judge':run['judge']})
-        if run['result'].get('auto_recovery',{}).get('authorized') and not self.store.claim_evaluation_worker(run_id):return self.store.evaluation_run(run_id)
+        if run['result'].get('auto_recovery',{}).get('enabled', run['result'].get('auto_recovery',{}).get('authorized')) and not self.store.claim_evaluation_worker(run_id):return self.store.evaluation_run(run_id)
         limits=run['judge'].get('execution_snapshot',{}).get('request_limits')
         with execution_limits(limits),accounting_only():return self._execute_baseline(run_id,approved,config)
 
@@ -508,12 +573,17 @@ class EvaluationRunner:
         frozen_ids = set(json.loads(run['dataset_snapshot_json'])['question_ids'])
         cases = self.store.evaluation_case_results(run_id)
         checkpoints = run['result'].get('checkpoints', {})
+        baseline_cases = {}
+        if config.get('candidate_id'):
+            owner = self.store.candidate(config['candidate_id'])
+            experiment = self.store.experiment(owner['experiment_id'])
+            baseline_cases = {c['question_id']: c for c in self.store.evaluation_case_results(experiment['baseline_run_id'])}
         lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity') if k in run['result']}
         def progress(*, complete=False):
             from .telemetry import cost_fields
             from .paid_run import unsettled_usage
             from .evaluation_stage import checkpoint_usage
-            events=[u for cp in checkpoints.values() for u in checkpoint_usage(cp)]
+            events=[u for cp in checkpoints.values() for stage in [cp, *cp.get('regression_review', {}).get('runs', [])] for u in checkpoint_usage(stage)]
             accounting={'provenance':'logical_task_including_resume_history','call_events':len(events),
                 'unknown_usage_events':sum(unsettled_usage(u) for u in events),
                 'known_input_tokens':sum(u.get('prompt_tokens',u.get('total_tokens',0)) for u in events if type(u.get('prompt_tokens',u.get('total_tokens'))) is int),
@@ -533,7 +603,7 @@ class EvaluationRunner:
             expected = {i['id'] for i in approved}
             if not saved <= expected or len(saved) != len(cases):
                 raise ValueError('Saved evaluation cases do not match frozen snapshot')
-            automatic=lineage.get('auto_recovery',{}).get('authorized') is True
+            automatic=lineage.get('auto_recovery',{}).get('enabled', lineage.get('auto_recovery',{}).get('authorized')) is True
             def check_stop():
                 if self.store.evaluation_run(run_id)['result'].get('stop_request'):
                     raise InterruptedError('用户停止运行，断点已保存')
@@ -588,6 +658,9 @@ class EvaluationRunner:
                         raise RuntimeError('连续两题受控重试耗尽；疑似系统性配置或合同失效，已停止Provider调用') from error
                     continue
                 result=checkpoint['scored_result']
+                if baseline_cases.get(item['id'], {}).get('passed') is True and result.get('passed') is False:
+                    phase = 'regression_review'
+                    result['regression_review'] = self.review_regression(item, result, config, checkpoint, run_id, check_stop, lambda *_a, **_kw: self.store.update_evaluation_progress(run_id, progress()))
                 self.store.record_evaluation_case(run_id,item['id'],result,with_bad_case=True)
                 cases.append({'question_id':item['id'],**result});saved.add(item['id'])
                 consecutive_errors=0
@@ -620,11 +693,9 @@ class EvaluationRunner:
         from .paid_run import PaidRun,controlled_run,accounting_only
         run=self.store.evaluation_run(run_id)
         auto=run['result'].get('auto_recovery',{})
-        if not auto.get('authorized') or auto.get('state')=='stopped' or run['result'].get('stop_request'):return
+        if not auto.get('enabled', auto.get('authorized')) or auto.get('state')=='stopped' or run['result'].get('stop_request'):return
         snapshot=json.loads(run['dataset_snapshot_json'])
         if run['judge'].get('evaluation_identity')!=evaluation_identity(snapshot,run['judge']) or not policy_current(run['judge']):raise ValueError('自动恢复Evaluation Identity不匹配')
-        if run['config'].get('candidate_id') and run['result'].get('execution_owner_pid')!=os.getpid():
-            raise ValueError('Sandbox进程重启后须重新明确付费授权，断点保留')
         if run['config'].get('candidate_id'):
             items,config,candidate,baseline=self.candidate_inputs(run['config']['candidate_id'])
             if config!=run['config'] or baseline['judge']!=run['judge']:raise ValueError('自动恢复Candidate身份不匹配')
@@ -653,18 +724,17 @@ class EvaluationRunner:
             raise ValueError("Candidate 必须基于已完成的 Baseline 运行")
         self._require_generation_contract(baseline['judge'])
         if not policy_current(baseline['judge']):
-            raise ValueError('评测规则已升级，请授权建立新Baseline；旧Candidate只读')
+            raise ValueError('评测规则已升级，请建立新Baseline；旧Candidate只读')
         from .policy import validate_candidate_config
         if not validate_candidate_config(candidate["config"])["valid"]:
             raise ValueError("Candidate 参数超出 Search Space")
-        if candidate['reasoning'].get('intervention_contract_version')=='agent-closure-3':
-            from .agent_coverage import coverage_inputs
-            if candidate['reasoning'].get('candidate_label')!='D' and coverage_inputs(self.store,experiment['id'])[-1]['status']=='incomplete':
-                raise ValueError('本轮优化规划未完成：请先零调用补齐合法候选或明确能力缺口')
+        if candidate['reasoning'].get('intervention_contract_version') in {'agent-closure-3', 'agent-closure-4'}:
             from .optimization import validate_intervention
             base={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}
             for key in ('run_target','knowledge_identity'):base.pop(key,None)
-            targets={ref:row['result'] for row in self.store.bad_case_rows() if row['run_id']==baseline['id'] for ref in (row['id'],row['question_id'])}
+            from .diagnostics import standard_evidence
+            frozen = {q['id']: q for q in json.loads(baseline['dataset_snapshot_json']).get('questions', [])}
+            targets={ref:{**row['result'], 'standard_evidence': standard_evidence(frozen.get(row['question_id'], {}))} for row in self.store.bad_case_rows() if row['run_id']==baseline['id'] for ref in (row['id'],row['question_id'])}
             reasoning=candidate['reasoning']
             actual={k:v for k,v in candidate['config'].items() if v!=base.get(k)}
             if actual!=reasoning.get('changed_parameters'):raise ValueError('Candidate配置与已审查干预不一致')
@@ -737,30 +807,25 @@ class EvaluationRunner:
         baseline_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(baseline["id"])}
         candidate_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(run_id)}
         failed = [question_id for question_id, item in baseline_cases.items() if not item.get("passed")]
-        passed = [(question_id, item) for question_id, item in baseline_cases.items() if item.get("passed")]
-        regression = evaluate_regression(new_critical_failures=sum(not candidate_cases.get(question_id, {}).get("passed", False) and item.get("severity") == "critical" for question_id, item in passed), new_ordinary_failures=sum(not candidate_cases.get(question_id, {}).get("passed", False) and item.get("severity") != "critical" for question_id, item in passed))
         references = set(candidate['reasoning'].get('observed_evidence', []))
         targets = [q for q in failed if q in references or f"BC-{baseline['id']}-{q}" in references]
-        comparison = compare_cases(baseline_cases, candidate_cases, targets)
-        regression.update({key:comparison[key] for key in ('formal_blocking_question_ids','confirmed_regression_question_ids','pending_regression_question_ids','disputed_regression_question_ids','unclassified_regression_question_ids','regression_interpretation')})
-        if comparison.get('comparison_version') == VERSIONS['scoring_policy']:
-            critical_ids={q for q in comparison['new_regression_question_ids'] if candidate_cases[q].get('severity')=='critical' or any(i.get('critical') is True for i in candidate_cases[q].get('judge_result',{}).get('issues',[]))}
-            regression=evaluate_regression(new_critical_failures=len(critical_ids),new_ordinary_failures=len(comparison['new_regression_question_ids'])-len(critical_ids))
-            regression.update(comparison)
-            regression['passed']=regression['passed'] and comparison.get('safety_verification_complete',True) and comparison['comparison_complete'] and not comparison['continued_failure_new_critical_question_ids']
-            regression['status']='NOT_EVALUABLE' if not comparison.get('safety_verification_complete',True) else 'PASS' if regression['passed'] else 'FAIL' if comparison['comparison_complete'] else 'NOT_EVALUABLE'
-        qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), run["result"]["bad_case_count"])
-        if not comparison.get('safety_verification_complete',True):
-            qualification['blocking_reason']='关键安全规则无法可靠核验；不伪造业务FAIL，不按新增退化数量超限解释'
+        frozen = {q['id']: q for q in json.loads(baseline['dataset_snapshot_json']).get('questions', [])} if baseline.get('dataset_snapshot_json') else {}
+        comparison = candidate_comparison(baseline_cases, candidate_cases, targets, frozen)
+        regression = evaluate_regression(new_critical_failures=comparison['new_critical_failures'], new_ordinary_failures=comparison['new_ordinary_failures'])
+        regression.update(comparison)
+        regression['passed'] = regression['passed'] and comparison['comparison_complete']
+        regression['status'] = 'NOT_EVALUABLE' if not comparison['comparison_complete'] else 'PASS' if regression['passed'] else 'FAIL'
+        qualification = qualify_candidate(run["result"]["gates"], regression, comparison['target_bad_cases_fixed'], len(failed), comparison['bad_case_count'])
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
-        result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "recommendation": None}
+        result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "release_qualification": qualify_release(run["result"]["gates"], regression, len(comparison["all_fixed_question_ids"])), "recommendation": None}
         if candidate['reasoning'].get('candidate_label') == 'D':
+            result['qualification'] = result['release_qualification']
             winner = self.store.candidate(candidate['reasoning']['winner_id'])
             winner_cases = {item['question_id']: item for item in self.store.evaluation_case_results(winner['result']['evaluation_run_id'])}
             newly_failed = [key for key, item in winner_cases.items() if item.get('passed') and not candidate_cases.get(key, {}).get('passed')]
             newly_fixed = [key for key, item in winner_cases.items() if not item.get('passed') and candidate_cases.get(key, {}).get('passed')]
-            result['winner_comparison'] = {'winner_id': winner['id'], 'new_failures': newly_failed, 'fixed_cases': newly_fixed, 'promote': run['status'] == 'completed' and qualification['qualified'] and not newly_failed and bool(newly_fixed)}
+            result['winner_comparison'] = {'winner_id': winner['id'], 'new_failures': newly_failed, 'fixed_cases': newly_fixed, 'promote': run['status'] == 'completed' and result['release_qualification']['qualified']}
         finished = self.store.finish_candidate(candidate["id"], "evaluated" if run['status'] == 'completed' else 'failed', result)
         recommendation = self.store.refresh_recommendation(candidate["experiment_id"])
         return {**finished, "recommendation": recommendation}
