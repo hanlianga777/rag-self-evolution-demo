@@ -388,6 +388,20 @@ class GovernanceStore:
         fingerprint = manifest_identity(current_manifest())
         for saved in rows:
             item = self._row(saved)
+            if item['raw'].get('source') == 'reviewed_csv':
+                from .reviewed_import import validate_item
+                try:
+                    reviewed = validate_item(self, item)
+                    reasons = [] if reviewed['approved'] else ['人工审定导入待整卷确认']
+                except ValueError as error:
+                    reviewed, reasons = {'approved': False}, [str(error)]
+                result.append({**{key:item.get(key) for key in ('id','stage','review_status','probe_status','qc_status','question','test_category','negative_subtype','construction_type','created_at','updated_at')},
+                    'raw': item['raw'], 'slot':item['raw'].get('coverage_slot'), 'topic_cluster':item['raw'].get('topic_cluster'),
+                    'probe':None, 'qc':None, 'qualification_status':'human_approved' if reviewed['approved'] else 'needs_human_review',
+                    'qualification_source':'human_reviewed_csv' if reviewed['approved'] else None,
+                    'attention_reasons':reasons, 'attention_categories':[], 'disposition':'review', 'quality_audit':None,
+                    'quality_audit_created_at':None, 'retrieval_fact_coverage':None, 'disclosed_retrieval_risk':None})
+                continue
             content_hash = self._quality_content(item)
             reasons = []
             if item['probe_status'] != 'probe_passed' or not item['probe_id']:
@@ -537,6 +551,10 @@ class GovernanceStore:
                 ids.append(question_id)
             connection.execute('INSERT INTO business_import_batches VALUES (?,?)', (file_hash, _json({'question_ids': ids, 'imported_count': len(ids), 'filename': filename, 'accepted_rows': [candidate['import_row'] for candidate in candidates], 'errors': errors or []})))
         return ids
+
+    def import_reviewed_candidates(self, candidates, source_sha256, *, source, review_note):
+        from .reviewed_import import import_batch
+        return import_batch(self, candidates, source_sha256, source, review_note)
 
     def coverage_preview(self, profile_name, chunks, embeddings, embedding_identity=None):
         from .golden_v2 import build_plan
@@ -1096,6 +1114,15 @@ class GovernanceStore:
 
     def approval_eligibility(self, question_id: str):
         item = self.question(question_id)
+        if item['raw'].get('source') == 'reviewed_csv':
+            from .reviewed_import import validate_item
+            try:
+                validate_item(self, item, require_approval=True)
+                blockers = []
+            except ValueError as error:
+                blockers = [str(error)]
+            return {'can_approve':not blockers, 'blocking_reasons':blockers, 'requires_qc_p0_acceptance':False,
+                    'requires_issue_resolution':False, 'qc_reason':None, 'qc_created_at':None}
         probes, qcs = self.probe_history(question_id), self.qc_history(question_id)
         blockers = []
         validation = item['raw'].get('validation') or {}
@@ -1708,6 +1735,13 @@ class GovernanceStore:
             item=self.question(supplied['id'])
             if item['stage']!='golden' or item['review_status']!='approved' or not self.approval_eligibility(item['id'])['can_approve']:
                 raise ValueError('Snapshot requires current approved Golden quality')
+            if item['raw'].get('source') == 'reviewed_csv':
+                from .reviewed_import import validate_item
+                validate_item(self, item, require_approval=True)
+                members=(self.generation_run(item['raw']['generation_run_id'],qualification=False) or {}).get('question_ids',[])
+                if {q['id'] for q in approved} != set(members) or supplied['raw'] != item['raw']:
+                    raise ValueError('人工审定Snapshot须为当前完整且未经改动的题卷')
+                continue
             if item['raw'].get('business_requirements'):
                 run_id=item['raw'].get('generation_run_id')
                 members=(self.generation_run(run_id,qualification=False) or {}).get('question_ids',[])
@@ -1734,6 +1768,9 @@ class GovernanceStore:
             snapshot["generation_run_id"] = generation_run_id
             snapshot['coverage_plan'] = self.generation_run(generation_run_id, qualification=False)['artifacts']['hard_validation'].get('frozen_plan')
             snapshot['qualification_sources'] = {row['id']:row['qualification_source'] for row in self.candidate_rows(snapshot['question_ids'])}
+            if run['artifacts']['hard_validation'].get('reviewed_csv_receipt'):
+                snapshot['profile'] = run['profile']
+                snapshot['reviewed_import'] = self.business_import_receipt(run['artifacts']['hard_validation']['reviewed_csv_receipt'])
         if all(q.get("business_requirements") is not None for q in snapshot["questions"]):
             from .scoring_contract import snapshot_manifest
             snapshot["scoring_contract_manifest"] = snapshot_manifest(snapshot)
@@ -1936,7 +1973,7 @@ class GovernanceStore:
     def _quality_identity(self, item, connection):
         probe = connection.execute('SELECT id FROM probe_results WHERE question_id=? ORDER BY id DESC LIMIT 1', (item['id'],)).fetchone()
         return {'content_hash': self._quality_content(item), 'active_candidate': item.get('stage') != 'superseded', 'corpus_fingerprint': manifest_identity(current_manifest()),
-                'probe_id': probe['id'] if probe else None, 'quality_contract':'golden-quality-85-v1'}
+                'probe_id': probe['id'] if probe else None, 'quality_contract':'human-reviewed-csv-v1' if item['raw'].get('source') == 'reviewed_csv' else 'golden-quality-85-v1'}
 
     def capture_quality(self, question_id, *, qc=False):
         from .full_text import CORPUS_LOCK
@@ -2000,10 +2037,10 @@ class GovernanceStore:
             rows = connection.execute("SELECT result_json, created_at FROM probe_results WHERE question_id = ? ORDER BY id DESC", (question_id,)).fetchall()
         return [{**_load(row["result_json"], {}), "created_at": row["created_at"]} for row in rows]
 
-    def review_generation_batch(self, question_ids: list[str], actor: str, *, confirmed_manual_review: bool = False):
+    def review_generation_batch(self, question_ids: list[str], actor: str, *, confirmed_manual_review: bool = False, reason: str | None = None):
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:
-            return self._review_generation_batch(question_ids, actor, confirmed_manual_review=confirmed_manual_review)
+            return self._review_generation_batch(question_ids, actor, confirmed_manual_review=confirmed_manual_review, reason=reason)
 
     def review_owner_delegated_batch(self, generation_run_id, authorization_id, reviews):
         from .full_text import CORPUS_LOCK
@@ -2041,7 +2078,7 @@ class GovernanceStore:
                     connection.execute('INSERT INTO approvals(gate,target_id,decision,actor,created_at) VALUES (?,?,?,?,?)',('dataset',question_id,'owner_delegated_confirmed','Codex',now))
             return {'reviewed':[self.question(key) for key in delegated['reviews']], 'generation_run_id':generation_run_id}
 
-    def _review_generation_batch(self, question_ids, actor, *, confirmed_manual_review=False, delegated=None):
+    def _review_generation_batch(self, question_ids, actor, *, confirmed_manual_review=False, delegated=None, reason=None):
         if not confirmed_manual_review and delegated is None:
             raise ValueError("Human Review confirmation is required")
         candidates = [self.question(question_id) for question_id in question_ids]
@@ -2067,6 +2104,22 @@ class GovernanceStore:
                 raise ValueError('活动题目已变化，请刷新')
             if any(sum(item['test_category'] == category for item in candidates) != profile_count(run['profile'], category) for category in ('positive', 'ablation', 'negative')):
                 raise ValueError('Profile 类别数量不符')
+            if any(item['raw'].get('source') == 'reviewed_csv' for item in candidates):
+                from .reviewed_import import validate_item
+                if not confirmed_manual_review or not (reason or '').strip() or not actor.strip() or not all(item['raw'].get('source') == 'reviewed_csv' for item in candidates):
+                    raise ValueError('人工审定导入须整卷显式确认，并记录确认人及原因')
+                prepared = [(item, validate_item(self, item)) for item in candidates]
+                for item, validation in prepared:
+                    if validation['approved']:
+                        continue
+                    metadata = {'qualification_source':'human_reviewed_csv', 'quality_identity':validation['identity'],
+                                'reason':reason.strip(), 'review_qc_id':None, 'machine_quality_executed':False}
+                    connection.execute('UPDATE questions SET stage=?,review_status=?,updated_at=? WHERE id=?', ('golden','approved',now,item['id']))
+                    connection.execute('INSERT INTO review_events(question_id,gate,decision,actor,created_at,metadata_json) VALUES (?,?,?,?,?,?)',
+                        (item['id'],'dataset','dataset_confirmed',actor,now,_json(metadata)))
+                    connection.execute('INSERT INTO approvals(gate,target_id,decision,actor,created_at) VALUES (?,?,?,?,?)',
+                        ('dataset',item['id'],'confirmed',actor,now))
+                return {'reviewed':[{**item, 'stage':'golden', 'review_status':'approved', 'updated_at':now if not validation['approved'] else item['updated_at']} for item, validation in prepared], 'generation_run_id':run['id']}
             qualified = self.candidate_rows(question_ids)
             if delegated is not None:
                 from .delegated_review import validate_delegation

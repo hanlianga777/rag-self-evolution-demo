@@ -202,6 +202,14 @@ class BatchReviewRequest(BaseModel):
     question_ids: list[str] = Field(min_length=1)
     actor: str = Field(default="local_user", min_length=1, max_length=80)
     confirmed_manual_review: bool = False
+    reason: str | None = None
+
+
+class ReviewedImportRequest(BaseModel):
+    candidates: list[dict] = Field(min_length=50, max_length=50)
+    source_sha256: str = Field(pattern='^[0-9a-f]{64}$')
+    source: str = Field(min_length=1)
+    review_note: str = Field(min_length=1)
 
 
 class OwnerDelegatedReviewRequest(BaseModel):
@@ -565,8 +573,9 @@ def candidate_list(run_id: str | None = None, offset: int = Query(0, ge=0), limi
     if run_id and run is None:
         raise HTTPException(status_code=404, detail="Generation run not found")
     rows = store.candidate_rows(run['question_ids']) if run else store.working_pool_rows()
-    summary = {'total':len(rows), 'ai':sum(row['raw'].get('source')!='business_import' for row in rows), 'business':sum(row['raw'].get('source')=='business_import' for row in rows),
-        'machine_qualified':sum(row['qualification_status'] in {'machine_qualified','human_approved','owner_delegated_approved'} for row in rows),
+    summary = {'total':len(rows), 'ai':sum(row['raw'].get('source') not in {'business_import','reviewed_csv'} for row in rows), 'business':sum(row['raw'].get('source')=='business_import' for row in rows),
+        'reviewed_csv':sum(row['raw'].get('source')=='reviewed_csv' for row in rows),
+        'machine_qualified':sum(row['raw'].get('source')!='reviewed_csv' and row['qualification_status'] in {'machine_qualified','human_approved','owner_delegated_approved'} for row in rows),
         'needs_processing':sum(row['qualification_status']=='needs_human_review' and row['probe_status']!='probe_pending' and row['qc_status']!='qc_pending' for row in rows),
         'pending_checks':sum(row['qualification_status']=='needs_human_review' and (row['probe_status']=='probe_pending' or row['qc_status']=='qc_pending') for row in rows)}
     types = sorted({row['construction_type'] for row in rows if row['construction_type']})
@@ -1239,7 +1248,7 @@ def _revision_attempt(run_store, revision_id, stage, service, work):
 def review_mini_batch(payload: BatchReviewRequest):
     """A single explicit operator action writes individual, auditable Human Review decisions."""
     try:
-        return store.review_generation_batch(payload.question_ids, payload.actor, confirmed_manual_review=payload.confirmed_manual_review)
+        return store.review_generation_batch(payload.question_ids, payload.actor, confirmed_manual_review=payload.confirmed_manual_review, reason=payload.reason)
     except KeyError:
         raise HTTPException(status_code=404, detail="Golden question not found")
     except ValueError as error:
@@ -1247,6 +1256,14 @@ def review_mini_batch(payload: BatchReviewRequest):
     except sqlite3.Error as error:
         logging.getLogger(__name__).exception("Golden freeze database request failed")
         raise HTTPException(status_code=503, detail="Golden 冻结数据库请求失败，请刷新核对 Snapshot 后重试") from error
+
+
+@app.post('/api/governance/reviewed-import', status_code=201, dependencies=[Depends(require_trusted_origin)])
+def import_reviewed_csv(payload: ReviewedImportRequest):
+    try:
+        return store.import_reviewed_candidates(payload.candidates, payload.source_sha256, source=payload.source, review_note=payload.review_note)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.post('/api/governance/owner-delegated-review',dependencies=[Depends(require_trusted_origin)])
