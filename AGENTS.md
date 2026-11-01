@@ -1,14 +1,13 @@
-# 项目协作规则
+# 协作规则（简版，2026-11-01 起生效）
 
-- 修改前读取 `docs/RAG_SELF_EVOLUTION_SPEC.md` 文首当前有效合同及真实代码/数据。历史说明不覆盖当前合同，Fixture不冒充Provider结果。
-- 每次修改产品逻辑、业务流程、参数、评测规则、Gate、版本治理或UI Contract，必须检查并同步当前SPEC、`docs/SPEC_CHANGELOG.md`、相关README/文档、受影响架构。代码与SPEC必须在同一次Commit提交。
-- 纯代码Bug且SPEC行为不变，可在提交说明记录 `No SPEC Change`，不机械改文档；有不确定冲突先列明，不发明新规则。
-- 正式业务/技术图唯一源为 `frontend/src/components/KnowledgeDiagrams.tsx` 及Shared CSS。页面改图后运行 `python3 scripts/export_architecture.py`，同步 `架构` 中SVG/PNG/manifest及引用，不另画不同版本。
-- 所有右侧Drawer使用唯一 `--drawer-width`，不得新增页面自定义宽度；复用现有Card/Select/PageShell。
-- 后端测试必须在导入app前使用隔离 `RAG_DEMO_DB_PATH`，同时隔离Corpus/索引和.env；既有Legacy索引fixture只能用于明确标注的离线测试，不混入当前Knowledge或冒充真实Provider验收；真实写入前SQLite Backup API及产物备份。凭据不回显、不入日志/数据库/Git。
-- 人工批准、Snapshot冻结、Gate和发布不得自动代行；Provider调用严格遵守本轮用户授权范围及冻结预算。
-- 最小精准修改；验证源码、接口、数据与页面一致后提交范围内文件、push origin/main并确认干净同步。
+旧版规则已移到 `docs/归档/AGENTS_旧版_20261101.md`，不再生效。
 
-- Business Golden V2复用既有Topic及资格审计，角色/场景/意图/难度与Child/Parent来源必须持久化；负向Topic材料Anchor不是答案Evidence，真实Probe仍校验整个Corpus边界。已有Full与Snapshot只读保护，新工作集不自动冻结。
-
-- 数据集自然度/多样性诊断只作建议；内容修订保留Revision History并按新身份检查，不用词面规则或旧审计自动关闭风险。
+1. **按任务单做事**：只做 `指挥/当前任务.md` 写明的内容。不自行扩大范围，不自行加审批、授权、等待确认环节。
+2. **不上传数据**：仓库是公开的。数据库、`.env`、密钥、运行数据、日志、截图、压缩包、单个超过 10MB 的文件一律不提交。
+3. **测试不留垃圾**：测试一律用临时目录和临时数据库，跑完自动删除。不要为了测试复制正式数据库。
+4. **备份有上限**：不需要每次写入前都整库备份。确实需要备份时，同一类备份最多保留最近 2 份，更旧的自动删除。
+5. **不强制同步文档**：除非任务单要求，否则不需要同步 SPEC、CHANGELOG、README 等文档。提交说明里写清楚改了什么即可。
+6. **花钱要有依据**：只有任务单明确要求时才调用 DeepSeek，并在报告里写明调用次数。
+7. **改完要能跑**：改完确认 demo 能正常启动、主链路页面能打开，再提交推送。
+8. **用完要关掉**：任务结束前，关掉自己启动的后端、前端、测试浏览器等程序，不要留在后台。
+9. **报告写人话**：报告用中文大白话，只写事实，注明来源；不知道的写"未知"。
