@@ -163,6 +163,19 @@ print(-1)
 PY
 }
 
+show_account() {
+  python3 - <<'PY'
+import json, base64, os
+try:
+    home = os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex")
+    t = json.load(open(os.path.join(home, "auth.json")))["tokens"]["id_token"].split(".")[1]
+    t += "=" * (-len(t) % 4)
+    print(json.loads(base64.urlsafe_b64decode(t)).get("email", "未知"))
+except Exception:
+    print("未知")
+PY
+}
+
 RUN_LOG=""
 RESUME_TASK=""
 RESUME_ID=""
@@ -255,17 +268,7 @@ if ! command -v codex >/dev/null 2>&1; then
 fi
 say "使用的 Codex：$(command -v codex)（$(codex --version 2>/dev/null)）；登录状态：$(codex login status 2>&1 | head -1)"
 # 显示当前登录的是哪个 GPT 账号（读本机已保存的登录信息，不花额度）
-acct="$(python3 - <<'PY' 2>/dev/null
-import json, base64, os
-try:
-    home = os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex")
-    t = json.load(open(os.path.join(home, "auth.json")))["tokens"]["id_token"].split(".")[1]
-    t += "=" * (-len(t) % 4)
-    print(json.loads(base64.urlsafe_b64decode(t)).get("email", "未知"))
-except Exception:
-    print("未知")
-PY
-)"
+acct="$(show_account 2>/dev/null)"
 say "当前登录的 GPT 账号：${acct:-未知}（不对的话：按 Ctrl+C 停下，在 Codex 桌面版换号后重新启动）"
 
 # 开工前检查：项目里如果有没保存的改动（通常是桌面版做了一半的任务），先不开工，免得混在一起
