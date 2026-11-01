@@ -320,6 +320,59 @@ class EvaluationRunner:
         execution = self.runtime.answer(item["question"], config)
         return self.score_execution(item, execution)
 
+    def review_baseline_errors(self, run_id):
+        """Attach majority reviews to a completed Baseline, preserving its formal score."""
+        from .corpus import current_manifest, manifest_identity
+        from .paid_run import accounting_only, execution_limits
+        from .providers import permanent_provider_error, provider_error_details
+        run = self.store.evaluation_run(run_id)
+        result = run['result'] if run else {}
+        if (not run or run['status'] != 'completed' or run['config'].get('run_target') != 'baseline'
+                or result.get('evaluation_complete') is not True or result.get('technical_failed') != 0):
+            raise ValueError('错题复核需要完整且无技术失败的 Baseline')
+        snapshot = json.loads(run['dataset_snapshot_json'])
+        cases = self.store.evaluation_case_results(run_id)
+        if (len(cases) != result.get('completed') or {c['question_id'] for c in cases} != set(snapshot['question_ids'])
+                or any(type(c.get('passed')) is not bool for c in cases)):
+            raise ValueError('Baseline 逐题结果与冻结题集不完整')
+        self._require_generation_contract(run['judge'])
+        if (not policy_current(run['judge']) or run['judge'].get('evaluation_identity') != evaluation_identity(snapshot, run['judge'])
+                or snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest())):
+            raise ValueError('Baseline 冻结身份与当前合同或语料不一致')
+        items = {i['id']: i for i in self.snapshot_items(snapshot)}
+        failed = {c['question_id']: c for c in cases if c['passed'] is False}
+        review = result.get('baseline_review', {'cases': {}, 'complete': False})
+        def save(*_args, **_kwargs):
+            with self.store.connection() as connection:
+                connection.execute("UPDATE evaluation_runs SET result_json=json_set(result_json,'$.baseline_review',json(?)) WHERE id=? AND status='completed'",
+                                   (json.dumps(review, ensure_ascii=False), run_id))
+        with accounting_only(), execution_limits(run['judge'].get('execution_snapshot', {}).get('request_limits')):
+            for final_pass in range(2):
+                for key, initial in failed.items():
+                    checkpoint = review['cases'].setdefault(key, {'attempts': []})
+                    if checkpoint.get('regression_review', {}).get('status') in {'confirmed_regression', 'fluctuation'}:
+                        continue
+                    if final_pass:
+                        if not checkpoint.get('technical_error') or checkpoint.get('final_retry_done'):
+                            continue
+                        checkpoint['final_retry_done'] = True
+                        for stage in checkpoint.get('regression_review', {}).get('runs', []):
+                            stage.pop('phase_windows', None)
+                    stage_id = run_id + ':baseline-review' + (':final-retry' if final_pass else '')
+                    try:
+                        self.review_regression(items[key], initial, run['config'], checkpoint, stage_id, lambda: None, save)
+                        checkpoint.pop('technical_error', None)
+                    except Exception as error:
+                        checkpoint['technical_error'] = {'error': str(error), 'error_type': type(error).__name__,
+                                                         'provider_error': provider_error_details(error, 'baseline_review')}
+                        save()
+                        if permanent_provider_error(error):
+                            raise
+                    save()
+        review['complete'] = all(review['cases'][q].get('regression_review', {}).get('status') in {'confirmed_regression', 'fluctuation'} for q in failed)
+        save()
+        return review
+
     def review_regression(self, item, initial, config, checkpoint, run_id, check_stop, on_state):
         """Two independent answer/judge runs, with saved stages preventing duplicate RPCs."""
         from .evaluation_stage import perform_stage, checkpoint_usage
