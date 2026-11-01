@@ -26,6 +26,8 @@ def main():
         backup=args.backup.resolve();backup.parent.mkdir(parents=True,exist_ok=True)
         backup.touch(mode=0o600,exist_ok=False)
         with sqlite3.connect(backup) as target:source.backup(target)
+        from app.backup_retention import keep_recent_two
+        keep_recent_two(backup, 'history')
     paths=list((ROOT/'backend/data/index').glob('*'))+list((ROOT/'backend/documents').glob('*.pdf'))
     paths += [ROOT/'backend/data'/n for n in ['corpus_state.json','legacy_index.json','q02-switch.json']]
     binding=ROOT/'backend/data/legacy_index.json'

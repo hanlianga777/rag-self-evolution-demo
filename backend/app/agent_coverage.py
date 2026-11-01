@@ -138,6 +138,8 @@ def complete_coverage(store,experiment_id,*,expected_binding,backup_path):
         path.parent.mkdir(parents=True,exist_ok=True)
         # A separate reader backs up committed state; never back up the active writer.
         with sqlite3.connect(store.database_path) as source,sqlite3.connect(path) as destination:source.backup(destination)
+        from .backup_retention import keep_recent_two
+        keep_recent_two(path, 'coverage')
         for label,config,reason in batch:
             connection.execute("INSERT INTO candidate_configs(id,experiment_id,status,config_json,reasoning_json,result_json,created_at) VALUES (?,?,'generated',?,?,'{}',?)",(experiment_id+'-'+label,experiment_id,_json(config),_json(reason),_now()))
         connection.execute("INSERT INTO agent_traces(experiment_id,status,result_json,created_at) VALUES (?,'coverage_planned',?,?)",(experiment_id,_json({'coverage_plan':final,'provider_calls':0,'validation_audit':audit}),_now()))

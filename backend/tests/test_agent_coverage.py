@@ -19,6 +19,23 @@ def view(case):
 ROWS=[]
 
 class CoverageTests(unittest.TestCase):
+    def test_custom_backup_names_keep_only_two_of_same_kind(self):
+        import tempfile
+        from pathlib import Path
+        from app.backup_retention import keep_recent_two
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            unrelated = root / 'unrelated.db'
+            unrelated.write_bytes(b'preserve')
+            for name in ('first.db', 'second.db', 'third.db'):
+                backup = root / name
+                backup.write_bytes(b'fixture')
+                keep_recent_two(backup, 'coverage')
+            self.assertFalse((root / 'first.db').exists())
+            self.assertTrue((root / 'second.db').exists())
+            self.assertTrue((root / 'third.db').exists())
+            self.assertTrue(unrelated.exists())
+
     def plan(self,rows,candidates=(),**kwargs):
         global ROWS
         ROWS=rows
@@ -94,6 +111,11 @@ class CoverageTests(unittest.TestCase):
         experiment={'id':'EXP','status':'completed','baseline_run_id':'BASE','candidates':[a],
                     'result':{'provider_raw_text':'original model response','token_usage':[123]},'evaluation_budget':{'used':0}}
         with tempfile.TemporaryDirectory() as directory:
+            import os
+            oldest=Path(directory)/'coverage-20261001.db';oldest.write_bytes(b'old')
+            recent=Path(directory)/'coverage-20261031.db';recent.write_bytes(b'recent')
+            os.utime(oldest,(1,1));os.utime(recent,(2,2))
+            backup=Path(directory)/'coverage-20261101.db'
             store=GovernanceStore(Path(directory)/'test.db')
             with store.connection() as connection:
                 connection.execute("INSERT INTO experiments VALUES ('EXP','BASE','completed',?,'now')",(_json(experiment['result']),))
@@ -104,8 +126,11 @@ class CoverageTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'身份'):
                     complete_coverage(store,'EXP',expected_binding='stale',backup_path=Path(directory)/'stale.db')
                 self.assertFalse((Path(directory)/'stale.db').exists())
-                result=complete_coverage(store,'EXP',expected_binding='bound',backup_path=Path(directory)/'before.db')
+                result=complete_coverage(store,'EXP',expected_binding='bound',backup_path=backup)
             self.assertEqual(result['status'],'complete')
+            self.assertFalse(oldest.exists())
+            self.assertTrue(recent.exists())
+            self.assertTrue(backup.exists())
             with store.connection() as connection:
                 self.assertEqual(tuple(connection.execute("SELECT * FROM candidate_configs WHERE id='EXP-R1-A'").fetchone()),original)
                 self.assertEqual(connection.execute('SELECT COUNT(*) FROM candidate_configs').fetchone()[0],2)

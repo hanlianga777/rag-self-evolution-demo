@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
 OUTPUT = ROOT / 'output/playwright/medium50-full-20261014'
 SOURCE = Path('/Users/zhanghaohan/.codex/attachments/fbaa0811-e5ad-49a4-b3b7-13ad4b266be7/已粘贴的文本.txt')

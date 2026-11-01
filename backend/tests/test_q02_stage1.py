@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/归档'))
 from build_q02_stage1 import PaidClient, verify_patch
 
 

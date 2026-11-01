@@ -163,6 +163,6 @@ if __name__ == '__main__':
     import argparse
     parser=argparse.ArgumentParser(description='Read-only Q02 startup gate; never switches or recovers automatically')
     parser.add_argument('--check-startup',action='store_true',required=True)
-    parser.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[1]/'backend/data')
+    parser.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[2]/'backend/data')
     args=parser.parse_args()
     LinkedSwitch(args.root).startup_check()

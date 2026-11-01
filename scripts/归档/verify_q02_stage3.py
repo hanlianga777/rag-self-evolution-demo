@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'backend'))
 from app.full_text import checksum,validate_bundle
 from app.golden_v2 import validate_golden_candidate

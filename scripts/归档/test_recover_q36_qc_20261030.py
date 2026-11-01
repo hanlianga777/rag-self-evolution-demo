@@ -98,7 +98,7 @@ class Q36RecoverySafetyTests(unittest.TestCase):
             'RAG_DEMO_DB_PATH': directory + '/test.db', 'RAG_DEMO_INDEX_DIR': directory + '/index',
             'RAG_DEMO_DOCUMENTS_DIR': directory + '/documents', 'RAG_DEMO_ENV_PATH': directory + '/empty.env',
             'RAG_DEMO_UPLOADS_DIR': directory + '/uploads', 'DEEPSEEK_API_KEY': '', 'DASHSCOPE_API_KEY': '', 'RAG_SAFE_START': '1'}), recovery.offline():
-            sys.path.insert(0, str(SCRIPT.parents[1] / 'backend'))
+            sys.path.insert(0, str(SCRIPT.parents[2] / 'backend'))
             with self.assertRaisesRegex(ValueError, 'first invalid QC'):
                 recovery.common.single_quality_check(service, {})
         self.assertEqual(service.calls, 1)

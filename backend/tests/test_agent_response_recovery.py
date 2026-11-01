@@ -89,7 +89,12 @@ class RecoveryTests(unittest.TestCase):
 
     def test_transactional_recovery_preserves_failure_usage_and_candidate_semantics(self):
         from app.agent_recovery import recover_saved_response
+        from pathlib import Path
+        import os
         trace_id,backup=self.failed_source()
+        oldest=Path(self.directory.name)/'recovery-20261001.db';oldest.write_bytes(b'old')
+        recent=Path(self.directory.name)/'recovery-20261031.db';recent.write_bytes(b'recent')
+        os.utime(oldest,(1,1));os.utime(recent,(2,2))
         with self.store.connection() as c:
             before=dict(c.execute('SELECT * FROM agent_traces WHERE id=?',(trace_id,)).fetchone())
             source=dict(c.execute('SELECT * FROM experiments WHERE id=?',(before['experiment_id'],)).fetchone())
@@ -97,6 +102,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse(backup.exists())
         recovered=recover_saved_response(self.store,trace_id,apply=True,expected_binding=plan['binding'],backup_path=backup)
         self.assertTrue(backup.exists());self.assertEqual(recovered['status'],'recovered')
+        self.assertFalse(oldest.exists());self.assertTrue(recent.exists())
         new=self.store.experiment(recovered['experiment_id'])
         original=json.loads(before['result_json'])
         self.assertEqual(new['result']['provider_raw_text'],original['provider_raw_text'])

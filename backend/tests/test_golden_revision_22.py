@@ -10,7 +10,7 @@ from app.evaluation_contract import assess_claims, normalize
 from app.governance import GovernanceStore
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / 'scripts'))
+sys.path.insert(0, str(ROOT / 'scripts/归档'))
 from revise_medium_golden_22 import CONFIG, append_working_set, prepare
 
 

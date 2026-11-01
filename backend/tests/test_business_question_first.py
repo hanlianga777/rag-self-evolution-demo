@@ -8,7 +8,7 @@ class BusinessQuestionFirstTests(unittest.TestCase):
     def test_cli_resume_reuses_revision_and_skips_completed_quality(self):
         from pathlib import Path
         import runpy
-        resume = runpy.run_path(str(Path(__file__).resolve().parents[2] / 'scripts/run_medium50_full_evolution.py'))['continue_revision']
+        resume = runpy.run_path(str(Path(__file__).resolve().parents[2] / 'scripts/归档/run_medium50_full_evolution.py'))['continue_revision']
         for applied in (False, True):
             state = {'status':'interrupted', 'applied_at':'saved' if applied else None}
             calls = []

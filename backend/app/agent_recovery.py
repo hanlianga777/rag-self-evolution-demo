@@ -77,6 +77,8 @@ def recover_saved_response(store,trace_id,*,apply=False,expected_binding=None,ba
     backup.parent.mkdir(parents=True,exist_ok=True)
     with sqlite3.connect(store.database_path.as_uri()+'?mode=ro',uri=True) as reader,sqlite3.connect(backup) as target:
         reader.backup(target)
+    from .backup_retention import keep_recent_two
+    keep_recent_two(backup, 'recovery')
     with CORPUS_LOCK,store.connection() as connection:
         connection.execute('BEGIN IMMEDIATE')
         *_,current_binding=recovery_inputs(store,trace_id,connection)

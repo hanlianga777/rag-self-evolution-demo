@@ -94,7 +94,7 @@ class GoldenExecutionSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
                 'RAG_DEMO_DB_PATH': directory + '/unused.db', 'RAG_DEMO_INDEX_DIR': directory + '/index',
                 'RAG_DEMO_DOCUMENTS_DIR': directory + '/documents', 'RAG_DEMO_ENV_PATH': directory + '/empty.env'}):
-            sys.path.insert(0, str(SCRIPT.parents[1] / 'backend'))
+            sys.path.insert(0, str(SCRIPT.parents[2] / 'backend'))
             with self.assertRaisesRegex(ValueError, 'first schema failure'):
                 self.module.single_quality_check(service, {})
         self.assertEqual(service.calls, 1)

@@ -15,7 +15,7 @@ from contextlib import closing, contextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 CODE = ['governance.py', 'scoring_contract.py', 'ai_service.py', 'delegated_review.py',
         'golden_v2.py', 'paid_run.py', 'providers.py', 'retrieval.py', 'policy.py', 'knowledge_pipeline.py']
 

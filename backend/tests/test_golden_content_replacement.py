@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from app.governance import GovernanceStore
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/归档'))
 from replace_golden_content import apply, database_audit
 
 

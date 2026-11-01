@@ -305,7 +305,7 @@ class PaidRunTests(unittest.TestCase):
 
     def test_checkpoint_vectors_require_exact_successful_request_identity(self):
         import hashlib, importlib.util
-        path = Path(__file__).resolve().parents[2]/'scripts/run_medium50_full_evolution.py'
+        path = Path(__file__).resolve().parents[2]/'scripts/归档/run_medium50_full_evolution.py'
         spec = importlib.util.spec_from_file_location('medium50_scope_test',path)
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
         response = Path(self.temp.name)/'offline-vector.json'

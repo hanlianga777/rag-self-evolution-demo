@@ -10,14 +10,15 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
-from test_v14_offline import isolated_corpus
 import socket
 import sys
 import tempfile
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts'))
+from test_v14_offline import isolated_corpus
 DEFAULT_OUTPUT = ROOT / 'output/playwright/interview-demo/browser'
 
 

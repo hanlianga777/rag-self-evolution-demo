@@ -2,7 +2,7 @@
 import argparse,hashlib,json,sqlite3,sys,urllib.request
 from dataclasses import replace
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'backend'))
 SOURCE='EVAL-20261013074657234750'
 CID='EXP-20261013065746494438-R1-A'

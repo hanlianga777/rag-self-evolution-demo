@@ -211,7 +211,7 @@ Golden 50题前轮离线修复过程：见[最终索引离线验收](docs/GOLDEN
 [Stage3切换前隔离验证](docs/GOLDEN_Q02_STAGE3_VERIFICATION.md)已通过：11个联动/中断场景、51项回归及启动守卫；本轮Provider0，正式仍未切换。新Corpus会使旧Baseline失去当前身份资格，历史成绩和Production原Legacy索引保留。正式切换须下一次明确授权及维护窗口重验。
 # 2026-10-12 夜间受控验收
 
-本轮因保持DeepSeek请求配置下的20元预算预检阻断，未切换正式Corpus、未调用付费Provider。完整状态见[中文执行报告](docs/GOLDEN_OVERNIGHT_ACCEPTANCE.md)。只读复核入口为 `python3 scripts/preflight_golden_overnight.py --output <全新本地审计目录>`；不导入API、不联网、不激活。
+本轮因保持DeepSeek请求配置下的20元预算预检阻断，未切换正式Corpus、未调用付费Provider。完整状态见[中文执行报告](docs/GOLDEN_OVERNIGHT_ACCEPTANCE.md)。历史只读复核入口已归档至 `scripts/归档/preflight_golden_overnight.py`；不导入API、不联网、不激活。
 
 受控质量Worker内部可显式传入 `paid_run`，使用 `app.paid_run.PaidRun` 的全新账本、经核实的人民币保守费率/模型输出范围及实时身份校验函数。该上下文必须传至线程入口；它不改变请求参数、不自动重试或续跑，也不替代维护切换、预算预检或人工Gate。现有公共API没有新增执行入口，普通任务不自动使用本轮账本。正式执行前仍须重新核价、完成预算校验及按Stage3要求停服备份。
 # 2026-10-12/13 所有者授权连续运行
@@ -234,7 +234,7 @@ Agent上下文超限已通过传输去重修复：省去重复的result_json字�
 
 Mini20支持显式Business V2业务出题与十维审计，保留原Coverage/Construction约束。所有者委托AI审核必须绑定唯一Run、当前Corpus/Plan、明确Profile及实际授权来源，不冒充真人。具体本次结果见[Mini20收口验收](docs/MINI20_QUALITY_CLOSURE_ACCEPTANCE.md)。
 
-2026-10-14新Medium50采用问题设计先于证据核验，设计阶段不传PDF正文/答案；独立审计检查单核心意图及设计谱系。仅本次授权CLI `scripts/run_medium50_full_evolution.py` 复用正式Generation/治理/委托审核/Baseline/Agent/Sandbox链路；账本不设本轮金额上限，实际有限失败结果见[验收](docs/MEDIUM50_FULL_EVOLUTION_ACCEPTANCE.md)：当前32/50机器合格，Q07实际PDF歧义且两次新替换耗尽，未冻结、未执行新Baseline/Agent/A/B/C；检查点与未知Usage保留。
+2026-10-14新Medium50采用问题设计先于证据核验，设计阶段不传PDF正文/答案；独立审计检查单核心意图及设计谱系。仅本次授权CLI（现已归档至 `scripts/归档/run_medium50_full_evolution.py`）复用正式Generation/治理/委托审核/Baseline/Agent/Sandbox链路；账本不设本轮金额上限，实际有限失败结果见[验收](docs/MEDIUM50_FULL_EVOLUTION_ACCEPTANCE.md)：当前32/50机器合格，Q07实际PDF歧义且两次新替换耗尽，未冻结、未执行新Baseline/Agent/A/B/C；检查点与未知Usage保留。
 
 2026-10-15 Baseline 与 Agent 工作台完成前端产品表达重构；现有规则与数据保持。见[验收报告](docs/WORKBENCH_PRODUCT_EXPRESSION_ACCEPTANCE.md)及[最终截图图库](docs/screenshots/workbench-20261015/index.html)。截图中的Mini20是既有结果，不代表前序Medium50已完成。
 
@@ -259,7 +259,7 @@ Golden验证分离来源真实性与内容语义：严格核对真实Chunk、原
 
 50题Probe/QC及人工审核均未完成，本轮没有Provider、正式评测或发布。默认生成版本仍为generation-vnext-1；未改Judge、11 Gate、Agent、Pipeline、知识库或前端。
 
-只读内容核验：`python3 scripts/verify_golden_vnext.py --source-database backend/data/demo.db --self-test`。`scripts/replace_golden_content.py`是本轮一次性替换工具，默认仅prepare，显式--apply先完整备份再事务写入；已应用内容不能重复执行。
+只读内容核验：`python3 scripts/verify_golden_vnext.py --source-database backend/data/demo.db --self-test`。`scripts/归档/replace_golden_content.py`是本轮已归档的一次性替换工具，默认仅prepare，显式--apply先完整备份再事务写入；已应用内容不能重复执行。
 
 Golden 批量恢复与真实结果见 [收口报告](docs/GOLDEN_BATCH_RECOVERY_REPORT.md)：只补缺失/技术中断阶段，已完成质量争议进入审核，Human Gate不自动确认。
 

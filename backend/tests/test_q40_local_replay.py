@@ -1,7 +1,7 @@
 """The authorized repair accepts only one missing outer brace."""
 import json,sys,unittest
 from pathlib import Path
-sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts'))
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'scripts/归档'))
 from resume_candidate_a_q40 import close_outer_object
 
 class Q40LocalReplayTests(unittest.TestCase):
