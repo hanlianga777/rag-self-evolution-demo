@@ -19,7 +19,7 @@ from .evaluation_contract import abstention_valid, claim_consistent, normalize, 
 
 DEFAULT_TASK_THINKING = {
     'baseline': 'max', 'generation': 'max', 'answer': 'max', 'candidate': 'max',
-    'judge': 'max', 'agent': 'high', 'query_rewrite': 'low', 'multi_query': 'low',
+    'judge': 'low', 'agent': 'high', 'query_rewrite': 'low', 'multi_query': 'low',
     'hyde': 'high', 'query_decompose': 'high', 'query': 'low', 'auxiliary': 'high',
 }
 _thinking_task = ContextVar('provider_thinking_task', default=None)

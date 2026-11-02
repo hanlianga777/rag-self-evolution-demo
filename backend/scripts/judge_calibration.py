@@ -119,6 +119,60 @@ def run_calibration(runner, source, cases, effort, state, save):
     return state
 
 
+def calibrated_cases(source, cases, state, effort):
+    """Validate saved calibration scores without replaying a paid request."""
+    expected = calibration_plan(source, cases, effort)
+    # Concurrent follow-up reviews append metadata to the source summary only.
+    if (state.get('complete') is not True
+            or any(state.get('plan', {}).get(k) != v for k, v in expected.items() if k != 'source_sha256')
+            or set(state.get('cases', {})) != {c['question_id'] for c in cases}):
+        raise ValueError('校准未完成或源题集、判分身份不一致')
+    scored = []
+    for case in cases:
+        checkpoint = state['cases'][case['question_id']]
+        result = checkpoint.get('scored_result', {})
+        if (checkpoint.get('technical_error') or type(result.get('passed')) is not bool
+                or saved_case_execution(result) != saved_case_execution(case)):
+            raise ValueError('校准判分缺失或保存的回答、检索记录已变化：' + case['question_id'])
+        scored.append({'question_id': case['question_id'], **result})
+    return scored
+
+
+def import_calibration(store, source_id, state, effort='low'):
+    """Persist a complete Baseline using normal case and summary writers; no RPCs."""
+    from app.evaluation import summarize_evaluation_cases
+    from app.evaluation_stage import checkpoint_usage
+    from app.telemetry import cost_fields
+    from app.paid_run import unsettled_usage
+    source, cases = read_baseline(store.database_path, source_id)
+    scored = calibrated_cases(source, cases, state, effort)
+    lineage = {'source_run_id': source_id, 'generation_thinking': source['config'].get('generation_thinking'),
+               'judge_thinking': effort, 'judge_source': '010a 校准',
+               'calibration_source_sha256': state['plan']['source_sha256'],
+               'source_sha256_at_import': source_digest(source, cases),
+               'timing_provenance': '回答耗时、TTFT、检索记录沿用源 Baseline'}
+    existing = next((r for r in store.evaluation_runs() if r['result'].get('calibration_import') == lineage), None)
+    if existing and existing['status'] == 'completed':
+        return existing
+    run_id = existing['id'] if existing else store.create_evaluation_run(
+        json.loads(source['dataset_snapshot_json']), source['config'], state['plan']['judge'])
+    store.update_evaluation_progress(run_id, {'calibration_import': lineage})
+    for case in scored:
+        store.record_evaluation_case(run_id, case['question_id'], {k: v for k, v in case.items() if k != 'question_id'}, with_bad_case=True)
+    events = [u for cp in state['cases'].values() for u in checkpoint_usage(cp)]
+    result = {**summarize_evaluation_cases(scored), 'calibration_import': lineage,
+              'evaluation_complete': True, 'technical_failed': 0, 'technical_error_count': 0,
+              'technical_errors': [], 'attempted': len(scored), 'total': len(scored),
+              'checkpoints': {k: {field: v for field, v in cp.items() if field != 'scored_result'} for k, cp in state['cases'].items()},
+              'calibration_job': state.get('_job'), 'runtime_limits': source['result'].get('runtime_limits'),
+              'request_accounting': {'provenance': '010a 校准已支付判分；本次导入无调用', 'call_events': len(events),
+                                     'unknown_usage_events': sum(unsettled_usage(u) for u in events),
+                                     'known_input_tokens': sum(u.get('prompt_tokens', 0) for u in events if type(u.get('prompt_tokens')) is int),
+                                     'known_output_tokens': sum(u.get('completion_tokens', 0) for u in events if type(u.get('completion_tokens')) is int),
+                                     **cost_fields(source['judge']['model'], events)}}
+    return store.finish_evaluation_run(run_id, 'completed', result)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline', required=True)

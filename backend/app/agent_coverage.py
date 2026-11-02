@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .agent_recovery import digest
 from .diagnostics import diagnostic_view
-from .agent_inputs import prepare_baseline_rows
+from .agent_inputs import prepare_baseline_rows, is_optimization_target
 from .full_text import CORPUS_LOCK
 from .governance import _json, _now
 from .optimization import prepare_response, validate_intervention
@@ -18,6 +18,7 @@ REQUIREMENTS='相同冻结50题回答与Judge；检查目标要求及来源适�
 
 def plan_coverage(rows,base,candidates,*,round_number=1,labels=None):
     """Proposals never count as saved coverage. Group by actual legal interventions."""
+    rows = [row for row in rows if is_optimization_target(row)]
     labels=list('ABC') if labels is None else labels
     current=[c for c in candidates if c['reasoning'].get('round',1)==round_number and c['reasoning'].get('candidate_label') in {'A','B','C'}]
     available=[label for label in labels if label not in {c['reasoning'].get('candidate_label') for c in current}]

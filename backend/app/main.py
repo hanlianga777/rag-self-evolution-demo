@@ -299,6 +299,9 @@ def overview(light: bool = False):
     production = store.active_production()
     identity = store.current_baseline_identity()
     baseline = store.evaluation_run(identity["current_baseline_id"], light=light) if identity["current_baseline_id"] else None
+    if baseline:
+        from .agent_inputs import baseline_review_summary
+        baseline = {**baseline, 'review_summary': baseline_review_summary(baseline)}
     triggers = store.optimization_triggers()
     knowledge_state = knowledge()
     if light:
@@ -1425,7 +1428,9 @@ def optimization(light: bool = False, planning: bool = False):
         else:
             experiment = store.experiment(identity['current_experiment_id'])
     if experiment is None:
-        return {"status": "not_run", **({"bad_cases":bad_cases(light=True)} if planning else {}), "data_source": "real", "message": identity["baseline_unavailable_reason"] or "当前 Baseline 尚未运行 Optimization Agent", **identity}
+        from .policy import MAX_EVALS
+        budget = {'used': 0, 'max': MAX_EVALS, 'reserved_for_d': 1, 'remaining': MAX_EVALS, 'remaining_for_abc': MAX_EVALS - 1}
+        return {"status": "not_run", 'evaluation_budget': budget, **({"bad_cases":bad_cases(light=True)} if planning else {}), "data_source": "real", "message": identity["baseline_unavailable_reason"] or "当前 Baseline 尚未运行 Optimization Agent", **identity}
     if light:
         result = light_value({**(experiment_resume_view(experiment) if planning else experiment),
             'data_source':'real','recommendation':store.recommendation(experiment['id']),**identity})
@@ -1723,8 +1728,9 @@ def evaluation_run(run_id: str):
     if run is None:
         raise HTTPException(status_code=404, detail="Evaluation run not found")
     run=persisted_evaluation_progress(run)
-    questions = {q['id']:q for q in json.loads(run['dataset_snapshot_json']).get('questions', [])}
-    cases = [{**case,"diagnostic_view":diagnostic_view(case, golden_item=questions.get(case.get('question_id')))} for case in store.evaluation_case_results(run_id)]
+    from .agent_inputs import prepare_baseline_rows
+    cases = [{**row['result'], 'diagnostic_view': row['diagnostic_view']} for row in prepare_baseline_rows(run,
+             [{'question_id': case['question_id'], 'result': case} for case in store.evaluation_case_results(run_id)])]
     return {**run, "diagnostic_categories":DIAGNOSTIC_CATEGORIES,"product_diagnostics":product_diagnostics(store,run,cases), "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":requires_foundation_upgrade(run.get("judge",{})), "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []), statistics_version=run.get("judge", {}).get("gate_statistics_version"))}
 
 

@@ -31,7 +31,7 @@ class JudgeConfigurationTests(unittest.TestCase):
         self.addCleanup(self.env.stop)
 
     def test_settings_default_file_and_validation(self):
-        self.assertEqual(load_settings({}, self.empty).judge_thinking, 'max')
+        self.assertEqual(load_settings({}, self.empty).judge_thinking, 'low')
         self.empty.write_text('JUDGE_THINKING=low\n')
         self.assertEqual(load_settings({}, self.empty).judge_thinking, 'low')
         self.assertEqual(load_settings({'JUDGE_THINKING': 'high'}, self.empty).judge_thinking, 'high')
@@ -64,7 +64,7 @@ class JudgeConfigurationTests(unittest.TestCase):
         async def all_runs():
             return await asyncio.gather(run('low'), run('high'), run('max'))
         self.assertEqual(asyncio.run(all_runs()), ['low', 'high', 'max'])
-        self.assertEqual(thinking_config('judge')['reasoning_effort'], 'max')
+        self.assertEqual(thinking_config('judge')['reasoning_effort'], 'low')
 
 
 class JudgeScriptTests(unittest.TestCase):

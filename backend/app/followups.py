@@ -69,7 +69,8 @@ class FollowupJobs:
                     def progress(review):
                         state.update(review)
                         save()
-                    runner.review_baseline_errors(run_id, ['Q37', 'Q46'], on_progress=progress, stop_on_error=True)
+                    state['planned'] = 2 * sum(c['passed'] is False for c in cases)
+                    runner.review_baseline_errors(run_id, on_progress=progress, stop_on_error=True)
                 else:
                     state['plan'] = calibration_plan(source, cases, group)
                     def progress(*_args, **_kwargs):
@@ -100,7 +101,7 @@ class FollowupJobs:
         events = [event for stage in stages for event in checkpoint_usage(stage)]
         completed = [stage for stage in stages if type(stage.get('scored_result', {}).get('passed')) is bool]
         return {**state['_job'], 'source_run_id': run_id, 'group': group,
-                'planned': 4 if group == 'review' else state.get('plan', {}).get('planned_questions', 50),
+                'planned': state.get('planned', 4) if group == 'review' else state.get('plan', {}).get('planned_questions', 50),
                 'completed': len(completed), 'complete': state.get('complete', False),
                 'passed': sum(stage['scored_result']['passed'] for stage in completed),
                 'technical_failed': sum(bool(cp.get('technical_error')) or any(a.get('status') == 'error' for stage in (cp.get('regression_review', {}).get('runs', []) if group == 'review' else [cp]) for a in stage.get('attempts', [])) for cp in checkpoints),

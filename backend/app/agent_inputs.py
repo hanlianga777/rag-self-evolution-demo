@@ -6,6 +6,23 @@ from .diagnostics import diagnostic_view, standard_evidence, unmet_required_poin
 MISSING = '记录缺失'
 
 
+def is_optimization_target(row):
+    case = row.get('result', row)
+    review = case.get('baseline_review') or (row.get('retrieval_facts') or {}).get('baseline_review') or {}
+    return case.get('optimization_target', True) and review.get('status') != 'fluctuation' and review.get('conclusion') != '随机波动'
+
+
+def baseline_review_summary(baseline):
+    result = (baseline or {}).get('result', {})
+    reviews = (result.get('baseline_review') or {}).get('cases') or {}
+    statuses = [cp.get('regression_review', {}).get('status') for cp in reviews.values()]
+    unstable = statuses.count('fluctuation')
+    total = result.get('bad_case_count')
+    target = statuses.count('confirmed_regression') if result.get('calibration_import') else total - unstable if type(total) is int else None
+    return {'target_count': target, 'unstable_count': unstable,
+            'pending_count': max(0, total - statuses.count('confirmed_regression') - unstable) if type(total) is int and reviews else 0}
+
+
 def evidence_positions(question, trace):
     raw = question.get('raw') or {}
     evidence = (question.get('evidence') or raw.get('evidence')
@@ -63,6 +80,16 @@ def prepare_baseline_rows(baseline, rows):
     for row in rows:
         question = questions.get(row['question_id'])
         case = {**row['result']}
+        summary = reviews.get(row['question_id'], {}).get('regression_review') or {}
+        if summary:
+            case['baseline_review'] = {k: v for k, v in summary.items() if k != 'runs'}
+            failed, total = summary.get('failed_votes'), summary.get('total_votes')
+            label = {'confirmed_regression': '真错', 'fluctuation': '随机波动'}.get(summary.get('status'))
+            case['baseline_review_label'] = f'{label}（{total} 次错 {failed} 次）' if label else '复核中'
+        if (baseline or {}).get('result', {}).get('calibration_import'):
+            case['optimization_target'] = summary.get('status') == 'confirmed_regression'
+        elif summary.get('status') == 'fluctuation':
+            case['optimization_target'] = False
         if question is not None:
             case['standard_evidence'] = standard_evidence(question) or case.get('standard_evidence', [])
         prepared.append({**row, 'result': case,

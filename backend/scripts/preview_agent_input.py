@@ -34,7 +34,7 @@ def preview(database, baseline_id):
         base.pop(key, None)
     gates = (baseline['result'].get('gates') or {}).get('gates')
     failed = [gate for gate in gates if gate.get('passed') is False] if isinstance(gates, list) else None
-    system, prompt = build_agent_prompt(rows, base, [], failed, list('ABC'))
+    system, prompt = build_agent_prompt(rows, base, [], failed, list('ABC'), baseline_gates=gates)
     return {'baseline_id': baseline_id, 'golden_id': raw['dataset_version_id'],
             'scope': '首次生成A/B/C的完整提示词；上一轮方案为空，仅内存构建，不创建实验',
             'system': system, 'prompt': prompt, 'coverage': plan_coverage(rows, base, []), 'provider_calls': 0}

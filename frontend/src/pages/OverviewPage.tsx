@@ -60,7 +60,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
       <Metric label="Baseline 答对" value={correct == null ? "未知" : `${correct} / ${total}`} note="保存的逐题判定" />
       <Metric label={displayText("Hard Gate")} value={metrics?.gates ? `${metrics.gates.passed_count} / ${metrics.gates.total}` : "未知"} note="已通过 / 总项数" />
       <Metric label="回答耗时 P50" value={typeof p50 === "number" ? `${p50.toFixed(1)} 秒` : "未知"} note="一半问题在此时间内回答" />
-      <Metric label="待优化 Bad Case" value={metrics?.bad_case_count == null ? "未知" : `${metrics.bad_case_count} 道`} note={metrics ? "交给 Agent 分析" : "等待有效 Baseline"} />
+      <Metric label="待优化 Bad Case" value={metrics?.bad_case_count == null ? "未知" : `${run.review_summary?.target_count ?? metrics.bad_case_count} 道`} note={metrics ? (run.review_summary?.unstable_count ? `真错题；另有 ${run.review_summary.unstable_count} 道不稳定题` : "交给 Agent 分析") : "等待有效 Baseline"} />
     </div>
     <section className="next-action" aria-labelledby="next-action-title"><div><span className="next-action-label">{currentReleased ? "当前推荐演示 · Baseline 与线上版本" : "当前下一步"}</span><h2 id="next-action-title">{next[0]}</h2><p>{next[1]}</p></div><a className="primary" href={`#${next[2]}`} onClick={() => navigate(next[2])}>{currentReleased ? "开始方案对比" : next[0]}<ArrowRight size={15} aria-hidden="true" /></a></section>
     {formal && workSummary.generation_run_id && workSummary.generation_run_id !== formal.generation_run_id && <p className="muted overview-work-run">工作 Run：{workSummary.generation_status || "未记录状态"} · {workSummary.total ?? 0} / {workSummary.expected_count ?? "—"}；不替代当前正式 Golden。</p>}

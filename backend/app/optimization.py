@@ -12,7 +12,7 @@ from collections import Counter
 from .providers import ProviderRequestError, provider_error_details
 from .diagnostics import diagnostic_view
 from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
-from .agent_inputs import prepare_baseline_rows, retrieval_facts
+from .agent_inputs import prepare_baseline_rows, retrieval_facts, is_optimization_target
 from .paid_run import provider_task
 from .telemetry import collect_usage, measure, cost_fields
 from .policy import DEFAULT_PIPELINE_CONFIG, MAX_EVALS, canonicalize_config, search_space_contract, validate_candidate_config
@@ -89,6 +89,8 @@ def baseline_diagnosis_summary(bad_cases, gates):
             continue
         metric = gate.get('metric') or gate.get('id')
         groups = {}
+        unstable = []
+        targets = []
         for row in bad_cases:
             case = row['result']
             category = case.get('test_category')
@@ -100,26 +102,30 @@ def baseline_diagnosis_summary(bad_cases, gates):
             if relevant:
                 view = row.get('diagnostic_view') or diagnostic_view(case)
                 groups.setdefault(view.get('diagnosis_category', '记录缺失：缺分类记录'), []).append(view.get('display_question_id') or row['question_id'])
+                (targets if is_optimization_target(row) else unstable).append(view.get('display_question_id') or row['question_id'])
         labels={'positive_correctness':'正向题正确性','positive_faithfulness':'正向题忠实性','positive_completeness':'正向题完整性','ablation_correctness':'消融题正确性','ablation_faithfulness':'消融题忠实性','ablation_completeness':'消融题完整性','safe_rejection_rate':'安全拒答率','safety_critical_accuracy':'安全关键准确率','prompt_injection_resistance':'提示注入抵抗','latency_p50_seconds':'回答耗时中位数','latency_p99_seconds':'回答耗时第99百分位'}
         failed = gate.get('passed') is False or gate.get('status') == 'FAIL'
+        unstable_only = failed and bool(unstable) and not targets
+        unstable_note = 'Baseline 该门槛未过由不稳定题造成（复核多数判对），方案仍须通过该门槛' if unstable_only else ''
         summary.append({'dimension': metric, 'dimension_label':labels.get(metric,'维度记录缺失'), 'baseline_value': actual, 'target_value': target,
                         'operator': gate.get('operator'), 'gap': max(0, -margin),
                         'status': '未通过' if failed else '接近门槛',
                         'root_causes': [{'diagnosis_category': key, 'question_ids': ids,
-                                         'priority': 1 if failed else next((c['priority'] for c in DIAGNOSTIC_CATEGORIES if c['label']==key), None),
-                                         'priority_note': '导致门槛未过：'+labels.get(metric,'维度记录缺失') if failed else ''} for key, ids in groups.items()],
-                        'root_cause_note': '整轮耗时问题，需结合已保存耗时拆解' if str(metric).startswith('latency_') else None if groups else '记录缺失：没有该维度对应的错题诊断'})
+                                         'priority': 1 if failed and any(q in targets for q in ids) else next((c['priority'] for c in DIAGNOSTIC_CATEGORIES if c['label']==key), None),
+                                         'priority_note': '导致门槛未过：'+labels.get(metric,'维度记录缺失') if failed and any(q in targets for q in ids) else unstable_note} for key, ids in groups.items()],
+                        'unstable_question_ids': unstable, 'target_question_ids': targets,
+                        'root_cause_note': unstable_note or ('整轮耗时问题，需结合已保存耗时拆解' if str(metric).startswith('latency_') else None if groups else '记录缺失：没有该维度对应的错题诊断')})
     return summary
 
 
 def optimization_priorities(bad_cases, gates):
     summary = baseline_diagnosis_summary(bad_cases, gates)
-    counts = Counter((row.get('diagnostic_view') or diagnostic_view(row['result']))['diagnosis_category'] for row in bad_cases)
+    counts = Counter((row.get('diagnostic_view') or diagnostic_view(row['result']))['diagnosis_category'] for row in bad_cases if is_optimization_target(row))
     priorities = []
     for definition in DIAGNOSTIC_CATEGORIES:
         label = definition['label']
         if not counts[label] or label == '延迟':continue
-        causes = [cause for item in summary if item['status']=='未通过' for cause in item['root_causes'] if cause['diagnosis_category']==label]
+        causes = [cause for item in summary if item['status']=='未通过' for cause in item['root_causes'] if cause['diagnosis_category']==label and cause['priority']==1]
         priorities.append({**definition, 'count':counts[label], 'priority':1 if causes else definition['priority'],
                            'priority_note':'；'.join(dict.fromkeys(cause['priority_note'] for cause in causes))})
     return sorted(priorities, key=lambda item:item['priority'])
@@ -131,6 +137,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要。A/B/C必须是三个不同方向，不能只把同一个参数换几个数值。'
               '导致门槛未过的错题分类优先级升为1，按optimization_priorities及其原因安排优化。每个参数的用途与各可选值说明见allowed_parameter_values。'
+              '复核为随机波动的题不作为优化目标；仅由不稳定题造成的未过门槛不提升分类优先级，方案仍须通过该门槛。'
               '预期影响须点名预计修好的题号；风险须说明可能弄坏的题号或指标及原因；不得重复失败组合签名。'
               '没有合格方案就回到分析并再出一轮，最多12次试跑，其中1次留给D。D仅合并已验证有效改动；'
               'D无新增错题且至少修好1道才发布，否则保留赢家；发布规则与门槛不变。'
@@ -144,9 +151,11 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     priorities = optimization_priorities(bad_cases, gates)
     priority_by_category = {item['label']:item for item in priorities}
     rows=[]
+    unstable_rows=[]
     for row in bad_cases:
         view=row.get('diagnostic_view') or diagnostic_view(row['result'])
-        rows.append({'id':row['id'],'question_id':row['question_id'], 'display_question_id':view.get('display_question_id', row['question_id']),
+        target_rows = rows if is_optimization_target(row) else unstable_rows
+        target_rows.append({'id':row['id'],'question_id':row['question_id'], 'display_question_id':view.get('display_question_id', row['question_id']),
                      'question':row['result'].get('question'),
                      'diagnosis_category':view.get('diagnosis_category',view['primary_root_cause']),
                      'reason':view['analysis_reason'], 'subfeature':view.get('subfeature'), 'severity_label':view.get('severity_label'),
@@ -163,6 +172,8 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         'goal':{'objective':'通过11项门槛、错题总数少于Baseline、至少修好1道目标错题，安全关键题和提示注入题无新错。普通新错留给方案D处理。',
                 'failed_gates':failed_gates,'candidate_labels':labels,'baseline_configuration':base_config},
         'bad_cases':rows,
+        'unstable_cases':unstable_rows,
+        'unstable_case_instruction':'不稳定题：方案需保持判对，不作为必修目标',
         'priority_parameters':PRIORITY_PARAMETERS,
         'allowed_parameter_values':search_space_contract(),
         'prior_sandbox_results':[{'id':c['id'],'action_name':c.get('reasoning',{}).get('action_name'),
@@ -370,7 +381,8 @@ class OptimizationAgent:
         audited_cases = prepare_baseline_rows(baseline, bad_cases)
         audited_cases = [{**item, 'category':item['diagnostic_view']['primary_root_cause']} for item in audited_cases]
         from .evaluation_contract import business_verdict
-        bad_cases = [item for item in audited_cases if business_verdict(item['result'])=='FAIL' or (item['result'].get('evaluation_outcome') or {}).get('contract_version')!='business-vnext-1' and item['result'].get('passed') is False]
+        failures = [item for item in audited_cases if business_verdict(item['result'])=='FAIL' or (item['result'].get('evaluation_outcome') or {}).get('contract_version')!='business-vnext-1' and item['result'].get('passed') is False]
+        bad_cases = [item for item in failures if is_optimization_target(item)]
         diagnostic_tasks=[]
         for item in bad_cases:
             view=item['diagnostic_view'];plan=view.get('experiment_plan',{})
@@ -424,7 +436,7 @@ class OptimizationAgent:
         failed_signatures.update(parameter_signature(base_config,{key:value for key,value in c['config'].items() if value!=base_config.get(key)})
                                  for c in prior_candidates if c['status'] in {'failed','evaluated'} and not c.get('result',{}).get('qualification',{}).get('qualified'))
         audit['failed_parameter_signatures'] = sorted(failed_signatures)
-        system,prompt=build_agent_prompt(bad_cases,base_config,prior_candidates,failed_gates,labels,
+        system,prompt=build_agent_prompt(failures,base_config,prior_candidates,failed_gates,labels,
             baseline_gates=persisted_gates,evaluation_budget=evaluation_budget,failed_parameter_signatures=audit['failed_parameter_signatures'])
         audit['baseline_diagnosis_summary'] = prompt['baseline_diagnosis_summary']
         audit['next_action'] = prompt['next_action']
