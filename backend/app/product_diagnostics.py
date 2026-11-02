@@ -81,8 +81,10 @@ def thinking_comparison(runs,current_id):
         case=next((by_id[r['id']][key] for r,_ in runs if by_id[r['id']].get(key,{}).get('passed') is False),{})
         view=diagnostic_view(case)
         different.append({'question_id':key,'display_question_id':view['display_question_id'],'question':case.get('question'),
-            'diagnosis_category':view['diagnosis_category'],'results':results})
-    return {'columns':columns,'different_cases':different,'note':f'两档结果有差异的题目共 {len(different)} 道；按保存的逐题记录列出，已纳入本轮诊断。'}
+            'diagnosis_category':view['diagnosis_category'],'subfeature':view['subfeature'],'results':results})
+    all_current_failures = all(by_id[current_id].get(row['question_id'],{}).get('passed') is False for row in different)
+    note = f'两档结果不同的题目共 {len(different)} 道，均已列入本轮错题。' if all_current_failures else f'结果不同的题目共 {len(different)} 道，已按保存结果列出。'
+    return {'columns':columns,'different_cases':different,'note':note}
 
 
 def product_diagnostics(store,run,cases=None):
@@ -91,9 +93,10 @@ def product_diagnostics(store,run,cases=None):
     cases=store.evaluation_case_results(run['id']) if cases is None else cases
     questions={q['id']:q for q in json.loads(run['dataset_snapshot_json']).get('questions',[])}
     from .agent_inputs import prepare_baseline_rows
-    from .optimization import baseline_diagnosis_summary
+    from .optimization import baseline_diagnosis_summary, optimization_priorities
     rows=prepare_baseline_rows(run,[{'id':f"BC-{run['id']}-{case['question_id']}",'question_id':case['question_id'],'result':case} for case in cases if case.get('passed') is False])
     result={'objective_metrics':objective_metrics(cases,questions),
+        'optimization_priorities':optimization_priorities(rows,run['result'].get('gates',{}).get('gates',[])),
         'baseline_diagnosis_summary':baseline_diagnosis_summary(rows,run['result'].get('gates',{}).get('gates',[]))}
     designation=store.baseline_designation()
     if designation and run['id']==designation['baseline_run_id']:

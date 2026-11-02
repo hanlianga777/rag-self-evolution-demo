@@ -90,7 +90,7 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(provider.prompt["allowed_parameter_values"], search_space_contract())
         self.assertEqual(set(provider.prompt["allowed_parameter_values"]), set(ALLOWED_SEARCH_SPACE))
         self.assertNotIn("excluded_automatic_parameters",provider.prompt)
-        self.assertEqual(provider.prompt["allowed_parameter_values"]["multi_query"], {"type": "boolean false or integer", "allowed": [False, 2, 4, 6]})
+        self.assertEqual({key: provider.prompt["allowed_parameter_values"]["multi_query"][key] for key in ("type", "allowed")}, {"type": "boolean false or integer", "allowed": [False, 2, 4, 6]})
 
     def test_targets_require_current_persisted_ids_and_audit_unknown_references(self):
         for target in ('invented-case-id', 'Baseline 有一题失败', 'Q-other-run'):
@@ -164,7 +164,7 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(result['result']['generation_status'],'insufficient_evidence')
 
     def test_cross_stage_changes_are_allowed_and_raw_audit_is_retained(self):
-        response=drafts();response['candidates'][1]['config_diff']['prompt_strategy']='Abstention'
+        response=drafts();response['candidates'][1]['config_diff']['prompt_strategy']='Tiered'
         experiment,trace,audit,_,raw=self.run_drafts(response)
         self.assertEqual(trace['status'],'completed')
         self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['A','B','C'])

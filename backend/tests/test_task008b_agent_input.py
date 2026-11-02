@@ -122,8 +122,8 @@ class Task008bInputTests(unittest.TestCase):
         facts = self.prepare(baseline, row)['retrieval_facts']
         self.assertEqual(facts['standard_evidence_positions'], '记录缺失')
         self.assertEqual(facts['candidate_k'], '记录缺失')
-        self.assertEqual(facts['unmet_required_points'], '记录缺失')
-        self.assertEqual(facts['baseline_review'], {'conclusion': '记录缺失', 'failed_votes': '记录缺失', 'total_votes': '记录缺失'})
+        self.assertEqual(facts['unmet_required_points'], '记录缺失：未保存完整的要点判分记录')
+        self.assertEqual(facts['baseline_review'], {'conclusion': '尚未复核', 'failed_votes': '尚未复核', 'total_votes': '尚未复核'})
         baseline, row = fixture()
         review = baseline['result']['baseline_review']['cases']['Q1']['regression_review']
         review.update(status='fluctuation', failed_votes=1)

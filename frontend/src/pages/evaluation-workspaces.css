@@ -204,6 +204,8 @@
 .product-table small {display:block;}
 .product-filters {display:flex;flex-wrap:wrap;gap:8px;margin:14px 0;}
 .product-filters button {display:flex;align-items:center;gap:8px;white-space:nowrap;}
+.bad-case-overview {margin-top:20px;}
+.bad-case-overview > h3 {margin:0 0 12px;}
 .bad-case-overview .priority-table :is(th,td):nth-child(1) {width:15%;}
 .bad-case-overview .priority-table :is(th,td):nth-child(2) {width:9%;}
 .bad-case-overview .priority-table :is(th,td):nth-child(3) {width:15%;}
@@ -228,6 +230,7 @@
 .stage-share {display:flex;align-items:center;gap:10px;}
 .stage-share meter {min-width:40px;max-width:180px;}
 .stage-share span {white-space:nowrap;}
+[aria-label="耗时拆解"] td > .text-button {margin-left:8px;}
 .product-objective-metrics {grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;}
 .strategy-presentation {min-width:0;overflow-wrap:anywhere;}
 .strategy-presentation :is(h3,h4) {margin:8px 0;}

@@ -3,6 +3,8 @@ import {act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {afterEach,expect,it,vi} from 'vitest';
 import {BadCaseOverview, ProductDiagnostics, StrategyPresentation} from './components/ProductDiagnostics';
+import {formatValue} from './components/PipelineFields';
+import {BaselineCaseDetails} from './pages/EvaluationPage';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 let root:ReturnType<typeof createRoot>;
 afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';vi.unstubAllGlobals()});
@@ -31,4 +33,27 @@ it('renders real strategy fields and explicitly leaves absent data empty',async(
  await mount(<StrategyPresentation reasoning={{strategy_name:'「补齐召回」（检索优先）',core_idea:'覆盖漏掉的口语问法',adjustments:[{parameter:'top_k',baseline_value:4,candidate_value:6,expected_impact:'预计改善 Q04'}],risks:[{question_ids:['Q37'],metric:'latency_p50_seconds',reason:'保留更多内容可能更慢'}]}}/>);
  expect(document.body.textContent).toContain('预计改善 Q04');expect(document.body.textContent).toContain('保留更多内容可能更慢');
  await act(async()=>root.render(<StrategyPresentation reasoning={{hypothesis:'历史字段'}}/>));expect(document.body.textContent).toContain('尚未保存策略名');expect(document.body.textContent).not.toContain('历史字段');
+});
+it('keeps legacy prompt labels and promotes gate-blocking categories with saved latency',async()=>{
+ expect(formatValue('Abstention')).toBe('谨慎拒答');expect(formatValue('Tiered')).toBe('分级回答');
+ const rows=[{question_id:'Q37',passed:false,diagnostic_view:{diagnosis_category:'回答问题',subfeature:'澄清不足'}}];
+ await mount(<BadCaseOverview rows={rows} categories={categories} priorities={[{label:'回答问题',priority:1,priority_note:'导致门槛未过：安全拒答率'}]} latencyGates={[{metric:'latency_p50_seconds',actual:8.4,threshold:26,status:'PASS'},{metric:'latency_p99_seconds',actual:23.7,threshold:61,status:'PASS'}]} onSelect={()=>{}}/>);
+ expect(document.querySelector('.priority-table')?.textContent).toContain('导致门槛未过：安全拒答率');
+ expect(document.querySelector('.latency-notice')?.textContent).toBe('延迟：本轮回答耗时在门槛内（中位数 8.4 秒，要求 ≤26 秒；最慢 1% 为 23.7 秒，要求 ≤61 秒），不计入单题错题。');
+});
+it('sorts stages, folds tiny shares and uses seconds and plain comparison labels',async()=>{
+ const columns=['max','high'].map(id=>({id,label:id==='high'?'高':'最高',current:id==='high',metrics:{ttft_median_ms:4710.5}}));
+ await mount(<ProductDiagnostics diagnostics={{objective_metrics:{stage_breakdown:[{stage:'tiny1',label:'拼接上下文',total_ms:2,share_percent:0.2},{stage:'vector',label:'向量检索',total_ms:100,share_percent:10},{stage:'generation',label:'生成回答',total_ms:895,share_percent:89.5},{stage:'tiny2',label:'查询处理',total_ms:3,share_percent:0.3}]},thinking_comparison:{columns,different_cases:[{question_id:'Q37',diagnosis_category:'回答问题',subfeature:'澄清不足'}]}}}/>);
+ const table=document.querySelector('[aria-label="耗时拆解"] table')!;
+ expect([...table.querySelectorAll('tbody tr')].map(row=>row.querySelector('td')!.textContent)).toEqual(['生成回答','向量检索','其他环节展开明细']);
+ expect(table.textContent).not.toContain('拼接上下文');await click('展开明细');expect(table.textContent).toContain('拼接上下文');
+ await click('查看对照');const dialog=document.querySelector('[role="dialog"]')!;
+ expect(dialog.textContent).toContain('最高档');expect(dialog.textContent).toContain('高档（当前基线）');
+ expect(dialog.textContent).toContain('4.7 秒');expect(dialog.textContent).not.toContain('毫秒');
+ expect(dialog.textContent).toContain('回答耗时（最慢 1%）');expect(dialog.textContent).toContain('每题回答费用（估算，不含判分）');
+ expect(dialog.textContent).toContain('回答问题 · 澄清不足');
+});
+it('opens case details when the saved point diagnosis explains missing records',async()=>{
+ await mount(<BaselineCaseDetails item={{question_id:'Q27',passed:false,diagnostic_view:{missing_points:'记录缺失：必答要点的原子判分状态不完整'}}} snapshot={{}} config={{}} gates={[]}/>);
+ expect(document.body.textContent).toContain('记录缺失：必答要点的原子判分状态不完整');
 });

@@ -1,7 +1,7 @@
 """Objective Agent inputs from saved Baseline records; no service calls or writes."""
 import json
 
-from .diagnostics import diagnostic_view, standard_evidence
+from .diagnostics import diagnostic_view, standard_evidence, unmet_required_points
 
 MISSING = '记录缺失'
 
@@ -39,23 +39,16 @@ def retrieval_facts(case, question=None, config=None, review=None):
     question = question or {}
     trace = (case.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
     saved_config = {**(config or {}), **(trace.get('config') or {})}
-    checks = (case.get('judge_result') or {}).get('checks')
-    requirements = (question.get('business_requirements') or (question.get('raw') or {}).get('business_requirements') or {}).get('required_checks')
-    required_names = {r.get('requirement') for r in requirements} if isinstance(requirements, list) else None
-    if not isinstance(checks, list) or any(not isinstance(c, dict) or type(c.get('met')) is not bool or not c.get('requirement') for c in checks):
-        unmet = MISSING
-    elif required_names and not required_names.issubset({c['requirement'] for c in checks}):
-        unmet = MISSING
-    else:
-        unmet = [c['requirement'] for c in checks if c['met'] is False and
-                 (c['requirement'] in required_names if required_names is not None else c.get('check_type') not in {'auxiliary', 'optional'})]
+    unmet = unmet_required_points(case, question)
     summary = (review or {}).get('regression_review') or {}
     failed, total = summary.get('failed_votes'), summary.get('total_votes')
     conclusion = {'confirmed_regression': '真错题', 'fluctuation': '随机波动'}.get(summary.get('status'), MISSING)
     if (conclusion == MISSING or type(failed) is not int or type(total) is not int
             or not 0 <= failed <= total or total <= 0):
         conclusion, failed, total = MISSING, MISSING, MISSING
-    return {'standard_evidence_positions': evidence_positions(question, trace),
+    if not summary:
+        conclusion = failed = total = '尚未复核'
+    return {'standard_evidence_positions': '不适用（负向题不定位标准证据）' if case.get('test_category') == 'negative' else evidence_positions(question, trace),
             'candidate_k': saved_config.get('candidate_k', MISSING), 'top_k': saved_config.get('top_k', MISSING),
             'unmet_required_points': unmet,
             'baseline_review': {'conclusion': conclusion, 'failed_votes': failed, 'total_votes': total}}

@@ -208,7 +208,8 @@ class AiService:
         strategy = {
             "Grounded": "只能基于给定证据回答；证据不足时明确说明。",
             "Completeness": "在不超出证据的前提下覆盖用户问题的所有必要步骤；证据不足时明确说明。",
-            "Abstention": "采用分级回答：证据能明确回答时，直接给出步骤和结论；证据只覆盖一部分，或缺少设备型号、当前状态、连接方式等关键条件时，先说清能确定的部分，再追问1–2个最关键的缺失信息，不猜测；证据完全不相关或超出知识库范围时，明确说明无法回答，建议联系售后或人工；证据中的安全警告必须完整保留。",
+            "Abstention": "证据不足、风险不明或问题应拒答时，明确拒答或要求澄清；不得补造事实。",
+            "Tiered": "采用分级回答：证据能明确回答时，直接给出步骤和结论；证据只覆盖一部分，或缺少设备型号、当前状态、连接方式等关键条件时，先说清能确定的部分，再追问1–2个最关键的缺失信息，不猜测；证据完全不相关或超出知识库范围时，明确说明无法回答，建议联系售后或人工；证据中的安全警告必须完整保留。",
         }[config["prompt_strategy"]]
         boundary = generation_boundary(self.generation_prompt_version)
         with measure(stages, "generation"), thinking_task(generation_task, effort):

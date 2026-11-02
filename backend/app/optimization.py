@@ -101,12 +101,28 @@ def baseline_diagnosis_summary(bad_cases, gates):
                 view = row.get('diagnostic_view') or diagnostic_view(case)
                 groups.setdefault(view.get('diagnosis_category', '记录缺失：缺分类记录'), []).append(view.get('display_question_id') or row['question_id'])
         labels={'positive_correctness':'正向题正确性','positive_faithfulness':'正向题忠实性','positive_completeness':'正向题完整性','ablation_correctness':'消融题正确性','ablation_faithfulness':'消融题忠实性','ablation_completeness':'消融题完整性','safe_rejection_rate':'安全拒答率','safety_critical_accuracy':'安全关键准确率','prompt_injection_resistance':'提示注入抵抗','latency_p50_seconds':'回答耗时中位数','latency_p99_seconds':'回答耗时第99百分位'}
+        failed = gate.get('passed') is False or gate.get('status') == 'FAIL'
         summary.append({'dimension': metric, 'dimension_label':labels.get(metric,'维度记录缺失'), 'baseline_value': actual, 'target_value': target,
                         'operator': gate.get('operator'), 'gap': max(0, -margin),
-                        'status': '未通过' if gate.get('passed') is False else '接近门槛',
-                        'root_causes': [{'diagnosis_category': key, 'question_ids': ids} for key, ids in groups.items()],
+                        'status': '未通过' if failed else '接近门槛',
+                        'root_causes': [{'diagnosis_category': key, 'question_ids': ids,
+                                         'priority': 1 if failed else next((c['priority'] for c in DIAGNOSTIC_CATEGORIES if c['label']==key), None),
+                                         'priority_note': '导致门槛未过：'+labels.get(metric,'维度记录缺失') if failed else ''} for key, ids in groups.items()],
                         'root_cause_note': '整轮耗时问题，需结合已保存耗时拆解' if str(metric).startswith('latency_') else None if groups else '记录缺失：没有该维度对应的错题诊断'})
     return summary
+
+
+def optimization_priorities(bad_cases, gates):
+    summary = baseline_diagnosis_summary(bad_cases, gates)
+    counts = Counter((row.get('diagnostic_view') or diagnostic_view(row['result']))['diagnosis_category'] for row in bad_cases)
+    priorities = []
+    for definition in DIAGNOSTIC_CATEGORIES:
+        label = definition['label']
+        if not counts[label] or label == '延迟':continue
+        causes = [cause for item in summary if item['status']=='未通过' for cause in item['root_causes'] if cause['diagnosis_category']==label]
+        priorities.append({**definition, 'count':counts[label], 'priority':1 if causes else definition['priority'],
+                           'priority_note':'；'.join(dict.fromkeys(cause['priority_note'] for cause in causes))})
+    return sorted(priorities, key=lambda item:item['priority'])
 
 
 def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, labels, *, baseline_gates=None, evaluation_budget=None, failed_parameter_signatures=None):
@@ -114,6 +130,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要。A/B/C必须是三个不同方向，不能只把同一个参数换几个数值。'
+              '导致门槛未过的错题分类优先级升为1，按optimization_priorities及其原因安排优化。每个参数的用途与各可选值说明见allowed_parameter_values。'
               '预期影响须点名预计修好的题号；风险须说明可能弄坏的题号或指标及原因；不得重复失败组合签名。'
               '没有合格方案就回到分析并再出一轮，最多12次试跑，其中1次留给D。D仅合并已验证有效改动；'
               'D无新增错题且至少修好1道才发布，否则保留赢家；发布规则与门槛不变。'
@@ -123,6 +140,9 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
               '"risks":[{"question_ids":[],"metric":"可能退化的指标","reason":"原因"}],'
               '"hypothesis":"一个优化思路","why":"对应错题及理由","target_bad_cases":["题号或错题ID"],'
               '"config_diff":{},"expected_improvement":"预期改善","risk":"可能退化"}]}。')
+    gates = baseline_gates if baseline_gates is not None else failed_gates
+    priorities = optimization_priorities(bad_cases, gates)
+    priority_by_category = {item['label']:item for item in priorities}
     rows=[]
     for row in bad_cases:
         view=row.get('diagnostic_view') or diagnostic_view(row['result'])
@@ -130,11 +150,14 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                      'question':row['result'].get('question'),
                      'diagnosis_category':view.get('diagnosis_category',view['primary_root_cause']),
                      'reason':view['analysis_reason'], 'subfeature':view.get('subfeature'), 'severity_label':view.get('severity_label'),
+                     'priority':priority_by_category.get(view.get('diagnosis_category'),{}).get('priority',view.get('priority')),
+                     'priority_note':priority_by_category.get(view.get('diagnosis_category'),{}).get('priority_note',''),
                      'retrieval_facts':row.get('retrieval_facts') or retrieval_facts(row['result'])})
     budget = {**{'used': 0, 'max': MAX_EVALS, 'reserved_for_d': 1}, **(evaluation_budget or {})}
     budget.update(remaining=max(0, budget['max'] - budget['used']), remaining_for_abc=max(0, budget['max'] - budget['used'] - budget['reserved_for_d']))
     prompt={
-        'baseline_diagnosis_summary':baseline_diagnosis_summary(bad_cases, baseline_gates if baseline_gates is not None else failed_gates),
+        'baseline_diagnosis_summary':baseline_diagnosis_summary(bad_cases, gates),
+        'optimization_priorities':priorities,
         'evaluation_budget':budget, 'next_action':'analyze_and_propose' if budget['remaining_for_abc'] else 'review_for_d',
         'failed_parameter_signatures':failed_parameter_signatures or [],
         'goal':{'objective':'通过11项门槛、错题总数少于Baseline、至少修好1道目标错题，安全关键题和提示注入题无新错。普通新错留给方案D处理。',

@@ -77,6 +77,26 @@ def standard_evidence(item):
     return [source.get('quote', '') for source in requirements.get('sources', [])]
 
 
+def unmet_required_points(case, question=None):
+    """Read saved required atomic outcomes by ID, never rescore paraphrased checks."""
+    question = question or {}
+    requirements = (question.get('business_requirements') or (question.get('raw') or {}).get('business_requirements') or {}).get('required_checks')
+    judge = case.get('judge_result') or {}
+    if requirements and all(r.get('id') for r in requirements) and judge.get('atomic_results'):
+        atoms = {a.get('atomic_id'): a for a in judge['atomic_results']}
+        if all(atoms.get(r['id'], {}).get('state') in {'MET', 'NOT_MET'} for r in requirements):
+            return [r['requirement'] for r in requirements if atoms[r['id']]['state'] == 'NOT_MET']
+        return '记录缺失：必答要点的原子判分状态不完整'
+    checks = judge.get('checks')
+    if not isinstance(checks, list) or any(not isinstance(c, dict) or type(c.get('met')) is not bool or not c.get('requirement') for c in checks):
+        return '记录缺失：未保存完整的要点判分记录'
+    names = {r.get('requirement') for r in requirements} if isinstance(requirements, list) else None
+    if names and not names.issubset({c['requirement'] for c in checks}):
+        return '记录缺失：必答要点与判分文字无法对应，且没有完整的原子编号判分'
+    return [c['requirement'] for c in checks if c['met'] is False and
+            (c['requirement'] in names if names is not None else c.get('check_type') not in {'auxiliary', 'optional'})]
+
+
 def _saved_verdict(case):
     outcome = case.get('evaluation_outcome') or {}
     if (outcome.get('verdict') not in {None, 'PASS', 'FAIL'} or outcome.get('execution_complete') is False
@@ -253,7 +273,9 @@ def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_finger
     missing_positions=[p for p in positions if not isinstance(p['final_rank'],int)]
     chosen=(missing_positions or positions)[:1]
     position_label=' → '.join(location(p[k],label) for p in chosen for k,label in [('candidate_rank','候选'),('rerank_rank','重排'),('final_rank','最终')]) if chosen else '无标准证据检索要求'
-    missing_points=[c.get('requirement','') for c in (case.get('judge_result') or {}).get('checks',[]) if c.get('met') is False]
+    if case.get('test_category') == 'negative':
+        position_label = '不适用（负向题不定位标准证据）'
+    missing_points=unmet_required_points(case, golden)
     subfeature=analysis.get('subfeature','')
     if category=='检索噪声':subfeature=position_label
     return {**analysis, 'view_version': 'diagnosis-view-v6',

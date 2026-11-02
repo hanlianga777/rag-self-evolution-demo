@@ -25,7 +25,7 @@ class Task009AgentRulesTests(unittest.TestCase):
         for strategy, digest in expected.items():
             service.answer('问题', {'prompt_strategy': strategy})
             self.assertEqual(hashlib.sha256(provider.requests[-1][0].encode()).hexdigest(), digest)
-        service.answer('问题', {'prompt_strategy': 'Abstention'})
+        service.answer('问题', {'prompt_strategy': 'Tiered'})
         for term in ('1–2', '能确定', '售后', '安全警告'):
             self.assertIn(term, provider.requests[-1][0])
 
