@@ -18,7 +18,7 @@ class ReplayApiTests(unittest.TestCase):
         with patch.object(main,'EvaluationRunner',return_value=runner),TestClient(main.app) as client:
             self.assertEqual(client.get('/api/evaluations/source/judge-replay/preflight').json()['reusable'],50)
             self.assertEqual(client.post('/api/evaluations/source/judge-replay',json={'authorize_provider':False},headers={'Origin':'http://127.0.0.1:5174'}).status_code,409)
-            runner.start_judge_replay.assert_called_once_with('source')
+            runner.start_judge_replay.assert_called_once_with('source',judge_thinking=None)
     def test_invalid_eligibility_does_not_start_thread_or_generate(self):
         runner=Mock();runner.start_judge_replay.side_effect=ValueError('Final source incomplete')
         with patch.object(main,'EvaluationRunner',return_value=runner),patch.object(main.threading,'Thread') as thread,TestClient(main.app) as client:

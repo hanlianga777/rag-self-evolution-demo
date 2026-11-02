@@ -63,4 +63,4 @@ class AgentTask004Tests(unittest.TestCase):
         self.assertIn('retrieval_trace',self.rows()[0]['result']['programmatic_metrics'])
         self.assertNotIn('retrieval_trace',prompt['bad_cases'][0])
         self.assertNotIn('coverage_obligations',prompt)
-        self.assertEqual(prompt['priority_parameters']['回答问题 / 过度拒答'],['prompt_strategy','generation_thinking'])
+        self.assertEqual(prompt['priority_parameters']['回答问题'],['prompt_strategy','generation_thinking'])

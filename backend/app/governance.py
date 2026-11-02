@@ -2247,7 +2247,10 @@ class GovernanceStore:
             return {**identity, "baseline_unavailable_reason": "Corpus 已变化；请创建并确认新的 Golden 测试集及 Baseline"}
         identity["requires_new_golden"] = False
         # Missing run_target is classified by persisted execution evidence, never by NULL alone.
-        rows = connection.execute("SELECT id,config_json,judge_json,json_remove(result_json,'$.checkpoints') AS result_json,dataset_snapshot_json,error_message,completed_at FROM evaluation_runs WHERE status='completed' AND run_mode='real' AND data_source='real' AND dataset_version_id=? AND coalesce(CASE WHEN json_valid(config_json) THEN json_extract(config_json,'$.run_target') END,'baseline')!='sandbox_candidate' ORDER BY created_at DESC, rowid DESC", (golden["id"],))
+        designation = self.baseline_designation(connection)
+        identity['baseline_designation'] = designation
+        pinned = designation.get('baseline_run_id') if designation else None
+        rows = connection.execute("SELECT id,config_json,judge_json,json_remove(result_json,'$.checkpoints') AS result_json,dataset_snapshot_json,error_message,completed_at FROM evaluation_runs WHERE status='completed' AND run_mode='real' AND data_source='real' AND dataset_version_id=? AND coalesce(CASE WHEN json_valid(config_json) THEN json_extract(config_json,'$.run_target') END,'baseline')!='sandbox_candidate'" + (" AND id=?" if pinned else "") + " ORDER BY created_at DESC, rowid DESC", (golden["id"],pinned) if pinned else (golden["id"],))
         for row in rows:
             config, judge, result = _load(row["config_json"], {}), _load(row["judge_json"], {}), _load(row["result_json"], {})
             frozen = _load(row["dataset_snapshot_json"], {})
@@ -2272,6 +2275,41 @@ class GovernanceStore:
             generation_changed = 'generation_prompt_version' in judge and (any(judge.get(k) != v for k,v in current_generation.items()) or judge.get('common_identity_version') != 'round0-common-1')
             return {**identity, "current_baseline_id": row["id"], "current_experiment_id": experiment["id"] if experiment else None, 'requires_policy_upgrade': generation_changed or not policy_current(judge) or judge.get('evaluation_identity') != evaluation_identity(_load(row['dataset_snapshot_json'], {}), judge)}
         return {**identity, "baseline_unavailable_reason": "当前 Golden/Corpus 需要新的有效 Baseline；旧实验仅供历史查看"}
+
+    def baseline_designation(self, connection=None):
+        if connection is None:
+            with self.connection() as connection:return self.baseline_designation(connection)
+        if not connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='baseline_designations'").fetchone():
+            return None
+        row=connection.execute('SELECT * FROM baseline_designations ORDER BY id DESC LIMIT 1').fetchone()
+        return dict(row) if row else None
+
+    def designate_baseline(self, baseline_id, comparison_id, actor, reason):
+        """One audited operator action selects roles and discards the unsaved draft."""
+        if not actor.strip() or not reason.strip() or baseline_id==comparison_id:
+            raise ValueError('请填写确认人、原因和不同的对照运行')
+        with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            golden=connection.execute("SELECT id,snapshot_json FROM dataset_versions WHERE status='approved' ORDER BY created_at DESC,rowid DESC LIMIT 1").fetchone()
+            if not golden:raise ValueError('缺少当前冻结题卷')
+            frozen=_load(golden['snapshot_json'],{})
+            for key in (baseline_id,comparison_id):
+                row=connection.execute('SELECT * FROM evaluation_runs WHERE id=?',(key,)).fetchone()
+                snapshot=_load(row['dataset_snapshot_json'],{}) if row else {}
+                config=_load(row['config_json'],{}) if row else {}
+                result=_load(row['result_json'],{}) if row else {}
+                saved={r[0] for r in connection.execute('SELECT question_id FROM evaluation_case_results WHERE run_id=?',(key,))}
+                if (not row or row['status']!='completed' or row['run_mode']!='real' or row['data_source']!='real'
+                    or row['dataset_version_id']!=golden['id'] or config.get('run_target')!='baseline'
+                    or row['error_message'] or result.get('evaluation_complete') is not True or result.get('technical_failed',0)
+                    or saved!=set(frozen.get('question_ids',[])) or not saved
+                    or any(snapshot.get(k)!=frozen.get(k) for k in ('questions','question_ids','corpus_fingerprint'))):
+                    raise ValueError('只能指定当前题卷下完整且无技术失败的真实Baseline')
+            connection.execute('CREATE TABLE IF NOT EXISTS baseline_designations (id INTEGER PRIMARY KEY, baseline_run_id TEXT NOT NULL, comparison_run_id TEXT NOT NULL, comparison_label TEXT NOT NULL, actor TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)')
+            connection.execute('INSERT INTO baseline_designations(baseline_run_id,comparison_run_id,comparison_label,actor,reason,created_at) VALUES (?,?,?,?,?,?)',
+                (baseline_id,comparison_id,'思考档位对照（回答 max）',actor.strip(),reason.strip(),_now()))
+            connection.execute('DELETE FROM pipeline_config_draft')
+        return self.baseline_designation()
 
     def require_current_baseline(self, run_id=None, connection=None):
         identity = self.current_baseline_identity(connection)
@@ -2373,8 +2411,9 @@ class GovernanceStore:
                 result['judge_replay']['execution_sha256']={key:digest(e) for key,e in judge_replay['executions'].items()}
                 result['judge_replay']['timing_provenance']='historical_generation_not_current_latency'
             if result.get('judge_replay'):
-                from .q18_probe import require_reviewed_probe
-                require_reviewed_probe(self.database_path,{**result['judge_replay'],'new_judge':judge})
+                from .q18_probe import require_reviewed_probe, QUESTION_ID
+                if QUESTION_ID in snapshot['question_ids']:
+                    require_reviewed_probe(self.database_path,{**result['judge_replay'],'new_judge':judge})
             if automatic:
                 from .paid_run import current_paid_run
                 paid=current_paid_run()

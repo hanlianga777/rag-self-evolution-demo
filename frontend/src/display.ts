@@ -2,8 +2,8 @@ export const isMachineQualified = (status?: string) => status === "machine_quali
 
 const translations: Record<string, string> = {
   "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "机器合格", "ai_agent": "AI 代理",
-  "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "query_only": "仅基于查询的重排序", "ON": "开启", "OFF": "关闭",
-  "Grounded": "有据生成", "Completeness": "完整性优先", "Abstention": "谨慎拒答",
+  "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "query_only": "按原问题排序", "STRICT": "严格", "FALLBACK": "回退", "ON": "开启", "OFF": "关闭",
+  "Grounded": "有据生成", "Completeness": "完整性优先", "Abstention": "分级回答",
   "Query": "查询处理", "Retrieval": "检索", "Generation": "回答生成",
   "Pending": "待处理", "pending": "待处理", "needs_human_review": "待人工复核", "machine_qualified": "机器合格",
   "expected_improvement": "预期收益", "root_cause": "技术根因", "new_failures": "新增失败",

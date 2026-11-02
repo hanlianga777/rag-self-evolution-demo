@@ -10,6 +10,7 @@ class Settings:
     model: str
     timeout_seconds: float = 240.0
     baseline_thinking: str = "max"
+    judge_thinking: str = "max"
 
     @property
     def configured(self) -> bool:
@@ -37,10 +38,14 @@ def load_settings(env: dict[str, str] | None = None, env_file: Path | None = Non
     baseline_thinking = values.get("BASELINE_THINKING", "max")
     if baseline_thinking not in {"off", "low", "high", "max"}:
         raise ValueError("BASELINE_THINKING must be off/low/high/max")
+    judge_thinking = values.get("JUDGE_THINKING", "max")
+    if judge_thinking not in {"low", "high", "max"}:
+        raise ValueError("JUDGE_THINKING must be low/high/max")
     return Settings(
         api_key=values.get("DEEPSEEK_API_KEY", "").strip(),
         base_url=values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/"),
         model=model,
         timeout_seconds=timeout,
         baseline_thinking=baseline_thinking,
+        judge_thinking=judge_thinking,
     )

@@ -103,49 +103,23 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     if (activeBatches.current.has(id)) return;
     activeBatches.current.add(id);
     start(`第 ${request.round} 轮 A/B/C Sandbox`, { id, current: 0, total: request.candidateIds.length, stage: "核对当前实验" });
-    let completed = 0;
     try {
-      for (const candidateId of request.candidateIds) {
-        if (!mounted.current) return;
-        const [workspace, experiment] = await Promise.all([getJson<any>("/api/workspace"), getJson<any>(`/api/experiments/${request.experimentId}`)]);
-        if (!mounted.current) return;
-        if (workspace.current_baseline_id !== request.baselineId || (request.identity && identityKey(workspace) !== request.identity) || experiment.baseline_run_id !== request.baselineId) throw new Error("当前实验身份已变化，停止本轮运行");
-        if (experiment.result?.report_confirmation) throw new Error("Gate 2 已确认，本轮结果不能改变");
-        const candidate = experiment.candidates?.find((item: any) => item.id === candidateId);
-        if (!candidate || candidate.reasoning?.round !== request.round || !["A", "B", "C"].includes(candidate.reasoning?.candidate_label)) throw new Error("候选不属于本轮 A/B/C");
-        if (["evaluated", "failed"].includes(candidate.status)) { completed++; update(id, { current: completed }); continue; }
-        if (candidate.status !== "generated" || experiment.candidates.some((item: any) => ["running", "queued"].includes(item.status))) throw new Error("已有实验运行中，请等待后再继续");
-        const budget = experiment.evaluation_budget;
-        if (!budget || budget.used >= budget.max - (budget.reserved_for_d ?? 1)) throw new Error("Sandbox 预算不足，保留 D 额度");
-        const itemId = start(`Candidate ${candidate.reasoning.candidate_label} · Sandbox`, { candidateId, stage: "正在预约评测" });
-        try {
-          const started = await postJson<{ id: string }>(`/api/candidates/${candidateId}/run`, { authorize_provider: true });
-          update(itemId, { runId: started.id });
-          // ponytail: browser-owned serial queue; refresh requires a new explicit click for unstarted candidates.
-          let result: any;
-          do {
-            if (!mounted.current) return;
-            result = await getJson<any>(`/api/evaluations/${started.id}`);
-            update(itemId, evaluation(result));
-            if (["queued", "running"].includes(result.status)) await new Promise(resolve => window.setTimeout(resolve, 1000));
-          } while (["queued", "running"].includes(result.status));
-          if (!mounted.current) return;
-          // Evaluation completion precedes Candidate qualification persistence; wait for both.
-          let saved: any;
-          do {
-            const next = await getJson<any>(`/api/experiments/${request.experimentId}`);
-            saved = next.candidates?.find((item: any) => item.id === candidateId);
-            if (!saved) throw new Error("运行候选记录缺失，停止并核对审计");
-            if (["running", "queued"].includes(saved.status)) await new Promise(resolve => window.setTimeout(resolve, 1000));
-          } while (mounted.current && ["running", "queued"].includes(saved.status));
-          if (!mounted.current) return;
-          if (saved.result?.interrupted) throw new Error("服务器重启中断本项；其余未运行方案等待再次点击，不自动继续");
-          if (saved.status === "evaluated" && result.status === "completed") succeed(itemId);
-          else { throw new Error(`${result.error_message || saved.result?.error || "评测未完整，预算已消耗"}；本轮已暂停，其余候选等待人工决定`); }
-        } catch (reason) { fail(itemId, reason); throw reason; }
-        completed++; update(id, { current: completed, stage: `已结束 ${completed}/${request.candidateIds.length}` });
+      const [workspace, experiment] = await Promise.all([getJson<any>("/api/workspace"), getJson<any>(`/api/experiments/${request.experimentId}`)]);
+      if (workspace.current_baseline_id !== request.baselineId || (request.identity && identityKey(workspace) !== request.identity) || experiment.baseline_run_id !== request.baselineId) throw new Error("当前实验身份已变化，请刷新");
+      if (experiment.result?.report_confirmation) throw new Error("报告已确认，本轮结果不能改变");
+      await postJson(`/api/experiments/${request.experimentId}/run-cycle`, {});
+      while (mounted.current) {
+        const saved = await getJson<any>(`/api/experiments/${request.experimentId}`);
+        const cycle = saved.result?.optimization_cycle;
+        if (!cycle) throw new Error("记录缺失：优化批次状态");
+        update(id, {current:cycle.used,total:12,stage:`已用 ${cycle.used} 次，剩余 ${cycle.remaining} 次（含合并方案预留）`});
+        if (candidateRefresh.current) await candidateRefresh.current();
+        if (cycle.status !== "running") {
+          if (["failed", "analysis_exhausted"].includes(cycle.status)) throw new Error(cycle.last_error || "本批次已停止");
+          succeed(id); break;
+        }
+        await new Promise(resolve => window.setTimeout(resolve, 1000));
       }
-      succeed(id);
     } catch (reason) { fail(id, reason); throw reason; }
     finally { activeBatches.current.delete(id); }
   }, [start, update, succeed, fail]);

@@ -17,7 +17,7 @@ class PipelineDraftTests(unittest.TestCase):
             with patch.object(main, 'store', store):
                 identity = store.current_baseline_identity()
                 production = store.active_production()
-                config = {**DEFAULT_PIPELINE_CONFIG, 'top_k': 6}
+                config = {**DEFAULT_PIPELINE_CONFIG, 'top_k': 6, 'generation_thinking':main.ai_service.provider.settings.baseline_thinking}
                 response = client.post('/api/pipeline/draft', json={'config': config, 'identity': identity})
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(GovernanceStore(path).pipeline_draft()['config'], config)

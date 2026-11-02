@@ -57,7 +57,7 @@ ALLOWED_SEARCH_SPACE = {
     "prompt_strategy": ("Grounded", "Completeness", "Abstention"),
     "generation_thinking": ("off", "low", "high", "max"),
     "query_decompose": (False, True),
-    "retrieval_max_tokens": (False, 8192, 16384, 32768, 65536),
+    "retrieval_max_tokens": (False,),
 }
 
 EXCLUDED_AUTOMATIC_PARAMETERS = frozenset({

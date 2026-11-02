@@ -12,7 +12,7 @@ import time
 import urllib.error
 import urllib.request
 
-from .config import Settings
+from .config import Settings, load_settings
 from .telemetry import record_usage
 from .evaluation_contract import abstention_valid, claim_consistent, normalize, scoped_reference_valid
 
@@ -23,6 +23,18 @@ DEFAULT_TASK_THINKING = {
     'hyde': 'high', 'query_decompose': 'high', 'query': 'low', 'auxiliary': 'high',
 }
 _thinking_task = ContextVar('provider_thinking_task', default=None)
+_judge_thinking = ContextVar('provider_judge_thinking', default=None)
+
+
+@contextmanager
+def judge_thinking(effort=None):
+    """Freeze Judge effort for one run without changing settings or other tasks."""
+    effort = thinking_config('judge')['reasoning_effort'] if effort is None else effort
+    if effort not in {'low', 'high', 'max'}:
+        raise ValueError('JUDGE_THINKING must be low/high/max')
+    token = _judge_thinking.set(effort)
+    try: yield
+    finally: _judge_thinking.reset(token)
 
 
 @contextmanager
@@ -39,7 +51,10 @@ def thinking_config(task=None, effort=None):
     if task is None:
         task, effort = selected or (_task.get() or 'auxiliary', None)
         if _task.get() in {'judge', 'agent'}: task, effort = _task.get(), None
-    if task == 'judge': effort = 'max'
+    if task == 'judge':
+        effort = _judge_thinking.get() or (load_settings().judge_thinking if effort is None else effort)
+        if effort not in {'low', 'high', 'max'}:
+            raise ProviderRequestError('请求本地校验：Judge Thinking必须为low/high/max')
     effort = DEFAULT_TASK_THINKING.get(task, 'high') if effort is None else effort
     if effort not in {'off', 'low', 'high', 'max'}:
         raise ProviderRequestError('请求本地校验：Thinking必须为off/low/high/max')

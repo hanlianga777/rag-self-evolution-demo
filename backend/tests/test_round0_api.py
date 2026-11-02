@@ -9,7 +9,7 @@ class Round0APITests(unittest.TestCase):
         store=Mock()
         store.current_baseline_identity.return_value={'current_baseline_id':'old','requires_policy_upgrade':True}
         store.evaluation_run.return_value={'id':'old','status':'completed','judge':{**VERSIONS,'model':'deepseek-v4-flash','generation_prompt_version':'generation-vnext-1'}}
-        with patch.object(main,'store',store): result=main.evaluation()
+        with patch.object(main,'store',store),patch.object(main,'product_diagnostics',return_value={}): result=main.evaluation()
         self.assertTrue(result['requires_policy_upgrade'])
         self.assertEqual(result['judge']['model'],'deepseek-v4-flash')
 
@@ -22,5 +22,5 @@ class Round0APITests(unittest.TestCase):
         store.monitoring_events.return_value=[]
         with patch.object(main,'store',store),patch.object(main,'knowledge',return_value={'identity':{},'coverage_status':'fixture','index':{}}): result=main.pipeline()
         self.assertEqual(result['config']['prompt_strategy'],'Abstention')
-        self.assertEqual(result['baseline_defaults'],DEFAULT_PIPELINE_CONFIG)
+        self.assertEqual(result['baseline_defaults'],{**DEFAULT_PIPELINE_CONFIG,'generation_thinking':main.ai_service.provider.settings.baseline_thinking})
         self.assertIsNone(result['baseline_config'])

@@ -1,8 +1,9 @@
 """Read-only explanation of saved evidence; never rescore or rewrite a Run."""
 from .evaluation_contract import normalize
 from .read_view import memoized_view
+from .diagnostic_categories import DIAGNOSTIC_CATEGORIES, category_definition
 
-TYPICAL = ('检索失败', '检索噪声', '模型过度拒答', '安全边界误伤', '延迟黑洞')
+TYPICAL = tuple(row['label'] for row in DIAGNOSTIC_CATEGORIES)
 @memoized_view
 def _current_corpus(trace):
     """Read persisted chunks only after their manifest/source identities are verified."""
@@ -128,9 +129,17 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
         gaps.extend(problems)
     if trace.get('status') not in (None, 'completed'):
         gaps.append('检索记录未完成：retrieval_trace.status=' + str(trace['status']))
+    def rank(quote, stage):
+        rows=trace.get(stage)
+        if not isinstance(rows,list):return '记录缺失'
+        for index,row in enumerate(rows,1):
+            if quote and quote in _text(row.get('content') or row.get('chunk_text') or row.get('text')):
+                return index
+        return None
     checks = [{'evidence_index': i + 1, 'quote': quotes[i].get('quote', '') if isinstance(quotes[i], dict) else quotes[i],
                'candidate_hit': any(q in t for t in entries['candidates']) if q and not stage_gaps['candidates'] else None,
-               'final_hit': any(q in t for t in entries['final']) if q and not stage_gaps['final'] else None}
+               'final_hit': any(q in t for t in entries['final']) if q and not stage_gaps['final'] else None,
+               'candidate_rank':rank(q,'candidates'), 'rerank_rank':rank(q,'reranked'), 'final_rank':rank(q,'final')}
               for i, q in enumerate(normalized)]
     retrieval = {'recall_at_k': None, 'precision_at_k': None, 'mrr': None,
                  'evidence_count': len(quotes), 'evidence_hit_count': None,
@@ -150,12 +159,15 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
               'retrieval_failure_stage': None, 'evidence_checks': checks,
               'retrieval_metrics': retrieval, 'diagnostic_gaps': []}
     def conclude(category, root, reason, priority=None, stage=None):
+        definition=category_definition(category)
         result.update(diagnosis_category=category, primary_root_cause=root, analysis_reason=reason,
-                      priority=priority, retrieval_failure_stage=stage,
+                      priority=definition.get('priority',priority), retrieval_failure_stage=stage,
                       target_eligible=category not in {'记录缺失', '通过'},
                       execution_verified=not gaps,
                       analysis_category='not_applicable' if category == '通过' else 'insufficient_evidence' if category == '记录缺失' else 'rag_failure')
         result['diagnostic_gaps'] = [{'condition': gap} for gap in gaps]
+        result.update(severity_label=definition.get('severity','记录缺失' if category=='记录缺失' else '无'),
+                      tuning_directions=definition.get('directions',[]),repair_hint=definition.get('repair_hint',reason))
         return result
     verdict = _saved_verdict(case)
     scored = bool(judge) and any(k in judge for k in ('verdict', 'correctness', 'quality', 'behavior_pass', 'checks'))
@@ -170,16 +182,29 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
         gaps.append('缺少题型（positive / ablation / negative）')
     # Negative outcomes are determined by the saved safety judgment, not positive evidence coverage.
     if category == 'negative' and verdict == 'FAIL' and scored:
-        return conclude('安全边界问题', 'Safety', '负向题已保存判分为错：回答未遵守该题要求的拒答或安全边界。', '安全')
+        subtype=case.get('negative_subtype') or golden.get('negative_subtype')
+        # A missing clarification is an answer defect, not an unsafe refusal.
+        if subtype=='clarify':
+            result['subfeature']='澄清不足'
+            return conclude('回答问题','Generation','已保存判分要求追问关键缺失信息，回答未完成必要澄清。')
+        if subtype in {'safety_critical','prompt_injection'}:
+            result['subfeature']='该拒未拒' if subtype=='safety_critical' else '注入绕过'
+            return conclude('安全边界','Safety','已保存判分显示未遵守安全关键或提示注入边界。')
+        if subtype=='insufficient_evidence':
+            result['subfeature']='库外回答'
+            return conclude('安全边界','Safety','证据不足题的已保存判分为错：回答越过资料边界。')
+        gaps.append('缺少负向题子类')
     if 'model_answer' not in case or not isinstance(case.get('model_answer'), str):
         gaps.append('缺少已保存的模型回答')
     if gaps:
         return conclude('记录缺失', 'MissingRecord', '；'.join(gaps))
     missing = [str(c['evidence_index']) for c in checks if not c['candidate_hit']]
     if missing:
+        result['subfeature']='未进候选'
         return conclude('检索失败', 'Retrieval', '第' + '、'.join(missing) + '段标准证据未进入该次候选，查找环节没有找全。', 1, 'candidate_recall')
     missing = [str(c['evidence_index']) for c in checks if not c['final_hit']]
     if missing:
+        result['subfeature']='候选有证据，最终内容未保留'
         return conclude('检索噪声', 'Ranking', '标准证据已全部进入候选，但第' + '、'.join(missing) + '段未进入最终内容，筛选时漏掉了。', 2, 'ranking_context_selection')
     import re
     answer = _text(case['model_answer'])
@@ -188,7 +213,9 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
                or judge.get('answer_behavior') in {'refusal', 'abstention'}
                or re.search(r'(?:资料|材料|文档|手册|上下文).{0,12}(?:没有|未提供|未找到|未说明|未包含)|无法确认|不能确认|不能回答|无法回答|无法提供|无法确定', answer))
     if refusal:
+        result['subfeature']='有据仍拒答'
         return conclude('过度拒答', 'Generation', '标准证据已交给模型，但保存的回答或判分显示仍在拒答、表示资料没有或无法确认。', 4)
+    result['subfeature']='漏答要点'
     return conclude('回答问题', 'Generation', '标准证据已交给模型，已保存判分仍为错，回答存在遗漏或错误。', 3)
 
 
@@ -200,11 +227,11 @@ def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_finger
     direction_map = {'检索失败': ['query_expansion', 'candidate_recall'],
                      '检索噪声': ['context_selection'],
                      '回答问题': ['grounded_generation'], '过度拒答': ['grounded_generation'],
-                     '安全边界问题': ['grounded_generation']}
+                     '安全边界': ['grounded_generation']}
     observation_map = {'检索失败': ['recall_missing'], '检索噪声': ['ranking_omission'],
                        '回答问题': ['final_sufficient', 'confirmed_claim'],
                        '过度拒答': ['final_sufficient', 'confirmed_claim'],
-                       '安全边界问题': ['safety_failure', 'confirmed_claim']}
+                       '安全边界': ['safety_failure', 'confirmed_claim']}
     directions = direction_map.get(category, [])
     observations = observation_map.get(category, [])
     metrics = case.get('programmatic_metrics') or {}
@@ -214,7 +241,24 @@ def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_finger
                'question_stages': stages, 'judge_stages': metrics.get('judge_stages'),
                'bottleneck': max(measured, key=lambda s: s['duration_ms']) if measured else None}
     issues = [{'type': 'missing_record', 'reason': g['condition']} for g in analysis['diagnostic_gaps']]
-    return {**analysis, 'view_version': 'diagnosis-view-v5',
+    import re
+    golden=golden_item or case.get('golden_item') or {}
+    display_id=golden.get('display_id') or golden.get('coverage_slot') or (golden.get('raw') or {}).get('coverage_slot')
+    if not display_id:
+        match=re.search(r'(?:^Q|[-_])(\d{2,3})$',str(case.get('question_id') or case.get('id') or ''))
+        display_id=f'Q{int(match[1]):02d}' if match else '记录缺失：题号'
+    positions=[{k:check[k] for k in ('evidence_index','candidate_rank','rerank_rank','final_rank')} for check in analysis['evidence_checks']]
+    def location(value,stage):
+        return f'{stage}第 {value} 位' if isinstance(value,int) else f'{stage}记录缺失' if value=='记录缺失' else f'未进{stage}'
+    missing_positions=[p for p in positions if not isinstance(p['final_rank'],int)]
+    chosen=(missing_positions or positions)[:1]
+    position_label=' → '.join(location(p[k],label) for p in chosen for k,label in [('candidate_rank','候选'),('rerank_rank','重排'),('final_rank','最终')]) if chosen else '无标准证据检索要求'
+    missing_points=[c.get('requirement','') for c in (case.get('judge_result') or {}).get('checks',[]) if c.get('met') is False]
+    subfeature=analysis.get('subfeature','')
+    if category=='检索噪声':subfeature=position_label
+    return {**analysis, 'view_version': 'diagnosis-view-v6',
+            'display_question_id':display_id,'subfeature':subfeature,'subfeatures':[subfeature] if subfeature else [],
+            'retrieval_positions':positions,'retrieval_position_label':position_label,'missing_points':missing_points,
             'phenomena': [{'name': category, 'status': 'observed', 'basis': [analysis['analysis_reason']]}] if directions else [],
             'secondary_root_causes': [], 'is_technical_bad_case': bool(directions),
             'optimization_directions': directions, 'trace_observations': observations,
@@ -232,7 +276,7 @@ def business_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fing
 def experiment_plan(case, analysis, *, corpus_chunks=None, corpus_fingerprint=None):
     directions = {'检索失败': ['query_expansion', 'candidate_recall'], '检索噪声': ['context_selection'],
                   '回答问题': ['grounded_generation'], '过度拒答': ['grounded_generation'],
-                  '安全边界问题': ['grounded_generation']}.get(analysis['diagnosis_category'], [])
+                  '安全边界': ['grounded_generation']}.get(analysis['diagnosis_category'], [])
     return {'status': 'ready' if directions else 'capability_gap',
             'directions': directions, 'observations': [],
             'next_action': 'controlled_sandbox' if directions else 'repair_sources_or_trace',

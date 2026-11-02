@@ -4,9 +4,40 @@ from .diagnostic_evidence import digest
 from .evaluation_contract import evaluation_identity,VERSIONS
 
 
+def resolve_question_ids(snapshot, requested=None):
+    """Resolve explicit frozen IDs or displayed Q numbers; never silently skip one."""
+    questions = snapshot['questions']
+    if requested is None:
+        return [q['id'] for q in questions]
+    aliases = {}
+    for index, question in enumerate(questions, 1):
+        slot = question.get('coverage_slot')
+        for alias in ({question['id'], slot} if slot else {question['id'], f'Q{index:02d}', f'Q{index}'}):
+            aliases.setdefault(alias, set()).add(question['id'])
+    selected = []
+    for value in requested:
+        matches = {value} if value in snapshot['question_ids'] else aliases.get(value, set())
+        if len(matches) != 1:
+            raise ValueError(f'题号不存在或不唯一：{value}')
+        key = next(iter(matches))
+        if key not in selected:
+            selected.append(key)
+    if not selected:
+        raise ValueError('至少指定一道题')
+    return selected
+
+
 def source_digest(run,cases):
     return digest({'snapshot':run['dataset_snapshot_json'],'config':run['config'],'judge':run['judge'],'result':run['result'],
         'status':run['status'],'mode':run['run_mode'],'data_source':run['data_source'],'cases':cases})
+
+
+def saved_case_execution(case):
+    metrics = case.get('programmatic_metrics') or {}
+    execution = {k: v for k, v in metrics.items() if not k.startswith('judge_') and k not in {
+        'behavior_contract', 'evidence_sufficiency', 'safety_guard', 'evidence_coverage',
+        'retrieval_hit', 'retrieval_precision', 'retrieval_rank'}}
+    return {**execution, 'answer': case.get('model_answer'), 'retrieval': case.get('retrieved_chunks')}
 
 
 def saved_selection_error(trace,chunks):
@@ -54,9 +85,7 @@ def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint):
     for question in snapshot['questions']:
         key=question['id'];reasons=list(shared);case=rows.get(key);cp=source['result'].get('checkpoints',{}).get(key,{})
         if case:
-            metrics=case.get('programmatic_metrics') or {}
-            execution={k:v for k,v in metrics.items() if not k.startswith('judge_') and k not in {'behavior_contract','evidence_sufficiency','safety_guard','evidence_coverage','retrieval_hit','retrieval_precision','retrieval_rank'}}
-            execution.update(answer=case.get('model_answer'),retrieval=case.get('retrieved_chunks'))
+            execution=saved_case_execution(case)
             if any(case.get(k)!=question.get(k) for k in ('question','test_category','negative_subtype')) or case.get('reference_answer')!=(question.get('reference_answer') or question.get('expected_behavior','拒答或澄清')):reasons.append('saved_question_or_reference_changed')
             origin='scored_case_generation'
         else:execution=cp.get('execution') or {};origin='generation_checkpoint'

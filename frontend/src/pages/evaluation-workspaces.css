@@ -197,3 +197,43 @@
 .workbench-drawer .candidate-release-row > .badge {justify-self:start;}
 .evaluation-page .page-content .judge-replay-preflight {height:auto;min-height:0;flex:none;overflow:visible;}
 .evaluation-page .judge-replay-preflight > button {align-self:flex-start;white-space:normal;}
+/* Task 009: reuse workspace surfaces and type sizes, keep diagnosis details expandable. */
+.product-table {height:auto !important;max-height:none !important;min-height:0;}
+.product-table table {width:100%;min-width:0 !important;table-layout:fixed;}
+.product-table :is(th,td) {position:static !important;white-space:normal !important;overflow-wrap:anywhere;vertical-align:top;}
+.product-table small {display:block;}
+.product-filters {display:flex;flex-wrap:wrap;gap:8px;margin:14px 0;}
+.product-filters button {display:flex;align-items:center;gap:8px;white-space:nowrap;}
+.bad-case-overview .priority-table :is(th,td):nth-child(1) {width:15%;}
+.bad-case-overview .priority-table :is(th,td):nth-child(2) {width:9%;}
+.bad-case-overview .priority-table :is(th,td):nth-child(3) {width:15%;}
+.bad-case-overview .priority-table :is(th,td):last-child {width:10%;}
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(1) {width:26%;}
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(2) {width:11%;}
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(3) {width:20%;}
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(4) {width:11%;}
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(5) {width:20%;}
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(6) {width:12%;}
+.product-diagnosis-table td:last-child .text-button {display:block;white-space:nowrap;}
+.bad-case-overview .product-case-expanded td {width:auto !important;background:var(--card-good-bg);}
+.product-case-expanded dl {display:grid;gap:10px;margin:0;}
+.product-case-expanded dl > div {display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;}
+.product-case-expanded :is(dt,dd) {margin:0;white-space:normal;}
+.product-case-expanded dt {color:var(--muted);}
+.thinking-comparison-drawer.drawer {width:min(1080px,calc(100vw - 48px));max-width:none;}
+.thinking-comparison-drawer .product-table td > .badge {display:block;width:max-content;margin-top:6px;}
+.thinking-comparison-drawer .thinking-overview th:first-child {width:27%;}
+.thinking-comparison-drawer .thinking-different th:first-child {width:40%;}
+.single-line-text {display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.stage-share {display:flex;align-items:center;gap:10px;}
+.stage-share meter {min-width:40px;max-width:180px;}
+.stage-share span {white-space:nowrap;}
+.product-objective-metrics {grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;}
+.strategy-presentation {min-width:0;overflow-wrap:anywhere;}
+.strategy-presentation :is(h3,h4) {margin:8px 0;}
+.strategy-presentation .product-table {border-radius:var(--card-radius);}
+.strategy-presentation .strategy-adjustments th:last-child {width:40%;}
+.evolution-page .candidate-card-body {grid-template-rows:90px 310px 150px 90px 80px 80px 190px;}
+.evolution-page .candidate-cards {grid-template-columns:1fr;}
+.evolution-page .candidate-card-header {height:auto;min-height:84px;overflow:visible;}
+@media(max-width:1100px){.product-objective-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.bad-case-overview .product-table :is(th,td){padding:10px 8px;}}

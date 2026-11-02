@@ -31,6 +31,8 @@ from .evaluation_contract import policy_current, VERSIONS, BUSINESS_JUDGE_PROMPT
 from .governance import GovernanceStore, GENERATION_PROFILES
 from .optimization import OptimizationAgent
 from .diagnostics import diagnostic_view
+from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
+from .product_diagnostics import product_diagnostics
 from .policy import DEFAULT_PIPELINE_CONFIG, EXCLUDED_AUTOMATIC_PARAMETERS, search_space_contract, validate_candidate_config
 from .telemetry import price_config
 from .providers import DeepSeekProvider, ProviderTimeout, ProviderUnavailable
@@ -1342,24 +1344,28 @@ def persisted_evaluation_progress(run):
 def requires_foundation_upgrade(judge):
     if not policy_current(judge): return True
     try:
-        EvaluationRunner(store, ai_service)._require_generation_contract(judge)
+        from .providers import judge_thinking
+        with judge_thinking(judge.get('judge_thinking',{}).get('reasoning_effort')):
+            EvaluationRunner(store, ai_service)._require_generation_contract(judge)
     except ValueError:
         return True
     return False
 
 
 @app.get("/api/evaluation")
+@read_view()
 def evaluation(active_task: bool = False, light: bool = False):
     identity = store.current_baseline_identity()
     run = store.evaluation_run(identity["current_baseline_id"], light=light) if identity["current_baseline_id"] else None
-    if active_task or run is None:
+    if not identity.get('baseline_designation') and (active_task or run is None):
         with store.connection() as connection:
             latest = connection.execute("""SELECT id FROM evaluation_runs WHERE dataset_version_id=?
                 AND json_extract(config_json,'$.run_target')='baseline'""" +
                 ("" if active_task else " AND status IN ('running','partial','failed')") +
                 " ORDER BY created_at DESC,rowid DESC LIMIT 1",(identity['current_golden_id'],)).fetchone()
         if latest:run=persisted_evaluation_progress(store.evaluation_run(latest['id'],light=light))
-    return {"runtime_contract":EVALUATION_RUNTIME_CONTRACT, **(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":bool(identity.get("requires_policy_upgrade")) or requires_foundation_upgrade(run.get("judge",{}))} if run else {})}
+    diagnostics = product_diagnostics(store,run) if run else {}
+    return {"diagnostic_categories":DIAGNOSTIC_CATEGORIES,"product_diagnostics":diagnostics,"runtime_contract":EVALUATION_RUNTIME_CONTRACT, **(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":bool(identity.get("requires_policy_upgrade")) or requires_foundation_upgrade(run.get("judge",{}))} if run else {})}
 
 
 def case_list_row(row, *, light=False):
@@ -1445,7 +1451,7 @@ def pipeline():
     return {
         **identity,
         "config_draft": draft,
-        "baseline_defaults": DEFAULT_PIPELINE_CONFIG,
+        "baseline_defaults": {**DEFAULT_PIPELINE_CONFIG,"generation_thinking":ai_service.provider.settings.baseline_thinking},
         "data_version": hashlib.sha256(json.dumps([identity, draft, active["id"] if active else None, knowledge_state["identity"], knowledge_state["coverage_status"]], sort_keys=True).encode()).hexdigest(),
         "draft_identity": identity,
         "frozen_models": {"generation": ai_service.provider.settings.model, "judge": ai_service.provider.settings.model},
@@ -1474,8 +1480,8 @@ def save_pipeline_draft(payload: PipelineDraftRequest):
     if payload.identity != identity:
         raise HTTPException(status_code=409, detail="配置基准已变化，请刷新后保存草稿")
     if payload.config is not None:
-        if payload.config.get("generation_thinking", "max") != "max":
-            raise HTTPException(status_code=422, detail="Baseline Thinking 固定为 Max；Candidate 可独立选择其他档位")
+        if payload.config.get("generation_thinking", ai_service.provider.settings.baseline_thinking) != ai_service.provider.settings.baseline_thinking:
+            raise HTTPException(status_code=422, detail="Baseline 回答思考档位以本机设置为准")
         validation = validate_candidate_config(payload.config)
         if not validation["valid"]:
             raise HTTPException(status_code=422, detail="；".join(validation["errors"]))
@@ -1540,6 +1546,9 @@ def probe_readiness():
 @app.post("/api/experiments/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
 def run_experiments(payload: ExperimentRequest | None = None):
     completed = require_current_baseline()
+    current_id=store.current_baseline_identity().get("current_experiment_id")
+    if current_id:
+        require_idle_cycle(store.experiment(current_id))
     try:
         return OptimizationAgent(store, ai_service.provider).generate(completed["id"], payload.trigger_id if payload else None)
     except ValueError as error:
@@ -1579,6 +1588,7 @@ def continue_experiment(run_id: str):
     if experiment is None:
         raise HTTPException(status_code=404, detail="Experiment not found")
     require_current_baseline(experiment["baseline_run_id"])
+    require_idle_cycle(experiment)
     try:
         return OptimizationAgent(store, ai_service.provider).generate(experiment["baseline_run_id"], experiment_id=run_id)
     except ValueError as error:
@@ -1591,6 +1601,7 @@ def select_recommendation(run_id: str, payload: RecommendationRequest):
     if experiment is None:
         raise HTTPException(status_code=404, detail="Experiment not found")
     require_current_baseline(experiment["baseline_run_id"])
+    require_idle_cycle(experiment)
     try:
         return store.select_recommendation(run_id, payload.candidate_id, payload.actor)
     except ValueError as error:
@@ -1606,6 +1617,7 @@ def create_composite(run_id: str, payload: PaidActionRequest | None = None):
     experiment = store.experiment(run_id)
     if experiment is not None:
         require_current_baseline(experiment["baseline_run_id"])
+    require_idle_cycle(experiment)
     try:
         return store.create_composite(run_id, ai_service.provider)
     except ValueError as error:
@@ -1632,6 +1644,7 @@ def run_candidate(candidate_id: str, payload: PaidActionRequest | None = None):
         experiment = store.experiment(candidate["experiment_id"])
         if experiment:
             require_current_baseline(experiment["baseline_run_id"])
+            require_idle_cycle(experiment)
     runner = EvaluationRunner(store, ai_service)
     try:
         run_id, approved, config, candidate, baseline = runner.start_candidate(candidate_id,automatic=True)
@@ -1692,7 +1705,7 @@ def evaluation_run(run_id: str):
     run=persisted_evaluation_progress(run)
     questions = {q['id']:q for q in json.loads(run['dataset_snapshot_json']).get('questions', [])}
     cases = [{**case,"diagnostic_view":diagnostic_view(case, golden_item=questions.get(case.get('question_id')))} for case in store.evaluation_case_results(run_id)]
-    return {**run, "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":requires_foundation_upgrade(run.get("judge",{})), "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []), statistics_version=run.get("judge", {}).get("gate_statistics_version"))}
+    return {**run, "diagnostic_categories":DIAGNOSTIC_CATEGORIES,"product_diagnostics":product_diagnostics(store,run,cases), "dataset_snapshot": json.loads(run["dataset_snapshot_json"]), "cases": cases,"requires_policy_upgrade":requires_foundation_upgrade(run.get("judge",{})), "gate_details": gate_details(cases, run.get("result", {}).get("gates", {}).get("gates", []), statistics_version=run.get("judge", {}).get("gate_statistics_version"))}
 
 
 @app.post('/api/evaluations/{run_id}/stop', dependencies=[Depends(require_trusted_origin)])
@@ -1704,16 +1717,20 @@ def stop_evaluation(run_id: str):
 
 
 @app.get('/api/evaluations/{source_id}/judge-replay/preflight')
-def judge_replay_preflight(source_id: str):
-    try:return EvaluationRunner(store,ai_service).judge_replay_preflight(source_id)
+def judge_replay_preflight(source_id: str, judge_thinking: Literal['low','high','max'] | None = None):
+    try:return EvaluationRunner(store,ai_service).judge_replay_preflight(source_id,judge_thinking=judge_thinking)
     except (ValueError,KeyError) as error:raise HTTPException(409,str(error)) from error
 
 
+class JudgeReplayRequest(BaseModel):
+    judge_thinking: Literal['low','high','max'] | None = None
+
+
 @app.post('/api/evaluations/{source_id}/judge-replay',status_code=201,dependencies=[Depends(require_trusted_origin)])
-def judge_replay(source_id: str,payload: PaidActionRequest | None = None):
+def judge_replay(source_id: str,payload: JudgeReplayRequest | None = None):
     try:
         runner=EvaluationRunner(store,ai_service)
-        run_id,items,config=runner.start_judge_replay(source_id)
+        run_id,items,config=runner.start_judge_replay(source_id,judge_thinking=payload.judge_thinking if payload else None)
     except (ValueError,KeyError) as error:raise HTTPException(409,str(error)) from error
     threading.Thread(target=contextvars.copy_context().run,args=(runner.execute_baseline,run_id,items,config),daemon=True).start()
     return {'id':run_id,'status':'running','execution_kind':'judge_only_baseline','generation_calls':0}
@@ -1868,3 +1885,35 @@ def preview_scheme(payload: SchemePreviewRequest):
 @app.post("/api/evaluations/live", dependencies=[Depends(require_trusted_origin)])
 def live_evaluation(payload: EvaluationRequest):
     raise HTTPException(status_code=410, detail="旧评测接口已停用；请使用 /api/evaluations/run 创建可审计正式评测")
+
+
+class BaselineDesignationRequest(BaseModel):
+    baseline_run_id: str
+    comparison_run_id: str
+    actor: str
+    reason: str
+
+
+@app.post('/api/baseline-designation', dependencies=[Depends(require_trusted_origin)])
+def designate_baseline(payload: BaselineDesignationRequest):
+    try:
+        return store.designate_baseline(payload.baseline_run_id, payload.comparison_run_id, payload.actor, payload.reason)
+    except ValueError as error:
+        raise HTTPException(409,str(error)) from error
+
+
+def require_idle_cycle(experiment):
+    if experiment and experiment['result'].get('optimization_cycle',{}).get('status') == 'running':
+        raise HTTPException(409,'优化批次正在运行，请等待批次结束')
+
+
+@app.post('/api/experiments/{run_id}/run-cycle', status_code=201, dependencies=[Depends(require_trusted_origin)])
+def run_optimization_cycle(run_id: str):
+    from .optimization_cycle import claim_cycle, run_until_qualified
+    try:
+        state=claim_cycle(store,run_id)
+    except ValueError as error:
+        raise HTTPException(409,str(error)) from error
+    threading.Thread(target=contextvars.copy_context().run,
+        args=(lambda:run_until_qualified(store,ai_service,run_id,claimed=True),),daemon=True).start()
+    return state

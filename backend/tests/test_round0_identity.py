@@ -71,17 +71,17 @@ class BaselineConfigTests(unittest.TestCase):
 
     def test_current_draft_is_consumed_but_stale_draft_blocks(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG
-        draft={'identity':{'fixture':'same'},'config':{**DEFAULT_PIPELINE_CONFIG,'query_decompose':True,'retrieval_max_tokens':16384}}
+        draft={'identity':{'fixture':'same'},'config':{**DEFAULT_PIPELINE_CONFIG,'query_decompose':True,'retrieval_max_tokens':False}}
         _,_,config,_=self.runtime_store(draft).baseline_inputs()
-        self.assertTrue(config['query_decompose']); self.assertEqual(config['retrieval_max_tokens'],16384)
+        self.assertTrue(config['query_decompose']); self.assertIs(config['retrieval_max_tokens'],False)
         with self.assertRaisesRegex(ValueError,'Draft'):
             self.runtime_store({**draft,'identity':{'fixture':'stale'}}).baseline_inputs()
 
-    def test_baseline_rejects_candidate_only_thinking_override(self):
+    def test_baseline_uses_runtime_thinking_instead_of_draft_override(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG
         draft={'identity':{'fixture':'same'},'config':{**DEFAULT_PIPELINE_CONFIG,'generation_thinking':'low'}}
-        with self.assertRaisesRegex(ValueError,'Max'):
-            self.runtime_store(draft).baseline_inputs()
+        _,_,config,_=self.runtime_store(draft).baseline_inputs()
+        self.assertEqual(config['generation_thinking'],'max')
 
     def test_hybrid_off_draft_does_not_reintroduce_alpha(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG

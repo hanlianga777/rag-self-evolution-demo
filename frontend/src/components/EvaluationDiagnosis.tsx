@@ -24,17 +24,18 @@ export function DiagnosisDistribution({rows}:{rows:any[]}){
  return <div className="diagnosis-distribution"><div className="review-filters" aria-label="问题分布维度">{[['symptom','失败现象'],['root','主要根因']].map(([key,label])=><button key={key} aria-pressed={dimension===key} className={dimension===key?'active':''} onClick={()=>setDimension(key)}>{label}</button>)}</div><div className="diagnosis-distribution-bars">{Object.entries(counts).map(([name,count])=><div key={name}><span>{name}</span><meter min={0} max={Math.max(unique.length,1)} value={count} /><strong>{count} 题</strong></div>)}</div><p className="muted">{!unique.length?'当前没有具备完整证据和合法优化方向的技术 Bad Case。':dimension==='symptom'?'按唯一题号统计；一题可有多个现象，标签数量不等于问题数量。':'仅统计有依据且具备合法优化方向的技术根因；评测规则与证据缺口见质量审计。'}</p></div>;
 }
 
-export const typicalPhenomena=['检索失败','检索噪声','模型过度拒答','安全边界误伤','延迟黑洞'];
+const savedCategories=(rows:any[])=>[...new Set<string>(rows.flatMap(row=>Object.keys(caseData(row).diagnostic_view?.typical_detection || {})))];
 export const caseData=(row:any)=>row.result || row;
 export const caseId=(row:any)=>row.question_id || row.result?.question_id || row.id;
-export const questionLabel=(id:string)=>{const slot=id?.match(/^V1G-\d+-(\d{2})(?:-R\d+)?$/)?.[1];return slot?`Q${slot}`:id || '题号未采集';};
+export const questionLabel=(id:string)=>{const slot=id?.match(/^(?:V1G|CSV)-\d+-(\d{2})(?:-R\d+)?$/)?.[1];return slot?`Q${slot}`:id || '题号未采集';};
 export const optimizationDirection=(value?:string)=>({query_expansion:'查询表达与扩展',candidate_recall:'候选召回覆盖',context_selection:'排序与上下文选择',source_filter:'产品与来源筛选',grounded_generation:'有据生成与回答约束',stage_performance:'实测阶段性能'}[value || ''] || '保存方向未采集');
-export const savedDirections=(row:any)=>{const view=caseData(row).diagnostic_view,plan=view?.experiment_plan;const directions=plan?.directions?.length?plan.directions:view?.optimization_directions;return directions?.length ? `${directions.map(optimizationDirection).join('、')}；通过受控实验验证假设` : ({repair_canonical_sources:'核对冻结规范来源及正文，按原资料治理修复来源绑定',review_evaluation:'对照原始评分与失败要求核验评测依据，再确定实验假设',repair_sources_or_trace:'核对规范来源与候选、排序、最终上下文，定位遗漏环节'} as Record<string,string>)[plan?.next_action] || '对照失败要求与实际回答，核验来源覆盖并提出优化假设';};
+export const savedDirections=(row:any)=>{const view=caseData(row).diagnostic_view,plan=view?.experiment_plan;if(view?.tuning_directions?.length)return view.tuning_directions.join('、');const directions=plan?.directions?.length?plan.directions:view?.optimization_directions;return directions?.length ? `${directions.map(optimizationDirection).join('、')}；用实际结果检查是否改善` : ({repair_canonical_sources:'核对冻结规范来源及正文，按原资料治理修复来源绑定',review_evaluation:'对照原始评分与失败要求核验评测依据，再确定实验假设',repair_sources_or_trace:'核对规范来源与候选、排序、最终上下文，定位遗漏环节'} as Record<string,string>)[plan?.next_action] || '对照失败要求与实际回答，核验来源覆盖并提出优化假设';};
 export const businessDiagnosisRows=(rows:any[])=>filterDiagnosis(rows.filter(row=>businessVerdict(row)==='FAIL'),allDiagnosis);
 export const agentDiagnosisRows=businessDiagnosisRows;
 export type DiagnosisFilter={phenomenon:string;root:string;examples?:boolean};
 export const allDiagnosis:DiagnosisFilter={phenomenon:'all',root:'all'};
 export function filterDiagnosis(rows:any[],filter:DiagnosisFilter){
+ const typicalPhenomena=savedCategories(rows);
  const seen=new Set();const filtered=rows.filter(row=>{const item=caseData(row),id=caseId(row);if(seen.has(id))return false;seen.add(id);
  const labels=symptoms(item);
  return (filter.phenomenon==='all' || filter.phenomenon==='other' && labels.some(label=>!typicalPhenomena.includes(label)) || labels.includes(filter.phenomenon))
@@ -45,7 +46,7 @@ export function filterDiagnosis(rows:any[],filter:DiagnosisFilter){
 }
 
 export function PhenomenonSummary({rows,value,onChange}:{rows:any[];value:string;onChange:(value:string)=>void}){
- const unique=technicalDiagnosisRows(rows);
+ const unique=technicalDiagnosisRows(rows),typicalPhenomena=savedCategories(rows);
  return <div className="phenomenon-summary" aria-label="典型失败模式">{typicalPhenomena.map(name=>{
   const observed=unique.filter(row=>symptoms(caseData(row)).includes(name)).length;
   const detection=unique.map(row=>caseData(row).diagnostic_view?.typical_detection?.[name]);
@@ -56,6 +57,7 @@ export function PhenomenonSummary({rows,value,onChange}:{rows:any[];value:string
 
 export function DiagnosisFilters({value,onChange,rows:allRows,technicalOnly=true,visibleCount,showRoots=true}:{value:DiagnosisFilter;onChange:(value:DiagnosisFilter)=>void;rows:any[];technicalOnly?:boolean;visibleCount?:number;showRoots?:boolean}){
  const rows=technicalOnly?technicalDiagnosisRows(allRows):filterDiagnosis(allRows,allDiagnosis);
+ const typicalPhenomena=savedCategories(allRows);
  const dimensions=[['phenomenon','失败现象',[...typicalPhenomena,'other']],['root','技术根因',technicalRoots]] as const;
  return <div className="diagnosis-filters">{dimensions.filter(([key])=>showRoots || key!=='root').map(([key,label,values])=><FilterButtons key={key} label={label} value={value[key]} onChange={next=>onChange({...value,[key]:next,examples:false})} options={[{value:'all',label:'全部',count:rows.length},...values.map(v=>({value:v,label:v==='other'?'其他':key==='root'?rootName(v):v,count:filterDiagnosis(rows,{...allDiagnosis,[key]:v}).length}))]} />)}<span className="muted">{visibleCount ?? filterDiagnosis(rows,value).length} / {new Set(rows.map(caseId)).size} 题 · 多标签不重复计数</span></div>;
 }
@@ -67,7 +69,8 @@ export function DiagnosisTable({rows:allRows,onSelect,strategy,evidence=false,bu
  return <>{rows.length>50 && <div className="review-batch"><button disabled={current===1} onClick={()=>setPage(current-1)}>上一页</button><span>第 {current} / {pages} 页 · 共 {rows.length} 题 · 每页最多50条</span><button disabled={current===pages} onClick={()=>setPage(current+1)}>下一页</button></div>}<div className={`table-scroll baseline-table baseline-cases-table diagnosis-list ${evidence?"with-evidence":""}`}><table><thead><tr><th>题号 / 问题</th><th>失败现象</th><th>{business?'评测结果':'主要技术根因'}</th>{evidence && <th>诊断依据</th>}<th>{strategy?'优化方向':'核心证据'}</th><th>详情</th></tr></thead><tbody>{rows.slice((current-1)*50,current*50).map(row=>{const item=caseData(row),labels=symptoms(item),proposal=strategy?.(row);return <tr key={caseId(row)} tabIndex={0} onClick={()=>onSelect(row)} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();onSelect(row)}}}><td className="case-question"><small>{questionLabel(caseId(row))}</small><TruncatedText lines={2}>{item.question || '问题未采集'}</TruncatedText></td><td>{labels.slice(0,2).join('、') || '未采集'}{labels.length>2 && <StoryDisclosure onClick={event=>event.stopPropagation()} label={<>另 {labels.length-2} 个标签</>}>{labels.slice(2).join('、')}</StoryDisclosure>}</td><td>{business ? 'FAIL · Bad Case' : rootName(currentRoot(row))}</td>{evidence && <td><TruncatedText lines={2}>{coreEvidence(item)}</TruncatedText></td>}<td onClick={event=>strategy && event.stopPropagation()}>{strategy?(typeof proposal==='string'?<TruncatedText lines={2}>{proposal}</TruncatedText>:proposal):<TruncatedText lines={2}>{coreEvidence(item)}</TruncatedText>}</td><td><button className="text-button" onClick={event=>{event.stopPropagation();onSelect(row)}}>查看案例</button></td></tr>})}{!rows.length && <tr><td colSpan={evidence?6:5}>当前组合筛选无记录；可选择全部。分类未采集不代表真实案例为0。</td></tr>}</tbody></table></div></>;
 }
 export function DetectionNotice({rows}:{rows:any[]}){
- return <StoryDisclosure className="detection-notice" label={<>五类检测依据与边界</>}>{typicalPhenomena.map(name=>{const views=rows.map(caseData).map(item=>item.diagnostic_view);const observed=filterDiagnosis(rows,allDiagnosis).filter(row=>symptoms(caseData(row)).includes(name)).length;
+ const typicalPhenomena=savedCategories(rows);
+ return <StoryDisclosure className="detection-notice" label={<>分类检测依据与边界</>}>{typicalPhenomena.map(name=>{const views=rows.map(caseData).map(item=>item.diagnostic_view);const observed=filterDiagnosis(rows,allDiagnosis).filter(row=>symptoms(caseData(row)).includes(name)).length;
  const available=views.some(v=>v?.typical_detection?.[name] && v.typical_detection[name]!=='not_collected');
  return <p key={name}>{name}：{observed?`${observed} 题已保存或可追溯现象`:available?'保存规则未记录该类失败':'该类型尚未形成可靠自动诊断；未记录现象不代表检测结果为0'}</p>})}<p>来源冲突、定位争议独立治理；低Precision不自动等于噪声。阶段耗时区分问答、Judge及整批Sandbox。</p></StoryDisclosure>;
 }

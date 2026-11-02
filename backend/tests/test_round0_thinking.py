@@ -177,7 +177,7 @@ class ThinkingTests(unittest.TestCase):
         case = {'programmatic_metrics':{'retrieval_trace':{'candidates':[],'final':[]}}}
         for direction, observation, diff in [('grounded_generation','final_sufficient',{'generation_thinking':'off'}),
                                              ('query_expansion','recall_missing',{'query_decompose':True}),
-                                             ('context_selection','retrieval_noise',{'retrieval_max_tokens':16384})]:
+                                             ('context_selection','retrieval_noise',{'top_k':6})]:
             view = {'target_eligible':True,'primary_root_cause':'Generation','trace_observations':[observation], 'context_selection_options':[]}
             proposal = {'target_bad_cases':['Q1'],'root_cause':'Generation','intervention_direction':direction,
                         'config_diff':diff,'evidence_assertions':[{'target_id':'Q1','observation':observation}],
@@ -194,7 +194,7 @@ class ThinkingTests(unittest.TestCase):
     def test_agent_new_stage_parameters_allow_advisory_bottleneck_but_reject_illegal_values(self):
         from app.optimization import validate_intervention
         from app.policy import DEFAULT_PIPELINE_CONFIG
-        for stage, diff in [('query_decompose', {'query_decompose':True}), ('context_budget', {'retrieval_max_tokens':16384})]:
+        for stage, diff in [('query_decompose', {'query_decompose':True}), ('context_budget', {'top_k':6})]:
             case = {'programmatic_metrics':{'retrieval_trace':{'candidates':[],'final':[]}, 'stages':[{'stage_name':stage,'duration_ms':100}]}}
             view = {'target_eligible':True,'primary_root_cause':'Performance','trace_observations':['measured_latency'], 'latency':{'bottleneck':{'stage_name':stage}}}
             proposal = {'target_bad_cases':['Q1'],'root_cause':'Performance','intervention_direction':'stage_performance',

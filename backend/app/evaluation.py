@@ -176,6 +176,19 @@ def gate_details(cases: list[dict], gates: list[dict], *, statistics_version='fr
     return details
 
 
+def frozen_run_judge(function):
+    """A resumed run uses its saved Judge setting, independent of current env."""
+    from functools import wraps
+    @wraps(function)
+    def execute(self, run_id, *args, **kwargs):
+        from .providers import judge_thinking
+        run = self.store.evaluation_run(run_id)
+        effort = (run or {}).get('judge', {}).get('judge_thinking', {}).get('reasoning_effort')
+        with judge_thinking(effort):
+            return function(self, run_id, *args, **kwargs)
+    return execute
+
+
 class EvaluationRunner:
     def __init__(self, store, runtime):
         self.store, self.runtime = store, runtime
@@ -208,6 +221,14 @@ class EvaluationRunner:
         return items
 
     def baseline_inputs(self, resume_source_id=None):
+        from .providers import judge_thinking
+        from contextlib import nullcontext
+        source=self.store.evaluation_run(resume_source_id) if resume_source_id else None
+        context=judge_thinking(source['judge'].get('judge_thinking',{}).get('reasoning_effort')) if source else nullcontext()
+        with context:
+            return self._baseline_inputs(resume_source_id)
+
+    def _baseline_inputs(self, resume_source_id=None):
         snapshots = self.store.dataset_snapshots()
         if not snapshots:
             raise ValueError("正式评测需要已批准（approved）且显式创建的 Golden Snapshot")
@@ -320,7 +341,8 @@ class EvaluationRunner:
         execution = self.runtime.answer(item["question"], config)
         return self.score_execution(item, execution)
 
-    def review_baseline_errors(self, run_id):
+    @frozen_run_judge
+    def review_baseline_errors(self, run_id, question_ids=None):
         """Attach majority reviews to a completed Baseline, preserving its formal score."""
         from .corpus import current_manifest, manifest_identity
         from .paid_run import accounting_only, execution_limits
@@ -340,7 +362,9 @@ class EvaluationRunner:
                 or snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest())):
             raise ValueError('Baseline 冻结身份与当前合同或语料不一致')
         items = {i['id']: i for i in self.snapshot_items(snapshot)}
-        failed = {c['question_id']: c for c in cases if c['passed'] is False}
+        from .judge_replay import resolve_question_ids
+        selected = set(resolve_question_ids(snapshot, question_ids)) if question_ids is not None else {c['question_id'] for c in cases if c['passed'] is False}
+        failed = {c['question_id']: c for c in cases if c['question_id'] in selected}
         review = result.get('baseline_review', {'cases': {}, 'complete': False})
         def save(*_args, **_kwargs):
             with self.store.connection() as connection:
@@ -369,7 +393,8 @@ class EvaluationRunner:
                         if permanent_provider_error(error):
                             raise
                     save()
-        review['complete'] = all(review['cases'][q].get('regression_review', {}).get('status') in {'confirmed_regression', 'fluctuation'} for q in failed)
+        review['complete'] = all(review['cases'][q].get('regression_review', {}).get('status') in {'confirmed_regression', 'fluctuation'} for q in review['cases'])
+        review['selected_question_ids'] = sorted(selected)
         save()
         return review
 
@@ -556,12 +581,17 @@ class EvaluationRunner:
             root_cause={'primary': analysis['primary_root_cause'], 'secondary': [], 'diagnostic_basis': analysis['analysis_reason']})
         return case
 
-    def judge_replay_preflight(self,source_id,*,include_executions=False):
+    def judge_replay_preflight(self,source_id,*,include_executions=False,judge_thinking=None):
         from .judge_replay import replay_eligibility
         from .diagnostics import _current_corpus
         source=self.store.evaluation_run(source_id)
         if not source:raise ValueError('Replay source not found')
-        snapshot,items,config,judge=self.baseline_inputs(source_id)
+        from .providers import judge_thinking as freeze_judge, thinking_config
+        with freeze_judge(source['judge'].get('judge_thinking',{}).get('reasoning_effort')):
+            snapshot,items,config,judge=self.baseline_inputs(source_id)
+        with freeze_judge(judge_thinking):
+            judge['judge_thinking']=thinking_config('judge')
+        judge['evaluation_identity']=evaluation_identity(snapshot,judge)
         chunks,fingerprint=_current_corpus({'corpus_fingerprint':snapshot['corpus_fingerprint']})
         result=replay_eligibility(source,self.store.evaluation_case_results(source_id),snapshot,config,judge,chunks,fingerprint)
         with self.store.connection() as connection:
@@ -571,12 +601,15 @@ class EvaluationRunner:
         if not include_executions:result.pop('executions')
         return result
 
-    def start_judge_replay(self,source_id,*,automatic=True):
+    def start_judge_replay(self,source_id,*,automatic=True,judge_thinking=None):
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK:
-            plan=self.judge_replay_preflight(source_id,include_executions=True)
+            plan=self.judge_replay_preflight(source_id,include_executions=True,judge_thinking=judge_thinking)
             if not plan['can_replay']:raise ValueError('Replay eligibility blocked: '+json.dumps({k:v for k,v in plan.items() if k not in {'executions','new_judge'}},ensure_ascii=False))
-            snapshot,items,config,judge=self.baseline_inputs(source_id)
+            source=self.store.evaluation_run(source_id)
+            snapshot=json.loads(source['dataset_snapshot_json'])
+            items=self.snapshot_items(snapshot)
+            config=dict(source['config']);judge=plan['new_judge']
             run_id=self.store.create_baseline_run(snapshot,config,judge,automatic=automatic,judge_replay=plan)
         return run_id,items,config
 
@@ -600,6 +633,7 @@ class EvaluationRunner:
         run_id = self.store.create_evaluation_run(snapshot, {**source['config'], 'run_target': 'answer_replay', 'source_evaluation_id': source_id}, judge)
         return run_id, items, executions
 
+    @frozen_run_judge
     def execute_replay(self, run_id, items, executions):
         from .evaluation_stage import perform_stage, checkpoint_usage, correction_for
         from .providers import permanent_provider_error, provider_error_details
@@ -660,6 +694,7 @@ class EvaluationRunner:
         except Exception as error:
             return self.store.finish_evaluation_run(run_id,'partial' if cases else 'failed',progress(),str(error))
 
+    @frozen_run_judge
     def execute_baseline(self, run_id, approved, config):
         from .paid_run import execution_limits,accounting_only
         run=self.store.evaluation_run(run_id)
@@ -833,7 +868,9 @@ class EvaluationRunner:
         baseline = self.store.evaluation_run(experiment["baseline_run_id"]) if experiment else None
         if baseline is None or baseline["status"] != "completed":
             raise ValueError("Candidate 必须基于已完成的 Baseline 运行")
-        self._require_generation_contract(baseline['judge'])
+        from .providers import judge_thinking
+        with judge_thinking(baseline['judge'].get('judge_thinking',{}).get('reasoning_effort')):
+            self._require_generation_contract(baseline['judge'])
         if not policy_current(baseline['judge']):
             raise ValueError('评测规则已升级，请建立新Baseline；旧Candidate只读')
         from .policy import validate_candidate_config
@@ -915,6 +952,8 @@ class EvaluationRunner:
                     'qualification':{'qualified':None,'blocking_reason':'Sandbox未完成'},'recommendation':None}
             finished=self.store.finish_candidate(candidate['id'],'failed',result)
             return {**finished,'recommendation':self.store.refresh_recommendation(candidate['experiment_id'])}
+        if run['judge'].get('evaluation_identity') != baseline['judge'].get('evaluation_identity'):
+            raise ValueError('判分身份不同，禁止比较门槛或计算修好和弄坏')
         baseline_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(baseline["id"])}
         candidate_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(run_id)}
         failed = [question_id for question_id, item in baseline_cases.items() if not item.get("passed")]

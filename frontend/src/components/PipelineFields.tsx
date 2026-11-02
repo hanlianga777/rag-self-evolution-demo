@@ -3,21 +3,21 @@ import { displayText } from "../display";
 import { Drawer } from "./Dialog";
 
 export const parameterNames: Record<string, string> = {
-  candidate_k: "CandidateK", top_k: "TopK", min_score: "MinScore", hybrid_search: "Hybrid", hybrid_alpha: "Hybrid 权重",
-  generation_thinking: "Generation Thinking", query_decompose: "Query Decompose", retrieval_max_tokens: "Retrieval MaxTokens",
-  rerank: "Rerank", query_rewrite: "Query Rewrite", multi_query: "MultiQuery", hyde: "HyDE",
-  metadata_filter: "元数据筛选", alias_mapping: "别名映射", prompt_strategy: "Prompt 策略",
+  candidate_k: "候选数", top_k: "保留条数", min_score: "最低分数线", hybrid_search: "混合检索", hybrid_alpha: "向量检索权重",
+  generation_thinking: "回答思考档位", query_decompose: "问题拆分", retrieval_max_tokens: "上下文容量",
+  rerank: "重排方式", query_rewrite: "查询改写", multi_query: "多路查询", hyde: "假设文本辅助检索",
+  metadata_filter: "元数据筛选", alias_mapping: "别名映射", prompt_strategy: "回答策略",
 };
 
 export const descriptions: Record<string, string> = {
-  generation_thinking: "回答生成推理档位；Candidate 可由 Agent 合法调整，Judge 独立配置", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "Final 上下文 Token 容量；关闭时保留完整上下文",
+  generation_thinking: "Baseline 使用「高」；Candidate 可由 Agent 选择 OFF / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "暂不可用：本机缺少分词器归档，目前只支持关闭；不截断检索内容",
   candidate_k: "初始候选召回数量", top_k: "进入回答上下文的证据数量", min_score: "进入上下文前的最低相关分",
-  hybrid_search: "组合向量与关键词检索", hybrid_alpha: "向量检索在 Hybrid 中的权重", rerank: "模型重排、原排序或仅原问题的 BM25 排序",
+  hybrid_search: "组合向量与关键词检索", hybrid_alpha: "向量检索在混合检索中的权重", rerank: "模型重排、原排序或仅原问题的 BM25 排序",
   query_rewrite: "生成标准化检索问法", multi_query: "生成互补检索问法", hyde: "使用假设文本辅助检索",
-  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "回答约束策略",
+  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "分级回答：能确定的先回答，条件缺失时追问，资料无关时转人工，并保留安全警告",
 };
 
-export const draftDefaults: Record<string, unknown> = { generation_thinking: "max", query_decompose: false, retrieval_max_tokens: false };
+export const draftDefaults: Record<string, unknown> = { generation_thinking: "high", query_decompose: false, retrieval_max_tokens: false };
 
 export function thinkingLabel(value: unknown): string {
   if (value && typeof value === "object") {
@@ -35,7 +35,7 @@ export function formatValue(value: unknown): string {
 }
 
 export function SearchSpaceTable({ contract, baseline }: { contract: Record<string, { type: string; allowed: unknown[] }>; baseline: Record<string, unknown> }) {
-  return <div className="table-scroll"><table className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th>当前 Baseline</th>}<th>允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td>{parameterNames[key] || key}</td>{Object.keys(baseline).length > 0 && <td>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key])}</td>}<td>{rule.allowed.map(formatValue).join(" / ")}</td><td>{key === "top_k" ? "CandidateK ≥ TopK" : key === "hybrid_alpha" ? "Hybrid 已开启" : "—"}</td><td>{descriptions[key] || "—"}</td></tr>)}</tbody></table></div>;
+  return <div className="table-scroll"><table className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th>当前 Baseline</th>}<th>允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td>{parameterNames[key] || key}</td>{Object.keys(baseline).length > 0 && <td>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key])}</td>}<td>{rule.allowed.map(formatValue).join(" / ")}</td><td>{key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "混合检索已开启" : "—"}</td><td>{descriptions[key] || "—"}</td></tr>)}</tbody></table></div>;
 }
 
 export const parameterGroups: Record<string, string[]> = { Query: ["query_rewrite", "multi_query", "hyde", "query_decompose", "alias_mapping"], Retrieval: ["candidate_k", "top_k", "min_score", "hybrid_search", "hybrid_alpha", "metadata_filter", "retrieval_max_tokens"], Rerank: ["rerank"], Generation: ["prompt_strategy", "generation_thinking"] };
@@ -56,7 +56,7 @@ export function estimatedCostText(metrics?: any): string | null {
 
 export function ExecutionMetrics({ metrics, compact = false }: { metrics?: any; compact?: boolean }) {
   const stages: any[] = Array.isArray(metrics?.stages) ? metrics.stages.filter((row: any) => row && typeof row.stage_name === "string" && typeof row.duration_ms === "number") : [];
-  const names: Record<string, string> = { query_processing: "查询处理", retrieval: "检索总计", vector_search: "向量检索", bm25: "BM25", hybrid_fusion: "Hybrid 融合", candidate_selection: "候选筛选", rerank: "Rerank", context_build: "上下文构建", generation: "回答生成", judge: "Judge" };
+  const names: Record<string, string> = { query_processing: "查询处理", retrieval: "检索总计", vector_search: "向量检索", bm25: "BM25", hybrid_fusion: "Hybrid 融合", candidate_selection: "候选筛选", rerank: "重排方式", context_build: "上下文构建", generation: "回答生成", judge: "Judge" };
   const grouped = stages.reduce((result: Record<string, { duration: number; parent?: string }>, stage) => { const value = result[stage.stage_name] || { duration: 0, parent: stage.parent }; value.duration += stage.duration_ms; result[stage.stage_name] = value; return result; }, {});
   const usage = metrics?.token_usage;
   const cost = metrics?.cost_estimation || metrics?.estimated_cost;
