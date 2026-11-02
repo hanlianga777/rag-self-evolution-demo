@@ -14,10 +14,10 @@ it("restores compact Baseline summary without treating aggregate Gate success as
   await render(<EvaluationPage data={{ evaluation: run }} />);
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(0);
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("11 / 11");
-  expect(document.querySelector(".baseline-metrics")?.textContent).toContain("92.50");
-  expect(document.body.textContent).toContain("有 20 道 Bad Case");
+  expect(document.querySelector(".baseline-metrics")?.textContent).toContain("92.5");
+  expect(document.querySelectorAll(".baseline-metrics > div")).toHaveLength(4);
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "分类", "子特征", "严重程度", "调节方向", "操作"]);
+  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "分类", "现象（子特征）", "复核结论", "严重程度", "优化方向"]);
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("Hallucination");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("业务问题");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("记录缺失");
@@ -29,8 +29,8 @@ it("restores compact Baseline summary without treating aggregate Gate success as
 it("orders business evidence before diagnosis and preserves negative anchors and stored primary", async () => {
   await render(<CaseDetails item={{ question_id: "q", question: "业务问题", test_category: "negative", primary_root_cause: "Generation", model_answer: "回答", programmatic_metrics: { retrieval_trace: { candidates: [], final: [] }, evidence_coverage: { candidate_recall: { any_hit: false }, final_context: { any_hit: false }, diagnostic_basis: "保存的证据观察" } } }} snapshot={{ questions: [{ id: "q", acceptable_evidence: [{ source_chunk_ids: ["child"], evidence_key_points: ["业务材料锚点"] }] }] }} config={{}} gates={[]} />);
   const heads = [...document.querySelectorAll(".case-details > section > h3")].map(h => h.textContent);
-  expect(heads.indexOf("预期与实际回答")).toBeLessThan(heads.indexOf("证据依据"));
-  expect(heads.indexOf("证据依据")).toBeLessThan(heads.indexOf("诊断与优化方向"));
+  expect(heads.indexOf("答案对比")).toBeLessThan(heads.indexOf("检索路径"));
+  expect(heads.indexOf("检索路径")).toBeLessThan(heads.indexOf("优化方向"));
   expect(document.body.textContent).toContain("负向题的材料锚点用于来源追溯");
   expect(document.body.textContent).toContain("业务材料锚点");
   expect(document.body.textContent).toContain("保存的证据观察");

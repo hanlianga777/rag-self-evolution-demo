@@ -38,7 +38,7 @@ it("blocks before real Production exists, even with a qualified Candidate", asyn
   const value = { ...data, optimization: { candidates: [{ id: "C-1", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } }] }, versions: [{ id: "baseline-v1", status: "active", provenance: "bootstrap", snapshot: { candidate_id: "" }, config: {} }] };
   const fetcher=vi.fn();vi.stubGlobal("fetch",fetcher);const root = await mount(value);
   expect(document.querySelector(".query-action button")).toBeNull();expect(document.querySelector(".experiment-results")).toBeNull();expect(fetcher).not.toHaveBeenCalled();
-  expect(document.body.textContent).toContain("尚无已发布 线上版本");
+  expect(document.body.textContent).toContain("还没有可对比的已发布方案");
   await act(async () => root.unmount());
 });
 

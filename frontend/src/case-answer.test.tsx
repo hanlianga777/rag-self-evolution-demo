@@ -27,11 +27,11 @@ it('renders safe HTML lists without tags or active attributes and preserves sour
   expect(document.body.textContent).toContain('第40页');
   expect(answer).toContain('onerror="alert(1)"');
 });
-it('keeps raw answers and all technical records in a closed audit while presenting five business cards', () => {
+it('keeps raw answers and all technical records in a closed audit while presenting ordered business cards', () => {
   const item = { question_id: 'Q-test', question: '设备如何加水？', model_answer: '1. **等待停止**。 2. 检查水位。', reference_answer: '<p>自动停止 [C115]</p>', passed: false, primary_root_cause: 'Generation', failure_tags: ['Generation Failure'], diagnosis: { status: 'confirmed', reason: 'source_scope / claim_assessment.pending' }, diagnostic_view: { target_eligible: true }, judge_result: { correctness: 2, reason: '原始Judge' }, programmatic_metrics: { claim_assessment: { raw: '原始Matcher' }, retrieval_trace: { final: [] } } };
   const before = JSON.stringify(item);
   render(<BaselineCaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
-  expect([...document.querySelectorAll('.bad-case-details > section > h3')].map(el => el.textContent)).toEqual(['案例结论', '业务问题', '预期与实际回答', '证据依据', '诊断与优化方向']);
+  expect([...document.querySelectorAll('.bad-case-details > section > h3')].map(el => el.textContent)).toEqual(['业务问题', '答案对比', '检索路径', '优化方向']);
   const audit = document.querySelector<HTMLDetailsElement>('.bad-case-details > details')!;
   expect(audit.open).toBe(false);
   expect(audit.textContent).toContain(item.model_answer);
@@ -43,9 +43,9 @@ it('keeps raw answers and all technical records in a closed audit while presenti
 it('keeps FAIL as Bad Case while diagnosis remains part of Agent processing', () => {
   render(<BaselineCaseDetails item={{ passed: false, question_id: 'offline', diagnosis: { status: 'disputed' }, primary_root_cause: 'Unknown', diagnostic_view: { analysis_category: 'evaluation_issue', analysis_reason: '安全拒答正确，但评测规则存在兼容问题。', target_eligible: false } }} snapshot={{}} config={{}} gates={[]} />);
   const cards = document.querySelectorAll('.bad-case-details > section');
-  expect(cards[0].textContent).toContain('FAIL · Bad Case');
-  expect(cards[4].textContent).toContain('核验来源覆盖并提出优化假设');
-  expect(cards[3].textContent).toContain('最终上下文 未采集');
+  expect(document.querySelector('.case-review')?.textContent).toContain('答错');expect(document.querySelector('.bad-case-details > details')?.textContent).toContain('业务判定：FAIL');
+  expect(cards[3].textContent).toContain('核验来源覆盖并提出优化假设');
+  expect(document.querySelector('.bad-case-details > details')?.textContent).toContain('最终上下文 未采集');
 });
 it('formats mixed HTML and markdown lists and turns behavior enums into the saved business expectation', () => {
   render(<BaselineCaseDetails item={{ question_id: 'offline', reference_answer: 'safe_rejection', raw: { expected_response: '拒绝高压水枪；按说明书清洁。' }, model_answer: '<p>处理步骤：1. **停止使用**。 2. 查看第4.2章节和第40页 [C115]。</p>', diagnostic_view: {} }} snapshot={{}} config={{}} gates={[]} />);
@@ -72,7 +72,7 @@ it('shows concrete saved contradiction quotes, source facts and missing facts in
   const item = { question_id: 'generic-case', diagnostic_view: { analysis_category: 'rag_failure', primary_root_cause: 'Generation', target_eligible: true, evidence_checks: checks }, programmatic_metrics: { retrieval_trace: { final: [{ chunk_id: 'child-source', document_id: 'document-source', document: '设备操作手册', page_start: 40 }] } } };
   const before = JSON.stringify(item);
   render(<BaselineCaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
-  const card = document.querySelectorAll('.bad-case-details > section')[4];
+  const card = [...document.querySelectorAll('details')].find(e=>e.querySelector('summary')?.textContent==='阶段证据与实验约束')!;
   for (const text of ['实际回答片段：', '水满后请人工关闭进水。', '原文依据 · 设备操作手册 · 第40页', '填满清水箱后自动停止加水。', '遗漏事实：', '检查设备是否损坏。', '第24页']) expect(card.textContent).toContain(text);
   expect(card.textContent).not.toContain('child-source');
   expect(card.textContent).not.toContain('answer_quotes');
@@ -84,7 +84,7 @@ it.each(['confirmed','disputed','needs_review'])('keeps historical and Agent sha
   const before=JSON.stringify(item);
   render(<CaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
   const business=[...document.querySelectorAll('.bad-case-details > section')].map(el=>el.textContent).join('');
-  expect(business).toContain('Generation · 生成');
+  expect(document.querySelector('.bad-case-details > details')?.textContent).toContain('Generation · 生成');
   expect(business).not.toMatch(/Safety · 安全|可信度|Confirmed|Needs Review|Disputed|已确认|评测争议/);
   expect(document.querySelector('.bad-case-details > details')?.textContent).toContain(status);
   expect(JSON.stringify(item)).toBe(before);

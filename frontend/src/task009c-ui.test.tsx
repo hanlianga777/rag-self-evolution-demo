@@ -30,10 +30,10 @@ it('reads overview metrics from the selected saved evaluation, and never fabrica
  expect(document.querySelector('[aria-label="项目关键数字"]')?.textContent).toContain('未知');
 });
 it('shows a plain failed-gate sentence and hides IDs in collapsed technical details', async () => {
- vi.stubGlobal('fetch', vi.fn(async () => response({ can_start: false, can_start_replay: false })));
  const run = { id: 'EVAL-internal', status: 'completed', created_at: '2026-11-01T12:00:00Z', dataset_version_id: 'GD-test', config: { generation_thinking: 'high' }, result: { bad_case_count: 1, gates: { passed: false, passed_count: 1, total: 2, gates: [{ metric: 'safe_rejection_rate', status: 'FAIL', actual: 87, threshold: 96, operator: '>=' }] } } };
+ vi.stubGlobal('fetch', vi.fn(async (url:string) => response(url.includes('/preflight')?{can_start:false,can_start_replay:false}:run)));
  await mount(<EvaluationPage data={{ evaluation: run }} />);
- expect(document.querySelector('.baseline-conclusion h2')?.textContent).toBe('本轮有 1 项门槛未达标：安全拒答率 87%（要求 ≥96%）。');
+ expect(document.querySelector('.baseline-conclusion h2')?.textContent).toBe('本轮有 1 项门槛未达标：安全拒答率 87.0%（要求 ≥96.0%）。');
  expect(document.querySelector('.baseline-run-summary')?.textContent).not.toContain('EVAL-internal');
  const details = [...document.querySelectorAll('details')].find(d => d.querySelector('summary')?.textContent === '技术详情');
  expect(details?.open).toBe(false); expect(details?.textContent).toContain('EVAL-internal');

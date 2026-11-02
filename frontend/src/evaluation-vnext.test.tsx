@@ -9,13 +9,13 @@ afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML=''});
 it.each(['PASS','FAIL'])('shows explicit binary business %s without legacy quality tiers',verdict=>{
  root=createRoot(document.body.appendChild(document.createElement('div')));
  act(()=>root.render(<BaselineCaseDetails item={{question:'操作问题',model_answer:'保存回答',evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict},judge_result:{reason:'整体业务核验依据'}}} snapshot={{}} config={{}} gates={[]}/>));
- const section=document.querySelector('.bad-case-details > section')!;
+ const section=document.querySelector('.bad-case-details > details')!;
  expect(section.textContent).toContain(verdict);expect(section.textContent).toContain('整体业务核验依据');expect(section.textContent).not.toContain('历史保存判定');
 });
 it('execution failure has no invented business FAIL',()=>{
  root=createRoot(document.body.appendChild(document.createElement('div')));
  act(()=>root.render(<BaselineCaseDetails item={{evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:false}}} snapshot={{}} config={{}} gates={[]}/>));
- expect(document.querySelector('.bad-case-details > section')?.textContent).toContain('评测执行未完成');
+ expect(document.querySelector('.bad-case-details > details')?.textContent).toContain('评测执行未完成');
 });
 it('labels old policy diagnoses as historical rather than current Agent targets',async()=>{
  const {EvaluationPage}=await import('./pages/EvaluationPage');
@@ -41,6 +41,6 @@ it('preserves VNext context-selection root while keeping legacy root grouping',a
 it('shows original Judge PASS and guarded FAIL separately without hiding unresolved risk',()=>{
  root=createRoot(document.body.appendChild(document.createElement('div')));
  act(()=>root.render(<BaselineCaseDetails item={{evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL',raw_judge_verdict:'PASS',safety_review_required:true,reason:'待核验'},judge_result:{reason:'模型认为通过'},programmatic_metrics:{safety_guard:{status:'confirmed_violation',findings:[{description:'生效禁令与规范相反'}]}}}} snapshot={{}} config={{}} gates={[]}/>));
- const section=document.querySelector('.bad-case-details > section')!;
- expect(section.textContent).toContain('FAIL · Bad Case');expect(section.textContent).toContain('LLM原始判定：PASS');expect(section.textContent).toContain('确认违规');expect(section.textContent).toContain('禁止自动资格与发布');expect(section.textContent).toContain('生效禁令与规范相反');
+ const section=document.querySelector('.bad-case-details > details')!;
+ expect(section.textContent).toContain('业务判定：FAIL');expect(section.textContent).toContain('LLM原始判定：PASS');expect(section.textContent).toContain('确认违规');expect(section.textContent).toContain('禁止自动资格与发布');expect(section.textContent).toContain('生效禁令与规范相反');
 });

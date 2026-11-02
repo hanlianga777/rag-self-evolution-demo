@@ -48,7 +48,7 @@ it('refreshes an open light-list drawer with the saved full case when it arrives
  try {
   await act(async()=>root.render(<EvaluationPage data={{evaluation:run,badCases:[{id:'BC1',run_id:'E1',question_id:'Q04',result:item}]}}/>));
   await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Bad Case 诊断')!.click());
-  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看案例')!.click());
+  await act(async()=>document.querySelector<HTMLElement>('.product-diagnosis-table tbody tr')!.click());
   await act(async()=>{complete(new Response(JSON.stringify({...run,cases:[{...item,programmatic_metrics:{retrieval_trace:{final}}}]})));await response;});
   const displayed=document.querySelector('.case-answer-stack > div:nth-child(2) .case-answer');
   expect(displayed?.textContent).toContain('设备手册.pdf');expect(displayed?.textContent).not.toContain('引用来源未核验');

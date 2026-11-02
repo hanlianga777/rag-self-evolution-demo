@@ -15,8 +15,8 @@ it('groups saved metrics in four dimensions and explains missing observations wi
  await render(<EvaluationPage data={{evaluation}}/>);await click('查看评测依据');
  const sections=[...document.querySelectorAll('.evaluation-dimensions > section')];
  expect(sections.map(s=>s.querySelector('h3')?.textContent)).toEqual(['答案质量','检索效果','安全鲁棒','性能体验']);
- expect(sections[0].textContent).toContain('75.00%');expect(sections[1].textContent).toContain('0.00%');
- expect(sections[1].textContent).toContain('未保存该指标');expect(sections[3].textContent).toContain('2.00 s');
+ expect(sections[0].textContent).toContain('75.0%');expect(sections[1].textContent).toContain('0.0%');
+ expect(sections[1].textContent).toContain('未保存该指标');expect(sections[3].textContent).toContain('2.0 s');
 });
 it('keeps insufficient candidate evidence explicit and renders saved candidate reasoning in one Drawer',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));

@@ -31,7 +31,7 @@ it('retains all ten planning targets under identity block and hides technical cl
 it('shows a single business count and agent entry in Baseline',async()=>{
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/bad-cases')?rows:url.endsWith('/api/evaluations/baseline')?evaluation:{}))));
  const navigate=vi.fn();await render(<EvaluationPage data={{evaluation,badCases:rows}} navigate={navigate}/>);
- expect(document.querySelector('.baseline-metrics')?.textContent).toContain('Bad Case10');
+ expect(document.querySelectorAll('.baseline-metrics > div')).toHaveLength(4);
  expect(document.body.textContent).not.toMatch(/技术 Bad Case|原始失败/);
  await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(10);
  await click('进入 Agent 处理');expect(navigate).toHaveBeenCalledWith('evolution');

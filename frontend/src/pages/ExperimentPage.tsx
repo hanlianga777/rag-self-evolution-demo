@@ -1,11 +1,10 @@
 import { displayText } from "../display";
 import { answerCitationDisplay } from "../answerCitations";
 import { StoryDisclosure } from "../components/Storytelling";
-import { StoryEmpty } from "../components/Storytelling";
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { errorMessage, identityKey, postJson } from "../api";
-import { Badge, ConclusionCard, CustomSelect } from "../components/Primitives";
+import { Badge, ConclusionCard, CustomSelect, EmptyState } from "../components/Primitives";
 import { readSession, writeSession } from "../session";
 import { ExecutionMetrics, ParameterDiff } from "../components/PipelineFields";
 import type { Citation, PipelinePreview } from "../types";
@@ -57,7 +56,7 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
     if (ticket === requests.current && captured === currentIdentity.current) setBusy(false);
   };
 
-  if (blocked) return <div className="page experiment-page"><ConclusionCard title="当前尚不具备 Baseline / 线上版本 实时对比条件" tone="neutral">{blocked} 系统初始运行配置可以用于问答验证；只有经 {displayText("Candidate")} 晋升发布的新 {displayText("Production")} 才进入此对比。</ConclusionCard><StoryEmpty title="先完成有效 Baseline 与人工发布" action={<><a className="secondary" href="#evaluation">查看 Baseline</a><a className="secondary" href="#versions">查看发布条件</a></>}>保留历史评测与初始配置；前置条件满足后，使用同一道问题比较实际回答与引用。本页不会生成预览结果或实时评分。</StoryEmpty></div>;
+  if (blocked) return <div className="page experiment-page"><EmptyState title={!baselineId || baselineId!==baseline.id?"还没有可用于对比的有效 Baseline":"还没有可对比的已发布方案"} action={<a className="secondary" href={!baselineId || baselineId!==baseline.id?"#evaluation":"#versions"}>{!baselineId || baselineId!==baseline.id?"查看 Baseline":"查看发布条件"}</a>}>发布新方案后，可以用同一个问题对比优化前后的回答。</EmptyState></div>;
   return <div className="page experiment-page"><ConclusionCard title={left.status === "completed" && right.status === "completed" ? "同题实际回答已保存，可核对内容与引用差异" : "对比当前有效 Baseline 与已发布 线上版本"} tone="neutral">{left.status === "completed" && right.status === "completed" ? "两侧均为本次主动运行返回的真实回答；未调用 Judge，不产生新评分或资格。" : "选择或输入同一道问题，再主动运行两套已保存配置。参数差异可展开核对，回答未运行时不预判改善。"}</ConclusionCard>
     <section className="experiment-query compare-toolbar">
       <CustomSelect ariaLabel="选择真实 Bad Case" value={selectedCase} onChange={id => { clearResults(); setSelectedCase(id); const item = badCases.find((row: any) => row.id === id); if (item) setQuestion(item.result?.question || ""); }} placeholder="Baseline Bad Case" options={[{ value: "", label: "Baseline Bad Case" }, ...badCases.map((item: any) => ({ value: item.id, label: item.result?.question || item.id }))]} />

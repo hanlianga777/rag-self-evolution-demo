@@ -27,10 +27,10 @@ it('shows PASS without old failure attribution while retaining the unmodified au
   const item = { question_id: 'pass', passed: false, evaluation_outcome: outcome('PASS'), model_answer: '资料引用【DOC-001-C-00140】仍需核验。', failure_tags: ['Retrieval Failure'], primary_root_cause: 'Unknown', diagnostic_view: { primary_root_cause: 'Unknown', optimization_directions: ['candidate_recall'] } };
   const saved = JSON.stringify(item);
   await render(<BaselineCaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
-  const conclusion = document.querySelector('.bad-case-details > section')!;
-  expect(conclusion.textContent).toContain('PASS');
+  const conclusion = document.querySelector('.case-review')!;
+  expect(conclusion.textContent).toContain('答对');
   expect(conclusion.textContent).not.toMatch(/FAIL|Bad Case|失败现象|技术归属|尚待证据定位/);
-  expect(document.querySelectorAll('.bad-case-details > section')[4].textContent).not.toContain('候选召回覆盖');
+  expect(document.querySelectorAll('.bad-case-details > section')[3].textContent).not.toContain('候选召回覆盖');
   expect(document.querySelector('.case-answer-stack')?.textContent).toContain('【DOC-001-C-00140】');
   expect(document.querySelector('.bad-case-details > details')?.textContent).toContain('Retrieval Failure');
   expect(JSON.stringify(item)).toBe(saved);
@@ -38,7 +38,7 @@ it('shows PASS without old failure attribution while retaining the unmodified au
 
 it.each([undefined, 'NOT_EVALUABLE'])('does not invent PASS for an invalid completed business verdict %s', async verdict => {
   await render(<BaselineCaseDetails item={{ evaluation_outcome: { contract_version: 'business-vnext-1', execution_complete: true, verdict } }} snapshot={{}} config={{}} gates={[]} />);
-  const conclusion = document.querySelector('.bad-case-details > section > p')!;
+  const conclusion = document.querySelector('.case-review')!;
   expect(conclusion.textContent).toContain('业务结果未产生');
   expect(conclusion.textContent).not.toMatch(/PASS|FAIL|Bad Case/);
 });

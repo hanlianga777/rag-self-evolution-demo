@@ -24,7 +24,7 @@ it("filters persisted Baseline cases and opens their diagnostic detail", async (
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "检索未命中")!.click());
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("未召回题");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("正常题");
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".product-diagnosis-table button")].find(b => b.textContent === "查看案例")!.click());
+  await act(async () => document.querySelector<HTMLElement>(".product-diagnosis-table tbody tr")!.click());
   expect(document.querySelector("[role=dialog]")?.textContent).toContain("未召回题");
   await act(async () => root.unmount());
 });

@@ -45,7 +45,7 @@ it("ignores a corrupt cached answer and blocks comparison without a valid formal
   await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
   expect(document.querySelector("textarea")).toBeNull();
   expect(document.querySelector(".experiment-results")).toBeNull();
-  expect(document.querySelector(".conclusion-card")?.textContent).toContain("需要当前有效 Baseline");
+  expect(document.querySelector(".empty-state")?.textContent).toContain("还没有可用于对比的有效 Baseline");
   expect(document.querySelector('a[href="#evaluation"]')).not.toBeNull();
   expect(fetch).not.toHaveBeenCalled();
 });

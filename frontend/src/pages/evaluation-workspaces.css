@@ -247,3 +247,70 @@
 :is(.evaluation-page,.evolution-page) meter::-moz-meter-bar { background:var(--status); border-radius:999px; }
 :is(.evaluation-page,.evolution-page) meter::-webkit-meter-suboptimum-value,
 :is(.evaluation-page,.evolution-page) meter::-webkit-meter-even-less-good-value { background:var(--card-bad-ink); }
+/* 012b: use the 012a primitives; keep workspace tables in document flow. */
+:is(.evaluation-page,.evolution-page,.versions-page,.verification-page).page-shell .page-content .table-scroll { height:auto !important; min-height:0 !important; max-height:none !important; overflow:visible; }
+:is(.evaluation-page,.evolution-page,.versions-page,.verification-page) .page-content .table-scroll table { min-width:0; width:100%; table-layout:fixed; }
+:is(.evaluation-page,.evolution-page,.versions-page,.verification-page) .page-content .table-scroll :is(th,td) { position:static; white-space:normal; overflow-wrap:anywhere; }
+.evaluation-page.page-shell .baseline-metrics { gap:16px; margin:24px 0; border:0; overflow:visible; }
+.evaluation-page.page-shell .baseline-metrics > div { border:1px solid var(--line); border-radius:var(--card-radius); padding:20px; }
+.evaluation-page .baseline-conclusion { margin:0 0 24px; }
+.evaluation-page .baseline-conclusion h2 { margin:0; font-size:16px; font-weight:600; line-height:1.6; }
+.evaluation-page .baseline-report { display:grid; gap:24px; }
+.evaluation-page .baseline-report > .panel { margin:0; }
+.evaluation-page .baseline-run-summary { grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.evaluation-page .baseline-run-summary dd { overflow-wrap:anywhere; }
+.evaluation-page.page-shell .baseline-gates-table :is(th,td):first-child { width:28%; }
+.evaluation-page.page-shell .baseline-gates-table :is(th,td):nth-child(2) { width:14%; }
+.evaluation-page.page-shell .baseline-gates-table :is(th,td):nth-child(3) { width:16%; }
+.evaluation-page.page-shell .baseline-gates-table :is(th,td):nth-child(4) { width:30%; }
+.evaluation-page.page-shell .baseline-gates-table :is(th,td):nth-child(5) { width:12%; }
+.evaluation-page .baseline-gates-table td { vertical-align:middle; }
+.evaluation-page .baseline-gates-table .gate-failed td { background:var(--card-bad-bg); color:var(--card-bad-ink); }
+.evaluation-page .baseline-gates-table tr { cursor:pointer; }
+.bad-case-overview .latency-notice { font-size:12px; line-height:1.6; }
+.product-filters button:disabled { color:var(--muted); border-color:var(--line); background:var(--canvas); cursor:default; }
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(1) { width:25%; }
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(2) { width:10%; }
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(3) { width:20%; }
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(4) { width:16%; }
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(5) { width:9%; }
+.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(6) { width:20%; }
+.product-diagnosis-table tbody tr { cursor:pointer; }
+.product-diagnosis-table tbody tr:focus-visible { outline:2px solid var(--focus); outline-offset:-2px; }
+.product-objective-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:24px; }
+.product-objective-metrics .metric { padding:20px; min-width:0; background:var(--surface); }
+.product-objective-metrics .metric strong { font-size:24px; overflow-wrap:anywhere; }
+.thinking-cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.thinking-cards .panel { margin:0; min-width:0; }
+.thinking-comparison-drawer .thinking-cards dl { display:grid; grid-template-columns:1fr; gap:0; margin:0; }
+.thinking-cards dl > div { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:12px 0; border-bottom:1px solid var(--line-soft); }
+.thinking-cards dt { color:var(--muted); }
+.thinking-cards dd { margin:0; font-variant-numeric:tabular-nums; }
+.thinking-deltas { display:flex; flex-wrap:wrap; gap:12px; }
+.comparison-difference td { background:var(--card-warning-bg); }
+.bad-case-details { display:grid; gap:24px; }
+.bad-case-details > .candidate-card { margin:0; padding:20px; }
+.bad-case-details .case-answer-stack { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.bad-case-details .case-answer-stack > div { min-width:0; border:1px solid var(--line); border-radius:var(--card-radius); padding:20px; background:var(--surface); }
+.bad-case-details .case-answer-stack h4 { margin:0 0 12px; }
+.missing-points { border-top:1px solid var(--line); padding-top:12px; margin-top:16px; color:var(--card-bad-ink); }
+.case-difference { font-size:12px; color:var(--muted); }
+.evidence-path + .evidence-path { border-top:1px solid var(--line); margin-top:16px; padding-top:16px; }
+.evidence-path ol { display:flex; flex-wrap:wrap; gap:12px; list-style:none; padding:0; }
+.evidence-path li { padding:8px 12px; border:1px solid var(--line); border-radius:var(--card-radius); background:var(--surface); }
+.evidence-path li + li::before { content:'→'; margin-right:12px; color:var(--muted); }
+.bad-case-details .story-disclosure .badge { margin-left:8px; }
+.qa-version-status { font-size:14px; margin:0 0 24px; }
+.verification-page .decision-chain span { font-size:14px; }
+.monitoring-assessment { display:flex; flex-wrap:wrap; gap:8px; }
+.monitoring-assessment button { white-space:nowrap; padding:6px 10px; font-size:12px; }
+.verification-page .monitoring-table th:first-child { width:32%; }
+.verification-page .monitoring-table th:last-child { width:32%; }
+:is(.evolution-page,.versions-page,.verification-page) :is(.agent-decision-flow li,.strategy-source,.chat-composer,.experiment-query) { background:var(--surface); border-color:var(--line); }
+.evolution-page .candidate-card-body { grid-template-rows:none; }
+.evolution-page .candidate-field-content { overflow:visible; }
+.evolution-page .candidate-card-footer { height:auto; gap:12px; }
+@media(max-width:700px) { .thinking-cards,.bad-case-details .case-answer-stack { grid-template-columns:1fr; } .product-objective-metrics,.evaluation-page .baseline-run-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+.verification-page .suggested-questions button { background:var(--surface); color:var(--status); border-color:var(--line); }
+.case-review { display:flex; flex-wrap:wrap; gap:8px; }
