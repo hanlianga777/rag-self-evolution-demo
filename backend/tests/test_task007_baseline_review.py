@@ -71,6 +71,25 @@ class BaselineReviewTests(unittest.TestCase):
         self.assertNotIn('final_retry_done', saved['cases']['Q1'])
         self.assertEqual(updates[-1], saved)
 
+    def test_stop_on_error_allows_successful_internal_judge_recovery(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from app.ai_service import AiService
+        from app.providers import ProviderInvalidResponse
+        key, _ = self.completed()
+        service=SimpleNamespace(model='fixture',provider=SimpleNamespace(judge=Mock(side_effect=[
+            ProviderInvalidResponse('citation invalid'), {'passed':True},
+            {'passed':True}, {'passed':True}, {'passed':True}])))
+        def score(*args, **kwargs):
+            return AiService.judge(service,'q','reference','answer','positive')
+        with patch.object(self.runner,'score_execution',side_effect=score):
+            review=self.runner.review_baseline_errors(key,stop_on_error=True)
+        self.assertTrue(review['complete'])
+        first=review['cases']['Q1']['regression_review']['runs'][0]['scored_result']
+        self.assertTrue(first['passed'])
+        self.assertEqual(len(first['response_recovery']),1)
+        self.assertEqual(service.provider.judge.call_count,5)
+
     def test_incomplete_baseline_never_calls_provider(self):
         key, _ = self.completed()
         with self.store.connection() as db:

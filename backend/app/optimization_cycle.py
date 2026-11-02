@@ -83,7 +83,7 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
             try:
                 agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
             except ValueError:
-                # A rejected draft has a saved signature and costs no Sandbox trial.
+                # A rejected draft is saved for audit and costs no Sandbox trial.
                 audit = store.experiment(experiment_id)['result']
                 if audit.get('provider_raw_text') is None or not audit.get('rejected_candidates'):
                     raise

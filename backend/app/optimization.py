@@ -140,14 +140,15 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
               '先读程序生成的基线诊断摘要。A/B/C必须是三个不同方向，不能只把同一个参数换几个数值。'
               '导致门槛未过的错题分类优先级升为1，按optimization_priorities及其原因安排优化。每个参数的用途与各可选值说明见allowed_parameter_values。'
               '复核为随机波动的题不作为优化目标；仅由不稳定题造成的未过门槛不提升分类优先级，方案仍须通过该门槛。'
-              '预期影响须点名预计修好的题号；风险须说明可能弄坏的题号或指标及原因；不得重复失败组合签名。'
+              '每个参数的预期影响须点名预计修好的目标题号；风险须说明可能弄坏的题号或指标及原因；不得重复失败组合签名。'
+              'target_bad_cases可用展示题号（例如Q04）、正式题目ID或Bad Case ID，必须引用当前bad_cases。'
               '没有合格方案就回到分析并再出一轮，最多12次试跑，其中1次留给D。D仅合并已验证有效改动；'
               'D无新增错题且至少修好1道才发布，否则保留赢家；发布规则与门槛不变。'
               '只返回JSON，格式：{"candidates":[{"id":"A","action_name":"中文动作短语",'
               '"strategy_name":"「动作名」（检索优先）","core_idea":"一两句话",'
               '"adjustments":[{"parameter":"参数名","baseline_value":0,"candidate_value":0,"expected_impact":"预计修好Q04"}],'
               '"risks":[{"question_ids":[],"metric":"可能退化的指标","reason":"原因"}],'
-              '"hypothesis":"一个优化思路","why":"对应错题及理由","target_bad_cases":["题号或错题ID"],'
+              '"hypothesis":"一个优化思路","why":"对应错题及理由","target_bad_cases":["Q04"],'
               '"config_diff":{},"expected_improvement":"预期改善","risk":"可能退化"}]}。')
     gates = baseline_gates if baseline_gates is not None else failed_gates
     priorities = optimization_priorities(bad_cases, gates)
@@ -227,6 +228,14 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
     """One offline validation path for fresh and already-paid responses; no semantic repairs."""
     prior=[base_config]+[item['config'] for item in prior_candidates]
     target_reference_map={key:{'bad_case_id':item['id']} for item in bad_cases for key in (item['id'],item['question_id'])}
+    display_ids = {}
+    for item in bad_cases:
+        display = item['diagnostic_view'].get('display_question_id')
+        if isinstance(display,str) and re.fullmatch(r'Q\d+',display):
+            display_ids.setdefault(display, set()).add(item['question_id'])
+    # Only unambiguous aliases from this Baseline's frozen question mapping are valid.
+    display_ids = {key:next(iter(ids)) for key,ids in display_ids.items() if len(ids)==1}
+    target_reference_map.update({key:target_reference_map[value] for key,value in display_ids.items()})
     audit["validation_stage"] = "json_parse"
     result = json.loads(content, object_pairs_hook=unique_keys, parse_constant=reject_constant, parse_float=finite_float)
     audit["parsed_json"] = result
@@ -277,6 +286,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
             if len(canonical)!=len(set(canonical)):
                 audit['failed_field']='target_bad_cases'
                 raise ValueError('同一目标被重复引用（含题号与Case别名）')
+            candidate['target_bad_cases'] = [display_ids.get(r,r) for r in candidate['target_bad_cases']]
             selected=[item for item in bad_cases if item['id'] in candidate['target_bad_cases'] or item['question_id'] in candidate['target_bad_cases']]
             roots={item['question_id']:item['diagnostic_view']['primary_root_cause'] for item in selected}
             candidate['target_root_causes']=roots
@@ -336,9 +346,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
             directions.add(direction)
             staged.append((candidate, config))
         except (ValueError,TypeError,KeyError) as error:
-            if isinstance(candidate,dict) and isinstance(candidate.get('config_diff'),dict):
-                try:failed_signatures.add(parameter_signature(base_config,candidate['config_diff']))
-                except (ValueError,TypeError):pass
+            # Validation refusals have not been tried in Sandbox and are not failed effects.
             audit['rejected_candidates'].append({'index':index,'id':candidate.get('id') if isinstance(candidate,dict) else None,
                 'stage':audit['validation_stage'],'field':audit.get('failed_field'),'reason':str(error),
                 'validation_issues':audit.get('validation_issues',[]),

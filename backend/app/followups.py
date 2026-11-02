@@ -55,7 +55,8 @@ class FollowupJobs:
             checkpoints = list(state['cases'].values())
             stages = [stage for cp in checkpoints for stage in cp.get('regression_review', {}).get('runs', [])] if group == 'review' else checkpoints
             errors = [cp['technical_error'] for cp in checkpoints if cp.get('technical_error')]
-            errors += [attempt.get('error', attempt.get('error_type')) for stage in stages for attempt in stage.get('attempts', []) if attempt.get('status') == 'error']
+            if group != 'review':
+                errors += [attempt.get('error', attempt.get('error_type')) for stage in stages for attempt in stage.get('attempts', []) if attempt.get('status') == 'error']
             if group == 'review':
                 errors += [review_summary(cp)['technical_error'] for cp in checkpoints if review_summary(cp).get('status') == 'technical_failure']
             if errors:
@@ -109,7 +110,7 @@ class FollowupJobs:
                 'planned': state.get('planned', 4) if group == 'review' else state.get('plan', {}).get('planned_questions', 50),
                 'completed': len(completed), 'complete': state.get('complete', False) and not review_errors,
                 'passed': sum(stage['scored_result']['passed'] for stage in completed),
-                'technical_failed': sum(bool(cp.get('technical_error')) or (group == 'review' and review_summary(cp).get('status') == 'technical_failure') or any(a.get('status') == 'error' for stage in (cp.get('regression_review', {}).get('runs', []) if group == 'review' else [cp]) for a in stage.get('attempts', [])) for cp in checkpoints),
+                'technical_failed': sum(bool(cp.get('technical_error')) or (review_summary(cp).get('status') == 'technical_failure' if group == 'review' else any(a.get('status') == 'error' for a in cp.get('attempts', []))) for cp in checkpoints),
                 'recorded_provider_calls': len(events), 'cost_estimation': cost_report(state['_job'].get('model'), events),
                 'checkpoint_path': str(path),
                 'results': [{'question_id': key, 'passed': stage['scored_result']['passed']}

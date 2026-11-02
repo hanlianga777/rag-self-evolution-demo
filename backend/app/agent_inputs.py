@@ -7,9 +7,11 @@ MISSING = '记录缺失'
 
 
 def review_summary(checkpoint):
+    """Decision 14: a successful internal retry is valid; keep recovery in runs."""
     summary = (checkpoint or {}).get('regression_review') or {}
     error = (checkpoint or {}).get('technical_error') or next((r.get('error') for stage in summary.get('runs', [])
-        for r in stage.get('scored_result', {}).get('judge_result', {}).get('response_recovery', []) if r.get('error')), None)
+        for r in stage.get('scored_result', {}).get('judge_result', {}).get('response_recovery', [])
+        if r.get('error') and type(stage.get('scored_result', {}).get('passed')) is not bool), None)
     return {**summary, 'status': 'technical_failure', 'confirmed_regression': None,
             'failed_votes': None, 'total_votes': None, 'technical_error': error} if error else summary
 
