@@ -23,8 +23,15 @@ it('uses true errors in the overview while keeping saved correctness',async()=>{
  expect(cards.find(e=>e.textContent?.includes('Baseline 答对'))?.textContent).toContain('42 / 50');
 });
 it('shows review votes on each saved failed case',async()=>{
- const row={question_id:'Q37',result:{passed:false,question:'测试问题',baseline_review_label:'随机波动（3 次错 1 次）',optimization_target:false,diagnostic_view:{diagnosis_category:'回答问题',display_question_id:'Q37'}}};
+ const row={question_id:'Q37',result:{passed:false,question:'测试问题',baseline_review_label:'随机波动（3 次错 1 次）',baseline_review:{status:'fluctuation'},optimization_target:false,diagnostic_view:{diagnosis_category:'回答问题',display_question_id:'Q37'}}};
  await mount(<BadCaseOverview rows={[row]} onSelect={()=>{}}/>);
  expect(document.body.textContent).toContain('随机波动（3 次错 1 次）');
  expect(document.body.textContent).toContain('不稳定题：方案需保持判对，不作为必修目标');
+});
+
+it('keeps a technical review unknown instead of calling it fluctuation',async()=>{
+ const row={question_id:'Q46',result:{passed:false,question:'异常',baseline_review_label:'未知（复核技术异常，已停止）',baseline_review:{status:'technical_failure'},optimization_target:false}};
+ await mount(<BadCaseOverview rows={[row]} onSelect={()=>{}}/>);
+ expect(document.body.textContent).toContain('未知（复核技术异常，已停止）');
+ expect(document.body.textContent).not.toContain('不稳定题：方案需保持判对，不作为必修目标');
 });

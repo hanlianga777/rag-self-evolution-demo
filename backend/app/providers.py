@@ -24,6 +24,14 @@ DEFAULT_TASK_THINKING = {
 }
 _thinking_task = ContextVar('provider_thinking_task', default=None)
 _judge_thinking = ContextVar('provider_judge_thinking', default=None)
+_judge_fail_fast = ContextVar('provider_judge_fail_fast', default=False)
+
+
+@contextmanager
+def judge_fail_fast(enabled=True):
+    token = _judge_fail_fast.set(enabled)
+    try: yield
+    finally: _judge_fail_fast.reset(token)
 
 
 @contextmanager

@@ -281,7 +281,8 @@ class AiService:
                                      'response_metadata':dict(error.response_metadata)})
                     error.response_metadata = {**error.response_metadata, 'response_recovery':recovery}
                     error.provider_retry_exhausted = True
-                    if attempt + 1 >= remaining:
+                    from .providers import _judge_fail_fast
+                    if _judge_fail_fast.get() or attempt + 1 >= remaining:
                         raise
         return {**result, "response_retries":2 - remaining + attempt, "response_recovery":recovery,
                 "stages": stages, "token_usage": usage, **cost_fields(self.model, usage)}

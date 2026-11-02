@@ -12,7 +12,7 @@ from collections import Counter
 from .providers import ProviderRequestError, provider_error_details
 from .diagnostics import diagnostic_view
 from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
-from .agent_inputs import prepare_baseline_rows, retrieval_facts, is_optimization_target
+from .agent_inputs import prepare_baseline_rows, retrieval_facts, is_optimization_target, is_unstable_case
 from .paid_run import provider_task
 from .telemetry import collect_usage, measure, cost_fields
 from .policy import DEFAULT_PIPELINE_CONFIG, MAX_EVALS, canonicalize_config, search_space_contract, validate_candidate_config
@@ -91,6 +91,7 @@ def baseline_diagnosis_summary(bad_cases, gates):
         groups = {}
         unstable = []
         targets = []
+        pending = []
         for row in bad_cases:
             case = row['result']
             category = case.get('test_category')
@@ -102,19 +103,20 @@ def baseline_diagnosis_summary(bad_cases, gates):
             if relevant:
                 view = row.get('diagnostic_view') or diagnostic_view(case)
                 groups.setdefault(view.get('diagnosis_category', '记录缺失：缺分类记录'), []).append(view.get('display_question_id') or row['question_id'])
-                (targets if is_optimization_target(row) else unstable).append(view.get('display_question_id') or row['question_id'])
+                (targets if is_optimization_target(row) else unstable if is_unstable_case(row) else pending).append(view.get('display_question_id') or row['question_id'])
         labels={'positive_correctness':'正向题正确性','positive_faithfulness':'正向题忠实性','positive_completeness':'正向题完整性','ablation_correctness':'消融题正确性','ablation_faithfulness':'消融题忠实性','ablation_completeness':'消融题完整性','safe_rejection_rate':'安全拒答率','safety_critical_accuracy':'安全关键准确率','prompt_injection_resistance':'提示注入抵抗','latency_p50_seconds':'回答耗时中位数','latency_p99_seconds':'回答耗时第99百分位'}
         failed = gate.get('passed') is False or gate.get('status') == 'FAIL'
-        unstable_only = failed and bool(unstable) and not targets
+        unstable_only = failed and bool(unstable) and not targets and not pending
         unstable_note = 'Baseline 该门槛未过由不稳定题造成（复核多数判对），方案仍须通过该门槛' if unstable_only else ''
+        pending_note = '复核技术异常或未完成，门槛归因未知；方案仍须通过该门槛' if failed and pending else ''
         summary.append({'dimension': metric, 'dimension_label':labels.get(metric,'维度记录缺失'), 'baseline_value': actual, 'target_value': target,
                         'operator': gate.get('operator'), 'gap': max(0, -margin),
                         'status': '未通过' if failed else '接近门槛',
                         'root_causes': [{'diagnosis_category': key, 'question_ids': ids,
                                          'priority': 1 if failed and any(q in targets for q in ids) else next((c['priority'] for c in DIAGNOSTIC_CATEGORIES if c['label']==key), None),
                                          'priority_note': '导致门槛未过：'+labels.get(metric,'维度记录缺失') if failed and any(q in targets for q in ids) else unstable_note} for key, ids in groups.items()],
-                        'unstable_question_ids': unstable, 'target_question_ids': targets,
-                        'root_cause_note': unstable_note or ('整轮耗时问题，需结合已保存耗时拆解' if str(metric).startswith('latency_') else None if groups else '记录缺失：没有该维度对应的错题诊断')})
+                        'unstable_question_ids': unstable, 'target_question_ids': targets, 'review_pending_question_ids': pending,
+                        'root_cause_note': pending_note or unstable_note or ('整轮耗时问题，需结合已保存耗时拆解' if str(metric).startswith('latency_') else None if groups else '记录缺失：没有该维度对应的错题诊断')})
     return summary
 
 
@@ -152,9 +154,10 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     priority_by_category = {item['label']:item for item in priorities}
     rows=[]
     unstable_rows=[]
+    pending_rows=[]
     for row in bad_cases:
         view=row.get('diagnostic_view') or diagnostic_view(row['result'])
-        target_rows = rows if is_optimization_target(row) else unstable_rows
+        target_rows = rows if is_optimization_target(row) else unstable_rows if is_unstable_case(row) else pending_rows
         target_rows.append({'id':row['id'],'question_id':row['question_id'], 'display_question_id':view.get('display_question_id', row['question_id']),
                      'question':row['result'].get('question'),
                      'diagnosis_category':view.get('diagnosis_category',view['primary_root_cause']),
@@ -173,6 +176,8 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                 'failed_gates':failed_gates,'candidate_labels':labels,'baseline_configuration':base_config},
         'bad_cases':rows,
         'unstable_cases':unstable_rows,
+        'review_pending_cases':pending_rows,
+        'review_pending_instruction':'复核技术异常或未完成：结论未知，不作为已确认优化目标，也不归为随机波动',
         'unstable_case_instruction':'不稳定题：方案需保持判对，不作为必修目标',
         'priority_parameters':PRIORITY_PARAMETERS,
         'allowed_parameter_values':search_space_contract(),

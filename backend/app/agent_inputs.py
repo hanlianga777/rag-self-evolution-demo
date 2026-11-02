@@ -6,19 +6,33 @@ from .diagnostics import diagnostic_view, standard_evidence, unmet_required_poin
 MISSING = '记录缺失'
 
 
+def review_summary(checkpoint):
+    summary = (checkpoint or {}).get('regression_review') or {}
+    error = (checkpoint or {}).get('technical_error') or next((r.get('error') for stage in summary.get('runs', [])
+        for r in stage.get('scored_result', {}).get('judge_result', {}).get('response_recovery', []) if r.get('error')), None)
+    return {**summary, 'status': 'technical_failure', 'confirmed_regression': None,
+            'failed_votes': None, 'total_votes': None, 'technical_error': error} if error else summary
+
+
 def is_optimization_target(row):
     case = row.get('result', row)
     review = case.get('baseline_review') or (row.get('retrieval_facts') or {}).get('baseline_review') or {}
-    return case.get('optimization_target', True) and review.get('status') != 'fluctuation' and review.get('conclusion') != '随机波动'
+    return case.get('optimization_target', True) and review.get('status') not in {'fluctuation', 'technical_failure'} and review.get('conclusion') != '随机波动'
+
+
+def is_unstable_case(row):
+    case = row.get('result', row)
+    review = case.get('baseline_review') or (row.get('retrieval_facts') or {}).get('baseline_review') or {}
+    return review.get('status') == 'fluctuation' or review.get('conclusion') == '随机波动'
 
 
 def baseline_review_summary(baseline):
     result = (baseline or {}).get('result', {})
     reviews = (result.get('baseline_review') or {}).get('cases') or {}
-    statuses = [cp.get('regression_review', {}).get('status') for cp in reviews.values()]
+    statuses = [review_summary(cp).get('status') for cp in reviews.values()]
     unstable = statuses.count('fluctuation')
     total = result.get('bad_case_count')
-    target = statuses.count('confirmed_regression') if result.get('calibration_import') else total - unstable if type(total) is int else None
+    target = statuses.count('confirmed_regression') if result.get('calibration_import') else total - unstable - statuses.count('technical_failure') if type(total) is int else None
     return {'target_count': target, 'unstable_count': unstable,
             'pending_count': max(0, total - statuses.count('confirmed_regression') - unstable) if type(total) is int and reviews else 0}
 
@@ -57,7 +71,7 @@ def retrieval_facts(case, question=None, config=None, review=None):
     trace = (case.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
     saved_config = {**(config or {}), **(trace.get('config') or {})}
     unmet = unmet_required_points(case, question)
-    summary = (review or {}).get('regression_review') or {}
+    summary = review_summary(review)
     failed, total = summary.get('failed_votes'), summary.get('total_votes')
     conclusion = {'confirmed_regression': '真错题', 'fluctuation': '随机波动'}.get(summary.get('status'), MISSING)
     if (conclusion == MISSING or type(failed) is not int or type(total) is not int
@@ -65,6 +79,9 @@ def retrieval_facts(case, question=None, config=None, review=None):
         conclusion, failed, total = MISSING, MISSING, MISSING
     if not summary:
         conclusion = failed = total = '尚未复核'
+    elif summary.get('status') == 'technical_failure':
+        conclusion = '未知（复核技术异常）'
+        failed = total = '未知'
     return {'standard_evidence_positions': '不适用（负向题不定位标准证据）' if case.get('test_category') == 'negative' else evidence_positions(question, trace),
             'candidate_k': saved_config.get('candidate_k', MISSING), 'top_k': saved_config.get('top_k', MISSING),
             'unmet_required_points': unmet,
@@ -80,12 +97,15 @@ def prepare_baseline_rows(baseline, rows):
     for row in rows:
         question = questions.get(row['question_id'])
         case = {**row['result']}
-        summary = reviews.get(row['question_id'], {}).get('regression_review') or {}
+        summary = review_summary(reviews.get(row['question_id']))
         if summary:
             case['baseline_review'] = {k: v for k, v in summary.items() if k != 'runs'}
             failed, total = summary.get('failed_votes'), summary.get('total_votes')
             label = {'confirmed_regression': '真错', 'fluctuation': '随机波动'}.get(summary.get('status'))
             case['baseline_review_label'] = f'{label}（{total} 次错 {failed} 次）' if label else '复核中'
+            if summary.get('status') == 'technical_failure':
+                case['baseline_review_label'] = '未知（复核技术异常，已停止）'
+                case['optimization_target'] = False
         if (baseline or {}).get('result', {}).get('calibration_import'):
             case['optimization_target'] = summary.get('status') == 'confirmed_regression'
         elif summary.get('status') == 'fluctuation':

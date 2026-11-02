@@ -372,7 +372,8 @@ class EvaluationRunner:
                                    (json.dumps(review, ensure_ascii=False), run_id))
             if on_progress:
                 on_progress(review)
-        with accounting_only(), execution_limits(run['judge'].get('execution_snapshot', {}).get('request_limits')):
+        from .providers import judge_fail_fast
+        with judge_fail_fast(stop_on_error), accounting_only(), execution_limits(run['judge'].get('execution_snapshot', {}).get('request_limits')):
             for final_pass in range(2):
                 for key, initial in failed.items():
                     checkpoint = review['cases'].setdefault(key, {'attempts': []})
