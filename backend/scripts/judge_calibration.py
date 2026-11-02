@@ -48,8 +48,6 @@ def calibration_plan(source, cases, effort):
     if source['judge'].get('evaluation_identity') != evaluation_identity(snapshot, source['judge']):
         raise ValueError('原 Baseline 判分身份与保存内容不一致')
     judge['evaluation_identity'] = evaluation_identity(snapshot, judge)
-    if judge['evaluation_identity'] == source['judge'].get('evaluation_identity'):
-        raise ValueError('目标判分身份与原 Baseline 相同，请指定不同档位')
     return {'source_run_id': source['id'], 'source_sha256': source_digest(source, cases),
             'source_evaluation_identity': source['judge'].get('evaluation_identity'),
             'new_evaluation_identity': judge['evaluation_identity'], 'judge': judge,

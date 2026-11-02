@@ -342,7 +342,7 @@ class EvaluationRunner:
         return self.score_execution(item, execution)
 
     @frozen_run_judge
-    def review_baseline_errors(self, run_id, question_ids=None):
+    def review_baseline_errors(self, run_id, question_ids=None, *, on_progress=None, stop_on_error=False):
         """Attach majority reviews to a completed Baseline, preserving its formal score."""
         from .corpus import current_manifest, manifest_identity
         from .paid_run import accounting_only, execution_limits
@@ -370,6 +370,8 @@ class EvaluationRunner:
             with self.store.connection() as connection:
                 connection.execute("UPDATE evaluation_runs SET result_json=json_set(result_json,'$.baseline_review',json(?)) WHERE id=? AND status='completed'",
                                    (json.dumps(review, ensure_ascii=False), run_id))
+            if on_progress:
+                on_progress(review)
         with accounting_only(), execution_limits(run['judge'].get('execution_snapshot', {}).get('request_limits')):
             for final_pass in range(2):
                 for key, initial in failed.items():
@@ -390,7 +392,7 @@ class EvaluationRunner:
                         checkpoint['technical_error'] = {'error': str(error), 'error_type': type(error).__name__,
                                                          'provider_error': provider_error_details(error, 'baseline_review')}
                         save()
-                        if permanent_provider_error(error):
+                        if stop_on_error or permanent_provider_error(error):
                             raise
                     save()
         review['complete'] = all(review['cases'][q].get('regression_review', {}).get('status') in {'confirmed_regression', 'fluctuation'} for q in review['cases'])

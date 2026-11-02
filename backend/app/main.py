@@ -1696,6 +1696,26 @@ def evaluation_runs(page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=
     return store.evaluation_history(page,limit,active_only=active_only)
 
 
+from .followups import FollowupJobs
+followup_jobs = FollowupJobs(store, ai_service)
+
+
+@app.get('/api/evaluations/{run_id}/followups/{group}')
+def followup_progress(run_id: str, group: Literal['review', 'max', 'high', 'low']):
+    try:
+        return followup_jobs.progress(run_id, group)
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+
+
+@app.post('/api/evaluations/{run_id}/followups/{group}', dependencies=[Depends(require_trusted_origin)])
+def start_followup(run_id: str, group: Literal['review', 'max', 'high', 'low']):
+    try:
+        return followup_jobs.start(run_id, group)
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+
+
 @app.get("/api/evaluations/{run_id}")
 @read_view()
 def evaluation_run(run_id: str):

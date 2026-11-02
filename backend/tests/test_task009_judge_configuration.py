@@ -146,8 +146,8 @@ class JudgeScriptTests(unittest.TestCase):
         source['judge']['evaluation_identity'] = 'wrong'
         with self.assertRaisesRegex(ValueError, '身份'):
             judge_calibration.calibration_plan(source, self.cases, 'low')
-        with self.assertRaisesRegex(ValueError, '相同'):
-            judge_calibration.calibration_plan(self.source, self.cases, 'max')
+        control = judge_calibration.calibration_plan(self.source, self.cases, 'max')
+        self.assertEqual(control['new_evaluation_identity'], self.source['judge']['evaluation_identity'])
         state = {'plan': judge_calibration.calibration_plan(self.source, self.cases, 'low'), 'cases': {}}
         runner = Mock()
         with self.assertRaisesRegex(ValueError, '变化'):

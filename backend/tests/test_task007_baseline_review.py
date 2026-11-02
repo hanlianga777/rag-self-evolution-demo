@@ -58,6 +58,19 @@ class BaselineReviewTests(unittest.TestCase):
         self.assertEqual(self.runtime.answers.count('Q2'), 2)
         self.assertTrue(result['cases']['Q1']['final_retry_done'])
 
+    def test_followup_stop_on_error_has_no_final_retry_and_saves_progress(self):
+        key, _ = self.completed()
+        updates = []
+        with patch.object(self.runner, 'score_execution', side_effect=ProviderTimeout('fixture stop')) as score:
+            with self.assertRaises(ProviderTimeout):
+                self.runner.review_baseline_errors(key, on_progress=lambda review: updates.append(deepcopy(review)), stop_on_error=True)
+        self.assertEqual(score.call_count, 1)
+        self.assertEqual(self.runtime.answers, ['Q1'])
+        saved = self.store.evaluation_run(key)['result']['baseline_review']
+        self.assertIn('technical_error', saved['cases']['Q1'])
+        self.assertNotIn('final_retry_done', saved['cases']['Q1'])
+        self.assertEqual(updates[-1], saved)
+
     def test_incomplete_baseline_never_calls_provider(self):
         key, _ = self.completed()
         with self.store.connection() as db:
