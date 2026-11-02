@@ -36,9 +36,9 @@ it.each([true, false])("I4 manual current Preview is available with legacy Run=%
   await render(<GovernancePage data={input} />);
   expect(posts).toHaveLength(0);
   if (legacy) { await clickText("历史版本"); await clickText("运行审计"); }
-  await clickText("预览当前 Corpus Coverage");
+  await clickText("预览当前 Corpus 覆盖规划");
   expect(posts).toEqual([{ url: expect.stringContaining("/api/governance/coverage-preview"), body: { profile: "mini" } }]);
-  expect(document.body.textContent).toContain("当前 Corpus · V2 Coverage Preview");
+  expect(document.body.textContent).toContain("当前 Corpus · V2 覆盖规划 Preview");
   expect(document.body.textContent).toContain("1 Topics · 1 Slots · Gap 0 · Merge 1");
   expect(JSON.stringify(input)).toBe(frozen);
 });
@@ -47,7 +47,7 @@ it.each(["profile", "corpus"])("I4 suppresses delayed Preview after %s changes",
   const replies: ((reply: Response) => void)[] = [];
   vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => replies.push(resolve))));
   await render(<CurrentCoveragePreview profile="mini" corpusFingerprint={{ D: "fixture" }} documents={[]} />);
-  await clickText("预览当前 Corpus Coverage");
+  await clickText("预览当前 Corpus 覆盖规划");
   await act(async () => root.render(<CurrentCoveragePreview profile={change === "profile" ? "full" : "mini"} corpusFingerprint={{ D: change === "corpus" ? "new" : "fixture" }} documents={[]} />));
   await act(async () => replies[0](new Response(JSON.stringify(previewPlan()))));
   expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -58,7 +58,7 @@ it.each(["profile", "corpus"])("I4 suppresses delayed Preview after %s changes",
 it.each(["mini", "medium", "full"])("I4 Preview carries selected %s Profile and reports server failure", async profile => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail: "Fixture planner unavailable" }), { status: 422 })));
   await render(<CurrentCoveragePreview profile={profile} documents={[]} />);
-  await clickText("预览当前 Corpus Coverage");
+  await clickText("预览当前 Corpus 覆盖规划");
   expect(JSON.parse((fetch as any).mock.calls[0][1].body)).toEqual({ profile });
   expect(document.body.textContent).toContain("Preview 失败：Fixture planner unavailable");
   expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -69,7 +69,7 @@ it.each([{ proposal: "实际持久化 proposal" }, { why: "兼容 Why 字段" },
   const candidate = { id: "E1-A", status: "generated", config: {}, reasoning: { candidate_label: "A", hypothesis: "假设", risk: "风险", observed_evidence: [], ...reasoning }, result: {} };
   await render(<EvolutionPage data={{ ...data("B1"), optimization: { id: "E1", candidates: [candidate] } }} />);
   await clickText("A/B/C/D"); await clickText("查看方案与完整报告");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(`Why：${(reasoning as any).proposal || (reasoning as any).why || "未保存依据"}`);
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain((reasoning as any).proposal || (reasoning as any).why || "尚未保存策略名");
 });
 
 it.each([0, 1.25, null])("M4 Sandbox and release keep frozen estimated cost %s and source-backed missing reason", async cost => {
@@ -82,26 +82,26 @@ it.each([0, 1.25, null])("M4 Sandbox and release keep frozen estimated cost %s a
   await clickText("查看高级指标");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
   expect(document.body.textContent).not.toContain("暂未配置单价");
-  await act(async () => root.render(<VersionsPage data={input} />)); await clickText("查看其他 Candidate"); await clickText("查看 Candidate 评测报告");
+  await act(async () => root.render(<VersionsPage data={input} />)); await clickText("查看其他候选方案"); await clickText("查看候选方案评测报告");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("暂未配置单价");
 });
 
 it("M7 restores completed comparison on same-identity remount and rejects a different identity", async () => {
-  vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify({ answer: JSON.parse(init?.body as string).scheme_id === "baseline" ? "保留 Baseline 回答" : "保留 Production 回答", version: JSON.parse(init?.body as string).scheme_id === "baseline" ? "B1" : "P0", evidence: [] }))));
+  vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify({ answer: JSON.parse(init?.body as string).scheme_id === "baseline" ? "保留 Baseline 回答" : "保留 线上版本 回答", version: JSON.parse(init?.body as string).scheme_id === "baseline" ? "B1" : "P0", evidence: [] }))));
   await render(<ExperimentPage data={data("B1")} onOpenCitation={() => {}} />);
   await fill("保留同一个问题"); await act(async () => document.querySelector<HTMLButtonElement>(".query-action button")!.click());
   expect(document.body.textContent).toContain("保留 Baseline 回答");
   await act(async () => root.unmount());
   await render(<ExperimentPage data={data("B1")} onOpenCitation={() => {}} />);
   expect(document.body.textContent).toContain("保留 Baseline 回答");
-  expect(document.body.textContent).toContain("保留 Production 回答");
+  expect(document.body.textContent).toContain("保留 线上版本 回答");
   expect(fetch).toHaveBeenCalledTimes(2);
   expect((fetch as any).mock.calls.map((call: any[]) => JSON.parse(call[1].body).scheme_id)).toEqual(["baseline", "P0"]);
   await act(async () => root.unmount());
   await render(<ExperimentPage data={data("B2")} onOpenCitation={() => {}} />);
   expect(document.body.textContent).not.toContain("保留 Baseline 回答");
-  expect(document.body.textContent).not.toContain("保留 Production 回答");
+  expect(document.body.textContent).not.toContain("保留 线上版本 回答");
 });
 
 it("M3 clean/save, cancel, content replacement and external close reset the Drawer contract", async () => {
@@ -202,7 +202,7 @@ it("RL-03/05 uses centered confirmation and keeps failed release visible without
   const candidate = { id: "A-fixture", status: "evaluated", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
   await render(<VersionsPage data={{ versions: [{ id: "P0", status: "active" }], optimization: { candidates: [candidate] } }} />);
   await act(async () => document.querySelector<HTMLButtonElement>(".release-actions button")!.click());
-  expect(document.querySelector(".confirm-dialog")?.textContent).toContain("Gate 3");
+  expect(document.querySelector(".confirm-dialog")?.textContent).toContain("发布确认");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".confirm-dialog button")].find(button => button.textContent === "确认")!.click());
   expect(document.querySelector(".confirm-dialog")?.textContent).toContain("提交时资格已失效");
   expect(document.querySelector(".release-actions")?.textContent).toBe("确认发布");
@@ -229,14 +229,14 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   await render(<EvolutionPage data={{ workspace: identity("B1", "E1"), evaluation: { id: "B1", status: "completed", config: {} }, optimization: { id: "E1", candidates: [d], result: { report_confirmation: { winner_id: "A" }, composite: { candidate_id: d.id } } } }} />);
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Sandbox")!.click());
   const coreRows = [...document.querySelectorAll(".sandbox-core-table tbody tr")];
-  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["Hard Gate", "Bad Case", "修复原 Bad Case", "新增失败", "Regression", "正式资格"]);
-  expect(coreRows.find(row => row.querySelector("td")?.textContent === "Hard Gate")?.lastElementChild?.textContent).toBe("11 / 11");
-  expect(coreRows.find(row => row.querySelector("td")?.textContent === "Regression")?.lastElementChild?.textContent).toBe("未通过");
+  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["门槛", "Bad Case", "修复原 Bad Case", "新增失败", "回归检查", "正式资格"]);
+  expect(coreRows.find(row => row.querySelector("td")?.textContent === "门槛")?.lastElementChild?.textContent).toBe("11 / 11");
+  expect(coreRows.find(row => row.querySelector("td")?.textContent === "回归检查")?.lastElementChild?.textContent).toBe("未通过");
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "正式资格")?.lastElementChild?.textContent).toBe("不合格");
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "A/B/C/D")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-cards button")].filter(x => x.textContent === "查看方案与完整报告").at(-1)!.click());
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不合格 · Hard Gate：通过");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Regression：未通过");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不合格 · 门槛：通过");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("回归检查：未通过");
 });
 
 it.each([undefined, "running", "failed"])("review R2 keeps %s Baseline at Evaluation before Agent", async status => {
@@ -250,10 +250,10 @@ it("review R2 an older Production does not finish a new recommendation Gate3", a
   const candidate = { id: "E1-A", status: "evaluated", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
   const input = { ...data("B1"), snapshots: [{ id: identity("B1").current_golden_id, status: "approved", snapshot: { question_ids: ["Q1"], questions: [{ id: "Q1", test_category: "positive" }] } }], overview: { dataset: { expected_count: 1, approved: 1 } }, evaluation: { id: "B1", status: "completed" }, optimization: { id: "E1", baseline_run_id: "B1", candidates: [candidate], recommendation: { result: { status: "Recommended", recommended_candidate: candidate.id } } }, versions: [{ id: "P0", status: "active", provenance: "published", snapshot: { candidate_id: "E0-C" } }] };
   await render(<OverviewPage data={input} navigate={() => {}} />);
-  expect(document.querySelector(".next-action h2")?.textContent).toContain("Gate 3");
+  expect(document.querySelector(".next-action h2")?.textContent).toContain("人工确认发布");
   await act(async () => root.render(<VersionsPage data={input} />));
   expect(document.querySelector('[aria-label="发布阶段"]')).toBeNull();
-  expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("Candidate A");
+  expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("候选方案 A");
   expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("本轮推荐，尚未发布");
   expect(document.querySelector<HTMLButtonElement>(".release-actions button")?.disabled).toBe(false);
   expect(document.querySelector(".release-actions")?.textContent).toBe("确认发布");
@@ -295,7 +295,7 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
     return new Response(JSON.stringify(url.endsWith("/monitoring?page=1&limit=50") ? monitoring() : url.includes("/experiments/") ? context() : {}));
   }));
   await render(<VerificationPage data={{ ...data("B1"), monitoring: monitoring(), optimization: { id: "E-prior", candidates: [{ id: "old-A" }] } }} onOpenDocument={() => {}} onOpenCitation={() => {}} />);
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Monitoring")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "监控")!.click());
   expect(document.querySelector('[aria-label="监控阶段"]')).toBeNull();
   expect(document.querySelector(".monitoring-context")?.textContent).toContain("尚未人工确认，未创建 Optimization 上下文");
   expect([...document.querySelectorAll("button")].some(button => button.textContent?.includes("启动此上下文"))).toBe(false);
@@ -323,7 +323,7 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
 it("review R4 selected historical Monitoring context is identified and cannot start under a new Baseline", async () => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/experiments/") ? { id: "E-history", baseline_run_id: "B0", status: "pending_agent", result: { round: 0 }, candidates: [] } : { triggers: [{ id: "T-history", status: "human_confirmed", optimization_run_id: "E-history" }], events: [] }))));
   await render(<VerificationPage data={{ ...data("B1"), monitoring: { triggers: [{ id: "T-history", status: "human_confirmed", optimization_run_id: "E-history" }] } }} onOpenDocument={() => {}} onOpenCitation={() => {}} />);
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Monitoring")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "监控")!.click());
   await clickText("查看 Trigger 上下文");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Trigger：T-history");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联实验：E-history");

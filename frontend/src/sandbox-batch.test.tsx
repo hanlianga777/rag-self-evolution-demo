@@ -1,66 +1,70 @@
 // @vitest-environment jsdom
-import { act } from "react";
-import { createRoot } from "react-dom/client";
-import { afterEach, expect, it, vi } from "vitest";
-import { OperationProvider, useOperation } from "./operation";
-
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { afterEach, expect, it, vi } from 'vitest';
+import { OperationProvider, useOperation } from './operation';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 let root: ReturnType<typeof createRoot>;
-afterEach(() => { if (root) act(() => root.unmount()); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = ""; });
+afterEach(() => { if (root) act(() => root.unmount()); vi.useRealTimers(); vi.unstubAllGlobals(); document.body.innerHTML = ''; });
 async function mount() {
-  function Harness() { const o = useOperation(); return <button onClick={() => void o.runCandidateBatch({ experimentId: "EXP", baselineId: "E1", round: 1, candidateIds: ["A", "B", "C"] }).catch(() => {})}>执行本轮</button>; }
-  root = createRoot(document.body.appendChild(document.createElement("div"))); await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
+ function Harness() { const operation = useOperation(); return <button onClick={() => void operation.runCandidateBatch({ experimentId: 'EXP', baselineId: 'E1', round: 1, candidateIds: ['A', 'B', 'C'] }).catch(() => {})}>执行本轮</button>; }
+ root = createRoot(document.body.appendChild(document.createElement('div')));
+ await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
 }
-
-it("pauses on Provider failure, preserves unstarted candidates and ignores a repeated click", async () => {
-  vi.useFakeTimers(); const posted: string[] = [], states: Record<string, string> = { A: "generated", B: "generated", C: "evaluated" };
-  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
-    if (url.endsWith("workspace")) return new Response(JSON.stringify({ current_baseline_id: "E1" }));
-    if (url.endsWith("/experiments/EXP")) return new Response(JSON.stringify({ id: "EXP", baseline_run_id: "E1", evaluation_budget: { used: posted.length, max: 12, reserved_for_d: 1 }, result: {}, candidates: Object.entries(states).map(([id, status]) => ({ id, status, reasoning: { round: 1, candidate_label: id } })) }));
-    if (init?.method === "POST") { const id = url.split("/").at(-2)!; posted.push(id); states[id] = "running"; return new Response(JSON.stringify({ id: `RUN-${id}` })); }
-    const id = url.split("RUN-")[1]; states[id] = id === "A" ? "failed" : "evaluated";
-    return new Response(JSON.stringify({ id: `RUN-${id}`, status: id === "A" ? "failed" : "completed", error_message: id === "A" ? "Stub failed" : undefined, cases: [] }));
-  }); vi.stubGlobal("fetch", fetcher); await mount();
-  await act(async () => { document.querySelector("button")!.click(); document.querySelector("button")!.click(); });
-  await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
-  expect(posted).toEqual(["A"]);
-  expect(states).toEqual({ A: "failed", B: "generated", C: "evaluated" });
-  expect(document.body.textContent).toContain("运行失败");
-  expect(document.body.textContent).toContain("本轮已暂停");
-  await act(async () => document.querySelector("button")!.click());
-  expect(posted).toEqual(["A", "B"]); // A is not implicitly retried; this click authorizes unstarted B.
-  expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST").every(([url]) => url.includes("/candidates/"))).toBe(true);
+const reply = (value: any, status = 200) => new Response(JSON.stringify(value), { status });
+const click = () => act(async () => document.querySelector('button')!.click());
+it('starts one server cycle on a repeated click, displays its saved failure and preserves unstarted candidates', async () => {
+ const candidates = [{ id: 'A', status: 'failed' }, { id: 'B', status: 'generated' }], original = JSON.stringify(candidates);
+ let starts = 0;
+ const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+  if (url.endsWith('/workspace')) return reply({ current_baseline_id: 'E1' });
+  if (init?.method === 'POST') { starts++; return reply({}); }
+  return reply({ baseline_run_id: 'E1', candidates, result: starts ? { optimization_cycle: { status: 'failed', used: 1, remaining: 11, last_error: '运行失败，本轮已暂停' } } : {} });
+ });
+ vi.stubGlobal('fetch', fetcher); await mount();
+ await act(async () => { document.querySelector('button')!.click(); document.querySelector('button')!.click(); });
+ expect(starts).toBe(1); expect(document.body.textContent).toContain('本轮已暂停');
+ expect(JSON.stringify(candidates)).toBe(original);
+ await click(); expect(starts).toBe(2);
+ const posts = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST');
+ expect(posts.every(([url, init]) => url.endsWith('/experiments/EXP/run-cycle') && init?.body === '{}')).toBe(true);
+ expect(fetcher.mock.calls.some(([url]) => url.includes('/candidates/'))).toBe(false);
 });
-
-it.each(["identity", "gate2", "budget"])("stops before a paid start when %s blocks it", async reason => {
-  const fetcher = vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("workspace") ? { current_baseline_id: reason === "identity" ? "E2" : "E1" } : { id: "EXP", baseline_run_id: "E1", evaluation_budget: { used: reason === "budget" ? 11 : 0, max: 12, reserved_for_d: 1 }, result: reason === "gate2" ? { report_confirmation: {} } : {}, candidates: [{ id: "A", status: "generated", reasoning: { round: 1, candidate_label: "A" } }] })));
-  vi.stubGlobal("fetch", fetcher); await mount(); await act(async () => document.querySelector("button")!.click());
-  expect(fetcher.mock.calls.every(call => (call as any)[1]?.method !== "POST")).toBe(true);
-  expect(document.body.textContent).toContain("运行失败");
+it.each(['identity', 'gate2'])('blocks a server cycle when %s changed', async reason => {
+ const fetcher = vi.fn(async (url: string) => reply(url.endsWith('/workspace') ? { current_baseline_id: reason === 'identity' ? 'E2' : 'E1' } : { baseline_run_id: 'E1', result: reason === 'gate2' ? { report_confirmation: {} } : {} }));
+ vi.stubGlobal('fetch', fetcher); await mount(); await click();
+ expect(fetcher.mock.calls.every(call => (call as any)[1]?.method !== 'POST')).toBe(true);
+ expect(document.body.textContent).toContain('运行失败');
 });
-
-it("requires another explicit click after a server interruption", async () => {
-  const posted: string[] = [];
-  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
-    if (url.endsWith("workspace")) return new Response(JSON.stringify({ current_baseline_id: "E1" }));
-    if (url.endsWith("/experiments/EXP")) return new Response(JSON.stringify({ baseline_run_id: "E1", evaluation_budget: { used: posted.length, max: 12, reserved_for_d: 1 }, result: {}, candidates: ["A", "B", "C"].map(id => ({ id, status: id === "A" && posted.length ? "failed" : "generated", reasoning: { round: 1, candidate_label: id }, result: id === "A" && posted.length ? { interrupted: true } : {} })) }));
-    if (init?.method === "POST") { const id = url.split("/").at(-2)!; posted.push(id); return new Response(JSON.stringify({ id: `RUN-${id}` })); }
-    return new Response(JSON.stringify({ status: "failed", error_message: "Worker interrupted" }));
-  }));
-  await mount(); await act(async () => document.querySelector("button")!.click());
-  expect(posted).toEqual(["A"]);
-  expect(document.body.textContent).toContain("重启");
+it('displays the server budget rejection without starting individual candidate requests', async () => {
+ const fetcher = vi.fn(async (url: string, init?: RequestInit) => init?.method === 'POST' ? reply({ detail: '试跑预算已用完' }, 409) : reply(url.endsWith('/workspace') ? { current_baseline_id: 'E1' } : { baseline_run_id: 'E1', result: {} }));
+ vi.stubGlobal('fetch', fetcher); await mount(); await click();
+ expect(document.body.textContent).toContain('试跑预算已用完');
+ expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST').map(([url]) => url)).toEqual([expect.stringContaining('/experiments/EXP/run-cycle')]);
 });
-
-it("continues after a completed but unqualified candidate", async () => {
-  const posted: string[] = [], states: Record<string,string> = { A:"generated", B:"generated", C:"generated" };
-  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
-    if (url.endsWith("workspace")) return new Response(JSON.stringify({ current_baseline_id:"E1" }));
-    if (url.endsWith("/experiments/EXP")) return new Response(JSON.stringify({ baseline_run_id:"E1", evaluation_budget:{ used:posted.length,max:12,reserved_for_d:1 },result:{},candidates:Object.entries(states).map(([id,status])=>({ id,status,reasoning:{round:1,candidate_label:id},result:{qualification:{qualified:false}} })) }));
-    if (init?.method === "POST") { const id=url.split("/").at(-2)!; posted.push(id); states[id]="running"; return new Response(JSON.stringify({id:`RUN-${id}`})); }
-    const id=url.split("RUN-")[1]; states[id]="evaluated";
-    return new Response(JSON.stringify({status:"completed",cases:[]}));
-  }));
-  await mount(); await act(async () => document.querySelector("button")!.click());
-  expect(posted).toEqual(["A","B","C"]);
+it('shows a saved worker interruption and requires a new explicit click', async () => {
+ let starts = 0;
+ const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+  if (url.endsWith('/workspace')) return reply({ current_baseline_id: 'E1' });
+  if (init?.method === 'POST') { starts++; return reply({}); }
+  return reply({ baseline_run_id: 'E1', result: starts ? { optimization_cycle: { status: 'failed', used: 1, remaining: 11, last_error: '服务重启，批次已停止' } } : {} });
+ });
+ vi.stubGlobal('fetch', fetcher); await mount(); await click();
+ expect(starts).toBe(1); expect(document.body.textContent).toContain('服务重启');
+ await click(); expect(starts).toBe(2);
+});
+it('polls saved progress until the server completes the cycle', async () => {
+ vi.useFakeTimers(); let started = false, reads = 0;
+ const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+  if (url.endsWith('/workspace')) return reply({ current_baseline_id: 'E1' });
+  if (init?.method === 'POST') { started = true; return reply({}); }
+  if (!started) return reply({ baseline_run_id: 'E1', result: {} });
+  reads++; return reply({ baseline_run_id: 'E1', result: { optimization_cycle: { status: reads === 1 ? 'running' : 'review', used: reads, remaining: 12 - reads } } });
+ });
+ vi.stubGlobal('fetch', fetcher); await mount(); await click();
+ expect(document.body.textContent).toContain('已用 1 次');
+ await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+ expect(document.querySelector('.operation-count')?.textContent).toContain('2 / 12');
+ expect(document.querySelector('.operation-console')?.textContent).toContain('✓ 完成');
+ expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
 });

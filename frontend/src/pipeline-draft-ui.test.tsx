@@ -21,10 +21,10 @@ it("saves and reloads an isolated Config Draft, removes inactive Alpha and disca
   await act(async () => document.querySelector<HTMLButtonElement>('[data-parameter="query_rewrite"] button')!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="hybrid_search"] button')].find(button => button.textContent === "关闭")!.click());
   expect([...document.querySelectorAll<HTMLButtonElement>('[data-parameter="hybrid_alpha"] button')].every(button => button.disabled)).toBe(true);
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "保存 Config Draft")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "保存草稿")!.click());
   expect(posts[0]).toEqual({ identity: pipeline.draft_identity, config: { query_rewrite: true, hybrid_search: false } });
   expect(pipeline.config).toEqual(config);
-  expect(document.body.textContent).toContain("Config Draft 已保存");
+  expect(document.body.textContent).toContain("配置草稿已保存");
   await act(async () => root.unmount()); root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={{}} />));
   expect(document.querySelector('[data-parameter="query_rewrite"] button[aria-pressed="true"]')?.textContent).toBe("开启");

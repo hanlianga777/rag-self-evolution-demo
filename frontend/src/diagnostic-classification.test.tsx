@@ -29,7 +29,7 @@ it('shows saved per-question repairs and Regression without generating results',
  const candidate={id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'current',all_fixed_question_ids:['Q1','Q1']}};
  await act(async()=>root.render(<CandidateCaseComparison candidates={[candidate]} baselineId="baseline" kind="fixed" onSelect={select}/>));
  expect(host.querySelector('tbody tr td:nth-child(2)')?.textContent).toBe('未通过');expect(host.querySelector('tbody tr td:nth-child(3)')?.textContent).toBe('通过');expect(host.textContent).toContain('保存为已修复');expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
- await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Candidate证据')!.click());expect(select).toHaveBeenCalledWith(after);
+ await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='候选方案证据')!.click());expect(select).toHaveBeenCalledWith(after);
  await act(async()=>root.render(<CandidateCaseComparison candidates={[{id:'b',status:'generated',reasoning:{candidate_label:'B'},result:{}}]} baselineId="baseline" kind="regression" onSelect={select}/>));
  expect(host.textContent).toContain('回归对照未判定');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method||init.method==='GET')).toBe(true);
  await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();

@@ -1,22 +1,8 @@
 import { useState } from "react";
-import { displayText } from "../display";
+import { displayText, parameterNames, descriptions } from "../display";
 import { Drawer } from "./Dialog";
 
-export const parameterNames: Record<string, string> = {
-  candidate_k: "候选数", top_k: "保留条数", min_score: "最低分数线", hybrid_search: "混合检索", hybrid_alpha: "向量检索权重",
-  generation_thinking: "回答思考档位", query_decompose: "问题拆分", retrieval_max_tokens: "上下文容量",
-  rerank: "重排方式", query_rewrite: "查询改写", multi_query: "多路查询", hyde: "假设文本辅助检索",
-  metadata_filter: "元数据筛选", alias_mapping: "别名映射", prompt_strategy: "回答策略",
-};
-
-export const descriptions: Record<string, string> = {
-  generation_thinking: "Baseline 使用「高」；Candidate 可由 Agent 选择 OFF / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "暂不可用：本机缺少分词器归档，目前只支持关闭；不截断检索内容",
-  candidate_k: "初始候选召回数量", top_k: "进入回答上下文的证据数量", min_score: "进入上下文前的最低相关分",
-  hybrid_search: "组合向量与关键词检索", hybrid_alpha: "向量检索在混合检索中的权重", rerank: "模型重排、原排序或仅原问题的 BM25 排序",
-  query_rewrite: "生成标准化检索问法", multi_query: "生成互补检索问法", hyde: "使用假设文本辅助检索",
-  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "分级回答：能确定的先回答，条件缺失时追问，资料无关时转人工，并保留安全警告",
-};
-
+export { parameterNames, descriptions } from "../display";
 export const draftDefaults: Record<string, unknown> = { generation_thinking: "high", query_decompose: false, retrieval_max_tokens: false };
 
 export function thinkingLabel(value: unknown): string {

@@ -1,3 +1,4 @@
+import { displayText } from "../display";
 import { answerCitationDisplay } from "../answerCitations";
 import { StoryDisclosure } from "../components/Storytelling";
 import { StoryEmpty } from "../components/Storytelling";
@@ -17,11 +18,11 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
   const baseline = data.evaluation || {};
   const active = (data.versions || []).find((version: any) => version.status === "active" && version.provenance === "published");
   const baselineId = data.workspace?.current_baseline_id === undefined ? baseline.id : data.workspace.current_baseline_id;
-  const blocked = !baselineId || baselineId !== baseline.id ? data.workspace?.baseline_unavailable_reason || "需要当前有效 Baseline" : !active ? "尚无已发布 Production，请先完成人工发布。" : "";
+  const blocked = !baselineId || baselineId !== baseline.id ? data.workspace?.baseline_unavailable_reason || "需要当前有效 Baseline" : !active ? "尚无已发布 线上版本，请先完成人工发布。" : "";
   const identity = JSON.stringify(["interview-v1", identityKey(data.workspace || baseline), baselineId, active?.id]);
   const leftScheme: Scheme = { id: "baseline", label: "Baseline", version: baselineId, config: baseline.config };
   const source = active?.snapshot?.candidate_id?.match(/(?:^|-)R\d+-([ABC])$/)?.[1];
-  const rightScheme: Scheme = { id: active?.id || "", label: source ? `Production ${source}` : "Production", version: active?.id, config: active?.snapshot?.pipeline_config || active?.config };
+  const rightScheme: Scheme = { id: active?.id || "", label: source ? `线上版本 ${source}` : displayText("Production"), version: active?.id, config: active?.snapshot?.pipeline_config || active?.config };
   const [saved] = useState(() => readSession("rag-qa-compare", { identity: "", question: "", selectedCase: "", left: {} as Run, right: {} as Run }));
   const [question, setQuestion] = useState(saved.identity === identity ? saved.question : "");
   const [selectedCase, setSelectedCase] = useState(saved.identity === identity ? saved.selectedCase : "");
@@ -56,8 +57,8 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
     if (ticket === requests.current && captured === currentIdentity.current) setBusy(false);
   };
 
-  if (blocked) return <div className="page experiment-page"><ConclusionCard title="当前尚不具备 Baseline / Production 实时对比条件" tone="neutral">{blocked} 系统初始运行配置可以用于问答验证；只有经 Candidate 晋升发布的新 Production 才进入此对比。</ConclusionCard><StoryEmpty title="先完成有效 Baseline 与人工发布" action={<><a className="secondary" href="#evaluation">查看 Baseline</a><a className="secondary" href="#versions">查看发布条件</a></>}>保留历史评测与初始配置；前置条件满足后，使用同一道问题比较实际回答与引用。本页不会生成预览结果或实时评分。</StoryEmpty></div>;
-  return <div className="page experiment-page"><ConclusionCard title={left.status === "completed" && right.status === "completed" ? "同题实际回答已保存，可核对内容与引用差异" : "对比当前有效 Baseline 与已发布 Production"} tone="neutral">{left.status === "completed" && right.status === "completed" ? "两侧均为本次主动运行返回的真实回答；未调用 Judge，不产生新评分或资格。" : "选择或输入同一道问题，再主动运行两套已保存配置。参数差异可展开核对，回答未运行时不预判改善。"}</ConclusionCard>
+  if (blocked) return <div className="page experiment-page"><ConclusionCard title="当前尚不具备 Baseline / 线上版本 实时对比条件" tone="neutral">{blocked} 系统初始运行配置可以用于问答验证；只有经 {displayText("Candidate")} 晋升发布的新 {displayText("Production")} 才进入此对比。</ConclusionCard><StoryEmpty title="先完成有效 Baseline 与人工发布" action={<><a className="secondary" href="#evaluation">查看 Baseline</a><a className="secondary" href="#versions">查看发布条件</a></>}>保留历史评测与初始配置；前置条件满足后，使用同一道问题比较实际回答与引用。本页不会生成预览结果或实时评分。</StoryEmpty></div>;
+  return <div className="page experiment-page"><ConclusionCard title={left.status === "completed" && right.status === "completed" ? "同题实际回答已保存，可核对内容与引用差异" : "对比当前有效 Baseline 与已发布 线上版本"} tone="neutral">{left.status === "completed" && right.status === "completed" ? "两侧均为本次主动运行返回的真实回答；未调用 Judge，不产生新评分或资格。" : "选择或输入同一道问题，再主动运行两套已保存配置。参数差异可展开核对，回答未运行时不预判改善。"}</ConclusionCard>
     <section className="experiment-query compare-toolbar">
       <CustomSelect ariaLabel="选择真实 Bad Case" value={selectedCase} onChange={id => { clearResults(); setSelectedCase(id); const item = badCases.find((row: any) => row.id === id); if (item) setQuestion(item.result?.question || ""); }} placeholder="Baseline Bad Case" options={[{ value: "", label: "Baseline Bad Case" }, ...badCases.map((item: any) => ({ value: item.id, label: item.result?.question || item.id }))]} />
       <textarea aria-label="试验问题" placeholder="输入或编辑同一道问题…" maxLength={1000} value={question} onChange={event => { clearResults(); setQuestion(event.target.value); }} />
@@ -65,7 +66,7 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
     </section>
     <StoryDisclosure label="查看方案参数差异"><ParameterDiff before={leftScheme.config} after={rightScheme.config}/></StoryDisclosure>
     <section className="experiment-results" aria-label="实时回答"><AnswerCard scheme={leftScheme} run={left} onOpenCitation={onOpenCitation}/><AnswerCard scheme={rightScheme} run={right} onOpenCitation={onOpenCitation}/></section>
-    {left.status === "completed" && right.status === "completed" && Array.isArray(left.result?.evidence) && Array.isArray(right.result?.evidence) && <p className="comparison-observation" role="status">本次可观察差异：Baseline 返回 {left.result?.evidence?.length ?? 0} 条 Evidence，Production 返回 {right.result?.evidence?.length ?? 0} 条 Evidence。引用数量不代表答案正确性；本次未进行实时 Judge 评分。</p>}
+    {left.status === "completed" && right.status === "completed" && Array.isArray(left.result?.evidence) && Array.isArray(right.result?.evidence) && <p className="comparison-observation" role="status">本次可观察差异：Baseline 返回 {left.result?.evidence?.length ?? 0} 条 Evidence，{displayText("Production")} 返回 {right.result?.evidence?.length ?? 0} 条 Evidence。引用数量不代表答案正确性；本次未进行实时 Judge 评分。</p>}
   </div>;
 }
 

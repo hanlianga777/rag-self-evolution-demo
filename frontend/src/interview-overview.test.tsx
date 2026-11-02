@@ -15,9 +15,9 @@ it.each(["generating", "needs_regeneration", "failed"])("keeps the frozen Golden
   const data = input(status), before = JSON.stringify(data);
   await render(data);
   expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("3 题");
-  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("正向 1 / 消融 1 / 负向 1");
+  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("已冻结 · 3 题");
   expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("Golden Dataset已冻结");
-  expect(document.querySelector(".next-action h2")?.textContent).toBe("运行 Optimization Agent");
+  expect(document.querySelector(".next-action h2")?.textContent).toBe("运行优化 Agent");
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#evolution");
   expect(document.querySelector(".overview-work-run")?.textContent).toContain("工作 Run");
   expect(document.querySelectorAll(".stage-stepper")).toHaveLength(1);
@@ -29,7 +29,7 @@ it("keeps the current recommendation at human release despite an unfinished new 
   const candidate = { id: "E1-C", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } };
   const data = { ...input("failed"), optimization: { id: "E1", baseline_run_id: "B1", candidates: [candidate], recommendation: { result: { status: "Recommended", recommended_candidate: candidate.id } } }, versions: [{ id: "P-old", status: "active", provenance: "published", snapshot: { candidate_id: "E0-A" } }] };
   await render(data);
-  expect(document.querySelector(".next-action h2")?.textContent).toBe("Gate 3 · 人工确认发布");
+  expect(document.querySelector(".next-action h2")?.textContent).toBe("人工确认发布");
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#versions");
   expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("3 题");
 });

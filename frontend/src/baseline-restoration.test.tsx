@@ -17,10 +17,10 @@ it("restores compact Baseline summary without treating aggregate Gate success as
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("92.50");
   expect(document.body.textContent).toContain("有 20 道 Bad Case");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll("thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "失败现象", "评测结果", "诊断依据", "优化方向", "详情"]);
-  expect(document.querySelector("tbody")?.textContent).not.toContain("Hallucination");
-  expect(document.querySelector("tbody")?.textContent).toContain("业务问题");
-  expect(document.querySelector("tbody")?.textContent).toContain("FAIL");
+  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "分类", "子特征", "严重程度", "调节方向", "操作"]);
+  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("Hallucination");
+  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("业务问题");
+  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("记录缺失");
   expect(document.querySelector(".quality-audit")).toBeNull();
   expect(document.querySelector(".baseline-metrics")).toBeNull();
   expect(JSON.stringify(run)).toBe(frozen);
@@ -68,7 +68,7 @@ it("keeps partial technical exceptions separate from business failures on all Ba
   expect(document.body.textContent).toContain("已完成 49 / 50");
   expect(document.body.textContent).toContain("题目级技术异常 1（不计入 Bad Case）");
   expect(document.body.textContent).not.toContain("Baseline 群组Gate通过");
-  for(const label of ["Hard Gate","Bad Case 诊断"]){
+  for(const label of ["门槛","Bad Case 诊断"]){
     await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent===label)!.click());
     expect(document.body.textContent).toContain("题目级技术异常 1（不计入 Bad Case）");
   }

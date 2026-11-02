@@ -17,11 +17,11 @@ const production = { id: "PROD-old-C", status: "active", provenance: "published"
 it("centres the actual published snapshot while a newer recommendation remains unpublished", async () => {
   const candidate = { id: "EXP-new-A", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
   await render(<VersionsPage data={{ versions: [production, { id: "baseline-v1", status: "archived", config: { prompt_strategy: "Grounded", rerank: false } }], optimization: { candidates: [candidate], recommendation: { result: { recommended_candidate: candidate.id } } } }} />);
-  expect(document.querySelector(".release-decision")?.textContent).toContain("Production 来源 Candidate C");
+  expect(document.querySelector(".release-decision")?.textContent).toContain("线上版本 来源 候选方案 C");
   expect(document.querySelector(".release-decision")?.textContent).toContain("11 / 11");
-  expect(document.querySelector(".release-decision")?.textContent).toContain("Regression 通过");
-  expect(document.querySelector(".release-decision")?.textContent).toContain("Gate 3 人工发布已确认");
-  expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("Candidate A");
+  expect(document.querySelector(".release-decision")?.textContent).toContain("回归检查 通过");
+  expect(document.querySelector(".release-decision")?.textContent).toContain("发布确认 人工发布已确认");
+  expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("候选方案 A");
   expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("确认发布");
   expect(document.querySelector(".stage-stepper")).toBeNull();
   expect(document.querySelector(".release-checks")).toBeNull();
@@ -40,7 +40,7 @@ it("shows only changed parameters on the release main screen and opens full conf
 
 it("does not invent manual publication evidence for incomplete historical snapshots", async () => {
   await render(<VersionsPage data={{ versions: [{ ...production, snapshot: { candidate_id: "EXP-old-C" } }] }} />);
-  expect(document.querySelector(".release-decision")?.textContent).not.toContain("Gate 3 人工发布已确认");
+  expect(document.querySelector(".release-decision")?.textContent).not.toContain("发布确认 人工发布已确认");
   expect(document.querySelector(".release-decision")?.textContent).toContain("发布审计未完整保存");
 });
 
@@ -61,8 +61,8 @@ it("orders verification tabs and reduces Monitoring to question, state, judgemen
   const monitoring = { events: [{ id: "MON-internal", question: "新问题", answer: "实际回答", determinable: false, source: { production_version_id: "PROD-source" }, metrics: { latency_ms: 33 } }], triggers: [] };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(monitoring))));
   await render(<VerificationPage data={{ monitoring }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  expect([...document.querySelectorAll(".tabs > button")].map(node => node.textContent)).toEqual(["问答验证", "方案对比", "Monitoring"]);
-  await click("Monitoring");
+  expect([...document.querySelectorAll(".tabs > button")].map(node => node.textContent)).toEqual(["问答验证", "方案对比", "监控"]);
+  await click("监控");
   expect([...document.querySelectorAll(".monitoring-table th")].map(node => node.textContent)).toEqual(["问题", "当前状态", "人工判断", "操作"]);
   expect(document.querySelector(".monitoring-table")?.textContent).not.toContain("33 ms");
   expect(document.querySelector(".stage-stepper")).toBeNull();
@@ -81,7 +81,7 @@ it("requires human judgement and confirmation before starting only the linked Mo
     return new Response(JSON.stringify(value));
   }));
   await render(<VerificationPage data={{ workspace: { current_baseline_id: "B1" }, monitoring: monitoring(), optimization: { id: "EXP-prior", candidates: [{ id: "prior-A" }] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  await click("Monitoring");
+  await click("监控");
   expect(posts).toHaveLength(0);
   await click("Bad Case");
   expect(posts[0]).toEqual({ url: expect.stringContaining("/api/monitoring/events/M1/assessment"), body: { bad_case: true, severity: "ordinary" } });

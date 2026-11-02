@@ -1264,3 +1264,9 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 
 .operation-stop-button { margin-top: 12px; padding: 6px 12px; border: 1px solid #c6d6e6; border-radius: 6px; background: transparent; color: #e6edf5; cursor: pointer; }
 .operation-stop-button:disabled { opacity: .6; cursor: wait; }
+
+/* Keep parameter choices on one line at both desktop acceptance sizes. */
+.search-space-control[data-parameter="rerank"] .parameter-options button { flex: 0 0 auto; white-space: nowrap; }
+.search-space-control[data-parameter="rerank"] .parameter-options button:last-child { flex: 1; }
+.overview-page .page-content > .metrics-grid { margin-bottom: var(--card-gap); }
+.knowledge-page .page-content .cluster-card { height: auto; min-height: var(--card-height); }

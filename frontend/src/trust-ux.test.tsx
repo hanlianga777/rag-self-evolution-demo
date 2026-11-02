@@ -18,6 +18,6 @@ it("shows Not Run rather than a historical seed score", async () => {
 it("summarizes current governance without inventing an optimization result", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<OverviewPage data={{ overview: { dataset: { approved: 0, pending_review: 40 } }, versions: [], badCases: [], optimization: { status: "not_run" } }} navigate={() => {}} />); });
-  expect(document.body.textContent).toContain("待人工审核");
+  expect(document.body.textContent).toContain("待人工确认");
   expect(document.body.textContent).not.toContain("87.6");
 });

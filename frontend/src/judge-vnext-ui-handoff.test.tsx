@@ -72,7 +72,7 @@ it('uses saved business verdicts for Baseline rows and deduplicates Bad Cases by
   await render(<EvaluationPage data={{ evaluation: run }} />);
   expect(document.querySelectorAll('.tabs > button')).toHaveLength(3);
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>('.tabs button')].find(el => el.textContent === 'Bad Case 诊断')!.click());
-  expect(document.querySelector('.conclusion-card')?.textContent || document.body.textContent).toContain('1 道 Bad Case');
+  expect(document.querySelector('.conclusion-card')?.textContent || document.body.textContent).toContain('1 道错题');
   expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
   expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('独立业务失败');
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>('.review-filters button')].find(el => el.textContent === '全部')!.click());

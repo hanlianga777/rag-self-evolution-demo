@@ -10,8 +10,8 @@ import {VerificationPage} from './pages/VerificationPage';
 let root:ReturnType<typeof createRoot>;
 afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';sessionStorage.clear();localStorage.clear();vi.unstubAllGlobals();});
 const view={is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Retrieval',optimization_directions:['candidate_recall'],phenomena:[{name:'检索失败'}]};
-const rows=['Q71','Q72'].map((question_id,i)=>({question_id,question:`问题${i}`,passed:false,diagnostic_view:{...view,primary_root_cause:i?'Generation':'Retrieval',phenomena:[{name:i?'模型过度拒答':'检索失败'}]}}));
-const evaluation={id:'BASE',status:'completed',config:{candidate_k:12},cases:rows,result:{bad_case_count:2,gates:{passed:true,passed_count:11,total:11}}};
+const rows=['Q71','Q72'].map((question_id,i)=>({question_id,question:`问题${i}`,passed:false,diagnostic_view:{...view,primary_root_cause:i?'Generation':'Retrieval',phenomena:[{name:i?'模型过度拒答':'检索失败'}],diagnosis_category:i?'过度拒答':'检索失败'}}));
+const evaluation={diagnostic_categories:[{label:'检索失败'},{label:'过度拒答'}],id:'BASE',status:'completed',config:{candidate_k:12},cases:rows,result:{bad_case_count:2,gates:{passed:true,passed_count:11,total:11}}};
 const badCases=rows.map(row=>({id:'BC-'+row.question_id,question_id:row.question_id,run_id:'BASE',result:row}));
 const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));};
 const click=async(label:string)=>act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label)!.click());
@@ -19,9 +19,9 @@ it('uses one finite filter per dimension, real counts and resets on returning to
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/bad-cases')?badCases:evaluation))));
  await mount(<EvaluationPage data={{evaluation,badCases}}/>);await click('Bad Case 诊断');
  expect(document.querySelector('.diagnosis-filters [role=combobox]')).toBeNull();
- const retrieval=[...document.querySelectorAll<HTMLButtonElement>('[aria-label="失败现象"] button')].find(b=>b.textContent?.includes('检索失败'))!;
+ const retrieval=[...document.querySelectorAll<HTMLButtonElement>('[aria-label="错题分类"] button')].find(b=>b.textContent?.includes('检索失败'))!;
  await act(async()=>retrieval.click());expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
- await click('Hard Gate');await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
+ await click('门槛');await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
  expect(document.body.textContent).not.toContain('恢复全部');expect(document.body.textContent).not.toContain('每类首例');
 });
 it('groups multiple saved candidate hypotheses under one actual problem and keeps raw rationale folded',async()=>{
@@ -30,7 +30,7 @@ it('groups multiple saved candidate hypotheses under one actual problem and keep
  const data={evaluation,badCases,optimization:{id:'EXP',candidates}};const before=JSON.stringify(data);
  await mount(<EvolutionPage data={data}/>);await click('优化 Agent');
  expect(document.querySelectorAll('.strategy-branch')).toHaveLength(2);expect(document.querySelector('.strategy-branch')?.querySelectorAll('.strategy-hypotheses section')).toHaveLength(2);expect(document.querySelector('.experiment-plan')).toBeNull();
- await click('Candidate A · 详情');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
+ await click('候选方案 A · 详情');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
 });
 it('compares a pending release against current Production rather than unrelated Baseline configuration',async()=>{
  const candidate={id:'A',config:{candidate_k:24},reasoning:{candidate_label:'A'},release_state:{sandbox:true,qualified:true,recommended:true,round_complete:true}};
@@ -39,6 +39,6 @@ it('compares a pending release against current Production rather than unrelated 
 });
 it('shows the real feedback chain with a compact empty state and no pretend monitoring rows',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({events:[],triggers:[]}))));
- await mount(<VerificationPage data={{monitoring:{events:[],triggers:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('Monitoring');
+ await mount(<VerificationPage data={{monitoring:{events:[],triggers:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('监控');
  expect(document.querySelectorAll('.decision-chain li')).toHaveLength(4);expect(document.querySelector('.monitoring-table')).toBeNull();expect(document.querySelector('.story-empty')?.textContent).toContain('当前尚无反馈记录');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
 });

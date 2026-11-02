@@ -29,7 +29,7 @@ it("uses the stage flow on Overview without redundant numbered storyline", async
   expect(document.body.textContent).not.toContain("Baseline 发现问题 → Agent 提出假设");
   expect(document.body.textContent).not.toContain("01");
   expect(document.querySelector(".optimization-results")).toBeNull();
-  expect(document.body.textContent).not.toContain("Production 发布来源");
+  expect(document.body.textContent).not.toContain("线上版本 发布来源");
 });
 
 it("marks completed and current lifecycle stages accessibly", async () => {
@@ -59,9 +59,9 @@ it("keeps the Baseline Bad Case table compact and detail ready", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["题号 / 问题", "失败现象", "评测结果", "诊断依据", "优化方向", "详情"]);
-  expect(document.querySelector("tbody")?.textContent).toContain("无依据生成");
-  expect(document.querySelector("tbody")?.textContent).not.toContain("Hallucination");
-  expect(document.querySelector("tbody")?.textContent).toContain("发生故障后如何恢复运行？");
-  expect(document.querySelector("tbody")?.textContent).not.toContain("Not Passed");
+  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(item => item.textContent)).toEqual(["题号 / 问题", "分类", "子特征", "严重程度", "调节方向", "操作"]);
+  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("记录缺失：分类");
+  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("Hallucination");
+  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("发生故障后如何恢复运行？");
+  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("Not Passed");
 });

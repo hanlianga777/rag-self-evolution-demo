@@ -28,7 +28,7 @@ it("shows saved parameter diff before any provider call and restores question", 
   await act(async () => root.render(<ExperimentPage data={data} onOpenCitation={() => {}} />));
   expect(document.body.textContent).toContain("有据生成");
   expect(document.body.textContent).toContain("谨慎拒答");
-  expect(document.body.textContent).not.toContain("上一 Production");
+  expect(document.body.textContent).not.toContain("上一 线上版本");
   const textarea = document.querySelector("textarea")!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "保留的问题"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => root.unmount());

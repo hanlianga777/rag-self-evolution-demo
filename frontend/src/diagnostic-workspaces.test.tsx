@@ -26,7 +26,7 @@ it('keeps insufficient candidate evidence explicit and renders saved candidate r
  await click('A/B/C/D');await click('查看方案与完整报告');
  expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
  const text=document.querySelector('[role="dialog"]')!.textContent;
- for(const saved of ['保存假设','保存理由','保存的原文观察','保存改善','保存风险','Intervention','Root Cause Evidence'])expect(text).toContain(saved);
+ for(const saved of ['保存假设','保存理由','保存的原文观察','保存改善','保存风险','intervention_direction','root_cause_evidence'])expect(text).toContain(saved);
 });
 it('requests evaluation history in bounded server pages',async()=>{
  const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/evaluations?')?Array.from({length:50},(_,i)=>({id:`history-${i}`})):url.endsWith('/api/bad-cases')?[]:evaluation)));
@@ -41,13 +41,14 @@ it('pages version history without dropping the active runtime summary',async()=>
  const fetcher=vi.fn(async()=>new Response(JSON.stringify([{id:'older',status:'archived'}])));vi.stubGlobal('fetch',fetcher);
  await render(<VersionsPage data={{versions}}/>);await click('下一页');
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/versions?page=2&limit=50'))).toBe(true);
- expect(document.querySelector('.release-decision')?.textContent).toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(1);
+ expect(document.querySelector('.release-decision')?.textContent).toContain('初始配置');
+ expect(document.querySelector('details')?.textContent).toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(1);
 });
 it('pages monitoring events and triggers with bounded read requests',async()=>{
  const {VerificationPage}=await import('./pages/VerificationPage');
  const page={events:Array.from({length:50},(_,i)=>({id:`event-${i}`,question:`问题${i}`})),triggers:[]};
  const fetcher=vi.fn(async()=>new Response(JSON.stringify(page)));vi.stubGlobal('fetch',fetcher);
- await render(<VerificationPage data={{monitoring:page}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('Monitoring');await click('下一页');
+ await render(<VerificationPage data={{monitoring:page}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('监控');await click('下一页');
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/monitoring?page=2&limit=50'))).toBe(true);expect(document.querySelectorAll('tbody tr')).toHaveLength(50);
 });
 it('separates saved formal blockers from confirmed regression without clearing pending risk',async()=>{
@@ -85,14 +86,14 @@ it('shows every current business failure in Agent including pending diagnoses',a
  await render(<EvolutionPage data={{evaluation,badCases}}/>);
  expect(document.querySelectorAll('tbody tr')).toHaveLength(10);
  expect([...document.querySelectorAll('button')].find(button=>button.textContent?.includes('生成 A / B / C'))?.disabled).toBe(false);
- expect(document.body.textContent).toContain('全部业务失败由 Agent 接手');
+ expect(document.body.textContent).toContain('全部进入 Agent 诊断与优化规划');
 });
 it('connects an unknown exploratory target to its saved candidate without calling it confirmed',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const badCases=[{run_id:'offline',question_id:'new-explore',result:{question:'未知原因的维护遗漏',passed:false,evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL'},diagnostic_view:{primary_root_cause:'Unknown',target_eligible:false,is_technical_bad_case:false,analysis_category:'insufficient_evidence',optimization_directions:[],experiment_plan:{status:'exploratory',directions:['candidate_recall'],next_action:'controlled_sandbox'}}}}];
  const optimization={id:'exp',result:{diagnostic_tasks:[{question_id:'new-explore',status:'exploratory',experiment_plan:{directions:['candidate_recall']}}]},candidates:[{id:'a',status:'generated',config:{candidate_k:24},reasoning:{candidate_label:'A',observed_evidence:['new-explore'],experiment_kind:'exploratory',hypothesis:'扩大候选池验证缺失来源',falsification:'目标仍失败则不支持'}}]};
  await render(<EvolutionPage data={{evaluation,badCases,optimization}}/>);
- expect(document.querySelector('.diagnosis-list')?.textContent).toContain('候选召回覆盖');
+ expect(document.querySelector('.diagnosis-list')?.textContent).toContain('记录缺失：调节方向');
  await click('优化 Agent');
  expect(document.querySelector('.strategy-relations')?.textContent).toContain('未知原因的维护遗漏');
  expect(document.querySelector('.strategy-relations')?.textContent).toContain('扩大候选池验证缺失来源');

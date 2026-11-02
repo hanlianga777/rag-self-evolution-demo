@@ -11,31 +11,32 @@ afterEach(async () => { await act(async () => root?.unmount()); document.body.in
 const render = async (node: React.ReactNode) => { root = createRoot(document.body.appendChild(document.createElement("div"))); await act(async () => root.render(node)); };
 const click = async (label: string) => act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === label)!.click());
 const contract = { generation_thinking: { allowed: ["off", "low", "high", "max"] }, query_decompose: { allowed: [false, true] }, retrieval_max_tokens: { allowed: [false, 8192, 16384, 32768, 65536] } };
-it("edits and persists the three real controlled parameters and restores the saved draft", async () => {
-  const pipeline: any = { config: {}, search_space: contract, config_draft: null };
+it("persists Query Decompose while keeping saved Baseline Thinking and unavailable context capacity unchanged", async () => {
+  const pipeline: any = { baseline_config: { generation_thinking: "high", query_decompose: false, retrieval_max_tokens: false }, search_space: contract, config_draft: null };
   const posts: any[] = [];
   vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => { if (init?.method === "POST") { posts.push(JSON.parse(String(init.body))); pipeline.config_draft = { config: posts.at(-1).config }; } return new Response(JSON.stringify(pipeline)); }));
   await render(<SettingsPage data={{}} />);
-  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe("Max");
+  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe("High");
   expect(document.querySelector<HTMLButtonElement>('[data-parameter="generation_thinking"] button')?.disabled).toBe(true);
+  expect(document.querySelector('[data-parameter="retrieval_max_tokens"] [role="combobox"]')).toBeNull();
+  expect(document.querySelector('[data-parameter="retrieval_max_tokens"] button[aria-pressed="true"]')?.textContent).toBe("关闭");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="query_decompose"] button')].find(button => button.textContent === "开启")!.click());
-  await act(async () => document.querySelector<HTMLButtonElement>('[data-parameter="retrieval_max_tokens"] [role="combobox"]')!.click());
-  await act(async () => document.querySelector<HTMLElement>('[data-value="16384"]')!.click());
-  await click("保存 Config Draft");
-  expect(posts[0].config).toEqual({ generation_thinking: "max", query_decompose: true, retrieval_max_tokens: 16384 });
-  await act(async () => root.unmount());
-  await render(<SettingsPage data={{}} />);
-  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe("Max");
-  expect(document.querySelector('[data-parameter="retrieval_max_tokens"] [role="combobox"]')?.textContent).toContain("16384");
+  await click("保存草稿");
+  expect(posts[0].config).toEqual({ generation_thinking: "high", query_decompose: true, retrieval_max_tokens: false });
+  await act(async () => root.unmount()); await render(<SettingsPage data={{}} />);
+  expect(document.querySelector('[data-parameter="query_decompose"] button[aria-pressed="true"]')?.textContent).toBe("开启");
+  expect(pipeline.baseline_config.query_decompose).toBe(false);
 });
-it("keeps unsaved Baseline differences inside the draft editor and removes the bottom snapshot", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ config: {}, baseline_config: { generation_thinking: "high" }, search_space: contract }))));
+it("shows allowed unsaved changes in the draft while refusing a different Baseline Thinking", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ baseline_config: { generation_thinking: "high", query_decompose: false }, search_space: contract }))));
   await render(<SettingsPage data={{}} />);
-  expect(document.body.textContent).not.toContain("Baseline 冻结快照");
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="generation_thinking"] button')].find(button => button.textContent === "Max")!.click());
-  const editor = [...document.querySelectorAll("section")].find(section => section.querySelector('h2')?.textContent === "Agent Search Space");
-  expect(editor?.textContent).toContain("Baseline → 草稿参数变化");
-  expect(editor?.textContent).toContain("High → Max");
+  const max = [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="generation_thinking"] button')].find(b => b.textContent === "Max")!;
+  expect(max.disabled).toBe(true);
+  await act(async () => { max.click(); });
+  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe("High");
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="query_decompose"] button')].find(b => b.textContent === "开启")!.click());
+  expect(document.querySelector('.pipeline-draft-diff')?.textContent).toContain("关闭 → 开启");
+  expect(document.querySelector('.pipeline-draft-diff')?.textContent).not.toContain("High → Max");
 });
 it("reports saved Run values and absent historical Thinking as unknown in report and drawer", async () => {
   const run = { id: "R-OLD", status: "completed", dataset_version_id: "G-OLD", config: { candidate_k: 12, top_k: 4, hybrid_search: true, rerank: true }, judge: { model: "judge-old", generation_prompt_version: "generation-vnext-1", execution_snapshot: { generation_model: "gen-old" } }, result: {}, dataset_snapshot: { id: "G-OLD" } };
@@ -45,7 +46,7 @@ it("reports saved Run values and absent historical Thinking as unknown in report
   expect(summary.textContent).toContain("gen-old");
   expect(summary.textContent).toContain("judge-old");
   expect(summary.textContent).toContain("历史未知");
-  expect([...summary.querySelectorAll("dt")].filter(node => node.textContent === "Golden Snapshot")).toHaveLength(1);
+  expect([...summary.querySelectorAll("dt")].filter(node => node.textContent === "题卷")).toHaveLength(1);
   await click("完整配置快照");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("历史未知");
   expect([...document.querySelectorAll('[role="dialog"] dd')].some(node => node.textContent === "Max")).toBe(false);
@@ -64,14 +65,14 @@ it("uses a new Run's saved Thinking and knowledge identities consistently in sum
   const summary = document.querySelector('.baseline-run-summary')!;
   expect(summary.textContent).toContain("gen-saved · OFF");
   expect(summary.textContent).toContain("judge-saved · Max");
-  expect(summary.textContent).toContain("CORPUS-SAVED / IDX-SAVED");
-  expect(summary.textContent).toContain("RESULT-CONFIG-SAVED");
+  expect(document.querySelector("details")?.textContent).toContain("CORPUS-SAVED / IDX-SAVED");
+  expect(document.querySelector("details")?.textContent).toContain("RESULT-CONFIG-SAVED");
   expect(summary.textContent).not.toContain("corpus-old-fallback");
   await click("完整配置快照");
   const rows = [...document.querySelectorAll('[role="dialog"] dl > div')];
-  expect(rows.find(row => row.querySelector('dt')?.textContent === "Generation Thinking")?.querySelector('dd')?.textContent).toBe("OFF");
+  expect(rows.find(row => row.querySelector('dt')?.textContent === "Thinking 档位")?.querySelector('dd')?.textContent).toBe("OFF");
   expect(rows.find(row => row.querySelector('dt')?.textContent === "Judge Thinking")?.querySelector('dd')?.textContent).toBe("Max");
-  expect(rows.find(row => row.querySelector('dt')?.textContent === "Retrieval MaxTokens")?.querySelector('dd')?.textContent).toBe("8192");
+  expect(rows.find(row => row.querySelector('dt')?.textContent === "上下文容量")?.querySelector('dd')?.textContent).toBe("8192");
 });
 
 it("starts a new unsaved Baseline draft with approved defaults while leaving historical values visible", async () => {
@@ -92,7 +93,7 @@ it.each([
   const frozen = JSON.stringify(run);
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(run))));
   await render(<EvaluationPage data={{ evaluation: run }} />);
-  expect(document.querySelector('.baseline-run-summary')?.textContent).toContain(expected);
+  expect(document.querySelector("details")?.textContent).toContain(expected);
   expect(document.body.textContent).not.toContain("[object Object]");
   await click("完整配置快照");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("完整 Corpus / Index 身份");
@@ -109,6 +110,6 @@ it("offers repair instead of presenting an old non-Max Baseline draft as saved M
   const pipeline={baseline_config:{generation_thinking:"max"},config_draft:{config:{generation_thinking:"low"}},search_space:{generation_thinking:contract.generation_thinking}};
   vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify(pipeline))));
   await render(<SettingsPage data={{}} />);
-  expect(document.body.textContent).toContain("旧草稿需要修复");
-  expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="保存 Config Draft")?.disabled).toBe(false);
+  expect(document.body.textContent).toContain("已放弃旧草稿中的回答思考档位修改");
+  expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="保存草稿")?.disabled).toBe(false);
 });

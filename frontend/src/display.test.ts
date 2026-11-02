@@ -7,7 +7,7 @@ describe("displayText", () => {
     expect(displayText("Retrieval Failure")).toBe("检索失败");
     expect(displayText("Candidate B")).toBe("Candidate B");
     expect(displayText("Baseline")).toBe("Baseline");
-    expect(displayText("Production")).toBe("Production");
+    expect(displayText("Production")).toBe("线上版本");
     expect(displayText("Qualified")).toBe("合格");
     expect(displayText("Not Qualified")).toBe("不合格");
     expect(displayText("Generated")).toBe("已生成");
@@ -19,7 +19,7 @@ describe("displayText", () => {
     expect(displayText("live")).toBe("服务回答");
     expect(displayText("not_run")).toBe("未运行");
     expect(displayText("RETRIEVAL_INCOHERENT")).toBe("检索不一致（保留人工审核）");
-    expect(displayText("Ablation")).toBe("消融题（Ablation）");
+    expect(displayText("Ablation")).toBe("消融");
     expect(displayText("approved")).toBe("已批准");
     expect(displayText("rejected")).toBe("已拒绝");
   });

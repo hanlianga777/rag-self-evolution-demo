@@ -20,7 +20,7 @@ it("counts delegated AI approval as machine qualified without claiming human rev
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [row], snapshots: [snapshot] }} />));
   expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("机器合格 1");
   expect(document.querySelector(".review-table")?.textContent).toContain("机器合格");
-  expect(document.querySelector('.golden-summary-strip')?.textContent).toContain("Human Gate 1 · 已确认");
+  expect(document.querySelector('.golden-summary-strip')?.textContent).toContain("人工确认 · 已冻结");
   expect(document.body.textContent).not.toContain("已人工确认");
   await act(async () => root.unmount());
 });
@@ -225,7 +225,7 @@ it("shows Gate 1 complete without a separate Snapshot action", async () => {
   vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(goldenFixture(url, questions)), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(row => row.id), artifacts: {} }], dataset: questions, snapshots: [{ id: "GD-20", snapshot: { generation_run_id: "GGEN-20", question_ids: questions.map(row => row.id) } }] }} />));
-  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("Human Gate 1 · 已确认");
+  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("人工确认 · 已冻结");
   expect(document.querySelectorAll(".snapshot-next button")).toHaveLength(0);
   await act(async () => root.unmount());
 });
@@ -325,7 +325,7 @@ it("shows only Revision Draft while a paired preview is active", async () => {
   expect(document.body.textContent).toContain("修订草案");
   expect(document.body.textContent).toContain("新题 1");
   expect(document.querySelector(".draft-workspace")?.previousElementSibling?.textContent).toContain("重新选材 · 系统按最新修订意图自动选材");
-  expect(document.body.textContent).not.toContain("发起 Candidate 修订");
+  expect(document.body.textContent).not.toContain("发起 候选方案 修订");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "生成修订草案")).toBe(false);
   expect(document.querySelector(".candidate-actionbar")?.textContent).toContain("确认应用");
   await act(async () => root.unmount());
@@ -344,7 +344,7 @@ it("starts Q09 independently and keeps Q01 as read-only context", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }], dataset: questions }} />));
   await act(async () => (document.querySelectorAll<HTMLButtonElement>(".review-table tbody button")[1]).click());
-  expect(document.body.textContent).toContain("关联 Positive：Q01");
+  expect(document.body.textContent).toContain("关联 正向：Q01");
   await act(async () => ([...document.querySelectorAll(".candidate-actionbar button")].find(button => button.textContent === "编辑") as HTMLButtonElement).click());
   expect(document.querySelector(".revision-pair input[type='checkbox']")).toBeNull();
   expect(document.querySelectorAll(".draft-workspace")).toHaveLength(0);

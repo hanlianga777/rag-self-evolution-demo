@@ -65,7 +65,7 @@ it("keeps Gate 1 available when every question is approved but the current run h
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [{ id: "OLD", snapshot: { generation_run_id: "G1", question_ids: ["old-question"] } }] }} />));
-  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("Human Gate 1");
+  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("人工确认");
   const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "冻结 Golden Dataset")!;
   expect(confirm).toBeTruthy();
   await act(async () => document.querySelector<HTMLInputElement>(".review-batch input")!.click());
@@ -106,7 +106,7 @@ it("shows persisted partial slots, failure details, and only the refill action",
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.body.textContent).toContain("已处理 20/20 · 100%");
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
-  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("12 / 20 Slot");
+  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("12 / 20 题位");
   expect(document.body.textContent).toContain("补齐失败题（8）");
   expect(document.body.textContent).not.toContain("生成 V1 Mini 8 / 4 / 8");
   expect(document.querySelector(".review-batch")).toBeNull();
@@ -114,7 +114,7 @@ it("shows persisted partial slots, failure details, and only the refill action",
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-NEW");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Slot 20 / 20");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("题位 20 / 20");
   await act(async () => document.querySelector<HTMLDetailsElement>(".slot-audit summary")!.click());
   expect(document.querySelector<HTMLDetailsElement>(".slot-audit")?.open).toBe(true);
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("原文证据");
@@ -141,7 +141,7 @@ for (const count of [10, 12, 19]) {
     await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-partial");
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Slot 20 / 20");
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("题位 20 / 20");
     await act(async () => root.unmount());
   });
 }
@@ -213,7 +213,7 @@ it("confirms an evaluated qualified winner and then offers composite D", async (
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: { status: "completed" }, badCases: [{}] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Sandbox")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Recommendation")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "推荐方案")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("确认报告"))!.click());
   expect(requests[0]).toEqual({ url: expect.stringContaining("/api/experiments/EXP1/recommendation"), body: { candidate_id: "A1", actor: "human" } });
   await act(async () => root.unmount());
