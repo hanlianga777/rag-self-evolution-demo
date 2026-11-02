@@ -113,3 +113,14 @@ it("offers repair instead of presenting an old non-Max Baseline draft as saved M
   expect(document.body.textContent).toContain("已放弃旧草稿中的回答思考档位修改");
   expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="保存草稿")?.disabled).toBe(false);
 });
+
+it("explains backend-locked Thinking and unavailable capacity, and collapses untouched draft actions", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ baseline_config: { generation_thinking: "high", query_decompose: false, retrieval_max_tokens: false }, search_space: contract }))));
+  await render(<SettingsPage data={{}} />);
+  expect(document.querySelector('[data-parameter="generation_thinking"] .badge')?.textContent).toBe("锁定");
+  expect(document.querySelector('[data-parameter="generation_thinking"]')?.getAttribute('title')).toContain("本机设置");
+  expect(document.querySelector('[data-parameter="retrieval_max_tokens"] .badge')?.textContent).toBe("暂不可用");
+  expect(document.querySelector('.pipeline-draft-actions')).toBeNull();
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="query_decompose"] button')].find(button => button.textContent === "开启")!.click());
+  expect(document.querySelector('.pipeline-draft-actions')).not.toBeNull();
+});

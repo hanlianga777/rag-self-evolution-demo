@@ -12,7 +12,7 @@ it("renders inline architecture without reference upload or developer disclosure
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OverviewPage data={{}} navigate={() => {}} />));
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "业务架构")!.click());
-  expect(document.querySelector('.knowledge-diagrams')?.textContent).toContain("唯一 Main Agent");
+  expect(document.querySelector('.knowledge-diagrams')?.textContent).toContain("统一分析与优化");
   expect(document.body.textContent).not.toContain("已保存参考图");
   expect(document.querySelector('input[type="file"]')).toBeNull();
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "技术架构")!.click());

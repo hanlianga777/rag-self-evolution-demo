@@ -98,7 +98,7 @@ export type Stage = { label: string; state: "completed" | "current" | "pending" 
 export function StageStepper({ ariaLabel, steps, compact = false }: { ariaLabel: string; steps: Stage[]; compact?: boolean }) {
   return <ol className={`stage-stepper${compact ? " compact" : ""}`} aria-label={ariaLabel}>{steps.map(step => <li key={step.label} className={step.state} aria-current={step.state === "current" ? "step" : undefined}>
     {step.href ? <a href={step.href}><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</a> : <div><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</div>}
-    <small>{step.state === "completed" ? "已完成" : step.state === "current" ? "当前阶段" : step.state === "blocked" ? "待处理" : "待开始"}</small>
+    <small>{step.state === "completed" ? "✓ 已完成" : step.state === "current" ? "当前阶段" : step.state === "blocked" ? "待处理" : "待开始"}</small>
   </li>)}</ol>;
 }
 
@@ -134,3 +134,23 @@ export function ActionMenu({ label, children, triggerText = "⋯" }: { label:str
   },[]);
   return <><button ref={trigger} type="button" className="secondary" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={id} {...{popovertarget:id}}>{triggerText}</button><div ref={menu} id={id} {...{popover:"auto"}} role="menu" aria-label={label} className="action-menu-content" onClick={event=>{if ((event.target as HTMLElement).closest("button,a")) menu.current?.hidePopover?.();}}>{children}</div></>;
 }
+
+/** One track style for both completion and proportions; thresholds are optional. */
+export function ProgressBar({ value, max = 100, label, failed = false, threshold }: { value: number; max?: number; label: string; failed?: boolean; threshold?: number }) {
+  const percent = max > 0 ? Math.max(0, Math.min(100, value / max * 100)) : 0;
+  return <div className={`progress-track${failed ? " failed" : ""}`} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value}><span style={{ width: `${percent}%` }} />{threshold != null && max > 0 && <i className="progress-threshold" style={{ left: `${Math.max(0, Math.min(100, threshold / max * 100))}%` }} title={`门槛 ${threshold}`} />}</div>;
+}
+
+export function DrawerSection({ title, children }: { title: string; children: ReactNode }) {
+  return <section className="drawer-section"><h3>{title}</h3>{children}</section>;
+}
+
+export function DrawerFooter({ children }: { children: ReactNode }) { return <div className="detail-footer">{children}</div>; }
+
+export function EmptyState({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
+  return <div className="empty-state"><p>{title}</p><p className="muted">{children}</p>{action}</div>;
+}
+
+export function MoreMenu({ children }: { children: ReactNode }) { return <ActionMenu label="页面更多操作" triggerText="更多">{children}</ActionMenu>; }
+
+export function TechnicalDetails({ children }: { children: ReactNode }) { return <Disclosure label="技术详情">{children}</Disclosure>; }

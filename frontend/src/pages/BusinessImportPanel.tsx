@@ -1,4 +1,4 @@
-import { displayText } from "../display";
+import { displayText, questionSource } from "../display";
 import { useEffect, useRef, useState } from "react";
 import { apiUrl, errorMessage, postJson, requestError } from "../api";
 import { CustomSelect, FixedTableCard, Section, Badge, TruncatedText, ActionMenu } from "../components/Primitives";
@@ -6,11 +6,11 @@ import { ScrollablePagedTable, usePagedCandidates } from "../components/Scrollab
 import { isMachineQualified } from "../display";
 import { Drawer, ConfirmDialog } from "../components/Dialog";
 
-export function BusinessImportPanel({ items, onCreated, profiles = {}, onDetail, initialProfile = "mini", currentQuestionIds = [], coveragePlan, corpusFingerprint }: { items: any[]; onCreated: () => Promise<void>; profiles?: Record<string, any>; onDetail?: (row: any) => void; initialProfile?: string; currentQuestionIds?: string[]; coveragePlan?: any; corpusFingerprint?: unknown }) {
+export function BusinessImportPanel({ items, onCreated, profiles = {}, onDetail, initialProfile = "mini", currentQuestionIds = [], coveragePlan, corpusFingerprint, readOnly = false }: { readOnly?: boolean; items: any[]; onCreated: () => Promise<void>; profiles?: Record<string, any>; onDetail?: (row: any) => void; initialProfile?: string; currentQuestionIds?: string[]; coveragePlan?: any; corpusFingerprint?: unknown }) {
   const quotas = Object.fromEntries(Object.entries(profiles).map(([name, counts]) => [name, [counts.positive_count, counts.ablation_count, counts.negative_count]]));
   const stashKey = `golden-pool-selection:${JSON.stringify(corpusFingerprint)}`;
   const restore = () => { try { return JSON.parse(sessionStorage.getItem(stashKey) || "[]") as any[]; } catch { return []; } };
-  const selectedRows = useRef(new Map<string, any>(restore().filter(row => row?.id).map(row => [row.id, row])));
+  const selectedRows = useRef(new Map<string, any>((readOnly ? [] : restore()).filter(row => row?.id).map(row => [row.id, row])));
   const [selected, setSelected] = useState<string[]>([...selectedRows.current.keys()]), [profile, setProfile] = useState(initialProfile);
   const [assembling, setAssembling] = useState(false), [quality, setQuality] = useState("all");
   const [file, setFile] = useState<File | null>(null), [preview, setPreview] = useState<any>(null), [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -28,20 +28,22 @@ export function BusinessImportPanel({ items, onCreated, profiles = {}, onDetail,
   const reason = invalid ? `${invalid}题结构校验未通过，请治理或替换。` : selected.length < expected ? `还差${expected - selected.length}题；选题已暂存，可智能补齐。` : selected.length > expected ? `请减少${selected.length - expected}题。` : checking ? "正在校验选题。" : !exact ? "正向、消融或负向配额不符，请调整选题。" : !matching?.valid ? "存在覆盖缺口或无效候选，请治理或替换。" : "";
   const activeStash = useRef(stashKey);
   useEffect(() => {
+    if (readOnly) return;
     if (activeStash.current !== stashKey) {
       activeStash.current = stashKey; selectedRows.current = new Map(restore().filter(row => row?.id).map(row => [row.id, row])); setSelected([...selectedRows.current.keys()]); return;
     }
     sessionStorage.setItem(stashKey, JSON.stringify(selected.map(id => selectedRows.current.get(id)).filter(Boolean)));
-  }, [selected, stashKey]);
+  }, [selected, stashKey, readOnly]);
   useEffect(() => {
     const ticket = ++request.current; setMatching(null); setError("");
+    if (readOnly) { setChecking(false); return; }
     if (!selected.length) { setChecking(false); return; }
     setChecking(true);
     void postJson("/api/governance/generation-runs/from-pool/preview", { profile, question_ids: selected }).then(result => { if (ticket === request.current) setMatching(result); }).catch(reason => { if (ticket === request.current) setError(errorMessage(reason)); }).finally(() => { if (ticket === request.current) setChecking(false); });
     return () => { request.current++; };
-  }, [profile, selected]);
+  }, [profile, selected, readOnly]);
   const upload = async (chosen: File, confirm = false) => {
-    if (acting.current) return;
+    if (readOnly || acting.current) return;
     acting.current = true; const ticket = ++uploadRequest.current; setBusy(true); setError("");
     try {
       const response = await fetch(apiUrl(`/api/governance/imports?filename=${encodeURIComponent(chosen.name)}&confirm=${confirm}&allow_partial=${confirm && !!preview?.error_count}${confirm ? `&preview_hash=${preview.file_hash}` : ""}`), { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: chosen });
@@ -53,7 +55,7 @@ export function BusinessImportPanel({ items, onCreated, profiles = {}, onDetail,
     finally { if (ticket === uploadRequest.current) setBusy(false); acting.current = false; }
   };
   const autofill = async () => {
-    if (acting.current || !selected.length) return;
+    if (readOnly || acting.current || !selected.length) return;
     acting.current = true; const captured = identity; setBusy(true); setError("");
     try {
       const result: any = await postJson("/api/governance/generation-runs/from-pool/autofill", { profile, question_ids: selected, plan_id: matching?.plan_id });
@@ -63,7 +65,7 @@ export function BusinessImportPanel({ items, onCreated, profiles = {}, onDetail,
     } catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); acting.current = false; }
   };
   const create = async () => {
-    if (acting.current || !matching?.valid || !exact) return;
+    if (readOnly || acting.current || !matching?.valid || !exact) return;
     acting.current = true; setBusy(true); setError("");
     try {
       await postJson("/api/governance/generation-runs/from-pool", { profile, question_ids: selected, plan_id: matching.plan_id });
@@ -72,14 +74,15 @@ export function BusinessImportPanel({ items, onCreated, profiles = {}, onDetail,
   };
   return <><Section title={assembling ? "组建 Golden" : "候选池"}>
     {(error || pageData.error) && !importOpen && <p className="error-notice" role="alert">{error || pageData.error}</p>}
+    {readOnly && <p className="muted">这些题已全部进入冻结题卷</p>}
     {notice && <p role="status" className="muted">{notice}</p>}
     <div className="candidate-pool-toolbar">
-      {assembling ? <><span className="pool-profile-selector"><CustomSelect ariaLabel="候选池 Profile" value={profile} onChange={setProfile} disabled={busy} options={Object.keys(quotas).map(value => ({ value, label: value[0].toUpperCase() + value.slice(1) }))} /></span><strong>{profile[0].toUpperCase() + profile.slice(1)} · 已选{selected.length}/{expected} · {selected.length <= expected ? `还差${expected - selected.length}题` : `超出${selected.length - expected}题`}</strong><div className="pool-toolbar-actions"><button className="secondary" disabled={busy || !selected.length || selected.length >= expected} onClick={() => void autofill()}>智能补齐</button><button className="secondary" disabled={busy} onClick={() => { setAssembling(false); setNotice(""); }}>返回浏览</button><button className="primary" disabled={busy || checking || !exact || !matching?.valid} onClick={() => void create()}>创建待审核测试集</button></div></> : <><div className="review-filters" aria-label="候选质量筛选">{[{value:"all",label:"全部",count:summary?.total},{value:"usable",label:"可用",count:summary?.machine_qualified},{value:"govern",label:"待治理",count:summary ? summary.needs_processing + summary.pending_checks : undefined}].map(item => <button key={item.value} aria-pressed={quality===item.value} className={quality===item.value ? "active" : ""} onClick={() => setQuality(item.value)}>{item.label} {item.count ?? "—"}</button>)}</div><div className="pool-toolbar-actions"><ActionMenu label="业务用例" triggerText="业务用例 ▾"><a role="menuitem" href={apiUrl("/api/governance/import-template?format=xlsx")} download>下载Excel模板</a><button role="menuitem" disabled={busy} onClick={() => fileInput.current?.click()}>上传业务用例</button></ActionMenu><button className="primary" onClick={() => { setAssembling(true); setQuality("all"); setNotice(""); }}>创建Golden</button></div></>}
+      {!readOnly && assembling ? <><span className="pool-profile-selector"><CustomSelect ariaLabel="候选池 Profile" value={profile} onChange={setProfile} disabled={busy} options={Object.keys(quotas).map(value => ({ value, label: value[0].toUpperCase() + value.slice(1) }))} /></span><strong>{profile[0].toUpperCase() + profile.slice(1)} · 已选{selected.length}/{expected} · {selected.length <= expected ? `还差${expected - selected.length}题` : `超出${selected.length - expected}题`}</strong><div className="pool-toolbar-actions"><button className="secondary" disabled={busy || !selected.length || selected.length >= expected} onClick={() => void autofill()}>智能补齐</button><button className="secondary" disabled={busy} onClick={() => { setAssembling(false); setNotice(""); }}>返回浏览</button><button className="primary" disabled={busy || checking || !exact || !matching?.valid} onClick={() => void create()}>创建待审核测试集</button></div></> : <><div className="review-filters" aria-label="候选质量筛选">{[{value:"all",label:"全部",count:summary?.total},{value:"usable",label:"可用",count:summary?.machine_qualified},{value:"govern",label:"待治理",count:summary ? summary.needs_processing + summary.pending_checks : undefined}].map(item => <button key={item.value} aria-pressed={quality===item.value} className={quality===item.value ? "active" : ""} onClick={() => setQuality(item.value)}>{item.label} {item.count ?? "—"}</button>)}</div>{!readOnly && <div className="pool-toolbar-actions"><ActionMenu label="业务用例" triggerText="业务用例 ▾"><a role="menuitem" href={apiUrl("/api/governance/import-template?format=xlsx")} download>下载Excel模板</a><button role="menuitem" disabled={busy} onClick={() => fileInput.current?.click()}>上传业务用例</button></ActionMenu><button className="primary" onClick={() => { setAssembling(true); setQuality("all"); setNotice(""); }}>创建Golden</button></div>}</>}
     </div>
-    {assembling && <><div className="pool-selection-status">{reason && <span>{reason}</span>}{pending > 0 && <span>{pending}题待治理；暂存及结构校验不代表质量通过。</span>}<details><summary>选题要求</summary><p>正向{counts[0]}/{target[0]} · 消融{counts[1]}/{target[1]} · 负向{counts[2]}/{target[2]}。完整配额、有效证据和覆盖匹配后才能创建待审核工作集。</p><p>真实覆盖缺口：{matching?.gaps?.length ?? "待校验"}。{matching?.unmatched_question_ids?.length ? `未匹配候选：${matching.unmatched_question_ids.length}题。` : ""}</p>{matching?.gaps?.length > 0 && <ul>{matching.gaps.map((gap: any) => <li key={gap.slot_id}>{gap.topic_cluster} · {gap.evaluation_group} · {gap.construction_type}</li>)}</ul>}</details></div></>}
-    <ScrollablePagedTable className="fixed-table" resetKey={identity + path} loading={pageData.loading} hasMore={pageData.hasMore} onMore={pageData.loadMore}><table className="candidate-pool-table"><colgroup>{[...(assembling ? [38] : []), 0, 100, 95, 95, 90].map((width,index) => <col key={index} style={width ? {width} : undefined} />)}</colgroup><thead><tr>{assembling && <th>选择</th>}<th>问题</th><th>评测组</th><th>来源</th><th>质量状态</th><th>操作</th></tr></thead><tbody>{pool.map(row => <tr key={row.id} data-question-id={row.id}>{assembling && <td><input aria-label={`选择 ${row.question}`} type="checkbox" checked={selected.includes(row.id)} disabled={busy} onChange={event => { selectedRows.current.set(row.id,row); setSelected(ids => event.target.checked ? [...ids,row.id] : ids.filter(id => id!==row.id)); }} /></td>}<td><TruncatedText lines={2}>{row.question}</TruncatedText></td><td>{({positive:"正向",ablation:"消融",negative:"负向",unclassified:"待分类"} as Record<string,string>)[row.test_category] || row.test_category}</td><td>{row.raw?.source === "business_import" ? "业务导入" : "AI 生成"}</td><td><Badge tone={isMachineQualified(row.qualification_status) || row.qualification_status === "human_approved" ? "good" : "warning"}>{isMachineQualified(row.qualification_status) ? "机器合格" : row.qualification_status === "human_approved" ? "人工通过" : "待治理"}</Badge></td><td><button className="text-button" onClick={() => onDetail ? onDetail(row) : setDetail(row)}>查看详情</button></td></tr>)}</tbody></table></ScrollablePagedTable>
+    {!readOnly && assembling && <><div className="pool-selection-status">{reason && <span>{reason}</span>}{pending > 0 && <span>{pending}题待治理；暂存及结构校验不代表质量通过。</span>}<details><summary>选题要求</summary><p>正向{counts[0]}/{target[0]} · 消融{counts[1]}/{target[1]} · 负向{counts[2]}/{target[2]}。完整配额、有效证据和覆盖匹配后才能创建待审核工作集。</p><p>真实覆盖缺口：{matching?.gaps?.length ?? "待校验"}。{matching?.unmatched_question_ids?.length ? `未匹配候选：${matching.unmatched_question_ids.length}题。` : ""}</p>{matching?.gaps?.length > 0 && <ul>{matching.gaps.map((gap: any) => <li key={gap.slot_id}>{gap.topic_cluster} · {gap.evaluation_group} · {gap.construction_type}</li>)}</ul>}</details></div></>}
+    <ScrollablePagedTable className="fixed-table" resetKey={identity + path} loading={pageData.loading} hasMore={pageData.hasMore} onMore={pageData.loadMore}><table className="candidate-pool-table"><colgroup>{[...(!readOnly && assembling ? [38] : []), 0, 100, 95, 95, ...(!readOnly ? [90] : [])].map((width,index) => <col key={index} style={width ? {width} : undefined} />)}</colgroup><thead><tr>{!readOnly && assembling && <th>选择</th>}<th>问题</th><th>评测组</th><th>来源</th><th>质量状态</th>{!readOnly && <th>操作</th>}</tr></thead><tbody>{pool.map(row => <tr key={row.id} data-question-id={row.id} tabIndex={0} role="button" onClick={() => onDetail ? onDetail(row) : setDetail(row)} onKeyDown={event => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onDetail ? onDetail(row) : setDetail(row); } }}>{!readOnly && assembling && <td><input aria-label={`选择 ${row.question}`} type="checkbox" checked={selected.includes(row.id)} disabled={busy} onClick={event => event.stopPropagation()} onChange={event => { selectedRows.current.set(row.id,row); setSelected(ids => event.target.checked ? [...ids,row.id] : ids.filter(id => id!==row.id)); }} /></td>}<td><TruncatedText lines={2}>{row.question}</TruncatedText></td><td>{({positive:"正向",ablation:"消融",negative:"负向",unclassified:"待分类"} as Record<string,string>)[row.test_category] || row.test_category}</td><td>{questionSource(row)}</td><td><Badge tone={isMachineQualified(row.qualification_status) || row.qualification_status === "human_approved" ? "good" : "warning"}>{isMachineQualified(row.qualification_status) ? "机器合格" : row.qualification_status === "human_approved" ? "人工通过" : "待治理"}</Badge></td>{!readOnly && <td><button className="text-button" onClick={event => { event.stopPropagation(); onDetail ? onDetail(row) : setDetail(row); }}>查看详情</button></td>}</tr>)}</tbody></table></ScrollablePagedTable>
   </Section>
-  <input ref={fileInput} className="sr-only" aria-label="业务测试集文件" type="file" accept=".csv,.xlsx" disabled={busy} onChange={event => { const chosen = event.target.files?.[0]; event.target.value = ""; if (!chosen) return; setFile(chosen); setPreview(null); setNotice(""); setImportOpen(true); void upload(chosen); }} />
+  {!readOnly && <input ref={fileInput} className="sr-only" aria-label="业务测试集文件" type="file" accept=".csv,.xlsx" disabled={busy} onChange={event => { const chosen = event.target.files?.[0]; event.target.value = ""; if (!chosen) return; setFile(chosen); setPreview(null); setNotice(""); setImportOpen(true); void upload(chosen); }} />}
   <ConfirmDialog open={importOpen} onOpenChange={setImportOpen} title="确认导入业务用例" busy={busy} disabled={!preview?.valid_count || !!error} confirmLabel={preview?.error_count ? `仅导入${preview.valid_count}个有效行` : "确认导入"} onConfirm={() => file && void upload(file,true)}><p>{file?.name}</p>{preview && <><p>识别{preview.recognized_count}题 · 可导入{preview.valid_count}题 · 错误{preview.error_count}题</p><p>导入后进入候选池待治理；处理经验为待核验材料。</p>{preview.error_count > 0 && <div className="business-import-errors"><p>确认后仅导入有效行；以下异常行不会导入，错误记录保留。</p>{preview.rows.filter((row: any) => row.errors.length).map((row: any) => <p key={row.row}>Excel第{row.row}行：{row.errors.join("；")}</p>)}</div>}</>}{error && <p className="error-notice" role="alert">{error}</p>}</ConfirmDialog>
   <Drawer showCloseFooter={false} open={!!detail} onOpenChange={open => !open && setDetail(null)} title="候选池题目详情"><div className="drawer-body"><h3>{detail?.question}</h3><p>{detail?.reference_answer || detail?.expected_behavior || "未记录"}</p></div></Drawer></>;
 }

@@ -120,7 +120,7 @@ it("shows persisted partial slots, failure details, and only the refill action",
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("原文证据");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("unsupported answer anchor");
   await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-table button")].at(-1)!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-table tbody tr[role=button]")].at(-1)!.click());
   expect(document.body.textContent).toContain("unsupported answer anchor");
   await act(async () => root.unmount());
 });

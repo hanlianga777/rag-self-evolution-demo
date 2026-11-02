@@ -30,7 +30,7 @@ const previewPlan = (profile = "mini", corpus = { D: "fixture" }) => ({ plan_id:
 
 it.each([true, false])("I4 manual current Preview is available with legacy Run=%s and preserves saved objects", async legacy => {
   const run = { id: "legacy", status: "completed", profile: { expected_count: 20 }, artifacts: {}, question_ids: [] };
-  const input = { ...data("B1"), dataset: [], generationRuns: legacy ? [run] : [], snapshots: [] };
+  const input = { ...data("B1"), workspace: { ...identity("B1"), current_golden_id: null }, dataset: [], generationRuns: legacy ? [run] : [], snapshots: [] };
   const frozen = JSON.stringify(input), posts: any[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") { posts.push({ url, body: JSON.parse(init.body as string) }); return new Response(JSON.stringify(previewPlan())); } return new Response(JSON.stringify([])); }));
   await render(<GovernancePage data={input} />);
@@ -273,6 +273,9 @@ it("review R3 persisted Golden risks count and filter exact rows without changin
   const run = { id: "G1", status: "completed", question_ids: rows.map(x => x.id), profile: { expected_count: 6 }, artifacts: {} };
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : url.replace("?light=true", "").endsWith("generation-runs") ? [run] : url.endsWith("/dataset") ? rows : []))));
   await render(<GovernancePage data={{ dataset: rows, generationRuns: [run] }} />);
+  expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(6);
+  expect(document.querySelector('.review-filters button[aria-pressed="true"]')?.textContent).toBe("全部 6");
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-filters button")].find(button => button.textContent === "需要人工关注 5")!.click());
   expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(5);
   expect(document.querySelector(".review-table tbody")?.textContent).toContain("P0 确定性阻断");
   expect(document.querySelector(".exception-summary")).toBeNull();

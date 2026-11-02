@@ -32,7 +32,7 @@ it("saves and reloads an isolated Config Draft, removes inactive Alpha and disca
   expect(posts[1].config).toBeNull();
   expect(pipeline.baseline_config).toBeNull();
 });
-it("confirms the actual anomaly count and requests only the anomaly scope", async () => {
+it("keeps the anomaly filter and removes the bulk rerun entry", async () => {
   const base = { stage: "candidate", review_status: "human_review_pending", probe_status: "probe_passed", qc_status: "qc_passed", test_category: "positive", evidence: [] };
   const rows = [{ ...base, id: "pass", question: "Passed" }, { ...base, id: "fail", question: "Failed", qc_status: "qc_failed" }];
   const run = { id: "G1", status: "completed", profile: { expected_count: 2 }, question_ids: rows.map(row => row.id), artifacts: {} };
@@ -40,9 +40,9 @@ it("confirms the actual anomaly count and requests only the anomaly scope", asyn
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") posts.push(url); return new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : url.endsWith('/G1') ? run : [])); }));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run] }} />));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "批量重跑异常项")!.click());
-  expect(document.querySelector('.confirm-dialog')?.textContent).toContain('仅处理 1 道');
+  expect([...document.querySelectorAll<HTMLButtonElement>("button")].some(button => button.textContent === "批量重跑异常项")).toBe(false);
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-filters button")].find(button => button.textContent === "需要人工关注 1")!.click());
+  expect(document.querySelector(".review-table tbody")?.textContent).toContain("Failed");
+  expect(document.querySelector(".review-table tbody")?.textContent).not.toContain("Passed");
   expect(posts).toHaveLength(0);
-  await act(async () => document.querySelector<HTMLButtonElement>('.confirm-dialog button.primary')!.click());
-  expect(posts).toEqual([expect.stringContaining('/G1/rerun-quality?anomalies_only=true')]);
 });

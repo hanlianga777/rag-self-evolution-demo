@@ -2,7 +2,7 @@ import { PageShell } from "../components/PageShell";
 import { useState } from "react";
 import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
 import { ArrowRight } from "lucide-react";
-import { Metric, Section, StageStepper } from "../components/Primitives";
+import { Metric, Section, StageStepper, TechnicalDetails } from "../components/Primitives";
 import { displayText, productionName } from "../display";
 import type { Page } from "../types";
 
@@ -63,10 +63,11 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
       <Metric label="待优化 Bad Case" value={metrics?.bad_case_count == null ? "未知" : `${run.review_summary?.target_count ?? metrics.bad_case_count} 道`} note={metrics ? (run.review_summary?.unstable_count ? `真错题；另有 ${run.review_summary.unstable_count} 道不稳定题` : "交给 Agent 分析") : "等待有效 Baseline"} />
     </div>
     <section className="next-action" aria-labelledby="next-action-title"><div><span className="next-action-label">{currentReleased ? "当前推荐演示 · Baseline 与线上版本" : "当前下一步"}</span><h2 id="next-action-title">{next[0]}</h2><p>{next[1]}</p></div><a className="primary" href={`#${next[2]}`} onClick={() => navigate(next[2])}>{currentReleased ? "开始方案对比" : next[0]}<ArrowRight size={15} aria-hidden="true" /></a></section>
-    {formal && workSummary.generation_run_id && workSummary.generation_run_id !== formal.generation_run_id && <p className="muted overview-work-run">工作 Run：{workSummary.generation_status || "未记录状态"} · {workSummary.total ?? 0} / {workSummary.expected_count ?? "—"}；不替代当前正式 Golden。</p>}
+
     <Section title="全链路阶段"><p className="muted">当前新版本链路</p><StageStepper ariaLabel="全链路阶段" compact steps={stages.map(([label, detail, page], index) => ({ label, detail, href: `#${page}`, state: index === currentStage ? "current" : (page === "knowledge" ? (data.documents?.length > 0) : page === "settings" ? !!production?.config : page === "governance" ? frozen : page === "evaluation" ? run?.status === "completed" : page === "evolution" ? qualified.length > 0 : page === "versions" ? currentReleased : released) ? "completed" : "pending" }))} /></Section>
     {productionLegacy && <section className="legacy-production"><span>线上版本：仍是{productionName(production).replace("初始配置 · ", "")}的初始配置，优化方案通过发布确认后才会替换。</span><a href="#verification" onClick={() => navigate("verification")}>查看线上版本</a></section>}
     </>}
+    <TechnicalDetails><p>冻结题卷：{goldenId || "未知"}</p><p>Baseline 评测：{run?.id || "未知"}</p>{formal && workSummary.generation_run_id && workSummary.generation_run_id !== formal.generation_run_id && <p className="muted overview-work-run">工作 Run：{workSummary.generation_status || "未记录状态"} · {workSummary.total ?? 0} / {workSummary.expected_count ?? "—"}；不替代当前正式 Golden。</p>}</TechnicalDetails>
   </PageShell>;
 }
 

@@ -41,10 +41,13 @@ it('shows a plain failed-gate sentence and hides IDs in collapsed technical deta
 it('shows the current frozen paper and the saved reviewed-import source', async () => {
  const row = { id: 'q1', question: '人工题', slot: 'Q01', test_category: 'positive', stage: 'golden', raw: { generation_run_id: 'run', source: 'reviewed_csv_machine_checks' }, qualification_status: 'human_approved' };
  const run = { id: 'run', status: 'completed', profile: { name: 'mini', expected_count: 1, positive: 1 }, question_ids: ['q1'], artifacts: {}, human_gate: { status: 'ready' } };
- vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.includes('candidates?') ? { rows: [row], candidate_index: [row], total: 1, has_more: false } : [])));
- await mount(<GovernancePage data={{ workspace: { current_golden_id: 'GD-saved' }, dataset: [row], generationRuns: [run], snapshots: [{ id: 'GD-saved', status: 'approved', snapshot: { generation_run_id: 'run', question_ids: ['q1'], questions: [row] } }] }} />);
- expect(document.body.textContent).toContain('当前题卷 GD-saved · 已冻结 · 1 题');
- expect(document.querySelector('.question-provenance')?.textContent).toContain('人工审核导入');
+ vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.endsWith('/questions/q1') ? row : url.includes('candidates?') ? { rows: [row], candidate_index: [row], total: 1, has_more: false } : [])));
+ await mount(<GovernancePage data={{ workspace: { current_golden_id: 'GD-saved' }, dataset: [row], generationRuns: [run], snapshots: [{ id: 'GD-saved', status: 'approved', created_at: '2026-11-01T15:19:40Z', snapshot: { generation_run_id: 'run', question_ids: ['q1'], questions: [row] } }] }} />);
+ expect(document.querySelector('.page-title p')?.textContent).toBe('1 题 · 已冻结 · 11-01');
+ expect(document.querySelector('.golden-technical-details')?.textContent).toContain('GD-saved');
+ expect(document.querySelector('.question-provenance')).toBeNull();
+ await act(async () => document.querySelector<HTMLElement>('.review-table tbody tr[role=button]')!.click());
+ expect(document.querySelector('.frozen-question-details')?.textContent).toContain('人工审核导入');
  expect([...document.querySelectorAll('button')].some(b => b.textContent === '冻结 Golden Dataset')).toBe(false);
  expect(document.querySelector('[aria-label="Golden 治理阶段"]')?.textContent).toContain('覆盖规划');
 });
@@ -88,6 +91,7 @@ it('counts the frozen Golden paper instead of a newer unfinished work Run', asyn
  const snapshot = { id: 'GD-frozen', question_ids: ['a', 'b', 'c', 'd'] };
  vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.includes('/snapshots') ? [{ id: snapshot.id, status: 'approved', snapshot }] : { index: {}, knowledge: { identity: { corpus_snapshot_id: 'current' }, coverage: { final_k: 1, clusters: [] } } })));
  await mount(<KnowledgePage data={{ workspace: { current_golden_id: snapshot.id }, overview: { current_golden_id: snapshot.id, dataset: { approved: 0, total: 2 }, knowledge: {} }, documents: [] }} />);
- expect(document.querySelector('.asset-summary')?.textContent).toContain('当前题卷 · 4 题');
- expect(document.querySelector('.asset-summary')?.textContent).not.toContain('当前题卷 · 0 题');
+ expect(document.querySelector('.asset-summary')?.textContent).toContain('K-means 聚类得到');
+ expect(document.querySelector('.knowledge-page .disclosure')?.textContent).toContain('当前冻结题卷：4 题');
+ expect(document.querySelector('.knowledge-page .disclosure')?.textContent).not.toContain('当前冻结题卷：0 题');
 });

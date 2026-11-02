@@ -6,7 +6,7 @@
 .evaluation-page .baseline-cases-table th:last-child {width:90px;}
 :is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars {display:grid;gap:10px;margin:14px 0;}
 :is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div {display:grid;grid-template-columns:minmax(130px,1fr) 2fr 60px;gap:12px;align-items:center;}
-:is(.evaluation-page,.evolution-page) meter {width:100%;height:14px;accent-color:var(--card-good-ink);}
+:is(.evaluation-page,.evolution-page) meter {width:100%;height:6px;accent-color:var(--status);}
 :is(.evaluation-page,.evolution-page) .workbench-status {display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:var(--card-support);}
 :is(.evolution-page,.workbench-drawer) .candidate-cards > .candidate-card { height:auto; min-height:0; overflow:hidden; margin-bottom:0; }
 :is(.evolution-page,.workbench-drawer) .candidate-card-header { height:84px; flex:none; gap:8px; overflow:auto; }
@@ -125,7 +125,7 @@
 .story-disclosure > summary::marker {content:"";}
 .story-disclosure > summary svg {flex:none;transition:transform .18s ease;}
 .story-disclosure[open] > summary svg {transform:rotate(180deg);}
-.story-disclosure > summary:focus-visible {outline:2px solid #526782;outline-offset:2px;}
+.story-disclosure > summary:focus-visible {outline:2px solid var(--focus);outline-offset:2px;}
 .story-disclosure-content {padding:4px 0 12px;min-width:0;}
 .story-secondary {border-top:1px solid var(--line);margin-top:16px;}
 .strategy-map {display:grid;gap:18px;}
@@ -147,7 +147,7 @@
 .decision-chain li + li {border-left:1px solid var(--line-soft);}
 .decision-chain strong {display:block;font-size:var(--card-title);font-weight:700;color:var(--navy);}
 .decision-chain span {display:block;font-size:var(--card-body);color:var(--muted);margin-top:4px;}
-.story-empty {border:1px solid var(--line-soft);border-radius:var(--card-radius);padding:var(--card-padding);background:#fafbfc;margin:12px 0;}
+.story-empty {border:1px solid var(--line-soft);border-radius:var(--card-radius);padding:var(--card-padding);background:var(--surface);margin:12px 0;}
 .story-empty h3 {margin:0 0 6px;}
 .story-empty p {margin:6px 0;color:var(--muted);}
 .story-empty .header-actions {margin-top:12px;flex-wrap:wrap;}
@@ -173,7 +173,7 @@
 .verification-page .experiment-query {border:1px solid var(--line);border-radius:var(--card-radius);padding:var(--card-padding);background:var(--card-good-bg);}
 .verification-page .experiment-page .experiment-results {grid-template-rows:auto;}
 .verification-page .experiment-page .experiment-answer-card {height:auto;min-height:240px;border-radius:var(--card-radius);box-shadow:none;}
-.verification-page .experiment-answer-card .answer-scroll {overflow:visible;background:white;border:0;padding:0;}
+.verification-page .experiment-answer-card .answer-scroll {overflow:visible;background:var(--surface);border:0;padding:0;}
 .verification-page :is(.answer-text,.chat-message,.empty-chat p) {font-size:var(--card-body);line-height:1.5;}
 .verification-page .monitoring-table table {min-width:760px;table-layout:fixed;}
 .verification-page .monitoring-table th:first-child {width:38%;}
@@ -240,3 +240,10 @@
 .evolution-page .candidate-cards {grid-template-columns:1fr;}
 .evolution-page .candidate-card-header {height:auto;min-height:84px;overflow:visible;}
 @media(max-width:1100px){.product-objective-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.bad-case-overview .product-table :is(th,td){padding:10px 8px;}}
+/* Shared proportion bar: same six-pixel track on every workspace. */
+:is(.evaluation-page,.evolution-page) meter { height:6px; appearance:none; border:0; border-radius:999px; background:var(--line-soft); }
+:is(.evaluation-page,.evolution-page) meter::-webkit-meter-bar { height:6px; border:0; background:var(--line-soft); border-radius:999px; box-shadow:none; }
+:is(.evaluation-page,.evolution-page) meter::-webkit-meter-optimum-value { background:var(--status); border-radius:999px; }
+:is(.evaluation-page,.evolution-page) meter::-moz-meter-bar { background:var(--status); border-radius:999px; }
+:is(.evaluation-page,.evolution-page) meter::-webkit-meter-suboptimum-value,
+:is(.evaluation-page,.evolution-page) meter::-webkit-meter-even-less-good-value { background:var(--card-bad-ink); }
