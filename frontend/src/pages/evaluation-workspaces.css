@@ -314,3 +314,5 @@
 
 .verification-page .suggested-questions button { background:var(--surface); color:var(--status); border-color:var(--line); }
 .case-review { display:flex; flex-wrap:wrap; gap:8px; }
+.case-detail-skeleton { display:grid; gap:16px; }
+.case-detail-skeleton > span { height:96px; border-radius:var(--card-radius); background:var(--line-soft); }

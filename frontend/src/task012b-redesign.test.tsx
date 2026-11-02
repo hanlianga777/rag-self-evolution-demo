@@ -4,7 +4,7 @@ import {createRoot} from 'react-dom/client';
 import {afterEach,expect,it} from 'vitest';
 import {BadCaseOverview,ProductDiagnostics} from './components/ProductDiagnostics';
 import {VerificationPage} from './pages/VerificationPage';
-import {BaselineCaseDetails} from './pages/EvaluationPage';
+import {BaselineCaseDetails,EvaluationPage} from './pages/EvaluationPage';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 let root:ReturnType<typeof createRoot>;
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';});
@@ -33,4 +33,21 @@ it('resolves frozen evidence through saved candidate chunks and marks final evid
 it('opens real monitoring source objects without rendering them as React children',async()=>{
  const {vi}=await import('vitest');vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({events:[{id:'event',question:'历史问答',source:{corpus_fingerprint:{'DOC-001':'saved-hash'}}}]}))));
  try {await mount(<VerificationPage data={{monitoring:{events:[{id:'event',question:'历史问答',source:{corpus_fingerprint:{'DOC-001':'saved-hash'}}}]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('监控');await click('历史问答');expect(document.querySelector('[role="dialog"]')?.textContent).toContain('saved-hash');}finally{vi.unstubAllGlobals();}
+});
+
+it('waits for saved case details instead of reporting missing sources from a light response',async()=>{
+ const {vi}=await import('vitest');let resolveDetails!:(value:Response)=>void;
+ const row={question_id:'Q04',question:'存放设备',passed:false,diagnostic_view:{diagnosis_category:'检索噪声'}};
+ const run={id:'saved',status:'completed',dataset_snapshot:{questions:[{id:'Q04',evidence:[{source_chunk_ids:['c1']}]}]},result:{bad_case_count:1}};
+ const details=new Promise<Response>(resolve=>{resolveDetails=resolve;});
+ vi.stubGlobal('fetch',vi.fn((url:string)=>url.endsWith('/api/evaluations/saved')?details:Promise.resolve(new Response(JSON.stringify(url.includes('preflight')?{can_start:false}:run)))));
+ try {
+  await mount(<EvaluationPage data={{evaluation:run,badCases:[{run_id:'saved',question_id:'Q04',result:row}]}}/>);await click('Bad Case 诊断');
+  await act(async()=>document.querySelector<HTMLTableRowElement>('.diagnosis-list tbody tr')!.click());
+  const dialog=document.querySelector('[role="dialog"]')!;
+  expect(dialog.querySelector('[role="status"]')?.getAttribute('aria-label')).toBe('正在读取保存的案例详情');
+  expect(dialog.textContent).not.toContain('来源位置未记录');
+  await act(async()=>resolveDetails(new Response(JSON.stringify({...run,cases:[{...row,programmatic_metrics:{retrieval_trace:{candidates:[{chunk_id:'c1',document:'KIRA 手册',page_start:85}]}}}]}))));
+  expect(dialog.textContent).toContain('KIRA 手册 · 第85页');expect(dialog.querySelector('[role="status"]')).toBeNull();
+ }finally{vi.unstubAllGlobals();}
 });
