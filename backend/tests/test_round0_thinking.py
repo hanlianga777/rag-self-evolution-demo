@@ -30,6 +30,8 @@ class Response(io.BytesIO):
 
 class ThinkingTests(unittest.TestCase):
     def setUp(self):
+        environment = patch.dict(os.environ, {**_env, 'JUDGE_THINKING':'low'})
+        environment.start(); self.addCleanup(environment.stop)
         self.network = patch('socket.create_connection', side_effect=AssertionError('offline only'))
         self.network.start()
         self.addCleanup(self.network.stop)
@@ -44,7 +46,7 @@ class ThinkingTests(unittest.TestCase):
         self.assertEqual(load_settings({'DEEPSEEK_MODEL':'deepseek-v4-flash'}, empty).model, 'deepseek-flash')
 
     def test_tasks_independent_and_off_has_no_effort(self):
-        for task, effort in {'baseline':'max','judge':'max','agent':'high','query_rewrite':'low','multi_query':'low','hyde':'high','query_decompose':'high'}.items():
+        for task, effort in {'baseline':'max','judge':'low','agent':'high','query_rewrite':'low','multi_query':'low','hyde':'high','query_decompose':'high'}.items():
             with providers.thinking_task(task):
                 payload = self.payload()
                 self.assertEqual(payload['thinking'], {'type':'enabled'})
@@ -54,7 +56,7 @@ class ThinkingTests(unittest.TestCase):
             self.assertEqual(self.payload()['thinking'], {'type':'disabled'})
             self.assertNotIn('reasoning_effort', self.payload())
             with provider_task('judge'):
-                self.assertEqual(self.payload()['reasoning_effort'], 'max')
+                self.assertEqual(self.payload()['reasoning_effort'], 'low')
             with provider_task('agent'):
                 self.assertEqual(self.payload()['reasoning_effort'], 'high')
         with providers.thinking_task('candidate', 'typo'):
@@ -130,7 +132,7 @@ class ThinkingTests(unittest.TestCase):
             self.assertNotIn('PRIVATE THINKING', failure.exception.raw_provider_response)
             self.assertNotIn('PRIVATE THINKING', str(failure.exception))
 
-    def test_baseline_explicit_high_and_judge_max_cannot_inherit_candidate_off(self):
+    def test_baseline_explicit_high_and_judge_low_cannot_inherit_candidate_off(self):
         calls = []
         class Provider:
             settings = SimpleNamespace(configured=True, model='fixture')
@@ -145,7 +147,7 @@ class ThinkingTests(unittest.TestCase):
         with providers.thinking_task('candidate','off'):
             service.answer('question', {'run_target':'baseline','generation_thinking':'high'})
             service.judge('question','golden','answer','positive')
-        self.assertEqual([c['reasoning_effort'] for c in calls], ['high','max'])
+        self.assertEqual([c['reasoning_effort'] for c in calls], ['high','low'])
 
     def test_decompose_strict_bounded_json_and_high_effort(self):
         class Provider:
@@ -176,7 +178,7 @@ class ThinkingTests(unittest.TestCase):
         from app.policy import DEFAULT_PIPELINE_CONFIG
         case = {'programmatic_metrics':{'retrieval_trace':{'candidates':[],'final':[]}}}
         for direction, observation, diff in [('grounded_generation','final_sufficient',{'generation_thinking':'off'}),
-                                             ('query_expansion','recall_missing',{'query_decompose':True}),
+                                             ('query_expansion','recall_missing',{'query_rewrite':True}),
                                              ('context_selection','retrieval_noise',{'top_k':6})]:
             view = {'target_eligible':True,'primary_root_cause':'Generation','trace_observations':[observation], 'context_selection_options':[]}
             proposal = {'target_bad_cases':['Q1'],'root_cause':'Generation','intervention_direction':direction,
@@ -194,7 +196,7 @@ class ThinkingTests(unittest.TestCase):
     def test_agent_new_stage_parameters_allow_advisory_bottleneck_but_reject_illegal_values(self):
         from app.optimization import validate_intervention
         from app.policy import DEFAULT_PIPELINE_CONFIG
-        for stage, diff in [('query_decompose', {'query_decompose':True}), ('context_budget', {'top_k':6})]:
+        for stage, diff in [('hyde', {'hyde':True}), ('context_budget', {'top_k':6})]:
             case = {'programmatic_metrics':{'retrieval_trace':{'candidates':[],'final':[]}, 'stages':[{'stage_name':stage,'duration_ms':100}]}}
             view = {'target_eligible':True,'primary_root_cause':'Performance','trace_observations':['measured_latency'], 'latency':{'bottleneck':{'stage_name':stage}}}
             proposal = {'target_bad_cases':['Q1'],'root_cause':'Performance','intervention_direction':'stage_performance',

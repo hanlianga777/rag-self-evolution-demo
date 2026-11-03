@@ -67,7 +67,7 @@ it('reads Agent progress from the saved budget and keeps the internal Baseline I
 });
 it('names a runtime version from its saved date and hides its internal ID', async () => {
  await mount(<VersionsPage data={{ versions: [{ id: 'runtime-internal-123', created_at: '2026-10-14T03:00:00Z', status: 'active', provenance: 'bootstrap', config: {} }] }} />);
- expect(document.querySelector('.release-history-table')?.textContent).toContain('初始配置 · 10-14');
+ expect(document.querySelector('.release-history-table')?.textContent).toContain('当前线上配置');
  expect(document.querySelector('.release-decision')?.textContent).not.toContain('runtime-internal-123');
  expect(document.querySelector('details')?.textContent).toContain('runtime-internal-123');
 });

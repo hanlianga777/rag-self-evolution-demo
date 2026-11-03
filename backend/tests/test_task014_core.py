@@ -48,3 +48,60 @@ class Task014CoreTests(unittest.TestCase):
         self.assertEqual(row['diagnostic_view']['diagnosis_category'], '生成层问题')
         self.assertEqual(row['diagnostic_view']['subfeature'], '召回成功但答案漏要点')
         self.assertNotIn('随机波动', json.dumps(row, ensure_ascii=False))
+
+    def test_failed_latency_gate_is_in_shared_priorities(self):
+        from app.optimization import optimization_priorities
+        gates = [{'metric': 'latency_p50_seconds', 'actual': 30, 'threshold': 25,
+                  'operator': '<=', 'passed': False}]
+        rows = optimization_priorities([], gates)
+        self.assertEqual(rows[0]['label'], '性能问题')
+        self.assertEqual(rows[0]['priority'], 1)
+        self.assertEqual(rows[0]['count'], 0)  # No fabricated question failures.
+
+    def test_online_config_has_business_name_without_changing_identifier(self):
+        from app.governance import GovernanceStore
+        with tempfile.TemporaryDirectory() as directory:
+            store = GovernanceStore(Path(directory) / 'fixture.db')
+            production = store.active_production()
+            self.assertEqual(production['display_name'], '当前线上配置')
+            self.assertEqual(production['id'], 'baseline-v1')
+
+    def test_normal_failed_questions_are_never_automatically_reviewed(self):
+        from test_baseline_resume import ResumeTests
+        fixture = ResumeTests()
+        fixture.setUp()
+        self.addCleanup(fixture.tearDown)
+        fixture.runtime.fail = None
+        baseline = fixture.runner.execute_baseline(*fixture.runner.start_baseline())
+        self.assertEqual(fixture.runtime.answers, ['Q1', 'Q2', 'Q3', 'Q4'])
+        experiment = fixture.store.create_experiment(baseline['id'], 'completed')
+        fixture.store.save_candidate(experiment, 'R1-A', {**DEFAULT_PIPELINE_CONFIG, 'generation_thinking': 'low'},
+                                     {'candidate_label': 'A', 'observed_evidence': ['Q1']})
+        fixture.runtime.answers.clear(); fixture.runtime.judges.clear()
+        judge = fixture.runtime.judge
+        def fail_judge(*args, **kwargs):
+            return {**judge(*args, **kwargs), 'correctness': 0, 'faithfulness': 0,
+                    'completeness': 0, 'behavior_pass': False}
+        with patch.object(fixture.runtime, 'judge', side_effect=fail_judge), patch.object(
+                fixture.runner, 'review_regression', side_effect=AssertionError('review is forbidden')):
+            candidate = fixture.runner.execute_candidate(*fixture.runner.start_candidate(experiment + '-R1-A'))
+        self.assertEqual(fixture.runtime.answers, ['Q1', 'Q2', 'Q3', 'Q4'])
+        self.assertEqual(fixture.runtime.judges, ['Q1', 'Q2', 'Q3', 'Q4'])
+        self.assertEqual(candidate['result']['bad_case_count'], 4)
+
+    def test_generation_uses_selected_thinking_and_lowest_temperature(self):
+        from types import SimpleNamespace
+        from app.ai_service import AiService
+        from app.providers import thinking_config
+        calls = []
+        class Stub:
+            settings = SimpleNamespace(configured=True, model='fixture')
+            def complete_with_metrics(self, *args, **kwargs):
+                calls.append((thinking_config(), kwargs['temperature']))
+                return {'content': '回答', 'ttft_ms': 1, 'input_tokens': 1, 'output_tokens': 1}
+        service = AiService(object(), object(), Stub(), False)
+        service.retriever = SimpleNamespace(retrieve=lambda *a, **k: [{'chunk_id': 'c', 'content': '来源'}])
+        for effort in ('off', 'low', 'high', 'max'):
+            service.answer('问题', {'run_target': 'sandbox_candidate', 'generation_thinking': effort})
+        self.assertEqual([c[0].get('reasoning_effort', 'off') for c in calls], ['off', 'low', 'high', 'max'])
+        self.assertEqual([c[1] for c in calls], [0, 0, 0, 0])

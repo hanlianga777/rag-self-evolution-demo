@@ -1,5 +1,7 @@
 """Round0 identity boundaries, offline only; no database/provider imports."""
 import unittest
+import os
+from unittest.mock import patch
 from copy import deepcopy
 from types import SimpleNamespace
 from app.evaluation_contract import evaluation_identity, experiment_config_identity
@@ -8,8 +10,10 @@ from app.evaluation import EvaluationRunner
 
 class IdentityTests(unittest.TestCase):
     def setUp(self):
+        environment = patch.dict(os.environ, {'JUDGE_THINKING':'low', 'RAG_DEMO_ENV_PATH':os.devnull})
+        environment.start(); self.addCleanup(environment.stop)
         self.snapshot = {'id':'frozen','question_ids':['q'], 'questions':[{'id':'q','question':'original'}], 'corpus_fingerprint':{'index_artifact_id':'i'}}
-        self.judge = {'model':'deepseek-flash','common_identity_version':'round0-common-1','judge_thinking':{'task':'judge','thinking':{'type':'enabled'},'reasoning_effort':'max'},'generation_model_constraint':'deepseek-flash','generation_prompt_version':'generation-vnext-2'}
+        self.judge = {'model':'deepseek-flash','common_identity_version':'round0-common-1','judge_thinking':{'task':'judge','thinking':{'type':'enabled'},'reasoning_effort':'low'},'generation_model_constraint':'deepseek-flash','generation_prompt_version':'generation-vnext-2'}
 
     def test_common_hash_binds_frozen_content_and_independent_judge(self):
         before = evaluation_identity(self.snapshot, self.judge)
@@ -39,6 +43,10 @@ class IdentityTests(unittest.TestCase):
 
 
 class BaselineConfigTests(unittest.TestCase):
+    def setUp(self):
+        environment = patch.dict(os.environ, {'JUDGE_THINKING':'low', 'RAG_DEMO_ENV_PATH':os.devnull})
+        environment.start(); self.addCleanup(environment.stop)
+
     def runtime_store(self, draft=None):
         from app.ai_service import generation_contract
         items=[{'id':str(i),'question':str(i),'test_category':cat,'negative_subtype':sub,'expected_behavior':'clarify' if cat=='negative' else None} for i,(cat,sub) in enumerate([('positive',None),('ablation',None),('negative','safety_critical'),('negative','prompt_injection')])]
@@ -62,26 +70,26 @@ class BaselineConfigTests(unittest.TestCase):
         runtime=SimpleNamespace(model='deepseek-flash',generation_contract=generation_contract())
         return EvaluationRunner(store,runtime)
 
-    def test_new_baseline_defaults_ignore_historical_production_strategy(self):
+    def test_new_baseline_uses_current_production_strategy(self):
         _,_,config,judge=self.runtime_store().baseline_inputs()
-        self.assertEqual(config['prompt_strategy'],'Grounded')
+        self.assertEqual(config['prompt_strategy'],'Abstention')
         self.assertEqual(config['generation_thinking'],'max')
-        self.assertEqual(judge['judge_thinking']['reasoning_effort'],'max')
+        self.assertEqual(judge['judge_thinking']['reasoning_effort'],'low')
         self.assertEqual(judge['generation_prompt_version'],'generation-vnext-2')
 
     def test_current_draft_is_consumed_but_stale_draft_blocks(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG
-        draft={'identity':{'fixture':'same'},'config':{**DEFAULT_PIPELINE_CONFIG,'query_decompose':True,'retrieval_max_tokens':False}}
+        draft={'identity':{'fixture':'same'},'config':{**DEFAULT_PIPELINE_CONFIG,'query_rewrite':True,'retrieval_max_tokens':4096}}
         _,_,config,_=self.runtime_store(draft).baseline_inputs()
-        self.assertTrue(config['query_decompose']); self.assertIs(config['retrieval_max_tokens'],False)
+        self.assertTrue(config['query_rewrite']); self.assertEqual(config['retrieval_max_tokens'],4096)
         with self.assertRaisesRegex(ValueError,'Draft'):
             self.runtime_store({**draft,'identity':{'fixture':'stale'}}).baseline_inputs()
 
-    def test_baseline_uses_runtime_thinking_instead_of_draft_override(self):
+    def test_baseline_keeps_draft_thinking(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG
         draft={'identity':{'fixture':'same'},'config':{**DEFAULT_PIPELINE_CONFIG,'generation_thinking':'low'}}
         _,_,config,_=self.runtime_store(draft).baseline_inputs()
-        self.assertEqual(config['generation_thinking'],'max')
+        self.assertEqual(config['generation_thinking'],'low')
 
     def test_hybrid_off_draft_does_not_reintroduce_alpha(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG
@@ -107,7 +115,7 @@ class BaselineConfigTests(unittest.TestCase):
         del runner.runtime.generation_contract
         _,_,_,judge=runner.baseline_inputs()
         self.assertEqual(judge.get('common_identity_version'),'round0-common-1')
-        self.assertEqual(judge['judge_thinking']['reasoning_effort'],'max')
+        self.assertEqual(judge['judge_thinking']['reasoning_effort'],'low')
         runner._require_generation_contract(judge)
 
 

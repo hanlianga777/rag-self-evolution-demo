@@ -61,24 +61,27 @@ class ReviewAdmissionTests(unittest.TestCase):
                 'retrieval_facts':{'baseline_review':{'status':status,'conclusion':'真错题' if key=='Q01' else '随机波动','failed_votes':3 if key=='Q01' else 1,'total_votes':3}}})
         return rows
 
-    def test_unstable_has_no_target_and_no_priority_promotion(self):
+    def test_historical_fluctuation_remains_single_pass_target(self):
         rows=self.rows()
         gate={'metric':'positive_correctness','actual':80,'threshold':90,'operator':'>=','passed':False}
         system,prompt=build_agent_prompt(rows,{},[],[gate],list('ABC'))
-        self.assertEqual([r['question_id'] for r in prompt['bad_cases']],['Q01'])
-        self.assertEqual([r['question_id'] for r in prompt['unstable_cases']],['Q02'])
-        self.assertIn('不稳定题：方案需保持判对，不作为必修目标',str(prompt))
+        self.assertEqual([r['question_id'] for r in prompt['bad_cases']],['Q01','Q02'])
+        self.assertNotIn('unstable_cases',prompt)
+        self.assertNotIn('review_pending_cases',prompt)
+        self.assertNotIn('不稳定题',str(prompt))
         summary=baseline_diagnosis_summary(rows[1:],[gate])[0]
-        self.assertIn('复核多数判对',summary['root_cause_note'])
-        self.assertNotEqual(summary['root_causes'][0]['priority'],1)
+        self.assertNotIn('复核', str(summary['root_cause_note']))
+        self.assertEqual(summary['root_causes'][0]['priority'],1)
         self.assertEqual(baseline_diagnosis_summary(rows,[gate])[0]['root_causes'][0]['priority'],1)
 
     def test_prepared_review_admission_is_shared(self):
         import json
         baseline={'dataset_snapshot_json':json.dumps({'questions':[]}), 'result':{'baseline_review':{'cases':{'Q02':{'regression_review':{'status':'fluctuation','failed_votes':1,'total_votes':3}}}}}}
         prepared=agent_inputs.prepare_baseline_rows(baseline,[{'id':'b','question_id':'Q02','result':{'passed':False}}])[0]
-        self.assertFalse(agent_inputs.is_optimization_target(prepared))
-        self.assertEqual(prepared['result']['baseline_review']['status'],'fluctuation')
+        self.assertTrue(agent_inputs.is_optimization_target(prepared))
+        self.assertNotIn('baseline_review',prepared['result'])
+        self.assertEqual(prepared['result']['baseline_review_label'],'单遍判错')
+        self.assertEqual(baseline['result']['baseline_review']['cases']['Q02']['regression_review']['status'],'fluctuation')
 
 class BudgetTests(unittest.TestCase):
     def test_budget_is_available_without_experiment(self):
@@ -98,7 +101,7 @@ class ActualAgentAdmissionTests(unittest.TestCase):
         import test_optimization_contract as fixture
         fixture.OptimizationContractTests.setUp(self)
 
-    def test_random_case_is_preserved_but_never_a_candidate_target(self):
+    def test_historical_random_case_is_preserved_and_is_candidate_target(self):
         import json
         import test_optimization_contract as fixture
         from app.optimization import OptimizationAgent
@@ -109,10 +112,11 @@ class ActualAgentAdmissionTests(unittest.TestCase):
         self.store.finish_evaluation_run('EVAL-test','completed',run['result'])
         provider=fixture.FixedProvider(json.dumps(fixture.drafts()))
         experiment=OptimizationAgent(self.store,provider).generate('EVAL-test')
-        self.assertEqual([r['question_id'] for r in provider.prompt['bad_cases']],['Q1'])
-        self.assertEqual([r['question_id'] for r in provider.prompt['unstable_cases']],['unstable'])
-        self.assertEqual(set(experiment['result']['source_bad_case_ids']),{'BC-EVAL-test-Q1'})
-        self.assertEqual(experiment['result']['processing_progress']['baseline_failed_question_ids'],['Q1'])
+        self.assertEqual(set(r['question_id'] for r in provider.prompt['bad_cases']),{'Q1','unstable'})
+        self.assertNotIn('unstable_cases',provider.prompt)
+        self.assertNotIn('review_pending_cases',provider.prompt)
+        self.assertEqual(set(experiment['result']['source_bad_case_ids']),{'BC-EVAL-test-Q1','BC-EVAL-test-unstable'})
+        self.assertEqual(set(experiment['result']['processing_progress']['baseline_failed_question_ids']),{'Q1','unstable'})
         self.assertEqual(len(self.store.bad_case_rows('EVAL-test')),2)
 
 class CompositeAdmissionTests(unittest.TestCase):
@@ -136,8 +140,9 @@ class CompositeAdmissionTests(unittest.TestCase):
         provider=fixture.CompositeTests.provider(self,generate=False)
         self.store.create_composite(self.experiment,provider,True)
         prompt=json.loads(provider.complete.call_args.args[1])
-        self.assertEqual([r['question_id'] for r in prompt['bad_cases']],['q'])
-        self.assertEqual([r['question_id'] for r in prompt['unstable_cases']],['unstable'])
+        self.assertEqual(set(r['question_id'] for r in prompt['bad_cases']),{'q','unstable'})
+        self.assertNotIn('unstable_cases',prompt)
+        self.assertNotIn('review_pending_cases',prompt)
 
 
 class FollowupSelectionTests(unittest.TestCase):

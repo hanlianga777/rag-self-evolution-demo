@@ -1,3 +1,4 @@
+import { mergeEvaluationProgress, hasEvaluationDetails } from "./evaluationProgress";
 import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { BarChart3, BookOpen, Bot, ClipboardCheck, FlaskConical, LoaderCircle, Menu, MessageCircle, Settings, Sparkles, Waypoints } from "lucide-react";
 import { identityKey, loadAppData } from "./api";
@@ -32,7 +33,7 @@ export default function App() {
       const next = await loadAppData(true, page);
       if (request === requests.current) setPages(previous => {
         const old = Object.values(previous)[0];
-        return { ...(old && identityKey(old.workspace) !== identityKey(next.workspace) ? {} : previous), [page]: next };
+        return { ...(old && identityKey(old.workspace) !== identityKey(next.workspace) ? {} : previous), [page]: previous[page]?.evaluation?.id && previous[page]?.evaluation?.id === next.evaluation?.id && !hasEvaluationDetails(next.evaluation || {}) ? { ...next, evaluation: mergeEvaluationProgress(previous[page]!.evaluation, next.evaluation) } : next };
       });
     } catch (reason) { if (request === requests.current) setError((reason as Error).message); }
   }, [page]);

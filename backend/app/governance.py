@@ -2341,7 +2341,7 @@ class GovernanceStore:
     def production_versions(self):
         with self.connection() as connection:
             rows = connection.execute("SELECT * FROM production_versions ORDER BY created_at DESC").fetchall()
-        return [{**dict(row), "config": _load(row["config_json"], {}), "snapshot": _load(row["snapshot_json"] if "snapshot_json" in row.keys() else "{}", {}), "provenance": "bootstrap" if row["approval_id"] is None and row["evaluation_run_id"] is None else "published"} for row in rows]
+        return [{**dict(row), "display_name": "当前线上配置" if row["status"] == "active" else "历史线上配置", "config": _load(row["config_json"], {}), "snapshot": _load(row["snapshot_json"] if "snapshot_json" in row.keys() else "{}", {}), "provenance": "bootstrap" if row["approval_id"] is None and row["evaluation_run_id"] is None else "published"} for row in rows]
 
     def active_production(self):
         return next((item for item in self.production_versions() if item["status"] == "active"), None)

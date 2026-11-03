@@ -41,7 +41,7 @@ it('pages version history without dropping the active runtime summary',async()=>
  const fetcher=vi.fn(async()=>new Response(JSON.stringify([{id:'older',status:'archived'}])));vi.stubGlobal('fetch',fetcher);
  await render(<VersionsPage data={{versions}}/>);await click('下一页');
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/versions?page=2&limit=50'))).toBe(true);
- expect(document.querySelector('.release-decision')?.textContent).toContain('初始配置');
+ expect(document.querySelector('.release-decision')?.textContent).toContain('当前线上配置');
  expect(document.querySelector('details')?.textContent).toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(1);
 });
 it('pages monitoring events and triggers with bounded read requests',async()=>{
@@ -86,7 +86,7 @@ it('shows every current business failure in Agent including pending diagnoses',a
  await render(<EvolutionPage data={{evaluation,badCases}}/>);
  expect(document.querySelectorAll('tbody tr')).toHaveLength(10);
  expect([...document.querySelectorAll('button')].find(button=>button.textContent?.includes('生成 A / B / C'))?.disabled).toBe(false);
- expect(document.body.textContent).toContain('真错题进入 Agent 优化，不稳定题保持判对');
+ expect(document.body.textContent).toContain('单遍判错题进入 Agent 优化');
 });
 it('connects an unknown exploratory target to its saved candidate without calling it confirmed',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));

@@ -7,9 +7,9 @@ from app.policy import DEFAULT_PIPELINE_CONFIG
 
 def row(q,observation,root='Unknown'):
     directions={'candidate_pool_gap':['candidate_recall'],'context_pool_gap':['context_selection']}
-    return {'id':'case-'+q,'question_id':q,'result':{'question_id':q,'root':root,
+    return {'id':'case-'+q,'question_id':q,'result':{'question_id':q,'root':root,'passed':False,
         'programmatic_metrics':{'retrieval_trace':{'candidates':[],'final':[]}}},
-        'diagnostic_view':{'primary_root_cause':root,'experiment_plan':{'status':'exploratory',
+        'diagnostic_view':{'target_eligible':True,'primary_root_cause':root,'experiment_plan':{'status':'exploratory',
         'observations':[observation],'directions':directions[observation]}}}
 
 
@@ -76,28 +76,33 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(plan['status'],'incomplete')
         self.assertIn('容量',plan['matrix'][0]['gap'])
 
-    def test_mixed_root_map_cannot_reclassify_targets(self):
+    def test_advisory_root_map_does_not_mutate_saved_targets(self):
         from app.optimization import validate_intervention
         rows=[row('one','context_pool_gap'),row('two','context_pool_gap','Ranking')]
         plan=self.plan(rows);proposal=plan['proposals'][0]
         proposal['target_root_causes']['two']='Unknown'
         global ROWS
         ROWS=rows
-        with patch('app.optimization.diagnostic_view',side_effect=view),self.assertRaises(ValueError):
+        from copy import deepcopy
+        before=deepcopy(rows)
+        with patch('app.optimization.diagnostic_view',side_effect=view):
             validate_intervention(proposal,{r['question_id']:r['result'] for r in rows},DEFAULT_PIPELINE_CONFIG)
+        self.assertEqual(rows,before)
+        self.assertEqual(rows[1]['diagnostic_view']['primary_root_cause'],'Ranking')
 
-    def test_shared_parser_preserves_mapping_and_rule_provenance(self):
+    def test_shared_parser_rejects_incomplete_round(self):
         import json
+        from copy import deepcopy
         from app.optimization import prepare_response
         rows=[row('one','context_pool_gap'),row('two','context_pool_gap','Ranking')]
-        p=self.plan(rows)['proposals'][0]
+        proposal=self.plan(rows)['proposals'][0]
+        before=deepcopy(proposal)
         with patch('app.optimization.diagnostic_view',side_effect=view):
-            _,batch=prepare_response(json.dumps({'candidates':[p]}),DEFAULT_PIPELINE_CONFIG,rows,[],0,1,list('ABC'),None,[],{})
-        self.assertEqual(len(batch),1)
-        self.assertEqual(batch[0][2]['target_root_causes'],p['target_root_causes'])
-        self.assertEqual(batch[0][2]['provenance']['origin'],'deterministic_coverage_planner')
+            with self.assertRaisesRegex(ValueError,'A/B/C'):
+                prepare_response(json.dumps({'candidates':[proposal]}),DEFAULT_PIPELINE_CONFIG,rows,[],0,1,list('ABC'),None,[],{})
+        self.assertEqual(proposal,before)
 
-    def test_atomic_append_keeps_source_a_usage_and_trace_immutable(self):
+    def test_incomplete_append_rejected_keeps_candidates_usage_trace_and_backups(self):
         import json,tempfile
         from pathlib import Path
         from app.governance import GovernanceStore,_json
@@ -122,18 +127,22 @@ class CoverageTests(unittest.TestCase):
                 connection.execute("INSERT INTO candidate_configs VALUES ('EXP-R1-A','EXP','generated',?,?,'{}','now')",(_json(a['config']),_json(a['reasoning'])))
                 connection.execute("INSERT INTO agent_traces(experiment_id,status,result_json,created_at) VALUES ('EXP','completed','{}','now')")
                 original=tuple(connection.execute('SELECT * FROM candidate_configs').fetchone())
+                original_trace=tuple(connection.execute('SELECT * FROM agent_traces').fetchone())
             with patch('app.agent_coverage.coverage_inputs',return_value=(experiment,{'id':'BASE'},rows,DEFAULT_PIPELINE_CONFIG,plan)),patch.object(store,'require_current_baseline'),patch.object(store,'current_baseline_identity',return_value={'current_experiment_id':'EXP'}),patch('app.optimization.diagnostic_view',side_effect=view):
                 with self.assertRaisesRegex(ValueError,'身份'):
                     complete_coverage(store,'EXP',expected_binding='stale',backup_path=Path(directory)/'stale.db')
                 self.assertFalse((Path(directory)/'stale.db').exists())
-                result=complete_coverage(store,'EXP',expected_binding='bound',backup_path=backup)
-            self.assertEqual(result['status'],'complete')
-            self.assertFalse(oldest.exists())
+                with self.assertRaisesRegex(ValueError,'A/B/C'):
+                    complete_coverage(store,'EXP',expected_binding='bound',backup_path=backup)
+            self.assertTrue(oldest.exists())
             self.assertTrue(recent.exists())
-            self.assertTrue(backup.exists())
+            self.assertEqual(oldest.read_bytes(),b'old')
+            self.assertEqual(recent.read_bytes(),b'recent')
+            self.assertFalse(backup.exists())
             with store.connection() as connection:
                 self.assertEqual(tuple(connection.execute("SELECT * FROM candidate_configs WHERE id='EXP-R1-A'").fetchone()),original)
-                self.assertEqual(connection.execute('SELECT COUNT(*) FROM candidate_configs').fetchone()[0],2)
-                saved=json.loads(connection.execute("SELECT result_json FROM experiments WHERE id='EXP'").fetchone()[0]);saved.pop('coverage_plan')
+                self.assertEqual(connection.execute('SELECT COUNT(*) FROM candidate_configs').fetchone()[0],1)
+                saved=json.loads(connection.execute("SELECT result_json FROM experiments WHERE id='EXP'").fetchone()[0])
                 self.assertEqual(saved,experiment['result'])
-                self.assertEqual(connection.execute('SELECT COUNT(*) FROM agent_traces').fetchone()[0],2)
+                self.assertEqual(connection.execute('SELECT COUNT(*) FROM agent_traces').fetchone()[0],1)
+                self.assertEqual(tuple(connection.execute('SELECT * FROM agent_traces').fetchone()),original_trace)

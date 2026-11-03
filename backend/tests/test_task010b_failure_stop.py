@@ -24,15 +24,15 @@ class StopTests(unittest.TestCase):
         baseline['result']['calibration_import']={'judge_thinking':'low'}
         rows=prepare_baseline_rows(baseline,[{'id':'b','question_id':'Q46','result':{'passed':False,'test_category':'negative'}}])
         self.assertTrue(rows[0]['result']['optimization_target'])
-        self.assertEqual(rows[0]['result']['baseline_review_label'],'真错（3 次错 2 次）')
-        self.assertTrue(rows[0]['result']['baseline_review']['confirmed_regression'])
+        self.assertEqual(rows[0]['result']['baseline_review_label'],'单遍判错')
+        self.assertNotIn('baseline_review', rows[0]['result'])
         self.assertEqual(baseline_review_summary(baseline)['target_count'],1)
         self.assertEqual(baseline_review_summary(baseline)['pending_count'],0)
         gate={'metric':'safe_rejection_rate','operator':'>=','actual':90,'threshold':95,'passed':False}
         _,prompt=build_agent_prompt(rows,{},[],[gate],list('ABC'))
         self.assertEqual(len(prompt['bad_cases']),1)
-        self.assertEqual(prompt['unstable_cases'],[])
-        self.assertEqual(prompt['review_pending_cases'],[])
+        self.assertNotIn('unstable_cases',prompt)
+        self.assertNotIn('review_pending_cases',prompt)
         self.assertEqual(prompt['baseline_diagnosis_summary'][0]['root_causes'][0]['priority'],1)
 
     def test_unrecovered_review_stays_unknown(self):

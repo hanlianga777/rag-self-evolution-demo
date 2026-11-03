@@ -98,7 +98,7 @@ export function baselineName(run: any): string {
   return `Baseline · ${level} · ${shortDate(run?.created_at)}`;
 }
 export function productionName(version: any): string {
-  return version ? `${version.provenance === "bootstrap" ? "初始配置" : "线上版本"} · ${shortDate(version.created_at)}` : "版本未知";
+  return version ? "当前线上配置" : "版本未知";
 }
 export function questionSource(row: any): string {
   const source = row?.raw?.source;
@@ -115,7 +115,7 @@ export const parameterNames: Record<string, string> = {
 };
 
 export const descriptions: Record<string, string> = {
-  generation_thinking: "Baseline 使用「高」；候选方案 可由 Agent 选择 OFF / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "暂不可用：本机缺少分词器归档，目前只支持关闭；不截断检索内容",
+  generation_thinking: "可选择 OFF / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "不限 / 8192 / 4096；缺少 tokenizer 时按字符数估算 token",
   candidate_k: "初始候选召回数量", top_k: "进入回答上下文的证据数量", min_score: "进入上下文前的最低相关分",
   hybrid_search: "组合向量与关键词检索", hybrid_alpha: "向量检索在混合检索中的权重", rerank: "模型重排、原排序或仅原问题的 BM25 排序",
   query_rewrite: "生成标准化检索问法", multi_query: "生成互补检索问法", hyde: "先写一段假设答案，再拿去检索",

@@ -52,7 +52,7 @@ class Task008bInputTests(unittest.TestCase):
             {'chunk_id': 'absent', 'candidates': '未进入', 'reranked': '未进入', 'final': '未进入'}])
         self.assertEqual((facts['candidate_k'], facts['top_k']), (12, 4))
         self.assertEqual(facts['unmet_required_points'], ['操作前关闭设备'])
-        self.assertEqual(facts['baseline_review'], {'conclusion': '真错题', 'failed_votes': 3, 'total_votes': 3})
+        self.assertEqual(facts['baseline_review'], {'conclusion': '单遍判错'})
         self.assertEqual((baseline, row), before)
         trace = row['result']['programmatic_metrics']['retrieval_trace']
         trace.pop('reranked')
@@ -89,7 +89,7 @@ class Task008bInputTests(unittest.TestCase):
                 OptimizationAgent(store, provider).generate('base')
             sent = provider.prompt['bad_cases'][0]['retrieval_facts']
             self.assertEqual(sent['standard_evidence_positions'][0]['candidates'], 2)
-            self.assertEqual(sent['baseline_review']['conclusion'], '真错题')
+            self.assertEqual(sent['baseline_review']['conclusion'], '单遍判错')
             self.assertNotIn('人工分析秘密', json.dumps(provider.prompt, ensure_ascii=False))
 
     def test_preview_is_readonly_and_rebuilds_the_same_full_prompt(self):
@@ -123,13 +123,13 @@ class Task008bInputTests(unittest.TestCase):
         self.assertEqual(facts['standard_evidence_positions'], '记录缺失')
         self.assertEqual(facts['candidate_k'], '记录缺失')
         self.assertEqual(facts['unmet_required_points'], '记录缺失：未保存完整的要点判分记录')
-        self.assertEqual(facts['baseline_review'], {'conclusion': '尚未复核', 'failed_votes': '尚未复核', 'total_votes': '尚未复核'})
+        self.assertEqual(facts['baseline_review'], {'conclusion': '单遍判错'})
         baseline, row = fixture()
         review = baseline['result']['baseline_review']['cases']['Q1']['regression_review']
         review.update(status='fluctuation', failed_votes=1)
-        self.assertEqual(self.prepare(baseline, row)['retrieval_facts']['baseline_review']['conclusion'], '随机波动')
+        self.assertEqual(self.prepare(baseline, row)['retrieval_facts']['baseline_review']['conclusion'], '单遍判错')
         review['status'] = 'running'
-        self.assertEqual(self.prepare(baseline, row)['retrieval_facts']['baseline_review']['conclusion'], '记录缺失')
+        self.assertEqual(self.prepare(baseline, row)['retrieval_facts']['baseline_review']['conclusion'], '单遍判错')
 
     def test_ready_and_exploratory_plan_but_missing_records_block(self):
         from app.agent_coverage import plan_coverage
@@ -160,7 +160,7 @@ class Task008bInputTests(unittest.TestCase):
         store.bad_case_rows.return_value = [row]
         store.experiment.return_value = {'baseline_run_id': 'base', 'candidates': []}
         _, _, rows, _, _ = coverage_inputs(store, 'exp')
-        self.assertEqual(rows[0]['diagnostic_view']['diagnosis_category'], '检索噪声')
+        self.assertEqual(rows[0]['diagnostic_view']['diagnosis_category'], '检索层问题')
         with patch.object(main, 'store', store):
             direct = main.case_list_row(row)['result']['diagnostic_view']
             with patch('app.agent_inputs.diagnostic_view', side_effect=AssertionError('reuse')):

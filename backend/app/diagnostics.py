@@ -238,7 +238,14 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
         result['subfeature']='模型过度拒绝（已检索到相关切片仍拒答）'
         return conclude('过度拒答', 'Generation', '标准证据已交给模型，但保存的回答或判分显示仍在拒答、表示资料没有或无法确认。', 4)
     tags = case.get('failure_tags') or []
-    if 'Hallucination' in tags or judge.get('hallucination') is True:
+    saved_issues = [issue for issue in judge.get('issues', []) if isinstance(issue, dict)]
+    safety_issue = any(issue.get('safety_violation') is True and issue.get('failure_kind') in
+                       {'omission', 'unsafe_operation', 'forbidden_action'} for issue in saved_issues)
+    fact_issue = any(issue.get('failure_kind') in {'unsupported', 'contradiction', 'scope'}
+                     and issue.get('answer_quotes') for issue in saved_issues)
+    if safety_issue and category in {'positive', 'ablation'}:
+        result['subfeature']='安全提示丢失'
+    elif fact_issue or 'Hallucination' in tags or judge.get('hallucination') is True:
         result['subfeature']='答案出现幻觉'
     elif any('Safety' in tag or 'Unsafe' in tag for tag in tags):
         result['subfeature']='安全提示丢失'
@@ -284,10 +291,17 @@ def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_finger
         position_label = '不适用（负向题不定位标准证据）'
     missing_points=unmet_required_points(case, golden)
     subfeature=analysis.get('subfeature','')
+    phenomena = [{'name': subfeature, 'status': 'observed', 'basis': [analysis['analysis_reason']]}] if subfeature else []
+    from .policy import GATE_DEFINITIONS
+    latency_limit_ms = next(gate['threshold'] * 1000 for gate in GATE_DEFINITIONS
+                            if gate['metric'] == 'latency_p99_seconds')
+    if type(latency['question_ms']) in (int, float) and latency['question_ms'] > latency_limit_ms:
+        phenomena.append({'name': 'Latency 过高', 'status': 'observed',
+                          'basis': [f"已保存单题耗时 {latency['question_ms']} ms，超过现有 P99 门槛对照 {latency_limit_ms} ms；不改变业务判分"]})
     return {**analysis, 'view_version': 'diagnosis-view-v7',
             'display_question_id':display_id,'subfeature':subfeature,'subfeatures':[subfeature] if subfeature else [],
             'retrieval_positions':positions,'retrieval_position_label':position_label,'missing_points':missing_points,
-            'phenomena': [{'name': category, 'status': 'observed', 'basis': [analysis['analysis_reason']]}] if directions else [],
+            'phenomena': phenomena,
             'secondary_root_causes': [], 'is_technical_bad_case': bool(directions),
             'optimization_directions': directions, 'trace_observations': observations,
             'diagnosis_complete': category != '记录缺失',

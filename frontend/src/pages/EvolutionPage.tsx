@@ -110,7 +110,7 @@ export function EvolutionPage({ data }: { data: any }) {
   const runBatch = () => requestPaid('运行本轮 A/B/C Sandbox', `Golden ${evaluation.dataset_snapshot?.question_ids?.length ?? evaluation.cases?.length ?? '未采集'} 题，待运行 ${pending.length} 个候选方案；每题回答+Judge；评测次数 ${budget.used}/${budget.max}，D预留1次。Rewrite/MultiQuery/HyDE启用时有额外模型调用。`, () => void executeBatch());
   const activeOperation = (candidateId: string) => operation.operations.find(item => item.candidateId === candidateId && item.status === "running");
   const processingCases=agentDiagnosisRows(badCases);
-  const targetCases=processingCases.filter(row=>caseData(row).optimization_target!==false);
+  const targetCases=processingCases;
 
   const failedGates = (evaluation.result?.gates?.gates || []).filter((gate: any) => gate.status === "FAIL");
   const gateDetails = evaluation.gate_details || [];
@@ -192,10 +192,10 @@ export function EvolutionPage({ data }: { data: any }) {
     {experiment?.result?.rejected_candidates?.length>0 && <><p className="workbench-status">本轮保留 {currentRound.length} 个合法候选，拒绝 {experiment.result.rejected_candidates.length} 个候选；拒绝项不会进入 Sandbox。</p></>}
     {experiment?.result?.generation_status==='insufficient_evidence' && <p className="workbench-status" role="status">候选依据不足：{experiment.result.insufficient_evidence || '暂无足够依据生成合格优化假设；待核实原始证据，不补造A/B/C。'}</p>}
     {data.workspace?.baseline_unavailable_reason && <p className="error-notice">{data.workspace.baseline_unavailable_reason}</p>}
-    <p className="agent-identity">{evaluation.id ? <>当前 Baseline：{baselineName(evaluation)} · {evaluation.result?.gates?.passed === true ? `门槛通过（${evaluation.result.gates.passed_count}/${evaluation.result.gates.total}）` : `${failedGates.length} 项门槛待改善`} · Bad Case {processingCases.length} 题 · 真错题进入 Agent 优化，不稳定题保持判对</> : "当前有效 Baseline 尚未就绪。"}</p>
+    <p className="agent-identity">{evaluation.id ? <>当前 Baseline：{baselineName(evaluation)} · {evaluation.result?.gates?.passed === true ? `门槛通过（${evaluation.result.gates.passed_count}/${evaluation.result.gates.total}）` : `${failedGates.length} 项门槛待改善`} · Bad Case {processingCases.length} 题 · 单遍判错题进入 Agent 优化</> : "当前有效 Baseline 尚未就绪。"}</p>
 
     {experiment?.result?.processing_progress && <p className="workbench-status">已验证配置 {experiment.result.processing_progress.verified_configuration_id || "尚无"} · 修复 {experiment.result.processing_progress.fixed_question_ids.length} 题 · 待处理 {experiment.result.processing_progress.remaining_question_ids.length} 题。不同候选的修复不相加，组合须重新完整评测。</p>}
-    {stage === "bad" && <Section title="本轮 Bad Case"><p>本轮 {processingCases.length} 道错题，{evaluation.product_diagnostics?.review_summary?.target_count ?? targetCases.length} 道作为优化目标；随机波动的题单独保留。</p><BadCaseOverview rows={processingCases} categories={evaluation.diagnostic_categories} priorities={evaluation.product_diagnostics?.optimization_priorities} latencyGates={evaluation.result?.gates?.gates} onSelect={setSelectedBadCase} /></Section>}
+    {stage === "bad" && <Section title="本轮 Bad Case"><p>本轮 {processingCases.length} 道错题，{evaluation.product_diagnostics?.review_summary?.target_count ?? targetCases.length} 道作为优化目标；以单遍结果为准。</p><BadCaseOverview rows={processingCases} categories={evaluation.diagnostic_categories} priorities={evaluation.product_diagnostics?.optimization_priorities} latencyGates={evaluation.result?.gates?.gates} onSelect={setSelectedBadCase} /></Section>}
 
     {stage === "agent" && <>
       <ConclusionCard title={currentRound.length ? `${coverage?.covered_count ?? targetCases.filter((row:any)=>currentRound.some(c=>targetRows(c,[row]).length)).length}/${targetCases.length} 道有实际方案，${currentRound.length} 个候选` : `${targetCases.length} 道真错题，等待生成优化假设`} tone="neutral">同一问题可以对应不同干预假设。下方从实际问题证据连接到候选方案的参数变化；预期收益须由 Sandbox 验证，不能代替结果。</ConclusionCard>

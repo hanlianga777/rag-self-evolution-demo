@@ -154,7 +154,7 @@ class StorageTests(unittest.TestCase):
         full=self.store.evaluation_run(run)
         light=self.store.evaluation_run(run,light=True)
         self.assertEqual(baseline_review_summary(light),baseline_review_summary(full))
-        self.assertEqual(baseline_review_summary(light)['target_count'],1)
+        self.assertEqual(baseline_review_summary(light)['target_count'],2)
         self.assertNotIn('runs',light['result']['baseline_review']['cases']['Q1']['regression_review'])
 
     def test_judge_replay_start_checks_the_complete_logical_source_digest(self):

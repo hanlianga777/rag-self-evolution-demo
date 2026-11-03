@@ -3,7 +3,7 @@ import { displayText, parameterNames, descriptions } from "../display";
 import { Drawer } from "./Dialog";
 
 export { parameterNames, descriptions } from "../display";
-export const draftDefaults: Record<string, unknown> = { generation_thinking: "high", query_decompose: false, retrieval_max_tokens: false };
+export const draftDefaults: Record<string, unknown> = { generation_thinking: "high", retrieval_max_tokens: false };
 
 export function thinkingLabel(value: unknown): string {
   if (value && typeof value === "object") {

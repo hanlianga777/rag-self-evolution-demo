@@ -99,3 +99,12 @@ it("keeps a saved lower Thinking draft editable",async()=>{
  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe('Low');
  expect(document.body.textContent).not.toContain('已放弃旧草稿');
 });
+it('keeps the fixed full Baseline when active-task lookup returns a different completed historical run', async () => {
+ const run={id:'FIXED-HIGH',status:'completed',config:{generation_thinking:'high'},result:{bad_case_count:8,total:50,completed:50},cases:[],product_diagnostics:{thinking_comparison:{note:'固定Baseline完整档位对照'},objective_metrics:{recall_at_k:81}}};
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('active_task')?{id:'HISTORICAL-MAX',status:'completed',config:{generation_thinking:'max'},result:{bad_case_count:6},product_diagnostics:{}}:url.includes('preflight')?{}:{id:'HISTORICAL-MAX',status:'completed',cases:[],config:{generation_thinking:'max'},result:{bad_case_count:6},product_diagnostics:{}}))));
+ await render(<EvaluationPage data={{evaluation:run}}/>);
+ expect(document.querySelector('.baseline-run-summary')?.textContent).toContain('High');
+ expect(document.body.textContent).toContain('固定Baseline完整档位对照');
+ await click('Bad Case 诊断');
+ expect(document.body.textContent).toContain('8 道错题');
+});

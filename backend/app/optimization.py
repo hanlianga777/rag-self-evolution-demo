@@ -180,6 +180,13 @@ def optimization_priorities(bad_cases, gates):
     priorities = []
     for definition in DIAGNOSTIC_CATEGORIES:
         label = definition['label']
+        if label == '性能问题':
+            failed = [g for g in gates or [] if str(g.get('metric', '')).startswith('latency_')
+                      and (g.get('passed') is False or g.get('status') == 'FAIL')]
+            if failed:
+                priorities.append({**definition, 'count': counts[label], 'priority': 1,
+                                   'priority_note': '回答耗时门槛未过；整轮性能问题不增加业务错题数'})
+                continue
         if not counts[label]:continue
         causes = [cause for item in summary if item['status']=='未通过' for cause in item['root_causes'] if cause['diagnosis_category']==label and cause['priority']==1]
         priorities.append({**definition, 'count':counts[label], 'priority':1 if causes else definition['priority'] or 3,

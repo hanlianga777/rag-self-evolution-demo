@@ -7,21 +7,21 @@ import { Drawer } from "../components/Dialog";
 import { draftDefaults, formatValue, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
 
 const settingsGroups: Record<string, string[]> = {
-  "查询理解": ["query_rewrite", "multi_query", "hyde", "query_decompose"],
-  "检索召回": ["candidate_k", "hybrid_search", "hybrid_alpha", "alias_mapping", "metadata_filter"],
+  "查询理解": ["query_rewrite", "multi_query", "hyde"],
+  "检索召回": ["candidate_k", "hybrid_search", "hybrid_alpha"],
   "筛选排序": ["rerank", "top_k", "min_score", "retrieval_max_tokens"],
   "回答生成": ["prompt_strategy", "generation_thinking"],
 };
 const parameterNotes: Record<string, string> = {
-  query_rewrite: "把原问题改写为更适合检索的问法。", multi_query: "用多个互补问法查找资料。", hyde: "用假设答案辅助查找，假设文本不作为证据。", query_decompose: "把多个独立意图拆开查找。",
-  candidate_k: "决定进入筛选排序的候选资料数量。", hybrid_search: "结合语义相似度和关键词查找资料。", hybrid_alpha: "分配语义与关键词检索的权重。", alias_mapping: "把已审核的设备别名映射到标准名称。", metadata_filter: "按识别到的型号等条件筛选资料。",
-  rerank: "调整候选资料进入回答前的排序。", top_k: "决定最终送给回答模型的资料段数。", min_score: "过滤相关分低于门槛的资料。", retrieval_max_tokens: "限制送给回答模型的上下文长度。",
+  query_rewrite: "把原问题改写为更适合检索的问法。", multi_query: "用多个互补问法查找资料。", hyde: "用假设答案辅助查找，假设文本不作为证据。",
+  candidate_k: "决定进入筛选排序的候选资料数量。", hybrid_search: "结合语义相似度和关键词查找资料。", hybrid_alpha: "分配语义与关键词检索的权重。",
+  rerank: "调整候选资料进入回答前的排序。", top_k: "决定最终送给回答模型的资料段数。", min_score: "过滤相关分低于门槛的资料。", retrieval_max_tokens: "限制送给回答模型的上下文长度；没有 tokenizer 时按字符数估算 token。",
   prompt_strategy: "决定怎样使用证据并处理缺失条件。", generation_thinking: "控制回答模型的思考投入。",
 };
 
 export function SettingsPage({ data }: { data: any }) {
   const identity = pipelineIdentity(data);
-  const startDraft = (value: any) => { const start = value?.draft_stale ? value.baseline_defaults || value.baseline_config || value.config : value?.config_draft?.config || value?.baseline_defaults || value?.baseline_config || value?.config; const merged = { ...draftDefaults, ...start, generation_thinking: value?.baseline_config?.generation_thinking || value?.baseline_defaults?.generation_thinking || "high" }; return Object.fromEntries(Object.keys(value?.search_space || {}).filter(key => merged[key] !== undefined).map(key => [key, merged[key]])); };
+  const startDraft = (value: any) => { const start = value?.draft_stale ? value.baseline_defaults || value.baseline_config || value.config : value?.config_draft?.config || value?.baseline_defaults || value?.baseline_config || value?.config; const merged = { ...draftDefaults, ...start }; return Object.fromEntries(Object.keys(value?.search_space || {}).filter(key => merged[key] !== undefined).map(key => [key, merged[key]])); };
   const [record, setRecord] = useState<any>(() => ({ identity, value: pipelineCached(identity) }));
   const pipeline = record.identity === identity ? record.value : pipelineCached(identity);
   const [draft, setDraft] = useState<Record<string, any>>(() => startDraft(pipeline));
@@ -29,7 +29,6 @@ export function SettingsPage({ data }: { data: any }) {
   useEffect(() => { let cancelled = false; const cached = pipelineCached(identity); setRecord({ identity, value: cached }); setDraft(startDraft(cached)); void pipelineFetch(identity).then(value => { if (!cancelled && (!cached || cached.data_version !== value.data_version)) { setRecord({ identity, value }); setDraft(startDraft(value)); } }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [identity]);
   const baseline = pipeline?.baseline_config || {};
   const base = pipeline?.baseline_config || { ...draftDefaults, ...(pipeline?.baseline_defaults || pipeline?.config) };
-  const invalidSavedThinking = pipeline?.config_draft?.config?.generation_thinking != null && pipeline.config_draft.config.generation_thinking !== (base.generation_thinking || "high");
   const contract = pipeline?.search_space || {};
   const changed = Object.keys(contract).filter(key => draft[key] !== base[key]);
   const index = pipeline?.index || {}, knowledge = index.knowledge_config || {};
@@ -56,21 +55,18 @@ export function SettingsPage({ data }: { data: any }) {
     <Section title="Agent 可选参数" action={<Badge tone="accent">{Object.keys(contract).length} 项可调参数</Badge>}>
       {!pipeline?.baseline_config && <p className="muted">新 Baseline 待评测｜当前配置草稿 以已确认的 Baseline 默认配置作为起点</p>}
       {pipeline?.draft_stale && <p className="error-notice">已保存草稿的基准已变化，请重新核对并保存。</p>}
-      {invalidSavedThinking && <p className="error-notice">已放弃旧草稿中的回答思考档位修改；当前基线使用「{formatValue(base.generation_thinking)}」。</p>}
       <div className="search-space-groups">{Object.entries(settingsGroups).map(([group, keys]) => <section key={group}><h3>{group}</h3><div className="search-space-controls">{keys.filter(key => contract[key]).map(key => {
-        const allowed: any[] = key === "retrieval_max_tokens" ? [false] : contract[key].allowed;
+        const allowed: any[] = contract[key].allowed;
         const disabled = busy || key === "hybrid_alpha" && !draft.hybrid_search;
         const dependency = key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "仅开启混合检索时生效" : "";
-        const locked = key === "generation_thinking";
         const note = parameterNotes[key];
-        const lockReason = "保存草稿接口要求回答思考档位与本机设置一致；如需更改，请调整本机 Baseline 设置。";
-        return <div className="search-space-control" title={locked ? lockReason : dependency || note} key={key} data-parameter={key}>
-          <div><strong>{parameterNames[key]}</strong>{locked ? <Badge>锁定</Badge> : key === "retrieval_max_tokens" ? <Badge tone="warning">暂不可用</Badge> : null}</div>
-          <div className="parameter-options" role="group" aria-label={parameterNames[key]}>{allowed.map(value => <button key={JSON.stringify(value)} className={`secondary${draft[key] === value ? " active" : ""}${pipeline?.baseline_config && baseline[key] === value ? " baseline-option" : ""}`} title={pipeline?.baseline_config && baseline[key] === value ? "Baseline 使用此值" : undefined} aria-pressed={draft[key] === value} disabled={disabled || locked && value !== (base.generation_thinking || "high") || key === "top_k" && value > draft.candidate_k} onClick={() => change(key, value)}>{key === "generation_thinking" && value === "off" ? "Off" : formatValue(value)}</button>)}</div>
+        return <div className="search-space-control" title={dependency || note} key={key} data-parameter={key}>
+          <div><strong>{parameterNames[key]}</strong></div>
+          <div className="parameter-options" role="group" aria-label={parameterNames[key]}>{allowed.map(value => <button key={JSON.stringify(value)} className={`secondary${draft[key] === value ? " active" : ""}${pipeline?.baseline_config && baseline[key] === value ? " baseline-option" : ""}`} title={pipeline?.baseline_config && baseline[key] === value ? "Baseline 使用此值" : undefined} aria-pressed={draft[key] === value} disabled={disabled || key === "top_k" && value > draft.candidate_k} onClick={() => change(key, value)}>{key === "retrieval_max_tokens" && value === false ? "不限" : key === "generation_thinking" && value === "off" ? "Off" : formatValue(value)}</button>)}</div>
           <small className="parameter-description" title={note}>{note}</small>
         </div>;
       })}</div></section>)}</div>
-      {(changed.length > 0 || invalidSavedThinking) && <div className="pipeline-draft-actions"><span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale && !invalidSavedThinking ? " · 配置草稿已保存" : ""}</span><button className="secondary" disabled={busy || !changed.length && !pipeline?.config_draft} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length && !invalidSavedThinking} onClick={() => void save()}>保存草稿</button></div>}
+      {(changed.length > 0) && <div className="pipeline-draft-actions"><span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · 配置草稿已保存" : ""}</span><button className="secondary" disabled={busy || !changed.length && !pipeline?.config_draft} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length} onClick={() => void save()}>保存草稿</button></div>}
       {(changed.length > 0 || pipeline?.config_draft) && <p className="muted">配置草稿尚未生效；需显式运行新的 Baseline 才会成为评测基线。候选方案的优化使用独立实验配置。</p>}
       {pipeline?.baseline_config && (changed.length > 0 || pipeline?.config_draft) && <div className="pipeline-draft-diff"><h3>Baseline → 草稿参数变化</h3><dl className="baseline-strategy">{changed.map(key => <div key={key}><dt>{parameterNames[key] || key}</dt><dd>{formatValue(baseline[key])} → {formatValue(draft[key])}</dd></div>)}</dl>{!changed.length && <p className="muted">草稿与 冻结 Baseline 参数一致。</p>}</div>}
     </Section>
