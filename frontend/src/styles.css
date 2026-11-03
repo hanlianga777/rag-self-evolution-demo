@@ -998,7 +998,7 @@ td, th { font-variant-numeric: tabular-nums; }
 .cluster-card span { color: var(--card-good-ink); }
 .cluster-card strong { color: var(--card-good-ink); }
 .cluster-card small { color: var(--card-good-ink); }
-.knowledge-page .table-scroll { max-height: 360px; overflow: auto; }
+.knowledge-page .table-scroll { max-height:none; overflow:visible; }
 .pending-note { color: var(--card-good-ink); }
 .child-examples, .slot-list { display: flex; gap: 8px; flex-wrap: wrap; }
 .parent-context { background: var(--card-good-bg); border: 1px solid var(--card-good-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; overflow-wrap: anywhere; }
@@ -1073,7 +1073,7 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .drawer .candidate-card, .drawer .chunk-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: var(--card-padding); }
 .page-content .parent-context { background: var(--surface); border-color: var(--line); }
 .page-content .cluster-scroll { height: 280px; overflow-y: auto; }
-.knowledge-page .page-content > .panel:last-child .table-scroll { height: 280px; overflow-y: auto; }
+.knowledge-page .page-content > .panel:last-child .table-scroll { height:auto; overflow:visible; }
 .knowledge-diagram { margin: 12px 0; padding: 12px; background: var(--diagram-paper); border: 1px solid var(--diagram-rule); border-radius: 8px; overflow-x: auto; }
 .knowledge-diagram figcaption { color: var(--diagram-ink); font-size: 16px; font-weight: 600; margin-bottom: 8px; }
 .knowledge-diagram svg { display: block; width: 100%; }
@@ -1359,6 +1359,7 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .settings-page .parameter-options button:first-child { border-radius:8px 0 0 8px; }
 .settings-page .parameter-options button:last-child { border-radius:0 8px 8px 0; }
 .settings-page .parameter-options button:only-child { border-radius:8px; }
+.settings-page .search-space-control[data-parameter="rerank"] .parameter-options button { white-space:nowrap !important; }
 .baseline-option::after { content:""; position:absolute; bottom:3px; left:calc(50% - 2px); width:4px; height:4px; border-radius:50%; background:var(--status); }
 .settings-page .parameter-description { display:block; height:18px; min-height:18px; line-height:18px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12px; }
 .settings-page .pipeline-draft-actions { margin-top:24px; }

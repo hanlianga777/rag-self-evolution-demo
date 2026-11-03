@@ -11,7 +11,7 @@ import { useOperation } from "../operation";
 
 function candidateName(candidate: any, candidateId?: string) {
   const label = candidate?.reasoning?.candidate_label || candidateId?.match(/-([ABCD])$/)?.[1];
-  return label === "D" ? "组合方案 D" : label ? `候选方案 ${label}` : `候选方案 ${candidateId || candidate?.id || "身份未记录"}`;
+  return label === "D" ? "组合方案 D" : label ? `候选方案 ${label}` : "候选方案（标签未记录）";
 }
 
 const versionTime = (value?: string) => value && !Number.isNaN(Date.parse(value)) ? new Intl.DateTimeFormat("zh-CN", { timeZone:"Asia/Shanghai",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false }).format(new Date(value)) : "未记录";

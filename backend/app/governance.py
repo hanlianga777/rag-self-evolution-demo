@@ -3342,7 +3342,7 @@ class GovernanceStore:
         with self.connection() as connection:
             items = [{**dict(candidate), "config": _load(candidate["config_json"], {}), "reasoning": _load(candidate["reasoning_json"], {}), "result": self._candidate_result(connection,candidate,light=light)} for candidate in candidates]
         numbers = sorted({item.get("reasoning", {}).get("round") for item in items if isinstance(item.get("reasoning", {}).get("round"), int)})
-        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**item, "release_state": self.release_state(item)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": MAX_EVALS, 'reserved_for_d': 1}}
+        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": MAX_EVALS, 'reserved_for_d': 1}}
 
     def latest_experiment(self):
         with self.connection() as connection:

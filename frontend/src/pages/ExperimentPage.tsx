@@ -59,7 +59,7 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
   if (blocked) return <div className="page experiment-page"><EmptyState title={!baselineId || baselineId!==baseline.id?"还没有可用于对比的有效 Baseline":"还没有可对比的已发布方案"} action={<a className="secondary" href={!baselineId || baselineId!==baseline.id?"#evaluation":"#versions"}>{!baselineId || baselineId!==baseline.id?"查看 Baseline":"查看发布条件"}</a>}>发布新方案后，可以用同一个问题对比优化前后的回答。</EmptyState></div>;
   return <div className="page experiment-page"><ConclusionCard title={left.status === "completed" && right.status === "completed" ? "同题实际回答已保存，可核对内容与引用差异" : "对比当前有效 Baseline 与已发布 线上版本"} tone="neutral">{left.status === "completed" && right.status === "completed" ? "两侧均为本次主动运行返回的真实回答；未调用 Judge，不产生新评分或资格。" : "选择或输入同一道问题，再主动运行两套已保存配置。参数差异可展开核对，回答未运行时不预判改善。"}</ConclusionCard>
     <section className="experiment-query compare-toolbar">
-      <CustomSelect ariaLabel="选择真实 Bad Case" value={selectedCase} onChange={id => { clearResults(); setSelectedCase(id); const item = badCases.find((row: any) => row.id === id); if (item) setQuestion(item.result?.question || ""); }} placeholder="Baseline Bad Case" options={[{ value: "", label: "Baseline Bad Case" }, ...badCases.map((item: any) => ({ value: item.id, label: item.result?.question || item.id }))]} />
+      <CustomSelect ariaLabel="选择真实 Bad Case" value={selectedCase} onChange={id => { clearResults(); setSelectedCase(id); const item = badCases.find((row: any) => row.id === id); if (item) setQuestion(item.result?.question || ""); }} placeholder="Baseline Bad Case" options={[{ value: "", label: "Baseline Bad Case" }, ...badCases.map((item: any) => ({ value: item.id, label: item.result?.question || "题目内容未记录" }))]} />
       <textarea aria-label="试验问题" placeholder="输入或编辑同一道问题…" maxLength={1000} value={question} onChange={event => { clearResults(); setQuestion(event.target.value); }} />
       <div className="query-action"><button className="primary" disabled={busy || !question.trim() || !!blocked} onClick={() => void ask()}><Send size={15} />{busy ? "正在回答…" : "运行实时对比"}</button></div>
     </section>
@@ -75,11 +75,10 @@ function AnswerCard({ scheme, run, onOpenCitation }: { scheme: Scheme; run: Run;
   const elapsed = run.startedAt == null ? "" : `${((run.durationMs ?? Math.max(0, now - run.startedAt)) / 1000).toFixed(1)}s`;
   const result: any = run.result;
   return <article className={`experiment-answer-card ${scheme.id === "baseline" ? "compare-baseline" : "compare-production"}`}><div className="answer-card-header"><Badge tone="neutral">{run.label || scheme.label}</Badge><span className={run.status || "waiting"}>{run.status === "running" ? `等待 · ${elapsed}` : run.status === "completed" ? "已完成" : run.status === "failed" ? "失败" : "等待运行"}</span></div>
-    <p className="muted">配置身份：{run.sourceId || scheme.version || "未记录"}</p>
     <div className="answer-scroll">{run.error ? <p className="error-notice" role="alert">回答失败：{run.error}</p> : result ? <MarkdownAnswer text={result.answer} final={result.retrieval_trace?.final ?? result.evidence ?? []} /> : <p className="muted">点击运行后显示实际回答。</p>}</div>
     <div className="answer-evidence">{result?.evidence?.length ? result.evidence.map((item: Citation) => <button className="document-link" key={item.chunk_id} onClick={() => onOpenCitation(item)}>{item.document} · P.{item.page_start}</button>) : result ? <span className="muted">本次回答未返回可定位 Evidence。</span> : null}</div>
     <footer className="answer-metrics-footer"><ExecutionMetrics compact metrics={{latency_ms:result?.latency_ms}} /></footer>
-    <div className="answer-audit"><StoryDisclosure label={<>查看本次运行审计</>}>{result ? <><p className="muted">实时预览 · {run.sourceId} · {run.question}</p><ExecutionMetrics metrics={result} /><ParameterDiff after={result.config || scheme.config || {}} /></> : <p className="muted">运行完成后显示已采集的耗时与 Token。</p>}</StoryDisclosure></div>
+    <div className="answer-audit"><StoryDisclosure label={<>查看本次运行审计</>}><p className="muted">配置身份：{run.sourceId || scheme.version || "未记录"}</p>{result ? <><p className="muted">实时预览 · {run.sourceId} · {run.question}</p><ExecutionMetrics metrics={result} /><ParameterDiff after={result.config || scheme.config || {}} /></> : <p className="muted">运行完成后显示已采集的耗时与 Token。</p>}</StoryDisclosure></div>
   </article>;
 }
 

@@ -91,12 +91,13 @@ class StorageTests(unittest.TestCase):
             c.execute("INSERT INTO experiments VALUES ('exp','baseline','completed','{}','now')")
             c.execute("INSERT INTO candidate_configs VALUES ('candidate','exp','generated','{}','{}','{}','now')")
         checkpoints={'Q1':{'answer':'证据'*100000}}
-        self.store.finish_candidate('candidate','failed',{'checkpoints':checkpoints,'evaluation_complete':False})
+        self.store.finish_candidate('candidate','failed',{'checkpoints':checkpoints,'evaluation_complete':False,'error':'database is locked'})
         with self.store.connection() as c:
             raw=c.execute("SELECT result_json FROM candidate_configs WHERE id='candidate'").fetchone()[0]
         self.assertLess(len(raw),1000)
         self.assertEqual(self.store.candidate('candidate')['result']['checkpoints'],checkpoints)
         self.assertNotIn('checkpoints',self.store.experiment('exp',light=True)['candidates'][0]['result'])
+        self.assertTrue(self.store.experiment('exp',light=True)['candidates'][0]['product_interruption'])
 
     def test_storage_migration_preserves_review_and_checkpoint_values(self):
         run,items,config=self.runner.start_baseline()

@@ -18,6 +18,9 @@
 :is(.evolution-page,.workbench-drawer) .candidate-field-content p:last-child { margin-bottom:0; }
 :is(.evolution-page,.workbench-drawer) .candidate-card-footer { display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; height:84px; flex:none; border-top:1px solid var(--line-soft); padding-top:8px; }
 :is(.evolution-page,.workbench-drawer) .candidate-card-footer .candidate-card-action { margin:0; padding:0; }
+.evolution-page .candidate-card-header { height:auto; min-height:84px; overflow:visible; }
+.evolution-page .candidate-card-body { grid-template-rows:none; }
+.evolution-page .candidate-field-content { overflow:visible; }
 .workbench-drawer .candidate-cards { grid-template-columns:1fr; }
 .evolution-page .experiment-plan {align-items:stretch;}
 .evolution-page .experiment-plan article {display:flex;flex-direction:column;min-width:0;}

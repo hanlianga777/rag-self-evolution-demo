@@ -14,9 +14,9 @@ it('keeps all candidate fields in the same order, including empty and incomplete
  const cards=[...document.querySelectorAll('.candidate-cards > .candidate-card')];expect(cards).toHaveLength(4);
  for(const card of cards){expect([...card.querySelectorAll('.candidate-story-block > .field-label')].map(e=>e.textContent)).toEqual(["优化目标", "方案内容", "历史策略", "参数变化", "预期收益", "潜在风险", "实验结果"]);expect(card.querySelectorAll('.candidate-field-content')).toHaveLength(7);expect(card.querySelector('.candidate-card-footer')).not.toBeNull();}
  expect(cards[1].querySelector('.candidate-story-block:last-child')?.textContent).toContain('已完成 1/50');
- expect(document.body.textContent).toContain('历史英文原文');expect(document.body.textContent).toContain('按原问题排序');expect(document.body.textContent).not.toContain('{"rerank"');expect(JSON.stringify(data)).toBe(saved);
+ expect(document.body.textContent).toContain('历史英文原文');expect(document.body.textContent).toContain('原问题排序');expect(document.body.textContent).not.toContain('{"rerank"');expect(JSON.stringify(data)).toBe(saved);
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
 });
 it('formats internal values without changing their meaning',()=>{
- expect(formatValue('query_only')).toBe('按原问题排序');expect(formatValue(true)).toBe('开启');expect(formatValue(false)).toBe('关闭');expect(formatValue(0)).toBe('0');expect(formatValue(null)).toBe('未采集');
+ expect(formatValue('query_only')).toBe('原问题排序');expect(formatValue(true)).toBe('开启');expect(formatValue(false)).toBe('关闭');expect(formatValue(0)).toBe('0');expect(formatValue(null)).toBe('未采集');
 });

@@ -1,0 +1,64 @@
+// @vitest-environment jsdom
+import {act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {afterEach,expect,it,vi} from 'vitest';
+import {EvolutionPage} from './pages/EvolutionPage';
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
+let root:ReturnType<typeof createRoot>;
+afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
+const candidate=(label:string,status:string,result:any={},extra:any={})=>({id:'candidate-'+label,status,config:{top_k:4},reasoning:{round:1,candidate_label:label,hypothesis:'验证保存的假设'},result,...extra});
+const experiment=(candidates:any[],extra:any={})=>({id:'experiment-013c',baseline_run_id:'baseline',candidates,evaluation_budget:{used:0,max:12,reserved_for_d:1},result:{},...extra});
+async function mount(optimization:any,badCases:any[]=[]){
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/experiments/')||url.includes('/api/optimization')?optimization:{search_space:{}}))));
+ root=createRoot(document.body.appendChild(document.createElement('div')));
+ await act(async()=>root.render(<EvolutionPage data={{workspace:{},evaluation:{id:'baseline',status:'completed',config:{top_k:4},result:{}},badCases,optimization}}/>));
+}
+async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent===text)!.click());}
+it('separates running, product interruption, evaluated failure and qualified cards',async()=>{
+ await mount(experiment([candidate('A','running'),candidate('B','failed',{evaluation_complete:false,completed:7,total:50},{product_interruption:true}),candidate('C','evaluated',{qualification:{qualified:false}}),candidate('D','evaluated',{qualification:{qualified:true}})]));
+ await click('A/B/C/D');
+ const cards=[...document.querySelectorAll('.candidate-card')];
+ expect(cards.map(card=>card.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['运行中','试跑中断','已评测未通过','合格']);
+ expect(cards[1].querySelector('.candidate-card-header .badge')?.classList.contains('warning')).toBe(true);
+ expect(cards[1].textContent).toContain('产品故障，会自动续跑');
+ expect(cards[1].textContent).not.toContain('付费确认');
+});
+it('does not promise automatic continuation for permission or identity failures',async()=>{
+ await mount(experiment([candidate('A','failed',{evaluation_complete:false,error:'Provider权限不足'},{product_interruption:false})]));
+ await click('A/B/C/D');
+ expect(document.querySelector('.candidate-card-header .badge')?.textContent).toBe('试跑停止');
+ expect(document.querySelector('.candidate-card')?.textContent).not.toContain('自动续跑');
+});
+it('reads budget usage from the API even when several candidates are interrupted',async()=>{
+ await mount(experiment(['A','B','C'].map(label=>candidate(label,'failed',{evaluation_complete:false},{product_interruption:true})),{evaluation_budget:{used:0,max:12,reserved_for_d:1}}));
+ expect(document.querySelector('.stage-stepper')?.parentElement?.textContent).toContain('已试跑 0 / 12 次');
+ await click('优化 Agent');
+ expect(document.body.textContent).not.toContain('3 / 12');
+});
+it('does not infer paid usage from candidate statuses when the budget is missing',async()=>{
+ await mount(experiment([candidate('A','failed')],{evaluation_budget:undefined}));
+ await click('优化 Agent');
+ expect(document.body.textContent).toContain('预算尚未同步');
+ expect(document.body.textContent).not.toContain('1 / 12');
+});
+it('counts actual optimization targets when the light response omits diagnostic totals',async()=>{
+ await mount(experiment([]),[true,false].map((target,index)=>({id:'bad-'+index,run_id:'baseline',question_id:'Q0'+index,result:{passed:false,optimization_target:target,question:'问题'+index}})));
+ expect(document.body.textContent).toContain('本轮 2 道错题，1 道作为优化目标');
+});
+it('moves unfinished planning into More after a Sandbox exists and makes progress the primary action',async()=>{
+ await mount(experiment([candidate('A','failed',{evaluation_run_id:'saved-run',evaluation_complete:false},{product_interruption:true})],{coverage_plan:{status:'incomplete',covered_count:0,total:1,binding:'binding',matrix:[{question_id:'CSV-20261101100758945425-41',candidates:[],gap:'本轮剩余A/B/C容量不足，需明确调整规划，不能宣称完成'}]}}));
+ expect(document.querySelector('.page-title .primary')?.textContent).toBe('查看 Sandbox 进度');
+ expect(document.querySelector('.page-title .primary')?.textContent).not.toContain('补齐本轮规划');
+ expect(document.querySelector('.page-title [role="menu"]')?.textContent).toContain('补齐本轮规划');
+ expect(document.querySelector('.page-title button[aria-haspopup="menu"]')?.getAttribute('aria-expanded')).toBe('false');
+ await click('查看 Sandbox 进度');
+ expect(document.querySelector('.tabs button.active')?.textContent).toBe('Sandbox');
+ await click('更多');
+ expect(document.querySelector('[role="menu"]')?.textContent).toContain('补齐本轮规划（不收费）');
+ const detail=document.querySelectorAll('.stage-stepper li')[1].textContent;
+ expect(detail).toContain('Q41 暂时没有方案覆盖');
+ expect(detail).toContain('三套方案的名额已用完');
+ expect(detail).not.toContain('Q27');
+ expect(detail).not.toContain('规划未完成');
+ expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method)).toBe(true);
+});
