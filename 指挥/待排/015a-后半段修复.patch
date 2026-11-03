@@ -1,0 +1,446 @@
+diff --git a/backend/app/evaluation.py b/backend/app/evaluation.py
+--- a/backend/app/evaluation.py
++++ b/backend/app/evaluation.py
+@@ -943,7 +943,8 @@
+             sources=[candidate]
+             if reasoning.get('candidate_label')=='D':
+                 sources=[self.store.candidate(s['candidate_id']) for s in reasoning.get('sources',[])]
+-                if len(sources)<2 or any(not c or c['status']!='evaluated' or c['result'].get('evaluation_identity')!=baseline['judge'].get('evaluation_identity') or not c['result'].get('regression',{}).get('passed') or not c['result'].get('all_fixed_question_ids') for c in sources):
++                from .policy import composite_source_eligible
++                if len(sources)<2 or any(not c or not composite_source_eligible(c, baseline['judge'].get('evaluation_identity')) for c in sources):
+                     raise ValueError('D缺少同身份完整验证来源')
+                 if any(not any(c['config'].get(k)==v for c in sources) for k,v in actual.items()):raise ValueError('D参数缺少已验证来源')
+             for source in sources:
+diff --git a/backend/app/governance.py b/backend/app/governance.py
+--- a/backend/app/governance.py
++++ b/backend/app/governance.py
+@@ -2958,7 +2958,7 @@
+ 
+     def create_composite(self, experiment_id: str, provider=None, authorize_provider=None):
+         from .evaluation_contract import policy_current, evaluation_identity
+-        from .policy import validate_candidate_config
++        from .policy import validate_candidate_config, composite_source_eligible
+         from .optimization import INTERVENTIONS, validate_intervention, strategy_case, strategy_candidate
+         from .telemetry import collect_usage, cost_fields
+         from .full_text import CORPUS_LOCK
+@@ -2974,11 +2974,11 @@
+             previous = experiment['result'].get('composite')
+             if previous:
+                 return self.candidate(previous['candidate_id']) if previous.get('candidate_id') else previous
+-            winner = self.candidate(confirmation['winner_id'])
++            winner = next((c for c in experiment['candidates'] if c['id'] == confirmation['winner_id']), None)
+             if not winner or not winner['result'].get('qualification', {}).get('qualified'):
+                 raise ValueError('Winner资格失效')
+             identity = baseline['judge'].get('evaluation_identity')
+-            eligible = [c for c in experiment['candidates'] if c['id'] != winner['id'] and c['status'] == 'evaluated' and c['result'].get('evaluation_identity') == identity and c['result'].get('regression', {}).get('passed') and (c['result'].get('all_fixed_question_ids') or c['reasoning'].get('direction') == '效率（降档 + 检索补偿）' and c['result'].get('gates', {}).get('passed') is True) and c['config'] != winner['config'] and validate_candidate_config(c['config'])['valid']]
++            eligible = [c for c in experiment['candidates'] if c['id'] != winner['id'] and composite_source_eligible(c, identity) and c['config'] != winner['config'] and validate_candidate_config(c['config'])['valid']]
+             base_config={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}
+             base_config={k:v for k,v in base_config.items() if k in ALLOWED_SEARCH_SPACE}
+             if experiment['evaluation_budget']['used'] >= MAX_EVALS:
+@@ -3086,7 +3086,7 @@
+             identity = baseline.get('judge', {}).get('evaluation_identity')
+             qualified = sorted([item for item in candidates if item['reasoning'].get('candidate_label') != 'D' and item['status'] == 'evaluated' and item['result'].get('qualification', {}).get('qualified') and policy_current(baseline.get('judge', {})) and identity and item['result'].get('evaluation_identity') == identity], key=lambda c: (c['result'].get('bad_case_count') if type(c['result'].get('bad_case_count')) is int else float('inf'), c['id']))
+             final = next((c for c in candidates if c['reasoning'].get('candidate_label') == 'D' and c['status'] == 'evaluated' and c['result'].get('evaluation_identity') == identity), None)
+-            decision = select_final_candidate(qualified, final)
++            decision = select_final_candidate([c for c in qualified if c['id'] == confirmation['winner_id']] if confirmation else qualified, final)
+             selected = None
+             if any(item['status'] in {'running', 'generated'} or item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label') != 'D'):
+                 status = 'WAITING_FOR_ROUND_COMPLETION'
+diff --git a/backend/app/optimization_cycle.py b/backend/app/optimization_cycle.py
+--- a/backend/app/optimization_cycle.py
++++ b/backend/app/optimization_cycle.py
+@@ -114,6 +114,8 @@
+                 return save('round_completed','review')
+             if experiment['evaluation_budget']['used'] >= MAX_EVALS-1:
+                 return save('budget_exhausted', 'review')
++            if experiment['evaluation_budget']['used'] > MAX_EVALS - 4:
++                return save('budget_exhausted', 'review', '剩余额度不足完整 A/B/C 三套，并须保留 1 次给 D')
+             save('running', 'analysis')
+             before = len(experiment['candidates'])
+             try:
+diff --git a/backend/app/policy.py b/backend/app/policy.py
+--- a/backend/app/policy.py
++++ b/backend/app/policy.py
+@@ -133,6 +133,15 @@
+               "zero_new_failures": regression.get("passed") is True and regression.get("new_critical_failures") == 0 and regression.get("new_ordinary_failures") == 0,
+               "at_least_one_fixed": type(fixed_count) is int and fixed_count >= 1}
+     return {"qualified": all(checks.values()), "checks": checks}
++
++
++def composite_source_eligible(candidate: dict, identity: str) -> bool:
++    result = candidate.get('result', {})
++    return bool(candidate.get('status') == 'evaluated' and result.get('evaluation_identity') == identity
++                and result.get('regression', {}).get('passed')
++                and (result.get('all_fixed_question_ids')
++                     or candidate.get('reasoning', {}).get('direction') == '效率（降档 + 检索补偿）'
++                     and result.get('gates', {}).get('passed') is True))
+ 
+ 
+ def select_final_candidate(candidates: list[dict], final_candidate: dict | None = None) -> dict:
+diff --git a/frontend/src/api.ts b/frontend/src/api.ts
+--- a/frontend/src/api.ts
++++ b/frontend/src/api.ts
+@@ -48,7 +48,7 @@
+   governance: ['workspace'], evaluation: ['workspace','evaluation','badCases','optimization'],
+   evolution: ['workspace','evaluation','badCases','optimization'],
+   versions: ['workspace','evaluation','optimization','versions'],
+-  verification: ['workspace','badCases','versions','readiness','monitoring'],
++  verification: ['workspace','evaluation','badCases','versions','readiness','monitoring'],
+ };
+ 
+ export async function loadAppData(retry = true, page?: Page): Promise<AppData> {
+diff --git a/frontend/src/pages/EvolutionPage.tsx b/frontend/src/pages/EvolutionPage.tsx
+--- a/frontend/src/pages/EvolutionPage.tsx
++++ b/frontend/src/pages/EvolutionPage.tsx
+@@ -76,6 +76,7 @@
+   const savedRecommended=candidates.find(item=>item.id===recommendation.recommended_candidate);
+   const confirmation = experiment?.result?.report_confirmation || recommendation.report_confirmation;
+   const composite = experiment?.result?.composite || recommendation.composite;
++  const cycle = experiment?.result?.optimization_cycle;
+   const dWinner = candidates.find(item => item.id === (d?.reasoning?.winner_id || confirmation?.winner_id));
+   const retainedWinner = d && recommendation.recommended_candidate && recommendation.recommended_candidate !== d.id;
+   const dDecision = !d || d.status !== "evaluated" ? { title: d?.status === "failed" ? "组合方案 D 运行失败" : "等待完整 Sandbox", message: d?.status === "failed" ? "运行未完成，继续保留 已确认赢家。" : "组合方案 D 尚无完整评测与资格结论。", tone: "neutral" as const }
+@@ -86,7 +87,7 @@
+   const budgetKnown = Number.isFinite(budget.used) && Number.isFinite(budget.max);
+   const diagnosisSummary = experiment?.result?.baseline_diagnosis_summary || evaluation.product_diagnostics?.baseline_diagnosis_summary || [];
+   const latestRound = experiment?.rounds?.at(-1);
+-  const canContinue = latestRound?.complete && !confirmation && budgetKnown && budget.used < budget.max - (budget.reserved_for_d ?? budget.reserved_for_d1 ?? 1);
++  const canContinue = latestRound?.complete && !confirmation && budgetKnown && budget.used <= budget.max - (budget.reserved_for_d ?? budget.reserved_for_d1 ?? 1) - 3;
+   const qualified = candidates.filter(item => ["A", "B", "C"].includes(item.reasoning?.candidate_label) && item.status === "evaluated" && item.result?.qualification?.qualified);
+   const selectedWinner = qualified.some(item => item.id === winnerId) ? winnerId : recommendation.suggested_winner || qualified[0]?.id || "";
+   const batchId = `sandbox-round:${experiment?.id}:${roundNumber}`;
+@@ -183,6 +184,8 @@
+   return <PageShell className="page evolution-page" header={<><div className="page-title"><div><h1>Agent 工作台</h1><p>读取 Bad Case 诊断，提出 A/B/C 三套优化方案，在 Sandbox 里验证改善和副作用。</p></div>{triedSandbox ? <button className="primary" onClick={() => setStage("sandbox")}>查看 Sandbox 进度</button> : planningIncomplete ? <button className="primary" disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button> : pending.length ? <button className="primary" disabled={busy || !canBatch} onClick={() => void runBatch()}><Play size={15} />{batchRunning ? "本轮 Sandbox 运行中" : "运行本轮 A/B/C Sandbox"}</button> : <button className="primary" disabled={policyBlocked || busy || hasRunning || evaluation.status !== "completed" || (!!abc.length && !canContinue) || (!badCases.length && !experiment?.result?.monitoring_context)} onClick={() => void (canContinue ? continueRound() : generate())}><Play size={15} />{busy ? "处理中…" : canContinue ? "继续优化下一轮" : abc.length ? "本轮方案已生成" : "生成 A / B / C"}</button>}{planningIncomplete && triedSandbox && <MoreMenu><button role="menuitem" disabled={busy || policyBlocked || hasRunning || !!confirmation} onClick={completePlan}>补齐本轮规划（不收费）</button></MoreMenu>}</div><StoryDisclosure label="实验进度"><p>{budgetKnown ? `已试跑 ${budget.used} / ${budget.max} 次（其中 ${budget.reserved_for_d ?? "未知"} 次留给方案 D）` : experiment ? "预算尚未同步，正在等待后台已用次数。" : "尚未试跑；创建实验后显示已用次数、试跑上限和方案 D 的预留次数。"}</p><StageStepper compact ariaLabel="Agent 实验阶段" steps={[...steps]} /></StoryDisclosure></>} tabs={<div className="tabs"><button aria-pressed={stage === "bad"} className={stage === "bad" ? "active" : ""} onClick={() => setStage("bad")}>问题诊断</button><button aria-pressed={stage === "agent"} className={stage === "agent" ? "active" : ""} onClick={() => setStage("agent")}>{displayText("Optimization Agent")}</button><button aria-pressed={stage === "candidates"} className={stage === "candidates" ? "active" : ""} onClick={() => setStage("candidates")}>A/B/C/D</button><button aria-pressed={stage === "sandbox"} className={stage === "sandbox" ? "active" : ""} onClick={() => setStage("sandbox")}>Sandbox</button><button aria-pressed={stage === "regression"} className={stage === "regression" ? "active" : ""} onClick={()=>setStage("regression")}>{displayText("Regression")}</button><button aria-pressed={stage === "recommendation"} className={stage === "recommendation" ? "active" : ""} onClick={()=>setStage("recommendation")}>{displayText("Recommendation")}</button></div>} resetKey={stage}>
+ 
+ 
++    {cycle?.status === "qualified" && !confirmation && <p className="workbench-status" role="status">本轮 A/B/C 已完成，等待人工确认报告与赢家；确认后才能生成组合方案 D。</p>}
++    {cycle?.status === "budget_exhausted" && <p className="workbench-status" role="status">优化循环已停止：已试跑 {budget.used} / {budget.max} 次，剩余 {Math.max(0, budget.max - budget.used)} 次（其中 1 次留给 D）。{cycle.last_error || "A/B/C 试跑额度已用完；只有合格赢家经人工确认后才能进入 D。"}</p>}
+     {policyBlocked && <p className="error-notice">当前 Baseline 评测版本身份与运行代码不兼容，真实 Agent 启动已阻断，旧实验只读。全部 Bad Case 保留在优化规划中；请先到 Baseline 查看身份预检，按原 Q18 复核与独立授权流程处理，不自动重评。</p>}
+     {abc.some(item => (item.reasoning?.round || 1) < roundNumber) && <button className="text-button" onClick={() => setHistoryOpen(true)}>历史实验 · {new Set(abc.filter(item => (item.reasoning?.round || 1) < roundNumber).map(item => item.reasoning?.round || 1)).size}轮</button>}
+     <Drawer className="workbench-drawer" open={historyOpen} onOpenChange={setHistoryOpen} title="历史实验 · 原方案与结果只读"><div className="drawer-body"><div className="candidate-cards">{abc.filter(item => (item.reasoning?.round || 1) < roundNumber).map(candidate => <CandidateCard key={candidate.id} candidate={candidate} baseline={evaluation.config || {}} busy={true} onDetail={()=>{setHistoryOpen(false);setSelectedCandidate(candidate);}} targets={targetRows(candidate,badCases)} onTargets={()=>{setHistoryOpen(false);setTargetCandidate(candidate);}} onRun={()=>void run(candidate)} />)}</div></div></Drawer>
+diff --git a/frontend/src/pages/ExperimentPage.tsx b/frontend/src/pages/ExperimentPage.tsx
+--- a/frontend/src/pages/ExperimentPage.tsx
++++ b/frontend/src/pages/ExperimentPage.tsx
+@@ -16,10 +16,11 @@
+ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOpenCitation: (citation: Citation) => void; baselineLabel?: string }) {
+   const baseline = data.evaluation || {};
+   const active = (data.versions || []).find((version: any) => version.status === "active" && version.provenance === "published");
++  const previous = (data.versions || []).find((version: any) => version.id === active?.previous_version_id);
+   const baselineId = data.workspace?.current_baseline_id === undefined ? baseline.id : data.workspace.current_baseline_id;
+-  const blocked = !baselineId || baselineId !== baseline.id ? data.workspace?.baseline_unavailable_reason || "需要当前有效 Baseline" : !active ? "尚无已发布 线上版本，请先完成人工发布。" : "";
++  const blocked = !baselineId || baselineId !== baseline.id ? data.workspace?.baseline_unavailable_reason || "需要当前有效 Baseline" : !active ? "尚无已发布 线上版本，请先完成人工发布。" : active.previous_version_id && !previous ? "发布前配置未读取到，请查看版本历史。" : "";
+   const identity = JSON.stringify(["interview-v1", identityKey(data.workspace || baseline), baselineId, active?.id]);
+-  const leftScheme: Scheme = { id: "baseline", label: "Baseline", version: baselineId, config: baseline.config };
++  const leftScheme: Scheme = { id: previous?.id || "baseline", label: previous ? "发布前配置" : "Baseline", version: previous?.id || baselineId, config: previous?.config || baseline.config };
+   const source = active?.snapshot?.candidate_id?.match(/(?:^|-)R\d+-([ABC])$/)?.[1];
+   const rightScheme: Scheme = { id: active?.id || "", label: source ? `线上版本 ${source}` : displayText("Production"), version: active?.id, config: active?.snapshot?.pipeline_config || active?.config };
+   const [saved] = useState(() => readSession("rag-qa-compare", { identity: "", question: "", selectedCase: "", left: {} as Run, right: {} as Run }));
+@@ -57,7 +58,7 @@
+   };
+ 
+   if (blocked) return <div className="page experiment-page"><EmptyState title={!baselineId || baselineId!==baseline.id?"还没有可用于对比的有效 Baseline":"还没有可对比的已发布方案"} action={<a className="secondary" href={!baselineId || baselineId!==baseline.id?"#evaluation":"#versions"}>{!baselineId || baselineId!==baseline.id?"查看 Baseline":"查看发布条件"}</a>}>发布新方案后，可以用同一个问题对比优化前后的回答。</EmptyState></div>;
+-  return <div className="page experiment-page"><ConclusionCard title={left.status === "completed" && right.status === "completed" ? "同题实际回答已保存，可核对内容与引用差异" : "对比当前有效 Baseline 与已发布 线上版本"} tone="neutral">{left.status === "completed" && right.status === "completed" ? "两侧均为本次主动运行返回的真实回答；未调用 Judge，不产生新评分或资格。" : "选择或输入同一道问题，再主动运行两套已保存配置。参数差异可展开核对，回答未运行时不预判改善。"}</ConclusionCard>
++  return <div className="page experiment-page"><ConclusionCard title={left.status === "completed" && right.status === "completed" ? "同题实际回答已保存，可核对内容与引用差异" : "对比发布前配置与已发布线上配置"} tone="neutral">{left.status === "completed" && right.status === "completed" ? "两侧均为本次主动运行返回的真实回答；未调用 Judge，不产生新评分或资格。" : "选择或输入同一道问题，再主动运行两套已保存配置。参数差异可展开核对，回答未运行时不预判改善。"}</ConclusionCard>
+     <section className="experiment-query compare-toolbar">
+       <CustomSelect ariaLabel="选择真实 Bad Case" value={selectedCase} onChange={id => { clearResults(); setSelectedCase(id); const item = badCases.find((row: any) => row.id === id); if (item) setQuestion(item.result?.question || ""); }} placeholder="Baseline Bad Case" options={[{ value: "", label: "Baseline Bad Case" }, ...badCases.map((item: any) => ({ value: item.id, label: item.result?.question || "题目内容未记录" }))]} />
+       <textarea aria-label="试验问题" placeholder="输入或编辑同一道问题…" maxLength={1000} value={question} onChange={event => { clearResults(); setQuestion(event.target.value); }} />
+@@ -65,7 +66,7 @@
+     </section>
+     <StoryDisclosure label="查看方案参数差异"><ParameterDiff before={leftScheme.config} after={rightScheme.config}/></StoryDisclosure>
+     <section className="experiment-results" aria-label="实时回答"><AnswerCard scheme={leftScheme} run={left} onOpenCitation={onOpenCitation}/><AnswerCard scheme={rightScheme} run={right} onOpenCitation={onOpenCitation}/></section>
+-    {left.status === "completed" && right.status === "completed" && Array.isArray(left.result?.evidence) && Array.isArray(right.result?.evidence) && <p className="comparison-observation" role="status">本次可观察差异：Baseline 返回 {left.result?.evidence?.length ?? 0} 条 Evidence，{displayText("Production")} 返回 {right.result?.evidence?.length ?? 0} 条 Evidence。引用数量不代表答案正确性；本次未进行实时 Judge 评分。</p>}
++    {left.status === "completed" && right.status === "completed" && Array.isArray(left.result?.evidence) && Array.isArray(right.result?.evidence) && <p className="comparison-observation" role="status">本次可观察差异：{leftScheme.label} 返回 {left.result?.evidence?.length ?? 0} 条 Evidence，{displayText("Production")} 返回 {right.result?.evidence?.length ?? 0} 条 Evidence。引用数量不代表答案正确性；本次未进行实时 Judge 评分。</p>}
+   </div>;
+ }
+ 
+diff --git a/frontend/src/task015a-offline.test.tsx b/frontend/src/task015a-offline.test.tsx
+new file mode 100644
+--- /dev/null
++++ b/frontend/src/task015a-offline.test.tsx
+@@ -0,0 +1,47 @@
++// @vitest-environment jsdom
++import {act} from 'react';
++import {createRoot} from 'react-dom/client';
++import {afterEach,expect,it,vi} from 'vitest';
++import {EvolutionPage} from './pages/EvolutionPage';
++import {ExperimentPage} from './pages/ExperimentPage';
++import {loadAppData} from './api';
++(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
++let root:ReturnType<typeof createRoot>;
++afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';sessionStorage.clear();vi.unstubAllGlobals();});
++async function show(cycle:any){
++ const candidates=['A','B','C'].map(label=>({id:'candidate-'+label,status:'evaluated',config:{top_k:4},reasoning:{round:1,candidate_label:label},result:{qualification:{qualified:label==='A'}}}));
++ const exp={id:'exp',rounds:[{round:1,complete:true}],baseline_run_id:'base',candidates,evaluation_budget:{used:cycle.used,max:12,reserved_for_d:1},result:{optimization_cycle:cycle}};
++ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
++ root=createRoot(document.body.appendChild(document.createElement('div')));
++ await act(async()=>root.render(<EvolutionPage data={{workspace:{},evaluation:{id:'base',status:'completed',config:{},result:{}},badCases:[],optimization:exp}}/>));
++}
++it('shows unattended Gate 2 wait on the main screen',async()=>{
++ await show({status:'qualified',used:3,remaining:9});
++ expect(document.querySelector('[role="status"]')?.textContent).toContain('等待人工确认');
++});
++it('explains exhausted complete-batch allowance after a page reload',async()=>{
++ await show({status:'budget_exhausted',used:9,remaining:3,last_error:'剩余额度不足完整 A/B/C 三套，并须保留 1 次给 D'});
++ expect(document.querySelector('[role="status"]')?.textContent).toContain('完整 A/B/C');
++ expect(document.querySelector('[role="status"]')?.textContent).toContain('9 / 12');
++ await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='A/B/C/D')!.click());
++ expect([...document.querySelectorAll('button')].some(b=>b.textContent==='继续优化下一轮')).toBe(false);
++});
++it('compares the actual previous production config when Baseline differs',async()=>{
++ const data={workspace:{current_baseline_id:'base'},evaluation:{id:'base',config:{top_k:4}},badCases:[],versions:[
++  {id:'new',status:'active',provenance:'published',previous_version_id:'old',config:{top_k:6}},
++  {id:'old',status:'archived',provenance:'published',config:{top_k:4,prompt_strategy:'Tiered'}}]};
++ root=createRoot(document.body.appendChild(document.createElement('div')));
++ vi.stubGlobal('fetch',vi.fn(async(_url:string,init:any)=>{const b=JSON.parse(init.body);return new Response(JSON.stringify({version:b.scheme_id,answer:'保存配置回答',retrieval:[],config:{}}));}));
++ await act(async()=>root.render(<ExperimentPage data={data} onOpenCitation={()=>{}}/>));
++ const textarea=document.querySelector('textarea')!;
++ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!.call(textarea,'同一个问题');textarea.dispatchEvent(new Event('input',{bubbles:true}));});
++ await act(async()=>document.querySelector<HTMLButtonElement>('.query-action button')!.click());
++ expect((fetch as any).mock.calls.map(([,init]:any)=>JSON.parse(init.body).scheme_id)).toEqual(['old','new']);
++ expect((fetch as any).mock.calls.map(([,init]:any)=>JSON.parse(init.body).question)).toEqual(['同一个问题','同一个问题']);
++});
++
++it('loads the Baseline needed by the full verification page',async()=>{
++ vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/evaluation')?{id:'base'}:url.includes('/api/workspace')?{current_baseline_id:'base'}:url.includes('/api/versions')?[]:{}))));
++ const data=await loadAppData(true,'verification');
++ expect(data.evaluation.id).toBe('base');
++});
+diff --git a/backend/tests/test_task009_optimization_cycle.py b/backend/tests/test_task009_optimization_cycle.py
+--- a/backend/tests/test_task009_optimization_cycle.py
++++ b/backend/tests/test_task009_optimization_cycle.py
+@@ -34,10 +34,10 @@
+ 
+     def test_no_qualified_returns_to_analysis_and_reserves_d(self):
+         result,exp,calls,states=self.run_cycle()
+-        self.assertEqual(exp['evaluation_budget']['used'],11)
+-        self.assertEqual(calls.count('analysis'),4)
++        self.assertEqual(exp['evaluation_budget']['used'],9)
++        self.assertEqual(calls.count('analysis'),3)
+         self.assertEqual(result['status'],'budget_exhausted')
+-        self.assertEqual(result['remaining'],1)
++        self.assertEqual(result['remaining'],3)
+         self.assertEqual(result['reserved_for_d'],1)
+ 
+     def test_qualified_stops_after_current_batch(self):
+diff --git a/backend/tests/test_task015a_rehearsal.py b/backend/tests/test_task015a_rehearsal.py
+new file mode 100644
+--- /dev/null
++++ b/backend/tests/test_task015a_rehearsal.py
+@@ -0,0 +1,217 @@
++"""Synthetic-only post-Agent rehearsal. No network Provider and no formal DB."""
++import json, os, unittest
++from pathlib import Path
++from unittest.mock import patch
++import test_v14_api_lifecycle as fixtures
++from test_v14_api_lifecycle import LifecycleService, LifecycleProvider, main
++from app.optimization_cycle import run_until_qualified
++
++class Stub(LifecycleProvider):
++    class Settings(LifecycleProvider.Settings):
++        baseline_thinking='max'
++        judge_thinking='low'
++    settings=Settings()
++    def __init__(self): self.calls=[]
++    def complete(self, system, prompt, **kwargs):
++        if 'RAG优化Agent' not in system and '唯一Optimization Agent' not in system:
++            return super().complete(system,prompt,**kwargs)
++        data=json.loads(prompt); self.calls.append(data)
++        if '唯一Optimization Agent' in system:
++            winner=data['winner']; source=next(c for c in data['sources'] if c['reasoning'].get('direction')=='效率（降档 + 检索补偿）')
++            return json.dumps(dict(should_generate_d=True,source_candidates=[winner['id'],source['id']],
++                proposed_config_diff={'generation_thinking':'off','hyde':True},hypothesis='组合质量与效率',
++                root_cause='检索层问题',intervention_direction='stage_performance',
++                evidence_assertions=[],root_cause_alignment='相同冻结题卷',complementary_capabilities='质量加降档补偿',
++                expected_improvement='减少错题并降低耗时',risks='需完整回归',explanation='仅组合来源验证值'))
++        n=len([c for c in self.calls if 'prior_sandbox_results' in c]); targets=[c['id'] for c in data['bad_cases']]
++        diffs=[({'top_k':6,'prompt_strategy':'Tiered'},{'candidate_k':24},{'generation_thinking':'off','hyde':True}),
++               ({'top_k':6,'prompt_strategy':'Completeness'},{'multi_query':2},{'generation_thinking':'high','rerank':'query_only'}),
++               ({'min_score':0.1,'prompt_strategy':'Tiered'},{'multi_query':4},{'generation_thinking':'low','hyde':True})][min(n-1,2)]
++        rows=[]
++        for label,diff,direction in zip('ABC',diffs,['回答策略','检索召回增强','效率（降档 + 检索补偿）']):
++            rows.append(dict(id=label,direction=direction,action_name=f'离线第{n}轮{label}',config_diff=diff,
++                hypothesis=f'第{n}轮{label}保存证据支持假设',why='验证保存的检索与安全错题',target_bad_cases=targets,
++                root_cause='检索层问题',expected_improvement='减少错题或耗时',risk='完整回归验证',
++                intervention_direction='stage_performance' if label=='C' else 'grounded_generation',evidence_assertions=[]))
++        return json.dumps({'candidates':rows})
++
++class Service(LifecycleService):
++    fail_d=False
++    no_improvement=False
++    calls=0
++    def answer(self,question,config):
++        self.calls+=1
++        used={**config}
++        if self.no_improvement and config.get('candidate_id'):
++            used.update(top_k=4,prompt_strategy='Grounded')
++        result=super().answer(question,used)
++        row=next(r for r in self.store.questions() if r['question']==question)
++        clarifiers=sorted(r['id'] for r in self.store.questions() if r.get('negative_subtype')=='insufficient_evidence')
++        if clarifiers and row['id']==clarifiers[0]:result['answer']='错误答案'
++        if self.fail_d and config.get('candidate_id','').endswith('-D') and row['raw'].get('coverage_slot')=='Q04':result['answer']='错误答案'
++        return result
++
++class RehearsalTests(unittest.TestCase):
++    def setUp(self):
++        import tempfile
++        seed=tempfile.TemporaryDirectory(prefix='task015a-seed-');self.addCleanup(seed.cleanup)
++        path=Path(seed.name)/'empty.json';path.write_text('{"cases":[]}')
++        seed_patch=patch('app.governance.GOLDEN_DRAFT',path);seed_patch.start();self.addCleanup(seed_patch.stop)
++        fixtures.ApiLifecycleTests.setUp(self)
++        self.corpus.index_dir=Path(self.temp.name)/"corpus-index"
++        self.corpus.index_dir.mkdir()
++    post=fixtures.ApiLifecycleTests.post
++    wait=fixtures.ApiLifecycleTests.wait
++    join_workers=fixtures.ApiLifecycleTests.join_workers
++    def bootstrap(self):
++        self.provider=Stub();self.service.__class__=Service;self.service.provider=self.provider
++        # Also reject accidental calls through configured production adapters.
++        for name in ('app.providers.DeepSeekProvider.complete','app.knowledge_pipeline.AlibabaProvider._post_request'):
++            blocker=patch(name,side_effect=AssertionError('Real Provider forbidden'));blocker.start();self.addCleanup(blocker.stop)
++        plan=self.post('governance/coverage-preview',{'profile':'medium'})
++        started=self.post('governance/generate',{'profile':'medium','plan_id':plan['plan_id']})
++        run=self.wait('governance/generation-runs/'+started['run_id'],('completed','failed','needs_regeneration'))
++        self.assertEqual(run['status'],'completed',run)
++        for key in run['question_ids']:
++            self.assertTrue(self.post(f'governance/questions/{key}/probe')['passed'])
++            self.assertEqual(self.post(f'governance/questions/{key}/qc')['status'],'qc_passed')
++        self.post('governance/review-batch',{'question_ids':run['question_ids'],'confirmed_manual_review':True})
++        self.post('governance/generation-runs/'+started['run_id']+'/snapshot',{})
++        baseline=self.post('evaluations/run',{'fresh':True})
++        self.baseline=self.wait('evaluations/'+baseline['id'],('completed','failed'))
++        self.assertEqual(self.baseline['status'],'completed',self.baseline)
++        self.assertEqual(len(self.baseline['cases']),50)
++        causes={c['result'].get('primary_root_cause') for c in self.store.bad_case_rows(self.baseline['id'])}
++        self.assertIn('Safety',causes);self.assertTrue(causes & {'Ranking','Retrieval'})
++        self.exp=self.post('experiments/run')['id']
++        self.before=self.store.active_production()
++
++    def snapshot(self,label):
++        folder=os.getenv('RAG_015A_EVIDENCE_DIR')
++        if not folder:return
++        paths=['workspace','overview','documents','dataset?light=true','evaluation','bad-cases','optimization','versions','readiness','monitoring','pipeline']
++        values={('/api/'+key.split('?')[0]):self.client.get('/api/'+key).json() for key in paths}
++        Path(folder).mkdir(parents=True,exist_ok=True)
++        Path(folder,label+'.json').write_text(json.dumps(values,ensure_ascii=False))
++
++    def lifecycle(self,fail_d):
++        self.bootstrap();self.service.fail_d=fail_d
++        cycle=run_until_qualified(self.store,self.service,self.exp)
++        self.assertEqual(cycle['status'],'qualified',cycle)
++        self.assertEqual(cycle['used'],3)
++        rec=self.store.recommendation(self.exp)['result']
++        self.assertEqual(rec['status'],'Needs Report Confirmation')
++        self.snapshot('gate2')
++        candidates=self.store.candidates(self.exp);winner=self.exp+'-R1-A'
++        c=next(c for c in candidates if c['id'].endswith('-C'))
++        self.assertTrue(c['result']['gates']['passed'],c['result']['gates'])
++        self.assertEqual(c['result']['all_fixed_question_ids'],[])
++        self.assertFalse(c['result']['qualification']['qualified'])
++        self.post('experiments/'+self.exp+'/recommendation',{'candidate_id':winner,'actor':'offline'})
++        d=self.post('experiments/'+self.exp+'/composite',{})
++        self.assertEqual(d['status'],'generated',d)
++        sources=[self.store.candidate(s['candidate_id']) for s in d['reasoning']['sources']]
++        self.assertIn(c['id'],[s['id'] for s in sources])
++        self.assertTrue(all(any(s['config'].get(k)==v for s in sources) for k,v in d['config'].items()))
++        self.assertEqual(d['config']['generation_thinking'],'off')
++        if not fail_d:
++            # Seed synthetic prior attempt history to exercise the 11 -> 12 boundary.
++            with self.store.connection() as db:
++                for source,count in zip(candidates,[3,4,4]):
++                    reasoning={**source['reasoning'],'sandbox_attempts':[{'attempt':n+1} for n in range(count)]}
++                    db.execute('UPDATE candidate_configs SET reasoning_json=? WHERE id=?',(json.dumps(reasoning),source['id']))
++            self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'],11)
++        # This real API preflight reproduces the efficiency-source mismatch.
++        preflight=self.client.get('/api/candidates/'+d['id']+'/preflight')
++        self.assertEqual(preflight.status_code,200,preflight.text)
++        run=self.post('candidates/'+d['id']+'/run')
++        result=self.wait('evaluations/'+run['id'],('completed','failed','partial'))
++        self.assertEqual(result['status'],'completed',result)
++        self.assertEqual(len(result['cases']),50)
++        self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'],4 if fail_d else 12)
++        if not fail_d:
++            with self.store.connection() as db:
++                db.execute("INSERT INTO candidate_configs SELECT ?,experiment_id,'generated',config_json,reasoning_json,'{}',created_at FROM candidate_configs WHERE id=?",(d['id']+'-extra',d['id']))
++            extra=self.client.post('/api/candidates/'+d['id']+'-extra/run',json={})
++            self.assertEqual(extra.status_code,409,extra.text)
++            self.assertIn('budget',extra.json()['detail'])
++            with self.store.connection() as db:db.execute('DELETE FROM candidate_configs WHERE id=?',(d['id']+'-extra',))
++        current=self.store.candidate(d['id']);self.assertEqual(current['result']['release_qualification']['qualified'],not fail_d)
++        rec=self.store.refresh_recommendation(self.exp)
++        selected=winner if fail_d else d['id'];self.assertEqual(rec['recommended_candidate'],selected)
++        self.snapshot('d-failed' if fail_d else 'd-passed')
++        version=self.post('candidates/'+selected+'/publish',{'decision':'approved','actor':'offline'})
++        self.assertEqual(self.store.active_production()['config'],self.store.candidate(selected)['config'])
++        versions=self.client.get('/api/versions').json();overview=self.client.get('/api/overview').json();workspace=self.client.get('/api/workspace').json()
++        self.assertEqual(next(v for v in versions if v['status']=='active')['id'],version['id'])
++        self.assertEqual(overview['production']['config'],version['config']);self.assertEqual(workspace['active_version'],version['id'])
++        self.snapshot('published')
++        question=next(r['question'] for r in self.store.questions() if r['raw'].get('coverage_slot')=='Q02')
++        count=self.service.calls
++        left=self.post('preview/scheme',{'question':question,'scheme_id':self.before['id']})
++        right=self.post('preview/scheme',{'question':question,'scheme_id':version['id']})
++        self.assertEqual(left['question'],right['question']);self.assertNotEqual(left['answer'],right['answer'])
++        self.assertEqual(self.service.calls-count,2)
++        folder=os.getenv('RAG_015A_EVIDENCE_DIR')
++        if folder:Path(folder,'answers.json').write_text(json.dumps({'left':left,'right':right},ensure_ascii=False))
++        from test_v14_probe_cost import bundle
++        index=Path(self.temp.name)/'index';bundle(index)
++        with patch('app.knowledge_pipeline.index_for_config',return_value=index):
++            rolled=self.post('versions/'+self.before['id']+'/rollback',{'decision':'approved','actor':'offline'})
++        self.assertEqual(rolled['config'],self.before['config']);self.snapshot('rolled-back')
++        print('EVIDENCE',json.dumps({'baseline_bad':self.baseline['result']['bad_case_count'],'baseline_gates':self.baseline['result']['gates']['passed_count'],
++            'baseline_causes':[c['result'].get('primary_root_cause') for c in self.store.bad_case_rows(self.baseline['id'])],
++            'abc':[(c['reasoning']['candidate_label'],c['result']['qualification']['qualified'],c['result']['gates']['passed_count'],c['result']['all_fixed_question_ids']) for c in candidates],
++            'D_release':not fail_d,'used':self.store.experiment(self.exp)['evaluation_budget']['used']},ensure_ascii=False))
++
++    def test_source_guards_and_reserved_boundary(self):
++        from copy import deepcopy
++        from app.policy import composite_source_eligible
++        source={'status':'evaluated','reasoning':{'direction':'效率（降档 + 检索补偿）'},
++                'result':{'evaluation_identity':'same','regression':{'passed':True},'gates':{'passed':True},'all_fixed_question_ids':[]}}
++        self.assertTrue(composite_source_eligible(source,'same'))
++        for field,value in [('status','running'),('identity','other'),('regression',False),('gates',False),('direction','回答策略')]:
++            c=deepcopy(source)
++            if field=='status':c['status']=value
++            elif field=='identity':c['result']['evaluation_identity']=value
++            elif field=='direction':c['reasoning']['direction']=value
++            else:c['result'][field]['passed']=value
++            self.assertFalse(composite_source_eligible(c,'same'),field)
++        from test_task009_optimization_cycle import CycleTests
++        state,exp,calls,_=CycleTests().run_cycle(used=11)
++        self.assertEqual(state['status'],'budget_exhausted');self.assertEqual(state['remaining'],1)
++        self.assertEqual(calls,[])
++
++    def test_d_pass_publish_compare_rollback(self):self.lifecycle(False)
++    def test_confirmed_winner_survives_d_decline(self):
++        import tempfile
++        from app.governance import GovernanceStore
++        from identity_fixture import completed_baseline, comparison_identity
++        from app.policy import DEFAULT_PIPELINE_CONFIG
++        with tempfile.TemporaryDirectory() as directory:
++            store=GovernanceStore(Path(directory)/'winner.db')
++            with patch('identity_fixture.current_manifest',return_value={'sources':fixtures.FINGERPRINT}):base=completed_baseline(store)
++            exp=store.create_experiment(base)
++            for label,bad in [('A',0),('B',1)]:
++                store.save_candidate(exp,label,{**DEFAULT_PIPELINE_CONFIG,'top_k':6 if label=='A' else 4,'min_score':0.1 if label=='B' else 0},
++                    {'candidate_label':label,'round':1})
++                store.finish_candidate(exp+'-'+label,'evaluated',{**comparison_identity(store,base),'bad_case_count':bad,'qualification':{'qualified':True}})
++            store.confirm_experiment_report(exp,exp+'-B','offline')
++            with store.connection() as db:
++                row=store.experiment(exp)['result'];row['composite']={'status':'no_effective_composite'}
++                db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(row),exp))
++            self.assertEqual(store.refresh_recommendation(exp)['recommended_candidate'],exp+'-B')
++    def test_d_fail_keeps_winner_publish_compare_rollback(self):self.lifecycle(True)
++    def test_real_agent_round_two_input_and_budget_stop(self):
++        self.bootstrap();self.service.no_improvement=True
++        cycle=run_until_qualified(self.store,self.service,self.exp)
++        prompts=[p for p in self.provider.calls if 'prior_sandbox_results' in p]
++        self.assertGreaterEqual(len(prompts),2)
++        self.assertEqual(len(prompts[1]['prior_sandbox_results']),3)
++        self.assertTrue(all(c['status']=='evaluated' and c['result']['qualification']['qualified'] is False for c in prompts[1]['prior_sandbox_results']))
++        self.snapshot('budget')
++        self.assertEqual(cycle['status'],'budget_exhausted',cycle)
++        self.assertEqual(cycle['used'],9)
++        self.assertEqual(cycle['remaining'],3)
++        self.assertIn('完整',cycle['last_error'])
++        print('BUDGET',json.dumps(cycle,ensure_ascii=False))
