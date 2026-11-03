@@ -10,33 +10,20 @@ let root: ReturnType<typeof createRoot>;
 afterEach(async () => { await act(async () => root?.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); invalidatePipeline(); });
 const render = async (node: React.ReactNode) => { root = createRoot(document.body.appendChild(document.createElement("div"))); await act(async () => root.render(node)); };
 const click = async (label: string) => act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === label)!.click());
-const contract = { generation_thinking: { allowed: ["off", "low", "high", "max"] }, query_decompose: { allowed: [false, true] }, retrieval_max_tokens: { allowed: [false, 8192, 16384, 32768, 65536] } };
-it("persists Query Decompose while keeping saved Baseline Thinking and unavailable context capacity unchanged", async () => {
-  const pipeline: any = { baseline_config: { generation_thinking: "high", query_decompose: false, retrieval_max_tokens: false }, search_space: contract, config_draft: null };
-  const posts: any[] = [];
-  vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => { if (init?.method === "POST") { posts.push(JSON.parse(String(init.body))); pipeline.config_draft = { config: posts.at(-1).config }; } return new Response(JSON.stringify(pipeline)); }));
-  await render(<SettingsPage data={{}} />);
-  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe("High");
-  expect(document.querySelector<HTMLButtonElement>('[data-parameter="generation_thinking"] button')?.disabled).toBe(true);
-  expect(document.querySelector('[data-parameter="retrieval_max_tokens"] [role="combobox"]')).toBeNull();
-  expect(document.querySelector('[data-parameter="retrieval_max_tokens"] button[aria-pressed="true"]')?.textContent).toBe("关闭");
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="query_decompose"] button')].find(button => button.textContent === "开启")!.click());
-  await click("保存草稿");
-  expect(posts[0].config).toEqual({ generation_thinking: "high", query_decompose: true, retrieval_max_tokens: false });
-  await act(async () => root.unmount()); await render(<SettingsPage data={{}} />);
-  expect(document.querySelector('[data-parameter="query_decompose"] button[aria-pressed="true"]')?.textContent).toBe("开启");
-  expect(pipeline.baseline_config.query_decompose).toBe(false);
-});
-it("shows allowed unsaved changes in the draft while refusing a different Baseline Thinking", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ baseline_config: { generation_thinking: "high", query_decompose: false }, search_space: contract }))));
-  await render(<SettingsPage data={{}} />);
-  const max = [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="generation_thinking"] button')].find(b => b.textContent === "Max")!;
-  expect(max.disabled).toBe(true);
-  await act(async () => { max.click(); });
-  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe("High");
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="query_decompose"] button')].find(b => b.textContent === "开启")!.click());
-  expect(document.querySelector('.pipeline-draft-diff')?.textContent).toContain("关闭 → 开启");
-  expect(document.querySelector('.pipeline-draft-diff')?.textContent).not.toContain("High → Max");
+const contract = { generation_thinking: { allowed: ["off", "low", "high", "max"] }, retrieval_max_tokens: { allowed: [false, 8192, 4096] }, min_score: { allowed: [0.2, 0.4] } };
+it("saves freely selected Thinking and context, preserves saved drafts and removes retired controls", async () => {
+ const pipeline: any={baseline_config:{generation_thinking:"high",retrieval_max_tokens:false,min_score:0.2},search_space:contract};
+ const posts:any[]=[];
+ vi.stubGlobal("fetch",vi.fn(async (_url:string,init?:RequestInit)=>{if(init?.method==="POST"){posts.push(JSON.parse(String(init.body)));pipeline.config_draft={config:posts.at(-1).config};}return new Response(JSON.stringify(pipeline));}));
+ await render(<SettingsPage data={{}}/>);
+ expect(document.querySelector('[data-parameter="generation_thinking"] .badge')).toBeNull();
+ expect(document.querySelector('[data-parameter="query_decompose"]')).toBeNull();
+ await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[data-parameter="generation_thinking"] button')].find(b=>b.textContent==='Max')!.click());
+ await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[data-parameter="retrieval_max_tokens"] button')].find(b=>b.textContent==='4096')!.click());
+ await click("保存草稿");
+ expect(posts[0].config).toEqual({generation_thinking:"max",retrieval_max_tokens:4096,min_score:0.2});
+ expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe('Max');
+ expect(document.body.textContent).toContain('字符数估算');
 });
 it("reports saved Run values and absent historical Thinking as unknown in report and drawer", async () => {
   const run = { id: "R-OLD", status: "completed", dataset_version_id: "G-OLD", config: { candidate_k: 12, top_k: 4, hybrid_search: true, rerank: true }, judge: { model: "judge-old", generation_prompt_version: "generation-vnext-1", execution_snapshot: { generation_model: "gen-old" } }, result: {}, dataset_snapshot: { id: "G-OLD" } };
@@ -106,21 +93,9 @@ it("does not present partial case rows as the whole dataset composition", async 
   await render(<EvaluationPage data={{ evaluation: run }} />);
   expect(document.querySelector('.baseline-run-summary')?.textContent).not.toContain("1 Positive");
 });
-it("offers repair instead of presenting an old non-Max Baseline draft as saved Max", async () => {
-  const pipeline={baseline_config:{generation_thinking:"max"},config_draft:{config:{generation_thinking:"low"}},search_space:{generation_thinking:contract.generation_thinking}};
-  vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify(pipeline))));
-  await render(<SettingsPage data={{}} />);
-  expect(document.body.textContent).toContain("已放弃旧草稿中的回答思考档位修改");
-  expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="保存草稿")?.disabled).toBe(false);
-});
-
-it("explains backend-locked Thinking and unavailable capacity, and collapses untouched draft actions", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ baseline_config: { generation_thinking: "high", query_decompose: false, retrieval_max_tokens: false }, search_space: contract }))));
-  await render(<SettingsPage data={{}} />);
-  expect(document.querySelector('[data-parameter="generation_thinking"] .badge')?.textContent).toBe("锁定");
-  expect(document.querySelector('[data-parameter="generation_thinking"]')?.getAttribute('title')).toContain("本机设置");
-  expect(document.querySelector('[data-parameter="retrieval_max_tokens"] .badge')?.textContent).toBe("暂不可用");
-  expect(document.querySelector('.pipeline-draft-actions')).toBeNull();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="query_decompose"] button')].find(button => button.textContent === "开启")!.click());
-  expect(document.querySelector('.pipeline-draft-actions')).not.toBeNull();
+it("keeps a saved lower Thinking draft editable",async()=>{
+ vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({baseline_config:{generation_thinking:"max"},config_draft:{config:{generation_thinking:"low"}},search_space:contract}))));
+ await render(<SettingsPage data={{}}/>);
+ expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe('Low');
+ expect(document.body.textContent).not.toContain('已放弃旧草稿');
 });

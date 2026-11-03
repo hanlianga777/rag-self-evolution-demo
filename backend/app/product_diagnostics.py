@@ -93,9 +93,9 @@ def product_diagnostics(store,run,cases=None):
         run=store.evaluation_run(run['id'])
     cases=store.evaluation_case_results(run['id']) if cases is None else cases
     questions={q['id']:q for q in json.loads(run['dataset_snapshot_json']).get('questions',[])}
-    from .agent_inputs import prepare_baseline_rows, baseline_review_summary
+    from .agent_inputs import baseline_bad_case_rows, baseline_review_summary
     from .optimization import baseline_diagnosis_summary, optimization_priorities
-    rows=prepare_baseline_rows(run,[{'id':f"BC-{run['id']}-{case['question_id']}",'question_id':case['question_id'],'result':case} for case in cases if case.get('passed') is False])
+    rows=baseline_bad_case_rows(store,run)
     result={'objective_metrics':objective_metrics(cases,questions), 'review_summary': baseline_review_summary(run),
         'optimization_priorities':optimization_priorities(rows,run['result'].get('gates',{}).get('gates',[])),
         'baseline_diagnosis_summary':baseline_diagnosis_summary(rows,run['result'].get('gates',{}).get('gates',[]))}

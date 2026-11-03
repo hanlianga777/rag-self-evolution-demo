@@ -1525,7 +1525,7 @@ def requires_foundation_upgrade(judge):
 def evaluation(active_task: bool = False, light: bool = False):
     identity = store.current_baseline_identity()
     run = store.evaluation_run(identity["current_baseline_id"], light=light) if identity["current_baseline_id"] else None
-    if not identity.get('baseline_designation') and (active_task or run is None):
+    if active_task or (not identity.get('baseline_designation') and run is None):
         with store.connection() as connection:
             latest = connection.execute("""SELECT id FROM evaluation_runs WHERE dataset_version_id=?
                 AND json_extract(config_json,'$.run_target')='baseline'""" +
@@ -1555,7 +1555,8 @@ def case_list_row(row, *, light=False):
 @read_view()
 def bad_cases(light: bool = False):
     current=store.current_baseline_identity()['current_baseline_id']
-    return [case_list_row(row,light=light) for row in store.bad_case_rows(current) if row["run_id"]==current]
+    from .agent_inputs import baseline_bad_case_rows
+    return [case_list_row(row,light=light) for row in baseline_bad_case_rows(store, store.evaluation_run(current) if current else None)]
 
 
 @app.get("/api/bad-cases/{case_id}")
@@ -1650,8 +1651,6 @@ def save_pipeline_draft(payload: PipelineDraftRequest):
     if payload.identity != identity:
         raise HTTPException(status_code=409, detail="配置基准已变化，请刷新后保存草稿")
     if payload.config is not None:
-        if payload.config.get("generation_thinking", ai_service.provider.settings.baseline_thinking) != ai_service.provider.settings.baseline_thinking:
-            raise HTTPException(status_code=422, detail="Baseline 回答思考档位以本机设置为准")
         validation = validate_candidate_config(payload.config)
         if not validation["valid"]:
             raise HTTPException(status_code=422, detail="；".join(validation["errors"]))

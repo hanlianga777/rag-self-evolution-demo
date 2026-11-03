@@ -28,10 +28,15 @@ def _tokenizer():
 
 
 def count_context_tokens(text):
-    return len(_tokenizer().encode(text, add_special_tokens=False).ids)
+    try:
+        return len(_tokenizer().encode(text, add_special_tokens=False).ids)
+    except ValueError:
+        # Character estimate: Chinese one token per character, ASCII four per token.
+        import math
+        return math.ceil(sum(0.25 if ord(char) < 128 else 1 for char in text))
 
 
-BUDGETS = (8192, 16384, 32768, 65536)
+BUDGETS = (8192, 4096)
 
 
 def render_generation_context(entries):
@@ -58,7 +63,7 @@ heuristic can prove an excluded block lacks a necessary safety prerequisite.
 The trace contains counts of the exact same rendering used by generation.
 """
     if max_tokens is not False and (type(max_tokens) is not int or max_tokens not in BUDGETS):
-        raise ValueError('retrieval_max_tokens must be false or 8192/16384/32768/65536')
+        raise ValueError('retrieval_max_tokens must be false or 8192/4096')
     trace = {'enabled': max_tokens is not False, 'limit': max_tokens,
              'count_method': 'deepseek_v4_official_local' if max_tokens is not False else None,
              'tokenizer_artifact_sha256': TOKENIZER_SHA256 if max_tokens is not False else None,
@@ -67,6 +72,10 @@ The trace contains counts of the exact same rendering used by generation.
              'context_complete': True, 'generation_allowed': True}
     if max_tokens is False:
         return entries, trace
+    try:
+        _tokenizer()
+    except ValueError:
+        trace.update(count_method='字符数估算 token', tokenizer_artifact_sha256=None)
     def count(blocks):
         return count_context_tokens(render_generation_context(blocks))
     trace['tokens_before'] = count(entries)

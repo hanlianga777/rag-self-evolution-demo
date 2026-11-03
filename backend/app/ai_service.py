@@ -165,7 +165,7 @@ class AiService:
         stages, trace = [], {}
         with measure(stages, "query_processing"), collect_usage() as auxiliary_usage:
             queries = self._retrieval_queries(question, config, trace=trace, stages=stages)
-        aliases = self.store.approved_aliases() if hasattr(self.store, "approved_aliases") and config["alias_mapping"] else {}
+        aliases = self.store.approved_aliases() if hasattr(self.store, "approved_aliases") and config.get("alias_mapping", False) else {}
         retriever = self.retriever
         if isinstance(retriever, VectorRetriever) and isinstance(self.corpus, CorpusStore) and self.corpus.index_info().get('knowledge_identity'):
             from .knowledge_pipeline import index_for_config
@@ -216,7 +216,7 @@ class AiService:
             response = self.provider.complete_with_metrics(
                 f"你是机器人官方 PDF 知识助手。{strategy}{boundary}回答使用中文，简洁、可执行。",
                 f"问题：{question}\n证据：\n{context}",
-                stream=True,
+                stream=True, temperature=0,
             )
         return {"answer": response["content"], "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000), "ttft_ms": response["ttft_ms"], "retrieval": citations, "input_tokens": response["input_tokens"], "output_tokens": response["output_tokens"], "stages": stages, "token_usage": {"auxiliary_queries": auxiliary_usage, "generation": response.get("usage", {})}, **cost_fields(self.model, [*auxiliary_usage, response.get("usage", {})]), **retrieval_fields}
 

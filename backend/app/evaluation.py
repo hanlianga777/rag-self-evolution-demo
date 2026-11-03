@@ -75,7 +75,7 @@ def protected_question(case, golden=None):
 def candidate_comparison(baseline, candidate, targets, golden_questions=None):
     """Task 004 compares saved binary outcomes; only reviewed fluctuations are excluded."""
     comparison = compare_cases(baseline, candidate, targets)
-    fluctuations = sorted(q for q, c in candidate.items() if baseline.get(q, {}).get('passed') is True and c.get('regression_review', {}).get('status') == 'fluctuation')
+    fluctuations = []
     new = sorted(q for q, c in baseline.items() if c.get('passed') is True and candidate.get(q, {}).get('passed') is False and q not in fluctuations)
     fixed = sorted(q for q, c in baseline.items() if c.get('passed') is False and candidate.get(q, {}).get('passed') is True)
     critical = [q for q in new if protected_question(baseline[q], (golden_questions or {}).get(q))]
@@ -89,7 +89,7 @@ def candidate_comparison(baseline, candidate, targets, golden_questions=None):
             'net_improvement': len(fixed) - len(new), 'formal_blocking_question_ids': critical,
             'bad_case_count': sum(c.get('passed') is False for q, c in candidate.items() if q not in fluctuations),
             'initial_bad_case_count': sum(c.get('passed') is False for c in candidate.values()),
-            'regression_interpretation': '初次新增错题复核两次，三次多数判错才计新增；普通新增只记录，关键安全及注入新增阻断ABC'}
+            'regression_interpretation': '按单遍结果计新增错题；普通新增只记录，关键安全及注入新增阻断ABC'}
 
 
 def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:
@@ -243,7 +243,7 @@ class EvaluationRunner:
             raise ValueError("正式评测需要完整 approved Golden：Positive、Ablation、Negative、Safety Critical 与 Prompt Injection")
         production = self.store.active_production() or {"config": {}}
         source = self.store.evaluation_run(resume_source_id) if resume_source_id else None
-        config = {**DEFAULT_PIPELINE_CONFIG, "run_target": "baseline"}
+        config = {**DEFAULT_PIPELINE_CONFIG, "generation_thinking": getattr(getattr(getattr(self.runtime, "provider", None), "settings", None), "baseline_thinking", "max"), **{k:v for k,v in production["config"].items() if k in DEFAULT_PIPELINE_CONFIG}, "run_target": "baseline"}
         if source:
             self._require_generation_contract(source['judge'])
             from .evaluation_contract import experiment_config_identity
@@ -262,7 +262,8 @@ class EvaluationRunner:
                     raise ValueError('Config Draft参数非法：' + '; '.join(validation['errors']))
                 config.update(draft['config'])
                 if config.get('hybrid_search') is False: config.pop('hybrid_alpha', None)
-            config['generation_thinking'] = getattr(getattr(getattr(self.runtime, 'provider', None), 'settings', None), 'baseline_thinking', 'max')
+            if not isinstance(draft, dict) or not isinstance(draft.get('config'), dict):
+                config.setdefault('generation_thinking', getattr(getattr(getattr(self.runtime, 'provider', None), 'settings', None), 'baseline_thinking', 'max'))
             if config['generation_thinking'] not in {'off', 'low', 'high', 'max'}:
                 raise ValueError('BASELINE_THINKING必须为off/low/high/max')
         index_info = self.runtime.corpus.index_info() if hasattr(self.runtime, "corpus") and hasattr(self.runtime.corpus, "index_info") else {}
@@ -301,8 +302,8 @@ class EvaluationRunner:
             generation_model_constraint=self.runtime.model,
             frozen_business_rules={'source':'docs/RAG_SELF_EVOLUTION_SPEC.md','contract':'round0-20261028'})
         judge_meta['execution_snapshot'].update(generation_thinking=thinking_config('baseline', config['generation_thinking']),
-            effective_temperature=None, temperature_ignored=True)
-        judge_meta['execution_snapshot'].pop('temperature', None)
+            temperature=0, effective_temperature=0 if config['generation_thinking']=='off' else None,
+            temperature_ignored=config['generation_thinking']!='off', evaluation_passes=1)
         judge_meta["evaluation_identity"] = evaluation_identity(snapshot, judge_meta)
         return snapshot, approved, config, judge_meta
 
@@ -839,20 +840,7 @@ class EvaluationRunner:
                         if final_pass:checkpoint['final_retry_done']=True
                         persist()
                         continue
-                    try:
-                        result=checkpoint['scored_result']
-                        if baseline_cases.get(item['id'], {}).get('passed') is True and result.get('passed') is False:
-                            phase = 'regression_review'
-                            result['regression_review'] = self.review_regression(item, result, config, checkpoint, stage_run_id, check_stop, lambda *_a, **_kw: persist())
-                    except Exception as error:
-                        from .providers import permanent_provider_error, provider_error_details
-                        if isinstance(error, InterruptedError) or permanent_provider_error(error):
-                            raise
-                        checkpoint['technical_error']={'phase':phase, 'error_type':type(error).__name__, 'error':str(error),
-                            'provider_error':provider_error_details(error,phase)}
-                        if final_pass:checkpoint['final_retry_done']=True
-                        persist()
-                        continue
+                    result=checkpoint['scored_result']
                     try:
                         from .sqlite_support import retry_storage
                         retry_storage(lambda:self.store.record_evaluation_case(run_id,item['id'],result,with_bad_case=True))
@@ -975,7 +963,7 @@ class EvaluationRunner:
         approved = self.snapshot_items(snapshot)
         if baseline['judge'].get('model') != self.runtime.model:
             raise ValueError('Sandbox 必须使用 Baseline 冻结的 Judge Model')
-        config = {**{k:DEFAULT_PIPELINE_CONFIG[k] for k in ("generation_thinking","query_decompose","retrieval_max_tokens")}, **candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
+        config = {**{k:baseline["config"].get(k,DEFAULT_PIPELINE_CONFIG[k]) for k in ("generation_thinking","retrieval_max_tokens")}, **candidate["config"], **({"knowledge_identity": baseline["config"]["knowledge_identity"]} if baseline["config"].get("knowledge_identity") else {}), "run_target": "sandbox_candidate", "candidate_id": candidate_id}
         return approved, config, candidate, baseline
 
     def candidate_resume_plan(self,candidate_id, *, manual_resume=False):

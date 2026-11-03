@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .agent_recovery import digest
 from .diagnostics import diagnostic_view
-from .agent_inputs import prepare_baseline_rows, is_optimization_target
+from .agent_inputs import prepare_baseline_rows, is_optimization_target, baseline_bad_case_rows
 from .full_text import CORPUS_LOCK
 from .governance import _json, _now
 from .optimization import prepare_response, validate_intervention
@@ -109,10 +109,10 @@ def coverage_inputs(store,experiment_id):
     experiment=store.experiment(experiment_id)
     if not experiment:raise ValueError('Experiment不存在')
     baseline=store.evaluation_run(experiment['baseline_run_id'])
-    rows=prepare_baseline_rows(baseline, [r for r in store.bad_case_rows(baseline['id']) if r['run_id']==baseline['id']])
+    rows=baseline_bad_case_rows(store,baseline)
     from .evaluation_contract import business_verdict
     rows=[r for r in rows if business_verdict(r['result'])=='FAIL' or (r['result'].get('evaluation_outcome') or {}).get('contract_version')!='business-vnext-1' and r['result'].get('passed') is False]
-    base={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}
+    base={**DEFAULT_PIPELINE_CONFIG,**{k:v for k,v in baseline['config'].items() if k in ALLOWED_SEARCH_SPACE}}
     for key in ('run_target','knowledge_identity'):base.pop(key,None)
     number=max([c['reasoning'].get('round',1) for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}] or [1])
     report=plan_coverage(rows,base,experiment['candidates'],round_number=number)

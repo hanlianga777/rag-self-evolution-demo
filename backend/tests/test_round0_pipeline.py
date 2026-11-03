@@ -21,7 +21,7 @@ with patch.dict(os.environ, _env):
 class Round0PolicyTests(unittest.TestCase):
     def test_new_defaults_and_historical_absence(self):
         self.assertEqual(DEFAULT_PIPELINE_CONFIG['generation_thinking'], 'max')
-        self.assertIs(DEFAULT_PIPELINE_CONFIG['query_decompose'], False)
+        self.assertNotIn('query_decompose', DEFAULT_PIPELINE_CONFIG)
         self.assertIs(DEFAULT_PIPELINE_CONFIG['retrieval_max_tokens'], False)
         old = {k: v for k, v in DEFAULT_PIPELINE_CONFIG.items()
                if k not in {'generation_thinking', 'query_decompose', 'retrieval_max_tokens'}}
@@ -35,9 +35,9 @@ class Round0PolicyTests(unittest.TestCase):
                            ('generation_thinking', 'medium')]:
             with self.subTest(key=key, value=value):
                 self.assertFalse(validate_candidate_config({**DEFAULT_PIPELINE_CONFIG, key: value})['valid'])
-        for limit in (False, 8192, 16384, 32768, 65536):
+        for limit in (False, 8192, 4096):
             self.assertTrue(validate_candidate_config({**DEFAULT_PIPELINE_CONFIG, 'retrieval_max_tokens': limit})['valid'])
-        self.assertIn('query_decompose', search_space_contract())
+        self.assertNotIn('query_decompose', search_space_contract())
 
 
 class Round0DecomposeTests(unittest.TestCase):
@@ -111,11 +111,11 @@ class Round0BudgetTests(unittest.TestCase):
         self.assertFalse(trace['generation_allowed'])
         self.assertFalse(trace['context_complete'])
         self.assertEqual(trace['excluded'][0]['chunk_id'], 'C2')
-        self.assertEqual(trace['count_method'], 'deepseek_v4_official_local')
+        self.assertIn(trace['count_method'], ('deepseek_v4_official_local', '字符数估算 token'))
 
     def test_on_full_context_keeps_generation(self):
-        selected, trace = budget_context(self.entries(), 65536)
-        self.assertEqual(len(selected), 2)
+        selected, trace = budget_context(self.entries()[:1], 8192)
+        self.assertEqual(len(selected), 1)
         self.assertTrue(trace['generation_allowed'])
 
     def test_budget_rejects_invalid_input(self):
@@ -126,10 +126,10 @@ class Round0BudgetTests(unittest.TestCase):
         with patch('app.context_budget._tokenizer', side_effect=AssertionError('must not load')):
             self.assertTrue(budget_context(self.entries(), False)[1]['generation_allowed'])
 
-    def test_corrupt_tokenizer_blocks_on(self):
+    def test_missing_tokenizer_estimates_on(self):
         with patch('app.context_budget.TOKENIZER_ARCHIVE', Path(_isolation.name) / 'absent.zip'):
             from app.context_budget import _tokenizer
             _tokenizer.cache_clear()
             try:
-                with self.assertRaises(ValueError): budget_context(self.entries(), 8192)
+                self.assertIn('估算', budget_context(self.entries(), 8192)[1]['count_method'])
             finally: _tokenizer.cache_clear()

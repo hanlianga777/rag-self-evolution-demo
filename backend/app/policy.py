@@ -18,11 +18,8 @@ DEFAULT_PIPELINE_CONFIG = {
     "query_rewrite": False,
     "multi_query": False,
     "hyde": False,
-    "metadata_filter": "OFF",
-    "alias_mapping": False,
     "prompt_strategy": "Grounded",
     "generation_thinking": "max",
-    "query_decompose": False,
     "retrieval_max_tokens": False,
 }
 
@@ -45,19 +42,16 @@ QUALITY_METRICS = tuple(gate["metric"] for gate in GATE_DEFINITIONS[:9])
 ALLOWED_SEARCH_SPACE = {
     "candidate_k": (12, 24),
     "top_k": (4, 6),
-    "min_score": (0, 0.1, 0.2, 0.3),
+    "min_score": (0, 0.1, 0.2, 0.3, 0.4),
     "hybrid_search": (True, False),
     "hybrid_alpha": (0.3, 0.5, 0.7),
     "rerank": (True, False, "query_only"),
     "query_rewrite": (True, False),
     "multi_query": (False, 2, 4, 6),
     "hyde": (True, False),
-    "metadata_filter": ("OFF", "STRICT", "FALLBACK"),
-    "alias_mapping": (True, False),
     "prompt_strategy": ("Grounded", "Completeness", "Tiered"),
     "generation_thinking": ("off", "low", "high", "max"),
-    "query_decompose": (False, True),
-    "retrieval_max_tokens": (False,),
+    "retrieval_max_tokens": (False, 8192, 4096),
 }
 
 EXCLUDED_AUTOMATIC_PARAMETERS = frozenset({
@@ -69,22 +63,19 @@ EXCLUDED_AUTOMATIC_PARAMETERS = frozenset({
 PARAMETER_EXPLANATIONS = {
     'candidate_k': ('候选数：初次查找保留多少段资料，供后续排序。', ['先保留12段候选资料。', '先保留24段候选资料，扩大查找范围。']),
     'top_k': ('保留条数：最终送给回答模型的资料段数。', ['最多保留4段资料用于回答。', '最多保留6段资料用于回答，可能增加耗时。']),
-    'min_score': ('最低分数线：低于该相关分的内容不进入回答。', ['不额外提高相关分门槛。', '仅保留相关分至少0.1的内容。', '仅保留相关分至少0.2的内容。', '仅保留相关分至少0.3的内容，过滤更严格。']),
+    'min_score': ('最低分数线：低于该相关分的内容不进入回答。', ['不额外提高相关分门槛。', '仅保留相关分至少0.1的内容。', '仅保留相关分至少0.2的内容。', '仅保留相关分至少0.3的内容，过滤更严格。', '仅保留相关分至少0.4的内容。']),
     'hybrid_search': ('混合检索：是否结合向量和关键词查找。', ['结合语义相似度和关键词检索。', '按向量相关分排序，不混合关键词分数。']),
     'hybrid_alpha': ('向量检索权重：仅在混合检索开启时使用。', ['向量权重0.3、关键词权重0.7，更重视原词。', '向量和关键词各占0.5。', '向量权重0.7、关键词权重0.3，更重视语义。']),
     'rerank': ('重排方式：决定候选资料进入回答前如何排序。', ['调用重排模型重新排序。', '保留检索原排序，不调用重排模型。', '只按原问题做关键词排序，不调用重排模型。']),
     'query_rewrite': ('查询改写：是否先把原问题改写为检索问法。', ['调用模型生成标准化检索问法。', '不生成改写问法。']),
     'multi_query': ('多路查询：是否生成互补问法一起查找。', ['不生成多路查询。', '生成2个互补问法并检索。', '生成4个互补问法并检索。', '生成6个互补问法并检索，检索量和耗时可能增加。']),
     'hyde': ('HyDE：先写一段假设答案再拿去检索，假设文本不作为证据。', ['调用模型生成假设答案辅助检索。', '不生成假设答案。']),
-    'metadata_filter': ('元数据筛选：按识别到的型号等条件限制资料范围。', ['不按元数据限制资料范围。', '严格按识别条件筛选，没有匹配资料就返回空。', '先按识别条件筛选，没有匹配资料时回退到全部资料。']),
-    'alias_mapping': ('别名映射：是否使用已审核的设备别名。', ['把已审核别名映射到标准名称。', '不使用已审核别名映射。']),
     'prompt_strategy': ('回答策略：决定怎样使用证据和处理缺失条件；历史Abstention仍为谨慎拒答，不可新选。', [
         '有据生成：只能基于给定证据回答；证据不足时明确说明。',
         '完整性优先：在不超出证据的前提下覆盖用户问题的所有必要步骤；证据不足时明确说明。',
         '分级回答：证据能明确回答时直接给出步骤和结论；只覆盖一部分或缺关键条件时，先说清能确定的部分，再追问1–2个最关键的信息，不猜；证据完全不相关或超出知识库时说明无法回答，建议联系售后或人工；安全警告必须完整保留。']),
-    'generation_thinking': ('回答思考档位：控制回答模型的思考投入，可能影响质量、耗时和费用。', ['关闭思考。', '低档思考，投入较少。', '高档思考，当前基线使用此档。', '最高档思考，投入较多。']),
-    'query_decompose': ('问题拆分：是否把多个独立意图拆开查找。', ['不拆分原问题。', '调用模型把独立意图拆开后分别检索。']),
-    'retrieval_max_tokens': ('上下文容量：本机缺少分词器归档，暂时只能关闭。', ['关闭容量裁剪，不截断检索内容。']),
+    'generation_thinking': ('回答思考档位：控制回答模型的思考投入，可能影响质量、耗时和费用。', ['关闭思考。', '低档思考，投入较少。', '高档思考。', '最高档思考，投入较多。']),
+    'retrieval_max_tokens': ('上下文窗口：保留完整来源块；缺少分词器时按字符数估算 token。', ['不限，不截断检索内容。', '限制为8192 token。', '限制为4096 token。']),
 }
 
 
@@ -219,7 +210,7 @@ def validate_candidate_config(config: dict, *, prior_configs=(), completed_evals
     for key, rule in contract.items():
         if key == "hybrid_alpha" and config.get("hybrid_search") is False:
             continue
-        if key not in config and key in {"generation_thinking", "query_decompose", "retrieval_max_tokens"}:
+        if key not in config and key in {"generation_thinking", "retrieval_max_tokens"}:
             continue  # Read historical configs without inventing execution metadata.
         if key not in config:
             errors.append(f"missing required parameter: {key}")

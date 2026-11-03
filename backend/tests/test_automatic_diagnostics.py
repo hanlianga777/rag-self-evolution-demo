@@ -27,7 +27,7 @@ class AutomaticDiagnosticTests(unittest.TestCase):
         from unittest.mock import patch
         with patch('app.diagnostics._current_corpus',side_effect=AssertionError('live KB must not be read')):
             view=diagnostic_view(case,corpus_chunks=[],corpus_fingerprint='changed')
-        self.assertEqual(view['diagnosis_category'],'检索失败')
+        self.assertEqual(view['diagnosis_category'],'检索层问题')
         self.assertTrue(view['target_eligible'])
         self.assertEqual(view['retrieval_failure_stage'],'candidate_recall')
         self.assertEqual(case,before)
@@ -35,7 +35,7 @@ class AutomaticDiagnosticTests(unittest.TestCase):
     def test_explicit_empty_stages_are_different_from_missing_stages(self):
         case,_=recall_case();trace=case['programmatic_metrics']['retrieval_trace']
         trace.update(candidates=[],final=[])
-        self.assertEqual(diagnostic_view(case)['diagnosis_category'],'检索失败')
+        self.assertEqual(diagnostic_view(case)['diagnosis_category'],'检索层问题')
         trace['candidates']=None
         self.assertEqual(diagnostic_view(case)['diagnosis_category'],'记录缺失')
         trace['candidates']=[]
@@ -46,18 +46,18 @@ class AutomaticDiagnosticTests(unittest.TestCase):
     def test_candidate_missing_dominates_incorrect_answer_and_saved_cause(self):
         case,_=recall_case();case.update(model_answer='无需检查外壳。',primary_root_cause='Generation')
         case['judge_result'].update(behavior_pass=False,unsupported_claims=['无需检查外壳。'])
-        self.assertEqual(diagnostic_view(case)['diagnosis_category'],'检索失败')
+        self.assertEqual(diagnostic_view(case)['diagnosis_category'],'检索层问题')
 
     def test_saved_pending_or_disputed_status_does_not_hide_text_based_result(self):
         case,_=recall_case()
         for status in ('confirmed','needs_review','disputed'):
             case['diagnosis']['status']=status
             case['programmatic_metrics']['claim_assessment']['pending']=[{'claim':'未闭合的附加主张'}]
-            self.assertEqual(diagnostic_view(case)['diagnosis_category'],'检索失败')
+            self.assertEqual(diagnostic_view(case)['diagnosis_category'],'检索层问题')
 
     def test_final_source_ids_can_differ_and_parent_expansion_is_plain_saved_text(self):
         case,chunks=recall_case();trace=case['programmatic_metrics']['retrieval_trace']
         trace['candidates'].append({'chunk_id':'unrelated-id','content':chunks[1]['chunk_text']})
         trace['final']=[{'chunk_id':'parent','content':'父段落：检查外壳，检查传感器是否脏污。'}]
         trace['parent_expand']=True
-        self.assertEqual(diagnostic_view(case)['diagnosis_category'],'回答问题')
+        self.assertEqual(diagnostic_view(case)['diagnosis_category'],'生成层问题')

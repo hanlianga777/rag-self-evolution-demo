@@ -32,6 +32,8 @@ class FollowupJobs:
         return self.root / run_id / (group + '.json')
 
     def start(self, run_id, group):
+        if group == 'review':
+            raise ValueError('当前评测以单遍结果为准，已关闭错题复核；历史记录只读保留')
         read_baseline(self.store.database_path, run_id)
         path = self.path(run_id, group)
         with self.lock:
@@ -120,7 +122,7 @@ class FollowupJobs:
         if not self.root.exists():
             return
         for path in self.root.glob('*/*.json'):
-            if path.stem not in {'review', 'max', 'high', 'low'}:
+            if path.stem not in {'max', 'high', 'low'}:
                 continue
             state = json.loads(path.read_text())
             job = state.get('_job', {})
