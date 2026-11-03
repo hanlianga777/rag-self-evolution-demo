@@ -7,6 +7,7 @@
 #   bash 指挥/自动值班/值班.sh --once        只做一张任务单就结束（试跑用）
 #   bash 指挥/自动值班/值班.sh --until 2300  改成 23:00 后不再开新任务
 #   bash 指挥/自动值班/值班.sh --接手        桌面版做了一半的改动，先保存下来，交给命令行版接着做
+#   bash 指挥/自动值班/值班.sh --一直跑      不按钟点收工：一直值班，直到总指挥放了「指挥/暂停」文件或手动 Ctrl+C
 #   bash 指挥/自动值班/值班.sh --全权限      Codex 不受限制（能重启 demo 后台等），只在试跑证明需要时用
 #   几个选项可以一起用，例如：bash 指挥/自动值班/值班.sh --接手 --全权限
 #
@@ -39,6 +40,7 @@ PAUSE_FILE="指挥/暂停"
 LOGDIR="$HOME/RAG归档/值班日志"
 ONCE=0
 TAKEOVER=0
+NONSTOP=0
 FULL=0
 
 while [ $# -gt 0 ]; do
@@ -46,6 +48,7 @@ while [ $# -gt 0 ]; do
     --once) ONCE=1 ;;
     --until) shift; STOP_NEW="${1:-$STOP_NEW}" ;;
     --接手) TAKEOVER=1 ;;
+    --一直跑) NONSTOP=1 ;;
     --全权限) FULL=1 ;;
   esac
   shift
@@ -214,7 +217,7 @@ run_task() {
   while kill -0 "$CODEX_PID" 2>/dev/null; do
     sleep 30
     elapsed=$(( ( $(date +%s) - start ) / 60 ))
-    if [ "$elapsed" -ge "$TASK_MAX_MIN" ] || { [ "$ONCE" -eq 0 ] && [ "$(now_min)" -ge "$HARD_STOP_MIN" ]; }; then
+    if [ "$elapsed" -ge "$TASK_MAX_MIN" ] || { [ "$ONCE" -eq 0 ] && [ "$NONSTOP" -eq 0 ] && [ "$(now_min)" -ge "$HARD_STOP_MIN" ]; }; then
       stop_codex
       echo "[值班脚本] 超时，已强制停止（已做 ${elapsed} 分钟）" >> "$RUN_LOG"
       break
@@ -286,7 +289,7 @@ if [ -n "$(g status --porcelain)" ]; then
   fi
 fi
 
-if [ "$ONCE" -eq 0 ] && [ "$(now_min)" -ge "$STOP_NEW_MIN" ]; then
+if [ "$ONCE" -eq 0 ] && [ "$NONSTOP" -eq 0 ] && [ "$(now_min)" -ge "$STOP_NEW_MIN" ]; then
   say "现在已经过了 ${STOP_NEW:0:2}:${STOP_NEW:2:2}，不开始值班。需要的话用 --until 改时间。"
   exit 0
 fi
@@ -302,13 +305,17 @@ fi
 if [ "$ONCE" -eq 1 ]; then
   record "值班开始（试跑，只做一张）"
 else
-  record "值班开始（${STOP_NEW:0:2}:${STOP_NEW:2:2} 后不再开新任务）"
+  if [ "$NONSTOP" -eq 1 ]; then
+    record "值班开始（一直跑，直到总指挥暂停）"
+  else
+    record "值班开始（${STOP_NEW:0:2}:${STOP_NEW:2:2} 后不再开新任务）"
+  fi
 fi
 
 fails=0
 fails_limit_logged=""
 while :; do
-  if [ "$ONCE" -eq 0 ] && [ "$(now_min)" -ge "$STOP_NEW_MIN" ]; then
+  if [ "$ONCE" -eq 0 ] && [ "$NONSTOP" -eq 0 ] && [ "$(now_min)" -ge "$STOP_NEW_MIN" ]; then
     record "到点，值班结束"
     break
   fi
@@ -359,7 +366,7 @@ while :; do
       fi
       wake_min=$(( ( $(date +%s) + wait_s ) / 60 ))
       day_start=$(( $(date +%s) / 60 - $(now_min) ))
-      if [ "$ONCE" -eq 0 ] && [ $(( wake_min - day_start )) -ge "$STOP_NEW_MIN" ]; then
+      if [ "$ONCE" -eq 0 ] && [ "$NONSTOP" -eq 0 ] && [ $(( wake_min - day_start )) -ge "$STOP_NEW_MIN" ]; then
         record "额度用完：$task 没做完（已做部分已保存）。恢复时间晚于今天收工时间，值班结束；下次启动值班会接着做"
         break
       fi
@@ -372,6 +379,14 @@ while :; do
     fails_limit_logged=""
     fails=$((fails + 1))
     if [ "$fails" -ge 2 ]; then
+      if [ "$NONSTOP" -eq 1 ]; then
+        # 一直跑模式：这张单先挪成草稿（文件名前加 _），值班继续做后面的单，交给总指挥处理
+        parked="$QUEUE/_暂缓-$(basename "$task")"
+        g mv "$task" "$parked" >/dev/null 2>&1 && g commit -q -m "值班：$(basename "$task" .md) 连续两次没做完，暂缓 (No SPEC Change)" >/dev/null 2>&1 && push_now
+        record "连续两次没做完，已暂缓（改名为草稿），继续后面的任务：${task}（本机日志：${RUN_LOG}）"
+        fails=0
+        sleep "$CHECK_EVERY"; continue
+      fi
       record "连续两次没做完，值班停止：${task}（本机日志：${RUN_LOG}）"
       break
     fi
