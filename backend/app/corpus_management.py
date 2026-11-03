@@ -1,6 +1,7 @@
 """User initiated PDF changes; build a complete replacement index before activation."""
 
 from __future__ import annotations
+from .sqlite_support import open_database
 
 import hashlib
 import json
@@ -27,7 +28,7 @@ def require_consistent_switch(index_dir, database_path=None):
     expected=record['new_identity'] if record['phase']=='completed' else record['old_identity']
     actual=validate_bundle(index_dir,require_full_text=True)['manifest']['knowledge_identity']
     database=Path(database_path or index_dir.parent/'demo.db').resolve()
-    with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as connection:
+    with open_database(database,read_only=True) as connection:
         reset_name='experiment-reset-v1:'+str(expected.get('corpus_snapshot_id'))
         reset=connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").fetchone()
         reset=reset and connection.execute('SELECT 1 FROM schema_migrations WHERE name=?',(reset_name,)).fetchone()

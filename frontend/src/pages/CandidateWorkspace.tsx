@@ -161,18 +161,22 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
   useEffect(() => {
     if (!revisionRun?.id || !["queued", "generating", "validating", "probing", "qc"].includes(revisionRun.status)) return;
     let cancelled = false;
+    let timer: number;
     const poll = async () => {
       try {
-        const updated = await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`);
+        let updated = await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}?light=true`);
         if (cancelled) return;
-        setRevisionRun(updated);
+        const active = ["queued", "generating", "validating", "probing", "qc"].includes(updated.status);
+        if (!active) updated = await getJson<Candidate>(`/api/governance/revisions/${revisionRun.id}`);
+        if (cancelled) return;
+        setRevisionRun(previous => active ? {...previous,...updated} : updated);
         if (updated.status === "completed") setView("review");
         if (["preview_ready", "failed", "failed_quality", "interrupted"].includes(updated.status)) void onRefresh();
-      } catch (error) { if (!cancelled) setRevisionError(errorMessage(error)); }
+        if (active) timer = window.setTimeout(poll, 1000);
+      } catch (error) { if (!cancelled) {setRevisionError(errorMessage(error));timer = window.setTimeout(poll, 2000);} }
     };
     void poll();
-    const timer = window.setInterval(() => void poll(), 1000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [revisionRun?.id, revisionRun?.status]);
 
   if (!row) return null;
@@ -310,7 +314,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
           <section className="candidate-card"><h3>{row.test_category === "negative" ? "预期行为" : "参考答案"}</h3><p className="candidate-answer">{row.test_category === "negative" ? qc.behavior_criteria || negativeBehavior[row.raw?.expected_behavior || row.negative_subtype] || displayText(row.raw?.expected_behavior || row.negative_subtype || "未记录") : row.reference_answer}</p></section>
           <section className="candidate-card"><h3>核心证据</h3>{row.test_category === "negative" ? <p className="muted">此题检验拒答或澄清边界，无预设 Golden Evidence。</p> : <>{evidenceChunks[0] && <p className="candidate-evidence-meta">{evidenceChunks[0].document_name || evidenceChunks[0].document_id || "当前索引未匹配"} · P.{evidenceChunks[0].page_start ?? "—"} · {evidenceChunks[0].section_path || "未标注章节"} · {evidenceChunks[0].chunk_id}</p>}<p className="candidate-evidence-preview">{cleanPreview(summarySource) || "当前索引未匹配，无法展示证据摘要"}</p><details><summary>查看完整证据</summary>{evidence.map((source: Candidate, index: number) => <div className="review-evidence" key={index}>{source.chunks?.map((chunk: Candidate) => <div key={chunk.chunk_id}><strong>{chunk.document_name || chunk.document_id || "当前索引未匹配"}</strong><p>{chunk.section_path || "未标注章节"} · P.{chunk.page_start ?? "—"}–{chunk.page_end ?? "—"} · {chunk.chunk_id}</p><p className="review-full-text">{chunk.chunk_text || "当前索引未匹配，无法展示原文"}</p></div>)}</div>)}</details></>}</section>
           {row.attention_reasons?.length > 0 && <section className="candidate-card"><h3>关注原因</h3><p>{row.attention_reasons.join(" · ")}</p>{row.attention_categories?.map((item: Candidate) => <p key={item.code}><strong>{item.code} · {item.label}</strong>：{item.action}</p>)}{row.quality_audit?.checks && !Object.values(row.quality_audit.checks).every(Boolean) && <p>{row.quality_audit.reason}</p>}</section>}
-          <section className="candidate-card"><h3>自动质量检查</h3><div className="quality-grid"><div><strong>Probe · {probe.probe_details?.probe_execution_status === "failed" ? "执行失败" : numberText(probe.score)}</strong><span>{probeLabel(row.probe_status)}</span><p>{probe.probe_details?.classification === "RETRIEVAL_INCOHERENT" || probe.classification === "RETRIEVAL_INCOHERENT" ? "检索未召回（P1），可由人工审核" : row.probe_status === "probe_passed" ? (rank >= 0 ? `预期证据命中第 ${rank + 1} 位` : "检索验证通过") : displayText(probe.reason || probe.probe_details?.failure_reason || "未运行")}</p><button className="secondary" disabled={busy || readOnly || row.stage === "golden" || activeRevision} onClick={() => onRun(row.id, "probe")}>运行 Probe</button></div><div><strong>QC · {numberText(qc.score)}</strong><span>{qcLabel(row.qc_status)}{qc.priority === "P1" ? " · P1复核" : ""}</span><p>{rerunSlot?.qc === "skipped" ? "本次 Probe 未通过，QC 已跳过" : qc.reason || "—"}</p><button className="secondary" disabled={busy || readOnly || row.stage === "golden" || activeRevision || row.probe_status !== "probe_passed"} onClick={() => onRun(row.id, "qc")}>运行 QC</button></div></div>{eligibility?.requires_qc_p0_acceptance && <p className="error-notice">QC P0 风险：{eligibility.qc_reason || "请查看 QC 详情"} · {eligibility.qc_created_at || "时间未记录"}。批准前需明确接受并记录理由。</p>}</section>
+          <section className="candidate-card"><h3>自动质量检查</h3><div className="quality-grid"><div><strong>Probe · {probe.probe_details?.probe_execution_status === "failed" ? "执行失败" : numberText(probe.score)}</strong><span>{probeLabel(row.probe_status)}</span><p>题目有效：{probe.question_validity_reason || (row.probe_status === "probe_passed" ? "题目与证据校验通过。" : displayText(probe.reason || probe.probe_details?.failure_reason || "未运行"))}</p><p>召回观察：{probe.retrieval_observation || (probe.probe_details?.classification === "RETRIEVAL_INCOHERENT" || probe.classification === "RETRIEVAL_INCOHERENT" ? "检索未召回（P1），可由人工审核" : rank >= 0 ? `预期证据命中第 ${rank + 1} 位` : "未记录")}</p><button className="secondary" disabled={busy || readOnly || row.stage === "golden" || activeRevision} onClick={() => onRun(row.id, "probe")}>运行 Probe</button></div><div><strong>QC · {numberText(qc.score)}</strong><span>{qcLabel(row.qc_status)}{qc.priority === "P1" ? " · P1复核" : ""}</span><p>{rerunSlot?.qc === "skipped" ? "本次 Probe 未通过，QC 已跳过" : qc.reason || "—"}</p><button className="secondary" disabled={busy || readOnly || row.stage === "golden" || activeRevision || row.probe_status !== "probe_passed"} onClick={() => onRun(row.id, "qc")}>运行 QC</button></div></div>{eligibility?.requires_qc_p0_acceptance && <p className="error-notice">QC P0 风险：{eligibility.qc_reason || "请查看 QC 详情"} · {eligibility.qc_created_at || "时间未记录"}。批准前需明确接受并记录理由。</p>}</section>
           {acceptingQc && <section className="candidate-card"><h3>接受 QC P0 风险</h3><p>{eligibility?.qc_reason || "请查看 QC 详情"}</p><label>接受理由<textarea aria-label="接受 QC P0 的理由" value={qcAcceptanceReason} onChange={event => setQcAcceptanceReason(event.target.value)} /></label><button className="primary" disabled={busy || !qcAcceptanceReason.trim()} onClick={() => void onReview(row.id, "approved", qcAcceptanceReason.trim(), undefined, true)}>确认接受并批准</button></section>}
           {!!row.revision_history?.length && <details className="revision-summary"><summary>修订历史 · {row.revision_history.length}</summary>{row.revision_history.map((item: Candidate) => <p key={item.id}>{displayText(item.status)} · {item.reason || "未记录原因"} · {item.created_at}</p>)}</details>}
         </div>}

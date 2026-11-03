@@ -57,6 +57,14 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [preflight,setPreflight]=useState<Row | null>(null);
+  useEffect(() => {
+    if (!selectedCase || !run.id || !["queued","running"].includes(run.status) || run.cases?.some((row:Row) => row.question_id === selectedCase.question_id)) return;
+    let cancelled=false;
+    void getJson<Row>(`/api/evaluations/${run.id}`).then(value => {
+      if (!cancelled) setRun(current => ({...current,cases:value.cases,dataset_snapshot:value.dataset_snapshot}));
+    }).catch(reason => {if (!cancelled)setError(errorMessage(reason));});
+    return () => {cancelled=true;};
+  }, [run.id, selectedCase?.question_id]);
   useEffect(()=>{
     let cancelled=false;
     const load=async()=>{
@@ -78,9 +86,11 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
     const poll = async () => {
       if(cancelled)return;
       try {
-        const next = await getJson<Row>(`/api/evaluations/${run.id}`);
+        let next = await getJson<Row>(`/api/evaluations/${run.id}?light=true`);
         if (cancelled) return;
-        setRun(next);
+        if (!["queued","running"].includes(next.status)) next = await getJson<Row>(`/api/evaluations/${run.id}`);
+        if (cancelled) return;
+        setRun(current => ["queued","running"].includes(next.status) ? {...current,...next,cases:current.cases,dataset_snapshot:current.dataset_snapshot} : next);
         if (["queued","running"].includes(next.status)) window.setTimeout(poll, 1000);
         if (next.status !== "running" && ["queued","running"].includes(run.status)) { const rows = await getJson<Row[]>("/api/bad-cases"); if (!cancelled) setBadCases(rows); }
       } catch (reason) { if (!cancelled) { setError(errorMessage(reason)); window.setTimeout(poll,2000); } }

@@ -625,7 +625,7 @@ class AiService:
             raise ProviderUnavailable('修订业务元数据响应未符合契约') from error
         return {key:result[key] for key in ('business_scenario','user_intent')}
 
-    def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None, profile=None, coverage_plan=None) -> dict:
+    def generate_mini_golden(self, chunks: list[dict], on_progress=None, embeddings=None, *, plan=None, existing=None, prior_audit=None, profile=None, coverage_plan=None, stage_runner=None) -> dict:
         """Generate a coverage-planned Golden set; approval remains human-only."""
         if not self.live_enabled:
             raise ProviderRequestError("未配置 DEEPSEEK_API_KEY，无法生成 Golden Candidate")
@@ -671,9 +671,11 @@ class AiService:
                                     if on_progress:
                                         pending = {"slot":slot["slot"], "attempt":attempt, "business_design":design, "validation_error":"evidence_verification_pending", "model":self.model, "timestamp":datetime.now(timezone.utc).isoformat()}
                                         on_progress({"stage":"generating", "slot":slot["slot"], "attempt":attempt, "slot_complete":False, "slot_audit":{**slot_audit, slot["slot"]:[*attempts,pending]}})
-                                generated = self.business_question_first(slot, source_payload, [item["question"] for item in candidates], attempts[-1]["validation_error"] if attempts else None, save_design=save_design, prior_design=pending_design if retry == 0 else None)
+                                work = lambda: self.business_question_first(slot, source_payload, [item["question"] for item in candidates], attempts[-1]["validation_error"] if attempts else None, save_design=save_design, prior_design=pending_design if retry == 0 else None)
+                                generated = stage_runner(slot['slot'], attempt, work) if stage_runner else work()
                             else:
-                                response = self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload, **({"parent_context": self.business_parent_context(slot)} if business else {}), "prior_questions": [item["question"] for item in candidates]}, ensure_ascii=False), json_mode=True)
+                                work = lambda: self.provider.complete("你是 Golden Dataset 生成器。" + instruction, json.dumps({"category": slot["test_category"], "coverage_slot": slot["slot"], "sources": source_payload, **({"parent_context": self.business_parent_context(slot)} if business else {}), "prior_questions": [item["question"] for item in candidates]}, ensure_ascii=False), json_mode=True)
+                                response = stage_runner(slot['slot'], attempt, work) if stage_runner else work()
                                 generated = json.loads(response)
                         if isinstance(generated, dict):
                             generated["generation_method"] = "owner_controlled_draft_revision" if draft_revision else "provider"

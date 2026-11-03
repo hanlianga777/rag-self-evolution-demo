@@ -293,7 +293,8 @@ class OptimizationContractTests(unittest.TestCase):
         self.store.claim_agent_generation('EVAL-test', experiment_id=experiment)
         with patch('app.governance.os.kill', side_effect=ProcessLookupError):
             self.store.interrupt_agent_generations()
-        self.assertEqual(self.store.experiment(experiment)['status'], 'failed')
+        self.assertEqual(self.store.experiment(experiment)['status'], 'generating')
+        self.assertIn('agent_interruption',self.store.experiment(experiment)['result'])
 
     def test_persistence_response_reuse_revalidates_without_second_provider_call(self):
         import hashlib
@@ -314,6 +315,53 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(len(result['candidates']), 3)
         self.assertIn('response_reuse',result['result'])
+
+    def test_raw_response_survives_worker_exit_before_validation(self):
+        import hashlib
+        from unittest.mock import patch
+        from app.telemetry import record_usage
+        provider=FixedProvider(json.dumps(drafts()))
+        provider.request_summary=lambda system,user,**kw: {'request_sha256':hashlib.sha256((system+user).encode()).hexdigest()}
+        complete=provider.complete
+        calls=[]
+        def respond(*args,**kwargs):
+            calls.append(True);record_usage({'provider':'Stub','status':'ok'})
+            return complete(*args,**kwargs)
+        provider.complete=respond
+        with patch('app.optimization.prepare_response',side_effect=KeyboardInterrupt('worker exited')):
+            with self.assertRaises(KeyboardInterrupt):OptimizationAgent(self.store,provider).generate('EVAL-test')
+        experiment=self.store.latest_experiment()
+        with self.store.connection() as connection:
+            connection.execute("UPDATE experiments SET status='failed' WHERE id=?",(experiment['id'],))
+        result=OptimizationAgent(self.store,provider).generate('EVAL-test',experiment_id=experiment['id'])
+        self.assertEqual(len(calls),1)
+        self.assertEqual(len(result['candidates']),3)
+
+    def test_rpc_response_checkpoint_survives_exit_before_complete_returns(self):
+        import hashlib
+        from app.evaluation_stage import checkpoint_request
+        from app.telemetry import record_usage
+        provider=FixedProvider(json.dumps(drafts()))
+        provider.request_summary=lambda system,user,**kw: {'request_sha256':hashlib.sha256((system+user).encode()).hexdigest()}
+        calls=[]
+        crashed=False
+        def respond(system,user,**kwargs):
+            nonlocal crashed
+            def action():
+                calls.append(True);record_usage({'provider':'Stub','status':'ok'})
+                return json.dumps(drafts())
+            content=checkpoint_request('Stub','fixture','agent',{'system':system,'user':user},action)
+            if not crashed:
+                crashed=True;raise KeyboardInterrupt('worker exited after durable RPC response')
+            return content
+        provider.complete=respond
+        with self.assertRaises(KeyboardInterrupt):OptimizationAgent(self.store,provider).generate('EVAL-test')
+        experiment=self.store.latest_experiment()
+        with self.store.connection() as connection:
+            connection.execute("UPDATE experiments SET status='failed' WHERE id=?",(experiment['id'],))
+        result=OptimizationAgent(self.store,provider).generate('EVAL-test',experiment_id=experiment['id'])
+        self.assertEqual(len(calls),1)
+        self.assertEqual(len(result['candidates']),3)
 
 
 if __name__ == "__main__":

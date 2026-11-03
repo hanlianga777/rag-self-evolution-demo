@@ -78,10 +78,16 @@ def recover_authorized_evaluations():
     def recover(run_id):
         try:EvaluationRunner(store,ai_service).recover_run(run_id)
         except Exception as error:
-            run=store.evaluation_run(run_id)
-            if run and run['status'] in {'queued','running'}:
-                result=run['result'];result['auto_recovery'].update(state='stopped',error=str(error))
-                store.finish_evaluation_run(run_id,'partial' if store.evaluation_case_results(run_id) else 'failed',result,str(error))
+            from .providers import permanent_provider_error
+            try:
+                run=store.evaluation_run(run_id,light=True)
+                if run and run['status'] in {'queued','running'}:
+                    result=run['result']
+                    fatal=isinstance(error,(InterruptedError,ValueError)) or permanent_provider_error(error)
+                    result.setdefault('auto_recovery',{}).update(state='stopped' if fatal else 'retrying',error=str(error))
+                    if fatal:store.finish_evaluation_run(run_id,'partial' if store.evaluation_case_results(run_id) else 'failed',result,str(error))
+                    else:store.update_evaluation_progress(run_id,result)
+            except Exception:logging.exception('Recovery storage unavailable; monitor will retry')
     for run in store.evaluation_runs(authorized_only=True):
         auto=run['result'].get('auto_recovery',{})
         if run['result'].get('stop_request'):
@@ -96,25 +102,35 @@ def recover_authorized_evaluations():
                 except PermissionError:continue
                 else:continue
         candidate=store.candidate(run['config']['candidate_id']) if run['config'].get('candidate_id') else None
+        if candidate:
+            experiment=store.experiment(candidate['experiment_id'])
+            if experiment and experiment['result'].get('optimization_cycle',{}).get('status')=='running':continue
         if run['status'] in {'queued','running'} or run['status']=='completed' and candidate and candidate['status']=='running':
             threading.Thread(target=recover,args=(run['id'],),daemon=True).start()
 
 
 @app.on_event('startup')
 def start_recovery_monitor():
-    if safe_start: return
     _recovery_stop.clear()
     def monitor():
-        last_retention=0.0
+        retention_due=not safe_start
+        had_jobs=False
         while not _recovery_stop.is_set():
-            if time.monotonic()-last_retention>=60:
-                try:
-                    from .history import prune_history
-                    prune_history(store)
-                except Exception:logging.exception('History retention unavailable')
-                last_retention=time.monotonic()
-            try:recover_authorized_evaluations()
-            except Exception:logging.exception('Evaluation recovery monitor unavailable')
+            try:
+                from .history import has_active_jobs, prune_history
+                with store.connection() as connection:active=has_active_jobs(connection)
+                active=active or followup_jobs.has_active()
+                if had_jobs and not active and not safe_start:retention_due=True
+                if retention_due and not active:
+                    prune_history(store);retention_due=False
+                had_jobs=active
+                recover_authorized_evaluations()
+                from .optimization_cycle import recover_optimization_cycles, recover_agent_generations
+                recover_optimization_cycles(store,ai_service)
+                recover_agent_generations(store,ai_service)
+                followup_jobs.recover()
+                recover_golden_jobs()
+            except Exception:logging.exception('Background recovery monitor unavailable')
             _recovery_stop.wait(5)
     threading.Thread(target=monitor,daemon=True).start()
 
@@ -342,7 +358,9 @@ def knowledge():
             if plan['corpus_fingerprint'] == index.get('knowledge_identity') and plan['profile'] == {'name': 'full', **GENERATION_PROFILES['full']}:
                 coverage = plan
                 break
-        index['coverage'] = coverage
+        from .read_view import semantic_coverage
+        coverage=semantic_coverage(coverage,corpus.chunks()) if coverage else None
+        index={**index,'coverage':coverage}
         fresh = manifest.get('sources') == current_manifest()['sources']
         operations = [corpus_manager.operation(p.stem) for p in (corpus_manager.data_dir/'corpus_operations').glob('*.json')]
         operation = next(iter(sorted((o for o in operations if o), key=lambda o: o['id'].rsplit('-', 1)[-1], reverse=True)), None)
@@ -610,6 +628,12 @@ def generation_runs(light: bool = False):
     if not light:
         return store.generation_runs()
     current = store.working_generation_run()
+    if current:
+        with store.connection() as connection:
+            frozen=connection.execute("SELECT 1 FROM dataset_versions WHERE status='approved' AND json_extract(snapshot_json,'$.generation_run_id')=? LIMIT 1",(current['id'],)).fetchone()
+        if frozen or current['status'] in {'queued','coverage','generating','validation','probing','qc'}:
+            from .read_view import generation_progress
+            return [generation_progress(store,current['id'],include_plan=True)]
     runs = [store.generation_run(current['id'])] if current else []
     result = []
     for run in runs[:1]:
@@ -624,8 +648,12 @@ def generation_runs(light: bool = False):
 
 
 @app.get("/api/governance/generation-runs/{run_id}")
-def generation_run_status(run_id: str):
-    result = store.generation_run(run_id)
+def generation_run_status(run_id: str, light: bool = False):
+    if light:
+        from .read_view import generation_progress
+        result=generation_progress(store,run_id)
+    else:
+        result = store.generation_run(run_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Generation run not found")
     return result
@@ -749,6 +777,83 @@ def resume_generation_quality(generation_run_id: str):
     return {"run_id": generation_run_id, "status": "probing"}
 
 
+_golden_recovery_threads = {}
+
+
+def _golden_owner():
+    return {'auto_resume': True, 'execution_owner_pid': os.getpid(), 'worker_thread': threading.get_ident()}
+
+
+def _golden_owner_alive(owner):
+    pid = owner.get('execution_owner_pid')
+    if pid == os.getpid():
+        if owner.get('worker_thread') is None:
+            return time.time() - (owner.get('worker_claimed_at') or 0) < 10
+        return any(t.ident == owner.get('worker_thread') and t.is_alive() for t in threading.enumerate())
+    if type(pid) is int and pid > 0:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True
+    return False
+
+
+def recover_golden_jobs():
+    """Resume only explicitly checkpointed jobs left by an exited owner."""
+    with store.connection() as connection:
+        generations = connection.execute("""SELECT r.id,r.status,
+            json_extract(a.hard_validation_json,'$.auto_resume') auto_resume,
+            json_extract(a.hard_validation_json,'$.execution_owner_pid') owner_pid,
+            json_extract(a.hard_validation_json,'$.worker_thread') worker_thread,
+            json_extract(a.hard_validation_json,'$.worker_claimed_at') claimed_at,
+            json_extract(a.hard_validation_json,'$.quality_rerun.status') quality_status,
+            json_extract(a.hard_validation_json,'$.quality_rerun.auto_resume') quality_auto,
+            json_extract(a.hard_validation_json,'$.quality_rerun.execution_owner_pid') quality_pid,
+            json_extract(a.hard_validation_json,'$.quality_rerun.worker_thread') quality_thread,
+            json_extract(a.hard_validation_json,'$.quality_rerun.worker_claimed_at') quality_claimed_at
+            FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id
+            WHERE r.status IN ('queued','coverage','generating','validation','probing','qc')
+               OR json_extract(a.hard_validation_json,'$.quality_rerun.status')='running'""").fetchall()
+        revisions = connection.execute("""SELECT id,json_extract(audit_json,'$.auto_resume') auto_resume,
+            json_extract(audit_json,'$.execution_owner_pid') owner_pid,
+            json_extract(audit_json,'$.worker_thread') worker_thread,
+            json_extract(audit_json,'$.worker_claimed_at') claimed_at
+            FROM candidate_revision_runs WHERE status IN ('queued','generating','validating','probing','qc')""").fetchall()
+    def start(key, target, args, kwargs=None):
+        thread = _golden_recovery_threads.get(key)
+        if thread and thread.is_alive():
+            return
+        thread = threading.Thread(target=target, args=args, kwargs=kwargs or {}, daemon=True)
+        _golden_recovery_threads[key] = thread
+        thread.start()
+    for row in generations:
+        quality = row['quality_status'] == 'running'
+        owner = {'execution_owner_pid': row['quality_pid'] if quality else row['owner_pid'],
+                 'worker_thread': row['quality_thread'] if quality else row['worker_thread'],
+                 'worker_claimed_at': row['quality_claimed_at'] if quality else row['claimed_at']}
+        if not (row['quality_auto'] if quality else row['auto_resume']) or _golden_owner_alive(owner):
+            continue
+        run = store.generation_run(row['id'], qualification=False)
+        if quality and row['status'] not in {'probing', 'qc'}:
+            state = run['artifacts']['hard_validation']['quality_rerun']
+            ids = state.get('question_ids') or state.get('selected_question_ids') or run['question_ids']
+            start(row['id'], _run_quality_rerun, (row['id'], ids, store, ai_service, corpus))
+        else:
+            start(row['id'], _run_mini_generation, (row['id'], store, ai_service, corpus),
+                  {'resume_quality': row['status'] in {'probing', 'qc'}})
+    for row in revisions:
+        if not row['auto_resume'] or _golden_owner_alive({'execution_owner_pid': row['owner_pid'], 'worker_thread': row['worker_thread'], 'worker_claimed_at': row['claimed_at']}):
+            continue
+        run = store.revision_run(row['id'])
+        target = (_run_revision_quality if run.get('applied_at') else
+                  _regenerate_revision_draft if run.get('active_draft', {}).get('kind') in {'regenerate', 'reselect'} else
+                  _resume_revision_edit if run.get('active_draft', {}).get('kind') == 'edit' else _prepare_revision)
+        start(row['id'], target, (row['id'], store, ai_service, corpus))
+
+
 def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=False, resume_quality=False, paid_run=None):
     from .paid_run import controlled_run
     if paid_run is not None and (regenerate or not resume_quality):
@@ -761,7 +866,22 @@ def _run_mini_generation(run_id, run_store, service, run_corpus, *, regenerate=F
 def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regenerate=False, resume_quality=False):
     from .paid_run import current_paid_run
     stage = "generation"
-    profile = run_store.generation_run(run_id)["profile"]
+    initial = run_store.generation_run(run_id, qualification=False)
+    profile = initial["profile"]
+    run_store.update_generation_run(run_id, status=initial['status'], validation=_golden_owner())
+
+    generation_checkpoints = run_store.generation_run(run_id, qualification=False)['artifacts']['hard_validation'].get('generation_checkpoints', {})
+    generation_checkpoints.update({key.removeprefix('generation:'): value for key, value in run_store.job_checkpoints(run_id).items() if key.startswith('generation:')})
+    def generation_stage(slot, attempt, work):
+        checkpoint = generation_checkpoints.setdefault(slot + ':' + str(attempt), {'attempts': []})
+        return perform_stage(checkpoint, 'generation', work, run_id + ':' + slot + ':' + str(attempt),
+                             automatic=False, check_stop=lambda: None,
+                             on_state=lambda *args, **kwargs: run_store.save_job_checkpoint(
+                                 run_id, 'generation:' + slot + ':' + str(attempt), checkpoint))
+    def generate(**kwargs):
+        if isinstance(service, AiService):
+            kwargs['stage_runner'] = generation_stage
+        return service.generate_mini_golden(chunks, on_progress=on_progress, **kwargs)
 
     def on_progress(event):
         nonlocal stage
@@ -779,6 +899,7 @@ def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regener
             if frozen['corpus_fingerprint'] != manifest_identity(current_manifest()) or frozen['chunk_fingerprint'] != digest(sorted(chunks, key=lambda item: item['chunk_id'])):
                 raise ValueError('Coverage Plan 已失效：Corpus 已变化')
         complete = resume_quality
+        regenerate = regenerate or bool(run_store.generation_run(run_id, qualification=False)['question_ids'])
         for round_number in ([] if resume_quality else range(1, 4 if regenerate and not (frozen and frozen.get('generation_strategy') == 'business_v2') else 2)):
             if regenerate:
                 run = run_store.generation_run(run_id)
@@ -800,7 +921,7 @@ def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regener
                             source_ids = [alternative["chunk_id"]]
                             slot = {**slot, "material_chunk_ids": source_ids, "evidence_chunk_ids": source_ids if slot["test_category"] != "negative" else [], "selected_reason": "same_product_retry", "structured_type": None}
                     plan.append({**slot, "sources": [by_id[chunk_id] for chunk_id in source_ids]})
-                generated = service.generate_mini_golden(chunks, on_progress=on_progress, plan=plan, existing=existing, prior_audit=prior_audit, profile=profile, coverage_plan=run['artifacts']['hard_validation'].get('frozen_plan'))
+                generated = generate(plan=plan, existing=existing, prior_audit=prior_audit, profile=profile, coverage_plan=run['artifacts']['hard_validation'].get('frozen_plan'))
             else:
                 frozen = run_store.generation_run(run_id)['artifacts']['hard_validation'].get('frozen_plan')
                 kwargs = {'profile': profile}
@@ -813,7 +934,7 @@ def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regener
                     kwargs['plan'] = [{**slot, 'sources': [known[key] for key in slot['material_chunk_ids']]} for slot in frozen['slots']]
                 elif profile.get('name', 'mini') == 'mini':
                     kwargs = {}
-                generated = service.generate_mini_golden(chunks, on_progress=on_progress, **kwargs)
+                generated = generate(**kwargs)
             failed_slots = generated.get("failed_slots", [])
             continue_refill = regenerate and not (frozen and frozen.get('generation_strategy') == 'business_v2') and round_number < 3 and 0 < len(failed_slots) < remaining_before
             complete = run_store.complete_generation_slots(run_id, failed_slots=failed_slots, hard_validation=generated["hard_validation"], continue_refill=continue_refill)
@@ -888,7 +1009,9 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generatio
     counters = {'completed':0,'probe_passed':0,'probe_failed':0,'qc_passed':0,'qc_failed':0,'qc_skipped':0,'technical_failed':0}
     validation_state = run_store.generation_run(run_id,qualification=False)['artifacts']['hard_validation']
     state = validation_state.get('quality_rerun',{})
-    checkpoints = state.get('checkpoints',{}); slots = dict(state.get('slots',{}))
+    run_store.update_quality_rerun(run_id, {**_golden_owner(), 'selected_question_ids': ids})
+    checkpoints = dict(state.get('checkpoints',{})); slots = dict(state.get('slots',{}))
+    checkpoints.update({key.removeprefix('quality:'): value for key, value in run_store.job_checkpoints(run_id).items() if key.startswith('quality:')})
     attempt_id = state.get('attempt_id',run_id)
     def persist(**values):
         selected = [value for value in slots.values() if value.get('question_id') in ids]
@@ -899,7 +1022,7 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generatio
             qc_failed=sum(v.get('qc')=='qc_failed' for v in selected),
             qc_skipped=sum(v.get('qc')=='skipped' for v in selected),
             technical_failed=sum(v.get('execution_status')=='failed' for v in selected))
-        run_store.update_quality_rerun(run_id,{**counters,'slots':slots,'checkpoints':checkpoints,**values})
+        run_store.update_quality_rerun(run_id,{**counters,'slots':slots,**values})
         if generation_progress:
             status = values.get('status')
             stage = status if status in {'completed','failed'} else 'probing' if values.get('stage') in {'probe','precheck','business_audit'} else 'qc'
@@ -907,6 +1030,10 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generatio
                 'probe_completed':counters['probe_passed']+counters['probe_failed'],
                 'qc_completed':counters['qc_passed']+counters['qc_failed'],'qc_skipped':counters['qc_skipped'],
                 'quality_processed':counters['completed'],'technical_failed':counters['technical_failed']})
+
+    def persist_checkpoint(key, checkpoint, **values):
+        run_store.save_job_checkpoint(run_id, 'quality:' + key, checkpoint)
+        persist(**values)
 
     try:
         chunks=run_corpus.chunks(); peers=[run_store.question(key) for key in run_store.generation_run(run_id,qualification=False)['question_ids']]
@@ -956,9 +1083,9 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generatio
                             if retired:
                                 cp.setdefault('manual_resume_history',[]).append({'provider_requests':retired,'reason':'retry of invalid quality response'})
                                 for request_key in retired:del requests[request_key]
-                                persist(stage=phase,slot=slot)
+                                persist_checkpoint(key,cp,stage=phase,slot=slot)
                         return perform_stage(cp,phase,action,stage_run_id,automatic=False,check_stop=lambda:None,
-                                             on_state=lambda *args,**kwargs:persist(stage=phase,slot=slot))
+                                             on_state=lambda *args,**kwargs:persist_checkpoint(key,cp,stage=phase,slot=slot))
                     row=run_store.candidate_rows([key])[0]
                     if item['raw'].get('generation_strategy')=='business_v2' and not row['quality_audit']:
                         audit=perform('business_audit',lambda:service.business_quality_audit(item,[q['question'] for q in peers if q['id']!=key]))
@@ -982,10 +1109,13 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generatio
                     else:
                         slots[slot]['qc']='skipped'
                     slots[slot].pop('final_retry_pending',None)
-                    persist(stage='qc',slot=slot)
+                    persist_checkpoint(key,cp,stage='qc',slot=slot)
                 except Exception as error:
                     slots[slot] = {**slots.get(slot,{}), 'question_id':key, 'execution_status':'failed', 'failed_stage':phase, 'error':str(error), 'final_retry_done':bool(final_pass)}
-                    persist(stage=phase, slot=slot)
+                    if key in checkpoints:
+                        persist_checkpoint(key, checkpoints[key], stage=phase, slot=slot)
+                    else:
+                        persist(stage=phase, slot=slot)
                     if isinstance(error, InterruptedError) or permanent_provider_error(error):
                         raise
         persist(status='completed',stage='completed',error='部分题目技术执行失败，成功阶段已保留' if counters['technical_failed'] else None,finished_at=datetime.now(timezone.utc).isoformat())
@@ -1004,13 +1134,19 @@ def review_question(question_id: str, payload: ReviewRequest):
 
 
 @app.get("/api/governance/revisions")
-def revision_runs(generation_run_id: str | None = None, active_only: bool = False):
+def revision_runs(generation_run_id: str | None = None, active_only: bool = False, light: bool = False):
+    if light:
+        from .read_view import revision_progress
+        return revision_progress(store,generation_run_id=generation_run_id,active_only=active_only)
     return store.revision_runs(generation_run_id,active_only=active_only)
 
 
 @app.get("/api/governance/revisions/{revision_id}")
-def revision_status(revision_id: str):
+def revision_status(revision_id: str, light: bool = False):
     try:
+        if light:
+            from .read_view import revision_progress
+            return revision_progress(store,revision_id)
         return store.revision_run(revision_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Revision Run not found") from error
@@ -1031,13 +1167,18 @@ def create_revision(question_id: str, payload: RevisionRequest):
 
 
 def _prepare_revision(revision_id, run_store, service, run_corpus):
+    run_store.update_revision(revision_id, **_golden_owner())
     try:
         chunks = run_corpus.chunks()
         run = run_store.revision_run(revision_id)
+        if run['mode'] == 'manual_edit' and run.get('status') == 'validating' and not run.get('applied_at'):
+            run_store.update_revision(revision_id, status='queued', stage='queued')
+            run = run_store.revision_run(revision_id)
         generated = run.get("generated_drafts") if run["mode"] == "ai_regenerate" else None
         if run["mode"] == "ai_regenerate":
             if not run.get("material_selection"):
-                selection = service.select_revision_material(run, chunks)
+                selection = _revision_attempt(run_store, revision_id, 'material_selection', service,
+                    lambda: service.select_revision_material(run, chunks))
                 run_store.update_revision(revision_id, material_selection=selection, stage="material_selected")
                 run = run_store.revision_run(revision_id)
             run_store.update_revision(revision_id, status="generating", stage="generating")
@@ -1099,6 +1240,7 @@ def regenerate_revision_draft(revision_id: str, payload: RevisionDraftRegenerate
 
 
 def _regenerate_revision_draft(revision_id, run_store, service, run_corpus):
+    run_store.update_revision(revision_id, **_golden_owner())
     try:
         run = run_store.revision_run(revision_id)
         active = run["active_draft"]
@@ -1110,7 +1252,9 @@ def _regenerate_revision_draft(revision_id, run_store, service, run_corpus):
             manual = active.get("manual_chunk_ids")
             excluded = set(selected) | {key for source in run["before"][target]["evidence"] for key in source.get("source_chunk_ids", [])}
             prompt_run = {**run, "reason": active["reason"], "tags": active["tags"], "changes": {**run["changes"], target: {"context_chunk_ids" if run["before"][target]["test_category"] == "negative" else "source_chunk_ids": manual} if manual is not None else {}}, "force_reselect": True, "exclude_chunk_ids": {target: sorted(excluded)}}
-            selection = {target: active["material_selection"]} if active.get("material_selection") else service.select_revision_material({**prompt_run, "question_ids": [target]}, run_corpus.chunks())
+            selection = {target: active["material_selection"]} if active.get("material_selection") else _revision_attempt(
+                run_store, revision_id, 'material_selection', service,
+                lambda: service.select_revision_material({**prompt_run, "question_ids": [target]}, run_corpus.chunks()))
             material[target] = selection[target]
             if not active.get("material_selection"):
                 run_store.update_revision(revision_id, active_draft={**active, "material_selection": selection[target]}, draft_attempts=[*run["draft_attempts"][:-1], {**run["draft_attempts"][-1], "material_selection": selection[target]}], stage="material_selected")
@@ -1183,6 +1327,7 @@ def _resume_revision_edit(revision_id, run_store, service, run_corpus):
 
 
 def _run_revision_quality(revision_id, run_store, service, run_corpus):
+    run_store.update_revision(revision_id, **_golden_owner())
     results = {}
     try:
         chunks = run_corpus.chunks()
@@ -1239,19 +1384,39 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
 
 
 def _revision_attempt(run_store, revision_id, stage, service, work):
+    from .evaluation_stage import perform_stage
+    run = run_store.revision_run(revision_id)
+    number = (run.get('active_draft') or {}).get('number', 0)
+    key = 'revision:' + stage + ':' + str(number)
+    checkpoint = run_store.job_checkpoint(revision_id, key) if hasattr(run_store, 'job_checkpoint') else None
+    checkpoint = checkpoint or {'attempts': []}
+    previous = checkpoint['attempts'][-1] if checkpoint['attempts'] else {}
+    if previous.get('status') == 'error' and (previous.get('error_type') in {'ProviderInvalidResponse', 'ValueError', 'JSONDecodeError'}
+            or previous.get('cause_type') in {'ValueError', 'JSONDecodeError', 'TypeError'}):
+        requests = checkpoint.setdefault('provider_requests', {})
+        retired = {key: value for key, value in requests.items()
+                   if value.get('status') == 'completed' and value.get('provider', '').lower() == 'deepseek'}
+        checkpoint.setdefault('manual_resume_history', []).append({'provider_requests': retired, 'reason': 'retry invalid quality response'})
+        for request in retired:
+            del requests[request]
+    def save(*args, **kwargs):
+        if hasattr(run_store, 'save_job_checkpoint'):
+            run_store.save_job_checkpoint(revision_id, key, checkpoint)
     started = time.perf_counter()
     error = None
     try:
         from .telemetry import collect_usage
         with collect_usage() as usage:
-            return work()
+            return perform_stage(checkpoint, stage, work, revision_id + ':' + key, automatic=False,
+                                 check_stop=lambda: None, on_state=save)
     except Exception as caught:
         error = caught
         raise
     finally:
+        save()
         run = run_store.revision_run(revision_id)
         history = list(run.get("runtime_attempts") or [])
-        history.append({"stage": stage, "attempt": 1, "error_type": type(error).__name__ if error else None, "error": str(error.__cause__ or error) if error else None, "elapsed_ms": round((time.perf_counter() - started) * 1000), "result": "failed" if error else "passed", "provider": "DeepSeek" if getattr(service, "model", None) else None, "model": getattr(service, "model", None), "token_usage":usage})
+        history.append({"stage": stage, "attempt": len(checkpoint['attempts']), "error_type": type(error).__name__ if error else None, "error": str(error.__cause__ or error) if error else None, "elapsed_ms": round((time.perf_counter() - started) * 1000), "result": "failed" if error else "passed", "provider": "DeepSeek" if getattr(service, "model", None) else None, "model": getattr(service, "model", None), "token_usage":usage})
         run_store.update_revision(revision_id, runtime_attempts=history)
 
 
@@ -1367,7 +1532,7 @@ def evaluation(active_task: bool = False, light: bool = False):
                 ("" if active_task else " AND status IN ('running','partial','failed')") +
                 " ORDER BY created_at DESC,rowid DESC LIMIT 1",(identity['current_golden_id'],)).fetchone()
         if latest:run=persisted_evaluation_progress(store.evaluation_run(latest['id'],light=light))
-    diagnostics = product_diagnostics(store,run) if run else {}
+    diagnostics = product_diagnostics(store,run) if run and not light else {}
     return {"diagnostic_categories":DIAGNOSTIC_CATEGORIES,"product_diagnostics":diagnostics,"runtime_contract":EVALUATION_RUNTIME_CONTRACT, **(run or {"status": "not_run", "data_source": "real", "message": identity["baseline_unavailable_reason"]}), **identity, **({"requires_policy_upgrade":bool(identity.get("requires_policy_upgrade")) or requires_foundation_upgrade(run.get("judge",{}))} if run else {})}
 
 
@@ -1426,7 +1591,7 @@ def optimization(light: bool = False, planning: bool = False):
             from .agent_coverage import coverage_inputs
             experiment, _, rows, _, coverage = coverage_inputs(store, identity['current_experiment_id'])
         else:
-            experiment = store.experiment(identity['current_experiment_id'])
+            experiment = store.experiment(identity['current_experiment_id'],light=True)
     if experiment is None:
         from .policy import MAX_EVALS
         budget = {'used': 0, 'max': MAX_EVALS, 'reserved_for_d': 1, 'remaining': MAX_EVALS, 'remaining_for_abc': MAX_EVALS - 1}
@@ -1566,10 +1731,12 @@ def start_direct_release(payload: DirectReleaseRequest):
 
 
 @app.get("/api/experiments/{run_id}")
-def experiment(run_id: str):
-    result = store.experiment(run_id)
+def experiment(run_id: str, light: bool = False):
+    result = store.experiment(run_id,light=light)
     if result is None:
         raise HTTPException(status_code=404, detail="Experiment not found")
+    if light:
+        return {key:value for key,value in light_value(result).items() if key in {'id','status','baseline_run_id','result','candidates','evaluation_budget','rounds'}}
     return result
 
 
@@ -1723,8 +1890,11 @@ def start_followup(run_id: str, group: Literal['review', 'max', 'high', 'low']):
 
 @app.get("/api/evaluations/{run_id}")
 @read_view()
-def evaluation_run(run_id: str):
-    run = store.evaluation_run(run_id)
+def evaluation_run(run_id: str, light: bool = False):
+    run = store.evaluation_run(run_id,light=light)
+    if light:
+        if run is None:raise HTTPException(status_code=404,detail='Evaluation run not found')
+        return run
     if run is None:
         raise HTTPException(status_code=404, detail="Evaluation run not found")
     run=persisted_evaluation_progress(run)

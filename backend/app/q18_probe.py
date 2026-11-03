@@ -1,4 +1,5 @@
 """Q18 independent probe; independent artifacts, never formal evaluation writes."""
+from .sqlite_support import open_database
 import json
 import hashlib
 import sqlite3
@@ -57,7 +58,7 @@ def validate_artifact(record,plan,database):
     expected=next(r['execution_sha256'] for r in plan['eligibility'] if r['question_id']==QUESTION_ID)
     if digest(record['execution'])!=expected:raise ValueError('Q18 execution hash changed')
     execution=record['execution'];item=record['item'];case=record['case'];judge=case['judge_result']
-    with sqlite3.connect(Path(database).resolve().as_uri()+'?mode=ro',uri=True) as connection:
+    with open_database(database,read_only=True) as connection:
         row=connection.execute('SELECT dataset_snapshot_json FROM evaluation_runs WHERE id=?',(plan['source_run_id'],)).fetchone()
     frozen=next(q for q in json.loads(row[0])['questions'] if q['id']==QUESTION_ID)
     expected_item={'id':QUESTION_ID,'question':frozen['question'],'reference_answer':frozen.get('reference_answer'),

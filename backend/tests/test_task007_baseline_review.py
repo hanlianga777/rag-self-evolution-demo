@@ -48,7 +48,7 @@ class BaselineReviewTests(unittest.TestCase):
         calls = []
         def score(item, execution, **kwargs):
             calls.append(item['id'])
-            if len(calls) == 1:
+            if len(calls) <= 3:
                 raise ProviderTimeout('fixture exhausted transport')
             return {'passed': True}
         with patch.object(self.runner, 'score_execution', side_effect=score):
@@ -64,7 +64,7 @@ class BaselineReviewTests(unittest.TestCase):
         with patch.object(self.runner, 'score_execution', side_effect=ProviderTimeout('fixture stop')) as score:
             with self.assertRaises(ProviderTimeout):
                 self.runner.review_baseline_errors(key, on_progress=lambda review: updates.append(deepcopy(review)), stop_on_error=True)
-        self.assertEqual(score.call_count, 1)
+        self.assertEqual(score.call_count, 3)
         self.assertEqual(self.runtime.answers, ['Q1'])
         saved = self.store.evaluation_run(key)['result']['baseline_review']
         self.assertIn('technical_error', saved['cases']['Q1'])

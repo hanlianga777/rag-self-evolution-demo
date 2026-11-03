@@ -14,6 +14,9 @@ describe("getJson", () => {
       expect(fetcher.mock.calls.map(call=>call[0])).toContain(apiUrl('/api/optimization?light=true&planning=true'));
       expect(fetcher.mock.calls.map(call=>call[0])).not.toContain(apiUrl('/api/bad-cases'));
       expect(fetcher.mock.calls.map(call=>call[0])).not.toContain(apiUrl('/api/dataset?light=true'));
+      fetcher.mockClear();
+      await loadAppData(true,'governance');
+      expect(fetcher.mock.calls.map(call=>call[0])).toEqual([apiUrl('/api/workspace')]);
     } finally { vi.unstubAllGlobals(); }
   });
   it("builds PDF asset URLs on the API origin instead of the Vite origin", () => {

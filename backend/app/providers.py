@@ -138,6 +138,9 @@ def redact_provider_error(raw, api_key):
 
 
 def provider_error_details(error, stage):
+    from .sqlite_support import locked
+    if locked(error):
+        return {'stage':stage,'error_type':type(error).__name__,'detail':str(error),'failure_class':'internal_storage_retry','retryable':True,'http_status':None,'request_execution_unknown':False}
     original=error;seen=set()
     while error.__cause__ is not None and id(error) not in seen and not isinstance(error,ProviderUnavailable):
         seen.add(id(error));error=error.__cause__
@@ -173,7 +176,7 @@ def permanent_provider_error(error):
             code=getattr(error,'provider_code',None)
             if any(term in str(code).lower().replace('_','') for term in ('insufficientbalance','insufficientquota','invalidapikey','arrearage','accessdenied')):return True
             status=getattr(error,'status_code',None) or getattr(error,'code',None)
-            return type(status) is int and 400<=status<500 and status not in {408,429}
+            return status in {400,401,402,403}
         error=error.__cause__
     return False
 

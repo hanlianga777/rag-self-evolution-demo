@@ -37,6 +37,9 @@ class FollowupJobs:
         with self.lock:
             if path.exists() or (run_id, group) in self.threads:
                 return self.progress(run_id, group)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({'cases': {}, 'complete': False, '_job': {
+                'status': 'starting', 'pid': os.getpid(), 'started_at': now()}}, ensure_ascii=False))
             thread = threading.Thread(target=contextvars.copy_context().run, args=(self._run, run_id, group), daemon=True)
             self.threads[run_id, group] = thread
             thread.start()
@@ -45,26 +48,36 @@ class FollowupJobs:
     def _run(self, run_id, group):
         path = self.path(run_id, group)
         path.parent.mkdir(parents=True, exist_ok=True)
-        state = {'cases': {}, 'complete': False, '_job': {'status': 'running', 'started_at': now(), 'pid': os.getpid()}}
+        state = json.loads(path.read_text()) if path.exists() else {'cases': {}, 'complete': False, '_job': {}}
+        if hasattr(self.store, 'job_checkpoints'):
+            state.setdefault('cases', {}).update({key.removeprefix('followup:' + group + ':'): value
+                for key, value in self.store.job_checkpoints(run_id).items() if key.startswith('followup:' + group + ':')})
+        saved_cases = {}
+        state['_job'].update(status='running', started_at=state['_job'].get('started_at', now()), pid=os.getpid(), checkpoint_path=str(path))
+        state['_job'].pop('error', None)
+        state['_job'].pop('ended_at', None)
 
         def save(*_args, **_kwargs):
             state['_job']['updated_at'] = now()
+            summary = state
+            if hasattr(self.store, 'save_job_checkpoint'):
+                for key, checkpoint in state.get('cases', {}).items():
+                    encoded = json.dumps(checkpoint, ensure_ascii=False, sort_keys=True)
+                    if saved_cases.get(key) != encoded:
+                        self.store.save_job_checkpoint(run_id, 'followup:' + group + ':' + key, checkpoint)
+                        saved_cases[key] = encoded
+                summary = {key: value for key, value in state.items() if key != 'cases'}
+                summary['_progress'] = self._summarize(state, run_id, group)
             temporary = path.with_suffix('.tmp')
-            temporary.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+            temporary.write_text(json.dumps(summary, ensure_ascii=False, indent=2))
             temporary.replace(path)
-            checkpoints = list(state['cases'].values())
-            stages = [stage for cp in checkpoints for stage in cp.get('regression_review', {}).get('runs', [])] if group == 'review' else checkpoints
-            errors = [cp['technical_error'] for cp in checkpoints if cp.get('technical_error')]
-            if group != 'review':
-                errors += [attempt.get('error', attempt.get('error_type')) for stage in stages for attempt in stage.get('attempts', []) if attempt.get('status') == 'error']
-            if group == 'review':
-                errors += [review_summary(cp)['technical_error'] for cp in checkpoints if review_summary(cp).get('status') == 'technical_failure']
-            if errors:
-                raise RuntimeError(str(errors[0]))
 
         with path.with_suffix('.lock').open('w') as lock:
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return
+            try:
                 source, cases = read_baseline(self.store.database_path, run_id)
                 state['_job']['model'] = source['judge'].get('model')
                 runner = EvaluationRunner(self.store, self.service)
@@ -74,9 +87,12 @@ class FollowupJobs:
                         state.update(review)
                         save()
                     state['planned'] = 2 * sum(c['passed'] is False for c in cases)
-                    runner.review_baseline_errors(run_id, on_progress=progress, stop_on_error=True)
+                    runner.review_baseline_errors(run_id, on_progress=progress, stop_on_error=False)
                 else:
-                    state['plan'] = calibration_plan(source, cases, group)
+                    plan = calibration_plan(source, cases, group)
+                    if state.get('plan', plan) != plan:
+                        raise ValueError('校准源数据或目标判分身份发生变化')
+                    state['plan'] = plan
                     def progress(*_args, **_kwargs):
                         save()
                         rows = comparison_rows(source, cases, state['cases'], group)
@@ -91,15 +107,56 @@ class FollowupJobs:
             finally:
                 state['_job']['ended_at'] = now()
                 # Preserve the error checkpoint without re-raising the stop signal.
-                temporary = path.with_suffix('.tmp')
-                temporary.write_text(json.dumps(state, ensure_ascii=False, indent=2))
-                temporary.replace(path)
+                save()
+
+    def has_active(self):
+        if any(thread.is_alive() for thread in self.threads.values()):
+            return True
+        return self.root.exists() and any(json.loads(path.read_text()).get('_job', {}).get('status') in {'running', 'starting'}
+            for path in self.root.glob('*/*.json') if path.stem in {'review', 'max', 'high', 'low'})
+
+    def recover(self):
+        """Reclaim only jobs whose persisted owner exited; completed work is reused."""
+        if not self.root.exists():
+            return
+        for path in self.root.glob('*/*.json'):
+            if path.stem not in {'review', 'max', 'high', 'low'}:
+                continue
+            state = json.loads(path.read_text())
+            job = state.get('_job', {})
+            if job.get('status') not in {'running', 'starting'}:
+                continue
+            pid = job.get('pid')
+            if type(pid) is int and pid > 0 and pid != os.getpid():
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    pass
+                except PermissionError:
+                    continue
+                else:
+                    continue
+            key = (path.parent.name, path.stem)
+            with self.lock:
+                thread = self.threads.get(key)
+                if thread and thread.is_alive():
+                    continue
+                thread = threading.Thread(target=self._run, args=key, daemon=True)
+                self.threads[key] = thread
+                thread.start()
 
     def progress(self, run_id, group):
         path = self.path(run_id, group)
         if not path.exists():
             return {'source_run_id': run_id, 'group': group, 'status': 'not_started', 'completed': 0}
         state = json.loads(path.read_text())
+        state['_job'].setdefault('checkpoint_path', str(path))
+        if '_progress' in state:
+            return {**state['_progress'], **state['_job']}
+        return self._summarize(state, run_id, group)
+
+    @staticmethod
+    def _summarize(state, run_id, group):
         checkpoints = list(state.get('cases', {}).values())
         stages = [stage for cp in checkpoints for stage in cp.get('regression_review', {}).get('runs', [])] if group == 'review' else checkpoints
         events = [event for stage in stages for event in checkpoint_usage(stage)]
@@ -110,9 +167,9 @@ class FollowupJobs:
                 'planned': state.get('planned', 4) if group == 'review' else state.get('plan', {}).get('planned_questions', 50),
                 'completed': len(completed), 'complete': state.get('complete', False) and not review_errors,
                 'passed': sum(stage['scored_result']['passed'] for stage in completed),
-                'technical_failed': sum(bool(cp.get('technical_error')) or (review_summary(cp).get('status') == 'technical_failure' if group == 'review' else any(a.get('status') == 'error' for a in cp.get('attempts', []))) for cp in checkpoints),
+                'technical_failed': sum(bool(cp.get('technical_error')) or (review_summary(cp).get('status') == 'technical_failure' if group == 'review' else type(cp.get('scored_result', {}).get('passed')) is not bool and any(a.get('status') == 'error' for a in cp.get('attempts', []))) for cp in checkpoints),
                 'recorded_provider_calls': len(events), 'cost_estimation': cost_report(state['_job'].get('model'), events),
-                'checkpoint_path': str(path),
+                'checkpoint_path': state.get('_job', {}).get('checkpoint_path'),
                 'results': [{'question_id': key, 'passed': stage['scored_result']['passed']}
                             for key, cp in state.get('cases', {}).items()
                             for stage in (cp.get('regression_review', {}).get('runs', []) if group == 'review' else [cp])

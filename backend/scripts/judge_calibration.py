@@ -18,7 +18,8 @@ from app.providers import judge_thinking, thinking_config
 
 def read_baseline(database, run_id):
     """No GovernanceStore initialization or migrations during a dry run."""
-    with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True)) as db:
+    from app.sqlite_support import open_database
+    with closing(open_database(database, read_only=True)) as db:
         db.row_factory = sqlite3.Row
         row = db.execute('SELECT * FROM evaluation_runs WHERE id=?', (run_id,)).fetchone()
         if row is None:
@@ -26,6 +27,15 @@ def read_baseline(database, run_id):
         source = dict(row)
         source.update(config=json.loads(row['config_json']), judge=json.loads(row['judge_json']),
                       result=json.loads(row['result_json']))
+        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if 'evaluation_checkpoints' in tables:
+            checkpoints = {saved['question_id']: json.loads(saved['checkpoint_json']) for saved in db.execute(
+                'SELECT question_id,checkpoint_json FROM evaluation_checkpoints WHERE run_id=?', (run_id,))}
+            if checkpoints:
+                source['result']['checkpoints'] = {**source['result'].get('checkpoints', {}), **checkpoints}
+        if 'job_checkpoints' in tables:
+            for saved in db.execute("SELECT question_id,checkpoint_json FROM job_checkpoints WHERE run_id=? AND question_id LIKE 'review:%'", (run_id,)):
+                source['result'].setdefault('baseline_review', {}).setdefault('cases', {})[saved['question_id'].removeprefix('review:')] = json.loads(saved['checkpoint_json'])
         cases = [{'question_id': row['question_id'], **json.loads(row['result_json']), 'run_id': run_id}
                  for row in db.execute('SELECT question_id,result_json FROM evaluation_case_results WHERE run_id=? ORDER BY id', (run_id,))]
     snapshot = json.loads(source['dataset_snapshot_json'])

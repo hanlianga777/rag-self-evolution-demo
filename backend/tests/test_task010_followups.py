@@ -10,7 +10,7 @@ from app.followups import FollowupJobs
 
 
 class FollowupTests(unittest.TestCase):
-    def test_calibration_stops_on_first_technical_error_and_keeps_checkpoint(self):
+    def test_calibration_continues_after_technical_error_and_keeps_checkpoint(self):
         with TemporaryDirectory() as directory:
             store = SimpleNamespace(database_path=Path(directory) / 'empty.db')
             jobs = FollowupJobs(store, None)
@@ -20,15 +20,18 @@ class FollowupTests(unittest.TestCase):
             def run(_runner, _source, _cases, _effort, state, save):
                 state['cases']['one'] = {'attempts': [], 'technical_error': 'fixture failure'}
                 save()
-                self.fail('technical failure must stop this group')
+                state['cases']['two'] = {'attempts': [], 'scored_result': {'passed': True}}
+                save()
             with patch('app.followups.read_baseline', return_value=(source, cases)), patch('app.followups.calibration_plan', return_value={}), patch('app.followups.run_calibration', side_effect=run), patch('app.followups.comparison_rows', return_value=[{'题号': 'Q01'}]), patch('app.followups.EvaluationRunner', return_value=runner):
                 jobs._run('fixture', 'low')
             result = jobs.progress('fixture', 'low')
             self.assertEqual(result['status'], 'failed')
             self.assertEqual(result['technical_failed'], 1)
-            self.assertIn('fixture failure', result['error'])
+            self.assertEqual(result['completed'], 1)
+            self.assertNotIn('error', result)
             state = json.loads(jobs.path('fixture', 'low').read_text())
             self.assertEqual(state['cases']['one']['technical_error'], 'fixture failure')
+            self.assertTrue(state['cases']['two']['scored_result']['passed'])
             runner.answer.assert_not_called()
 
     def test_repeated_start_does_not_launch_second_worker(self):

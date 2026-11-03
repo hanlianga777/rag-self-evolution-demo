@@ -6,6 +6,7 @@ import json
 import math
 import hashlib
 import re
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from collections import Counter
 
@@ -377,6 +378,26 @@ class OptimizationAgent:
         self.store = store
         self.provider = provider
 
+    def _checkpoint(self, experiment_id, generation_token, updates):
+        with self.store.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            row=connection.execute('SELECT status,result_json FROM experiments WHERE id=?',(experiment_id,)).fetchone()
+            context=json.loads(row['result_json'])
+            if row['status']!='generating' or context.get('agent_generation',{}).get('token')!=generation_token:
+                raise ValueError('Optimization Context 已变化，不能保存生成断点')
+            connection.execute('UPDATE experiments SET result_json=? WHERE id=?',
+                (json.dumps({**context,**updates},ensure_ascii=False,allow_nan=False),experiment_id))
+
+    @contextmanager
+    def _request_checkpoint(self, experiment_id, generation_token, previous, request_hash):
+        from .evaluation_stage import _request_checkpoint
+        checkpoint=previous.get('agent_request_checkpoint',{'attempts':[]}) if previous.get('agent_request_sha256')==request_hash else {'attempts':[]}
+        def save(*_args,**_kwargs):
+            self._checkpoint(experiment_id,generation_token,{'agent_request_checkpoint':checkpoint,'agent_request_sha256':request_hash})
+        token=_request_checkpoint.set((checkpoint,'agent',experiment_id,save,lambda:None))
+        try:yield checkpoint
+        finally:_request_checkpoint.reset(token)
+
     @provider_task('agent')
     def generate(self, baseline_run_id: str, trigger_id: str | None = None, experiment_id: str | None = None):
         # Check identity before budget reads; the short claim serializes duplicate starts.
@@ -455,6 +476,7 @@ class OptimizationAgent:
         audit['next_action'] = prompt['next_action']
         try:
             stages = []
+            recovered_usage=[]
             with collect_usage() as usage, measure(stages, 'optimization_agent'):
                 try:
                     user=json.dumps(prompt,ensure_ascii=False)
@@ -472,14 +494,22 @@ class OptimizationAgent:
                         content = previous['provider_raw_text']
                         audit['response_reuse'] = {'request_sha256': request_hash, 'source_timestamp': previous['timestamp'], 'new_provider_call': False}
                     else:
-                        content=self.provider.complete(system,user,json_mode=True)
+                        with self._request_checkpoint(experiment_id,generation_token,previous,request_hash) as checkpoint:
+                            content=self.provider.complete(system,user,json_mode=True)
+                            if not usage:
+                                from .evaluation_stage import checkpoint_usage
+                                recovered_usage=checkpoint_usage(checkpoint)
+                                if recovered_usage:audit['rpc_response_reuse']={'new_provider_call':False}
                 finally:
                     if audit.get('response_reuse'):
                         audit.update({k:previous.get(k) for k in ('token_usage','cost_estimation','estimated_cost')})
                         audit.update(stages=previous.get('stages',[]),revalidation_stages=stages,new_provider_calls=0)
                     else:
-                        audit.update(token_usage=usage, stages=stages, **cost_fields(getattr(getattr(self.provider, 'settings', None), 'model', None), usage))
+                        events=usage or recovered_usage
+                        audit.update(token_usage=events, stages=stages, **cost_fields(getattr(getattr(self.provider, 'settings', None), 'model', None), events))
             audit["provider_raw_text"] = content
+            # Save the paid response before parsing/validation; restart reuses it.
+            self._checkpoint(experiment_id,generation_token,{**audit,'validation_stage':'persistence'})
             result,batch=prepare_response(content,base_config,bad_cases,prior_candidates,completed,round_number,labels,trigger_id,monitoring_target_event_ids,audit)
             audit["validation_stage"] = "persistence"
             self.store.save_agent_round(experiment_id, batch, {**result, **audit, "generation_status":"partial" if audit["rejected_candidates"] else "completed" if batch else "no_candidates", "requested_candidate_count":len(labels), "generated_candidate_count":len(batch), "validation_stage": "completed", "round": round_number, "evaluation_budget": evaluation_budget}, generation_token=generation_token)

@@ -1,4 +1,5 @@
 import json
+from .sqlite_support import open_database
 import sqlite3
 from pathlib import Path
 
@@ -40,7 +41,7 @@ class SeedStore:
     def __init__(self, database_path=None):
         self.database_path = Path(database_path or Path(__file__).parents[1] / "data" / "demo.db")
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(self.database_path)
+        connection = open_database(self.database_path)
         try:
             connection.execute("CREATE TABLE IF NOT EXISTS demo_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             connection.execute("INSERT OR REPLACE INTO demo_state(key, value) VALUES (?, ?)", ("seed", json.dumps(build_seed(), ensure_ascii=False)))
@@ -50,7 +51,7 @@ class SeedStore:
             connection.close()
 
     def get(self, key):
-        connection = sqlite3.connect(self.database_path)
+        connection = open_database(self.database_path)
         try:
             payload = json.loads(connection.execute("SELECT value FROM demo_state WHERE key = 'seed'").fetchone()[0])
             active_version = connection.execute("SELECT value FROM demo_state WHERE key = 'demo_active_version'").fetchone()[0]
@@ -67,7 +68,7 @@ class SeedStore:
         return payload[key]
 
     def set_active_version(self, version_id):
-        connection = sqlite3.connect(self.database_path)
+        connection = open_database(self.database_path)
         try:
             connection.execute("UPDATE demo_state SET value = ? WHERE key = 'demo_active_version'", (version_id,))
             connection.commit()

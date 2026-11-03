@@ -1,4 +1,5 @@
 """Deterministic, zero-Provider coverage planning over saved evidence only."""
+from .sqlite_support import open_database
 import json
 import sqlite3
 from itertools import combinations
@@ -139,7 +140,7 @@ def complete_coverage(store,experiment_id,*,expected_binding,backup_path):
         if path.exists():raise ValueError('备份路径已存在')
         path.parent.mkdir(parents=True,exist_ok=True)
         # A separate reader backs up committed state; never back up the active writer.
-        with sqlite3.connect(store.database_path) as source,sqlite3.connect(path) as destination:source.backup(destination)
+        with open_database(store.database_path) as source,open_database(path) as destination:source.backup(destination)
         from .backup_retention import keep_recent_two
         keep_recent_two(path, 'coverage')
         for label,config,reason in batch:

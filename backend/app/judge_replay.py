@@ -120,5 +120,5 @@ def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint):
         'source_evaluation_identity':original.get('evaluation_identity'),'new_evaluation_identity':evaluation_identity(snapshot,judge),
         'new_versions':{k:judge[k] for k in VERSIONS},
         'total':len(ids),'reusable':len(executions),'eligibility':checks,'executions':executions,
-        'generation_calls':0,'judge_calls':len(ids),'max_attempts_per_question':3,'max_judge_calls':len(ids)*3,
+        'generation_calls':0,'judge_calls':len(ids),'max_attempts_per_question':8,'max_responses_per_pass':4,'max_judge_calls':len(ids)*8,
         'request_output_limit':32768,'timing_provenance':'historical_generation_not_current_latency','new_judge':judge}

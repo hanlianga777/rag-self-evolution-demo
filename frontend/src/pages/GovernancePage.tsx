@@ -116,19 +116,22 @@ export function GovernancePage({ data }: { data: any }) {
   useEffect(() => {
     if ((!running && !qualityRunning) || !workRun?.id) return;
     let cancelled = false;
+    let timer: number;
     const poll = async () => {
       try {
-        const updated = await getJson<Candidate>(`/api/governance/generation-runs/${workRun.id}`);
+        const updated = await getJson<Candidate>(`/api/governance/generation-runs/${workRun.id}?light=true`);
         if (cancelled) return;
-        setRuns(previous => [updated, ...previous.filter(row => row.id !== updated.id)]);
-        if (updated.artifacts?.hard_validation?.slot_persistence_v1 || updated.question_ids?.length === (updated.profile?.expected_count || expectedCount)) void loadReview(updated).catch(reason => setError(errorMessage(reason)));
+        setRuns(previous => {
+          const saved = previous.find(row => row.id === updated.id);
+          return [{...saved, ...updated, artifacts:{...saved?.artifacts,...updated.artifacts,hard_validation:{...saved?.artifacts?.hard_validation,...updated.artifacts?.hard_validation}}}, ...previous.filter(row => row.id !== updated.id)];
+        });
         if (["completed", "failed"].includes(updated.status) && updated.created_at) setRunDuration({ id: updated.id, ms: Date.now() - Date.parse(updated.created_at) });
         if (["completed", "failed", "needs_regeneration"].includes(updated.status) && (running || updated.artifacts?.hard_validation?.quality_rerun?.status !== "running")) void reload().catch(reason => setError(errorMessage(reason)));
       } catch (reason) { if (!cancelled) setError(errorMessage(reason)); }
+      if (!cancelled) timer = window.setTimeout(poll, 1000);
     };
     void poll();
-    const timer = window.setInterval(() => void poll(), 1000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [workRun?.id, workRun?.status, qualityRunning]);
 
 

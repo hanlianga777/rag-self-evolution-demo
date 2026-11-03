@@ -45,7 +45,7 @@ export const identityKey = (value: any) => JSON.stringify([value?.current_baseli
 const pageInputs: Record<Page, (keyof AppData)[]> = {
   overview: ['workspace','overview','documents','optimization'],
   knowledge: ['workspace','overview','documents'], settings: ['workspace','documents'],
-  governance: ['workspace','dataset'], evaluation: ['workspace','evaluation','badCases','optimization'],
+  governance: ['workspace'], evaluation: ['workspace','evaluation','badCases','optimization'],
   evolution: ['workspace','evaluation','optimization'],
   versions: ['workspace','evaluation','optimization','versions'],
   verification: ['workspace','badCases','versions','readiness','monitoring'],

@@ -88,7 +88,7 @@ it("refreshes the open Drawer and table before reporting Revision complete", asy
   const revision = { id: "REV-sync", status: "qc", stage: "qc", question_ids: [old.id], progress: { current: 0, total: 1 } };
   let finished = false;
   vi.stubGlobal("fetch", vi.fn((url: string) => {
-    if (url.endsWith("/api/governance/revisions/REV-sync")) { finished = true; return Promise.resolve(new Response(JSON.stringify({ ...revision, status: "completed", stage: "completed", progress: { current: 1, total: 1 } }), { status: 200 })); }
+    if (new URL(url).pathname.endsWith("/api/governance/revisions/REV-sync")) { finished = true; return Promise.resolve(new Response(JSON.stringify({ ...revision, status: "completed", stage: "completed", progress: { current: 1, total: 1 } }), { status: 200 })); }
     const data = url.endsWith("/api/evaluations") ? [] : new URL(url).pathname.endsWith("/api/governance/revisions") ? [revision] : url.endsWith("/api/dataset") ? [finished ? updated : old] : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, [{ ...(finished ? updated : old), revision_history:[revision] }]) : [];
     return Promise.resolve(new Response(JSON.stringify(data), { status: 200 }));
   }));
@@ -259,7 +259,7 @@ it("restores a running generation and reads persisted slot progress", async () =
 
 it("shows the current automatic refill round and remaining slots", async () => {
   const run = { id: "GGEN-refill", status: "generating", profile: { expected_count: 20 }, question_ids: [], operation_progress: { phase: "generating", phase_label: "补齐失败题", phase_processed: 4, phase_total: 10, phase_percent: 40, hard_valid_completed: 14, hard_valid_total: 20, failed_count: 6, probe_processed: 0, qc_processed: 0, refill_round: 2, refill_max_rounds: 3 }, artifacts: { hard_validation: { slot_persistence_v1: true, progress: {} } } };
-  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : url.endsWith("/GGEN-refill") ? run : url.endsWith("/api/dataset") || new URL(url).pathname.endsWith("/api/governance/revisions") || url.endsWith("/api/governance/snapshots") ? [] : goldenFixture(url, [])), { status: 200 }))));
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : new URL(url).pathname.endsWith("/GGEN-refill") ? run : url.endsWith("/api/dataset") || new URL(url).pathname.endsWith("/api/governance/revisions") || url.endsWith("/api/governance/snapshots") ? [] : goldenFixture(url, [])), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());

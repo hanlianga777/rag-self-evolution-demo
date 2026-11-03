@@ -114,6 +114,23 @@ export function EvolutionPage({ data }: { data: any }) {
   useEffect(() => { setDiagnosticPlan(null); }, [identity]);
   const loadDiagnosticPlan = async () => { const captured=identity; try { const plan=await getJson<any>(`/api/evaluations/${evaluation.id}/diagnostic-plan`); if(currentIdentity.current===captured)setDiagnosticPlan(plan); } catch(reason) { if(currentIdentity.current===captured)setError(errorMessage(reason)); } };
   const refresh = async () => { const captured = identity; const value: any = await getJson("/api/optimization?light=true&planning=true"); if (currentIdentity.current === captured && (!value.current_baseline_id || value.current_baseline_id === evaluation.id)) setExperiment(value.id ? value : null); };
+  const polling = hasRunning || experiment?.result?.optimization_cycle?.status === "running";
+  useEffect(() => {
+    if (!experiment?.id || !polling) return;
+    let cancelled = false;
+    let timer: number;
+    const poll = async () => {
+      try {
+        const value = await getJson<any>(`/api/experiments/${experiment.id}?light=true`);
+        if (cancelled) return;
+        setExperiment((previous: any) => ({...previous, ...value, result:{...previous?.result,...value.result}, candidates:(value.candidates || []).map((candidate:any) => ({...previous?.candidates?.find((saved:any) => saved.id === candidate.id), ...candidate}))}));
+        if (value.result?.optimization_cycle?.status === "running" || value.candidates?.some((candidate:any) => ["running","queued"].includes(candidate.status))) timer = window.setTimeout(poll, 1000);
+        else await refresh();
+      } catch (reason) { if (!cancelled) { setError(errorMessage(reason)); timer = window.setTimeout(poll, 2000); } }
+    };
+    void poll();
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [experiment?.id, polling, identity]);
 
   useEffect(() => { let cancelled = false; void getJson("/api/pipeline").then(value => { if (!cancelled) setSearchSpace(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [identity]);
   useEffect(() => {

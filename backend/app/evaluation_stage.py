@@ -21,7 +21,10 @@ def checkpoint_request(provider, model, endpoint, payload, action, *, reuse=True
     check_stop()
     key = hashlib.sha256(json.dumps([phase, provider, model, endpoint, payload], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     saved = checkpoint.setdefault('provider_requests', {}).setdefault(key, {'phase':phase, 'provider':provider, 'model':model, 'attempts':[]})
-    if reuse and saved.get('status') == 'completed':
+    if saved.get('status') == 'completed' and (reuse or saved.get('persistence_pending')):
+        if saved.get('persistence_pending'):
+            on_state('running', phase=phase, durable=True)
+            saved.pop('persistence_pending', None)
         return deepcopy(saved['result'])
     # A recovered worker may leave a request in flight. Keep its billing unknown
     # and start a separately accounted attempt under task006's revised policy.
@@ -31,7 +34,7 @@ def checkpoint_request(provider, model, endpoint, payload, action, *, reuse=True
                 previous.update(status='unknown', recovery_reason='worker ended before request result was saved')
     attempt = {'id':uuid.uuid4().hex, 'recorded_by_run_id':run_id, 'status':'inflight', 'usage':[]}
     saved['attempts'].append(attempt);saved['status'] = 'inflight'
-    on_state('running', phase=phase)
+    on_state('running', phase=phase, durable=True)
     try:
         with collect_usage() as usage:
             try:
@@ -43,11 +46,13 @@ def checkpoint_request(provider, model, endpoint, payload, action, *, reuse=True
         unknown = getattr(error, 'request_execution_unknown', None) is True or any(unsettled_usage(u) for u in attempt['usage'])
         attempt.update(status='unknown' if unknown else 'error', error_type=type(error).__name__)
         saved['status'] = attempt['status']
-        on_state('running', phase=phase)
+        on_state('running', phase=phase, durable=True)
         raise
     saved.update(status='completed', result=deepcopy(value))
     attempt['status'] = 'completed'
-    on_state('running', phase=phase)
+    saved['persistence_pending'] = True
+    on_state('running', phase=phase, durable=True)
+    saved.pop('persistence_pending', None)
     return value
 
 
@@ -87,7 +92,7 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
     if checkpoint.get('inflight')==phase:checkpoint.setdefault('unknown_execution',{})[phase]=True
     while True:
         check_stop()
-        if failures>=3 or invalid_failures>=2 or time.monotonic()>=deadline:
+        if (invalid_failures>=4 if phase=='judge' else failures>=3) or failures-invalid_failures>=3 or time.monotonic()>=deadline:
             last=checkpoint['attempts'][-1] if checkpoint['attempts'] else {}
             if (last.get('phase')==phase and last.get('recorded_by_run_id')==run_id
                     and last.get('status')=='error' and last.get('retryable') is True
@@ -120,11 +125,24 @@ def perform_stage(checkpoint,phase,action,run_id,*,automatic,check_stop,on_state
             if billing_unknown:checkpoint.setdefault('unsettled_usage',{})[phase]=True
             attempt['billing_unknown']=billing_unknown
             responses=max(1,sum(u.get('status')=='ok' for u in usage))
-            retry=phase=='judge' and isinstance(error,ProviderInvalidResponse) and retryable_error(error) and failures<2 and judge_request_count(checkpoint,run_id)+responses<2 and time.monotonic()<deadline
-            # Repeated structurally invalid Judge replies are a terminal contract failure.
+            from .providers import permanent_provider_error
+            retry = not isinstance(error, InterruptedError) and not permanent_provider_error(error) and time.monotonic()<deadline
+            # The transport already used its bounded attempts; the question's final
+            # pass can retry it, without nesting another transport retry window here.
+            transport_error=error
+            while transport_error is not None:
+                if getattr(transport_error,'provider_retry_exhausted',False):
+                    retry=False
+                    break
+                transport_error=transport_error.__cause__
+            if isinstance(error, ProviderInvalidResponse):
+                retry = retry and phase=='judge' and invalid_failures<3 and judge_request_count(checkpoint,run_id)+responses<4
+            else:
+                retry = retry and failures-invalid_failures<3
+            # Four invalid replies end this pass; validation stays strict.
             if isinstance(error,ProviderInvalidResponse):
                 invalid_failures+=1
-                if invalid_failures>=2:retry=False
+                if invalid_failures>=4:retry=False
             attempt['request_execution_unknown']=unknown
             if unknown:checkpoint.setdefault('unknown_execution',{})[phase]=True
             attempt['retryable']=retry;checkpoint['attempts'].append(attempt);checkpoint.pop('inflight',None)

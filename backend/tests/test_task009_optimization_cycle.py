@@ -11,7 +11,7 @@ class CycleTests(unittest.TestCase):
         experiment = {'id':'exp','baseline_run_id':'base','result':{},'evaluation_budget':{'used':used},'candidates':[]}
         calls, states = [], []
         class Store:
-            def experiment(self, _): return deepcopy(experiment)
+            def experiment(self, _, **kwargs): return deepcopy(experiment)
             def require_current_baseline(self, _): return {'id':'base'}
         class Agent:
             def __init__(self, *args): pass
@@ -52,7 +52,7 @@ class CycleTests(unittest.TestCase):
         self.assertEqual(exp['evaluation_budget']['used'],0)
         self.assertEqual(result['status'],'analysis_exhausted')
 
-    def test_technical_failure_stops_without_auto_resume(self):
+    def test_failure_without_checkpoint_stops_safely(self):
         result,exp,calls,_=self.run_cycle(technical=True)
         self.assertEqual(exp['evaluation_budget']['used'],1)
         self.assertEqual(result['status'],'failed')

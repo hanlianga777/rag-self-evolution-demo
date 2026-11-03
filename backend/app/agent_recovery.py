@@ -1,4 +1,5 @@
 """Revalidate an already-paid response and append a recovery; never call a Provider."""
+from .sqlite_support import open_database
 import hashlib
 import json
 import sqlite3
@@ -75,7 +76,7 @@ def recover_saved_response(store,trace_id,*,apply=False,expected_binding=None,ba
     backup=Path(backup_path) if backup_path else None
     if backup is None or backup.exists() or backup.resolve()==store.database_path.resolve():raise ValueError('恢复须指定新的SQLite备份路径')
     backup.parent.mkdir(parents=True,exist_ok=True)
-    with sqlite3.connect(store.database_path.as_uri()+'?mode=ro',uri=True) as reader,sqlite3.connect(backup) as target:
+    with open_database(store.database_path,read_only=True) as reader,open_database(backup) as target:
         reader.backup(target)
     from .backup_retention import keep_recent_two
     keep_recent_two(backup, 'recovery')

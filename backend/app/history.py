@@ -4,18 +4,24 @@ from datetime import datetime, timezone
 
 RETAINED_TABLES = {'schema_migrations', 'tool_registry', 'pipeline_config_draft', 'alias_mappings'}
 EXPERIMENT_TABLES = (
-    'evaluation_case_results', 'bad_cases', 'agent_traces', 'tool_calls', 'recommendations',
+    'evaluation_checkpoints', 'job_checkpoints', 'evaluation_case_results', 'bad_cases', 'agent_traces', 'tool_calls', 'recommendations',
     'candidate_configs', 'optimization_triggers', 'monitoring_events', 'experiments', 'evaluation_runs',
     'review_events', 'probe_results', 'qc_results', 'question_quality_audits', 'candidate_revision_runs',
     'golden_generation_artifacts', 'golden_generation_runs', 'coverage_plan_previews',
     'questions', 'dataset_versions', 'approvals', 'rollback_history', 'business_import_batches', 'demo_state',
 )
-ACTIVE = ('queued', 'running', 'generating', 'coverage', 'validation', 'validating', 'probing', 'qc')
+ACTIVE = ('queued', 'running', 'generating', 'coverage', 'validation', 'validating', 'validation', 'probing', 'qc')
 
 
 def table_counts(connection):
     return {r[0]: connection.execute('SELECT count(*) FROM "'+r[0]+'"').fetchone()[0]
             for r in connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()}
+
+
+def has_active_jobs(connection):
+    for table in ('evaluation_runs','experiments','candidate_configs','golden_generation_runs','candidate_revision_runs'):
+        if connection.execute('SELECT 1 FROM '+table+' WHERE status IN ('+','.join('?' for _ in ACTIVE)+') LIMIT 1',ACTIVE).fetchone():return True
+    return bool(connection.execute("SELECT 1 FROM experiments WHERE json_extract(result_json,'$.optimization_cycle.status')='running' LIMIT 1").fetchone())
 
 
 def require_idle(connection):
@@ -65,7 +71,9 @@ def prune_history(store, limit=50):
     """Retain complete referenced objects; the limit never applies to case/trace rows."""
     if type(limit) is not int or not 1<=limit<=50:raise ValueError('history limit must be 1..50')
     with store.connection() as c:
+        if has_active_jobs(c):return {'skipped':'有作业运行，暂不清理'}
         c.execute('BEGIN IMMEDIATE')
+        if has_active_jobs(c):return {'skipped':'有作业运行，暂不清理'}
         # Project only relationship fields; do not deserialize large saved checkpoint payloads.
         evals={r['id']:dict(r) for r in c.execute("SELECT id,status,dataset_version_id,created_at,json_extract(config_json,'$.candidate_id') candidate_id,json_extract(result_json,'$.resume_source_id') source_id,coalesce(json_extract(config_json,'$.source_evaluation_id'),json_extract(judge_json,'$.source_evaluation_id')) replay_source_id FROM evaluation_runs ORDER BY created_at DESC,rowid DESC")}
         exps={r['id']:dict(r) for r in c.execute('SELECT id,status,baseline_run_id FROM experiments ORDER BY created_at DESC,rowid DESC')}
@@ -123,7 +131,7 @@ def prune_history(store, limit=50):
                 keep_q.update(r[f] for f in ('positive_id','replaces_id','source_id') if r.get(f) in questions)
             if size==sum(map(len,(keep_e,keep_x,keep_g,keep_d,keep_q,keep_c,keep_i))):break
         for table,field,ids in (
-            ('evaluation_case_results','run_id',keep_e),('bad_cases','run_id',keep_e),
+            ('evaluation_checkpoints','run_id',keep_e),('evaluation_case_results','run_id',keep_e),('bad_cases','run_id',keep_e),
             ('agent_traces','experiment_id',keep_x),('tool_calls','experiment_id',keep_x),('recommendations','experiment_id',keep_x),
             ('candidate_configs','id',keep_c),('experiments','id',keep_x),('evaluation_runs','id',keep_e),
             ('review_events','question_id',keep_q),('probe_results','question_id',keep_q),('qc_results','question_id',keep_q),
@@ -131,6 +139,9 @@ def prune_history(store, limit=50):
             ('golden_generation_artifacts','generation_run_id',keep_g),('golden_generation_runs','id',keep_g),
             ('questions','id',keep_q),('dataset_versions','id',keep_d)):
             _delete_except(c,table,field,ids)
+        if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_checkpoints'").fetchone():
+            job_ids=keep_e|keep_g|keep_x|{'candidate:'+key for key in keep_c}|{r[0] for r in c.execute('SELECT id FROM candidate_revision_runs')}
+            _delete_except(c,'job_checkpoints','run_id',job_ids)
         # Monitoring events referenced by any retained trigger/experiment/approval remain intact.
         events={r[0] for r in c.execute('SELECT id FROM monitoring_events ORDER BY created_at DESC,rowid DESC LIMIT ?', (limit,))}
         triggers=[]

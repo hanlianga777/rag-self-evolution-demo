@@ -75,7 +75,7 @@ it("does not restore a Golden Generation toast for a running or recoverable run"
 
 it("uses persisted evaluation cases for progress while short operations complete", async () => {
   const evaluation = { id: "EVAL-1", status: "running", dataset_snapshot_json: JSON.stringify({ question_ids: ["Q1", "Q2", "Q3"] }), cases: [{ question_id: "Q1" }] };
-  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [evaluation] : url.endsWith("EVAL-1") ? evaluation : []), { status: 200 }))));
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [evaluation] : new URL(url).pathname.endsWith("EVAL-1") ? evaluation : []), { status: 200 }))));
   let finish!: () => void;
   function Harness() { const operation = useOperation(); finish = () => operation.succeed(operation.start("短操作")); return <button onClick={finish}>执行短操作</button>; }
   const root = createRoot(document.body.appendChild(document.createElement("div")));

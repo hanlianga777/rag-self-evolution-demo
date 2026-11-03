@@ -95,6 +95,29 @@ def _answer_anchor_supported(answer: str, evidence_texts: list[str]) -> bool:
     return all(any(supported(fact, original, text) for original, text in zip(evidence_texts, texts)) for fact in facts)
 
 
+def pending_job_owner():
+    import time
+    return {'auto_resume': True, 'execution_owner_pid': os.getpid(), 'worker_thread': None,
+            'worker_claimed_at': time.time()}
+
+
+def product_interruption(candidate):
+    result=candidate.get('result',{})
+    if result.get('evaluation_complete') is not False and not result.get('interrupted'):return False
+    if result.get('stop_request'):return False
+    error=str(result.get('error') or '').lower()
+    if any(term in error for term in ('身份不匹配','身份不同','身份已变化','冻结合同','用户停止','evaluation identity','configuration changed','contract mismatch')):return False
+    errors=result.get('technical_errors',[])
+    if any(e.get('provider_error',{}).get('http_status') in {400,401,402,403} for e in errors):return False
+    return bool(errors or result.get('error'))
+
+
+def sandbox_attempts_used(candidate):
+    attempts=candidate.get('reasoning',{}).get('sandbox_attempts',[])
+    count=len(attempts) or int(candidate.get('status') in {'evaluated','failed','running'})
+    return max(0,count-int(candidate.get('status')=='failed' and product_interruption(candidate)))
+
+
 class GovernanceStore:
     """Small persistence boundary; JSON keeps evidence and run snapshots immutable."""
 
@@ -108,13 +131,97 @@ class GovernanceStore:
 
     @contextmanager
     def connection(self):
-        connection = sqlite3.connect(self.database_path)
+        from .sqlite_support import open_database
+        connection = open_database(self.database_path)
         connection.row_factory = sqlite3.Row
         try:
             yield connection
             connection.commit()
         finally:
             connection.close()
+
+    def save_job_checkpoint(self, run_id, question_id, payload):
+        with self.connection() as connection:
+            connection.execute('INSERT INTO job_checkpoints VALUES (?,?,?) ON CONFLICT(run_id,question_id) DO UPDATE SET checkpoint_json=excluded.checkpoint_json', (run_id,question_id,_json(payload)))
+            if question_id.startswith('review:'):
+                self._save_review_summary(connection,run_id,question_id,payload)
+
+    @staticmethod
+    def _save_review_summary(connection,run_id,question_id,payload):
+        from .agent_inputs import review_summary
+        summary=review_summary(payload)
+        small={'regression_review':{key:summary[key] for key in ('status','confirmed_regression','failed_votes','total_votes','review_runs') if key in summary}}
+        connection.execute('INSERT INTO job_checkpoints VALUES (?,?,?) ON CONFLICT(run_id,question_id) DO UPDATE SET checkpoint_json=excluded.checkpoint_json', (run_id,'review_summary:'+question_id.removeprefix('review:'),_json(small)))
+
+    def job_checkpoints(self, run_id):
+        with self.connection() as connection:
+            return {row['question_id']:_load(row['checkpoint_json'],{}) for row in connection.execute('SELECT question_id,checkpoint_json FROM job_checkpoints WHERE run_id=?',(run_id,))}
+
+    def job_checkpoint(self, run_id, question_id):
+        with self.connection() as connection:
+            row=connection.execute('SELECT checkpoint_json FROM job_checkpoints WHERE run_id=? AND question_id=?',(run_id,question_id)).fetchone()
+            return _load(row[0],{}) if row else None
+
+    def _evaluation_result(self, connection, row):
+        result = _load(row['result_json'], {})
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='evaluation_checkpoints'").fetchone():
+            checkpoints = {r['question_id']: _load(r['checkpoint_json'], {}) for r in connection.execute(
+                'SELECT question_id,checkpoint_json FROM evaluation_checkpoints WHERE run_id=?', (row['id'],))}
+            if checkpoints:
+                result['checkpoints'] = {**result.get('checkpoints', {}), **checkpoints}
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_checkpoints'").fetchone():
+            for saved in connection.execute("SELECT question_id,checkpoint_json FROM job_checkpoints WHERE run_id=? AND question_id LIKE 'review:%'", (row['id'],)):
+                result.setdefault('baseline_review', {}).setdefault('cases', {})[saved['question_id'].removeprefix('review:')] = _load(saved['checkpoint_json'], {})
+        return result
+
+    def _save_checkpoints(self, connection, run_id, result, checkpoint_id=None):
+        checkpoints = result.get('checkpoints', {})
+        selected = checkpoints.items() if checkpoint_id is None else ((checkpoint_id, checkpoints[checkpoint_id]),) if checkpoint_id in checkpoints else ()
+        for question_id, checkpoint in selected:
+            value = _json(checkpoint)
+            connection.execute("INSERT INTO evaluation_checkpoints VALUES (?,?,?) ON CONFLICT(run_id,question_id) DO UPDATE SET checkpoint_json=excluded.checkpoint_json WHERE checkpoint_json!=excluded.checkpoint_json", (run_id, question_id, value))
+        return {k: v for k, v in result.items() if k != 'checkpoints' or not checkpoints}
+
+    def migrate_evaluation_checkpoints(self):
+        """Explicit storage-only migration; operator must back up and verify logical values."""
+        with self.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            connection.execute('CREATE TABLE IF NOT EXISTS job_checkpoints (run_id TEXT NOT NULL, question_id TEXT NOT NULL, checkpoint_json TEXT NOT NULL, PRIMARY KEY(run_id,question_id))')
+            connection.execute('CREATE TABLE IF NOT EXISTS evaluation_checkpoints (run_id TEXT NOT NULL,question_id TEXT NOT NULL,checkpoint_json TEXT NOT NULL,PRIMARY KEY(run_id,question_id))')
+            count = 0
+            for row in connection.execute('SELECT id,result_json FROM evaluation_runs').fetchall():
+                result = _load(row['result_json'], {})
+                review_cases = result.get('baseline_review', {}).get('cases', {})
+                if 'checkpoints' not in result and not review_cases:
+                    continue
+                for question_id, checkpoint in review_cases.items():
+                    connection.execute('INSERT INTO job_checkpoints VALUES (?,?,?) ON CONFLICT(run_id,question_id) DO UPDATE SET checkpoint_json=excluded.checkpoint_json', (row['id'], 'review:' + question_id, _json(checkpoint)))
+                if review_cases:
+                    result['baseline_review'] = {key:value for key,value in result['baseline_review'].items() if key != 'cases'}
+                small = self._save_checkpoints(connection, row['id'], result)
+                connection.execute('UPDATE evaluation_runs SET result_json=? WHERE id=?', (_json(small), row['id']))
+                count += 1
+            for row in connection.execute('SELECT id,result_json FROM candidate_configs').fetchall():
+                result=_load(row['result_json'],{})
+                if result.get('checkpoints'):
+                    small=self._save_candidate_result(connection,row['id'],result)
+                    connection.execute('UPDATE candidate_configs SET result_json=? WHERE id=?',(_json(small),row['id']))
+            for row in connection.execute('SELECT generation_run_id,hard_validation_json FROM golden_generation_artifacts').fetchall():
+                audit=_load(row['hard_validation_json'],{})
+                groups=[('slot_audit:',audit.get('slot_audit',{})),
+                        ('generation:',audit.get('generation_checkpoints',{})),
+                        ('quality:',audit.get('quality_rerun',{}).get('checkpoints',{}))]
+                if 'slot_audit' in audit:audit['slot_audit']={}
+                if 'generation_checkpoints' in audit:audit['generation_checkpoints']={}
+                if 'checkpoints' in audit.get('quality_rerun',{}):audit['quality_rerun']['checkpoints']={}
+                for prefix,checkpoints in groups:
+                    for question_id,checkpoint in checkpoints.items():
+                        connection.execute('INSERT INTO job_checkpoints VALUES (?,?,?) ON CONFLICT(run_id,question_id) DO UPDATE SET checkpoint_json=excluded.checkpoint_json', (row['generation_run_id'],prefix+question_id,_json(checkpoint)))
+                if any(checkpoints for _,checkpoints in groups):
+                    connection.execute('UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?',(_json(audit),row['generation_run_id']))
+            for row in connection.execute("SELECT run_id,question_id,checkpoint_json FROM job_checkpoints WHERE question_id LIKE 'review:%'").fetchall():
+                self._save_review_summary(connection,row['run_id'],row['question_id'],_load(row['checkpoint_json'],{}))
+            return count
 
     def migrate(self):
         with self.connection() as connection:
@@ -136,6 +243,8 @@ class GovernanceStore:
                 CREATE TABLE IF NOT EXISTS qc_results (id INTEGER PRIMARY KEY, question_id TEXT NOT NULL, status TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS review_events (id INTEGER PRIMARY KEY, question_id TEXT NOT NULL, gate TEXT NOT NULL, decision TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS evaluation_runs (id TEXT PRIMARY KEY, status TEXT NOT NULL, run_mode TEXT NOT NULL, data_source TEXT NOT NULL, dataset_version_id TEXT, dataset_snapshot_json TEXT NOT NULL, config_json TEXT NOT NULL, judge_json TEXT NOT NULL, result_json TEXT NOT NULL, error_message TEXT, created_at TEXT NOT NULL, completed_at TEXT);
+                CREATE TABLE IF NOT EXISTS job_checkpoints (run_id TEXT NOT NULL,question_id TEXT NOT NULL,checkpoint_json TEXT NOT NULL,PRIMARY KEY(run_id,question_id));
+                CREATE TABLE IF NOT EXISTS evaluation_checkpoints (run_id TEXT NOT NULL,question_id TEXT NOT NULL,checkpoint_json TEXT NOT NULL,PRIMARY KEY(run_id,question_id));
                 CREATE TABLE IF NOT EXISTS evaluation_case_results (id INTEGER PRIMARY KEY, run_id TEXT NOT NULL, question_id TEXT NOT NULL, result_json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS bad_cases (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, question_id TEXT NOT NULL, category TEXT NOT NULL, severity TEXT NOT NULL, status TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS experiments (id TEXT PRIMARY KEY, baseline_run_id TEXT NOT NULL, status TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL);
@@ -301,11 +410,11 @@ class GovernanceStore:
                 categories.append({'code': code, 'label': label, 'action': action})
         return categories
 
-    def _golden_qc_state(self, item, qc):
+    def _golden_qc_state(self, item, qc, *, chunks=None):
         from .golden_v2 import qc_outcome, content_review_identity, validate_content_sources
         state = qc_outcome(qc)
         if item['raw'].get('business_requirements'):
-            chunks = CorpusStore().chunks()
+            if chunks is None:chunks = CorpusStore().chunks()
             raw = {**item['raw'], 'question':item['question'], 'reference_answer':item['reference_answer'], 'evidence':item['evidence']}
             by_id = {c['chunk_id']:c for c in chunks}
             sources = [by_id[s['chunk_id']] for s in raw['business_requirements']['sources'] if s['chunk_id'] in by_id]
@@ -386,6 +495,7 @@ class GovernanceStore:
         from .business_golden import audit_passed
         result = []
         fingerprint = manifest_identity(current_manifest())
+        chunks = None
         for saved in rows:
             item = self._row(saved)
             if item['raw'].get('source') == 'reviewed_csv':
@@ -409,13 +519,15 @@ class GovernanceStore:
             if item['qc_status'] != 'qc_passed' or not item['qc_id']:
                 reasons.append('QC 未执行' if not item['qc_id'] else 'QC 未通过')
             qc = _load(item.get('qc_summary_json'), {})
-            qc_state = self._golden_qc_state(item, qc)
+            if chunks is None and (item['raw'].get('business_requirements') or item['classification']=='RETRIEVAL_INCOHERENT'):
+                chunks = CorpusStore().chunks()
+            qc_state = self._golden_qc_state(item, qc, chunks=chunks)
             if item['qc_id'] and not qc_state['passed']: reasons.append('QC 分数未达85或存在阻断')
             if qc_state['needs_review']: reasons.append('QC P1' if item['priority']=='P1' else '语义/安全争议待复核')
             fact_coverage = None
             if item['classification']=='RETRIEVAL_INCOHERENT' and qc_state['passed'] and item['probe_hash']==content_hash and item['qc_hash']==content_hash:
                 from .golden_v2 import golden_fact_coverage
-                fact_coverage = {**golden_fact_coverage(item, _load(item['retrieval_probe_json'],{}), _load(item['retrieval_qc_json'],{}), CorpusStore().chunks()), 'content_hash':content_hash, 'probe_id':item['probe_id'], 'qc_id':item['qc_id']}
+                fact_coverage = {**golden_fact_coverage(item, _load(item['retrieval_probe_json'],{}), _load(item['retrieval_qc_json'],{}), chunks), 'content_hash':content_hash, 'probe_id':item['probe_id'], 'qc_id':item['qc_id']}
             if item['classification'] not in {None, 'EVIDENCE_VALID','NEGATIVE_VALID'} and (fact_coverage or {}).get('status')!='necessary_facts_located':
                 reasons.append({'RETRIEVAL_INCOHERENT':'检索不连贯','FAKE_NEGATIVE_RISK':'负向证据需复核'}.get(item['classification'], '证据需复核'))
             if item['execution_status'] in {'failed','uncertain'}:
@@ -436,7 +548,7 @@ class GovernanceStore:
             if errors or validation.get('valid') is False and validation.get('source_validation',{}).get('status')!='passed':
                 reasons.append('Hard Validation 未通过')
             with self.connection() as quality_connection:
-                identity=self._quality_identity(item,quality_connection)
+                identity=self._quality_identity(item,quality_connection,corpus_fingerprint=fingerprint)
             if item['qc_id'] and _load(item.get('qc_identity_json'),{}) != identity:
                 reasons.append('质量记录已过期')
             decision=decisions.get(item['id'],{})
@@ -764,6 +876,21 @@ class GovernanceStore:
             connection.execute("INSERT OR REPLACE INTO alias_mappings VALUES (?, ?, ?, ?, ?)", (alias.strip(), canonical.strip(), "approved", actor, _now()))
         return {"alias": alias.strip(), "canonical": canonical.strip(), "status": "approved", "actor": actor}
 
+    def _separate_generation_audit(self, connection, run_id, audit):
+        """Keep raw per-slot history outside the small mutable Golden progress row."""
+        small = dict(audit)
+        quality = dict(small.get('quality_rerun', {}))
+        groups = [('slot_audit:', small.pop('slot_audit', {})),
+                  ('generation:', small.pop('generation_checkpoints', {})),
+                  ('quality:', quality.pop('checkpoints', {}))]
+        if 'quality_rerun' in small:
+            small['quality_rerun'] = quality
+        for prefix, entries in groups:
+            for key, value in entries.items():
+                connection.execute('INSERT INTO job_checkpoints VALUES (?,?,?) ON CONFLICT(run_id,question_id) DO UPDATE SET checkpoint_json=excluded.checkpoint_json WHERE checkpoint_json!=excluded.checkpoint_json',
+                                   (run_id, prefix + key, _json(value)))
+        return small
+
     def start_generation_run(self, model_version: str, profile_name: str = "mini", *, coverage_plan=None):
         from .corpus import current_manifest
         if profile_name not in GENERATION_PROFILES:
@@ -779,7 +906,7 @@ class GovernanceStore:
             if connection.execute("SELECT 1 FROM golden_generation_runs WHERE status IN ('queued', 'coverage', 'generating', 'validation', 'probing', 'qc') LIMIT 1").fetchone():
                 raise ValueError("已有 Generation Run 正在执行")
             connection.execute("INSERT INTO golden_generation_runs (id, profile_json, model_version, status, question_ids_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(profile), model_version, "queued", _json([]), now))
-            connection.execute("INSERT INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)", (run_id, _json(coverage_plan["slots"] if coverage_plan else []), _json([]), _json({"slot_persistence_v1": True, "frozen_plan": coverage_plan, "corpus_fingerprint": manifest_identity(current_manifest()), "progress": {"stage": "queued", "completed_slots": 0, "total_slots": profile["expected_count"], "phase_processed": 0, "phase_total": profile["expected_count"], "processed_slot_ids": [], "probe_completed": 0, "qc_completed": 0, "started_at": now, "operation_id": run_id}})))
+            connection.execute("INSERT INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)", (run_id, _json(coverage_plan["slots"] if coverage_plan else []), _json([]), _json({**pending_job_owner(), "slot_persistence_v1": True, "frozen_plan": coverage_plan, "corpus_fingerprint": manifest_identity(current_manifest()), "progress": {"stage": "queued", "completed_slots": 0, "total_slots": profile["expected_count"], "phase_processed": 0, "phase_total": profile["expected_count"], "processed_slot_ids": [], "probe_completed": 0, "qc_completed": 0, "started_at": now, "operation_id": run_id}})))
         return run_id
 
     def claim_regeneration(self, run_id: str, corpus_fingerprint):
@@ -798,7 +925,7 @@ class GovernanceStore:
             audit["progress"] = {**prior_progress, "stage": "generating", "phase_processed": 0, "phase_total": remaining, "processed_slot_ids": prior_progress.get("processed_slot_ids", list(audit.get("slot_audit", {}))), "started_at": _now(), "finished_at": None, "operation_id": f"{run_id}-R{audit.get('regeneration_count', 0) + 1}", "refill_round": 1, "refill_max_rounds": 3, "refill_remaining": remaining}
             audit["regeneration_count"] = audit.get("regeneration_count", 0) + 1
             connection.execute("UPDATE golden_generation_runs SET status='generating' WHERE id=?", (run_id,))
-            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), run_id))
+            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(self._separate_generation_audit(connection, run_id, audit)), run_id))
 
     def claim_quality_resume(self, run_id, corpus_fingerprint):
         with self.connection() as connection:
@@ -820,7 +947,7 @@ class GovernanceStore:
             audit.setdefault('quality_recovery_history', []).append({'error': audit.get('error') if interrupted else '仍有未完成质量项', 'stage': audit.get('failed_stage') if interrupted else 'quality_pending', 'at': _now()})
             audit['quality_recovery_count'] = audit.get('quality_recovery_count', 0) + 1
             connection.execute("UPDATE golden_generation_runs SET status='probing' WHERE id=?", (run_id,))
-            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), run_id))
+            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(self._separate_generation_audit(connection, run_id, audit)), run_id))
 
     def persist_generation_attempt(self, run_id: str, candidate: dict | None, slot_audit: dict, *, slot: str, attempt: int, model: str, slot_complete: bool | None = None):
         with self.connection() as connection:
@@ -836,7 +963,9 @@ class GovernanceStore:
                 raise ValueError(f"{slot} 已有活动 Candidate")
             if candidate and any(_load(item["raw_json"], {}).get("coverage_slot") == slot for item in connection.execute("SELECT raw_json FROM questions WHERE legacy_question_type='v1_mini' AND stage!='superseded' AND raw_json LIKE ?", (f'%"generation_run_id": "{run_id}"%',))):
                 raise ValueError(f"{slot} 已有活动 Candidate")
-            audit["slot_audit"] = slot_audit
+            if audit.get('slot_audit'):
+                audit = self._separate_generation_audit(connection, run_id, audit)
+            audit['slot_audit'] = {slot: slot_audit.get(slot, [])}
             connection.execute("UPDATE golden_generation_runs SET status='generating' WHERE id=?", (run_id,))
             progress = audit.get("progress", {})
             finished = bool(candidate) if slot_complete is None else slot_complete
@@ -857,7 +986,7 @@ class GovernanceStore:
                 ids = [item["question_id"] for item in question_plan]
                 connection.execute("UPDATE golden_generation_runs SET question_ids_json=? WHERE id=?", (_json(ids), run_id))
                 connection.execute("UPDATE golden_generation_artifacts SET question_plan_json=? WHERE generation_run_id=?", (_json(question_plan), run_id))
-            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), run_id))
+            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(self._separate_generation_audit(connection, run_id, audit)), run_id))
 
     def complete_generation_slots(self, run_id: str, *, failed_slots: list[str], hard_validation: dict, continue_refill: bool = False):
         with self.connection() as connection:
@@ -877,7 +1006,7 @@ class GovernanceStore:
             next_status = "probing" if complete else "generating" if continue_refill else "needs_regeneration"
             audit["progress"] = {**progress, "stage": next_status, "completed_slots": len(ids), "finished_at": None if complete or continue_refill else _now(), "refill_remaining": len(failed_slots), **({"refill_round": progress["refill_round"] + 1, "phase_processed": 0, "phase_total": len(failed_slots), "slot": None, "attempt": None} if continue_refill else {})}
             connection.execute("UPDATE golden_generation_runs SET status=? WHERE id=?", (next_status, run_id))
-            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), run_id))
+            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(self._separate_generation_audit(connection, run_id, audit)), run_id))
         return complete
 
     def update_generation_run(self, run_id: str, *, status: str, progress: dict | None = None, coverage_plan: list[dict] | None = None, validation: dict | None = None):
@@ -892,7 +1021,7 @@ class GovernanceStore:
                 if status in {"completed", "failed"}:
                     audit["progress"]["finished_at"] = _now()
             connection.execute("UPDATE golden_generation_runs SET status = ? WHERE id = ?", (status, run_id))
-            connection.execute("UPDATE golden_generation_artifacts SET coverage_plan_json = ?, hard_validation_json = ? WHERE generation_run_id = ?", (_json(coverage_plan if coverage_plan is not None else _load(row["coverage_plan_json"], [])), _json(audit), run_id))
+            connection.execute("UPDATE golden_generation_artifacts SET coverage_plan_json = ?, hard_validation_json = ? WHERE generation_run_id = ?", (_json(coverage_plan if coverage_plan is not None else _load(row["coverage_plan_json"], [])), _json(self._separate_generation_audit(connection, run_id, audit)), run_id))
 
     def interrupt_generation_runs(self):
         """A process restart cannot resume daemon workers; preserve their audit and unblock manual retry."""
@@ -900,6 +1029,7 @@ class GovernanceStore:
             rows = connection.execute("SELECT r.id, r.status, a.hard_validation_json FROM golden_generation_runs r JOIN golden_generation_artifacts a ON a.generation_run_id=r.id").fetchall()
             for row in rows:
                 audit = _load(row["hard_validation_json"], {})
+                if audit.get('auto_resume') or audit.get('quality_rerun',{}).get('auto_resume'):continue
                 changed = False
                 if row["status"] in {"queued", "coverage", "generating", "validation", "probing", "qc"}:
                     audit.update({"failed_stage": audit.get("progress", {}).get("stage") or row["status"], "error": "服务重启后生成 Worker 已中断，请手动重新运行", "interrupted_at": _now()})
@@ -913,7 +1043,7 @@ class GovernanceStore:
                     audit["quality_rerun"] = {**rerun, "status": "failed", "failed_stage": rerun.get("stage"), "error": "服务重启后质量 Worker 已中断，请手动重试", "interrupted_at": _now()}
                     changed = True
                 if changed:
-                    connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(audit), row["id"]))
+                    connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?", (_json(self._separate_generation_audit(connection, row['id'], audit)), row["id"]))
 
     def save_mini_golden_candidates(self, candidates: list[dict], model_version: str, *, coverage_plan: list[dict] | None = None, hard_validation: dict | None = None, slot_audit: dict | None = None, run_id: str | None = None):
         """Persist the V1 Mini profile only as review-pending candidates, never as Golden."""
@@ -948,7 +1078,7 @@ class GovernanceStore:
             question_plan = [{"question_id": question_id, "test_category": item["test_category"], "negative_subtype": item.get("negative_subtype"), "ablation_attribute": item.get("ablation_attribute"), "coverage_slot": item.get("coverage_slot"), "source_positive_id": item.get("source_positive_id") or next((saved_id for saved_id, prior in zip(question_ids, candidates) if prior.get("coverage_slot") == item.get("source_positive_slot") and prior.get("test_category") == "positive"), None)} for question_id, item in zip(question_ids, candidates)]
             previous = _load(connection.execute("SELECT hard_validation_json FROM golden_generation_artifacts WHERE generation_run_id = ?", (run_id,)).fetchone()[0], {}) if existing_run else {}
             validation = {**previous, "status": "passed", "profile": "mini", "counts": actual, "validated_at": now, "slot_audit": slot_audit if slot_audit is not None else previous.get("slot_audit", {}), **(hard_validation or {})}
-            connection.execute("INSERT OR REPLACE INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)", (run_id, _json(coverage), _json(question_plan), _json(validation)))
+            connection.execute("INSERT OR REPLACE INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)", (run_id, _json(coverage), _json(question_plan), _json(self._separate_generation_audit(connection, run_id, validation))))
         return [self.question(question_id) for question_id in question_ids]
 
     def save_failed_generation_run(self, profile: dict, model_version: str, coverage_plan: list[dict], hard_validation: dict, slot_audit: dict, failed_slots: list[str]):
@@ -957,7 +1087,7 @@ class GovernanceStore:
         validation = {**hard_validation, "slot_audit": slot_audit, "failed_slots": failed_slots, "validated_at": now}
         with self.connection() as connection:
             connection.execute("INSERT INTO golden_generation_runs (id, profile_json, model_version, status, question_ids_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", (run_id, _json(profile), model_version, "failed", _json([]), now))
-            connection.execute("INSERT INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)", (run_id, _json(coverage_plan), _json([]), _json(validation)))
+            connection.execute("INSERT INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?, ?, ?, ?)", (run_id, _json(coverage_plan), _json([]), _json(self._separate_generation_audit(connection, run_id, validation))))
         return next(item for item in self.generation_runs(qualification=False) if item["id"] == run_id)
 
     def generation_artifacts(self, generation_run_id: str):
@@ -966,6 +1096,13 @@ class GovernanceStore:
         if row is None:
             return None
         validation = _load(row["hard_validation_json"], {})
+        with self.connection() as connection:
+            if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_checkpoints'").fetchone():
+                checkpoints=self.job_checkpoints(generation_run_id)
+                for key,value in checkpoints.items():
+                    if key.startswith('generation:'):validation.setdefault('generation_checkpoints',{})[key.removeprefix('generation:')]=value
+                    elif key.startswith('slot_audit:'):validation.setdefault('slot_audit',{})[key.removeprefix('slot_audit:')]=value
+                    elif key.startswith('quality:'):validation.setdefault('quality_rerun',{}).setdefault('checkpoints',{})[key.removeprefix('quality:')]=value
         return {**dict(row), "coverage_plan": _load(row["coverage_plan_json"], []), "question_plan": _load(row["question_plan_json"], []), "hard_validation": validation, "slot_audit": validation.get("slot_audit", {}), "failed_slots": validation.get("failed_slots", [])}
 
     def generation_runs(self, *, qualification=True):
@@ -1062,8 +1199,8 @@ class GovernanceStore:
             if start:
                 for checkpoint in previous.get('checkpoints',{}).values():checkpoint.pop('final_retry_done',None)
                 for slot in previous.get('slots',{}).values():slot.pop('final_retry_done',None)
-            audit["quality_rerun"] = {**previous, **changes, **({"attempt_id":uuid.uuid4().hex, "error":None, "finished_at":None,"final_retry_started":False} if start else {})}
-            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json = ? WHERE generation_run_id = ?", (_json(audit), run_id))
+            audit["quality_rerun"] = {**previous, **changes, **({**pending_job_owner(), "attempt_id":uuid.uuid4().hex, "error":None, "finished_at":None,"final_retry_started":False} if start else {})}
+            connection.execute("UPDATE golden_generation_artifacts SET hard_validation_json = ? WHERE generation_run_id = ?", (_json(self._separate_generation_audit(connection, run_id, audit)), run_id))
             if changes.get("status")=="completed":
                 connection.execute("UPDATE golden_generation_runs SET status='completed' WHERE id=?",(run_id,))
         return ids
@@ -1091,7 +1228,8 @@ class GovernanceStore:
                 raise ValueError("本轮 Candidate 归属或数量不一致")
             probes = {question_id: [] for question_id in ids}
             for row in connection.execute(f"SELECT question_id, result_json, created_at FROM probe_results WHERE question_id IN ({marks}) ORDER BY id DESC", ids):
-                probes[row["question_id"]].append({**_load(row["result_json"], {}), "created_at": row["created_at"]})
+                from .golden_v2 import probe_reason_fields
+                probes[row["question_id"]].append({**_load(row["result_json"], {}), **probe_reason_fields(_load(row["result_json"],{})), "created_at": row["created_at"]})
             qcs = {question_id: [] for question_id in ids}
             for row in connection.execute(f"SELECT question_id, status, result_json, created_at FROM qc_results WHERE question_id IN ({marks}) ORDER BY id DESC", ids):
                 qcs[row["question_id"]].append({"status": row["status"], "result": _load(row["result_json"], {}), "created_at": row["created_at"]})
@@ -1267,6 +1405,8 @@ class GovernanceStore:
         with self.connection() as connection:
             rows = connection.execute("SELECT id, audit_json FROM candidate_revision_runs WHERE status IN ('queued', 'generating', 'validating', 'probing', 'qc')").fetchall()
             for row in rows:
+                if _load(row['audit_json'], {}).get('auto_resume'):
+                    continue
                 audit = {**_load(row["audit_json"], {}), "interrupted_at": _now(), "interrupted_stage": _load(row["audit_json"], {}).get("stage"), "stage": "interrupted"}
                 connection.execute("UPDATE candidate_revision_runs SET status='interrupted', audit_json=?, updated_at=? WHERE id=?", (_json(audit), _now(), row["id"]))
 
@@ -1323,7 +1463,7 @@ class GovernanceStore:
         if any(item["stage"] == "golden" for item in before.values()):
             raise ValueError("已批准题目不能修订")
         revision_id = f"REV-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
-        audit = {"question_ids": ids, "mode": mode, 'replacement': replacement, 'actor': actor, "reason": reason.strip(), "tags": tags or [], "before": before, "previous_hash": {item_id: self._revision_hash(item) for item_id, item in before.items()}, "changes": changes_by_id, "stage": "queued", "progress": {"current": 0, "total": len(ids)}}
+        audit = {**pending_job_owner(), "question_ids": ids, "mode": mode, 'replacement': replacement, 'actor': actor, "reason": reason.strip(), "tags": tags or [], "before": before, "previous_hash": {item_id: self._revision_hash(item) for item_id, item in before.items()}, "changes": changes_by_id, "stage": "queued", "progress": {"current": 0, "total": len(ids)}}
         with self.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             for row in connection.execute("SELECT audit_json FROM candidate_revision_runs WHERE generation_run_id=? AND status IN ('queued','generating','validating','preview_ready','probing','qc','interrupted')", (run_id,)):
@@ -1981,9 +2121,9 @@ class GovernanceStore:
             payload['raw']={k:v for k,v in item['raw'].items() if k!='validation'}
         return hashlib.sha256(_json(payload).encode()).hexdigest()
 
-    def _quality_identity(self, item, connection):
+    def _quality_identity(self, item, connection, *, corpus_fingerprint=None):
         probe = connection.execute('SELECT id FROM probe_results WHERE question_id=? ORDER BY id DESC LIMIT 1', (item['id'],)).fetchone()
-        return {'content_hash': self._quality_content(item), 'active_candidate': item.get('stage') != 'superseded', 'corpus_fingerprint': manifest_identity(current_manifest()),
+        return {'content_hash': self._quality_content(item), 'active_candidate': item.get('stage') != 'superseded', 'corpus_fingerprint': manifest_identity(current_manifest()) if corpus_fingerprint is None else corpus_fingerprint,
                 'probe_id': probe['id'] if probe else None, 'quality_contract':'human-reviewed-csv-v1' if item['raw'].get('source') == 'reviewed_csv' else 'golden-quality-85-v1'}
 
     def capture_quality(self, question_id, *, qc=False):
@@ -2037,7 +2177,8 @@ class GovernanceStore:
             manual = connection.execute("SELECT 1 FROM review_events WHERE question_id = ? LIMIT 1", (question_id,)).fetchone()
             review_status = item["review_status"] if manual else "human_review_pending" if passed else "needs_revision"
             connection.execute("UPDATE questions SET probe_status = ?, review_status = ?, updated_at = ? WHERE id = ?", ("probe_passed" if passed else "needs_revision", review_status, _now(), question_id))
-        return stored
+        from .golden_v2 import probe_reason_fields
+        return {**stored,**probe_reason_fields(stored)}
 
     def reset_qc_for_rerun(self, question_id: str):
         with self.connection() as connection:
@@ -2046,7 +2187,8 @@ class GovernanceStore:
     def probe_history(self, question_id: str):
         with self.connection() as connection:
             rows = connection.execute("SELECT result_json, created_at FROM probe_results WHERE question_id = ? ORDER BY id DESC", (question_id,)).fetchall()
-        return [{**_load(row["result_json"], {}), "created_at": row["created_at"]} for row in rows]
+        from .golden_v2 import probe_reason_fields
+        return [{**_load(row["result_json"], {}), **probe_reason_fields(_load(row["result_json"],{})), "created_at": row["created_at"]} for row in rows]
 
     def review_generation_batch(self, question_ids: list[str], actor: str, *, confirmed_manual_review: bool = False, reason: str | None = None):
         from .full_text import CORPUS_LOCK
@@ -2207,8 +2349,9 @@ class GovernanceStore:
     def evaluation_runs(self, *, authorized_only=False):
         with self.connection() as connection:
             where=" WHERE COALESCE(json_extract(result_json,'$.auto_recovery.enabled'),json_extract(result_json,'$.auto_recovery.authorized'))=1 AND (status IN ('queued','running') OR status='completed' AND EXISTS (SELECT 1 FROM candidate_configs WHERE candidate_configs.status='running' AND json_extract(candidate_configs.result_json,'$.evaluation_run_id')=evaluation_runs.id))" if authorized_only else ""
-            rows = connection.execute("SELECT * FROM evaluation_runs"+where+" ORDER BY created_at DESC").fetchall()
-        return [{**dict(row), "result": _load(row["result_json"], {}), "config": _load(row["config_json"], {}), "judge": _load(row["judge_json"], {})} for row in rows]
+            columns="id,status,config_json,judge_json,result_json,error_message" if authorized_only else "*"
+            rows = connection.execute("SELECT "+columns+" FROM evaluation_runs"+where+" ORDER BY created_at DESC").fetchall()
+            return [{**dict(row), "result": self._evaluation_result(connection, row) if not authorized_only else _load(row['result_json'],{}), "config": _load(row["config_json"], {}), "judge": _load(row["judge_json"], {})} for row in rows]
 
     def evaluation_history(self, page=1, limit=50, *, active_only=False):
         if type(page) is not int or page<1 or type(limit) is not int or not 1<=limit<=50:
@@ -2223,14 +2366,21 @@ class GovernanceStore:
                 row = connection.execute("""SELECT id,status,run_mode,data_source,dataset_version_id,config_json,judge_json,
                     json_remove(result_json,'$.checkpoints') AS result_json,
                     dataset_snapshot_json,error_message,created_at,completed_at FROM evaluation_runs WHERE id=?""",(run_id,)).fetchone()
+                if row is None:return None
+                result=_load(row['result_json'],{})
+                if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_checkpoints'").fetchone():
+                    for saved in connection.execute("SELECT question_id,checkpoint_json FROM job_checkpoints WHERE run_id=? AND question_id LIKE 'review_summary:%'",(run_id,)):
+                        result.setdefault('baseline_review',{}).setdefault('cases',{})[saved['question_id'].removeprefix('review_summary:')]=_load(saved['checkpoint_json'],{})
             if row is None:return None
             snapshot = self.snapshot_summary(_load(row['dataset_snapshot_json'],{}))
             return {**{k:row[k] for k in row.keys() if not k.endswith('_json')},
-                'result':_load(row['result_json'],{}),'config':_load(row['config_json'],{}),
+                'result':result,'config':_load(row['config_json'],{}),
                 'judge':_load(row['judge_json'],{}),'dataset_snapshot':snapshot}
         with self.connection() as connection:
             row=connection.execute('SELECT * FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
-        return {**dict(row), 'result':_load(row['result_json'],{}), 'config':_load(row['config_json'],{}), 'judge':_load(row['judge_json'],{})} if row else None
+            if row is None:return None
+            result = self._evaluation_result(connection, row)
+            return {**dict(row), 'result_json':_json(result), 'result':result, 'config':_load(row['config_json'],{}), 'judge':_load(row['judge_json'],{})}
 
     def current_baseline_identity(self, connection=None):
         """One resolver for current APIs and transactional mutation guards."""
@@ -2361,6 +2511,7 @@ class GovernanceStore:
         if snapshot.get('corpus_fingerprint') != manifest_identity(current_manifest()):
             raise ValueError('续跑Corpus身份不匹配，禁止混合结果')
         source = connection.execute('SELECT * FROM evaluation_runs WHERE id=?', (source_id,)).fetchone()
+        if source is not None:source = {**dict(source), 'result_json':_json(self._evaluation_result(connection, source))}
         if source is None or (source['status'] not in {'partial','failed'} and not (source['status']=='completed' and _load(source['result_json'],{}).get('technical_failed'))) or _load(source['config_json'], {}).get('run_target') != ('sandbox_candidate' if candidate_id else 'baseline'):
             raise ValueError('仅中断的同身份评测可以续跑')
         from .paid_run import require_reconciled_execution
@@ -2388,7 +2539,7 @@ class GovernanceStore:
             self.validate_evaluation_start(connection, snapshot, judge, candidate_id=candidate_id)
             if candidate_id:
                 candidate = self.reserve_candidate_evaluation(candidate_id, connection)
-                baseline = self.require_current_baseline(self.experiment(candidate['experiment_id'])['baseline_run_id'], connection)
+                baseline = self.require_current_baseline(self.experiment(candidate['experiment_id'],light=True)['baseline_run_id'], connection)
                 expected_config = {**{k:DEFAULT_PIPELINE_CONFIG[k] for k in ('generation_thinking','query_decompose','retrieval_max_tokens')}, **candidate['config'], **({'knowledge_identity':baseline['config']['knowledge_identity']} if baseline['config'].get('knowledge_identity') else {}), 'run_target':'sandbox_candidate', 'candidate_id':candidate_id}
                 if config != expected_config or judge != baseline['judge'] or snapshot != _load(baseline['dataset_snapshot_json'], {}):
                     raise ValueError('Candidate/Baseline身份或配置已变化')
@@ -2423,7 +2574,8 @@ class GovernanceStore:
                 paid=current_paid_run()
                 result['auto_recovery']={'enabled':True,'state':'ready','ledger_path':str(paid.path) if paid else None,'ledger_identity':paid.identity if paid else None}
             result['execution_owner_pid']=os.getpid()
-            connection.execute('INSERT INTO evaluation_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (run_id,'running','real','real',snapshot['id'],_json(snapshot),_json(config),_json(judge),_json(result),None,_now(),None))
+            small = self._save_checkpoints(connection,run_id,result)
+            connection.execute('INSERT INTO evaluation_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (run_id,'running','real','real',snapshot['id'],_json(snapshot),_json(config),_json(judge),_json(small),None,_now(),None))
             if candidate_id:
                 attempts = candidate['reasoning']['sandbox_attempts']
                 attempts[-1].update(evaluation_run_id=run_id, resume_source_id=source_id)
@@ -2481,7 +2633,7 @@ class GovernanceStore:
                     connection.execute("UPDATE candidate_configs SET status='failed' WHERE status='running' AND json_extract(result_json,'$.evaluation_run_id')=?",(run_id,))
         return self.evaluation_run(run_id)
 
-    def update_evaluation_progress(self, run_id, result):
+    def update_evaluation_progress(self, run_id, result, *, checkpoint_id=None):
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             row=connection.execute('SELECT result_json FROM evaluation_runs WHERE id=?',(run_id,)).fetchone()
@@ -2489,7 +2641,8 @@ class GovernanceStore:
             stored=_load(row['result_json'],{}) if row else {}
             if 'experiment_config_identity' in stored: result['experiment_config_identity']=stored['experiment_config_identity']
             if stop:result['stop_request']=stop
-            changed = connection.execute("UPDATE evaluation_runs SET result_json=? WHERE id=? AND status='running'", (_json(result),run_id)).rowcount
+            small = self._save_checkpoints(connection,run_id,result,checkpoint_id)
+            changed = connection.execute("UPDATE evaluation_runs SET result_json=? WHERE id=? AND status='running'", (_json(small),run_id)).rowcount
             if not changed:
                 raise ValueError('评测已终止，不能写入进度')
 
@@ -2515,8 +2668,9 @@ class GovernanceStore:
                 result['stop_request']=stop;result['evaluation_complete']=False
                 result.setdefault('auto_recovery',{}).update(state='stopped',error='用户停止运行')
                 status='partial';error_message='用户停止运行'
-            connection.execute("UPDATE evaluation_runs SET status = ?, result_json = ?, error_message = ?, completed_at = ? WHERE id = ?", (status, _json(result), error_message, _now(), run_id))
-        return next(item for item in self.evaluation_runs() if item["id"] == run_id)
+            small = self._save_checkpoints(connection,run_id,result)
+            connection.execute("UPDATE evaluation_runs SET status = ?, result_json = ?, error_message = ?, completed_at = ? WHERE id = ?", (status, _json(small), error_message, _now(), run_id))
+        return self.evaluation_run(run_id)
 
     def evaluation_case_results(self, run_id: str):
         with self.connection() as connection:
@@ -2560,11 +2714,17 @@ class GovernanceStore:
             if not experiment_id:
                 row = connection.execute("SELECT id FROM experiments WHERE baseline_run_id=? AND status!='direct_release' ORDER BY created_at DESC, rowid DESC LIMIT 1", (baseline_run_id,)).fetchone()
                 experiment_id = row["id"] if row else None
-            existing = self.experiment(experiment_id) if experiment_id else None
+            existing = self.experiment(experiment_id,light=True) if experiment_id else None
             if experiment_id and (existing is None or existing["baseline_run_id"] != baseline_run_id):
                 raise ValueError("Optimization Run 不存在或不属于该 Baseline")
             if existing and existing["status"] == "generating":
-                raise ValueError("Optimization Agent 正在生成中，请等待当前请求完成")
+                pid=existing['result'].get('agent_generation',{}).get('owner_pid')
+                alive=False
+                if type(pid) is int and pid>0:
+                    try:os.kill(pid,0);alive=True
+                    except ProcessLookupError:pass
+                    except PermissionError:alive=True
+                if alive:raise ValueError("Optimization Agent 正在生成中，请等待当前请求完成")
             if existing and existing["result"].get("report_confirmation"):
                 raise ValueError("报告已确认，不能继续改变实验")
             candidates = existing["candidates"] if existing else []
@@ -2632,7 +2792,7 @@ class GovernanceStore:
                     except PermissionError: continue
                     else: continue
                 context['agent_interruption'] = {'at': _now(), 'reason': 'Generation owner exited or legacy ownership unavailable'}
-                connection.execute("UPDATE experiments SET status='failed',result_json=? WHERE id=?", (_json(context), row['id']))
+                connection.execute("UPDATE experiments SET result_json=? WHERE id=?", (_json(context), row['id']))
 
     def interrupt_evaluation_runs(self):
         """Preserve live evaluation owners; interrupt exited or legacy workers."""
@@ -2678,21 +2838,36 @@ class GovernanceStore:
         self.save_candidate(experiment_id, "DIRECT", config, {"root_cause_cluster": "Human Direct Release", "observed_evidence": [], "hypothesis": "Human-confirmed configuration", "proposal": "Skip Agent search only; preserve Sandbox validation", "risk": "Requires complete Gate and Regression verification", "changed_parameters": config, "operator": actor})
         return self.candidate(f"{experiment_id}-DIRECT")
 
+    def _candidate_result(self, connection, row, *, light=False):
+        result=_load(row['result_json'],{})
+        if light:
+            return {key:value for key,value in result.items() if key!='checkpoints'}
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_checkpoints'").fetchone():
+            for saved in connection.execute('SELECT question_id,checkpoint_json FROM job_checkpoints WHERE run_id=?',('candidate:'+row['id'],)):
+                result.setdefault('checkpoints',{})[saved['question_id']]=_load(saved['checkpoint_json'],{})
+        return result
+
+    def _save_candidate_result(self, connection, candidate_id, result):
+        for question_id,checkpoint in result.get('checkpoints',{}).items():
+            connection.execute('INSERT INTO job_checkpoints VALUES (?,?,?) ON CONFLICT(run_id,question_id) DO UPDATE SET checkpoint_json=excluded.checkpoint_json',('candidate:'+candidate_id,question_id,_json(checkpoint)))
+        return {key:({} if key=='checkpoints' else value) for key,value in result.items()}
+
     def candidate(self, candidate_id: str):
         with self.connection() as connection:
             row = connection.execute("SELECT * FROM candidate_configs WHERE id = ?", (candidate_id,)).fetchone()
-        if row is None:
-            return None
-        return {**dict(row), "config": _load(row["config_json"], {}), "reasoning": _load(row["reasoning_json"], {}), "result": _load(row["result_json"], {})}
+            if row is None:return None
+            result=self._candidate_result(connection,row)
+            return {**dict(row),'result_json':_json(result), "config":_load(row['config_json'],{}),"reasoning":_load(row['reasoning_json'],{}),'result':result}
 
-    def candidates(self, experiment_id: str | None = None):
+    def candidates(self, experiment_id: str | None = None, *, light=False):
         with self.connection() as connection:
             query, args = "SELECT * FROM candidate_configs", []
             if experiment_id:
                 query += " WHERE experiment_id = ?"
                 args.append(experiment_id)
             rows = connection.execute(query + " ORDER BY created_at", args).fetchall()
-        return [{**dict(row), "config": _load(row["config_json"], {}), "reasoning": _load(row["reasoning_json"], {}), "result": _load(row["result_json"], {})} for row in rows]
+        with self.connection() as connection:
+            return [{**dict(row), "config": _load(row["config_json"], {}), "reasoning": _load(row["reasoning_json"], {}), "result": self._candidate_result(connection,row,light=light)} for row in rows]
 
     @staticmethod
     def _round_summary(candidates: list[dict], number: int) -> dict:
@@ -2704,11 +2879,12 @@ class GovernanceStore:
         number = candidate.get("reasoning", {}).get("round")
         if not isinstance(number, int):
             return {"direct_or_legacy": True, "complete": True, "evaluated": 1, "total": 1}
-        return self._round_summary(self.candidates(candidate["experiment_id"]), number)
+        return self._round_summary(self.candidates(candidate["experiment_id"],light=True), number)
 
     def finish_candidate(self, candidate_id: str, status: str, result: dict):
         with self.connection() as connection:
-            connection.execute("UPDATE candidate_configs SET status = ?, result_json = ? WHERE id = ?", (status, _json(result), candidate_id))
+            small=self._save_candidate_result(connection,candidate_id,result)
+            connection.execute("UPDATE candidate_configs SET status = ?, result_json = ? WHERE id = ?", (status, _json(small), candidate_id))
         return self.candidate(candidate_id)
 
     def reserve_candidate_evaluation(self, candidate_id: str, connection=None):
@@ -2732,24 +2908,29 @@ class GovernanceStore:
             is_d = candidate['reasoning'].get('candidate_label') == 'D'
             if result.get('report_confirmation') and not is_d:
                 raise ValueError('报告已确认，不能改变已确认的实验结果')
-            items = connection.execute("SELECT status, reasoning_json FROM candidate_configs WHERE experiment_id=?", (candidate['experiment_id'],)).fetchall()
-            used = sum(len(_load(item['reasoning_json'], {}).get('sandbox_attempts', [])) or int(item['status'] in {'evaluated', 'failed', 'running'}) for item in items)
+            items = connection.execute("SELECT status, reasoning_json, result_json FROM candidate_configs WHERE experiment_id=?", (candidate['experiment_id'],)).fetchall()
+            used = sum(sandbox_attempts_used({'status':item['status'],'reasoning':_load(item['reasoning_json'],{}),'result':_load(item['result_json'],{})}) for item in items)
             limit = MAX_EVALS if is_d else MAX_EVALS - 1
             if used >= limit:
                 raise ValueError('Sandbox budget exhausted；D 保留一次额度')
             if is_d and not result.get('report_confirmation'):
                 raise ValueError('D 需要 Gate 2 报告确认')
             attempts = list(candidate['reasoning'].get('sandbox_attempts', []))
-            if not attempts and row['status'] == 'failed':
+            resuming = row['status']=='failed' and product_interruption(candidate)
+            if not attempts and row['status'] == 'failed' and not resuming:
                 attempts.append({'attempt':1, 'legacy':True})
-            attempts.append({'attempt': len(attempts) + 1, 'started_at': _now()})
+            if resuming and attempts:
+                attempts[-1].setdefault('resume_run_ids',[]).append(attempts[-1].get('evaluation_run_id'))
+                attempts[-1]['resumed_at']=_now()
+            else:
+                attempts.append({'attempt': len(attempts) + 1, 'started_at': _now()})
             connection.execute("UPDATE candidate_configs SET status='running', reasoning_json=? WHERE id=?", (_json({**candidate['reasoning'], 'sandbox_attempts': attempts}), candidate_id))
         return {**candidate, 'status':'running', 'reasoning':{**candidate['reasoning'], 'sandbox_attempts':attempts}}
 
     def confirm_experiment_report(self, experiment_id: str, winner_id: str, actor: str):
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
-            experiment = self.experiment(experiment_id)
+            experiment = self.experiment(experiment_id,light=True)
             if not experiment:
                 raise ValueError('Experiment 不存在')
             if experiment['result'].get('report_confirmation'):
@@ -2783,7 +2964,7 @@ class GovernanceStore:
         from .full_text import CORPUS_LOCK
         with CORPUS_LOCK, self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
-            experiment = self.experiment(experiment_id)
+            experiment = self.experiment(experiment_id,light=True)
             if not experiment:
                 raise ValueError('Experiment不存在')
             baseline = self.require_current_baseline(experiment['baseline_run_id'], connection)
@@ -2867,7 +3048,7 @@ class GovernanceStore:
                 self.require_current_baseline(baseline['id'], connection)
             except ValueError as error:
                 decision.update(status='failed', reason=f'调用后身份失效：{error}')
-            current = self.experiment(experiment_id)
+            current = self.experiment(experiment_id,light=True)
             if current['result'].get('report_confirmation') != confirmation or current['result'].get('composite') != claim:
                 raise ValueError('D决策身份已变化')
             saved_sources = {c['id']: c for c in current['candidates']}
@@ -2891,14 +3072,14 @@ class GovernanceStore:
         # One writer snapshot prevents a late worker from erasing a newer Gate 2/D decision.
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
-            candidates = self.candidates(experiment_id)
+            candidates = self.candidates(experiment_id,light=True)
             row = connection.execute('SELECT result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
             state = _load(row[0], {}) if row else {}
             confirmation = state.get('report_confirmation')
             composite = state.get('composite')
             from .evaluation_contract import policy_current
             from .policy import select_final_candidate
-            experiment = self.experiment(experiment_id)
+            experiment = self.experiment(experiment_id,light=True)
             baseline = self.evaluation_run(experiment['baseline_run_id']) or {}
             identity = baseline.get('judge', {}).get('evaluation_identity')
             qualified = sorted([item for item in candidates if item['reasoning'].get('candidate_label') != 'D' and item['status'] == 'evaluated' and item['result'].get('qualification', {}).get('qualified') and policy_current(baseline.get('judge', {})) and identity and item['result'].get('evaluation_identity') == identity], key=lambda c: (c['result'].get('bad_case_count') if type(c['result'].get('bad_case_count')) is int else float('inf'), c['id']))
@@ -3152,15 +3333,16 @@ class GovernanceStore:
     def trigger_is_confirmed(self, trigger_id: str):
         return (self.optimization_trigger(trigger_id) or {}).get("status") == "human_confirmed"
 
-    def experiment(self, experiment_id: str):
+    def experiment(self, experiment_id: str, *, light=False):
         with self.connection() as connection:
             row = connection.execute("SELECT * FROM experiments WHERE id = ?", (experiment_id,)).fetchone()
             candidates = connection.execute("SELECT * FROM candidate_configs WHERE experiment_id = ? ORDER BY id", (experiment_id,)).fetchall()
         if row is None:
             return None
-        items = [{**dict(candidate), "config": _load(candidate["config_json"], {}), "reasoning": _load(candidate["reasoning_json"], {}), "result": _load(candidate["result_json"], {})} for candidate in candidates]
+        with self.connection() as connection:
+            items = [{**dict(candidate), "config": _load(candidate["config_json"], {}), "reasoning": _load(candidate["reasoning_json"], {}), "result": self._candidate_result(connection,candidate,light=light)} for candidate in candidates]
         numbers = sorted({item.get("reasoning", {}).get("round") for item in items if isinstance(item.get("reasoning", {}).get("round"), int)})
-        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**item, "release_state": self.release_state(item)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(len(item['reasoning'].get('sandbox_attempts', [])) or int(item['status'] in {'evaluated', 'failed', 'running'}) for item in items), "max": MAX_EVALS, 'reserved_for_d': 1}}
+        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**item, "release_state": self.release_state(item)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": MAX_EVALS, 'reserved_for_d': 1}}
 
     def latest_experiment(self):
         with self.connection() as connection:

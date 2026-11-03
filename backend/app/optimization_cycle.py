@@ -1,6 +1,8 @@
 """Explicitly started A/B/C batches; D and release keep their existing decisions."""
 import json
+import logging
 import os
+import threading
 from datetime import datetime, timezone
 
 from .evaluation import EvaluationRunner
@@ -24,7 +26,7 @@ def claim_cycle(store, experiment_id):
     """Called before starting the worker, so duplicate clicks cannot own two cycles."""
     with CORPUS_LOCK, store.connection() as connection:
         connection.execute('BEGIN IMMEDIATE')
-        experiment = store.experiment(experiment_id)
+        experiment = store.experiment(experiment_id, light=True)
         if not experiment:
             raise ValueError('实验不存在')
         store.require_current_baseline(experiment['baseline_run_id'], connection)
@@ -45,15 +47,16 @@ def claim_cycle(store, experiment_id):
 
 
 def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
-    """Only this explicit batch action loops; technical failures never auto-resume."""
+    """Continue the authorized batch, reusing saved Sandbox checkpoints."""
     if not claimed:
         claim_cycle(store, experiment_id)
     runner, agent = EvaluationRunner(store, runtime), OptimizationAgent(store, runtime.provider)
     empty_rounds = 0
-    state = {}
+    state = dict(store.experiment(experiment_id, light=True)['result'].get('optimization_cycle', {}))
+    state.update(owner_pid=os.getpid(), worker_thread=threading.get_ident())
 
     def save(status, phase, error=None):
-        experiment = store.experiment(experiment_id)
+        experiment = store.experiment(experiment_id, light=True)
         used = experiment['evaluation_budget']['used']
         state.update(status=status, phase=phase, used=used, remaining=max(0, MAX_EVALS-used),
                      reserved_for_d=1, last_error=error,
@@ -63,17 +66,46 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
 
     try:
         while True:
-            experiment = store.experiment(experiment_id)
+            experiment = store.experiment(experiment_id, light=True)
             store.require_current_baseline(experiment['baseline_run_id'])
-            pending = [c for c in experiment['candidates'] if c['status']=='generated' and c['reasoning'].get('candidate_label') in {'A','B','C'}]
+            pending = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}
+                       and (c['status'] in {'generated','running'} or c['status']=='failed' and c['result'].get('evaluation_run_id'))]
             for candidate in pending:
-                if store.experiment(experiment_id)['evaluation_budget']['used'] >= MAX_EVALS-1:
+                if candidate['status']=='generated' and store.experiment(experiment_id, light=True)['evaluation_budget']['used'] >= MAX_EVALS-1:
                     return save('budget_exhausted', 'review')
                 save('running', 'sandbox')
-                finished = runner.run_candidate(candidate['id'], automatic=True)
-                if finished['status'] != 'evaluated':
-                    return save('failed', 'sandbox', '试跑未完整结束，请检查已保存断点后再处理')
-            experiment = store.experiment(experiment_id)
+                finished = candidate
+                while True:
+                    if finished['status']=='running':
+                        runner.recover_run(finished['result']['evaluation_run_id'])
+                        finished = store.candidate(candidate['id'])
+                    elif finished['status']=='generated':
+                        finished = runner.run_candidate(candidate['id'], automatic=True)
+                    if finished['status']=='evaluated':break
+                    run = store.evaluation_run(finished['result'].get('evaluation_run_id'))
+                    if not run:
+                        return save('failed','sandbox','试跑没有可用断点，不能安全续跑')
+                    result = run['result']
+                    if result.get('stop_request'):
+                        return save('stopped','sandbox','用户已停止试跑，保留断点')
+                    errors=result.get('technical_errors',[])
+                    if any(e.get('provider_error',{}).get('status_code') in {400,401,402,403}
+                           or e.get('provider_error',{}).get('http_status') in {400,401,402,403} for e in errors):
+                        return save('failed','sandbox',run.get('error_message') or 'Provider请求、权限或余额错误，已停止')
+                    error = run.get('error_message') or str(result.get('technical_errors') or '试跑未完整结束')
+                    failures = state.setdefault('sandbox_recovery', {})
+                    recovery = failures.setdefault(candidate['id'], {'resumes':0, 'error':error})
+                    if recovery['error'] != error:
+                        recovery.update(error=error, resumes=0)
+                    if recovery['resumes'] >= 2:
+                        return save('failed','sandbox',f'同一故障连续2次续跑仍未恢复：{error}')
+                    plan = runner.candidate_resume_plan(candidate['id'])
+                    if not plan['can_resume']:
+                        return save('failed','sandbox',plan.get('reason') or '冻结身份或费用账本不允许续跑')
+                    recovery['resumes'] += 1
+                    save('running','sandbox',f"断点续跑第{recovery['resumes']}次：{error}")
+                    finished = runner.run_candidate(candidate['id'], automatic=True)
+            experiment = store.experiment(experiment_id, light=True)
             if any(c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True for c in experiment['candidates']):
                 return save('qualified', 'review')
             if experiment['evaluation_budget']['used'] >= MAX_EVALS-1:
@@ -84,12 +116,55 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                 agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
             except ValueError:
                 # A rejected draft is saved for audit and costs no Sandbox trial.
-                audit = store.experiment(experiment_id)['result']
+                audit = store.experiment(experiment_id, light=True)['result']
                 if audit.get('provider_raw_text') is None or not audit.get('rejected_candidates'):
                     raise
-            experiment = store.experiment(experiment_id)
+            experiment = store.experiment(experiment_id, light=True)
             empty_rounds = empty_rounds+1 if len(experiment['candidates'])==before else 0
             if empty_rounds >= 3:
                 return save('analysis_exhausted', 'analysis', '连续3轮没有合法草案，已停止；试跑预算未额外扣减')
     except Exception as error:
         return save('failed', state.get('phase','analysis'), str(error))
+
+
+def recover_optimization_cycles(store, runtime):
+    """Restart only persisted authorized cycles whose worker has exited."""
+    with store.connection() as connection:
+        rows = connection.execute("SELECT id,json_extract(result_json,'$.optimization_cycle') cycle FROM experiments WHERE json_extract(result_json,'$.optimization_cycle.status')='running'").fetchall()
+    for row in rows:
+        state = json.loads(row['cycle'])
+        owner = state.get('owner_pid')
+        if owner == os.getpid():
+            if any(t.ident==state.get('worker_thread') and t.is_alive() for t in threading.enumerate()):continue
+            # A claim made by this process has not entered its thread yet.
+            if not state.get('worker_thread'):continue
+        elif type(owner) is int:
+            try:os.kill(owner,0)
+            except ProcessLookupError:pass
+            except PermissionError:continue
+            else:continue
+        with CORPUS_LOCK, store.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            current = connection.execute('SELECT result_json FROM experiments WHERE id=?',(row['id'],)).fetchone()
+            context = json.loads(current['result_json'])
+            if context.get('optimization_cycle') != state:continue
+            context['optimization_cycle'].update(owner_pid=os.getpid(), worker_thread=None)
+            connection.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(context,ensure_ascii=False),row['id']))
+        threading.Thread(target=run_until_qualified,args=(store,runtime,row['id']),kwargs={'claimed':True},daemon=True).start()
+
+
+def recover_agent_generations(store, runtime):
+    """Recover standalone generation; active batch generations belong to their cycle."""
+    with store.connection() as connection:
+        rows=connection.execute("SELECT id,baseline_run_id,json_extract(result_json,'$.agent_generation.owner_pid') owner_pid FROM experiments WHERE status='generating' AND coalesce(json_extract(result_json,'$.optimization_cycle.status'),'')!='running'").fetchall()
+    def recover(row):
+        try:OptimizationAgent(store,runtime.provider).generate(row['baseline_run_id'],experiment_id=row['id'])
+        except Exception:logging.exception('Agent generation recovery failed: %s',row['id'])
+    for row in rows:
+        owner=row['owner_pid']
+        if type(owner) is int:
+            try:os.kill(owner,0)
+            except ProcessLookupError:pass
+            except PermissionError:continue
+            else:continue
+        threading.Thread(target=recover,args=(dict(row),),daemon=True).start()

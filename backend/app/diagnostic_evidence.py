@@ -4,6 +4,7 @@ A review is evidence data, not an inferred root: a reviewer checks equivalence a
 source applicability against an entire immutable stage. Hashes prevent reusing
 that semantic observation after any answer, source or stage changes.
 """
+from .sqlite_support import open_database
 import hashlib
 import json
 import os
@@ -34,7 +35,7 @@ def saved_review(case):
             source=(root/path).resolve()
             if not source.is_relative_to(root) or hashlib.sha256(source.read_bytes()).hexdigest()!=sha:return {'load_error':'independent_audit_source_sha_mismatch'},None
         database=Path(os.getenv('RAG_DEMO_DB_PATH') or root/'backend/data/demo.db').resolve()
-        with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as connection:
+        with open_database(database,read_only=True) as connection:
             row=connection.execute('SELECT c.result_json,r.dataset_snapshot_json FROM evaluation_case_results c JOIN evaluation_runs r ON r.id=c.run_id WHERE c.run_id=? AND c.question_id=?',(review['run_id'],review['question_id'])).fetchone()
         if row is None or case_digest(json.loads(row[0]))!=review['case_sha256']:return {'load_error':'persisted_case_not_found_or_changed'},None
         snapshot=json.loads(row[1])

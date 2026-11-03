@@ -26,13 +26,14 @@ const OperationContext = createContext<OperationContextValue>(fallback);
 export function useOperation() { return useContext(OperationContext); }
 
 function evaluation(run: any): Partial<Operation> {
-  let total: number | undefined;
-  try { total = JSON.parse(run.dataset_snapshot_json || "{}").question_ids?.length; } catch { /* old run has no readable snapshot */ }
+  let total: number | undefined = run.result?.total;
+  const current = run.result?.completed ?? run.cases?.length;
+  try { total ??= JSON.parse(run.dataset_snapshot_json || "{}").question_ids?.length; } catch { /* old run has no readable snapshot */ }
   if (run.result?.stop_request) {
     const active = ["queued", "running"].includes(run.status);
-    return { status: active ? "running" : "stopped", stopping: active, stage: active ? "正在停止，等待当前请求结束并保存断点" : "已停止，断点已保存", current: run.cases?.length, total, ...(!active ? { endedAt: Date.now() } : {}) };
+    return { status: active ? "running" : "stopped", stopping: active, stage: active ? "正在停止，等待当前请求结束并保存断点" : "已停止，断点已保存", current, total, ...(!active ? { endedAt: Date.now() } : {}) };
   }
-  return { status: ["queued", "running"].includes(run.status) ? "running" : run.status === "completed" ? "completed" : "failed", stage: ["queued", "running"].includes(run.status) ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败", current: run.cases?.length, total, error: run.error_message };
+  return { status: ["queued", "running"].includes(run.status) ? "running" : run.status === "completed" ? "completed" : "failed", stage: ["queued", "running"].includes(run.status) ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败", current, total, error: run.error_message };
 }
 
 const revisionStages: Record<string, string> = {
@@ -109,7 +110,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       if (experiment.result?.report_confirmation) throw new Error("报告已确认，本轮结果不能改变");
       await postJson(`/api/experiments/${request.experimentId}/run-cycle`, {});
       while (mounted.current) {
-        const saved = await getJson<any>(`/api/experiments/${request.experimentId}`);
+        const saved = await getJson<any>(`/api/experiments/${request.experimentId}?light=true`);
         const cycle = saved.result?.optimization_cycle;
         if (!cycle) throw new Error("记录缺失：优化批次状态");
         update(id, {current:cycle.used,total:12,stage:`已用 ${cycle.used} 次，剩余 ${cycle.remaining} 次（含合并方案预留）`});
@@ -139,7 +140,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       if (cancelled) return;
       for (const item of evaluations.filter(item => item.status === "running")) start(item.config?.candidate_id ? `Candidate ${item.config.candidate_id} Sandbox` : "Baseline Evaluation", { id: item.id, runId: item.id, candidateId: item.config?.candidate_id, kind: "evaluation", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
     }).catch(() => {});
-    getJson<any[]>("/api/governance/revisions?active_only=true").then(revisions => {
+    getJson<any[]>("/api/governance/revisions?active_only=true&light=true").then(revisions => {
       if (cancelled) return;
       for (const item of revisions.filter(item => ["queued", "generating", "validating", "probing", "qc"].includes(item.status))) start("局部修订", { id: item.id, kind: "revision", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
     }).catch(() => {});
@@ -154,7 +155,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       for (const item of active) {
         if (syncing.current.has(item.id)) continue;
         syncing.current.add(item.id);
-        void getJson<any>(item.kind === "revision" ? `/api/governance/revisions/${item.id}` : `/api/evaluations/${item.runId || item.id}`).then(async result => {
+        void getJson<any>(item.kind === "revision" ? `/api/governance/revisions/${item.id}?light=true` : `/api/evaluations/${item.runId || item.id}?light=true`).then(async result => {
           const next: Partial<Operation> = item.kind === "revision" ? revision(result) : evaluation(result);
           if (item.kind === "revision" && next.status === "completed" && candidateRefresh.current) {
             update(item.id, { ...next, status: "running", stage: "正在同步 Candidate 状态" });

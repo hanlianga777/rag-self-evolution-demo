@@ -121,10 +121,12 @@ class TransportRetryTests(unittest.TestCase):
             self.assertTrue(transient_provider_error(error))
             self.assertFalse(permanent_provider_error(error))
         self.assertFalse(transient_provider_error(ProviderInvalidResponse('invalid JSON')))
-        for status in (400,401,403,404,413,422):
+        for status in (400,401,402,403):
             error=ProviderAPIError('fixture',status_code=status)
             self.assertFalse(transient_provider_error(error))
             self.assertTrue(permanent_provider_error(error))
+        for status in (404,413,422):
+            self.assertFalse(permanent_provider_error(ProviderAPIError('fixture',status_code=status)))
 
     def test_network_attempt_does_not_consume_judge_format_rejudgment(self):
         from app.ai_service import AiService

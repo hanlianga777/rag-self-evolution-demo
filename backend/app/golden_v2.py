@@ -96,6 +96,47 @@ def cluster_vectors(vectors, k, initial_membership=None):
     return sorted((sorted(ids) for ids in groups.values()), key=lambda ids: ids[0]), merges
 
 
+def topic_label(chunks):
+    """Label source content without letting a repeated local step name a whole topic."""
+    representative = chunks[0]
+    heading = representative.get('section_path') or representative.get('section')
+    if heading and heading != representative.get('product') and not re.search(r'\.pdf|^\d[\d ()/.-]*$', str(heading), re.I):
+        return str(heading).strip()
+    headings = [re.search(r'(?m)^\s*#{1,6}\s+([^\n]{2,60})', text(c)) for c in chunks]
+    if headings[0]:
+        return headings[0].group(1).strip()
+    topics = [('设备运行与操作', r'运行|操作|启动|停止|停机|对接|遥控|路线|导航|快速指南'),
+              ('设置与用户权限', r'设置|密码|权限|账户|用户|显示屏|触摸屏'),
+              ('安全与维护', r'安全|警告|维护|保养|故障|检查|维修'),
+              ('电池与充电', r'电池|充电|电量'), ('连接与通信', r'连接|网络|通信|信号')]
+    scores = [(sum(bool(re.search(pattern, str(c.get('section_path') or c.get('section') or '') + '\n' + text(c)))
+                   for c in chunks), label) for label, pattern in topics]
+    score, label = max(scores, key=lambda pair: pair[0])
+    if score:
+        return label
+    lines = [re.sub(r'^\s*(?:[-*#]+|\d+[.、])\s*', '', line).strip()
+             for chunk in chunks for line in text(chunk).splitlines()]
+    return next((line for line in lines if 2 <= len(line) <= 40
+                 and not re.search(r'\.pdf$|^第.*页$|^\d[\d ()/.-]*$', line, re.I)), '操作与维护知识')
+
+
+def probe_reason_fields(result):
+    """Add display fields to old and new results without changing their judgment."""
+    details = result.get('probe_details', {})
+    validity = details.get('question_validity')
+    classification = details.get('classification') or result.get('classification')
+    positive = classification in {'RETRIEVAL_INCOHERENT', 'EVIDENCE_VALID', 'EVIDENCE_INVALID'}
+    valid = validity == 'valid' or classification in {'RETRIEVAL_INCOHERENT', 'EVIDENCE_VALID', 'NEGATIVE_VALID'}
+    question = ('题目有效，原始证据支持参考答案' if positive else '题目有效，负向题检查通过') if valid else (
+        '题目有效性待复核' if validity == 'needs_review' or not classification else '题目或参考证据检查未通过')
+    recalled = details.get('retrieval_coherent')
+    observation = ('当前 Pipeline 未完整召回题目证据' if recalled is False or classification == 'RETRIEVAL_INCOHERENT'
+                   else '当前 Pipeline 已召回题目证据' if recalled is True
+                   else '检索执行失败' if classification == 'RETRIEVAL_EXECUTION_FAILED'
+                   else '负向题召回观察见检索详情' if classification and not positive else '召回观察未知')
+    return {'question_validity_reason': question, 'retrieval_observation': observation}
+
+
 def build_plan(chunks, embeddings, profile, corpus_fingerprint=None, embedding_identity=None, usage=None):
     from .governance import profile_count
     if not chunks:
@@ -124,7 +165,7 @@ def build_plan(chunks, embeddings, profile, corpus_fingerprint=None, embedding_i
     for index, ids in enumerate(groups):
         representative = chunks[ids[0]]
         cluster_id = f'T{index + 1:03d}'
-        clusters.append({'cluster_id': cluster_id, 'size': len(ids), 'center': vectors[ids].mean(axis=0).tolist(), 'chunk_ids': [chunks[i]['chunk_id'] for i in ids], 'representative_chunk_ids': [representative['chunk_id']], 'label': representative.get('section_path') or representative.get('section') or representative.get('document_name') or '未采集', 'initial_cluster_ids': sorted({initial_membership[i] for i in ids}), 'small_cluster_merged': any(m['from'] in {initial_membership[i] for i in ids} for m in merges), 'products': sorted({chunks[i]['product'] for i in ids if chunks[i].get('product')}), 'anchor_quota': anchor_quotas[index], 'quotas': {g: quotas[g][index] for g in GROUPS}})
+        clusters.append({'cluster_id': cluster_id, 'size': len(ids), 'center': vectors[ids].mean(axis=0).tolist(), 'chunk_ids': [chunks[i]['chunk_id'] for i in ids], 'representative_chunk_ids': [representative['chunk_id']], 'label': topic_label([chunks[i] for i in ids]), 'initial_cluster_ids': sorted({initial_membership[i] for i in ids}), 'small_cluster_merged': any(m['from'] in {initial_membership[i] for i in ids} for m in merges), 'products': sorted({chunks[i]['product'] for i in ids if chunks[i].get('product')}), 'anchor_quota': anchor_quotas[index], 'quotas': {g: quotas[g][index] for g in GROUPS}})
         if not anchor_quotas[index]:
             gaps.append({'topic_cluster': cluster_id, 'reason': 'no_anchor_slots', 'size': len(ids)})
         if not quotas['positive'][index] + quotas['ablation'][index]:
