@@ -72,21 +72,47 @@ class CompositeEfficiencyTests(unittest.TestCase):
         from identity_fixture import completed_baseline, comparison_identity
         class Stub:
             def complete(self,system,user,**kwargs):
+                self.system=system
                 self.prompt=json.loads(user)
-                return json.dumps({'should_generate_d':False,'root_cause_alignment':'相同题卷','complementary_capabilities':'降档','expected_improvement':'降低耗时','risks':'质量','explanation':'当前不合并'})
+                return json.dumps({'should_generate_d':True,'source_candidates':[self.prompt['winner']['id'], self.prompt['sources'][0]['id']],
+                    'proposed_config_diff':{'generation_thinking':'off','hyde':True},
+                    'hypothesis':'检索补偿支持降档','root_cause':'生成层问题','intervention_direction':'stage_performance',
+                    'evidence_assertions':[{'target_id':'Q1','observation':'final_sufficient'}],
+                    'root_cause_alignment':'相同题卷','complementary_capabilities':'降档与检索补偿',
+                    'expected_improvement':'降低耗时','risks':'质量','explanation':'合并已验证的质量与效率改动'})
         with tempfile.TemporaryDirectory() as directory:
             store=GovernanceStore(Path(directory)/'demo.db')
             baseline=completed_baseline(store)
+            with store.connection() as connection:
+                config=store.evaluation_run(baseline)['config'] | {'generation_thinking':'max'}
+                connection.execute('UPDATE evaluation_runs SET config_json=? WHERE id=?',(json.dumps(config),baseline))
             experiment=store.create_experiment(baseline)
             for label,diff,direction,fixed in (
                 ('A',{'top_k':6},'排序与过滤',['Q1']),
-                ('B',{'generation_thinking':'high','hyde':True},'效率（降档 + 检索补偿）',[]),
+                ('B',{'generation_thinking':'off','hyde':True},'效率（降档 + 检索补偿）',[]),
             ):
-                store.save_candidate(experiment,label,{**DEFAULT_PIPELINE_CONFIG,**diff},{'round':1,'candidate_label':label,'direction':direction,'changed_parameters':diff})
-                store.finish_candidate(experiment+'-'+label,'evaluated',{**comparison_identity(store,baseline),'qualification':{'qualified':label=='A'},'gates':{'passed':True},'regression':{'passed':True},'all_fixed_question_ids':fixed})
+                store.save_candidate(experiment,label,{**DEFAULT_PIPELINE_CONFIG,'generation_thinking':'max',**diff},
+                    {'round':1,'candidate_label':label,'direction':direction,'changed_parameters':diff,
+                     'observed_evidence':['Q1'],'hypothesis':'保存证据支持改动','proposal':'组合质量与效率','risk':'质量','expected_improvement':'质量或耗时改善',
+                     'unstable_cases':['Q1'],'review_pending_cases':['Q1']})
+                store.finish_candidate(experiment+'-'+label,'evaluated',{**comparison_identity(store,baseline),
+                    'qualification':{'qualified':label=='A'},'gates':{'passed':True},
+                    'regression':{'passed':True,'new_critical_failures':0,'new_ordinary_failures':1,
+                                  'fluctuation_question_ids':['Q1'],'pending_regression_question_ids':['Q1'],
+                                  'regression_interpretation':'不稳定题 / 随机波动 / 复核未完成'},
+                    'all_fixed_question_ids':fixed})
             store.confirm_experiment_report(experiment,experiment+'-A','fixture')
             provider=Stub()
-            store.create_composite(experiment,provider,True)
+            composite=store.create_composite(experiment,provider,True)
             self.assertEqual([row['id'] for row in provider.prompt['sources']],[experiment+'-B'])
-            self.assertNotIn('unstable_cases',provider.prompt)
-            self.assertNotIn('review_pending_cases',provider.prompt)
+            self.assertEqual(composite['status'],'generated',composite)
+            self.assertEqual(composite['config']['generation_thinking'],'off')
+            self.assertEqual(composite['config']['top_k'],6)
+            self.assertTrue(composite['config']['hyde'])
+            self.assertIn(experiment+'-B',[s['candidate_id'] for s in composite['reasoning']['sources']])
+            for field in ('unstable_cases','review_pending_cases','fluctuation_question_ids',
+                          'pending_regression_question_ids','不稳定题','随机波动','复核未完成'):
+                self.assertNotIn(field,json.dumps(provider.prompt,ensure_ascii=False))
+            self.assertEqual(provider.prompt['bad_cases'][0]['category'],'生成层问题')
+            for category in ('检索层问题','生成层问题','安全边界问题','性能问题'):
+                self.assertIn(category,provider.system)

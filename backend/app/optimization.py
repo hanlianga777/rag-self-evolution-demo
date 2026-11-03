@@ -256,9 +256,18 @@ def strategy_case(row):
 
 
 def strategy_candidate(candidate):
+    result = candidate.get('result', {})
     return {key:candidate.get(key) for key in ('id','config','status')} | {
-        'reasoning':{key:value for key,value in candidate.get('reasoning',{}).items() if key!='target_diagnosis'},
-        'result':{key:value for key,value in candidate.get('result',{}).items() if key not in {'checkpoints','all_bad_case_audit'}}}
+        'reasoning':{key:value for key,value in candidate.get('reasoning',{}).items() if key in {
+            'candidate_label','round','direction','action_name','hypothesis','proposal','risk','expected_improvement',
+            'changed_parameters','observed_evidence','intervention_direction','evidence_assertions','parameter_dependencies'}},
+        'result':{key:value for key,value in result.items() if key in {
+            'evaluation_identity','evaluation_run_id','qualification','release_qualification','gates','metrics',
+            'bad_case_count','all_fixed_question_ids','target_fixed_question_ids','new_failure_question_ids',
+            'net_improvement','latency_p50_seconds','latency_p99_seconds','token_usage','estimated_cost'}} | {
+                'regression':{key:value for key,value in result.get('regression',{}).items() if key in {
+                    'passed','status','new_critical_failures','new_ordinary_failures','limits',
+                    'all_fixed_question_ids','new_regression_question_ids','continued_failure_new_critical_question_ids'}}}}
 
 
 def unique_keys(pairs):
