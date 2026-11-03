@@ -22,7 +22,7 @@ def _save_state(store, experiment_id, **state):
                            (json.dumps(result, ensure_ascii=False, allow_nan=False), experiment_id))
 
 
-def claim_cycle(store, experiment_id):
+def claim_cycle(store, experiment_id, *, current_round_only=False):
     """Called before starting the worker, so duplicate clicks cannot own two cycles."""
     with CORPUS_LOCK, store.connection() as connection:
         connection.execute('BEGIN IMMEDIATE')
@@ -36,7 +36,9 @@ def claim_cycle(store, experiment_id):
             raise ValueError('当前方案或评测仍在运行')
         if experiment['result'].get('report_confirmation'):
             raise ValueError('报告已确认，不能继续改变实验')
-        state = {'status':'running', 'phase':'analysis', 'owner_pid':os.getpid(),
+        if current_round_only and not any(c['reasoning'].get('candidate_label') in {'A','B','C'} for c in experiment['candidates']):
+            raise ValueError('当前没有可续跑的 A/B/C 方案')
+        state = {'status':'running', 'phase':'analysis', 'owner_pid':os.getpid(), 'current_round_only':current_round_only,
                  'used':experiment['evaluation_budget']['used'],
                  'remaining':max(0, MAX_EVALS-experiment['evaluation_budget']['used']),
                  'reserved_for_d':1, 'last_error':None}
@@ -108,6 +110,8 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
             experiment = store.experiment(experiment_id, light=True)
             if any(c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True for c in experiment['candidates']):
                 return save('qualified', 'review')
+            if state.get('current_round_only'):
+                return save('round_completed','review')
             if experiment['evaluation_budget']['used'] >= MAX_EVALS-1:
                 return save('budget_exhausted', 'review')
             save('running', 'analysis')

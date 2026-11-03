@@ -2104,10 +2104,10 @@ def require_idle_cycle(experiment):
 
 
 @app.post('/api/experiments/{run_id}/run-cycle', status_code=201, dependencies=[Depends(require_trusted_origin)])
-def run_optimization_cycle(run_id: str):
+def run_optimization_cycle(run_id: str, current_round_only: bool = False):
     from .optimization_cycle import claim_cycle, run_until_qualified
     try:
-        state=claim_cycle(store,run_id)
+        state=claim_cycle(store,run_id,current_round_only=current_round_only)
     except ValueError as error:
         raise HTTPException(409,str(error)) from error
     threading.Thread(target=contextvars.copy_context().run,

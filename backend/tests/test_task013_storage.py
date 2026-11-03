@@ -157,6 +157,18 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(baseline_review_summary(light)['target_count'],1)
         self.assertNotIn('runs',light['result']['baseline_review']['cases']['Q1']['regression_review'])
 
+    def test_judge_replay_start_checks_the_complete_logical_source_digest(self):
+        from app.judge_replay import source_digest
+        runtime=fixture.Runtime(fail=None);runner=EvaluationRunner(self.store,runtime)
+        source=runner.execute_baseline(*runner.start_baseline(automatic=True))
+        snapshot=json.loads(source['dataset_snapshot_json'])
+        cases=self.store.evaluation_case_results(source['id'])
+        plan={'source_run_id':source['id'],'source_sha256':source_digest(source,cases),
+              'can_replay':True,'new_judge':source['judge'],
+              'executions':{item['id']:runtime.answer(item['question'],source['config']) for item in snapshot['questions']}}
+        replay=self.store.create_baseline_run(snapshot,source['config'],source['judge'],judge_replay=plan,automatic=True)
+        self.assertEqual(self.store.evaluation_run(replay)['result']['judge_replay']['source_run_id'],source['id'])
+
 
 if __name__ == '__main__':
     unittest.main()

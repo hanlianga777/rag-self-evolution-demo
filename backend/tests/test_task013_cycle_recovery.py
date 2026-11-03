@@ -8,11 +8,12 @@ from unittest.mock import patch
 
 
 class CycleRecoveryTests(unittest.TestCase):
-    def exercise(self, *, repeated=False, stopped=False, restart=False, account_failure=False):
+    def exercise(self, *, repeated=False, stopped=False, restart=False, account_failure=False, current_round_only=False):
         from app.optimization_cycle import run_until_qualified
         candidates = [{'id':label, 'status':'generated', 'reasoning':{'candidate_label':label, 'round':1}, 'result':{}}
                       for label in 'ABC']
         exp = {'id':'exp', 'baseline_run_id':'base', 'result':{}, 'evaluation_budget':{'used':0}, 'candidates':candidates}
+        if current_round_only:exp['result']['optimization_cycle']={'current_round_only':True}
         completed = {label:set() for label in 'ABC'}
         calls, tries, states = [], {}, []
         class Store:
@@ -37,7 +38,7 @@ class CycleRecoveryTests(unittest.TestCase):
                         return deepcopy(candidate)
                     completed[cid].add(q);calls.append((cid,q))
                 exp['evaluation_budget']['used']+=1
-                candidate.update(status='evaluated', result={'evaluation_complete':True, 'qualification':{'qualified':cid=='C'}})
+                candidate.update(status='evaluated', result={'evaluation_complete':True, 'qualification':{'qualified':cid=='C' and not current_round_only}})
                 return deepcopy(candidate)
             def recover_run(self, rid):
                 return self.run_candidate(rid.split('-')[-1])
@@ -46,7 +47,8 @@ class CycleRecoveryTests(unittest.TestCase):
             completed['A'].update(range(25));calls.extend(('A',q) for q in range(25))
             tries['A']=1
         with patch('app.optimization_cycle.claim_cycle'), patch('app.optimization_cycle._save_state', side_effect=lambda s,e,**kw:states.append(kw)), \
-             patch('app.optimization_cycle.EvaluationRunner',Runner):
+             patch('app.optimization_cycle.EvaluationRunner',Runner), patch('app.optimization_cycle.OptimizationAgent') as agent:
+            if current_round_only:agent.return_value.generate.side_effect=AssertionError('本轮续跑不能重新生成方案')
             result=run_until_qualified(Store(),SimpleNamespace(provider=object()),'exp')
         return result, exp, calls, tries
 
@@ -57,6 +59,12 @@ class CycleRecoveryTests(unittest.TestCase):
         self.assertEqual(len(set(calls)),150)
         self.assertEqual(exp['evaluation_budget']['used'],3)
         self.assertEqual(tries,{'A':2,'B':1,'C':1})
+
+    def test_explicit_current_round_stops_after_abc_without_generating_new_plans(self):
+        result,exp,calls,tries=self.exercise(current_round_only=True)
+        self.assertEqual(result['status'],'round_completed')
+        self.assertEqual(len(set(calls)),150)
+        self.assertEqual(exp['evaluation_budget']['used'],3)
 
     def test_repeated_same_failure_stops_after_two_resumes(self):
         result,_,calls,tries=self.exercise(repeated=True)

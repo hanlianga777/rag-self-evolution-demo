@@ -84,7 +84,8 @@ def thinking_comparison(runs,current_id):
             'diagnosis_category':view['diagnosis_category'],'subfeature':view['subfeature'],'results':results})
     all_current_failures = all(by_id[current_id].get(row['question_id'],{}).get('passed') is False for row in different)
     note = f'两档结果不同的题目共 {len(different)} 道，均已列入本轮错题。' if all_current_failures else f'结果不同的题目共 {len(different)} 道，已按保存结果列出。'
-    return {'columns':columns,'different_cases':different,'note':note}
+    return {'columns':columns,'different_cases':different,'note':note,
+            'judge_thinking':runs[0][0]['judge'].get('judge_thinking',{}).get('reasoning_effort')}
 
 
 def product_diagnostics(store,run,cases=None):
@@ -101,6 +102,19 @@ def product_diagnostics(store,run,cases=None):
     designation=store.baseline_designation()
     if designation and run['id']==designation['baseline_run_id']:
         comparison=store.evaluation_run(designation['comparison_run_id'])
+        for saved in store.evaluation_history():
+            if (saved['id']==run['id'] or saved['status']!='completed'
+                    or saved.get('run_mode')!='real' or saved.get('data_source')!='real'
+                    or saved.get('dataset_version_id')!=run.get('dataset_version_id')
+                    or saved['result'].get('evaluation_complete') is not True or saved['result'].get('technical_failed')
+                    or not saved['result'].get('judge_replay',{}).get('source_run_id')
+                    or saved['judge'].get('evaluation_identity')!=run['judge'].get('evaluation_identity')
+                    or saved['config'].get('generation_thinking')==run['config'].get('generation_thinking')):
+                continue
+            if {k:v for k,v in saved['config'].items() if k!='generation_thinking'} != {k:v for k,v in run['config'].items() if k!='generation_thinking'}:
+                continue
+            comparison=store.evaluation_run(saved['id'])
+            break
         if comparison:
             result['thinking_comparison']=thinking_comparison([(comparison,store.evaluation_case_results(comparison['id'])),(run,cases)],run['id'])
     return result

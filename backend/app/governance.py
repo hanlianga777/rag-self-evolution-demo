@@ -2557,7 +2557,7 @@ class GovernanceStore:
                 from .diagnostic_evidence import digest
                 source_row=connection.execute('SELECT * FROM evaluation_runs WHERE id=?',(judge_replay['source_run_id'],)).fetchone()
                 if source_row is None:raise ValueError('Replay source disappeared')
-                source={**dict(source_row),'result':_load(source_row['result_json'],{}),'config':_load(source_row['config_json'],{}),'judge':_load(source_row['judge_json'],{})}
+                source={**dict(source_row),'result':self._evaluation_result(connection,source_row),'config':_load(source_row['config_json'],{}),'judge':_load(source_row['judge_json'],{})}
                 original_cases=[{'question_id':r['question_id'],**_load(r['result_json'],{}),'run_id':source['id']} for r in connection.execute('SELECT question_id,result_json FROM evaluation_case_results WHERE run_id=? ORDER BY id',(source['id'],))]
                 if (source_digest(source,original_cases)!=judge_replay['source_sha256'] or not judge_replay['can_replay']
                     or judge_replay['new_judge']!=judge or set(judge_replay['executions'])!=set(snapshot['question_ids'])):raise ValueError('Replay source or target identity changed')
