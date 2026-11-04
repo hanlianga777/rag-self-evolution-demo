@@ -17,7 +17,7 @@ it("restores compact Baseline summary without treating aggregate Gate success as
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("92.5");
   expect(document.querySelectorAll(".baseline-metrics > div")).toHaveLength(4);
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "分类", "现象（子特征）", "判定方式", "严重程度", "优化方向"]);
+  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(th => th.textContent)).toEqual(["题号 / 问题", "分类", "缺了什么", "判定方式", "严重程度", "优化方向"]);
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("Hallucination");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("业务问题");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("记录缺失");

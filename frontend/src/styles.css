@@ -1334,7 +1334,7 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .knowledge-page .flow-step::after { display:none; }
 .knowledge-page .page-content .cluster-scroll { height:auto; max-height:none; overflow:visible; grid-template-columns:repeat(3,minmax(0,1fr)); }
 .knowledge-page .page-content .cluster-card { height:auto; min-height:144px; display:grid; align-content:start; gap:12px; background:var(--surface); border-color:var(--line); }
-.knowledge-page .page-content .cluster-card strong { overflow-wrap:anywhere; }
+.knowledge-page .page-content .cluster-card strong { overflow-wrap:anywhere; color:var(--ink); }
 :is(.knowledge-page,.settings-page) .page-content .table-scroll table { width:100%; min-width:0; table-layout:fixed; }
 .knowledge-page .table-scroll th:first-child { width:36%; }
 .knowledge-page .table-scroll .detail-button { text-align:left; justify-content:flex-start; }

@@ -30,21 +30,26 @@ it("shows a skeleton until the initial run and frozen snapshot resolve", async (
   await act(async () => root.unmount());
 });
 
-it("hides frozen mutation controls and renders numbered answers and source evidence", async () => {
+it("keeps frozen controls visible and renders numbered answers and source evidence", async () => {
   const fetcher = stubFrozen();
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={frozenData} />));
   expect(document.querySelector(".page-title p")?.textContent).toBe("1 题 · 已冻结 · 11-01");
   expect(document.querySelector(".review-filters")?.textContent).not.toContain("需要人工关注 0");
-  expect(document.querySelectorAll(".review-table th")).toHaveLength(4);
-  expect(document.querySelector(".review-table")?.textContent).toContain("Probe ✓ QC ✓");
+  expect(document.querySelectorAll(".review-table th")).toHaveLength(10);
+  expect(document.querySelector(".review-table")?.textContent).toContain("95");
   expect(document.querySelector(".review-table")?.textContent).not.toContain("人工审核导入");
   await act(async () => document.querySelector<HTMLElement>(".review-table tbody tr")!.click());
   expect(document.querySelectorAll(".golden-answer-list li")).toHaveLength(2);
   expect(document.querySelector(".frozen-question-details")?.textContent).toContain("设备手册.pdf · 第 85 页");
   expect(document.querySelector(".golden-probe-result")?.textContent).toContain("题目与证据校验通过");
   expect(document.querySelector(".golden-probe-result")?.textContent).toContain("P1 召回观察");
-  for (const label of ["运行 Probe", "运行 QC", "编辑", "替换", "批准", "批量重跑异常项"]) expect([...document.querySelectorAll("button")].some(button => button.textContent === label)).toBe(false);
+  for (const label of ["运行 Probe", "运行 QC", "编辑", "替换", "批准"]) {
+    const button = [...document.querySelectorAll("button")].find(button => button.textContent === label)!;
+    expect(button).toBeDefined();
+    expect(button.disabled).toBe(["编辑", "替换", "批准"].includes(label));
+  }
+  expect(document.querySelector('button[title="已冻结，修改需新建题卷版本"]')).not.toBeNull();
   expect(document.querySelector('.candidate-workspace [aria-label="更多操作"]')).toBeNull();
   expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
   await act(async () => root.unmount());

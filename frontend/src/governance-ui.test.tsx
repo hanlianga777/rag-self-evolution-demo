@@ -97,7 +97,7 @@ it("refreshes the open Drawer and table before reporting Revision complete", asy
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody tr[role=button]")!.click());
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
   expect(document.querySelector(".review-table tbody")?.textContent).toContain("新题");
-  expect(document.querySelector(".review-table tbody")?.textContent).toContain("Probe ✓");
+  expect(document.querySelector(".review-table tbody td:nth-child(6)")?.getAttribute("title")).toBe("通过");
   expect(document.querySelector(".candidate-workspace .quality-grid")?.textContent).toContain("通过");
   expect(document.querySelector(".candidate-workspace .workspace-badges")?.textContent).not.toContain("QC 通过");
   expect(document.querySelector(".operation-console")?.textContent).toContain("✓ 完成");
@@ -118,10 +118,11 @@ it("refreshes single Probe and QC results in both table and open Drawer", async 
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [base] }} />));
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody tr[role=button]")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".quality-grid button")].find(button => button.textContent === "运行 Probe")!.click());
-  expect(document.querySelector(".review-table tbody")?.textContent).toContain("Probe ✓");
+  expect(document.querySelector(".review-table tbody td:nth-child(6)")?.getAttribute("title")).toBe("通过");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".quality-grid button")].find(button => button.textContent === "运行 QC")!.click());
   expect(qc).toBe(true);
-  expect(document.querySelector(".review-table tbody")?.textContent).toContain("Probe ✓ QC ✓");
+  expect(document.querySelector(".review-table tbody td:nth-child(6)")?.getAttribute("title")).toBe("通过");
+  expect(document.querySelector(".review-table tbody td:nth-child(7)")?.getAttribute("title")).toBe("通过");
   expect(document.querySelector(".review-workspace")?.textContent).toContain("通过");
   await act(async () => root.unmount());
 });
@@ -198,7 +199,7 @@ it("keeps human review actions visible and technical audit out of the default vi
   expect(document.querySelector(".candidate-workspace .candidate-actionbar")?.textContent).toContain("批准");
   expect(document.querySelector(".candidate-workspace .candidate-scroll")?.textContent).toContain("检查电源和刷盘");
   expect(document.querySelector(".candidate-workspace .candidate-scroll")?.textContent).not.toContain("Retrieved TopK");
-  expect(document.querySelector(".candidate-evidence-preview")?.textContent).not.toContain("□");
+  expect(document.querySelector(".golden-evidence-scroll")?.textContent).toContain(question.evidence_details[0].chunks[0].chunk_text);
   await act(async () => root.unmount());
 });
 
@@ -211,7 +212,8 @@ it("shows negative expected behavior and reveals evidence and quality records on
   expect(document.querySelector(".review-workspace")?.textContent).toContain("预期行为");
   expect(document.querySelector(".review-workspace")?.textContent).toContain("应拒绝危险操作请求");
   expect(document.querySelector(".review-workspace")?.textContent).toContain("负向子类与题目不符");
-  expect(document.querySelector(".review-workspace")?.textContent).not.toContain("Negative subtype does not match the question");
+  expect(document.querySelector(".review-workspace .golden-quality-results")?.textContent).not.toContain("Negative subtype does not match the question");
+  expect(document.querySelector<HTMLDetailsElement>(".review-workspace .disclosure")?.open).toBe(false);
   expect(document.querySelector(".review-workspace")?.textContent).not.toContain("Retrieved TopK");
   await act(async () => ([...document.querySelectorAll(".candidate-menu button")].find(button => button.textContent === "质量审计记录") as HTMLButtonElement).click());
   await act(async () => ([...document.querySelectorAll(".audit-tabs button")].find(button => button.textContent === "Probe") as HTMLButtonElement).click());

@@ -342,3 +342,8 @@
 .verification-page .assistant-page > .story-disclosure { margin:8px 0 0; flex:none; }
 .verification-page .chat-header { padding:10px 16px; }
 .verification-page .chat-header strong { white-space:nowrap; text-overflow:ellipsis; overflow:hidden; max-width:48vw; }
+
+.publication-checks { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--card-gap); }
+.publication-checks article { border:1px solid var(--line); border-radius:var(--card-radius); padding:16px; min-width:0; }
+.publication-checks h3 { margin:0 0 8px; font-size:14px; }
+.publication-checks p { margin:0; }

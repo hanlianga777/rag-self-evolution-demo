@@ -24,7 +24,7 @@ it("uses persisted corpus totals and actual index dimensions in six asset cards 
   expect(document.querySelector(".knowledge-notice")?.textContent).toContain("Legacy");
   expect(document.querySelector(".asset-summary")?.textContent).toContain("9 页");
   expect(document.querySelector(".asset-summary")?.textContent).toContain("检索索引6 已索引");
-  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["文档名", "页数", "Parent Chunks", "Child Chunks", "解析状态", "索引状态"]);
+  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["文档名", "页数", "Parent Chunks", "Child Chunks", "解析状态", "索引状态", "操作"]);
   expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
   await act(async () => root.unmount());
 });

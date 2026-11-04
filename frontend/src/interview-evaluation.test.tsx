@@ -33,7 +33,7 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   expect(document.querySelector(".baseline-gates-table tbody")?.textContent).toContain("≥ 90.0%");
   expect(document.querySelectorAll(".baseline-gates-table")).toHaveLength(4);
   await click("Bad Case 诊断");
-  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "分类", "现象（子特征）", "判定方式", "严重程度", "优化方向"]);
+  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(cell => cell.textContent)).toEqual(["题号 / 问题", "分类", "缺了什么", "判定方式", "严重程度", "优化方向"]);
   expect(document.querySelector(".product-diagnosis-table tbody tr td:nth-child(2)")?.textContent).toBe("检索失败");
   await act(async()=>document.querySelector<HTMLElement>(".product-diagnosis-table tbody tr")!.click());
   expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["业务问题", "答案对比", "检索路径", "优化方向"]);

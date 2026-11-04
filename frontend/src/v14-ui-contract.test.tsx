@@ -205,7 +205,7 @@ it("RL-03/05 uses centered confirmation and keeps failed release visible without
   expect(document.querySelector(".confirm-dialog")?.textContent).toContain("发布确认");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".confirm-dialog button")].find(button => button.textContent === "确认")!.click());
   expect(document.querySelector(".confirm-dialog")?.textContent).toContain("提交时资格已失效");
-  expect(document.querySelector(".release-actions")?.textContent).toBe("确认发布");
+  expect(document.querySelector(".release-actions button")?.textContent).toBe("确认发布");
   expect(document.querySelector(".version-records")?.textContent || "").not.toContain("P1");
   expect(fetch).toHaveBeenCalledTimes(1);
 });
@@ -256,7 +256,7 @@ it("review R2 an older Production does not finish a new recommendation Gate3", a
   expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("候选方案 A");
   expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("本轮推荐，尚未发布");
   expect(document.querySelector<HTMLButtonElement>(".release-actions button")?.disabled).toBe(false);
-  expect(document.querySelector(".release-actions")?.textContent).toBe("确认发布");
+  expect(document.querySelector(".release-actions button")?.textContent).toBe("确认发布");
   expect(input.versions[0].snapshot.candidate_id).toBe("E0-C");
 });
 

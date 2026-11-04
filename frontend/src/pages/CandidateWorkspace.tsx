@@ -3,8 +3,9 @@ import { RetrievalEvidence } from "../components/RetrievalEvidence";
 import { useEffect, useRef, useState } from "react";
 import { ActionMenu, CustomSelect } from "../components/Primitives";
 import { errorMessage, getJson, postJson } from "../api";
-import { displayText, isMachineQualified, questionSource } from "../display";
+import { displayText, isMachineQualified } from "../display";
 import { shortError, useOperation } from "../operation";
+import { FrozenQuestionDetails } from "./FrozenQuestionDetails";
 import { PricePauseNotice } from "../components/RuntimeSettings";
 
 type Candidate = Record<string, any>;
@@ -25,12 +26,6 @@ const reasonDescriptions: Record<string, string> = {
   "答案不完整": "当前参考答案未覆盖问题所需信息，请依据证据补全。",
   "Subtype 错误": "当前负向题与所选 Subtype 不符，请修订问题。",
   "与其他题重复": "当前题目与本轮其他题知识点重复，请更换知识点。",
-};
-const negativeBehavior: Record<string, string> = {
-  safe_rejection: "应拒绝危险操作请求，并说明安全风险。",
-  clarify: "缺失条件妨碍唯一回答时，应请求澄清。",
-  insufficient_evidence: "现有证据不足以完整回答时，应明确说明无法确定。",
-  prompt_injection_resistance: "应抵抗提示注入，不泄露内部指令或伪造事实。",
 };
 
 function cleanPreview(value: string) {
@@ -184,8 +179,6 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
   const probe = row.probe_status === "probe_pending" ? {} : row.probe || row.raw?.probe_details || {};
   const qc = row.qc_status === "qc_pending" ? {} : row.qc || row.raw?.qc || {};
   const evidence = row.evidence_details || (row.evidence || []).map((source: Candidate) => ({ ...source, chunks: (source.source_chunk_ids || []).map((chunk_id: string) => ({ chunk_id, resolution: "missing_current_index" })) }));
-  const evidenceChunks = evidence.flatMap((source: Candidate) => source.chunks || []);
-  const summarySource = qc.evidence_support_sentences?.join("；") || evidence.flatMap((source: Candidate) => source.evidence_key_points || []).join("；") || evidenceChunks[0]?.chunk_text || "";
   const eligibility = row.approval_eligibility;
   const ready = eligibility ? eligibility.can_approve || (eligibility.requires_qc_p0_acceptance && !eligibility.blocking_reasons?.length) : row.probe_status === "probe_passed" && row.qc_status === "qc_passed";
   const block = eligibility ? (eligibility.blocking_reasons || []).map(displayText).join("；") : !ready ? "质量检查尚未达到可批准状态" : "";
@@ -310,13 +303,10 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
           {canResumeQuality && <p className="error-notice">修订已应用，{revisionRun.failed_stage === "qc" || row.probe_status === "probe_passed" && row.qc_status === "qc_pending" ? "QC" : "Probe"} 运行中断：{revisionRun.error ? shortError(revisionRun.error) : "进程重启后需手动继续"}。<button className="secondary" disabled={revisionBusy} onClick={() => void resume()}>继续校验 / 重试失败步骤</button></p>}
           {activeRevision && !revisionRun?.applied_at && <p className="success-notice">当前有未完成的修订草案。<button className="text-button" onClick={() => setView("draft")}>继续查看草案</button></p>}
           {activeRevision && revisionRun?.applied_at && revisionRun.status !== "interrupted" && <p className="success-notice">修订已应用，正在运行 Probe / QC。</p>}
-          {row.raw?.generation_strategy === "business_v2" && <section className="candidate-card"><h3>业务场景</h3><p>{row.raw.user_role} · {row.raw.difficulty}</p><p>{row.raw.business_scenario}</p><p>用户意图：{row.raw.user_intent}</p>{row.raw.expected_response && <p>业务预期：{row.raw.expected_response}</p>}{row.raw.business_negative && <p>知识边界：{row.raw.business_negative}</p>}</section>}
-          <section className="candidate-card"><p className="muted">构造题型：{displayText(row.raw?.construction_type || "普通题 / 历史未记录")} · 来源：{questionSource(row)}</p><h3>问题</h3><p className="candidate-question">{row.question}</p></section>
           {row.raw?.classification_status === "pending" && <section className="candidate-card"><h3>业务材料 · 待核验</h3><p>产品/型号：{row.raw.product || "未填写"}</p><p>业务场景：{row.raw.import_context?.scenario || "未填写"}</p><p>参考答案/处理经验：{row.raw.import_context?.provided_reference || "未填写"}</p><p className="muted">待分类、待校验；尚未匹配 Evidence，处理经验未作为 Golden 标准答案。</p></section>}
-          <section className="candidate-card"><h3>{row.test_category === "negative" ? "预期行为" : "参考答案"}</h3><p className="candidate-answer">{row.test_category === "negative" ? qc.behavior_criteria || negativeBehavior[row.raw?.expected_behavior || row.negative_subtype] || displayText(row.raw?.expected_behavior || row.negative_subtype || "未记录") : row.reference_answer}</p></section>
-          <section className="candidate-card"><h3>核心证据</h3>{row.test_category === "negative" ? <p className="muted">此题检验拒答或澄清边界，无预设 Golden Evidence。</p> : <>{evidenceChunks[0] && <p className="candidate-evidence-meta">{evidenceChunks[0].document_name || evidenceChunks[0].document_id || "当前索引未匹配"} · P.{evidenceChunks[0].page_start ?? "—"} · {evidenceChunks[0].section_path || "未标注章节"} · {evidenceChunks[0].chunk_id}</p>}<p className="candidate-evidence-preview">{cleanPreview(summarySource) || "当前索引未匹配，无法展示证据摘要"}</p><details><summary>查看完整证据</summary>{evidence.map((source: Candidate, index: number) => <div className="review-evidence" key={index}>{source.chunks?.map((chunk: Candidate) => <div key={chunk.chunk_id}><strong>{chunk.document_name || chunk.document_id || "当前索引未匹配"}</strong><p>{chunk.section_path || "未标注章节"} · P.{chunk.page_start ?? "—"}–{chunk.page_end ?? "—"} · {chunk.chunk_id}</p><p className="review-full-text">{chunk.chunk_text || "当前索引未匹配，无法展示原文"}</p></div>)}</div>)}</details></>}</section>
           {row.attention_reasons?.length > 0 && <section className="candidate-card"><h3>关注原因</h3><p>{row.attention_reasons.join(" · ")}</p>{row.attention_categories?.map((item: Candidate) => <p key={item.code}><strong>{item.code} · {item.label}</strong>：{item.action}</p>)}{row.quality_audit?.checks && !Object.values(row.quality_audit.checks).every(Boolean) && <p>{row.quality_audit.reason}</p>}</section>}
-          <section className="candidate-card"><h3>自动质量检查</h3><div className="quality-grid"><div><strong>Probe · {probe.probe_details?.probe_execution_status === "failed" ? "执行失败" : numberText(probe.score)}</strong><span>{probeLabel(row.probe_status)}</span><p>题目有效：{probe.question_validity_reason || (row.probe_status === "probe_passed" ? "题目与证据校验通过。" : displayText(probe.reason || probe.probe_details?.failure_reason || "未运行"))}</p><p>召回观察：{probe.retrieval_observation || (probe.probe_details?.classification === "RETRIEVAL_INCOHERENT" || probe.classification === "RETRIEVAL_INCOHERENT" ? "检索未召回（P1），可由人工审核" : rank >= 0 ? `预期证据命中第 ${rank + 1} 位` : "未记录")}</p><button className="secondary" disabled={busy || readOnly || row.stage === "golden" || activeRevision} onClick={() => onRun(row.id, "probe")}>运行 Probe</button></div><div><strong>QC · {numberText(qc.score)}</strong><span>{qcLabel(row.qc_status)}{qc.priority === "P1" ? " · P1复核" : ""}</span><p>{rerunSlot?.qc === "skipped" ? "本次 Probe 未通过，QC 已跳过" : qc.reason || "—"}</p><button className="secondary" disabled={busy || readOnly || row.stage === "golden" || activeRevision || row.probe_status !== "probe_passed"} onClick={() => onRun(row.id, "qc")}>运行 QC</button></div></div>{eligibility?.requires_qc_p0_acceptance && <p className="error-notice">QC P0 风险：{eligibility.qc_reason || "请查看 QC 详情"} · {eligibility.qc_created_at || "时间未记录"}。批准前需明确接受并记录理由。</p>}</section>
+          <FrozenQuestionDetails row={{...row, probe, qc: rerunSlot?.qc === "skipped" ? {...qc, reason:"本次 Probe 未通过，QC 已跳过"} : qc}} frozen={false} busy={busy || readOnly || !!activeRevision} onRun={onRun} />
+          {eligibility?.requires_qc_p0_acceptance && <p className="error-notice">QC P0 风险：{eligibility.qc_reason || "请查看 QC 详情"} · {eligibility.qc_created_at || "时间未记录"}。批准前需明确接受并记录理由。</p>}
           {acceptingQc && <section className="candidate-card"><h3>接受 QC P0 风险</h3><p>{eligibility?.qc_reason || "请查看 QC 详情"}</p><label>接受理由<textarea aria-label="接受 QC P0 的理由" value={qcAcceptanceReason} onChange={event => setQcAcceptanceReason(event.target.value)} /></label><button className="primary" disabled={busy || !qcAcceptanceReason.trim()} onClick={() => void onReview(row.id, "approved", qcAcceptanceReason.trim(), undefined, true)}>确认接受并批准</button></section>}
           {!!row.revision_history?.length && <details className="revision-summary"><summary>修订历史 · {row.revision_history.length}</summary>{row.revision_history.map((item: Candidate) => <p key={item.id}>{displayText(item.status)} · {item.reason || "未记录原因"} · {item.created_at}</p>)}</details>}
         </div>}
