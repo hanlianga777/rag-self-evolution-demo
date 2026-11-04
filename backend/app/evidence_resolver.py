@@ -296,15 +296,27 @@ def diagnostic_plan(store,run_id,question_ids=None):
 
 
 def execute_diagnostic_batch(store,run_id,runtime,*,question_ids=None,expected_binding,authorization_id=None,max_calls,price_snapshot=None,budget_yuan=None):
-    """One bounded diagnostic batch; no generation, scoring, approval or DB writes."""
-    from datetime import datetime,timezone
-    from .paid_run import PaidRun,controlled_run,REQUEST_LIMITS
-    selected,chunks,fingerprint,binding=batch_inputs(store,run_id,question_ids)
-    if expected_binding!=digest(binding):raise ValueError('诊断输入已变化，请刷新批量预检')
+    """One owner per authorized batch, including while waiting for cheaper hours."""
+    import fcntl
     if authorization_id is None:
         from uuid import uuid4
         authorization_id=uuid4().hex
     if not authorization_id or not authorization_id.replace('-','').replace('_','').isalnum():raise ValueError('无效诊断记录编号')
+    directory=Path(store.database_path).parent/'diagnostic-batches'
+    directory.mkdir(parents=True,exist_ok=True)
+    with (directory/(authorization_id+'.lock')).open('w') as lock:
+        try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError:raise ValueError('该诊断批次正在运行，不能重复启动') from None
+        return _execute_diagnostic_batch(store,run_id,runtime,question_ids=question_ids,expected_binding=expected_binding,
+            authorization_id=authorization_id,max_calls=max_calls,price_snapshot=price_snapshot,budget_yuan=budget_yuan)
+
+
+def _execute_diagnostic_batch(store,run_id,runtime,*,question_ids,expected_binding,authorization_id,max_calls,price_snapshot,budget_yuan):
+    """Persist diagnostics and accounting without changing answers or scores."""
+    from datetime import datetime,timezone
+    from .paid_run import PaidRun,controlled_run,REQUEST_LIMITS
+    selected,chunks,fingerprint,binding=batch_inputs(store,run_id,question_ids)
+    if expected_binding!=digest(binding):raise ValueError('诊断输入已变化，请刷新批量预检')
     if type(max_calls) is not int or not 0<max_calls<=len(selected):raise ValueError('必须冻结本次调用上限')
     if price_snapshot:
         try:

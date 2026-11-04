@@ -5,6 +5,7 @@ import { ActionMenu, CustomSelect } from "../components/Primitives";
 import { errorMessage, getJson, postJson } from "../api";
 import { displayText, isMachineQualified, questionSource } from "../display";
 import { shortError, useOperation } from "../operation";
+import { PricePauseNotice } from "../components/RuntimeSettings";
 
 type Candidate = Record<string, any>;
 type View = "review" | "revision" | "draft" | "audit";
@@ -294,6 +295,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
   })();
 
   return <div className="candidate-shell">
+    <PricePauseNotice pause={revisionRun?.price_pause} target={revisionRun ? {revision_id:revisionRun.id} : undefined} onChanged={onRefresh} />
 <ConfirmDialog open={!!confirmation} onOpenChange={open => !open && setConfirmation(null)} title={confirmation === "apply" ? "确认应用修订" : "确认放弃草案"} busy={revisionBusy} onConfirm={() => void (confirmation === "apply" ? applyDraft() : discardPreview())}><p>{confirmation === "apply" ? "原候选题保留在历史；新题重新执行 Probe / QC，并按机器资格或人工异常分类。" : "放弃未应用草案；当前候选题和原 Probe / QC 保留。"}</p>{revisionError && <p className="error-notice">{revisionError}</p>}</ConfirmDialog>
     <div className="candidate-menu"><ActionMenu label="更多操作"><button role="menuitem" onClick={event => { setAuditReturn(view === "audit" ? auditReturn : view); setAuditTab("evidence"); setView("audit"); }}>质量审计记录</button><button role="menuitem" onClick={event => { void navigator.clipboard.writeText(row.id); }}>复制 Question ID</button></ActionMenu></div>
     <div className="candidate-scroll">

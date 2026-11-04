@@ -9,6 +9,7 @@ import { BusinessImportPanel, CoverageSummary, CurrentCoveragePreview } from "./
 import { FrozenQuestionDetails } from "./FrozenQuestionDetails";
 import "./golden-workspace.css";
 import { CandidateWorkspace } from "./CandidateWorkspace";
+import { PricePauseNotice } from "../components/RuntimeSettings";
 
 import { goldenCached, goldenFetch, invalidateGolden } from "../goldenCache";
 import { ScrollablePagedTable, usePagedCandidates } from "../components/ScrollablePagedTable";
@@ -220,6 +221,7 @@ export function GovernancePage({ data }: { data: any }) {
 
       <div className="golden-metrics" aria-label="题卷摘要">{["positive", "ablation", "negative"].map(group => <Metric key={group} label={group === "positive" ? "正向" : group === "ablation" ? "消融" : "负向"} value={current.filter(row => row.test_category === group).length.toLocaleString()} note={group === "positive" ? "验证知识问答" : group === "ablation" ? "验证证据依赖" : "验证回答边界"} />)}<Metric label="质检通过" value={`${current.filter(row => row.probe_status === "probe_passed" && row.qc_status === "qc_passed").length.toLocaleString()}/${current.length.toLocaleString()}`} note="Probe 与 QC 均通过" /></div>
 
+      <PricePauseNotice pause={workRun?.artifacts?.hard_validation?.price_pause} target={workRun ? {generation_id:workRun.id} : undefined} onChanged={reload} />
       <StageStepper compact ariaLabel="Golden 治理阶段" steps={[
         { label: displayText("Coverage"), state: gate1Snapshot || workRun?.artifacts?.coverage_plan?.length ? "completed" : "current" },
         { label: displayText("Question Generation"), state: current.length === expectedCount ? "completed" : running ? "current" : "pending" },

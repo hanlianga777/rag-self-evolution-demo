@@ -369,7 +369,7 @@ class RevisionCheckpointRecoveryTests(unittest.TestCase):
                 calls.append(True); return {'Q1': {'chunk_ids': ['C1']}}
             return checkpoint_request('DeepSeek', 'offline-stub', 'select', {'question': 'Q1'}, request)
         service = SimpleNamespace(select_revision_material=select, model='offline-stub', revision_similarity=None)
-        with patch.object(main, '_generate_revision_with_weak_keyword_repair', return_value={'Q1': {}}):
+        with patch.object(main, '_generate_revision_with_weak_keyword_repair', return_value={'Q1': {}}), patch.object(main,'_wait_revision_price'):
             main._prepare_revision('revision', store, service, SimpleNamespace(chunks=lambda: []))
             main._prepare_revision('revision', store, service, SimpleNamespace(chunks=lambda: []))
         self.assertTrue(prepared)

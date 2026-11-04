@@ -55,6 +55,7 @@ class GoldenScheduleTests(unittest.TestCase):
         self.assertFalse(generation_progress(self.store, key)['artifacts']['hard_validation']['price_pause']['paused'])
 
     def test_quality_finishes_current_probe_and_qc_before_pausing_next_question(self):
+        self.service.quality_check.return_value = {'score': 95, 'priority': 'P2', 'reason': 'fixture'}
         generated = self.service.generate_mini_golden(self.chunks)
         key = self.store.start_generation_run('mock-provider', 'mini')
         rows = self.store.save_mini_golden_candidates(generated['valid_slots'], 'mock-provider',

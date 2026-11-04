@@ -26,6 +26,12 @@ export function PricePauseNotice({ pause, evaluationId, experimentId, target, on
 export function RuntimeSettings() {
   const [settings, setSettings] = useState<any>(null), [busy, setBusy] = useState(false), [error, setError] = useState("");
   useEffect(() => { let cancelled = false; void getJson("/api/runtime-settings").then(value => { if (!cancelled) setSettings(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, []);
+  useEffect(() => {
+    if (!settings?.active_pauses?.length) return;
+    let cancelled = false;
+    const timer = window.setInterval(() => { void getJson("/api/runtime-settings").then(value => { if (!cancelled) setSettings(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); }, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [settings?.active_pauses?.length]);
   const save = async (offPeakOnly: boolean) => {
     setBusy(true); setError("");
     try { setSettings(await postJson("/api/runtime-settings", { off_peak_only: offPeakOnly })); }

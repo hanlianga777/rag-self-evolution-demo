@@ -78,7 +78,10 @@ def pause_state(store, task_key):
         active_cycle = (experiment or {}).get('result', {}).get('optimization_cycle', {}).get('status') == 'running'
         override = bool(active_cycle and settings.get('override:cycle:' + experiment_id))
     if task_key.startswith('agent:'):
-        override = override or settings.get('override:cycle:' + task_key.split(':', 1)[1], False)
+        experiment_id=task_key.split(':',1)[1]
+        experiment=store.experiment(experiment_id,light=True)
+        active_cycle=(experiment or {}).get('result',{}).get('optimization_cycle',{}).get('status')=='running'
+        override = override or bool(active_cycle and settings.get('override:cycle:' + experiment_id, False))
     paused = status['off_peak_only'] and not override and status['peak_now'] is not False
     return {'paused': bool(paused), 'resume_at': status['next_off_peak_at'], 'resume_at_toronto': status['resume_at_toronto'],
             'message': ('高峰时段暂停，预计 ' + status['resume_at_toronto'] + ' 自动继续（多伦多时间）') if paused and status['peak_now'] else
@@ -123,8 +126,9 @@ def start_scheduled_composite(store, provider, experiment_id, *, recover=False):
             wait_for_off_peak(store, 'composite:' + experiment_id,
                 lambda pause: save_composite_schedule(store, experiment_id, price_pause=pause))
             save_composite_schedule(store, experiment_id, status='running')
-            store.create_composite(experiment_id, provider)
-            save_composite_schedule(store, experiment_id, status='completed')
+            outcome=store.create_composite(experiment_id, provider)
+            save_composite_schedule(store, experiment_id,
+                status='running' if outcome.get('status')=='analyzing' else 'completed')
         except Exception as error:
             save_composite_schedule(store, experiment_id, status='failed', error=str(error))
     with _composite_lock:
@@ -184,7 +188,8 @@ def active_pauses(store):
         for row in db.execute("SELECT id,status,json_object('optimization_cycle',json_extract(result_json,'$.optimization_cycle'),'price_pause',json_extract(result_json,'$.price_pause'),'composite_schedule',json_extract(result_json,'$.composite_schedule')) result_json FROM experiments"):
             saved={key:value for key,value in json.loads(row['result_json']).items() if value is not None}
             if saved.get('optimization_cycle',{}).get('status')=='running':
-                add('Agent 优化循环',saved['optimization_cycle'].get('price_pause'),{'experiment_id':row['id']})
+                pauses=[saved['optimization_cycle'].get('price_pause'),saved.get('price_pause')]
+                add('Agent 优化循环',next((pause for pause in pauses if pause and pause.get('paused')),None),{'experiment_id':row['id']})
             elif row['status']=='generating':
                 add('Agent 生成方案',saved.get('price_pause'),{'experiment_id':row['id']})
             if saved.get('composite_schedule',{}).get('status') in {'waiting','running'}:

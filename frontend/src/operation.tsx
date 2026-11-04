@@ -51,6 +51,7 @@ function revision(run: any): Partial<Operation> {
     status: failed ? "failed" : ["preview_ready", "completed", "cancelled"].includes(run.status) ? "completed" : "running",
     stageCode: code, stage: revisionStages[code] || (run.status === "interrupted" ? "进程已中断，需手动继续" : code),
     current: run.progress?.current, total: run.progress?.total,
+    pricePause: run.price_pause,
     error: run.error || (run.status === "interrupted" ? "进程重启后 Worker 不会自动恢复" : undefined),
     errorDetail: run.error_detail || run.error, provider: lastAttempt?.provider, model: lastAttempt?.model, attempt: lastAttempt?.attempt,
   };
@@ -201,7 +202,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   const console = !!visible.length && <div className="operation-stack" aria-label="运行状态">{visible.map(item => <section className="operation-console" key={item.id} role={item.status === "failed" ? "alert" : "status"}>
       <div className="operation-head"><strong>{item.title}</strong><button aria-label="关闭运行状态" onClick={() => setOperations(current => current.map(row => row.id === item.id && row.status === "running" ? { ...row, dismissed: true } : row).filter(row => row.id !== item.id || row.status === "running"))}>×</button></div>
       <p>{item.status === "stopped" ? "已停止，断点已保存" : item.status === "failed" ? "运行失败" : item.status === "completed" ? "✓ 完成" : item.pricePause?.paused ? "等待平价时段" : item.restored ? `后台运行中（本页面重新连接） · ${item.stage || "运行中"}` : item.stage || "运行中"}{item.startedAt != null && <span> · {elapsedText((item.endedAt ?? now) - item.startedAt)}</span>}</p>
-      <PricePauseNotice pause={item.status === "running" ? item.pricePause : undefined} evaluationId={item.runId || (item.kind === "evaluation" ? item.id : undefined)} experimentId={item.experimentId} onChanged={() => update(item.id, { pricePause: { paused: false } })} />
+      <PricePauseNotice pause={item.status === "running" ? item.pricePause : undefined} target={item.kind === "revision" ? {revision_id:item.id} : undefined} evaluationId={item.runId || (item.kind === "evaluation" ? item.id : undefined)} experimentId={item.experimentId} onChanged={() => update(item.id, { pricePause: { paused: false } })} />
       {item.current != null && item.total != null && item.total > 1 && <><div className="operation-count">{item.current} / {item.total}<span>{Math.round(item.current / item.total * 100)}%</span></div><progress value={item.current} max={item.total} /></>}
       {item.status === "running" && (item.kind === "evaluation" || item.runId) && <button className="operation-stop-button" disabled={item.stopping} onClick={() => void stopEvaluation(item)}>{item.stopping ? "正在停止…" : "停止运行"}</button>}
       {item.stopError && <small role="alert" className="operation-error-summary">{item.stopError}</small>}

@@ -655,6 +655,7 @@ class EvaluationRunner:
         run=self.store.evaluation_run(run_id)
         if run['status']=='completed':return run
         if run['result'].get('auto_recovery',{}).get('enabled') and not self.store.claim_evaluation_worker(run_id):return self.store.evaluation_run(run_id)
+        run=self.store.evaluation_run(run_id)
         cases=self.store.evaluation_case_results(run_id)
         saved={case['question_id'] for case in cases}
         checkpoints=run['result'].get('checkpoints',{})

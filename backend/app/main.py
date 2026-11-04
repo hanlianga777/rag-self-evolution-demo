@@ -1855,7 +1855,8 @@ def runtime_settings():
 @app.post('/api/runtime-settings', dependencies=[Depends(require_trusted_origin)])
 def update_runtime_settings(payload: RuntimeSettingsRequest):
     from .paid_schedule import set_settings
-    return set_settings(store, payload.off_peak_only)
+    set_settings(store, payload.off_peak_only)
+    return runtime_settings()
 
 
 @app.post('/api/runtime-settings/run-now', dependencies=[Depends(require_trusted_origin)])
@@ -1911,6 +1912,9 @@ def create_composite(run_id: str, payload: PaidActionRequest | None = None):
     require_idle_cycle(experiment)
     try:
         from .paid_schedule import pause_state, start_scheduled_composite
+        scheduled=(experiment or {}).get('result',{}).get('composite_schedule',{})
+        if scheduled.get('status') in {'waiting','running'}:
+            return {'status':'scheduled',**scheduled}
         if pause_state(store, 'composite:' + run_id)['paused']:
             state = start_scheduled_composite(store, ai_service.provider, run_id)
             return {'status': 'scheduled', **state}

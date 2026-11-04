@@ -16,6 +16,19 @@ async function mount(node: any) { root = createRoot(document.body.appendChild(do
 async function click(text: string) { await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === text)!.click()); }
 const pause = { paused: true, resume_at_toronto: "23:00", resume_at: "2026-11-04T04:00:00Z" };
 
+it("refreshes saved pause state after the worker automatically resumes without a POST", async () => {
+  vi.useFakeTimers();
+  let reads = 0;
+  const fetcher = vi.fn((_url:string,_init?:RequestInit) => response({off_peak_only:true,peak_now:reads++ === 0,active_pauses:reads===1 ? [{task_label:"方案 A · Sandbox 试跑",price_pause:pause,target:{evaluation_id:"offline"}}] : []}));
+  vi.stubGlobal("fetch",fetcher);
+  await mount(<RuntimeSettings />);
+  expect(document.body.textContent).toContain("高峰时段暂停");
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(document.body.textContent).not.toContain("高峰时段暂停");
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher.mock.calls.every(args => !args[1]?.method || args[1].method === "GET")).toBe(true);
+});
+
 it("loads and saves the shared off-peak setting with a high-price explanation", async () => {
   const fetcher = vi.fn((url: string, init?: RequestInit) => response(init?.method ? { off_peak_only: JSON.parse(String(init.body)).off_peak_only, peak_now: true } : { off_peak_only: true, peak_now: true, resume_at_toronto: "23:00" }));
   vi.stubGlobal("fetch", fetcher);

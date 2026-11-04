@@ -135,7 +135,9 @@ class ScheduleTests(unittest.TestCase):
         def sleep(_seconds):
             self.assertEqual(runtime.answers,[])
             self.assertEqual(runtime.judges,[])
-            self.assertTrue(self.store.evaluation_run(key)['result']['price_pause']['paused'])
+            saved=self.store.evaluation_run(key)['result']
+            self.assertTrue(saved['price_pause']['paused'])
+            self.assertTrue(saved['auto_recovery'].get('worker_token'))
             clock[0]=datetime(2026,11,4,4,tzinfo=timezone.utc)
         with patch.object(schedule,'utc_now',side_effect=lambda:clock[0]),patch.object(schedule.time,'sleep',side_effect=sleep):
             result=runner.execute_replay(key,items,executions)
@@ -195,8 +197,59 @@ class ScheduleTests(unittest.TestCase):
         runner.score_execution.assert_called_once()
         self.assertTrue(state['complete'])
 
+    def test_cycle_lists_agent_retry_pause_without_changing_stopped_tasks(self):
+        from app import paid_schedule as schedule
+        key=self.store.create_experiment('fixture-base')
+        pause={'paused':True,'resume_at_toronto':'23:00'}
+        result={'optimization_cycle':{'status':'running','price_pause':{'paused':False}},'price_pause':pause}
+        with self.store.connection() as db:
+            db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(result),key))
+        rows=schedule.active_pauses(self.store)
+        self.assertEqual(rows,[{'task_label':'Agent 优化循环','price_pause':pause,'target':{'experiment_id':key}}])
+        from api_fixture import main
+        from fastapi.testclient import TestClient
+        result['optimization_cycle']['status']='failed'
+        with self.store.connection() as db:
+            db.execute("UPDATE experiments SET status='failed',result_json=? WHERE id=?",(json.dumps(result),key))
+        with patch.object(main,'store',self.store):
+            client=TestClient(main.app)
+            try:
+                response=client.post('/api/runtime-settings/run-now',json={'experiment_id':key,'acknowledge_peak_price':True},headers={'Origin':'http://127.0.0.1:5174'})
+                self.assertEqual(response.status_code,409)
+            finally:client.close()
+        schedule.set_run_now(self.store,'cycle:'+key)
+        with patch.object(schedule,'utc_now',return_value=datetime(2026,11,4,1,tzinfo=timezone.utc)):
+            self.assertTrue(schedule.pause_state(self.store,'agent:'+key)['paused'])
+            result['optimization_cycle']['status']='running'
+            with self.store.connection() as db:
+                db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(result),key))
+            self.assertFalse(schedule.pause_state(self.store,'agent:'+key)['paused'])
+
 
 class DiagnosticScheduleTests(unittest.TestCase):
+    def test_two_requests_cannot_own_same_diagnostic_authorization(self):
+        from app import evidence_resolver as resolver
+        from app.governance import GovernanceStore
+        import tempfile,threading
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as directory:
+            store=GovernanceStore(Path(directory)/'fixture.db')
+            entered,release=threading.Event(),threading.Event()
+            def work(*_args,**_kwargs):
+                entered.set();release.wait(3)
+                return {'provider_calls':0}
+            args=dict(expected_binding='fixture',authorization_id='same',max_calls=1)
+            with patch.object(resolver,'_execute_diagnostic_batch',side_effect=work) as execute:
+                thread=threading.Thread(target=lambda:resolver.execute_diagnostic_batch(store,'fixture',object(),**args))
+                thread.start()
+                try:
+                    self.assertTrue(entered.wait(2))
+                    with self.assertRaisesRegex(ValueError,'正在运行'):
+                        resolver.execute_diagnostic_batch(store,'fixture',object(),**args)
+                    self.assertEqual(execute.call_count,1)
+                finally:release.set();thread.join(3)
+                self.assertFalse(thread.is_alive())
+
     def test_diagnostic_pause_restart_uses_saved_authorization(self):
         from test_agent_closed_loop import BatchAndReplayTests
         from app import evidence_resolver as resolver, paid_schedule as schedule

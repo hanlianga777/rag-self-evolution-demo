@@ -270,6 +270,7 @@ class RehearsalTests(unittest.TestCase):
         run=self.post('candidates/'+d['id']+'/run')
         result=self.wait('evaluations/'+run['id'],('completed','failed','partial'))
         self.assertEqual(result['status'],'completed',result)
+        self.join_workers()
         self.assertTrue(self.store.candidate(d['id'])['result']['release_qualification']['qualified'])
         rec=self.store.refresh_recommendation(self.exp)
         self.assertEqual(rec['recommended_candidate'],d['id'])
