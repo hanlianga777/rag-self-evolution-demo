@@ -11,19 +11,31 @@ from app.telemetry import record_usage
 
 
 class BillingTests(unittest.TestCase):
+    def test_existing_resume_child_is_recovered_when_marker_still_points_to_parent(self):
+        self.recovered_child = True
+        self.test_interrupted_replay_uses_formal_resume_and_keeps_saved_answers()
+
+    def test_completed_status_with_technical_failure_resumes_only_missing_case(self):
+        self.resume_status = 'completed'
+        self.test_interrupted_replay_uses_formal_resume_and_keeps_saved_answers()
+
     def test_interrupted_replay_uses_formal_resume_and_keeps_saved_answers(self):
-        from contextlib import redirect_stdout
+        from contextlib import redirect_stdout, nullcontext
         from io import StringIO
         from types import SimpleNamespace
         from unittest.mock import Mock
         cases = [{'question_id': str(i), 'model_answer': 'saved', 'programmatic_metrics': {
             'latency_ms': 10, 'ttft_ms': 1, 'retrieval_trace': {'final': []}}} for i in range(50)]
-        old = {'id': 'partial', 'status': 'partial', 'result': {'judge_replay': {'source_run_id': 'original'}}}
-        active = {'id': 'resumed', 'status': 'running', 'config': {'run_target': 'baseline'}}
+        old = {'id': 'partial', 'status': getattr(self, 'resume_status', 'partial'), 'result': {
+            'evaluation_complete': False, 'technical_failed': 1, 'judge_replay': {'source_run_id': 'original'}}}
+        active = {'id': 'resumed', 'status': 'running', 'config': {'run_target': 'baseline'},
+            'result': {'judge_replay': {'source_run_id': 'original'}}}
         finished = {**active, 'status': 'completed', 'result': {'bad_case_count': 0, 'technical_failed': 0}}
         store = SimpleNamespace(dataset_snapshots=lambda: [{'id': 'target'}],
             evaluation_run=lambda key: {'partial': old, 'resumed': active}[key],
-            evaluation_case_results=lambda _: cases)
+            evaluation_case_results=lambda _: cases,
+            connection=lambda: nullcontext(SimpleNamespace(execute=lambda sql, args: SimpleNamespace(
+                fetchone=lambda: ('resumed',) if getattr(self, 'recovered_child', False) and args[0] == 'partial' else None))))
         runner = Mock(); runner.start_baseline.return_value = ('resumed', [], active['config'])
         runner.execute_baseline.return_value = finished
         with tempfile.TemporaryDirectory() as temporary, patch.object(task, 'OUT', Path(temporary)), \
@@ -34,7 +46,8 @@ class BillingTests(unittest.TestCase):
             marker.write_text(json.dumps({'id': 'partial'}))
             task.replays(SimpleNamespace(store=store, ai_service=None))
             result = json.loads(marker.read_text())
-        runner.start_baseline.assert_called_once_with('partial', automatic=True)
+        if getattr(self, 'recovered_child', False): runner.start_baseline.assert_not_called()
+        else: runner.start_baseline.assert_called_once_with('partial', automatic=True)
         runner.start_judge_replay.assert_not_called()
         self.assertEqual(result['id'], 'resumed')
         self.assertEqual(result['previous_run_ids'], ['partial'])

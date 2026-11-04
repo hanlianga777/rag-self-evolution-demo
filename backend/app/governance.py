@@ -2458,7 +2458,9 @@ class GovernanceStore:
                     raise ValueError('只能指定当前题卷下完整且无技术失败的真实Baseline')
                 compared.append((_load(row['judge_json'],{}).get('judge_thinking',{}).get('reasoning_effort'), config.get('generation_thinking')))
             comparison_label = (f'判分档位对照（当前 {compared[0][0]} / 原 {compared[1][0]}，回答 {compared[0][1]}）'
-                                if compared[0][0] != compared[1][0] else f'思考档位对照（回答 {compared[1][1] or "未知"}）')
+                                if compared[0][0] != compared[1][0] else
+                                f'思考档位对照（回答 {compared[1][1] or "未知"}）' if compared[0][1] != compared[1][1] else
+                                f'保存回答对照（回答 {compared[1][1] or "未知"}）')
             connection.execute('CREATE TABLE IF NOT EXISTS baseline_designations (id INTEGER PRIMARY KEY, baseline_run_id TEXT NOT NULL, comparison_run_id TEXT NOT NULL, comparison_label TEXT NOT NULL, actor TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)')
             connection.execute('INSERT INTO baseline_designations(baseline_run_id,comparison_run_id,comparison_label,actor,reason,created_at) VALUES (?,?,?,?,?,?)',
                 (baseline_id,comparison_id,comparison_label,actor.strip(),reason.strip(),_now()))

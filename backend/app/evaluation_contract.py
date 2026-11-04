@@ -402,8 +402,12 @@ def validate_business_judgment(value, answer, entries, *, category, constraints=
         if not isinstance(scope,list) or any(not scope_quote_present(q,entries,canonical_chunks,constraints=constraints) for q in scope):
             raise ValueError('scope_support is not bound to verified Canonical heading and Final')
         support = finding.get('support')
-        if not isinstance(support, list) or any(not quote_present(q, entries, display=True) and not (missing and omission_evidence([q], checks, entries, candidates)) for q in support):
-            raise ValueError('support is not located in actual full Final')
+        invalid_support = ([q for q in support if not quote_present(q, entries, display=True)
+            and not (missing and omission_evidence([q], checks, entries, candidates))] if isinstance(support, list) else [support])
+        if invalid_support:
+            raise ValueError('support is not located in actual full Final; invalid_support='
+                + json.dumps(invalid_support, ensure_ascii=False) + '; actual_final_chunk_ids='
+                + json.dumps([e.get('chunk_id') for e in entries], ensure_ascii=False))
         for q in (support if applicable else []):
             matched = [e for e in entries if quote_present(q, [e], display=True)]
             for field in ('product', 'version'):

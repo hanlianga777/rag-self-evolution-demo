@@ -10,6 +10,19 @@ import test_judge_replay_v5 as replay
 
 
 class ScoringRevisionTests(unittest.TestCase):
+    def test_invalid_citation_feedback_identifies_bad_source_and_actual_final(self):
+        from app.evaluation_contract import validate_business_judgment
+        value = {'verdict': 'PASS', 'reason': 'fixture', 'issues': [], 'checks': [{
+            'check_type': 'fact', 'requirement': 'saved fact', 'met': True, 'answer_quotes': ['saved'],
+            'support': [{'source_id': 'golden-only', 'quote': 'real source text'}]}]}
+        original = deepcopy(value)
+        with self.assertRaises(ValueError) as failure:
+            validate_business_judgment(value, 'saved', [{'chunk_id': 'actual-final', 'content': 'real source text'}],
+                category='positive')
+        self.assertIn('golden-only', str(failure.exception))
+        self.assertIn('actual-final', str(failure.exception))
+        self.assertEqual(value, original)
+
     def example(self):
         source, cases, old, config, judge, chunks = replay.JudgeReplayTests().example()
         old['questions'][0]['business_requirements'] = {'required_checks': [
@@ -135,6 +148,27 @@ class ScoringRevisionTests(unittest.TestCase):
             self.assertEqual(target_config, config)
             self.assertEqual(fake.create_baseline_run.call_args.args[0], frozen)
             self.assertEqual(items, ['saved-item'])
+
+    def test_same_thinking_saved_answers_are_not_labeled_as_thinking_comparison(self):
+        import tempfile
+        from pathlib import Path
+        from app.governance import GovernanceStore
+        _, _, frozen, _, _, judge, _ = self.example()
+        with tempfile.TemporaryDirectory() as temporary:
+            store = GovernanceStore(Path(temporary) / 'isolated.db')
+            with store.connection() as db:
+                db.execute('INSERT INTO dataset_versions VALUES (?,?,?,?,?)',
+                    (frozen['id'], 'approved', 'fixture', json.dumps(frozen), '9999'))
+            runs = []
+            for prompt in ('Grounded', 'Tiered'):
+                run = store.create_evaluation_run(frozen, {'run_target': 'baseline',
+                    'generation_thinking': 'max', 'prompt_strategy': prompt}, judge)
+                store.record_evaluation_case(run, 'q-new', {'passed': True})
+                store.finish_evaluation_run(run, 'completed', {'evaluation_complete': True, 'technical_failed': 0})
+                runs.append(run)
+            designation = store.designate_baseline(*runs, 'task017a', '同卷历史方案对照')
+            self.assertIn('保存回答对照', designation['comparison_label'])
+            self.assertNotIn('思考档位对照', designation['comparison_label'])
 
 
 class PaidRecoveryTests(unittest.TestCase):

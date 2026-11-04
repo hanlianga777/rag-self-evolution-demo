@@ -11,3 +11,13 @@ it('labels the saved comparison with the actual low judge effort',async()=>{
   expect(host.textContent).toContain('同为 low 判分');
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+it('labels equal thinking levels as saved answers instead of a thinking experiment',async()=>{
+ const host=document.body.appendChild(document.createElement('div'));const root=createRoot(host);
+ try{
+  await act(async()=>root.render(<ProductDiagnostics diagnostics={{thinking_comparison:{judge_thinking:'low',columns:[{id:'history',label:'最高',metrics:{correct_count:44}},{id:'current',label:'最高',current:true,metrics:{correct_count:44}}]}}}/>));
+  expect(host.textContent).toContain('保存回答对照');
+  expect(host.textContent).toContain('当前 Baseline');
+  expect(host.textContent).toContain('历史对照');
+  expect(host.textContent).not.toContain('回答思考档位对照');
+ }finally{await act(async()=>root.unmount());host.remove();}
+});

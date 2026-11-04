@@ -125,8 +125,17 @@ def replays(main):
                 state.update(source_id=source_id, dataset_id=target['id']); save(path, state)
                 print('REPLAY_STARTED', label, state['id'], flush=True)
             run = main.store.evaluation_run(state['id'])
-            if run['status'] != 'completed':
-                if run['status'] in {'partial', 'failed'}:
+            # DB insertion may have succeeded before the child's marker was saved.
+            while True:
+                with main.store.connection() as db:
+                    child = db.execute("SELECT id FROM evaluation_runs WHERE json_extract(result_json,'$.resume_source_id')=? AND dataset_version_id=? ORDER BY created_at DESC LIMIT 1", (run['id'], target['id'])).fetchone()
+                if not child: break
+                state.setdefault('previous_run_ids', []).append(run['id'])
+                run = main.store.evaluation_run(child[0])
+                assert run['result'].get('judge_replay', {}).get('source_run_id') == source_id
+                state['id'] = run['id']; save(path, state)
+            if run['status'] != 'completed' or run['result'].get('technical_failed', 0) or run['result'].get('evaluation_complete') is False:
+                if run['status'] in {'partial', 'failed', 'completed'}:
                     assert run['result'].get('judge_replay', {}).get('source_run_id') == source_id
                     state.setdefault('previous_run_ids', []).append(run['id'])
                     # Formal resume copies completed cases and saved generation checkpoints.
