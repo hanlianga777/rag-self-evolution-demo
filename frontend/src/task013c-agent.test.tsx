@@ -55,10 +55,12 @@ it('moves unfinished planning into More after a Sandbox exists and makes progres
  expect(document.querySelector('.tabs button.active')?.textContent).toBe('Sandbox');
  await click('更多');
  expect(document.querySelector('[role="menu"]')?.textContent).toContain('补齐本轮规划（不收费）');
- const detail=document.querySelectorAll('.stage-stepper li')[1].textContent;
+ expect(document.querySelectorAll('.stage-stepper li')[1].textContent).toContain('有覆盖缺口');
+ await click('优化 Agent');
+ const detail=document.querySelector('.page-content')!.textContent;
  expect(detail).toContain('Q41 暂时没有方案覆盖');
  expect(detail).toContain('三套方案的名额已用完');
  expect(detail).not.toContain('Q27');
- expect(detail).not.toContain('规划未完成');
+ expect(detail).toContain('规划未完成');
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method)).toBe(true);
 });

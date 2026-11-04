@@ -229,7 +229,7 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   await render(<EvolutionPage data={{ workspace: identity("B1", "E1"), evaluation: { id: "B1", status: "completed", config: {} }, optimization: { id: "E1", candidates: [d], result: { report_confirmation: { winner_id: "A" }, composite: { candidate_id: d.id } } } }} />);
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Sandbox")!.click());
   const coreRows = [...document.querySelectorAll(".sandbox-core-table tbody tr")];
-  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["门槛", "Bad Case", "修复原 Bad Case", "新增失败", "回归检查", "正式资格"]);
+  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["运行状态", "门槛", "Bad Case", "修复原 Bad Case", "新增失败", "回归检查", "正式资格"]);
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "门槛")?.lastElementChild?.textContent).toBe("11 / 11");
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "回归检查")?.lastElementChild?.textContent).toBe("未通过");
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "正式资格")?.lastElementChild?.textContent).toBe("不合格");

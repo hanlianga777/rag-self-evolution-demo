@@ -41,16 +41,16 @@ it("hides missing index measurements instead of deriving them from chunks", asyn
 
 it("groups pipeline configuration by purpose and marks parameters by their contract keys", async () => {
   const pipeline = { config: { query_rewrite: false, top_k: 6, prompt_strategy: "Grounded" }, index: { embedding_model: "BGE", vector_index: "FAISS", dimension: 384 }, search_space: { top_k: { type: "integer", allowed: [4, 6] }, prompt_strategy: { type: "string", allowed: ["Grounded"] } } };
-  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(pipeline), { status: 200 }));
+  const fetcher = vi.fn(async (_url: string) => new Response(JSON.stringify(pipeline), { status: 200 }));
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={{ documents: [{ parser: "PyMuPDF", chunk_strategy: "Section-aware" }], versions: [{ status: "active", snapshot: { generation_model: "generation-model" } }], readiness: { status: "ready", model: "provider-model" }, evaluation: { judge: { model: "judge-model", temperature: 0.9, execution_snapshot: { generation_model: "generation-model", temperature: 0.2 } } } }} />));
   expect(document.querySelector(".light-stepper")).toBeNull();
-  expect([...document.querySelectorAll(".settings-page h2")].map(item => item.textContent)).toEqual(["固定技术基座", "Agent 可选参数"]);
+  expect([...document.querySelectorAll(".settings-page h2")].map(item => item.textContent)).toEqual(["固定技术基座", "Agent 可选参数", "运行设置"]);
   expect(document.querySelector('[data-parameter="top_k"]')?.textContent).not.toContain("Baseline 未采集");
   expect(document.body.textContent).toContain("Baseline 待评测");
   expect(document.querySelector(".provider-status-row")).toBeNull();
-  expect(fetcher.mock.calls).toHaveLength(1);
+  expect(fetcher.mock.calls.map(([url]) => new URL(String(url)).pathname).sort()).toEqual(["/api/pipeline", "/api/runtime-settings"]);
   await act(async () => root.unmount());
 });
 

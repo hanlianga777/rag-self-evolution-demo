@@ -16,11 +16,11 @@ export function Section({ title, action, children }: { title: string; action?: R
 }
 
 export function Status({ value }: { value: string }) {
-  const tone = /fail|rejected|not[\s_-]*qualified|needs_revision/i.test(value) ? "bad" : /pass|completed|indexed|active|recommended|released|reviewed|qualified|evaluated/i.test(value) ? "good" : /running|evaluating|queued/i.test(value) ? "accent" : /pending|human_review|not_run|not_evaluable|legacy/i.test(value) ? "warning" : "neutral";
+  const tone = /fail|rejected|not[\s_-]*qualified|needs_revision/i.test(value) ? "bad" : /pass|completed|indexed|released|reviewed|qualified|evaluated/i.test(value) ? "good" : /running|evaluating|queued/i.test(value) ? "accent" : /pending|human_review|not_run|not_evaluable|legacy/i.test(value) ? "warning" : "neutral";
   return <Badge tone={tone}>{displayText(value)}</Badge>;
 }
 
-export function TruncatedText({ children, lines = 3 }: { children: ReactNode; lines?: 2 | 3 }) {
+export function TruncatedText({ children, lines = 2 }: { children: ReactNode; lines?: 2 | 3 }) {
   const id = useId(), ref = useRef<HTMLSpanElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const show = () => { const node=ref.current; if (!node || node.scrollHeight<=node.clientHeight && node.scrollWidth<=node.clientWidth) return; const box = node.getBoundingClientRect(); if (box) setPosition({ left: Math.max(8, Math.min(box.left, window.innerWidth - 368)), top: Math.max(8, Math.min(box.bottom + 6, window.innerHeight - 210)) }); };
@@ -93,11 +93,11 @@ export function CustomSelect({ ariaLabel, value, options, onChange, disabled = f
   </div>;
 }
 
-export type Stage = { label: string; state: "completed" | "current" | "pending" | "blocked"; detail?: string; href?: string };
+export type Stage = { label: string; state: "completed" | "current" | "pending" | "blocked"; detail?: string; href?: string; onSelect?: () => void };
 
 export function StageStepper({ ariaLabel, steps, compact = false }: { ariaLabel: string; steps: Stage[]; compact?: boolean }) {
   return <ol className={`stage-stepper${compact ? " compact" : ""}`} aria-label={ariaLabel}>{steps.map(step => <li key={step.label} className={step.state} aria-current={step.state === "current" ? "step" : undefined}>
-    {step.href ? <a href={step.href}><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</a> : <div><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</div>}
+    {step.onSelect ? <button type="button" onClick={step.onSelect}><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</button> : step.href ? <a href={step.href}><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</a> : <div><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</div>}
     <small>{step.state === "completed" ? "✓ 已完成" : step.state === "current" ? "当前阶段" : step.state === "blocked" ? "待处理" : "待开始"}</small>
   </li>)}</ol>;
 }

@@ -1,3 +1,4 @@
+import { DataTable } from "./DataTable";
 import { useState } from "react";
 import { displayText, parameterNames, descriptions } from "../display";
 import { Drawer } from "./Dialog";
@@ -21,7 +22,7 @@ export function formatValue(value: unknown): string {
 }
 
 export function SearchSpaceTable({ contract, baseline }: { contract: Record<string, { type: string; allowed: unknown[] }>; baseline: Record<string, unknown> }) {
-  return <div className="table-scroll"><table className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th>当前 Baseline</th>}<th>允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td>{parameterNames[key] || key}</td>{Object.keys(baseline).length > 0 && <td>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key])}</td>}<td>{rule.allowed.map(formatValue).join(" / ")}</td><td>{key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "混合检索已开启" : "—"}</td><td>{descriptions[key] || "—"}</td></tr>)}</tbody></table></div>;
+  return <div className="table-scroll"><DataTable className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th>当前 Baseline</th>}<th>允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td>{parameterNames[key] || key}</td>{Object.keys(baseline).length > 0 && <td>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key])}</td>}<td>{rule.allowed.map(formatValue).join(" / ")}</td><td>{key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "混合检索已开启" : "—"}</td><td>{descriptions[key] || "—"}</td></tr>)}</tbody></DataTable></div>;
 }
 
 export const parameterGroups: Record<string, string[]> = { Query: ["query_rewrite", "multi_query", "hyde", "query_decompose", "alias_mapping"], Retrieval: ["candidate_k", "top_k", "min_score", "hybrid_search", "hybrid_alpha", "metadata_filter", "retrieval_max_tokens"], Rerank: ["rerank"], Generation: ["prompt_strategy", "generation_thinking"] };
@@ -29,7 +30,7 @@ export function ParameterDiff({ before = {}, after = {} }: { before?: Record<str
   const [open, setOpen] = useState(false);
   const keys = Object.values(parameterGroups).flat().filter(key => key in before || key in after);
   const changed = keys.filter(key => before[key] !== after[key]);
-  const render = (selected: string[]) => Object.entries(parameterGroups).map(([name, members]) => { const rows = members.filter(key => selected.includes(key)); return rows.length ? <section className="parameter-group" key={name}><h3>{displayText(name)}</h3><div className="table-scroll"><table><thead><tr><th>参数</th><th>优化前</th><th>优化后</th></tr></thead><tbody>{rows.map(key => <tr key={key} className={changed.includes(key) ? "parameter-changed" : ""}><td>{parameterNames[key] || key}</td><td>{formatValue(before[key])}</td><td>{formatValue(after[key])}</td></tr>)}</tbody></table></div></section> : null; });
+  const render = (selected: string[]) => Object.entries(parameterGroups).map(([name, members]) => { const rows = members.filter(key => selected.includes(key)); return rows.length ? <section className="parameter-group" key={name}><h3>{displayText(name)}</h3><div className="table-scroll"><DataTable><thead><tr><th>参数</th><th>优化前</th><th>优化后</th></tr></thead><tbody>{rows.map(key => <tr key={key} className={changed.includes(key) ? "parameter-changed" : ""}><td>{parameterNames[key] || key}</td><td>{formatValue(before[key])}</td><td>{formatValue(after[key])}</td></tr>)}</tbody></DataTable></div></section> : null; });
   return <div className="parameter-diff">{render(changed)}{!changed.length && <p className="muted">{keys.length ? "两个保存配置的参数一致。" : "未保存可比较的配置。"}</p>}{keys.length > changed.length && <><button className="text-button" onClick={() => setOpen(true)}>{changed.length} 项变化 · 未变参数 {keys.length - changed.length}</button><Drawer open={open} onOpenChange={setOpen} title="完整配置与未变参数"><div className="drawer-body">{render(keys)}</div></Drawer></>}</div>;
 }
 

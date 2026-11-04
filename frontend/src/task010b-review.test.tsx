@@ -12,7 +12,7 @@ const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendCh
 it('shows the supplied budget before creating an experiment',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{status:'not_run',evaluation_budget:{used:0,max:12,reserved_for_d:1}}}}/>);
- expect(document.querySelector('.page-shell-header details')?.textContent).toContain('已试跑 0 / 12 次（其中 1 次留给方案 D）');
+ expect(document.querySelector('.page-shell-header .experiment-progress')?.textContent).toContain('已试跑 0 / 12 次（其中 1 次留给方案 D）');
  expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });
 it('uses true errors in the overview while keeping saved correctness',async()=>{

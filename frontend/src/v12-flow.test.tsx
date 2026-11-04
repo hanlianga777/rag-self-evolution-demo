@@ -219,13 +219,14 @@ it("confirms an evaluated qualified winner and then offers composite D", async (
   await act(async () => root.unmount());
 });
 
-it("allows a partial final round while keeping one Sandbox slot for D", async () => {
-  const experiment = { id: "EXP2", candidates: [], recommendation: { result: { status: "No Qualified Candidate" } }, evaluation_budget: { used: 9, max: 12, reserved_for_d: 1 }, rounds: [{ round: 3, complete: true, evaluated: 2, total: 2 }] };
+it.each([{ max: 13, canContinue: true }, { max: 12, canContinue: false }])("keeps saved partial rounds and requires a full next batch plus D reserve ($max slots)", async ({ max, canContinue }) => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
+  const experiment = { id: "EXP2", candidates: [], recommendation: { result: { status: "No Qualified Candidate" } }, evaluation_budget: { used: 9, max, reserved_for_d: 1 }, rounds: [{ round: 3, complete: true, evaluated: 2, total: 2 }] };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: {}, badCases: [] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "优化 Agent")!.click());
   expect(document.body.textContent).toContain("第 3 轮 · 2/2");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "A/B/C/D")!.click());
-  expect(document.body.textContent).toContain("继续优化下一轮");
+  expect(document.body.textContent?.includes("继续优化下一轮")).toBe(canContinue);
   await act(async () => root.unmount());
 });

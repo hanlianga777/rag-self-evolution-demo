@@ -25,8 +25,8 @@ it('retains all ten planning targets under identity block and hides technical cl
  expect(document.querySelector('.agent-identity')?.textContent).toContain('Bad Case 10');
  expect(document.body.textContent).not.toMatch(/已确认可干预|可探索 \d|saved_diagnostic_identity_changed/);
  expect([...document.querySelectorAll('button')].find(b=>b.textContent?.includes('生成 A / B / C'))?.disabled).toBe(true);
- await click('优化 Agent');expect(document.querySelectorAll('.strategy-branch')).toHaveLength(10);
- expect(document.querySelector('.strategy-relations')?.textContent).toContain('排序与上下文选择');
+ await click('优化 Agent');expect(document.querySelectorAll('.agent-fact')).toHaveLength(10);
+ expect(document.querySelector('.agent-facts')?.textContent).toContain('排序与上下文选择');
 });
 it('shows a single business count and agent entry in Baseline',async()=>{
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/bad-cases')?rows:url.endsWith('/api/evaluations/baseline')?evaluation:{}))));
@@ -38,9 +38,9 @@ it('shows a single business count and agent entry in Baseline',async()=>{
 });
 it('offers Sandbox for one valid candidate while disclosing rejected candidates',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
- await render(<EvolutionPage data={{evaluation,badCases:rows,optimization:{id:'partial',candidates:[{id:'valid-a',status:'generated',reasoning:{candidate_label:'A',round:1,hypothesis:'原始合法假设'}}],result:{generation_status:'partial',rejected_candidates:[{id:'B',reason:'参数类型错误'}]}}}}/>);
+ await render(<EvolutionPage data={{evaluation,badCases:rows,optimization:{id:'partial',evaluation_budget:{used:0,max:12,reserved_for_d:1},candidates:[{id:'valid-a',status:'generated',reasoning:{candidate_label:'A',round:1,hypothesis:'原始合法假设'}}],result:{generation_status:'partial',rejected_candidates:[{id:'B',reason:'参数类型错误'}]}}}}/>);
  expect(document.body.textContent).toContain('保留 1 个合法候选，拒绝 1 个候选');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent?.includes('运行本轮 A/B/C Sandbox'))?.disabled).toBe(false);
- expect(document.body.textContent).toContain('1 个候选已生成（最多3个）');
+ expect(document.body.textContent).toContain('1 个候选方案');
  expect(document.querySelector('details[open]')).toBeNull();
 });

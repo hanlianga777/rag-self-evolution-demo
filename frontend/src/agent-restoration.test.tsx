@@ -22,7 +22,7 @@ it("restores stages and complete generated plans without inventing evaluated res
   expect(document.querySelectorAll(".strategy-hypotheses > section")).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/null|undefined|\[object Object\]/);
   await click("A/B/C/D");
-  expect([...document.querySelectorAll(".candidate-card:first-child .field-label")].map(e => e.textContent)).toEqual(["优化目标", "方案内容", "历史策略", "参数变化", "预期收益", "潜在风险", "实验结果"]);
+  expect([...document.querySelectorAll(".candidate-card:first-child .field-label")].map(e => e.textContent)).toEqual(["方向", "核心思路", "参数变化", "针对的题", "预期效果", "风险", "结果"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("Sandbox 尚未运行");
   await click("查看目标 1 题");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(bad.result.question);
@@ -30,10 +30,10 @@ it("restores stages and complete generated plans without inventing evaluated res
   expect((fetch as any).mock.calls.every(([, init]: any) => !init?.method)).toBe(true);
 });
 
-it("shows six decision rows and blocks Gate2 while another candidate is generated", async () => {
+it("shows a status row and six decision rows and blocks Gate2 while another candidate is generated", async () => {
   const value = { ...data, optimization: { ...data.optimization, candidates: [{ ...candidates[0], status: "evaluated", result: { qualification: { qualified: true }, gates: { total: 11, passed_count: 11 }, regression: { status: "PASS", new_critical_failures: 0, new_ordinary_failures: 0 }, target_bad_cases_fixed: 1 } }, candidates[1], candidates[2]] } };
   await mount(value); await click("Sandbox");
-  expect(document.querySelectorAll(".sandbox-core-table tbody tr")).toHaveLength(6);
+  expect(document.querySelectorAll(".sandbox-core-table tbody tr")).toHaveLength(7);
   expect(document.querySelector(".sandbox-core-table")?.textContent).toContain("修复原 Bad Case");
   expect(document.body.textContent).not.toContain("确认报告与赢家");
   expect(document.body.textContent).toContain("运行本轮 A/B/C Sandbox");

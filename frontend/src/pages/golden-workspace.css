@@ -1,14 +1,13 @@
-.governance-page .golden-workspace { display: grid; gap: 24px; }
+.governance-page .golden-workspace { display:flex; flex-direction:column; flex:1; min-height:0; gap:16px; }
 .governance-page .golden-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .governance-page .golden-metrics .metric { background: var(--surface); border: 1px solid var(--line); padding: 20px; }
 .governance-page .golden-metrics .metric small { font-size: 12px; }
 .governance-page .stage-stepper { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .governance-page .stage-stepper li { min-width: 0; }
-.governance-page.page-shell .page-content { display: block; overflow-y: auto; overflow-x: hidden; }
-.governance-page .page-content .table-scroll { height: auto !important; min-height: 0; max-height: none; overflow: visible !important; flex: none; }
+.governance-page.page-shell .page-content { display:flex; flex-direction:column; overflow:auto; }
 .governance-page .page-content .table-scroll table { min-width: 0 !important; }
-.governance-page .golden-workspace > .panel, .governance-page .page-content > .panel { flex: none; overflow: visible; margin: 0; }
-.governance-page.page-shell .page-content .golden-workspace .stage-stepper li { height: auto; min-height: 132px; padding: 16px; }
+.governance-page .golden-workspace > .panel { flex:1; min-height:180px; overflow:hidden; margin:0; display:flex; flex-direction:column; }
+.governance-page .golden-workspace .review-table:has(tbody > tr:nth-child(6)) { flex:1; min-height:140px; }
 .candidate-workspace.frozen-question-workspace .detail-content { display: block; overflow-y: auto; }
 .governance-page .review-table table { width: 100%; table-layout: fixed; }
 .governance-page .review-table th:nth-child(1) { width: 7%; }

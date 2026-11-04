@@ -26,7 +26,7 @@ it.each(["generating", "needs_regeneration", "failed"])("keeps the frozen Golden
 });
 
 it("keeps the current recommendation at human release despite an unfinished new work Run", async () => {
-  const candidate = { id: "E1-C", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } };
+  const candidate = { id: "E1-C", status: "evaluated", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } };
   const data = { ...input("failed"), optimization: { id: "E1", baseline_run_id: "B1", candidates: [candidate], recommendation: { result: { status: "Recommended", recommended_candidate: candidate.id } } }, versions: [{ id: "P-old", status: "active", provenance: "published", snapshot: { candidate_id: "E0-A" } }] };
   await render(data);
   expect(document.querySelector(".next-action h2")?.textContent).toBe("人工确认发布");
@@ -55,4 +55,11 @@ it("does not promote unrelated approved work data or an old Corpus to frozen eli
   await render(data);
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#governance");
   expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).not.toContain("Golden Dataset已冻结");
+});
+
+it.each(["running", "failed", "generated"])("does not skip unfinished Sandbox (%s) to the final decision", async status => {
+  const data = {...input("completed"), optimization:{id:"E1",baseline_run_id:"B1",candidates:[{id:"C1",status,reasoning:{candidate_label:"A",round:1},result:{evaluation_complete:false,completed:7,total:50}}]}};
+  await render(data);
+  expect(document.querySelector(".next-action h2")?.textContent).toBe(status === "running" ? "等待 Sandbox 完成" : status === "failed" ? "查看 Sandbox 中断" : "运行 Sandbox");
+  expect(document.querySelector(".next-action h2")?.textContent).not.toBe("完成调优决策");
 });

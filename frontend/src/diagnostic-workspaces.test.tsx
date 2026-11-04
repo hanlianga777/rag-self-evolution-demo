@@ -95,8 +95,8 @@ it('connects an unknown exploratory target to its saved candidate without callin
  await render(<EvolutionPage data={{evaluation,badCases,optimization}}/>);
  expect(document.querySelector('.diagnosis-list')?.textContent).toContain('记录缺失：调节方向');
  await click('优化 Agent');
- expect(document.querySelector('.strategy-relations')?.textContent).toContain('未知原因的维护遗漏');
- expect(document.querySelector('.strategy-relations')?.textContent).toContain('扩大候选池验证缺失来源');
+ expect(document.querySelector('.agent-facts')?.textContent).toContain('未知原因的维护遗漏');
+ expect(document.querySelector('.agent-hypotheses')?.textContent).toContain('扩大候选池验证缺失来源');
  expect(document.body.textContent).not.toContain('诊断待完成的先补证');
 });
 it('opens Sandbox fee confirmation without a budget and submits only explicit consent',async()=>{

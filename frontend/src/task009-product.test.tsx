@@ -50,7 +50,7 @@ it('sorts stages, folds tiny shares and uses seconds and plain comparison labels
  await click('查看对照');const dialog=document.querySelector('[role="dialog"]')!;
  expect(dialog.textContent).toContain('最高档');expect(dialog.textContent).toContain('高档 · 当前回答档位');
  expect(dialog.textContent).toContain('4.7 秒');expect(dialog.textContent).not.toContain('毫秒');
- expect(dialog.textContent).toContain('最慢 1%');expect(dialog.textContent).toContain('每题回答费用');
+ expect(dialog.textContent).toContain('回答耗时 P99');expect(dialog.textContent).toContain('每题回答费用');
  expect(dialog.textContent).toContain('回答问题 · 澄清不足');
 });
 it('opens case details when the saved point diagnosis explains missing records',async()=>{

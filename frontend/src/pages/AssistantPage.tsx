@@ -10,7 +10,7 @@ import { postJson } from "../api";
 import { isConversation, loadConversations, saveConversations } from "../conversations";
 import type { ChatMessage, Citation, Conversation } from "../types";
 
-const suggestedQuestions = ["清洁机器人 KIRA B 50 首次使用前应该做什么？", "巡检机器人 B2 遥控器低电量时如何充电？", "巡检机器人 B2 电池首次使用前有什么要求？"];
+const suggestedQuestions = ["清洁机器人 KIRA B 50 首次使用前应该做什么？", "四足机器人 B2 遥控器低电量时如何充电？", "四足机器人 B2 电池首次使用前有什么要求？"];
 
 function now() { return new Date().toISOString(); }
 function id(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }

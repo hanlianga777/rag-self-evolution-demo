@@ -26,7 +26,7 @@ it('links saved evidence and hypothesis to actual parameter changes without eval
  const audit={id:'AUDIT',run_id:'BASE',question_id:'Q92',result:{question:'仅评测核验问题',diagnostic_view:{analysis_category:'evaluation_issue',is_technical_bad_case:false}}};
  const candidate={id:'A',status:'generated',config:{candidate_k:40,top_k:4},reasoning:{candidate_label:'A',hypothesis:'保存的召回假设',intervention_direction:'candidate_recall',observed_evidence:['BC','AUDIT']}};
  const data={evaluation,badCases:[technical,audit],optimization:{id:'EXP',candidates:[candidate]}};const before=JSON.stringify(data);await mount(<EvolutionPage data={data}/>);await click('优化 Agent');
- const relation=document.querySelector('.strategy-relations')!;expect(relation.textContent).toContain('保存的必要事实');expect(relation.textContent).toContain('保存的召回假设');expect(relation.textContent).toContain('CandidateK');expect(relation.textContent).not.toContain('仅评测核验问题');expect(document.querySelector('.diagnosis-distribution')).toBeNull();expect(JSON.stringify(data)).toBe(before);
+ const relation=document.querySelector('.page-content')!;expect(relation.textContent).toContain('保存的必要事实');expect(relation.textContent).toContain('保存的召回假设');expect(relation.textContent).toContain('CandidateK');expect(relation.textContent).not.toContain('仅评测核验问题');expect(document.querySelector('.diagnosis-distribution')).toBeNull();expect(JSON.stringify(data)).toBe(before);
  await click('候选方案 A · 详情');expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('仅评测核验问题');
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
 });

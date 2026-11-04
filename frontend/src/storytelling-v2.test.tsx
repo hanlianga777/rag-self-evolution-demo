@@ -24,12 +24,12 @@ it('uses one finite filter per dimension, real counts and resets on returning to
  await click('门槛');await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
  expect(document.body.textContent).not.toContain('恢复全部');expect(document.body.textContent).not.toContain('每类首例');
 });
-it('groups multiple saved candidate hypotheses under one actual problem and keeps raw rationale folded',async()=>{
+it('links multiple saved candidate hypotheses to the same actual problem and keeps raw rationale folded',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const candidates=['A','B'].map((label,i)=>({id:label,status:'generated',config:{candidate_k:24+i},reasoning:{candidate_label:label,observed_evidence:[badCases[0].id],hypothesis:'假设'+label,proposal:'candidate_missing=true 原始提出理由'}}));
  const data={evaluation,badCases,optimization:{id:'EXP',candidates}};const before=JSON.stringify(data);
  await mount(<EvolutionPage data={data}/>);await click('优化 Agent');
- expect(document.querySelectorAll('.strategy-branch')).toHaveLength(2);expect(document.querySelector('.strategy-branch')?.querySelectorAll('.strategy-hypotheses section')).toHaveLength(2);expect(document.querySelector('.experiment-plan')).toBeNull();
+ expect(document.querySelectorAll('.agent-fact')).toHaveLength(2);expect(document.querySelectorAll('.agent-hypotheses > section')).toHaveLength(2);for (const hypothesis of document.querySelectorAll('.agent-hypotheses > section')) { expect(hypothesis.textContent).toContain('Q71');expect(hypothesis.textContent).not.toContain('Q72'); }expect(document.querySelector('.experiment-plan')).toBeNull();
  await click('候选方案 A · 详情');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
 });
 it('compares a pending release against current Production rather than unrelated Baseline configuration',async()=>{

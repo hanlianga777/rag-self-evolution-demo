@@ -8,20 +8,12 @@
 :is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div {display:grid;grid-template-columns:minmax(130px,1fr) 2fr 60px;gap:12px;align-items:center;}
 :is(.evaluation-page,.evolution-page) meter {width:100%;height:6px;accent-color:var(--status);}
 :is(.evaluation-page,.evolution-page) .workbench-status {display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:var(--card-support);}
-:is(.evolution-page,.workbench-drawer) .candidate-cards > .candidate-card { height:auto; min-height:0; overflow:hidden; margin-bottom:0; }
-:is(.evolution-page,.workbench-drawer) .candidate-card-header { height:84px; flex:none; gap:8px; overflow:auto; }
-:is(.evolution-page,.workbench-drawer) .candidate-card-body { display:grid; grid-template-rows:90px 150px 90px 80px 80px 190px; flex:none; overflow:visible; margin-top:0; }
 :is(.evolution-page,.workbench-drawer) .candidate-story-block { display:flex; flex-direction:column; min-height:0; min-width:0; border-top:1px solid var(--line-soft); padding:8px 0; line-height:1.5; }
 :is(.evolution-page,.workbench-drawer) .candidate-story-block > .field-label { flex:none; margin:0 0 6px; font-size:var(--card-title); font-weight:700; line-height:1.5; color:var(--ink); }
 :is(.evolution-page,.workbench-drawer) .candidate-field-content { min-height:0; overflow:auto; scrollbar-width:thin; overflow-wrap:anywhere; font-size:var(--card-body); font-weight:400; }
 :is(.evolution-page,.workbench-drawer) .candidate-story-block .candidate-field-content p { line-height:1.5; margin:0 0 4px; }
 :is(.evolution-page,.workbench-drawer) .candidate-field-content p:last-child { margin-bottom:0; }
-:is(.evolution-page,.workbench-drawer) .candidate-card-footer { display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; height:84px; flex:none; border-top:1px solid var(--line-soft); padding-top:8px; }
 :is(.evolution-page,.workbench-drawer) .candidate-card-footer .candidate-card-action { margin:0; padding:0; }
-.evolution-page .candidate-card-header { height:auto; min-height:84px; overflow:visible; }
-.evolution-page .candidate-card-body { grid-template-rows:none; }
-.evolution-page .candidate-field-content { overflow:visible; }
-.workbench-drawer .candidate-cards { grid-template-columns:1fr; }
 .evolution-page .experiment-plan {align-items:stretch;}
 .evolution-page .experiment-plan article {display:flex;flex-direction:column;min-width:0;}
 .evolution-page .experiment-plan article > button {margin-top:auto;}
@@ -163,9 +155,9 @@
 .versions-page .release-history-table th:last-child {width:16%;}
 .versions-page .release-history-table td {overflow-wrap:anywhere;}
 .versions-page .unpublished-candidates article {padding:var(--card-padding);border:1px solid var(--line);border-radius:var(--card-radius);}
-.verification-page.page-shell .page-content > :is(.assistant-page,.experiment-page) {height:auto;display:block;padding:0;max-width:none;}
-.verification-page .assistant-workspace {height:auto;min-height:420px;grid-template-rows:auto;border-radius:var(--card-radius);}
-.verification-page .chat-panel {min-height:420px;}
+.verification-page.page-shell .page-content > .experiment-page {height:auto;display:block;padding:0;max-width:none;}
+.verification-page .assistant-workspace {min-height:0;grid-template-rows:minmax(0,1fr);border-radius:var(--card-radius);}
+.verification-page .chat-panel {min-height:0;}
 .verification-page .message-list.is-empty {display:block;flex:1;}
 .verification-page .empty-chat {padding:20px;margin:0;text-align:left;max-width:none;}
 .verification-page .empty-chat > div {justify-content:flex-start;}
@@ -201,9 +193,9 @@
 .evaluation-page .page-content .judge-replay-preflight {height:auto;min-height:0;flex:none;overflow:visible;}
 .evaluation-page .judge-replay-preflight > button {align-self:flex-start;white-space:normal;}
 /* Task 009: reuse workspace surfaces and type sizes, keep diagnosis details expandable. */
-.product-table {height:auto !important;max-height:none !important;min-height:0;}
+.product-table {min-height:0;}
 .product-table table {width:100%;min-width:0 !important;table-layout:fixed;}
-.product-table :is(th,td) {position:static !important;white-space:normal !important;overflow-wrap:anywhere;vertical-align:top;}
+.product-table :is(th,td) {white-space:normal;overflow-wrap:anywhere;vertical-align:top;}
 .product-table small {display:block;}
 .product-filters {display:flex;flex-wrap:wrap;gap:8px;margin:14px 0;}
 .product-filters button {display:flex;align-items:center;gap:8px;white-space:nowrap;}
@@ -239,9 +231,6 @@
 .strategy-presentation :is(h3,h4) {margin:8px 0;}
 .strategy-presentation .product-table {border-radius:var(--card-radius);}
 .strategy-presentation .strategy-adjustments th:last-child {width:40%;}
-.evolution-page .candidate-card-body {grid-template-rows:90px 310px 150px 90px 80px 80px 190px;}
-.evolution-page .candidate-cards {grid-template-columns:1fr;}
-.evolution-page .candidate-card-header {height:auto;min-height:84px;overflow:visible;}
 @media(max-width:1100px){.product-objective-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.bad-case-overview .product-table :is(th,td){padding:10px 8px;}}
 /* Shared proportion bar: same six-pixel track on every workspace. */
 :is(.evaluation-page,.evolution-page) meter { height:6px; appearance:none; border:0; border-radius:999px; background:var(--line-soft); }
@@ -251,9 +240,7 @@
 :is(.evaluation-page,.evolution-page) meter::-webkit-meter-suboptimum-value,
 :is(.evaluation-page,.evolution-page) meter::-webkit-meter-even-less-good-value { background:var(--card-bad-ink); }
 /* 012b: use the 012a primitives; keep workspace tables in document flow. */
-:is(.evaluation-page,.evolution-page,.versions-page,.verification-page).page-shell .page-content .table-scroll { height:auto !important; min-height:0 !important; max-height:none !important; overflow:visible; }
 :is(.evaluation-page,.evolution-page,.versions-page,.verification-page) .page-content .table-scroll table { min-width:0; width:100%; table-layout:fixed; }
-:is(.evaluation-page,.evolution-page,.versions-page,.verification-page) .page-content .table-scroll :is(th,td) { position:static; white-space:normal; overflow-wrap:anywhere; }
 .evaluation-page.page-shell .baseline-metrics { gap:16px; margin:24px 0; border:0; overflow:visible; }
 .evaluation-page.page-shell .baseline-metrics > div { border:1px solid var(--line); border-radius:var(--card-radius); padding:20px; }
 .evaluation-page .baseline-conclusion { margin:0 0 24px; }
@@ -310,12 +297,48 @@
 .verification-page .monitoring-table th:first-child { width:32%; }
 .verification-page .monitoring-table th:last-child { width:32%; }
 :is(.evolution-page,.versions-page,.verification-page) :is(.agent-decision-flow li,.strategy-source,.chat-composer,.experiment-query) { background:var(--surface); border-color:var(--line); }
-.evolution-page .candidate-card-body { grid-template-rows:none; }
-.evolution-page .candidate-field-content { overflow:visible; }
-.evolution-page .candidate-card-footer { height:auto; gap:12px; }
 @media(max-width:700px) { .thinking-cards,.bad-case-details .case-answer-stack { grid-template-columns:1fr; } .product-objective-metrics,.evaluation-page .baseline-run-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 .verification-page .suggested-questions button { background:var(--surface); color:var(--status); border-color:var(--line); }
 .case-review { display:flex; flex-wrap:wrap; gap:8px; }
 .case-detail-skeleton { display:grid; gap:16px; }
 .case-detail-skeleton > span { height:96px; border-radius:var(--card-radius); background:var(--line-soft); }
+.evolution-page.page-shell .candidate-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.evolution-page.page-shell .candidate-cards > .candidate-card { height:clamp(360px,calc(100dvh - 330px),560px); min-height:0; margin:0; padding:12px; display:flex; flex-direction:column; gap:0; overflow:hidden; }
+.evolution-page.page-shell .candidate-card-header { flex:none; min-height:44px; height:44px; align-items:flex-start; gap:8px; overflow:hidden; }
+.evolution-page.page-shell .candidate-card-header h3 { font-size:16px; margin:0; }
+.evolution-page.page-shell .candidate-card-body { display:block; flex:1; min-height:0; margin:0; overflow:auto; scrollbar-width:thin; }
+.evolution-page.page-shell .candidate-card-footer { flex:none; display:flex; flex-direction:row; align-items:center; gap:8px; min-height:64px; padding-top:8px; }
+.evolution-page.page-shell .candidate-card-footer .candidate-card-action { margin:0; padding:0; }
+.evolution-page.page-shell .candidate-field-content { overflow:visible; }
+.evolution-page.page-shell .candidate-story-block { padding:8px 0; }
+.evolution-page .compact-config-diff { display:block; }
+.compact-config-diff table { table-layout:fixed; width:100%; }
+.compact-config-diff :is(th,td) { padding:6px 4px; font-size:12px; overflow-wrap:anywhere; }
+.compact-config-diff th:first-child { width:45%; }
+.evolution-page.page-shell .page-shell-header .stage-stepper li { height:100px; min-height:0; padding:10px; }
+.evolution-page .page-shell-header .stage-stepper { margin-bottom:0; }
+.experiment-budget { margin:6px 0 10px; color:var(--muted); font-size:12px; }
+.evolution-page.page-shell .page-title { flex-wrap:nowrap; }
+.evolution-page .page-title > div:first-child { min-width:0; }
+.evolution-page .page-title .primary { white-space:nowrap; }
+.agent-facts,.agent-hypotheses { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.agent-fact,.agent-hypotheses > section { border:1px solid var(--line); border-radius:var(--card-radius); background:var(--surface); padding:12px; min-width:0; }
+.agent-fact { display:flex; flex-direction:column; gap:8px; }
+.agent-fact h3,.agent-hypotheses h3 { font-size:14px; margin:0; }
+.agent-hypotheses > section { max-height:260px; overflow:auto; }
+@media(max-width:900px) { .evolution-page.page-shell .candidate-cards,.agent-facts,.agent-hypotheses { grid-template-columns:1fr; } .evolution-page.page-shell .page-title { flex-wrap:wrap; } }
+
+.verification-page.page-shell:has(.assistant-page) > .page-content { display:flex; flex-direction:column; overflow:hidden; padding-bottom:12px; scrollbar-gutter:auto; }
+.verification-page.page-shell .page-content > .assistant-page { display:grid; grid-template-rows:auto minmax(0,1fr) auto; height:100%; min-height:0; width:100%; max-width:none; padding:0; }
+.verification-page .qa-version-status { margin:4px 0 8px; font-size:12px; }
+.verification-page .assistant-workspace { height:100%; min-height:0; }
+.verification-page .chat-panel { height:100%; min-height:0; }
+.verification-page .message-list { display:flex; flex-direction:column; gap:16px; padding:16px 20px; }
+.verification-page .message-list > * { flex:none; }
+.verification-page .chat-message.user { align-self:flex-end; }
+.verification-page .message-list.is-empty { display:flex; justify-content:center; }
+.verification-page .chat-composer { margin:8px; padding:8px; }
+.verification-page .assistant-page > .story-disclosure { margin:8px 0 0; flex:none; }
+.verification-page .chat-header { padding:10px 16px; }
+.verification-page .chat-header strong { white-space:nowrap; text-overflow:ellipsis; overflow:hidden; max-width:48vw; }
