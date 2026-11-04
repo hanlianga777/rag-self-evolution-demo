@@ -2746,6 +2746,8 @@ class GovernanceStore:
             else:
                 connection.execute("UPDATE experiments SET status='generating' WHERE id=?", (experiment_id,))
             context = existing['result'] if existing else {}
+            from .paid_policy import current_binding
+            if current_binding():context['paid_run']=current_binding()
             claim = {'token': uuid.uuid4().hex, 'owner_pid': os.getpid(), 'started_at': _now()}
             connection.execute('UPDATE experiments SET result_json=? WHERE id=?', (_json({**context, 'agent_generation': claim}), experiment_id))
         return experiment_id, candidates, current_round + 1, used, claim['token']

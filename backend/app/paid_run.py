@@ -18,11 +18,12 @@ REQUEST_LIMITS = {'business_audit':16384,'qc':16384,'answerability':12288,'negat
 
 
 class PaidRun:
-    def __init__(self, path, budget_yuan=None, prices=None, identity=None, *, identity_check=None, output_limits=None):
+    def __init__(self, path, budget_yuan=None, prices=None, identity=None, *, identity_check=None, output_limits=None, request_policy=None):
         if type(budget_yuan) not in (int, float) or not math.isfinite(budget_yuan):
             budget_yuan = None
         self.path, self.budget, self.prices = Path(path), budget_yuan, prices or {}
         self.identity, self.identity_check = identity, identity_check
+        self.request_policy = request_policy
         self.output_limits = output_limits
         self.calls, self.spent, self.stopped = [], 0., None
         self.stages = []
@@ -36,9 +37,10 @@ class PaidRun:
     def save(self):
         temporary = self.path.with_suffix(self.path.suffix+'.tmp')
         data = {'identity':self.identity, 'budget_yuan':self.budget, 'price_snapshot':self.prices,
-                'spent_yuan':self.spent, 'budget_enforcement':False, 'available_yuan':None,
+                'spent_yuan':self.spent, 'budget_enforcement':bool(getattr(self,'request_policy',None)), 'available_yuan':None,
                 'cost_unknown':any(c['status'] not in {'ok','rejected'} or c['status']=='ok' and c.get('upper_estimate_yuan') is None for c in self.calls),
                 'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
+        if getattr(self,'request_policy',None):data['request_policy']=self.request_policy
         with temporary.open('w') as stream:
             json.dump(data,stream,ensure_ascii=False,indent=2); stream.flush(); os.fsync(stream.fileno())
         os.replace(temporary,self.path)
@@ -62,6 +64,7 @@ class PaidRun:
         run.identity,run.identity_check=data['identity'],identity_check
         run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],None
         run.output_limits=data['output_limits'];run.stages=[*stages,{'stage':stage,'claimed_at':datetime.now(timezone.utc).isoformat()}]
+        run.request_policy=data.get('request_policy')
         run._retire_reserved()
         run.save();return run
 
@@ -72,6 +75,7 @@ class PaidRun:
         run.identity,run.identity_check=data['identity'],identity_check
         run.calls,run.spent,run.stopped=data['calls'],data['spent_yuan'],data.get('stopped')
         run.stages=data.get('stages',[]);run.output_limits=data.get('output_limits')
+        run.request_policy=data.get('request_policy')
         run._retire_reserved()
         return run
 
@@ -81,6 +85,12 @@ class PaidRun:
                 call.update(status='unknown', upper_estimate_yuan=None, recovery_reason='previous worker ended before settlement')
 
     def begin(self, provider, model, payload):
+        if getattr(self,'request_policy',None):
+            from .paid_policy import guarded_begin
+            return guarded_begin(self,provider,model,payload)
+        return self._begin(provider,model,payload)
+
+    def _begin(self, provider, model, payload):
         if _accounting.get():
             if self.stopped: raise RuntimeError('Paid run stopped: '+self.stopped)
             request_hash = hashlib.sha256(json.dumps(payload,ensure_ascii=False).encode()).hexdigest()

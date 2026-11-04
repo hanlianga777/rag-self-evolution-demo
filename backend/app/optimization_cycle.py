@@ -44,6 +44,8 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
                  'remaining':max(0, MAX_EVALS-experiment['evaluation_budget']['used']),
                  'reserved_for_d':1, 'last_error':None}
         result = {**experiment['result'], 'optimization_cycle':state}
+        from .paid_policy import current_binding
+        if current_binding():result['paid_run']=current_binding()
         connection.execute('UPDATE experiments SET result_json=? WHERE id=?',
                            (json.dumps(result, ensure_ascii=False), experiment_id))
     from .paid_schedule import clear_run_now
@@ -54,6 +56,12 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
 
 def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
     """Continue the authorized batch, reusing saved Sandbox checkpoints."""
+    from .paid_run import current_paid_run
+    binding=store.experiment(experiment_id,light=True)['result'].get('paid_run')
+    if binding and current_paid_run() is None:
+        from .paid_policy import restore_paid_context
+        with restore_paid_context(store,binding):
+            return run_until_qualified(store,runtime,experiment_id,claimed=claimed)
     if not claimed:
         claim_cycle(store, experiment_id)
     runner, agent = EvaluationRunner(store, runtime), OptimizationAgent(store, runtime.provider)

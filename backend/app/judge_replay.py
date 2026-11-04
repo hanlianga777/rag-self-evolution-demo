@@ -68,8 +68,16 @@ def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint):
     frozen=json.loads(source['dataset_snapshot_json']);checks=[];executions={};rows={c['question_id']:c for c in cases}
     shared=[]
     if source.get('run_mode')!='real' or source.get('data_source')!='real' or source.get('status') not in {'partial','failed','completed'}:shared.append('source_not_inactive_real_execution')
-    if frozen!=snapshot:shared.append('frozen_snapshot_changed')
-    if source['config']!=config or config.get('run_target')!='baseline':shared.append('pipeline_or_generation_config_changed')
+    revision = frozen != snapshot
+    if revision:
+        from .scoring_revision import revision_changes
+        try:revision_changes(frozen,snapshot)
+        except ValueError:shared.append('frozen_snapshot_changed')
+    expected_config=dict(source['config'])
+    if revision and expected_config.get('run_target')=='sandbox_candidate':
+        expected_config.pop('candidate_id',None)
+        expected_config['run_target']='baseline'
+    if expected_config!=config or config.get('run_target')!='baseline':shared.append('pipeline_or_generation_config_changed')
     if snapshot['corpus_fingerprint']!=fingerprint or source['config'].get('knowledge_identity')!=config.get('knowledge_identity'):shared.append('corpus_or_pipeline_identity_changed')
     original=source['judge']
     try:

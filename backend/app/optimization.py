@@ -542,6 +542,11 @@ class OptimizationAgent:
         existing_id = experiment_id or (trigger or {}).get("optimization_run_id") or self.store.current_baseline_identity()["current_experiment_id"]
         existing = self.store.experiment(existing_id) if existing_id else None
         confirmed_context = (existing or {}).get("result", {})
+        from .paid_run import current_paid_run
+        if confirmed_context.get('paid_run') and current_paid_run() is None:
+            from .paid_policy import restore_paid_context
+            with restore_paid_context(self.store,confirmed_context['paid_run']):
+                return self.generate(baseline_run_id,trigger_id,experiment_id=existing_id)
         trigger = trigger or self.store.optimization_trigger(confirmed_context.get("trigger_id"))
         event = None
         if existing and existing["baseline_run_id"] == baseline_run_id and trigger and trigger["status"] == "human_confirmed" and trigger["optimization_run_id"] == existing_id:
@@ -567,6 +572,9 @@ class OptimizationAgent:
         processing_progress={'baseline_failed_question_ids':sorted(failed_questions),'verified_configuration_id':best['id'] if best else None,
             'fixed_question_ids':sorted(fixed),'remaining_question_ids':sorted(failed_questions-fixed),'status':'unfinished' if failed_questions-fixed else 'verified_complete'}
         context = self.store.experiment(experiment_id)["result"]
+        if context.get('historical_sandbox_replays'):
+            from .scoring_revision import historical_replay_candidates
+            prior_candidates = historical_replay_candidates(self.store,baseline,context['historical_sandbox_replays']) + prior_candidates
         trigger_id = trigger_id or context.get("trigger_id")
         monitoring_context = {"trigger": self.store.optimization_trigger(trigger_id), "event": event or context.get("monitoring_event"), "confirmed_baseline_id": context.get("baseline_id"), "golden_id": context.get("golden_id"), "corpus_fingerprint": context.get("corpus_fingerprint")} if trigger_id else None
         monitoring_target_event_ids = [event["id"]] if event else []

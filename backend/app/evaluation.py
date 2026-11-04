@@ -600,6 +600,9 @@ class EvaluationRunner:
         from .providers import judge_thinking as freeze_judge, thinking_config
         with freeze_judge(source['judge'].get('judge_thinking',{}).get('reasoning_effort')):
             snapshot,items,config,judge=self.baseline_inputs(source_id)
+        if snapshot.get('scoring_revision') and config.get('run_target')=='sandbox_candidate':
+            config={k:v for k,v in config.items() if k!='candidate_id'}
+            config['run_target']='baseline'
         with freeze_judge(judge_thinking):
             judge['judge_thinking']=thinking_config('judge')
         judge['evaluation_identity']=evaluation_identity(snapshot,judge)
@@ -618,9 +621,11 @@ class EvaluationRunner:
             plan=self.judge_replay_preflight(source_id,include_executions=True,judge_thinking=judge_thinking)
             if not plan['can_replay']:raise ValueError('Replay eligibility blocked: '+json.dumps({k:v for k,v in plan.items() if k not in {'executions','new_judge'}},ensure_ascii=False))
             source=self.store.evaluation_run(source_id)
-            snapshot=json.loads(source['dataset_snapshot_json'])
+            snapshot=self.store.dataset_snapshots()[0]['snapshot']
             items=self.snapshot_items(snapshot)
             config=dict(source['config']);judge=plan['new_judge']
+            if snapshot.get('scoring_revision') and config.get('run_target')=='sandbox_candidate':
+                config.pop('candidate_id',None);config['run_target']='baseline'
             run_id=self.store.create_baseline_run(snapshot,config,judge,automatic=automatic,judge_replay=plan)
         return run_id,items,config
 
