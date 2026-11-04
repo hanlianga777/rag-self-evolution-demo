@@ -11,6 +11,33 @@ from app.telemetry import record_usage
 
 
 class TrialChecks(unittest.TestCase):
+    def test_interrupted_requests_keep_bounded_cost_without_repeating(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            (out / 'jobs').mkdir()
+            saved = {'calls': [{'provider': 'DeepSeek', 'model': 'deepseek-flash',
+                                'status': 'unknown', 'reservation_usd': .06}]}
+            (out / 'jobs/interrupted.ledger.json').write_text(json.dumps(saved))
+            with patch.object(trials, 'OUT', out):
+                cost = trials.money()
+                self.assertEqual(cost['unknown'], 1)
+                self.assertEqual(cost['unbounded_unknown'], 0)
+                self.assertEqual(cost['known_usd'], 0)
+                self.assertEqual(cost['usd'], .06)
+                self.assertIsNone(trials.job('interrupted', 'judge', lambda: self.fail('duplicate request')))
+                with patch('app.paid_schedule.schedule_status', return_value={'off_peak_only': True, 'peak_now': False}):
+                    def independent():
+                        with paid_request('DeepSeek', 'deepseek-flash', {'max_tokens': 65536}):
+                            record_usage({'provider': 'DeepSeek', 'requested_model': 'deepseek-flash',
+                                          'status': 'ok', 'prompt_tokens': 100, 'completion_tokens': 100,
+                                          'prompt_cache_hit_tokens': 0, 'prompt_cache_miss_tokens': 100,
+                                          'call_started_at': '2026-11-04T04:30:00+00:00'})
+                        return 'completed'
+                    self.assertEqual(trials.job('independent', 'judge', independent), 'completed')
+                saved['calls'][0].pop('reservation_usd')
+                (out / 'jobs/interrupted.ledger.json').write_text(json.dumps(saved))
+                self.assertEqual(trials.money()['unbounded_unknown'], 1)
+
     def test_parallel_reservations_reuse_budget_and_unknown(self):
         with tempfile.TemporaryDirectory() as temporary:
             out = Path(temporary)

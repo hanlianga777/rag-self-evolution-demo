@@ -6,6 +6,7 @@ import csv
 import fcntl
 import hashlib
 import json
+import math
 import os
 import sqlite3
 import sys
@@ -228,7 +229,7 @@ def draft(sources):
 
 def _money_unlocked():
     from app.telemetry import cost_report
-    total, unknown, count, auxiliary = 0., 0, 0, 0
+    total, known, unknown, unbounded, count, auxiliary = 0., 0., 0, 0, 0, 0
     for path in (OUT / 'jobs').glob('*.ledger.json'):
         for call in json.loads(path.read_text())['calls']:
             if call['provider'] != 'DeepSeek':
@@ -238,10 +239,16 @@ def _money_unlocked():
             report = cost_report(call['model'], [call.get('usage', {})])
             if report['amount'] is not None:
                 total += report['amount']
+                known += report['amount']
             else:
                 unknown += call['status'] != 'reserved'
-                total += call.get('reservation_usd', 0.)
-    return {'usd': round(total, 8), 'unknown': unknown, 'deepseek_calls': count, 'alibaba_calls': auxiliary}
+                bound = call.get('reservation_usd')
+                if type(bound) in (int, float) and math.isfinite(bound) and bound >= 0:
+                    total += bound
+                else:
+                    unbounded += 1
+    return {'usd': round(total, 8), 'known_usd': round(known, 8), 'unknown': unknown,
+            'unbounded_unknown': unbounded, 'deepseek_calls': count, 'alibaba_calls': auxiliary}
 
 
 def money():
@@ -286,7 +293,7 @@ def job(name, phase, action, *, repair_invalid=False):
             with BUDGET_LOCK:
                 if provider == 'DeepSeek':
                     cost = money()
-                    if cost['unknown']:
+                    if cost.get('unbounded_unknown', cost['unknown']):
                         raise RuntimeError('前序调用费用未知，停止进一步DeepSeek请求')
                     rates = price_config()['periods']['off_peak']
                     reserve = ((len(json.dumps(payload).encode()) + 1024) * rates['input_per_million']
@@ -338,9 +345,13 @@ def run(part):
     from app.providers import DeepSeekProvider, judge_thinking
     from app.evaluation import EvaluationRunner
     from app.judge_replay import saved_case_execution
-    if any(c['status'] == 'reserved' for p in (OUT / 'jobs').glob('*.ledger.json')
-           for c in json.loads(p.read_text())['calls']):
-        raise RuntimeError('前次Worker遗留未结算请求，不能自动重复调用')
+    # The exclusive worker lock proves these reservations belong to a dead worker.
+    # Preserve their upper bounds; job() skips them and never repeats the request.
+    from app.paid_run import PaidRun
+    for path in (OUT / 'jobs').glob('*.ledger.json'):
+        if any(c['status'] == 'reserved' for c in json.loads(path.read_text())['calls']):
+            ledger = PaidRun.load_accounting(path, None)
+            ledger.save()
     sources = inputs()
     questions, changed = draft(sources)
     before = OUT / 'protected-before.json'

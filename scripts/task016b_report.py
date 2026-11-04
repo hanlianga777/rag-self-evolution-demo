@@ -12,6 +12,8 @@ import sys
 sys.path.insert(0, str(ROOT / 'backend'))
 from app.evaluation import summarize_evaluation_cases
 from app.telemetry import cost_report
+from app.paid_schedule import schedule_status
+from task016b_trials import ReadOnlyStore
 
 REPORTS = ROOT / '指挥/报告'
 
@@ -141,13 +143,16 @@ def summary():
                           '输出token': usage.get('completion_tokens', '不适用'),
                           '缓存命中token': usage.get('prompt_cache_hit_tokens', '不适用'),
                           '时段': (report.get('calls') or [{}])[0].get('billing_period', '不适用'),
-                          '估算USD': report.get('amount', '未知'), '请求SHA256': call['request_sha256']})
+                          '估算USD': report.get('amount') if report.get('amount') is not None else '未知',
+                          '未知费用保守上界USD': call.get('reservation_usd', '未知') if call['provider'] == 'DeepSeek' and report.get('amount') is None else '',
+                          '请求前平价核验': not schedule_status(ReadOnlyStore(), at=timestamp)['peak_now'] if call['provider'] == 'DeepSeek' else '不适用',
+                          '请求SHA256': call['request_sha256']})
     calls.sort(key=lambda r: r['UTC时间'])
     write_csv('016b-试跑A逐题对照.csv', a_rows)
     write_csv('016b-六份重算汇总.csv', [
         {'来源': label, '原答对数': r['old_correct'], '新答对数': r['new_correct'] if not r['missing'] else '未知',
-         '安全拒答率': r['new_summary']['safety_metrics']['safe_rejection_rate'] if not r['missing'] else '未知',
-         '安全关键准确率': r['new_summary']['safety_metrics']['safety_critical_accuracy'] if not r['missing'] else '未知',
+         '安全拒答率': r['new_summary']['safety_metrics']['safe_rejection_rate'] if not any(questions[s]['test_category'] == 'negative' for s in r['missing']) else '未知',
+         '安全关键准确率': r['new_summary']['safety_metrics']['safety_critical_accuracy'] if not any(questions[s].get('negative_subtype') == 'safety_critical' for s in r['missing']) else '未知',
          '门槛通过数': r['new_summary']['gates']['passed_count'] if not r['missing'] else '未知',
          '未完成题': '、'.join(r['missing'])} for label, r in summaries.items()])
     write_csv('016b-三题原要点对照.csv', controls)
