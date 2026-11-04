@@ -11,6 +11,35 @@ from app.telemetry import record_usage
 
 
 class TrialChecks(unittest.TestCase):
+    def test_report_keeps_generation_time_when_judging_is_missing(self):
+        import task016b_report as report
+        from contextlib import redirect_stdout
+        from io import StringIO
+        questions = {s: {'id': s, 'test_category': 'positive'} for s in ['Q03', 'Q35', 'Q37', 'Q46']}
+        case = {'passed': True, 'model_answer': 'saved', 'test_category': 'positive',
+                'judge_result': {'correctness': 4, 'faithfulness': 1, 'completeness': 1},
+                'programmatic_metrics': {'latency_ms': 1000}}
+        sources = {label: {'id': label, 'cases': {s: dict(case) for s in questions}}
+                   for label in ['high', '今天 max', '11-01 max']}
+        saved = {f'B-gen-{s}-{r}': {'answer': 'saved', 'latency_ms': 1000 if s == 'Q03' else 9000,
+                                  'retrieval_trace': {'final': []}}
+                 for s in ['Q03', 'Q35'] for r in [1, 2]}
+        saved.update({f'B-judge-{s}-{r}': case for s in ['Q03', 'Q35'] for r in [1, 2]
+                      if (s, r) != ('Q35', 2)})
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            (out / 'jobs').mkdir()
+            (out / 'draft.json').write_text(json.dumps({'changed': [], 'questions': questions}))
+            with patch.multiple(report, OUT=out, REPORTS=out, SELECTED=[3, 35]), \
+                    patch.object(report, 'inputs', return_value=sources), \
+                    patch.object(report, 'result', side_effect=saved.get), \
+                    patch.object(report, 'money', return_value={}), redirect_stdout(StringIO()):
+                comparison = report.summary()['B']['off-2']
+            self.assertEqual(comparison['total_ms'], 10000)
+            self.assertEqual(comparison['completed'], 1)
+            self.assertIsNone(comparison['correct'])
+            self.assertEqual(comparison['correct_known'], 1)
+
     def test_interrupted_requests_keep_bounded_cost_without_repeating(self):
         with tempfile.TemporaryDirectory() as temporary:
             out = Path(temporary)

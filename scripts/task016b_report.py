@@ -123,8 +123,12 @@ def summary():
                               'median_ms': median(times), 'mean_ms': round(mean(times), 2), 'total_ms': sum(times)}
     for repeat in [1, 2]:
         chosen = b_cases[repeat]
-        times = [c['programmatic_metrics']['latency_ms'] for c in chosen]
-        comparisons[f'off-{repeat}'] = {'completed': len(chosen), 'correct': sum(c['passed'] for c in chosen),
+        executions = [result(f'B-gen-Q{n:02d}-{repeat}') for n in SELECTED]
+        times = [e['latency_ms'] for e in executions if e is not None]
+        correct = sum(c['passed'] for c in chosen)
+        comparisons[f'off-{repeat}'] = {'completed': len(chosen), 'generated': len(times),
+                                        'correct': correct if len(chosen) == len(SELECTED) else None,
+                                        'correct_known': correct,
                                         'median_ms': median(times) if times else None,
                                         'mean_ms': round(mean(times), 2) if times else None, 'total_ms': sum(times)}
     calls = []
