@@ -43,7 +43,7 @@ class V11ClosureTests(unittest.TestCase):
         for label in "ABC":
             self.store.save_candidate(experiment_id, label, DEFAULT_PIPELINE_CONFIG, {"round": 1, "candidate_label": label})
             self.store.finish_candidate(f"{experiment_id}-{label}", "evaluated", {
-                **comparison_identity(self.store,baseline), "qualification": {"qualified": label == "A"}, "evaluation_run_id": run_id,
+                **comparison_identity(self.store,baseline), "qualification": {"qualified": label == "A"}, "release_qualification": {"qualified": label == "A"}, "evaluation_run_id": run_id,
                 "gates": {"passed": label == "A", "passed_count": 11 if label == "A" else 0},
                 "regression": {"passed": label == "A"},
             })

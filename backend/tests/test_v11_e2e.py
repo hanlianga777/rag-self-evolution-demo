@@ -34,14 +34,17 @@ class FixtureProvider:
     def complete(self, system, prompt, **_kwargs):
         if "Golden Dataset 质量审核助手" in system:
             return json.dumps({"score": 95, "priority": "P2", "issues": [], "reason": "固定证据支持", "ablation_valid": True, "ablation_reason": "符合属性"}, ensure_ascii=False)
-        if "RAG Optimization Agent" in system:
+        if "RAG优化Agent" in system:
             payload = json.loads(prompt)
             cause = "Retrieval" if any(item["result"].get("primary_root_cause")=="Retrieval" for item in payload["bad_cases"]) else "Generation"
-            targets = [item["id"] for item in payload["bad_cases"] if item["result"].get("primary_root_cause")==cause] or payload["monitoring_target_event_ids"]
+            targets = [item["id"] for item in payload["bad_cases"]]
             value = {"root_cause_cluster": "检索覆盖不足", "observed_evidence": targets, "candidates": [{"id": "A", "config_diff": {"top_k": 6}, "hypothesis": "扩大上下文", "why": "提高 TopK", "target_bad_cases": targets, "risk": "延迟"}, {"id": "B", "config_diff": {"min_score": 0.2}, "hypothesis": "过滤噪声", "why": "提高阈值", "target_bad_cases": targets, "risk": "召回"}, {"id": "C", "config_diff": {"min_score": 0.1}, "hypothesis": "平衡阈值", "why": "小幅提高阈值", "target_bad_cases": targets, "risk": "漏召回"}] }
             cause = "Retrieval" if any(item["result"].get("primary_root_cause")=="Retrieval" for item in payload["bad_cases"]) else "Generation"
             for candidate in value["candidates"]:
                 candidate.update(intervention_direction="context_selection",evidence_assertions=[{"target_id":target,"observation":"ranking_omission"} for target in targets],parameter_dependencies=[],target_group="Fixture可信问题", root_cause=cause, root_cause_evidence=targets, expected_improvement="Fixture目标改善")
+            for candidate, direction in zip(value['candidates'], ('排序与过滤', '检索召回增强', '效率（降档 + 检索补偿）')):
+                candidate['direction'] = direction
+            value['candidates'][2]['config_diff'] = {'generation_thinking':'off', 'candidate_k':24}
             return json.dumps(value, ensure_ascii=False)
         if "唯一Optimization Agent" in system:
             payload = json.loads(prompt)

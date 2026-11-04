@@ -197,7 +197,7 @@ class FinalCorpusWriteTests(unittest.TestCase):
             experiment = store.create_experiment(baseline, 'direct_release')
             store.save_candidate(experiment, 'A', DEFAULT_PIPELINE_CONFIG, {'candidate_label': 'A'})
             evaluation = completed_baseline(store, target='sandbox_candidate')
-            store.finish_candidate(experiment + '-A', 'evaluated', {**comparison_identity(store, baseline), 'qualification': {'qualified': True}, 'gates': {'passed': True}, 'regression': {'passed': True}, 'evaluation_run_id': evaluation})
+            store.finish_candidate(experiment + '-A', 'evaluated', {**comparison_identity(store, baseline), 'qualification': {'qualified': True}, 'release_qualification': {'qualified': True}, 'gates': {'passed': True}, 'regression': {'passed': True}, 'evaluation_run_id': evaluation})
             # Only this lock-interleaving fixture bypasses unrelated release proof;
             # API lifecycle and RL-05 still exercise real release guards.
             self.addCleanup(patch.stopall)

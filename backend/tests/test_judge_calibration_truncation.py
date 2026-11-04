@@ -1,5 +1,5 @@
 """Offline regressions from a known-usage, length-exhausted real response."""
-import io,json,subprocess,sys,unittest,os,tempfile
+import hashlib,io,json,subprocess,sys,unittest,os,tempfile
 from pathlib import Path
 from unittest.mock import patch
 from app.config import Settings
@@ -8,14 +8,31 @@ from app.providers import DeepSeekProvider,ProviderInvalidResponse,provider_erro
 ROOT=Path(__file__).resolve().parents[2]
 
 class CalibrationCapTests(unittest.TestCase):
-    def test_dry_run_uses_current_formal_judge_limit(self):
-        result=subprocess.run([sys.executable,str(ROOT/'scripts/calibrate_judge_contract_20261029.py'),'--samples',str(ROOT/'docs/judge_vnext_20261029/provider_q13_authorized_minimal_manifest.json')],capture_output=True,text=True,cwd=ROOT,check=True,env={**os.environ,'DEEPSEEK_API_KEY':'fixture','DEEPSEEK_BASE_URL':'https://api.deepseek.com','DEEPSEEK_MODEL':'deepseek-flash'})
+    def setUp(self):
+        directory=tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root=Path(directory.name)
+        quote='维护前必须切断电源。'
+        source=root/'source.txt';source.write_text(quote)
+        requirements={field:[] for field in ('conditional_checks','auxiliary_information','prohibited','acceptable_equivalents')}
+        requirements.update(required_checks=[{'id':'R1','requirement':quote,'source_chunk_ids':['C1']}],sources=[{'chunk_id':'C1','quote':quote}])
+        item={'id':'Q01','test_category':'positive','question':'维护前如何处理电源？','reference_answer':quote,'business_requirements':requirements}
+        self.manifest={'source_files':[{'path':str(source),'sha256':hashlib.sha256(source.read_bytes()).hexdigest()}],
+            'cases':[{'id':case_id,'fixture_label':'approved_direction_synthetic_answer','golden_item':item,'answer':quote,
+                'context':{'final_context':[{'chunk_id':'C1','text':quote}]},'expected_verdict':'PASS'} for case_id in ('sample-1','sample-2')]}
+        self.samples=root/'samples.json';self.samples.write_text(json.dumps(self.manifest,ensure_ascii=False))
+
+    def test_max_calibration_dry_run_uses_current_formal_judge_limit(self):
+        result=subprocess.run([sys.executable,str(ROOT/'scripts/calibrate_judge_contract_20261029.py'),'--samples',str(self.samples)],capture_output=True,text=True,cwd=ROOT,env={**os.environ,'DEEPSEEK_API_KEY':'fixture','DEEPSEEK_BASE_URL':'https://api.deepseek.com','DEEPSEEK_MODEL':'deepseek-flash','JUDGE_THINKING':'max'})
+        self.assertEqual(result.returncode,0,result.stderr)
         report=json.loads(result.stdout)
+        self.assertEqual(len(report['requests']),2)
+        self.assertTrue(all(r['request']['reasoning_effort']=='max' for r in report['requests']))
         self.assertTrue(all(r['request']['max_tokens']==65536 for r in report['requests']))
         self.assertEqual(report['network_calls'],0)
 
     def test_duplicate_sample_id_is_rejected_without_sending(self):
-        manifest=json.loads((ROOT/'docs/judge_vnext_20261029/provider_q13_authorized_minimal_manifest.json').read_text())
+        manifest=self.manifest
         manifest['cases'][1]['id']=manifest['cases'][0]['id']
         with tempfile.TemporaryDirectory() as root:
             source=Path(root)/'duplicate.json';source.write_text(json.dumps(manifest))

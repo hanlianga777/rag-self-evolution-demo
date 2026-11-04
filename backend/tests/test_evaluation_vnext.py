@@ -101,7 +101,7 @@ class ProviderBinaryTests(BinaryContractTests):
         self.assertNotIn('七类Claim强制',call.call_args.args[0]);self.assertEqual(call.call_args.kwargs['temperature'],0)
 
 class BoundedRecoveryTests(unittest.TestCase):
-    def test_network_failure_is_not_repeated_and_keeps_generation(self):
+    def test_network_failure_has_bounded_retries_and_keeps_generation(self):
         import test_baseline_resume as fixture
         from app.evaluation import EvaluationRunner
         from app.providers import ProviderTimeout
@@ -111,11 +111,13 @@ class BoundedRecoveryTests(unittest.TestCase):
             runtime=fixture.Runtime(fail=None);runner=EvaluationRunner(holder.store,runtime)
             def judge(*a,**kw):
                 runtime.judges.append(a[0])
-                if len(runtime.judges)>6:raise AssertionError('unbounded retry detected by test sentinel')
+                if len(runtime.judges)>24:raise AssertionError('unbounded retry detected by test sentinel')
                 raise ProviderTimeout('offline timeout')
             runtime.judge=judge;key,items,config=runner.start_baseline(automatic=True)
             with patch('app.evaluation.time.sleep'):r=runner.execute_baseline(key,items,config)
-            self.assertEqual(len(runtime.judges),2);self.assertEqual(runtime.answers,['Q1','Q2']);self.assertEqual(r['status'],'partial');self.assertEqual(holder.store.evaluation_case_results(key),[])
+            self.assertEqual(runtime.judges,['Q1']*3+['Q2']*3+['Q3']*3+['Q4']*3+['Q1']*3+['Q2']*3+['Q3']*3+['Q4']*3)
+            self.assertEqual(runtime.answers,['Q1','Q2','Q3','Q4']);self.assertEqual(r['status'],'completed');self.assertEqual(holder.store.evaluation_case_results(key),[])
+            self.assertEqual(r['result']['technical_failed'],4);self.assertFalse(r['result']['evaluation_complete'])
             self.assertIn('execution',r['result']['checkpoints']['Q1'])
         finally:holder.tearDown()
 
@@ -174,7 +176,7 @@ class AgentAndRiskTests(VNextStageTests):
         self.assertEqual(r['continued_failure_new_critical_question_ids'],[])
         new[0]['critical']=True;old[0]['critical']=False
         self.assertEqual(contract.compare_cases({'same':c(old)},{'same':c(new)},[])['continued_failure_new_critical_question_ids'],['same'])
-    def test_stage_elapsed_budget_and_unknown_usage_stop_without_bad_cases(self):
+    def test_stage_elapsed_budget_and_unknown_usage_follow_batch_recovery(self):
         import test_baseline_resume as fixture
         from app.evaluation import EvaluationRunner
         from app.providers import ProviderTimeout
@@ -189,14 +191,18 @@ class AgentAndRiskTests(VNextStageTests):
                         runtime.judges.append(a[0]);record_usage({'provider':'DeepSeek','status':'unknown','request_sha256':'fixture'})
                         raise ProviderTimeout('unknown paid execution')
                     runtime.judge=judge
-                    result=runner.execute_baseline(key,items,config)
-                    self.assertEqual(len(runtime.judges),1)
+                    with patch('app.evaluation.time.sleep'):result=runner.execute_baseline(key,items,config)
+                    self.assertEqual(len(runtime.judges),24)
+                    self.assertEqual(result['result']['technical_failed'],4)
+                    self.assertEqual(holder.store.evaluation_case_results(key),[])
                 else:
                     from time import time
                     progress=holder.store.evaluation_run(key)['result'];progress['checkpoints']={'Q1':{'attempts':[],'phase_windows':{'generation':{'run_id':key,'started_at':time()-601}}}}
                     holder.store.update_evaluation_progress(key,progress);result=runner.execute_baseline(key,items,config)
-                    self.assertEqual(runtime.answers,[])
-                self.assertIn(result['status'],['failed','partial']);self.assertEqual(holder.store.evaluation_case_results(key),[])
+                    self.assertEqual(runtime.answers,['Q2','Q3','Q4','Q1'])
+                    self.assertTrue(result['result']['evaluation_complete'])
+                    self.assertEqual(len(holder.store.evaluation_case_results(key)),4)
+                self.assertEqual(result['status'],'completed')
                 self.assertFalse(holder.store.bad_case_rows())
             finally:holder.tearDown()
 
@@ -211,7 +217,7 @@ class PerformanceAndWriteBoundaryTests(VNextStageTests):
         from app.diagnostics import automatic_analysis
         c,chunks=self.case('missing');c['judge_result']['checks'][0]['scope_resolved']=False
         c['programmatic_metrics'].update(latency_ms=61000,stages=[{'stage_name':'generation','duration_ms':60500,'parent':None}])
-        self.assertEqual(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['diagnosis_category'],'检索失败')
+        self.assertEqual(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['diagnosis_category'],'检索层问题')
         c['evaluation_outcome']['execution_complete']=False
         self.assertFalse(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['target_eligible'])
 
@@ -245,7 +251,7 @@ class DiagnosticEvidenceBoundaryTests(VNextStageTests):
     def test_judge_candidate_quote_does_not_override_saved_candidate_text(self):
         from app.diagnostics import automatic_analysis
         c,chunks=self.case('candidate');c['judge_result']['checks'][0]['candidate_support']=[{'source_id':'safe','quote':'并不存在的原文'}]
-        self.assertEqual(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['diagnosis_category'],'检索噪声')
+        self.assertEqual(automatic_analysis(c,corpus_chunks=chunks,corpus_fingerprint='fixture-corpus')['diagnosis_category'],'检索层问题')
     def test_business_failure_cannot_show_a_passed_redline(self):
         from app.evaluation import EvaluationRunner
         c,chunks=self.case('final');v={**c['judge_result'],'quality':{'correctness':2,'faithfulness':.5,'completeness':.5}}
@@ -286,8 +292,8 @@ class SandboxCriticalityTests(unittest.TestCase):
         store=MagicMock();store.evaluation_case_results.side_effect=[baseline,candidate]
         store.finish_candidate.side_effect=lambda _,status,result:{'status':status,'result':result}
         runner=EvaluationRunner(store,None)
-        runner.execute_baseline=MagicMock(return_value={'status':'completed','result':{'gates':{'passed':True},'bad_case_count':1},'judge':{'evaluation_identity':'fixture'}})
-        result=runner.execute_candidate('new',[],{}, {'id':'candidate','experiment_id':'exp','reasoning':{'observed_evidence':['a']}},{'id':'baseline'})['result']
+        runner.execute_baseline=MagicMock(return_value={'status':'completed','result':{'gates':{'passed':True},'bad_case_count':1,'evaluation_complete':True},'judge':{'evaluation_identity':'fixture'}})
+        result=runner.execute_candidate('new',[],{}, {'id':'candidate','experiment_id':'exp','reasoning':{'observed_evidence':['a']}},{'id':'baseline','judge':{'evaluation_identity':'fixture'}})['result']
         self.assertEqual(result['regression']['new_critical_failures'],0)
         self.assertEqual(result['regression']['new_ordinary_failures'],1)
         self.assertTrue(result['qualification']['qualified'])

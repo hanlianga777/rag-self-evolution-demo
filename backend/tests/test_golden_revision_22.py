@@ -21,15 +21,47 @@ class RevisionTests(unittest.TestCase):
         self.assertEqual(normalize('2*3=-6'), '2*3=-6')
         self.assertNotEqual(normalize('**未闭合'), normalize('未闭合'))
 
-    def test_saved_q06_q39_claim_locations(self):
-        path = ROOT / 'output/playwright/golden50-quality-audit/rows.json'
-        if not path.exists(): self.skipTest('私有真实响应未入Git；不是Provider验证')
-        rows = json.loads(path.read_text())
-        for n in (6, 39):
-            case = rows[n-1]['case']
-            result = assess_claims(case['model_answer'], case['judge_result'], case['programmatic_metrics']['retrieval_trace']['final'])
-            self.assertTrue(result['accepted'], f'Q{n:02d}')
-            self.assertFalse(result['pending'], f'Q{n:02d}')
+    def test_synthetic_saved_claim_locations(self):
+        for index,claim in enumerate(('维护前关闭设备电源','操作结束后断开电池')):
+            entry={'chunk_id':f'C{index}','content':claim+'。'}
+            review={'unsupported_claim_index':0,'claim':claim,'kind':'supported_fact',
+                    'changes_operation':False,'operation_basis':{'effect':'none','source_applicable':True},
+                    'reason':'explicit offline source fixture','support':[{'chunk_id':entry['chunk_id'],'quote':claim}]}
+            judgment={'unsupported_claims':[claim],'claim_reviews':[review]}
+            result=assess_claims(claim,judgment,[entry])
+            self.assertTrue(result['accepted']);self.assertFalse(result['pending'])
+            self.assertTrue(assess_claims(claim,judgment,[])['pending'])
+
+    @staticmethod
+    def synthetic_revision():
+        from app.golden_v2 import digest
+        chunks=[{'chunk_id':'C1','document_id':'D','chunk_text':'维护前关闭设备电源。'},
+                {'chunk_id':'DOC-001-C-00134','document_id':'D','chunk_text':'4. 点击用户名的输入栏'}]
+        config=json.loads(CONFIG.read_text())
+        config['source_snapshot_id']='fixture-revision-22'
+        for revision in config['revisions']:
+            revision['changes']={'question':'离线修订场景'+revision['question_number']+'如何操作？'}
+        questions=[];slots=[]
+        for index,group in enumerate(['positive']*20+['ablation']*10+['negative']*20,1):
+            slot=f'Q{index:02d}';negative=group=='negative'
+            key='DOC-001-C-00134' if slot=='Q02' else 'C1'
+            answer='5. 利用屏幕上的键盘输入用户名，点击回车键完成\n6. 按下“密码”按钮' if slot=='Q02' else '维护前关闭设备电源。'
+            questions.append({'id':f'fixture-{slot}','coverage_slot':slot,'question':f'离线原始场景{slot}如何操作？',
+                'test_category':group,'construction_type':'Ordinary','difficulty':'medium',
+                'reference_answer':None if negative else answer,
+                'evidence':[] if negative else [{'source_chunk_ids':[key],'evidence_key_points':[answer]}],
+                'ablation_attribute':'colloquial' if group=='ablation' else None,
+                'negative_subtype':'safe_rejection' if negative else None,
+                'expected_behavior':'safe_rejection' if negative else None,
+                'generation_strategy':'business_v2','coverage_anchor_chunk_ids':[key],
+                'topic_cluster':'T1','related_clusters':['T1']})
+            slots.append({'slot_id':slot,'evaluation_group':group,'construction_type':'Ordinary',
+                          'topic_cluster':'T1','requirements':{},'coverage_anchor_chunk_ids':[key]})
+        plan={'plan_id':'fixture-plan','corpus_fingerprint':'fixture-corpus',
+              'chunk_fingerprint':digest(sorted(chunks,key=lambda c:c['chunk_id'])),
+              'chunk_clusters':{c['chunk_id']:'T1' for c in chunks},'slots':slots}
+        snapshot={'id':config['source_snapshot_id'],'questions':questions,'coverage_plan':plan}
+        return snapshot,chunks,config
 
     def test_technical_instructions_still_fail(self):
         response = {'unsupported_claims':['测量电压后换件'], 'claim_reviews':[{
@@ -41,16 +73,8 @@ class RevisionTests(unittest.TestCase):
         self.assertTrue(assess_claims('请**测量电压后换件**', response, [])['pending'])
 
     def test_draft_and_append_preserve_frozen_records_and_block_paid_quality(self):
-        source = ROOT / 'output/playwright/golden50-quality-audit/source.json'
-        if not source.exists(): self.skipTest('本地冻结Snapshot审计材料未入Git')
-        snapshot = json.loads(source.read_text())['snapshot']
-        # Historical omission regression must use its preserved source Corpus.
-        source_id=snapshot['corpus_fingerprint']['corpus_snapshot_id']
-        bundles=[p.parent for p in (ROOT/'backend/data/index_versions').glob('*/manifest.json')
-                 if json.loads(p.read_text()).get('knowledge_identity',{}).get('corpus_snapshot_id')==source_id]
-        if not bundles:self.skipTest('Preserved historical Corpus unavailable')
-        chunks = json.loads((bundles[0]/'chunks.json').read_text())
-        config = json.loads(CONFIG.read_text())
+        # Synthetic shape and omission fixture; no private Snapshot/Corpus is copied.
+        snapshot,chunks,config=self.synthetic_revision()
         draft = prepare(snapshot, chunks, config)
         self.assertEqual(set(draft['hard_validation']['blocked_questions']), {'Q02'})
         revised = {r['question_number'] for r in config['revisions']}
@@ -61,7 +85,7 @@ class RevisionTests(unittest.TestCase):
         # Isolated text correction proves the exact omission; this is not a usable index.
         preview = copy.deepcopy(chunks)
         child = next(c for c in preview if c['chunk_id']=='DOC-001-C-00134')
-        for field in ('text','chunk_text'):
+        for field in ('chunk_text',):
             child[field] = child[field].replace('4. 点击用户名的输入栏', '4. 点击用户名的输入栏\n5. 利用屏幕上的键盘输入用户名，点击回车键完成\n6. 按下“密码”按钮')
         from app.golden_v2 import validate_golden_candidate
         q02 = next(q for q in draft['questions'] if q['coverage_slot']=='Q02')

@@ -14,7 +14,6 @@ from app.evaluation import EvaluationRunner
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
 from app.retrieval import VectorRetriever
-import test_agent_exploration as exploration
 import test_optimization_contract as contracts
 from offline_contract_fixture import bind_snapshot, atomic_judgment
 
@@ -77,10 +76,12 @@ class Sandbox50Tests(unittest.TestCase):
         from app.diagnostics import diagnostic_view
         case=next(r['result'] for r in self.store.bad_case_rows() if r['run_id']==self.baseline['id'] and r['question_id']=='case-0')
         plan=diagnostic_view(case)['experiment_plan']
-        self.assertEqual(plan['status'],'exploratory',plan)
-        p=exploration.proposal({'question_id':'case-0'},'context_selection','context_pool_gap',{'top_k':6})
-        p.update(id='A',target_group='fixture50',root_cause_evidence=['case-0'])
-        experiment = OptimizationAgent(self.store,contracts.FixedProvider(json.dumps({'candidates':[p],'insufficient_evidence':'single fixture experiment'}))).generate(self.baseline['id'])
+        self.assertEqual(plan['status'],'ready',plan)
+        response=contracts.drafts()
+        for row in response['candidates']:
+            row.update(target_bad_cases=['case-0'],root_cause_evidence=['case-0'])
+            row['evidence_assertions'][0]['target_id']='case-0'
+        experiment = OptimizationAgent(self.store,contracts.FixedProvider(json.dumps(response))).generate(self.baseline['id'])
         # Current preflight requires the remaining diagnostic tasks to be planned too.
         from app.agent_coverage import coverage_inputs, complete_coverage
         report = coverage_inputs(self.store, experiment['id'])[-1]
@@ -92,7 +93,7 @@ class Sandbox50Tests(unittest.TestCase):
         before=deepcopy(self.store.evaluation_run(self.baseline['id']))
         exp=self.generate();candidate=exp['candidates'][0]
         self.assertEqual(len(exp['result']['diagnostic_tasks']),10)
-        self.assertEqual(candidate['reasoning']['experiment_kind'],'exploratory')
+        self.assertEqual(candidate['reasoning']['experiment_kind'],'confirmed')
         result=self.runner.run_candidate(candidate['id'],automatic=False)
         self.assertEqual(result['status'],'evaluated',result['result'].get('error'))
         run=self.store.evaluation_run(result['result']['evaluation_run_id'])
@@ -115,6 +116,6 @@ class Sandbox50Tests(unittest.TestCase):
 
     def test_tampered_exploration_is_rejected_before_sandbox_budget_or_calls(self):
         exp=self.generate();candidate=exp['candidates'][0]
-        with self.store.connection() as db:db.execute('UPDATE candidate_configs SET config_json=? WHERE id=?',(json.dumps({**candidate['config'],'prompt_strategy':'Abstention'}),candidate['id']))
+        with self.store.connection() as db:db.execute('UPDATE candidate_configs SET config_json=? WHERE id=?',(json.dumps({**candidate['config'],'candidate_k':True}),candidate['id']))
         with self.assertRaises(ValueError):self.runner.start_candidate(candidate['id'])
         self.assertEqual(self.store.experiment(exp['id'])['evaluation_budget']['used'],0)

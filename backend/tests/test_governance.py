@@ -120,7 +120,8 @@ class GovernanceApiTests(unittest.TestCase):
         self.assertEqual(summary["approved"], 0)
         self.assertEqual(review.status_code, 409)
         self.assertIn("Probe", review.json()["detail"])
-        self.assertEqual(self.client.get("/api/dataset").json()[0]["id"], "GGC-001")
+        self.assertEqual(self.client.get("/api/dataset").json(), [])
+        self.assertEqual(self.client.get("/api/governance/questions/GGC-001").json()["id"], "GGC-001")
 
 
 class FakeEvaluationRuntime:
@@ -209,7 +210,8 @@ class EvaluationRunnerTests(unittest.TestCase):
 
 class FakeAgentProvider:
     def complete(self, _system, prompt, **_kwargs):
-        result = json.loads('{"root_cause_cluster":"检索范围不足","observed_evidence":["召回缺失"],"candidates":[{"id":"A","config_diff":{"top_k":6},"hypothesis":"扩大召回","why":"增加上下文","target_bad_cases":["召回缺失"],"risk":"延迟"},{"id":"B","config_diff":{"min_score":0.2},"hypothesis":"过滤噪声","why":"提升过滤","target_bad_cases":["召回缺失"],"risk":"拒答"},{"id":"C","config_diff":{"min_score":0.1},"hypothesis":"平衡","why":"平衡召回","target_bad_cases":["召回缺失"],"risk":"召回"}]}')
+        from test_optimization_contract import drafts
+        result = drafts()
         targets = [item['id'] for item in json.loads(prompt)['bad_cases']]
         result['observed_evidence'] = targets
         for candidate in result['candidates']:

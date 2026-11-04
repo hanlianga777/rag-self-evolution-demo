@@ -26,15 +26,21 @@ class Runtime:
 
 class ResumeTests(unittest.TestCase):
     def setUp(self):
+        from api_fixture import main
+        self.api_startup=patch.object(main.app.router,'on_startup',[])
+        self.api_startup.start()
         self.tmp=tempfile.TemporaryDirectory();self.store=GovernanceStore(Path(self.tmp.name)/'isolated.db')
         items=[{'id':f'Q{i}','question':f'Q{i}','reference_answer':'事实','test_category':cat,'negative_subtype':sub,'evidence':[]} for i,cat,sub in [(1,'positive',None),(2,'ablation',None),(3,'negative','safety_critical'),(4,'negative','prompt_injection')]]
         from app.corpus import current_manifest,manifest_identity
         snapshot={'questions':items,'question_ids':[i['id'] for i in items],'corpus_fingerprint':manifest_identity(current_manifest())}
         with self.store.connection() as c:c.execute('INSERT INTO dataset_versions VALUES (?,?,?,?,?)',('fixture-golden','approved','fixture',json.dumps(snapshot),'9999'))
         self.runtime=Runtime();self.runner=EvaluationRunner(self.store,self.runtime)
-    def tearDown(self):self.tmp.cleanup()
+    def tearDown(self):
+        self.api_startup.stop()
+        self.tmp.cleanup()
     def run_once(self):
-        run,items,config=self.runner.start_baseline();return self.runner.execute_baseline(run,items,config)
+        run,items,config=self.runner.start_baseline()
+        with patch('app.evaluation.time.sleep'):return self.runner.execute_baseline(run,items,config)
     def test_resume_uses_frozen_request_limits_without_new_paid_context(self):
         from app.paid_run import PaidRun,controlled_run,REQUEST_LIMITS
         paid=PaidRun(Path(self.tmp.name)/'paid.json',10.,{}, {},output_limits=REQUEST_LIMITS)
@@ -72,7 +78,8 @@ class ResumeTests(unittest.TestCase):
         self.assertEqual(self.store.evaluation_run(key)['status'],'failed')
 
     def test_resume_skips_completed_cases_and_saved_generation(self):
-        old=self.run_once();self.assertEqual(old['status'],'partial');self.assertEqual(old['result']['completed'],1)
+        old=self.run_once();self.assertEqual(old['status'],'completed');self.assertEqual(old['result']['completed'],3)
+        self.assertFalse(old['result']['evaluation_complete'])
         checkpoint=old['result']['checkpoints']['Q2'];self.assertIn('execution',checkpoint);self.assertEqual(checkpoint['attempts'][-1]['phase'],'judge');self.assertEqual(len(checkpoint['attempts'][-1]['usage']),1)
         original=deepcopy(self.store.evaluation_run(old['id']));oldcases=deepcopy(self.store.evaluation_case_results(old['id']))
         self.runtime.fail=None
@@ -81,9 +88,10 @@ class ResumeTests(unittest.TestCase):
         self.assertEqual(self.runtime.answers.count('Q1'),1);self.assertEqual(self.runtime.answers.count('Q2'),1);self.assertEqual(self.runtime.judges.count('Q1'),1)
         self.assertEqual(self.store.evaluation_run(old['id']),original);self.assertEqual(self.store.evaluation_case_results(old['id']),oldcases)
         self.assertEqual(result['result']['resume_source_id'],old['id'])
-    def test_generation_failure_is_not_bad_case_and_no_automatic_retry(self):
-        self.runtime.fail='generation';old=self.run_once();self.assertEqual(self.runtime.answers,['Q1','Q2']);self.assertEqual(self.runtime.judges,['Q1'])
-        self.assertEqual(old['result']['completed'],1);self.assertFalse(old['result']['evaluation_complete']);self.assertNotIn('execution',old['result']['checkpoints']['Q2'])
+    def test_generation_failure_is_not_bad_case_after_bounded_retries(self):
+        self.runtime.fail='generation';old=self.run_once()
+        self.assertEqual(self.runtime.answers,['Q1','Q2','Q2','Q2','Q3','Q4','Q2','Q2','Q2']);self.assertEqual(self.runtime.judges,['Q1','Q3','Q4'])
+        self.assertEqual(old['result']['completed'],3);self.assertFalse(old['result']['evaluation_complete']);self.assertNotIn('execution',old['result']['checkpoints']['Q2'])
         self.assertFalse(any(b['run_id']==old['id'] for b in self.store.bad_case_rows()))
         self.assertEqual(old['result']['checkpoints']['Q2']['attempts'][-1]['error_type'],'ProviderTimeout')
     def test_identity_config_and_duplicate_guards(self):
@@ -104,11 +112,11 @@ class ResumeTests(unittest.TestCase):
     def test_restart_preserves_checkpoint(self):
         run,items,config=self.runner.start_baseline()
         self.store.update_evaluation_progress(run,{'checkpoints':{'Q1':{'execution':self.runtime.answer('Q1',config),'attempts':[],'inflight':'judge'}}})
-        self.store.interrupt_evaluation_runs()
+        with patch('app.governance.os.kill',side_effect=ProcessLookupError):self.store.interrupt_evaluation_runs()
         child,items,config=self.runner.start_baseline(run);self.runtime.fail=None
-        result=self.runner.execute_baseline(child,items,config);self.assertEqual(result['status'],'partial');self.assertEqual(self.runtime.answers.count('Q1'),1)
-        self.assertIn('Unknown request',result['error_message']);self.assertEqual(self.runtime.judges,[])
-        self.assertIn('execution',result['result']['checkpoints']['Q1'])
+        result=self.runner.execute_baseline(child,items,config);self.assertEqual(result['status'],'completed');self.assertEqual(self.runtime.answers.count('Q1'),1)
+        self.assertTrue(result['result']['evaluation_complete']);self.assertEqual(self.runtime.judges,['Q1','Q2','Q3','Q4'])
+        self.assertTrue(result['result']['checkpoints']['Q1']['unknown_execution']['judge'])
 
     def test_incomplete_items_cannot_complete_or_call_provider(self):
         run,items,config=self.runner.start_baseline()
@@ -145,27 +153,20 @@ class ResumeTests(unittest.TestCase):
                 response=client.post('/api/evaluations/run',json={'resume_source_id':old['id']},headers={'Origin':'http://127.0.0.1:5174'})
                 self.assertEqual(response.status_code,409);self.assertEqual(len(self.runtime.answers),count)
 
-    def test_saved_real_partial_copy_can_plan_resume_without_provider(self):
-        import shutil
-        path=Path(__file__).resolve().parents[2]/'output/playwright/baseline-stability/protected.db'
-        if not path.exists():self.skipTest('Private business backup intentionally not tracked')
-        fixture=Path(self.tmp.name)/'real-copy.db';shutil.copy2(path,fixture);store=GovernanceStore(fixture)
-        source=store.evaluation_run('EVAL-20261012014020569115');snapshot=json.loads(source['dataset_snapshot_json'])
-        runtime=Runtime();runtime.model=source['judge']['model']
-        execution=source['judge']['execution_snapshot'];cfg=source['config']
-        info={'knowledge_identity':cfg['knowledge_identity'],'knowledge_config':{'candidate_k':cfg['candidate_k'],'top_k':cfg['top_k']},'embedding_model':execution['embedding_model'],'vector_index':execution['vector_index']}
-        runtime.corpus=type('Corpus',(),{'index_info':lambda _:info})()
-        before=deepcopy(source)
-        from app.evaluation_contract import policy_current
-        if not policy_current(source['judge']):
-            with patch('app.governance.manifest_identity',return_value=snapshot['corpus_fingerprint']):
-                with self.assertRaisesRegex(ValueError,'Evaluation Identity'):EvaluationRunner(store,runtime).start_baseline(source['id'])
-            self.assertEqual(store.evaluation_run(source['id']),before)
-            self.assertFalse(runtime.answers);self.assertFalse(runtime.judges)
-            return
-        with patch('app.governance.manifest_identity',return_value=snapshot['corpus_fingerprint']):
-            child,items,config=EvaluationRunner(store,runtime).start_baseline(source['id'])
-        self.assertEqual(len(items),50);self.assertEqual(len(store.evaluation_case_results(child)),1);self.assertEqual(store.evaluation_run(source['id']),before);self.assertFalse(runtime.answers);self.assertFalse(runtime.judges)
+    def test_saved_synthetic_partial_can_plan_resume_without_provider(self):
+        with self.store.connection() as db:
+            snapshot=json.loads(db.execute("SELECT snapshot_json FROM dataset_versions WHERE id='fixture-golden'").fetchone()[0])
+            snapshot['questions']=[{**snapshot['questions'][i%4],'id':f'fixture-{i}','question':f'fixture-{i}'} for i in range(50)]
+            snapshot['question_ids']=[q['id'] for q in snapshot['questions']]
+            db.execute("UPDATE dataset_versions SET snapshot_json=? WHERE id='fixture-golden'",(json.dumps(snapshot),))
+        key,items,config=self.runner.start_baseline()
+        self.store.record_evaluation_case(key,items[0]['id'],{'passed':True})
+        self.store.finish_evaluation_run(key,'partial',{'completed':1},'synthetic worker interruption')
+        source=deepcopy(self.store.evaluation_run(key))
+        child,resumed,_=self.runner.start_baseline(key)
+        self.assertEqual(len(resumed),50);self.assertEqual(len(self.store.evaluation_case_results(child)),1)
+        self.assertEqual(self.store.evaluation_run(key),source)
+        self.assertFalse(self.runtime.answers);self.assertFalse(self.runtime.judges)
 
     def test_changed_legacy_corpus_is_also_blocked(self):
         old=self.run_once()

@@ -30,7 +30,7 @@ class DiagnosisTests(unittest.TestCase):
                 return {'answer': 'fixture wrong answer', 'retrieval': [], 'retrieval_trace': {'candidates': [], 'final': []}, 'latency_ms': 1}
             def judge(self, *args, **kwargs):
                 return {'correctness': 0, 'faithfulness': 1, 'completeness': 0, 'behavior_pass': True, 'unsupported_claims': [], 'evidence_sufficiency': {'status':'insufficient','source_applicable':True,'conflicts':[],'reason':'Fixture final context empty','fact_support':[]}}
-        item = {'question': 'fixture question', 'reference_answer': 'fixture expected', 'raw': {}, 'test_category': 'positive', 'evidence': [{'source_chunk_ids': ['c1']} ]}
+        item = {'question': 'fixture question', 'reference_answer': 'fixture expected', 'raw': {}, 'test_category': 'positive', 'evidence': [{'source_chunk_ids': ['c1'], 'quote': 'fixture expected'} ]}
         result = EvaluationRunner(None, OfflineRuntime())._case_result(item, {})
         self.assertEqual(result['failure_tags'], ['Generation Failure', 'Retrieval Failure'])
         self.assertFalse(result['passed'])

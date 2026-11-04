@@ -104,10 +104,11 @@ class ProbeCostTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         result = store.run_probe(key, Retriever(), [], lambda *_: {'answerable': False, 'reason': 'related entity but necessary detail missing'})
         self.assertTrue(result['passed'])
-        for judge in [lambda *_: 'malformed', lambda *_: (_ for _ in ()).throw(TimeoutError('fixture timeout'))]:
-            result = store.run_probe(key, Retriever(), [], judge, fail_on_judge_error=True)
-            self.assertFalse(result['passed'])
-            self.assertEqual(result['probe_details']['question_validity'], 'needs_review')
+        result = store.run_probe(key, Retriever(), [], lambda *_: 'malformed', fail_on_judge_error=True)
+        self.assertFalse(result['passed'])
+        self.assertEqual(result['probe_details']['question_validity'], 'needs_review')
+        with self.assertRaisesRegex(TimeoutError, 'fixture timeout'):
+            store.run_probe(key, Retriever(), [], lambda *_: (_ for _ in ()).throw(TimeoutError('fixture timeout')), fail_on_judge_error=True)
         class Incomplete(Retriever):
             def full_text_probe(self, question):
                 pages = raw_pages('unrelated')
@@ -561,5 +562,5 @@ class ProbeCostTests(unittest.TestCase):
             evaluation_store.record_evaluation_case.assert_not_called()
             evaluation_store.record_bad_case.assert_not_called()
             service.judge.assert_not_called()
-            self.assertEqual(service.retriever._bm25.call_count, 2)
+            self.assertEqual(service.retriever._bm25.call_count, 2, evaluation_store.finish_evaluation_run.call_args)
         provider.complete_with_metrics.assert_not_called()

@@ -10,57 +10,62 @@ class ResponseTests(unittest.TestCase):
     setUp=contracts.OptimizationContractTests.setUp
     run_drafts=contracts.OptimizationContractTests.run_drafts
 
-    def test_zero_to_three_without_insufficient_reason(self):
+    def test_only_complete_abc_round_is_accepted(self):
         for count in range(4):
             with self.subTest(count=count):
                 response=drafts();response['candidates']=response['candidates'][:count]
                 experiment,trace,audit,_,raw=self.run_drafts(response)
-                self.assertEqual(len(experiment['candidates']),count)
-                self.assertEqual(trace['status'],'completed')
-                self.assertNotIn('insufficient_evidence',audit)
+                self.assertEqual(len(experiment['candidates']),3 if count==3 else 0)
+                self.assertEqual(trace['status'],'completed' if count==3 else 'analysis_exhausted')
                 self.assertEqual(audit['provider_raw_text'],raw)
-                self.assertEqual(audit['response_status'],'accepted' if count else 'empty')
+                if count<3:
+                    self.assertIn('每轮必须恰好提供A/B/C三套方案',audit['validation_error'])
+                    self.assertEqual(experiment['evaluation_budget']['used'],0)
 
-    def test_partial_keeps_valid_and_records_bad_types_unknown_ids_and_duplicate_configs(self):
+    def test_invalid_candidate_rejects_entire_round_with_reason(self):
         for mutate in [lambda c:c['target_bad_cases'].append('unknown'),
-                       lambda c:c['config_diff'].update(top_k='6'),
-                       lambda c:c['config_diff'].update(top_k=True),
-                       lambda c:c.update(root_cause_evidence=[{}]),
-                       lambda c:c['evidence_assertions'][0].update(observation={}),
-                       lambda c:c.update(config_diff={'top_k':6})]:
-            response=drafts();mutate(response['candidates'][1])
-            experiment,trace,audit,_,_=self.run_drafts(response)
-            self.assertEqual(trace['status'],'completed')
-            self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['A','C'])
-            self.assertEqual(audit['rejected_candidates'][0]['id'],'B')
-            self.assertTrue(audit['rejected_candidates'][0]['reason'])
+                       lambda c:c['config_diff'].update(min_score='0.1'),
+                       lambda c:c['config_diff'].update(min_score=True)]:
+            with self.subTest(mutate=mutate):
+                response=drafts();mutate(response['candidates'][1])
+                experiment,trace,audit,_,_=self.run_drafts(response)
+                self.assertEqual(trace['status'],'analysis_exhausted')
+                self.assertFalse(experiment['candidates'])
+                self.assertEqual(audit['rejected_candidates'][0]['id'],'B')
+                self.assertTrue(audit['rejected_candidates'][0]['reason'])
+                self.assertEqual(experiment['evaluation_budget']['used'],0)
 
     def test_labels_and_aliases_are_not_silently_rewritten(self):
-        response=drafts();response['candidates'].append({**deepcopy(response['candidates'][0]),'id':'D'})
-        experiment,trace,audit,_,_=self.run_drafts(response)
-        self.assertEqual(len(experiment['candidates']),3)
-        self.assertEqual(audit['rejected_candidates'][0]['id'],'D')
-        response=drafts();response['candidates'][1]['id']='A'
-        experiment,trace,audit,_,_=self.run_drafts(response)
-        self.assertEqual([c['reasoning']['candidate_label'] for c in experiment['candidates']],['C'])
-        self.assertEqual(len(audit['rejected_candidates']),2)
-        response=drafts();response['candidates'][1]['target_bad_cases'].append('BC-EVAL-test-Q1')
-        experiment,trace,audit,_,_=self.run_drafts(response)
-        self.assertEqual(len(experiment['candidates']),2)
-        self.assertIn('重复引用',audit['rejected_candidates'][0]['reason'])
+        for mutation in ('extra_label','duplicate_label','duplicate_target','shared_parameter'):
+            with self.subTest(mutation=mutation):
+                response=drafts()
+                if mutation=='extra_label':response['candidates'].append({**deepcopy(response['candidates'][0]),'id':'D'})
+                elif mutation=='duplicate_label':response['candidates'][1]['id']='A'
+                elif mutation=='duplicate_target':response['candidates'][1]['target_bad_cases'].append('BC-EVAL-test-Q1')
+                else:response['candidates'][1]['config_diff']['top_k']=6
+                experiment,trace,audit,_,raw=self.run_drafts(response)
+                self.assertEqual(trace['status'],'analysis_exhausted')
+                self.assertFalse(experiment['candidates'])
+                self.assertEqual(audit['provider_raw_text'],raw)
+                if mutation=='duplicate_target':self.assertIn('重复引用',audit['rejected_candidates'][0]['reason'])
 
     def test_all_invalid_is_not_success(self):
         response=drafts()
-        for c in response['candidates']:c['config_diff']={'top_k':'6'}
+        for c in response['candidates']:
+            key=next(k for k in c['config_diff'] if k!='generation_thinking')
+            c['config_diff'][key]='6'
         experiment,trace,audit,_,_=self.run_drafts(response)
-        self.assertEqual(trace['status'],'failed');self.assertFalse(experiment['candidates'])
+        self.assertEqual(trace['status'],'analysis_exhausted');self.assertFalse(experiment['candidates'])
         self.assertEqual(len(audit['rejected_candidates']),3)
 
     def test_only_descriptive_metadata_is_optional(self):
-        response=drafts();response['candidates']=response['candidates'][:1]
+        response=drafts()
         response['candidates'][0].pop('target_group')
+        # Historical root labels/assertions are audit metadata, not admission gates.
+        response['candidates'][1].update(root_cause_evidence=[{}])
+        response['candidates'][1]['evidence_assertions'][0]['observation']={}
         experiment,trace,audit,_,_=self.run_drafts(response)
-        self.assertEqual(trace['status'],'completed');self.assertEqual(len(experiment['candidates']),1)
+        self.assertEqual(trace['status'],'completed');self.assertEqual(len(experiment['candidates']),3)
         self.assertIsNone(experiment['candidates'][0]['reasoning']['target_group'])
         self.assertNotIn('target_group',audit['parsed_candidates'][0])
 

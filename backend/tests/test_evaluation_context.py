@@ -78,18 +78,19 @@ class ContextTests(unittest.TestCase):
         with patch.object(provider,'complete',return_value=json.dumps({k:v for k,v in self.judge.items() if k!='evidence_sufficiency'})):
             with self.assertRaises(ProviderUnavailable):provider.judge('q','r','a',context={})
 
-    def test_real_b_saved_context_readonly_observations_do_not_inherit_pass(self):
-        material=Path(__file__).resolve().parents[2]/'output/playwright/closure-2026-10-11/candidate-b-readonly-regression.json'
-        if not material.exists():
-            self.skipTest('Private saved B material is intentionally excluded from Git')
-        cases=json.loads(material.read_text())
+    def test_saved_legacy_context_readonly_observations_do_not_inherit_pass(self):
+        # A legacy PASS without typed sufficiency is an observation, not fresh evidence proof.
+        cases=[{'test_category':category,'reference_answer':self.item['reference_answer'],
+                'judge_result':{'verdict':'PASS','reason':'synthetic legacy response'},
+                'programmatic_metrics':{'retrieval_trace':{'final':self.entries}}}
+               for category in ['positive']*20+['ablation']*10+['negative']*20]
         self.assertEqual(len(cases),50)
         for case in cases:
             item={'test_category':case['test_category'],'reference_answer':case.get('reference_answer'),'raw':{}}
-            final=case.get('programmatic_metrics',{}).get('retrieval_trace',{}).get('final',[])
+            final=case['programmatic_metrics']['retrieval_trace']['final']
             observation=observe_evidence(item,final)
             self.assertIsNone(observation['sufficient'])
-            self.assertIsNone(resolve_evidence(item,observation,case.get('judge_result',{}),final)['sufficient'])
+            self.assertIsNone(resolve_evidence(item,observation,case['judge_result'],final)['sufficient'])
 
     def test_replay_rejects_missing_final_context_before_write(self):
         class Store:

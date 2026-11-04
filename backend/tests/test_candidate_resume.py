@@ -41,7 +41,7 @@ class CandidateResumeTests(unittest.TestCase):
         from app.paid_run import current_request_limit,provider_task
         baseline=self.freeze_request_limits();limits=baseline['judge']['execution_snapshot']['request_limits']
         configs=[self.store.candidate(self.cid)['config'],{**self.store.candidate(self.cid)['config'],'query_rewrite':True},
-                 {**self.store.candidate(self.cid)['config'],'metadata_filter':'FALLBACK'}]
+                 {**self.store.candidate(self.cid)['config'],'candidate_k':24}]
         for label,config in zip('ABC',configs):
             if label!='A':self.store.save_candidate(self.exp,'R1-'+label,config,{'round':1,'candidate_label':label})
         observed=[]
@@ -108,9 +108,9 @@ class CandidateResumeTests(unittest.TestCase):
                     def fail(q,*args,**kwargs):
                         if q=='Q2':raise error
                         return original(q,*args,**kwargs)
-                    with patch.object(self.runtime,'answer' if phase=='generation' else 'judge',side_effect=fail) as call:
+                    with patch.object(self.runtime,'answer' if phase=='generation' else 'judge',side_effect=fail) as call, patch('app.evaluation_stage.time.sleep'):
                         first=self.runner.run_candidate(self.cid, automatic=False)
-                        self.assertEqual(sum(args.args[0]=='Q2' for args in call.call_args_list),2)
+                        self.assertEqual(sum(args.args[0]=='Q2' for args in call.call_args_list),6)
                     self.assertEqual(first['status'],'failed');self.assertEqual(first['result']['completed'],3)
                     self.assertEqual(first['result']['technical_failed'],1)
                     self.assertFalse(first['result']['evaluation_complete'])
@@ -197,13 +197,13 @@ class CandidateResumeTests(unittest.TestCase):
             record_usage({'provider':'fixture','prompt_tokens':12,'completion_tokens':7,'total_tokens':19})
             error=ProviderUnavailable('DeepSeek Judge 未返回有效 JSON');error.raw_provider_response=raw
             raise error from ValueError('correctness must be an integer between 0 and 4')
-        with patch.object(self.runtime,'judge',side_effect=invalid) as call:
+        with patch.object(self.runtime,'judge',side_effect=invalid) as call, patch('app.evaluation_stage.time.sleep'):
             result=self.runner.run_candidate(self.cid, automatic=False)
         attempt=result['result']['checkpoints']['Q1']['attempts'][-1]
         self.assertEqual(attempt['raw_provider_response'],raw)
         self.assertEqual(attempt['cause_message'],'correctness must be an integer between 0 and 4')
         self.assertEqual(attempt['usage'][0]['total_tokens'],19)
-        self.assertEqual([args.args[0] for args in call.call_args_list],['Q1','Q2','Q3','Q4']*2)
+        self.assertEqual([args.args[0] for args in call.call_args_list],[q for q in ('Q1','Q2','Q3','Q4') for _ in range(3)]*2)
         self.assertEqual(result['status'],'failed')
         self.assertEqual(result['result']['technical_failed'],4)
         self.assertFalse(result['result']['evaluation_complete'])
@@ -212,34 +212,36 @@ class CandidateResumeTests(unittest.TestCase):
         self.assertFalse(result['result']['qualification']['qualified'])
         self.assertFalse(self.store.evaluation_case_results(result['result']['evaluation_run_id']))
 
-    def test_saved_c_copy_resumes_43_cases_and_generation_without_touching_a_b(self):
-        import shutil
-        from pathlib import Path
-        from app.governance import GovernanceStore
-        from app.evaluation import EvaluationRunner
-        from test_baseline_resume import Runtime
-        backup=Path(__file__).resolve().parents[2]/'output/playwright/candidate-c-audit/protected.db'
-        if not backup.exists():self.skipTest('Private real-record copy is not tracked')
-        copied=Path(self.tmp.name)/'candidate-c-copy.db';shutil.copy2(backup,copied)
-        store=GovernanceStore(copied);cid='EXP-20261012054110446321-R1-C'
-        candidate=store.candidate(cid);source=store.evaluation_run(candidate['result']['evaluation_run_id'])
-        snapshot=json.loads(source['dataset_snapshot_json'])
+    def test_synthetic_c_resumes_43_cases_and_generation_without_touching_a_b(self):
+        # Build only disposable records; never depend on or copy a private database.
+        with self.store.connection() as db:
+            snapshot=json.loads(db.execute("SELECT snapshot_json FROM dataset_versions WHERE id='fixture-golden'").fetchone()[0])
+            snapshot['questions']=[{**snapshot['questions'][i%4],'id':f'fixture-{i:02d}','question':f'fixture-{i:02d}'} for i in range(50)]
+            snapshot['question_ids']=[q['id'] for q in snapshot['questions']]
+            db.execute("UPDATE dataset_versions SET snapshot_json=? WHERE id='fixture-golden'",(json.dumps(snapshot),))
+        store=self.store;runner=self.runner;runtime=self.runtime
+        baseline=runner.execute_baseline(*runner.start_baseline())
+        self.assertEqual(baseline['status'],'completed')
+        experiment=store.create_experiment(baseline['id'],'completed')
+        for label in 'ABC':
+            store.save_candidate(experiment,'R1-'+label,store.candidate(self.cid)['config'],{'candidate_label':label})
+        cid=experiment+'-R1-C'
+        run,items,config,_,_=runner.start_candidate(cid)
+        baseline_cases=store.evaluation_case_results(baseline['id'])
+        for case in baseline_cases[:43]:store.record_evaluation_case(run,case['question_id'],case)
+        execution=runtime.answer(items[43]['question'],config)
+        store.finish_evaluation_run(run,'completed',{'completed':43,'technical_failed':7,'evaluation_complete':False,
+            'checkpoints':{items[43]['id']:{'execution':execution,'attempts':[]}}})
+        store.finish_candidate(cid,'failed',{'evaluation_run_id':run})
+        candidate=store.candidate(cid);source=store.evaluation_run(run)
         a_b=[deepcopy(store.candidate(cid[:-1]+x)) for x in ('A','B')]
-        source_before=deepcopy(source);rows_before=deepcopy(store.evaluation_case_results(source['id']))
-        runtime=Runtime(None);runtime.model=source['judge']['model'];runner=EvaluationRunner(store,runtime)
-        budget_before=store.experiment(candidate['experiment_id'])['evaluation_budget']['used']
-        from app.evaluation_contract import policy_current
-        if not policy_current(source['judge']):
-            with self.assertRaisesRegex(ValueError,'评测规则已升级'):runner.start_candidate(cid)
-            self.assertEqual(store.evaluation_run(source['id']),source_before)
-            self.assertEqual(store.evaluation_case_results(source['id']),rows_before)
-            self.assertEqual([store.candidate(cid[:-1]+x) for x in ('A','B')],a_b)
-            self.assertEqual(store.experiment(candidate['experiment_id'])['evaluation_budget']['used'],budget_before)
-            return
+        source_before=deepcopy(source);rows_before=deepcopy(store.evaluation_case_results(run))
+        budget_before=store.experiment(experiment)['evaluation_budget']['used']
+        runtime.answers.clear();runtime.judges.clear()
         started=runner.start_candidate(cid)
         self.assertEqual(len(store.evaluation_case_results(started[0])),43)
         judged=[];template=deepcopy(rows_before[0])
-        def score(item,execution):
+        def score(item,execution,**_kwargs):
             judged.append(item['id']);case=deepcopy(template)
             case.update(question_id=item['id'],question=item['question'],test_category=item['test_category'],negative_subtype=item.get('negative_subtype'),answer=execution['answer'])
             return case

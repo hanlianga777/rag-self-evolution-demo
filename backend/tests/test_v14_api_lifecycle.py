@@ -46,7 +46,7 @@ class LifecycleProvider(FixtureProvider):
                 parameter_dependencies=[{'parameters':['top_k','prompt_strategy'],
                     'reason':'Retain the independently verified Final selection and answer-completeness changes; full D regression remains required.'}])
             return json.dumps(value, ensure_ascii=False)
-        if 'RAG Optimization Agent' not in system:
+        if 'RAG优化Agent' not in system:
             return raw
         payload = json.loads(prompt); value = json.loads(raw)
         value['root_cause_cluster'] = 'Explicit offline Final omission and independently grounded answer omission'

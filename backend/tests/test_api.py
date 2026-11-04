@@ -2,6 +2,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -30,8 +31,14 @@ class GovernanceApiTests(unittest.TestCase):
         response = self.client.get("/api/dataset")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 40)
-        self.assertEqual(response.json()[0]["review_status"], "human_review_pending")
+        self.assertEqual(response.json(), [])
+        from test_candidate_review_export import candidates
+        run_id=main.store.start_generation_run('offline-fixture')
+        rows=main.store.save_mini_golden_candidates(candidates(), 'offline-fixture', run_id=run_id)
+        response=self.client.get('/api/dataset')
+        self.assertEqual({row['id'] for row in response.json()}, {row['id'] for row in rows})
+        self.assertTrue(all(row['review_status']=='human_review_pending' for row in response.json()))
+        self.assertTrue(all(row['probe_status']=='probe_pending' and row['qc_status']=='qc_pending' for row in response.json()))
 
     def test_evaluation_is_blocked_until_a_human_approves_a_question(self):
         response = self.client.post("/api/evaluations/run", json={"fresh":True}, headers={"Origin": "http://127.0.0.1:5174"})
@@ -85,12 +92,14 @@ class GovernanceApiTests(unittest.TestCase):
                 break
             threading.Event().wait(0.01)
         self.assertEqual(self.client.get(f"/api/governance/generation-runs/{run_id}").json()["status"], "needs_regeneration")
-        self.assertEqual(self.client.get("/api/dataset").json().__len__(), 40)
+        self.assertEqual(self.client.get("/api/dataset").json(), [])
 
     def test_partial_run_blocks_a_new_full_generation(self):
         run_id = main.store.start_generation_run("mock-provider")
         main.store.update_generation_run(run_id, status="needs_regeneration", progress={"stage": "needs_regeneration"})
-        response = self.client.post("/api/governance/generate-mini", headers={"Origin": "http://127.0.0.1:5174"})
+        # Exercise the pending-run guard independently of local Coverage assets.
+        with patch.object(main, 'current_coverage_plan', return_value=None):
+            response = self.client.post("/api/governance/generate-mini", headers={"Origin": "http://127.0.0.1:5174"})
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["detail"], "当前 V1 Mini 尚有失败 Slot 待补齐，请先完成当前 Run。")
         self.assertEqual(len(main.store.generation_runs()), 1)

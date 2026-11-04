@@ -9,7 +9,7 @@ class BaselineEntryTests(unittest.TestCase):
     tearDown=fixture.ResumeTests.tearDown
     def partial(self):
         key,items,config=self.runner.start_baseline()
-        return self.runner.execute_baseline(key,items,config)
+        with patch('app.evaluation.time.sleep'):return self.runner.execute_baseline(key,items,config)
     def test_identical_partial_is_explicitly_resumable_without_writes_or_provider(self):
         old=self.partial();before=copy.deepcopy(self.store.evaluation_runs());calls=(list(self.runtime.answers),list(self.runtime.judges))
         result=self.runner.baseline_preflight(old['id'])

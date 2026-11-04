@@ -7,17 +7,17 @@ from app.evaluation import summarize_evaluation_cases
 
 
 class CurrentGovernanceContracts(unittest.TestCase):
-    def test_unknown_request_blocks_child_creation_and_preserves_checkpoint_history(self):
+    def test_unknown_request_can_resume_and_preserves_source_checkpoint_history(self):
         holder = resume_fixture.ResumeTests(); holder.setUp(); self.addCleanup(holder.tearDown)
         key, items, config = holder.runner.start_baseline()
         execution = holder.runtime.answer('Q1', config)
         holder.store.update_evaluation_progress(key, {'checkpoints':{'Q1':{'execution':execution, 'attempts':[], 'inflight':'judge'}}})
         holder.store.interrupt_evaluation_runs()
-        before = deepcopy(holder.store.evaluation_runs())
-        with self.assertRaisesRegex(ValueError, 'Unknown request execution'):
-            holder.runner.start_baseline(key)
-        self.assertEqual(holder.store.evaluation_runs(), before)
-        self.assertEqual(len(holder.store.evaluation_runs()), 1)
+        before = deepcopy(holder.store.evaluation_run(key))
+        child,_,_=holder.runner.start_baseline(key)
+        self.assertEqual(holder.store.evaluation_run(key), before)
+        self.assertEqual(len(holder.store.evaluation_runs()), 2)
+        self.assertEqual(holder.store.evaluation_run(child)['result']['resume_source_id'],key)
         self.assertEqual(holder.store.evaluation_run(key)['result']['checkpoints']['Q1']['execution'], execution)
         self.assertEqual(holder.runtime.judges, [])
 

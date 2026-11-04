@@ -12,9 +12,10 @@ class AgentHttpErrorTests(unittest.TestCase):
         fixture.OptimizationContractTests.setUp(self)
         from app.ai_service import generation_contract
         from app.evaluation_contract import evaluation_identity
+        from app.providers import thinking_config
         run = self.store.evaluation_run('EVAL-test')
         judge = {**run['judge'], **generation_contract(), 'common_identity_version':'round0-common-1',
-                 'judge_thinking':{'task':'judge','thinking':{'type':'enabled'},'reasoning_effort':'max'},
+                 'judge_thinking':thinking_config('judge'),
                  'generation_model_constraint':'fixture'}
         judge['evaluation_identity'] = evaluation_identity(json.loads(run['dataset_snapshot_json']), judge)
         with self.store.connection() as connection:

@@ -9,6 +9,11 @@ from api_fixture import main
 from app.evaluation import EvaluationRunner
 from app.providers import ProviderAPIError, ProviderTimeout
 
+def exhausted(message):
+    error=ProviderTimeout(message)
+    error.provider_retry_exhausted=True
+    return error
+
 
 class BaselineBatchRecoveryTests(unittest.TestCase):
     setUp = baseline_fixture.ResumeTests.setUp
@@ -44,7 +49,7 @@ class BaselineBatchRecoveryTests(unittest.TestCase):
         self.assertFalse(result['result']['evaluation_complete'])
         self.assertIsNone(result['result']['gates']['passed'])
         self.assertEqual(self.runtime.answers, ['Q1', 'Q2', 'Q3', 'Q4'])
-        self.assertEqual(self.runtime.judges.count('Q2'), 2)
+        self.assertEqual(self.runtime.judges.count('Q2'), 6)
         self.assertFalse(self.store.bad_case_rows())
         self.runtime.fail = None
         child = self.runner.execute_baseline(*self.runner.start_baseline(result['id']))
@@ -72,7 +77,7 @@ class BaselineBatchRecoveryTests(unittest.TestCase):
         def score(item, execution, **kwargs):
             calls.append(item['id'])
             if item['id']=='Q2' and calls.count('Q2')==1:
-                raise ProviderTimeout('fixture replay exhausted')
+                raise exhausted('fixture replay exhausted')
             return original(item, execution, **kwargs)
         before=list(self.runtime.answers)
         with patch.object(self.runner, 'score_execution', side_effect=score):
@@ -112,7 +117,7 @@ class QualityBatchRecoveryTests(unittest.TestCase):
         def qc(item):
             calls.append(item['id'])
             if item['id'] == target and calls.count(target) == 1:
-                raise ProviderTimeout('fixture transient exhausted')
+                raise exhausted('fixture transient exhausted')
             return self.reply()
         ids, state = self.run_batch(qc)
         self.assertEqual(calls, ids + [target])
@@ -127,7 +132,7 @@ class QualityBatchRecoveryTests(unittest.TestCase):
         def qc(item):
             calls.append(item['id'])
             if item['id'] == target:
-                raise ProviderTimeout('fixture original exhausted')
+                raise exhausted('fixture original exhausted')
             return self.reply()
         ids, state = self.run_batch(qc)
         self.assertEqual(calls, ids + [target])
@@ -194,7 +199,7 @@ class QualityBatchRecoveryTests(unittest.TestCase):
         calls=[];target=self.rows[1]['id']
         def qc(item):
             calls.append(item['id'])
-            if item['id']==target and calls.count(target)==1:raise ProviderTimeout('fixture original quality')
+            if item['id']==target and calls.count(target)==1:raise exhausted('fixture original quality')
             return self.reply()
         def probe(key,*_args,**_kwargs):
             _,binding=self.store.capture_quality(key)
@@ -249,8 +254,8 @@ class QualityBatchRecoveryTests(unittest.TestCase):
         ids=[row['id'] for row in self.rows];calls=[]
         def qc(item):
             key=item['id'];calls.append(key)
-            if key==ids[0]:raise ProviderTimeout('fixture remains exhausted')
-            if key==ids[1] and calls.count(key)==1:raise ProviderTimeout('fixture first pass')
+            if key==ids[0]:raise exhausted('fixture remains exhausted')
+            if key==ids[1] and calls.count(key)==1:raise exhausted('fixture first pass')
             if key==ids[1] and calls.count(key)==2:raise KeyboardInterrupt('fixture worker crash')
             return self.reply()
         def probe(key,*_args,**_kwargs):
@@ -298,9 +303,9 @@ class QualityBatchRecoveryTests(unittest.TestCase):
             revision_quality_step=lambda _run,key:'qc',finish_revision_quality=finish)
         def qc(_store,_service,key):
             calls.append(key)
-            if key=='one' and calls.count(key)==1:raise ProviderTimeout('fixture paired QC exhausted')
+            if key=='one' and calls.count(key)==1:raise exhausted('fixture paired QC exhausted')
             return {'reason':'synthetic fixture'},{'status':'qc_passed'}
-        with patch.object(main,'_quality_check',side_effect=qc):
+        with patch.object(main,'_quality_check',side_effect=qc),patch.object(main,'_wait_revision_price'):
             main._run_revision_quality('fixture',store,SimpleNamespace(model='fixture'),SimpleNamespace(chunks=lambda:[]))
         self.assertEqual(calls,['one','two','one'])
         self.assertNotIn('error',finished)

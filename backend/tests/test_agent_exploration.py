@@ -1,4 +1,4 @@
-"""Offline admission tests: hypotheses are not confirmed root causes."""
+"""Offline admission uses saved evidence and complete ABC rounds."""
 import json
 import os
 import unittest
@@ -14,6 +14,7 @@ import test_optimization_contract as contracts
 def example(stage='recall'):
     q,c,chunks,hit,_=resolver_fixture.ResolverTests().example()
     c.pop('run_id',None)
+    c.update(passed=False,standard_evidence=[q['reference_answer']])
     c['judge_result'].update(verdict='FAIL',issues=[],reason='fixture incomplete answer')
     c['judge_result']['checks'][0]['check_type']='fact'
     c['programmatic_metrics']['evidence_coverage']={'required_chunk_ids':[hit['chunk_id']]}
@@ -24,51 +25,52 @@ def example(stage='recall'):
     return q,c,chunks
 
 
-def proposal(c, direction='candidate_recall', observation='candidate_pool_gap', diff=None):
-    return {'target_bad_cases':[c['question_id']],'root_cause':'Unknown','experiment_kind':'exploratory',
+def proposal(c, direction='candidate_recall', observation='recall_missing', diff=None):
+    return {'target_bad_cases':[c['question_id']],'root_cause':diagnostic_view(c)['primary_root_cause'],
         'intervention_direction':direction,'config_diff':diff or {'candidate_k':24},'supporting_directions':[],
         'evidence_assertions':[{'target_id':c['question_id'],'observation':observation}], 'parameter_dependencies':[],
-        'hypothesis':'候选池扩展可能补全冻结规范；尚未证明根因','why':'冻结规范来源未进入当前候选池',
+        'hypothesis':'按保存证据验证参数调整','why':'冻结规范与保存检索记录存在覆盖差距',
         'expected_improvement':'验证失败要求覆盖改善','risk':'噪声和延迟增加',
         'falsification':'相同冻结50题中目标仍FAIL或新增安全失败则不能推荐'}
 
 
 class ExplorationTests(unittest.TestCase):
-    def test_unknown_has_falsifiable_plan_and_legal_candidate(self):
+    def test_saved_evidence_has_falsifiable_plan_without_current_corpus(self):
         q,c,chunks=example()
-        with patch('app.diagnostics._current_corpus',return_value=(chunks,'new-corpus')):
+        with patch('app.diagnostics._current_corpus',side_effect=AssertionError('must use saved evidence')):
             view=diagnostic_view(c)
-            self.assertEqual(view['primary_root_cause'],'Unknown')
-            self.assertFalse(view['target_eligible'])
-            self.assertEqual(view['experiment_plan']['status'],'exploratory')
-            self.assertIn('candidate_pool_gap',view['experiment_plan']['observations'])
+            self.assertEqual(view['primary_root_cause'],'Retrieval')
+            self.assertTrue(view['target_eligible'])
+            self.assertEqual(view['experiment_plan']['status'],'ready')
+            self.assertTrue(view['experiment_plan']['falsification'])
             validate_intervention(proposal(c),{q['id']:c},DEFAULT_PIPELINE_CONFIG)
 
-    def test_exploration_cannot_invent_cause_or_change_unobserved_stage(self):
+    def test_priority_directions_are_advisory_but_required_fields_are_checked(self):
         q,c,chunks=example()
-        with patch('app.diagnostics._current_corpus',return_value=(chunks,'new-corpus')):
-            for change in [{'root_cause':'Retrieval'}, {'experiment_kind':'confirmed'}, {'falsification':''},
-                           {'intervention_direction':'grounded_generation','config_diff':{'prompt_strategy':'Completeness'}}]:
-                p={**proposal(c),**change}
-                with self.subTest(change=change),self.assertRaises(ValueError):validate_intervention(p,{q['id']:c},DEFAULT_PIPELINE_CONFIG)
+        validate_intervention(proposal(c,'grounded_generation','recall_missing',{'prompt_strategy':'Completeness'}),{q['id']:c},DEFAULT_PIPELINE_CONFIG)
+        for change in [{'hypothesis':''}, {'why':''}, {'expected_improvement':''}, {'risk':''}]:
+            p={**proposal(c),**change}
+            with self.subTest(change=change),self.assertRaises(ValueError):validate_intervention(p,{q['id']:c},DEFAULT_PIPELINE_CONFIG)
 
-    def test_context_and_generation_explore_without_claiming_semantic_sufficiency(self):
-        for stage,direction,observation,diff in [('context','context_selection','context_pool_gap',{'top_k':6}),
-                ('answer','grounded_generation','answer_requirement_gap',{'prompt_strategy':'Completeness'})]:
+    def test_context_and_generation_are_located_from_saved_stage_text(self):
+        for stage,root,direction,observation,diff in [('context','Ranking','context_selection','ranking_omission',{'top_k':6}),
+                ('answer','Generation','grounded_generation','final_sufficient',{'prompt_strategy':'Completeness'})]:
             q,c,chunks=example(stage)
             with patch('app.diagnostics._current_corpus',return_value=(chunks,'new-corpus')):
-                self.assertFalse(diagnostic_view(c)['target_eligible'])
+                self.assertEqual(diagnostic_view(c)['primary_root_cause'],root)
+                self.assertTrue(diagnostic_view(c)['target_eligible'])
                 validate_intervention(proposal(c,direction,observation,diff),{q['id']:c},DEFAULT_PIPELINE_CONFIG)
 
-    def test_missing_source_and_invalid_judge_are_repair_tasks_not_parameter_candidates(self):
-        for broken in ['source','judge','trace','identity']:
+    def test_missing_saved_evidence_judgment_or_trace_requires_repair(self):
+        for broken in ['source','judge','trace','status']:
             q,c,chunks=example()
-            if broken=='source':chunks=chunks[1:]
-            if broken=='judge':c['judge_result']['checks'][0]['support']=[{'source_id':'invented','quote':'made up'}]
-            if broken=='trace':c['programmatic_metrics']['retrieval_trace'].pop('reranked')
-            if broken=='identity':c['programmatic_metrics']['retrieval_trace']['corpus_fingerprint']='changed'
+            if broken=='source':c['standard_evidence']=[]
+            if broken=='judge':c.update(judge_result={},evaluation_outcome={},passed=None)
+            if broken=='trace':c['programmatic_metrics']['retrieval_trace'].pop('final')
+            if broken=='status':c['programmatic_metrics']['retrieval_trace']['status']='running'
             with patch('app.diagnostics._current_corpus',return_value=(chunks,'new-corpus')):
                 plan=diagnostic_view(c)['experiment_plan']
+                self.assertEqual(diagnostic_view(c)['primary_root_cause'],'MissingRecord')
                 self.assertEqual(plan['status'],'capability_gap',plan)
                 self.assertTrue(plan['next_action'])
                 with self.assertRaises(ValueError):validate_intervention(proposal(c),{q['id']:c},DEFAULT_PIPELINE_CONFIG)
@@ -76,17 +78,16 @@ class ExplorationTests(unittest.TestCase):
 
 class AgentExplorationTests(unittest.TestCase):
     setUp=contracts.OptimizationContractTests.setUp
-    def test_unknown_is_persisted_as_exploration_instead_of_repeated_paid_diagnosis(self):
+    def test_saved_evidence_persists_ready_diagnosis_and_complete_abc(self):
         q,c,chunks=example();c['question_id']='Q1'
         self.store.record_bad_case('EVAL-test','Q1','Unknown','ordinary',c)
-        p=proposal(c);p.update(id='A',target_group='offline',root_cause_evidence=['Q1'])
-        provider=contracts.FixedProvider(json.dumps({'candidates':[p],'insufficient_evidence':'one coherent hypothesis'}))
+        provider=contracts.FixedProvider(json.dumps(contracts.drafts()))
         with patch.dict(os.environ,{'RAG_DEMO_DB_PATH':str(self.store.database_path)}),patch('app.diagnostics._current_corpus',return_value=(chunks,'new-corpus')):
             result=OptimizationAgent(self.store,provider).generate('EVAL-test')
-        self.assertEqual(result['result']['diagnostic_tasks'][0]['status'],'exploratory')
-        self.assertEqual(len(result['candidates']),1)
-        self.assertEqual(result['candidates'][0]['reasoning']['experiment_kind'],'exploratory')
-        self.assertEqual(result['candidates'][0]['reasoning']['root_cause'],'Unknown')
+        self.assertEqual(result['result']['diagnostic_tasks'][0]['status'],'ready_for_experiment')
+        self.assertEqual(len(result['candidates']),3)
+        self.assertEqual(result['candidates'][0]['reasoning']['experiment_kind'],'confirmed')
+        self.assertEqual(result['candidates'][0]['reasoning']['root_cause'],'Retrieval')
 
 class TraceCompletenessTests(unittest.TestCase):
     def test_local_pipeline_records_real_rerank_before_threshold_and_completed_status(self):
@@ -107,7 +108,12 @@ class ProgressTests(unittest.TestCase):
         exp=OptimizationAgent(self.store,contracts.FixedProvider(json.dumps(contracts.drafts()))).generate('EVAL-test')
         for candidate,ids in zip(exp['candidates'],[['Q1'],['Q2'],[]]):
             self.store.finish_candidate(candidate['id'],'evaluated',{'qualification':{'qualified':bool(ids)},'all_fixed_question_ids':ids,'bad_case_count':1})
-        next_round=OptimizationAgent(self.store,contracts.FixedProvider(json.dumps({'candidates':[],'insufficient_evidence':'offline new hypothesis pending'}))).generate('EVAL-test',experiment_id=exp['id'])
+        response=contracts.drafts()
+        for row,diff in zip(response['candidates'],[{'query_rewrite':True},{'generation_thinking':'low','hyde':True},{'prompt_strategy':'Tiered'}]):
+            row['config_diff']=diff
+            row['hypothesis']+=' second round'
+        response['candidates'][2]['direction']='回答策略'
+        next_round=OptimizationAgent(self.store,contracts.FixedProvider(json.dumps(response))).generate('EVAL-test',experiment_id=exp['id'])
         progress=next_round['result']['processing_progress']
         self.assertEqual(len(progress['fixed_question_ids']),1)
         self.assertEqual(len(progress['remaining_question_ids']),1)

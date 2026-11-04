@@ -85,15 +85,16 @@ class TuningV12Tests(unittest.TestCase):
         self.assertEqual(after['report_confirmation'], before['report_confirmation'])
         self.assertEqual(after['composite'], before['composite'])
 
-    def test_restart_terminalizes_reserved_execution_without_refunding_budget(self):
+    def test_restart_terminalizes_execution_and_resume_reuses_one_budget_slot(self):
         self.store.save_candidate(self.experiment, 'A', DEFAULT_PIPELINE_CONFIG, {'candidate_label': 'A'})
         key = f'{self.experiment}-A'
         self.store.reserve_candidate_evaluation(key)
         self.store.interrupt_evaluation_runs()
         self.assertEqual(self.store.candidate(key)['status'], 'failed')
-        self.assertEqual(self.store.experiment(self.experiment)['evaluation_budget']['used'], 1)
+        self.assertEqual(self.store.experiment(self.experiment)['evaluation_budget']['used'], 0)
         self.store.reserve_candidate_evaluation(key)
-        self.assertEqual(self.store.experiment(self.experiment)['evaluation_budget']['used'], 2)
+        self.assertEqual(self.store.experiment(self.experiment)['evaluation_budget']['used'], 1)
+        self.assertEqual(len(self.store.candidate(key)['reasoning']['sandbox_attempts']), 1)
 
     def test_parallel_reservations_do_not_exceed_abc_allowance(self):
         for number in range(12):

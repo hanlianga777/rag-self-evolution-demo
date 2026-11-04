@@ -30,33 +30,44 @@ class EvidenceDiagnosisTests(unittest.TestCase):
 
     def test_partial_final_text_is_noise_when_candidate_has_whole_standard(self):
         case,corpus=example();before=deepcopy(case);result=self.analyze(case,corpus)
-        self.assertEqual(result['diagnosis_category'],'检索噪声')
+        self.assertEqual(result['diagnosis_category'],'检索层问题')
+        self.assertEqual(result['primary_root_cause'],'Ranking')
         self.assertEqual(result['retrieval_metrics']['recall_at_k'],0)
         self.assertEqual(case,before)
 
     def test_missing_candidate_text_dominates_judge_issue_order(self):
         case,corpus=example();case['programmatic_metrics']['retrieval_trace']['candidates']=[corpus[1]]
         case['judge_result']['issues']=[{'critical':True,'safety_violation':True}]
-        self.assertEqual(self.analyze(case,corpus)['diagnosis_category'],'检索失败')
+        result=self.analyze(case,corpus)
+        self.assertEqual(result['diagnosis_category'],'检索层问题')
+        self.assertEqual(result['primary_root_cause'],'Retrieval')
 
     def test_judge_scope_and_source_ids_are_not_text_comparison_inputs(self):
         case,corpus=example();case['judge_result']['checks'][0].update(scope_resolved=False,candidate_support=[])
         case['judge_result']['checks'][0]['reference_support'][0]['source_id']='different'
-        self.assertEqual(self.analyze(case,[])['diagnosis_category'],'检索噪声')
+        result=self.analyze(case,[])
+        self.assertEqual(result['diagnosis_category'],'检索层问题')
+        self.assertEqual(result['primary_root_cause'],'Ranking')
 
     def test_missing_judge_candidate_support_is_not_a_missing_trace(self):
         case,corpus=example();case['judge_result']['checks'][0].pop('candidate_support')
-        self.assertEqual(self.analyze(case,corpus)['diagnosis_category'],'检索噪声')
+        result=self.analyze(case,corpus)
+        self.assertEqual(result['diagnosis_category'],'检索层问题')
+        self.assertEqual(result['primary_root_cause'],'Ranking')
 
     def test_actual_final_text_overrides_judge_stage_absence_claims(self):
         case,corpus=example();case['judge_result']['checks'][0].update(support=[],candidate_support=[])
         case['programmatic_metrics']['retrieval_trace']['final']=[corpus[0]]
-        self.assertEqual(self.analyze(case,corpus)['diagnosis_category'],'回答问题')
+        result=self.analyze(case,corpus)
+        self.assertEqual(result['diagnosis_category'],'生成层问题')
+        self.assertEqual(result['primary_root_cause'],'Generation')
 
     def test_metadata_or_corpus_drift_does_not_remove_saved_text_coverage(self):
         case,corpus=example();wrong={**corpus[0],'chunk_id':'changed','product':'other'}
         case['programmatic_metrics']['retrieval_trace']['final']=[wrong]
-        self.assertEqual(self.analyze(case,[])['diagnosis_category'],'回答问题')
+        result=self.analyze(case,[])
+        self.assertEqual(result['diagnosis_category'],'生成层问题')
+        self.assertEqual(result['primary_root_cause'],'Generation')
 
     def test_missing_scores_do_not_block_a_text_supported_noise_target(self):
         from app.diagnostics import diagnostic_view

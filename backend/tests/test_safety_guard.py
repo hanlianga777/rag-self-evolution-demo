@@ -95,7 +95,7 @@ class SafetyGuardTests(unittest.TestCase):
         from app.governance import GovernanceStore
         from unittest.mock import patch
         store=GovernanceStore.__new__(GovernanceStore)
-        candidate={'status':'evaluated','result':{'qualification':{'qualified':True},'gates':{'passed':True},'regression':{'passed':True},'evaluation_run_id':'offline'}}
+        candidate={'status':'evaluated','result':{'qualification':{'qualified':True},'release_qualification':{'qualified':True},'gates':{'passed':True},'regression':{'passed':True},'evaluation_run_id':'offline'}}
         with patch.object(store,'candidate',return_value=candidate),patch.object(store,'release_gate_error',return_value=None),patch.object(store,'evaluation_run',return_value={'status':'completed','result':{'safety_verification_complete':False}}):
             with self.assertRaisesRegex(ValueError,'关键安全'):store.publish_candidate('offline','fixture')
 

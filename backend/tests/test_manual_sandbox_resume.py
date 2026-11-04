@@ -10,7 +10,10 @@ from app.telemetry import record_usage
 
 
 class ManualSandboxResumeTests(unittest.TestCase):
-    setUp = fixture.ResumeTests.setUp
+    def setUp(self):
+        fixture.ResumeTests.setUp(self)
+        delay=patch('app.evaluation.time.sleep')
+        delay.start();self.addCleanup(delay.stop)
     tearDown = fixture.ResumeTests.tearDown
 
     def test_unknown_isolated_and_saved_answer_only_needs_judge_on_resume(self):
@@ -27,7 +30,7 @@ class ManualSandboxResumeTests(unittest.TestCase):
             return judge(q,*args,**kwargs)
         with patch.object(self.runtime,'judge',side_effect=unknown):
             first=self.runner.run_candidate(cid,automatic=True)
-            self.assertEqual(len(calls),2)
+            self.assertEqual(len(calls),6)
             self.assertTrue(self.runner.candidate_resume_plan(cid)['can_resume'])
             self.assertTrue(self.runner.candidate_resume_plan(cid,manual_resume=True)['can_resume'])
             self.assertTrue(first['result']['checkpoints']['Q2']['unknown_execution']['judge'])
@@ -44,8 +47,8 @@ class ManualSandboxResumeTests(unittest.TestCase):
             self.assertEqual(recovered['result']['resume_source_id'],source['id'])
             self.assertEqual(self.store.evaluation_run(source['id']),before)
         self.assertEqual(self.runtime.answers.count('Q2'),2)  # one Baseline, one Candidate answer
-        self.assertEqual(first['result']['request_accounting']['unknown_usage_events'],2)
-        self.assertEqual(recovered['result']['request_accounting']['unknown_usage_events'],2)
+        self.assertEqual(first['result']['request_accounting']['unknown_usage_events'],6)
+        self.assertEqual(recovered['result']['request_accounting']['unknown_usage_events'],6)
 
     def test_unknown_embedding_or_rerank_resumes_49_completed_cases(self):
         from app.corpus import current_manifest, manifest_identity
@@ -104,7 +107,7 @@ class ManualSandboxResumeTests(unittest.TestCase):
                     self.assertEqual(recovered['result']['completed'],50)
                     self.assertTrue(recovered['result']['evaluation_complete'])
                     self.assertEqual(recovered['result']['resume_source_id'],source['id'])
-                    self.assertEqual(recovered['result']['request_accounting']['unknown_usage_events'],2)
+                    self.assertEqual(recovered['result']['request_accounting']['unknown_usage_events'],6)
                     for case in cases:
                         self.assertEqual(answers.count(case['question_id']),1)
                     if label=='B':self.assertEqual(rpc.count(('Q49','embedding')),1)

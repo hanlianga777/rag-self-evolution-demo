@@ -13,11 +13,12 @@ class AgentContextTests(unittest.TestCase):
         self.assertNotIn('result_json',row)
         self.assertNotIn('all_bad_case_audit',provider.prompt)
         self.assertNotIn('retrieval_trace',row)
-        self.assertEqual(row['diagnosis_category'],'检索失败')
+        self.assertEqual(row['diagnosis_category'],'检索层问题')
         self.assertTrue(row['reason'])
         with self.store.connection() as connection:
             audit=json.loads(connection.execute('SELECT result_json FROM agent_traces ORDER BY id DESC LIMIT 1').fetchone()[0])
         projected=audit['all_bad_case_audit'][0]['result']
-        self.assertEqual({k:v for k,v in projected.items() if k!='standard_evidence'}, {k:v for k,v in before['result'].items() if k!='standard_evidence'})
+        expected={**before['result'],'baseline_review_label':'单遍判错','optimization_target':True}
+        self.assertEqual({k:v for k,v in projected.items() if k!='standard_evidence'}, {k:v for k,v in expected.items() if k!='standard_evidence'})
         self.assertEqual(self.store.bad_case_rows()[0],before)
         self.assertEqual(row['question_id'],'Q1')

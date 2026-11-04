@@ -1,4 +1,5 @@
 """Offline regression for admission versus executable action; no live Provider."""
+import json
 import unittest
 from copy import deepcopy
 from unittest.mock import patch
@@ -17,20 +18,20 @@ class ClosedLoopTests(unittest.TestCase):
         case['judge_result']['checks'][0].pop('candidate_support')
         case['judge_result']['checks'][0].pop('scope_resolved')
         self.store.record_bad_case('EVAL-test','new-missing-diagnosis','Unknown','ordinary',case)
-        provider=FixedProvider('{"candidates":[],"insufficient_evidence":"先完成系统诊断任务"}')
+        provider=FixedProvider(json.dumps(contracts.drafts()))
         result=OptimizationAgent(self.store,provider).generate('EVAL-test')
         self.assertEqual(len(provider.prompt['bad_cases']),2)
         tasks=result['result']['diagnostic_tasks']
         self.assertTrue(any(t['question_id']=='new-missing-diagnosis' for t in tasks))
-        self.assertIn('new-missing-diagnosis',provider.prompt['target_reference_map'])
-        self.assertFalse(self.store.candidates())
+        self.assertIn('new-missing-diagnosis',result['result']['target_reference_map'])
+        self.assertEqual(len(result['candidates']),3)
 
     def test_pass_is_not_an_agent_target_even_with_old_technical_flag(self):
         case,_=example()
         case['evaluation_outcome']={'contract_version':'business-vnext-1','execution_complete':True,'verdict':'PASS'}
         case['passed']=True
         self.store.record_bad_case('EVAL-test','old-pass','Ranking','ordinary',case)
-        provider=FixedProvider('{"candidates":[],"insufficient_evidence":"offline"}')
+        provider=FixedProvider(json.dumps(contracts.drafts()))
         from app.diagnostics import diagnostic_view
         def stale_view(case):
             return {**diagnostic_view(case),'target_eligible':True}
@@ -40,7 +41,7 @@ class ClosedLoopTests(unittest.TestCase):
 
 
 class ActionContractTests(unittest.TestCase):
-    def test_evidence_backed_two_stage_dependency_is_executable(self):
+    def test_evidence_backed_two_stage_change_uses_saved_targets_and_legal_parameters(self):
         case,_=example()
         view={'target_eligible':True,'primary_root_cause':'Retrieval','trace_observations':['recall_missing','ranking_omission']}
         proposal={'intervention_direction':'candidate_recall','supporting_directions':['context_selection'],
@@ -50,7 +51,10 @@ class ActionContractTests(unittest.TestCase):
             'hypothesis':'补全多段规范','why':'候选与Final分别有已核验缺口','expected_improvement':'必要事实覆盖增加','risk':'噪声及延迟'}
         with patch('app.optimization.diagnostic_view',return_value=view):
             validate_intervention(proposal,{'new-case':case},DEFAULT_PIPELINE_CONFIG)
-            bad=deepcopy(proposal);bad['evidence_assertions']=bad['evidence_assertions'][:1]
+            # Task 004 made evidence assertions advisory; actual target/config remain mandatory.
+            bad=deepcopy(proposal);bad['target_bad_cases']=['invented-case']
+            with self.assertRaises(ValueError):validate_intervention(bad,{'new-case':case},DEFAULT_PIPELINE_CONFIG)
+            bad=deepcopy(proposal);bad['config_diff']['candidate_k']=4
             with self.assertRaises(ValueError):validate_intervention(bad,{'new-case':case},DEFAULT_PIPELINE_CONFIG)
 
     def test_query_only_ranking_reads_only_query_and_saved_pool(self):
@@ -204,7 +208,7 @@ class BatchAndReplayTests(unittest.TestCase):
         self.assertFalse(optimization_preflight(q,chunks)['ready'])
 
 class FourDirectionTests(unittest.TestCase):
-    def test_new_behavior_failure_and_measured_performance_have_real_actions(self):
+    def test_behavior_failure_and_latency_keep_distinct_saved_evidence(self):
         from app.diagnostics import diagnostic_view
         for root in ['Safety','Performance']:
             c,chunks=example();c['question_id']='fresh-'+root
@@ -214,11 +218,14 @@ class FourDirectionTests(unittest.TestCase):
             else:
                 c['programmatic_metrics'].update(latency_ms=70000,stages=[{'stage_name':'generation','duration_ms':65000}])
             view=diagnostic_view(c,corpus_chunks=chunks,corpus_fingerprint='isolated')
-            self.assertEqual(view['primary_root_cause'],root,view)
+            self.assertEqual(view['primary_root_cause'],'Safety' if root=='Safety' else 'Ranking',view)
+            if root=='Performance':
+                self.assertEqual(view['latency']['bottleneck']['stage_name'],'generation')
+                self.assertIn('Latency 过高',[p['name'] for p in view['phenomena']])
             self.assertTrue(view['target_eligible'])
             proposal={'target_bad_cases':[c['question_id']],'root_cause':root,
                 'intervention_direction':'grounded_generation' if root=='Safety' else 'stage_performance',
-                'performance_stage':'generation','config_diff':{'prompt_strategy':'Abstention' if root=='Safety' else 'Completeness'},
+                'performance_stage':'generation','config_diff':{'prompt_strategy':'Tiered'} if root=='Safety' else {'generation_thinking':'high','candidate_k':24},
                 'evidence_assertions':[{'target_id':c['question_id'],'observation':'safety_failure' if root=='Safety' else 'measured_latency'}],
                 'parameter_dependencies':[],'hypothesis':'验证已定位失败','why':'真实回答/阶段记录','expected_improvement':'完整题集验证','risk':'误拒答、越界与质量回归'}
             with patch('app.optimization.diagnostic_view',return_value=view):

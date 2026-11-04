@@ -407,13 +407,17 @@ class CandidateReviewExportTests(unittest.TestCase):
         before = {key:self.store.probe_history(key) for key in ids}
         self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
         service = SimpleNamespace(quality_check=Mock(side_effect=RuntimeError('known offline local error')))
-        with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')):
+        with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')), patch('app.evaluation_stage.time.sleep'):
             main._run_quality_rerun(self.run_id, ids, self.store, service, main.corpus)
         audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
         self.assertEqual(audit['status'], 'completed')
         self.assertEqual(audit['completed'], 20)
         self.assertEqual(audit['technical_failed'], 20)
-        self.assertEqual(service.quality_check.call_count, 40)
+        self.assertEqual(service.quality_check.call_count, 120)
+        for checkpoint in audit['checkpoints'].values():
+            attempts = [attempt for attempt in checkpoint['attempts'] if attempt['phase'] == 'qc']
+            self.assertEqual([attempt.get('retry_delay_seconds') for attempt in attempts], [1, 2, None] * 2)
+            self.assertTrue(all(attempt['request_execution_unknown'] is False for attempt in attempts))
         self.assertEqual(len(audit['slots']), 20)
         self.assertTrue(all(slot['failed_stage'] == 'qc' and slot['execution_status'] == 'failed' for slot in audit['slots'].values()))
         self.assertTrue(all(self.store.qc_history(key) == [] for key in ids))
@@ -429,13 +433,17 @@ class CandidateReviewExportTests(unittest.TestCase):
         error.request_execution_unknown = True
         service = SimpleNamespace(quality_check=Mock(side_effect=error))
         self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
-        with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')):
+        with patch.object(self.store, 'run_probe', side_effect=AssertionError('passed Probe must not rerun')), patch('app.evaluation_stage.time.sleep'):
             main._run_quality_rerun(self.run_id, ids, self.store, service, main.corpus)
         audit = self.store.generation_run(self.run_id)['artifacts']['hard_validation']['quality_rerun']
         self.assertEqual(audit['status'], 'completed')
         self.assertEqual(audit['completed'], 20)
         self.assertEqual(audit['technical_failed'], 20)
-        self.assertEqual(service.quality_check.call_count, 40)
+        self.assertEqual(service.quality_check.call_count, 120)
+        for checkpoint in audit['checkpoints'].values():
+            attempts = [attempt for attempt in checkpoint['attempts'] if attempt['phase'] == 'qc']
+            self.assertEqual([attempt.get('retry_delay_seconds') for attempt in attempts], [1, 2, None] * 2)
+            self.assertTrue(all(attempt['request_execution_unknown'] is True for attempt in attempts))
         self.assertEqual(len(audit['slots']), 20)
         self.assertTrue(all(self.store.qc_history(key) == [] for key in ids))
         selected = self.store.update_quality_rerun(self.run_id, {'status':'running'}, start=True, anomalies_only=True)
@@ -491,7 +499,8 @@ class CandidateReviewExportTests(unittest.TestCase):
         service = AiService(self.store, main.corpus, Provider(), False)
         service.retriever = type("Retriever", (FullTextFixture,), {"retrieve": lambda _self, _question, _config: [{"chunk_id": "C1", "score": .9}]})()
         ids = self.store.update_quality_rerun(self.run_id, {"status": "running", "completed": 0}, start=True)
-        main._run_quality_rerun(self.run_id, ids, self.store, service, main.corpus)
+        with patch('app.evaluation_stage.time.sleep'):
+            main._run_quality_rerun(self.run_id, ids, self.store, service, main.corpus)
         rerun = self.store.generation_run(self.run_id)["artifacts"]["hard_validation"]["quality_rerun"]
         self.assertEqual(rerun["status"], "completed")
         self.assertEqual(rerun["completed"], 20)

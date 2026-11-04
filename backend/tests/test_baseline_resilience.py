@@ -44,24 +44,25 @@ class BaselineResilienceTests(unittest.TestCase):
             if q==target['question']:raise ProviderInvalidResponse('contract',raw_provider_response='{}')
             return original(q,*args,**kw)
         runtime.judge=judge;old=self.execute(runner)
-        self.assertEqual(old['status'],'partial');self.assertEqual(old['result']['completed'],49)
+        self.assertEqual(old['status'],'completed');self.assertFalse(old['result']['evaluation_complete']);self.assertEqual(old['result']['completed'],49)
         self.assertEqual(old['result']['technical_error_count'],1)
         self.assertIsNone(old['result']['overall_score']);self.assertIsNone(old['result']['gates']['passed'])
         self.assertFalse(any(b['run_id']==old['id'] for b in self.store.bad_case_rows()))
         cp=old['result']['checkpoints'][target['id']];self.assertIn('execution',cp)
-        self.assertEqual(len([a for a in cp['attempts'] if a['status']=='error']),2)
+        self.assertEqual(len([a for a in cp['attempts'] if a['status']=='error']),8)
         frozen=copy.deepcopy(old);runtime.judge=original;new=self.execute(runner,old['id'])
         self.assertEqual(new['status'],'completed');self.assertEqual(new['result']['completed'],50)
         self.assertEqual(new['result']['technical_error_count'],0)
         self.assertEqual(len(runtime.answers),50);self.assertEqual(len(set(runtime.answers)),50)
         self.assertEqual(self.store.evaluation_run(old['id']),frozen)
 
-    def test_consecutive_contract_failure_stops_after_two_questions(self):
+    def test_consecutive_contract_failures_finish_all_questions_without_a_score(self):
         runtime,runner,_=self.fifty()
         runtime.judge=lambda *_a,**_k:(_ for _ in ()).throw(ProviderInvalidResponse('invalid contract',raw_provider_response='{}'))
         result=self.execute(runner)
-        self.assertEqual(len(runtime.answers),2);self.assertEqual(result['result']['technical_error_count'],2)
-        self.assertIn('连续',result['error_message']);self.assertFalse(result['result']['evaluation_complete'])
+        self.assertEqual(len(runtime.answers),50);self.assertEqual(result['result']['technical_error_count'],50)
+        self.assertEqual(result['status'],'completed');self.assertFalse(result['result']['evaluation_complete'])
+        self.assertIsNone(result['result']['overall_score']);self.assertFalse(self.store.bad_case_rows())
 
     def test_generation_timeout_exhaustion_is_isolated_but_account_error_stops(self):
         for error,expected in [(ProviderTimeout('timeout'),49),(ProviderAPIError('account',status_code=401),2)]:
@@ -72,7 +73,7 @@ class BaselineResilienceTests(unittest.TestCase):
                 return answer(q,c)
             runtime.answer=flaky;result=self.execute(runner)
             self.assertEqual(result['result']['completed'],expected)
-            self.assertEqual(calls.count(target['question']),3 if isinstance(error,ProviderTimeout) else 1)
+            self.assertEqual(calls.count(target['question']),6 if isinstance(error,ProviderTimeout) else 1)
 
     def test_real_invalid_response_is_persisted_and_batch_continues(self):
         runtime,runner,items=self.fifty();f=json.loads(REAL.read_text());e=f['checkpoint']['execution'];answer=runtime.answer;judge=runtime.judge
@@ -83,7 +84,11 @@ class BaselineResilienceTests(unittest.TestCase):
             if q==target['question']:
                 with patch.object(provider,'complete',return_value=raw):return provider.judge(q,f['question']['reference_answer'],e['answer'],context=context)
             return judge(q,*args,context=context,**kw)
-        runtime.answer=saved_answer;runtime.judge=saved_judge;result=self.execute(runner)
+        runtime.answer=saved_answer;runtime.judge=saved_judge
+        # Replay the saved source context; its historical corpus is not the live test index.
+        chunks=[{**entry,'chunk_text':entry['content']} for entry in e['retrieval_trace']['candidates']]
+        with patch('app.diagnostics._current_corpus',return_value=(chunks,e['retrieval_trace']['corpus_fingerprint'])):
+            result=self.execute(runner)
         self.assertEqual(result['result']['completed'],49);self.assertEqual(result['result']['technical_error_count'],1)
         cp=result['result']['checkpoints'][target['id']]
         self.assertEqual(cp['attempts'][-1]['raw_provider_response'],raw)
@@ -105,14 +110,14 @@ class BaselineResilienceTests(unittest.TestCase):
         def judge(q,*args,context=None,**kw):
             if q=='Q2':
                 contexts.append(context)
-                if len(contexts)<=2: raise ProviderInvalidResponse('missing quote',raw_provider_response='{"verdict":"FAIL"}')
+                if len(contexts)<=8: raise ProviderInvalidResponse('missing quote',raw_provider_response='{"verdict":"FAIL"}')
             return original(q,*args,context=context,**kw)
         runtime.judge=judge; runner=EvaluationRunner(self.store,runtime)
-        old=self.execute(runner); self.assertEqual(old['status'],'partial')
+        old=self.execute(runner); self.assertEqual(old['status'],'completed');self.assertFalse(old['result']['evaluation_complete'])
         result=self.execute(runner,old['id'])
         self.assertEqual(result['status'],'completed')
         self.assertEqual(runtime.answers.count('Q2'),1)
-        self.assertEqual(contexts[2]['judge_correction'],{'error':'missing quote','previous_response':'{"verdict":"FAIL"}'})
+        self.assertEqual(contexts[8]['judge_correction'],{'error':'missing quote','previous_response':'{"verdict":"FAIL"}'})
 
     def test_fifty_case_recovery_at_boundaries_for_judge_and_timeout(self):
         for index in (0,3,24,48,49):
@@ -124,7 +129,7 @@ class BaselineResilienceTests(unittest.TestCase):
                         if q==target['question']: raise failure
                         return original(q,*args,context=context,**kw)
                     runtime.judge=judge; old=self.execute(runner)
-                    self.assertEqual(old['status'],'partial'); self.assertEqual(old['result']['completed'],49)
+                    self.assertEqual(old['status'],'completed');self.assertFalse(old['result']['evaluation_complete']); self.assertEqual(old['result']['completed'],49)
                     self.assertIn('execution',old['result']['checkpoints'][target['id']])
                     self.assertIsNone(old['result']['overall_score'])
                     runtime.judge=original; result=self.execute(runner,old['id'])
@@ -167,8 +172,9 @@ class BaselineResilienceTests(unittest.TestCase):
         runtime.judge=flaky;result=self.execute(runner)
         with patch.object(main,'store',self.store):
             api=main.evaluation(active_task=True)
-            self.assertEqual(api['runtime_contract']['prompt_version'],'judge-vnext-5-fact-scope')
-            self.assertEqual(set(api['runtime_contract']['loaded_code_sha256']),{'validator','provider_parser','scorer','batch_runner','diagnostic_view','agent_generate'})
+            from app.evaluation_contract import VERSIONS
+            self.assertEqual(api['runtime_contract']['prompt_version'],VERSIONS['prompt_version'])
+            self.assertGreaterEqual(set(api['runtime_contract']['loaded_code_sha256']),{'validator','provider_parser','scorer','batch_runner','diagnostic_view','agent_generate'})
             self.assertEqual(api['result']['completed'],49);self.assertEqual(api['result']['technical_error_count'],1)
             self.assertIsNone(api['current_baseline_id']);self.assertEqual(main.bad_cases(),[])
             self.assertEqual([g['status'] for g in api['result']['gates']['gates']],['NOT_EVALUABLE']*11)
@@ -192,7 +198,7 @@ class BaselineResilienceTests(unittest.TestCase):
         runtime.judge=flaky;key,approved,config=runner.start_baseline(automatic=True)
         with patch('app.evaluation.time.monotonic',side_effect=lambda:clock[0]),patch('app.evaluation.time.sleep',side_effect=sleep):
             result=runner.execute_baseline(key,approved,config)
-        self.assertEqual(result['result']['completed'],49);self.assertEqual(calls.count(target['question']),1)
+        self.assertEqual(result['result']['completed'],49);self.assertEqual(calls.count(target['question']),2)
         self.assertEqual(result['result']['technical_error_count'],1)
 
     def test_actual_missing_final_is_business_fail_not_technical_error(self):
@@ -244,7 +250,9 @@ class BaselineResilienceTests(unittest.TestCase):
             setattr(runtime,stage,late);key,approved,config=runner.start_baseline(automatic=True)
             with patch('app.evaluation.time.monotonic',side_effect=lambda:clock[0]),patch('app.evaluation.time.sleep'):
                 old=runner.execute_baseline(key,approved,config)
-            self.assertEqual(old['result']['completed'],49);self.assertEqual(old['result']['technical_error_count'],1)
-            self.assertIn('execution' if stage=='answer' else 'scored_result',old['result']['checkpoints'][target['id']])
-            new=self.execute(runner,old['id'])
-            self.assertEqual(new['status'],'completed');self.assertEqual(calls.count(target['question']),1)
+            self.assertEqual(old['status'],'completed');self.assertEqual(old['result']['completed'],50)
+            self.assertEqual(old['result']['technical_error_count'],0)
+            self.assertTrue(old['result']['evaluation_complete'])
+            self.assertEqual(calls.count(target['question']),1)
+            self.assertEqual(runtime.answers.count(target['question']),1)
+            self.assertEqual(runtime.judges.count(target['question']),1)

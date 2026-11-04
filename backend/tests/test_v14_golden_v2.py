@@ -169,7 +169,7 @@ class GoldenV2Tests(unittest.TestCase):
         centers = {slot['slot']: next(c['center'] for c in plan['clusters'] if c['cluster_id'] == slot['topic_cluster']) for slot in plan['slots']}
         import re
         service.negative_topic_embedding = lambda question: centers[re.search(r'Q\d+', question).group()]
-        service.quality_check = Mock(return_value={'priority': 'P2', 'reason': 'fixture'})
+        service.quality_check = Mock(return_value={'score':95, 'priority': 'P2', 'reason': 'fixture'})
         run_id = self.store.start_generation_run('offline-stub', coverage_plan=plan)
         main._run_mini_generation(run_id, self.store, service, corpus)
         partial = self.store.generation_run(run_id)
@@ -182,7 +182,7 @@ class GoldenV2Tests(unittest.TestCase):
         self.store.claim_regeneration(run_id, plan['corpus_fingerprint'])
         def probe_stub(question_id, *_args, **_kwargs):
             return self.store.record_probe_result(question_id, {'question_quality': 30, 'golden_answer_quality': 30, 'evidence_support': 40})
-        with patch.object(self.store, 'run_probe', side_effect=probe_stub), patch.object(self.store, 'record_qc'):
+        with patch.object(self.store, 'run_probe', side_effect=probe_stub):
             main._run_mini_generation(run_id, self.store, service, corpus, regenerate=True)
         run = self.store.generation_run(run_id)
         self.assertEqual(run['status'], 'completed')

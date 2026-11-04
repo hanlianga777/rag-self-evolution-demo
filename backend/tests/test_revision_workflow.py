@@ -687,7 +687,9 @@ class RevisionWorkflowTests(unittest.TestCase):
         result = self.store.revision_run(run["id"])
         self.assertEqual(result["status"], "preview_ready")
         self.assertEqual(service.calls, 2)
-        self.assertEqual([(item["attempt"], item["result"]) for item in result["runtime_attempts"]], [(1, "failed"), (2, "passed")])
+        self.assertEqual([(item["stage"], item["attempt"], item["result"]) for item in result["runtime_attempts"]], [("material_selection", 1, "passed"), ("generating", 2, "passed")])
+        checkpoint = self.store.job_checkpoint(run["id"], "revision:generating:0:" + first)
+        self.assertEqual([(item["status"], item.get("error_type")) for item in checkpoint["attempts"]], [("error", "ProviderTimeout"), ("ok", None)])
         self.assertEqual(self.store.question(first)["question"], "原题 1")
 
     def test_preview_edit_regenerate_and_discard_preserve_original_until_apply(self):
@@ -893,9 +895,12 @@ class RevisionWorkflowTests(unittest.TestCase):
             self.store.apply_revision(run["id"], self.chunks[:1], similarity=lambda _a, _b: .1)
         self.assertEqual(self.store.question(first)["question"], "原题 1")
 
-    def test_restart_marks_unfinished_worker_interrupted_without_losing_audit(self):
+    def test_restart_preserves_auto_resume_and_interrupts_legacy_worker_without_losing_audit(self):
         first = self.ids[0]
         run = self.store.start_revision(first, "manual_edit", "补证据", False, {first: {"question": "如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
+        self.store.interrupt_revision_runs()
+        self.assertEqual(GovernanceStore(self.store.database_path).revision_run(run["id"])["status"], "queued")
+        self.store.update_revision(run["id"], auto_resume=False)
         self.store.interrupt_revision_runs()
         restored = GovernanceStore(self.store.database_path).revision_run(run["id"])
         self.assertEqual(restored["status"], "interrupted")
@@ -925,7 +930,7 @@ class RevisionWorkflowTests(unittest.TestCase):
         self.store.review_question(first, "approved", "reviewer")
         self.assertEqual(self.store.question(first)["stage"], "golden")
 
-    def test_qc_timeout_retries_once_then_resumes_without_reapplying_or_reprobing(self):
+    def test_qc_exhausted_transport_gets_final_pass_then_resumes_without_reapplying_or_reprobing(self):
         first = self.ids[0]
         run = self.store.start_revision(first, "manual_edit", "修订操作", False, {first: {"question": "清洁前如何检查急停？", "reference_answer": "启动前检查急停按钮", "source_chunk_ids": ["C2"]}}, self.chunks)
         self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)
@@ -936,7 +941,9 @@ class RevisionWorkflowTests(unittest.TestCase):
         def qc(_item):
             calls.append("qc")
             if len(calls) <= 2:
-                raise ProviderTimeout("DeepSeek 请求超时，请重试")
+                error = ProviderTimeout("DeepSeek 请求超时，请重试")
+                error.provider_retry_exhausted = True
+                raise error
             return {"score": 95, "priority": "P2", "reason": "通过"}
         service = SimpleNamespace(retriever=retriever, answerability_check=lambda *_args: {}, negative_subtype_check=None, quality_check=qc, model="fixture")
         main._run_revision_quality(run["id"], self.store, service, SimpleNamespace(chunks=lambda: self.chunks))

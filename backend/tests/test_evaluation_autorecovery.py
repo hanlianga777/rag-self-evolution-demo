@@ -88,7 +88,7 @@ class AutomaticRecoveryTests(unittest.TestCase):
         with patch('app.evaluation.time.sleep'):result=runner.execute_baseline(key,items,config)
         self.assertEqual(result['status'],'completed');self.assertEqual(result['result']['technical_failed'],4);self.assertFalse(result['result']['evaluation_complete']);checkpoint=result['result']['checkpoints']['Q1']
         errors=[a for a in checkpoint['attempts'] if a['status']=='error']
-        self.assertEqual(len(errors),4);self.assertEqual(errors[-1]['raw_provider_response'],'{}');self.assertIn('execution',checkpoint)
+        self.assertEqual(len(errors),8);self.assertEqual(errors[-1]['raw_provider_response'],'{}');self.assertIn('execution',checkpoint)
 
     def test_long_task_is_not_stopped_by_elapsed_time(self):
         import itertools
@@ -101,7 +101,7 @@ class AutomaticRecoveryTests(unittest.TestCase):
         runtime=Runtime(fail=None);runner=EvaluationRunner(self.store,runtime);key,items,config=runner.start_baseline(automatic=True)
         with patch.object(self.store,'record_evaluation_case',side_effect=OSError('fixture disk')):
             first=runner.execute_baseline(key,items,config)
-        self.assertEqual(first['status'],'partial');self.assertIn('scored_result',first['result']['checkpoints']['Q1'])
+        self.assertEqual(first['status'],'completed');self.assertFalse(first['result']['evaluation_complete']);self.assertEqual(first['result']['technical_failed'],4);self.assertIn('scored_result',first['result']['checkpoints']['Q1'])
         child,items,config=runner.start_baseline(key,automatic=True);result=runner.execute_baseline(child,items,config)
         self.assertEqual(result['status'],'completed');self.assertEqual(runtime.judges.count('Q1'),1);self.assertEqual(runtime.answers.count('Q1'),1)
 
