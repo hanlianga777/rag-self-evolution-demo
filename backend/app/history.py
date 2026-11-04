@@ -2,7 +2,7 @@
 import json
 from datetime import datetime, timezone
 
-RETAINED_TABLES = {'schema_migrations', 'tool_registry', 'pipeline_config_draft', 'alias_mappings'}
+RETAINED_TABLES = {'schema_migrations', 'tool_registry', 'pipeline_config_draft', 'alias_mappings', 'paid_schedule_settings'}
 EXPERIMENT_TABLES = (
     'evaluation_checkpoints', 'job_checkpoints', 'evaluation_case_results', 'bad_cases', 'agent_traces', 'tool_calls', 'recommendations',
     'candidate_configs', 'optimization_triggers', 'monitoring_events', 'experiments', 'evaluation_runs',
@@ -21,10 +21,12 @@ def table_counts(connection):
 def has_active_jobs(connection):
     for table in ('evaluation_runs','experiments','candidate_configs','golden_generation_runs','candidate_revision_runs'):
         if connection.execute('SELECT 1 FROM '+table+' WHERE status IN ('+','.join('?' for _ in ACTIVE)+') LIMIT 1',ACTIVE).fetchone():return True
-    return bool(connection.execute("SELECT 1 FROM experiments WHERE json_extract(result_json,'$.optimization_cycle.status')='running' LIMIT 1").fetchone())
+    return bool(connection.execute("SELECT 1 FROM experiments WHERE json_extract(result_json,'$.optimization_cycle.status')='running' OR json_extract(result_json,'$.composite_schedule.status') IN ('waiting','running') LIMIT 1").fetchone() or connection.execute("SELECT 1 FROM job_checkpoints WHERE question_id LIKE 'diagnostic-batch:%' AND json_extract(checkpoint_json,'$.status') IN ('waiting','running') LIMIT 1").fetchone())
 
 
 def require_idle(connection):
+    if has_active_jobs(connection):
+        raise ValueError('存在活动任务，禁止破坏性清理')
     for table in ('evaluation_runs', 'experiments', 'candidate_configs', 'golden_generation_runs', 'candidate_revision_runs'):
         if connection.execute('SELECT 1 FROM '+table+' WHERE status IN ('+','.join('?' for _ in ACTIVE)+') LIMIT 1', ACTIVE).fetchone():
             raise ValueError('存在活动任务，禁止破坏性清理：'+table)

@@ -52,7 +52,7 @@ export function VersionsPage({ data }: { data: any }) {
     catch(reason) { setError(errorMessage(reason)); }
     finally { setHistoryBusy(false); }
   };
-  const rollback = async (version: any) => { setBusy(true); setError(""); try { const active: any = await operation.run(`回滚至 ${version.id}`, () => postJson(`/api/versions/${version.id}/rollback`, { decision: "approved" })); setVersions(current => current.map(item => ({ ...item, status: item.id === active.id ? "active" : item.status === "active" ? "archived" : item.status }))); await reload(); setConfirmation(null); } catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); } };
+  const rollback = async (version: any) => { setBusy(true); setError(""); try { const active: any = await operation.run("回滚历史线上配置", () => postJson(`/api/versions/${version.id}/rollback`, { decision: "approved" })); setVersions(current => current.map(item => ({ ...item, status: item.id === active.id ? "active" : item.status === "active" ? "archived" : item.status }))); await reload(); setConfirmation(null); } catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); } };
   const release = async (candidate: any) => {
     if (!canRelease(candidate)) return;
     setBusy(true); setError("");

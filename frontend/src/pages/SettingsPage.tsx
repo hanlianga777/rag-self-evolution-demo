@@ -1,3 +1,4 @@
+import { RuntimeSettings } from "../components/RuntimeSettings";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { errorMessage, postJson } from "../api";
@@ -70,6 +71,7 @@ export function SettingsPage({ data }: { data: any }) {
       {(changed.length > 0 || pipeline?.config_draft) && <p className="muted">配置草稿尚未生效；需显式运行新的 Baseline 才会成为评测基线。候选方案的优化使用独立实验配置。</p>}
       {pipeline?.baseline_config && (changed.length > 0 || pipeline?.config_draft) && <div className="pipeline-draft-diff"><h3>Baseline → 草稿参数变化</h3><dl className="baseline-strategy">{changed.map(key => <div key={key}><dt>{parameterNames[key] || key}</dt><dd>{formatValue(baseline[key])} → {formatValue(draft[key])}</dd></div>)}</dl>{!changed.length && <p className="muted">草稿与 冻结 Baseline 参数一致。</p>}</div>}
     </Section>
+    <RuntimeSettings />
     <TechnicalDetails><p>评测与治理：判分规则和门槛固定。</p></TechnicalDetails>
     <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="可选参数范围" className="parameter-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={contract} baseline={baseline} /></div></Drawer>
   </PageShell>;

@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 
 from .evaluation import EvaluationRunner
 from .full_text import CORPUS_LOCK
-from .optimization import OptimizationAgent
+from .optimization import OptimizationAgent, ProposalValidationExhausted
+from .paid_schedule import wait_for_off_peak
 from .policy import MAX_EVALS
 
 
@@ -45,7 +46,10 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
         result = {**experiment['result'], 'optimization_cycle':state}
         connection.execute('UPDATE experiments SET result_json=? WHERE id=?',
                            (json.dumps(result, ensure_ascii=False), experiment_id))
-        return state
+    from .paid_schedule import clear_run_now
+    for kind in ('cycle:', 'agent:'):
+        clear_run_now(store, kind + experiment_id)
+    return state
 
 
 def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
@@ -114,15 +118,18 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                 return save('round_completed','review')
             if experiment['evaluation_budget']['used'] >= MAX_EVALS-1:
                 return save('budget_exhausted', 'review')
+            if experiment['evaluation_budget']['used'] > MAX_EVALS - 4:
+                return save('budget_exhausted', 'review', '剩余额度不足完整 A/B/C 三套，并须保留 1 次给 D')
             save('running', 'analysis')
             before = len(experiment['candidates'])
             try:
+                def price_state(pause):
+                    state['price_pause']=pause
+                    save('running','analysis')
+                wait_for_off_peak(store,'cycle:'+experiment_id,price_state)
                 agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
-            except ValueError:
-                # A rejected draft is saved for audit and costs no Sandbox trial.
-                audit = store.experiment(experiment_id, light=True)['result']
-                if audit.get('provider_raw_text') is None or not audit.get('rejected_candidates'):
-                    raise
+            except ProposalValidationExhausted as error:
+                return save('analysis_exhausted','analysis',str(error))
             experiment = store.experiment(experiment_id, light=True)
             empty_rounds = empty_rounds+1 if len(experiment['candidates'])==before else 0
             if empty_rounds >= 3:

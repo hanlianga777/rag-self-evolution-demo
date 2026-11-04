@@ -128,6 +128,10 @@ def start_recovery_monitor():
                 from .optimization_cycle import recover_optimization_cycles, recover_agent_generations
                 recover_optimization_cycles(store,ai_service)
                 recover_agent_generations(store,ai_service)
+                from .paid_schedule import recover_scheduled_composites
+                recover_scheduled_composites(store,ai_service.provider)
+                from .evidence_resolver import recover_diagnostic_batches
+                recover_diagnostic_batches(store,ai_service)
                 followup_jobs.recover()
                 recover_golden_jobs()
             except Exception:logging.exception('Background recovery monitor unavailable')
@@ -784,6 +788,20 @@ def _golden_owner():
     return {'auto_resume': True, 'execution_owner_pid': os.getpid(), 'worker_thread': threading.get_ident()}
 
 
+def _wait_golden_price(run_id, run_store):
+    from .paid_schedule import wait_for_off_peak
+    wait_for_off_peak(run_store, 'golden:' + run_id,
+        lambda pause: run_store.update_generation_run(run_id,
+            status=run_store.generation_run(run_id, qualification=False)['status'],
+            validation={'price_pause': pause}))
+
+
+def _wait_revision_price(revision_id, run_store):
+    from .paid_schedule import wait_for_off_peak
+    wait_for_off_peak(run_store, 'revision:' + revision_id,
+        lambda pause: run_store.update_revision(revision_id, price_pause=pause))
+
+
 def _golden_owner_alive(owner):
     pid = owner.get('execution_owner_pid')
     if pid == os.getpid():
@@ -872,13 +890,19 @@ def _run_mini_generation_work(run_id, run_store, service, run_corpus, *, regener
 
     generation_checkpoints = run_store.generation_run(run_id, qualification=False)['artifacts']['hard_validation'].get('generation_checkpoints', {})
     generation_checkpoints.update({key.removeprefix('generation:'): value for key, value in run_store.job_checkpoints(run_id).items() if key.startswith('generation:')})
+    active_slot = None
     def generation_stage(slot, attempt, work):
+        nonlocal active_slot
+        if slot != active_slot:
+            _wait_golden_price(run_id, run_store)
+            active_slot = slot
         checkpoint = generation_checkpoints.setdefault(slot + ':' + str(attempt), {'attempts': []})
         return perform_stage(checkpoint, 'generation', work, run_id + ':' + slot + ':' + str(attempt),
                              automatic=False, check_stop=lambda: None,
                              on_state=lambda *args, **kwargs: run_store.save_job_checkpoint(
                                  run_id, 'generation:' + slot + ':' + str(attempt), checkpoint))
     def generate(**kwargs):
+        _wait_golden_price(run_id, run_store)
         if isinstance(service, AiService):
             kwargs['stage_runner'] = generation_stage
         return service.generate_mini_golden(chunks, on_progress=on_progress, **kwargs)
@@ -1049,6 +1073,11 @@ def _run_quality_rerun(run_id, ids, run_store, service, run_corpus, *, generatio
                 item=run_store.question(key);slot=item['raw'].get('coverage_slot') or f'Q{index:02}'
                 if final_pass and (not (slots.get(slot,{}).get('execution_status') == 'failed' or slots.get(slot,{}).get('final_retry_pending')) or slots.get(slot,{}).get('final_retry_done')):
                     continue
+                if not final_pass and slots.get(slot, {}).get('qc') in {'qc_passed', 'qc_failed', 'skipped'} and slots[slot].get('execution_status') != 'failed':
+                    _, identity = run_store.capture_quality(key)
+                    if checkpoints.get(key, {}).get('identity') == {k:v for k,v in identity.items() if k!='probe_id'}:
+                        continue
+                _wait_golden_price(run_id, run_store)
                 if final_pass:
                     slots[slot]['final_retry_pending']=True
                 else:
@@ -1198,10 +1227,22 @@ def _generate_revision_with_weak_keyword_repair(run, run_store, service, chunks,
     attempts = list(run.get("generation_attempts", []))
     draft_attempt = (run.get("active_draft") or {}).get("number")
     attempts_allowed = (1,) if any(item['raw'].get('generation_path')=='business_question_first' for item in run['before'].values()) else (1,2)
+    def progress(index, total, item_id, drafts):
+        run_store.update_revision(run['id'], generated_drafts=drafts,
+            progress={'current': index, 'total': total})
+        if on_progress:
+            on_progress(index, total, item_id, drafts)
     for attempt in attempts_allowed:
         prompt_run = {**run, 'repair_error': '；'.join(errors) if attempt > 1 else None}
         try:
-            generated = _revision_attempt(run_store, run['id'], 'generating', service, lambda: service.generate_revision_drafts(prompt_run, chunks, existing=generated, **({'on_progress': on_progress} if on_progress else {})))
+            ids = sorted(run['question_ids'], key=lambda key: run['before'][key]['test_category'] == 'ablation')
+            for index, item_id in enumerate(ids, 1):
+                if item_id in generated:
+                    continue
+                generated = _revision_attempt(run_store, run['id'], 'generating', service,
+                    lambda: service.generate_revision_drafts({**prompt_run, 'question_ids': [item_id]}, chunks, existing=generated),
+                    question_id=item_id)
+                progress(index, len(ids), item_id, generated)
         except Exception as error:
             attempts.append({'question_ids': run['question_ids'], 'draft_attempt': draft_attempt, 'attempt': attempt, 'error': str(error), 'at': datetime.now(timezone.utc).isoformat()})
             run_store.update_revision(run['id'], generation_attempts=attempts)
@@ -1338,6 +1379,9 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
             for index, item_id in enumerate(run["question_ids"], 1):
                 if final_pass and results.get(item_id,{}).get('execution_status')!='failed':
                     continue
+                if not final_pass and results.get(item_id, {}).get('probe') == 'passed' and results.get(item_id, {}).get('qc') in {'qc_passed', 'qc_failed'}:
+                    continue
+                _wait_revision_price(revision_id, run_store)
                 try:
                     run=run_store.revision_run(revision_id)
                     candidate = run_store.question(item_id)
@@ -1383,12 +1427,17 @@ def _run_revision_quality(revision_id, run_store, service, run_corpus):
         run_store.finish_revision_quality(revision_id, results, error=str(error), error_type=type(error).__name__, error_detail=str(error.__cause__ or error))
 
 
-def _revision_attempt(run_store, revision_id, stage, service, work):
+def _revision_attempt(run_store, revision_id, stage, service, work, *, question_id=None):
     from .evaluation_stage import perform_stage
+    if stage in {'material_selection', 'generating'}:
+        _wait_revision_price(revision_id, run_store)
     run = run_store.revision_run(revision_id)
     number = (run.get('active_draft') or {}).get('number', 0)
     key = 'revision:' + stage + ':' + str(number)
     checkpoint = run_store.job_checkpoint(revision_id, key) if hasattr(run_store, 'job_checkpoint') else None
+    if question_id:
+        key += ':' + question_id
+        checkpoint = run_store.job_checkpoint(revision_id, key) or checkpoint
     checkpoint = checkpoint or {'attempts': []}
     previous = checkpoint['attempts'][-1] if checkpoint['attempts'] else {}
     if previous.get('status') == 'error' and (previous.get('error_type') in {'ProviderInvalidResponse', 'ValueError', 'JSONDecodeError'}
@@ -1783,6 +1832,77 @@ class PaidActionRequest(BaseModel):
     pass
 
 
+class RuntimeSettingsRequest(BaseModel):
+    off_peak_only: bool = Field(strict=True)
+
+
+class RunNowRequest(BaseModel):
+    evaluation_id: str | None = None
+    experiment_id: str | None = None
+    calibration_group: Literal['max', 'high', 'low'] | None = None
+    generation_id: str | None = None
+    revision_id: str | None = None
+    diagnostic_id: str | None = None
+    acknowledge_peak_price: Literal[True]
+
+
+@app.get('/api/runtime-settings')
+def runtime_settings():
+    from .paid_schedule import schedule_status, active_pauses
+    return {**schedule_status(store), 'active_pauses':active_pauses(store)}
+
+
+@app.post('/api/runtime-settings', dependencies=[Depends(require_trusted_origin)])
+def update_runtime_settings(payload: RuntimeSettingsRequest):
+    from .paid_schedule import set_settings
+    return set_settings(store, payload.off_peak_only)
+
+
+@app.post('/api/runtime-settings/run-now', dependencies=[Depends(require_trusted_origin)])
+def run_now(payload: RunNowRequest):
+    from .paid_schedule import set_run_now
+    if sum(bool(value) for value in (payload.evaluation_id, payload.experiment_id, payload.generation_id, payload.revision_id)) != 1:
+        raise HTTPException(422, '请指定一个已运行的任务')
+    if payload.diagnostic_id:
+        if not payload.evaluation_id or payload.calibration_group:
+            raise HTTPException(422, '诊断批次须指定源评测和一个批次')
+        job=store.job_checkpoint(payload.evaluation_id,'diagnostic-batch:'+payload.diagnostic_id)
+        if not job or job.get('status') not in {'waiting','running'}:
+            raise HTTPException(409,'诊断批次未运行')
+        set_run_now(store,'diagnostic:'+payload.evaluation_id+':'+payload.diagnostic_id)
+    elif payload.calibration_group:
+        if not payload.evaluation_id:
+            raise HTTPException(422, '校准任务须指定源评测')
+        job = followup_jobs.progress(payload.evaluation_id, payload.calibration_group)
+        if job.get('status') not in {'running', 'starting'}:
+            raise HTTPException(409, '校准任务未运行')
+        set_run_now(store, 'calibration:' + payload.evaluation_id + ':' + payload.calibration_group)
+    elif payload.generation_id:
+        run = store.generation_run(payload.generation_id, qualification=False)
+        if not run or run['status'] not in {'queued', 'running', 'generating', 'coverage', 'validation', 'validating', 'probing', 'qc'}:
+            raise HTTPException(409, '出题或质检任务未运行')
+        set_run_now(store, 'golden:' + payload.generation_id)
+    elif payload.revision_id:
+        run = store.revision_run(payload.revision_id)
+        if not run or run['status'] not in {'queued', 'generating', 'validating', 'probing', 'qc'}:
+            raise HTTPException(409, '修订任务未运行')
+        set_run_now(store, 'revision:' + payload.revision_id)
+    elif payload.evaluation_id:
+        run = store.evaluation_run(payload.evaluation_id, light=True)
+        if not run or run['status'] not in {'queued', 'running'}:
+            raise HTTPException(409, '任务未运行；立即运行不能启动已停止或已完成的任务')
+        set_run_now(store, 'evaluation:' + payload.evaluation_id)
+    else:
+        experiment = store.experiment(payload.experiment_id, light=True)
+        result = (experiment or {}).get('result', {})
+        if not experiment or not (result.get('optimization_cycle', {}).get('status') == 'running'
+                or experiment['status'] == 'generating' or result.get('composite_schedule', {}).get('status') == 'waiting'):
+            raise HTTPException(409, '任务未运行；立即运行不能启动已停止的循环')
+        kind = 'cycle:' if result.get('optimization_cycle', {}).get('status') == 'running' else 'agent:' if experiment['status'] == 'generating' else 'composite:'
+        set_run_now(store, kind + payload.experiment_id)
+    return {'status': 'resuming', 'message': '已临时忽略时段限制；高峰期间按高峰价计费', 'off_peak_only': runtime_settings()['off_peak_only']}
+
+
 @app.post('/api/experiments/{run_id}/composite', dependencies=[Depends(require_trusted_origin)])
 def create_composite(run_id: str, payload: PaidActionRequest | None = None):
     experiment = store.experiment(run_id)
@@ -1790,6 +1910,10 @@ def create_composite(run_id: str, payload: PaidActionRequest | None = None):
         require_current_baseline(experiment["baseline_run_id"])
     require_idle_cycle(experiment)
     try:
+        from .paid_schedule import pause_state, start_scheduled_composite
+        if pause_state(store, 'composite:' + run_id)['paused']:
+            state = start_scheduled_composite(store, ai_service.provider, run_id)
+            return {'status': 'scheduled', **state}
         return store.create_composite(run_id, ai_service.provider)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error

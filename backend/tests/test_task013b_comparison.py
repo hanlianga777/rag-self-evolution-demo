@@ -19,6 +19,7 @@ class ComparisonTests(unittest.TestCase):
             def evaluation_history(self):return [replay,old,current]
             def evaluation_run(self,key):return next(r for r in [current,old,replay] if r['id']==key)
             def evaluation_case_results(self,key):return []
+            def bad_case_rows(self,run_id):return []
         result=product_diagnostics(Store(),current,[])
         self.assertEqual([c['id'] for c in result['thinking_comparison']['columns']],['replayed-max','current'])
         self.assertEqual(result['thinking_comparison']['judge_thinking'],'low')

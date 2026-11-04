@@ -54,7 +54,10 @@ class FixedProvider:
 class OptimizationContractTests(unittest.TestCase):
     def setUp(self):
         from unittest.mock import patch
+        from datetime import datetime, timezone
         from diagnostic_fixture import retrieval_case
+        clock=patch('app.paid_schedule.utc_now',return_value=datetime(2026,11,3,16,tzinfo=timezone.utc))
+        clock.start();self.addCleanup(clock.stop)
         self.corpus_patch=patch('app.diagnostics._current_corpus',return_value=(retrieval_case()[1],{'corpus':'one'}))
         self.corpus_patch.start();self.addCleanup(self.corpus_patch.stop)
         self.directory = tempfile.TemporaryDirectory()
@@ -100,7 +103,7 @@ class OptimizationContractTests(unittest.TestCase):
             result = drafts()
             result['candidates'][1]['target_bad_cases'] = [target]
             experiment, trace, audit, _, _ = self.run_drafts(result)
-            self.assertEqual(trace['status'], 'failed')
+            self.assertEqual(trace['status'], 'analysis_exhausted')
             self.assertEqual(experiment['candidates'], [])
             rejected=audit['rejected_candidates'][0]
             self.assertEqual(rejected['id'], 'B')
@@ -135,7 +138,7 @@ class OptimizationContractTests(unittest.TestCase):
     def test_bad_candidate_k_rejects_round_and_preserves_full_raw_trace(self):
         result=drafts();result['candidates'][2]['config_diff']['candidate_k']='32'
         experiment,trace,audit,_,raw=self.run_drafts(result)
-        self.assertEqual(trace['status'],'failed')
+        self.assertEqual(trace['status'],'analysis_exhausted')
         self.assertEqual(experiment['candidates'],[])
         self.assertEqual(audit['provider_raw_text'],raw)
         rejected=audit['rejected_candidates'][0]
@@ -149,7 +152,7 @@ class OptimizationContractTests(unittest.TestCase):
             response=drafts();response['candidates']=response['candidates'][:count]
             response['insufficient_evidence']='insufficient'
             experiment,trace,audit,_,_=self.run_drafts(response)
-            self.assertEqual(trace['status'],'failed')
+            self.assertEqual(trace['status'],'analysis_exhausted')
             self.assertEqual(experiment['candidates'],[])
             self.assertIn('format_retry',audit)
 
@@ -196,18 +199,18 @@ class OptimizationContractTests(unittest.TestCase):
         result = drafts()
         result["candidates"][0]["config_diff"] = {"hybrid_search": False, "hybrid_alpha": 0.5}
         _, trace, audit, _, _ = self.run_drafts(result)
-        self.assertEqual(trace["status"], "failed")
+        self.assertEqual(trace["status"], "analysis_exhausted")
         self.assertEqual(audit["rejected_candidates"][0]["field"], "hybrid_alpha")
 
     def test_cross_field_duplicate_and_excluded_checks(self):
         for diff in ({'candidate_k':4,'top_k':6},{'top_k':6,'temperature':.8},{'top_k':6,'new_parameter':1}):
             response=drafts();response['candidates'][0]['config_diff']=diff
             experiment,trace,audit,_,_=self.run_drafts(response)
-            self.assertEqual(trace['status'],'failed')
+            self.assertEqual(trace['status'],'analysis_exhausted')
             self.assertEqual(experiment['candidates'],[])
         response=drafts();response['candidates'][1]['config_diff']={'top_k':6,'generation_thinking':'high'}
         experiment,trace,audit,_,_=self.run_drafts(response)
-        self.assertEqual(trace['status'],'failed')
+        self.assertEqual(trace['status'],'analysis_exhausted')
         self.assertIn('共用参数',audit['validation_error'])
 
     def test_json_parse_failure_retains_raw_text(self):

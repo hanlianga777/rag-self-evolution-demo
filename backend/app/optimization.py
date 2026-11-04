@@ -15,6 +15,7 @@ from .diagnostics import diagnostic_view
 from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
 from .agent_inputs import prepare_baseline_rows, retrieval_facts, is_optimization_target, is_unstable_case, baseline_bad_case_rows
 from .paid_run import provider_task
+from .paid_schedule import wait_for_off_peak, clear_run_now
 from .telemetry import collect_usage, measure, cost_fields
 from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, canonicalize_config, search_space_contract, validate_candidate_config
 
@@ -51,6 +52,10 @@ THINKING_LEVELS = ('off', 'low', 'high', 'max')
 EFFICIENCY_PARAMETERS = {'hyde','multi_query','candidate_k','top_k','min_score','rerank','hybrid_alpha'}
 
 
+class ProposalValidationExhausted(ValueError):
+    """Drafts exhausted validation retries without running a Sandbox."""
+
+
 def gate_harming_changes(prior_candidates, baseline_gates=None):
     baseline = {g.get('id') or g.get('metric'):g for g in baseline_gates or []}
     changes=[]
@@ -67,12 +72,14 @@ def gate_harming_changes(prior_candidates, baseline_gates=None):
                 if gate.get('passed') is False and worse: harmed.append(gate)
         if harmed:
             diff=candidate.get('reasoning',{}).get('changed_parameters',{})
-            changes.append({'candidate_id':candidate['id'] if 'id' in candidate else None,'config_diff':diff,'harmed_gates':harmed})
+            changes.append({'candidate_id':candidate.get('id'),'config_diff':diff,'harmed_gates':harmed,
+                            'new_failure_question_ids':candidate.get('result',{}).get('new_failure_question_ids',[]),
+                            'attribution':'多个改动混在一起，无法判断是哪个参数造成的' if len(diff)>1 else '本方案只改动一个参数' if diff else '未知'})
     return changes
 
 
 def validate_round_contract(candidates, baseline, prior_candidates, baseline_gates=None):
-    if len(candidates)!=3 or {c.get('id') for c in candidates}!={'A','B','C'}:
+    if len(candidates)!=3 or any(not isinstance(c,dict) for c in candidates) or {c.get('id') for c in candidates}!={'A','B','C'}:
         raise ValueError('每轮必须恰好提供A/B/C三套方案')
     directions=[c.get('direction') for c in candidates]
     if any(d not in ROUND_DIRECTIONS for d in directions) or len(set(directions))!=3 or directions.count(ROUND_DIRECTIONS[-1])!=1:
@@ -194,11 +201,29 @@ def optimization_priorities(bad_cases, gates):
     return sorted(priorities, key=lambda item:item['priority'])
 
 
-def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, labels, *, baseline_gates=None, evaluation_budget=None, failed_parameter_signatures=None):
+def performance_facts(result, cases):
+    """Use saved generation latency/usage only; absent measurements stay unknown."""
+    metrics=result.get('metrics',{})
+    slowest=[]
+    for case in cases:
+        measured=case.get('programmatic_metrics') or {}
+        latency=measured.get('latency_ms')
+        if type(latency) not in (int,float):continue
+        usage=measured.get('token_usage') or {}
+        generation=(usage.get('generation') or {}) if isinstance(usage,dict) else {}
+        reasoning=generation.get('reasoning_tokens',(generation.get('completion_tokens_details') or {}).get('reasoning_tokens'))
+        slowest.append({'question_id':case.get('question_id'),'display_question_id':case.get('display_question_id') or case.get('question_id'),
+                        'latency_seconds':latency/1000,'reasoning_tokens':reasoning})
+    return {key:metrics.get(key,result.get(key)) for key in ('latency_p50_seconds','latency_p99_seconds')} | {
+        'slowest_questions':sorted(slowest,key=lambda row:row['latency_seconds'],reverse=True)[:5]}
+
+
+def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, labels, *, baseline_gates=None, evaluation_budget=None, failed_parameter_signatures=None,
+                       baseline_result=None, baseline_cases=None, candidate_cases=None):
     """Build the exact Agent request without a Provider or persistence side effect."""
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
-              '先读程序生成的基线诊断摘要。每轮恰好ABC三套，每套direction为检索召回增强/排序与过滤/回答策略/效率（降档 + 检索补偿）之一。三套方向不同，恰好一套效率：Thinking低于Baseline且至少改HyDE、Multi-Query、CandidateK、TopK、MinScore、Rerank、Hybrid权重之一；另两套不得降档。同轮修改参数互斥。不得照搬gate_harming_changes。'
+              '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。每轮恰好ABC三套，每套direction为检索召回增强/排序与过滤/回答策略/效率（降档 + 检索补偿）之一。三套方向不同，恰好一套效率：Thinking低于Baseline且至少改HyDE、Multi-Query、CandidateK、TopK、MinScore、Rerank、Hybrid权重之一；另两套不得降档。同轮修改参数互斥。不得照搬gate_harming_changes。'
               '导致门槛未过的错题分类优先级升为1，按optimization_priorities及其原因安排优化。每个参数的用途与各可选值说明见allowed_parameter_values。'
               '每个参数的预期影响须点名预计修好的目标题号；风险须说明可能弄坏的题号或指标及原因；不得重复失败组合签名。'
               'target_bad_cases可用展示题号（例如Q04）、正式题目ID或Bad Case ID，必须引用当前bad_cases。'
@@ -225,6 +250,26 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                      'retrieval_facts':row.get('retrieval_facts') or retrieval_facts(row['result'])})
     budget = {**{'used': 0, 'max': MAX_EVALS, 'reserved_for_d': 1}, **(evaluation_budget or {})}
     budget.update(remaining=max(0, budget['max'] - budget['used']), remaining_for_abc=max(0, budget['max'] - budget['used'] - budget['reserved_for_d']))
+    baseline_by_id={case['question_id']:case for case in baseline_cases or []}
+    prior_results=[]
+    for candidate in prior_candidates:
+        result=candidate.get('result',{})
+        saved={case['question_id']:case for case in (candidate_cases or {}).get(candidate['id'],[])}
+        changes={}
+        for label,key in (('fixed','all_fixed_question_ids'),('new_failures','new_failure_question_ids')):
+            changes[label]=[]
+            for question_id in result.get(key,[]):
+                case=(baseline_by_id.get(question_id) or saved.get(question_id,{})) if label=='fixed' else (saved.get(question_id) or baseline_by_id.get(question_id,{}))
+                changes[label].append({'question_id':question_id,'display_question_id':case.get('display_question_id') or question_id,
+                    'diagnosis_category':case.get('diagnosis_category') or {'Retrieval':'检索层问题','Ranking':'检索层问题',
+                        'Generation':'生成层问题','Safety':'安全边界问题','Performance':'性能问题'}.get(case.get('primary_root_cause'),'未知'),
+                    'test_category':case.get('test_category'),'negative_subtype':case.get('negative_subtype')})
+        diff=candidate.get('reasoning',{}).get('changed_parameters',{})
+        prior_results.append({'id':candidate['id'],'action_name':candidate.get('reasoning',{}).get('action_name'),
+            'hypothesis':candidate.get('reasoning',{}).get('hypothesis'),'configuration':candidate['config'],'status':candidate['status'],
+            'result':{key:result.get(key) for key in ('qualification','bad_case_count','all_fixed_question_ids','new_failure_question_ids','regression','gates')},
+            'performance':performance_facts(result,list(saved.values())), 'question_changes':changes,'changed_parameters':diff,
+            'attribution':'多个改动混在一起，无法判断是哪个参数造成的' if len(diff)>1 else '本方案只改动一个参数' if diff else '未知'})
     prompt={
         'baseline_diagnosis_summary':baseline_diagnosis_summary(bad_cases, gates),
         'optimization_priorities':priorities,
@@ -233,13 +278,12 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         'goal':{'objective':'通过11项门槛、错题总数少于Baseline、至少修好1道目标错题，安全关键题和提示注入题无新错。普通新错留给方案D处理。',
                 'failed_gates':failed_gates,'candidate_labels':labels,'baseline_configuration':base_config},
         'bad_cases':rows,
+        'baseline_performance':performance_facts(baseline_result or {},baseline_cases or []),
         'priority_parameters':PRIORITY_PARAMETERS,
         'allowed_parameter_values':search_space_contract(),
         'round_contract':{'directions':ROUND_DIRECTIONS,'count':3,'exactly_one_efficiency':True,'parameters_disjoint':True},
         'gate_harming_changes':gate_harming_changes(prior_candidates,gates),
-        'prior_sandbox_results':[{'id':c['id'],'action_name':c.get('reasoning',{}).get('action_name'),
-            'hypothesis':c.get('reasoning',{}).get('hypothesis'),'configuration':c['config'],'status':c['status'],
-            'result':{key:c.get('result',{}).get(key) for key in ('qualification','bad_case_count','all_fixed_question_ids','new_failure_question_ids','regression','gates')}} for c in prior_candidates],
+        'prior_sandbox_results':prior_results,
     }
     return system,prompt
 
@@ -290,6 +334,7 @@ def finite_float(value):
 
 def prepare_response(content,base_config,bad_cases,prior_candidates,completed,round_number,labels,trigger_id,monitoring_target_event_ids,audit):
     """One offline validation path for fresh and already-paid responses; no semantic repairs."""
+    audit.update(parsed_json=None,parsed_candidates=None,rejected_candidates=[])
     prior=[base_config]+[item['config'] for item in prior_candidates]
     target_reference_map={key:{'bad_case_id':item['id']} for item in bad_cases for key in (item['id'],item['question_id'])}
     display_ids = {}
@@ -457,9 +502,12 @@ class OptimizationAgent:
     @contextmanager
     def _request_checkpoint(self, experiment_id, generation_token, previous, request_hash):
         from .evaluation_stage import _request_checkpoint
-        checkpoint=previous.get('agent_request_checkpoint',{'attempts':[]}) if previous.get('agent_request_sha256')==request_hash else {'attempts':[]}
+        checkpoints=previous.get('agent_request_checkpoints',{})
+        checkpoint=checkpoints.setdefault(request_hash,previous.get('agent_request_checkpoint',{'attempts':[]})
+            if previous.get('agent_request_sha256')==request_hash else {'attempts':[]})
         def save(*_args,**_kwargs):
-            self._checkpoint(experiment_id,generation_token,{'agent_request_checkpoint':checkpoint,'agent_request_sha256':request_hash})
+            self._checkpoint(experiment_id,generation_token,{'agent_request_checkpoint':checkpoint,'agent_request_sha256':request_hash,
+                'agent_request_checkpoints':checkpoints})
         token=_request_checkpoint.set((checkpoint,'agent',experiment_id,save,lambda:None))
         try:yield checkpoint
         finally:_request_checkpoint.reset(token)
@@ -506,6 +554,8 @@ class OptimizationAgent:
         if existing and existing.get('evaluation_budget',{}).get('used',0) > MAX_EVALS - 4:
             raise ValueError('剩余试跑预算不足完整ABC三套，并须保留D预算')
         experiment_id, prior_candidates, round_number, completed, generation_token = self.store.claim_agent_generation(baseline_run_id, trigger_id, existing_id)
+        if not existing or existing['status']!='generating':
+            clear_run_now(self.store,'agent:'+experiment_id)
         if not bad_cases:
             reason='暂无足够依据生成合格优化假设：没有具备实际证据与Trace的可验证Baseline目标；Monitoring事件须先补齐同等证据'
             self.store.save_agent_round(experiment_id, [], {'generation_status':'insufficient_evidence','insufficient_evidence':reason,'generated_candidate_count':0,'round':round_number,'provider_called':False,'all_bad_case_audit':[{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases]}, generation_token=generation_token)
@@ -538,8 +588,19 @@ class OptimizationAgent:
         failed_signatures.update(parameter_signature(base_config,{key:value for key,value in c['config'].items() if value!=base_config.get(key)})
                                  for c in prior_candidates if c['status'] in {'failed','evaluated'} and not c.get('result',{}).get('qualification',{}).get('qualified'))
         audit['failed_parameter_signatures'] = sorted(failed_signatures)
+        frozen=json.loads(baseline.get('dataset_snapshot_json') or '{}')
+        questions={q['id']:q for q in frozen.get('questions',[])}
+        def saved_cases(run_id):
+            rows=self.store.evaluation_case_results(run_id) if run_id else []
+            for row in rows:
+                golden=questions.get(row['question_id'],{})
+                match=re.search(r'(?:^Q|[-_])(\d{2,3})$',row['question_id'])
+                row['display_question_id']=golden.get('display_id') or golden.get('coverage_slot') or (golden.get('raw') or {}).get('coverage_slot') or (f'Q{int(match[1]):02d}' if match else row['question_id'])
+            return rows
         system,prompt=build_agent_prompt(failures,base_config,prior_candidates,failed_gates,labels,
-            baseline_gates=persisted_gates,evaluation_budget=evaluation_budget,failed_parameter_signatures=audit['failed_parameter_signatures'])
+            baseline_gates=persisted_gates,evaluation_budget=evaluation_budget,failed_parameter_signatures=audit['failed_parameter_signatures'],
+            baseline_result=baseline['result'],baseline_cases=saved_cases(baseline_run_id),
+            candidate_cases={c['id']:saved_cases(c.get('result',{}).get('evaluation_run_id')) for c in prior_candidates})
         audit['baseline_diagnosis_summary'] = prompt['baseline_diagnosis_summary']
         audit['next_action'] = prompt['next_action']
         try:
@@ -551,6 +612,8 @@ class OptimizationAgent:
                     audit['validation_stage']='request_validation'
                     if callable(getattr(self.provider,'request_summary',None)):
                         audit['request_summary']=self.provider.request_summary(system,user,json_mode=True)
+                    else:
+                        audit['request_summary']={'request_sha256':hashlib.sha256((system+user).encode()).hexdigest()}
                     audit['validation_stage']='provider'
                     previous = confirmed_context
                     request_hash = audit.get('request_summary', {}).get('request_sha256')
@@ -561,7 +624,11 @@ class OptimizationAgent:
                             and any(item.get('status') == 'ok' for item in previous.get('token_usage', []))):
                         content = previous['provider_raw_text']
                         audit['response_reuse'] = {'request_sha256': request_hash, 'source_timestamp': previous['timestamp'], 'new_provider_call': False}
+                        for key in ('validation_retries','format_retry'):
+                            if key in previous:audit[key]=previous[key]
                     else:
+                        wait_for_off_peak(self.store,'agent:'+experiment_id,
+                            lambda pause:self._checkpoint(experiment_id,generation_token,{'price_pause':pause}))
                         with self._request_checkpoint(experiment_id,generation_token,previous,request_hash) as checkpoint:
                             content=self.provider.complete(system,user,json_mode=True)
                             if not usage:
@@ -578,17 +645,33 @@ class OptimizationAgent:
             audit["provider_raw_text"] = content
             # Save the paid response before parsing/validation; restart reuses it.
             self._checkpoint(experiment_id,generation_token,{**audit,'validation_stage':'persistence'})
-            for attempt in range(2):
+            for attempt in range(len(audit.get('validation_retries',[])),4):
                 try:
                     result,batch=prepare_response(content,base_config,bad_cases,prior_candidates,completed,round_number,labels,trigger_id,monitoring_target_event_ids,audit)
                     break
                 except (ValueError,TypeError,KeyError) as validation_error:
-                    if attempt:raise
-                    audit['format_retry']={'reason':str(validation_error),'first_raw_text':content,'sandbox_budget_used':0}
-                    retry_prompt={**prompt,'validation_rejection':{'reason':str(validation_error),'rejected_response':content,'instruction':'重出完整ABC一次；格式拒绝未占试跑预算'}}
+                    if attempt==3:
+                        raise ProposalValidationExhausted('连续 3 次方案不合规；首次被拒后的 3 次重出均未通过：'+str(validation_error)) from validation_error
+                    rejection={'attempt':attempt+1,'reason':str(validation_error),'rejected_response':content,'sandbox_budget_used':0,
+                               'stage':audit['validation_stage'],'rejected_candidates':list(audit.get('rejected_candidates') or [])}
+                    audit.setdefault('validation_retries',[]).append(rejection)
+                    audit.setdefault('format_retry',{'reason':str(validation_error),'first_raw_text':content,'sandbox_budget_used':0})
+                    retry_prompt={**prompt,'validation_rejection':{**rejection,'instruction':'按具体拒绝原因重出完整ABC；规则拒绝未占试跑预算'},
+                                  'validation_rejection_history':audit['validation_retries']}
+                    wait_for_off_peak(self.store,'agent:'+experiment_id,
+                        lambda pause:self._checkpoint(experiment_id,generation_token,{'price_pause':pause}))
+                    retry_user=json.dumps(retry_prompt,ensure_ascii=False)
+                    summary=self.provider.request_summary(system,retry_user,json_mode=True) if callable(getattr(self.provider,'request_summary',None)) else {
+                        'request_sha256':hashlib.sha256((system+retry_user).encode()).hexdigest()}
                     with collect_usage() as retry_usage:
-                        content=self.provider.complete(system,json.dumps(retry_prompt,ensure_ascii=False),json_mode=True)
-                    audit['token_usage']=[*audit.get('token_usage',[]),*retry_usage]
+                        previous=self.store.experiment(experiment_id,light=True)['result']
+                        with self._request_checkpoint(experiment_id,generation_token,previous,summary['request_sha256']) as checkpoint:
+                            content=self.provider.complete(system,retry_user,json_mode=True)
+                            if not retry_usage:
+                                from .evaluation_stage import checkpoint_usage
+                                retry_events=checkpoint_usage(checkpoint)
+                            else:retry_events=retry_usage
+                    audit['token_usage']=[*audit.get('token_usage',[]),*retry_events]
                     audit.update(cost_fields(getattr(getattr(self.provider,'settings',None),'model',None),audit['token_usage']))
                     audit['provider_raw_text']=content
                     self._checkpoint(experiment_id,generation_token,{**audit,'validation_stage':'persistence'})
@@ -596,6 +679,10 @@ class OptimizationAgent:
             self.store.save_agent_round(experiment_id, batch, {**result, **audit, "generation_status":"partial" if audit["rejected_candidates"] else "completed" if batch else "no_candidates", "requested_candidate_count":len(labels), "generated_candidate_count":len(batch), "validation_stage": "completed", "round": round_number, "evaluation_budget": evaluation_budget}, generation_token=generation_token)
             return self.store.experiment(experiment_id)
         except Exception as error:
+            if isinstance(error,ProposalValidationExhausted):
+                audit.update(generation_status='analysis_exhausted',validation_error=str(error),provider_error=None)
+                self.store.save_agent_trace(experiment_id,'analysis_exhausted',audit,str(error),generation_token=generation_token)
+                raise
             if isinstance(error,ProviderRequestError):audit['validation_stage']='request_validation'
             audit['generation_status']='failed'
             audit['provider_error']=provider_error_details(error,audit['validation_stage'])

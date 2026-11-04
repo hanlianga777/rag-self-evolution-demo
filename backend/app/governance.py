@@ -2958,10 +2958,20 @@ class GovernanceStore:
 
     def create_composite(self, experiment_id: str, provider=None, authorize_provider=None):
         from .evaluation_contract import policy_current, evaluation_identity
-        from .policy import validate_candidate_config
+        from .policy import validate_candidate_config, composite_source_eligible
         from .optimization import INTERVENTIONS, validate_intervention, strategy_case, strategy_candidate
         from .telemetry import collect_usage, cost_fields
         from .full_text import CORPUS_LOCK
+        from .paid_schedule import wait_for_off_peak, save_composite_schedule
+        # The short transactional validation below runs again after waiting.
+        # No corpus/database lock is held while the price window is closed.
+        requested = self.experiment(experiment_id, light=True)
+        if not requested or not requested['result'].get('report_confirmation'):
+            raise ValueError('需要Gate 2人工确认合格Winner')
+        self.require_current_baseline(requested['baseline_run_id'])
+        if not requested['result'].get('composite'):
+            wait_for_off_peak(self, 'composite:' + experiment_id,
+                lambda pause: save_composite_schedule(self, experiment_id, price_pause=pause))
         with CORPUS_LOCK, self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             experiment = self.experiment(experiment_id,light=True)
@@ -2974,11 +2984,11 @@ class GovernanceStore:
             previous = experiment['result'].get('composite')
             if previous:
                 return self.candidate(previous['candidate_id']) if previous.get('candidate_id') else previous
-            winner = self.candidate(confirmation['winner_id'])
+            winner = next((c for c in experiment['candidates'] if c['id'] == confirmation['winner_id']), None)
             if not winner or not winner['result'].get('qualification', {}).get('qualified'):
                 raise ValueError('Winner资格失效')
             identity = baseline['judge'].get('evaluation_identity')
-            eligible = [c for c in experiment['candidates'] if c['id'] != winner['id'] and c['status'] == 'evaluated' and c['result'].get('evaluation_identity') == identity and c['result'].get('regression', {}).get('passed') and (c['result'].get('all_fixed_question_ids') or c['reasoning'].get('direction') == '效率（降档 + 检索补偿）' and c['result'].get('gates', {}).get('passed') is True) and c['config'] != winner['config'] and validate_candidate_config(c['config'])['valid']]
+            eligible = [c for c in experiment['candidates'] if c['id'] != winner['id'] and composite_source_eligible(c, identity) and c['config'] != winner['config'] and validate_candidate_config(c['config'])['valid']]
             base_config={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}
             base_config={k:v for k,v in base_config.items() if k in ALLOWED_SEARCH_SPACE}
             if experiment['evaluation_budget']['used'] >= MAX_EVALS:
@@ -3086,7 +3096,7 @@ class GovernanceStore:
             identity = baseline.get('judge', {}).get('evaluation_identity')
             qualified = sorted([item for item in candidates if item['reasoning'].get('candidate_label') != 'D' and item['status'] == 'evaluated' and item['result'].get('qualification', {}).get('qualified') and policy_current(baseline.get('judge', {})) and identity and item['result'].get('evaluation_identity') == identity], key=lambda c: (c['result'].get('bad_case_count') if type(c['result'].get('bad_case_count')) is int else float('inf'), c['id']))
             final = next((c for c in candidates if c['reasoning'].get('candidate_label') == 'D' and c['status'] == 'evaluated' and c['result'].get('evaluation_identity') == identity), None)
-            decision = select_final_candidate(qualified, final)
+            decision = select_final_candidate([c for c in qualified if c['id'] == confirmation['winner_id']] if confirmation else qualified, final)
             selected = None
             if any(item['status'] in {'running', 'generated'} or item['result'].get('evaluation_complete') is False for item in candidates if item['reasoning'].get('candidate_label') != 'D'):
                 status = 'WAITING_FOR_ROUND_COMPLETION'

@@ -666,7 +666,7 @@ class EvaluationRunner:
             events=[event for cp in checkpoints.values() for event in checkpoint_usage(cp)]
             return {**summarize_evaluation_cases(cases,complete=complete),
                 'execution_kind':'answer_replay','release_eligible':False,
-                **{k:run['result'][k] for k in ('auto_recovery','execution_owner_pid','experiment_config_identity') if k in run['result']},
+                **{k:run['result'][k] for k in ('auto_recovery','execution_owner_pid','experiment_config_identity','price_pause') if k in run['result']},
                 'timing_provenance':'历史生成耗时，非本次生成性能',
                 'evaluation_complete':complete,'total':len(items),'checkpoints':checkpoints,'final_retry_started':final_retry_started,
                 'technical_errors':errors,'technical_error_count':len(errors),'technical_failed':len(errors),
@@ -688,6 +688,11 @@ class EvaluationRunner:
                 for item in items:
                     check_stop()
                     if item['id'] in saved:continue
+                    from .paid_schedule import wait_for_off_peak
+                    def price_state(pause):
+                        run['result']['price_pause']=pause
+                        persist()
+                    wait_for_off_peak(self.store,'evaluation:'+run_id,price_state,check_stop)
                     checkpoint=checkpoints.setdefault(item['id'],{'attempts':[]})
                     if final_pass and (not checkpoint.get('technical_error') or checkpoint.get('final_retry_done')):continue
                     try:
@@ -743,7 +748,7 @@ class EvaluationRunner:
             owner = self.store.candidate(config['candidate_id'])
             experiment = self.store.experiment(owner['experiment_id'])
             baseline_cases = {c['question_id']: c for c in self.store.evaluation_case_results(experiment['baseline_run_id'])}
-        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity','final_retry_started') if k in run['result']}
+        lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity','final_retry_started','price_pause') if k in run['result']}
         summary_cache = {}
         def progress(*, complete=False):
             from .telemetry import cost_fields
@@ -809,6 +814,11 @@ class EvaluationRunner:
                         continue
                     if final_pass and (not checkpoints.get(item['id'],{}).get('technical_error') or checkpoints[item['id']].get('final_retry_done')):
                         continue
+                    from .paid_schedule import wait_for_off_peak
+                    def price_state(pause):
+                        lineage['price_pause']=pause
+                        persist()
+                    wait_for_off_peak(self.store,'evaluation:'+run_id,price_state,check_stop)
                     checkpoint=checkpoints.setdefault(item['id'],{'attempts':[]})
                     if 'execution' in checkpoint and (not isinstance(checkpoint['execution'].get('answer'),str) or not isinstance(checkpoint['execution'].get('retrieval_trace',{}).get('final'),list)):
                         raise ValueError('生成检查点缺少完整答案/最终上下文')
@@ -943,7 +953,8 @@ class EvaluationRunner:
             sources=[candidate]
             if reasoning.get('candidate_label')=='D':
                 sources=[self.store.candidate(s['candidate_id']) for s in reasoning.get('sources',[])]
-                if len(sources)<2 or any(not c or c['status']!='evaluated' or c['result'].get('evaluation_identity')!=baseline['judge'].get('evaluation_identity') or not c['result'].get('regression',{}).get('passed') or not c['result'].get('all_fixed_question_ids') for c in sources):
+                from .policy import composite_source_eligible
+                if len(sources)<2 or any(not c or not composite_source_eligible(c, baseline['judge'].get('evaluation_identity')) for c in sources):
                     raise ValueError('D缺少同身份完整验证来源')
                 if any(not any(c['config'].get(k)==v for c in sources) for k,v in actual.items()):raise ValueError('D参数缺少已验证来源')
             for source in sources:

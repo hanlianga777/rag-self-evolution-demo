@@ -1,7 +1,11 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 from app import policy
-from app.evaluation import EvaluationRunner
-from app.telemetry import record_usage
+from app.followups import FollowupJobs
 
 
 class Task004PolicyTests(unittest.TestCase):
@@ -25,63 +29,48 @@ class Task004PolicyTests(unittest.TestCase):
         self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'failed', 'result': {'release_qualification': {'qualified': True}}})['candidate_id'], 'B')
         self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'evaluated', 'result': {'release_qualification': {'qualified': True}}})['decision'], '发布合格')
 
-    def test_review_runs_two_new_answers_and_judges_records_usage_and_majority(self):
-        for verdicts, expected in [([True, True], False), ([False, True], True), ([True, False], True), ([False, False], True)]:
-            with self.subTest(verdicts=verdicts):
-                class Runtime:
-                    model = 'fixture'
-                    def answer(self, question, config):
-                        record_usage({'status': 'ok', 'prompt_tokens': 2, 'completion_tokens': 1})
-                        return {'answer': 'new'}
-                runner = EvaluationRunner(None, Runtime())
-                values = iter(verdicts)
-                def score(item, execution):
-                    record_usage({'status': 'ok', 'prompt_tokens': 3, 'completion_tokens': 1})
-                    return {'passed': next(values)}
-                runner.score_execution = score
-                checkpoint = {'attempts': []}
-                review = runner.review_regression({'id': 'q', 'question': 'Q'}, {'passed': False}, {}, checkpoint, 'run', lambda: None, lambda *_a, **_kw: None)
-                self.assertEqual(review['confirmed_regression'], expected)
-                self.assertEqual(review['status'], 'confirmed_regression' if expected else 'fluctuation')
-                self.assertEqual(review['review_runs'], 2)
-                self.assertEqual(review['call_events'], 4)
-                self.assertEqual(review['known_input_tokens'], 10)
-                # Re-entering a saved review must not regenerate or rejudge.
-                self.assertEqual(runner.review_regression({'id': 'q'}, {'passed': False}, {}, checkpoint, 'run', lambda: None, lambda *_a, **_kw: None), review)
+    def test_review_request_is_disabled_without_new_answers_or_judgments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Mock()
+            jobs = FollowupJobs(SimpleNamespace(database_path=Path(directory) / 'isolated.db'), runtime)
+            for _ in range(2):
+                with self.assertRaisesRegex(ValueError, '以单遍结果为准，已关闭错题复核'):
+                    jobs.start('run', 'review')
+            self.assertFalse(jobs.root.exists())
+            self.assertEqual(jobs.threads, {})
+            runtime.answer.assert_not_called()
+            runtime.judge.assert_not_called()
 
-    def test_review_unknown_request_keeps_failed_attempts_on_reentry(self):
-        class Runtime:
-            model = 'fixture'
-            calls = 0
-            def answer(self, *args):
-                self.calls += 1
-                error = RuntimeError('unknown request')
-                error.request_execution_unknown = True
-                raise error
-        runner = EvaluationRunner(None, Runtime())
-        checkpoint = {'attempts': []}
-        # Decision 14 permits reentry after transport uncertainty, preserving history.
-        for _ in range(2):
-            with self.assertRaisesRegex(RuntimeError, 'unknown request'):
-                runner.review_regression({'id': 'q', 'question': 'Q'}, {'passed': False}, {}, checkpoint, 'run', lambda: None, lambda *_a, **_kw: None)
-        self.assertEqual(runner.runtime.calls, 2)
-        stages = checkpoint['regression_review']['runs']
-        self.assertEqual(len(stages), 1)
-        self.assertNotIn('execution', stages[0])
-        self.assertEqual(len(stages[0]['attempts']), 2)
-        self.assertTrue(all(a['request_execution_unknown'] and a['status'] == 'error' for a in stages[0]['attempts']))
+    def test_restart_preserves_unknown_review_history_without_resuming(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Mock()
+            jobs = FollowupJobs(SimpleNamespace(database_path=Path(directory) / 'isolated.db'), runtime)
+            path = jobs.path('run', 'review')
+            path.parent.mkdir(parents=True)
+            history = {'_job': {'status': 'running'}, 'cases': {'q': {'regression_review': {'runs': [
+                {'attempts': [{'phase': 'generation', 'status': 'error', 'request_execution_unknown': True}]}
+            ]}}}}
+            path.write_text(json.dumps(history))
+            for _ in range(2):
+                jobs.recover()
+                with self.assertRaisesRegex(ValueError, '已关闭错题复核'):
+                    jobs.start('run', 'review')
+            self.assertEqual(json.loads(path.read_text()), history)
+            self.assertEqual(jobs.threads, {})
+            runtime.answer.assert_not_called()
+            runtime.judge.assert_not_called()
 
 class Task004ComparisonTests(unittest.TestCase):
-    def test_injection_is_critical_and_fluctuation_not_new_failure(self):
+    def test_injection_is_critical_and_historical_fluctuation_counts_as_single_pass_failure(self):
         from app.evaluation import candidate_comparison
         baseline = {'q': {'passed': True, 'severity': 'ordinary', 'negative_subtype': 'prompt_injection'}, 'f': {'passed': False}, 'n': {'passed': True}}
         candidate = {'q': {'passed': False, 'severity': 'ordinary', 'negative_subtype': 'prompt_injection'}, 'f': {'passed': True}, 'n': {'passed': False, 'regression_review': {'status': 'fluctuation'}}}
         result = candidate_comparison(baseline, candidate, ['f'])
-        self.assertEqual(result['new_regression_question_ids'], ['q'])
-        self.assertEqual(result['fluctuation_question_ids'], ['n'])
+        self.assertEqual(result['new_regression_question_ids'], ['n', 'q'])
+        self.assertEqual(result['fluctuation_question_ids'], [])
         self.assertEqual(result['new_critical_failures'], 1)
-        self.assertEqual(result['new_ordinary_failures'], 0)
-        self.assertEqual(result['bad_case_count'], 1)
+        self.assertEqual(result['new_ordinary_failures'], 1)
+        self.assertEqual(result['bad_case_count'], 2)
         self.assertEqual(result['target_bad_cases_fixed'], 1)
         ordinary = candidate_comparison({'q': {'passed': True, 'severity': 'ordinary'}}, {'q': {'passed': False, 'severity': 'critical', 'judge_result': {'issues': [{'critical': True}]}}}, [])
         self.assertEqual(ordinary['new_critical_failures'], 0)
@@ -96,7 +85,7 @@ class Task004CandidateIntegrationTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_candidate_reviews_before_completion_and_keeps_initial_failure_record(self):
+    def test_candidate_scores_once_and_keeps_initial_failure_record(self):
         original = self.runner.score_execution
         def baseline_score(item, execution, **kwargs):
             result = original(item, execution, **kwargs)
@@ -116,14 +105,19 @@ class Task004CandidateIntegrationTests(unittest.TestCase):
             return result
         self.runner.score_execution = candidate_score
         self.runtime.answers.clear()
+        self.runtime.judges.clear()
         result = self.runner.execute_candidate(*self.runner.start_candidate(exp + '-R1-A'))
-        self.assertTrue(result['result']['qualification']['qualified'])
-        self.assertEqual(result['result']['bad_case_count'], 0)
+        self.assertEqual(result['status'], 'evaluated')
+        self.assertFalse(result['result']['qualification']['qualified'])
+        self.assertEqual(result['result']['bad_case_count'], 1)
         self.assertEqual(result['result']['initial_bad_case_count'], 1)
-        self.assertEqual(result['result']['new_regressions'], 0)
-        self.assertEqual(result['result']['fluctuation_question_ids'], ['Q2'])
-        self.assertEqual(self.runtime.answers.count('Q2'), 3)
+        self.assertEqual(result['result']['new_regressions'], 1)
+        self.assertEqual(result['result']['new_regression_question_ids'], ['Q2'])
+        self.assertEqual(result['result']['fluctuation_question_ids'], [])
+        self.assertEqual(counts, {'Q1': 1, 'Q2': 1, 'Q3': 1, 'Q4': 1})
+        self.assertEqual(self.runtime.answers, ['Q1', 'Q2', 'Q3', 'Q4'])
+        self.assertEqual(self.runtime.judges, ['Q1', 'Q2', 'Q3', 'Q4'])
         saved = self.store.evaluation_case_result(result['result']['evaluation_run_id'], 'Q2')
         self.assertFalse(saved['passed'])
-        self.assertEqual(saved['regression_review']['call_events'], 4)
-        self.assertEqual(result['result']['request_accounting']['call_events'], 12)
+        self.assertNotIn('regression_review', saved)
+        self.assertEqual(result['result']['request_accounting']['call_events'], 8)

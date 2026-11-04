@@ -41,9 +41,9 @@ it('does not infer paid usage from candidate statuses when the budget is missing
  expect(document.body.textContent).toContain('预算尚未同步');
  expect(document.body.textContent).not.toContain('1 / 12');
 });
-it('counts actual optimization targets when the light response omits diagnostic totals',async()=>{
+it('keeps every single-pass failed question as a target even with a legacy exclusion flag',async()=>{
  await mount(experiment([]),[true,false].map((target,index)=>({id:'bad-'+index,run_id:'baseline',question_id:'Q0'+index,result:{passed:false,optimization_target:target,question:'问题'+index}})));
- expect(document.body.textContent).toContain('本轮 2 道错题，1 道作为优化目标');
+ expect(document.body.textContent).toContain('本轮 2 道错题，2 道作为优化目标');
 });
 it('moves unfinished planning into More after a Sandbox exists and makes progress the primary action',async()=>{
  await mount(experiment([candidate('A','failed',{evaluation_run_id:'saved-run',evaluation_complete:false},{product_interruption:true})],{coverage_plan:{status:'incomplete',covered_count:0,total:1,binding:'binding',matrix:[{question_id:'CSV-20261101100758945425-41',candidates:[],gap:'本轮剩余A/B/C容量不足，需明确调整规划，不能宣称完成'}]}}));

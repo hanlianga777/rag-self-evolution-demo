@@ -40,8 +40,8 @@ class FollowupTests(unittest.TestCase):
             jobs = FollowupJobs(store, None)
             source = {'id': 'fixture'}
             with patch('app.followups.read_baseline', return_value=(source, [])), patch('app.followups.threading.Thread') as thread:
-                jobs.start('fixture', 'review')
-                jobs.start('fixture', 'review')
+                jobs.start('fixture', 'low')
+                jobs.start('fixture', 'low')
             self.assertEqual(thread.return_value.start.call_count, 1)
 
     def test_review_summary_counts_runs_not_questions(self):

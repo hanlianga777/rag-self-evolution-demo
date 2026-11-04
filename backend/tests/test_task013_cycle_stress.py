@@ -2,6 +2,7 @@
 import http.client
 import faulthandler
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 import subprocess
 import sys
@@ -76,7 +77,7 @@ def cycle_worker(database, experiment_id, restart=False):
     store=GovernanceStore(database,migrate=False)
     if restart:store.interrupt_evaluation_runs()
     runtime=PressureRuntime(database,pause=not restart)
-    with patch('app.evaluation_stage.time.sleep',lambda *_:None):
+    with patch('app.evaluation_stage.time.sleep',lambda *_:None), patch('app.paid_schedule.utc_now',return_value=datetime(2026,11,7,12,tzinfo=timezone.utc)):
         # The restart pause must remain real while retry backoff is skipped.
         runtime_pause=runtime.pause
         runtime.pause=False
@@ -105,6 +106,10 @@ def cycle_worker(database, experiment_id, restart=False):
 
 
 class RealCyclePressureTests(unittest.TestCase):
+    def setUp(self):
+        clock=patch('app.paid_schedule.utc_now',return_value=datetime(2026,11,7,12,tzinfo=timezone.utc))
+        clock.start();self.addCleanup(clock.stop)
+
     def test_real_abc_150_questions_api_polling_and_process_restart(self):
         from app.corpus import current_manifest,manifest_identity
         from app.history import prune_history

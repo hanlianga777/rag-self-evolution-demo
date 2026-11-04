@@ -108,6 +108,11 @@ def run_calibration(runner, source, cases, effort, state, save):
             checkpoint = state['cases'].setdefault(key, {'attempts': []})
             if 'scored_result' in checkpoint:
                 continue
+            from app.paid_schedule import wait_for_off_peak
+            def price_state(pause):
+                state.setdefault('_job', {})['price_pause'] = pause
+                save()
+            wait_for_off_peak(runner.store, 'calibration:' + source['id'] + ':' + effort, price_state)
             execution = saved_case_execution(case)
             if (not isinstance(execution['answer'], str) or not execution['answer'].strip()
                     or not isinstance(execution.get('retrieval_trace', {}).get('final'), list)):

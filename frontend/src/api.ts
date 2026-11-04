@@ -48,7 +48,7 @@ const pageInputs: Record<Page, (keyof AppData)[]> = {
   governance: ['workspace'], evaluation: ['workspace','evaluation','badCases','optimization'],
   evolution: ['workspace','evaluation','badCases','optimization'],
   versions: ['workspace','evaluation','optimization','versions'],
-  verification: ['workspace','badCases','versions','readiness','monitoring'],
+  verification: ['workspace','evaluation','badCases','versions','readiness','monitoring'],
 };
 
 export async function loadAppData(retry = true, page?: Page): Promise<AppData> {

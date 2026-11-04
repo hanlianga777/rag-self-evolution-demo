@@ -14,7 +14,7 @@ const translations: Record<string, string> = {
   "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "query_only": "原问题排序", "STRICT": "严格", "FALLBACK": "回退", "ON": "开启", "OFF": "关闭",
   "Grounded": "有据生成", "Completeness": "完整性优先", "Abstention": "谨慎拒答", "Tiered": "分级回答",
   "Query": "查询处理", "Retrieval": "检索", "Generation": "回答生成",
-  "Pending": "待处理", "pending": "待处理", "needs_human_review": "待人工复核", "machine_qualified": "机器合格",
+  "Pending": "待处理", "pending": "待处理", "needs_human_review": "待确认", "machine_qualified": "机器合格",
   "expected_improvement": "预期收益", "root_cause": "技术根因", "new_failures": "新增失败",
   "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
   "completed": "已完成", "running": "运行中", "queued": "排队中", "evaluating": "评测中",

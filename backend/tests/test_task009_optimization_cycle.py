@@ -28,16 +28,16 @@ class CycleTests(unittest.TestCase):
                 calls.append(cid);experiment['evaluation_budget']['used']+=1
                 c.update(status='failed' if technical else 'evaluated',result={'qualification':{'qualified':qualified_at is not None and int(cid)>=qualified_at}})
                 return c
-        with patch('app.optimization_cycle.claim_cycle'),patch('app.optimization_cycle._save_state',side_effect=lambda s,e,**kw:states.append(kw)),patch('app.optimization_cycle.OptimizationAgent',Agent),patch('app.optimization_cycle.EvaluationRunner',Runner):
+        with patch('app.optimization_cycle.wait_for_off_peak'),patch('app.optimization_cycle.claim_cycle'),patch('app.optimization_cycle._save_state',side_effect=lambda s,e,**kw:states.append(kw)),patch('app.optimization_cycle.OptimizationAgent',Agent),patch('app.optimization_cycle.EvaluationRunner',Runner):
             result=run_until_qualified(Store(), SimpleNamespace(provider=object()), 'exp')
         return result,experiment,calls,states
 
     def test_no_qualified_returns_to_analysis_and_reserves_d(self):
         result,exp,calls,states=self.run_cycle()
-        self.assertEqual(exp['evaluation_budget']['used'],11)
-        self.assertEqual(calls.count('analysis'),4)
+        self.assertEqual(exp['evaluation_budget']['used'],9)
+        self.assertEqual(calls.count('analysis'),3)
         self.assertEqual(result['status'],'budget_exhausted')
-        self.assertEqual(result['remaining'],1)
+        self.assertEqual(result['remaining'],3)
         self.assertEqual(result['reserved_for_d'],1)
 
     def test_qualified_stops_after_current_batch(self):

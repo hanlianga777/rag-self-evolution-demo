@@ -1,0 +1,5 @@
+.runtime-setting-toggle { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-weight:600; }
+.price-pause-notice { border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:12px 0; color:var(--ink); font-size:var(--card-support); }
+.price-pause-notice p { margin:0 0 8px; line-height:1.6; }
+.price-pause-notice button { margin:0 8px 4px 0; white-space:normal; }
+.operation-console .price-pause-notice { color:inherit; border-color:var(--nav-muted); padding:8px; }

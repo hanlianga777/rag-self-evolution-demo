@@ -29,7 +29,7 @@ def memoized_view(function):
 def generation_progress(store, run_id, *, include_plan=False):
     """Read progress fields in SQL; slot audits and Provider payloads stay in SQLite."""
     from datetime import datetime, timezone
-    audit_keys = ('corpus_fingerprint','slot_persistence_v1','progress','quality_rerun','failed_stage','regeneration_count','error')
+    audit_keys = ('corpus_fingerprint','slot_persistence_v1','progress','quality_rerun','failed_stage','regeneration_count','error','price_pause')
     projection = ','.join("json_extract(a.hard_validation_json,'$."+key+"') AS "+key for key in audit_keys if key!='quality_rerun')
     quality_keys=('status','stage','slot','completed','total','probe_passed','probe_failed','qc_passed','qc_failed','qc_skipped','started_at','error')
     quality_fields=','.join("'"+key+"',json_extract(a.hard_validation_json,'$.quality_rerun."+key+"')" for key in quality_keys)
@@ -42,7 +42,7 @@ def generation_progress(store, run_id, *, include_plan=False):
         if not row:return None
         ids=json.loads(row['question_ids_json'] or '[]')
         quality=c.execute("SELECT probe_status,qc_status,stage,EXISTS(SELECT 1 FROM probe_results p WHERE p.question_id=q.id) has_probe,EXISTS(SELECT 1 FROM qc_results p WHERE p.question_id=q.id) has_qc FROM questions q WHERE id IN ("+','.join('?' for _ in ids)+')',ids).fetchall() if ids else []
-    audit={key:json.loads(row[key]) if key in {'corpus_fingerprint','progress','quality_rerun'} and row[key] else row[key] for key in audit_keys if row[key] is not None}
+    audit={key:json.loads(row[key]) if key in {'corpus_fingerprint','progress','quality_rerun','price_pause'} and row[key] else row[key] for key in audit_keys if row[key] is not None}
     if include_plan and row['frozen_plan']:
         plan=json.loads(row['frozen_plan'])
         audit['frozen_plan']={**plan,'clusters':[{k:v for k,v in cluster.items() if k not in {'centroid','center','embedding'}} for cluster in plan.get('clusters',[])]}
@@ -63,7 +63,7 @@ def generation_progress(store, run_id, *, include_plan=False):
 
 
 def revision_progress(store, revision_id=None, *, generation_run_id=None, active_only=False):
-    keys=('stage','progress','question_ids','error','error_detail','failed_stage','interrupted_stage','apply_blocked','quality_results')
+    keys=('stage','progress','question_ids','error','error_detail','failed_stage','interrupted_stage','apply_blocked','quality_results','price_pause')
     projection=','.join("json_extract(audit_json,'$."+key+"') AS "+key for key in keys)
     projection+=",json_array(json_object('stage',json_extract(audit_json,'$.runtime_attempts[#-1].stage'),'provider',json_extract(audit_json,'$.runtime_attempts[#-1].provider'),'model',json_extract(audit_json,'$.runtime_attempts[#-1].model'),'attempt',json_extract(audit_json,'$.runtime_attempts[#-1].attempt'))) AS runtime_attempts"
     where=[];args=[]
@@ -73,7 +73,7 @@ def revision_progress(store, revision_id=None, *, generation_run_id=None, active
     if active_only:where.append(status+" IN ('queued','generating','validating','probing','qc')")
     with store.connection() as c:
         rows=c.execute('SELECT id,generation_run_id,'+status+' AS status,created_at,updated_at,'+projection+' FROM candidate_revision_runs'+(' WHERE '+' AND '.join(where) if where else '')+' ORDER BY created_at DESC',args).fetchall()
-    result=[{key:json.loads(row[key]) if key in {'progress','question_ids','quality_results','runtime_attempts'} and row[key] else row[key] for key in row.keys()} for row in rows]
+    result=[{key:json.loads(row[key]) if key in {'progress','question_ids','quality_results','runtime_attempts','price_pause'} and row[key] else row[key] for key in row.keys()} for row in rows]
     if revision_id:
         if not result:raise KeyError(revision_id)
         return result[0]

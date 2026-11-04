@@ -256,6 +256,12 @@ def resolve_batch(store,run_id,question_ids,chunks,fingerprint,*,semantic=None,m
         if result['status']=='needs_semantic' and semantic is not None:
             if calls>=max_calls:
                 results.append({'question_id':question_id,'status':'pending_call_limit','findings':[]});continue
+            from .paid_schedule import wait_for_off_peak
+            job_key='diagnostic-batch:'+current_paid_run().path.stem
+            def price_state(pause):
+                job=store.job_checkpoint(run_id,job_key) or {}
+                store.save_job_checkpoint(run_id,job_key,{**job,'status':'waiting' if pause['paused'] else 'running','price_pause':pause})
+            wait_for_off_peak(store,'diagnostic:'+run_id+':'+current_paid_run().path.stem,price_state)
             calls+=1
             result=resolve_persisted(store,run_id,question_id,chunks,fingerprint,semantic=semantic,persist=persist,authorization_id=current_paid_run().path.stem)
         results.append({'question_id':question_id,**result})
@@ -285,7 +291,8 @@ def batch_inputs(store,run_id,question_ids=None):
 
 def diagnostic_plan(store,run_id,question_ids=None):
     selected,chunks,fingerprint,binding=batch_inputs(store,run_id,question_ids)
-    return {**resolve_batch(store,run_id,selected,chunks,fingerprint),'binding_sha256':digest(binding),'provider_calls':0}
+    jobs=[value for key,value in store.job_checkpoints(run_id).items() if key.startswith('diagnostic-batch:')]
+    return {**resolve_batch(store,run_id,selected,chunks,fingerprint),'binding_sha256':digest(binding),'provider_calls':0,'batch_jobs':jobs}
 
 
 def execute_diagnostic_batch(store,run_id,runtime,*,question_ids=None,expected_binding,authorization_id=None,max_calls,price_snapshot=None,budget_yuan=None):
@@ -313,8 +320,48 @@ def execute_diagnostic_batch(store,run_id,runtime,*,question_ids=None,expected_b
         if set(record.get('identity',{}).get('requests',[])) & set(binding['requests']) and any(c['status']!='ok' for c in record.get('calls',[])):
             raise ValueError('同一诊断输入存在结果未知的请求；执行失败，不自动重发')
     authorization={'authorization_id':authorization_id,'max_calls':max_calls,'price_snapshot_sha256':digest(price_snapshot)}
-    ledger=PaidRun(directory/(authorization_id+'.json'),budget_yuan,(price_snapshot or {}).get('models',{}),{**binding,**authorization},
-        identity_check=lambda:{**batch_inputs(store,run_id,selected)[3],**authorization},output_limits=REQUEST_LIMITS)
+    import os,threading
+    job_key='diagnostic-batch:'+authorization_id
+    previous_job=store.job_checkpoint(run_id,job_key)
+    identity_check=lambda:{**batch_inputs(store,run_id,selected)[3],**authorization}
+    path=directory/(authorization_id+'.json')
+    if path.exists():
+        if not previous_job or previous_job.get('status') not in {'waiting','running'}:
+            raise ValueError('诊断批次已处理，不能重复调用')
+        ledger=PaidRun.load_accounting(path,identity_check)
+        if ledger.identity!=identity_check() or any(call['status']!='ok' for call in ledger.calls):
+            store.save_job_checkpoint(run_id,job_key,{**previous_job,'status':'unknown','error':'费用或输入状态未知，不重复调用'})
+            raise ValueError('诊断费用或输入状态未知，不重复调用')
+    else:
+        ledger=PaidRun(path,budget_yuan,(price_snapshot or {}).get('models',{}),{**binding,**authorization},
+            identity_check=identity_check,output_limits=REQUEST_LIMITS)
+    job={**(previous_job or {}),'status':'running','owner_pid':os.getpid(),'worker_thread':threading.get_ident(),
+        'arguments':{'question_ids':selected,'expected_binding':expected_binding,'authorization_id':authorization_id,
+                     'max_calls':max_calls,'price_snapshot':price_snapshot,'budget_yuan':budget_yuan}}
+    store.save_job_checkpoint(run_id,job_key,job)
     with controlled_run(ledger):
-        result=resolve_batch(store,run_id,selected,chunks,fingerprint,semantic=runtime.resolve_diagnostic,max_calls=max_calls,persist=True)
+        result=resolve_batch(store,run_id,selected,chunks,fingerprint,semantic=runtime.resolve_diagnostic,max_calls=max(0,max_calls-len(ledger.calls)),persist=True)
+    store.save_job_checkpoint(run_id,job_key,{**store.job_checkpoint(run_id,job_key),'status':'completed','price_pause':{'paused':False}})
     return {**result,'binding_sha256':digest(binding),'ledger':str(ledger.path),'spent_yuan':ledger.spent,'provider_calls':len(ledger.calls)}
+
+
+def recover_diagnostic_batches(store,runtime):
+    """Resume explicitly authorized batches; saved semantic records are reused."""
+    import json,os,threading
+    with store.connection() as db:
+        rows=db.execute("SELECT run_id,question_id,checkpoint_json FROM job_checkpoints WHERE question_id LIKE 'diagnostic-batch:%' AND json_extract(checkpoint_json,'$.status') IN ('waiting','running')").fetchall()
+    for row in rows:
+        job=json.loads(row['checkpoint_json']);owner=job.get('owner_pid')
+        if owner==os.getpid() and (job.get('worker_thread') is None or any(t.ident==job.get('worker_thread') and t.is_alive() for t in threading.enumerate())):continue
+        if owner!=os.getpid() and type(owner) is int:
+            try:os.kill(owner,0)
+            except ProcessLookupError:pass
+            except PermissionError:continue
+            else:continue
+        store.save_job_checkpoint(row['run_id'],row['question_id'],{**job,'owner_pid':os.getpid(),'worker_thread':None})
+        def work(row=row,job=job):
+            try:execute_diagnostic_batch(store,row['run_id'],runtime,**job['arguments'])
+            except Exception as error:
+                saved=store.job_checkpoint(row['run_id'],row['question_id']) or job
+                store.save_job_checkpoint(row['run_id'],row['question_id'],{**saved,'status':'failed','error':str(error)})
+        threading.Thread(target=work,daemon=True).start()

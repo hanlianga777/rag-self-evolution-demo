@@ -135,6 +135,15 @@ def qualify_release(gates: dict, regression: dict, fixed_count: int) -> dict:
     return {"qualified": all(checks.values()), "checks": checks}
 
 
+def composite_source_eligible(candidate: dict, identity: str) -> bool:
+    result = candidate.get('result', {})
+    return bool(candidate.get('status') == 'evaluated' and result.get('evaluation_identity') == identity
+                and result.get('regression', {}).get('passed')
+                and (result.get('all_fixed_question_ids')
+                     or candidate.get('reasoning', {}).get('direction') == '效率（降档 + 检索补偿）'
+                     and result.get('gates', {}).get('passed') is True))
+
+
 def select_final_candidate(candidates: list[dict], final_candidate: dict | None = None) -> dict:
     if final_candidate and final_candidate.get('status') == 'evaluated' and final_candidate.get('result', {}).get('release_qualification', {}).get('qualified') is True:
         return {'decision': '发布合格', 'candidate_id': final_candidate['id'], 'reason': '11项门槛全过、相对Baseline零新增错题且至少修好1道'}

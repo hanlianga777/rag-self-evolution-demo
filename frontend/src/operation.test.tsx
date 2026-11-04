@@ -251,12 +251,12 @@ it("uses real counts for paired Revision and exposes failed details before remov
 });
 
 it("keeps Provider operations out of Pipeline configuration", async () => {
-  const fetcher = vi.fn(async () => new Response(JSON.stringify({ config: {}, search_space: {} })));
+  const fetcher = vi.fn(async (_url: string) => new Response(JSON.stringify({ config: {}, search_space: {} })));
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={{}} />));
   expect(document.querySelector(".provider-status-row")).toBeNull();
-  expect(fetcher.mock.calls).toHaveLength(1);
+  expect(fetcher.mock.calls.map(([url]) => new URL(String(url)).pathname).sort()).toEqual(["/api/pipeline", "/api/runtime-settings"]);
   await act(async () => root.unmount());
 });
 
