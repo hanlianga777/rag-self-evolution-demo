@@ -28,7 +28,7 @@ class Task006QualityStartTests(unittest.TestCase):
                                return_value=probe if not isinstance(probe, Exception) else None)
         service = SimpleNamespace(retriever=None, answerability_check=None, negative_subtype_check=None,
                                   quality_check=Mock())
-        with patch('app.golden_v2.validate_golden_candidate', return_value={'valid': True}):
+        with patch.object(main, '_wait_golden_price'), patch('app.golden_v2.validate_golden_candidate', return_value={'valid': True}):
             main._run_quality_rerun('fixture', ['Q01', 'Q02'], store, service,
                                     SimpleNamespace(chunks=lambda: []))
         self.assertEqual(store.run_probe.call_count, 4)

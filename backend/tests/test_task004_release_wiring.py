@@ -36,11 +36,12 @@ class ReleaseWiringTests(unittest.TestCase):
         self.assertEqual(result['suggested_winner'],'B')
         self.assertEqual(result['final_decision']['decision'],'保持 Baseline')
 
-    def test_failed_final_falls_back_to_fewest_error_qualified_abc(self):
+    def test_failed_final_keeps_confirmed_winner_with_fewer_error_alternative(self):
         self.candidate('A',5,release=True);self.candidate('B',2,release=True);self.candidate('D',4,release=False)
         self.state(report_confirmation={'winner_id':'A'},composite={'status':'generated','candidate_id':'D'})
         result=self.store.refresh_recommendation('E0')
-        self.assertEqual(result['recommended_candidate'],'B')
+        self.assertEqual(result['recommended_candidate'],'A')
+        self.assertEqual(result['suggested_winner'],'B')
         self.assertEqual(result['final_decision']['decision'],'保留赢家方案')
 
     def test_no_qualified_candidate_records_keep_baseline(self):

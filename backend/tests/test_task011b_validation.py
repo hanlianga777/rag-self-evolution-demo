@@ -42,7 +42,8 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(audit['failed_parameter_signatures'],[])
 
     def test_historical_011a_drafts_do_not_bypass_current_round_contract(self):
-        with self.assertRaisesRegex(ValueError,'效率'):
+        # Historical drafts predate the mandatory retrospective, checked before directions.
+        with self.assertRaisesRegex(ValueError,'prior_round_review'):
             self.validate(self.historical_raw)
         self.assertEqual(self.audit.get('failed_parameter_signatures',[]),[])
 

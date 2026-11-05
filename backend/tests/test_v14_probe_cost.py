@@ -334,10 +334,10 @@ class ProbeCostTests(unittest.TestCase):
             'missing_points':['检查传感器是否脏污'],'faithfulness':1,'behavior_pass':True,'unsupported_claims':[]})
         runner=EvaluationRunner(None,runtime)
         item={'question':'question','reference_answer':'检查外壳\n检查传感器是否脏污','test_category':'positive',
-              'evidence':[{'source_chunk_ids':['covered','missing']}],'raw':{}}
+              'evidence':[{'source_chunk_ids':['covered','missing'],'evidence_key_points':[c['chunk_text'] for c in chunks]}],'raw':{}}
         result = runner._case_result(item, {})
         self.assertIn('Ranking Failure', result['failure_tags'])
-        self.assertEqual(result['primary_root_cause'],'Retrieval')
+        self.assertEqual(result['primary_root_cause'],'Ranking')
         self.assertEqual(result['diagnosis']['analysis_category'],'rag_failure')
         self.assertTrue(diagnostic_view(result)['target_eligible']);self.assertNotIn('status',result['diagnosis'])
         self.assertEqual(result['diagnosis']['retrieval_failure_stage'],'ranking_context_selection')
@@ -414,7 +414,8 @@ class ProbeCostTests(unittest.TestCase):
             audit = store.generation_run(run_id)['artifacts']['hard_validation']
             audit['corpus_fingerprint'] = {'D': 'old'}
             connection.execute('INSERT OR REPLACE INTO golden_generation_artifacts (generation_run_id, coverage_plan_json, question_plan_json, hard_validation_json) VALUES (?,?,?,?)', (run_id, '[]', '[]', json.dumps(audit)))
-        with patch.object(store, 'approval_eligibility', return_value={'can_approve': True}):
+        # This unit isolates Corpus binding; the next test exercises the real Human Gate.
+        with patch.object(store, 'gate_summary', return_value={'status':'ready'}), patch.object(store, 'approval_eligibility', return_value={'can_approve': True}):
             with patch('app.corpus.current_manifest', return_value={'sources': {'D': 'new'}}):
                 with self.assertRaisesRegex(ValueError, 'Corpus 已变化'): store.create_generation_snapshot(run_id)
                 with self.assertRaisesRegex(ValueError, 'Corpus 已变化'): store.create_dataset_snapshot(rows, run_id)
@@ -557,10 +558,14 @@ class ProbeCostTests(unittest.TestCase):
             evaluation_store = Mock()
             evaluation_store.evaluation_run.return_value = {"status":"running", "judge":judge, "result":{}, "dataset_snapshot_json":json.dumps(snapshot)}
             evaluation_store.evaluation_case_results.return_value = []
-            EvaluationRunner(evaluation_store, service).execute_baseline('fixture-run', [item], config)
-            self.assertEqual(evaluation_store.finish_evaluation_run.call_args.args[1], 'failed')
+            with patch('app.paid_schedule.wait_for_off_peak'), patch('app.evaluation_stage.time.sleep'):
+                EvaluationRunner(evaluation_store, service).execute_baseline('fixture-run', [item], config)
+            self.assertEqual(evaluation_store.finish_evaluation_run.call_args.args[1], 'completed')
+            result=evaluation_store.finish_evaluation_run.call_args.args[2]
+            self.assertFalse(result['evaluation_complete'])
+            self.assertEqual(result['technical_failed'],1)
             evaluation_store.record_evaluation_case.assert_not_called()
             evaluation_store.record_bad_case.assert_not_called()
             service.judge.assert_not_called()
-            self.assertEqual(service.retriever._bm25.call_count, 2, evaluation_store.finish_evaluation_run.call_args)
+            self.assertEqual(service.retriever._bm25.call_count, 7, evaluation_store.finish_evaluation_run.call_args)
         provider.complete_with_metrics.assert_not_called()

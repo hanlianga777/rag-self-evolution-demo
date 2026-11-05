@@ -51,7 +51,7 @@ class CycleRecoveryTests(unittest.TestCase):
             exp['result']['optimization_cycle']={'resume_stopped_runs':['run-A']}
             completed['A'].update(range(25));calls.extend(('A',q) for q in range(25))
             tries['A']=1
-        with patch('app.optimization_cycle.claim_cycle'), patch('app.optimization_cycle._save_state', side_effect=lambda s,e,**kw:states.append(kw)), \
+        with patch('app.optimization_cycle.unattended_authorization',return_value={'enabled':False}), patch('app.optimization_cycle.claim_cycle'), patch('app.optimization_cycle._save_state', side_effect=lambda s,e,**kw:states.append(kw)), \
              patch('app.optimization_cycle.EvaluationRunner',Runner), patch('app.optimization_cycle.OptimizationAgent') as agent:
             if current_round_only:agent.return_value.generate.side_effect=AssertionError('本轮续跑不能重新生成方案')
             result=run_until_qualified(Store(),SimpleNamespace(provider=object()),'exp')

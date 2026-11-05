@@ -2,7 +2,6 @@
 import hashlib
 import json
 import unittest
-from copy import deepcopy
 from unittest.mock import patch
 
 from app.optimization import build_agent_prompt, prepare_response
@@ -79,14 +78,18 @@ class Task009AgentRulesTests(unittest.TestCase):
         batch,_=self.prepare([proposal])
         self.assertEqual(batch[0][2]['risks'][0]['metric'],'latency_p99_seconds')
 
-    def test_rejected_combination_signature_blocks_later_repetition(self):
-        candidate=self.candidate(diff={'top_k':6,'candidate_k':24})
+    def test_schema_rejection_does_not_ban_config_but_saved_failure_does(self):
+        candidate=self.candidate(diff={'top_k':6})
         broken={**candidate,'target_bad_cases':['invented']}
         with self.assertRaises(ValueError):
             self.prepare([broken], audit := {})
-        self.assertEqual(len(audit['failed_parameter_signatures']),1)
+        self.assertEqual(audit.get('failed_parameter_signatures',[]),[])
+        batch,_=self.prepare([candidate])
+        self.assertEqual(len(batch),3)
+        from app.optimization import parameter_signature
+        saved_failure=parameter_signature(DEFAULT_PIPELINE_CONFIG,candidate['config_diff'])
         with self.assertRaisesRegex(ValueError,'失败'):
-            self.prepare([candidate], {'failed_parameter_signatures':deepcopy(audit['failed_parameter_signatures'])})
+            self.prepare([candidate], {'failed_parameter_signatures':[saved_failure]})
 
 
 if __name__ == '__main__': unittest.main()

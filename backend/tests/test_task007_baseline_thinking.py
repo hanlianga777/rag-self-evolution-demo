@@ -13,6 +13,10 @@ import test_reviewed_csv_machine_checks as machine_fixture
 
 
 class BaselineThinkingTests(unittest.TestCase):
+    def setUp(self):
+        judge=patch.dict('os.environ', {'JUDGE_THINKING':'low'})
+        judge.start();self.addCleanup(judge.stop)
+
     def test_backend_setting_default_and_validation(self):
         from pathlib import Path
         import tempfile
@@ -24,7 +28,7 @@ class BaselineThinkingTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'BASELINE_THINKING'):
                 load_settings({'BASELINE_THINKING': 'typo'}, empty)
 
-    def test_baseline_high_reaches_http_and_judge_remains_max(self):
+    def test_baseline_high_reaches_http_and_judge_remains_independent_low(self):
         provider = DeepSeekProvider(Settings('fixture', 'https://invalid', 'deepseek-flash'))
         service = AiService(object(), object(), provider, False)
         service.retriever = SimpleNamespace(retrieve=lambda *a, **k: [{'chunk_id': 'C1', 'content': 'source'}])
@@ -38,11 +42,13 @@ class BaselineThinkingTests(unittest.TestCase):
         with patch('urllib.request.urlopen', side_effect=http), patch('app.paid_run.payment_usage'):
             result = service.answer('question', {'run_target': 'baseline', 'generation_thinking': 'high'})
             default = service.answer('question', {'run_target': 'baseline'})
-            with thinking_task('judge', 'off'):
+            with thinking_task('judge'):
                 provider.complete('judge', 'answer')
+            with thinking_task('judge','off'), self.assertRaises(ProviderRequestError):
+                provider.complete('judge','answer')
         self.assertEqual(result['generation_thinking'], 'high')
         self.assertEqual(default['generation_thinking'], 'max')
-        self.assertEqual([r['reasoning_effort'] for r in requests], ['high', 'max', 'max'])
+        self.assertEqual([r['reasoning_effort'] for r in requests], ['high', 'max', 'low'])
         with self.assertRaises(ProviderRequestError):
             service.answer('question', {'run_target': 'baseline', 'generation_thinking': 'typo'})
 
@@ -60,7 +66,7 @@ class BaselineThinkingTests(unittest.TestCase):
             _, _, config, judge = runner.baseline_inputs()
         self.assertEqual(config['generation_thinking'], 'high')
         self.assertEqual(judge['execution_snapshot']['generation_thinking']['reasoning_effort'], 'high')
-        self.assertEqual(judge['judge_thinking']['reasoning_effort'], 'max')
+        self.assertEqual(judge['judge_thinking']['reasoning_effort'], 'low')
         self.assertNotEqual(experiment_config_identity(config), experiment_config_identity({**config, 'generation_thinking': 'max'}))
 
 

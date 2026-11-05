@@ -1,4 +1,5 @@
 """Disposable real-runner A/B/C pressure test, with Stub RPCs and process restart."""
+import os
 import http.client
 import faulthandler
 import json
@@ -155,7 +156,10 @@ class RealCyclePressureTests(unittest.TestCase):
             def launch(restart=False):
                 command=[sys.executable,str(Path(__file__).resolve()),'worker',str(database),experiment_id]
                 if restart:command.append('restart')
-                process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+                from app.corpus import INDEX_DIR, DOCUMENTS_DIR, UPLOADS_DIR
+                process=subprocess.Popen(command,env={**os.environ,'PYTHONPATH':os.pathsep.join([str(Path(__file__).resolve().parents[1]),str(Path(__file__).resolve().parent)]),
+                    'RAG_DEMO_INDEX_DIR':str(INDEX_DIR),'RAG_DEMO_DOCUMENTS_DIR':str(DOCUMENTS_DIR),
+                    'RAG_DEMO_UPLOADS_DIR':str(UPLOADS_DIR),'RAG_DEMO_DB_PATH':str(database)},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
                 processes.append(process)
                 return process
             with patch.object(main,'store',store),patch.object(main,'ai_service',runtime),patch.object(main,'safe_start',True):

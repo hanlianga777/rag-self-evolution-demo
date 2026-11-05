@@ -245,8 +245,10 @@ class ApiLifecycleTests(unittest.TestCase):
         current = self.wait_decision()
         d = next(row for row in current['candidates'] if row['id'] == composite['id'])
         self.assertFalse(d['result']['qualification']['qualified'], json.dumps({'config': d['config'], 'reasoning': d['reasoning'], 'result': d['result']}, ensure_ascii=False))
-        self.assertTrue(d['result']['gates']['passed'], 'D passes gates; two new ordinary failures fail Regression')
-        self.assertFalse(d['result']['regression']['passed'])
+        self.assertTrue(d['result']['gates']['passed'])
+        self.assertTrue(d['result']['regression']['passed'], 'Ordinary new failures are recorded; critical new failures block Regression')
+        self.assertEqual(d['result']['regression']['new_ordinary_failures'],2)
+        self.assertFalse(d['result']['release_qualification']['qualified'])
         self.post('candidates/' + composite['id'] + '/publish', {'decision': 'approved'}, status=409)
         self.assertEqual(self.store.active_production(), initial_version)
         self.assertEqual(self.store.production_versions(), initial_versions)
@@ -258,7 +260,7 @@ class ApiLifecycleTests(unittest.TestCase):
             result = require_baseline(run_id, connection)
             if connection is not None:
                 stale = json.loads(connection.execute('SELECT result_json FROM candidate_configs WHERE id=?', (winner,)).fetchone()[0])
-                stale['qualification']['qualified'] = False
+                stale['release_qualification']['qualified'] = False
                 connection.execute('UPDATE candidate_configs SET result_json=? WHERE id=?', (json.dumps(stale), winner))
             return result
         before_versions = self.store.production_versions()
@@ -266,7 +268,7 @@ class ApiLifecycleTests(unittest.TestCase):
             refused = self.post('candidates/' + winner + '/publish', {'decision': 'approved'}, status=409)
         self.assertIn('发布资格已变化', refused['detail'])
         self.assertEqual(self.store.production_versions(), before_versions)
-        self.assertTrue(self.store.candidate(winner)['result']['qualification']['qualified'], 'Failed transaction rolls back')
+        self.assertTrue(self.store.candidate(winner)['result']['release_qualification']['qualified'], 'Failed transaction rolls back')
         version = self.post('candidates/' + winner + '/publish', {'decision': 'approved'})
         question = self.store.question(run['question_ids'][0])['question']
         left = self.post('preview/scheme', {'question': question, 'scheme_id': 'baseline'})

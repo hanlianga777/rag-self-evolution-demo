@@ -61,9 +61,9 @@ class RejectedRoundStub(Stub):
         if '唯一Optimization Agent' in system:
             value=json.loads(raw)
             data=json.loads(prompt)
-            source=next(c for c in data['sources'] if c['config'].get('generation_thinking')=='low')
+            source=next(c for c in data['sources'] if c['config'].get('generation_thinking')=='off')
             value['source_candidates']=[data['winner']['id'],source['id']]
-            value['proposed_config_diff']['generation_thinking']='low'
+            value['proposed_config_diff']['generation_thinking']='off'
             return json.dumps(value)
         if 'RAG优化Agent' not in system:return raw
         data=json.loads(prompt)
@@ -173,7 +173,8 @@ class RehearsalTests(unittest.TestCase):
             with self.store.connection() as db:db.execute('DELETE FROM candidate_configs WHERE id=?',(d['id']+'-extra',))
         current=self.store.candidate(d['id']);self.assertEqual(current['result']['release_qualification']['qualified'],not fail_d)
         rec=self.store.refresh_recommendation(self.exp)
-        selected=winner if fail_d else d['id'];self.assertEqual(rec['recommended_candidate'],selected)
+        # Equal-quality D has no measured cost/P99 improvement in this offline fixture.
+        selected=winner;self.assertEqual(rec['recommended_candidate'],selected)
         self.snapshot('d-failed' if fail_d else 'd-passed')
         version=self.post('candidates/'+selected+'/publish',{'decision':'approved','actor':'offline'})
         self.assertEqual(self.store.active_production()['config'],self.store.candidate(selected)['config'])
@@ -203,7 +204,7 @@ class RehearsalTests(unittest.TestCase):
         from copy import deepcopy
         from app.policy import composite_source_eligible
         source={'config':{'generation_thinking':'off'},'status':'evaluated','reasoning':{'direction':'效率（降档 + 检索补偿）'},
-                'result':{'evaluation_identity':'same','regression':{'passed':True},'gates':{'passed':True},'all_fixed_question_ids':[]}}
+                'result':{'evaluation_identity':'same','regression':{'passed':True,'new_critical_failures':0},'gates':{'passed':True},'all_fixed_question_ids':[]}}
         self.assertTrue(composite_source_eligible(source,'same'))
         for field,value in [('status','running'),('identity','other'),('regression',False),('gates',False),('direction','回答策略')]:
             c=deepcopy(source)
@@ -217,7 +218,7 @@ class RehearsalTests(unittest.TestCase):
         self.assertEqual(state['status'],'budget_exhausted');self.assertEqual(state['remaining'],1)
         self.assertEqual(calls,[])
 
-    def test_d_pass_publish_compare_rollback(self):self.lifecycle(False)
+    def test_release_eligible_equal_quality_d_keeps_winner_publish_compare_rollback(self):self.lifecycle(False)
     def test_confirmed_winner_survives_d_decline(self):
         import tempfile
         from app.governance import GovernanceStore
@@ -230,14 +231,14 @@ class RehearsalTests(unittest.TestCase):
             for label,bad in [('A',0),('B',1)]:
                 store.save_candidate(exp,label,{**DEFAULT_PIPELINE_CONFIG,'top_k':6 if label=='A' else 4,'min_score':0.1 if label=='B' else 0},
                     {'candidate_label':label,'round':1})
-                store.finish_candidate(exp+'-'+label,'evaluated',{**comparison_identity(store,base),'bad_case_count':bad,'qualification':{'qualified':True},'release_qualification':{'qualified':True}})
+                store.finish_candidate(exp+'-'+label,'evaluated',{**comparison_identity(store,base),'bad_case_count':bad,'qualification':{'qualified':True},'release_qualification':{'qualified':True},'regression':{'passed':True},'gates':{'passed':True}})
             store.confirm_experiment_report(exp,exp+'-B','offline')
             with store.connection() as db:
                 row=store.experiment(exp)['result'];row['composite']={'status':'no_effective_composite'}
                 db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(row),exp))
             self.assertEqual(store.refresh_recommendation(exp)['recommended_candidate'],exp+'-B')
     def test_d_fail_keeps_winner_publish_compare_rollback(self):self.lifecycle(True)
-    def test_real_agent_round_two_input_and_budget_stop(self):
+    def test_real_agent_round_two_input_and_exact_repeat_stop_preserve_budget(self):
         self.bootstrap();self.service.no_improvement=True
         cycle=run_until_qualified(self.store,self.service,self.exp)
         prompts=[p for p in self.provider.calls if 'prior_sandbox_results' in p]
@@ -245,10 +246,10 @@ class RehearsalTests(unittest.TestCase):
         self.assertEqual(len(prompts[1]['prior_sandbox_results']),3)
         self.assertTrue(all(c['status']=='evaluated' and c['result']['qualification']['qualified'] is False for c in prompts[1]['prior_sandbox_results']))
         self.snapshot('budget')
-        self.assertEqual(cycle['status'],'budget_exhausted',cycle)
+        self.assertEqual(cycle['status'],'analysis_exhausted',cycle)
         self.assertEqual(cycle['used'],9)
         self.assertEqual(cycle['remaining'],3)
-        self.assertIn('完整',cycle['last_error'])
+        self.assertIn('以前失败的参数组合不得重复',cycle['last_error'])
         print('BUDGET',json.dumps(cycle,ensure_ascii=False))
 
     def test_rejected_round_regenerates_then_qualified_gate2_d_recommendation(self):
@@ -258,7 +259,7 @@ class RehearsalTests(unittest.TestCase):
         self.service.round_one_no_improvement=True
         cycle=run_until_qualified(self.store,self.service,self.exp)
         self.assertEqual(cycle['status'],'qualified',cycle)
-        self.assertEqual(cycle['used'],6)
+        self.assertEqual(cycle['used'],4)
         prompts=[p for p in self.provider.calls if 'prior_sandbox_results' in p]
         self.assertEqual(len(prompts),3)
         self.assertIn('共用参数',prompts[2]['validation_rejection']['reason'])
@@ -270,6 +271,7 @@ class RehearsalTests(unittest.TestCase):
         self.assertTrue(all(c['result']['qualification']['qualified'] is False for c in candidates if c['reasoning']['round']==1))
         winner=self.exp+'-R2-A'
         self.assertTrue(self.store.candidate(winner)['result']['qualification']['qualified'])
+        self.assertTrue(all(c['status']=='skipped' for c in candidates if c['reasoning']['round']==2 and c['id']!=winner))
         self.post('experiments/'+self.exp+'/recommendation',{'candidate_id':winner,'actor':'offline'})
         d=self.post('experiments/'+self.exp+'/composite',{})
         self.assertEqual(d['status'],'generated',d)
@@ -279,7 +281,7 @@ class RehearsalTests(unittest.TestCase):
         self.join_workers()
         self.assertTrue(self.store.candidate(d['id'])['result']['release_qualification']['qualified'])
         rec=self.store.refresh_recommendation(self.exp)
-        self.assertEqual(rec['recommended_candidate'],d['id'])
-        self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'],7)
-        print('TASK016A_REHEARSAL',json.dumps({'rounds':2,'rejected_regenerations':1,'sandbox_used':7,
-            'cycle':cycle['status'],'gate2':winner,'d_release_qualified':True,'recommended':d['id']},ensure_ascii=False))
+        self.assertEqual(rec['recommended_candidate'],winner)
+        self.assertEqual(self.store.experiment(self.exp)['evaluation_budget']['used'],5)
+        print('TASK016A_REHEARSAL',json.dumps({'rounds':2,'rejected_regenerations':1,'sandbox_used':5,
+            'cycle':cycle['status'],'gate2':winner,'d_release_qualified':True,'recommended':winner},ensure_ascii=False))

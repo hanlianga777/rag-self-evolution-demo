@@ -12,6 +12,9 @@ from app.providers import DeepSeekProvider, ProviderAPIError, ProviderTimeout
 
 
 class RequestCheckpointTests(unittest.TestCase):
+    def setUp(self):
+        backoff=patch('app.evaluation_stage.time.sleep');backoff.start();self.addCleanup(backoff.stop)
+
     def stage(self, cp, action, run='one'):
         return perform_stage(cp, 'generation', action, run, automatic=True,
                              check_stop=lambda: None, on_state=lambda *a, **kw: None)
@@ -25,7 +28,7 @@ class RequestCheckpointTests(unittest.TestCase):
             calls.append(request.full_url)
             if request.full_url.endswith('/embeddings'):
                 return io.BytesIO(b'{"data":[{"index":0,"embedding":[1,2]}],"usage":{"total_tokens":2}}')
-            if calls.count(request.full_url) <= 1:
+            if calls.count(request.full_url) <= 3:
                 raise urllib.error.HTTPError(request.full_url, 429, 'limited', {}, io.BytesIO(b'{}'))
             return io.BytesIO(b'{"results":[{"index":0,"relevance_score":0.9}],"usage":{"total_tokens":2}}')
         cp = {'attempts': []}; provider = self.provider()
@@ -51,8 +54,7 @@ class RequestCheckpointTests(unittest.TestCase):
         from app.evaluation_stage import checkpoint_usage
         from app.paid_run import require_reconciled_execution
         self.assertEqual(len(checkpoint_usage(saved[-1])),1)
-        with self.assertRaisesRegex(ValueError,'禁止重复'):
-            require_reconciled_execution({'checkpoints':{'Q1':saved[-1]}})
+        require_reconciled_execution({'checkpoints':{'Q1':saved[-1]}})
 
     def test_answer_rpc_reuses_full_response_without_recharging_usage(self):
         from app.evaluation_stage import checkpoint_usage
@@ -75,19 +77,22 @@ class RequestCheckpointTests(unittest.TestCase):
         cp = {'attempts': []}
         with patch('urllib.request.urlopen', side_effect=network) as request, patch('app.evaluation_stage.time.sleep'):
             with self.assertRaises(ProviderAPIError): self.stage(cp, lambda: provider.complete('system', 'user'))
-        self.assertEqual(request.call_count, 1)
+        self.assertEqual(request.call_count, 3)
         self.assertFalse(cp.get('unknown_execution', {}).get('generation', False))
         self.assertFalse(cp.get('unsettled_usage', {}).get('generation', False))
 
-    def test_5xx_or_timeout_is_unknown_never_retried(self):
+    def test_5xx_or_timeout_keeps_unknown_after_three_attempts(self):
         for provider in (self.provider(), DeepSeekProvider(Settings('fixture', 'https://fixture.invalid', 'fixture'))):
-            for fault in (TimeoutError('fixture'), urllib.error.HTTPError('https://fixture.invalid', 503, 'service', {}, io.BytesIO(b'{}'))):
-                with self.subTest(provider=type(provider).__name__, fault=type(fault).__name__):
+            for fault in ('timeout', '503'):
+                def fail(*args, **kwargs):
+                    if fault=='timeout':raise TimeoutError('fixture')
+                    raise urllib.error.HTTPError('https://fixture.invalid',503,'service',{},io.BytesIO(b'{}'))
+                with self.subTest(provider=type(provider).__name__, fault=fault):
                     cp = {'attempts': []}
                     action = (lambda: provider._post('/embeddings', {'model':'text-embedding-v4'})) if isinstance(provider, AlibabaProvider) else (lambda: provider.complete('system', 'user'))
-                    with patch('urllib.request.urlopen', side_effect=fault) as request:
+                    with patch('urllib.request.urlopen', side_effect=fail) as request:
                         with self.assertRaises((ProviderAPIError, ProviderTimeout)): self.stage(cp, action)
-                    self.assertEqual(request.call_count, 1)
+                    self.assertEqual(request.call_count, 3)
                     self.assertTrue(cp['unknown_execution']['generation'])
 
     def test_body_timeout_preserves_received_http_headers_without_claiming_completion(self):
@@ -97,7 +102,7 @@ class RequestCheckpointTests(unittest.TestCase):
             def read(self,*args):raise TimeoutError('fixture body timeout')
         for provider in (self.provider(),DeepSeekProvider(Settings('fixture','https://fixture.invalid','fixture'))):
             action = (lambda:provider._post('/embeddings',{'model':'text-embedding-v4'})) if isinstance(provider,AlibabaProvider) else (lambda:provider.complete('system','user'))
-            with patch('urllib.request.urlopen',return_value=Response()),self.assertRaises(ProviderTimeout) as caught:
+            with patch('urllib.request.urlopen',side_effect=lambda *a,**kw:Response()),self.assertRaises(ProviderTimeout) as caught:
                 self.stage({'attempts':[]},action)
             metadata = caught.exception.response_metadata
             self.assertIs(metadata.get('http_response_received'),True)
@@ -105,15 +110,16 @@ class RequestCheckpointTests(unittest.TestCase):
             self.assertEqual(metadata['request_id'],'fixture-response-id')
             self.assertTrue(metadata['request_execution_unknown'])
 
-    def test_missing_usage_saves_rpc_result_and_blocks_another_request(self):
+    def test_missing_usage_saves_rpc_result_and_reuses_without_another_request(self):
         from app.paid_run import require_reconciled_execution
         cp = {'attempts': []}
         with patch('urllib.request.urlopen', return_value=io.BytesIO(b'{"data":[{"index":0,"embedding":[1,2]}]}')) as request:
-            with self.assertRaisesRegex(RuntimeError, 'Usage'):
-                self.stage(cp, lambda: self.provider().embed(['query'], 2))
+            first=self.stage(cp, lambda: self.provider().embed(['query'], 2))
+            self.assertEqual(first.shape,(1,2))
+            self.assertAlmostEqual(float(first[0] @ first[0]),1.,delta=1e-6)
             self.assertTrue(any('result' in r for r in cp['provider_requests'].values()))
-            with self.assertRaisesRegex(ValueError, '禁止重复'):
-                require_reconciled_execution({'checkpoints': {'Q1': cp}})
+            require_reconciled_execution({'checkpoints': {'Q1': cp}})
+            self.stage(json.loads(json.dumps(cp)),lambda:self.provider().embed(['query'],2),'resume')
             self.assertEqual(request.call_count, 1)
 
     def test_invalid_embedding_is_audited_but_never_reused_as_success(self):
@@ -191,15 +197,17 @@ class FiftyQuestionMatrixTests(unittest.TestCase):
                             outcome = self.runner.run_candidate(cid,automatic=True)
                             source = self.store.evaluation_run(outcome['result']['evaluation_run_id'])
                             rows = self.store.evaluation_case_results(source['id']); before = deepcopy(source)
-                            if fault=='none': self.assertEqual(len(rows),50,source.get('error_message'))
+                            if fault in {'none','usage'}:
+                                self.assertEqual(len(rows),50,source.get('error_message'))
+                                self.assertTrue(source['result']['evaluation_complete'])
+                                if fault=='usage':self.assertGreater(source['result']['request_accounting']['unknown_usage_events'],0)
                             else:
                                 self.assertGreaterEqual(len(rows),position-1,source.get("error_message"))
-                                self.assertNotEqual(source['status'],'completed')
+                                self.assertFalse(source['result']['evaluation_complete'])
                                 self.assertIsNone(outcome['result']['qualification']['qualified'])
                                 plan = self.runner.candidate_resume_plan(cid)
-                                safe = fault in {'429','auth','judge_structure','judge_quote','stop'}
-                                self.assertEqual(plan['can_resume'],safe)
-                                if safe:
+                                self.assertTrue(plan['can_resume'])
+                                if plan['can_resume']:
                                     enabled[0] = False
                                     finished = self.runner.run_candidate(cid,automatic=True)
                                     self.assertEqual(finished['result']['completed'],50)

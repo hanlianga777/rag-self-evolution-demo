@@ -220,10 +220,11 @@ class PaidRunTests(unittest.TestCase):
         from unittest.mock import Mock
         frozen = {'generation_strategy':'business_v2','corpus_fingerprint':{},'chunk_fingerprint':digest([])}
         store = Mock()
-        store.generation_run.return_value = {'profile':{},'question_ids':['q1','q2'], 'artifacts':{'hard_validation':{'frozen_plan':frozen}}}
+        store.generation_run.return_value = {'status':'qc','profile':{},'question_ids':['q1','q2'], 'artifacts':{'hard_validation':{'frozen_plan':frozen}}}
+        store.job_checkpoints.return_value = {}
         store.question.side_effect = lambda key:{'id':key,'raw':{'coverage_slot':key},'probe_status':'probe_pending','qc_status':'qc_pending'}
         corpus = SimpleNamespace(chunks=lambda:[])
-        with patch('app.main.wait_for_off_peak'),patch.object(main,'current_manifest',return_value={'documents':[]}), patch.object(main,'manifest_identity',return_value={}), patch.object(main,'_run_quality_rerun',side_effect=ProviderAPIError('invalid key',status_code=401)) as step:
+        with patch.object(main, '_wait_golden_price'),patch.object(main,'current_manifest',return_value={'documents':[]}), patch.object(main,'manifest_identity',return_value={}), patch.object(main,'_run_quality_rerun',side_effect=ProviderAPIError('invalid key',status_code=401)) as step:
             thread = threading.Thread(target=main._run_mini_generation,args=('fixture',store,None,corpus),kwargs={'resume_quality':True,'paid_run':self.run})
             thread.start(); thread.join(timeout=5)
             self.assertFalse(thread.is_alive())
