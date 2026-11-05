@@ -13,7 +13,7 @@ from collections import Counter
 from .providers import ProviderRequestError, provider_error_details
 from .diagnostics import diagnostic_view
 from .diagnostic_categories import DIAGNOSTIC_CATEGORIES
-from .agent_inputs import prepare_baseline_rows, retrieval_facts, is_optimization_target, is_unstable_case, baseline_bad_case_rows
+from .agent_inputs import prepare_baseline_rows, retrieval_facts, is_optimization_target, is_unstable_case, baseline_bad_case_rows, new_failure_ids
 from .paid_run import provider_task
 from .paid_schedule import wait_for_off_peak, clear_run_now
 from .telemetry import collect_usage, measure, cost_fields
@@ -73,7 +73,7 @@ def gate_harming_changes(prior_candidates, baseline_gates=None):
         if harmed:
             diff=candidate.get('reasoning',{}).get('changed_parameters',{})
             changes.append({'candidate_id':candidate.get('id'),'config_diff':diff,'harmed_gates':harmed,
-                            'new_failure_question_ids':candidate.get('result',{}).get('new_failure_question_ids',[]),
+                            'new_failure_question_ids':new_failure_ids(candidate.get('result',{})),
                             'attribution':'多个改动混在一起，无法判断是哪个参数造成的' if len(diff)>1 else '本方案只改动一个参数' if diff else '未知'})
     return changes
 
@@ -100,8 +100,35 @@ def validate_round_contract(candidates, baseline, prior_candidates, baseline_gat
         elif lower:raise ValueError('质量方向不得降低Thinking')
         for previous in gate_harming_changes(prior_candidates,baseline_gates):
             harmed=previous['config_diff']
-            if harmed and all(k in diff and diff[k]==v for k,v in harmed.items()):
+            if harmed and diff == harmed:
                 raise ValueError('不得照搬已证明伤害门槛的相同改动')
+
+
+def validate_prior_round_review(result, prior_candidates):
+    review = result.get('prior_round_review')
+    if not isinstance(review, dict) or not isinstance(review.get('plans'), list) or not isinstance(review.get('baseline_remaining_assessment'), str) or not review['baseline_remaining_assessment'].strip():
+        raise ValueError('缺少前几轮复盘 prior_round_review：plans、baseline_remaining_assessment 必填')
+    expected = {c['id'] for c in prior_candidates if c['status'] == 'evaluated'}
+    plans = review['plans']
+    if len(plans) != len(expected) or {p.get('candidate_id') for p in plans if isinstance(p, dict)} != expected:
+        raise ValueError('前几轮复盘必须逐一覆盖本实验所有已完成历史方案')
+    for plan in plans:
+        if any(not isinstance(plan.get(k), str) or not plan[k].strip() for k in ('changes', 'evidence_reason', 'conclusion')) or any(not isinstance(plan.get(k), list) for k in ('fixed_question_ids', 'new_failure_question_ids')):
+            raise ValueError('前几轮复盘每套须写改动、修好/弄坏题号、证据原因、结论')
+        previous = next(c for c in prior_candidates if c['id'] == plan['candidate_id'])
+        if set(plan['fixed_question_ids']) != set(previous['result'].get('all_fixed_question_ids', [])) or set(plan['new_failure_question_ids']) != set(new_failure_ids(previous['result'])):
+            raise ValueError('前几轮复盘修好/弄坏题号须与保存结果一致，使用正式 question_id')
+    conclusions = review.get('conclusions')
+    if not isinstance(conclusions, list) or not conclusions or any(not isinstance(c, dict) or not isinstance(c.get('id'), str) or not c['id'].strip() or not isinstance(c.get('conclusion'), str) or not c['conclusion'].strip() for c in conclusions):
+        raise ValueError('前几轮复盘须提供可引用的 conclusions（id、conclusion）')
+    ids = {c['id'] for c in conclusions}
+    if len(ids) != len(conclusions):
+        raise ValueError('复盘结论编号不得重复')
+    for candidate in result['candidates']:
+        refs = candidate.get('review_conclusion_ids') if isinstance(candidate, dict) else None
+        if not isinstance(refs, list) or not refs or any(not isinstance(r, str) or r not in ids for r in refs):
+            raise ValueError('每套方案必须通过 review_conclusion_ids 引用前几轮复盘结论')
+    return review
 
 
 def validate_intervention(candidate, targets, baseline):
@@ -218,18 +245,43 @@ def performance_facts(result, cases):
         'slowest_questions':sorted(slowest,key=lambda row:row['latency_seconds'],reverse=True)[:5]}
 
 
+def enhancement_latency_deltas(baseline_config, baseline_result, candidates):
+    """Observed bundle deltas; never claim causal attribution for mixed changes."""
+    baseline = performance_facts(baseline_result, [])
+    rows = []
+    for parameter in ('hyde', 'query_rewrite', 'multi_query', 'top_k', 'candidate_k', 'generation_thinking'):
+        samples = []
+        for candidate in candidates:
+            diff = candidate.get('reasoning', {}).get('changed_parameters', {})
+            if candidate.get('status') != 'evaluated' or parameter not in diff:
+                continue
+            performance = performance_facts(candidate.get('result', {}), [])
+            deltas = {key:performance[key]-baseline[key] if type(performance[key]) in (int,float) and type(baseline[key]) in (int,float) else None
+                      for key in ('latency_p50_seconds','latency_p99_seconds')}
+            samples.append({'candidate_id':candidate['id'], 'value':diff[parameter], **deltas,
+                'attribution':'无法单独归因' if len(diff)>1 else '单参数观测差值'})
+        rows.append({'parameter':parameter, 'baseline_value':baseline_config.get(parameter), 'samples':samples,
+            'mean_deltas':{key:sum(values)/len(values) if (values := [s[key] for s in samples if s[key] is not None]) else None
+                           for key in ('latency_p50_seconds','latency_p99_seconds')},
+            'interpretation':'相对Baseline的观测平均差值；多参数无法单独归因' if samples else '无本实验Sandbox观测'})
+    return rows
+
+
 def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, labels, *, baseline_gates=None, evaluation_budget=None, failed_parameter_signatures=None,
-                       baseline_result=None, baseline_cases=None, candidate_cases=None):
+                       baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None):
     """Build the exact Agent request without a Provider or persistence side effect."""
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。每轮恰好ABC三套，每套direction为检索召回增强/排序与过滤/回答策略/效率（降档 + 检索补偿）之一。三套方向不同，恰好一套效率：Thinking低于Baseline且至少改HyDE、Multi-Query、CandidateK、TopK、MinScore、Rerank、Hybrid权重之一；另两套不得降档。同轮修改参数互斥。不得照搬gate_harming_changes。'
+              '有害改动仅禁止完整配置差异原样重复；叠加其他参数的组合只提示风险，不能推断单参数有害。'
+              '先写前几轮复盘prior_round_review：plans逐一覆盖所有已完成历史方案，每条含candidate_id、changes、fixed_question_ids、new_failure_question_ids（均用保存的正式question_id）、evidence_reason（证据位置、速度、单/多参数归因）、conclusion（有效/有害/无法判断及依据）；baseline_remaining_assessment总结Baseline剩余错题；conclusions为[{id,conclusion}]。首轮plans为空，conclusions从Baseline事实归纳。每套方案必须用review_conclusion_ids引用其中结论。'
               '导致门槛未过的错题分类优先级升为1，按optimization_priorities及其原因安排优化。每个参数的用途与各可选值说明见allowed_parameter_values。'
               '每个参数的预期影响须点名预计修好的目标题号；风险须说明可能弄坏的题号或指标及原因；不得重复失败组合签名。'
               'target_bad_cases可用展示题号（例如Q04）、正式题目ID或Bad Case ID，必须引用当前bad_cases。'
               '没有合格方案就回到分析并再出一轮，最多12次试跑，其中1次留给D。D仅合并已验证有效改动；'
               'D无新增错题且至少修好1道才发布，否则保留赢家；发布规则与门槛不变。'
-              '只返回JSON，格式：{"candidates":[{"id":"A","action_name":"中文动作短语",'
+              '设计方案时要留余量，让预期能修好的题数明显多于可能弄坏的题数，不要只追求刚好多修1道。'
+              '只返回JSON，格式：{"prior_round_review":{"plans":[],"baseline_remaining_assessment":"整体判断","conclusions":[{"id":"L1","conclusion":"事实结论"}]},"candidates":[{"id":"A","review_conclusion_ids":["L1"],"action_name":"中文动作短语",'
               '"direction":"检索召回增强","strategy_name":"「动作名」（检索优先）","core_idea":"一两句话",'
               '"adjustments":[{"parameter":"参数名","baseline_value":0,"candidate_value":0,"expected_impact":"预计修好Q04"}],'
               '"risks":[{"question_ids":[],"metric":"可能退化的指标","reason":"原因"}],'
@@ -251,6 +303,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     budget = {**{'used': 0, 'max': MAX_EVALS, 'reserved_for_d': 1}, **(evaluation_budget or {})}
     budget.update(remaining=max(0, budget['max'] - budget['used']), remaining_for_abc=max(0, budget['max'] - budget['used'] - budget['reserved_for_d']))
     baseline_by_id={case['question_id']:case for case in baseline_cases or []}
+    questions = {q['id']:q for q in golden_questions or []}
     prior_results=[]
     for candidate in prior_candidates:
         result=candidate.get('result',{})
@@ -258,16 +311,20 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         changes={}
         for label,key in (('fixed','all_fixed_question_ids'),('new_failures','new_failure_question_ids')):
             changes[label]=[]
-            for question_id in result.get(key,[]):
+            for question_id in (new_failure_ids(result) if label == 'new_failures' else result.get(key,[])):
                 case=(baseline_by_id.get(question_id) or saved.get(question_id,{})) if label=='fixed' else (saved.get(question_id) or baseline_by_id.get(question_id,{}))
                 changes[label].append({'question_id':question_id,'display_question_id':case.get('display_question_id') or question_id,
                     'diagnosis_category':case.get('diagnosis_category') or {'Retrieval':'检索层问题','Ranking':'检索层问题',
                         'Generation':'生成层问题','Safety':'安全边界问题','Performance':'性能问题'}.get(case.get('primary_root_cause'),'未知'),
-                    'test_category':case.get('test_category'),'negative_subtype':case.get('negative_subtype')})
+                    'test_category':case.get('test_category'),'negative_subtype':case.get('negative_subtype'),
+                    'retrieval_facts':retrieval_facts(case, questions.get(question_id), candidate.get('config'))})
         diff=candidate.get('reasoning',{}).get('changed_parameters',{})
         prior_results.append({'id':candidate['id'],'action_name':candidate.get('reasoning',{}).get('action_name'),
             'hypothesis':candidate.get('reasoning',{}).get('hypothesis'),'configuration':candidate['config'],'status':candidate['status'],
-            'result':{key:result.get(key) for key in ('qualification','bad_case_count','all_fixed_question_ids','new_failure_question_ids','regression','gates')},
+            'result':{key:result.get(key) for key in ('qualification','bad_case_count','all_fixed_question_ids','regression','gates')} | {'new_failure_question_ids':new_failure_ids(result)},
+            'failed_questions':[{'question_id':q, 'display_question_id':case.get('display_question_id') or q,
+                'judge_reason':case.get('judge_result',{}).get('reason'), 'retrieval_facts':retrieval_facts(case, questions.get(q), candidate.get('config'))}
+                for q,case in saved.items() if case.get('passed') is False],
             'performance':performance_facts(result,list(saved.values())), 'question_changes':changes,'changed_parameters':diff,
             'attribution':'多个改动混在一起，无法判断是哪个参数造成的' if len(diff)>1 else '本方案只改动一个参数' if diff else '未知'})
     prompt={
@@ -284,6 +341,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
         'round_contract':{'directions':ROUND_DIRECTIONS,'count':3,'exactly_one_efficiency':True,'parameters_disjoint':True},
         'gate_harming_changes':gate_harming_changes(prior_candidates,gates),
         'prior_sandbox_results':prior_results,
+        'enhancement_latency_deltas':enhancement_latency_deltas(base_config, baseline_result or {}, prior_candidates),
     }
     return system,prompt
 
@@ -354,6 +412,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
         raise ValueError("Agent 输出必须包含 candidates 数组")
     candidates = result.get("candidates", [])
     audit["parsed_candidates"] = candidates
+    audit['prior_round_review'] = validate_prior_round_review(result, prior_candidates)
     validate_round_contract(candidates,base_config,prior_candidates,(audit.get('baseline_gate_results') or {}).get('gates'))
     audit.update(response_contract_version='agent-response-2',rejected_candidates=[],response_warnings=[])
     if len(candidates)<len(labels) and not isinstance(result.get('insufficient_evidence'),str):
@@ -469,7 +528,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
     batch = []
     for candidate, config in staged:
         batch.append((f"R{round_number}-{candidate['id']}", config, {
-            **{key:candidate[key] for key in ('direction','strategy_name','core_idea','adjustments','risks','parameter_signature')},
+            **{key:candidate[key] for key in ('direction','strategy_name','core_idea','adjustments','risks','parameter_signature','review_conclusion_ids')},
             "intervention_direction":candidate['intervention_direction'], "supporting_directions":candidate.get('supporting_directions',[]), "action_name":candidate["action_name"], "intervention_contract_version":"agent-closure-4", "experiment_kind":candidate.get("experiment_kind","confirmed"), "falsification":candidate.get("falsification"), "parameter_dependencies":candidate.get('parameter_dependencies',[]), "evidence_assertions":candidate.get('evidence_assertions',[]), "performance_stage":candidate.get('performance_stage'),
             "target_root_causes": candidate.get("target_root_causes"), "provenance": candidate.get("provenance"), "target_group": candidate.get("target_group") if isinstance(candidate.get("target_group"),str) else None, "root_cause": candidate["root_cause"], "root_cause_evidence": candidate["root_cause_evidence"], "expected_improvement": candidate["expected_improvement"], "target_diagnosis": [strategy_case(item) for item in bad_cases if item["id"] in candidate["target_bad_cases"] or item["question_id"] in candidate["target_bad_cases"]], "root_cause_cluster": result.get("root_cause_cluster"), "observed_evidence": candidate["target_bad_cases"], "hypothesis": candidate["hypothesis"], "proposal": candidate["why"], "risk": candidate["risk"],
             "changed_parameters": {key: value for key, value in config.items() if value != base_config.get(key)}, "source_trigger_id": trigger_id, "monitoring_target_event_ids": monitoring_target_event_ids, "round": round_number, "candidate_label": candidate["id"],
@@ -557,8 +616,8 @@ class OptimizationAgent:
         base_config.pop("run_target", None)
         base_config.pop("knowledge_identity", None)
         base_config = {k:v for k,v in base_config.items() if k in ALLOWED_SEARCH_SPACE}
-        if existing and existing.get('evaluation_budget',{}).get('used',0) > MAX_EVALS - 4:
-            raise ValueError('剩余试跑预算不足完整ABC三套，并须保留D预算')
+        if existing and existing.get('evaluation_budget',{}).get('used',0) >= MAX_EVALS - 1:
+            raise ValueError('A/B/C试跑预算已用完，须保留D预算')
         experiment_id, prior_candidates, round_number, completed, generation_token = self.store.claim_agent_generation(baseline_run_id, trigger_id, existing_id)
         if not existing or existing['status']!='generating':
             clear_run_now(self.store,'agent:'+experiment_id)
@@ -573,9 +632,7 @@ class OptimizationAgent:
         processing_progress={'baseline_failed_question_ids':sorted(failed_questions),'verified_configuration_id':best['id'] if best else None,
             'fixed_question_ids':sorted(fixed),'remaining_question_ids':sorted(failed_questions-fixed),'status':'unfinished' if failed_questions-fixed else 'verified_complete'}
         context = self.store.experiment(experiment_id)["result"]
-        if context.get('historical_sandbox_replays'):
-            from .scoring_revision import historical_replay_candidates
-            prior_candidates = historical_replay_candidates(self.store,baseline,context['historical_sandbox_replays']) + prior_candidates
+        # Only this experiment's observed runs may inform a new round.
         trigger_id = trigger_id or context.get("trigger_id")
         monitoring_context = {"trigger": self.store.optimization_trigger(trigger_id), "event": event or context.get("monitoring_event"), "confirmed_baseline_id": context.get("baseline_id"), "golden_id": context.get("golden_id"), "corpus_fingerprint": context.get("corpus_fingerprint")} if trigger_id else None
         monitoring_target_event_ids = [event["id"]] if event else []
@@ -609,7 +666,8 @@ class OptimizationAgent:
         system,prompt=build_agent_prompt(failures,base_config,prior_candidates,failed_gates,labels,
             baseline_gates=persisted_gates,evaluation_budget=evaluation_budget,failed_parameter_signatures=audit['failed_parameter_signatures'],
             baseline_result=baseline['result'],baseline_cases=saved_cases(baseline_run_id),
-            candidate_cases={c['id']:saved_cases(c.get('result',{}).get('evaluation_run_id')) for c in prior_candidates})
+            candidate_cases={c['id']:saved_cases(c.get('result',{}).get('evaluation_run_id')) for c in prior_candidates},
+            golden_questions=list(questions.values()))
         audit['baseline_diagnosis_summary'] = prompt['baseline_diagnosis_summary']
         audit['next_action'] = prompt['next_action']
         try:

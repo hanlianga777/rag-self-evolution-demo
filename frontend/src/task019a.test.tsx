@@ -1,0 +1,35 @@
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { afterEach, expect, it, vi } from 'vitest';
+import { QuestionTable } from './pages/GovernancePage';
+import { PriorRoundReview } from './pages/EvolutionPage';
+import { RuntimeSettings } from './components/RuntimeSettings';
+import { BadCaseOverview } from './components/ProductDiagnostics';
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
+let root:ReturnType<typeof createRoot>;
+const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));};
+afterEach(()=>{if(root)act(()=>root.unmount());vi.unstubAllGlobals();document.body.innerHTML='';});
+it('uses real Golden fields and omits unavailable columns without placeholder cells',async()=>{
+ await mount(<QuestionTable rows={[{id:'q',slot:'Q07',question:'如何操作',test_category:'negative',negative_subtype:'clarify',source_summary:'不适用（负向题无标准证据）',scoring_summary:{required:3,auxiliary:1},probe:{score:100},qc:{score:90},baseline_result:{passed:false,diagnosis_category:'检索层问题'}}]} onDetail={()=>{}}/>);
+ expect([...document.querySelectorAll('th')].map(e=>e.textContent)).toEqual(['题号','题型','问题','出处','评分要点','Probe','QC','Baseline','操作']);
+ expect(document.querySelector('tbody')?.textContent).toContain('必答 3 · 加分 1');
+ expect(document.querySelector('tbody')?.textContent).toContain('错 · 检索层问题');
+ expect(document.querySelector('tbody')?.textContent).not.toContain('暂无');
+});
+it('shows saved retrospective plans, conclusions and proposal references',async()=>{
+ await mount(<PriorRoundReview review={{plans:[{candidate_id:'R1-A',changes:'开启HyDE',fixed_question_ids:['Q15'],new_failure_question_ids:['Q07'],evidence_reason:'证据未进入最终资料；P99超标；单参数',conclusion:'本配置有害'}],baseline_remaining_assessment:'剩余题需要更完整证据',conclusions:[{id:'L1',conclusion:'检索改动有速度成本'}]}}/>);
+ expect(document.body.textContent).toContain('前几轮复盘');expect(document.body.textContent).toContain('Q07');expect(document.body.textContent).toContain('检索改动有速度成本');
+});
+it('persists visible unattended authorization with actor and never offers automatic publish',async()=>{
+ const fetcher=vi.fn(async(_url:string,init?:RequestInit)=>new Response(JSON.stringify(init?.method==='POST'?{enabled:true,actor:'当前用户',authorized_at:'2026-11-05T12:00:00Z'}:{off_peak_only:true,unattended_authorization:{enabled:false,actor:null,authorized_at:null}})));
+ vi.stubGlobal('fetch',fetcher);await mount(<RuntimeSettings/>);
+ const input=document.querySelector('input[aria-label="无人值守授权"]') as HTMLInputElement;expect(input).not.toBeNull();
+ await act(async()=>input.click());
+ expect(fetcher.mock.calls.some(([url,init])=>url.endsWith('/api/runtime-settings/unattended') && JSON.parse(init!.body as string).actor==='当前用户')).toBe(true);
+ expect(document.body.textContent).toContain('停在发布前');expect(document.body.textContent).toContain('2026-11-05');
+});
+it('removes the single-pass judging column from Agent diagnostics',async()=>{
+ await mount(<BadCaseOverview rows={[]} onSelect={()=>{}}/>);
+ expect(document.body.textContent).not.toContain('判定方式');expect(document.body.textContent).not.toContain('单遍判错');
+});

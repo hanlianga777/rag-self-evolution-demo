@@ -225,17 +225,17 @@ it("preserves unsaved Drawer edits until explicit discard confirmation", async (
 
 it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox and D report", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
-  const d = { id: "E1-D", status: "evaluated", config: {}, reasoning: { candidate_label: "D" }, result: { gates: { passed: true, passed_count: 11, total: 11 }, regression: { passed: false, status: "FAIL" }, qualification: { qualified: false } } };
+  const d = { id: "E1-D", status: "evaluated", config: {}, reasoning: { candidate_label: "D" }, result: { gates: { passed: true, passed_count: 11, total: 11 }, regression: { passed: false, status: "FAIL" }, qualification: { qualified: false }, release_qualification: { qualified: false } } };
   await render(<EvolutionPage data={{ workspace: identity("B1", "E1"), evaluation: { id: "B1", status: "completed", config: {} }, optimization: { id: "E1", candidates: [d], result: { report_confirmation: { winner_id: "A" }, composite: { candidate_id: d.id } } } }} />);
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Sandbox")!.click());
   const coreRows = [...document.querySelectorAll(".sandbox-core-table tbody tr")];
-  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["运行状态", "门槛", "Bad Case", "修复原 Bad Case", "新增失败", "回归检查", "正式资格"]);
+  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["运行状态", "门槛", "Bad Case", "修复原 Bad Case", "新增失败", "回归检查", "候选合格", "可发布"]);
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "门槛")?.lastElementChild?.textContent).toBe("11 / 11");
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "回归检查")?.lastElementChild?.textContent).toBe("未通过");
-  expect(coreRows.find(row => row.querySelector("td")?.textContent === "正式资格")?.lastElementChild?.textContent).toBe("不合格");
+  expect(coreRows.find(row => row.querySelector("td")?.textContent === "候选合格")?.lastElementChild?.textContent).toBe("不合格");
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "A/B/C/D")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-cards button")].filter(x => x.textContent === "查看方案与完整报告").at(-1)!.click());
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不合格 · 门槛：通过");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不可发布 · 门槛：通过");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("回归检查：未通过");
 });
 

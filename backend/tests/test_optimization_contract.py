@@ -26,13 +26,13 @@ def trace_case(root='Retrieval'):
 
 
 def drafts():
-    result = {"root_cause_cluster": "coverage", "observed_evidence": ["Q1"], "candidates": [
+    result = {"prior_round_review":{'plans':[],'baseline_remaining_assessment':'Baseline保存证据表明召回有缺口','conclusions':[{'id':'L1','conclusion':'依据Baseline召回事实设计方案'}]}, "root_cause_cluster": "coverage", "observed_evidence": ["Q1"], "candidates": [
         {"id": "A", "hypothesis": "depth", "why": "more evidence", "target_bad_cases": ["Q1"], "config_diff": {"top_k": 6}, "risk": "latency"},
         {"id": "B", "hypothesis": "noise", "why": "filter", "target_bad_cases": ["Q1"], "config_diff": {"min_score": 0.1}, "risk": "recall"},
         {"id": "C", "hypothesis": "coverage", "why": "more candidates", "target_bad_cases": ["Q1"], "config_diff": {"candidate_k": 24}, "risk": "latency"},
     ]}
     for candidate in result['candidates']:
-        candidate.update(intervention_direction='candidate_recall' if candidate['id']=='C' else 'context_selection', evidence_assertions=[{'target_id':'Q1','observation':'recall_missing' if candidate['id']=='C' else 'ranking_omission'}], parameter_dependencies=[], target_group='fixture检索组', root_cause='Retrieval', root_cause_evidence=candidate['target_bad_cases'], expected_improvement='fixture预期覆盖')
+        candidate.update(review_conclusion_ids=['L1'],intervention_direction='candidate_recall' if candidate['id']=='C' else 'context_selection', evidence_assertions=[{'target_id':'Q1','observation':'recall_missing' if candidate['id']=='C' else 'ranking_omission'}], parameter_dependencies=[], target_group='fixture检索组', root_cause='Retrieval', root_cause_evidence=candidate['target_bad_cases'], expected_improvement='fixture预期覆盖')
     for row,direction in zip(result['candidates'],('排序与过滤','效率（降档 + 检索补偿）','检索召回增强')):
         row['direction']=direction
     result['candidates'][1]['config_diff']['generation_thinking']='high'

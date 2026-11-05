@@ -42,12 +42,13 @@ class AgentRetryTests(unittest.TestCase):
         from diagnostic_fixture import retrieval_case
         proposals=RoundContractTests().proposals()
         for row in proposals:
-            row.update(hypothesis=row['id'],why='保存证据',target_bad_cases=['Q1'],expected_improvement='修好Q1',risk='耗时')
+            row.update(review_conclusion_ids=['L1'],hypothesis=row['id'],why='保存证据',target_bad_cases=['Q1'],expected_improvement='修好Q1',risk='耗时')
         class Stub:
             def __init__(self):self.calls=[]
             def complete(self,system,user,**kwargs):
                 self.calls.append(json.loads(user))
-                return json.dumps({'candidates':proposals if len(self.calls)>1 else proposals[:2]})
+                from test_optimization_contract import drafts
+                return json.dumps({'prior_round_review':drafts()['prior_round_review'],'candidates':proposals if len(self.calls)>1 else proposals[:2]})
         with tempfile.TemporaryDirectory() as directory, patch('app.diagnostics._current_corpus',return_value=(retrieval_case()[1],{'corpus':'one'})):
             store=GovernanceStore(Path(directory)/'test.db')
             completed_baseline(store,run_id='EVAL-test')
@@ -74,7 +75,7 @@ class CompositeEfficiencyTests(unittest.TestCase):
             def complete(self,system,user,**kwargs):
                 self.system=system
                 self.prompt=json.loads(user)
-                return json.dumps({'should_generate_d':True,'source_candidates':[self.prompt['winner']['id'], self.prompt['sources'][0]['id']],
+                return json.dumps({'source_reasons':{self.prompt['winner']['id']:'保留单参数质量改善',self.prompt['sources'][0]['id']:'保留效率整组'},'should_generate_d':True,'source_candidates':[self.prompt['winner']['id'], self.prompt['sources'][0]['id']],
                     'proposed_config_diff':{'generation_thinking':'off','hyde':True},
                     'hypothesis':'检索补偿支持降档','root_cause':'生成层问题','intervention_direction':'stage_performance',
                     'evidence_assertions':[{'target_id':'Q1','observation':'final_sufficient'}],

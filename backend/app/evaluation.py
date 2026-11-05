@@ -21,6 +21,15 @@ ROOT_CAUSE_BY_TAG = {
 }
 
 
+def sandbox_cost(cases):
+    """Total saved answering (including enhancements) plus Judge estimates."""
+    costs = [case.get('programmatic_metrics', {}).get(key) or {} for case in cases
+             for key in ('cost_estimation','judge_cost_estimation')]
+    known = bool(costs) and all(type(c.get('amount')) in (int,float) and c.get('currency') == 'USD' for c in costs)
+    return {'amount':round(sum(c['amount'] for c in costs),8) if known else None,
+            'currency':'USD', 'scope':'完整Sandbox回答、增强和Judge；仅保存用量估算'}
+
+
 def root_cause_layers(failure_tags: list[str], coverage: dict | None = None, test_category: str | None = None) -> tuple[str, list[str]]:
     """Preliminary diagnosis from observed pipeline evidence; legacy callers retain tag order."""
     layers = list(dict.fromkeys(ROOT_CAUSE_BY_TAG[tag] for tag in failure_tags if tag in ROOT_CAUSE_BY_TAG))
@@ -1040,13 +1049,15 @@ class EvaluationRunner:
         if run['status'] != 'completed':
             qualification = {**qualification, 'qualified': False}
         result = {"evaluation_run_id": run_id, "baseline_run_id": baseline["id"], "error": run.get("error_message"), **run["result"], "regression": regression, **comparison, "evaluation_identity": run["judge"].get("evaluation_identity"), "qualification": qualification, "release_qualification": qualify_release(run["result"]["gates"], regression, len(comparison["all_fixed_question_ids"])), "recommendation": None}
+        result['estimated_cost'] = sandbox_cost(list(candidate_cases.values()))
         if candidate['reasoning'].get('candidate_label') == 'D':
             result['qualification'] = result['release_qualification']
             winner = self.store.candidate(candidate['reasoning']['winner_id'])
             winner_cases = {item['question_id']: item for item in self.store.evaluation_case_results(winner['result']['evaluation_run_id'])}
             newly_failed = [key for key, item in winner_cases.items() if item.get('passed') and not candidate_cases.get(key, {}).get('passed')]
             newly_fixed = [key for key, item in winner_cases.items() if not item.get('passed') and candidate_cases.get(key, {}).get('passed')]
-            result['winner_comparison'] = {'winner_id': winner['id'], 'new_failures': newly_failed, 'fixed_cases': newly_fixed, 'promote': run['status'] == 'completed' and result['release_qualification']['qualified']}
+            from .policy import d_improves_winner
+            result['winner_comparison'] = {'winner_id': winner['id'], 'new_failures': newly_failed, 'fixed_cases': newly_fixed, 'promote': run['status'] == 'completed' and result['release_qualification']['qualified'] and d_improves_winner({'result':result},winner)}
         finished = self.store.finish_candidate(candidate["id"], "evaluated" if run['status'] == 'completed' else 'failed', result)
         recommendation = self.store.refresh_recommendation(candidate["experiment_id"])
         return {**finished, "recommendation": recommendation}

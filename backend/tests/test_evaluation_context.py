@@ -123,11 +123,11 @@ class CompositeTests(unittest.TestCase):
         self.store.confirm_experiment_report(self.experiment,self.winner['id'],'fixture human')
 
     def result(self):
-        return {'bad_case_count':0,'qualification':{'qualified':True},'regression':{'passed':True,'new_critical_failures':0,'new_ordinary_failures':0},'all_fixed_question_ids':['q'],'target_bad_cases_fixed':1,'net_improvement':1,'evaluation_identity':self.meta['evaluation_identity']}
+        return {'bad_case_count':0,'release_qualification':{'qualified':True},'qualification':{'qualified':True},'regression':{'passed':True,'new_critical_failures':0,'new_ordinary_failures':0},'all_fixed_question_ids':['q'],'target_bad_cases_fixed':1,'net_improvement':1,'evaluation_identity':self.meta['evaluation_identity']}
 
     def provider(self,generate=True,diff=None):
         from unittest.mock import Mock
-        value={'should_generate_d':generate,'source_candidates':[self.winner['id'],self.other['id']], 'root_cause_alignment':'fixture根因','complementary_capabilities':'fixture互补','proposed_config_diff':diff if diff is not None else {'query_rewrite':True},'expected_improvement':'fixture覆盖','risks':'fixture延迟','explanation':'fixture建议','hypothesis':'fixture查询表达','root_cause':'Retrieval','intervention_direction':'query_expansion','evidence_assertions':[{'target_id':'q','observation':'recall_missing'}],'parameter_dependencies':[]}
+        value={'source_reasons':{self.winner['id']:'保留已验证赢家',self.other['id']:'补充已验证查询改写'},'should_generate_d':generate,'source_candidates':[self.winner['id'],self.other['id']], 'root_cause_alignment':'fixture根因','complementary_capabilities':'fixture互补','proposed_config_diff':diff if diff is not None else {'query_rewrite':True},'expected_improvement':'fixture覆盖','risks':'fixture延迟','explanation':'fixture建议','hypothesis':'fixture查询表达','root_cause':'Retrieval','intervention_direction':'query_expansion','evidence_assertions':[{'target_id':'q','observation':'recall_missing'}],'parameter_dependencies':[]}
         return Mock(complete=Mock(return_value=json.dumps(value)),settings=Settings('fixture','https://example.invalid','fixture'))
 
     def test_d_runs_without_separate_paid_authorization(self):

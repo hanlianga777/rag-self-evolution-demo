@@ -11,15 +11,12 @@
 .candidate-workspace.frozen-question-workspace .detail-content { display:flex; flex-direction:column; overflow:hidden; }
 .frozen-question-workspace .frozen-question-details { flex:1; min-height:0; overflow-y:auto; }
 .governance-page .review-table table { width: 100%; table-layout: fixed; }
+.page-shell.governance-page .table-scroll.review-table thead th { width:8%; white-space:nowrap; word-break:normal; }
 .governance-page .review-table th:nth-child(1) { width:5%; }
-.governance-page .review-table th:nth-child(2) { width:9%; }
-.governance-page .review-table th:nth-child(3) { width:24%; }
-.governance-page .review-table th:nth-child(4) { width:9%; }
-.governance-page .review-table th:nth-child(5) { width:12%; }
-.governance-page .review-table th:nth-child(6), .governance-page .review-table th:nth-child(7) { width:6%; }
-.governance-page .review-table th:nth-child(8) { width:8%; }
-.governance-page .review-table th:nth-child(9) { width:13%; }
-.governance-page .review-table th:nth-child(10) { width:8%; }
+.governance-page .review-table th:nth-child(2) { width:10%; }
+.governance-page .review-table th:nth-child(3) { width:25%; }
+.governance-page .review-table th:nth-child(4) { width:18%; }
+.governance-page .review-table th:last-child { width:8%; }
 .governance-page .review-table td { font-size: 13px; }
 .governance-page .review-table td:nth-child(3) { white-space: normal; }
 .governance-page .review-table td .badge { white-space: normal; }

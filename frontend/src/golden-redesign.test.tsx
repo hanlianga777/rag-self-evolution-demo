@@ -25,7 +25,7 @@ it("shows a skeleton until the initial run and frozen snapshot resolve", async (
   expect(document.querySelector('[aria-label="测试集 Profile"]')).toBeNull();
   await act(async () => { pending.splice(0).forEach(resolve => resolve()); });
   await act(async () => { pending.splice(0).forEach(resolve => resolve()); });
-  expect(document.querySelector(".golden-metrics")?.textContent).toContain("质检通过");
+  expect(document.querySelector(".golden-metrics")).toBeNull();
   expect(document.querySelector('.review-filters button[aria-pressed="true"]')?.textContent).toBe("全部 1");
   await act(async () => root.unmount());
 });
@@ -36,7 +36,7 @@ it("keeps frozen controls visible and renders numbered answers and source eviden
   await act(async () => root.render(<GovernancePage data={frozenData} />));
   expect(document.querySelector(".page-title p")?.textContent).toBe("1 题 · 已冻结 · 11-01");
   expect(document.querySelector(".review-filters")?.textContent).not.toContain("需要人工关注 0");
-  expect(document.querySelectorAll(".review-table th")).toHaveLength(10);
+  expect(document.querySelectorAll(".review-table th")).toHaveLength(6);
   expect(document.querySelector(".review-table")?.textContent).toContain("95");
   expect(document.querySelector(".review-table")?.textContent).not.toContain("人工审核导入");
   await act(async () => document.querySelector<HTMLElement>(".review-table tbody tr")!.click());

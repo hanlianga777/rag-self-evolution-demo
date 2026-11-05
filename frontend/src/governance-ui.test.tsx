@@ -9,6 +9,7 @@ import { CandidateWorkspace } from "./pages/CandidateWorkspace";
 import { OperationProvider } from "./operation";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const tableValue=(label:string)=>{const index=[...document.querySelectorAll(".review-table th")].findIndex(e=>e.textContent===label);return document.querySelector(`.review-table tbody td:nth-child(${index+1})`)?.textContent;};
 afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("counts delegated AI approval as machine qualified without claiming human review", async () => {
@@ -19,7 +20,8 @@ it("counts delegated AI approval as machine qualified without claiming human rev
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [row], snapshots: [snapshot] }} />));
   expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("机器合格 1");
-  expect(document.querySelector(".golden-metrics")?.textContent).toContain("质检通过1/1");
+  expect(document.querySelector(".golden-metrics")).toBeNull();
+  expect(document.querySelector(".stage-stepper")?.textContent).toContain("1 / 1 通过");
   expect(document.querySelector('.golden-summary-strip')?.textContent).toContain("人工确认 · 已冻结");
   expect(document.body.textContent).not.toContain("已人工确认");
   await act(async () => root.unmount());
@@ -84,7 +86,7 @@ it("keeps the Drawer open when approval fails", async () => {
 it("refreshes the open Drawer and table before reporting Revision complete", async () => {
   const run = { id: "GGEN-sync", status: "completed", profile: { expected_count: 1 }, question_ids: ["V1-Q07"], artifacts: {} };
   const old = { id: "V1-Q07", slot: "Q07", question: "旧题", test_category: "positive", legacy_question_type: "v1_mini", review_status: "human_review_pending", probe_status: "probe_pending", qc_status: "qc_pending", stage: "candidate", evidence: [] };
-  const updated = { ...old, question: "新题", probe_status: "probe_passed", qc_status: "qc_passed" };
+  const updated = { ...old, question: "新题", probe:{score:100}, qc:{score:95}, probe_status: "probe_passed", qc_status: "qc_passed" };
   const revision = { id: "REV-sync", status: "qc", stage: "qc", question_ids: [old.id], progress: { current: 0, total: 1 } };
   let finished = false;
   vi.stubGlobal("fetch", vi.fn((url: string) => {
@@ -97,7 +99,7 @@ it("refreshes the open Drawer and table before reporting Revision complete", asy
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody tr[role=button]")!.click());
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
   expect(document.querySelector(".review-table tbody")?.textContent).toContain("新题");
-  expect(document.querySelector(".review-table tbody td:nth-child(6)")?.getAttribute("title")).toBe("通过");
+  expect(tableValue("Probe")).toBe("100");
   expect(document.querySelector(".candidate-workspace .quality-grid")?.textContent).toContain("通过");
   expect(document.querySelector(".candidate-workspace .workspace-badges")?.textContent).not.toContain("QC 通过");
   expect(document.querySelector(".operation-console")?.textContent).toContain("✓ 完成");
@@ -110,7 +112,7 @@ it("refreshes single Probe and QC results in both table and open Drawer", async 
   let probe = false, qc = false;
   vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
     if (init?.method === "POST") { if (url.endsWith("/probe")) probe = true; if (url.endsWith("/qc")) qc = true; return Promise.resolve(new Response(JSON.stringify({ status: "passed" }), { status: 200 })); }
-    const row = { ...base, probe_status: probe ? "probe_passed" : "probe_pending", qc_status: qc ? "qc_passed" : "qc_pending" };
+    const row = { ...base, probe:probe ? {score:100} : undefined, qc:qc ? {score:95} : undefined, probe_status: probe ? "probe_passed" : "probe_pending", qc_status: qc ? "qc_passed" : "qc_pending" };
     const data = url.endsWith("/api/dataset") ? [row] : url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, [row]) : [];
     return Promise.resolve(new Response(JSON.stringify(data), { status: 200 }));
   }));
@@ -118,11 +120,11 @@ it("refreshes single Probe and QC results in both table and open Drawer", async 
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [base] }} />));
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody tr[role=button]")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".quality-grid button")].find(button => button.textContent === "运行 Probe")!.click());
-  expect(document.querySelector(".review-table tbody td:nth-child(6)")?.getAttribute("title")).toBe("通过");
+  expect(tableValue("Probe")).toBe("100");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".quality-grid button")].find(button => button.textContent === "运行 QC")!.click());
   expect(qc).toBe(true);
-  expect(document.querySelector(".review-table tbody td:nth-child(6)")?.getAttribute("title")).toBe("通过");
-  expect(document.querySelector(".review-table tbody td:nth-child(7)")?.getAttribute("title")).toBe("通过");
+  expect(tableValue("Probe")).toBe("100");
+  expect(tableValue("QC")).toBe("95");
   expect(document.querySelector(".review-workspace")?.textContent).toContain("通过");
   await act(async () => root.unmount());
 });

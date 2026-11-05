@@ -33,7 +33,7 @@ it("loads and saves the shared off-peak setting with a high-price explanation", 
   const fetcher = vi.fn((url: string, init?: RequestInit) => response(init?.method ? { off_peak_only: JSON.parse(String(init.body)).off_peak_only, peak_now: true } : { off_peak_only: true, peak_now: true, resume_at_toronto: "23:00" }));
   vi.stubGlobal("fetch", fetcher);
   await mount(<RuntimeSettings />);
-  const input = document.querySelector<HTMLInputElement>("input")!;
+  const input = [...document.querySelectorAll<HTMLInputElement>("input")].find(input=>input.closest("label")?.textContent?.includes("只在平价时段运行"))!;
   expect(input.checked).toBe(true);
   expect(input.disabled).toBe(false);
   expect(document.body.textContent).toContain("23:00，多伦多时间");

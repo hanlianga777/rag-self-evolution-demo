@@ -32,6 +32,18 @@ def set_settings(store, off_peak_only):
     return schedule_status(store)
 
 
+def unattended_authorization(store):
+    return _settings(store).get('unattended_authorization', {'enabled':False, 'actor':None, 'authorized_at':None})
+
+
+def set_unattended_authorization(store, enabled, actor):
+    if not actor.strip():
+        raise ValueError('授权人不能为空')
+    value = {'enabled':enabled, 'actor':actor.strip(), 'authorized_at':utc_now().isoformat()}
+    _write(store, 'unattended_authorization', value)
+    return value
+
+
 def set_run_now(store, task_key):
     _write(store, 'override:' + task_key, True)
 

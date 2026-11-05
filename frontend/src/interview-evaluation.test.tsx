@@ -66,7 +66,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect(document.querySelectorAll(".diagnosis-cards")).toHaveLength(0);
   await click("优化 Agent");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
-  expect([...document.querySelectorAll(".panel > .section-head h2")].map(header => header.textContent)).toEqual(["Agent 读到了什么事实", "Agent 提出了什么假设", "Agent 得出了哪些方案"]);
+  expect([...document.querySelectorAll(".panel > .section-head h2")].map(header => header.textContent)).toEqual(["无人值守设置", "Agent 读到了什么事实", "Agent 提出了什么假设", "Agent 得出了哪些方案"]);
   expect(document.body.textContent).toContain("保存假设 A");
   expect(document.body.textContent).toContain("可调参数 · 2");
   await click("A/B/C/D");
@@ -74,7 +74,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["方向", "核心思路", "参数变化", "针对的题", "预期效果", "风险", "结果"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("持久化问题");
   await click("Sandbox");
-  expect([...document.querySelectorAll("tbody tr > td:first-child")].map(cell => cell.textContent)).toEqual(["运行状态", "门槛", "Bad Case", "修复原 Bad Case", "新增失败", "回归检查", "正式资格"]);
+  expect([...document.querySelectorAll("tbody tr > td:first-child")].map(cell => cell.textContent)).toEqual(["运行状态", "门槛", "Bad Case", "修复原 Bad Case", "新增失败", "回归检查", "候选合格", "可发布"]);
   expect(document.body.textContent).not.toContain("Input Tokens");
   await click("查看高级指标");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Input Tokens");

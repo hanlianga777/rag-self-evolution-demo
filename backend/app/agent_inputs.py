@@ -6,6 +6,12 @@ from .diagnostics import diagnostic_view, standard_evidence, unmet_required_poin
 MISSING = '记录缺失'
 
 
+def new_failure_ids(result):
+    """One saved comparison source, with aliases only for legacy records."""
+    return result.get('new_regression_question_ids', result.get('new_failure_question_ids',
+        result.get('regression', {}).get('new_regression_question_ids', [])))
+
+
 def review_summary(checkpoint):
     """Decision 14: a successful internal retry is valid; keep recovery in runs."""
     summary = (checkpoint or {}).get('regression_review') or {}
@@ -63,7 +69,8 @@ def retrieval_facts(case, question=None, config=None, review=None):
     trace = (case.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
     saved_config = {**(config or {}), **(trace.get('config') or {})}
     unmet = unmet_required_points(case, question)
-    return {'standard_evidence_positions': '不适用（负向题不定位标准证据）' if case.get('test_category') == 'negative' else evidence_positions(question, trace),
+    positions = evidence_positions(question, trace)
+    return {'standard_evidence_positions': '不适用（负向题不定位标准证据）' if case.get('test_category') == 'negative' and positions == MISSING else positions,
             'candidate_k': saved_config.get('candidate_k', MISSING), 'top_k': saved_config.get('top_k', MISSING),
             'unmet_required_points': unmet,
             'baseline_review': {'conclusion': '单遍判错' if case.get('passed') is False else '单遍判对'}}

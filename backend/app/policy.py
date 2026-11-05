@@ -139,22 +139,75 @@ def composite_source_eligible(candidate: dict, identity: str) -> bool:
     result = candidate.get('result', {})
     return bool(candidate.get('status') == 'evaluated' and result.get('evaluation_identity') == identity
                 and result.get('regression', {}).get('passed')
+                and result.get('regression', {}).get('new_critical_failures') == 0
+                and not result.get('continued_failure_new_critical_question_ids')
                 and (result.get('all_fixed_question_ids')
                      or candidate.get('reasoning', {}).get('direction') == '效率（降档 + 检索补偿）'
                      and result.get('gates', {}).get('passed') is True))
 
 
+def composite_source_grade(candidate, baseline):
+    diff = {k:v for k,v in candidate['config'].items() if k in ALLOWED_SEARCH_SPACE and v != baseline.get(k)}
+    critical = candidate.get('result', {}).get('regression', {}).get('new_critical_failures')
+    excluded = critical != 0 or bool(candidate.get('result', {}).get('continued_failure_new_critical_question_ids'))
+    return {'parameter_diff':diff, 'grade':'excluded' if excluded else 'whole_bundle' if len(diff)>1 else 'single_parameter',
+            'rule':'新增关键错题或关键回归记录缺失，排除' if excluded else '无法单独归因，只能整组取用' if len(diff)>1 else '单参数可单独取用'}
+
+
+def validate_composite_sources(sources, config, baseline, reasons):
+    selected = []
+    for source in sources:
+        grade = composite_source_grade(source, baseline)
+        if grade['grade']=='excluded':
+            raise ValueError('D来源有新增关键错题或记录缺失，排除')
+        if not isinstance(reasons, dict) or not isinstance(reasons.get(source['id']), str) or not reasons[source['id']].strip():
+            raise ValueError('每个D来源必须写明选择理由 source_reasons')
+        diff = grade['parameter_diff']
+        if any(config.get(k)!=v for k,v in diff.items()):
+            raise ValueError('多参数来源必须整组取用，单参数来源必须实际纳入D')
+        selected.append({'candidate_id':source['id'], **grade, 'reason':reasons[source['id']]})
+    return selected
+
+
+def candidate_rank(candidate):
+    from .agent_inputs import new_failure_ids
+    result = candidate.get('result', {})
+    bad = result.get('bad_case_count')
+    latency = result.get('metrics', {}).get('latency_p99_seconds', result.get('latency_p99_seconds'))
+    return (bad if type(bad) is int and bad >= 0 else float('inf'), len(new_failure_ids(result)),
+            latency if type(latency) in (int,float) else float('inf'),
+            len(candidate.get('reasoning', {}).get('changed_parameters', {})), candidate['id'])
+
+
+def d_improves_winner(final_candidate, winner):
+    d, w = final_candidate.get('result', {}), winner.get('result', {})
+    d_bad, w_bad = d.get('bad_case_count'), w.get('bad_case_count')
+    if type(d_bad) is not int or type(w_bad) is not int:
+        return False
+    if d_bad < w_bad:
+        return True
+    def p99(result):
+        return result.get('metrics', {}).get('latency_p99_seconds', result.get('latency_p99_seconds'))
+    def cost(result):
+        return result.get('estimated_cost') or result.get('metrics', {}).get('estimated_cost') or {}
+    dc, wc = cost(d), cost(w)
+    return bool(d_bad == w_bad and all(type(v) in (int,float) for v in (p99(d),p99(w),dc.get('amount'),wc.get('amount')))
+                and dc.get('currency') and dc.get('currency') == wc.get('currency')
+                and p99(d) < p99(w) and dc['amount'] < wc['amount'])
+
+
 def select_final_candidate(candidates: list[dict], final_candidate: dict | None = None) -> dict:
-    if final_candidate and final_candidate.get('status') == 'evaluated' and final_candidate.get('result', {}).get('release_qualification', {}).get('qualified') is True:
-        return {'decision': '发布合格', 'candidate_id': final_candidate['id'], 'reason': '11项门槛全过、相对Baseline零新增错题且至少修好1道'}
     qualified = [c for c in candidates if c.get('status') == 'evaluated' and c.get('reasoning', {}).get('candidate_label') != 'D' and c.get('result', {}).get('qualification', {}).get('qualified') is True]
     if not qualified:
         return {'decision': '保持 Baseline', 'candidate_id': None, 'reason': '没有已合格的A/B/C方案'}
-    def bad_count(candidate):
-        value = candidate['result'].get('bad_case_count')
-        return value if type(value) is int and value >= 0 else float('inf')
-    winner = min(qualified, key=lambda c: (bad_count(c), c['id']))
-    return {'decision': '保留赢家方案', 'candidate_id': winner['id'], 'reason': '最终方案未通过发布规则；保留已合格A/B/C中错题最少的方案'}
+    winner = min(qualified, key=candidate_rank)
+    if (final_candidate and final_candidate.get('status') == 'evaluated'
+            and final_candidate.get('result', {}).get('release_qualification', {}).get('qualified') is True
+            and d_improves_winner(final_candidate, winner)):
+        return {'decision':'推荐方案 D', 'candidate_id':final_candidate['id'], 'reason':'D具备发布资格且优于赢家：错题更少，或错题相同且P99、费用均更低'}
+    if winner['result'].get('release_qualification', {}).get('qualified') is not True:
+        return {'decision':'保持 Baseline', 'candidate_id':None, 'reason':'赢家候选合格但不具备发布资格，D也未满足推荐条件', 'winner_id':winner['id']}
+    return {'decision': '保留赢家方案', 'candidate_id': winner['id'], 'reason': 'D未同时满足发布资格与优于赢家；保留具有发布资格的赢家'}
 
 
 def canonicalize_config(config: dict) -> str:

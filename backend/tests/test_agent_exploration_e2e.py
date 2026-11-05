@@ -85,7 +85,7 @@ class Sandbox50Tests(unittest.TestCase):
         # Current preflight requires the remaining diagnostic tasks to be planned too.
         from app.agent_coverage import coverage_inputs, complete_coverage
         report = coverage_inputs(self.store, experiment['id'])[-1]
-        if report['status'] == 'incomplete':
+        if report['proposals']:
             complete_coverage(self.store, experiment['id'], expected_binding=report['binding'], backup_path=self.path.parent / 'offline-coverage-backup.db')
         return self.store.experiment(experiment['id'])
 

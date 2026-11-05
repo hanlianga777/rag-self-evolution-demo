@@ -15,7 +15,7 @@ it('opens a case by keyboard and disables zero categories without losing review 
  await mount(<BadCaseOverview rows={[row]} categories={[{label:'检索噪声'},{label:'安全边界'}]} onSelect={value=>selected=value}/>);
  const zero=[...document.querySelectorAll('button')].find(b=>b.textContent==='安全边界0')!;expect(zero.disabled).toBe(true);
  const tr=document.querySelector('.diagnosis-list tbody tr')!;await act(async()=>tr.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));expect(selected).toBe(row);
- expect(document.querySelector('.diagnosis-list thead')?.textContent).toContain('判定方式');expect(document.body.textContent).not.toContain('展开细项');
+ expect(document.querySelector('.diagnosis-list thead')?.textContent).not.toContain('判定方式');expect(document.body.textContent).not.toContain('展开细项');
 });
 it('derives comparison differences and defaults to changed gates',async()=>{
  const columns=[{id:'max',label:'最高',metrics:{correct_count:45,latency_p50_seconds:15,average_estimated_cost:{amount:0.002,currency:'USD'}},gates:[{metric:'safe_rejection_rate',actual:100,threshold:95,status:'PASS'},{metric:'positive_correctness',actual:95,status:'PASS'}]},{id:'high',label:'高',current:true,metrics:{correct_count:43,latency_p50_seconds:5,average_estimated_cost:{amount:0.001,currency:'USD'}},gates:[{metric:'safe_rejection_rate',actual:90,threshold:95,status:'FAIL'},{metric:'positive_correctness',actual:95,status:'PASS'}]}];

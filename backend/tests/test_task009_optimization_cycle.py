@@ -10,15 +10,23 @@ class CycleTests(unittest.TestCase):
         from app.optimization_cycle import run_until_qualified
         experiment = {'id':'exp','baseline_run_id':'base','result':{},'evaluation_budget':{'used':used},'candidates':[]}
         calls, states = [], []
+        import tempfile
+        from pathlib import Path
+        from app.governance import GovernanceStore
+        directory=tempfile.TemporaryDirectory();self.addCleanup(directory.cleanup)
+        store_fixture=GovernanceStore(Path(directory.name)/'cycle.db')
         class Store:
             def experiment(self, _, **kwargs): return deepcopy(experiment)
             def require_current_baseline(self, _): return {'id':'base'}
+            def connection(self): return store_fixture.connection()
+            def skip_candidate(self,cid,*args,**kwargs):
+                next(c for c in experiment['candidates'] if c['id']==cid)['status']='skipped'
         class Agent:
             def __init__(self, *args): pass
             def generate(self, *args, **kwargs):
                 calls.append('analysis')
                 if empty: return
-                count=min(3,11-experiment['evaluation_budget']['used'])
+                count=3
                 for n in range(count):
                     experiment['candidates'].append({'id':str(len(experiment['candidates'])),'status':'generated','reasoning':{'candidate_label':'ABC'[n]},'result':{}})
         class Runner:
@@ -34,15 +42,15 @@ class CycleTests(unittest.TestCase):
 
     def test_no_qualified_returns_to_analysis_and_reserves_d(self):
         result,exp,calls,states=self.run_cycle()
-        self.assertEqual(exp['evaluation_budget']['used'],9)
-        self.assertEqual(calls.count('analysis'),3)
+        self.assertEqual(exp['evaluation_budget']['used'],11)
+        self.assertEqual(calls.count('analysis'),4)
         self.assertEqual(result['status'],'budget_exhausted')
-        self.assertEqual(result['remaining'],3)
+        self.assertEqual(result['remaining'],1)
         self.assertEqual(result['reserved_for_d'],1)
 
-    def test_qualified_stops_after_current_batch(self):
+    def test_qualified_stops_immediately_and_skips_unstarted(self):
         result,exp,calls,_=self.run_cycle(qualified_at=3)
-        self.assertEqual(exp['evaluation_budget']['used'],6)
+        self.assertEqual(exp['evaluation_budget']['used'],4)
         self.assertEqual(calls.count('analysis'),2)
         self.assertEqual(result['status'],'qualified')
 

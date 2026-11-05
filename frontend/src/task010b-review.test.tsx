@@ -25,13 +25,13 @@ it('uses true errors in the overview while keeping saved correctness',async()=>{
 it('uses single-pass labels while retaining historical records',async()=>{
  const row={question_id:'Q37',result:{passed:false,question:'测试问题',baseline_review_label:'随机波动（3 次错 1 次）',baseline_review:{status:'fluctuation'},optimization_target:false,diagnostic_view:{diagnosis_category:'回答问题',display_question_id:'Q37'}}};
  await mount(<BadCaseOverview rows={[row]} onSelect={()=>{}}/>);
- expect(document.body.textContent).toContain('单遍判错');
+ expect(document.body.textContent).not.toContain('单遍判错');
  expect(document.body.textContent).not.toContain('随机波动');
 });
 
 it('does not use historical review status to exclude a single-pass failure',async()=>{
  const row={question_id:'Q46',result:{passed:false,question:'异常',baseline_review_label:'未知（复核技术异常，已停止）',baseline_review:{status:'technical_failure'},optimization_target:false}};
  await mount(<BadCaseOverview rows={[row]} onSelect={()=>{}}/>);
- expect(document.body.textContent).toContain('单遍判错');
+ expect(document.body.textContent).not.toContain('单遍判错');
  expect(document.body.textContent).not.toContain('不稳定题：方案需保持判对，不作为必修目标');
 });

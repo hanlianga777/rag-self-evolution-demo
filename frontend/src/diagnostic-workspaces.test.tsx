@@ -86,7 +86,7 @@ it('shows every current business failure in Agent including pending diagnoses',a
  await render(<EvolutionPage data={{evaluation,badCases}}/>);
  expect(document.querySelectorAll('tbody tr')).toHaveLength(10);
  expect([...document.querySelectorAll('button')].find(button=>button.textContent?.includes('生成 A / B / C'))?.disabled).toBe(false);
- expect(document.body.textContent).toContain('单遍判错题进入 Agent 优化');
+ expect(document.body.textContent).toContain('错题进入 Agent 优化');
 });
 it('connects an unknown exploratory target to its saved candidate without calling it confirmed',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));

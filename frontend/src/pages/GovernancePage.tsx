@@ -2,12 +2,12 @@ import { DataTable } from "../components/DataTable";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiUrl, errorMessage, getJson, postJson } from "../api";
-import { Badge, CustomSelect, Metric, MoreMenu, Section, ShortId, StageStepper, Status, TechnicalDetails, TruncatedText } from "../components/Primitives";
+import { Badge, CustomSelect, MoreMenu, Section, ShortId, StageStepper, Status, TechnicalDetails, TruncatedText } from "../components/Primitives";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { displayText, isMachineQualified } from "../display";
 import { useOperation } from "../operation";
 import { BusinessImportPanel, CoverageSummary, CurrentCoveragePreview } from "./BusinessImportPanel";
-import { FrozenQuestionDetails, goldenScore, questionSources } from "./FrozenQuestionDetails";
+import { FrozenQuestionDetails, goldenScore } from "./FrozenQuestionDetails";
 import "./golden-workspace.css";
 import { CandidateWorkspace } from "./CandidateWorkspace";
 import { PricePauseNotice } from "../components/RuntimeSettings";
@@ -220,7 +220,7 @@ export function GovernancePage({ data }: { data: any }) {
     {error && <p className="error-notice" role="alert">{error}</p>}
     {loadingWorkspace ? <div className="golden-skeleton golden-initial-skeleton" role="status" aria-label="正在读取 Golden Dataset">{[1, 2, 3, 4, 5, 6].map(index => <span key={index} aria-hidden="true" />)}</div> : tab === "run" && <div className="golden-workspace">
 
-      <div className="golden-metrics" aria-label="题卷摘要">{["positive", "ablation", "negative"].map(group => <Metric key={group} label={group === "positive" ? "正向" : group === "ablation" ? "消融" : "负向"} value={current.filter(row => row.test_category === group).length.toLocaleString()} note={group === "positive" ? "验证知识问答" : group === "ablation" ? "验证证据依赖" : "验证回答边界"} />)}<Metric label="质检通过" value={`${current.filter(row => row.probe_status === "probe_passed" && row.qc_status === "qc_passed").length.toLocaleString()}/${current.length.toLocaleString()}`} note="Probe 与 QC 均通过" /></div>
+
 
       <PricePauseNotice pause={workRun?.artifacts?.hard_validation?.price_pause} target={workRun ? {generation_id:workRun.id} : undefined} onChanged={reload} />
       <StageStepper compact ariaLabel="Golden 治理阶段" steps={[
@@ -252,6 +252,14 @@ export function GovernancePage({ data }: { data: any }) {
   </PageShell>;
 }
 
-function QuestionTable({ rows, onDetail, paging, resetKey }: { rows: Candidate[]; onDetail: (row: Candidate) => void; paging?: any; resetKey?: string }) {
-  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><DataTable><thead><tr>{["题号", "题型", "问题", "知识主题", "出处", "Probe 分", "QC 分", "Baseline 对错", "关注原因", "操作"].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row.id} tabIndex={0} role="button" aria-label={`${row.slot || "题目"} · ${row.question}`} onClick={() => onDetail(row)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDetail(row); } }}><td>{row.slot || row.raw?.coverage_slot || "暂无"}</td><td>{row.test_category ? displayText(row.test_category) : "暂无"}{row.test_category === "negative" && <small>{displayText(row.negative_subtype || "暂无")}</small>}</td><td><TruncatedText lines={2}>{row.question}</TruncatedText></td><td>{row.topic_cluster?.semantic_label || row.topic_cluster?.label || "暂无"}</td><td>{questionSources(row)}</td><td title={probeLabel(row.probe_status)}>{goldenScore(row.probe?.score)}</td><td title={qcLabel(row.qc_status)}>{goldenScore(row.qc?.score)}</td><td>暂无</td><td>{row.failed ? "待补齐" : row.attention_reasons?.join("；") || "暂无"}</td><td><button className="text-button" onClick={event => { event.stopPropagation(); onDetail(row); }}>查看详情</button></td></tr>)}{!rows.length && !paging?.error && <tr><td colSpan={10} className="empty-state">还没有符合筛选条件的题目。<p>题目完成生成与校验后会显示在这里。</p></td></tr>}</tbody></DataTable></ScrollablePagedTable>;
+export function QuestionTable({ rows, onDetail, paging, resetKey }: { rows: Candidate[]; onDetail: (row: Candidate) => void; paging?: any; resetKey?: string }) {
+  const optional = [
+    {label:"知识主题",value:(row:Candidate)=>typeof row.knowledge_topic === "string" ? row.knowledge_topic : row.knowledge_topic?.semantic_label || row.topic_cluster?.semantic_label},
+    {label:"出处",value:(row:Candidate)=>row.source_summary},
+    {label:"评分要点",value:(row:Candidate)=>row.scoring_summary ? `必答 ${row.scoring_summary.required} · 加分 ${row.scoring_summary.auxiliary}` : null},
+    {label:"Probe",value:(row:Candidate)=>typeof row.probe?.score === "number" ? goldenScore(row.probe.score) : null},
+    {label:"QC",value:(row:Candidate)=>typeof row.qc?.score === "number" ? goldenScore(row.qc.score) : null},
+    {label:"Baseline",value:(row:Candidate)=>typeof row.baseline_result?.passed === "boolean" ? row.baseline_result.passed ? "对" : row.baseline_result.diagnosis_category ? `错 · ${row.baseline_result.diagnosis_category}` : null : null},
+  ].filter(column=>rows.length>0 && rows.every(row=>column.value(row)!=null));
+  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><DataTable><thead><tr>{["题号", "题型", "问题",...optional.map(c=>c.label),"操作"].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row.id} tabIndex={0} role="button" aria-label={`${row.slot || "题目"} · ${row.question}`} onClick={() => onDetail(row)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDetail(row); } }}><td>{row.slot || row.raw?.coverage_slot || row.id}</td><td>{displayText(row.test_category || (row.failed ? "生成失败" : "类型未记录"))}{row.test_category === "negative" && row.negative_subtype && <small>{displayText(row.negative_subtype)}</small>}</td><td><TruncatedText lines={2}>{row.question}</TruncatedText></td>{optional.map(column=><td key={column.label}><TruncatedText lines={2}>{column.value(row)}</TruncatedText></td>)}<td><button className="text-button" onClick={event => { event.stopPropagation(); onDetail(row); }}>查看详情</button></td></tr>)}{!rows.length && !paging?.error && <tr><td colSpan={4+optional.length} className="empty-state">还没有符合筛选条件的题目。<p>题目完成生成与校验后会显示在这里。</p></td></tr>}</tbody></DataTable></ScrollablePagedTable>;
 }

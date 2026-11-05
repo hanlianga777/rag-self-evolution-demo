@@ -601,17 +601,19 @@ def candidate_list(run_id: str | None = None, offset: int = Query(0, ge=0), limi
     if run_id and run is None:
         raise HTTPException(status_code=404, detail="Generation run not found")
     rows = store.candidate_rows(run['question_ids']) if run else store.working_pool_rows()
+    from .golden_read import project_question_rows
+    rows = project_question_rows(store, rows)
     summary = {'total':len(rows), 'ai':sum(row['raw'].get('source') not in {'business_import','reviewed_csv'} for row in rows), 'business':sum(row['raw'].get('source')=='business_import' for row in rows),
         'reviewed_csv':sum(row['raw'].get('source')=='reviewed_csv' for row in rows),
         'machine_qualified':sum(row['raw'].get('source')!='reviewed_csv' and row['qualification_status'] in {'machine_qualified','human_approved','owner_delegated_approved'} for row in rows),
         'needs_processing':sum(row['qualification_status']=='needs_human_review' and row['probe_status']!='probe_pending' and row['qc_status']!='qc_pending' for row in rows),
         'pending_checks':sum(row['qualification_status']=='needs_human_review' and (row['probe_status']=='probe_pending' or row['qc_status']=='qc_pending') for row in rows)}
     types = sorted({row['construction_type'] for row in rows if row['construction_type']})
-    candidate_index = [{key:row[key] for key in ('id','stage','review_status','probe_status','qc_status','test_category','raw','slot','topic_cluster','qualification_status','qualification_source','attention_reasons','attention_categories','probe','qc')} for row in rows] if run else []
+    candidate_index = [{key:row[key] for key in ('id','stage','review_status','probe_status','qc_status','test_category','raw','slot','topic_cluster','qualification_status','qualification_source','attention_reasons','attention_categories','probe','qc','knowledge_topic','source_summary','scoring_summary','baseline_result')} for row in rows] if run else []
     version_rows = rows
     risks = any(row['qualification_status']=='needs_human_review' for row in rows)
     rows = [row for row in rows if (status=='all' or status=='attention' and (row['qualification_status']=='needs_human_review' or not risks) or status=='machine' and row['qualification_status'] in {'machine_qualified','owner_delegated_approved'} or status=='usable' and row['qualification_status'] in {'machine_qualified','human_approved','owner_delegated_approved'} or status=='govern' and row['qualification_status']=='needs_human_review') and (source=='all' or (row['raw'].get('source') or 'ai_generated')==source) and (group=='all' or row['test_category']==group) and (construction=='all' or row['construction_type']==construction) and search.lower() in row['question'].lower()]
-    version = hashlib.sha256(json.dumps([(row['id'],row['updated_at'],row['qualification_status'],row['attention_reasons'],row['quality_audit']) for row in version_rows],sort_keys=True).encode()).hexdigest()
+    version = hashlib.sha256(json.dumps([(row['id'],row['updated_at'],row['qualification_status'],row['attention_reasons'],row['quality_audit'],row['probe'],row['qc'],row['baseline_result']) for row in version_rows],sort_keys=True).encode()).hexdigest()
     return {'rows':[{key:value for key,value in row.items() if key!='quality_audit'} for row in rows[offset:offset+limit]], 'candidate_index':candidate_index, 'total':len(rows), 'summary':summary, 'construction_types':types, 'data_version':version, 'corpus_fingerprint':manifest_identity(current_manifest()), 'generation_run_id':run_id, 'profile':run['profile'] if run else None}
 
 
@@ -1836,6 +1838,20 @@ class RuntimeSettingsRequest(BaseModel):
     off_peak_only: bool = Field(strict=True)
 
 
+class UnattendedRequest(BaseModel):
+    enabled: bool = Field(strict=True)
+    actor: str = Field(min_length=1, max_length=200)
+
+
+@app.post('/api/runtime-settings/unattended', dependencies=[Depends(require_trusted_origin)])
+def update_unattended_authorization(payload: UnattendedRequest):
+    from .paid_schedule import set_unattended_authorization
+    try:
+        return set_unattended_authorization(store, payload.enabled, payload.actor)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+
+
 class RunNowRequest(BaseModel):
     evaluation_id: str | None = None
     experiment_id: str | None = None
@@ -1848,8 +1864,8 @@ class RunNowRequest(BaseModel):
 
 @app.get('/api/runtime-settings')
 def runtime_settings():
-    from .paid_schedule import schedule_status, active_pauses
-    return {**schedule_status(store), 'active_pauses':active_pauses(store)}
+    from .paid_schedule import schedule_status, active_pauses, unattended_authorization
+    return {**schedule_status(store), 'active_pauses':active_pauses(store), 'unattended_authorization':unattended_authorization(store)}
 
 
 @app.post('/api/runtime-settings', dependencies=[Depends(require_trusted_origin)])
@@ -2247,3 +2263,16 @@ def stop_optimization_cycle(run_id: str):
     from .optimization_cycle import request_cycle_stop
     try:return request_cycle_stop(store,run_id)
     except ValueError as error:raise HTTPException(404,str(error)) from error
+
+
+class SkipCandidateRequest(BaseModel):
+    actor: str = Field(min_length=1, max_length=200)
+    reason: str = Field(default='用户跳过未运行方案', min_length=1, max_length=500)
+
+
+@app.post('/api/candidates/{candidate_id}/skip', dependencies=[Depends(require_trusted_origin)])
+def skip_candidate(candidate_id: str, payload: SkipCandidateRequest):
+    try:
+        return store.skip_candidate(candidate_id, payload.actor, payload.reason)
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error

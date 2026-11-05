@@ -1,4 +1,4 @@
-"""Explicitly started A/B/C batches; D and release keep their existing decisions."""
+"""Authorized optimization loop; unattended work always stops before release."""
 import json
 import logging
 import os
@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 from .evaluation import EvaluationRunner
 from .full_text import CORPUS_LOCK
 from .optimization import OptimizationAgent, ProposalValidationExhausted
-from .paid_schedule import wait_for_off_peak
-from .policy import MAX_EVALS
+from .paid_schedule import wait_for_off_peak, unattended_authorization
+from .policy import MAX_EVALS, candidate_rank
 
 
 def _save_state(store, experiment_id, **state):
@@ -103,16 +103,53 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
         _save_state(store, experiment_id, **state)
         return dict(state)
 
+    def advance_qualified(experiment, qualified):
+        confirmation = experiment['result'].get('report_confirmation')
+        authorization = unattended_authorization(store)
+        if not confirmation:
+            for candidate in experiment['candidates']:
+                if candidate['status']=='generated' and candidate['reasoning'].get('candidate_label') in {'A','B','C'}:
+                    store.skip_candidate(candidate['id'], '自动循环', '出现合格方案，已跳过（未运行）', automatic=True)
+            if not authorization.get('enabled'):
+                return save('qualified', 'review')
+            winner = min(qualified, key=candidate_rank)
+            actor = '按用户授权自动确认：' + authorization['actor']
+            store.confirm_experiment_report(experiment_id, winner['id'], actor)
+        if not authorization.get('enabled'):
+            return save('qualified', 'review')
+        check_cycle_stop(store,experiment_id)
+        save('running', 'composite')
+        composite = store.create_composite(experiment_id, runtime.provider)
+        if composite.get('status') in {'analyzing','unknown'}:
+            return save('failed', 'composite', 'D分析结果未知，保留记录，不重复付费调用')
+        experiment = store.experiment(experiment_id, light=True)
+        d = next((c for c in experiment['candidates'] if c['reasoning'].get('candidate_label')=='D'), None)
+        if d is None or d['status']=='evaluated':
+            store.refresh_recommendation(experiment_id)
+            return save('recommended', 'before_release')
+        return None
+
     try:
         while True:
             check_cycle_stop(store,experiment_id)
             experiment = store.experiment(experiment_id, light=True)
             store.require_current_baseline(experiment['baseline_run_id'])
-            pending = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}
+            qualified = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}
+                         and c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True]
+            if qualified:
+                if terminal := advance_qualified(experiment, qualified):
+                    return terminal
+                experiment = store.experiment(experiment_id, light=True)
+            labels = {'D'} if qualified else {'A','B','C'}
+            pending = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in labels
                        and (c['status'] in {'generated','running'} or c['status']=='failed' and c['result'].get('evaluation_run_id'))]
+            if qualified and not pending:
+                return save('failed','composite','D没有可安全续跑的结果或断点')
             for candidate in pending:
                 check_cycle_stop(store,experiment_id)
-                if candidate['status']=='generated' and store.experiment(experiment_id, light=True)['evaluation_budget']['used'] >= MAX_EVALS-1:
+                limit = MAX_EVALS if candidate['reasoning'].get('candidate_label')=='D' else MAX_EVALS-1
+                if candidate['status']=='generated' and store.experiment(experiment_id, light=True)['evaluation_budget']['used'] >= limit:
+                    store.skip_candidate(candidate['id'], '自动循环', 'A/B/C预算已用完，D保留一次；已跳过（未运行）', automatic=True)
                     return save('budget_exhausted', 'review')
                 save('running', 'sandbox')
                 finished = candidate
@@ -147,15 +184,15 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                     recovery['resumes'] += 1
                     save('running','sandbox',f"断点续跑第{recovery['resumes']}次：{error}")
                     finished = runner.run_candidate(candidate['id'], automatic=True)
+                if finished['result'].get('qualification',{}).get('qualified') is True:
+                    break
             experiment = store.experiment(experiment_id, light=True)
             if any(c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True for c in experiment['candidates']):
-                return save('qualified', 'review')
+                continue
             if state.get('current_round_only'):
                 return save('round_completed','review')
             if experiment['evaluation_budget']['used'] >= MAX_EVALS-1:
                 return save('budget_exhausted', 'review')
-            if experiment['evaluation_budget']['used'] > MAX_EVALS - 4:
-                return save('budget_exhausted', 'review', '剩余额度不足完整 A/B/C 三套，并须保留 1 次给 D')
             save('running', 'analysis')
             before = len(experiment['candidates'])
             try:
