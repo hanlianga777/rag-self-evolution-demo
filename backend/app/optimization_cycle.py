@@ -40,6 +40,8 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
         if current_round_only and not any(c['reasoning'].get('candidate_label') in {'A','B','C'} for c in experiment['candidates']):
             raise ValueError('当前没有可续跑的 A/B/C 方案')
         state = {'status':'running', 'phase':'analysis', 'owner_pid':os.getpid(), 'current_round_only':current_round_only,
+                 'resume_stopped_runs':[c['result']['evaluation_run_id'] for c in experiment['candidates']
+                     if c['status']=='failed' and c['result'].get('stop_request') and c['result'].get('evaluation_run_id')],
                  'used':experiment['evaluation_budget']['used'],
                  'remaining':max(0, MAX_EVALS-experiment['evaluation_budget']['used']),
                  'reserved_for_d':1, 'last_error':None}
@@ -52,6 +54,29 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
     for kind in ('cycle:', 'agent:'):
         clear_run_now(store, kind + experiment_id)
     return state
+
+
+def check_cycle_stop(store, experiment_id):
+    state=(store.experiment(experiment_id,light=True) or {}).get('result',{}).get('optimization_cycle',{})
+    if state.get('status')=='running' and state.get('stop_request'):
+        raise InterruptedError('用户停止运行，断点已保存')
+
+
+def request_cycle_stop(store, experiment_id):
+    with CORPUS_LOCK, store.connection() as connection:
+        connection.execute('BEGIN IMMEDIATE')
+        row=connection.execute('SELECT result_json FROM experiments WHERE id=?',(experiment_id,)).fetchone()
+        if not row:raise ValueError('实验不存在')
+        result=json.loads(row['result_json'])
+        state=result.get('optimization_cycle',{})
+        if state.get('status')=='running':
+            state.setdefault('stop_request',{'requested_at':datetime.now(timezone.utc).isoformat(),'reason':'用户停止运行'})
+            connection.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps(result,ensure_ascii=False),experiment_id))
+        runs=connection.execute("""SELECT e.id FROM evaluation_runs e JOIN candidate_configs c
+            ON json_extract(e.config_json,'$.candidate_id')=c.id
+            WHERE c.experiment_id=? AND e.status IN ('queued','running')""",(experiment_id,)).fetchall()
+    for run in runs:store.request_evaluation_stop(run['id'])
+    return store.experiment(experiment_id,light=True)['result'].get('optimization_cycle',{})
 
 
 def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
@@ -80,11 +105,13 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
 
     try:
         while True:
+            check_cycle_stop(store,experiment_id)
             experiment = store.experiment(experiment_id, light=True)
             store.require_current_baseline(experiment['baseline_run_id'])
             pending = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}
                        and (c['status'] in {'generated','running'} or c['status']=='failed' and c['result'].get('evaluation_run_id'))]
             for candidate in pending:
+                check_cycle_stop(store,experiment_id)
                 if candidate['status']=='generated' and store.experiment(experiment_id, light=True)['evaluation_budget']['used'] >= MAX_EVALS-1:
                     return save('budget_exhausted', 'review')
                 save('running', 'sandbox')
@@ -95,12 +122,13 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                         finished = store.candidate(candidate['id'])
                     elif finished['status']=='generated':
                         finished = runner.run_candidate(candidate['id'], automatic=True)
+                    check_cycle_stop(store,experiment_id)
                     if finished['status']=='evaluated':break
                     run = store.evaluation_run(finished['result'].get('evaluation_run_id'))
                     if not run:
                         return save('failed','sandbox','试跑没有可用断点，不能安全续跑')
                     result = run['result']
-                    if result.get('stop_request'):
+                    if result.get('stop_request') and run['id'] not in state.get('resume_stopped_runs',[]):
                         return save('stopped','sandbox','用户已停止试跑，保留断点')
                     errors=result.get('technical_errors',[])
                     if any(e.get('provider_error',{}).get('status_code') in {400,401,402,403}
@@ -134,7 +162,7 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                 def price_state(pause):
                     state['price_pause']=pause
                     save('running','analysis')
-                wait_for_off_peak(store,'cycle:'+experiment_id,price_state)
+                wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
                 agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
             except ProposalValidationExhausted as error:
                 return save('analysis_exhausted','analysis',str(error))
@@ -142,6 +170,8 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
             empty_rounds = empty_rounds+1 if len(experiment['candidates'])==before else 0
             if empty_rounds >= 3:
                 return save('analysis_exhausted', 'analysis', '连续3轮没有合法草案，已停止；试跑预算未额外扣减')
+    except InterruptedError as error:
+        return save('stopped',state.get('phase','sandbox'),str(error))
     except Exception as error:
         return save('failed', state.get('phase','analysis'), str(error))
 

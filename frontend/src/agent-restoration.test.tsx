@@ -56,6 +56,25 @@ it("starts an eligible Sandbox continuation without another fee confirmation", a
   expect((fetch as any).mock.calls.some(([,init]:any)=>init?.method==="POST")).toBe(true);
 });
 
+it("allows manual continuation of an interrupted candidate when its cycle is no longer running", async () => {
+  await mount({...data,optimization:{...data.optimization,result:{optimization_cycle:{status:'failed'}},candidates:[{...candidates[0],status:'failed',product_interruption:true,result:{evaluation_complete:false,completed:17,total:50,evaluation_run_id:'PARTIAL'}},candidates[1],candidates[2]]}});
+  await click('A/B/C/D');
+  const button=[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='继续 Sandbox');
+  expect(button).toBeDefined();
+  expect(button!.disabled).toBe(false);
+  await click('继续 Sandbox');
+  expect((fetch as any).mock.calls.some(([url,init]:any)=>url.endsWith('/candidates/EXP-R1-A/run') && init?.method==='POST')).toBe(true);
+});
+
+it("runs three saved candidates while retaining an honest uncovered-question warning", async () => {
+  await mount({...data,optimization:{...data.optimization,coverage_plan:{status:'incomplete',covered_count:5,total:6,matrix:[{question_id:'Q38',candidates:[],gap:'本轮剩余A/B/C容量不足'}]}}});
+  await click('A/B/C/D');
+  const runButton=[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='运行 Sandbox')!;
+  expect(runButton.disabled).toBe(false);
+  await act(async()=>runButton.click());
+  expect((fetch as any).mock.calls.some(([url,init]:any)=>url.endsWith('/candidates/EXP-R1-A/run') && init?.method==='POST')).toBe(true);
+});
+
 it("keeps incomplete coverage out of Sandbox and offers same-round zero-call completion", async () => {
   await mount({ ...data, optimization:{...data.optimization,candidates:[candidates[0]],coverage_plan:{status:"incomplete",covered_count:1,total:10,binding:"reviewed",matrix:[{question_id:"Q1",candidates:[],gap:"缺口待记录"}]}}});
   expect(document.body.textContent).toContain("补齐本轮规划（不收费）");

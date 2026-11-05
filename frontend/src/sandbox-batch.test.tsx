@@ -68,3 +68,23 @@ it('polls saved progress until the server completes the cycle', async () => {
  expect(document.querySelector('.operation-console')?.textContent).toContain('✓ 完成');
  expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
 });
+
+it('lets the user stop the cycle once and shows stopped instead of completed', async () => {
+ vi.useFakeTimers(); let started=false, stopped=false;
+ const fetcher=vi.fn(async (url:string,init?:RequestInit) => {
+  if(url.endsWith('/workspace'))return reply({current_baseline_id:'E1'});
+  if(url.endsWith('/run-cycle'))started=true;
+  if(url.endsWith('/stop-cycle'))stopped=true;
+  const cycle={status:stopped?'stopped':'running',used:4,remaining:8,stop_request:stopped?{reason:'用户停止运行'}:undefined};
+  if(url.endsWith('/stop-cycle'))return reply(cycle);
+  return reply({baseline_run_id:'E1',result:started?{optimization_cycle:cycle}:{}});
+ });
+ vi.stubGlobal('fetch',fetcher);await mount();await click();
+ const stop=document.querySelector<HTMLButtonElement>('.operation-stop-button');
+ expect(stop).not.toBeNull();
+ await act(async()=>{stop!.click();stop!.click();});
+ await act(async()=>{await vi.advanceTimersByTimeAsync(1100);});
+ expect(fetcher.mock.calls.filter(([url])=>url.endsWith('/stop-cycle'))).toHaveLength(1);
+ expect(document.body.textContent).toContain('已停止，断点已保存');
+ expect(document.body.textContent).not.toContain('✓ 完成');
+});

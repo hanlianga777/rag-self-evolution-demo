@@ -2240,3 +2240,10 @@ def run_optimization_cycle(run_id: str, current_round_only: bool = False):
     threading.Thread(target=contextvars.copy_context().run,
         args=(lambda:run_until_qualified(store,ai_service,run_id,claimed=True),),daemon=True).start()
     return state
+
+
+@app.post('/api/experiments/{run_id}/stop-cycle', dependencies=[Depends(require_trusted_origin)])
+def stop_optimization_cycle(run_id: str):
+    from .optimization_cycle import request_cycle_stop
+    try:return request_cycle_stop(store,run_id)
+    except ValueError as error:raise HTTPException(404,str(error)) from error

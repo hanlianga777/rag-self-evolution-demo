@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { getJson, postJson, identityKey } from "./api";
 import { PricePauseNotice, type PricePause } from "./components/RuntimeSettings";
 
-type Operation = { id: string; runId?: string; candidateId?: string; experimentId?: string; pricePause?: PricePause; title: string; status: "running" | "completed" | "failed" | "stopped"; stopping?: boolean; stopError?: string; kind?: "evaluation" | "revision"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
+type Operation = { id: string; runId?: string; candidateId?: string; experimentId?: string; pricePause?: PricePause; title: string; status: "running" | "completed" | "failed" | "stopped"; stopping?: boolean; stopError?: string; kind?: "evaluation" | "revision" | "cycle"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
 type BatchRequest = { experimentId: string; baselineId: string; round: number; candidateIds: string[]; identity?: string };
 type OperationContextValue = {
   runCandidateBatch: (request: BatchRequest) => Promise<void>;
@@ -35,6 +35,16 @@ function evaluation(run: any): Partial<Operation> {
     return { status: active ? "running" : "stopped", stopping: active, stage: active ? "正在停止，等待当前请求结束并保存断点" : "已停止，断点已保存", current, total, ...(!active ? { endedAt: Date.now() } : {}) };
   }
   return { status: ["queued", "running"].includes(run.status) ? "running" : run.status === "completed" ? "completed" : "failed", stage: ["queued", "running"].includes(run.status) ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败", current, total, pricePause: run.result?.price_pause, error: run.error_message };
+}
+
+function cycleProgress(saved: any): Partial<Operation> {
+  const cycle = saved.result.optimization_cycle, budget = saved.evaluation_budget;
+  const stopped = ["stopped", "analysis_exhausted"].includes(cycle.status);
+  return { status: cycle.status === "running" ? "running" : cycle.status === "failed" ? "failed" : stopped ? "stopped" : "completed",
+    stopping: cycle.status === "running" && !!cycle.stop_request, error: cycle.last_error,
+    current: budget?.used ?? cycle.used, total: budget?.max ?? 12,
+    pricePause: [cycle.price_pause, saved.result.price_pause].find(pause => pause?.paused) || cycle.price_pause,
+    stage: cycle.stop_request ? "正在停止，等待当前请求结束并保存断点" : `已用 ${budget?.used ?? cycle.used} 次，剩余 ${cycle.remaining} 次（含合并方案预留）` };
 }
 
 const revisionStages: Record<string, string> = {
@@ -121,16 +131,17 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       const [workspace, experiment] = await Promise.all([getJson<any>("/api/workspace"), getJson<any>(`/api/experiments/${request.experimentId}`)]);
       if (workspace.current_baseline_id !== request.baselineId || (request.identity && identityKey(workspace) !== request.identity) || experiment.baseline_run_id !== request.baselineId) throw new Error("当前实验身份已变化，请刷新");
       if (experiment.result?.report_confirmation) throw new Error("报告已确认，本轮结果不能改变");
-      await postJson(`/api/experiments/${request.experimentId}/run-cycle`, {});
+      if (experiment.result?.optimization_cycle?.status !== "running") await postJson(`/api/experiments/${request.experimentId}/run-cycle`, {});
       while (mounted.current) {
         const saved = await getJson<any>(`/api/experiments/${request.experimentId}?light=true`);
         const cycle = saved.result?.optimization_cycle;
         if (!cycle) throw new Error("记录缺失：优化批次状态");
-        update(id, {current:cycle.used,total:12,pricePause:[cycle.price_pause,saved.result?.price_pause].find(pause => pause?.paused) || cycle.price_pause,stage:`已用 ${cycle.used} 次，剩余 ${cycle.remaining} 次（含合并方案预留）`});
+        update(id, cycleProgress(saved));
         if (candidateRefresh.current) await candidateRefresh.current();
         if (cycle.status !== "running") {
           if (cycle.status === "failed") throw new Error(cycle.last_error || "本批次已停止");
           if (cycle.status === "analysis_exhausted") { update(id,{status:"stopped",stage:cycle.last_error || "连续 3 次方案不合规，已停止",endedAt:Date.now()}); break; }
+          if (cycle.status === "stopped") { update(id,{status:"stopped",endedAt:Date.now()}); break; }
           succeed(id); break;
         }
         await new Promise(resolve => window.setTimeout(resolve, 1000));
@@ -158,6 +169,10 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       if (cancelled) return;
       for (const item of revisions.filter(item => ["queued", "generating", "validating", "probing", "qc"].includes(item.status))) start("局部修订", { id: item.id, kind: "revision", restored: true, startedAt: item.created_at ? Date.parse(item.created_at) : undefined });
     }).catch(() => {});
+    getJson<any>("/api/optimization?light=true").then(saved => {
+      if (cancelled || saved.result?.optimization_cycle?.status !== "running") return;
+      start("A/B/C · Sandbox 自动循环", { id: `cycle:${saved.id}`, experimentId: saved.id, kind: "cycle", restored: true, ...cycleProgress(saved) });
+    }).catch(() => {});
     });
     return () => { cancelled = true; };
   }, [restore, start]);
@@ -169,8 +184,8 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       for (const item of active) {
         if (syncing.current.has(item.id)) continue;
         syncing.current.add(item.id);
-        void getJson<any>(item.kind === "revision" ? `/api/governance/revisions/${item.id}?light=true` : `/api/evaluations/${item.runId || item.id}?light=true`).then(async result => {
-          const next: Partial<Operation> = item.kind === "revision" ? revision(result) : evaluation(result);
+        void getJson<any>(item.kind === "cycle" ? `/api/experiments/${item.experimentId}?light=true` : item.kind === "revision" ? `/api/governance/revisions/${item.id}?light=true` : `/api/evaluations/${item.runId || item.id}?light=true`).then(async result => {
+          const next: Partial<Operation> = item.kind === "cycle" ? cycleProgress(result) : item.kind === "revision" ? revision(result) : evaluation(result);
           if (item.kind === "revision" && next.status === "completed" && candidateRefresh.current) {
             update(item.id, { ...next, status: "running", stage: "正在同步 Candidate 状态" });
             try { await candidateRefresh.current(); }
@@ -191,8 +206,8 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     stoppingRuns.current.add(item.id);
     update(item.id, { stopping: true, stopError: undefined });
     try {
-      const result = await postJson<any>(`/api/evaluations/${item.runId || item.id}/stop`, {});
-      update(item.id, evaluation(result));
+      const result = await postJson<any>(item.experimentId ? `/api/experiments/${item.experimentId}/stop-cycle` : `/api/evaluations/${item.runId || item.id}/stop`, {});
+      update(item.id, item.experimentId ? cycleProgress({result:{optimization_cycle:result}}) : evaluation(result));
     } catch (reason) {
       update(item.id, { stopping: false, stopError: `停止请求失败：${reason instanceof Error ? reason.message : String(reason)}` });
     } finally { stoppingRuns.current.delete(item.id); }
@@ -204,7 +219,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       <p>{item.status === "stopped" ? "已停止，断点已保存" : item.status === "failed" ? "运行失败" : item.status === "completed" ? "✓ 完成" : item.pricePause?.paused ? "等待平价时段" : item.restored ? `后台运行中（本页面重新连接） · ${item.stage || "运行中"}` : item.stage || "运行中"}{item.startedAt != null && <span> · {elapsedText((item.endedAt ?? now) - item.startedAt)}</span>}</p>
       <PricePauseNotice pause={item.status === "running" ? item.pricePause : undefined} target={item.kind === "revision" ? {revision_id:item.id} : undefined} evaluationId={item.runId || (item.kind === "evaluation" ? item.id : undefined)} experimentId={item.experimentId} onChanged={() => update(item.id, { pricePause: { paused: false } })} />
       {item.current != null && item.total != null && item.total > 1 && <><div className="operation-count">{item.current} / {item.total}<span>{Math.round(item.current / item.total * 100)}%</span></div><progress value={item.current} max={item.total} /></>}
-      {item.status === "running" && (item.kind === "evaluation" || item.runId) && <button className="operation-stop-button" disabled={item.stopping} onClick={() => void stopEvaluation(item)}>{item.stopping ? "正在停止…" : "停止运行"}</button>}
+      {item.status === "running" && (item.experimentId || item.kind === "evaluation" || item.runId) && <button className="operation-stop-button" disabled={item.stopping} onClick={() => void stopEvaluation(item)}>{item.stopping ? "正在停止…" : "停止运行"}</button>}
       {item.stopError && <small role="alert" className="operation-error-summary">{item.stopError}</small>}
       {item.status === "failed" && <><small className="operation-error-summary">{shortError(item.error)}</small><button className="operation-detail-button" aria-label="查看错误详情" aria-expanded={detailId === item.id} aria-controls={`operation-detail-${item.id}`} onClick={() => setDetailId(current => current === item.id ? null : item.id)}>查看错误详情</button>{detailId === item.id && <div id={`operation-detail-${item.id}`} className="operation-details"><div>阶段：{item.stage || "未记录"}</div><div>耗时：{item.startedAt != null ? elapsedText((item.endedAt ?? now) - item.startedAt) : "未记录"}</div><div>错误：{item.errorDetail || item.error || "未记录"}</div><div>Operation ID：{item.id}</div>{item.provider && <div>Provider：{item.provider}</div>}{item.model && <div>Model：{item.model}</div>}{item.attempt != null && <div>Attempt：{item.attempt}</div>}</div>}</>}
     </section>)}</div>;

@@ -508,7 +508,8 @@ class OptimizationAgent:
         def save(*_args,**_kwargs):
             self._checkpoint(experiment_id,generation_token,{'agent_request_checkpoint':checkpoint,'agent_request_sha256':request_hash,
                 'agent_request_checkpoints':checkpoints})
-        token=_request_checkpoint.set((checkpoint,'agent',experiment_id,save,lambda:None))
+        from .optimization_cycle import check_cycle_stop
+        token=_request_checkpoint.set((checkpoint,'agent',experiment_id,save,lambda:check_cycle_stop(self.store,experiment_id)))
         try:yield checkpoint
         finally:_request_checkpoint.reset(token)
 

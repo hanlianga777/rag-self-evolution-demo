@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 
 class CycleRecoveryTests(unittest.TestCase):
-    def exercise(self, *, repeated=False, stopped=False, restart=False, account_failure=False, current_round_only=False):
+    def exercise(self, *, repeated=False, stopped=False, restart=False, account_failure=False, current_round_only=False, resume_stopped=False):
         from app.optimization_cycle import run_until_qualified
         candidates = [{'id':label, 'status':'generated', 'reasoning':{'candidate_label':label, 'round':1}, 'result':{}}
                       for label in 'ABC']
@@ -46,6 +46,11 @@ class CycleRecoveryTests(unittest.TestCase):
             candidates[0].update(status='running',result={'evaluation_run_id':'run-A'})
             completed['A'].update(range(25));calls.extend(('A',q) for q in range(25))
             tries['A']=1
+        if resume_stopped:
+            candidates[0].update(status='failed',result={'evaluation_run_id':'run-A'})
+            exp['result']['optimization_cycle']={'resume_stopped_runs':['run-A']}
+            completed['A'].update(range(25));calls.extend(('A',q) for q in range(25))
+            tries['A']=1
         with patch('app.optimization_cycle.claim_cycle'), patch('app.optimization_cycle._save_state', side_effect=lambda s,e,**kw:states.append(kw)), \
              patch('app.optimization_cycle.EvaluationRunner',Runner), patch('app.optimization_cycle.OptimizationAgent') as agent:
             if current_round_only:agent.return_value.generate.side_effect=AssertionError('本轮续跑不能重新生成方案')
@@ -77,6 +82,13 @@ class CycleRecoveryTests(unittest.TestCase):
         result,_,_,tries=self.exercise(stopped=True)
         self.assertEqual(result['status'],'stopped')
         self.assertEqual(tries,{'A':1})
+
+    def test_explicit_resume_reuses_stopped_a_but_a_new_stop_still_halts(self):
+        result,exp,calls,tries=self.exercise(stopped=True,resume_stopped=True)
+        self.assertEqual(result['status'],'qualified')
+        self.assertEqual(len(calls),150)
+        self.assertEqual(len(set(calls)),150)
+        self.assertEqual(tries,{'A':2,'B':1,'C':1})
 
     def test_provider_balance_failure_does_not_resume(self):
         result,_,_,tries=self.exercise(account_failure=True)

@@ -36,6 +36,9 @@ def guarded_begin(run, provider, model, payload):
     from .telemetry import price_config
     store = GovernanceStore(Path(policy['database_path']), migrate=False)
     while True:
+        from .evaluation_stage import _request_checkpoint
+        checkpoint=_request_checkpoint.get()
+        if checkpoint is not None:checkpoint[4]()
         status = schedule_status(store)
         if status['off_peak_only'] is not True: raise RuntimeError('Off-peak setting must remain enabled')
         if status['peak_now'] is not False:

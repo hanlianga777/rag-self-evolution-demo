@@ -2909,18 +2909,20 @@ class GovernanceStore:
             if experiment['status'] != 'direct_release' and identity['current_experiment_id'] != candidate['experiment_id']:
                 raise ValueError('Candidate 不属于当前 Optimization Run；旧实验仅供历史查看')
             result = _load(experiment['result_json'], {})
+            if result.get('optimization_cycle',{}).get('status')=='running' and result['optimization_cycle'].get('stop_request'):
+                raise InterruptedError('用户停止运行，断点已保存')
             is_d = candidate['reasoning'].get('candidate_label') == 'D'
             if result.get('report_confirmation') and not is_d:
                 raise ValueError('报告已确认，不能改变已确认的实验结果')
             items = connection.execute("SELECT status, reasoning_json, result_json FROM candidate_configs WHERE experiment_id=?", (candidate['experiment_id'],)).fetchall()
             used = sum(sandbox_attempts_used({'status':item['status'],'reasoning':_load(item['reasoning_json'],{}),'result':_load(item['result_json'],{})}) for item in items)
             limit = MAX_EVALS if is_d else MAX_EVALS - 1
-            if used >= limit:
+            resuming = row['status']=='failed' and (product_interruption(candidate) or bool(candidate['result'].get('stop_request')))
+            if used >= limit and not resuming:
                 raise ValueError('Sandbox budget exhausted；D 保留一次额度')
             if is_d and not result.get('report_confirmation'):
                 raise ValueError('D 需要 Gate 2 报告确认')
             attempts = list(candidate['reasoning'].get('sandbox_attempts', []))
-            resuming = row['status']=='failed' and product_interruption(candidate)
             if not attempts and row['status'] == 'failed' and not resuming:
                 attempts.append({'attempt':1, 'legacy':True})
             if resuming and attempts:

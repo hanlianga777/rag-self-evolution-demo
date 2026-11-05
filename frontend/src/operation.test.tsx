@@ -279,6 +279,20 @@ it("stops a persisted evaluation once and keeps its saved progress", async () =>
   await act(async () => root.unmount());
 });
 
+it("restores a cycle after refresh and keeps a stop button available inside a drawer", async () => {
+  vi.useFakeTimers();
+  const cycle={status:'running',used:4,remaining:8};
+  vi.stubGlobal('fetch',vi.fn(async (url:string)=>new Response(JSON.stringify(url.includes('/optimization') || url.includes('/experiments/') ? {id:'EXP',result:{optimization_cycle:cycle},evaluation_budget:{used:4,max:12}} : []))));
+  function Harness(){const [open,setOpen]=useState(true);return <Drawer open={open} onOpenChange={setOpen} title="运行详情"><p>后台任务</p></Drawer>;}
+  const root=createRoot(document.body.appendChild(document.createElement('div')));
+  try {
+    await act(async()=>root.render(<OperationProvider><Harness/></OperationProvider>));
+    const dialog=document.querySelector('[role="dialog"]')!;
+    expect(dialog.querySelector('.operation-stop-button')?.textContent).toBe('停止运行');
+    expect(dialog.querySelector('.operation-count')?.textContent).toContain('4 / 12');
+  } finally {await act(async()=>root.unmount());vi.useRealTimers();}
+});
+
 it("keeps evaluation running when the stop request fails", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail: "服务不可用" }), { status: 503 })));
   function Harness() { const op = useOperation(); useEffect(() => { op.watchEvaluation("EVAL-stop", "Baseline Evaluation"); }, []); return null; }

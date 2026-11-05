@@ -93,6 +93,9 @@ def wait_for_off_peak(store, task_key, on_state, check_stop=lambda: None):
     previous = None
     while True:
         check_stop()
+        if task_key.startswith(('agent:','cycle:')):
+            from .optimization_cycle import check_cycle_stop
+            check_cycle_stop(store,task_key.split(':',1)[1])
         pause = pause_state(store, task_key)
         if pause != previous:
             on_state(pause)
