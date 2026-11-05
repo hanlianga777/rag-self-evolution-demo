@@ -10,14 +10,17 @@ class SafeStartTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError): GovernanceStore(path, migrate=False)
             self.assertFalse(path.exists())
 
-    def test_baseline_draft_rejects_candidate_thinking(self):
+    def test_baseline_draft_accepts_current_thinking_choices(self):
         from api_fixture import main
-        from fastapi import HTTPException
         from app.policy import DEFAULT_PIPELINE_CONFIG
-        identity=main.store.current_baseline_identity()
-        with self.assertRaises(HTTPException) as error:
-            main.save_pipeline_draft(main.PipelineDraftRequest(identity=identity,config={**DEFAULT_PIPELINE_CONFIG,'generation_thinking':'low'}))
-        self.assertEqual(error.exception.status_code,422)
+        from app.governance import GovernanceStore
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            store=GovernanceStore(Path(directory)/'draft.db')
+            with patch.object(main,'store',store):
+                identity=store.current_baseline_identity()
+                main.save_pipeline_draft(main.PipelineDraftRequest(identity=identity,config={**DEFAULT_PIPELINE_CONFIG,'generation_thinking':'low'}))
+                self.assertEqual(store.pipeline_draft()['config']['generation_thinking'],'low')
 
     def test_ordinary_import_does_not_create_missing_database(self):
         import subprocess, sys

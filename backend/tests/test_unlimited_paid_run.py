@@ -45,7 +45,7 @@ class UnlimitedPaidRunTests(unittest.TestCase):
             self.assertGreater(ledger['spent_yuan'], ledger['budget_yuan'])
             self.assertEqual(ledger['calls'][0]['status'], 'ok')
 
-    def test_no_budget_and_unknown_request_still_stop(self):
+    def test_no_budget_preserves_unknown_history_and_allows_authorized_next_request(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'ledger.json'
             prices = {'model': {'provider': 'DeepSeek', 'input': 2, 'output': 8, 'max_output': 100}}
@@ -54,10 +54,11 @@ class UnlimitedPaidRunTests(unittest.TestCase):
                 with self.assertRaises(OSError):
                     with paid_request('DeepSeek', 'model', {'max_tokens': 10}):
                         raise OSError('network failure')
-                with self.assertRaises(RuntimeError):
-                    with paid_request('DeepSeek', 'model', {'max_tokens': 10}):
-                        self.fail('must not repeat unknown request')
+                with paid_request('DeepSeek', 'model', {'max_tokens': 10}):
+                    record_usage({'provider':'DeepSeek','requested_model':'model','status':'ok','prompt_tokens':1,'completion_tokens':1})
             saved = json.loads(path.read_text())
+            self.assertEqual(len(saved['calls']),2)
+            self.assertEqual(saved['calls'][1]['status'],'ok')
             self.assertNotEqual(saved['calls'][0]['status'], 'ok')
             self.assertIsNone(saved['calls'][0].get('upper_estimate_yuan'))
             self.assertTrue(saved['cost_unknown'])

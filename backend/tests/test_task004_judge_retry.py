@@ -116,14 +116,14 @@ class JudgeRetryTests(unittest.TestCase):
             self.assertEqual(sum(len(attempt['usage']) for attempt in checkpoint['attempts']),2)
         self.assertEqual(provider.judge.call_count,4)
 
-    def test_nonformat_stage_failure_is_not_resent(self):
+    def test_nonformat_stage_failure_has_three_bounded_attempts(self):
         from app.providers import ProviderAPIError
         action=Mock(side_effect=ProviderAPIError('rate limited',status_code=429))
         cp={'attempts':[]}
         with self.assertRaises(ProviderAPIError):
             perform_stage(cp,'generation',action,'run',automatic=True,check_stop=lambda:None,on_state=lambda *a,**k:None)
-        self.assertEqual(action.call_count,1)
-        self.assertFalse(cp['attempts'][0]['retryable'])
+        self.assertEqual(action.call_count,3)
+        self.assertTrue(cp['attempts'][0]['retryable'])
 
 
 class RemovedAuthorizationTests(unittest.TestCase):

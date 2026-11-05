@@ -109,6 +109,11 @@ class ProgressTests(unittest.TestCase):
         for candidate,ids in zip(exp['candidates'],[['Q1'],['Q2'],[]]):
             self.store.finish_candidate(candidate['id'],'evaluated',{'qualification':{'qualified':bool(ids)},'all_fixed_question_ids':ids,'bad_case_count':1})
         response=contracts.drafts()
+        response['prior_round_review']['plans']=[{
+            'candidate_id':candidate['id'],'changes':'offline saved configuration',
+            'fixed_question_ids':ids,'new_failure_question_ids':[],
+            'evidence_reason':'offline saved candidate result','conclusion':'keep configuration results separate',
+        } for candidate,ids in zip(exp['candidates'],[['Q1'],['Q2'],[]])]
         for row,diff in zip(response['candidates'],[{'query_rewrite':True},{'generation_thinking':'low','hyde':True},{'prompt_strategy':'Tiered'}]):
             row['config_diff']=diff
             row['hypothesis']+=' second round'

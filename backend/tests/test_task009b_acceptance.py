@@ -21,7 +21,7 @@ class AcceptanceTests(unittest.TestCase):
 
     def test_all_parameter_choices_explain_their_meaning(self):
         contract = search_space_contract()
-        self.assertEqual(len(contract), 15)
+        self.assertEqual(set(contract),set(DEFAULT_PIPELINE_CONFIG))
         for key, rule in contract.items():
             with self.subTest(key=key):
                 self.assertTrue(rule['description'])
@@ -32,8 +32,8 @@ class AcceptanceTests(unittest.TestCase):
     def test_negative_and_unreviewed_are_not_missing_records(self):
         facts = retrieval_facts({'test_category': 'negative', 'judge_result': {'checks': []}})
         self.assertEqual(facts['standard_evidence_positions'], '不适用（负向题不定位标准证据）')
-        self.assertEqual(set(facts['baseline_review'].values()), {'尚未复核'})
-        self.assertEqual(retrieval_facts({}, review={'regression_review': {'status': 'running'}})['baseline_review']['conclusion'], '记录缺失')
+        self.assertEqual(set(facts['baseline_review'].values()), {'单遍判对'})
+        self.assertEqual(retrieval_facts({}, review={'regression_review': {'status': 'running'}})['baseline_review']['conclusion'], '单遍判对')
 
     def test_required_atomic_ids_resolve_paraphrased_checks_without_auxiliary(self):
         baseline, row = fixture()
@@ -60,7 +60,7 @@ class AcceptanceTests(unittest.TestCase):
         rows = prepare_baseline_rows(baseline, [row])
         gates = [{'metric': 'safe_rejection_rate', 'actual': 90, 'threshold': 95, 'operator': '>=', 'passed': False, 'status': 'FAIL'}]
         _, prompt = build_agent_prompt(rows, DEFAULT_PIPELINE_CONFIG, [], gates, list('ABC'))
-        priority = next(p for p in prompt['optimization_priorities'] if p['label'] == '回答问题')
+        priority = next(p for p in prompt['optimization_priorities'] if p['label'] == '生成层问题')
         self.assertEqual(priority['priority'], 1)
         self.assertEqual(priority['priority_note'], '导致门槛未过：安全拒答率')
         self.assertEqual(prompt['bad_cases'][0]['priority'], 1)

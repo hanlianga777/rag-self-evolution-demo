@@ -14,6 +14,7 @@ from app.evaluation import EvaluationRunner
 from app.governance import GovernanceStore
 from app.optimization import OptimizationAgent
 from identity_fixture import context_judgment
+from agent_response_fixture import with_review
 
 
 class FixtureCorpus:
@@ -36,21 +37,21 @@ class FixtureProvider:
             return json.dumps({"score": 95, "priority": "P2", "issues": [], "reason": "固定证据支持", "ablation_valid": True, "ablation_reason": "符合属性"}, ensure_ascii=False)
         if "RAG优化Agent" in system:
             payload = json.loads(prompt)
-            cause = "Retrieval" if any(item["result"].get("primary_root_cause")=="Retrieval" for item in payload["bad_cases"]) else "Generation"
+            cause = "Retrieval" if any(item["diagnosis_category"]=="检索层问题" for item in payload["bad_cases"]) else "Generation"
             targets = [item["id"] for item in payload["bad_cases"]]
             value = {"root_cause_cluster": "检索覆盖不足", "observed_evidence": targets, "candidates": [{"id": "A", "config_diff": {"top_k": 6}, "hypothesis": "扩大上下文", "why": "提高 TopK", "target_bad_cases": targets, "risk": "延迟"}, {"id": "B", "config_diff": {"min_score": 0.2}, "hypothesis": "过滤噪声", "why": "提高阈值", "target_bad_cases": targets, "risk": "召回"}, {"id": "C", "config_diff": {"min_score": 0.1}, "hypothesis": "平衡阈值", "why": "小幅提高阈值", "target_bad_cases": targets, "risk": "漏召回"}] }
-            cause = "Retrieval" if any(item["result"].get("primary_root_cause")=="Retrieval" for item in payload["bad_cases"]) else "Generation"
+            cause = "Retrieval" if any(item["diagnosis_category"]=="检索层问题" for item in payload["bad_cases"]) else "Generation"
             for candidate in value["candidates"]:
                 candidate.update(intervention_direction="context_selection",evidence_assertions=[{"target_id":target,"observation":"ranking_omission"} for target in targets],parameter_dependencies=[],target_group="Fixture可信问题", root_cause=cause, root_cause_evidence=targets, expected_improvement="Fixture目标改善")
             for candidate, direction in zip(value['candidates'], ('排序与过滤', '检索召回增强', '效率（降档 + 检索补偿）')):
                 candidate['direction'] = direction
             value['candidates'][2]['config_diff'] = {'generation_thinking':'off', 'candidate_k':24}
-            return json.dumps(value, ensure_ascii=False)
+            return json.dumps(with_review(value,payload), ensure_ascii=False)
         if "唯一Optimization Agent" in system:
             payload = json.loads(prompt)
             winner = payload["winner"]; sources = payload["sources"]
             diff = {k:v for k,v in sources[0]["config"].items() if k not in ("run_target", "candidate_id") and winner["config"].get(k) != v and v != payload["baseline"]["config"].get(k)}
-            return json.dumps({"should_generate_d":bool(diff), "source_candidates":[winner["id"],sources[0]["id"]],"root_cause_alignment":"fixture","complementary_capabilities":"fixture","proposed_config_diff":diff,"expected_improvement":"fixture","risks":"fixture","explanation":"fixture","hypothesis":"fixture选择与阈值联动","root_cause":"Retrieval","intervention_direction":"context_selection","evidence_assertions":[{"target_id":target,"observation":"ranking_omission"} for target in winner["reasoning"]["observed_evidence"]],"parameter_dependencies":[{"parameters":[key for key,value in {**winner["config"],**diff}.items() if value!=payload["baseline"]["config"].get(key)],"reason":"扩展Final同时保留选择阈值以控制上下文质量"}]})
+            return json.dumps({"should_generate_d":bool(diff), "source_candidates":[winner["id"],sources[0]["id"]],"source_reasons":{s["id"]:"retain complete saved configuration changes" for s in [winner,sources[0]]},"root_cause_alignment":"fixture","complementary_capabilities":"fixture","proposed_config_diff":diff,"expected_improvement":"fixture","risks":"fixture","explanation":"fixture","hypothesis":"fixture选择与阈值联动","root_cause":"Retrieval","intervention_direction":"context_selection","evidence_assertions":[{"target_id":target,"observation":"ranking_omission"} for target in winner["reasoning"]["observed_evidence"]],"parameter_dependencies":[{"parameters":[key for key,value in {**winner["config"],**diff}.items() if value!=payload["baseline"]["config"].get(key)],"reason":"扩展Final同时保留选择阈值以控制上下文质量"}]})
         payload = json.loads(prompt)
         slot = payload["coverage_slot"]
         subtype = next((name for name in ("safe_rejection", "insufficient_evidence", "clarify", "safety_critical", "prompt_injection") if f"生成一个 {name} 负向问题" in system), None)

@@ -19,6 +19,7 @@ class Stub(LifecycleProvider):
         if '唯一Optimization Agent' in system:
             winner=data['winner']; source=next(c for c in data['sources'] if c['reasoning'].get('direction')=='效率（降档 + 检索补偿）')
             return json.dumps(dict(should_generate_d=True,source_candidates=[winner['id'],source['id']],
+                source_reasons={s['id']:'retain whole quality/efficiency source' for s in (winner,source)},
                 proposed_config_diff={'generation_thinking':'off','hyde':True},hypothesis='组合质量与效率',
                 root_cause='检索层问题',intervention_direction='stage_performance',
                 evidence_assertions=[],root_cause_alignment='相同冻结题卷',complementary_capabilities='质量加降档补偿',
@@ -29,11 +30,12 @@ class Stub(LifecycleProvider):
                ({'min_score':0.1,'prompt_strategy':'Tiered'},{'multi_query':4},{'generation_thinking':'low','hyde':True})][min(n-1,2)]
         rows=[]
         for label,diff,direction in zip('ABC',diffs,['回答策略','检索召回增强','效率（降档 + 检索补偿）']):
-            rows.append(dict(id=label,direction=direction,action_name=f'离线第{n}轮{label}',config_diff=diff,
+            rows.append(dict(id=label,direction=direction,review_conclusion_ids=['L1'],action_name=f'离线第{n}轮{label}',config_diff=diff,
                 hypothesis=f'第{n}轮{label}保存证据支持假设',why='验证保存的检索与安全错题',target_bad_cases=targets,
                 root_cause='检索层问题',expected_improvement='减少错题或耗时',risk='完整回归验证',
                 intervention_direction='stage_performance' if label=='C' else 'grounded_generation',evidence_assertions=[]))
-        return json.dumps({'candidates':rows})
+        from agent_response_fixture import with_review
+        return json.dumps(with_review({'candidates':rows},data))
 
 class Service(LifecycleService):
     fail_d=False
@@ -125,6 +127,10 @@ class RehearsalTests(unittest.TestCase):
 
     def lifecycle(self,fail_d):
         self.bootstrap();self.service.fail_d=fail_d
+        # This legacy D exercise explicitly runs all sources before the cycle checks Gate 2.
+        from app.evaluation import EvaluationRunner
+        for candidate in self.store.candidates(self.exp):
+            EvaluationRunner(self.store,self.service).run_candidate(candidate['id'])
         cycle=run_until_qualified(self.store,self.service,self.exp)
         self.assertEqual(cycle['status'],'qualified',cycle)
         self.assertEqual(cycle['used'],3)
@@ -196,7 +202,7 @@ class RehearsalTests(unittest.TestCase):
     def test_source_guards_and_reserved_boundary(self):
         from copy import deepcopy
         from app.policy import composite_source_eligible
-        source={'status':'evaluated','reasoning':{'direction':'效率（降档 + 检索补偿）'},
+        source={'config':{'generation_thinking':'off'},'status':'evaluated','reasoning':{'direction':'效率（降档 + 检索补偿）'},
                 'result':{'evaluation_identity':'same','regression':{'passed':True},'gates':{'passed':True},'all_fixed_question_ids':[]}}
         self.assertTrue(composite_source_eligible(source,'same'))
         for field,value in [('status','running'),('identity','other'),('regression',False),('gates',False),('direction','回答策略')]:
@@ -224,7 +230,7 @@ class RehearsalTests(unittest.TestCase):
             for label,bad in [('A',0),('B',1)]:
                 store.save_candidate(exp,label,{**DEFAULT_PIPELINE_CONFIG,'top_k':6 if label=='A' else 4,'min_score':0.1 if label=='B' else 0},
                     {'candidate_label':label,'round':1})
-                store.finish_candidate(exp+'-'+label,'evaluated',{**comparison_identity(store,base),'bad_case_count':bad,'qualification':{'qualified':True}})
+                store.finish_candidate(exp+'-'+label,'evaluated',{**comparison_identity(store,base),'bad_case_count':bad,'qualification':{'qualified':True},'release_qualification':{'qualified':True}})
             store.confirm_experiment_report(exp,exp+'-B','offline')
             with store.connection() as db:
                 row=store.experiment(exp)['result'];row['composite']={'status':'no_effective_composite'}

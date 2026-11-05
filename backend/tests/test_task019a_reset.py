@@ -7,7 +7,11 @@ import test_optimization_contract as contract
 class ResetTests(unittest.TestCase):
     setUp=contract.OptimizationContractTests.setUp
     def test_online_backup_and_scoped_deletion_preserve_baseline_and_snapshots(self):
-        from backend.scripts.task019a_reset_experiments import delete_optimization_history
+        import importlib.util
+        path=Path(__file__).resolve().parents[1]/'scripts/task019a_reset_experiments.py'
+        spec=importlib.util.spec_from_file_location('task019a_reset_fixture',path)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        delete_optimization_history=module.delete_optimization_history
         from app.paid_schedule import set_settings
         set_settings(self.store,True)
         baseline=self.store.evaluation_run('EVAL-test')

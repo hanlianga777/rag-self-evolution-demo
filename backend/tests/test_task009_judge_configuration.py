@@ -126,14 +126,14 @@ class JudgeScriptTests(unittest.TestCase):
     def test_calibration_reuses_saved_answers_resumes_and_does_not_write_formal_rows(self):
         before = deepcopy(self.source), deepcopy(self.cases), self.database.read_bytes()
         state = {'plan': judge_calibration.calibration_plan(self.source, self.cases, 'low'), 'cases': {}, 'complete': False}
-        runner = SimpleNamespace(snapshot_items=lambda snapshot: snapshot['questions'], _require_generation_contract=Mock(),
+        runner = SimpleNamespace(store=SimpleNamespace(),snapshot_items=lambda snapshot: snapshot['questions'], _require_generation_contract=Mock(),
                                  answer=Mock(side_effect=AssertionError('must never generate')), score_execution=Mock())
         def score(item, execution, **kwargs):
             self.assertEqual(execution['answer'], '已保存的回答')
             self.assertEqual(thinking_config('judge')['reasoning_effort'], 'low')
             return {'passed': True}
         runner.score_execution.side_effect = score
-        with patch('app.corpus.manifest_identity', return_value='fixture-corpus'), patch('socket.create_connection', side_effect=AssertionError('offline only')):
+        with patch('app.paid_schedule.wait_for_off_peak'),patch('app.corpus.manifest_identity', return_value='fixture-corpus'), patch('socket.create_connection', side_effect=AssertionError('offline only')):
             judge_calibration.run_calibration(runner, self.source, self.cases, 'low', state, lambda *a, **k: None)
             judge_calibration.run_calibration(runner, self.source, self.cases, 'low', state, lambda *a, **k: None)
         self.assertTrue(state['complete'])

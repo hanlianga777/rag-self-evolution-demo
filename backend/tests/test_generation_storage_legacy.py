@@ -18,9 +18,9 @@ def mini_candidates():
             "question": f"{category}-{index}",
             "reference_answer": "证据答案" if category != "negative" else None,
             "expected_behavior": "insufficient_evidence" if category == "negative" else None,
-            "evidence": [{"source_chunk_ids": ["C1"], "evidence_key_points": ["支持"]}] if category != "negative" else [],
-            "negative_subtype": "unanswerable" if category == "negative" else None,
-            "ablation_attribute": "检索参数" if category == "ablation" else None,
+            "evidence": [{"source_chunk_ids": ["C1"], "evidence_key_points": ["证据答案"]}] if category != "negative" else [],
+            "negative_subtype": "insufficient_evidence" if category == "negative" else None,
+            "ablation_attribute": "colloquial" if category == "ablation" else None,
         }
         for category, count in (("positive", 8), ("ablation", 4), ("negative", 8))
         for index in range(count)
@@ -35,7 +35,8 @@ class LegacyGenerationStorageTests(unittest.TestCase):
 
     def test_restart_marks_generation_interrupted_and_blocks_a_new_full_run(self):
         store = GovernanceStore(self.path)
-        run_id = store.start_generation_run("test-model")
+        with patch('app.governance.pending_job_owner',return_value={'auto_resume':False}):
+            run_id = store.start_generation_run("test-model")
         store.update_generation_run(run_id, status="generating", progress={"stage": "generating", "slot": "Q03", "completed_slots": 2})
 
         store.interrupt_generation_runs()
@@ -50,10 +51,12 @@ class LegacyGenerationStorageTests(unittest.TestCase):
 
     def test_restart_marks_quality_rerun_interrupted_without_losing_slot_audit(self):
         store = GovernanceStore(self.path)
-        run_id = store.start_generation_run("test-model")
+        with patch('app.governance.pending_job_owner',return_value={'auto_resume':False}):
+            run_id = store.start_generation_run("test-model")
         store.save_mini_golden_candidates(mini_candidates(), "test-model", run_id=run_id)
         store.update_generation_run(run_id, status="completed")
-        store.update_quality_rerun(run_id, {"status": "running", "stage": "qc", "completed": 7, "slots": {"Q01": {"probe": "passed", "qc": "passed"}}}, start=True)
+        with patch('app.governance.pending_job_owner',return_value={'auto_resume':False}):
+            store.update_quality_rerun(run_id, {"status": "running", "stage": "qc", "completed": 7, "slots": {"Q01": {"probe": "passed", "qc": "passed"}}}, start=True)
 
         store.interrupt_generation_runs()
 
@@ -132,7 +135,7 @@ with tempfile.TemporaryDirectory() as directory, patch.object(socket.socket, 'co
             self.assertEqual(row["qc_status"], "qc_pending")
             self.assertEqual(row["probe_status"], "probe_pending")
             self.assertEqual(row["stage"], "candidate")
-        self.assertEqual(next(row for row in rows if row["test_category"] == "ablation")["raw"]["ablation_attribute"], "检索参数")
+        self.assertEqual(next(row for row in rows if row["test_category"] == "ablation")["raw"]["ablation_attribute"], "colloquial")
         negative = next(row for row in rows if row["test_category"] == "negative")
         self.assertEqual(negative["raw"]["expected_behavior"], "insufficient_evidence")
         self.assertIsNone(negative["reference_answer"])
@@ -213,8 +216,10 @@ with tempfile.TemporaryDirectory() as directory, patch.object(socket.socket, 'co
             result = probe_results.pop(0)
             store.record_probe_result(question_id, {'question_quality': 30, 'golden_answer_quality': 30, 'evidence_support': 40, 'evidence_direct_failure': result['status'] == 'failed'})
             return result
-        with patch.object(store, "run_probe", side_effect=probe_stub), patch.object(store, "record_qc"):
-            _run_mini_generation(run_id, store, GeneratedService(), EmptyCorpus())
+        corpus=EmptyCorpus()
+        corpus.chunks=lambda:[{'chunk_id':'C1','document_id':'D','chunk_text':'证据答案'}]
+        with patch.object(store, "run_probe", side_effect=probe_stub), patch.object(store, "record_qc",return_value={"status":"qc_passed"}):
+            _run_mini_generation(run_id, store, GeneratedService(), corpus)
 
         run = store.generation_run(run_id)
         self.assertEqual(run["status"], "completed", run["artifacts"]["hard_validation"].get("error"))

@@ -96,10 +96,12 @@ class CoverageTests(unittest.TestCase):
         from app.optimization import prepare_response
         rows=[row('one','context_pool_gap'),row('two','context_pool_gap','Ranking')]
         proposal=self.plan(rows)['proposals'][0]
+        proposal['review_conclusion_ids']=['L1']
+        from test_optimization_contract import drafts
         before=deepcopy(proposal)
         with patch('app.optimization.diagnostic_view',side_effect=view):
             with self.assertRaisesRegex(ValueError,'A/B/C'):
-                prepare_response(json.dumps({'candidates':[proposal]}),DEFAULT_PIPELINE_CONFIG,rows,[],0,1,list('ABC'),None,[],{})
+                prepare_response(json.dumps({'candidates':[proposal],'prior_round_review':drafts()['prior_round_review']}),DEFAULT_PIPELINE_CONFIG,rows,[],0,1,list('ABC'),None,[],{})
         self.assertEqual(proposal,before)
 
     def test_incomplete_append_rejected_keeps_candidates_usage_trace_and_backups(self):
@@ -132,7 +134,8 @@ class CoverageTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'身份'):
                     complete_coverage(store,'EXP',expected_binding='stale',backup_path=Path(directory)/'stale.db')
                 self.assertFalse((Path(directory)/'stale.db').exists())
-                with self.assertRaisesRegex(ValueError,'A/B/C'):
+                # Current validation requires the Agent's review before checking ABC.
+                with self.assertRaisesRegex(ValueError,'prior_round_review'):
                     complete_coverage(store,'EXP',expected_binding='bound',backup_path=backup)
             self.assertTrue(oldest.exists())
             self.assertTrue(recent.exists())

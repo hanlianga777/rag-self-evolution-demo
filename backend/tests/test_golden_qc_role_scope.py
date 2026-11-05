@@ -1,4 +1,4 @@
-"""Recorded QC schema failure and offline samples; no Provider/approval evidence."""
+"""Synthetic QC role fixtures; no private files or Provider/approval evidence."""
 import copy
 import json
 import os
@@ -7,9 +7,6 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
-
-
-FIXTURE = Path(__file__).parent / 'fixtures/golden_qc_role_scope_20261030.json'
 
 
 class GoldenQCRoleScopeTests(unittest.TestCase):
@@ -25,7 +22,24 @@ class GoldenQCRoleScopeTests(unittest.TestCase):
         from app.ai_service import AiService
         from app.providers import ProviderInvalidResponse
         self.AiService, self.InvalidResponse = AiService, ProviderInvalidResponse
-        self.fixture = json.loads(FIXTURE.read_text())
+        quote='维护前关闭设备并断开电池连接。'
+        records=[]
+        for index in range(1,51):
+            qid=f'Q{index:02d}';required=qid+'-R1';auxiliary=qid+'-R2'
+            requirements={'required_checks':[{'id':required,'requirement':'关机且断电','source_chunk_ids':['C1']}],
+                'conditional_checks':[],'auxiliary_information':[{'id':auxiliary,'requirement':'辅助说明'}],
+                'prohibited':[],'acceptable_equivalents':[],'sources':[{'chunk_id':'C1','quote':quote}]}
+            records.append({'item':{'id':qid,'question':qid+'维护前怎么办？','test_category':'positive',
+                'reference_answer':quote,'evidence':[{'source_chunk_ids':['C1'],'evidence_key_points':[quote]}],
+                'raw':{'business_requirements':requirements,'expected_response':quote}},
+                'expected_qc_check_ids':[required],'excluded_role_or_child_ids':[auxiliary]})
+        response={'score':90,'priority':'P2','issues':[],'reason':'explicit synthetic QC fixture',
+            'ablation_valid':True,'ablation_reason':'fixture','content_review':{'checks':[
+                {'id':key,'applicable':True,'met':True,'reason':'fixture','support':[{'chunk_id':'C1','quote':quote}]}
+                for key in ('Q36-R1','Q36-R2')],
+                'scope_valid':True,'safety_valid':True,'prohibited_clear':True,'disputes':[]}}
+        self.fixture={'records':records,'chunks':[{'chunk_id':'C1','document_id':'D','chunk_text':quote}],
+            'recorded_failure':{'question_id':'Q36','raw_content':json.dumps(response)}}
         self.q36 = next(r for r in self.fixture['records'] if r['item']['id'] == self.fixture['recorded_failure']['question_id'])
         self.requests = []
 
@@ -38,7 +52,7 @@ class GoldenQCRoleScopeTests(unittest.TestCase):
         corpus = SimpleNamespace(chunks=lambda: self.fixture['chunks'])
         return self.AiService(store, corpus, provider, False)._quality_check(item)
 
-    def test_recorded_real_response_with_auxiliary_check_remains_strictly_rejected(self):
+    def test_synthetic_response_with_auxiliary_check_remains_strictly_rejected(self):
         raw = self.fixture['recorded_failure']['raw_content']
         self.assertEqual([c['id'] for c in json.loads(raw)['content_review']['checks']], ['Q36-R1','Q36-R2'])
         with self.assertRaisesRegex(self.InvalidResponse, 'required and conditional checks exactly once'):
@@ -59,7 +73,7 @@ class GoldenQCRoleScopeTests(unittest.TestCase):
         self.assertIn('Q36-R2', [c['id'] for c in payload['business_requirements']['auxiliary_information'] if isinstance(c, dict)])
         self.assertEqual(item, before)
 
-    def test_all_50_current_working_contracts_expose_exact_qc_parent_whitelists(self):
+    def test_50_synthetic_contracts_expose_exact_qc_parent_whitelists(self):
         self.assertEqual(len(self.fixture['records']), 50)
         for record in self.fixture['records']:
             with self.subTest(question_id=record['item']['id']):

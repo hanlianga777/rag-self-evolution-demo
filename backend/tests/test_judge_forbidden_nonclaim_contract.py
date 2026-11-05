@@ -17,8 +17,11 @@ FIXTURE=Path(__file__).parent/'fixtures/judge_forbidden_nonclaim_error_20261031.
 
 class ForbiddenNonclaimContractTests(unittest.TestCase):
     def setUp(self):
-        self.fixture=json.loads(FIXTURE.read_text());self.fields=self.fixture['input']
-        self.raw=self.fixture['raw_provider_response'];self.original=json.loads(self.raw)
+        if not self._testMethodName.startswith('test_prompt_'):
+            if not FIXTURE.is_file():
+                self.skipTest('缺少私有原始回包 judge_forbidden_nonclaim_error_20261031.json；不能伪造历史证据')
+            self.fixture=json.loads(FIXTURE.read_text());self.fields=self.fixture['input']
+            self.raw=self.fixture['raw_provider_response'];self.original=json.loads(self.raw)
         for name in ('socket.create_connection','urllib.request.urlopen'):
             guard=patch(name,side_effect=AssertionError('offline nonclaim regression'));guard.start();self.addCleanup(guard.stop)
 

@@ -11,6 +11,9 @@ CHECKS = ['naturalness','business_value','intent','grounding','independence','co
 
 class MachineGateTests(unittest.TestCase):
     def setUp(self):
+        for name in ('app.corpus.current_manifest','app.governance.current_manifest'):
+            manifest=patch(name,return_value={'sources':{'D':'offline-machine-gate'}})
+            manifest.start();self.addCleanup(manifest.stop)
         directory = tempfile.TemporaryDirectory(); self.addCleanup(directory.cleanup)
         self.store = GovernanceStore(Path(directory.name)/'test.db')
         self.run = self.store.start_generation_run('fixture', 'full')

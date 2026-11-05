@@ -20,6 +20,11 @@ class EquivalentOutputContractTests(unittest.TestCase):
         self.network=patch('socket.create_connection',side_effect=AssertionError('offline role protocol regression'))
         self.network.start();self.addCleanup(self.network.stop)
 
+    def saved_rows(self):
+        if not FIXTURE.is_file():
+            self.skipTest('缺少私有原始回包 judge_equivalent_type_errors_20261030.json；不能伪造历史证据')
+        return json.loads(FIXTURE.read_text())['cases']
+
     def validate_saved(self,row,value):
         fields=row['input']
         return validate_business_judgment(value,fields['actual_answer'],fields['final_context'],
@@ -27,7 +32,7 @@ class EquivalentOutputContractTests(unittest.TestCase):
             reference=fields['reference_answer'],scoring_contract=fields['scoring_contract'])
 
     def test_both_real_incorrect_equivalent_types_still_rejected_without_mutation(self):
-        for row in json.loads(FIXTURE.read_text())['cases']:
+        for row in self.saved_rows():
             with self.subTest(sample=row['sample_id']):
                 value=json.loads(row['raw_provider_response']);before=copy.deepcopy(value)
                 with self.assertRaisesRegex(ValueError,row['expected_schema_error']):self.validate_saved(row,value)
@@ -36,7 +41,7 @@ class EquivalentOutputContractTests(unittest.TestCase):
     def test_production_parser_preserves_real_schema_error_as_technical_exception(self):
         from app.config import Settings
         from app.providers import DeepSeekProvider,ProviderInvalidResponse
-        for row in json.loads(FIXTURE.read_text())['cases']:
+        for row in self.saved_rows():
             fields=row['input'];provider=DeepSeekProvider(Settings('offline','https://invalid','offline'))
             context={k:v for k,v in fields.items() if k not in {'question','reference_answer','actual_answer'}}
             with patch.object(provider,'complete',return_value=row['raw_provider_response']):
@@ -46,7 +51,7 @@ class EquivalentOutputContractTests(unittest.TestCase):
             self.assertEqual(failure.exception.response_metadata['validation_error']['category'],'business_contract')
 
     def test_only_explicit_offline_type_correction_is_accepted_without_semantic_changes(self):
-        for row in json.loads(FIXTURE.read_text())['cases']:
+        for row in self.saved_rows():
             with self.subTest(sample=row['sample_id']):
                 original=json.loads(row['raw_provider_response']);corrected=copy.deepcopy(original)
                 for edit in row['manual_format_correction_only']:

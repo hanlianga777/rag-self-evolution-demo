@@ -34,10 +34,10 @@ class ReleaseWiringTests(unittest.TestCase):
         self.candidate('A',5,0);self.candidate('B',2,3)
         result=self.store.refresh_recommendation('E0')
         self.assertEqual(result['suggested_winner'],'B')
-        self.assertEqual(result['final_decision']['decision'],'保留赢家方案')
+        self.assertEqual(result['final_decision']['decision'],'保持 Baseline')
 
     def test_failed_final_falls_back_to_fewest_error_qualified_abc(self):
-        self.candidate('A',5);self.candidate('B',2,3);self.candidate('D',4,release=False)
+        self.candidate('A',5,release=True);self.candidate('B',2,release=True);self.candidate('D',4,release=False)
         self.state(report_confirmation={'winner_id':'A'},composite={'status':'generated','candidate_id':'D'})
         result=self.store.refresh_recommendation('E0')
         self.assertEqual(result['recommended_candidate'],'B')

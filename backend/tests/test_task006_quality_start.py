@@ -21,6 +21,8 @@ class Task006QualityStartTests(unittest.TestCase):
             def capture_quality(self, key, **kwargs): return self.question(key), {'content_hash': key}
             def candidate_rows(self, keys): return [{'quality_audit': None}]
             def probe_history(self, key): return []
+            def job_checkpoints(self, key): return {}
+            def save_job_checkpoint(self, *args): pass
         store = Store()
         store.run_probe = Mock(side_effect=probe if isinstance(probe, Exception) else None,
                                return_value=probe if not isinstance(probe, Exception) else None)
@@ -38,8 +40,13 @@ class Task006QualityStartTests(unittest.TestCase):
         self.assertIn('Q02', state['slots'])
         return state
 
+    def exhausted_error(self):
+        error=ProviderUnavailable('fixture: provider connection unavailable')
+        error.provider_retry_exhausted=True
+        return error
+
     def test_first_technical_error_continues_and_gets_final_pass(self):
-        state = self.run_failed_probe(ProviderUnavailable('fixture: provider connection unavailable'))
+        state = self.run_failed_probe(self.exhausted_error())
         self.assertIn('fixture: provider connection unavailable', state['slots']['Q01']['error'])
 
     def test_uncertain_probe_is_not_counted_as_completed_machine_check(self):

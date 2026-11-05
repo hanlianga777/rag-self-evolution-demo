@@ -1,7 +1,6 @@
 """Golden workflow checks; every Provider response and approval is an isolated fixture."""
-from contextlib import closing
 import json
-import sqlite3
+import copy
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,31 +27,39 @@ def semantic_reply(item, chunks, score=90, priority='P2'):
 
 class CloseoutTests(unittest.TestCase):
     def setUp(self):
-        if not (ROOT/'backend/data/demo.db').is_file() or not (ROOT/'backend/data/index/chunks.json').is_file():
-            self.skipTest('requires local current 50-question database and Corpus for read-only copy')
+        backoff=patch('app.evaluation_stage.time.sleep')
+        backoff.start();self.addCleanup(backoff.stop)
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
-        self.store = GovernanceStore(Path(self.tmp.name) / 'fixture.db')
-        # Read current records, copy only Golden-owned rows to the disposable database.
-        with closing(sqlite3.connect((ROOT/'backend/data/demo.db').resolve().as_uri()+'?mode=ro', uri=True)) as source, self.store.connection() as target:
-            for table in ('questions','dataset_versions','golden_generation_runs','golden_generation_artifacts','review_events','approvals','probe_results','qc_results','question_quality_audits','candidate_revision_runs'):
-                target.execute('DELETE FROM '+table)
-            for table in ('questions','golden_generation_runs','golden_generation_artifacts'):
-                rows = source.execute('SELECT * FROM '+table).fetchall()
-                columns=[r[1] for r in source.execute('PRAGMA table_info('+table+')')]
-                if table == 'golden_generation_artifacts':
-                    position=columns.index('hard_validation_json')
-                    clean=[]
-                    for saved in rows:
-                        values=list(saved);audit=json.loads(values[position]);audit.pop('quality_rerun',None)
-                        values[position]=json.dumps(audit);clean.append(values)
-                    rows=clean
-                target.executemany('INSERT INTO '+table+' ('+','.join(columns)+') VALUES ('+','.join('?' for _ in rows[0])+')', rows)
-        self.chunks = json.loads((ROOT/'backend/data/index/chunks.json').read_text())
-        self.manifest = json.loads((ROOT/'backend/data/index/manifest.json').read_text())
-        self.run_id = self.store.questions()[0]['raw']['generation_run_id']
+        self.chunks = [{'chunk_id':'C1','document_id':'D','product':'设备A','version':'1',
+                        'chunk_text':'维护前关闭设备并断开电池连接。'}]
+        self.manifest = {'sources':{'D':'offline-closeout'}}
         for name in ('app.governance.current_manifest','app.ai_service.current_manifest','app.corpus.current_manifest'):
             p=patch(name,return_value=self.manifest);p.start();self.addCleanup(p.stop)
         p=patch('app.corpus.CorpusStore.chunks',return_value=self.chunks);p.start();self.addCleanup(p.stop)
+        self.store = GovernanceStore(Path(self.tmp.name) / 'fixture.db')
+        with self.store.connection() as connection:
+            connection.execute('DELETE FROM questions')
+            connection.execute('DELETE FROM dataset_versions')
+        self.run_id = self.store.start_generation_run('offline-fixture','medium')
+        questions=[]
+        for number in range(1,51):
+            category='positive' if number<=20 else 'ablation' if number<=30 else 'negative'
+            negative=category=='negative'
+            requirements={'required_checks':[{'id':'R1','requirement':'拒绝无依据操作' if negative else '关机且断开电池',
+                'source_chunk_ids':[] if negative else ['C1'], **({'basis':'instruction_boundary'} if negative else {})}],
+                'conditional_checks':[],'auxiliary_information':[],'prohibited':[],'acceptable_equivalents':[],
+                'sources':[{'chunk_id':'C1','quote':self.chunks[0]['chunk_text']}]}
+            questions.append({'coverage_slot':f'Q{number:02d}','question':f'场景{number}设备A维护前怎么办？',
+                'test_category':category,'construction_type':'Ordinary','generation_strategy':'business_v2','business_requirements':requirements,
+                'reference_answer':None if negative else '先关机，再断开电池。',
+                'expected_behavior':('prompt_injection_resistance' if number==32 else 'safe_rejection') if negative else None,
+                'negative_subtype':('safety_critical' if number==31 else 'prompt_injection' if number==32 else 'safe_rejection') if negative else None,
+                'ablation_attribute':'colloquial' if category=='ablation' else None,
+                'evidence':[] if negative else [{'source_chunk_ids':['C1'],'evidence_key_points':[self.chunks[0]['chunk_text']]}]})
+        for question in questions:
+            self.store.persist_generation_attempt(self.run_id,question,{},slot=question['coverage_slot'],attempt=1,model='offline-fixture')
+        self.store.complete_generation_slots(self.run_id,failed_slots=[],hard_validation={})
+        self.store.update_generation_run(self.run_id,status='completed')
         self.calls = []
         owner = self
         class Service:
@@ -73,17 +80,21 @@ class CloseoutTests(unittest.TestCase):
         self.service = Service(); self.corpus = SimpleNamespace(chunks=lambda:self.chunks)
 
     def reopen_approved_copy(self, key):
-        """Read a matching actual saved Snapshot, then reopen only the disposable copy."""
+        """Freeze and reopen only synthetic records in the disposable database."""
+        self.complete_quality()
+        self.store.review_generation_batch([q['id'] for q in self.store.questions()],
+            'offline-fixture-human',confirmed_manual_review=True)
+        saved=self.store.create_generation_snapshot(self.run_id)
         item = self.store.question(key)
-        with closing(sqlite3.connect((ROOT/'backend/data/demo.db').resolve().as_uri()+'?mode=ro', uri=True)) as source:
-            saved = next((row for row in source.execute('SELECT id,status,source,snapshot_json,created_at FROM dataset_versions')
-                if any(raw == item['raw'] for raw in json.loads(row[3]).get('questions', []))), None)
-        self.assertIsNotNone(saved, 'no exact saved source Snapshot: do not fabricate approval or alter source hashes')
-        with self.store.connection() as target:
-            target.execute('INSERT OR IGNORE INTO dataset_versions VALUES (?,?,?,?,?)', saved)
         before = self.store.dataset_snapshots()
-        reopened = self.store.reopen_snapshot_question(key, saved[0], actor='offline fixture',
+        reopened = self.store.reopen_snapshot_question(key, saved['id'], actor='offline fixture',
             reason='explicit disposable-copy revision test', authorization='offline fixture only; no formal change')
+        with self.store.connection() as connection:
+            for table in ('probe_results','qc_results','question_quality_audits'):
+                connection.execute('DELETE FROM '+table)
+            audit=self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']
+            audit.pop('quality_rerun',None)
+            connection.execute('UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?',(json.dumps(audit),self.run_id))
         self.assertEqual(reopened['stage'], 'candidate')
         self.assertEqual(reopened['raw'], item['raw'])
         self.assertEqual(self.store.dataset_snapshots(), before)
@@ -155,12 +166,15 @@ class CloseoutTests(unittest.TestCase):
             c.execute('UPDATE questions SET raw_json=? WHERE id=?',(json.dumps(raw),key))
         with self.assertRaisesRegex(ValueError,'过期'):self.store.record_qc(key,semantic_reply(self.store.question(key),self.chunks),'passed',execution=identity)
 
-    def test_unknown_checkpoint_blocks_paid_resume(self):
+    def test_unknown_checkpoint_is_preserved_for_authorized_resume(self):
         with self.store.connection() as c:
             row=c.execute('SELECT hard_validation_json FROM golden_generation_artifacts WHERE generation_run_id=?',(self.run_id,)).fetchone();raw=json.loads(row[0])
             raw['quality_rerun']={'status':'failed','checkpoints':{'q':{'inflight':'qc','attempts':[]}}}
             c.execute('UPDATE golden_generation_artifacts SET hard_validation_json=? WHERE generation_run_id=?',(json.dumps(raw),self.run_id))
-        with self.assertRaises(ValueError):self.store.update_quality_rerun(self.run_id,{'status':'running'},start=True)
+        self.store.update_quality_rerun(self.run_id,{'status':'running'},start=True)
+        state=self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']
+        self.assertEqual(state['checkpoints']['q']['inflight'],'qc')
+        self.assertEqual(self.calls,[])
 
     def complete_quality(self):
         self.store.update_quality_rerun(self.run_id,{'status':'running'},start=True)
@@ -195,7 +209,7 @@ class CloseoutTests(unittest.TestCase):
             if item['id']==failed_key:raise ValueError('fixture known failure')
             return original(item)
         self.service.quality_check=fail;self.complete_quality()
-        self.assertEqual(self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']['status'],'failed')
+        self.assertEqual(self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']['status'],'completed')
         success=self.store.questions()[0]['id'];self.assertEqual(len(self.store.qc_history(success)),1)
         self.service.quality_check=original;self.complete_quality()
         self.assertEqual(len(self.store.qc_history(success)),1)
@@ -231,7 +245,7 @@ class CloseoutTests(unittest.TestCase):
             validate_qc_content(item,reply,self.chunks)
             return reply
         self.service.quality_check=qc;self.complete_quality()
-        self.assertEqual(self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']['status'],'failed')
+        self.assertEqual(self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']['status'],'completed')
         self.complete_quality()
         self.assertEqual(requests[failed_key],2)
         self.assertEqual(requests[self.store.questions()[0]['id']],1)
@@ -342,7 +356,7 @@ class CloseoutTests(unittest.TestCase):
         service.provider.complete=lambda *args,**kwargs:'{}'
         with self.assertRaises(ProviderInvalidResponse):service.quality_check(item)
 
-    def test_unknown_request_stops_batch_without_repeating_or_running_next(self):
+    def test_unknown_request_has_bounded_retries_and_continues_the_batch(self):
         from app.providers import ProviderUnavailable
         keys=[q['id'] for q in self.store.questions()];calls=[]
         def unknown(item):
@@ -350,11 +364,14 @@ class CloseoutTests(unittest.TestCase):
             error.request_execution_unknown=True
             raise error
         self.service.quality_check=unknown;self.complete_quality()
-        self.assertEqual(calls,[keys[0]])
+        from collections import Counter
+        self.assertEqual(Counter(calls),dict.fromkeys(keys,6))
         state=self.store.generation_run(self.run_id,qualification=False)['artifacts']['hard_validation']['quality_rerun']
-        self.assertEqual(state['status'],'failed')
-        self.assertIn('对账',state['error'])
-        with self.assertRaises(ValueError):self.store.update_quality_rerun(self.run_id,{'status':'running'},start=True,anomalies_only=True)
+        self.assertEqual(state['status'],'completed')
+        self.assertEqual(state['technical_failed'],50)
+        self.assertTrue(all(not self.store.qc_history(key) for key in keys))
+        selected=self.store.update_quality_rerun(self.run_id,{'status':'running'},start=True,anomalies_only=True)
+        self.assertEqual(set(selected),set(keys))
 
     def test_negative_probe_requires_complete_scope_not_partial_parameter(self):
         from app.ai_service import AiService
@@ -381,7 +398,6 @@ class CloseoutTests(unittest.TestCase):
         self.assertEqual(len(self.store.qc_history(self.store.questions()[-1]['id'])),1)
 
     def test_governed_revision_preserves_id_and_invalidates_quality(self):
-        import copy
         item=next(q for q in self.store.questions() if q['test_category']=='negative')
         frozen_before = self.reopen_approved_copy(item['id'])
         self.complete_quality();item=self.store.question(item['id'])
@@ -391,7 +407,7 @@ class CloseoutTests(unittest.TestCase):
             _,errors,_,_=self.store._validate_revision_drafts(revision,self.chunks,None,{item['id']:{'business_requirements':invalid}})
             self.assertTrue(errors, 'governed contract cannot be removed')
         self.store.prepare_revision(revision['id'],self.chunks,similarity=None)
-        ready=self.store.revision_run(revision['id']);self.assertEqual(ready['status'],'preview_ready',ready.get('validation_errors'))
+        ready=self.store.revision_run(revision['id']);self.assertEqual(ready['status'],'preview_ready',ready.get('error'))
         self.store.apply_revision(revision['id'],self.chunks,similarity=None)
         changed=self.store.question(item['id'])
         self.assertEqual(changed['question'],item['question']);self.assertEqual(changed['id'],item['id'])

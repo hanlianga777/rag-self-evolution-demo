@@ -22,12 +22,12 @@ class Task004PolicyTests(unittest.TestCase):
         self.assertFalse(policy.qualify_release({'passed': True}, regression, 2)['qualified'])
         self.assertTrue(policy.qualify_release({'passed': True}, policy.evaluate_regression(new_critical_failures=0, new_ordinary_failures=0), 1)['qualified'])
         self.assertFalse(policy.qualify_release({'passed': False}, regression, 2)['qualified'])
-        rows = [{'id': label, 'status': 'evaluated', 'reasoning': {'candidate_label': label}, 'result': {'bad_case_count': count, 'qualification': {'qualified': True}}} for label, count in [('A', 4), ('B', 2), ('C', 3)]]
+        rows = [{'id': label, 'status': 'evaluated', 'reasoning': {'candidate_label': label}, 'result': {'bad_case_count': count, 'qualification': {'qualified': True},'release_qualification':{'qualified':True}}} for label, count in [('A', 4), ('B', 2), ('C', 3)]]
         self.assertEqual(policy.select_final_candidate(rows)['candidate_id'], 'B')
         self.assertEqual(policy.select_final_candidate([*rows, {'id': 'missing', 'status': 'evaluated', 'reasoning': {'candidate_label': 'A'}, 'result': {'qualification': {'qualified': True}, 'bad_case_count': None}}])['candidate_id'], 'B')
         self.assertEqual(policy.select_final_candidate([])['decision'], '保持 Baseline')
         self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'failed', 'result': {'release_qualification': {'qualified': True}}})['candidate_id'], 'B')
-        self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'evaluated', 'result': {'release_qualification': {'qualified': True}}})['decision'], '发布合格')
+        self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'evaluated', 'result': {'release_qualification': {'qualified': True},'bad_case_count':1}})['decision'], '发布合格')
 
     def test_review_request_is_disabled_without_new_answers_or_judgments(self):
         with tempfile.TemporaryDirectory() as directory:

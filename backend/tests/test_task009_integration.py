@@ -75,7 +75,7 @@ class IntegrationTests(unittest.TestCase):
             thread=threading_mock.Thread
             thread.reset_mock()
             self.assertEqual(client.post('/api/experiments/e/run-cycle').status_code,201)
-            claim.assert_called_once_with(store,'e');thread.return_value.start.assert_called_once()
+            claim.assert_called_once_with(store,'e',current_round_only=False);thread.return_value.start.assert_called_once()
             self.assertEqual(client.post('/api/experiments/e/continue').status_code,409)
     def test_judge_target_api_validates_without_calls(self):
         runner=Mock();runner.start_judge_replay.return_value=('fixture',[],{})

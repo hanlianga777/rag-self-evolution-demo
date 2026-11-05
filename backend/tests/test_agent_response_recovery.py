@@ -82,8 +82,13 @@ class RecoveryTests(unittest.TestCase):
     def failed_source(self):
         from pathlib import Path
         from app.governance import _json
-        response=drafts();response['candidates']=response['candidates'][:1]
+        response=drafts()
         experiment,trace,audit,_,_=self.run_drafts(response)
+        # Single-pass Agent input annotations must also be saved in this historical fixture.
+        with self.store.connection() as connection:
+            for row in audit['all_bad_case_audit']:
+                case={k:v for k,v in row['result'].items() if k not in {'run_id','question_id'}}
+                connection.execute('UPDATE bad_cases SET result_json=? WHERE id=?',(_json(case),row['id']))
         audit.update(token_usage=[{'status':'ok','provider':'FIXTURE','prompt_tokens':12}],
                      cost_estimation={'status':'FIXTURE','amount':0.123},validation_error='FIXTURE old schema failure')
         with self.store.connection() as connection:

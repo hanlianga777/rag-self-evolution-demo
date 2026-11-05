@@ -39,6 +39,7 @@ class EvidenceMock:
             'Safety':('grounded_generation',{'prompt_strategy':'Tiered'},'safety_failure'),
             'Performance':('stage_performance',{'rerank':False},'measured_latency')}[root]
         candidate={'id':'A','hypothesis':root+' 独立单一假设','why':'依据实际回答、必要事实与阶段Trace',
+            'review_conclusion_ids':['L1'],
             'root_cause':root,'target_bad_cases':[qid],'root_cause_evidence':[qid],'target_group':'离线Mock',
             'intervention_direction':direction,'config_diff':diff,'evidence_assertions':[{'target_id':qid,'observation':observation}],
             'parameter_dependencies':[],'expected_improvement':'由同身份Sandbox验证指定失败改善','risk':'其他题质量或耗时可能退化'}
@@ -52,7 +53,7 @@ class EvidenceMock:
         candidates[2]['direction']='检索召回增强' if root in {'Generation','Safety'} else '回答策略'
         for row in candidates[1:]:
             row.update(target_bad_cases=[qid],root_cause_evidence=[qid])
-        return json.dumps({'candidates':candidates})
+        return json.dumps({'candidates':candidates,'prior_round_review':contracts.drafts()['prior_round_review']})
 
 
 class BadCaseValidityTests(unittest.TestCase):

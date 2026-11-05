@@ -53,7 +53,7 @@ class LifecycleProvider(FixtureProvider):
         for candidate in value['candidates']:
             context = candidate['id'] == 'A'
             root = 'Ranking' if context else 'Generation'
-            targets = [row['id'] for row in payload['bad_cases'] if row['result']['primary_root_cause'] == root] or payload['monitoring_target_event_ids']
+            targets = [row['id'] for row in payload['bad_cases'] if row['diagnosis_category'] == ('检索层问题' if context else '生成层问题')] or [row['id'] for row in payload['bad_cases']]
             candidate.update(target_bad_cases=targets, root_cause=root, root_cause_evidence=targets,
                 intervention_direction='context_selection' if context else 'grounded_generation',
                 evidence_assertions=[{'target_id':key,'observation':'ranking_omission' if context else 'final_sufficient'} for key in targets])
@@ -62,6 +62,9 @@ class LifecycleProvider(FixtureProvider):
                 candidate.update(config_diff={'prompt_strategy':strategy}, hypothesis='Cover the missing answer requirement using the already sufficient Final.',
                     why='The saved Judge locates the complete normative fact in Final but the answer omits it.',
                     risk='A generation-strategy change can introduce regressions; all frozen cases must be evaluated.')
+        value['candidates'][0]['direction']='排序与过滤'
+        value['candidates'][1]['direction']='回答策略'
+        value['candidates'][2].update(direction='效率（降档 + 检索补偿）',config_diff={'generation_thinking':'off','candidate_k':24})
         return json.dumps(value, ensure_ascii=False)
 
 

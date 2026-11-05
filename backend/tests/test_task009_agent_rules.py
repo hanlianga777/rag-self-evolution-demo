@@ -29,9 +29,9 @@ class Task009AgentRulesTests(unittest.TestCase):
         for term in ('1–2', '能确定', '售后', '安全警告'):
             self.assertIn(term, provider.requests[-1][0])
 
-    def test_disabled_budget_never_offers_tokenizer_values(self):
-        self.assertEqual(search_space_contract()['retrieval_max_tokens']['allowed'], [False])
-        for limit in (8192, 16384, 32768, 65536, True):
+    def test_context_budget_exposes_only_current_allowed_values(self):
+        self.assertEqual(search_space_contract()['retrieval_max_tokens']['allowed'], [False,8192,4096])
+        for limit in (16384, 32768, 65536, True):
             self.assertFalse(validate_candidate_config({**DEFAULT_PIPELINE_CONFIG, 'retrieval_max_tokens': limit})['valid'])
 
     def test_program_summary_includes_failed_and_near_threshold_and_budget(self):
@@ -53,17 +53,22 @@ class Task009AgentRulesTests(unittest.TestCase):
 
     def prepare(self, candidates, audit=None, prior=None):
         audit = {} if audit is None else audit
-        _, batch = prepare_response(json.dumps({'candidates':candidates},ensure_ascii=False),DEFAULT_PIPELINE_CONFIG,self.rows(),prior or [],0,1,list('ABC'),None,[],audit)
+        from test_optimization_contract import drafts
+        response=drafts()
+        for index,candidate in enumerate(candidates):
+            response['candidates'][index].update(candidate)
+        _, batch = prepare_response(json.dumps(response,ensure_ascii=False),DEFAULT_PIPELINE_CONFIG,self.rows(),prior or [],0,1,list('ABC'),None,[],audit)
         return batch,audit
 
     def test_distinct_directions_and_multivalue_same_parameter_is_rejected(self):
-        batch, audit = self.prepare([self.candidate('A',{'min_score':0.1}),self.candidate('B',{'min_score':0.2}),self.candidate('C',{'query_rewrite':True,'candidate_k':24})])
-        self.assertEqual([r[2]['candidate_label'] for r in batch], ['A','C'])
-        self.assertIn('方向',audit['rejected_candidates'][0]['reason'])
+        with self.assertRaisesRegex(ValueError,'共用参数'):
+            self.prepare([self.candidate('A',{'min_score':0.1}),self.candidate('B',{'min_score':0.2}),self.candidate('C',{'query_rewrite':True,'candidate_k':24})])
+        batch,audit=self.prepare([self.candidate('A',{'top_k':6})])
+        self.assertEqual(len(batch),3)
         reasoning=batch[0][2]
         self.assertTrue(reasoning['strategy_name'].startswith('「'))
         self.assertEqual(reasoning['core_idea'],'提高可用证据覆盖')
-        self.assertEqual(reasoning['adjustments'][0], {'parameter':'min_score','baseline_value':0,'candidate_value':0.1,'expected_impact':'预计修好Q1'})
+        self.assertEqual(reasoning['adjustments'][0], {'parameter':'top_k','baseline_value':4,'candidate_value':6,'expected_impact':'预计修好Q1'})
         self.assertEqual(reasoning['risks'],[{'question_ids':[],'metric':None,'reason':'可能增加耗时'}])
 
     def test_structured_risk_must_name_question_or_metric(self):

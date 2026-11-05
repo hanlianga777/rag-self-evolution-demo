@@ -23,7 +23,7 @@ class SandboxInheritanceTests(unittest.TestCase):
         exp=self.store.create_experiment(baseline['id'],'completed')
         base={k:v for k,v in baseline['config'].items() if k!='run_target'}
         configs=[{**base,'prompt_strategy':'Grounded'},{**base,'query_rewrite':True,'multi_query':2},
-                 {**base,'metadata_filter':'FALLBACK'}]
+                 {**base,'hyde':True}]
         for label,config in zip('ABC',configs):
             self.store.save_candidate(exp,'R1-'+label,config,{'round':1,'candidate_label':label})
         return baseline,exp,configs

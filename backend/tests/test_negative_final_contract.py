@@ -61,7 +61,8 @@ class NegativeFinalContractTests(unittest.TestCase):
                     if calls[0]>completed:raise ProviderInvalidResponse('explicit invalid Judge')
                     return original(item,execution,**kwargs)
                 executions={q['id']:runtime.answer(q['question'],config) for q in items}
-                with patch.object(runner,'score_execution',side_effect=score):result=runner.execute_replay(key,items,executions)
+                with patch.object(runner,'score_execution',side_effect=score),patch('app.evaluation_stage.time.sleep'):
+                    result=runner.execute_replay(key,items,executions)
                 self.assertEqual(result['status'],'completed')
                 self.assertEqual(result['result']['completed'],completed)
                 self.assertEqual(result['result']['technical_failed'],len(items)-completed)
