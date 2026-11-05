@@ -139,8 +139,9 @@ class CompositeTests(unittest.TestCase):
         with self.store.connection() as connection:
             connection.execute('UPDATE candidate_configs SET config_json=? WHERE id=?',(json.dumps({**self.winner['config'],'prompt_strategy':'Abstention'}),self.winner['id']))
         provider=self.provider()
-        self.store.create_composite(self.experiment,provider,False)
-        provider.complete.assert_called_once()
+        result=self.store.create_composite(self.experiment,provider,False)
+        self.assertEqual(result['status'],'failed')
+        self.assertEqual(provider.complete.call_count,3)
         self.assertEqual(self.store.experiment(self.experiment)['result']['report_confirmation']['winner_id'],self.winner['id'])
 
     def test_coherent_multi_parameter_d_needs_saved_evidence_and_dependencies(self):
@@ -194,18 +195,20 @@ class CompositeTests(unittest.TestCase):
         self.assertIn('token_usage',value);self.assertEqual(provider.complete.call_count,1)
         self.assertFalse(any(c['reasoning'].get('candidate_label')=='D' for c in self.store.candidates(self.experiment)))
 
-    def test_d_provider_failure_is_saved_without_automatic_retry(self):
+    def test_d_provider_failure_is_saved_and_explicit_request_can_retry(self):
         provider=self.provider();provider.complete.side_effect=TimeoutError('fixture uncertain response')
         first=self.store.create_composite(self.experiment,provider,True)
         second=self.store.create_composite(self.experiment,provider,True)
-        self.assertEqual(first['status'],'failed');self.assertEqual(second,first)
-        self.assertEqual(provider.complete.call_count,1)
+        self.assertEqual(first['status'],'failed');self.assertEqual(second['status'],'failed')
+        self.assertEqual(provider.complete.call_count,2)
+        self.assertEqual(second['previous_failures'][0],first)
 
-    def test_invalid_model_parameters_do_not_create_d_or_retry(self):
+    def test_invalid_model_parameters_retry_but_never_create_d(self):
         provider=self.provider(diff={'generation_model':'forbidden'})
         value=self.store.create_composite(self.experiment,provider,True)
         self.assertEqual(value['status'],'failed');self.assertFalse(any(c['reasoning'].get('candidate_label')=='D' for c in self.store.candidates(self.experiment)))
-        self.store.create_composite(self.experiment,provider,True);self.assertEqual(provider.complete.call_count,1)
+        self.assertEqual(provider.complete.call_count,3)
+        self.store.create_composite(self.experiment,provider,True);self.assertEqual(provider.complete.call_count,6)
         self.assertEqual(self.store.recommendation(self.experiment)['result']['recommended_candidate'],self.winner['id'])
 
     def test_model_can_decline_d_without_config(self):

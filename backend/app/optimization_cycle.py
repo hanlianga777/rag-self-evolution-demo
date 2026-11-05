@@ -35,11 +35,16 @@ def claim_cycle(store, experiment_id, *, current_round_only=False):
             raise ValueError('优化批次正在运行')
         if experiment['status'] == 'generating' or any(c['status'] in {'queued', 'running'} for c in experiment['candidates']):
             raise ValueError('当前方案或评测仍在运行')
-        if experiment['result'].get('report_confirmation'):
-            raise ValueError('报告已确认，不能继续改变实验')
+        confirmation = experiment['result'].get('report_confirmation')
+        if confirmation:
+            winner = next((c for c in experiment['candidates'] if c['id'] == confirmation['winner_id']), None)
+            if not winner or winner['status'] != 'evaluated' or not winner['result'].get('qualification', {}).get('qualified'):
+                raise ValueError('Winner资格失效，不能续跑D')
+            if current_round_only:
+                raise ValueError('报告已确认，只能续跑D')
         if current_round_only and not any(c['reasoning'].get('candidate_label') in {'A','B','C'} for c in experiment['candidates']):
             raise ValueError('当前没有可续跑的 A/B/C 方案')
-        state = {'status':'running', 'phase':'analysis', 'owner_pid':os.getpid(), 'current_round_only':current_round_only,
+        state = {'status':'running', 'phase':'composite' if confirmation else 'analysis', 'owner_pid':os.getpid(), 'current_round_only':current_round_only,
                  'resume_stopped_runs':[c['result']['evaluation_run_id'] for c in experiment['candidates']
                      if c['status']=='failed' and c['result'].get('stop_request') and c['result'].get('evaluation_run_id')],
                  'used':experiment['evaluation_budget']['used'],

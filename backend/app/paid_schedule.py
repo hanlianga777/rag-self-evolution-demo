@@ -168,7 +168,9 @@ def start_scheduled_composite(store, provider, experiment_id, *, recover=False):
                 complete = composite.get('status') in {'generated', 'no_effective_composite'}
                 return save_composite_schedule(store, experiment_id, status='completed' if complete else 'unknown',
                     error=None if complete else '组合请求的结果未知，保留记录，不重复调用')
-        elif experiment['result'].get('composite'):
+        elif experiment['result'].get('composite') and not (
+                experiment['result']['composite'].get('status') == 'failed'
+                and not experiment['result']['composite'].get('candidate_id')):
             raise ValueError('方案 D 已处理，请刷新查看结果')
         elif experiment['result'].get('composite_schedule', {}).get('status') not in {'waiting', 'running'}:
             clear_run_now(store, 'composite:' + experiment_id)
