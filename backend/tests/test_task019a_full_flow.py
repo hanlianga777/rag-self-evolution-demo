@@ -12,7 +12,7 @@ from test_optimization_contract import drafts
 class FullFlowTests(unittest.TestCase):
     setUp=sandbox_fixture.Sandbox50Tests.setUp
 
-    def exercise(self, better):
+    def exercise(self, better, *, string_types=False):
         store, runtime=self.store,self.ai
         exp=store.create_experiment(self.baseline['id'])
         set_unattended_authorization(store,True,'用户 2026-11-05 授权')
@@ -56,10 +56,10 @@ class FullFlowTests(unittest.TestCase):
                     'baseline_remaining_assessment':'冻结Baseline的case-2仍需补足证据','conclusions':[{'id':'L1','conclusion':'尝试不同完整组合，不能把max+HyDE失败推断成high+HyDE失败'}]}
                 return json.dumps(response)
             winner=prompt['winner'];source=next(s for s in prompt['sources'] if s['config']['top_k']==6)
-            return json.dumps({'should_generate_d':True,'action_name':'合并已验证组合','source_candidates':[winner['id'],source['id']],
+            return json.dumps({'should_generate_d':'true' if string_types else True,'action_name':'合并已验证组合','source_candidates':[winner['id'],source['id']],
                 'source_reasons':{winner['id']:'保留high+HyDE整组，不能拆分',source['id']:'单参数TopK的目标改善已保存'},
                 'root_cause_alignment':'保存检索证据缺口','complementary_capabilities':'保留召回与上下文选择',
-                'proposed_config_diff':{'top_k':6},'expected_improvement':'覆盖case-2','risks':'可能增加延迟','explanation':'仅组合已经完整试跑的来源',
+                'proposed_config_diff':{'top_k':'6' if string_types else 6},'expected_improvement':'覆盖case-2','risks':'可能增加延迟','explanation':'仅组合已经完整试跑的来源',
                 'hypothesis':'补充上下文','root_cause':'Retrieval','intervention_direction':'combined','evidence_assertions':[], 'parameter_dependencies':[]})
         runtime.provider.complete=complete
         state=run_until_qualified(store,runtime,exp)
@@ -83,3 +83,4 @@ class FullFlowTests(unittest.TestCase):
 
     def test_full50_d_not_better_retains_winner(self):self.exercise(False)
     def test_full50_d_better_recommends_d(self):self.exercise(True)
+    def test_full50_d_accepts_equivalent_string_types(self):self.exercise(True, string_types=True)

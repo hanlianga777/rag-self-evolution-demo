@@ -113,7 +113,10 @@ def validate_prior_round_review(result, prior_candidates):
     if len(plans) != len(expected) or {p.get('candidate_id') for p in plans if isinstance(p, dict)} != expected:
         raise ValueError('前几轮复盘必须逐一覆盖本实验所有已完成历史方案')
     for plan in plans:
-        if any(not isinstance(plan.get(k), str) or not plan[k].strip() for k in ('changes', 'evidence_reason', 'conclusion')) or any(not isinstance(plan.get(k), list) for k in ('fixed_question_ids', 'new_failure_question_ids')):
+        changes = plan.get('changes')
+        if (not (isinstance(changes, str) and changes.strip() or isinstance(changes, dict) and changes)
+                or any(not isinstance(plan.get(k), str) or not plan[k].strip() for k in ('evidence_reason', 'conclusion'))
+                or any(not isinstance(plan.get(k), list) for k in ('fixed_question_ids', 'new_failure_question_ids'))):
             raise ValueError('前几轮复盘每套须写改动、修好/弄坏题号、证据原因、结论')
         previous = next(c for c in prior_candidates if c['id'] == plan['candidate_id'])
         if set(plan['fixed_question_ids']) != set(previous['result'].get('all_fixed_question_ids', [])) or set(plan['new_failure_question_ids']) != set(new_failure_ids(previous['result'])):
@@ -390,6 +393,44 @@ def finite_float(value):
     return result
 
 
+def normalize_agent_config(config):
+    """Convert JSON scalar strings only when they name an existing allowed value."""
+    normalized = dict(config)
+    for key, value in config.items():
+        if not isinstance(value, str):
+            continue
+        try:
+            scalar = json.loads(value)
+        except ValueError:
+            continue
+        for option in ALLOWED_SEARCH_SPACE.get(key, ()):
+            same_type = type(scalar) is type(option) or type(scalar) in (int, float) and type(option) in (int, float)
+            if same_type and scalar == option:
+                normalized[key] = option
+                break
+    return normalized
+
+
+def normalize_agent_candidate(candidate):
+    if not isinstance(candidate, dict):
+        return candidate
+    candidate = dict(candidate)
+    if isinstance(candidate.get('config_diff'), dict):
+        candidate['config_diff'] = normalize_agent_config(candidate['config_diff'])
+    if isinstance(candidate.get('target_bad_cases'), str):
+        candidate['target_bad_cases'] = [candidate['target_bad_cases']]
+    if isinstance(candidate.get('adjustments'), list):
+        candidate['adjustments'] = [
+            {**item, **{field: normalize_agent_config({item.get('parameter'): item[field]})[item.get('parameter')]
+                       for field in ('baseline_value', 'candidate_value') if field in item}}
+            if isinstance(item, dict) else item for item in candidate['adjustments']]
+    if isinstance(candidate.get('risks'), list):
+        candidate['risks'] = [{**risk, 'question_ids': [risk['question_ids']]}
+            if isinstance(risk, dict) and isinstance(risk.get('question_ids'), str) else risk
+            for risk in candidate['risks']]
+    return candidate
+
+
 def prepare_response(content,base_config,bad_cases,prior_candidates,completed,round_number,labels,trigger_id,monitoring_target_event_ids,audit):
     """One offline validation path for fresh and already-paid responses; no semantic repairs."""
     audit.update(parsed_json=None,parsed_candidates=None,rejected_candidates=[])
@@ -410,8 +451,9 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
     if not isinstance(result, dict) or not isinstance(result.get("candidates"), list):
         audit.update(failed_field="candidates", actual_value=result.get("candidates") if isinstance(result, dict) else result, expected_type="array", allowed_values=None)
         raise ValueError("Agent 输出必须包含 candidates 数组")
-    candidates = result.get("candidates", [])
-    audit["parsed_candidates"] = candidates
+    audit["parsed_candidates"] = result['candidates']
+    candidates = [normalize_agent_candidate(c) for c in result['candidates']]
+    result = {**result, 'candidates': candidates}
     audit['prior_round_review'] = validate_prior_round_review(result, prior_candidates)
     validate_round_contract(candidates,base_config,prior_candidates,(audit.get('baseline_gate_results') or {}).get('gates'))
     audit.update(response_contract_version='agent-response-2',rejected_candidates=[],response_warnings=[])
