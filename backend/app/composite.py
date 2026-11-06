@@ -3,7 +3,15 @@ import json
 from itertools import combinations
 
 from .agent_inputs import evidence_positions, new_failure_ids
-from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, GATE_DEFINITIONS, validate_candidate_config
+from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, GATE_DEFINITIONS, PARAMETER_EXPLANATIONS, validate_candidate_config
+
+D_FACTS_VERSION = 'winner-refinement-2'
+
+
+def retryable_d_decision(previous):
+    return not previous or not previous.get('candidate_id') and (
+        previous.get('status') == 'failed' or previous.get('status') == 'no_effective_composite'
+        and previous.get('facts', {}).get('version') != D_FACTS_VERSION)
 
 
 def pipeline_config(config):
@@ -74,7 +82,20 @@ def build_d_facts(store, baseline, winner, history):
                         'observations':[ {k:r[k] for k in ('candidate_id','parameter_diff','fixed_question_ids','new_failure_question_ids','failed_gates','gate_drops','p99_seconds','p99_change_from_baseline','p99_change_from_winner','attribution','observation_label')} for r in records if type(r['config'][key]) is type(v) and r['config'][key]==v],
                         'contrast_ids':[c['id'] for c in contrasts if c['parameter']==key and any(type(x) is type(v) and x==v for x in c['values'])]}
                        for v in allowed] for key,allowed in ALLOWED_SEARCH_SPACE.items()}
-    return {'version':'winner-refinement-1', 'winner_id':winner['id'], 'winner_config':pipeline_config(winner['config']),
+    for key, profile in profiles.items():
+        for option in profile:
+            for observation in option['observations']:
+                record = next(r for r in records if r['candidate_id']==observation['candidate_id'])
+                differences = parameter_diff(record['config'], pipeline_config(winner['config']))
+                prerequisites = {k:{'observed':v,'winner':winner['config'].get(k,DEFAULT_PIPELINE_CONFIG[k])}
+                                 for k,v in differences.items() if k!=key}
+                def plain(value):
+                    if isinstance(value,bool):return '开启' if value else '关闭'
+                    return {'high':'高','max':'最高','low':'低','off':'关闭'}.get(str(value),str(value))
+                description = '；'.join(f"{PARAMETER_EXPLANATIONS[k][0].split('：')[0]}：观察时 {plain(v['observed'])}，Winner {plain(v['winner'])}" for k,v in prerequisites.items())
+                observation.update(winner_config_diff=differences, prerequisite_differences=prerequisites,
+                                   premise_label='前提不同：'+description if prerequisites else '前提与 Winner 相同')
+    facts = {'version':D_FACTS_VERSION, 'winner_id':winner['id'], 'winner_config':pipeline_config(winner['config']),
         'winner_preserved_diff':parameter_diff(winner['config'],base), 'qualified_candidate_ids':[r['candidate_id'] for r in records if r['qualified']],
         'remaining_failures':[{'question_id':q, 'evidence_positions':positions(winner['id'],q),
             'historical_fixes':[{**r,'evidence_positions':positions(r['candidate_id'],q)} for r in records if cases.get(r['candidate_id'],{}).get(q,{}).get('passed') is True]} for q in remaining],
@@ -84,7 +105,54 @@ def build_d_facts(store, baseline, winner, history):
         'gate_margins':[{**g, 'actual':metric(winner['result'],g['metric']),
                          'margin':delta(metric(winner['result'],g['metric']),g['threshold']) if g['operator']=='>=' else delta(g['threshold'],metric(winner['result'],g['metric'])),
                          'unit':'秒' if 'latency' in g['metric'] else '百分点'} for g in GATE_DEFINITIONS],
-        'missing_winner_cases':sorted(set(questions)-set(win_cases)), 'note':'仅保存结果；缺记录为未知，伴随出现不等于导致。'}
+        'missing_winner_cases':sorted(set(questions)-set(win_cases)), 'note':'仅保存结果；缺记录为未知，伴随出现不等于导致。前提不同的副作用是待验证风险，不能单独作为放弃理由。'}
+    facts['usable_repairs'] = usable_repairs(facts)
+    return facts
+
+
+def usable_repairs(facts):
+    """Identify historical repairs supported by saved Winner positions, not predicted gains."""
+    winner = facts['winner_config']; preserved = facts['winner_preserved_diff']; repairs = []
+    for failure in facts['remaining_failures']:
+        positions = failure['evidence_positions']
+        if not isinstance(positions,list):continue
+        for source in failure['historical_fixes']:
+            if failure['question_id'] not in source['fixed_question_ids']:continue
+            for key,value in parameter_diff(source['config'],winner).items():
+                if key in preserved:continue
+                evidence = []
+                for pos in positions:
+                    final,rank,candidate = (pos.get(stage) for stage in ('final','reranked','candidates'))
+                    if key=='top_k':
+                        supported = type(rank) is int and final=='未进入' and winner[key]<rank<=value
+                    elif key=='candidate_k':
+                        supported = candidate=='未进入' and value>winner[key]
+                    elif key in {'generation_thinking','prompt_strategy','retrieval_max_tokens'}:
+                        supported = type(final) is int
+                    elif key in {'rerank','min_score'}:
+                        supported = type(candidate) is int and final=='未进入'
+                    else:
+                        supported = candidate=='未进入'
+                    if supported:evidence.append(pos)
+                if not evidence:continue
+                # A whole historical bundle or a real one-parameter contrast must
+                # remain usable without undoing the Winner or exceeding two edits.
+                bundle = source['parameter_diff']
+                whole = {**winner,**bundle}
+                contrast_ids = [c['id'] for c in facts['contrasts'] if c['parameter']==key and source['candidate_id'] in c['candidate_ids']]
+                configs = [('verified',whole)] + ([('partial',{**winner,key:value})] if contrast_ids else [])
+                for kind,config in configs:
+                    diff = parameter_diff(config,winner)
+                    if not diff or len(diff)>2 or any(k in diff for k in preserved):continue
+                    effective = {k:v for k,v in config.items() if k!='hybrid_alpha' or config['hybrid_search'] is not False}
+                    if key not in effective or not validate_candidate_config(effective)['valid']:continue
+                    repairs.append({'question_id':failure['question_id'],'parameter':key,'value':value,
+                        'source_candidate_id':source['candidate_id'],'source_type':kind,
+                        'proposed_config_diff':diff,'contrast_ids':contrast_ids if kind=='partial' else [],
+                        'evidence_basis':'Winner保存的证据位置支持验证：'+json.dumps(evidence,ensure_ascii=False),
+                        'note':'历史伴随修好，不承诺D修好；副作用必须通过Sandbox验证'})
+                    break
+    return repairs
 
 
 def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
@@ -118,6 +186,9 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
         side=row.get('side_effect_check')
         if (not isinstance(side,dict) or any(not isinstance(side.get(k),str) or not side[k].strip() for k in ('historical_effects','winner_fixed_risk','gate_risk','mitigation'))
             or not isinstance(side.get('protected_overlap'),list)):raise ValueError('改动缺副作用检查：历史伴随现象、保护题重叠、赢家修好题、门槛及规避措施必填')
+        if facts.get('version')==D_FACTS_VERSION and any(not isinstance(side.get(k),str) or not side[k].strip()
+                for k in ('same_premise_evidence','different_premise_evidence','risk_checklist')):
+            raise ValueError('副作用检查须分别写前提相同证据、前提不同证据和重点保护题/临界门槛风险清单；没有证据写未观察到')
         if any(type(row.get(k)) is not int or row[k]<0 for k in ('expected_fixed_count','possible_broken_count')):raise ValueError('预期修好/可能弄坏几道须为非负整数')
         profile=next(p for p in facts['parameter_profiles'][key] if type(p['value']) is type(value) and p['value']==value)
         overlap={q for p in profile['observations'] for q in p['new_failure_question_ids']} & protected

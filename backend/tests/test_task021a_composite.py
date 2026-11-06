@@ -40,7 +40,7 @@ class RefinementTests(unittest.TestCase):
                 'hypothesis':'增加上下文覆盖','root_cause':'Retrieval','intervention_direction':'combined','evidence_assertions':[],
                 'changes':[{'parameter':'top_k','source_type':'verified','source_candidates':[self.other['id']], 'reason':'历史修好q2',
                             'target_question_ids':['q2'],'evidence_basis':'D事实表remaining_failures q2证据最终位置1',
-                            'side_effect_check':{'historical_effects':'伴随q3翻错','protected_overlap':['q3'],'winner_fixed_risk':'q证据保留','gate_risk':'P99余量40秒','mitigation':'完整50题检验'},
+                            'side_effect_check':{'historical_effects':'伴随q3翻错','protected_overlap':['q3'],'winner_fixed_risk':'q证据保留','gate_risk':'P99余量40秒','mitigation':'完整50题检验','same_premise_evidence':'没有相同前提的观察','different_premise_evidence':'来源与赢家的其他参数不同，不能直接归因','risk_checklist':'完整题卷核对保护题与安全拒答95和P99不超过60秒'},
                             'expected_fixed_count':1,'possible_broken_count':1}]}
 
     def validate(self,value):

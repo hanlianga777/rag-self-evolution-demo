@@ -48,7 +48,7 @@ class LifecycleProvider(FixtureProvider):
                     'target_question_ids':[row['question_id'] for row in facts['remaining_failures'] if row['question_id'] in source['fixed_question_ids']],
                     'reason':'Retain B answer completeness on the remaining fixture failures.',
                     'evidence_basis':'Saved B fixed questions in d_facts.history and remaining_failures.',
-                    'side_effect_check':{'historical_effects':'Saved B repairs require full D regression.',
+                    'side_effect_check':{'same_premise_evidence':'No same-premise observation','different_premise_evidence':'Compare saved source config with Winner','risk_checklist':'Check protected questions and all gates in full Sandbox','historical_effects':'Saved B repairs require full D regression.',
                         'protected_overlap':[row['question_id'] for row in facts['protected_questions']],
                         'winner_fixed_risk':'Keep winner Final selection and recheck its repaired questions.',
                         'gate_risk':'D must pass its own saved gates.','mitigation':'Run the full isolated fixture Sandbox before qualification.'},
