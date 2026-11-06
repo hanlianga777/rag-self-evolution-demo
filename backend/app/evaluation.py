@@ -1047,6 +1047,13 @@ class EvaluationRunner:
                     'qualification':{'qualified':None,'blocking_reason':'Sandbox未完成'},'recommendation':None}
             finished=self.store.finish_candidate(candidate['id'],'failed',result)
             return {**finished,'recommendation':self.store.refresh_recommendation(candidate['experiment_id'])}
+        return self.finalize_saved_candidate(run, candidate, baseline)
+
+    def finalize_saved_candidate(self, run, candidate, baseline):
+        """Recalculate a completed saved Sandbox without executing any question."""
+        if run['status']!='completed' or not run['result'].get('evaluation_complete'):
+            raise ValueError('保存的Sandbox尚未完成')
+        run_id = run['id']
         if run['judge'].get('evaluation_identity') != baseline['judge'].get('evaluation_identity'):
             raise ValueError('判分身份不同，禁止比较门槛或计算修好和弄坏')
         baseline_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(baseline["id"])}

@@ -93,3 +93,21 @@ def semantic_coverage(plan, chunks):
             cluster={**cluster,'semantic_label':topic_label(sources)}
         clusters.append(cluster)
     return {**plan,'clusters':clusters}
+
+
+def evaluation_display(function):
+    """Omit replacement provenance from presentation responses, including raw JSON."""
+    def clean(value, raw_json=False):
+        if isinstance(value,list):return [clean(item) for item in value]
+        if isinstance(value,dict):
+            hidden={'_evaluation_audit','internal_recheck'}
+            if value.get('internal_recheck') is True:hidden.add('purpose')
+            return {key:clean(item,key.endswith('_json')) for key,item in value.items() if key not in hidden}
+        if raw_json and isinstance(value,str) and value.startswith(('{','[')):
+            try:return json.dumps(clean(json.loads(value)),ensure_ascii=False)
+            except ValueError:pass
+        return value
+
+    @wraps(function)
+    def read(*args,**kwargs):return clean(function(*args,**kwargs))
+    return read

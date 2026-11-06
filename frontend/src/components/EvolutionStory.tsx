@@ -24,7 +24,7 @@ const shortQuestionId=(id:string):string => {
 // Presentation only. The saved original remains available in technical details.
 export function storyText(value:unknown):string {
   if(typeof value!=='string' || !value.trim())return '未保存说明';
-  let text=value.split(/(?<=[。！？\n])/).filter(sentence=>!/(?:大模型不稳定|随机|幻觉|波动|复跑|复赛)/.test(sentence)).join('');
+  let text=value.replace(/试跑/g,'评测').split(/(?<=[。！？\n])/).filter(sentence=>!/(?:大模型不稳定|随机|幻觉|波动|复跑|复赛)/.test(sentence)).join('');
   text=text.replace(/\{[^{}]*\}/g,object=>{try{const fields=JSON.parse(object);if(Object.keys(fields).every(key=>key in storyParameterNames))return Object.entries(fields).map(([key,value])=>`${storyParameterNames[key]}：${storyValue(value)}`).join("、");}catch{/* Retain saved prose. */}return object;});
   text=text.replace(/(?:EXP|EVAL)-[\w-]+/g,id=>schemeName(null,id))
     .replace(/(?:CSV|V1G)-[\dA-Za-z-]*\d[\dA-Za-z-]*|\bQ\d+\b/gi,shortQuestionId)
@@ -46,7 +46,7 @@ export function StoryText({value,evaluation,badCases=[]}:{value:unknown;evaluati
 export function dProgressLabel(experiment:any):string {
   const state=experiment?.result || {},rec=recommendationOf(experiment),composite=state.composite || rec.composite || {};
   const d=experiment?.candidates?.find((c:any)=>c.reasoning?.candidate_label==='D'),schedule=state.composite_schedule;
-  if(d)return ['running','queued'].includes(d.status) ? 'D 试跑中' : d.status==='failed' ? 'D 试跑中断' : completeResult(d) ? 'D 已评测' : 'D 已生成';
+  if(d)return ['running','queued'].includes(d.status) ? 'D 评测中' : d.status==='failed' ? 'D 评测中断' : completeResult(d) ? 'D 已评测' : 'D 已生成';
   if(['scheduled','waiting','queued'].includes(schedule?.status) || schedule?.price_pause?.paused)return 'D 已排队';
   if(schedule?.status==='running' || composite.status==='analyzing')return 'D 分析中';
   if((composite.outcome || rec.d_outcome)==='declined' || composite.status==='no_effective_composite')return 'Agent 判断不做 D';
@@ -63,7 +63,7 @@ export function recommendationReason(experiment:any):string {
     return `Agent 判断不做 D：${excerpt ? `${storyText(excerpt).replace(/[。；;\s]+$/,'')}，因此` : '不生成的具体理由未保存；'}${keep}。`;
   }
   if(d){
-    if(completeResult(d))return selected?.id===d.id ? 'D 胜过赢家，推荐 D。' : selected ? dLosingReason(experiment,selected) : 'D 已完成评测，最终推荐结论未保存。';
+    if(completeResult(d))return selected?.id===d.id ? dWinningReason(experiment) : selected ? dLosingReason(experiment,selected) : 'D 已完成评测，最终推荐结论未保存。';
     return `${dProgressLabel(experiment)}，尚无完整评测结论；${keep}。`;
   }
   if(rec.d_outcome || composite.status)return `${dProgressLabel(experiment)}；${keep}。`;
@@ -109,6 +109,16 @@ function dLosingReason(experiment:any,selected:any):string {
   return `${repairs}，${regressions}；${comparison}，${eligibility}，因此保留${schemeName(selected)}。`;
 }
 
+function dWinningReason(experiment:any):string {
+  const {winner,result,fixed,broken}=dResultData(experiment);
+  const delta=typeof result?.bad_case_count==='number' && typeof winner?.result?.bad_case_count==='number' ? winner.result.bad_case_count-result.bad_case_count : null;
+  if(fixed===null || broken===null || delta===null)return 'D 胜过赢家，推荐 D。';
+  const repairs=fixed.length ? `方案 D 修好了 ${questionList(fixed)}` : '方案 D 未修好赢家剩余的错题';
+  const comparison=delta>0 ? `错题比${schemeName(winner)} 少 ${delta} 道` : `错题数与${schemeName(winner)} 相同，时延及费用更低`;
+  const regressions=broken.length ? `新增错题 ${questionList(broken)}` : '且没有新增错题';
+  return `${repairs}，${comparison}，${regressions}，满足发布条件，推荐方案 D。`;
+}
+
 function DResultStory({experiment,evaluation,badCases}:{experiment:any;evaluation:any;badCases:any[]}) {
   const {d,winner,facts,result,fixed,broken,targets,watched,watchedGates,riskRecorded}=dResultData(experiment);
   const runId=result?.evaluation_run_id,identity=result?.evaluation_identity;
@@ -146,9 +156,9 @@ function DResultStory({experiment,evaluation,badCases}:{experiment:any;evaluatio
   };
   return <div className="d-result-story"><section className="d-result-predictions"><h4>预测 vs 实际 · 赢家还剩 {qualityValue(winner,'bad')}错题</h4><div className="story-quality"><DataTable aria-label="预测与实际"><thead><tr><th>核对项</th><th>Agent 预测</th><th>实际结果</th></tr></thead><tbody>
     <tr><td>预计修好的题</td><td>{text(targets.length ? questionList(targets) : '预测未保存')}</td><td>{text(`实际修好的剩余错题：${questionList(fixed)}`)}</td></tr>
-    <tr><td>重点盯的受保护题</td><td>{text(watched.length ? questionList(watched) : '预测未保存')}</td><td>{text(watched.length ? watched.map(id=>`${shortQuestionId(id)}：${rowFor(id)?.passed===true ? '守住' : rowFor(id)?.passed===false ? '翻错' : '未知'}`).join('；') : '重点保护题未保存，核对结果未知')}</td></tr>
+    <tr><td>重点盯的受保护题</td><td>{text(watched.length ? questionList(watched) : '预测未保存')}</td><td>{watched.length ? watched.map(id=><p key={id}>{text(`${shortQuestionId(id)}：${rowFor(id)?.passed===true ? '守住' : rowFor(id)?.passed===false ? '翻错' : '未知'}`)}</p>) : '重点保护题未保存，核对结果未知'}</td></tr>
     <tr><td>临界门槛</td><td>{watchedGates.length ? watchedGates.map((gate:any)=><p key={gate.metric}>{gateName(gate.metric)} {gate.operator} {gate.threshold}{gate.metric.includes('latency')?' 秒':'%'}</p>) : '预测未保存'}</td><td>{watchedGates.length ? watchedGates.map((gate:any)=><p key={gate.metric}>{gateActual(gate)}</p>) : '核对范围未知'}</td></tr>
-    <tr><td>未预测到的新问题</td><td>{riskRecorded ? '未列入重点风险题' : '风险清单未保存'}</td><td>{text(questionList(unpredicted))}</td></tr>
+    {(unpredicted===null || unpredicted.length>0) && <tr><td>未预测到的新问题</td><td>{riskRecorded ? '未列入重点风险题' : '风险清单未保存'}</td><td>{text(questionList(unpredicted))}</td></tr>}
   </tbody></DataTable></div>{error && <p role="status">{error}</p>}{!saved && !error && <p>{runId ? '正在读取保存的逐题结果…' : '逐题结果来源未保存，保护题结果与判分原因未知。'}</p>}</section>
     <section className="d-result-comparison"><h4>赢家与 D 并列比较</h4><QualityComparison baseline={winner} baselineLabel={schemeName(winner)} candidate={d} candidateLabel="方案 D" includeNewFailures/><div className="d-result-causes"><h4>没修好与新弄坏的原因</h4>{remaining.map((row:any)=><p key={row.question_id}>{text(`${shortQuestionId(row.question_id)} · ${targets.includes(row.question_id) ? '预测修好，实际没修好' : '仍未修好'}：${missedReason(row)}`)}</p>)}{broken?.map(id=><p key={id}>{text(`${shortQuestionId(id)} · 新弄坏：${issueReason(id)}`)}</p>)}{!remaining.length && !broken?.length && <p>没有保存的未修好或新增错题原因。</p>}</div></section>
     <p className="d-result-conclusion">{text(recommendationReason(experiment))}</p>
@@ -182,7 +192,7 @@ export function questionText(id:string,evaluation:any,badCases:any[]=[]):string 
   return row?.result?.question || row?.question || saved?.question || '题目原文未保存';
 }
 export function schemeReason(candidate:any):string {
-  if(!completeResult(candidate))return candidate?.status==='failed' ? '试跑中断，资格未确定' : '等待完整试跑';
+  if(!completeResult(candidate))return candidate?.status==='failed' ? '评测中断，资格未确定' : '等待完整评测';
   if(candidate.result.qualification?.qualified===true)return '质量、安全与回归检查通过';
   const labels:Record<string,string>={hard_gates:'门槛未全过',regression:'回归检查未通过',target_bad_case_fixed:'目标题修复不足',total_bad_cases_reduced:'错题未减少'};
   return Object.entries(candidate.result.qualification?.checks || {}).filter(([,ok])=>ok===false).map(([key])=>labels[key] || '保存的资格条件未通过').join('；') || '未保存具体资格原因';
@@ -227,7 +237,7 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false}:{exp
   const title=waiting && !d ? '方案 D · 等待非高峰时段' : d ? '方案 D · 在赢家基础上融合' : running ? '方案 D · Agent 正在分析' : dProgressLabel(experiment)==='Agent 判断不做 D' ? 'Agent 判断不做 D' : ['validation_failed','suggestion_failed'].includes(composite.outcome) || composite.status==='failed' ? '方案 D 未形成' : '方案 D · 等待融合决策';
   const reason=waiting && !d ? '已排队，到可运行时段自动继续。' : d ? suggestion.explanation || suggestion.hypothesis : running ? '等待建议结果。' : composite.reason || suggestion.explanation || (composite.status==='no_effective_composite' ? '保留已确认赢家；不生成的具体理由未保存。' : '等待保存的决策。');
   const source=(change:any)=>`${({verified:'已验证',partial:'部分取用',new_attempt:'新尝试'} as Record<string,string>)[change.source_type] || '来源未保存'}${change.source_candidates?.length ? ` · 来自 ${change.source_candidates.map((id:string)=>schemeName(cs.find((c:any)=>c.id===id),id)).join('、')}` : ''}`;
-  return <article className="d-story"><h3>{title}</h3><p role="status">{completeResult(d) && <strong>Agent 当时的预测：</strong>}<StoryText value={reason} evaluation={evaluation} badCases={badCases}/></p>{d && <p>试跑状态：{d.status==='failed' ? '试跑中断，尚无完整结果' : completeResult(d) ? d.result.qualification?.qualified===true ? '合格' : '未通过' : ['running','queued'].includes(d.status) ? '运行中' : '等待完整试跑'}</p>}{d && changes.map((change:any,index:number)=><p key={index}>{storyParameterNames[change.parameter] || '参数调整'} · {source(change)}</p>)}{completeResult(d) && <DResultStory experiment={experiment} evaluation={evaluation} badCases={badCases}/>} {!compact && <div className="d-story-grid">
+  return <article className="d-story"><h3>{title}</h3><p role="status">{completeResult(d) && <strong>Agent 当时的预测：</strong>}<StoryText value={reason} evaluation={evaluation} badCases={badCases}/></p>{d && <p>评测状态：{d.status==='failed' ? '评测中断，尚无完整结果' : completeResult(d) ? d.result.qualification?.qualified===true ? '合格' : '未通过' : ['running','queued'].includes(d.status) ? '运行中' : '等待完整评测'}</p>}{d && changes.map((change:any,index:number)=><p key={index}>{storyParameterNames[change.parameter] || '参数调整'} · {source(change)}</p>)}{completeResult(d) && <DResultStory experiment={experiment} evaluation={evaluation} badCases={badCases}/>} {!compact && <div className="d-story-grid">
     <section><h4>还剩哪些错题</h4>{facts.remaining_failures?.map((row:any)=><article key={row.question_id}><TruncatedText>{questionText(row.question_id,evaluation,badCases)}</TruncatedText>{row.evidence_positions?.length ? row.evidence_positions.map((pos:any,index:number)=><p key={index}>{typeof pos.candidates==='number' ? `相关说明排在候选第 ${pos.candidates} 位` : '相关说明未进入候选'}{typeof pos.reranked==='number' ? `，重排第 ${pos.reranked} 位` : ''}{typeof pos.final==='number' ? `，被选为回答证据第 ${pos.final} 位` : pos.final==='未进入' ? '，没被选进回答' : '，最终位置未知'}</p>) : <p>证据位置未保存。</p>}<p>历史修好：{row.historical_fixes?.map((item:any)=>schemeName(cs.find((c:any)=>c.id===item.candidate_id),item.candidate_id)).join('、') || '没有保存的修复记录'}</p></article>)}{!facts.remaining_failures?.length && <p>剩余错题证据未保存。</p>}</section>
     <section><h4>采纳了什么</h4>{changes.map((change:any,index:number)=><article key={index}><strong>{storyParameterNames[change.parameter] || '参数调整'} · {storyValue(change.value ?? suggestion.proposed_config_diff?.[change.parameter] ?? d?.config?.[change.parameter])}</strong><p className="source-tag">{source(change)}</p><p>{storyText(change.reason || change.rationale)}</p></article>)}{!changes.length && <p>{waiting || running ? '等待 Agent 保存新建议。' : '未保存逐项采纳理由。'}</p>}</section>
     <section><h4>副作用检查</h4>{changes.map((change:any,index:number)=>{const side=change.side_effect_check || {};return <article key={index}><strong>{storyParameterNames[change.parameter] || '参数调整'}</strong><p>历史伴随：{storyText(side.historical_effects)}</p><p>涉及已答对题：{Array.isArray(side.protected_overlap) ? `${side.protected_overlap.length} 道` : '未知'}</p><p>已修好题：{storyText(side.winner_fixed_risk)}</p><p>门槛：{storyText(side.gate_risk)}</p><p>规避：{storyText(side.mitigation)}</p>{side.same_premise_evidence && <p>前提相同：{storyText(side.same_premise_evidence)}</p>}{side.different_premise_evidence && <p>前提不同：{storyText(side.different_premise_evidence)}</p>}{side.risk_checklist && <p>风险清单：<StoryText value={side.risk_checklist} evaluation={evaluation} badCases={badCases}/></p>}</article>;})}{!changes.length && <p>逐项副作用检查尚未保存。</p>}</section>

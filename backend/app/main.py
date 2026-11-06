@@ -42,7 +42,7 @@ from .retrieval import RetrievalUnavailable
 from .agent_coverage import plan_coverage, complete_coverage
 from .knowledge_pipeline import AlibabaProvider
 from .evaluation_stage import perform_stage
-from .read_view import read_view
+from .read_view import read_view, evaluation_display
 
 # Fingerprint loaded objects, not source files that may have changed under a live process.
 EVALUATION_RUNTIME_CONTRACT = {**VERSIONS, 'judge_prompt_sha256':hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(),
@@ -1593,6 +1593,7 @@ def experiment_resume_view(experiment):
 
 
 @app.get("/api/optimization")
+@evaluation_display
 @read_view()
 def optimization(light: bool = False, planning: bool = False):
     identity = store.current_baseline_identity()
@@ -1735,6 +1736,7 @@ def run_experiments(payload: ExperimentRequest | None = None):
 
 
 @app.get("/api/experiments/{run_id}")
+@evaluation_display
 def experiment(run_id: str, light: bool = False):
     result = store.experiment(run_id,light=light)
     if result is None:
@@ -1956,6 +1958,7 @@ def tools():
 
 
 @app.get("/api/evaluations")
+@evaluation_display
 def evaluation_runs(page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=50), active_only: bool = False):
     return store.evaluation_history(page,limit,active_only=active_only)
 
@@ -1981,8 +1984,10 @@ def start_followup(run_id: str, group: Literal['review', 'max', 'high', 'low']):
 
 
 @app.get("/api/evaluations/{run_id}")
+@evaluation_display
 @read_view()
 def evaluation_run(run_id: str, light: bool = False):
+    if store.superseded_evaluation(run_id):raise HTTPException(status_code=404,detail='Evaluation run not found')
     run = store.evaluation_run(run_id,light=light)
     if light:
         if run is None:raise HTTPException(status_code=404,detail='Evaluation run not found')

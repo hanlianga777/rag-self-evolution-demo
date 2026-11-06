@@ -1454,6 +1454,7 @@ button { border-radius:8px; }
 .d-result-story .story-quality { margin:8px 0 12px; }
 .d-result-story :is(th,td) { padding:8px; }
 .d-result-predictions th:first-child { width:26%; }
+.d-result-predictions .truncated-text { display:block; -webkit-line-clamp:unset; }
 .d-result-conclusion { grid-column:1/-1; line-height:1.6; }
 .source-tag { color:var(--status); }
 .story-alternatives > div { display:grid; grid-template-columns:170px 1fr; gap:16px; align-items:center; border-bottom:1px solid var(--line-soft); padding:8px 0; }

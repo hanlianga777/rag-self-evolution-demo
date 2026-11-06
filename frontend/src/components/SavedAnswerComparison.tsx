@@ -43,7 +43,7 @@ export function SavedAnswerComparison({data,onOpenCitation}:{data:any;onOpenCita
   const current=runs?.binding===binding ? runs : null;
   const before=current?.rows.find((row:any)=>row.question_id===selected),after=current?.after.cases?.find((row:any)=>row.question_id===selected);
   return <section className="saved-answer-comparison" aria-label="已保存回答对比"><div className="section-head"><h2>代表题 · 看见改善</h2><span>已保存的评测回答</span></div>
-    {baselineBlocked ? <p>当前有效 Baseline 尚未就绪，暂不展示前后对比。</p> : !candidate ? <p>最终推荐尚未保存，代表题待确定。</p> : !completeResult(candidate) ? <p>推荐方案尚无完整试跑结果。</p> : !runId ? <p>推荐方案的评测回答来源未保存。</p> : error ? <p role="alert" className="error-notice">{error}</p> : !current ? <p>正在读取已保存的回答…</p> : <>
+    {baselineBlocked ? <p>当前有效 Baseline 尚未就绪，暂不展示前后对比。</p> : !candidate ? <p>最终推荐尚未保存，代表题待确定。</p> : !completeResult(candidate) ? <p>推荐方案尚无完整评测结果。</p> : !runId ? <p>推荐方案的评测回答来源未保存。</p> : error ? <p role="alert" className="error-notice">{error}</p> : !current ? <p>正在读取已保存的回答…</p> : <>
       <div className="representative-questions">{current.rows.map((row:any)=><button key={row.question_id} className="secondary" aria-pressed={selected===row.question_id} onClick={()=>setSelected(row.question_id)} title={row.question}>{row.question}</button>)}</div>
       {before && after ? <><h3 className="saved-question">{before.question}</h3><div className="saved-answer-columns">{[[before,'Baseline · 优化前'],[after,`${schemeName(candidate)} · 优化后`]].map(([row,label]:any)=>{
         const final=row.programmatic_metrics?.retrieval_trace?.final || row.retrieved_chunks || [];

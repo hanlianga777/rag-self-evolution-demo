@@ -2353,11 +2353,15 @@ class GovernanceStore:
             rows = connection.execute("SELECT "+columns+" FROM evaluation_runs"+where+" ORDER BY created_at DESC").fetchall()
             return [{**dict(row), "result": self._evaluation_result(connection, row) if not authorized_only else _load(row['result_json'],{}), "config": _load(row["config_json"], {}), "judge": _load(row["judge_json"], {})} for row in rows]
 
+    def superseded_evaluation(self, run_id):
+        with self.connection() as connection:
+            return connection.execute("SELECT 1 FROM candidate_configs, json_each(candidate_configs.result_json,'$._evaluation_audit.superseded_evaluations') WHERE json_each.value=? LIMIT 1",(run_id,)).fetchone() is not None
+
     def evaluation_history(self, page=1, limit=50, *, active_only=False):
         if type(page) is not int or page<1 or type(limit) is not int or not 1<=limit<=50:
             raise ValueError('history page/limit invalid')
         with self.connection() as connection:
-            rows=connection.execute("SELECT id,status,run_mode,data_source,dataset_version_id,config_json,judge_json,json_remove(result_json,'$.checkpoints') result_json,error_message,created_at,completed_at FROM evaluation_runs"+(" WHERE status IN ('queued','running')" if active_only else '')+" ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?",(limit,(page-1)*limit)).fetchall()
+            rows=connection.execute("SELECT id,status,run_mode,data_source,dataset_version_id,config_json,judge_json,json_remove(result_json,'$.checkpoints') result_json,error_message,created_at,completed_at FROM evaluation_runs WHERE NOT EXISTS (SELECT 1 FROM candidate_configs, json_each(candidate_configs.result_json,'$._evaluation_audit.superseded_evaluations') WHERE json_each.value=evaluation_runs.id)"+(" AND status IN ('queued','running')" if active_only else '')+" ORDER BY created_at DESC,rowid DESC LIMIT ? OFFSET ?",(limit,(page-1)*limit)).fetchall()
         return [{**{k:row[k] for k in row.keys() if not k.endswith('_json')},'config':_load(row['config_json'],{}),'judge':_load(row['judge_json'],{}),'result':_load(row['result_json'],{})} for row in rows]
 
     def evaluation_run(self, run_id: str, *, light=False):
@@ -3229,7 +3233,7 @@ class GovernanceStore:
     def refresh_recommendation(self, experiment_id: str):
         # One writer snapshot prevents a late worker from erasing a newer Gate 2/D decision.
         with self.connection() as connection:
-            connection.execute('BEGIN IMMEDIATE')
+            if not connection.in_transaction:connection.execute('BEGIN IMMEDIATE')
             candidates = self.candidates(experiment_id,light=True)
             row = connection.execute('SELECT result_json FROM experiments WHERE id=?', (experiment_id,)).fetchone()
             state = _load(row[0], {}) if row else {}

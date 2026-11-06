@@ -67,7 +67,7 @@ it.each(['declined','lost','won','running','generated','failed','unknown'])('exp
  }
 });
 it.each([
- ['declined','Agent 判断不做 D'],['generated','D 已生成'],['running','D 试跑中'],
+ ['declined','Agent 判断不做 D'],['generated','D 已生成'],['running','D 评测中'],
 ])('shows current D state and round-qualified recommendation in progress (%s)',async(status,label)=>{
  const exp=experiment();
  if(status!=='declined')exp.candidates.push({...winner,id:'EXP-20261105143048349606-D',status,reasoning:{candidate_label:'D'} as any});

@@ -97,3 +97,14 @@ it('does not present baseline repairs as improvements over the winner when that 
  expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).toContain('实际修好的剩余错题：未知');
  expect(recommendationReason(experiment)).toContain('剩余错题修复记录未知');
 });
+
+it('shows the promoted D result with concrete repairs and no empty new-problem row',async()=>{
+ const value=run();value.cases.find(c=>c.question_id===q(25))!.passed=true;mockRun(value);
+ const experiment=exp(),candidate=experiment.candidates[1];
+ candidate.result.bad_case_count=2;candidate.result.new_regression_question_ids=[];candidate.result.winner_comparison.new_failures=[];candidate.result.qualification={qualified:true};
+ experiment.recommendation.recommended_candidate=candidate.id;
+ await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
+ expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).not.toContain('未预测到的新问题');
+ expect(document.querySelector('.d-story')!.textContent).not.toMatch(/导入|内部|试跑|复跑|第二次/);
+ expect(recommendationReason(experiment)).toContain('方案 D 修好了 Q04，错题比第 3 轮方案 C 少 1 道，且没有新增错题，满足发布条件，推荐方案 D');
+});
