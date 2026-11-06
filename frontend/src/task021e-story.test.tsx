@@ -61,7 +61,7 @@ it.each(['declined','lost','won','running','generated','failed','unknown'])('exp
  for(const text of [route,final]){
   expect(text).not.toContain('D未同时满足');
   if(outcome==='declined'){expect(text).toContain('Agent 判断不做 D');expect(text).toContain('保留第 3 轮方案 C');expect(text).not.toContain('没有胜过');}
-  else if(outcome==='lost')expect(text).toContain('D 已完成评测，但没有同时满足发布资格和胜过赢家的条件');
+  else if(outcome==='lost'){expect(text).toContain('错题数与第 3 轮方案 C 相同');expect(text).toContain('保留第 3 轮方案 C');}
   else if(outcome==='won')expect(text).toContain('D 胜过赢家，推荐 D');
   else {expect(text).not.toContain('D 已完成评测');expect(text).not.toContain('D 胜过赢家');}
  }
