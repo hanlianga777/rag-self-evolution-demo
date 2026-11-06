@@ -48,26 +48,28 @@ class CompositeRecoveryTests(unittest.TestCase):
         self.assertEqual(len(result['attempts']), 3)
         self.assertFalse(self.store.candidate(self.experiment+'-D'))
 
-    def test_string_is_wrapped_but_winner_and_two_sources_still_required(self):
+    def test_string_sources_are_wrapped_without_old_two_source_requirement(self):
         provider = self.provider()
         value = json.loads(provider.complete.return_value); value['source_candidates'] = 'A'
+        value['changes'][0]['source_candidates'] = 'B'
         provider.complete.return_value = json.dumps(value)
         result = self.store.create_composite(self.experiment, provider)
-        self.assertEqual(result['status'], 'failed')
-        self.assertEqual(result['attempts'][0]['normalized_suggestion']['source_candidates'], [self.winner['id']])
-        self.assertIn('D来源', result['reason'])
+        self.assertEqual(result['status'], 'generated')
+        normalized=self.decision()['attempts'][0]['normalized_suggestion']
+        self.assertEqual(normalized['source_candidates'],[self.winner['id']])
+        self.assertEqual(normalized['changes'][0]['source_candidates'],[self.other['id']])
 
     def test_validation_retry_receives_rejection_then_succeeds(self):
         provider = self.provider(); good = provider.complete.return_value
-        bad = json.loads(good); bad['source_candidates'] = ['unknown']
+        bad = json.loads(good); bad['changes'][0]['source_candidates'] = ['unknown']
         provider.complete.side_effect = [json.dumps(bad), good]
         result = self.store.create_composite(self.experiment, provider)
         self.assertEqual(result['status'], 'generated', result)
         audit = self.decision()
         self.assertEqual(audit['provider_calls'], 2)
         self.assertIn('D来源', audit['attempts'][0]['validation_error'])
-        self.assertIn('至少2个不同来源', audit['attempts'][0]['validation_error'])
-        self.assertIn('至少另一个输入sources来源', provider.complete.call_args.args[0])
+        self.assertIn('保存结果', audit['attempts'][0]['validation_error'])
+        self.assertIn('不要求两个来源', provider.complete.call_args.args[0])
         retry = json.loads(provider.complete.call_args.args[1])
         self.assertEqual(retry['validation_rejection']['reason'], audit['attempts'][0]['validation_error'])
         self.assertEqual(self.store.experiment(self.experiment)['evaluation_budget']['used'], 2)

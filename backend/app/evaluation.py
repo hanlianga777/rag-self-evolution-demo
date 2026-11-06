@@ -955,6 +955,21 @@ class EvaluationRunner:
         from .policy import validate_candidate_config
         if not validate_candidate_config(candidate["config"])["valid"]:
             raise ValueError("Candidate 参数超出 Search Space")
+        if candidate['reasoning'].get('intervention_contract_version') == 'winner-refinement-1':
+            from .composite import build_d_facts, validate_d_refinement, parameter_diff, pipeline_config
+            decision = experiment['result'].get('composite', {})
+            winner = self.store.candidate(candidate['reasoning'].get('winner_id'))
+            if (candidate['reasoning'].get('candidate_label')!='D' or not winner
+                    or decision.get('candidate_id')!=candidate_id
+                    or (experiment['result'].get('report_confirmation') or {}).get('winner_id')!=winner['id']):
+                raise ValueError('D缺少已确认Winner和保存建议')
+            history = [c for c in experiment['candidates'] if c['status']=='evaluated' and c['reasoning'].get('candidate_label')!='D' and c['result'].get('evaluation_identity')==baseline['judge'].get('evaluation_identity')]
+            facts = build_d_facts(self.store,baseline,winner,history)
+            if facts != decision.get('facts'):raise ValueError('D事实表对应的保存结果已变化')
+            config, changes = validate_d_refinement(decision['suggestion'],winner,history,baseline['config'],facts)
+            if (config != candidate['config'] or changes != candidate['reasoning'].get('changes')
+                    or parameter_diff(config,pipeline_config(baseline['config'])) != candidate['reasoning'].get('changed_parameters')):
+                raise ValueError('D配置与已审查建议不一致')
         if candidate['reasoning'].get('intervention_contract_version') in {'agent-closure-3', 'agent-closure-4'}:
             from .optimization import validate_intervention
             base={**DEFAULT_PIPELINE_CONFIG,**baseline['config']}

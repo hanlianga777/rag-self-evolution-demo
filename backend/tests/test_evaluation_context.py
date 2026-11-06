@@ -120,6 +120,20 @@ class CompositeTests(unittest.TestCase):
         self.winner=self.store.finish_candidate(f'{self.experiment}-A','evaluated',self.result())
         self.other=self.store.save_candidate(self.experiment,'B',{**DEFAULT_PIPELINE_CONFIG,'query_rewrite':True},{'candidate_label':'B','round':1,'observed_evidence':['q']})
         self.other=self.store.finish_candidate(f'{self.experiment}-B','evaluated',self.result())
+        self.snapshot['questions'].append({'id':'q2','question':'fixture remaining','evidence':[{'source_chunk_ids':['c1']}]})
+        self.snapshot['question_ids'].append('q2')
+        with self.store.connection() as c:
+            c.execute('update dataset_versions set snapshot_json=? where id=?',(json.dumps(self.snapshot),self.snapshot['id']))
+            c.execute('update evaluation_runs set dataset_snapshot_json=? where id=?',(json.dumps(self.snapshot),self.baseline))
+        self.store.record_evaluation_case(self.baseline,'q2',{'passed':False})
+        for candidate,ok in ((self.winner,False),(self.other,True)):
+            run=self.store.create_evaluation_run(self.snapshot,{**candidate['config'],'run_target':'sandbox_candidate'},self.meta)
+            for q,passed in (('q',True),('q2',ok)):
+                self.store.record_evaluation_case(run,q,{'passed':passed})
+            result={**self.result(),'evaluation_run_id':run,'bad_case_count':0 if ok else 1,'all_fixed_question_ids':['q','q2'] if ok else ['q']}
+            self.store.finish_evaluation_run(run,'completed',result)
+            self.store.finish_candidate(candidate['id'],'evaluated',result)
+        self.winner=self.store.candidate(self.winner['id']);self.other=self.store.candidate(self.other['id'])
         self.store.confirm_experiment_report(self.experiment,self.winner['id'],'fixture human')
 
     def result(self):
@@ -128,6 +142,7 @@ class CompositeTests(unittest.TestCase):
     def provider(self,generate=True,diff=None):
         from unittest.mock import Mock
         value={'source_reasons':{self.winner['id']:'保留已验证赢家',self.other['id']:'补充已验证查询改写'},'should_generate_d':generate,'source_candidates':[self.winner['id'],self.other['id']], 'root_cause_alignment':'fixture根因','complementary_capabilities':'fixture互补','proposed_config_diff':diff if diff is not None else {'query_rewrite':True},'expected_improvement':'fixture覆盖','risks':'fixture延迟','explanation':'fixture建议','hypothesis':'fixture查询表达','root_cause':'Retrieval','intervention_direction':'query_expansion','evidence_assertions':[{'target_id':'q','observation':'recall_missing'}],'parameter_dependencies':[]}
+        value['changes']=[{'parameter':'query_rewrite','source_type':'verified','source_candidates':[self.other['id']], 'reason':'保存来源修好q2','target_question_ids':['q2'],'evidence_basis':'q2保存证据记录缺失，不推测位置', 'side_effect_check':{'historical_effects':'无新增错题记录','protected_overlap':[],'winner_fixed_risk':'q需要完整试跑保护','gate_risk':'完整试跑检验门槛','mitigation':'不撤销赢家参数'},'expected_fixed_count':1,'possible_broken_count':0}]
         return Mock(complete=Mock(return_value=json.dumps(value)),settings=Settings('fixture','https://example.invalid','fixture'))
 
     def test_d_runs_without_separate_paid_authorization(self):
@@ -155,7 +170,7 @@ class CompositeTests(unittest.TestCase):
         self.assertEqual(result['status'],'generated')
         self.assertEqual(result['reasoning']['changed_parameters'],{'query_rewrite':True,'multi_query':2})
         self.assertEqual(result['reasoning']['intervention_direction'],'query_expansion')
-        self.assertEqual(result['reasoning']['root_cause_evidence'],['q'])
+        self.assertEqual(result['reasoning']['root_cause_evidence'],['q2'])
 
     def test_historical_d_uses_frozen_evidence_and_saves_action_name(self):
         from diagnostic_fixture import retrieval_case
@@ -234,11 +249,11 @@ class CompositeTests(unittest.TestCase):
         self.assertEqual(provider.complete.call_count,1)
         self.assertFalse(any(c['reasoning'].get('candidate_label')=='D' for c in self.store.candidates(self.experiment)))
 
-    def test_no_sources_zero_provider_calls(self):
+    def test_single_qualified_winner_still_calls_agent(self):
         self.store.finish_candidate(self.other['id'],'failed',{'error':'fixture'})
-        provider=self.provider()
+        provider=self.provider(generate=False,diff={})
         self.assertEqual(self.store.create_composite(self.experiment,provider,False)['status'],'no_effective_composite')
-        provider.complete.assert_not_called()
+        provider.complete.assert_called_once()
 
     def test_legacy_baseline_cannot_reserve_or_confirm(self):
         with self.store.connection() as c:c.execute('UPDATE evaluation_runs SET judge_json=? WHERE id=?',(json.dumps({'model':'fixture','prompt_version':'judge-v1','scoring_policy':'v1.0.1-gates'}),self.baseline))
