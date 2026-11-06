@@ -1428,6 +1428,8 @@ button { border-radius:8px; }
 .route-candidates { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:12px; }
 .route-candidate { display:flex; flex-direction:column; height:320px; min-width:0; padding:12px; border:1px solid var(--line); border-radius:var(--card-radius); }
 .route-candidate .section-head { flex:none; margin:0 0 8px !important; }
+.route-candidate-impact { flex:none; display:grid; gap:6px; margin-bottom:8px; }
+.story-question { text-decoration:underline dotted; text-underline-offset:3px; cursor:help; }
 .route-candidate-body { flex:1; min-height:0; overflow:auto; scrollbar-width:thin; }
 .route-candidate-body p { margin:8px 0; }
 .route-candidate .text-button { flex:none; align-self:flex-start; padding:6px 0 0; }
@@ -1451,6 +1453,7 @@ button { border-radius:8px; }
 .publication-checklist { list-style:none; padding:0; }
 .publication-checklist li { display:flex; flex-direction:column; gap:4px; padding:10px 0; border-bottom:1px solid var(--line-soft); }
 .publication-checklist li span { color:var(--muted); }
+.release-actions { display:flex; align-items:center; flex-wrap:wrap; gap:16px; margin-top:16px; }
 .pending-release h3 { margin:0 0 16px; }
 .pending-release-grid > div { min-width:0; }
 .story-achievements .metric { display:flex; flex-direction:column; justify-content:space-between; gap:8px; }
