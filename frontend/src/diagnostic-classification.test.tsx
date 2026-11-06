@@ -2,7 +2,7 @@
 import {act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {expect,it,vi} from 'vitest';
-import {filterDiagnosis,allDiagnosis,DiagnosisFilters,DiagnosisTable} from './components/EvaluationDiagnosis';
+import {filterDiagnosis,allDiagnosis,DiagnosisTable} from './components/EvaluationDiagnosis';
 const rows=[{question_id:'Q1',question:'操作',failure_tags:['Hallucination','Unsafe Answer'],primary_root_cause:'Safety',diagnosis:{status:'confirmed'},diagnostic_view:{is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Safety',optimization_directions:['grounded_generation']}},{question_id:'Q2',question:'澄清',failure_tags:['Evidence Pending Review'],primary_root_cause:'Unknown',diagnosis:{status:'needs_review'}},{question_id:'Q3',question:'噪声',failure_tags:['Retrieval Noise'],primary_root_cause:'Generation',diagnosis:{status:'disputed'},diagnostic_view:{is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Generation',optimization_directions:['grounded_generation']}}];
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 it('combines three independent dimensions, keeps other issues and unique question counts',()=>{
@@ -12,11 +12,10 @@ it('combines three independent dimensions, keeps other issues and unique questio
  expect(filterDiagnosis(rows,{...allDiagnosis,phenomenon:'安全边界误伤'})).toEqual([]);
  expect(filterDiagnosis(rows,{...allDiagnosis,root:'Unknown'})).toEqual([rows[1]]);
 });
-it('renders shared classification filters, preserves evidence action and explicit empty state',async()=>{
- const host=document.body.appendChild(document.createElement('div')),root=createRoot(host),select=vi.fn(),change=vi.fn();
- await act(async()=>root.render(<><DiagnosisFilters rows={rows} value={allDiagnosis} onChange={change} /><DiagnosisTable rows={rows} onSelect={select}/></>));
- expect(host.textContent).toContain('2 / 2 题');expect(host.textContent).toContain('安全边界失守');expect(host.textContent).not.toContain('待定位');
- const all=host.querySelector<HTMLButtonElement>('[aria-label="失败现象"] button')!;await act(async()=>all.click());expect(change).toHaveBeenCalledWith({...allDiagnosis,examples:false});expect(host.querySelector('[role=combobox]')).toBeNull();
+it('renders current technical list, preserves evidence action and explicit empty state',async()=>{
+ const host=document.body.appendChild(document.createElement('div')),root=createRoot(host),select=vi.fn();
+ await act(async()=>root.render(<DiagnosisTable rows={rows} onSelect={select}/>));
+ expect(host.querySelectorAll('tbody tr')).toHaveLength(2);expect(host.textContent).toContain('安全边界失守');expect(host.textContent).not.toContain('待定位');
  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='查看案例')!.click());expect(select).toHaveBeenCalledWith(rows[0]);
  await act(async()=>root.render(<DiagnosisTable rows={[]} onSelect={select}/>));expect(host.textContent).toContain('当前组合筛选无记录');await act(async()=>root.unmount());host.remove();
 });
@@ -45,28 +44,32 @@ it('blocks saved comparisons with inconsistent evaluation identities',async()=>{
 });
 
 it('uses current analysis root and evidence ahead of historical labels, counts unique questions',async()=>{
- const {DiagnosisDistribution,currentRoot,coreEvidence}=await import('./components/EvaluationDiagnosis');
+ const {currentRoot,coreEvidence}=await import('./components/EvaluationDiagnosis');
  const current={question_id:'Q03',primary_root_cause:'Safety',diagnosis:{status:'confirmed',answer_quote:'旧安全证据'},diagnostic_view:{primary_root_cause:'Generation',analysis_category:'rag_failure',analysis_reason:'配置适用范围解释错误',target_eligible:true,is_technical_bad_case:true,optimization_directions:['grounded_generation'],evidence_checks:[{answer_quotes:['实际错误配置说明']}]}};
  const evaluator={question_id:'Q06',primary_root_cause:'Safety',diagnosis:{status:'disputed'},diagnostic_view:{primary_root_cause:'Unknown',analysis_category:'evaluation_issue',analysis_reason:'评测规则错误：原文支持实际操作步骤',target_eligible:false}};
  expect(currentRoot(current)).toBe('Generation');expect(currentRoot(evaluator)).toBe('Unknown');
  expect(coreEvidence(current)).toBe('实际错误配置说明');expect(coreEvidence(evaluator)).toContain('评测规则错误');
  expect(filterDiagnosis([current,evaluator],{phenomenon:'all',root:'Generation'})).toEqual([current]);
  const host=document.body.appendChild(document.createElement('div')),root=createRoot(host);
- await act(async()=>root.render(<><DiagnosisFilters rows={[current,evaluator]} value={allDiagnosis} onChange={()=>{}}/><DiagnosisTable rows={[current,evaluator]} onSelect={()=>{}}/><DiagnosisDistribution rows={[current,current,evaluator]}/></>));
+ await act(async()=>root.render(<DiagnosisTable rows={[current,current,evaluator]} onSelect={()=>{}}/>));
  expect(host.textContent).not.toMatch(/可信度|Confirmed|Needs Review|Disputed|评测争议|已确认/);
  expect([...host.querySelectorAll('thead th')].map(el=>el.textContent)).toEqual(['题号 / 问题','失败现象','主要技术根因','核心证据','详情']);
- await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='主要根因')!.click());
- expect([...host.querySelectorAll('meter')].map(el=>el.value)).toEqual([1]);
+ expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
+ expect(host.textContent).toContain('Generation · 生成');expect(host.textContent).not.toContain('Safety · 安全');
  await act(async()=>root.unmount());host.remove();
 });
 
-it('keeps unresolved additions in quality audit even alongside a technical failure',async()=>{
- const {QualityAudit,technicalDiagnosisRows}=await import('./components/EvaluationDiagnosis');
+it('keeps unresolved business failures and their original audit payload available from current list',async()=>{
+ const {technicalDiagnosisRows}=await import('./components/EvaluationDiagnosis');
  const technical={...rows[0],passed:false,diagnostic_view:{...rows[0].diagnostic_view,evaluation_quality_audit:{issues:[{type:'claim_verification',evidence:[{reason:'附加配置说明尚未闭合'}]}]}}};
  const audit={question_id:'Q06',question:'手动清洁',passed:false,diagnostic_view:{analysis_category:'evaluation_issue',analysis_reason:'版本元数据断言未闭合',is_technical_bad_case:false,optimization_directions:[]}};
  expect(technicalDiagnosisRows([technical,audit])).toEqual([technical]);
- const host=document.body.appendChild(document.createElement('div')),root=createRoot(host);
- await act(async()=>root.render(<QualityAudit rows={[technical,audit]} onSelect={()=>{}}/>));
- expect(host.textContent).toContain('附加配置说明尚未闭合');expect(host.textContent).toContain('版本元数据断言未闭合');
+ const host=document.body.appendChild(document.createElement('div')),root=createRoot(host),select=vi.fn();
+ await act(async()=>root.render(<DiagnosisTable rows={[technical,audit]} business onSelect={select}/>));
+ expect(host.querySelectorAll('tbody tr')).toHaveLength(2);expect(host.textContent).toContain('版本元数据断言未闭合');
+ await act(async()=>host.querySelectorAll<HTMLButtonElement>('tbody button')[0].click());
+ expect(select).toHaveBeenCalledWith(technical);
+ expect(select.mock.calls[0][0].diagnostic_view.evaluation_quality_audit.issues[0].evidence[0].reason).toBe('附加配置说明尚未闭合');
+ await act(async()=>host.querySelectorAll<HTMLButtonElement>('tbody button')[1].click());expect(select).toHaveBeenLastCalledWith(audit);
  await act(async()=>root.unmount());host.remove();
 });

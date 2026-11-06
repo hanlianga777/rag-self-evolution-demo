@@ -31,4 +31,6 @@
 
 基线 Top4 未命中：`GGC-012`、`017`、`020`、`021`、`023`、`028`。候选还增加 `GGC-031` 未命中。分块数、索引体积、P95 均未超过基线 110%，页码字段也未退化；但四项检索质量必须全部不下降，候选在 Hit@4、Recall@4、MRR 三项失败。tiny 块减少只能作为结构改善的观察，不能抵消检索退化。因此不切换生产配置，也不发布候选索引。
 
-复现：在仓库根目录运行 `PYTHONPATH=backend python3 -m app.chunking_audit`；需已有 PDF、本地 RapidOCR/BGE 模型和仓库既有 Python 依赖。输出 JSON 包含逐题的相关性结果和 Top4 文档/页码/chunk 追溯。运行不写 `demo.db`、正式索引或 Golden 数据。
+实现已于 2026-11-06 移除，可从 Git 历史找回。
+
+复现（历史命令）：在仓库根目录运行 `PYTHONPATH=backend python3 -m app.chunking_audit`；需已有 PDF、本地 RapidOCR/BGE 模型和仓库既有 Python 依赖。输出 JSON 包含逐题的相关性结果和 Top4 文档/页码/chunk 追溯。运行不写 `demo.db`、正式索引或 Golden 数据。

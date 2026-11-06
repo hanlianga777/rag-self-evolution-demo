@@ -41,7 +41,8 @@ class GovernanceApiTests(unittest.TestCase):
         self.assertTrue(all(row['probe_status']=='probe_pending' and row['qc_status']=='qc_pending' for row in response.json()))
 
     def test_evaluation_is_blocked_until_a_human_approves_a_question(self):
-        response = self.client.post("/api/evaluations/run", json={"fresh":True}, headers={"Origin": "http://127.0.0.1:5174"})
+        with patch.object(main, 'require_baseline_corpus'):
+            response = self.client.post("/api/evaluations/run", json={"fresh":True}, headers={"Origin": "http://127.0.0.1:5174"})
 
         self.assertEqual(response.status_code, 409)
         self.assertIn("approved", response.json()["detail"])

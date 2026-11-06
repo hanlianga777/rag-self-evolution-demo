@@ -28,13 +28,6 @@ export function TruncatedText({ children, lines = 2 }: { children: ReactNode; li
   return <><span ref={ref} tabIndex={0} className={`truncated-text line-clamp-${lines}`} aria-describedby={position ? id : undefined} onMouseEnter={show} onMouseLeave={() => setPosition(null)} onFocus={show} onBlur={() => setPosition(null)} onKeyDown={event => { if (event.key === "Escape") setPosition(null); }}>{children}</span>{position && createPortal(<div id={id} role="tooltip" className="text-tooltip" style={position}>{children}</div>, document.body)}</>;
 }
 
-export function TagList({ tags }: { tags: string[] }) {
-  const id = useId(), button = useRef<HTMLButtonElement>(null), popup = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
-  useEffect(() => { if (!position) return; const close = (event: PointerEvent) => { if (!button.current?.contains(event.target as Node) && !popup.current?.contains(event.target as Node)) setPosition(null); }; const escape = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") setPosition(null); }; document.addEventListener("pointerdown", close); document.addEventListener("keydown", escape); return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", escape); }; }, [position]);
-  return <div className="tag-list">{tags.slice(0, 2).map(tag => <Badge key={tag} tone="warning">{tag}</Badge>)}{tags.length > 2 && <button ref={button} className="badge neutral" aria-expanded={!!position} aria-controls={position ? id : undefined} aria-label={`${tags.length - 2} 个其他标签`} onClick={event => { event.stopPropagation(); const box = button.current?.getBoundingClientRect(); setPosition(position || !box ? null : { left: Math.max(8, Math.min(box.left, window.innerWidth - 368)), top: Math.max(8, Math.min(box.bottom + 6, window.innerHeight - 210)) }); }}>+{tags.length - 2}</button>}{position && createPortal(<div id={id} ref={popup} role="group" aria-label="其他标签" className="text-tooltip tag-popover" style={position}>{tags.slice(2).map(tag => <p key={tag}>{tag}</p>)}</div>, document.body)}</div>;
-}
-
 export function FixedTableCard({ children }: { children: ReactNode }) { return <div className="table-scroll fixed-table">{children}</div>; }
 
 export function Disclosure({ label, children }: { label: string; children: ReactNode }) { return <details className="disclosure"><summary><ChevronDown size={14} aria-hidden="true" />{label}</summary>{children}</details>; }
@@ -104,11 +97,6 @@ export function StageStepper({ ariaLabel, steps, compact = false }: { ariaLabel:
 
 export function ConclusionCard({ title, children, status, tone = "good" }: { title: string; children?: ReactNode; status?: ReactNode; tone?: "good" | "warning" | "bad" | "neutral" }) {
   return <section className={`conclusion-card ${tone}`}><div><h2>{title}</h2>{children && <p>{children}</p>}</div>{status}</section>;
-}
-
-export function ExpandableText({ children }: { label: string; children?: ReactNode }) {
-  if (!children) return <span className="muted">未记录</span>;
-  return <TruncatedText>{children}</TruncatedText>;
 }
 
 export function ShortId({ value }: { value?: string | null }) {

@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { QuestionTable } from './pages/GovernancePage';
-import { PriorRoundReview } from './pages/EvolutionPage';
+import { EvolutionRoute } from './components/EvolutionStory';
 import { RuntimeSettings } from './components/RuntimeSettings';
 import { BadCaseOverview } from './components/ProductDiagnostics';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
@@ -17,9 +17,9 @@ it('uses real Golden fields and omits unavailable columns without placeholder ce
  expect(document.querySelector('tbody')?.textContent).toContain('错 · 检索层问题');
  expect(document.querySelector('tbody')?.textContent).not.toContain('暂无');
 });
-it('shows saved retrospective plans, conclusions and proposal references',async()=>{
- await mount(<PriorRoundReview review={{plans:[{candidate_id:'R1-A',changes:'开启HyDE',fixed_question_ids:['Q15'],new_failure_question_ids:['Q07'],evidence_reason:'证据未进入最终资料；P99超标；单参数',conclusion:'本配置有害'}],baseline_remaining_assessment:'剩余题需要更完整证据',conclusions:[{id:'L1',conclusion:'检索改动有速度成本'}]}}/>);
- expect(document.body.textContent).toContain('前几轮复盘');expect(document.body.textContent).toContain('Q07');expect(document.body.textContent).toContain('检索改动有速度成本');
+it('shows saved changes, repaired and harmed questions with the corresponding retrospective',async()=>{
+ await mount(<EvolutionRoute evaluation={{config:{hyde:false}}} badCases={[{question_id:'Q15',question:'修好的原问题'},{question_id:'Q07',question:'弄坏的原问题'}]} experiment={{candidates:[{id:'R1-A',status:'evaluated',config:{hyde:true},reasoning:{candidate_label:'A',round:1},result:{all_fixed_question_ids:['Q15'],new_regression_question_ids:['Q07']}}],result:{prior_round_reviews:{'2':{status:'saved',review:{conclusions:[{id:'L1',conclusion:'检索改动有速度成本'}]}}}}}}/>);
+ expect(document.body.textContent).toContain('Agent 本轮复盘');expect(document.body.textContent).toContain('修好：修好的原问题');expect(document.body.textContent).toContain('弄坏：弄坏的原问题');expect(document.body.textContent).toContain('假设答案检索');expect(document.body.textContent).toContain('检索改动有速度成本');
 });
 it('persists visible unattended authorization with actor and never offers automatic publish',async()=>{
  const fetcher=vi.fn(async(_url:string,init?:RequestInit)=>new Response(JSON.stringify(init?.method==='POST'?{enabled:true,actor:'当前用户',authorized_at:'2026-11-05T12:00:00Z'}:{off_peak_only:true,unattended_authorization:{enabled:false,actor:null,authorized_at:null}})));

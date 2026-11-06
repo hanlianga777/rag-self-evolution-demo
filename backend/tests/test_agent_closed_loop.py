@@ -117,6 +117,9 @@ class CompositionTests(unittest.TestCase):
             with store.connection() as connection:
                 connection.execute('UPDATE candidate_configs SET config_json=?,reasoning_json=? WHERE id=?',(json.dumps({**DEFAULT_PIPELINE_CONFIG,**diff}),json.dumps(reasoning),candidate_id))
         provider=fixture.provider(diff={'top_k':6})
+        suggestion=json.loads(provider.complete.return_value)
+        suggestion['changes'][0]['parameter']='top_k'
+        provider.complete.return_value=json.dumps(suggestion)
         result=store.create_composite(fixture.experiment,provider,True)
         self.assertEqual(result['status'],'generated',result)
         self.assertEqual(result['config']['candidate_k'],24)

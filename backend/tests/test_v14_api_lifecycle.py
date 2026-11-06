@@ -38,10 +38,21 @@ class LifecycleProvider(FixtureProvider):
         if '唯一Optimization Agent' in system:
             payload = json.loads(prompt); value = json.loads(raw)
             sources = [payload['winner'], payload['sources'][0]]
+            facts = payload['d_facts']
+            source = next(row for row in facts['history'] if row['candidate_id'] == sources[1]['id'])
             value.update(root_cause='Unknown',
                 root_cause_alignment='A has a verified Final omission; B has a verified answer omission with sufficient Final.',
                 complementary_capabilities='Context selection plus grounded answer completeness; both source runs passed.',
                 supporting_directions=['grounded_generation'],
+                changes=[{'parameter':'prompt_strategy','source_type':'verified','source_candidates':[source['candidate_id']],
+                    'target_question_ids':[row['question_id'] for row in facts['remaining_failures'] if row['question_id'] in source['fixed_question_ids']],
+                    'reason':'Retain B answer completeness on the remaining fixture failures.',
+                    'evidence_basis':'Saved B fixed questions in d_facts.history and remaining_failures.',
+                    'side_effect_check':{'historical_effects':'Saved B repairs require full D regression.',
+                        'protected_overlap':[row['question_id'] for row in facts['protected_questions']],
+                        'winner_fixed_risk':'Keep winner Final selection and recheck its repaired questions.',
+                        'gate_risk':'D must pass its own saved gates.','mitigation':'Run the full isolated fixture Sandbox before qualification.'},
+                    'expected_fixed_count':1,'possible_broken_count':2}],
                 evidence_assertions=[a for source in sources for a in source['reasoning']['evidence_assertions']],
                 parameter_dependencies=[{'parameters':['top_k','prompt_strategy'],
                     'reason':'Retain the independently verified Final selection and answer-completeness changes; full D regression remains required.'}])

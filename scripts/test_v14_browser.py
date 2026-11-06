@@ -30,11 +30,8 @@ def route_handler(route):
         route.fulfill(status=503, json={'detail': 'Browser fixture is read-only; lifecycle mutations run through the isolated FastAPI test.'}); return
     value = PAYLOADS.get(parsed.path)
     if value is None:
-        if parsed.path.startswith('/api/overview/architecture/'):
-            value = {'image_url': None}
-        else:
-            denied.append(parsed.path)
-            route.fulfill(status=404, json={'detail': 'Fixture endpoint not collected'}); return
+        denied.append(parsed.path)
+        route.fulfill(status=404, json={'detail': 'Fixture endpoint not collected'}); return
     route.fulfill(status=200, json=value)
 
 

@@ -357,32 +357,8 @@ function regressionText(result: any): string {
   return `${fixed == null ? "问题修复数未采集" : `修复 ${fixed} 个${result.comparison_version ? "指定目标" : "原问题（历史统计）"}`}；${counts}。${classification}${risk}${incomplete}`;
 }
 
-export function CandidateReasoning({candidate}:{candidate:any}) {
-  const r=candidate.reasoning || {};
-  const saved=(value:any)=>value==null || value==='' || Array.isArray(value)&&!value.length?'未保存依据':typeof value==='string'?value:JSON.stringify(value,null,2);
-  return <section><h3>优化假设与提出理由</h3>{r.experiment_kind === "exploratory" && <p>探索实验 · 根因待验证。证伪条件：{businessSummary(r.falsification)}</p>}<p>{businessSummary(r.hypothesis || "历史未保存优化假设")}</p><p>技术干预：{optimizationDirection(r.intervention_direction)}</p><TruncatedText lines={3}>预期改善：{businessSummary(r.expected_improvement || r.expected || "未采集")}</TruncatedText><TruncatedText lines={3}>潜在风险：{businessSummary(r.risk || "未采集")}</TruncatedText><StoryDisclosure label={<>完整假设与技术审计</>}><h3>技术假设与证据</h3><dl className="report-grid">{[
-    ['Target Bad Case · 目标',r.target_bad_cases || r.observed_evidence],['Root Cause · 主要根因',r.root_cause ? rootName(r.root_cause) : null],['Root Cause Evidence · 根因证据引用',r.root_cause_evidence],['Hypothesis · 假设',r.hypothesis],['Why · 提出理由',r.proposal || r.why],['Intervention · 技术干预',r.intervention_direction],['Expected Improvement · 预期改善',r.expected_improvement || r.expected],['回归风险',r.risk],
-  ].map(([label,value])=><div key={label}><dt>{label}</dt><dd><p className="technical-record">{label==='Why · 提出理由'?'Why：':''}{saved(value)}</p></dd></div>)}</dl>{(r.evidence_assertions || r.hypothesis_evidence) && <StoryDisclosure label={<>保存的假设证据</>}><pre className="technical-record">{saved(r.evidence_assertions || r.hypothesis_evidence)}</pre></StoryDisclosure>}{r.target_diagnosis && <StoryDisclosure label={<>保存的目标诊断原始审计</>}><pre className="technical-record">{saved(r.target_diagnosis)}</pre></StoryDisclosure>}{r.parameter_dependencies && <StoryDisclosure label={<>参数依赖依据</>}><pre className="technical-record">{saved(r.parameter_dependencies)}</pre></StoryDisclosure>}<p className="muted">以上为已保存的Agent假设与引用，干预方向仍须真实证据支持；效果等待同身份Sandbox验证。</p></StoryDisclosure></section>;
-}
-
 function accountingText(value:any):string {
   if (!value) return "历史费用未完整记录，不能按0元计算";
   const cost=value.cost_estimation;
   return `${value.call_events ?? "未采集"} 次调用记录，${value.unknown_usage_events ?? "未采集"} 次Usage未知；${cost?.status === "estimated" ? `${cost.amount} ${cost.currency}（按Usage核算，非账户实扣）` : "完整费用待账单核对"}`;
-}
-
-export function PriorRoundReview({review}:{review?:any}) {
-  if(!review)return null;
-  return <Section title="前几轮复盘"><div className="agent-facts">{review.plans?.map((plan:any)=><article className="agent-fact" key={plan.candidate_id}><h3>{plan.candidate_id}</h3><p>改了什么：{typeof plan.changes === "string" ? plan.changes : JSON.stringify(plan.changes)}</p><p>修好：{plan.fixed_question_ids?.map(questionLabel).join("、") || "无"} · 弄坏：{plan.new_failure_question_ids?.map(questionLabel).join("、") || "无"}</p><p>证据：{plan.evidence_reason}</p><p>结论：{plan.conclusion}</p></article>)}</div><h3>对 Baseline 剩余错题的整体判断</h3><p>{review.baseline_remaining_assessment}</p>{review.conclusions?.map((row:any)=><p key={row.id}><strong>{row.id}</strong> · {row.conclusion}</p>)}</Section>;
-}
-
-export function CompositeStatus({composite,candidate}:{composite?:any;candidate?:any}) {
-  if(!composite)return null;
-  const label=candidate?.status==="failed" ? "D 评测失败" : composite.outcome==="validation_failed" ? "建议校验失败" : composite.outcome==="suggestion_failed" ? "D 建议调用失败" : composite.status==="no_effective_composite" ? "合法不生成" : composite.status==="generated" ? "已生成" : composite.status==="failed" ? "历史建议失败" : "正在分析";
-  return <p role="status">方案 D：{label}{composite.status==="no_effective_composite" ? "；保留已确认赢家。" : ""}</p>;
-}
-
-export function PriorRoundReviews({reviews,fallback}:{reviews?:any;fallback?:any}) {
-  if(!reviews || !Object.keys(reviews).length)return <PriorRoundReview review={fallback}/>;
-  return <Section title="每一轮学到了什么">{Object.entries(reviews).sort(([a],[b])=>Number(a)-Number(b)).map(([number,saved]:[string,any])=><details key={number}><summary>第 {number} 轮 · {saved.status==="saved" ? "已保存复盘" : "未保存"}</summary>{saved.status==="saved" ? <PriorRoundReview review={saved.review}/> : <p>未保存</p>}</details>)}</Section>;
 }

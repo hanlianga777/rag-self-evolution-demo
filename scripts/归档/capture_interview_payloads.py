@@ -106,9 +106,6 @@ def main():
                 capture('/api/bad-cases/' + row['id'])
             for row in responses['/api/monitoring']['body'].get('triggers', []):
                 if row.get('optimization_context_id'): capture('/api/experiments/' + row['optimization_context_id'])
-            for slot in ('business', 'technical'):
-                meta = capture('/api/overview/architecture/' + slot)
-                if meta.get('image_url'): capture(meta['image_url'])
             client.close()
     after = {str(path): fingerprint(path) for path in protected}
     assert before == after, 'Protected real DB/backup/index files changed'

@@ -16,12 +16,12 @@ from typing import Literal
 
 from fastapi import Query, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response, JSONResponse
+from fastapi.responses import Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from .ai_service import AiService
-from . import architecture_assets, business_import
+from . import business_import
 from .corpus import CorpusStore, UPLOADS_DIR, current_manifest
 from .full_text import CORPUS_LOCK
 from .corpus_management import CorpusManager, require_consistent_switch
@@ -164,10 +164,6 @@ class SchemePreviewRequest(PreviewRequest):
     scheme_id: str = Field(strict=True, min_length=1, max_length=120)
 
 
-class EvaluationRequest(BaseModel):
-    limit: int = Field(default=40, strict=True, ge=1, le=40)
-
-
 class ReviewRequest(BaseModel):
     decision: str = Field(pattern="^(approved|rejected|needs_revision)$")
     actor: str = Field(default="local_user", min_length=1, max_length=80)
@@ -241,11 +237,6 @@ class OwnerDelegatedReviewRequest(BaseModel):
     reviews: list[dict] = Field(min_length=50,max_length=50)
 
 
-class DirectReleaseRequest(BaseModel):
-    config: dict
-    actor: str = Field(default="local_user", min_length=1, max_length=80)
-
-
 class ExperimentRequest(BaseModel):
     trigger_id: str | None = None
 
@@ -271,38 +262,6 @@ def require_trusted_origin(request: Request):
     origin = request.headers.get("origin")
     if origin is not None and origin not in TRUSTED_ORIGINS:
         raise HTTPException(status_code=403, detail="Untrusted Origin")
-
-
-@app.get("/api/overview/architecture/{slot}")
-def architecture_metadata(slot: Literal["business", "technical"]):
-    path = architecture_assets.asset_path(slot)
-    return {"slot": slot, "image_url": f"/api/overview/architecture/{slot}/image?v={path.stat().st_mtime_ns}" if path else None}
-
-
-@app.get("/api/overview/architecture/{slot}/image")
-def architecture_image(slot: Literal["business", "technical"]):
-    path = architecture_assets.asset_path(slot)
-    if path is None:
-        raise HTTPException(status_code=404, detail="尚未上传架构图")
-    return FileResponse(path, media_type=architecture_assets.FORMATS[path.suffix[1:]])
-
-
-@app.put("/api/overview/architecture/{slot}", dependencies=[Depends(require_trusted_origin)])
-async def architecture_upload(slot: Literal["business", "technical"], request: Request):
-    if request.headers.get("content-length") and int(request.headers["content-length"]) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="图片不能超过 10 MB")
-    data = await request.body()
-    try:
-        architecture_assets.save_asset(slot, data)
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    return architecture_metadata(slot)
-
-
-@app.delete("/api/overview/architecture/{slot}", dependencies=[Depends(require_trusted_origin)])
-def architecture_delete(slot: Literal["business", "technical"]):
-    architecture_assets.delete_asset(slot)
-    return architecture_metadata(slot)
 
 
 def light_value(value):
@@ -1775,11 +1734,6 @@ def run_experiments(payload: ExperimentRequest | None = None):
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 
-@app.post("/api/direct-release", status_code=201, dependencies=[Depends(require_trusted_origin)])
-def start_direct_release(payload: DirectReleaseRequest):
-    raise HTTPException(status_code=409, detail='V1.2 请经过 A/B/C Sandbox、Gate 2 报告确认及 D 决策后发布；历史 Direct Release 仅保留审计')
-
-
 @app.get("/api/experiments/{run_id}")
 def experiment(run_id: str, light: bool = False):
     result = store.experiment(run_id,light=light)
@@ -2001,11 +1955,6 @@ def tools():
     return store.tools()
 
 
-@app.post("/api/versions/{version_id}/activate")
-def activate_version(version_id: str):
-    raise HTTPException(status_code=409, detail="版本切换请使用受保护的发布或回滚流程")
-
-
 @app.get("/api/evaluations")
 def evaluation_runs(page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=50), active_only: bool = False):
     return store.evaluation_history(page,limit,active_only=active_only)
@@ -2219,11 +2168,6 @@ def preview_scheme(payload: SchemePreviewRequest):
     else: bound = config.get('knowledge_identity')
     result = ai_service.answer(payload.question, {**config, **({'knowledge_identity': bound} if bound else {})})
     return {"pipeline": source, "question": payload.question, "scheme_id": scheme_id, "version": version, "config": config, "status": "completed", **result, "evidence": result["retrieval"], "fallback_reason": None}
-
-
-@app.post("/api/evaluations/live", dependencies=[Depends(require_trusted_origin)])
-def live_evaluation(payload: EvaluationRequest):
-    raise HTTPException(status_code=410, detail="旧评测接口已停用；请使用 /api/evaluations/run 创建可审计正式评测")
 
 
 class BaselineDesignationRequest(BaseModel):

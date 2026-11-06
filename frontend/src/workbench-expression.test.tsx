@@ -4,7 +4,7 @@ import {createRoot} from 'react-dom/client';
 import {afterEach,expect,it,vi} from 'vitest';
 import {EvaluationPage} from './pages/EvaluationPage';
 import {EvolutionPage} from './pages/EvolutionPage';
-import {PhenomenonSummary,questionLabel} from './components/EvaluationDiagnosis';
+import {DetectionNotice,DiagnosisTable,filterDiagnosis,allDiagnosis,questionLabel} from './components/EvaluationDiagnosis';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 let root:ReturnType<typeof createRoot>;
 afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';vi.unstubAllGlobals()});
@@ -13,8 +13,8 @@ const click=async(label:string)=>act(async()=>[...document.querySelectorAll<HTML
 const technical={id:'BC',run_id:'BASE',question_id:'Q81',result:{question:'真实问题',passed:false,diagnostic_view:{is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Retrieval',optimization_directions:['candidate_recall'],phenomena:[{name:'检索失败'}],typical_detection:{'检索失败':'observed','检索噪声':'not_collected'},evidence_checks:[{fact:'保存的必要事实'}]}}};
 const evaluation={id:'BASE',status:'completed',config:{top_k:4,candidate_k:20},cases:[{...technical.result,question_id:'Q81'}],result:{overall_score:88,bad_case_count:1,gates:{passed:false,passed_count:10,total:11,gates:[]}}};
 it('counts unique saved observations and distinguishes missing detection',async()=>{
- await mount(<PhenomenonSummary rows={[technical,technical]} value="all" onChange={()=>{}}/>);
- expect(document.body.textContent).toContain('检索失败1 题');expect(document.body.textContent).toContain('检索噪声未采集');expect(document.body.textContent).not.toContain('0 题');
+ await mount(<DetectionNotice rows={[technical,technical]}/>);
+ expect(document.body.textContent).toContain('检索失败：1 题已保存或可追溯现象');expect(document.body.textContent).toContain('检索噪声：该类型尚未形成可靠自动诊断');expect(document.body.textContent).not.toContain('0 题');
  expect(questionLabel('V1G-153537417845-04-R201632573162')).toBe('Q04');expect(questionLabel('UNRELATED-XYZ')).toBe('UNRELATED-XYZ');
 });
 it('leads Baseline with conclusion and keeps diagnostics off the report',async()=>{
@@ -50,9 +50,10 @@ it('does not promote a failed candidate checkpoint into a completed Regression c
 });
 
 it('counts all saved regression records even when they are evaluator audits',async()=>{
- const {DiagnosisFilters,allDiagnosis}=await import('./components/EvaluationDiagnosis');
- await mount(<DiagnosisFilters rows={[{question_id:'Q82',diagnostic_view:{analysis_category:'evaluation_issue',is_technical_bad_case:false}}]} value={allDiagnosis} onChange={()=>{}} technicalOnly={false} visibleCount={0}/>);
- expect(document.body.textContent).toContain('0 / 1 题');
+ const rows=[{question_id:'Q82',passed:false,diagnostic_view:{analysis_category:'evaluation_issue',is_technical_bad_case:false}}];
+ expect(filterDiagnosis(rows,allDiagnosis)).toHaveLength(1);
+ await mount(<DiagnosisTable rows={rows} business onSelect={()=>{}}/>);
+ expect(document.querySelectorAll('tbody tr')).toHaveLength(1);expect(document.body.textContent).toContain('Q82');expect(document.body.textContent).toContain('FAIL · Bad Case');
 });
 
 it('keeps missing Baseline counts unknown rather than reporting zero failures',async()=>{

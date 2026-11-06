@@ -2,7 +2,6 @@ import { DataTable } from "./DataTable";
 import { StoryDisclosure } from "./Storytelling";
 import { useEffect, useState } from 'react';
 import { TruncatedText } from './Primitives';
-import { FilterButtons } from './Storytelling';
 
 export const rootDirection=(value?:string)=>['Query','Ranking','Metadata / Entity'].includes(value || '')?'Retrieval':value || 'Unknown';
 export const rootName = (value?: string) => ({Retrieval:'Retrieval · 检索',Generation:'Generation · 生成',Safety:'Safety · 安全',Performance:'Performance · 性能',Unknown:'待定位',None:'未归因',Query:'Retrieval · 检索 / Query · 查询表达',Ranking:'Retrieval · 检索 / Ranking · 排序', 'Metadata / Entity':'Retrieval · 检索 / Metadata · 产品版本'}[value || 'Unknown'] || value || '待定位');
@@ -16,14 +15,6 @@ export const technicalRoots=['Retrieval','Ranking','Generation','Safety','Perfor
 export const businessVerdict=(row:any)=>{const item=caseData(row),outcome=item.evaluation_outcome;return outcome?.contract_version==='business-vnext-1' ? outcome.execution_complete===true && ['PASS','FAIL'].includes(outcome.verdict) ? outcome.verdict : null : item.passed===true ? 'PASS' : item.passed===false ? 'FAIL' : null;};
 export const isTechnicalBadCase=(row:any)=>{const item=caseData(row),view=item.diagnostic_view;if(businessVerdict(row)==='PASS' || item.evaluation_outcome?.contract_version==='business-vnext-1' && businessVerdict(row)!=='FAIL')return false;return view?.is_technical_bad_case===true && view.analysis_category==='rag_failure' && technicalRoots.includes(currentRoot(row)) && view.optimization_directions?.length>0;};
 export const technicalDiagnosisRows=(rows:any[])=>filterDiagnosis(rows.filter(isTechnicalBadCase),allDiagnosis);
-
-export function DiagnosisDistribution({rows}:{rows:any[]}){
- const [dimension,setDimension]=useState('symptom');
- const counts:Record<string,number>={};
- const unique=technicalDiagnosisRows(rows);
- for(const row of unique){const values=dimension==='symptom'?symptoms(caseData(row)):[rootName(currentRoot(row))];for(const value of values)counts[value]=(counts[value] || 0)+1;}
- return <div className="diagnosis-distribution"><div className="review-filters" aria-label="问题分布维度">{[['symptom','失败现象'],['root','主要根因']].map(([key,label])=><button key={key} aria-pressed={dimension===key} className={dimension===key?'active':''} onClick={()=>setDimension(key)}>{label}</button>)}</div><div className="diagnosis-distribution-bars">{Object.entries(counts).map(([name,count])=><div key={name}><span>{name}</span><meter min={0} max={Math.max(unique.length,1)} value={count} /><strong>{count} 题</strong></div>)}</div><p className="muted">{!unique.length?'当前没有具备完整证据和合法优化方向的技术 Bad Case。':dimension==='symptom'?'按唯一题号统计；一题可有多个现象，标签数量不等于问题数量。':'仅统计有依据且具备合法优化方向的技术根因；评测规则与证据缺口见质量审计。'}</p></div>;
-}
 
 const savedCategories=(rows:any[])=>[...new Set<string>(rows.flatMap(row=>Object.keys(caseData(row).diagnostic_view?.typical_detection || {})))];
 export const caseData=(row:any)=>row.result || row;
@@ -46,22 +37,6 @@ export function filterDiagnosis(rows:any[],filter:DiagnosisFilter){
  const represented=new Set<string>();return filtered.filter(row=>{const labels=symptoms(caseData(row));const first=labels.some(label=>!represented.has(label));labels.forEach(label=>represented.add(label));return first;});
 }
 
-export function PhenomenonSummary({rows,value,onChange}:{rows:any[];value:string;onChange:(value:string)=>void}){
- const unique=technicalDiagnosisRows(rows),typicalPhenomena=savedCategories(rows);
- return <div className="phenomenon-summary" aria-label="典型失败模式">{typicalPhenomena.map(name=>{
-  const observed=unique.filter(row=>symptoms(caseData(row)).includes(name)).length;
-  const detection=unique.map(row=>caseData(row).diagnostic_view?.typical_detection?.[name]);
-  const collected=detection.length>0 && detection.every(status=>status && status!=='not_collected');
-  return <button key={name} aria-pressed={value===name} onClick={()=>onChange(value===name?'all':name)}><span>{name}</span><strong>{observed?`${observed} 题`:collected?'未观察到':'未采集'}</strong></button>;
- })}<p className="muted">按唯一题号统计；同题可出现多个现象。其他保存的现象可在筛选中查看。</p></div>;
-}
-
-export function DiagnosisFilters({value,onChange,rows:allRows,technicalOnly=true,visibleCount,showRoots=true}:{value:DiagnosisFilter;onChange:(value:DiagnosisFilter)=>void;rows:any[];technicalOnly?:boolean;visibleCount?:number;showRoots?:boolean}){
- const rows=technicalOnly?technicalDiagnosisRows(allRows):filterDiagnosis(allRows,allDiagnosis);
- const typicalPhenomena=savedCategories(allRows);
- const dimensions=[['phenomenon','失败现象',[...typicalPhenomena,'other']],['root','技术根因',technicalRoots]] as const;
- return <div className="diagnosis-filters">{dimensions.filter(([key])=>showRoots || key!=='root').map(([key,label,values])=><FilterButtons key={key} label={label} value={value[key]} onChange={next=>onChange({...value,[key]:next,examples:false})} options={[{value:'all',label:'全部',count:rows.length},...values.map(v=>({value:v,label:v==='other'?'其他':key==='root'?rootName(v):v,count:filterDiagnosis(rows,{...allDiagnosis,[key]:v}).length}))]} />)}<span className="muted">{visibleCount ?? filterDiagnosis(rows,value).length} / {new Set(rows.map(caseId)).size} 题 · 多标签不重复计数</span></div>;
-}
 export function DiagnosisTable({rows:allRows,onSelect,strategy,evidence=false,business=false}:{rows:any[];onSelect:(row:any)=>void;strategy?:(row:any)=>React.ReactNode;evidence?:boolean;business?:boolean}){
  const rows=business?businessDiagnosisRows(allRows):technicalDiagnosisRows(allRows);
  const [page,setPage]=useState(1);
@@ -74,9 +49,4 @@ export function DetectionNotice({rows}:{rows:any[]}){
  return <StoryDisclosure className="detection-notice" label={<>分类检测依据与边界</>}>{typicalPhenomena.map(name=>{const views=rows.map(caseData).map(item=>item.diagnostic_view);const observed=filterDiagnosis(rows,allDiagnosis).filter(row=>symptoms(caseData(row)).includes(name)).length;
  const available=views.some(v=>v?.typical_detection?.[name] && v.typical_detection[name]!=='not_collected');
  return <p key={name}>{name}：{observed?`${observed} 题已保存或可追溯现象`:available?'保存规则未记录该类失败':'该类型尚未形成可靠自动诊断；未记录现象不代表检测结果为0'}</p>})}<p>来源冲突、定位争议独立治理；低Precision不自动等于噪声。阶段耗时区分问答、Judge及整批Sandbox。</p></StoryDisclosure>;
-}
-
-export function QualityAudit({rows,onSelect}:{rows:any[];onSelect:(row:any)=>void}){
- const audit=filterDiagnosis(rows.filter(row=>businessVerdict(row)!=='PASS' && (!isTechnicalBadCase(row) || caseData(row).diagnostic_view?.evaluation_quality_audit?.issues?.length)),allDiagnosis);
- return <div className="quality-audit"><p className="muted">评测核验问题与证据缺口独立记录；原始失败判定、分数和回答保持只读，不进入已确认技术根因统计；有真实阶段观察的业务FAIL可由 Agent 提出探索实验。</p>{audit.length ? audit.map(row=>{const view=caseData(row).diagnostic_view;return <article key={caseId(row)}><h3>{questionLabel(caseId(row))} · {isTechnicalBadCase(row)?'附加核验缺口':view?.analysis_category==='evaluation_issue'?'评测核验问题':'证据不足'}</h3><TruncatedText lines={2}>{caseData(row).question || '问题未采集'}</TruncatedText><p>{view?.analysis_reason || '历史记录缺少回答失败定位、适用来源或完整 Trace，尚不能建立技术优化目标。'}</p>{view?.evaluation_quality_audit?.issues?.length>0 && <ul>{view.evaluation_quality_audit.issues.map((issue:any,index:number)=><li key={index}>{issue.reason || issue.evidence?.map?.((entry:any)=>entry.reason).filter(Boolean).join('；') || (issue.type==='claim_verification'?'附加主张证据或范围未闭合，保留原始阻断。':'来源或评测核验尚未闭合。')}</li>)}</ul>}{view?.evidence_gaps?.length>0 && <ul>{view.evidence_gaps.map((gap:string,index:number)=><li key={index}>{gap}</li>)}</ul>}<button className="text-button" onClick={()=>onSelect(row)}>查看原始案例与核验缺口</button></article>}) : <p>当前没有需单列的评测核验或证据缺口。</p>}</div>;
 }

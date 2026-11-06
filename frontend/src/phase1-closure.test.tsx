@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
-import { CustomSelect, ExpandableText } from "./components/Primitives";
+import { CustomSelect, TruncatedText } from "./components/Primitives";
 import { ExperimentPage } from "./pages/ExperimentPage";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -17,7 +17,7 @@ it("closes Select on outside pointer without requiring focus transfer", async ()
 });
 it("long text never duplicates through persistent inline expansion", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<ExpandableText label="原因">完整原因</ExpandableText>));
+  await act(async () => root.render(<TruncatedText>完整原因</TruncatedText>));
   expect(document.querySelector("details")).toBeNull();
   expect(document.querySelector('[tabindex="0"]')).not.toBeNull();
 });
@@ -51,7 +51,7 @@ it("ignores a corrupt cached answer and blocks comparison without a valid formal
 });
 it("opens long text on focus and clears its tooltip on blur", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<ExpandableText label="原因">完整长文说明</ExpandableText>));
+  await act(async () => root.render(<TruncatedText>完整长文说明</TruncatedText>));
   const target = document.querySelector('[tabindex="0"]') as HTMLElement;
   Object.defineProperty(target,"scrollHeight",{value:100});
   Object.defineProperty(target,"clientHeight",{value:20});
