@@ -149,7 +149,7 @@ for (const count of [10, 12, 19]) {
 it("keeps the Overview target at 20 and points a partial Run to refill", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OverviewPage data={{ overview: { dataset: { total: 10, expected_count: 20, generation_status: "needs_regeneration", approved: 0, pending_review: 10 } }, workspace: {} }} navigate={() => {}} />));
-  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("0 / 20");
+  expect(document.querySelector('[aria-label="进化主链路"]')?.textContent).toContain("0 / 20");
   expect(document.querySelector("#next-action-title")?.textContent).toBe("补齐失败题（10）");
   await act(async () => root.unmount());
 });
@@ -213,7 +213,7 @@ it("confirms an evaluated qualified winner and then offers composite D", async (
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: { status: "completed" }, badCases: [{}] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Sandbox")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "推荐方案")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "最终推荐")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("确认报告"))!.click());
   expect(requests[0]).toEqual({ url: expect.stringContaining("/api/experiments/EXP1/recommendation"), body: { candidate_id: "A1", actor: "human" } });
   await act(async () => root.unmount());
@@ -224,7 +224,7 @@ it.each([{ max: 13, canContinue: true }, { max: 12, canContinue: false }])("keep
   const experiment = { id: "EXP2", candidates: [], recommendation: { result: { status: "No Qualified Candidate" } }, evaluation_budget: { used: 9, max, reserved_for_d: 1 }, rounds: [{ round: 3, complete: true, evaluated: 2, total: 2 }] };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: {}, badCases: [] }} />));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "优化 Agent")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "进化路线")!.click());
   expect(document.body.textContent).toContain("第 3 轮 · 2/2");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "A/B/C/D")!.click());
   expect(document.body.textContent?.includes("继续优化下一轮")).toBe(canContinue);

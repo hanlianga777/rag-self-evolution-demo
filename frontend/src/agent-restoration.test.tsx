@@ -17,7 +17,7 @@ it("restores stages and complete generated plans without inventing evaluated res
   const frozen = JSON.stringify(data); await mount();
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
   expect(document.body.textContent).toContain("Bad Case 1 题");
-  await click("优化 Agent");
+  await click("进化路线");
   expect(document.body.textContent).toContain("问题与策略关联");
   expect(document.querySelectorAll(".strategy-hypotheses > section")).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/null|undefined|\[object Object\]/);
@@ -79,7 +79,7 @@ it("keeps incomplete coverage out of Sandbox and offers same-round zero-call com
   await mount({ ...data, optimization:{...data.optimization,candidates:[candidates[0]],coverage_plan:{status:"incomplete",covered_count:1,total:10,binding:"reviewed",matrix:[{question_id:"Q1",candidates:[],gap:"缺口待记录"}]}}});
   expect(document.body.textContent).toContain("补齐本轮规划（不收费）");
   expect(document.body.textContent).not.toContain("运行本轮 A/B/C Sandbox");
-  await click("优化 Agent");
+  await click("进化路线");
   expect(document.body.textContent).toContain("规划未完成");
   await click("A/B/C/D");
   expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="运行 Sandbox")?.disabled).toBe(true);
@@ -96,7 +96,7 @@ it("suppresses incomplete final scores, preserves progress and blocks unreconcil
   expect(document.querySelector('.sandbox-core-table')?.textContent).toContain("待完成");
   expect(document.querySelector('.sandbox-core-table')?.textContent).not.toContain("0 / 11");
   expect(document.querySelector('.sandbox-core-table')?.textContent).not.toContain("严重 12");
-  await click("推荐方案");
+  await click("最终推荐");
   expect(document.body.textContent).toContain("本轮实验尚未完成");
   expect(document.body.textContent).not.toContain("保存结论：本轮暂无合格候选方案");
   await click("A/B/C/D");

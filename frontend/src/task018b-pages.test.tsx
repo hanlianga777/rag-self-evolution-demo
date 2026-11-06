@@ -31,7 +31,7 @@ it('shows the saved Judge reason instead of the diagnostic category in Baseline 
 });
 it('orders publication cards and hides internal IDs outside technical details',async()=>{
  await mount(<VersionsPage data={{versions:[{id:'v1',status:'active',provenance:'bootstrap',config:{top_k:4,knowledge_identity:{corpus_snapshot_id:'INTERNAL-corpus'}}}]}}/>);
- expect([...document.querySelectorAll('.page-content > .panel > .section-head > h2')].map(e=>e.textContent)).toEqual(['当前线上配置','待发布方案','发布确认','版本历史与回滚']);
+ expect([...document.querySelectorAll('.page-content > .panel > .section-head > h2')].map(e=>e.textContent)).toEqual(['待发布方案','当前线上配置','版本历史与回滚']);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看完整配置')!.click());
  expect(document.querySelector('.story-details > .panel')?.textContent).not.toContain('v1');
  expect(document.querySelector('.story-details .parameter-list')?.textContent).not.toContain('[object Object]');

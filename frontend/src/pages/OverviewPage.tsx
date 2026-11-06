@@ -1,8 +1,9 @@
+import {qualityValue, recommendationOf} from "../components/EvolutionStory";
 import { PageShell } from "../components/PageShell";
 import { useState } from "react";
 import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
 import { ArrowRight } from "lucide-react";
-import { Metric, Section, StageStepper, TechnicalDetails } from "../components/Primitives";
+import { Metric, Section, TechnicalDetails } from "../components/Primitives";
 import { displayText, productionName } from "../display";
 import type { Page } from "../types";
 
@@ -51,25 +52,25 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     [displayText("Release"), currentReleased ? "当前推荐已发布" : recommendation.recommended_candidate ? "当前推荐待发布" : "尚无可发布方案", "versions"],
   ];
   const metrics = run?.status === "completed" && !run.requires_policy_upgrade && !data.workspace?.requires_policy_upgrade && !data.workspace?.requires_new_golden && !data.workspace?.requires_new_baseline && !data.workspace?.baseline_unavailable_reason && (data.workspace?.current_baseline_id === undefined || data.workspace.current_baseline_id === run.id) ? run.result : null;
-  const total = metrics?.total;
-  const correct = typeof total === "number" && typeof metrics?.bad_case_count === "number" && !metrics?.technical_error_count ? total - metrics.bad_case_count : null;
-  const p50 = metrics?.metrics?.latency_p50_seconds;
-  const currentStage = stages.findIndex(([, , route]) => route === next[2]);
+  const finalCandidate=candidates.find(c=>c.id===recommendationOf(experiment).recommended_candidate);
+  const storyBaseline=metrics ? run : undefined;
+  const storyTrials=candidates.filter((c:any)=>c.status!=="skipped" && (c.result?.evaluation_run_id || c.status==="evaluated" || c.status==="running")).length;
+  const storyRounds=new Set(candidates.filter((c:any)=>["A","B","C"].includes(c.reasoning?.candidate_label)).map((c:any)=>c.reasoning?.round || 1)).size;
 
   return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1>RAG 自进化项目概览</h1><p>评测驱动的 RAG 持续优化与版本决策系统</p><p className="overview-intro">用 Golden Dataset 评测 Baseline，优化 Agent 分析 Bad Case，在 Sandbox 验证改善并完成回归检查后，由人工确认发布。</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
 
 
     {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} /> : <>
-    <div className="metrics-grid" aria-label="项目关键数字">
-      <Metric label="Golden Dataset" value={frozen ? `${expectedCount} 题` : "未知"} note="当前冻结题卷" />
-      <Metric label="Baseline 答对" value={correct == null ? "未知" : `${correct} / ${total}`} note="保存的逐题判定" />
-      <Metric label={displayText("Hard Gate")} value={metrics?.gates ? `${metrics.gates.passed_count} / ${metrics.gates.total}` : "未知"} note="已通过 / 总项数" />
-      <Metric label="回答耗时 P50" value={typeof p50 === "number" ? `${p50.toFixed(1)} 秒` : "未知"} note="一半问题在此时间内回答" />
-      <Metric label="待优化 Bad Case" value={metrics?.bad_case_count == null ? "未知" : `${metrics.bad_case_count} 道`} note={metrics ? ("交给 Agent 分析") : "等待有效 Baseline"} />
+    <div className="metrics-grid story-achievements" aria-label="优化成果">
+      <Metric label="答对数" value={`${qualityValue(storyBaseline,'correct')} → ${qualityValue(finalCandidate,'correct')}`} note="Baseline → 最终推荐"/>
+      <Metric label="最慢回答 P99" value={`${qualityValue(storyBaseline,'latency_p99_seconds')} → ${qualityValue(finalCandidate,'latency_p99_seconds')}`} note="Baseline → 最终推荐"/>
+      <Metric label="安全拒答率" value={`${qualityValue(storyBaseline,'safe_rejection_rate')} → ${qualityValue(finalCandidate,'safe_rejection_rate')}`} note="Baseline → 最终推荐"/>
+      <Metric label="Agent 轮次" value={experiment?.id ? `${storyRounds} 轮` : '尚未开始'} note="从保存的方案统计"/>
+      <Metric label="试跑方案数" value={experiment?.id ? `${storyTrials} 个` : '尚未开始'} note="含已启动的融合方案"/>
     </div>
+    <Section title="从知识到线上改善"><nav className="story-chain" aria-label="进化主链路">{[['知识库','knowledge'],['Golden 题卷','governance'],['Baseline','evaluation'],['Agent','evolution'],['发布','versions'],['问答验证','verification']].map(([label,page],index)=><a key={page} href={`#${page}`} onClick={()=>navigate(page as Page)}><div><span>{label}</span><small>{page==="governance" ? frozen ? `已冻结 · ${expectedCount} 题` : `待人工确认 · ${summary.approved || 0} / ${expectedCount || "未知"} 题` : stages.find(item=>item[2]===page)?.[1] || "验证线上改善"}</small></div>{index<5 && <ArrowRight size={16} aria-hidden="true"/>}</a>)}</nav></Section>
     <section className="next-action" aria-labelledby="next-action-title"><div><span className="next-action-label">{currentReleased ? "当前推荐演示 · Baseline 与线上版本" : "当前下一步"}</span><h2 id="next-action-title">{next[0]}</h2><p>{next[1]}</p></div><a className="primary" href={`#${next[2]}`} onClick={() => navigate(next[2])}>{currentReleased ? "开始方案对比" : next[0]}<ArrowRight size={15} aria-hidden="true" /></a></section>
 
-    <Section title="全链路阶段"><p className="muted">当前新版本链路</p><StageStepper ariaLabel="全链路阶段" compact steps={stages.map(([label, detail, page], index) => ({ label, detail, href: `#${page}`, state: index === currentStage ? "current" : (page === "knowledge" ? (data.documents?.length > 0) : page === "settings" ? !!production?.config : page === "governance" ? frozen : page === "evaluation" ? run?.status === "completed" : page === "evolution" ? qualified.length > 0 : page === "versions" ? currentReleased : released) ? "completed" : "pending" }))} /></Section>
     {productionLegacy && <section className="legacy-production"><span>线上版本：{productionName(production)}，优化方案通过发布确认后才会替换。</span><a href="#verification" onClick={() => navigate("verification")}>查看线上版本</a></section>}
     </>}
     <TechnicalDetails><p>冻结题卷：{goldenId || "未知"}</p><p>Baseline 评测：{run?.id || "未知"}</p>{formal && workSummary.generation_run_id && workSummary.generation_run_id !== formal.generation_run_id && <p className="muted overview-work-run">工作 Run：{workSummary.generation_status || "未记录状态"} · {workSummary.total ?? 0} / {workSummary.expected_count ?? "—"}；不替代当前正式 Golden。</p>}</TechnicalDetails>

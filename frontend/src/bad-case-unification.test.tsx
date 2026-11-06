@@ -21,11 +21,12 @@ it('uses failed business requirements and saved plans instead of internal diagno
 it('retains all ten planning targets under identity block and hides technical classifications',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  await render(<EvolutionPage data={{evaluation,badCases:rows,workspace:{requires_policy_upgrade:true}}}/>);
+ await click('问题诊断');
  expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(10);
  expect(document.querySelector('.agent-identity')?.textContent).toContain('Bad Case 10');
  expect(document.body.textContent).not.toMatch(/已确认可干预|可探索 \d|saved_diagnostic_identity_changed/);
  expect([...document.querySelectorAll('button')].find(b=>b.textContent?.includes('生成 A / B / C'))?.disabled).toBe(true);
- await click('优化 Agent');expect(document.querySelectorAll('.agent-fact')).toHaveLength(10);
+ await click('进化路线');expect(document.querySelectorAll('.agent-fact')).toHaveLength(10);
  expect(document.querySelector('.agent-facts')?.textContent).toContain('排序与上下文选择');
 });
 it('shows a single business count and agent entry in Baseline',async()=>{

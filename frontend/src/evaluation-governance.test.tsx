@@ -23,7 +23,7 @@ it('retains six workstation stages and forbids old-rule candidate actions',async
  await mount(<EvolutionPage data={{evaluation:{...run,requires_policy_upgrade:true},workspace:{requires_policy_upgrade:true},badCases:[{id:'bc',run_id:'saved',result:item}],optimization:{id:'e',candidates:['A','B','C'].map(candidate_label=>({id:candidate_label,status:'generated',config:{},reasoning:{candidate_label,round:1},result:{}}))}}}/>);
  expect(document.body.textContent).not.toMatch(/诊断可信度|Confirmed|Needs Review|Disputed|评测争议/);
  const tabs=[...document.querySelectorAll('.tabs button')].map(b=>b.textContent);
- expect(tabs).toEqual(['问题诊断','优化 Agent','A/B/C/D','Sandbox','回归检查','推荐方案']);
+ expect(tabs).toEqual(['问题诊断','进化路线','A/B/C/D','Sandbox','回归检查','最终推荐']);
  await click('A/B/C/D');expect([...document.querySelectorAll<HTMLButtonElement>('.candidate-card-action button')].every(b=>b.disabled)).toBe(true);
  expect(document.body.textContent).not.toContain('Qualified Winner');
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method||init.method==='GET')).toBe(true);

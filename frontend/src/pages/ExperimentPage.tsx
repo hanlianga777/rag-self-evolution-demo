@@ -62,7 +62,7 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
     <section className="experiment-query compare-toolbar">
       <CustomSelect ariaLabel="选择真实 Bad Case" value={selectedCase} onChange={id => { clearResults(); setSelectedCase(id); const item = badCases.find((row: any) => row.id === id); if (item) setQuestion(item.result?.question || ""); }} placeholder="Baseline Bad Case" options={[{ value: "", label: "Baseline Bad Case" }, ...badCases.map((item: any) => ({ value: item.id, label: item.result?.question || "题目内容未记录" }))]} />
       <textarea aria-label="试验问题" placeholder="输入或编辑同一道问题…" maxLength={1000} value={question} onChange={event => { clearResults(); setQuestion(event.target.value); }} />
-      <div className="query-action"><button className="primary" disabled={busy || !question.trim() || !!blocked} onClick={() => void ask()}><Send size={15} />{busy ? "正在回答…" : "运行实时对比"}</button></div>
+      <div className="query-action"><button className="primary" disabled={busy || !question.trim() || !!blocked} onClick={() => void ask()}><Send size={15} />{busy ? "正在回答…" : "运行实时对比（调用模型）"}</button></div>
     </section>
     <StoryDisclosure label="查看方案参数差异"><ParameterDiff before={leftScheme.config} after={rightScheme.config}/></StoryDisclosure>
     <section className="experiment-results" aria-label="实时回答"><AnswerCard scheme={leftScheme} run={left} onOpenCitation={onOpenCitation}/><AnswerCard scheme={rightScheme} run={right} onOpenCitation={onOpenCitation}/></section>

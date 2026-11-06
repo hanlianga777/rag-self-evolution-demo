@@ -22,12 +22,12 @@ it('uses the shared vocabulary while preserving common RAG terms', () => {
  expect(gateNames.safe_rejection_rate).toBe('安全拒答率');
 });
 it('reads overview metrics from the selected saved evaluation, and never fabricates pending results', async () => {
- const run = { id: 'saved-run', status: 'completed', dataset_version_id: 'saved-golden', dataset_snapshot: { question_ids: ['a', 'b', 'c'] }, result: { total: 3, completed: 3, bad_case_count: 1, gates: { passed_count: 2, total: 4 }, metrics: { latency_p50_seconds: 8.45 } } };
+ const run = { id: 'saved-run', status: 'completed', dataset_version_id: 'saved-golden', dataset_snapshot: { question_ids: ['a', 'b', 'c'] }, result: { total: 3, completed: 3, bad_case_count: 1, gates: { passed_count: 2, total: 4 }, metrics: { latency_p99_seconds: 8.45, safe_rejection_rate: 95 } } };
  await mount(<OverviewPage data={{ workspace: { current_golden_id: 'saved-golden' }, overview: { dataset: { total: 3, expected_count: 3, approved: 3 }, latest_evaluation: run } }} navigate={() => {}} />);
- const text = document.querySelector('[aria-label="项目关键数字"]')?.textContent || '';
- expect(text).toContain('2 / 3'); expect(text).toContain('2 / 4'); expect(text).toContain('8.4 秒');
+ const text = document.querySelector('[aria-label="优化成果"]')?.textContent || '';
+ expect(text).toContain('2 / 3'); expect(text).toContain('95%'); expect(text).toContain('8.4 秒');
  await act(async () => root.render(<OverviewPage data={{ workspace: {}, overview: {} }} navigate={() => {}} />));
- expect(document.querySelector('[aria-label="项目关键数字"]')?.textContent).toContain('未知');
+ expect(document.querySelector('[aria-label="优化成果"]')?.textContent).toContain('待完整结果');
 });
 it('shows a plain failed-gate sentence and hides IDs in collapsed technical details', async () => {
  const run = { id: 'EVAL-internal', status: 'completed', created_at: '2026-11-01T12:00:00Z', dataset_version_id: 'GD-test', config: { generation_thinking: 'high' }, result: { bad_case_count: 1, gates: { passed: false, passed_count: 1, total: 2, gates: [{ metric: 'safe_rejection_rate', status: 'FAIL', actual: 87, threshold: 96, operator: '>=' }] } } };
@@ -75,7 +75,7 @@ it('uses an honest empty monitoring state and never invents records', async () =
  sessionStorage.clear();
  vi.stubGlobal('fetch', vi.fn(async () => response({ events: [], triggers: [] })));
  await mount(<VerificationPage data={{ monitoring: { events: [], triggers: [] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
- await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '监控')!.click());
+ await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '线上反馈 → 再次进化')!.click());
  expect(document.querySelector('.story-empty')?.textContent).toContain('当前尚无反馈记录');
  expect(document.querySelector('.monitoring-table')).toBeNull();
  expect((fetch as any).mock.calls.every(([, init]: any[]) => !init?.method || init.method === 'GET')).toBe(true);
@@ -83,8 +83,8 @@ it('uses an honest empty monitoring state and never invents records', async () =
 it('keeps old-policy Baseline numbers out of the current optimization cards', async () => {
  const run = { id: 'old-run', status: 'completed', requires_policy_upgrade: true, result: { total: 50, bad_case_count: 7, gates: { passed_count: 10, total: 11 }, metrics: { latency_p50_seconds: 7.3 } } };
  await mount(<OverviewPage data={{ workspace: { requires_policy_upgrade: true }, overview: { latest_evaluation: run } }} navigate={() => {}} />);
- expect(document.querySelector('[aria-label="项目关键数字"]')?.textContent).not.toContain('7 道');
- expect(document.querySelector('[aria-label="项目关键数字"]')?.textContent).toContain('未知');
+ expect(document.querySelector('[aria-label="优化成果"]')?.textContent).not.toContain('7 道');
+ expect(document.querySelector('[aria-label="优化成果"]')?.textContent).toContain('待完整结果');
 });
 it('counts the frozen Golden paper instead of a newer unfinished work Run', async () => {
  const { KnowledgePage } = await import('./pages/KnowledgePage');

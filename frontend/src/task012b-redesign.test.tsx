@@ -32,7 +32,7 @@ it('resolves frozen evidence through saved candidate chunks and marks final evid
 
 it('opens real monitoring source objects without rendering them as React children',async()=>{
  const {vi}=await import('vitest');vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({events:[{id:'event',question:'历史问答',source:{corpus_fingerprint:{'DOC-001':'saved-hash'}}}]}))));
- try {await mount(<VerificationPage data={{monitoring:{events:[{id:'event',question:'历史问答',source:{corpus_fingerprint:{'DOC-001':'saved-hash'}}}]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('监控');await click('历史问答');expect(document.querySelector('[role="dialog"]')?.textContent).toContain('saved-hash');}finally{vi.unstubAllGlobals();}
+ try {await mount(<VerificationPage data={{monitoring:{events:[{id:'event',question:'历史问答',source:{corpus_fingerprint:{'DOC-001':'saved-hash'}}}]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('线上反馈 → 再次进化');await click('历史问答');expect(document.querySelector('[role="dialog"]')?.textContent).toContain('saved-hash');}finally{vi.unstubAllGlobals();}
 });
 
 it('waits for saved case details instead of reporting missing sources from a light response',async()=>{

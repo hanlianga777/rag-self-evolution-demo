@@ -43,8 +43,8 @@ it("shows no effective composite without inventing a D candidate", async () => {
   const optimization = { id: "EXP-1", candidates: [], result: { report_confirmation: { winner_id: "C-1" }, composite: { status: "no_effective_composite" } } };
   await act(async () => root.render(<EvolutionPage data={{ evaluation: {}, badCases: [], optimization }} />));
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "A/B/C/D")!.click());
-  expect(document.body.textContent).toContain("保留 已确认赢家");
-  expect(document.body.textContent).toContain("没有有效的 组合方案 D");
+  expect(document.body.textContent).toContain("保留已确认赢家");
+  expect(document.body.textContent).toContain("Agent 判断不做 D");
   expect(document.querySelectorAll(".composite-card .candidate-card")).toHaveLength(0);
   await act(async () => root.unmount());
 });

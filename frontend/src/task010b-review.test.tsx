@@ -18,9 +18,8 @@ it('shows the supplied budget before creating an experiment',async()=>{
 it('uses true errors in the overview while keeping saved correctness',async()=>{
  const run={id:'b',status:'completed',review_summary:{target_count:6,unstable_count:2},result:{total:50,bad_case_count:8}};
  await mount(<OverviewPage data={{overview:{dataset:{},latest_evaluation:run},workspace:{}}} navigate={()=>{}}/>);
- const cards=[...document.querySelectorAll('[aria-label="项目关键数字"] > *')];
- expect(cards.find(e=>e.textContent?.includes('待优化 Bad Case'))?.textContent).toContain('8 道');
- expect(cards.find(e=>e.textContent?.includes('Baseline 答对'))?.textContent).toContain('42 / 50');
+ const cards=[...document.querySelectorAll('[aria-label="优化成果"] > *')];
+ expect(cards.find(e=>e.textContent?.includes('答对数'))?.textContent).toContain('42 / 50');
 });
 it('uses single-pass labels while retaining historical records',async()=>{
  const row={question_id:'Q37',result:{passed:false,question:'测试问题',baseline_review_label:'随机波动（3 次错 1 次）',baseline_review:{status:'fluctuation'},optimization_target:false,diagnostic_view:{diagnosis_category:'回答问题',display_question_id:'Q37'}}};

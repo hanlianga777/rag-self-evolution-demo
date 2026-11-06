@@ -14,13 +14,13 @@ const render = async (data: any) => { vi.stubGlobal("fetch", vi.fn()); root = cr
 it.each(["generating", "needs_regeneration", "failed"])("keeps the frozen Golden and Agent next step when a different work Run is %s", async status => {
   const data = input(status), before = JSON.stringify(data);
   await render(data);
-  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("3 题");
-  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("已冻结 · 3 题");
-  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("Golden Dataset已冻结");
+  expect(document.querySelector('[aria-label="进化主链路"]')?.textContent).toContain("3 题");
+  expect(document.querySelector('[aria-label="进化主链路"]')?.textContent).toContain("已冻结 · 3 题");
+  expect(document.querySelector('[aria-label="进化主链路"]')?.textContent).toContain("Golden 题卷已冻结");
   expect(document.querySelector(".next-action h2")?.textContent).toBe("运行优化 Agent");
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#evolution");
   expect(document.querySelector(".overview-work-run")?.textContent).toContain("工作 Run");
-  expect(document.querySelectorAll(".stage-stepper")).toHaveLength(1);
+  expect(document.querySelectorAll(".story-chain a")).toHaveLength(6);
   expect(JSON.stringify(data)).toBe(before);
   expect(fetch).not.toHaveBeenCalled();
 });
@@ -31,13 +31,13 @@ it("keeps the current recommendation at human release despite an unfinished new 
   await render(data);
   expect(document.querySelector(".next-action h2")?.textContent).toBe("人工确认发布");
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#versions");
-  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("3 题");
+  expect(document.querySelector('[aria-label="进化主链路"]')?.textContent).toContain("3 题");
 });
 
 it("uses the same-identity Baseline frozen Snapshot when the snapshot list is absent", async () => {
   const data: any = input("generating"); delete data.snapshots;
   await render(data);
-  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).toContain("3 题");
+  expect(document.querySelector('[aria-label="进化主链路"]')?.textContent).toContain("3 题");
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#evolution");
 });
 
@@ -48,13 +48,13 @@ it("does not promote unrelated approved work data or an old Corpus to frozen eli
   data.workspace.current_corpus_fingerprint = { D: "fixture-changed" };
   await render(data);
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#governance");
-  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).not.toContain("Golden Dataset已冻结");
+  expect(document.querySelector('[aria-label="进化主链路"]')?.textContent).not.toContain("Golden 题卷已冻结");
   await act(async () => root.unmount());
   data.workspace.requires_new_golden = false;
   data.workspace.current_golden_id = "GD-missing";
   await render(data);
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#governance");
-  expect(document.querySelector('[aria-label="全链路阶段"]')?.textContent).not.toContain("Golden Dataset已冻结");
+  expect(document.querySelector('[aria-label="进化主链路"]')?.textContent).not.toContain("Golden 题卷已冻结");
 });
 
 it.each(["running", "failed", "generated"])("does not skip unfinished Sandbox (%s) to the final decision", async status => {

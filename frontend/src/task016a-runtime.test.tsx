@@ -100,6 +100,7 @@ it("shows scheduled D as queued and keeps configuration identifiers inside techn
   vi.stubGlobal("fetch", vi.fn((url: string) => response(url.includes("/api/experiments") ? experiment : { search_space: {} })));
   await mount(<EvolutionPage data={{ evaluation: { id: "baseline", status: "completed" }, optimization: experiment }} />);
   expect(document.querySelector(".price-pause-notice")?.textContent).toContain("高峰时段暂停");
+  await click("问题诊断");
   const progress = [...document.querySelectorAll(".workbench-status")].find(node => node.textContent?.includes("修复 1 题"))!;
   expect(progress.textContent).toContain("已有经完整试跑验证的方案");
   expect(progress.textContent).not.toContain("CONFIG-private");
@@ -107,8 +108,8 @@ it("shows scheduled D as queued and keeps configuration identifiers inside techn
   expect(technical.open).toBe(false);
   expect(technical.textContent).toContain("CONFIG-private");
   await click("A/B/C/D");
-  expect(document.body.textContent).toContain("组合方案 D 已排队，平价时段自动继续");
-  await click("推荐方案");
+  expect(document.body.textContent).toContain("方案 D · 等待非高峰时段");
+  await click("最终推荐");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "生成智能组合建议")).toBe(false);
 });
 

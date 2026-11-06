@@ -27,12 +27,12 @@ it.each([false,true])("keeps clickable progress on all six tabs and displays sav
   expect(document.querySelector(".sandbox-core-table")?.textContent).toContain(paused?"高峰时段暂停 7/50":"运行中 7/50");
   expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method)).toBe(true);
 });
-it("removes repeated strategy fields and keeps one before/after parameter table",async()=>{
+it("removes repeated strategy fields and keeps one before/after parameter list",async()=>{
   await mount();
   await act(async()=>[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(b=>b.textContent==="A/B/C/D")!.click());
   const card=document.querySelector(".candidate-card")!;
   expect(card.textContent).toContain("扩大候选范围");
   expect(card.querySelector(".candidate-field-content")?.textContent).toContain("检索召回增强");
-  expect(card.querySelectorAll(".compact-config-diff table")).toHaveLength(1);
+  expect(card.querySelectorAll(".story-changes")).toHaveLength(1);
   expect([...card.querySelectorAll(".field-label")].map(e=>e.textContent)).toEqual(["方向","核心思路","参数变化","针对的题","预期效果","风险","结果"]);
 });

@@ -59,14 +59,15 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space }))));
   await render(<EvolutionPage data={input} />);
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
+  await click("问题诊断");
   expect(document.querySelector(".diagnosis-list")?.textContent).toContain("候选召回覆盖");
   expect(document.querySelector(".diagnosis-filters")).toBeNull();
   expect(document.querySelector(".diagnosis-list")?.textContent).toContain("持久化问题");
   expect(document.querySelector(".diagnosis-list")?.textContent).not.toContain("Evidence Miss");
   expect(document.querySelectorAll(".diagnosis-cards")).toHaveLength(0);
-  await click("优化 Agent");
+  await click("进化路线");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
-  expect([...document.querySelectorAll(".panel > .section-head h2")].map(header => header.textContent)).toEqual(["无人值守设置", "Agent 读到了什么事实", "Agent 提出了什么假设", "Agent 得出了哪些方案"]);
+  expect([...document.querySelectorAll(".route-planning .panel > .section-head h2")].map(header => header.textContent)).toEqual(["无人值守设置", "Agent 读到了什么事实", "Agent 提出了什么假设", "Agent 得出了哪些方案"]);
   expect(document.body.textContent).toContain("保存假设 A");
   expect(document.body.textContent).toContain("可调参数 · 2");
   await click("A/B/C/D");
@@ -83,8 +84,8 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
 });
 
 it.each([
-  { status: "generated", result: {}, expected: "等待完整 Sandbox" },
-  { status: "evaluated", result: { qualification: { qualified: true }, regression: { status: "PASS" }, gates: { passed_count: 11, total: 11 } }, expected: "保留 候选方案 C" },
+  { status: "generated", result: {}, expected: "等待完整试跑" },
+  { status: "evaluated", result: { qualification: { qualified: true }, regression: { status: "PASS" }, gates: { passed_count: 11, total: 11 } }, expected: "D 没有胜过赢家，保留赢家" },
 ])("reports 组合方案 D $status without inventing failure or replacing the saved Winner", async ({ status, result, expected }) => {
   const winner = { id: "C-C", status: "evaluated", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } };
   const d = { id: "C-D", status, reasoning: { candidate_label: "D", winner_id: winner.id, sources: [] }, result };
@@ -92,5 +93,5 @@ it.each([
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   await render(<EvolutionPage data={{ evaluation: run, badCases: [bad], optimization }} />);
   await click("A/B/C/D");
-  expect(document.querySelector(".composite-decision")?.textContent).toContain(expected);
+  expect(document.querySelector(".d-story")?.textContent).toContain(expected);
 });

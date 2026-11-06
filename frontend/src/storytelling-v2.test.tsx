@@ -28,17 +28,17 @@ it('links multiple saved candidate hypotheses to the same actual problem and kee
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const candidates=['A','B'].map((label,i)=>({id:label,status:'generated',config:{candidate_k:24+i},reasoning:{candidate_label:label,observed_evidence:[badCases[0].id],hypothesis:'假设'+label,proposal:'candidate_missing=true 原始提出理由'}}));
  const data={evaluation,badCases,optimization:{id:'EXP',candidates}};const before=JSON.stringify(data);
- await mount(<EvolutionPage data={data}/>);await click('优化 Agent');
+ await mount(<EvolutionPage data={data}/>);await click('进化路线');
  expect(document.querySelectorAll('.agent-fact')).toHaveLength(2);expect(document.querySelectorAll('.agent-hypotheses > section')).toHaveLength(2);for (const hypothesis of document.querySelectorAll('.agent-hypotheses > section')) { expect(hypothesis.textContent).toContain('Q71');expect(hypothesis.textContent).not.toContain('Q72'); }expect(document.querySelector('.experiment-plan')).toBeNull();
  await click('候选方案 A · 详情');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
 });
 it('compares a pending release against current Production rather than unrelated Baseline configuration',async()=>{
  const candidate={id:'A',config:{candidate_k:24},reasoning:{candidate_label:'A'},release_state:{sandbox:true,qualified:true,recommended:true,round_complete:true}};
- await mount(<VersionsPage data={{evaluation:{config:{candidate_k:99}},versions:[{id:'initial',status:'active',provenance:'bootstrap',config:{candidate_k:12}}],optimization:{candidates:[candidate]}}}/>);
- const diff=document.querySelector('.unpublished-candidates .parameter-diff')!;expect(diff.textContent).toContain('12');expect(diff.textContent).toContain('24');expect(diff.textContent).not.toContain('99');
+ await mount(<VersionsPage data={{evaluation:{config:{candidate_k:99}},versions:[{id:'initial',status:'active',provenance:'bootstrap',config:{candidate_k:12}}],optimization:{candidates:[candidate],recommendation:{recommended_candidate:candidate.id}}}}/>);
+ const diff=document.querySelector('.pending-release .story-changes')!;expect(diff.textContent).toContain('12');expect(diff.textContent).toContain('24');expect(diff.textContent).not.toContain('99');
 });
 it('shows the real feedback chain with a compact empty state and no pretend monitoring rows',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({events:[],triggers:[]}))));
- await mount(<VerificationPage data={{monitoring:{events:[],triggers:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('监控');
- expect(document.querySelectorAll('.decision-chain li')).toHaveLength(4);expect(document.querySelector('.monitoring-table')).toBeNull();expect(document.querySelector('.story-empty')?.textContent).toContain('当前尚无反馈记录');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
+ await mount(<VerificationPage data={{monitoring:{events:[],triggers:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('线上反馈 → 再次进化');
+ expect(document.querySelector('.feedback-loop')?.textContent).toContain('用户提问 → 人工标记坏例 → 触发新一轮 Agent');expect(document.querySelector('.monitoring-table')).toBeNull();expect(document.querySelector('.story-empty')?.textContent).toContain('当前尚无反馈记录');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
 });

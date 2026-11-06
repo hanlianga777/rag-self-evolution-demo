@@ -159,7 +159,7 @@ it("ID-08 ignores an old same-question comparison after Baseline changes", async
 it("ID-08 clears Candidate Drawer and rejects an old candidate report after identity changes", async () => {
   let resolveReport!: (reply: Response) => void;
   vi.stubGlobal("fetch", vi.fn((url: string) => url.includes("/evaluations/") ? new Promise<Response>(resolve => { resolveReport = resolve; }) : Promise.resolve(new Response(JSON.stringify({ search_space: {} })))));
-  const old = { workspace: identity("B0", "E0"), evaluation: { id: "B0" }, optimization: { id: "E0", candidates: [{ id: "A0", config: {}, reasoning: { candidate_label: "A" }, result: { evaluation_run_id: "R0" } }] } };
+  const old = { workspace: identity("B0", "E0"), evaluation: { id: "B0" }, optimization: { id: "E0", candidates: [{ id: "A0", status:"evaluated", config: {}, reasoning: { candidate_label: "A" }, result: { evaluation_run_id: "R0" } }] } };
   await render(<EvolutionPage data={old} />);
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "A/B/C/D")!.click());
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent?.includes("查看方案与完整报告"))!.click());
@@ -200,12 +200,12 @@ it("ID-08 refuses incoherent parallel app identities after one bounded retry", a
 it("RL-03/05 uses centered confirmation and keeps failed release visible without fake success", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail: "提交时资格已失效" }), { status: 409 })));
   const candidate = { id: "A-fixture", status: "evaluated", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
-  await render(<VersionsPage data={{ versions: [{ id: "P0", status: "active" }], optimization: { candidates: [candidate] } }} />);
-  await act(async () => document.querySelector<HTMLButtonElement>(".release-actions button")!.click());
+  await render(<VersionsPage data={{ versions: [{ id: "P0", status: "active" }], optimization: { candidates: [candidate], recommendation:{recommended_candidate:candidate.id} } }} />);
+  await act(async () => document.querySelector<HTMLButtonElement>(".pending-release button.primary")!.click());
   expect(document.querySelector(".confirm-dialog")?.textContent).toContain("发布确认");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".confirm-dialog button")].find(button => button.textContent === "确认")!.click());
   expect(document.querySelector(".confirm-dialog")?.textContent).toContain("提交时资格已失效");
-  expect(document.querySelector(".release-actions button")?.textContent).toBe("确认发布");
+  expect(document.querySelector(".pending-release button.primary")?.textContent).toBe("确认发布");
   expect(document.querySelector(".version-records")?.textContent || "").not.toContain("P1");
   expect(fetch).toHaveBeenCalledTimes(1);
 });
@@ -234,7 +234,7 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "回归检查")?.lastElementChild?.textContent).toBe("未通过");
   expect(coreRows.find(row => row.querySelector("td")?.textContent === "候选合格")?.lastElementChild?.textContent).toBe("不合格");
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "A/B/C/D")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-cards button")].filter(x => x.textContent === "查看方案与完整报告").at(-1)!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(x => x.textContent === "查看 D 完整报告")!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不可发布 · 门槛：通过");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("回归检查：未通过");
 });
@@ -253,10 +253,10 @@ it("review R2 an older Production does not finish a new recommendation Gate3", a
   expect(document.querySelector(".next-action h2")?.textContent).toContain("人工确认发布");
   await act(async () => root.render(<VersionsPage data={input} />));
   expect(document.querySelector('[aria-label="发布阶段"]')).toBeNull();
-  expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("候选方案 A");
-  expect(document.querySelector(".unpublished-candidates")?.textContent).toContain("本轮推荐，尚未发布");
-  expect(document.querySelector<HTMLButtonElement>(".release-actions button")?.disabled).toBe(false);
-  expect(document.querySelector(".release-actions button")?.textContent).toBe("确认发布");
+  expect(document.querySelector(".pending-release")?.textContent).toContain("方案 A");
+  expect(document.querySelector(".pending-release")?.textContent).toContain("本轮推荐，尚未发布");
+  expect(document.querySelector<HTMLButtonElement>(".pending-release button.primary")?.disabled).toBe(false);
+  expect(document.querySelector(".pending-release button.primary")?.textContent).toBe("确认发布");
   expect(input.versions[0].snapshot.candidate_id).toBe("E0-C");
 });
 
@@ -298,36 +298,36 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
     return new Response(JSON.stringify(url.endsWith("/monitoring?page=1&limit=50") ? monitoring() : url.includes("/experiments/") ? context() : {}));
   }));
   await render(<VerificationPage data={{ ...data("B1"), monitoring: monitoring(), optimization: { id: "E-prior", candidates: [{ id: "old-A" }] } }} onOpenDocument={() => {}} onOpenCitation={() => {}} />);
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "监控")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "线上反馈 → 再次进化")!.click());
   expect(document.querySelector('[aria-label="监控阶段"]')).toBeNull();
   expect(document.querySelector(".monitoring-context")?.textContent).toContain("尚未人工确认，未创建 Optimization 上下文");
   expect([...document.querySelectorAll("button")].some(button => button.textContent?.includes("启动此上下文"))).toBe(false);
   expect(document.body.textContent).not.toContain("old-A");
   await clickText("人工确认");
   expect(posts[0]).toEqual({ url: expect.stringContaining("/api/monitoring/triggers/T1/confirm"), body: { decision: "approved" } });
-  expect(document.querySelector(".monitoring-context")?.textContent).toContain("待启动 Round 1");
-  expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "启动此上下文 Agent · Round 1")?.disabled).toBe(false);
-  await clickText("查看 Trigger 上下文");
+  expect(document.querySelector(".monitoring-context")?.textContent).toContain("待启动第 1 轮");
+  expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "启动此上下文 Agent · 第 1 轮")?.disabled).toBe(false);
+  await clickText("查看进化上下文");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Trigger：T1");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联实验：E-monitor");
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("E-prior");
   await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());
-  await clickText("启动此上下文 Agent · Round 1");
+  await clickText("启动此上下文 Agent · 第 1 轮");
   expect(posts[1]).toEqual({ url: expect.stringContaining("/api/experiments/run"), body: { trigger_id: "T1" } });
   expect(posts).toHaveLength(2);
-  expect(document.querySelector(".monitoring-context")?.textContent).toContain("Agent 状态：已完成 · Round 1");
+  expect(document.querySelector(".monitoring-context")?.textContent).toContain("Agent 状态：已完成 · 第 1 轮");
   expect([...document.querySelectorAll("button")].some(button => button.textContent?.includes("启动此上下文"))).toBe(false);
-  await clickText("查看 Trigger 上下文");
+  await clickText("查看进化上下文");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联实验：E-monitor");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Round 1");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("第 1 轮");
   expect(document.querySelector('a[href="#evolution"]')).toBeNull();
 });
 
 it("review R4 selected historical Monitoring context is identified and cannot start under a new Baseline", async () => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/experiments/") ? { id: "E-history", baseline_run_id: "B0", status: "pending_agent", result: { round: 0 }, candidates: [] } : { triggers: [{ id: "T-history", status: "human_confirmed", optimization_run_id: "E-history" }], events: [] }))));
   await render(<VerificationPage data={{ ...data("B1"), monitoring: { triggers: [{ id: "T-history", status: "human_confirmed", optimization_run_id: "E-history" }] } }} onOpenDocument={() => {}} onOpenCitation={() => {}} />);
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "监控")!.click());
-  await clickText("查看 Trigger 上下文");
+  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "线上反馈 → 再次进化")!.click());
+  await clickText("查看进化上下文");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Trigger：T-history");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联实验：E-history");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Baseline：B0");
