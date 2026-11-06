@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""021c: private, checkpointed recheck; never writes or serves the demo database.
+"""021c/021c2: private checkpointed rechecks/trials; never writes or serves the demo database.
 
 start/status are operational commands. compare reads saved data and makes no RPC.
 The demo does not import this module or open its database.
@@ -13,6 +13,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import time
 from contextlib import contextmanager, closing
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,9 +21,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'backend'))
 from app.governance import GovernanceStore
-from app.evaluation import EvaluationRunner, candidate_comparison, protected_question
+from app.evaluation import EvaluationRunner, candidate_comparison, protected_question, sandbox_cost
 from app.evaluation_contract import evaluation_identity, policy_current
-from app.policy import GATE_DEFINITIONS, evaluate_gates
+from app.policy import (ALLOWED_SEARCH_SPACE, GATE_DEFINITIONS, evaluate_gates, validate_candidate_config,
+                        evaluate_regression, qualify_release, d_improves_winner)
 
 DEFAULT_SOURCE = ROOT / 'backend/data/demo.db'
 DEFAULT_OUT = ROOT / 'output/task021c'
@@ -125,22 +127,43 @@ def selected_candidates(source, experiment_id):
     return experiment, candidates
 
 
-def prepare(source_path, out, experiment_id):
+def prepare(source_path, out, experiment_id, *, trials=False, dependency=DEFAULT_OUT):
     source_path, out = Path(source_path).resolve(), Path(out).resolve()
     private_path = out / 'internal.db'
     if private_path.resolve() == source_path:
         raise ValueError('内部库必须与demo库隔离')
     if (out / 'state.json').exists():
         state = json.loads((out / 'state.json').read_text())
-        if state['source_path'] != str(source_path) or state['experiment_id'] != experiment_id:
+        if (state['source_path'] != str(source_path) or state['experiment_id'] != experiment_id
+                or bool(state.get('trials')) != trials
+                or trials and state.get('dependency') != str(Path(dependency).resolve())):
             raise ValueError('已有断点属于其他来源，拒绝覆盖')
         return state
     source = ReadOnlyStore(source_path, migrate=False)
     experiment, candidates = selected_candidates(source, experiment_id)
+    if trials:
+        candidates = [c for c in experiment['candidates'] if c['reasoning'].get('round') == 3
+                      and c['reasoning'].get('candidate_label') == 'C']
+        if len(candidates) != 1:
+            raise ValueError('缺少唯一R3-C，不能建立内部试跑')
     baseline = complete_run(source, experiment['baseline_run_id'])
     originals = [complete_run(source, c['result']['evaluation_run_id']) for c in candidates]
     if any(r['dataset_snapshot_json'] != baseline['dataset_snapshot_json'] or r['judge'] != baseline['judge'] for r in originals):
         raise ValueError('Golden或评分身份与Baseline不一致')
+    trial_configs = []
+    if trials:
+        dependency = Path(dependency).resolve()
+        dep = json.loads((dependency / 'state.json').read_text())
+        matches = [j for j in dep['jobs'] if j['source_run_id'] == originals[0]['id']]
+        if (dep['source_path'] != str(source_path) or dep['experiment_id'] != experiment_id
+                or dependency == out or len(matches) != 1):
+            raise ValueError('内部复核断点与R3-C来源不一致')
+        for changes in ({'top_k': 6}, {'top_k': 6, 'prompt_strategy': 'Tiered'}):
+            config = {**originals[0]['config'], **changes}
+            check = validate_candidate_config({k: v for k, v in config.items() if k in ALLOWED_SEARCH_SPACE})
+            if not check['valid']:
+                raise ValueError('内部试跑配置非法：' + str(check['errors']))
+            trial_configs.append((changes, config))
     before = protected_state(source_path)
     out.mkdir(parents=True, exist_ok=True)
     if private_path.exists():
@@ -164,14 +187,23 @@ def prepare(source_path, out, experiment_id):
         dst.commit()
     private = InternalStore(private_path, migrate=False)
     jobs = []
-    for candidate, original in zip(candidates, originals):
-        run_id = private.create_evaluation_run(json.loads(original['dataset_snapshot_json']), original['config'], original['judge'])
+    inputs = ([(candidates[0], originals[0], changes, config) for changes, config in trial_configs] if trials else
+              [(c, r, {}, r['config']) for c, r in zip(candidates, originals)])
+    for candidate, original, changes, config in inputs:
+        run_id = private.create_evaluation_run(json.loads(original['dataset_snapshot_json']), config, original['judge'])
         private.update_evaluation_progress(run_id, {'internal_recheck': True, 'purpose': '内部复核'})
         jobs.append({'candidate_id': candidate['id'], 'source_run_id': original['id'], 'run_id': run_id,
                      'source_config_sha256': digest(original['config'])})
+        if trials:
+            jobs[-1].update(label='内部-' + str(len(jobs)), changes=changes, config_sha256=digest(config))
+            with private.connection() as db:
+                db.execute("UPDATE evaluation_runs SET status='queued' WHERE id=?", (run_id,))
     state = {'internal_recheck': True, 'purpose': '内部复核', 'created_at': now(), 'source_path': str(source_path),
              'experiment_id': experiment_id, 'baseline_id': baseline['id'], 'jobs': jobs,
              'protected_before': before, 'protected_after_prepare': protected_state(source_path)}
+    if trials:
+        state.update(trials=True, purpose='内部试跑D候选', dependency=str(dependency),
+                     dependency_run_id=matches[0]['run_id'], queue_status='waiting_for_recheck')
     if state['protected_before'] != state['protected_after_prepare']:
         raise ValueError('正式记录哈希变化，禁止启动；请检查并发写入')
     save(out / 'state.json', state)
@@ -226,10 +258,10 @@ def execute_job(store, job, runtime):
             return run
         raise ValueError('技术失败已结束但成绩不完整；保留已付费断点，不自动另建或重复运行')
     original = store.evaluation_run(job['source_run_id'])
-    if (run['config'] != original['config'] or run['judge'] != original['judge']
+    if (run['config'] != {**original['config'], **job.get('changes', {})} or run['judge'] != original['judge']
             or run['dataset_snapshot_json'] != original['dataset_snapshot_json']):
         raise ValueError('内部记录配置、题卷或评分身份改变')
-    if run['status'] in {'partial', 'failed'}:
+    if run['status'] in {'queued', 'partial', 'failed'}:
         # Resume the same run with all saved cases/RPCs intact. The runner only
         # accepts progress writes while running; no new candidate is reserved.
         with store.connection() as db:
@@ -237,6 +269,23 @@ def execute_job(store, job, runtime):
                        (job['run_id'],))
     runner = EvaluationRunner(store, runtime)
     return runner.execute_baseline(job['run_id'], runner.snapshot_items(json.loads(run['dataset_snapshot_json'])), run['config'])
+
+
+def wait_for_official(state, out):
+    """Yield new internal RPCs to any official evaluation; never touch its rows."""
+    official = ReadOnlyStore(state['source_path'], migrate=False)
+    waited = False
+    while True:
+        with official.connection() as db:
+            active = db.execute("SELECT 1 FROM evaluation_runs WHERE status IN ('queued','running') LIMIT 1").fetchone()
+        status = 'waiting_for_official' if active else 'running'
+        if state.get('queue_status') != status:
+            state['queue_status'] = status
+            save(out / 'state.json', state)
+        if not active:
+            return waited
+        waited = True
+        time.sleep(1)
 
 
 def worker(out):
@@ -249,11 +298,27 @@ def worker(out):
         fcntl.flock(lock, fcntl.LOCK_EX)
         state = json.loads((out / 'state.json').read_text())
         store = InternalStore(out / 'internal.db', migrate=False)
+        dependency_lock = None
         try:
+            if state.get('trials'):
+                state['queue_status'] = 'waiting_for_recheck'
+                save(out / 'state.json', state)
+                # The existing 021c worker owns this lock for its entire run.
+                # Wait in the background without touching its state or results.
+                dependency_lock = (Path(state['dependency']) / 'worker.lock').open('a')
+                fcntl.flock(dependency_lock, fcntl.LOCK_EX)
+                dep = ReadOnlyStore(Path(state['dependency']) / 'internal.db', migrate=False)
+                with dep.connection() as db:
+                    row = db.execute("SELECT status,json_extract(result_json,'$.evaluation_complete') done FROM evaluation_runs WHERE id=?",
+                                     (state['dependency_run_id'],)).fetchone()
+                if not row or row['status'] != 'completed' or row['done'] != 1:
+                    raise ValueError('内部复核中断或不完整；保留队列，不重跑已付费题')
             for job in state['jobs']:
                 saved_run = store.evaluation_run(job['run_id'], light=True)
                 if saved_run['status'] == 'completed' and saved_run['result'].get('evaluation_complete'):
                     continue
+                if state.get('trials'):
+                    wait_for_official(state, out)
                 runtime, index = runtime_for(store, job)
                 if index != job['index']:
                     raise ValueError('冻结索引文件哈希改变')
@@ -264,34 +329,44 @@ def worker(out):
                 def identity_check():
                     # Reuse the existing price-window policy before every RPC,
                     # including Judge/format/transport retries, with no override.
-                    wait_for_off_peak(store, 'internal:' + job['run_id'], pause)
+                    while True:
+                        wait_for_off_peak(store, 'internal:' + job['run_id'], pause)
+                        if not state.get('trials') or not wait_for_official(state, out):
+                            break
+                        # Waiting for an official run may have crossed into peak.
                     from app.corpus import current_manifest, manifest_identity
                     if manifest_identity(current_manifest()) != index['identity']:
                         raise ValueError('运行期间源文件或索引身份改变')
-                    return job['source_config_sha256']
+                    return job.get('config_sha256', job['source_config_sha256'])
                 path = out / (job['run_id'] + '-calls.json')
                 ledger = (PaidRun.load_accounting(path, identity_check) if path.exists() else
-                          PaidRun(path, identity=job['source_config_sha256'], identity_check=identity_check,
+                          PaidRun(path, identity=job.get('config_sha256', job['source_config_sha256']), identity_check=identity_check,
                                   output_limits=store.evaluation_run(job['source_run_id'])['judge']['execution_snapshot']['request_limits']))
                 with controlled_run(ledger):
                     result = execute_job(store, job, runtime)
                 if result['status'] != 'completed' or not result['result'].get('evaluation_complete'):
                     raise RuntimeError('内部评测未形成完整成绩，保留断点；不另建运行')
             state['worker_finished_at'] = now()
+            if state.get('trials'):
+                state['queue_status'] = 'completed'
         except Exception as error:
             state['worker_error'] = str(error)
             state['worker_ended_at'] = now()
+            if state.get('trials'):
+                state['queue_status'] = 'blocked'
         finally:
+            if dependency_lock:
+                dependency_lock.close()
             state['protected_after_worker'] = protected_state(state['source_path'])
             state['official_unchanged'] = state['protected_before'] == state['protected_after_worker']
             save(out / 'state.json', state)
 
 
-def start(source, out, experiment):
+def start(source, out, experiment, *, trials=False, dependency=DEFAULT_OUT):
     out.mkdir(parents=True, exist_ok=True)
     with (out / 'start.lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        state = prepare(source, out, experiment)
+        state = prepare(source, out, experiment, trials=trials, dependency=dependency)
         with (out / 'worker.lock').open('a') as worker_lock:
             try:
                 fcntl.flock(worker_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -334,7 +409,8 @@ def status(out):
         alive = True
     except (KeyError, ProcessLookupError):
         alive = False
-    return {'checked_at': now(), 'started_at': state.get('started_at'), 'jobs': jobs, 'worker_alive': alive,
+    return {**({'queue_status': state.get('queue_status')} if state.get('trials') else {}),
+            'checked_at': now(), 'started_at': state.get('started_at'), 'jobs': jobs, 'worker_alive': alive,
             'worker_error': state.get('worker_error'), 'official_unchanged':
             protected_state(state['source_path']) == state['protected_before']}
 
@@ -382,9 +458,89 @@ def qualification(baseline, cases, metrics, golden):
             'new_critical': [q for q in comparison['new_regression_question_ids'] if protected_question(baseline[q], golden.get(q))] + continued}
 
 
+def trial_outcome(baseline, original, trial, original_metrics, trial_metrics):
+    """Use the existing D release (vs Baseline) and winner improvement rules."""
+    comparison = candidate_comparison(baseline, trial, list(baseline))
+    gates = evaluate_gates(trial_metrics)
+    regression = evaluate_regression(new_critical_failures=comparison['new_critical_failures'],
+                                    new_ordinary_failures=comparison['new_ordinary_failures'])
+    release = qualify_release(gates, regression, len(comparison['all_fixed_question_ids']))
+    def result(cases, metrics):
+        return {'result': {'bad_case_count': sum(c.get('passed') is False for c in cases.values()),
+                           'metrics': metrics, 'estimated_cost': sandbox_cost(list(cases.values()))}}
+    checks = {'完整50题': len(baseline) == len(original) == len(trial) == 50
+                            and comparison['comparison_complete'] and set(original) == set(trial),
+              '11/11门槛': gates['passed'] and gates['passed_count'] == 11,
+              '相对Baseline零新增错题': release['checks']['zero_new_failures'],
+              '相对Baseline至少修好1道': release['checks']['at_least_one_fixed'],
+              '错题更少或错题相同且P99及费用均更低': d_improves_winner(result(trial, trial_metrics), result(original, original_metrics))}
+    return {'wins': all(checks.values()), 'checks': checks}
+
+
+def compare_trials(out, report, state):
+    """Commander-only, offline comparison of the five saved complete runs."""
+    store = ReadOnlyStore(out / 'internal.db', migrate=False)
+    dep = ReadOnlyStore(Path(state['dependency']) / 'internal.db', migrate=False)
+    jobs = state['jobs']
+    runs = [complete_run(store, state['baseline_id']), complete_run(store, jobs[0]['source_run_id']),
+            complete_run(dep, state['dependency_run_id']), *[complete_run(store, j['run_id']) for j in jobs]]
+    original = runs[1]
+    expected = [runs[0]['config'], original['config'], original['config'],
+                *[{**original['config'], **j['changes']} for j in jobs]]
+    for run, config in zip(runs, expected):
+        if (run['config'] != config or run['judge'] != original['judge']
+                or run['dataset_snapshot_json'] != original['dataset_snapshot_json']):
+            raise ValueError('五列配置、Golden或评分身份不一致，不能比较')
+    names = ['Baseline', 'R3-C 原评测', 'R3-C 内部复核', *[j['label'] for j in jobs]]
+    cases = [{c['question_id']: c for c in s.evaluation_case_results(r['id'])}
+             for s, r in zip((store, store, dep, store, store), runs)]
+    metrics = [r['result'].get('metrics', {}) for r in runs]
+    snapshot = json.loads(original['dataset_snapshot_json'])
+    golden = {q['id']: q for q in snapshot['questions']}
+    lines = ['# 内部试跑D候选逐题对比', '', '仅使用保存数据，没有模型调用；结果只供内部判断，不写正式候选、D结论或推荐。', '',
+             '判定沿用现有D规则：零新增错题和至少修好1道相对Baseline；优劣相对R3-C原评测。另列相对R3-C及内部复核的新坏题，不混淆两种比较。', '',
+             '| 门槛/指标 | ' + ' | '.join(names) + ' |', '| --- | ' + ' | '.join(['---'] * 5) + ' |',
+             '| 运行编号 | ' + ' | '.join(r['id'] for r in runs) + ' |',
+             '| 错题数 | ' + ' | '.join(str(sum(c['passed'] is False for c in group.values())) for group in cases) + ' |']
+    for i, gate in enumerate(GATE_DEFINITIONS):
+        lines.append('| ' + gate['metric'] + ' | ' + ' | '.join(
+            f"{m.get(gate['metric']) if m.get(gate['metric']) is not None else '未知'}（{evaluate_gates(m)['gates'][i]['status']}）" for m in metrics) + ' |')
+    costs = [sandbox_cost(list(group.values())) for group in cases]
+    lines += ['| 费用（保存用量估算USD；非账单扣款） | ' + ' | '.join(
+        str(c['amount']) if c['amount'] is not None else '未知' for c in costs) + ' |', '',
+        '| 题目 | ' + ' | '.join(names) + ' |', '| --- | ' + ' | '.join(['---'] * 5) + ' |']
+    for q in snapshot['question_ids']:
+        question = str(golden[q].get('question', q)).replace('|', '／').replace('\n', ' ')
+        lines.append('| ' + q + ' ' + question + ' | ' + ' | '.join('对' if c[q]['passed'] else '错' for c in cases) + ' |')
+    for i in (3, 4):
+        lines += ['', '## ' + names[i], '']
+        # Every internal trial is compared with all three references and its peer.
+        for j in range(5):
+            if i == j:
+                continue
+            change = candidate_comparison(cases[j], cases[i], list(cases[j]), golden)
+            lines += [f"相对{names[j]}：修好：" + ('、'.join(change['all_fixed_question_ids']) or '无') +
+                      '；弄坏：' + ('、'.join(change['new_regression_question_ids']) or '无') + '。']
+        outcome = trial_outcome(cases[0], cases[1], cases[i], metrics[1], metrics[i])
+        lines += ['', '| D规则检查 | 是否满足 |', '| --- | --- |']
+        lines += [f"| {k} | {'是' if v else '否'} |" for k, v in outcome['checks'].items()]
+        lines += ['', '是否胜过 R3-C：' + ('是' if outcome['wins'] else '否') + '。']
+        ledger = out / (jobs[i - 3]['run_id'] + '-calls.json')
+        if ledger.exists():
+            calls = json.loads(ledger.read_text())['calls']
+            lines += [f"保存账本：DeepSeek {sum(c['provider']=='DeepSeek' for c in calls)} 次，其他Provider {sum(c['provider']!='DeepSeek' for c in calls)} 次；账单扣费未知。"]
+    unchanged = protected_state(state['source_path']) == state['protected_before']
+    lines += ['', f'正式记录与排队前哈希一致：{unchanged}。来源：state.json与正式库只读哈希。', '']
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text('\n'.join(lines))
+    return {'report': str(report), 'official_unchanged': unchanged}
+
+
 def compare(out, report):
     """Saved results only; imports no runtime and performs no model call."""
     state = json.loads((out / 'state.json').read_text())
+    if state.get('trials'):
+        return compare_trials(out, report, state)
     store = ReadOnlyStore(out / 'internal.db', migrate=False)
     baseline = complete_run(store, state['baseline_id'])
     base = {c['question_id']: c for c in store.evaluation_case_results(baseline['id'])}
@@ -436,13 +592,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('start', 'worker', 'status', 'compare'))
     parser.add_argument('--source', type=Path, default=DEFAULT_SOURCE)
-    parser.add_argument('--out', type=Path, default=DEFAULT_OUT)
+    parser.add_argument('--out', type=Path)
+    parser.add_argument('--trials', action='store_true', help='021c2: R3-C TopK6 / TopK6+Tiered sequential trials')
+    parser.add_argument('--dependency', type=Path, default=DEFAULT_OUT)
     parser.add_argument('--experiment', default=DEFAULT_EXPERIMENT)
-    parser.add_argument('--report', type=Path, default=ROOT / '指挥/报告/021c-内部复核-逐题对比.md')
+    parser.add_argument('--report', type=Path)
     args = parser.parse_args()
-    args.out = args.out.resolve()
+    args.out = (args.out or (ROOT / 'output/task021c2' if args.trials else DEFAULT_OUT)).resolve()
+    args.report = args.report or ROOT / ('指挥/报告/021c2-内部试跑D候选-逐题对比.md' if args.trials else '指挥/报告/021c-内部复核-逐题对比.md')
     if args.command == 'start':
-        result = start(args.source, args.out, args.experiment)
+        result = start(args.source, args.out, args.experiment, trials=args.trials, dependency=args.dependency)
     elif args.command == 'worker':
         worker(args.out)
         return
