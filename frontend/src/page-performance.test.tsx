@@ -55,3 +55,42 @@ it('reads candidate document material only once under StrictMode', async () => {
     expect(fetcher.mock.calls.filter(call => String((call as any)[0]).endsWith('/api/documents'))).toHaveLength(1);
   } finally { act(()=>root.unmount()); document.body.innerHTML=''; vi.unstubAllGlobals(); }
 });
+
+it('parses the saved snapshot once when rendering many question tooltips', async () => {
+  const { questionText } = await import('./components/EvolutionStory');
+  const evaluation = {dataset_snapshot_json:JSON.stringify({questions:[{id:'Q01',question:'第一题'},{id:'Q02',question:'第二题'}]})};
+  const parse = vi.spyOn(JSON, 'parse');
+  try {
+    expect(questionText('Q01',evaluation)).toBe('第一题');
+    expect(questionText('Q02',evaluation)).toBe('第二题');
+    expect(questionText('Q01',evaluation)).toBe('第一题');
+    expect(parse).toHaveBeenCalledTimes(1);
+  } finally { parse.mockRestore(); }
+});
+
+it('shows the destination shell and skeleton while first-page data is pending', async () => {
+  const root = createRoot(document.body.appendChild(document.createElement('div')));
+  let release!: () => void;
+  const ready = new Promise<void>(resolve => { release = resolve; });
+  vi.stubGlobal('fetch',vi.fn(async (input:RequestInfo | URL) => { await ready; return new Response(JSON.stringify(String(input).includes('/documents') ? [] : {})); }));
+  try {
+    await act(async () => root.render(<App />));
+    expect(document.querySelector('.page-shell .page-title h1')?.textContent).toContain('项目概览');
+    expect(document.querySelector('[role=status][aria-label="正在加载页面内容"]')).not.toBeNull();
+    expect(document.querySelector('.spin')).toBeNull();
+  } finally { await act(async()=>{release();});act(()=>root.unmount());document.body.innerHTML='';location.hash='';vi.unstubAllGlobals(); }
+});
+
+it('opens a hovered destination immediately while revalidating its prefetched data', async () => {
+  const root = createRoot(document.body.appendChild(document.createElement('div')));
+  let blocked = false, release!:()=>void;
+  vi.stubGlobal('fetch',vi.fn(async (input:RequestInfo | URL) => { if(blocked && String(input).endsWith('/api/workspace'))await new Promise<void>(resolve=>{release=resolve;});return new Response(JSON.stringify(String(input).includes('/documents') ? [] : {})); }));
+  try {
+    await act(async () => root.render(<App />));
+    const link=document.querySelector('a[href="#settings"]')!;
+    await act(async()=>{link.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));});
+    blocked=true;
+    await act(async()=>{(link as HTMLAnchorElement).click();});
+    expect(document.querySelector('.page-title h1')?.textContent).toBe('Pipeline 配置');
+  } finally {blocked=false;await act(async()=>{release?.();});act(()=>root.unmount());document.body.innerHTML='';location.hash='';vi.unstubAllGlobals();}
+});

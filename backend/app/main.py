@@ -16,6 +16,8 @@ from typing import Literal
 
 from fastapi import Query, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
+from .read_cache import ReadCacheMiddleware
 from fastapi.responses import Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
@@ -57,11 +59,15 @@ app = FastAPI(title="RAG Evolution Demo API", version="0.1.0")
 app.mount("/documents", StaticFiles(directory=Path(__file__).resolve().parents[1] / "documents"), name="documents")
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR, check_dir=False), name="uploads")
 TRUSTED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
-app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=TRUSTED_ORIGINS, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Read-Version"])
 corpus = CorpusStore()
 require_consistent_switch(corpus.index_dir, os.getenv("RAG_DEMO_DB_PATH") or None)
 safe_start = os.getenv("RAG_SAFE_START", "1") == "1"
 store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None, migrate=not safe_start)
+app.add_middleware(ReadCacheMiddleware, database_path=store.database_path,
+    dependencies=[corpus.index_dir / 'manifest.json', store.database_path.parent / 'corpus_state.json',
+                  Path(__file__).resolve().parents[2] / '.env'])
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=3)
 ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")
 corpus_manager = CorpusManager(ai_service.retriever, knowledge_pipeline=True, on_knowledge_activated=lambda: start_knowledge_golden())
 if not safe_start:

@@ -1926,7 +1926,7 @@ class GovernanceStore:
 
     @staticmethod
     def snapshot_summary(snapshot):
-        return {**{key:value for key,value in snapshot.items() if key not in {'questions','coverage_plan'}},
+        return {**{key:value for key,value in snapshot.items() if key not in {'questions','coverage_plan','scoring_revision'}},
             'questions':[{key:q[key] for key in ('id','test_category','evaluation_group') if key in q} for q in snapshot.get('questions',[])],
             'coverage_plan':{'planner_version':snapshot.get('coverage_plan',{}).get('planner_version')} if snapshot.get('coverage_plan') else None}
 
@@ -2938,11 +2938,11 @@ class GovernanceStore:
         self.refresh_recommendation(candidate['experiment_id'])
         return self.candidate(candidate_id)
 
-    def round_completion(self, candidate: dict) -> dict:
+    def round_completion(self, candidate: dict, *, peers=None) -> dict:
         number = candidate.get("reasoning", {}).get("round")
         if not isinstance(number, int):
             return {"direct_or_legacy": True, "complete": True, "evaluated": 1, "total": 1}
-        return self._round_summary(self.candidates(candidate["experiment_id"],light=True), number)
+        return self._round_summary(peers if peers is not None else self.candidates(candidate["experiment_id"],light=True), number)
 
     def finish_candidate(self, candidate_id: str, status: str, result: dict):
         from .agent_inputs import new_failure_ids
@@ -3304,9 +3304,9 @@ class GovernanceStore:
             return "需要 Gate 2 报告确认及 D 决策完成"
         return None
 
-    def release_state(self, candidate: dict) -> dict:
+    def release_state(self, candidate: dict, *, peers=None) -> dict:
         recommendation = (self.recommendation(candidate["experiment_id"]) or {}).get("result", {})
-        return {"sandbox": candidate["status"] == "evaluated", "qualified": bool(candidate["result"].get("release_qualification", {}).get("qualified")), "recommended": recommendation.get("recommended_candidate") == candidate["id"], "human_release": (self.latest_approval("human_release", candidate["id"]) or {}).get("decision") == "approved", "round_complete": self.round_completion(candidate)["complete"]}
+        return {"sandbox": candidate["status"] == "evaluated", "qualified": bool(candidate["result"].get("release_qualification", {}).get("qualified")), "recommended": recommendation.get("recommended_candidate") == candidate["id"], "human_release": (self.latest_approval("human_release", candidate["id"]) or {}).get("decision") == "approved", "round_complete": self.round_completion(candidate, peers=peers)["complete"]}
 
     def publish_candidate(self, candidate_id: str, actor: str):
         candidate = self.candidate(candidate_id)
@@ -3504,7 +3504,7 @@ class GovernanceStore:
         with self.connection() as connection:
             items = [{**dict(candidate), "config": _load(candidate["config_json"], {}), "reasoning": _load(candidate["reasoning_json"], {}), "result": self._candidate_result(connection,candidate,light=light)} for candidate in candidates]
         numbers = sorted({item.get("reasoning", {}).get("round") for item in items if isinstance(item.get("reasoning", {}).get("round"), int)})
-        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": MAX_EVALS, 'reserved_for_d': 1}}
+        return {**dict(row), "result": _load(row["result_json"], {}), "candidates": [{**item, "product_interruption":product_interruption(item), "release_state": self.release_state(item, peers=items)} for item in items], "rounds": [self._round_summary(items, number) for number in numbers], "evaluation_budget": {"used": sum(sandbox_attempts_used(item) for item in items), "max": MAX_EVALS, 'reserved_for_d': 1}}
 
     def latest_experiment(self):
         with self.connection() as connection:

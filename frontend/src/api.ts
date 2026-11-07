@@ -17,9 +17,38 @@ export function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "请求失败，请重试";
 }
 
-export async function getJson<T>(path: string, fetcher: Fetcher = fetch): Promise<T> {
+const readCaches = new WeakMap<Fetcher, { pending: Map<string, Promise<any>>; values: Map<string, { value: any; at: number }>; version?: string }>();
+function readCache(fetcher: Fetcher) {
+  if (!readCaches.has(fetcher)) readCaches.set(fetcher, { pending: new Map(), values: new Map() });
+  return readCaches.get(fetcher)!;
+}
+export function cachedJson<T>(path: string): T | undefined { return readCache(fetch).values.get(path)?.value; }
+export function invalidateReads() { readCaches.delete(fetch); }
+
+export function getJson<T>(path: string, fetcher: Fetcher = fetch): Promise<T> {
+  const cache = readCache(fetcher), saved = cache.values.get(path);
+  if (saved && Date.now() - saved.at < 30000) return Promise.resolve(saved.value);
+  if (!cache.pending.has(path)) {
+    const request = requestJson<T>(path, fetcher).then(value => {
+      // Mutable lists and running jobs always go to the server; retain completed detail records only.
+      const record = value as any;
+      const completed = record?.status === 'completed' && !record.candidates?.some((item:any)=>['running','queued'].includes(item.status)) && !['running','queued'].includes(record.result?.optimization_cycle?.status) && !['running','queued','scheduled','waiting'].includes(record.result?.composite_schedule?.status);
+      if ((/^\/api\/(evaluations|experiments)\/[^/?]+$/.test(path) && completed) || /^\/api\/(documents|governance\/questions)\/[^/?]+$/.test(path)) {
+        cache.values.set(path, { value, at: Date.now() });
+        if (cache.values.size > 24) cache.values.delete(cache.values.keys().next().value!);
+      }
+      return value;
+    }).finally(() => cache.pending.delete(path));
+    cache.pending.set(path, request);
+  }
+  return cache.pending.get(path)!;
+}
+
+async function requestJson<T>(path: string, fetcher: Fetcher): Promise<T> {
   try {
     const response = await fetcher(apiUrl(path), { signal: AbortSignal.timeout(15000) });
+    const version = response.headers.get('X-Read-Version'), cache = readCache(fetcher);
+    if (version && cache.version !== version) { cache.values.clear(); cache.version = version; }
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
       throw new Error(requestError(body.detail, response.status));
@@ -37,6 +66,7 @@ export async function postJson<T>(path: string, body?: unknown): Promise<T> {
     const data = await response.json().catch(() => ({}));
     throw new Error(requestError(data.detail, response.status));
   }
+  invalidateReads();
   return response.json() as Promise<T>;
 }
 

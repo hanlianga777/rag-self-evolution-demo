@@ -1,4 +1,5 @@
 import {EvolutionRoute, DStory, QualityComparison, schemeName, schemeReason, storyText, StoryText, recommendationReason, dProgressLabel, ChangedParameters} from "../components/EvolutionStory";
+import { savedSnapshot } from "../evaluationProgress";
 import { DataTable } from "../components/DataTable";
 import { PricePauseNotice, UnattendedAuthorization } from "../components/RuntimeSettings";
 import { StoryDisclosure } from "../components/Storytelling";
@@ -38,16 +39,18 @@ export function EvolutionPage({ data }: { data: any }) {
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null), [candidateReport, setCandidateReport] = useState<any>(null);
   const [reportPage,setReportPage]=useState(1);
   const [candidateAudit, setCandidateAudit] = useState<any>(null);
+  const [candidateAuditOpen, setCandidateAuditOpen] = useState(false), [candidateMetricsOpen, setCandidateMetricsOpen] = useState(false);
+  useEffect(() => { setCandidateAuditOpen(false); setCandidateMetricsOpen(false); }, [selectedCandidate?.id]);
   useEffect(() => {
     setCandidateAudit(null);
-    if (!selectedCandidate?.experiment_id) return;
+    if (!selectedCandidate?.experiment_id || !candidateAuditOpen) return;
     let cancelled = false;
     void getJson<any>(`/api/experiments/${selectedCandidate.experiment_id}`).then(value => {
       if (!cancelled) setCandidateAudit(value.candidates?.find((item:any) => item.id === selectedCandidate.id));
     }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); });
     return () => { cancelled = true; };
-  }, [selectedCandidate?.id]);
-  useEffect(() => { setReportPage(1); setCandidateReport(null); const id = selectedCandidate?.result?.evaluation_run_id; if (!id || selectedCandidate.status!=="evaluated") return; let cancelled = false; void getJson<any>(`/api/evaluations/${id}`).then(value => { if (!cancelled) setCandidateReport(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [selectedCandidate]);
+  }, [selectedCandidate?.id, candidateAuditOpen]);
+  useEffect(() => { setReportPage(1); setCandidateReport(null); const id = selectedCandidate?.result?.evaluation_run_id; if (!id || selectedCandidate.status!=="evaluated" || !candidateAuditOpen && !candidateMetricsOpen) return; let cancelled = false; void getJson<any>(`/api/evaluations/${id}`).then(value => { if (!cancelled) setCandidateReport(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [selectedCandidate, candidateAuditOpen, candidateMetricsOpen]);
   const [selectedBadCase, setSelectedBadCase] = useState<any>(null);
   useEffect(() => {
     if (!selectedBadCase?.id || selectedBadCase.details_loaded !== false) return;
@@ -123,7 +126,7 @@ export function EvolutionPage({ data }: { data: any }) {
 
   const failedGates = (evaluation.result?.gates?.gates || []).filter((gate: any) => gate.status === "FAIL");
   const gateDetails = evaluation.gate_details || [];
-  const snapshot = evaluation.dataset_snapshot || (() => { try { return JSON.parse(evaluation.dataset_snapshot_json || "{}"); } catch { return {}; } })();
+  const snapshot = savedSnapshot(evaluation);
   useEffect(() => { setDiagnosticPlan(null); }, [identity]);
   const loadDiagnosticPlan = async () => { const captured=identity; try { const plan=await getJson<any>(`/api/evaluations/${evaluation.id}/diagnostic-plan`); if(currentIdentity.current===captured)setDiagnosticPlan(plan); } catch(reason) { if(currentIdentity.current===captured)setError(errorMessage(reason)); } };
   const refresh = async () => { const captured = identity; const value: any = await getJson("/api/optimization?light=true&planning=true"); if (currentIdentity.current === captured && (!value.current_baseline_id || value.current_baseline_id === evaluation.id)) setExperiment(value.id ? value : null); };
@@ -246,8 +249,8 @@ export function EvolutionPage({ data }: { data: any }) {
       <Section title="Config Diff · 参数差异"><ConfigDiff base={evaluation.config || {}} candidate={selectedCandidate}/></Section>
       <Section title="真实实验结果"><p>{qualificationExplanation(selectedCandidate)}</p><p>{selectedCandidate.status === "evaluated" ? regressionText(selectedCandidate.result) : "没有完整 Sandbox，回归结论未判定。"}</p><p>回归检查：{metricText(selectedCandidate.result,"regression")} · 目标修复 {metricText(selectedCandidate.result,"target_bad_cases_fixed")} · 净改善 {metricText(selectedCandidate.result,"net_improvement")}</p>{selectedCandidate.result?.evaluation_complete !== false && selectedCandidate.result?.regression_interpretation && <p>{selectedCandidate.result.regression_interpretation}</p>}{selectedCandidate.result?.evaluation_complete === false ? <p>完整50题后判定修复与退化；历史部分比较保留在高级审计。</p> : <p>已修复：{(selectedCandidate.result?.all_fixed_question_ids || []).map(questionLabel).join("、") || "未采集"} · 新增失败：{(selectedCandidate.result?.new_regression_question_ids || []).map(questionLabel).join("、") || "未采集"}</p>}</Section>
       {selectedCandidate.reasoning?.candidate_label === "D" && <Section title="组合来源与冲突"><p>基础赢家：{candidateName(candidates.find(item=>item.id === selectedCandidate.reasoning.winner_id))}</p>{(selectedCandidate.reasoning.sources || []).map((source:any)=><p key={source.candidate_id}>{candidateName(candidates.find(item=>item.id === source.candidate_id))} · {source.why_merge || "未保存合并理由"}</p>)}<p>冲突：{selectedCandidate.reasoning.conflicts ? Object.keys(selectedCandidate.reasoning.conflicts).join("、") || "无冲突" : "未采集"}</p></Section>}
-      <StoryDisclosure label="用量、耗时与审计"><ExecutionMetrics metrics={candidateReport?.cases?.find((row:any)=>row.programmatic_metrics?.stages)?.programmatic_metrics || {input_tokens:selectedCandidate.result?.comparison_metrics?.input_tokens,output_tokens:selectedCandidate.result?.comparison_metrics?.output_tokens}}/></StoryDisclosure>
-      <StoryDisclosure label="完整逐题报告与原始候选审计">{candidateReport?.cases?.length>50 && <div className="review-batch"><button disabled={reportPage===1} onClick={()=>setReportPage(reportPage-1)}>上一页</button><span>第 {reportPage} / {Math.ceil(candidateReport.cases.length/50)} 页</span><button disabled={reportPage*50>=candidateReport.cases.length} onClick={()=>setReportPage(reportPage+1)}>下一页</button></div>}{candidateReport?.cases?.length>0 && <div className="table-scroll"><DataTable><thead><tr><th>问题</th><th>判定</th><th>根因</th></tr></thead><tbody>{candidateReport.cases.slice((reportPage-1)*50,reportPage*50).map((row:any)=><tr key={row.question_id}><td><TruncatedText lines={2}>{row.question}</TruncatedText></td><td>{row.passed === true ? "通过" : row.passed === false ? "未通过" : "未采集"}</td><td>{rootName(rootCause(row))}</td></tr>)}</tbody></DataTable></div>}<pre className="technical-record">{JSON.stringify(candidateAudit || selectedCandidate,null,2)}</pre></StoryDisclosure>
+      <StoryDisclosure key={`metrics:${selectedCandidate.id}`} label="用量、耗时与审计" onToggle={event=>setCandidateMetricsOpen(event.currentTarget.open)}><ExecutionMetrics metrics={candidateReport?.cases?.find((row:any)=>row.programmatic_metrics?.stages)?.programmatic_metrics || {input_tokens:selectedCandidate.result?.comparison_metrics?.input_tokens,output_tokens:selectedCandidate.result?.comparison_metrics?.output_tokens}}/></StoryDisclosure>
+      <StoryDisclosure key={`audit:${selectedCandidate.id}`} label="完整逐题报告与原始候选审计" onToggle={event=>setCandidateAuditOpen(event.currentTarget.open)}>{candidateReport?.cases?.length>50 && <div className="review-batch"><button disabled={reportPage===1} onClick={()=>setReportPage(reportPage-1)}>上一页</button><span>第 {reportPage} / {Math.ceil(candidateReport.cases.length/50)} 页</span><button disabled={reportPage*50>=candidateReport.cases.length} onClick={()=>setReportPage(reportPage+1)}>下一页</button></div>}{candidateReport?.cases?.length>0 && <div className="table-scroll"><DataTable><thead><tr><th>问题</th><th>判定</th><th>根因</th></tr></thead><tbody>{candidateReport.cases.slice((reportPage-1)*50,reportPage*50).map((row:any)=><tr key={row.question_id}><td><TruncatedText lines={2}>{row.question}</TruncatedText></td><td>{row.passed === true ? "通过" : row.passed === false ? "未通过" : "未采集"}</td><td>{rootName(rootCause(row))}</td></tr>)}</tbody></DataTable></div>}<pre className="technical-record">{candidateAuditOpen ? JSON.stringify(candidateAudit || selectedCandidate,null,2) : null}</pre></StoryDisclosure>
     </>}</div></Drawer>
     <Drawer className="workbench-drawer" open={!!targetCandidate} onOpenChange={open => !open && setTargetCandidate(null)} title={`${candidateName(targetCandidate)} · 目标问题`}><div className="drawer-body"><p className="muted">来自已保存目标引用，只展示当前 Baseline 中可匹配的问题。</p><DiagnosisTable business rows={targetRows(targetCandidate,badCases)} strategy={()=>targetCandidate?.reasoning?.hypothesis || '优化假设未采集'} onSelect={row=>{setTargetCandidate(null);setSelectedBadCase({...row,result:{...row.result,optimization_strategy:targetCandidate?.reasoning?.hypothesis}})}} /></div></Drawer>
     <Drawer className="workbench-drawer search-space-drawer" open={searchOpen} onOpenChange={setSearchOpen} title={`可调参数 · ${searchSpace?.search_space ? Object.keys(searchSpace.search_space).length : "—"}`} ><div className="drawer-body"><p>优化 Agent 只能修改以下字段；参数类型、允许值来自后端 Validator 的同一策略。</p>{searchSpace?.search_space ? <SearchSpaceTable contract={searchSpace.search_space} baseline={evaluation.config || {}} /> : <p>{error || "正在读取 可调参数…"}</p>}</div></Drawer>

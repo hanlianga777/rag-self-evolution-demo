@@ -46,3 +46,50 @@ describe("getJson", () => {
     finally { vi.unstubAllGlobals(); }
   });
 });
+
+describe('display request reuse', () => {
+  it('coalesces concurrent reads and caches completed details, while active reads stay live', async () => {
+    let release!: () => void;
+    const fetcher = vi.fn(async () => { await new Promise<void>(resolve => { release = resolve; }); return new Response(JSON.stringify({status:'completed',cases:[{question:'保存的问题'}]})); });
+    const first = getJson('/api/evaluations/cache-test', fetcher);
+    const duplicate = getJson('/api/evaluations/cache-test', fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    release();
+    expect(await first).toEqual(await duplicate);
+    await getJson('/api/evaluations/cache-test', fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const active = vi.fn(async () => new Response(JSON.stringify({status:'running',completed:Math.random()})));
+    await getJson('/api/evaluations/active-test', active);
+    await getJson('/api/evaluations/active-test', active);
+    expect(active).toHaveBeenCalledTimes(2);
+  });
+});
+
+it('invalidates retained details when the server reports a new persisted version', async () => {
+  let version = 'first';
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(String(input).includes('workspace') ? {} : {status:'completed',version}), {headers:{'X-Read-Version':version}}));
+  await getJson('/api/evaluations/versioned', fetcher);
+  version = 'second';
+  await getJson('/api/workspace', fetcher);
+  await expect(getJson('/api/evaluations/versioned', fetcher)).resolves.toMatchObject({version:'second'});
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});
+
+it('keeps an experiment live when generation completed but its cycle or candidates are running', async () => {
+  const fetcher=vi.fn(async()=>new Response(JSON.stringify({status:'completed',result:{optimization_cycle:{status:'running'}},candidates:[{status:'queued'}]})));
+  await getJson('/api/experiments/active-cycle',fetcher);
+  await getJson('/api/experiments/active-cycle',fetcher);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it('invalidates completed detail reads after a successful mutation', async () => {
+  const fetcher=vi.fn(async()=>new Response(JSON.stringify({status:'completed'})));
+  vi.stubGlobal('fetch',fetcher);
+  try {
+    await getJson('/api/evaluations/saved');
+    await getJson('/api/evaluations/saved');
+    await postJson('/api/fixture-mutation',{});
+    await getJson('/api/evaluations/saved');
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  } finally {vi.unstubAllGlobals();}
+});

@@ -12,6 +12,7 @@ it('loads settings directly with no previous page or evaluation cache',async()=>
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/documents')?[]:url.includes('/pipeline')?{search_space:{},config:{}}:{}))));
  root=createRoot(document.body.appendChild(document.createElement('div')));
  await act(async()=>{root.render(<App/>);});
+  await act(async()=>{await vi.dynamicImportSettled();});
  expect(document.querySelector('h1')?.textContent).toBe('Pipeline 配置');
  expect(document.body.textContent).toContain('Agent 可选参数');
 });

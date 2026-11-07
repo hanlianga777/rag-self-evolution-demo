@@ -4,6 +4,7 @@ import {formatValue, parameterNames} from './PipelineFields';
 import {gateNames, narrativeText} from '../display';
 import {useEffect, useState} from 'react';
 import {getJson} from '../api';
+import {savedSnapshot} from '../evaluationProgress';
 
 export const storyParameterNames:Record<string,string>={...parameterNames,candidate_k:'查找候选条数',top_k:'回答证据条数',generation_thinking:'回答思考档位',multi_query:'扩展查询条数',query_rewrite:'改写提问',query_decompose:'拆解问题',hyde:'假设答案检索',hybrid_search:'混合检索',hybrid_alpha:'向量检索权重',rerank:'重排方式',prompt_strategy:'回答策略',retrieval_max_tokens:'证据长度上限',min_score:'最低相关度'};
 export const storyValue=(value:unknown):string => typeof value==='string' && ['off','low','high','max'].includes(value) ? ({off:'关闭',low:'低',high:'高',max:'最高'}[value]!) : formatValue(value);
@@ -186,8 +187,7 @@ export function ChangedParameters({before,after}:{before:any;after:any}) {
 const idsOf=(candidate:any,key:string):string[]|null => Array.isArray(candidate?.result?.[key]) ? candidate.result[key] : null;
 export function questionText(id:string,evaluation:any,badCases:any[]=[]):string {
   const row=badCases.find(row=>row.question_id===id || shortQuestionId(row.question_id || '')===shortQuestionId(id));
-  let snapshot=evaluation?.dataset_snapshot;
-  if(!snapshot && evaluation?.dataset_snapshot_json){try{snapshot=JSON.parse(evaluation.dataset_snapshot_json);}catch{/* No invented question text. */}}
+  const snapshot=savedSnapshot(evaluation || {});
   const saved=snapshot?.questions?.find((row:any)=>[row.id,row.question_id].some(key=>key && shortQuestionId(key)===shortQuestionId(id)));
   return row?.result?.question || row?.question || saved?.question || '题目原文未保存';
 }

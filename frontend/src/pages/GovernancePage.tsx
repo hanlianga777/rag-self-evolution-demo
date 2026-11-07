@@ -1,7 +1,7 @@
 import { DataTable } from "../components/DataTable";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { apiUrl, errorMessage, getJson, postJson } from "../api";
+import { apiUrl, errorMessage, getJson, cachedJson, postJson } from "../api";
 import { Badge, CustomSelect, MoreMenu, Section, ShortId, StageStepper, Status, TechnicalDetails, TruncatedText } from "../components/Primitives";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { displayText, isMachineQualified } from "../display";
@@ -209,7 +209,8 @@ export function GovernancePage({ data }: { data: any }) {
   };
   const openPoolDetail = async (row: Candidate) => {
     const ticket = ++poolTicket.current;
-    setPoolDetail(row); setSelectedId(row.id); setDetailStatus("正在读取候选题详情…");
+    const cached = cachedJson<Candidate>(`/api/governance/questions/${row.id}`);
+    setPoolDetail(cached || row); setSelectedId(row.id); setDetailStatus(cached ? "" : "正在读取候选题详情…");
     try { const result = await getJson<Candidate>(`/api/governance/questions/${row.id}`); if (ticket === poolTicket.current) { setPoolDetail(result); setRevisions(result.revision_history || []); setDetailStatus(""); } }
     catch (reason) { if (ticket === poolTicket.current) setDetailStatus(errorMessage(reason)); }
 
@@ -261,5 +262,5 @@ export function QuestionTable({ rows, onDetail, paging, resetKey }: { rows: Cand
     {label:"QC",value:(row:Candidate)=>typeof row.qc?.score === "number" ? goldenScore(row.qc.score) : null},
     {label:"Baseline",value:(row:Candidate)=>typeof row.baseline_result?.passed === "boolean" ? row.baseline_result.passed ? "对" : row.baseline_result.diagnosis_category ? `错 · ${row.baseline_result.diagnosis_category}` : null : null},
   ].filter(column=>rows.length>0 && rows.every(row=>column.value(row)!=null));
-  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><DataTable><thead><tr>{["题号", "题型", "问题",...optional.map(c=>c.label),"操作"].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row.id} tabIndex={0} role="button" aria-label={`${row.slot || "题目"} · ${row.question}`} onClick={() => onDetail(row)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDetail(row); } }}><td>{row.slot || row.raw?.coverage_slot || row.id}</td><td>{displayText(row.test_category || (row.failed ? "生成失败" : "类型未记录"))}{row.test_category === "negative" && row.negative_subtype && <small>{displayText(row.negative_subtype)}</small>}</td><td><TruncatedText lines={2}>{row.question}</TruncatedText></td>{optional.map(column=><td key={column.label}><TruncatedText lines={2}>{column.value(row)}</TruncatedText></td>)}<td><button className="text-button" onClick={event => { event.stopPropagation(); onDetail(row); }}>查看详情</button></td></tr>)}{!rows.length && !paging?.error && <tr><td colSpan={4+optional.length} className="empty-state">还没有符合筛选条件的题目。<p>题目完成生成与校验后会显示在这里。</p></td></tr>}</tbody></DataTable></ScrollablePagedTable>;
+  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><DataTable><thead><tr>{["题号", "题型", "问题",...optional.map(c=>c.label),"操作"].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row.id} tabIndex={0} role="button" aria-label={`${row.slot || "题目"} · ${row.question}`} onClick={() => onDetail(row)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDetail(row); } }}><td>{row.slot || row.raw?.coverage_slot || row.id}</td><td>{displayText(row.test_category || (row.failed ? "生成失败" : "类型未记录"))}{row.test_category === "negative" && row.negative_subtype && <small>{displayText(row.negative_subtype)}</small>}</td><td><TruncatedText lines={2}>{row.question}</TruncatedText></td>{optional.map(column=><td key={column.label}><TruncatedText lines={2}>{column.value(row)}</TruncatedText></td>)}<td><button className="text-button" onMouseEnter={()=>{if(!row.failed)void getJson(`/api/governance/questions/${row.id}`).catch(()=>{});}} onFocus={()=>{if(!row.failed)void getJson(`/api/governance/questions/${row.id}`).catch(()=>{});}} onClick={event => { event.stopPropagation(); onDetail(row); }}>查看详情</button></td></tr>)}{!rows.length && !paging?.error && <tr><td colSpan={4+optional.length} className="empty-state">还没有符合筛选条件的题目。<p>题目完成生成与校验后会显示在这里。</p></td></tr>}</tbody></DataTable></ScrollablePagedTable>;
 }

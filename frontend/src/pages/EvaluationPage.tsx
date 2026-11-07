@@ -1,3 +1,4 @@
+import { savedSnapshot } from "../evaluationProgress";
 import { DataTable } from "../components/DataTable";
 import { PricePauseNotice } from "../components/RuntimeSettings";
 import { mergeEvaluationProgress, hasEvaluationDetails } from "../evaluationProgress";
@@ -157,7 +158,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const details: Row[] = run.gate_details || [];
   const relatedBad = badCases.filter(item => item.run_id === run.id);
   const cases: Row[] = run.cases || relatedBad.map(row=>({...row.result,question_id:row.question_id}));
-  const snapshot = run.dataset_snapshot || (() => { try { return JSON.parse(run.dataset_snapshot_json || "{}"); } catch { return {}; } })();
+  const snapshot = savedSnapshot(run);
   const profile = snapshot.profile || {};
   const categoryCounts = ["positive", "ablation", "negative"].map(key => profile[`${key}_count`] ?? profile[key] ?? (cases.length && cases.length === snapshot.question_ids?.length ? cases.filter(item => item.test_category === key).length : null));
   const config = run.config || {};
