@@ -14,6 +14,33 @@ const snapshot = { id: "GD-frozen", status: "approved", created_at: "2026-11-01T
 const frozenData = { generationRuns: [run], snapshots: [snapshot], dataset: [row], workspace: { current_golden_id: snapshot.id, generation_profiles: { medium: run.profile } } };
 function stubFrozen() { const fetcher = vi.fn(async (url: string, init?: RequestInit) => { if (init?.method && init.method !== "GET") throw new Error("禁止写接口"); return new Response(JSON.stringify(url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url) ? goldenFixture(url, [row]) : [])); }); vi.stubGlobal("fetch", fetcher); return fetcher; }
 
+it("shows a cached frozen dataset after a minute while metadata revalidation is pending", async () => {
+  let hold = false;
+  const pending: Array<() => void> = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (hold) await new Promise<void>(resolve => pending.push(resolve));
+    return new Response(JSON.stringify(url.includes('generation-runs?') ? [run] : url.includes('snapshots?') ? [snapshot] : goldenFixture(url, [row])));
+  }));
+  const container = document.body.appendChild(document.createElement('div'));
+  let root = createRoot(container);
+  const data = { workspace: frozenData.workspace };
+  await act(async () => root.render(<GovernancePage data={data} />));
+  expect(document.querySelector('.review-table')?.textContent).toContain(row.question);
+  await act(async () => root.unmount());
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60000);
+  hold = true;
+  root = createRoot(container);
+  try {
+    await act(async () => root.render(<GovernancePage data={data} />));
+    expect(document.querySelector('.golden-initial-skeleton')).toBeNull();
+    expect(document.querySelector('.review-table')?.textContent).toContain(row.question);
+    expect(document.querySelector('.page-title p')?.textContent).toContain('已冻结');
+  } finally {
+    await act(async () => root.unmount());
+    await act(async () => pending.forEach(resolve => resolve()));
+  }
+});
+
 it("shows a skeleton until the initial run and frozen snapshot resolve", async () => {
   const pending: Array<() => void> = [];
   vi.stubGlobal("fetch", vi.fn((url: string) => new Promise(resolve => pending.push(() => resolve(new Response(JSON.stringify(url.includes("generation-runs?") ? [run] : url.includes("snapshots?") ? [snapshot] : goldenFixture(url, [row]))))))));

@@ -3,7 +3,7 @@ import {DataTable} from './DataTable';
 import {formatValue, parameterNames} from './PipelineFields';
 import {gateNames, narrativeText} from '../display';
 import {useEffect, useState} from 'react';
-import {getJson} from '../api';
+import {cachedJson, getJson} from '../api';
 import {savedSnapshot} from '../evaluationProgress';
 
 export const storyParameterNames:Record<string,string>={...parameterNames,candidate_k:'查找候选条数',top_k:'回答证据条数',generation_thinking:'回答思考档位',multi_query:'扩展查询条数',query_rewrite:'改写提问',query_decompose:'拆解问题',hyde:'假设答案检索',hybrid_search:'混合检索',hybrid_alpha:'向量检索权重',rerank:'重排方式',prompt_strategy:'回答策略',retrieval_max_tokens:'证据长度上限',min_score:'最低相关度'};
@@ -123,15 +123,18 @@ function dWinningReason(experiment:any):string {
 function DResultStory({experiment,evaluation,badCases}:{experiment:any;evaluation:any;badCases:any[]}) {
   const {d,winner,facts,result,fixed,broken,targets,watched,watchedGates,riskRecorded}=dResultData(experiment);
   const runId=result?.evaluation_run_id,identity=result?.evaluation_identity;
-  const [saved,setSaved]=useState<any>(null),[error,setError]=useState('');
+  const [saved,setSaved]=useState<any>(()=>{const run=runId && cachedJson<any>(`/api/evaluations/${runId}`);return run && run.id===runId && run.status==='completed' && identity && run.judge?.evaluation_identity===identity ? {runId,identity,cases:run.cases || []} : null;}),[error,setError]=useState('');
   useEffect(()=>{
     let cancelled=false;setSaved(null);setError('');
     if(!runId)return;
-    void getJson<any>(`/api/evaluations/${runId}`).then(run=>{
+    const accept=(run:any)=>{
       if(cancelled)return;
       if(run.id!==runId || run.status!=='completed' || !identity || run.judge?.evaluation_identity!==identity)throw new Error('保存的评测身份不一致');
       setSaved({runId,identity,cases:run.cases || []});
-    }).catch(()=>{if(!cancelled)setError('保存的逐题结果读取失败，原因与保护题结果未知。');});
+    };
+    const cached=cachedJson<any>(`/api/evaluations/${runId}`);
+    if(cached){try{accept(cached);}catch{setError('保存的逐题结果读取失败，原因与保护题结果未知。');}}
+    void getJson<any>(`/api/evaluations/${runId}`).then(accept).catch(()=>{if(!cancelled)setError('保存的逐题结果读取失败，原因与保护题结果未知。');});
     return ()=>{cancelled=true;};
   },[runId,identity]);
   const cases=saved && saved.runId===runId && saved.identity===identity ? saved.cases : [];

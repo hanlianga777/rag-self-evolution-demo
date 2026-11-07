@@ -12,7 +12,7 @@ export function usePagedCandidates(identity: string, path: string, enabled = tru
   const read = async (offset = 0) => {
     if (!enabled || pending.current || key !== activeKey.current) return;
     const ticket = ++request.current;
-    pending.current = true; setLoading(true); setError("");
+    pending.current = true; setLoading(offset > 0 || !current.rows?.length); setError("");
     const url = `${path}&limit=30&offset=${offset}`;
     try {
       const value = await goldenFetch<any>(identity, url);

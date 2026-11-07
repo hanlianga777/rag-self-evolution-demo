@@ -12,7 +12,7 @@ import { PageShell } from "../components/PageShell";
 import { RetrievalEvidence } from "../components/RetrievalEvidence";
 import { useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
-import { errorMessage, getJson, identityKey, postJson } from "../api";
+import { cachedJson, errorMessage, getJson, identityKey, postJson } from "../api";
 import { Badge, ConclusionCard, MoreMenu, Section, ShortId, StageStepper, Status, TruncatedText } from "../components/Primitives";
 import { ExecutionMetrics, ParameterDiff, SearchSpaceTable, parameterNames, formatValue, billedCostText } from "../components/PipelineFields";
 import { Drawer } from "../components/Dialog";
@@ -44,13 +44,14 @@ export function EvolutionPage({ data }: { data: any }) {
   useEffect(() => {
     setCandidateAudit(null);
     if (!selectedCandidate?.experiment_id || !candidateAuditOpen) return;
+    setCandidateAudit(cachedJson<any>(`/api/experiments/${selectedCandidate.experiment_id}`)?.candidates?.find((item:any) => item.id === selectedCandidate.id) || null);
     let cancelled = false;
     void getJson<any>(`/api/experiments/${selectedCandidate.experiment_id}`).then(value => {
       if (!cancelled) setCandidateAudit(value.candidates?.find((item:any) => item.id === selectedCandidate.id));
     }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); });
     return () => { cancelled = true; };
   }, [selectedCandidate?.id, candidateAuditOpen]);
-  useEffect(() => { setReportPage(1); setCandidateReport(null); const id = selectedCandidate?.result?.evaluation_run_id; if (!id || selectedCandidate.status!=="evaluated" || !candidateAuditOpen && !candidateMetricsOpen) return; let cancelled = false; void getJson<any>(`/api/evaluations/${id}`).then(value => { if (!cancelled) setCandidateReport(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [selectedCandidate, candidateAuditOpen, candidateMetricsOpen]);
+  useEffect(() => { setReportPage(1); const id = selectedCandidate?.result?.evaluation_run_id; setCandidateReport(id && selectedCandidate.status==="evaluated" && (candidateAuditOpen || candidateMetricsOpen) ? cachedJson<any>(`/api/evaluations/${id}`) || null : null); if (!id || selectedCandidate.status!=="evaluated" || !candidateAuditOpen && !candidateMetricsOpen) return; let cancelled = false; void getJson<any>(`/api/evaluations/${id}`).then(value => { if (!cancelled) setCandidateReport(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [selectedCandidate, candidateAuditOpen, candidateMetricsOpen]);
   const [selectedBadCase, setSelectedBadCase] = useState<any>(null);
   useEffect(() => {
     if (!selectedBadCase?.id || selectedBadCase.details_loaded !== false) return;

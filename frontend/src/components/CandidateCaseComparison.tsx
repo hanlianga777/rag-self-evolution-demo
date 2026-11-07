@@ -1,19 +1,28 @@
 import { DataTable } from "./DataTable";
 import { displayText } from "../display";
 import { useEffect, useState } from 'react';
-import { getJson, errorMessage } from '../api';
+import { cachedJson, getJson, errorMessage } from '../api';
 import { TruncatedText } from './Primitives';
 import { FilterButtons } from './Storytelling';
 import { questionLabel } from './EvaluationDiagnosis';
 
 export function CandidateCaseComparison({candidates,baselineId,kind,onSelect,onCompare}:{candidates:any[];baselineId:string;kind:'fixed'|'regression';onSelect:(row:any)=>void;onCompare?:(row:any)=>void}){
- const [id,setId]=useState(candidates[0]?.id || ''),[runs,setRuns]=useState<any>(null),[error,setError]=useState('');
+ const [id,setId]=useState(candidates[0]?.id || ''),[error,setError]=useState('');
  const [severity,setSeverity]=useState('all');
  const candidate=candidates.find(c=>c.id===id) || candidates[0];
  const runId=candidate?.result?.evaluation_run_id;
  const pendingRun=!!candidate?.status && candidate.status!=="evaluated";
+ const paths=[`/api/evaluations/${baselineId}`,`/api/evaluations/${runId}`];
+ const readRuns=([baseline,current]:any[])=>{if(!baseline?.judge?.evaluation_identity || baseline.judge.evaluation_identity!==current?.judge?.evaluation_identity || !baseline.dataset_version_id || baseline.dataset_version_id!==current.dataset_version_id)throw new Error('Baseline与候选方案评测身份或Golden不一致，停止逐题对照。');return {baseline,current,runId};};
+ const [runs,setRuns]=useState<any>(()=>{if(!runId || !baselineId || pendingRun)return null;try{return readRuns(paths.map(path=>cachedJson<any>(path)));}catch{return null;}});
  useEffect(()=>{setSeverity('all');},[candidate?.id,kind]);
- useEffect(()=>{let cancelled=false;setRuns(null);setError('');if(!runId || !baselineId || pendingRun)return;void Promise.all([getJson<any>(`/api/evaluations/${baselineId}`),getJson<any>(`/api/evaluations/${runId}`)]).then(([baseline,current])=>{if(!baseline.judge?.evaluation_identity || baseline.judge.evaluation_identity!==current.judge?.evaluation_identity || !baseline.dataset_version_id || baseline.dataset_version_id!==current.dataset_version_id)throw new Error('Baseline与候选方案评测身份或Golden不一致，停止逐题对照。');if(!cancelled)setRuns({baseline,current,runId})}).catch(reason=>{if(!cancelled)setError(errorMessage(reason))});return()=>{cancelled=true};},[runId,baselineId,pendingRun]);
+ useEffect(()=>{
+  let cancelled=false;setRuns(null);setError('');if(!runId || !baselineId || pendingRun)return;
+  const accept=(values:any[])=>{const next=readRuns(values);if(!cancelled)setRuns(next)};
+  const saved=paths.map(path=>cachedJson<any>(path));
+  if(saved.every(Boolean)){try{accept(saved);}catch(reason){setError(errorMessage(reason));}}
+  void Promise.all(paths.map(path=>getJson<any>(path))).then(accept).catch(reason=>{if(!cancelled)setError(errorMessage(reason))});return()=>{cancelled=true};
+ },[runId,baselineId,pendingRun]);
  const ids=candidate?.result?.[kind==='fixed'?'all_fixed_question_ids':'new_regression_question_ids'];
  const rows=runs?.runId===runId && Array.isArray(ids)?[...new Set<string>(ids)].map(question_id=>{const before=runs.baseline.cases?.find((c:any)=>c.question_id===question_id),after=runs.current.cases?.find((c:any)=>c.question_id===question_id);return {question_id,before,after,...(kind==='fixed'?before:after)}}):[];
  const visible=rows.filter(row=>severity==='all' || severity==='unknown' && !row.after?.severity || row.after?.severity===severity);

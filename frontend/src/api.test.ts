@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { apiUrl, getJson, postJson, loadAppData } from "./api";
+import { apiUrl, cachedJson, getJson, postJson, loadAppData } from "./api";
 
 describe("getJson", () => {
   it("loads only the current page inputs and leaves full Agent details for its page", async () => {
@@ -48,6 +48,35 @@ describe("getJson", () => {
 });
 
 describe('display request reuse', () => {
+  it('evicts the least recently used retained detail instead of the oldest write', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({status:'completed'})));
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      for (let index = 0; index < 128; index++) await getJson(`/api/evaluations/lru-${index}`);
+      expect(cachedJson('/api/evaluations/lru-0')).toBeDefined();
+      await getJson('/api/evaluations/lru-128');
+      expect(cachedJson('/api/evaluations/lru-0')).toBeDefined();
+      expect(cachedJson('/api/evaluations/lru-1')).toBeUndefined();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it('keeps completed details visible beyond 30 seconds while refreshing them', async () => {
+    let release!: () => void;
+    const fetcher = vi.fn(async () => {
+      if (fetcher.mock.calls.length > 1) await new Promise<void>(resolve => { release = resolve; });
+      return new Response(JSON.stringify({status:'completed', revision:fetcher.mock.calls.length}));
+    });
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      await getJson('/api/evaluations/retained');
+      const now = Date.now();
+      vi.spyOn(Date,'now').mockReturnValue(now + 60000);
+      const refresh = getJson('/api/evaluations/retained');
+      expect(cachedJson('/api/evaluations/retained')).toMatchObject({revision:1});
+      release(); await refresh;
+      expect(cachedJson('/api/evaluations/retained')).toMatchObject({revision:2});
+    } finally { vi.restoreAllMocks(); vi.unstubAllGlobals(); }
+  });
   it('coalesces concurrent reads and caches completed details, while active reads stay live', async () => {
     let release!: () => void;
     const fetcher = vi.fn(async () => { await new Promise<void>(resolve => { release = resolve; }); return new Response(JSON.stringify({status:'completed',cases:[{question:'保存的问题'}]})); });

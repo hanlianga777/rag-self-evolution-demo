@@ -18,8 +18,8 @@ it('separates running, product interruption, evaluated failure and qualified car
  await mount(experiment([candidate('A','running'),candidate('B','failed',{evaluation_complete:false,completed:7,total:50},{product_interruption:true}),candidate('C','evaluated',{qualification:{qualified:false}}),candidate('D','evaluated',{qualification:{qualified:true}})]));
  await click('A/B/C/D');
  const cards=[...document.querySelectorAll('.candidate-card')];
- expect(cards.map(card=>card.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['运行中','试跑中断','已评测未通过']);
- expect(document.querySelector('.d-story')?.textContent).toContain('试跑状态：合格');
+ expect(cards.map(card=>card.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['运行中','评测中断','已评测未通过']);
+ expect(document.querySelector('.d-story')?.textContent).toContain('评测状态：合格');
  expect(cards[1].querySelector('.candidate-card-header .badge')?.classList.contains('warning')).toBe(true);
  expect(cards[1].textContent).toContain('产品故障，会自动续跑');
  expect(cards[1].textContent).not.toContain('付费确认');
@@ -27,12 +27,12 @@ it('separates running, product interruption, evaluated failure and qualified car
 it('does not promise automatic continuation for permission or identity failures',async()=>{
  await mount(experiment([candidate('A','failed',{evaluation_complete:false,error:'Provider权限不足'},{product_interruption:false})]));
  await click('A/B/C/D');
- expect(document.querySelector('.candidate-card-header .badge')?.textContent).toBe('试跑停止');
+ expect(document.querySelector('.candidate-card-header .badge')?.textContent).toBe('评测停止');
  expect(document.querySelector('.candidate-card')?.textContent).not.toContain('自动续跑');
 });
 it('reads budget usage from the API even when several candidates are interrupted',async()=>{
  await mount(experiment(['A','B','C'].map(label=>candidate(label,'failed',{evaluation_complete:false},{product_interruption:true})),{evaluation_budget:{used:0,max:12,reserved_for_d:1}}));
- expect(document.querySelector('.stage-stepper')?.parentElement?.textContent).toContain('已试跑 0 / 12 次');
+ expect(document.querySelector('.stage-stepper')?.parentElement?.textContent).toContain('已评测 0 / 12 次');
  await click('进化路线');
  expect(document.body.textContent).not.toContain('3 / 12');
 });

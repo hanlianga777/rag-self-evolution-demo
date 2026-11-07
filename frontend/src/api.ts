@@ -17,23 +17,31 @@ export function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "请求失败，请重试";
 }
 
-const readCaches = new WeakMap<Fetcher, { pending: Map<string, Promise<any>>; values: Map<string, { value: any; at: number }>; version?: string }>();
+const readCaches = new WeakMap<Fetcher, { pending: Map<string, Promise<any>>; values: Map<string, { value: any; at: number }>; token: { version?: string } }>();
 function readCache(fetcher: Fetcher) {
-  if (!readCaches.has(fetcher)) readCaches.set(fetcher, { pending: new Map(), values: new Map() });
+  if (!readCaches.has(fetcher)) readCaches.set(fetcher, { pending: new Map(), values: new Map(), token: {} });
   return readCaches.get(fetcher)!;
 }
-export function cachedJson<T>(path: string): T | undefined { return readCache(fetch).values.get(path)?.value; }
+// Display values have no TTL; 30 seconds below only avoids unnecessary revalidation.
+export function readCacheToken() { return readCache(fetch).token; }
+export function cachedJson<T>(path: string): T | undefined {
+  const values = readCache(fetch).values, saved = values.get(path);
+  if (saved) { values.delete(path); values.set(path, saved); }
+  return saved?.value;
+}
 export function invalidateReads() { readCaches.delete(fetch); }
 
 export function getJson<T>(path: string, fetcher: Fetcher = fetch): Promise<T> {
   const cache = readCache(fetcher), saved = cache.values.get(path);
+  if (saved) { cache.values.delete(path); cache.values.set(path, saved); }
   if (saved && Date.now() - saved.at < 30000) return Promise.resolve(saved.value);
   if (!cache.pending.has(path)) {
     const request = requestJson<T>(path, fetcher).then(value => {
       // Mutable lists and running jobs always go to the server; retain completed detail records only.
       const record = value as any;
       const completed = record?.status === 'completed' && !record.candidates?.some((item:any)=>['running','queued'].includes(item.status)) && !['running','queued'].includes(record.result?.optimization_cycle?.status) && !['running','queued','scheduled','waiting'].includes(record.result?.composite_schedule?.status);
-      if ((/^\/api\/(evaluations|experiments)\/[^/?]+(?:\/comparison-cases|\/cases\/[^/?]+)?$/.test(path) && completed) || /^\/api\/(documents|governance\/questions)\/[^/?]+$/.test(path)) {
+      if (cache === readCache(fetcher) && ((/^\/api\/(evaluations|experiments)\/[^/?]+(?:\/comparison-cases|\/cases\/[^/?]+)?$/.test(path) && completed) || /^\/api\/(documents|knowledge\/clusters|knowledge\/slots|governance\/questions)\/[^/?]+$/.test(path))) {
+        cache.values.delete(path);
         cache.values.set(path, { value, at: Date.now() });
         if (cache.values.size > 128) cache.values.delete(cache.values.keys().next().value!);
       }
@@ -46,9 +54,10 @@ export function getJson<T>(path: string, fetcher: Fetcher = fetch): Promise<T> {
 
 async function requestJson<T>(path: string, fetcher: Fetcher): Promise<T> {
   try {
+    const cache = readCache(fetcher);
     const response = await fetcher(apiUrl(path), { signal: AbortSignal.timeout(15000) });
-    const version = response.headers.get('X-Read-Version'), cache = readCache(fetcher);
-    if (version && cache.version !== version) { cache.values.clear(); cache.version = version; }
+    const version = response.headers.get('X-Read-Version');
+    if (cache === readCache(fetcher) && version && cache.token.version !== version) { cache.values.clear(); cache.token.version = version; }
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
       throw new Error(requestError(body.detail, response.status));

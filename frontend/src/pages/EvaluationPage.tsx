@@ -10,7 +10,7 @@ import { PageShell } from "../components/PageShell";
 import { RetrievalEvidence } from "../components/RetrievalEvidence";
 import { useEffect, useState } from "react";
 import { Play } from "lucide-react";
-import { errorMessage, getJson, postJson } from "../api";
+import { cachedJson, errorMessage, getJson, postJson } from "../api";
 import { Badge, Metric, MoreMenu, ProgressBar, Section, ShortId, Status } from "../components/Primitives";
 import { ExecutionMetrics, formatValue, parameterGroups, parameterNames, thinkingLabel } from "../components/PipelineFields";
 import { CaseAnswer } from "../components/CaseAnswer";
@@ -50,9 +50,10 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const [historyBusy, setHistoryBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("report");
   const [filter, setFilter] = useState<Filter>("bad");
-  const [run, setRun] = useState<Row>(data.evaluation || {});
+  const retainedRun = (value: Row) => value.status === "completed" && !hasEvaluationDetails(value) ? cachedJson<Row>(`/api/evaluations/${value.id}`) || value : value;
+  const [run, setRun] = useState<Row>(() => retainedRun(data.evaluation || {}));
   const [badCases, setBadCases] = useState<Row[]>(data.badCases || []);
-  useEffect(() => { setRun(current => hasEvaluationDetails(data.evaluation || {}) ? data.evaluation : mergeEvaluationProgress(current, data.evaluation || {})); setBadCases(data.badCases || []); }, [data.evaluation, data.badCases]);
+  useEffect(() => { const next = retainedRun(data.evaluation || {}); setRun(current => hasEvaluationDetails(next) ? next : mergeEvaluationProgress(current, next)); setBadCases(data.badCases || []); }, [data.evaluation, data.badCases]);
   const [selectedGate, setSelectedGate] = useState<Row | null>(null);
   const [selectedCase, setSelectedCase] = useState<Row | null>(null);
   const selectedDetail = run.cases?.find((row: Row) => row.question_id === selectedCase?.question_id) || selectedCase;
@@ -85,8 +86,12 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
 
   useEffect(()=>{let cancelled=false;void Promise.resolve().then(()=>{if(!cancelled)return getJson<Row>('/api/evaluation?active_task=true&light=true').then(value=>{if(!cancelled && value.id && ["queued","running"].includes(value.status))setRun(current=>mergeEvaluationProgress(current,value))}).catch(()=>{});});return()=>{cancelled=true};},[]);
   useEffect(() => {
-    if (!run.id || run.status === "completed" && run.cases) return;
+    if (!run.id) return;
     let cancelled = false;
+    if (run.status === "completed" && run.cases) {
+      void getJson<Row>(`/api/evaluations/${run.id}`).then(value => { if (!cancelled) setRun(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); });
+      return () => { cancelled = true; };
+    }
     const poll = async () => {
       if(cancelled)return;
       try {

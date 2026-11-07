@@ -13,15 +13,19 @@ export function SavedAnswerComparison({data,onOpenCitation}:{data:any;onOpenCita
   const baselineBlocked=!baselineId || baseline?.id!==baselineId;
   const paths=[baselineId,runId].map(id=>`/api/evaluations/${encodeURIComponent(id)}/comparison-cases`);
   const binding=JSON.stringify([baselineId,runId,candidate?.id,candidate?.status,candidate?.result?.evaluation_complete]);
-  const [runs,setRuns]=useState<any>(null),[selected,setSelected]=useState(''),[filter,setFilter]=useState('fixed'),[search,setSearch]=useState(''),[error,setError]=useState(''),[details,setDetails]=useState<any>({});
+  const readRuns=([before,after]:any[])=>{
+    if(before?.id!==baselineId || after?.id!==runId || before.status!=='completed' || after.status!=='completed' || !before.judge?.evaluation_identity || before.judge.evaluation_identity!==after.judge?.evaluation_identity || !before.dataset_version_id || before.dataset_version_id!==after.dataset_version_id)throw new Error('评测身份或题卷不一致，不能展示优化前后对比。');
+    const rows=(before.cases || []).map((row:any)=>({...row,after:(after.cases || []).find((item:any)=>item.question_id===row.question_id)}));
+    return {before,after,rows,binding};
+  };
+  const [runs,setRuns]=useState<any>(()=>{if(baselineBlocked || !runId || !completeResult(candidate))return null;try{return readRuns(paths.map(path=>cachedJson<any>(path)));}catch{return null;}}),[selected,setSelected]=useState(''),[filter,setFilter]=useState('fixed'),[search,setSearch]=useState(''),[error,setError]=useState(''),[details,setDetails]=useState<any>({});
   useEffect(()=>{
     let cancelled=false;setRuns(null);setSelected('');setError('');setDetails({});setFilter('fixed');setSearch('');
     if(baselineBlocked || !runId || !completeResult(candidate))return;
     const accept=([before,after]:any[])=>{
       if(cancelled)return;
-      if(before.id!==baselineId || after.id!==runId || before.status!=='completed' || after.status!=='completed' || !before.judge?.evaluation_identity || before.judge.evaluation_identity!==after.judge?.evaluation_identity || !before.dataset_version_id || before.dataset_version_id!==after.dataset_version_id)throw new Error('评测身份或题卷不一致，不能展示优化前后对比。');
-      const rows=(before.cases || []).map((row:any)=>({...row,after:(after.cases || []).find((item:any)=>item.question_id===row.question_id)}));
-      setRuns({before,after,rows,binding});setSelected(previous=>previous || rows.find((row:any)=>row.passed===false && row.after?.passed===true)?.question_id || '');
+      const next=readRuns([before,after]);
+      setRuns(next);setSelected(previous=>previous || next.rows.find((row:any)=>row.passed===false && row.after?.passed===true)?.question_id || '');
     };
     const saved=paths.map(path=>cachedJson<any>(path));
     if(saved.every(Boolean)){try{accept(saved);}catch(reason){setError(errorMessage(reason));}}
@@ -37,7 +41,7 @@ export function SavedAnswerComparison({data,onOpenCitation}:{data:any;onOpenCita
   const savedDetail=details[detailKey] || detailPaths.map(path=>cachedJson<any>(path));
   const ready=savedDetail?.every(Boolean),before=ready?savedDetail[0].case:null,after=ready?savedDetail[1].case:null;
   useEffect(()=>{
-    if(!current || !id || ready)return;
+    if(!current || !id)return;
     let cancelled=false;setError('');
     void Promise.all(detailPaths.map(path=>getJson<any>(path))).then(value=>{if(!cancelled)setDetails((previous:any)=>({...previous,[detailKey]:value}));}).catch(reason=>{if(!cancelled)setError(errorMessage(reason));});
     return ()=>{cancelled=true;};

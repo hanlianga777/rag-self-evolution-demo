@@ -38,7 +38,7 @@ export function GovernancePage({ data }: { data: any }) {
   const [snapshots, setSnapshots] = useState<Candidate[]>(goldenCached<Candidate[]>(cacheIdentity, "/api/governance/snapshots?light=true") || data.snapshots || []);
   const [revisions, setRevisions] = useState<Candidate[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
-  const [metadataLoaded, setMetadataLoaded] = useState(!!data.generationRuns && (!data.workspace?.current_golden_id || !!data.snapshots?.some((snapshot: Candidate) => snapshot.id === data.workspace.current_golden_id)));
+  const [metadataLoaded, setMetadataLoaded] = useState(!!(goldenCached(cacheIdentity, "/api/governance/generation-runs?light=true") || data.generationRuns) && (!data.workspace?.current_golden_id || snapshots.some(snapshot => snapshot.id === data.workspace.current_golden_id)));
   const [poolDetail, setPoolDetail] = useState<Candidate | null>(null);
   const [detailStatus, setDetailStatus] = useState("");
   const poolTicket = useRef(0);

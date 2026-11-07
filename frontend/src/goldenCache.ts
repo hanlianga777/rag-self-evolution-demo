@@ -1,14 +1,30 @@
-import { getJson } from "./api";
-// ponytail: process memory only; each revisit revalidates with the server.
-const values = new Map<string, any>(), versions = new Map<string, string>(), pending = new Map<string, Promise<any>>();
+import { getJson, readCacheToken } from "./api";
+// Session memory, at most 128 views; no time-based eviction. Revisit revalidates silently.
+const values = new Map<string, { value: any; scope: ReturnType<typeof readCacheToken>; version?: string }>();
+const pending = new Map<string, { scope: ReturnType<typeof readCacheToken>; version?: string; promise: Promise<any> }>();
 let epoch = 0;
-export const goldenCached = <T,>(identity: string, path: string): T | undefined => values.get(versions.get(identity + path) || "");
-export function goldenFetch<T>(identity: string, path: string): Promise<T> {
-  const key = identity + path, captured = epoch;
-  if (!pending.has(key)) pending.set(key, getJson<any>(path).then(value => {
-    if (captured === epoch) { const versionKey = key + JSON.stringify(value.data_version ?? value.map?.((row: any) => [row.id, row.updated_at, row.human_gate])); const previous = versions.get(key); if (previous) values.delete(previous); versions.set(key, versionKey); values.set(versionKey, value); }
-    return value;
-  }).finally(() => { if (captured === epoch) pending.delete(key); }));
-  return pending.get(key)!;
+export function goldenCached<T>(identity: string, path: string): T | undefined {
+  const key = JSON.stringify([identity, path]), saved = values.get(key), scope = readCacheToken();
+  if (!saved) return;
+  values.delete(key);
+  if (saved.scope !== scope || saved.version !== scope.version) return;
+  values.set(key, saved);
+  return saved.value;
 }
-export function invalidateGolden() { epoch++; values.clear(); versions.clear(); pending.clear(); }
+export function goldenFetch<T>(identity: string, path: string): Promise<T> {
+  const key = JSON.stringify([identity, path]), captured = epoch, scope = readCacheToken();
+  const previous = pending.get(key);
+  if (previous && (previous.scope !== scope || previous.version !== scope.version)) pending.delete(key);
+  if (!pending.has(key)) {
+    const request = getJson<any>(path).then(value => {
+      if (captured === epoch && scope === readCacheToken()) {
+        values.delete(key); values.set(key, { value, scope, version: scope.version });
+        if (values.size > 128) values.delete(values.keys().next().value!);
+      }
+      return value;
+    }).finally(() => { if (pending.get(key)?.promise === request) pending.delete(key); });
+    pending.set(key, { scope, version: scope.version, promise: request });
+  }
+  return pending.get(key)!.promise;
+}
+export function invalidateGolden() { epoch++; values.clear(); pending.clear(); }

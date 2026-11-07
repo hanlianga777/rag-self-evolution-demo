@@ -5,7 +5,7 @@ import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
 import { FileText, Search } from "lucide-react";
 import { Drawer } from "../components/Dialog";
 import { Badge, Section, Status, MoreMenu, TechnicalDetails, EmptyState } from "../components/Primitives";
-import { apiUrl, getJson } from "../api";
+import { apiUrl, cachedJson, getJson, invalidateReads } from "../api";
 import { displayText } from "../display";
 import type { Citation } from "../types";
 
@@ -17,9 +17,11 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
   const [view, setView] = useState("assets");
   const [knowledge, setKnowledge] = useState<any>(data.overview?.knowledge || {});
   const [clusterId, setClusterId] = useState<string>();
-  const [cluster, setCluster] = useState<any>();
+  const [clusterDetail, setCluster] = useState<any>();
+  const cluster = clusterDetail || (clusterId ? cachedJson<any>(`/api/knowledge/clusters/${clusterId}`) : undefined);
   const [slotId, setSlotId] = useState<string>();
-  const [slot, setSlot] = useState<any>();
+  const [slotDetail, setSlot] = useState<any>();
+  const slot = slotDetail || (slotId ? cachedJson<any>(`/api/knowledge/slots/${slotId}`) : undefined);
   const [child, setChild] = useState<any>();
   const goldenId = data.workspace?.current_golden_id;
   const [goldenSnapshot, setGoldenSnapshot] = useState<any>();
@@ -32,10 +34,16 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
   }, [goldenId]);
   const [index, setIndex] = useState<any>(data.overview?.knowledge?.index || {});
   useEffect(() => { setChild(undefined); setDetail(undefined); }, [knowledge.identity?.corpus_snapshot_id]);
-  useEffect(() => { let cancelled = false; void getJson<any>("/api/pipeline").then(value => { if (!cancelled) { setIndex(value.index || {}); setKnowledge(value.knowledge || {}); if (value.knowledge?.operation?.status === "running") { setOperation(value.knowledge.operation); setBusy(true); } } }).catch(reason => { if (!cancelled) setError(String(reason)); }); return () => { cancelled = true; }; }, [data.documents]);
+  const documentVersion = JSON.stringify(data.documents || []), previousDocuments = useRef(documentVersion);
+  useEffect(() => {
+    // A changed document set must not join an older in-flight Pipeline read.
+    if (previousDocuments.current !== documentVersion) { invalidateReads(); previousDocuments.current = documentVersion; }
+    let cancelled = false; void getJson<any>("/api/pipeline").then(value => { if (!cancelled) { setIndex(value.index || {}); setKnowledge(value.knowledge || {}); if (value.knowledge?.operation?.status === "running") { setOperation(value.knowledge.operation); setBusy(true); } } }).catch(reason => { if (!cancelled) setError(String(reason)); }); return () => { cancelled = true; };
+  }, [documentVersion]);
   useEffect(() => { let cancelled = false; setCluster(undefined); setSlotId(undefined); if (clusterId) void getJson(`/api/knowledge/clusters/${clusterId}`).then(value => { if (!cancelled) setCluster(value); }).catch(reason => { if (!cancelled) setError(String(reason)); }); return () => { cancelled = true; }; }, [clusterId, knowledge.identity?.corpus_snapshot_id, knowledge.coverage?.plan_id]);
   useEffect(() => { let cancelled = false; setSlot(undefined); if (slotId) void getJson(`/api/knowledge/slots/${slotId}`).then(value => { if (!cancelled) setSlot(value); }).catch(reason => { if (!cancelled) setError(String(reason)); }); return () => { cancelled = true; }; }, [slotId, knowledge.identity?.corpus_snapshot_id, knowledge.coverage?.plan_id]);
-  const [detail, setDetail] = useState<any>();
+  const [documentDetail, setDetail] = useState<any>();
+  const detail = documentDetail || (selected ? cachedJson<any>(`/api/documents/${selected.id}`) : undefined);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("pdf");
   const [page, setPage] = useState(1);

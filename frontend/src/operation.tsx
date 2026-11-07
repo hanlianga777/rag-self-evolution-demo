@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { getJson, postJson, identityKey } from "./api";
+import { getJson, postJson, identityKey, invalidateReads } from "./api";
 import { PricePauseNotice, type PricePause } from "./components/RuntimeSettings";
 
 type Operation = { id: string; runId?: string; candidateId?: string; experimentId?: string; pricePause?: PricePause; title: string; status: "running" | "completed" | "failed" | "stopped"; stopping?: boolean; stopError?: string; kind?: "evaluation" | "revision" | "cycle"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
@@ -187,6 +187,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
         void getJson<any>(item.kind === "cycle" ? `/api/experiments/${item.experimentId}?light=true` : item.kind === "revision" ? `/api/governance/revisions/${item.id}?light=true` : `/api/evaluations/${item.runId || item.id}?light=true`).then(async result => {
           const next: Partial<Operation> = item.kind === "cycle" ? cycleProgress(result) : item.kind === "revision" ? revision(result) : evaluation(result);
           if (item.kind === "revision" && next.status === "completed" && candidateRefresh.current) {
+            invalidateReads();
             update(item.id, { ...next, status: "running", stage: "正在同步 Candidate 状态" });
             try { await candidateRefresh.current(); }
             catch (reason) { throw new Error(`后台已完成，但候选题刷新失败：${reason instanceof Error ? reason.message : String(reason)}`); }
