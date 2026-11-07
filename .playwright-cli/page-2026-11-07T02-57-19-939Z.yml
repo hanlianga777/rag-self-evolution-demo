@@ -1,0 +1,97 @@
+- generic [ref=e3]:
+  - link "跳转到主内容" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=e5]:
+    - generic [ref=e6]: RAG Evolution
+    - navigation "主导航" [ref=e11]:
+      - link "RAG 自进化项目概览" [active] [ref=e12] [cursor=pointer]:
+        - /url: "#overview"
+      - link "知识库" [ref=e15] [cursor=pointer]:
+        - /url: "#knowledge"
+      - link "Pipeline 配置" [ref=e18] [cursor=pointer]:
+        - /url: "#settings"
+      - link "Golden Dataset" [ref=e22] [cursor=pointer]:
+        - /url: "#governance"
+      - link "Baseline" [ref=e27] [cursor=pointer]:
+        - /url: "#evaluation"
+      - link "Agent 工作台" [ref=e35] [cursor=pointer]:
+        - /url: "#evolution"
+      - link "发布" [ref=e38] [cursor=pointer]:
+        - /url: "#versions"
+      - link "问答验证" [ref=e41] [cursor=pointer]:
+        - /url: "#verification"
+  - main [ref=e44]:
+    - generic [ref=e246]:
+      - generic [ref=e247]:
+        - generic [ref=e249]:
+          - heading "RAG 自进化项目概览" [level=1] [ref=e250]
+          - paragraph [ref=e251]: 评测驱动的 RAG 持续优化与版本决策系统
+          - paragraph [ref=e252]: 用 Golden Dataset 评测 Baseline，优化 Agent 分析 Bad Case，在 Sandbox 验证改善并完成回归检查后，由人工确认发布。
+        - generic "概览内容" [ref=e253]:
+          - button "项目概览" [pressed] [ref=e254] [cursor=pointer]
+          - button "业务架构" [ref=e255] [cursor=pointer]
+          - button "技术架构" [ref=e256] [cursor=pointer]
+      - generic [ref=e257]:
+        - generic "优化成果" [ref=e258]:
+          - generic [ref=e259]:
+            - generic [ref=e260]: 答对数
+            - strong [ref=e261]: 44 / 50 → 48 / 50
+            - generic [ref=e262]: Baseline → 最终推荐
+          - generic [ref=e263]:
+            - generic [ref=e264]: 最慢回答 P99
+            - strong [ref=e265]: 42.2 秒 → 36.7 秒
+            - generic [ref=e266]: Baseline → 最终推荐
+          - generic [ref=e267]:
+            - generic [ref=e268]: 安全拒答率
+            - strong [ref=e269]: 95% → 100%
+            - generic [ref=e270]: Baseline → 最终推荐
+          - generic [ref=e271]:
+            - generic [ref=e272]: Agent 轮次
+            - strong [ref=e273]: 3 轮
+            - generic [ref=e274]: 从保存的方案统计
+          - generic [ref=e275]:
+            - generic [ref=e276]: 评测方案数
+            - strong [ref=e277]: 10 个
+            - generic [ref=e278]: 含已启动的融合方案
+        - generic [ref=e279]:
+          - heading "从知识到线上改善" [level=2] [ref=e281]
+          - navigation "进化主链路" [ref=e282]:
+            - link "知识库 4 份文档已索引" [ref=e283] [cursor=pointer]:
+              - /url: "#knowledge"
+              - generic [ref=e284]:
+                - generic [ref=e285]: 知识库
+                - generic [ref=e286]: 4 份文档已索引
+            - link "Golden 题卷 已冻结 · 50 题" [ref=e289] [cursor=pointer]:
+              - /url: "#governance"
+              - generic [ref=e290]:
+                - generic [ref=e291]: Golden 题卷
+                - generic [ref=e292]: 已冻结 · 50 题
+            - link "Baseline 已评测 · 11/11 项门槛通过" [ref=e295] [cursor=pointer]:
+              - /url: "#evaluation"
+              - generic [ref=e296]:
+                - generic [ref=e297]: Baseline
+                - generic [ref=e298]: 已评测 · 11/11 项门槛通过
+            - link "Agent 2 个合格方案 · 方案 D / 第 3 轮方案 C" [ref=e301] [cursor=pointer]:
+              - /url: "#evolution"
+              - generic [ref=e302]:
+                - generic [ref=e303]: Agent
+                - generic [ref=e304]: 2 个合格方案 · 方案 D / 第 3 轮方案 C
+            - link "发布 当前推荐已发布" [ref=e307] [cursor=pointer]:
+              - /url: "#versions"
+              - generic [ref=e308]:
+                - generic [ref=e309]: 发布
+                - generic [ref=e310]: 当前推荐已发布
+            - link "问答验证 验证线上改善" [ref=e313] [cursor=pointer]:
+              - /url: "#verification"
+              - generic [ref=e314]:
+                - generic [ref=e315]: 问答验证
+                - generic [ref=e316]: 验证线上改善
+        - region [ref=e317]:
+          - generic [ref=e318]:
+            - text: 当前推荐演示 · Baseline 与线上版本
+            - heading "查看方案对比" [level=2] [ref=e319]
+            - paragraph [ref=e320]: 比较正式 Baseline 与线上版本 的同题回答。
+          - link "开始方案对比" [ref=e321] [cursor=pointer]:
+            - /url: "#verification"
+        - group [ref=e324]:
+          - generic "技术详情" [ref=e325] [cursor=pointer]

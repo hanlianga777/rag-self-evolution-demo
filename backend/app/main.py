@@ -279,6 +279,7 @@ def light_value(value):
 
 
 @app.get("/api/overview")
+@evaluation_display
 def overview(light: bool = False):
     summary = store.dataset_summary()
     production = store.active_production()
@@ -1624,12 +1625,14 @@ def optimization(light: bool = False, planning: bool = False):
 
 
 @app.get("/api/versions")
+@evaluation_display
 def versions(page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=50)):
     rows=sorted(store.production_versions(),key=lambda r:r['status']!='active')
     return rows[(page-1)*limit:page*limit]
 
 
 @app.get("/api/pipeline")
+@evaluation_display
 def pipeline():
     knowledge_state = knowledge()
     identity = store.current_baseline_identity()
@@ -1932,6 +1935,7 @@ def run_candidate(candidate_id: str, payload: PaidActionRequest | None = None):
 
 
 @app.post("/api/candidates/{candidate_id}/publish", status_code=201, dependencies=[Depends(require_trusted_origin)])
+@evaluation_display
 def publish_candidate(candidate_id: str, payload: ReviewRequest):
     candidate = store.candidate(candidate_id)
     if candidate:
@@ -1947,6 +1951,7 @@ def publish_candidate(candidate_id: str, payload: ReviewRequest):
 
 
 @app.post("/api/versions/{version_id}/rollback", dependencies=[Depends(require_trusted_origin)])
+@evaluation_display
 def rollback_version(version_id: str, payload: ReviewRequest):
     if payload.decision != 'approved':
         raise HTTPException(409, '回滚需要明确人工确认')
@@ -2173,6 +2178,7 @@ def start_evaluation(payload: BaselineRunRequest | None = None):
 
 
 @app.post("/api/preview", dependencies=[Depends(require_trusted_origin)])
+@evaluation_display
 def preview(payload: PreviewRequest):
     result = ai_service.preview(payload.question)
     baseline = result.get("baseline", {})
@@ -2183,16 +2189,19 @@ def preview(payload: PreviewRequest):
 
 
 @app.post("/api/preview/baseline", dependencies=[Depends(require_trusted_origin)])
+@evaluation_display
 def preview_baseline(payload: PreviewRequest):
     return ai_service.baseline_preview(payload.question)
 
 
 @app.post("/api/preview/candidate", dependencies=[Depends(require_trusted_origin)])
+@evaluation_display
 def preview_candidate(payload: PreviewRequest):
     return ai_service.candidate_preview(payload.question)
 
 
 @app.post("/api/preview/scheme", dependencies=[Depends(require_trusted_origin)])
+@evaluation_display
 def preview_scheme(payload: SchemePreviewRequest):
     scheme_id = payload.scheme_id
     if scheme_id == "baseline":

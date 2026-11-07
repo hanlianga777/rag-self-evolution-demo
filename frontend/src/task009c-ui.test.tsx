@@ -61,7 +61,7 @@ it('keeps the freeze action hidden while the current paper is being read', async
 it('reads Agent progress from the saved budget and keeps the internal Baseline ID in details', async () => {
  vi.stubGlobal('fetch', vi.fn(async () => response({ search_space: {} })));
  await mount(<EvolutionPage data={{ evaluation: { id: 'internal-agent-baseline', status: 'completed', created_at: '2026-11-01T02:00:00Z', config: { generation_thinking: 'high' } }, optimization: { id: 'exp', evaluation_budget: { used: 4, max: 17, reserved_for_d: 2 }, candidates: [] } }} />);
- expect(document.querySelector('.page-shell-header .experiment-progress')?.textContent).toContain('已试跑 4 / 17 次（其中 2 次留给方案 D）');
+ expect(document.querySelector('.page-shell-header .experiment-progress')?.textContent).toContain('已评测 4 / 17 次（含方案 D）');
  expect(document.querySelector('.agent-identity')?.textContent).toContain('Baseline · 高档 · 11-01');
  expect(document.querySelector('.agent-identity')?.textContent).not.toContain('internal-agent-baseline');
 });

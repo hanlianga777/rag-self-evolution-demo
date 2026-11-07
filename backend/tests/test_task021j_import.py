@@ -118,3 +118,40 @@ class ImportTests(unittest.TestCase):
                 self.assertNotIn('internal_recheck',response.text)
                 if path=='/api/evaluations/'+self.run:
                     self.assertEqual(response.json()['cases'][1]['model_answer'],'{ "saved": "q2" }')
+
+    def test_published_snapshots_are_filtered_on_every_display_endpoint(self):
+        from api_fixture import main
+        from fastapi.testclient import TestClient
+        self.import_run()
+        with self.store.connection() as db:
+            raw=db.execute('select result_json from candidate_configs where id=?',(self.did,)).fetchone()[0]
+            result=json.loads(raw)
+            result['_evaluation_audit']['source_database']='/private/internal.db'
+            db.execute('update candidate_configs set result_json=? where id=?',(json.dumps(result),self.did))
+        with patch.object(main,'store',self.store):
+            client=TestClient(main.app)
+            published=client.post('/api/candidates/'+self.did+'/publish',json={'decision':'approved','actor':'fixture human'})
+            self.assertEqual(published.status_code,201,published.text[:200])
+            version_id=published.json()['id']
+            responses=[published]
+            for path in ('/api/versions','/api/pipeline','/api/overview','/api/overview?light=true','/api/optimization','/api/experiments/'+self.experiment):
+                response=client.get(path)
+                self.assertEqual(response.status_code,200,response.text[:200])
+                responses.append(response)
+            # Exercise the real rollback response on this disposable fixture only.
+            with patch('app.config.load_settings',return_value=type('Settings',(),{'model':'fixture'})()):
+                response=client.post('/api/versions/'+version_id+'/rollback',json={'decision':'approved','actor':'fixture human'})
+            self.assertEqual(response.status_code,200,response.text[:200])
+            responses.append(response)
+            # No Provider transport: only verify that the scheme response is filtered too.
+            with patch.object(main.ai_service,'answer',return_value={'retrieval':[],'_evaluation_audit':result['_evaluation_audit']}):
+                response=client.post('/api/preview/scheme',json={'scheme_id':version_id,'question':'fixture'})
+            self.assertEqual(response.status_code,200,response.text[:200])
+            responses.append(response)
+            for response in responses:
+                for hidden in ('_evaluation_audit','internal_trial','internal.db',self.old):
+                    self.assertNotIn(hidden,response.text,response.request.url)
+        raw_version=next(v for v in self.store.production_versions() if v['id']==version_id)
+        self.assertEqual(raw_version['snapshot']['evaluation_result']['_evaluation_audit'],result['_evaluation_audit'])
+        with self.store.connection() as db:
+            self.assertEqual(json.loads(db.execute('select result_json from candidate_configs where id=?',(self.did,)).fetchone()[0]),result)

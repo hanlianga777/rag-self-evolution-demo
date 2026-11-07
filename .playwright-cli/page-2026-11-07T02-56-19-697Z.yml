@@ -1,0 +1,179 @@
+- generic:
+  - generic [aria-hidden]:
+    - generic:
+      - link:
+        - /url: "#main-content"
+        - text: 跳转到主内容
+      - complementary:
+        - generic: RAG Evolution
+        - navigation:
+          - link:
+            - /url: "#overview"
+            - text: RAG 自进化项目概览
+          - link:
+            - /url: "#knowledge"
+            - text: 知识库
+          - link:
+            - /url: "#settings"
+            - text: Pipeline 配置
+          - link:
+            - /url: "#governance"
+            - text: Golden Dataset
+          - link:
+            - /url: "#evaluation"
+            - text: Baseline
+          - link:
+            - /url: "#evolution"
+            - text: Agent 工作台
+          - link:
+            - /url: "#versions"
+            - text: 发布
+          - link:
+            - /url: "#verification"
+            - text: 问答验证
+      - main:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - heading [level=1]: 发布
+                - paragraph: 将已验证的优化方案交由人工决策，保留版本变化与回滚依据。
+          - generic:
+            - generic:
+              - generic:
+                - heading [level=2]: 待发布方案
+                - link:
+                  - /url: "#evolution"
+                  - text: 查看最终推荐
+              - article:
+                - heading [level=3]: 方案 D
+                - paragraph: 本轮推荐，尚未发布
+                - generic:
+                  - generic:
+                    - heading [level=4]: 线上配置 → 推荐配置
+                    - generic:
+                      - paragraph:
+                        - strong: 查找候选条数
+                        - generic: 12 → 24
+                      - paragraph:
+                        - strong: 回答证据条数
+                        - generic: 4 → 6
+                      - paragraph:
+                        - strong: 回答思考档位
+                        - generic: 最高 → 高
+                    - heading [level=4]: Baseline → 推荐方案
+                    - generic:
+                      - table:
+                        - rowgroup:
+                          - row:
+                            - columnheader: 指标
+                            - columnheader: Baseline
+                            - columnheader: 方案 D
+                        - rowgroup:
+                          - row:
+                            - cell:
+                              - generic: 答对数
+                            - cell:
+                              - generic: 44 / 50
+                            - cell:
+                              - generic: 48 / 50
+                          - row:
+                            - cell:
+                              - generic: 门槛通过
+                            - cell:
+                              - generic: 11 / 11
+                            - cell:
+                              - generic: 11 / 11
+                          - row:
+                            - cell:
+                              - generic: 最慢回答 P99
+                            - cell:
+                              - generic: 42.2 秒
+                            - cell:
+                              - generic: 36.7 秒
+                          - row:
+                            - cell:
+                              - generic: 安全拒答率
+                            - cell:
+                              - generic: 95%
+                            - cell:
+                              - generic: 100%
+                  - generic:
+                    - heading [level=4]: 发布检查清单
+                    - list:
+                      - listitem:
+                        - strong: ✓ · 门槛全过
+                        - generic: 已满足
+                      - listitem:
+                        - strong: ✓ · 零新增错题
+                        - generic: 已满足
+                      - listitem:
+                        - strong: ✓ · 已有修好的题
+                        - generic: 修好 4 道原错题
+                      - listitem:
+                        - strong: ✓ · 人工确认
+                        - generic: 已满足
+                    - generic:
+                      - button: 确认发布
+                      - button: 查看评测报告
+            - generic:
+              - generic:
+                - heading [level=2]: 当前线上配置
+              - generic:
+                - generic:
+                  - term: 运行版本
+                  - definition: 当前线上配置
+                - generic:
+                  - term: 配置来源
+                  - definition: 初始配置
+                - generic:
+                  - term: 版本创建时间
+                  - definition: 2026/10/14 11:02
+                - generic:
+                  - term: 关键配置
+                  - definition: 候选条数 12 · 回答证据条数 4 · 回答策略 有据生成
+              - generic:
+                - button: 查看完整配置
+                - button: 查看其他候选方案
+            - generic:
+              - generic:
+                - heading [level=2]: 版本历史与回滚
+              - paragraph: 选择兼容的历史配置，可确认回滚。
+              - generic:
+                - button [disabled]: 上一页
+                - generic: 第 1 页 · 每页最多50条
+                - button [disabled]: 下一页
+              - generic:
+                - table:
+                  - rowgroup:
+                    - row:
+                      - columnheader: 版本 / 来源
+                      - columnheader: 创建时间
+                      - columnheader: 关键配置
+                      - columnheader: 状态
+                      - columnheader: 操作
+                  - rowgroup:
+                    - row:
+                      - cell:
+                        - generic:
+                          - button: 当前线上配置
+                          - paragraph: 当前线上配置
+                      - cell:
+                        - generic: 2026/10/14 11:02
+                      - cell:
+                        - generic: 回答策略 有据生成 候选条数 12 · 回答证据条数 4
+                      - cell:
+                        - generic: 当前线上配置
+                      - cell:
+                        - generic: 当前运行中
+              - paragraph: 当前无其他历史版本可选，无法执行回滚。
+            - group:
+              - generic: 技术详情
+  - dialog [ref=e193]:
+    - heading "发布确认 · 确认发布 线上版本" [level=2] [ref=e194]
+    - generic [ref=e195]:
+      - paragraph [ref=e196]: 发布 组合方案 D，将改变当前线上版本。
+      - paragraph [ref=e197]: 确认后由后端重验资格与兼容性，并保留决策审计。
+    - generic [ref=e198]:
+      - button "取消" [active] [ref=e199] [cursor=pointer]
+      - button "确认" [ref=e200] [cursor=pointer]

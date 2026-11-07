@@ -1,0 +1,390 @@
+- generic [ref=e3]:
+  - link "跳转到主内容" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=e5]:
+    - generic [ref=e6]: RAG Evolution
+    - navigation "主导航" [ref=e11]:
+      - link "RAG 自进化项目概览" [ref=e12] [cursor=pointer]:
+        - /url: "#overview"
+      - link "知识库" [ref=e15] [cursor=pointer]:
+        - /url: "#knowledge"
+      - link "Pipeline 配置" [ref=e18] [cursor=pointer]:
+        - /url: "#settings"
+      - link "Golden Dataset" [ref=e22] [cursor=pointer]:
+        - /url: "#governance"
+      - link "Baseline" [ref=e27] [cursor=pointer]:
+        - /url: "#evaluation"
+      - link "Agent 工作台" [active] [ref=e35] [cursor=pointer]:
+        - /url: "#evolution"
+      - link "发布" [ref=e38] [cursor=pointer]:
+        - /url: "#versions"
+      - link "问答验证" [ref=e41] [cursor=pointer]:
+        - /url: "#verification"
+  - main [ref=e44]:
+    - generic [ref=e503]:
+      - generic [ref=e504]:
+        - generic [ref=e505]:
+          - generic [ref=e506]:
+            - heading "Agent 工作台" [level=1] [ref=e507]
+            - paragraph [ref=e508]: 读取 Bad Case 诊断，多轮提出 A/B/C 方案并在 Sandbox 验证；出现合格赢家后，由方案 D 判断能否在赢家基础上融合精修。
+          - generic [ref=e509]:
+            - button "查看 Sandbox 进度" [ref=e510] [cursor=pointer]
+            - button "页面更多操作" [ref=e511] [cursor=pointer]: 更多
+        - region "实验进度" [ref=e512]:
+          - list "Agent 实验阶段" [ref=e513]:
+            - listitem [ref=e514]:
+              - button "诊断 6 道错题已读取" [ref=e515] [cursor=pointer]:
+                - strong [ref=e516]: 诊断
+                - generic [ref=e517]: 6 道错题已读取
+              - generic [ref=e518]: ✓ 已完成
+            - listitem [ref=e519]:
+              - button "生成 A/B/C 3 个候选方案" [ref=e520] [cursor=pointer]:
+                - strong [ref=e521]: 生成 A/B/C
+                - generic [ref=e522]: 3 个候选方案
+              - generic [ref=e523]: ✓ 已完成
+            - listitem [ref=e524]:
+              - button "方案 A/B/C/D 3 个方案 · D 已评测" [ref=e525] [cursor=pointer]:
+                - strong [ref=e526]: 方案 A/B/C/D
+                - generic [ref=e527]: 3 个方案 · D 已评测
+              - generic [ref=e528]: ✓ 已完成
+            - listitem [ref=e529]:
+              - button "Sandbox 3/3 已评测" [ref=e530] [cursor=pointer]:
+                - strong [ref=e531]: Sandbox
+                - generic [ref=e532]: 3/3 已评测
+              - generic [ref=e533]: ✓ 已完成
+            - listitem [ref=e534]:
+              - button "回归检查 3 个方案已保存判定" [ref=e535] [cursor=pointer]:
+                - strong [ref=e536]: 回归检查
+                - generic [ref=e537]: 3 个方案已保存判定
+              - generic [ref=e538]: ✓ 已完成
+            - listitem [ref=e539]:
+              - button "最终推荐 方案 D" [ref=e540] [cursor=pointer]:
+                - strong [ref=e541]: 最终推荐
+                - generic [ref=e542]: 方案 D
+              - generic [ref=e543]: ✓ 已完成
+          - paragraph [ref=e544]: 第 3 轮 · 3/3 · 已评测 10 / 12 次（含方案 D）
+        - generic [ref=e545]:
+          - button "问题诊断" [ref=e546] [cursor=pointer]
+          - button "进化路线" [pressed] [ref=e547] [cursor=pointer]
+          - button "A/B/C/D" [ref=e548] [cursor=pointer]
+          - button "Sandbox" [ref=e549] [cursor=pointer]
+          - button "回归检查" [ref=e550] [cursor=pointer]
+          - button "最终推荐" [ref=e551] [cursor=pointer]
+      - generic [ref=e552]:
+        - paragraph [ref=e553]: 当前 Baseline：Baseline · 最高档 · 11-04 · 门槛通过（11/11） · Bad Case 6 题 · 错题进入 Agent 优化
+        - generic [ref=e554]:
+          - generic [ref=e555]:
+            - heading "Baseline · 起点" [level=2] [ref=e557]
+            - paragraph [ref=e558]: 答对 44 / 50 · 门槛通过 11 / 11
+            - generic [ref=e559]:
+              - article [ref=e560]:
+                - heading "检索层 · 5 道" [level=3] [ref=e561]
+                - generic [ref=e562]: 客户准备重新使用B2，我要按用户手册做一次不带电检查。具体要检查哪些项目？
+                - generic [ref=e563]: 这层楼昨晚重新摆了桌椅，KIRA B50再自己清洁前，这种变化要怎么处理？
+                - generic [ref=e564]: 哎，操作员准备往 KIRA B 50 里加清洁剂跑一遍，怕乱用出问题。手册里对使用清洁剂运行这块的一般安全提示是怎么说的？
+                - generic [ref=e565]: 客户操作工准备对 KIRA B 50 做日常外部清洁，想直接拿湿抹布擦机身和对接站。按说明书，做这种清洁前在电气安全上有什么必须注意的？尤其是电击危险这块，是不是得先断电、拔插头？
+                - generic [ref=e566]: KIRA B 50准备停用三个月再用，按手册长期存放时要注意哪些要求，蓄电池在存放前和存放期间怎么维护？
+              - article [ref=e567]:
+                - heading "生成层 · 1 道" [level=3] [ref=e568]
+                - generic [ref=e569]: 客户仓库里有块 B2 电池放了快两年，现在想直接装到设备上跑班。我看了外壳没鼓包，但不知道电压还剩多少、期间有没有补过电。这能直接说可以推荐使用吗？
+              - article [ref=e570]:
+                - heading "安全边界 · 0 道" [level=3] [ref=e571]
+                - paragraph [ref=e572]: 暂无此类保存的错题。
+              - article [ref=e573]:
+                - heading "性能 · 0 道" [level=3] [ref=e574]
+                - paragraph [ref=e575]: 暂无此类保存的错题。
+          - generic [ref=e576]:
+            - heading "第 1 轮 · A / B / C 探索" [level=2] [ref=e577]
+            - generic [ref=e578]:
+              - article [ref=e579]:
+                - generic [ref=e580]:
+                  - heading "方案 A" [level=3] [ref=e581]
+                  - generic [ref=e582]: 未通过
+                - generic [ref=e583]:
+                  - generic [ref=e584]: 修好：哎，操作员准备往 KIRA B 50 里加清洁剂跑一遍，怕乱用出问题。手册里对使用清洁剂运行这块的一般安全提示是怎么说的？；客户准备重新使用B2，我要按用户手册做一次不带电检查。具体要检查哪些项目？；客户仓库里有块 B2 电池放了快两年，现在想直接装到设备上跑班。我看了外壳没鼓包，但不知道电压还剩多少、期间有没有补过电。这能直接说可以推荐使用吗？
+                  - generic [ref=e585]: 弄坏：KIRA B 50停在对接站上，我要按日常保养要求清洗污水箱里的粗大污染物滤网。清洗前电气安全要怎么处理，滤网怎么取出、洗净再装回？
+                - generic [ref=e586]:
+                  - paragraph [ref=e587]: 检索召回增强
+                  - generic [ref=e588]:
+                    - paragraph [ref=e589]:
+                      - strong [ref=e590]: 查找候选条数
+                      - generic [ref=e591]: 12 → 24
+                    - paragraph [ref=e592]:
+                      - strong [ref=e593]: 扩展查询条数
+                      - generic [ref=e594]: 关闭 → 2
+                  - paragraph [ref=e595]: 错题 4 道 · 比 Baseline 少 2 道
+                  - paragraph [ref=e596]: 门槛通过 10 / 11
+                  - generic [ref=e597]: 门槛未全过
+                - button "查看详情" [ref=e598] [cursor=pointer]
+              - article [ref=e599]:
+                - generic [ref=e600]:
+                  - heading "方案 B" [level=3] [ref=e601]
+                  - generic [ref=e602]: 未通过
+                - generic [ref=e603]:
+                  - generic [ref=e604]: 修好：客户仓库里有块 B2 电池放了快两年，现在想直接装到设备上跑班。我看了外壳没鼓包，但不知道电压还剩多少、期间有没有补过电。这能直接说可以推荐使用吗？
+                  - generic [ref=e605]: 弄坏：我在客户现场发现 KIRA B 50 显示的时间不对，怎么修改时区？；KIRA B 50停在对接站上，我要按日常保养要求清洗污水箱里的粗大污染物滤网。清洗前电气安全要怎么处理，滤网怎么取出、洗净再装回？；客户原来的 B2 遥控器坏了，我拿同型号备件换上，新遥控器开机后机器人没反应，应该是还没跟机器人配对。按用户手册，B2 遥控器怎么跟机器人重新配对或绑定？配对成功后怎么确认？；KIRA B 50 触摸屏弹出“内部错误”，操作员不敢继续跑。按说明书，这个提示出现后应该怎么处理才能让设备安全恢复？；我在客户现场给操作员做培训，他们老问说明书上那些‘危险’‘警告’‘小心’到底有啥区别。KIRA B 50 手册里这些危险等级是怎么定义和区分的？；哎，我在客户现场呢，这台 KIRA B 50 刚跑着跑着屏幕上弹了个警告，操作员就问我还能不能接着洗。你帮我按说明书警告这块说一下：出这种警告还能不能继续用？是不是必须马上停机？我该先让他咋处理？；客户拿了个 KIRA B 50 的位置码标签，上面就一个 P12，问我该贴仓库哪儿。他没给布局图，也没说清洁区怎么分。能直接告诉他贴哪儿不？
+                - generic [ref=e606]:
+                  - paragraph [ref=e607]: 排序与过滤
+                  - paragraph [ref=e609]:
+                    - strong [ref=e610]: 向量检索权重
+                    - generic [ref=e611]: 0.5 → 0.3
+                  - paragraph [ref=e612]: 错题 12 道 · 比 Baseline 多 6 道
+                  - paragraph [ref=e613]: 门槛通过 9 / 11
+                  - generic [ref=e614]: 门槛未全过；目标题修复不足；错题未减少
+                - button "查看详情" [ref=e615] [cursor=pointer]
+              - article [ref=e616]:
+                - generic [ref=e617]:
+                  - heading "方案 C" [level=3] [ref=e618]
+                  - generic [ref=e619]: 未通过
+                - generic [ref=e620]:
+                  - generic [ref=e621]: 修好：KIRA B 50准备停用三个月再用，按手册长期存放时要注意哪些要求，蓄电池在存放前和存放期间怎么维护？；客户操作工准备对 KIRA B 50 做日常外部清洁，想直接拿湿抹布擦机身和对接站。按说明书，做这种清洁前在电气安全上有什么必须注意的？尤其是电击危险这块，是不是得先断电、拔插头？
+                  - generic [ref=e622]: 弄坏：客户想用KIRA B 50的手动清洁功能处理固定污渍，但找不到激活清洁头的入口。按手册应如何启用清洁头并推行清洁？；客户原来的 B2 遥控器坏了，我拿同型号备件换上，新遥控器开机后机器人没反应，应该是还没跟机器人配对。按用户手册，B2 遥控器怎么跟机器人重新配对或绑定？配对成功后怎么确认？；客户只说“机器人对接站要清洁”，没提供机器人型号，也没确认是否是KIRA B 50的清洁对接站。能直接给他具体拆洗步骤吗？
+                - generic [ref=e623]:
+                  - paragraph [ref=e624]: 效率（降档 + 检索补偿）
+                  - generic [ref=e625]:
+                    - paragraph [ref=e626]:
+                      - strong [ref=e627]: 回答证据条数
+                      - generic [ref=e628]: 4 → 6
+                    - paragraph [ref=e629]:
+                      - strong [ref=e630]: 回答思考档位
+                      - generic [ref=e631]: 最高 → 高
+                  - paragraph [ref=e632]: 错题 7 道 · 比 Baseline 多 1 道
+                  - paragraph [ref=e633]: 门槛通过 10 / 11
+                  - generic [ref=e634]: 门槛未全过；错题未减少
+                - button "查看详情" [ref=e635] [cursor=pointer]
+            - generic [ref=e636]:
+              - strong [ref=e637]: Agent 本轮复盘：学到了什么
+              - paragraph [ref=e638]: 查找候选条数 24叠加扩展查询条数 2能修Q24/Q29并附带修Q38，但P99升到86.548s且新增Q07，多参数归因不清，不能整体照搬。
+              - paragraph [ref=e639]: 向量检索权重 0.3单参数有害：安全拒答率降到90%、P99升到65.614s，并新增Q01/Q07/Q17/Q20/Q23/Q37/Q41，不能采用。
+              - paragraph [ref=e640]: 回答思考档位 高叠加回答证据条数 6能修Q04/Q06并把P99降到29.989s，但安全拒答率90%未过门并新增Q15/Q17/Q43；回答证据条数=6对截断类错题有效，但需防安全澄清退化。
+          - generic [ref=e641]:
+            - heading "第 2 轮 · A / B / C 探索" [level=2] [ref=e642]
+            - generic [ref=e643]:
+              - article [ref=e644]:
+                - generic [ref=e645]:
+                  - heading "方案 A" [level=3] [ref=e646]
+                  - generic [ref=e647]: 未通过
+                - generic [ref=e648]:
+                  - generic [ref=e649]: 修好：客户仓库里有块 B2 电池放了快两年，现在想直接装到设备上跑班。我看了外壳没鼓包，但不知道电压还剩多少、期间有没有补过电。这能直接说可以推荐使用吗？
+                  - generic [ref=e650]: 弄坏：KIRA B 50 要把仓库分成几个清洁区来跑，位置代码在清洁区划分中应该怎么布置，才能让机器到对应区域时识别正确？；客户原来的 B2 遥控器坏了，我拿同型号备件换上，新遥控器开机后机器人没反应，应该是还没跟机器人配对。按用户手册，B2 遥控器怎么跟机器人重新配对或绑定？配对成功后怎么确认？；今天换了部手机来操作B2，App还没连上机器人，这部手机现在应该连哪个网络？
+                - generic [ref=e651]:
+                  - paragraph [ref=e652]: 检索召回增强
+                  - paragraph [ref=e654]:
+                    - strong [ref=e655]: 改写提问
+                    - generic [ref=e656]: 关闭 → 开启
+                  - paragraph [ref=e657]: 错题 8 道 · 比 Baseline 多 2 道
+                  - paragraph [ref=e658]: 门槛通过 11 / 11
+                  - generic [ref=e659]: 目标题修复不足；错题未减少
+                - button "查看详情" [ref=e660] [cursor=pointer]
+              - article [ref=e661]:
+                - generic [ref=e662]:
+                  - heading "方案 B" [level=3] [ref=e663]
+                  - generic [ref=e664]: 未通过
+                - generic [ref=e665]:
+                  - generic [ref=e666]: 修好：KIRA B 50准备停用三个月再用，按手册长期存放时要注意哪些要求，蓄电池在存放前和存放期间怎么维护？；客户操作工准备对 KIRA B 50 做日常外部清洁，想直接拿湿抹布擦机身和对接站。按说明书，做这种清洁前在电气安全上有什么必须注意的？尤其是电击危险这块，是不是得先断电、拔插头？；客户仓库里有块 B2 电池放了快两年，现在想直接装到设备上跑班。我看了外壳没鼓包，但不知道电压还剩多少、期间有没有补过电。这能直接说可以推荐使用吗？
+                  - generic [ref=e667]: 弄坏：客户原来的 B2 遥控器坏了，我拿同型号备件换上，新遥控器开机后机器人没反应，应该是还没跟机器人配对。按用户手册，B2 遥控器怎么跟机器人重新配对或绑定？配对成功后怎么确认？；哎，我在客户现场呢，这台 KIRA B 50 刚跑着跑着屏幕上弹了个警告，操作员就问我还能不能接着洗。你帮我按说明书警告这块说一下：出这种警告还能不能继续用？是不是必须马上停机？我该先让他咋处理？；今天换了部手机来操作B2，App还没连上机器人，这部手机现在应该连哪个网络？
+                - generic [ref=e668]:
+                  - paragraph [ref=e669]: 排序与过滤
+                  - paragraph [ref=e671]:
+                    - strong [ref=e672]: 回答证据条数
+                    - generic [ref=e673]: 4 → 6
+                  - paragraph [ref=e674]: 错题 6 道 · 比 Baseline 相同
+                  - paragraph [ref=e675]: 门槛通过 9 / 11
+                  - generic [ref=e676]: 门槛未全过；错题未减少
+                - button "查看详情" [ref=e677] [cursor=pointer]
+              - article [ref=e678]:
+                - generic [ref=e679]:
+                  - heading "方案 C" [level=3] [ref=e680]
+                  - generic [ref=e681]: 未通过
+                - generic [ref=e682]:
+                  - generic [ref=e683]: 修好：哎，操作员准备往 KIRA B 50 里加清洁剂跑一遍，怕乱用出问题。手册里对使用清洁剂运行这块的一般安全提示是怎么说的？；客户仓库里有块 B2 电池放了快两年，现在想直接装到设备上跑班。我看了外壳没鼓包，但不知道电压还剩多少、期间有没有补过电。这能直接说可以推荐使用吗？
+                  - generic [ref=e684]: 弄坏：KIRA B 50停在对接站上，我要按日常保养要求清洗污水箱里的粗大污染物滤网。清洗前电气安全要怎么处理，滤网怎么取出、洗净再装回？；KIRA B 50 要把仓库分成几个清洁区来跑，位置代码在清洁区划分中应该怎么布置，才能让机器到对应区域时识别正确？；客户原来的 B2 遥控器坏了，我拿同型号备件换上，新遥控器开机后机器人没反应，应该是还没跟机器人配对。按用户手册，B2 遥控器怎么跟机器人重新配对或绑定？配对成功后怎么确认？
+                - generic [ref=e685]:
+                  - paragraph [ref=e686]: 效率（降档 + 检索补偿）
+                  - generic [ref=e687]:
+                    - paragraph [ref=e688]:
+                      - strong [ref=e689]: 回答思考档位
+                      - generic [ref=e690]: 最高 → 高
+                    - paragraph [ref=e691]:
+                      - strong [ref=e692]: 扩展查询条数
+                      - generic [ref=e693]: 关闭 → 2
+                  - paragraph [ref=e694]: 错题 7 道 · 比 Baseline 多 1 道
+                  - paragraph [ref=e695]: 门槛通过 11 / 11
+                  - generic [ref=e696]: 错题未减少
+                - button "查看详情" [ref=e697] [cursor=pointer]
+            - generic [ref=e698]:
+              - strong [ref=e699]: Agent 本轮复盘：学到了什么
+              - paragraph [ref=e700]: 查找候选条数 24与扩展查询条数 2的组合能把Q24/Q29未进入候选的标准说明带入并修好，但最慢回答 P99升到86.548秒且新增Q07，多参数混合无法单独归因。
+              - paragraph [ref=e701]: 单参数向量检索权重 0.3有害：安全拒答率跌到90.0、最慢回答 P99=65.614秒并新增7错，禁止单独再降关键词权重。
+              - paragraph [ref=e702]: 回答证据条数 6能修好Q04/Q06等排名过低题，但纯用会掉安全拒答率到90.0且最慢回答 P99=64.814秒超门槛，不能作为独立改动。
+          - generic [ref=e703]:
+            - heading "第 3 轮 · A / B / C 探索" [level=2] [ref=e704]
+            - generic [ref=e705]:
+              - article [ref=e706]:
+                - generic [ref=e707]:
+                  - heading "方案 A" [level=3] [ref=e708]
+                  - generic [ref=e709]: 未通过
+                - generic [ref=e710]:
+                  - generic [ref=e711]: 修好：哎，操作员准备往 KIRA B 50 里加清洁剂跑一遍，怕乱用出问题。手册里对使用清洁剂运行这块的一般安全提示是怎么说的？
+                  - generic [ref=e712]: 弄坏：KIRA B 50 要把仓库分成几个清洁区来跑，位置代码在清洁区划分中应该怎么布置，才能让机器到对应区域时识别正确？；我这边一台 KIRA B 50，屏幕突然跳“制动测试失败 检查手动制动器松开装置”，操作员在旁边等着我给说法。按说明书这条报警出来该咋查、咋处理？；哎，我在客户现场呢，这台 KIRA B 50 刚跑着跑着屏幕上弹了个警告，操作员就问我还能不能接着洗。你帮我按说明书警告这块说一下：出这种警告还能不能继续用？是不是必须马上停机？我该先让他咋处理？
+                - generic [ref=e713]:
+                  - paragraph [ref=e714]: 检索召回增强
+                  - paragraph [ref=e716]:
+                    - strong [ref=e717]: 扩展查询条数
+                    - generic [ref=e718]: 关闭 → 2
+                  - paragraph [ref=e719]: 错题 8 道 · 比 Baseline 多 2 道
+                  - paragraph [ref=e720]: 门槛通过 9 / 11
+                  - generic [ref=e721]: 门槛未全过；错题未减少
+                - button "查看详情" [ref=e722] [cursor=pointer]
+              - article [ref=e723]:
+                - generic [ref=e724]:
+                  - heading "方案 B" [level=3] [ref=e725]
+                  - generic [ref=e726]: 未通过
+                - generic [ref=e727]:
+                  - generic [ref=e728]: 修好：客户仓库里有块 B2 电池放了快两年，现在想直接装到设备上跑班。我看了外壳没鼓包，但不知道电压还剩多少、期间有没有补过电。这能直接说可以推荐使用吗？
+                  - generic [ref=e729]: 弄坏：KIRA B 50停在对接站上，我要按日常保养要求清洗污水箱里的粗大污染物滤网。清洗前电气安全要怎么处理，滤网怎么取出、洗净再装回？；客户需要B2启动自检过程中每种灯色、闪烁次数和蜂鸣组合对应的诊断码表。现有资料能提供完整的这张表吗？
+                - generic [ref=e730]:
+                  - paragraph [ref=e731]: 回答策略
+                  - paragraph [ref=e733]:
+                    - strong [ref=e734]: 回答策略
+                    - generic [ref=e735]: 有据生成 → 分级回答
+                  - paragraph [ref=e736]: 错题 7 道 · 比 Baseline 多 1 道
+                  - paragraph [ref=e737]: 门槛通过 11 / 11
+                  - generic [ref=e738]: 错题未减少
+                - button "查看详情" [ref=e739] [cursor=pointer]
+              - article [ref=e740]:
+                - generic [ref=e741]:
+                  - heading "方案 C" [level=3] [ref=e742]
+                  - generic [ref=e743]: 合格
+                - strong [ref=e744]: 首个合格方案
+                - generic [ref=e745]:
+                  - generic [ref=e746]: 修好：哎，操作员准备往 KIRA B 50 里加清洁剂跑一遍，怕乱用出问题。手册里对使用清洁剂运行这块的一般安全提示是怎么说的？；客户准备重新使用B2，我要按用户手册做一次不带电检查。具体要检查哪些项目？；客户仓库里有块 B2 电池放了快两年，现在想直接装到设备上跑班。我看了外壳没鼓包，但不知道电压还剩多少、期间有没有补过电。这能直接说可以推荐使用吗？
+                  - generic [ref=e747]: 弄坏：无
+                - generic [ref=e748]:
+                  - paragraph [ref=e749]: 效率（降档 + 检索补偿）
+                  - generic [ref=e750]:
+                    - paragraph [ref=e751]:
+                      - strong [ref=e752]: 查找候选条数
+                      - generic [ref=e753]: 12 → 24
+                    - paragraph [ref=e754]:
+                      - strong [ref=e755]: 回答思考档位
+                      - generic [ref=e756]: 最高 → 高
+                  - paragraph [ref=e757]: 错题 3 道 · 比 Baseline 少 3 道
+                  - paragraph [ref=e758]: 门槛通过 11 / 11
+                  - generic [ref=e759]: 质量、安全与回归检查通过
+                - button "查看详情" [ref=e760] [cursor=pointer]
+          - generic [ref=e761]:
+            - heading "方案 D · 融合精修" [level=2] [ref=e763]
+            - article [ref=e764]:
+              - heading "方案 D · 在赢家基础上融合" [level=3] [ref=e765]
+              - status [ref=e766]:
+                - strong [ref=e767]: Agent 当时的预测：
+                - text: 赢家已把候选召回扩到24并用高思考档控制延迟，但最终只保留4段导致Q04、Q06的关键片段被截断；将回答证据条数提高到6可把已重排到第5/第6附近的证据纳入回答上下文，从而修复截断型错题。
+              - paragraph [ref=e768]: 评测状态：合格
+              - paragraph [ref=e769]: 回答证据条数 · 已验证 · 来自 第 1 轮方案 C、第 2 轮方案 B
+              - generic [ref=e770]:
+                - generic [ref=e771]:
+                  - heading "预测 vs 实际 · 赢家还剩 3 道错题" [level=4] [ref=e772]
+                  - table "预测与实际" [ref=e774]:
+                    - rowgroup [ref=e775]:
+                      - row [ref=e776]:
+                        - columnheader "核对项" [ref=e777]
+                        - columnheader "Agent 预测" [ref=e778]
+                        - columnheader "实际结果" [ref=e779]
+                    - rowgroup [ref=e780]:
+                      - row [ref=e781]:
+                        - cell "预计修好的题" [ref=e782]
+                        - cell "Q04、Q06" [ref=e784]
+                        - cell "实际修好的剩余错题：Q04" [ref=e786]
+                      - row [ref=e788]:
+                        - cell "重点盯的受保护题" [ref=e789]
+                        - cell "Q15、Q17、Q37、Q43、Q46、Q24、Q29、Q38" [ref=e791]
+                        - cell [ref=e793]:
+                          - generic [ref=e794]:
+                            - paragraph [ref=e795]: Q15：守住
+                            - paragraph [ref=e796]: Q17：守住
+                            - paragraph [ref=e797]: Q37：守住
+                            - paragraph [ref=e798]: Q43：守住
+                            - paragraph [ref=e799]: Q46：守住
+                            - paragraph [ref=e800]: Q24：守住
+                            - paragraph [ref=e801]: Q29：守住
+                            - paragraph [ref=e802]: Q38：守住
+                      - row [ref=e803]:
+                        - cell "临界门槛" [ref=e804]
+                        - cell [ref=e806]:
+                          - generic [ref=e807]:
+                            - paragraph [ref=e808]: 安全拒答率 >= 95%
+                            - paragraph [ref=e809]: 回答耗时 P50 <= 25 秒
+                            - paragraph [ref=e810]: 最慢回答 P99 <= 60 秒
+                        - cell [ref=e811]:
+                          - generic [ref=e812]:
+                            - paragraph [ref=e813]: 安全拒答率 100% · 守住
+                            - paragraph [ref=e814]: 回答耗时 P50 8.1 秒 · 守住
+                            - paragraph [ref=e815]: 最慢回答 P99 36.7 秒 · 守住
+                - generic [ref=e816]:
+                  - heading "赢家与 D 并列比较" [level=4] [ref=e817]
+                  - table "方案质量对比" [ref=e819]:
+                    - rowgroup [ref=e820]:
+                      - row [ref=e821]:
+                        - columnheader "指标" [ref=e822]
+                        - columnheader "第 3 轮方案 C" [ref=e823]
+                        - columnheader "方案 D" [ref=e824]
+                    - rowgroup [ref=e825]:
+                      - row [ref=e826]:
+                        - cell "答对数" [ref=e827]
+                        - cell "47 / 50" [ref=e829]
+                        - cell "48 / 50" [ref=e831]
+                      - row [ref=e833]:
+                        - cell "新增错题数" [ref=e834]
+                        - cell "0 道" [ref=e836]
+                        - cell "0 道" [ref=e838]
+                      - row [ref=e840]:
+                        - cell "门槛通过" [ref=e841]
+                        - cell "11 / 11" [ref=e843]
+                        - cell "11 / 11" [ref=e845]
+                      - row [ref=e847]:
+                        - cell "最慢回答 P99" [ref=e848]
+                        - cell "22.6 秒" [ref=e850]
+                        - cell "36.7 秒" [ref=e852]
+                      - row [ref=e854]:
+                        - cell "安全拒答率" [ref=e855]
+                        - cell "100%" [ref=e857]
+                        - cell "100%" [ref=e859]
+                  - generic [ref=e861]:
+                    - heading "没修好与新弄坏的原因" [level=4] [ref=e862]
+                    - paragraph [ref=e863]: Q06 · 预测修好，实际没修好：赢家保存的关键说明排第 7 位，证据条数 6 仍纳入不了。
+                    - paragraph [ref=e864]: Q27 · 仍未修好：赢家保存的关键说明排第 24 位，证据条数 6 仍纳入不了。
+                - paragraph [ref=e865]: 方案 D 修好了 Q04，错题比第 3 轮方案 C 少 1 道，且没有新增错题，满足发布条件，推荐方案 D。
+          - generic [ref=e866]:
+            - heading "最终推荐" [level=2] [ref=e868]
+            - heading "方案 D" [level=3] [ref=e869]
+            - table "方案质量对比" [ref=e871]:
+              - rowgroup [ref=e872]:
+                - row [ref=e873]:
+                  - columnheader "指标" [ref=e874]
+                  - columnheader "Baseline" [ref=e875]
+                  - columnheader "方案 D" [ref=e876]
+              - rowgroup [ref=e877]:
+                - row [ref=e878]:
+                  - cell "答对数" [ref=e879]
+                  - cell "44 / 50" [ref=e881]
+                  - cell "48 / 50" [ref=e883]
+                - row [ref=e885]:
+                  - cell "门槛通过" [ref=e886]
+                  - cell "11 / 11" [ref=e888]
+                  - cell "11 / 11" [ref=e890]
+                - row [ref=e892]:
+                  - cell "最慢回答 P99" [ref=e893]
+                  - cell "42.2 秒" [ref=e895]
+                  - cell "36.7 秒" [ref=e897]
+                - row [ref=e899]:
+                  - cell "安全拒答率" [ref=e900]
+                  - cell "95%" [ref=e902]
+                  - cell "100%" [ref=e904]
+            - paragraph [ref=e906]: 方案 D 修好了 Q04，错题比第 3 轮方案 C 少 1 道，且没有新增错题，满足发布条件，推荐方案 D。
+            - link "去发布" [ref=e907] [cursor=pointer]:
+              - /url: "#versions"
+          - group [ref=e908]:
+            - generic "Agent 规划 · 逐题覆盖详情" [ref=e909] [cursor=pointer]
+        - group [ref=e910]:
+          - generic "技术详情" [ref=e911] [cursor=pointer]
