@@ -67,7 +67,7 @@ it('uses explicit pages after unquoted sections and keeps prose around bare file
 });
 it('does not consume answer prose or bold markers after a source filename',()=>{
  const result=citationText('资料为《操作_说明.pdf》，但当前只提供了**页 1–1 的封面**，仍需确认。',[source]);
- expect(result.text.replace(/\uE000\d+\uE001/g,'')).toBe('资料为，但当前只提供了**页 1–1 的封面**，仍需确认。');
+ expect(result.text.replace(/\uE000\d+\uE001/g,'')).toBe('资料为 操作 说明，但当前只提供了**页 1–1 的封面**，仍需确认。');
 });
 it('keeps a repeated source before a different document in the same citation',()=>{
  const evidence=[{...source,document:'整机手册.pdf',page_start:14},{...source,document:'遥控手册.pdf',page_start:6},{...source,document:'遥控手册.pdf',page_start:11}];

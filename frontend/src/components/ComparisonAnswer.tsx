@@ -5,7 +5,7 @@ import type {Citation} from '../types';
 
 type Source = {number:number; document:string; section:string; page?:number; end?:number; citation?:any};
 const sourceToken = /\uE000(\d+)\uE001/g;
-const readable = (text:string) => text.replace(/\.pdf$/i,'').replace(/_/g,' ');
+const readable = (text:string) => text.replace(/\.pdf$/i,'').replace(/^(?:卡赫|宇树)[_\s]*/,'').replace(/[_（(]?中文版[）)]?|完整|四足机器人(?=用户手册)/g,'').replace(/_/g,' ').replace(/([A-Za-z0-9])(?=[\u4e00-\u9fff])/g,'$1 ').replace(/\s+/g,' ').trim();
 const compact = (text:string) => text.toLowerCase().replace(/\.pdf|完整|操作说明|中文版|中文|用户手册|使用说明|使用手册|宇树|卡赫|v\d+(?:\.\d+)?|[\s_（）()&与和]/g,'');
 
 /** Replace source spans before Markdown sees underscores; keep all other characters. */
@@ -32,9 +32,9 @@ export function citationText(answer:string,evidence:any[]) {
     String.raw`${same}(?:[，,]\s*[^\n。；;“《]*?(?=${page}))?${tail}`,
     String.raw`(?:DOC-\d+\s*)?${chapter}[，,]?\s*${page}`
   ].join('|'),'g');
-  const replaceSource=(whole:string):string=>{
+  const replaceSource=(whole:string,prose=false):string=>{
     const parts=whole.split(/[；;]/);
-    if(parts.length>1)return parts.map(replaceSource).join('');
+    if(parts.length>1)return parts.map(part=>replaceSource(part)).join('');
     const titles=[...whole.matchAll(/《([^》]+)》/g)].map(match=>match[1]);
     const pdf=evidence.map(item=>item.document || item.document_name).find(name=>name && whole.includes(name));
     const id=whole.match(/DOC-\d+/)?.[0];
@@ -51,10 +51,17 @@ export function citationText(answer:string,evidence:any[]) {
       const prefix=whole.slice(0,position),quoted=[...prefix.matchAll(/[“"]([^”"]+)[”"]|《([^》]+)》/g)].map(match=>match[1] || match[2]).filter(value=>value!==title);
       return quoted.at(-1) || prefix.match(/(?:》|同上)[，,]\s*([^第页]+)/)?.[1]?.replace(/[，,]\s*$/,'') || '';
     };
-    if(!pages.length)return add(document,sectionBefore(whole.length),isSame?previous?.page:undefined,isSame?previous?.end:undefined);
-    return pages.map(match=>add(document,sectionBefore(match.index!),Number(match[1] || match[3]),match[2] || match[4]?Number(match[2] || match[4]):undefined)).join('');
+    const tokens=pages.length?pages.map(match=>add(document,sectionBefore(match.index!),Number(match[1] || match[3]),match[2] || match[4]?Number(match[2] || match[4]):undefined)):[add(document,sectionBefore(whole.length),isSame?previous?.page:undefined,isSame?previous?.end:undefined)];
+    if(!prose || !title)return tokens.join('');
+    // In prose, only the filename and page references are citation syntax.
+    const named=whole.replace(whole.includes(`《${title}》`)?`《${title}》`:title,` ${readable(document)}`);
+    let index=0;
+    return pages.length?named.replace(new RegExp(String.raw`[（(]\s*${page}\s*[）)]|${page}`,'g'),()=>tokens[index++] || ''):named+tokens[0];
   };
-  const text=answer.replace(pattern,replaceSource);
+  const text=answer.replace(pattern,(whole:string,offset:number)=>{
+    const prefix=answer.slice(0,offset).split('\n').at(-1)!.replace(/[*#>]/g,'').trim();
+    return replaceSource(whole,!/^[（(]/.test(whole) && !!prefix && !/(?:来源[：:]|——|[；;])$/.test(prefix));
+  });
   return {text,sources};
 }
 const plainQuote=(text:string)=>citationText(text,[]).text.replace(sourceToken,'').replace(/[（(]同上[^）)\n]*[）)]/g,'').replace(/\*\*|__|[*_`#>]|\s/g,'');

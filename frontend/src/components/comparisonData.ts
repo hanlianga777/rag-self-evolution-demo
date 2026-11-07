@@ -26,14 +26,25 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
   const expanded=pairs.find(({a,b}:any)=>a.final_rank==null && Number.isFinite(a.rerank_rank) && a.rerank_rank<=(finalEvidence(after)?.length || 0) && b.final_rank!=null);
   const recalled=pairs.find(({a,b}:any)=>a.candidate_hit===false && b.candidate_hit===true);
   const pair=expanded || recalled || pairs.find(({a,b}:any)=>a.final_rank!==b.final_rank || a.candidate_rank!==b.candidate_rank || a.rerank_rank!==b.rerank_rank);
-  const key=expanded ? 'top_k' : recalled ? 'candidate_k' : undefined;
+  const negative=before?.test_category==='negative';
+  const key=negative ? undefined : expanded ? 'top_k' : recalled ? 'candidate_k' : undefined;
   const changes=configChanges(beforeConfig,afterConfig),change=changes.find(change=>change.key===key);
   if(change)steps.push({label:'配置变化',text:`${change.label} ${change.before} → ${change.after}`,key:true});
-  else if(changes.length)steps.push({label:'配置变化',text:'配置差异见下方'});
-  if(pair){
-    const position=(row:any)=>[row.candidate_rank!=null?`候选第 ${row.candidate_rank} 位`:row.candidate_hit===false?'未进候选':'',row.rerank_rank!=null?`重排第 ${row.rerank_rank} 位`:'',row.final_rank!=null?`进入回答第 ${row.final_rank} 位`:row.final_hit===false || row.final_rank===null?'未进入回答':''].filter(Boolean).join('、');
-    const a=position(pair.a),b=position(pair.b);
-    if(a&&b)steps.push({label:'关键证据位置',text:`“${Array.from(pair.a.quote as string).slice(0,36).join('')}${Array.from(pair.a.quote as string).length>36?'…':''}”：优化前${a}；优化后${b}`});
+  else if(changes.length)steps.push({label:'配置变化',text:negative?changes.map(change=>`${change.label} ${change.before}→${change.after}`).join('、'):'配置差异见下方'});
+  if(pair && !negative){
+    const cleaned=(pair.a.quote as string).trim().replace(/^(?:[^=；;\n]{1,12}=[^；;\n]*[；;]\s*)+/,'').replace(/^[^=；;\n]{1,12}=\s*/,'').replace(/^\s*(?:\d+[.、)）]\s*)+/,'').trim();
+    const characters=Array.from(cleaned),excerpt=/[\u4e00-\u9fff]{4}/.test(cleaned) && !/[={}\[\]]/.test(cleaned)?(characters.length>24?characters.slice(0,23).join('')+'…':cleaned):'关键说明';
+    const {a,b}=pair;
+    let movement:string;
+    if(expanded)movement=`重排第 ${a.rerank_rank} 位：优化前被截掉，优化后进入回答第 ${b.final_rank} 位`;
+    else if(recalled)movement=`优化前没进候选，优化后${b.final_rank!=null?`进入回答第 ${b.final_rank} 位`:'进入候选'}`;
+    else {
+      const stage=a.final_rank!==b.final_rank?'final_rank':a.rerank_rank!==b.rerank_rank?'rerank_rank':'candidate_rank';
+      const label={final_rank:'进入回答的位置',rerank_rank:'重排位置',candidate_rank:'候选位置'}[stage];
+      const position=(rank:number|null|undefined)=>rank==null?(stage==='final_rank'?'未进入':'未知'):`第 ${rank} 位`;
+      movement=`${label}：${position(a[stage])}→${position(b[stage])}`;
+    }
+    steps.push({label:'关键证据位置',text:`“${excerpt}”：${movement}`});
   }
   if(before?.test_category==='negative' && typeof before.passed==='boolean' && typeof after.passed==='boolean')steps.push({label:'回答结果',text:`优化前${before.passed?'正确拒答':'拒答判定未通过'}，优化后${after.passed?'正确拒答':'拒答判定未通过'}`});
   else if(points.some(point=>point.fresh))steps.push({label:'回答结果',text:`补上了必答要点 ${points.filter(point=>point.fresh).map(point=>`${String.fromCodePoint(0x2460+point.number-1)} ${point.text}`).join('；')}`});
