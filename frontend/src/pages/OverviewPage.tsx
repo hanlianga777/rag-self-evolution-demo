@@ -1,4 +1,4 @@
-import {qualityValue, recommendationOf} from "../components/EvolutionStory";
+import {qualityValue, recommendationOf, schemeName} from "../components/EvolutionStory";
 import { PageShell } from "../components/PageShell";
 import { useState } from "react";
 import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
@@ -33,7 +33,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const expectedCount = summary.expected_count || summary.total || 0;
   const experiment = newKnowledge && !run?.id ? {} : data.optimization?.baseline_run_id && data.optimization.baseline_run_id !== run?.id ? {} : data.optimization || {};
   const candidates: any[] = experiment.candidates || [];
-  const qualified = candidates.filter(candidate => candidate.reasoning?.candidate_label !== "D" && candidate.result?.qualification?.qualified);
+  const qualified = candidates.filter(candidate => candidate.result?.qualification?.qualified);
   const recommendation = experiment?.recommendation?.result || experiment?.recommendation || {};
   const frozen = !data.workspace?.requires_new_golden && expectedCount > 0 && (formal != null || goldenId === undefined && summary.approved >= expectedCount);
   const released = production?.provenance === "published";
@@ -48,7 +48,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const stages: [string, string, Page][] = [
     ["知识库", `${data.documents?.length || 0} 份文档${knowledge?.identity ? "已索引" : "待建立新索引"}`, "knowledge"], ["Pipeline", newKnowledge ? "知识处理与检索已配置" : (production?.config ? "当前线上配置已保存" : "待配置"), "settings"],
     ["Golden Dataset", frozen ? `已冻结 · ${expectedCount} 题` : `待人工确认 · ${summary.approved || 0} / ${expectedCount || "—"} 题`, "governance"], ["Baseline", run?.result?.gates ? `已评测 · ${run.result.gates.passed_count}/${run.result.gates.total} 项门槛通过` : "待评测", "evaluation"],
-    [displayText("Optimization Agent"), qualified.length ? `${qualified.length} 个合格候选方案 · ${qualified.map(row => row.reasoning?.candidate_label).join(" / ")}` : roundCandidates.length ? `${roundCandidates.filter(candidate => candidate.status === "evaluated" && candidate.result?.evaluation_complete !== false).length}/${roundCandidates.length} 个方案已评测` : experiment?.id ? "暂无候选，等待生成" : "尚未生成优化方案", "evolution"],
+    [displayText("Optimization Agent"), qualified.length ? `${qualified.length} 个合格方案 · ${qualified.map(row => schemeName(row)).join(" / ")}` : roundCandidates.length ? `${roundCandidates.filter(candidate => candidate.status === "evaluated" && candidate.result?.evaluation_complete !== false).length}/${roundCandidates.length} 个方案已评测` : experiment?.id ? "暂无候选，等待生成" : "尚未生成优化方案", "evolution"],
     [displayText("Release"), currentReleased ? "当前推荐已发布" : recommendation.recommended_candidate ? "当前推荐待发布" : "尚无可发布方案", "versions"],
   ];
   const metrics = run?.status === "completed" && !run.requires_policy_upgrade && !data.workspace?.requires_policy_upgrade && !data.workspace?.requires_new_golden && !data.workspace?.requires_new_baseline && !data.workspace?.baseline_unavailable_reason && (data.workspace?.current_baseline_id === undefined || data.workspace.current_baseline_id === run.id) ? run.result : null;

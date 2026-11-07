@@ -1,54 +1,59 @@
 import {useEffect, useState} from 'react';
-import {errorMessage, getJson} from '../api';
-import {CaseAnswer} from './CaseAnswer';
-import {completeResult, recommendationOf, schemeName, storyText} from './EvolutionStory';
+import {cachedJson, errorMessage, getJson} from '../api';
+import {completeResult, recommendationOf, schemeName, shortQuestionId} from './EvolutionStory';
+import {ComparisonAnswer} from './ComparisonAnswer';
+import {categoryName, comparisonPoints, configChanges, explanation, metricRows, verdict} from './comparisonData';
 import type {Citation} from '../types';
-
-export function evidenceChange(before:any,after:any,snapshot:any):string {
-  const question=snapshot?.questions?.find((q:any)=>q.id===before?.question_id || q.question_id===before?.question_id);
-  const source=question?.business_requirements?.sources?.[0];
-  const id=source?.chunk_id;
-  const left=before?.programmatic_metrics?.retrieval_trace,right=after?.programmatic_metrics?.retrieval_trace;
-  if(id && Array.isArray(left?.final) && Array.isArray(right?.final)){
-    const a=left.final.findIndex((item:any)=>item.chunk_id===id),b=right.final.findIndex((item:any)=>item.chunk_id===id);
-    const quote=source.quote ? `“${source.quote}”这段说明` : '标准说明';
-    if(a<0 && b>=0)return `优化前没找到${quote}作为回答证据；优化后排在第 ${b+1} 位。`;
-    if(a>=0 && b>=0)return `两次均选入${quote}，证据位置从第 ${a+1} 位变为第 ${b+1} 位；具体回答见上方。`;
-    if(a>=0 && b<0)return '优化后未选入这段标准说明；回答的改善以保存的逐题判定为准。';
-  }
-  return after?.judge_result?.reason ? `保存的判定说明：${storyText(after.judge_result.reason)}` : '保存记录没有足够的证据位置，变化未知。';
-}
+import './SavedAnswerComparison.css';
 
 export function SavedAnswerComparison({data,onOpenCitation}:{data:any;onOpenCitation:(citation:Citation)=>void}) {
-  const experiment=data.optimization,baseline=data.evaluation;
-  const recommendation=recommendationOf(experiment);
+  const experiment=data.optimization,baseline=data.evaluation,recommendation=recommendationOf(experiment);
   const candidate=experiment?.candidates?.find((c:any)=>c.id===recommendation.recommended_candidate);
-  const baselineId=data.workspace?.current_baseline_id===undefined ? baseline?.id : data.workspace.current_baseline_id;
-  const runId=candidate?.result?.evaluation_run_id;
+  const baselineId=data.workspace?.current_baseline_id===undefined ? baseline?.id : data.workspace.current_baseline_id,runId=candidate?.result?.evaluation_run_id;
   const baselineBlocked=!baselineId || baseline?.id!==baselineId;
-  const [runs,setRuns]=useState<any>(null),[selected,setSelected]=useState(''),[error,setError]=useState('');
+  const paths=[baselineId,runId].map(id=>`/api/evaluations/${encodeURIComponent(id)}/comparison-cases`);
   const binding=JSON.stringify([baselineId,runId,candidate?.id,candidate?.status,candidate?.result?.evaluation_complete]);
+  const [runs,setRuns]=useState<any>(null),[selected,setSelected]=useState(''),[filter,setFilter]=useState('fixed'),[search,setSearch]=useState(''),[error,setError]=useState(''),[details,setDetails]=useState<any>({});
   useEffect(()=>{
-    let cancelled=false;setRuns(null);setSelected('');setError('');
+    let cancelled=false;setRuns(null);setSelected('');setError('');setDetails({});setFilter('fixed');setSearch('');
     if(baselineBlocked || !runId || !completeResult(candidate))return;
-    void Promise.all([getJson<any>(`/api/evaluations/${baselineId}`),getJson<any>(`/api/evaluations/${runId}`)]).then(([before,after])=>{
+    const accept=([before,after]:any[])=>{
       if(cancelled)return;
       if(before.id!==baselineId || after.id!==runId || before.status!=='completed' || after.status!=='completed' || !before.judge?.evaluation_identity || before.judge.evaluation_identity!==after.judge?.evaluation_identity || !before.dataset_version_id || before.dataset_version_id!==after.dataset_version_id)throw new Error('评测身份或题卷不一致，不能展示优化前后对比。');
-      const fixed=new Set(candidate.result.all_fixed_question_ids || []);
-      const rows=(before.cases || []).filter((row:any)=>fixed.has(row.question_id) && row.passed===false && typeof row.model_answer==='string' && after.cases?.some((item:any)=>item.question_id===row.question_id && item.passed===true && typeof item.model_answer==='string'));
-      setRuns({before,after,rows,binding});setSelected(rows[0]?.question_id || '');
-    }).catch(reason=>{if(!cancelled)setError(errorMessage(reason));});
+      const rows=(before.cases || []).map((row:any)=>({...row,after:(after.cases || []).find((item:any)=>item.question_id===row.question_id)}));
+      setRuns({before,after,rows,binding});setSelected(previous=>previous || rows.find((row:any)=>row.passed===false && row.after?.passed===true)?.question_id || '');
+    };
+    const saved=paths.map(path=>cachedJson<any>(path));
+    if(saved.every(Boolean)){try{accept(saved);}catch(reason){setError(errorMessage(reason));}}
+    void Promise.all(paths.map(path=>getJson<any>(path))).then(accept).catch(reason=>{if(!cancelled)setError(errorMessage(reason));});
     return ()=>{cancelled=true;};
   },[binding]);
   const current=runs?.binding===binding ? runs : null;
-  const before=current?.rows.find((row:any)=>row.question_id===selected),after=current?.after.cases?.find((row:any)=>row.question_id===selected);
-  return <section className="saved-answer-comparison" aria-label="已保存回答对比"><div className="section-head"><h2>代表题 · 看见改善</h2><span>已保存的评测回答</span></div>
-    {baselineBlocked ? <p>当前有效 Baseline 尚未就绪，暂不展示前后对比。</p> : !candidate ? <p>最终推荐尚未保存，代表题待确定。</p> : !completeResult(candidate) ? <p>推荐方案尚无完整评测结果。</p> : !runId ? <p>推荐方案的评测回答来源未保存。</p> : error ? <p role="alert" className="error-notice">{error}</p> : !current ? <p>正在读取已保存的回答…</p> : <>
-      <div className="representative-questions">{current.rows.map((row:any)=><button key={row.question_id} className="secondary" aria-pressed={selected===row.question_id} onClick={()=>setSelected(row.question_id)} title={row.question}>{row.question}</button>)}</div>
-      {before && after ? <><h3 className="saved-question">{before.question}</h3><div className="saved-answer-columns">{[[before,'Baseline · 优化前'],[after,`${schemeName(candidate)} · 优化后`]].map(([row,label]:any)=>{
-        const final=row.programmatic_metrics?.retrieval_trace?.final || row.retrieved_chunks || [];
-        return <article className="saved-answer-card" key={label}><div className="section-head"><h3>{label}</h3><span>{row.passed===true?'答对':row.passed===false?'答错':'未知'}</span></div><div className="saved-answer-body"><CaseAnswer text={row.model_answer || '回答未保存'} final={final}/></div><div className="saved-answer-citations">{final.map((citation:Citation,index:number)=><button className="document-link" key={`${citation.chunk_id}-${index}`} onClick={()=>onOpenCitation({...citation,content_preview:(citation as any).content || citation.content_preview,savedEvidence:true} as Citation)}>{citation.document} · 第 {citation.page_start} 页</button>)}</div></article>;
-      })}</div><p className="comparison-observation">{evidenceChange(before,after,current.before.dataset_snapshot)}</p></> : <p>没有同时保存两侧判定和回答的修复题。</p>}
-    </>}
-  </section>;
+  const rows:any[]=current?.rows || [],fixed=rows.filter(row=>row.passed===false && row.after?.passed===true),remaining=rows.filter(row=>row.after?.passed===false);
+  const filtered=(filter==='fixed'?fixed:filter==='remaining'?remaining:rows).filter(row=>(row.question || '').includes(search));
+  const active=filtered.find(row=>row.question_id===selected) || filtered[0],id=active?.question_id;
+  const detailPaths=[baselineId,runId].map(run=>`/api/evaluations/${encodeURIComponent(run)}/cases/${encodeURIComponent(id)}`);
+  const detailKey=JSON.stringify([binding,id]);
+  const savedDetail=details[detailKey] || detailPaths.map(path=>cachedJson<any>(path));
+  const ready=savedDetail?.every(Boolean),before=ready?savedDetail[0].case:null,after=ready?savedDetail[1].case:null;
+  useEffect(()=>{
+    if(!current || !id || ready)return;
+    let cancelled=false;setError('');
+    void Promise.all(detailPaths.map(path=>getJson<any>(path))).then(value=>{if(!cancelled)setDetails((previous:any)=>({...previous,[detailKey]:value}));}).catch(reason=>{if(!cancelled)setError(errorMessage(reason));});
+    return ()=>{cancelled=true;};
+  },[detailKey,!!current]);
+  const points=before && after?comparisonPoints(before,after,savedDetail[1].question):[],why=explanation(before,after,current?.before.config,current?.after.config,points);
+  const unavailable=baselineBlocked?'当前有效 Baseline 尚未就绪，暂不展示前后对比。':!candidate?'最终推荐尚未保存，代表题待确定。':!completeResult(candidate)?'推荐方案尚无完整评测结果。':!runId?'推荐方案的评测回答来源未保存。':'';
+  return <section className="saved-answer-comparison" aria-label="已保存回答对比">{unavailable?<p>{unavailable}</p>:!current?<p role={error?'alert':'status'}>{error || '正在读取题目列表…'}</p>:<div className="comparison-workspace">
+    <aside className="comparison-rail" aria-label="选择题目"><div className="comparison-seg">{[['fixed','修好的',fixed.length],['remaining','仍未修好',remaining.length],['all','全部',rows.length]].map(([value,label,count])=><button key={value} aria-pressed={filter===value} onClick={()=>{setFilter(String(value));setSelected('');}}>{label}<b>{count}</b></button>)}</div><input className="comparison-search" aria-label="搜索题目内容" placeholder="搜索题目内容" value={search} onChange={event=>setSearch(event.target.value)}/><ul className="comparison-qlist">{filtered.map(row=><li key={row.question_id}><button className={id===row.question_id?'on':''} aria-pressed={id===row.question_id} onClick={()=>setSelected(row.question_id)} title={row.question}><span className="comparison-qid">{shortQuestionId(row.question_id)}</span><span className="comparison-qtext">{row.question}</span><span className="comparison-qmeta"><span className="comparison-flip" aria-label={`优化前${verdict(row)}，优化后${verdict(row.after)}`}><i className={`comparison-dot ${verdict(row)}`}/><i>›</i><i className={`comparison-dot ${verdict(row.after)}`}/></span>{categoryName(row.test_category)}</span></button></li>)}</ul>{!filtered.length && <p className="comparison-empty">没有符合条件的题目。</p>}</aside>
+    <div className="comparison-detail">{active && <header className="comparison-qhead"><div><div className="comparison-k">{shortQuestionId(id)}　{categoryName(active.test_category)}</div><h2>{active.question}</h2></div><div className="comparison-verdict"><span className={`comparison-badge ${verdict(active)}`}>优化前 {verdict(active)}</span><span>›</span><span className={`comparison-badge ${verdict(active.after)}`}>优化后 {verdict(active.after)}</span></div></header>}
+    {error && <p role="alert">{error}</p>}{id && !ready?<div className="case-detail-skeleton" role="status" aria-label="正在读取保存的单题详情"><span/><span/><span/></div>:before && after?<>
+      <section className="comparison-why"><div className="comparison-chain"><h3>{active.test_category==='negative'?'这道题的拒答变化':before.passed===false && after.passed===true?'这道题为什么变好':'这道题的前后变化'}</h3><ol className="comparison-steps">{why.steps.map(step=><li className={`comparison-step ${step.key?'key':''}`} key={step.label}><span className="comparison-t">{step.label}</span><span className="comparison-v">{step.text}</span></li>)}</ol>{!why.steps.length && <p>保存记录未提供变化依据。</p>}</div><div className="comparison-points"><h3>必答要点对照</h3><table className="comparison-ptable"><thead><tr><th>要点</th><th>优化前</th><th>优化后</th></tr></thead><tbody>{points.map(point=><tr key={point.number} className={point.fresh?'new':''}><td><span className="comparison-pn">{point.number}</span>{point.text}{point.fresh && <span className="comparison-newtag">新满足</span>}</td><td className={point.before?'yes':'no'}>{point.before?'✓':'✕'}</td><td className={point.after?'yes':'no'}>{point.after?'✓':'✕'}</td></tr>)}</tbody></table>{!points.length && <p>必答要点判分未保存。</p>}</div></section>
+      <div className="comparison-answers">{[['before',before,'Baseline'],['after',after,schemeName(candidate)]].map(([side,row,name]:any)=>{
+        const flagged=points.filter(point=>side==='before'?!point.before:point.fresh),met=points.filter(point=>side==='before'?point.before:point.after).length;
+        return <article className="comparison-ans" key={`${id}-${side}`}><header className="comparison-ans-h"><div className="comparison-name">{side==='before'?'优化前':'优化后'}<small>{name}</small></div><span className={`comparison-badge ${verdict(row)}`}>{verdict(row)}　要点 {points.length?`${met} / ${points.length}`:'未知'}</span></header>{flagged.length>0 && <div className={`comparison-flag ${side==='before'?'miss':'gain'}`}>{flagged.map(point=>`${side==='before'?'缺少':'新满足'}要点 ${point.number}：${point.text}`).join('；')}</div>}<ComparisonAnswer row={row} points={points} side={side} onOpenCitation={onOpenCitation}/></article>;
+      })}</div>
+      <section className="comparison-data"><h3>两次回答的配置差异</h3><div className="comparison-cfg">{configChanges(current.before.config,current.after.config).sort((a,b)=>Number(b.key===why.key)-Number(a.key===why.key)).map(change=><span className={`comparison-chip ${why.key===change.key?'key':''}`} key={change.key}>{change.label}<b>{change.before} → {change.after}</b>{why.key===change.key && <small>本题关键</small>}</span>)}</div><h3>本题数据</h3><div className="comparison-legend"><span>优化前</span><span>优化后</span></div><table className="comparison-dtable"><thead><tr><th>指标</th><th>优化前</th><th>优化后</th><th>对比条</th><th>变化</th></tr></thead><tbody>{metricRows(before,after,points).map(row=><tr key={row.label}><td>{row.label}</td><td>{row.better==='before'?<strong>{row.beforeText}</strong>:row.beforeText}</td><td>{row.better==='after'?<strong>{row.afterText}</strong>:row.afterText}</td><td className="comparison-bar">{row.before!=null && row.after!=null && row.scale>0 && <div className="comparison-pair"><i style={{width:`${Math.min(100,row.before/row.scale*100)}%`}}/><i style={{width:`${Math.min(100,row.after/row.scale*100)}%`}}/></div>}</td><td>{row.delta}</td></tr>)}</tbody></table><div className="comparison-foot">数字来自两次评测保存的本题判分、耗时和检索记录。时间行共用总耗时刻度；较好的一方加粗。</div></section>
+    </>:null}</div>
+  </div>}</section>;
 }

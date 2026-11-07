@@ -17,7 +17,7 @@ export const schemeName = (candidate:any, id?:string):string => {
   return label==='D' ? '方案 D' : label ? `${round ? `第 ${round} 轮` : ''}方案 ${label}` : '方案信息未保存';
 };
 
-const shortQuestionId=(id:string):string => {
+export const shortQuestionId=(id:string):string => {
   const number=id.match(/^Q(\d+)$/i)?.[1] || id.match(/^(?:CSV|V1G)-[\dA-Za-z-]*?-(\d{1,3})(?:-R[\dA-Za-z-]+)?$/)?.[1];
   return number ? `Q${number.padStart(2,'0')}` : id;
 };

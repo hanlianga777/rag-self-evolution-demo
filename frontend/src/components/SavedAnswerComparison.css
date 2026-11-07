@@ -1,0 +1,123 @@
+/* 021l: dimensions and tokens follow 指挥/设计稿/021l-问答验证前后对比.html. */
+.saved-answer-comparison {
+  --page:#F3F5F8; --panel:#FFF; --ink:#142033; --ink-2:#3A4A61; --muted:#6A7990;
+  --rule:#E3E8EF; --rule-2:#EEF1F5; --green:#0E7A5A; --green-tint:#E5F3EC; --green-mark:#C9EBD9;
+  --risk:#B4432B; --risk-tint:#FBEDE9; --shadow:0 1px 2px #1420330a,0 4px 16px #1420330d;
+  padding:0; color:var(--ink); font:14px/1.65 -apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; font-feature-settings:"tnum";
+}
+.saved-answer-comparison * { box-sizing:border-box; }
+.saved-answer-comparison button { font:inherit; color:inherit; cursor:pointer; }
+.saved-answer-comparison .comparison-workspace { display:grid; grid-template-columns:300px minmax(0,1fr); gap:24px; align-items:start; }
+.saved-answer-comparison .comparison-rail { background:var(--panel); border-radius:14px; box-shadow:var(--shadow); position:sticky; top:0; display:flex; flex-direction:column; max-height:calc(100dvh - 210px); min-height:0; }
+.saved-answer-comparison .comparison-seg { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; margin:14px 14px 10px; padding:3px; background:var(--rule-2); border-radius:10px; }
+.saved-answer-comparison .comparison-seg button { border:0; background:none; padding:6px 0; border-radius:7px; font-size:13px; color:var(--ink-2); white-space:nowrap; }
+.saved-answer-comparison .comparison-seg b { font-weight:600; margin-left:3px; }
+.saved-answer-comparison .comparison-seg [aria-pressed=true] { background:var(--panel); box-shadow:0 1px 2px #1420331f; color:var(--ink); font-weight:600; }
+.saved-answer-comparison .comparison-search { margin:0 14px 8px; width:calc(100% - 28px); padding:8px 12px; border:1px solid var(--rule); border-radius:10px; color:var(--ink-2); font:inherit; font-size:13px; background:var(--panel); }
+.saved-answer-comparison .comparison-qlist { list-style:none; margin:0; padding:4px 8px 10px; overflow:auto; }
+.saved-answer-comparison .comparison-qlist li+li { margin-top:2px; }
+.saved-answer-comparison .comparison-qlist button { width:100%; border:0; background:transparent; display:grid; grid-template-columns:38px 1fr; gap:4px 8px; padding:10px 10px 10px 8px; border-radius:10px; position:relative; text-align:left; }
+.saved-answer-comparison .comparison-qlist button:hover { background:#F6F8FB; }
+.saved-answer-comparison .comparison-qlist button.on { background:var(--green-tint); }
+.saved-answer-comparison .comparison-qlist .on::before { content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px; border-radius:3px; background:var(--green); }
+.saved-answer-comparison .comparison-qid { font-weight:650; font-size:13px; color:var(--ink); padding-top:1px; }
+.saved-answer-comparison .comparison-qtext { font-size:13px; line-height:1.5; color:var(--ink-2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.saved-answer-comparison .comparison-qmeta { grid-column:2; display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+.saved-answer-comparison .comparison-flip { display:inline-flex; align-items:center; gap:4px; }
+.saved-answer-comparison .comparison-flip i { font-style:normal; color:#A3AFC0; font-size:11px; }
+.saved-answer-comparison .comparison-dot { width:7px; height:7px; border-radius:50%; display:inline-block; background:#A3AFC0; }
+.saved-answer-comparison .comparison-dot.答错 { background:var(--risk); }
+.saved-answer-comparison .comparison-dot.答对 { background:var(--green); }
+.saved-answer-comparison .comparison-detail { min-width:0; display:flex; flex-direction:column; gap:18px; }
+.saved-answer-comparison .comparison-qhead { display:flex; justify-content:space-between; gap:22px; align-items:flex-start; }
+.saved-answer-comparison .comparison-k { font-size:12px; color:var(--muted); margin:0 0 4px; }
+.saved-answer-comparison .comparison-qhead h2 { font-size:19px; line-height:1.5; margin:0; font-weight:600; max-width:46em; }
+.saved-answer-comparison .comparison-verdict { display:flex; align-items:center; gap:8px; flex-shrink:0; margin-top:22px; color:#A3AFC0; }
+.saved-answer-comparison .comparison-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:999px; font-size:13px; font-weight:600; white-space:nowrap; }
+.saved-answer-comparison .comparison-badge.答错 { background:var(--risk-tint); color:var(--risk); }
+.saved-answer-comparison .comparison-badge.答对 { background:var(--green-tint); color:var(--green); }
+.saved-answer-comparison .comparison-why { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); background:var(--panel); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; }
+.saved-answer-comparison :is(.comparison-why,.comparison-data) h3 { font-size:14px; margin:0 0 14px; font-weight:600; }
+.saved-answer-comparison .comparison-chain { padding:18px 22px 20px; }
+.saved-answer-comparison .comparison-steps { list-style:none; margin:0; padding:0; position:relative; }
+.saved-answer-comparison .comparison-steps::before { content:""; position:absolute; left:5px; top:12px; bottom:12px; width:2px; background:var(--rule); }
+.saved-answer-comparison .comparison-step { display:grid; grid-template-columns:96px 1fr; gap:12px; align-items:baseline; padding:7px 0 7px 26px; position:relative; }
+.saved-answer-comparison .comparison-step::before { content:""; position:absolute; left:0; top:13px; width:12px; height:12px; border-radius:50%; background:var(--panel); border:2px solid #A3AFC0; }
+.saved-answer-comparison .comparison-step.key::before { border-color:var(--green); background:var(--green); }
+.saved-answer-comparison .comparison-t { font-size:12.5px; color:var(--muted); }
+.saved-answer-comparison .comparison-v { font-size:14px; line-height:1.6; color:var(--ink); overflow-wrap:anywhere; }
+.saved-answer-comparison .comparison-step.key .comparison-v { color:var(--green); font-weight:650; }
+.saved-answer-comparison .comparison-points { padding:18px 22px 20px; border-left:1px solid var(--rule-2); }
+.saved-answer-comparison table { width:100%; border-collapse:collapse; font-size:13.5px; table-layout:auto; }
+.saved-answer-comparison table th { font-weight:500; color:var(--muted); font-size:12px; background:transparent; }
+.saved-answer-comparison .comparison-ptable th { text-align:center; padding:0 0 8px; width:62px; }
+.saved-answer-comparison .comparison-ptable th:first-child { text-align:left; width:auto; }
+.saved-answer-comparison .comparison-ptable td { padding:8px 0; border-top:1px solid var(--rule-2); vertical-align:middle; }
+.saved-answer-comparison .comparison-ptable td:not(:first-child) { text-align:center; }
+.saved-answer-comparison .comparison-ptable tr.new td { background:var(--green-tint); }
+.saved-answer-comparison .comparison-ptable tr.new td:first-child { border-radius:8px 0 0 8px; padding-left:8px; }
+.saved-answer-comparison .comparison-ptable tr.new td:last-child { border-radius:0 8px 8px 0; }
+.saved-answer-comparison .comparison-pn { display:inline-flex; width:18px; height:18px; border-radius:50%; background:var(--ink); color:#fff; font-size:11px; align-items:center; justify-content:center; margin-right:8px; font-weight:600; vertical-align:1px; }
+.saved-answer-comparison .new .comparison-pn { background:var(--green); }
+.saved-answer-comparison .yes { color:var(--green); font-weight:700; }
+.saved-answer-comparison .no { color:var(--risk); font-weight:700; }
+.saved-answer-comparison .comparison-newtag { font-size:11.5px; color:var(--green); font-weight:600; margin-left:6px; }
+.saved-answer-comparison .comparison-answers { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.saved-answer-comparison .comparison-ans { background:var(--panel); border-radius:14px; box-shadow:var(--shadow); display:flex; flex-direction:column; min-width:0; }
+.saved-answer-comparison .comparison-ans-h { display:flex; justify-content:space-between; align-items:center; padding:14px 20px 12px; border-bottom:1px solid var(--rule-2); gap:8px; }
+.saved-answer-comparison .comparison-name { font-weight:600; }
+.saved-answer-comparison .comparison-name small { display:block; font-weight:400; color:var(--muted); font-size:12px; }
+.saved-answer-comparison .comparison-flag { margin:12px 20px 0; padding:8px 12px; border-radius:8px; font-size:13px; }
+.saved-answer-comparison .comparison-flag.miss { background:var(--risk-tint); color:var(--risk); }
+.saved-answer-comparison .comparison-flag.gain { background:var(--green-tint); color:var(--green); }
+.saved-answer-comparison .comparison-body { padding:12px 20px 4px; height:430px; flex:none; overflow:auto; color:var(--ink-2); }
+.saved-answer-comparison .case-answer { font:inherit; line-height:1.65; overflow-wrap:anywhere; }
+.saved-answer-comparison .comparison-body p { margin:0 0 10px; }
+.saved-answer-comparison .comparison-body h5 { margin:14px 0 6px; font-size:13.5px; color:var(--ink); font-weight:650; }
+.saved-answer-comparison .comparison-body ol { margin:0 0 8px; padding-left:20px; }
+.saved-answer-comparison .comparison-body li { margin:0 0 6px; padding-left:2px; }
+.saved-answer-comparison .comparison-body ul { margin:4px 0; padding-left:16px; }
+.saved-answer-comparison .comparison-body ul li { margin:0 0 2px; }
+.saved-answer-comparison .comparison-body strong { color:var(--ink); font-weight:650; }
+.saved-answer-comparison .comparison-note { background:#F7F9FB; border-radius:8px; padding:10px 12px; font-size:13px; color:var(--muted); margin:12px 0 10px; }
+.saved-answer-comparison mark { background:linear-gradient(transparent 12%,var(--green-mark) 12%,var(--green-mark) 92%,transparent 92%); color:var(--ink); padding:0 2px; border-radius:3px; }
+.saved-answer-comparison .comparison-met { background-image:linear-gradient(var(--green),var(--green)); background-size:100% 1px; background-position:0 100%; background-repeat:no-repeat; padding-bottom:1px; }
+.saved-answer-comparison .comparison-pin { display:inline-flex; width:15px; height:15px; border-radius:50%; background:var(--ink); color:#fff; font-size:10px; align-items:center; justify-content:center; margin:0 3px 0 1px; vertical-align:2px; font-weight:600; }
+.saved-answer-comparison mark .comparison-pin { background:var(--green); }
+.saved-answer-comparison .comparison-cite { display:inline-block; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:#E8EDF4; color:var(--ink-2); font-size:10.5px; line-height:16px; text-align:center; vertical-align:3px; margin-left:2px; font-weight:600; }
+.saved-answer-comparison .comparison-sources { border-top:1px solid var(--rule-2); padding:10px 20px 14px; font-size:12.5px; color:var(--muted); margin-top:auto; }
+.saved-answer-comparison .comparison-sources ol { list-style:none; margin:0; padding:0; }
+.saved-answer-comparison .comparison-sources li { display:flex; align-items:baseline; gap:8px; padding:3px 0; }
+.saved-answer-comparison .comparison-sources .comparison-cite { vertical-align:0; margin:0; }
+.saved-answer-comparison .comparison-sources button { color:var(--ink-2); background:none; border:0; border-bottom:1px solid var(--rule); padding:0; text-align:left; font-size:inherit; }
+.saved-answer-comparison .comparison-more { margin-top:6px; color:var(--muted); }
+.saved-answer-comparison .comparison-data { background:var(--panel); border-radius:14px; box-shadow:var(--shadow); padding:18px 22px 10px; }
+.saved-answer-comparison .comparison-cfg { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
+.saved-answer-comparison .comparison-chip { display:inline-flex; align-items:center; gap:8px; padding:5px 12px; border-radius:999px; border:1px solid var(--rule); font-size:13px; color:var(--ink-2); }
+.saved-answer-comparison .comparison-chip b { color:var(--ink); font-weight:600; }
+.saved-answer-comparison .comparison-chip.key { border-color:var(--green); background:var(--green-tint); }
+.saved-answer-comparison .comparison-chip small { color:var(--green); font-weight:600; font-size:11.5px; }
+.saved-answer-comparison .comparison-dtable th { text-align:left; padding:0 0 8px; }
+.saved-answer-comparison .comparison-dtable :is(th,td):is(:nth-child(2),:nth-child(3)) { text-align:right; width:110px; }
+.saved-answer-comparison .comparison-dtable td { padding:9px 0; border-top:1px solid var(--rule-2); }
+.saved-answer-comparison .comparison-dtable td:first-child { width:132px; color:var(--ink-2); }
+.saved-answer-comparison .comparison-dtable td.comparison-bar { padding-left:28px; padding-right:20px; }
+.saved-answer-comparison .comparison-dtable :is(th,td):last-child { width:96px; text-align:right; color:var(--muted); font-size:12.5px; }
+.saved-answer-comparison .comparison-dtable strong { font-weight:700; color:var(--ink); }
+.saved-answer-comparison .comparison-pair { display:grid; gap:3px; }
+.saved-answer-comparison .comparison-pair i { display:block; height:6px; border-radius:3px; background:#C7D0DC; }
+.saved-answer-comparison .comparison-pair i+i { background:var(--green); }
+.saved-answer-comparison .comparison-legend { display:flex; gap:16px; justify-content:flex-end; font-size:12px; color:var(--muted); margin:-30px 0 12px; }
+.saved-answer-comparison .comparison-legend span::before { content:""; display:inline-block; width:10px; height:6px; border-radius:3px; margin-right:6px; background:#C7D0DC; }
+.saved-answer-comparison .comparison-legend span+span::before { background:var(--green); }
+.saved-answer-comparison .comparison-foot { font-size:12px; color:var(--muted); padding:10px 0 6px; border-top:1px solid var(--rule-2); }
+.saved-answer-comparison .comparison-empty { padding:0 20px; color:var(--muted); }
+@media(max-width:1180px) { .saved-answer-comparison .comparison-why { grid-template-columns:1fr; } .saved-answer-comparison .comparison-points { border-left:0; border-top:1px solid var(--rule-2); } }
+@media(max-width:1350px) { .saved-answer-comparison .comparison-qhead { flex-direction:column; gap:8px; } .saved-answer-comparison .comparison-verdict { margin-top:0; } }
+@media(max-width:1000px) { .saved-answer-comparison .comparison-workspace { grid-template-columns:240px minmax(0,1fr); gap:16px; } .saved-answer-comparison .comparison-answers { grid-template-columns:1fr; } }
+@media(max-width:700px) { .saved-answer-comparison .comparison-workspace { grid-template-columns:1fr; } .saved-answer-comparison .comparison-rail { position:static; max-height:300px; } }
+.saved-answer-comparison .comparison-body ol { list-style:decimal; }
+.saved-answer-comparison .comparison-body ul { list-style:disc; }
+.saved-answer-comparison .comparison-source-title { font-weight:600; color:var(--ink-2); margin-bottom:4px; }
+.saved-answer-comparison .comparison-dtable th:nth-child(4) { padding-left:28px; }
+.verification-page:has(.saved-answer-comparison) .tabs button { border-radius:0; }

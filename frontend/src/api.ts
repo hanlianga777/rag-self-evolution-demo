@@ -33,9 +33,9 @@ export function getJson<T>(path: string, fetcher: Fetcher = fetch): Promise<T> {
       // Mutable lists and running jobs always go to the server; retain completed detail records only.
       const record = value as any;
       const completed = record?.status === 'completed' && !record.candidates?.some((item:any)=>['running','queued'].includes(item.status)) && !['running','queued'].includes(record.result?.optimization_cycle?.status) && !['running','queued','scheduled','waiting'].includes(record.result?.composite_schedule?.status);
-      if ((/^\/api\/(evaluations|experiments)\/[^/?]+$/.test(path) && completed) || /^\/api\/(documents|governance\/questions)\/[^/?]+$/.test(path)) {
+      if ((/^\/api\/(evaluations|experiments)\/[^/?]+(?:\/comparison-cases|\/cases\/[^/?]+)?$/.test(path) && completed) || /^\/api\/(documents|governance\/questions)\/[^/?]+$/.test(path)) {
         cache.values.set(path, { value, at: Date.now() });
-        if (cache.values.size > 24) cache.values.delete(cache.values.keys().next().value!);
+        if (cache.values.size > 128) cache.values.delete(cache.values.keys().next().value!);
       }
       return value;
     }).finally(() => cache.pending.delete(path));

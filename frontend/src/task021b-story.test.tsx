@@ -3,7 +3,7 @@ import {act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {afterEach,expect,it,vi} from 'vitest';
 import {EvolutionRoute, DStory, QualityComparison, storyText} from './components/EvolutionStory';
-import {SavedAnswerComparison,evidenceChange} from './components/SavedAnswerComparison';
+import {SavedAnswerComparison} from './components/SavedAnswerComparison';
 import {EvolutionPage} from './pages/EvolutionPage';
 import {VersionsPage} from './pages/VersionsPage';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
@@ -35,14 +35,14 @@ it('does not calculate correct answers or declare D lost from partial/technical 
 });
 it('loads saved fixed answers using GET and verifies the frozen evaluation identity',async()=>{
  const c=candidate(3,'C',true),runs={base:{...baseline,cases:[{question_id:'q1',question:'怎样清洁？',model_answer:'旧回答',passed:false}]},winner:{...baseline,id:'winner',cases:[{question_id:'q1',question:'怎样清洁？',model_answer:'先稀释再使用',passed:true}]}};
- const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(runs[url.endsWith('/base')?'base':'winner'])));vi.stubGlobal('fetch',fetcher);
+ const fetcher=vi.fn(async(url:string)=>{const run=runs[url.includes('/base/')?'base':'winner'];return new Response(JSON.stringify(url.includes('/cases/')?{status:'completed',case:run.cases[0]}:run));});vi.stubGlobal('fetch',fetcher);
  await mount(<SavedAnswerComparison data={{evaluation:baseline,optimization:{candidates:[c],recommendation:{recommended_candidate:c.id}}}} onOpenCitation={()=>{}}/>);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('怎样清洁'))!.click());
  expect(document.body.textContent).toContain('旧回答');expect(document.body.textContent).toContain('先稀释再使用');
- expect(fetcher.mock.calls).toHaveLength(2);expect(fetcher.mock.calls.every(([url])=>url.includes('/api/evaluations/'))).toBe(true);
+ expect(fetcher.mock.calls).toHaveLength(4);expect(fetcher.mock.calls.every(([url])=>url.includes('/api/evaluations/'))).toBe(true);
 });
 it('refuses saved-answer comparison when identities differ',async()=>{
- const c=candidate(3,'C',true);vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify({...baseline,id:url.endsWith('/base')?'base':'winner',judge:{evaluation_identity:url.endsWith('/base')?'one':'two'},cases:[]}))));
+ const c=candidate(3,'C',true);vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify({...baseline,id:url.includes('/base/')?'base':'winner',judge:{evaluation_identity:url.includes('/base/')?'one':'two'},cases:[]}))));
  await mount(<SavedAnswerComparison data={{evaluation:baseline,optimization:{candidates:[c],recommendation:{recommended_candidate:c.id}}}} onOpenCitation={()=>{}}/>);
  expect(document.body.textContent).toContain('评测身份或题卷不一致');
 });
@@ -69,14 +69,10 @@ it('honors an explicitly unavailable current Baseline without reading historical
  expect(document.body.textContent).toContain('当前有效 Baseline 尚未就绪');expect(fetcher).not.toHaveBeenCalled();
 });
 it('waits for a completed candidate before fetching its saved answers',async()=>{
- const c=candidate(3,'C',true),fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify({...baseline,id:url.endsWith('/base')?'base':'winner',cases:[]})));vi.stubGlobal('fetch',fetcher);
+ const c=candidate(3,'C',true),fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify({...baseline,id:url.includes('/base/')?'base':'winner',cases:[]})));vi.stubGlobal('fetch',fetcher);
  const render=(status:string)=><SavedAnswerComparison data={{evaluation:baseline,optimization:{candidates:[{...c,status}],recommendation:{recommended_candidate:c.id}}}} onOpenCitation={()=>{}}/>;
  await mount(render('running'));expect(fetcher).not.toHaveBeenCalled();
  await act(async()=>root.render(render('evaluated')));expect(fetcher).toHaveBeenCalledTimes(2);
-});
-it('describes the actual standard-evidence position without treating retrieval count as correctness',()=>{
- const source={questions:[{id:'q1',business_requirements:{sources:[{chunk_id:'saved',quote:'必须先稀释'}]}}]};
- expect(evidenceChange({question_id:'q1',programmatic_metrics:{retrieval_trace:{final:[]}}},{programmatic_metrics:{retrieval_trace:{final:[{chunk_id:'saved'}]}}},source)).toBe('优化前没找到“必须先稀释”这段说明作为回答证据；优化后排在第 1 位。');
 });
 it('switches historical rounds on all three detailed tabs while preserving the expanded progress',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({}))));
