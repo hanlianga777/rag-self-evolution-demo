@@ -20,7 +20,7 @@ it("tracks a Sandbox start and its persisted run in one operation", async () => 
   await act(async () => document.querySelector("button")!.click());
   expect(document.querySelector('[data-testid="operation-count"]')?.textContent).toBe("1");
   expect(document.querySelector('[data-testid="run-id"]')?.textContent).toBe("EVAL-C");
-  expect(document.querySelectorAll(".operation-console")).toHaveLength(1);
+  expect(document.querySelectorAll(".ui-run")).toHaveLength(1);
   await act(async () => root.unmount());
 });
 
@@ -35,16 +35,15 @@ it("keeps the operation controls inside an open modal drawer", async () => {
   await act(async () => document.querySelector<HTMLButtonElement>("button")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "触发失败")!.click());
   const dialog = document.querySelector("[role=dialog]")!;
-  expect(dialog.contains(document.querySelector(".operation-console"))).toBe(true);
-  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='查看错误详情']")!.click());
-  expect(dialog.textContent).toContain("Operation ID");
-  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='关闭运行状态']")!.click());
-  expect(document.querySelector(".operation-console")).toBeNull();
+  expect(dialog.contains(document.querySelector(".ui-run"))).toBe(true);
+  expect(dialog.textContent).not.toContain("Operation ID");
+  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='最小化运行状态']")!.click());
+  expect(document.querySelector(".ui-run")).toBeNull();
   expect(document.querySelector("[role=dialog]")).not.toBeNull();
   await act(async () => root.unmount());
 });
 
-it("shows an actual pending action and keeps its failure until dismissed", async () => {
+it("shows an actual pending action and keeps its human failure summary", async () => {
   let reject!: (reason: Error) => void;
   const pending = new Promise<void>((_, fail) => { reject = fail; });
   function Harness() { const operation = useOperation(); return <button onClick={() => void operation.run("保存人工判定", () => pending).catch(() => {})}>执行</button>; }
@@ -54,10 +53,9 @@ it("shows an actual pending action and keeps its failure until dismissed", async
   expect(document.body.textContent).toContain("保存人工判定");
   expect(document.querySelector("[role=status]")?.textContent).toContain("运行中");
   await act(async () => reject(new Error("SQLite detail")));
-  expect(document.querySelector("[role=alert]")?.textContent).toContain("运行失败");
-  expect(document.body.textContent).toContain("SQLite detail");
-  await act(async () => document.querySelector<HTMLButtonElement>("button[aria-label='查看错误详情']")!.click());
-  expect(document.body.textContent).toContain("SQLite detail");
+  expect(document.querySelector("[role=alert]")?.textContent).toContain("运行出错");
+  expect(document.body.textContent).toContain("运行遇到问题，请稍后重试");
+  expect(document.body.textContent).not.toContain("SQLite detail");
   await act(async () => root.unmount());
 });
 
@@ -68,7 +66,7 @@ it("does not restore a Golden Generation toast for a running or recoverable run"
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<OperationProvider><span>页面</span></OperationProvider>); });
-  expect(document.querySelector(".operation-console")).toBeNull();
+  expect(document.querySelector(".ui-run")).toBeNull();
   expect(fetcher.mock.calls.some(([url]) => url.endsWith("generation-runs"))).toBe(false);
   await act(async () => root.unmount());
 });
@@ -83,7 +81,7 @@ it("uses persisted evaluation cases for progress while short operations complete
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
   expect(document.body.textContent).toContain("1 / 3");
   await act(async () => document.querySelector("button")!.click());
-  expect(document.body.textContent).toContain("✓ 完成");
+  expect(document.body.textContent).toContain("已完成");
   await act(async () => await new Promise(resolve => setTimeout(resolve, 3200)));
   expect(document.body.textContent).toContain("1 / 3");
   await act(async () => root.unmount());
@@ -102,41 +100,42 @@ it("keeps a running operation visible while navigating without exposing reasonin
   await act(async () => document.querySelectorAll("button")[1].click());
   expect(document.body.textContent).toContain("知识库");
   expect(document.body.textContent).toContain("验证 Provider");
-  expect(document.querySelector(".operation-console progress")).toBeNull();
+  expect(document.querySelector(".ui-run progress")).toBeNull();
   expect(document.querySelector(".operation-stack")).not.toBeNull();
   expect(document.body.textContent).not.toMatch(/思考过程|推理链|已完成 50%/);
   await act(async () => root.unmount());
 });
 
-it("shows up to three concurrent operations and closing one does not stop its tracking", async () => {
+it("shows up to three concurrent operations and minimizing one does not stop its tracking", async () => {
   let settle!: () => void;
   function Harness() {
     const operation = useOperation();
-    settle = () => operation.succeed("first");
+    settle = () => operation.succeed("second");
     return <button onClick={() => ["first", "second", "third", "fourth"].forEach(id => operation.start(id, { id }))}>开始</button>;
   }
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
   await act(async () => document.querySelector("button")!.click());
-  expect(document.querySelectorAll(".operation-console")).toHaveLength(3);
-  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='关闭运行状态']")!.click());
-  expect(document.querySelectorAll(".operation-console")).toHaveLength(3);
-  expect(document.querySelector(".operation-stack")?.textContent).not.toContain("second");
+  expect(document.querySelectorAll(".ui-run")).toHaveLength(3);
+  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='最小化运行状态']")!.click());
+  expect(document.querySelectorAll(".ui-run")).toHaveLength(2);
+  expect(document.querySelector(".ui-run-pill")?.textContent).toContain("second");
   await act(async () => settle());
-  expect(document.querySelector(".operation-stack")?.textContent).toContain("✓ 完成");
+  await act(async () => document.querySelector<HTMLButtonElement>(".ui-run-pill")!.click());
+  expect(document.querySelector(".operation-stack")?.textContent).toContain("已完成");
   await act(async () => root.unmount());
 });
 
-it("keeps polling a persisted evaluation after its running bar is closed", async () => {
+it("keeps polling a persisted evaluation after its running bar is minimized", async () => {
   const evaluation = { id: "EVAL-live", status: "running", dataset_snapshot_json: JSON.stringify({ question_ids: ["Q1"] }), cases: [] };
   const fetcher = vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [evaluation] : evaluation), { status: 200 })));
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
-  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='关闭运行状态']")!.click());
+  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='最小化运行状态']")!.click());
   const before = fetcher.mock.calls.length;
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1150)));
-  expect(document.querySelector(".operation-stack")).toBeNull();
+  expect(document.querySelector(".ui-run-pill")).not.toBeNull();
   expect(fetcher.mock.calls.length).toBeGreaterThan(before);
   await act(async () => root.unmount());
 });
@@ -149,35 +148,37 @@ it("stops the elapsed clock when a short operation completes", async () => {
   await act(async () => document.querySelector("button")!.click());
   await act(async () => await new Promise(resolve => setTimeout(resolve, 250)));
   await act(async () => finish());
-  const completed = document.querySelector(".operation-console")?.textContent;
+  const completed = document.querySelector(".ui-run")?.textContent;
   await act(async () => await new Promise(resolve => setTimeout(resolve, 300)));
-  expect(document.querySelector(".operation-console")?.textContent).toBe(completed);
+  expect(document.querySelector(".ui-run")?.textContent).toBe(completed);
   await act(async () => root.unmount());
 });
 
-it("reopens a dismissed running bar if that operation later fails", async () => {
+it("keeps a minimized running bar tracked if that operation later fails", async () => {
   let fail!: () => void;
   function Harness() { const operation = useOperation(); return <button onClick={() => { const id = operation.start("后台任务"); fail = () => operation.fail(id, new Error("失败详情")); }}>开始</button>; }
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
   await act(async () => document.querySelector("button")!.click());
-  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='关闭运行状态']")!.click());
-  expect(document.querySelector(".operation-stack")).toBeNull();
+  await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='最小化运行状态']")!.click());
+  expect(document.querySelector(".ui-run-pill")).not.toBeNull();
   await act(async () => fail());
-  expect(document.querySelector(".operation-console[role=alert]")?.textContent).toContain("运行失败");
+  expect(document.querySelector(".ui-run-pill")?.textContent).toContain("后台任务");
+  await act(async () => document.querySelector<HTMLButtonElement>(".ui-run-pill")!.click());
+  expect(document.querySelector(".ui-run[role=alert]")?.textContent).toContain("运行出错");
   await act(async () => root.unmount());
 });
 
-it("shows the persisted QC stage without an invented percentage for one Revision", async () => {
+it("shows the persisted QC stage and actual single-question counts", async () => {
   const run = { id: "REV-q15", status: "qc", stage: "qc", question_ids: ["Q15"], progress: { current: 1, total: 1 } };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [] : new URL(url).pathname.endsWith("/api/governance/revisions") ? [run] : run), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
-  const card = document.querySelector(".operation-console")!;
+  const card = document.querySelector(".ui-run")!;
   expect(card.textContent).toContain("QC");
-  expect(card.textContent).not.toMatch(/\d+%/);
-  expect(card.textContent).not.toContain("1 / 1");
+  expect(card.textContent).toContain("100%");
+  expect(card.textContent).toContain("1 / 1");
   expect(card.querySelector("progress")).toBeNull();
   await act(async () => root.unmount());
 });
@@ -202,10 +203,10 @@ it("marks a completed Revision only after the visible Candidate state refreshes"
   await act(async () => root.render(<OperationProvider><Harness /></OperationProvider>));
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
   expect(document.body.textContent).toContain("正在同步 Candidate 状态");
-  expect(document.body.textContent).not.toContain("✓ 完成");
+  expect(document.querySelector(".ui-status")?.textContent).not.toBe("已完成");
   await act(async () => finishRefresh());
   expect(document.body.textContent).toContain("Probe 通过 · QC 通过 · 待人工审核");
-  expect(document.body.textContent).toContain("✓ 完成");
+  expect(document.body.textContent).toContain("已完成");
   await act(async () => root.unmount());
 });
 
@@ -224,29 +225,25 @@ it("reports a completed Revision as unsynced when Candidate refresh fails", asyn
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider><Harness /></OperationProvider>));
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
-  expect(document.querySelector(".operation-console[role=alert]")?.textContent).toContain("后台已完成，但候选题刷新失败");
-  expect(document.body.textContent).not.toContain("✓ 完成");
+  expect(document.querySelector(".ui-run[role=alert]")?.textContent).toContain("后台已完成，但候选题刷新失败");
+  expect(document.querySelector(".ui-status")?.textContent).not.toBe("已完成");
   await act(async () => root.unmount());
 });
 
-it("uses real counts for paired Revision and exposes failed details before removing its card", async () => {
+it("uses real counts for paired Revision and hides technical details before minimizing its card", async () => {
   let run: any = { id: "REV-pair", status: "qc", stage: "qc", question_ids: ["Q1", "Q9"], progress: { current: 1, total: 2 } };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(new URL(url).pathname.endsWith("/api/evaluations") ? [] : new URL(url).pathname.endsWith("/api/governance/revisions") ? [run] : run), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider><span>页面</span></OperationProvider>));
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
-  expect(document.querySelector(".operation-console")?.textContent).toContain("1 / 2");
+  expect(document.querySelector(".ui-run")?.textContent).toContain("1 / 2");
   run = { ...run, status: "failed_quality", failed_stage: "qc", error: "DeepSeek 请求超时，请重试", error_detail: "The read operation timed out", runtime_attempts: [{ stage: "qc", attempt: 2, model: "deepseek-test" }] };
   await act(async () => await new Promise(resolve => setTimeout(resolve, 1100)));
-  const card = document.querySelector(".operation-console[role=alert]")!;
+  const card = document.querySelector(".ui-run[role=alert]")!;
   expect(card.textContent).toContain("DeepSeek 请求超时，请重试");
-  const detail = card.querySelector<HTMLButtonElement>("[aria-label='查看错误详情']")!;
-  await act(async () => detail.click());
-  expect(detail.getAttribute("aria-expanded")).toBe("true");
-  expect(card.textContent).toContain("The read operation timed out");
-  expect(card.textContent).toContain("REV-pair");
-  await act(async () => card.querySelector<HTMLButtonElement>("[aria-label='关闭运行状态']")!.click());
-  expect(document.querySelector(".operation-console[role=alert]")).toBeNull();
+  expect(card.textContent).not.toMatch(/The read operation timed out|REV-pair|查看错误详情/);
+  await act(async () => card.querySelector<HTMLButtonElement>("[aria-label='最小化运行状态']")!.click());
+  expect(document.querySelector(".ui-run[role=alert]")).toBeNull();
   await act(async () => root.unmount());
 });
 
@@ -268,12 +265,13 @@ it("stops a persisted evaluation once and keeps its saved progress", async () =>
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
   const button = [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "停止运行")!;
-  await act(async () => { button.click(); button.click(); });
+  await act(async () => { button.click(); });
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="确认停止")!.click());
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(fetcher.mock.calls[0][0]).toContain("/api/evaluations/EVAL-stop/stop");
-  expect(button.disabled).toBe(true);
+  expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="正在停止…")!.disabled).toBe(true);
   await act(async () => resolve(new Response(JSON.stringify({ status: "partial", result: { stop_request: { reason: "用户停止运行" } }, cases: Array(37).fill({}), dataset_snapshot_json: JSON.stringify({ question_ids: Array(50).fill("q") }) }), { status: 200 })));
-  expect(document.body.textContent).toContain("已停止，断点已保存");
+  expect(document.body.textContent).toContain("已停止");
   expect(document.body.textContent).toContain("37 / 50");
   expect(document.querySelector(".operation-stop-button")).toBeNull();
   await act(async () => root.unmount());
@@ -288,8 +286,8 @@ it("restores a cycle after refresh and keeps a stop button available inside a dr
   try {
     await act(async()=>root.render(<OperationProvider><Harness/></OperationProvider>));
     const dialog=document.querySelector('[role="dialog"]')!;
-    expect(dialog.querySelector('.operation-stop-button')?.textContent).toBe('停止运行');
-    expect(dialog.querySelector('.operation-count')?.textContent).toContain('4 / 12');
+    expect([...dialog.querySelectorAll(".ui-run-actions button")].find(button=>button.textContent==="停止运行")).toBeDefined();
+    expect(dialog.querySelector('.ui-run-progress')?.textContent).toContain('4 / 12');
   } finally {await act(async()=>root.unmount());vi.useRealTimers();}
 });
 
@@ -298,9 +296,10 @@ it("keeps evaluation running when the stop request fails", async () => {
   function Harness() { const op = useOperation(); useEffect(() => { op.watchEvaluation("EVAL-stop", "Baseline Evaluation"); }, []); return null; }
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
-  await act(async () => document.querySelector<HTMLButtonElement>(".operation-stop-button")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".ui-run-actions button")].find(button=>button.textContent==="停止运行")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="确认停止")!.click());
   expect(document.body.textContent).toContain("停止请求失败");
-  expect(document.querySelector<HTMLButtonElement>(".operation-stop-button")!.disabled).toBe(false);
-  expect(document.body.textContent).not.toContain("已停止，断点已保存");
+  expect([...document.querySelectorAll<HTMLButtonElement>(".ui-run-actions button")].find(button=>button.textContent==="停止运行")!.disabled).toBe(false);
+  expect(document.body.textContent).not.toContain("已停止");
   await act(async () => root.unmount());
 });

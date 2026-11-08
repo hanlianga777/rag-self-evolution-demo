@@ -38,7 +38,7 @@ it('explains all remaining failures from saved positions and new failures from t
  expect(reasons).toContain('关键说明排第 7 位，证据条数 6 仍纳入不了');
  expect(reasons).toContain('关键说明排第 24 位，证据条数 6 仍纳入不了');
  expect(reasons).toContain('手册未给出固定充电时长');expect(reasons).toContain('与手册矛盾');
- expect(document.querySelector('.d-result-causes .story-question[title="第25题的原题"]')).not.toBeNull();
+ expect([...document.querySelectorAll(".d-result-causes .ui-clamp")].some(node=>node.textContent==="第25题的原题" && (node as HTMLElement).style.webkitLineClamp==="2")).toBe(true);
  expect(fetcher.mock.calls).toHaveLength(1);expect(String(fetcher.mock.calls[0])).toContain('/api/evaluations/d-run');
  expect(document.querySelector('.d-result-story')!.textContent).not.toMatch(/CSV-|EXP-|EVAL-|DOC-|随机|不稳定|复跑/);
  expect(document.querySelector('.d-result-story [aria-label="方案质量对比"]')!.textContent).toContain('新增 Bad Case 数0 个1 个');

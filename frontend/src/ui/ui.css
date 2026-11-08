@@ -422,3 +422,16 @@ td { border-bottom-color: var(--ui-rule-2); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
+
+/* 021s: host layout only; panels retain the supplied 360px design. */
+.operation-stack { width:360px; max-width:calc(100vw - 36px); z-index:60; }
+.operation-panel, .clamp-text-host { min-width:0; }
+.operation-stack .ui-run, .operation-stack .ui-run-pill { position:relative; right:auto; bottom:auto; width:360px; max-width:100%; }
+.operation-panel > .operation-error-summary { display:block; padding:8px 12px; background:var(--ui-red-tint); color:var(--ui-red); }
+body .evolution-page.page-shell .candidate-cards > .candidate-card { height:auto; overflow:visible; }
+body .evolution-page.page-shell .candidate-card-body { overflow:visible; }
+body .evolution-page .candidate-field-content { overflow:visible; }
+body .evolution-page .route-candidate { height:auto; }
+body .evolution-page .route-candidate-body { overflow:visible; }
+body .evolution-page .route-diagnoses > article { height:auto; overflow:visible; }
+body .evolution-page .agent-hypotheses > section { max-height:none; overflow:visible; }

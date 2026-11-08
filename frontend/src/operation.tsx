@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { getJson, postJson, identityKey, invalidateReads } from "./api";
-import { PricePauseNotice, type PricePause } from "./components/RuntimeSettings";
+import type { PricePause } from "./components/RuntimeSettings";
+
+import { RunProgressPanel } from "./ui/RunProgressPanel";
 
 type Operation = { id: string; runId?: string; candidateId?: string; experimentId?: string; pricePause?: PricePause; title: string; status: "running" | "completed" | "failed" | "stopped"; stopping?: boolean; stopError?: string; kind?: "evaluation" | "revision" | "cycle"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
 type BatchRequest = { experimentId: string; baselineId: string; round: number; candidateIds: string[]; identity?: string };
@@ -78,15 +80,28 @@ export function evaluationTitle(run: any) {
   return `${/^[ABCD]$/.test(label || "") ? `Candidate ${label}` : "Candidate"} · Sandbox 试跑`;
 }
 
+export function operationTitle(title: string) {
+  const candidate = title.match(/(?:Round \d+ · )?Candidate [ABCD](?![A-Z])/);
+  if (candidate) return candidate[0];
+  if (/Round \d+.*A\/B\/C/.test(title)) return title.match(/Round \d+/)![0] + " · A/B/C";
+  if (/Baseline/.test(title)) return "Baseline";
+  return title.replace(/(?:EVAL|EXP|CAND|REV)-[\w-]+/g, "").trim() || "运行任务";
+}
+
 export function shortError(error?: string) {
   if (!error) return "请查看运行审计";
   return /DeepSeek/i.test(error) && /timed out|请求超时/i.test(error) ? "DeepSeek 请求超时，请重试" : error.split("\n")[0].slice(0, 120);
 }
 
+function runErrorText(error?: string) {
+  if (!error) return "运行遇到问题，请稍后重试";
+  const summary = shortError(error);
+  return /[\u4e00-\u9fff]/.test(summary) ? summary.replace(/(?:EVAL|EXP|CAND|REV)-[\w-]+/g, "相关任务") : "运行遇到问题，请稍后重试";
+}
+
 export function OperationProvider({ children, restore = true }: { children: ReactNode; restore?: boolean }) {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [dialogHosts, setDialogHosts] = useState<HTMLElement[]>([]);
-  const [detailId, setDetailId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const timers = useRef<Set<number>>(new Set());
   const candidateRefresh = useRef<(() => Promise<void>) | null>(null);
@@ -182,7 +197,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     if (!active.length) return;
     const timer = window.setInterval(() => {
       for (const item of active) {
-        if (syncing.current.has(item.id)) continue;
+        if (syncing.current.has(item.id) || continuingRuns.current.has(item.id)) continue;
         syncing.current.add(item.id);
         void getJson<any>(item.kind === "cycle" ? `/api/experiments/${item.experimentId}?light=true` : item.kind === "revision" ? `/api/governance/revisions/${item.id}?light=true` : `/api/evaluations/${item.runId || item.id}?light=true`).then(async result => {
           const next: Partial<Operation> = item.kind === "cycle" ? cycleProgress(result) : item.kind === "revision" ? revision(result) : evaluation(result);
@@ -214,16 +229,47 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     } finally { stoppingRuns.current.delete(item.id); }
   };
 
+  const continuingRuns = useRef(new Set<string>());
+  const continueOperation = async (item: Operation) => {
+    if ((item.status === "running" && item.pricePause?.paused) || continuingRuns.current.has(item.id)) return;
+    continuingRuns.current.add(item.id);
+    update(item.id, { status: "running", stopping: false, stopError: undefined });
+    try {
+      if (item.experimentId) {
+        await postJson(`/api/experiments/${item.experimentId}/run-cycle`, {});
+        update(item.id, { kind: "cycle" });
+      } else if (item.candidateId) {
+        const started = await postJson<{ id: string }>(`/api/candidates/${item.candidateId}/run`, { authorize_provider: true });
+        update(item.id, { kind: "evaluation", runId: started.id });
+      } else if (item.kind === "revision") {
+        await postJson(`/api/governance/revisions/${item.id}/resume`);
+      } else {
+        const source = item.runId || item.id;
+        const preflight = await getJson<any>(`/api/evaluation/preflight?resume_source_id=${encodeURIComponent(source)}`);
+        if (!preflight.can_start || !preflight.can_resume || preflight.resume_source_id !== source) throw new Error(preflight.reason || preflight.resume_reason || "当前断点不能继续，请回到 Baseline 查看预检");
+        const started = await postJson<{ id: string }>("/api/evaluations/run", { resume_source_id: source });
+        update(item.id, { kind: "evaluation", runId: started.id });
+      }
+      update(item.id, { error: undefined, endedAt: undefined });
+    } catch (reason) { fail(item.id, reason); }
+    finally { continuingRuns.current.delete(item.id); }
+  };
+
   const visible = operations.filter(item => !item.dismissed).slice(-3);
-  const console = !!visible.length && <div className="operation-stack" aria-label="运行状态">{visible.map(item => <section className="operation-console" key={item.id} role={item.status === "failed" ? "alert" : "status"}>
-      <div className="operation-head"><strong>{item.title}</strong><button aria-label="关闭运行状态" onClick={() => setOperations(current => current.map(row => row.id === item.id && row.status === "running" ? { ...row, dismissed: true } : row).filter(row => row.id !== item.id || row.status === "running"))}>×</button></div>
-      <p>{item.status === "stopped" ? "已停止，断点已保存" : item.status === "failed" ? "运行失败" : item.status === "completed" ? "✓ 完成" : item.pricePause?.paused ? "等待平价时段" : item.restored ? `后台运行中（本页面重新连接） · ${item.stage || "运行中"}` : item.stage || "运行中"}{item.startedAt != null && <span> · {elapsedText((item.endedAt ?? now) - item.startedAt)}</span>}</p>
-      <PricePauseNotice pause={item.status === "running" ? item.pricePause : undefined} target={item.kind === "revision" ? {revision_id:item.id} : undefined} evaluationId={item.runId || (item.kind === "evaluation" ? item.id : undefined)} experimentId={item.experimentId} onChanged={() => update(item.id, { pricePause: { paused: false } })} />
-      {item.current != null && item.total != null && item.total > 1 && <><div className="operation-count">{item.current} / {item.total}<span>{Math.round(item.current / item.total * 100)}%</span></div><progress value={item.current} max={item.total} /></>}
-      {item.status === "running" && (item.experimentId || item.kind === "evaluation" || item.runId) && <button className="operation-stop-button" disabled={item.stopping} onClick={() => void stopEvaluation(item)}>{item.stopping ? "正在停止…" : "停止运行"}</button>}
-      {item.stopError && <small role="alert" className="operation-error-summary">{item.stopError}</small>}
-      {item.status === "failed" && <><small className="operation-error-summary">{shortError(item.error)}</small><button className="operation-detail-button" aria-label="查看错误详情" aria-expanded={detailId === item.id} aria-controls={`operation-detail-${item.id}`} onClick={() => setDetailId(current => current === item.id ? null : item.id)}>查看错误详情</button>{detailId === item.id && <div id={`operation-detail-${item.id}`} className="operation-details"><div>阶段：{item.stage || "未记录"}</div><div>耗时：{item.startedAt != null ? elapsedText((item.endedAt ?? now) - item.startedAt) : "未记录"}</div><div>错误：{item.errorDetail || item.error || "未记录"}</div><div>Operation ID：{item.id}</div>{item.provider && <div>Provider：{item.provider}</div>}{item.model && <div>Model：{item.model}</div>}{item.attempt != null && <div>Attempt：{item.attempt}</div>}</div>}</>}
-    </section>)}</div>;
+  const console = !!visible.length && <div className="operation-stack" aria-label="运行状态">{visible.map(item => <div key={item.id} className="operation-panel">
+    <RunProgressPanel
+      title={operationTitle(item.title)}
+      subtitle={item.status === "running" && !item.pricePause?.paused ? item.stage || (item.kind === "revision" ? "局部修订" : item.experimentId ? "Sandbox 批次" : "评测") : item.kind === "revision" ? "局部修订" : item.candidateId || item.experimentId ? "Sandbox 评测" : "Baseline"}
+      status={item.status === "running" && item.pricePause?.paused ? "waiting" : item.status}
+      current={item.current} total={item.total}
+      elapsedMs={item.startedAt != null ? (item.endedAt ?? now) - item.startedAt : undefined}
+      errorText={runErrorText(item.error)}
+      onContinue={item.experimentId || item.candidateId || item.kind === "revision" || item.kind === "evaluation" ? () => void continueOperation(item) : undefined}
+      onStop={item.experimentId || item.kind === "evaluation" || item.runId ? () => void stopEvaluation(item) : undefined}
+      stopping={item.stopping}
+    />
+    {item.stopError && <small role="alert" className="operation-error-summary">{runErrorText(item.stopError)}</small>}
+  </div>)}</div>;
   return <OperationContext.Provider value={{ operations, runCandidateBatch, start, update, succeed, fail, run, startEvaluation, watchEvaluation, watchRevision, registerCandidateRefresh, unregisterCandidateRefresh, registerDialogHost, unregisterDialogHost }}>
     {children}
     {dialogHosts.length ? createPortal(console, dialogHosts[dialogHosts.length - 1]) : console}

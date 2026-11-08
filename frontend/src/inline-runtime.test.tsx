@@ -17,7 +17,7 @@ it("shows assistant waiting inline and renders a complete synchronous answer at 
   await act(async () => root.render(<OperationProvider restore={false}><AssistantPage badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} /></OperationProvider>));
   await act(async () => document.querySelector<HTMLButtonElement>(".empty-chat button")!.click());
   expect(document.querySelector(".thinking-message")?.textContent).toContain("正在检索与生成回答");
-  expect(document.querySelector(".operation-console")).toBeNull();
+  expect(document.querySelector(".ui-run")).toBeNull();
   await act(async () => respond(new Response(JSON.stringify({ baseline: { answer: "完整回答内容", sources: [], evidence: [] }, model: "DeepSeek", mode: "live" }), { status: 200 })));
   expect(document.querySelector(".thinking-message")).toBeNull();
   expect(document.body.textContent).toContain("完整回答内容");
@@ -36,7 +36,7 @@ it("shows Before result without waiting for After and keeps a one-sided failure 
   await act(async () => { const textarea = document.querySelector("textarea")!; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "测试"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => document.querySelector<HTMLButtonElement>(".query-action button")!.click());
   expect(document.querySelectorAll(".experiment-answer-card .running")).toHaveLength(2);
-  expect(document.querySelector(".operation-console")).toBeNull();
+  expect(document.querySelector(".ui-run")).toBeNull();
   await act(async () => baseline(new Response(JSON.stringify({ answer: "Baseline 答案", version: "EVAL-1", latency_ms: 100, evidence: [] }), { status: 200 })));
   expect(document.querySelectorAll(".experiment-answer-card")[0].textContent).toContain("Baseline 答案");
   expect(document.querySelectorAll(".experiment-answer-card")[1].textContent).not.toContain("Baseline 答案");
@@ -56,6 +56,6 @@ it("restores Generation counters inline without creating partial candidates", as
   expect(document.querySelector(".run-summary")?.textContent).toContain("QC 跳过 7");
   expect(document.querySelector(".run-summary")?.textContent).toContain("运行耗时");
   expect(document.querySelectorAll(".review-table tbody button")).toHaveLength(0);
-  expect(document.querySelector(".operation-console")).toBeNull();
+  expect(document.querySelector(".ui-run")).toBeNull();
   await act(async () => root.unmount());
 });

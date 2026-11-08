@@ -41,7 +41,7 @@ it('uses small progress counters in the operation bar without reading cases', as
   await act(async () => document.querySelector('button')!.click());
   await act(async () => vi.advanceTimersByTimeAsync(1000));
   expect(fetcher.mock.calls[0][0]).toContain('/api/evaluations/run-013?light=true');
-  expect(document.querySelector('.operation-count')?.textContent).toContain('7 / 50');
+  expect(document.querySelector('.ui-run-progress')?.textContent).toContain('7 / 50');
 });
 it('refreshes an active Agent using progress without refetching the coverage plan', async () => {
   vi.useFakeTimers();

@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Children, createContext, useContext, useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
+import { ClampText } from "../ui/ClampText";
 import { displayText } from "../display";
 
 export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "good" | "bad" | "warning" | "accent" }) {
@@ -20,7 +21,17 @@ export function Status({ value }: { value: string }) {
   return <Badge tone={tone}>{displayText(value)}</Badge>;
 }
 
-export function TruncatedText({ children, lines = 2 }: { children: ReactNode; lines?: 2 | 3 }) {
+export const FullTextContext = createContext(false);
+
+export function TruncatedText({ children, lines = 2 }: { children: ReactNode; lines?: 2 | 3 | 4 }) {
+  const fullDetails = useContext(FullTextContext);
+  const parts = Children.toArray(children);
+  if (!fullDetails && parts.every(part => typeof part === "string" || typeof part === "number")) return <div className="clamp-text-host" onClick={event => { if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation(); }}><ClampText text={parts.join("")} lines={lines} /></div>;
+  return <LegacyTruncatedText lines={lines}>{children}</LegacyTruncatedText>;
+}
+
+// Rich cells retain their buttons and markup; drawer details keep their existing presentation.
+function LegacyTruncatedText({ children, lines }: { children: ReactNode; lines: number }) {
   const id = useId(), ref = useRef<HTMLSpanElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const show = () => { const node=ref.current; if (!node || node.scrollHeight<=node.clientHeight && node.scrollWidth<=node.clientWidth) return; const box = node.getBoundingClientRect(); if (box) setPosition({ left: Math.max(8, Math.min(box.left, window.innerWidth - 368)), top: Math.max(8, Math.min(box.bottom + 6, window.innerHeight - 210)) }); };

@@ -19,7 +19,7 @@ const pause = { paused: true, resume_at_toronto: "23:00", resume_at: "2026-11-04
 it("refreshes saved pause state after the worker automatically resumes without a POST", async () => {
   vi.useFakeTimers();
   let reads = 0;
-  const fetcher = vi.fn((_url:string,_init?:RequestInit) => response({off_peak_only:true,peak_now:reads++ === 0,active_pauses:reads===1 ? [{task_label:"Candidate A · Sandbox 试跑",price_pause:pause,target:{evaluation_id:"offline"}}] : []}));
+  const fetcher = vi.fn((_url:string,_init?:RequestInit) => response({off_peak_only:true,peak_now:reads++ === 0,active_pauses:reads===1 ? [{task_label:"Candidate A",price_pause:pause,target:{evaluation_id:"offline"}}] : []}));
   vi.stubGlobal("fetch",fetcher);
   await mount(<RuntimeSettings />);
   expect(document.body.textContent).toContain("高峰时段暂停");
@@ -73,16 +73,16 @@ it("restores friendly operation names, saved counts and the price pause after a 
   const run: any = { id: "EVAL-private", status: "running", created_at: "2026-11-04T02:30:00Z", config: { candidate_id: "EXP-private-R1-A" }, result: { completed: 7, total: 50, price_pause: pause } };
   vi.stubGlobal("fetch", vi.fn((url: string) => response(url.includes("/api/evaluations?") ? [run] : url.includes("/api/governance") ? [] : run)));
   await mount(<OperationProvider><span>页面</span></OperationProvider>);
-  const console = document.querySelector(".operation-console")!;
-  expect(console.querySelector("strong")?.textContent).toBe("Candidate A · Sandbox 试跑");
+  const console = document.querySelector(".ui-run")!;
+  expect(console.querySelector(".ui-run-title")?.textContent).toBe("Candidate A");
   expect(console.textContent).toContain("2 分 5 秒");
-  expect(console.textContent).toContain("高峰时段暂停，预计 23:00 自动继续");
+  expect(console.textContent).toContain("稍后自动继续");
   expect(console.textContent).not.toMatch(/EXP-|EVAL-|Worker 未确认/);
   await act(async () => vi.advanceTimersByTimeAsync(1000));
   expect(console.textContent).toContain("7 / 50");
   run.result.price_pause = { paused: false };
   await act(async () => vi.advanceTimersByTimeAsync(1000));
-  expect(console.textContent).toContain("后台运行中（本页面重新连接）");
+  expect(console.textContent).toContain("正在运行 Golden Case");
   expect(console.textContent).not.toContain("高峰时段暂停");
 });
 

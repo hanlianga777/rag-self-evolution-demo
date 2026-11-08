@@ -102,7 +102,7 @@ it("refreshes the open Drawer and table before reporting Revision complete", asy
   expect(tableValue("Probe")).toBe("100");
   expect(document.querySelector(".candidate-workspace .quality-grid")?.textContent).toContain("通过");
   expect(document.querySelector(".candidate-workspace .workspace-badges")?.textContent).not.toContain("QC 通过");
-  expect(document.querySelector(".operation-console")?.textContent).toContain("✓ 完成");
+  expect(document.querySelector(".ui-run")?.textContent).toContain("已完成");
   await act(async () => root.unmount());
 });
 

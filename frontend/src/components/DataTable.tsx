@@ -8,18 +8,14 @@ function controls(node: ReactNode): number {
     return count + (["button", "input", "select", "textarea", "a"].includes(String(child.type)) ? 1 : controls(child.props.children));
   }, 0);
 }
-function prose(node: ReactNode): ReactNode {
-  return Children.map(node, child => {
-    if (!isValidElement<{ children?: ReactNode }>(child)) return child;
-    if (child.type === TruncatedText) return prose(child.props.children);
-    return child.props.children ? cloneElement(child, {}, prose(child.props.children)) : child;
-  });
+function hasClamp(node: ReactNode): boolean {
+  return Children.toArray(node).some(child => isValidElement<{ children?: ReactNode }>(child) && (child.type === TruncatedText || hasClamp(child.props.children)));
 }
 function cells(node: ReactNode): ReactNode {
   return Children.map(node, child => {
     if (!isValidElement<{ children?: ReactNode; colSpan?: number }>(child)) return child;
-    if (child.type === "td" && !child.props.colSpan && controls(child.props.children) < 2) {
-      return cloneElement(child, {}, <TruncatedText lines={2}>{prose(child.props.children)}</TruncatedText>);
+    if (child.type === "td" && !child.props.colSpan && controls(child.props.children) < 2 && !hasClamp(child.props.children)) {
+      return cloneElement(child, {}, <TruncatedText lines={2}>{child.props.children}</TruncatedText>);
     }
     return child.props.children ? cloneElement(child as ReactElement, {}, cells(child.props.children)) : child;
   });

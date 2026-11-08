@@ -7,7 +7,7 @@ import { ExperimentPage } from "./pages/ExperimentPage";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 let root: ReturnType<typeof createRoot>;
-afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML = ""; sessionStorage.clear(); vi.unstubAllGlobals(); });
+afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.useRealTimers(); sessionStorage.clear(); vi.unstubAllGlobals(); });
 it("closes Select on outside pointer without requiring focus transfer", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<CustomSelect ariaLabel="方案" value="a" options={[{ value: "a", label: "A" }]} onChange={() => {}} />));
@@ -19,7 +19,8 @@ it("long text never duplicates through persistent inline expansion", async () =>
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<TruncatedText>完整原因</TruncatedText>));
   expect(document.querySelector("details")).toBeNull();
-  expect(document.querySelector('[tabindex="0"]')).not.toBeNull();
+  expect(document.querySelector(".ui-clamp")?.textContent).toBe("完整原因");
+  expect(document.querySelector('[tabindex="0"]')).toBeNull();
 });
 it("shows saved parameter diff before any provider call and restores question", async () => {
   vi.stubGlobal("fetch", vi.fn());
@@ -49,16 +50,21 @@ it("ignores a corrupt cached answer and blocks comparison without a valid formal
   expect(document.querySelector('a[href="#evaluation"]')).not.toBeNull();
   expect(fetch).not.toHaveBeenCalled();
 });
-it("opens long text on focus and clears its tooltip on blur", async () => {
+it("opens long text on focus, permits scrolling when pinned and closes on Escape", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
+  vi.useFakeTimers();
+  vi.spyOn(Element.prototype,"scrollHeight","get").mockReturnValue(100);
+  vi.spyOn(Element.prototype,"clientHeight","get").mockReturnValue(20);
   await act(async () => root.render(<TruncatedText>完整长文说明</TruncatedText>));
   const target = document.querySelector('[tabindex="0"]') as HTMLElement;
   Object.defineProperty(target,"scrollHeight",{value:100});
   Object.defineProperty(target,"clientHeight",{value:20});
-  await act(async () => target.focus());
+  await act(async () => {target.focus();vi.advanceTimersByTime(1);});
   expect(document.querySelector('[role="tooltip"]')?.textContent).toContain("完整长文说明");
+  await act(async () => target.click());
   await act(async () => document.querySelector('[role="tooltip"]')!.dispatchEvent(new Event("scroll",{bubbles:true})));
   expect(document.querySelector('[role="tooltip"]')).not.toBeNull();
+  await act(async () => document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape"})));
   await act(async () => target.blur());
   expect(document.querySelector('[role="tooltip"]')).toBeNull();
 });

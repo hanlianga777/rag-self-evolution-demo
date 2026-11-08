@@ -83,7 +83,7 @@ it("QuestionBadge shows the question on hover and focus", async () => {
 
 it("ParamChip renders from → to and key marker", async () => {
   await render(<ParamChip label="Top-K" from={4} to={6} keyParam />);
-  expect(host.textContent).toContain("Top-K4 → 6本题关键");
+  expect(host.textContent).toContain("Top-K 4 → 6本题关键");
 });
 
 it("RunProgressPanel: progress, button states, stop confirm, minimize", async () => {

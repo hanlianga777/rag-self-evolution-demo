@@ -19,7 +19,7 @@ it('starts one server cycle on a repeated click, displays its saved failure and 
  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
   if (url.endsWith('/workspace')) return reply({ current_baseline_id: 'E1' });
   if (init?.method === 'POST') { starts++; return reply({}); }
-  return reply({ baseline_run_id: 'E1', candidates, result: starts ? { optimization_cycle: { status: 'failed', used: 1, remaining: 11, last_error: '运行失败，本轮已暂停' } } : {} });
+  return reply({ baseline_run_id: 'E1', candidates, result: starts ? { optimization_cycle: { status: 'failed', used: 1, remaining: 11, last_error: '运行出错，本轮已暂停' } } : {} });
  });
  vi.stubGlobal('fetch', fetcher); await mount();
  await act(async () => { document.querySelector('button')!.click(); document.querySelector('button')!.click(); });
@@ -34,7 +34,7 @@ it.each(['identity', 'gate2'])('blocks a server cycle when %s changed', async re
  const fetcher = vi.fn(async (url: string) => reply(url.endsWith('/workspace') ? { current_baseline_id: reason === 'identity' ? 'E2' : 'E1' } : { baseline_run_id: 'E1', result: reason === 'gate2' ? { report_confirmation: {} } : {} }));
  vi.stubGlobal('fetch', fetcher); await mount(); await click();
  expect(fetcher.mock.calls.every(call => (call as any)[1]?.method !== 'POST')).toBe(true);
- expect(document.body.textContent).toContain('运行失败');
+ expect(document.body.textContent).toContain('运行出错');
 });
 it('displays the server budget rejection without starting individual candidate requests', async () => {
  const fetcher = vi.fn(async (url: string, init?: RequestInit) => init?.method === 'POST' ? reply({ detail: '试跑预算已用完' }, 409) : reply(url.endsWith('/workspace') ? { current_baseline_id: 'E1' } : { baseline_run_id: 'E1', result: {} }));
@@ -64,8 +64,8 @@ it('polls saved progress until the server completes the cycle', async () => {
  vi.stubGlobal('fetch', fetcher); await mount(); await click();
  expect(document.body.textContent).toContain('已用 1 次');
  await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
- expect(document.querySelector('.operation-count')?.textContent).toContain('2 / 12');
- expect(document.querySelector('.operation-console')?.textContent).toContain('✓ 完成');
+ expect(document.querySelector('.ui-run-progress')?.textContent).toContain('2 / 12');
+ expect(document.querySelector('.ui-run')?.textContent).toContain('已完成');
  expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
 });
 
@@ -80,11 +80,12 @@ it('lets the user stop the cycle once and shows stopped instead of completed', a
   return reply({baseline_run_id:'E1',result:started?{optimization_cycle:cycle}:{}});
  });
  vi.stubGlobal('fetch',fetcher);await mount();await click();
- const stop=document.querySelector<HTMLButtonElement>('.operation-stop-button');
+ const stop=[...document.querySelectorAll<HTMLButtonElement>('.ui-run-actions button')].find(button=>button.textContent==='停止运行');
  expect(stop).not.toBeNull();
- await act(async()=>{stop!.click();stop!.click();});
+ await act(async()=>{stop!.click();});
+ await act(async()=>{[...document.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent==='确认停止')!.click();});
  await act(async()=>{await vi.advanceTimersByTimeAsync(1100);});
  expect(fetcher.mock.calls.filter(([url])=>url.endsWith('/stop-cycle'))).toHaveLength(1);
- expect(document.body.textContent).toContain('已停止，断点已保存');
- expect(document.body.textContent).not.toContain('✓ 完成');
+ expect(document.body.textContent).toContain('已停止');
+ expect(document.querySelector('.ui-status')?.textContent).toBe('已停止');
 });
