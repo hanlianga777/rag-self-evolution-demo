@@ -94,7 +94,7 @@ it('counts the frozen Golden paper instead of a newer unfinished work Run', asyn
  const snapshot = { id: 'GD-frozen', question_ids: ['a', 'b', 'c', 'd'] };
  vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.includes('/snapshots') ? [{ id: snapshot.id, status: 'approved', snapshot }] : { index: {}, knowledge: { identity: { corpus_snapshot_id: 'current' }, coverage: { final_k: 1, clusters: [] } } })));
  await mount(<KnowledgePage data={{ workspace: { current_golden_id: snapshot.id }, overview: { current_golden_id: snapshot.id, dataset: { approved: 0, total: 2 }, knowledge: {} }, documents: [] }} />);
- expect(document.querySelector('.ui-kp')?.textContent).toContain('聚类方法未记录');
+ expect(document.querySelector('.ui-kp')?.textContent).toContain('K-means 聚类');
  expect(document.querySelector('.knowledge-page .disclosure')).toBeNull();
  expect(snapshot.question_ids).toHaveLength(4);
 });
