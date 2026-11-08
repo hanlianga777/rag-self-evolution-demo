@@ -63,7 +63,7 @@ export type QuestionTone = "fixed" | "broken" | "open" | "neutral";
 const TONE_TEXT: Record<QuestionTone, string> = { fixed: "修好", broken: "新增 Bad Case", open: "仍未修好", neutral: "无变化" };
 
 export function QuestionBadge({ id, tone = "neutral", question, detail }: { id: string; tone?: QuestionTone; question?: string; detail?: ReactNode }) {
-  const badge = <span className={`ui-q ${tone}`} tabIndex={question || detail ? 0 : undefined} aria-label={`${id} ${TONE_TEXT[tone]}`}>{id}</span>;
+  const badge = <span className={`ui-q is-${tone}`} tabIndex={question || detail ? 0 : undefined} aria-label={`${id} ${TONE_TEXT[tone]}`}>{id}</span>;
   if (!question && !detail) return badge;
   return <HoverCard content={<div style={{ maxWidth: 360 }}>
     <div><b>{id}</b> · {TONE_TEXT[tone]}</div>

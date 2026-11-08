@@ -164,10 +164,10 @@ td { border-bottom-color: var(--ui-rule-2); }
 
 /* —— QuestionBadge：Q04 —— */
 .ui-q { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 22px; padding: 0 7px; border-radius: 6px; font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; border: 1px solid transparent; cursor: default; }
-.ui-q.fixed { background: var(--ui-green-tint); color: var(--ui-green); }
-.ui-q.broken { background: var(--ui-red-tint); color: var(--ui-red); }
-.ui-q.open { background: var(--ui-surface); color: var(--ui-ink-2); border-color: var(--ui-rule); }
-.ui-q.neutral { background: var(--ui-rule-2); color: var(--ui-ink-2); }
+.ui-q.is-fixed { background: var(--ui-green-tint); color: var(--ui-green); }
+.ui-q.is-broken { background: var(--ui-red-tint); color: var(--ui-red); }
+.ui-q.is-open { background: var(--ui-surface); color: var(--ui-ink-2); border-color: var(--ui-rule); }
+.ui-q.is-neutral { background: var(--ui-rule-2); color: var(--ui-ink-2); }
 .ui-q:focus-visible { outline: 2px solid var(--ui-navy-3); outline-offset: 2px; }
 .ui-q-list { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 
@@ -444,11 +444,11 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-status.navy::before, .ui-status.solid::before { background: currentColor; }
 
 /* 题号：灰底 + 小圆点 */
-.ui-q, .ui-q.fixed, .ui-q.broken, .ui-q.open, .ui-q.neutral { background: var(--ui-rule-2); color: var(--ui-ink); border-color: transparent; gap: 5px; }
-.ui-q.fixed::before, .ui-q.broken::before, .ui-q.open::before { content: ""; flex: none; width: 5px; height: 5px; border-radius: 50%; }
-.ui-q.fixed::before { background: var(--ui-green); }
-.ui-q.broken::before { background: var(--ui-red); }
-.ui-q.open::before { background: var(--ui-faint); }
+.ui-q, .ui-q.is-fixed, .ui-q.is-broken, .ui-q.is-open, .ui-q.is-neutral { background: var(--ui-rule-2); color: var(--ui-ink); border-color: transparent; gap: 5px; }
+.ui-q.is-fixed::before, .ui-q.is-broken::before, .ui-q.is-open::before { content: ""; flex: none; width: 5px; height: 5px; border-radius: 50%; }
+.ui-q.is-fixed::before { background: var(--ui-green); }
+.ui-q.is-broken::before { background: var(--ui-red); }
+.ui-q.is-open::before { background: var(--ui-faint); }
 
 /* 变化胶囊、事实标签：去掉彩色底 */
 .ui-delta.good, .ui-delta.bad, .ui-delta.flat { background: var(--ui-rule-2); }

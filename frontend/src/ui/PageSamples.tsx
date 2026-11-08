@@ -9,6 +9,8 @@ import { BaselineHero } from "./baseline/BaselineHero";
 import { FinalRecommendation } from "./evolution/FinalRecommendation";
 import { CompareTable, GoldenPipeline, KnowledgeCoverage } from "./pages3";
 import { IconTile } from "./icons";
+import { OverviewStory } from "./overview/OverviewStory";
+import { ParamGrid } from "./settings/ParamGrid";
 
 /** 页面级样板：概览首屏、Agent 顶部统计、进化路线。数据来自 fixture（与正式库一致）。 */
 const GATE: Record<string, string> = { safe_rejection_rate: "安全拒答率", latency_p50_seconds: "P50", latency_p99_seconds: "P99" };
@@ -35,6 +37,21 @@ export function PageSamples() {
           { label: "问答验证", fact: "4 道修好的题可逐题对比" },
         ]}
       />
+      <OverviewStory
+        turns={[
+          { label: "Round 1", text: model.rounds[0]?.summary ?? "" },
+          { label: "Round 2", text: model.rounds[1]?.summary ?? "" },
+          { label: "Round 3", text: model.rounds[2]?.summary ?? "", key: true },
+          { label: "Candidate D", text: "在 Winner 上精修，多修好 Q04；推荐并已发布", key: true },
+        ]}
+        fixed={[
+          { id: "Q04", question: sampleQuestions.Q04, cause: "Top-K 4 → 6" },
+          { id: "Q24", question: sampleQuestions.Q24, cause: "Candidate K 12 → 24" },
+          { id: "Q29", question: sampleQuestions.Q29, cause: "Candidate K 12 → 24" },
+          { id: "Q38", question: sampleQuestions.Q38, cause: "Thinking Max → High" },
+        ]}
+        onOpenFixed={() => {}}
+      />
     </section>
 
 
@@ -54,6 +71,31 @@ export function PageSamples() {
       ]} />
     </section>
 
+    <section>
+      <h2 className="ui-sample-title">Pipeline 配置 · Agent 可调参数</h2>
+      <div className="panel"><ParamGrid onChange={() => {}} groups={[
+        { name: "查询理解", icon: "target", items: [
+          { key: "query_rewrite", label: "Query Rewrite", note: "把原问题改写为更适合检索的问法。", options: [{ value: false, label: "关闭" }, { value: true, label: "开启" }], value: false, baseline: false, online: false },
+          { key: "multi_query", label: "Multi-Query", note: "用多个互补问法查找资料。", options: [{ value: false, label: "关闭" }, { value: 2, label: "2" }, { value: 3, label: "3" }], value: false, baseline: false, online: false },
+          { key: "hyde", label: "HyDE", note: "用假设答案辅助查找，假设文本不作为证据。", options: [{ value: false, label: "关闭" }, { value: true, label: "开启" }], value: false, baseline: false, online: false },
+        ] },
+        { name: "检索召回", icon: "data", items: [
+          { key: "candidate_k", label: "Candidate K", note: "决定进入筛选排序的候选资料数量。", options: [12, 16, 24, 32].map(v => ({ value: v, label: String(v) })), value: 24, baseline: 12, online: 24 },
+          { key: "hybrid_search", label: "Hybrid Search", options: [{ value: true, label: "开启" }, { value: false, label: "关闭" }], value: true, baseline: true, online: true },
+          { key: "hybrid_alpha", label: "向量权重", note: "分配语义与 BM25 的权重。", options: [0.3, 0.5, 0.7].map(v => ({ value: v, label: String(v) })), value: 0.5, baseline: 0.5, online: 0.5 },
+        ] },
+        { name: "筛选排序", icon: "layers", items: [
+          { key: "rerank", label: "Rerank", options: [{ value: "on", label: "开启" }, { value: "off", label: "关闭" }, { value: "keep", label: "原问题排序" }], value: "on", baseline: "on", online: "on" },
+          { key: "top_k", label: "Top-K", note: "决定最终送给 Generation 模型的资料段数。", options: [4, 6, 8].map(v => ({ value: v, label: String(v) })), value: 6, baseline: 4, online: 6 },
+          { key: "min_score", label: "MinScore", options: [0, 0.1, 0.2, 0.3, 0.4].map(v => ({ value: v, label: String(v) })), value: 0, baseline: 0, online: 0 },
+          { key: "retrieval_max_tokens", label: "上下文容量", options: [{ value: null, label: "不限" }, { value: 8192, label: "8192" }, { value: 4096, label: "4096" }], value: null, baseline: null, online: null },
+        ] },
+        { name: "Generation", icon: "thinking", items: [
+          { key: "prompt_strategy", label: "Prompt 策略", options: [{ value: "Grounded", label: "有据生成" }, { value: "Complete", label: "完整性优先" }, { value: "Tiered", label: "分级回答" }], value: "Grounded", baseline: "Grounded", online: "Grounded" },
+          { key: "generation_thinking", label: "Thinking 档位", note: "控制 Generation 模型的思考投入。", options: ["off", "low", "high", "max"].map(v => ({ value: v, label: v === "off" ? "Off" : v[0].toUpperCase() + v.slice(1) })), value: "high", baseline: "max", online: "high", changed: true },
+        ] },
+      ]} /></div>
+    </section>
     <section>
       <h2 className="ui-sample-title">Golden Dataset · 当前测试集</h2>
       <GoldenPipeline total={50} split={[{ label: "Positive", count: 20 }, { label: "Ablation", count: 10 }, { label: "Negative", count: 20 }]}

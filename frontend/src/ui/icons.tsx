@@ -1,5 +1,5 @@
 import {
-  Activity, Award, Ban, BarChart3, BookOpen, Brain, Bug, CircleCheck, ClipboardCheck, Clock3, Database, FileCheck, FileText,
+  Activity, Award, Ban, BarChart3, BookOpen, Brain, Bug, ChevronRight, CircleCheck, Info, ClipboardCheck, Clock3, Database, FileCheck, FileText,
   FlaskConical, Gauge, GitBranch, Hourglass, Layers, Library, ListChecks, ListX, Lock, MessageCircle, Play, Repeat, Rocket,
   ShieldCheck, SlidersHorizontal, Square, Target, Timer, Trophy, Waypoints, Wrench, type LucideIcon,
 } from "lucide-react";
@@ -26,6 +26,8 @@ export const ICONS = {
   report: FileCheck, checks: ListChecks, approval: Lock, doc: FileText,
   // 运行控制
   play: Play, stop: Square,
+  // 导航与说明
+  go: ChevronRight, info: Info,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
