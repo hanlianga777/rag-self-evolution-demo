@@ -19,7 +19,7 @@ it('uses one finite filter per dimension, real counts and resets on returning to
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/bad-cases')?badCases:evaluation))));
  await mount(<EvaluationPage data={{evaluation,badCases}}/>);await click('Bad Case 诊断');
  expect(document.querySelector('.diagnosis-filters [role=combobox]')).toBeNull();
- const retrieval=[...document.querySelectorAll<HTMLButtonElement>('[aria-label="Bad Case 分类"] button')].find(b=>b.textContent?.includes('检索失败'))!;
+ const retrieval=[...document.querySelectorAll<HTMLButtonElement>('[aria-label="Bad Case 分类"] button')].find(b=>b.textContent?.includes('检索层'))!;
  await act(async()=>retrieval.click());expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
  await click('Hard Gate');await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
  expect(document.body.textContent).not.toContain('恢复全部');expect(document.body.textContent).not.toContain('每类首例');

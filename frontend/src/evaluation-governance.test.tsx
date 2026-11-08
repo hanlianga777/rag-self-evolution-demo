@@ -15,7 +15,7 @@ it('keeps report summary out of gate/case tabs and separates symptoms and causes
  await mount(<EvaluationPage data={{evaluation:run}}/>);
  await click('Hard Gate');expect(document.querySelector('.baseline-metrics')).toBeNull();expect(document.querySelector('.stage-stepper')).toBeNull();
  await click('Bad Case 诊断');expect(document.querySelector('.baseline-conclusion')).toBeNull();
- expect(document.body.textContent).toContain('缺了什么');expect(document.body.textContent).toContain('优化优先级');expect(document.body.textContent).not.toContain('诊断可信度');
+ expect(document.body.textContent).toContain('缺了什么');expect(document.querySelector('.ui-bcl')?.textContent).toContain('检索层');expect(document.body.textContent).not.toContain('诊断可信度');
  expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('版本尚未核实');expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('记录缺失');expect(document.querySelector('.quality-audit')).toBeNull();expect(document.querySelector('.diagnosis-list tbody')?.textContent).not.toContain('评测争议');
  expect(document.body.textContent).not.toMatch(/\bNone\b|undefined|null/);
 });

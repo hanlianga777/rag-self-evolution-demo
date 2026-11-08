@@ -13,7 +13,7 @@ const click=async(text:string)=>act(async()=>[...document.querySelectorAll<HTMLB
 it('opens a case by keyboard and disables zero categories without losing review status',async()=>{
  const row={question_id:'Q04',passed:false,question:'存放设备',baseline_review_label:'真错（3 次错 3 次）',diagnostic_view:{diagnosis_category:'检索噪声'}};let selected:any;
  await mount(<BadCaseOverview rows={[row]} categories={[{label:'检索噪声'},{label:'安全边界'}]} onSelect={value=>selected=value}/>);
- const zero=[...document.querySelectorAll('button')].find(b=>b.textContent==='安全边界0')!;expect(zero.disabled).toBe(true);
+ const zero=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('安全边界'))!;expect(zero.disabled).toBe(true);
  const tr=document.querySelector('.diagnosis-list tbody tr')!;await act(async()=>tr.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));expect(selected).toBe(row);
  expect(document.querySelector('.diagnosis-list thead')?.textContent).not.toContain('判定方式');expect(document.body.textContent).not.toContain('展开细项');
 });

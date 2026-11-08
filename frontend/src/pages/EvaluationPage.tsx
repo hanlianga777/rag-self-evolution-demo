@@ -1,6 +1,7 @@
 import { shortSourceName } from "./FrozenQuestionDetails";
 import { Icon, IconLabel, IconTile } from "../ui/icons";
 import { BaselineBreakdown } from "../ui/baseline/BaselineBreakdown";
+import { HardGateGrid } from "../ui/baseline/HardGateGrid";
 import { BaselineHero } from "../ui/baseline/BaselineHero";
 import { caseData } from "../components/EvaluationDiagnosis";
 import { usePageTab } from "../usePageTab";
@@ -17,7 +18,7 @@ import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { Play } from "lucide-react";
 import { cachedJson, errorMessage, getJson, postJson } from "../api";
-import { Badge, DrawerSection, Metric, ProgressBar, Section, TableVerdict, Status, TruncatedText } from "../components/Primitives";
+import { Badge, DrawerSection, Metric, Section, Status, TruncatedText } from "../components/Primitives";
 import { formatValue, thinkingLabel } from "../components/PipelineFields";
 import { CaseAnswer } from "../components/CaseAnswer";
 import { Drawer } from "../components/Dialog";
@@ -32,6 +33,36 @@ const format = (value: unknown, suffix = "") => typeof value === "number" ? `${v
 const group = (metric: string) => metric.startsWith("positive_") ? "正向（Positive）" : metric.startsWith("ablation_") ? "消融（Ablation）" : metric.startsWith("latency_") ? "性能" : "负向（Negative）与安全";
 const gateValue = (gate: Row) => format(gate.actual, gate.metric.startsWith("latency_") ? " 秒" : "%");
 const gateThreshold = (gate: Row) => `${gate.operator === ">=" ? "≥" : "≤"} ${format(gate.threshold, gate.metric.startsWith("latency_") ? " 秒" : "%")}`;
+
+
+// The supplied grid is display-only. Keep the original row drilldowns at the page boundary.
+function BaselineGates({ gates, passedCount, onSelect }: { gates: Row[]; passedCount?: number; onSelect: (gate: Row) => void }) {
+  const groups = ['正向（Positive）', '消融（Ablation）', '负向（Negative）与安全', '性能'].map(name => ({name, rows: gates.filter(gate => group(gate.metric) === name)}));
+  const ordered = groups.flatMap(group => group.rows);
+  return <div className="baseline-gate-grid" ref={node => {
+    node?.querySelectorAll<HTMLElement>('.ui-hg-card li').forEach((item, index) => {
+      const gate = ordered[index];
+      item.tabIndex = 0;
+      item.setAttribute('role', 'button');
+      item.setAttribute('aria-label', `${gateNames[gate.metric] || gate.metric}，查看详情`);
+      item.title = gateEnglishNames[gate.metric] || gate.metric;
+      item.onclick = () => onSelect(gate);
+      item.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(gate); } };
+      item.dataset.status = ['PASS', 'FAIL'].includes(gate.status) ? gate.status : 'unknown';
+      item.querySelector('.ui-hg-dot')?.setAttribute('aria-label', gate.status === 'PASS' ? '通过' : gate.status === 'FAIL' ? '未通过' : '未判定');
+    });
+    node?.querySelectorAll<HTMLElement>('.ui-hg-card header .ui-verdict').forEach((badge, index) => {
+      const rows = groups[index].rows;
+      badge.className = `ui-verdict ${rows.length && rows.every(gate => gate.status === 'PASS') ? 'ok' : rows.some(gate => gate.status === 'FAIL') ? 'bad' : ''}`;
+      badge.textContent = rows.length ? `${rows.filter(gate => gate.status === 'PASS').length} / ${rows.length} 通过` : '未采集';
+    });
+  }}><HardGateGrid summary={`${passedCount ?? '未知'} / ${gates.length || '未知'} 项通过；每项独立判断，综合分不能抵消未通过的 Hard Gate。`} groups={groups.map(({ name, rows }) => ({name, items: rows.map(gate => ({
+    label: (gateNames[gate.metric] || gate.metric).replace(/^(正向（Positive）|消融（Ablation）)/, ''),
+    actual: gateValue(gate), requirement: gateThreshold(gate), pass: gate.status === 'PASS',
+    ratio: typeof gate.actual === 'number' ? gate.actual / (gate.metric.startsWith('latency_') ? 60 : 100) : null,
+    threshold: typeof gate.threshold === 'number' ? gate.threshold / (gate.metric.startsWith('latency_') ? 60 : 100) : null,
+  }))}))} /></div>;
+}
 
 
 const baselinePreflight = (runId?: string) => getJson<Row>(`/api/evaluation/preflight${runId ? `?resume_source_id=${encodeURIComponent(runId)}` : ''}`);
@@ -204,9 +235,9 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
         </StoryDisclosure>
 
       </div>}
-      {tab === "gates" && <><p className="gate-intro">{result.gates?.passed_count ?? '未知'} / {gates.length || '未知'} 项通过；每项独立判断，综合分不能抵消未通过的 Hard Gate。</p>{['正向（Positive）','消融（Ablation）','负向（Negative）与安全','性能'].map(label=><Section key={label} title={<IconLabel name="gate">{`${label}（${gates.filter(gate=>group(gate.metric)===label).length}）`}</IconLabel>}><div className="table-scroll product-table baseline-gates-table"><DataTable><thead><tr><th>指标</th><th className="num">实际值</th><th className="num">要求</th><th>实际值与 Hard Gate</th><th>状态</th><th aria-label="打开详情"/></tr></thead><tbody>{gates.filter(gate=>group(gate.metric)===label).map(gate=><tr className={gate.status==='FAIL'?'gate-failed':''} key={gate.metric} role="button" tabIndex={0} onClick={()=>setSelectedGate(details.find(row=>row.metric===gate.metric) || gate)} onKeyDown={event=>{if(event.key==='Enter' || event.key===' '){event.preventDefault();setSelectedGate(details.find(row=>row.metric===gate.metric) || gate);}}}><td title={gateEnglishNames[gate.metric]}>{gateNames[gate.metric] || gate.metric}</td><td className="num">{gateValue(gate)}</td><td className="num">{gateThreshold(gate)}</td><td>{typeof gate.actual==='number' && typeof gate.threshold==='number'?<ProgressBar label={`${gateNames[gate.metric] || gate.metric}实际值与 Hard Gate`} value={gate.actual} max={gate.metric.startsWith('latency_')?Math.max(gate.actual,gate.threshold)*1.2:100} threshold={gate.threshold} failed={gate.status==='FAIL'}/>: '未采集'}</td><td><TableVerdict value={gate.status==='PASS'?true:gate.status==='FAIL'?false:undefined} pass="通过" fail="未通过"/></td><td><span className="ui-row-go"><Icon name="go" size={15}/></span></td></tr>)}</tbody></DataTable></div></Section>)}</>}
+      {tab === "gates" && <BaselineGates gates={gates} passedCount={result.gates?.passed_count} onSelect={gate=>setSelectedGate(details.find(row=>row.metric===gate.metric) || gate)} />}
 
-      {tab === "cases" && <><Section title={<IconLabel name="bad">{`${badCount ?? '未知'} 个 Bad Case：以单遍结果为准`}</IconLabel>} action={<button className="secondary ui-btn-tint" onClick={()=>navigate ? navigate('evolution') : location.hash='evolution'}>进入 Agent 处理</button>}><BadCaseOverview showJudgeReason rows={businessCases} categories={run.diagnostic_categories || data.evaluation?.diagnostic_categories} priorities={run.product_diagnostics?.optimization_priorities} latencyGates={gates} onSelect={setSelectedCase} /></Section></>}
+      {tab === "cases" && <><Section title={<IconLabel name="bad">{`${badCount ?? '未知'} 个 Bad Case`}</IconLabel>} action={<button className="secondary ui-btn-tint" onClick={()=>navigate ? navigate('evolution') : location.hash='evolution'}>进入 Agent 处理</button>}><BadCaseOverview showJudgeReason rows={businessCases} categories={run.diagnostic_categories || data.evaluation?.diagnostic_categories} priorities={run.product_diagnostics?.optimization_priorities} latencyGates={gates} onSelect={setSelectedCase} /></Section></>}
 
     </>}
 

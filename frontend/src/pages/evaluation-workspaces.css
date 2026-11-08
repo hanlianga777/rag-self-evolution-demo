@@ -336,8 +336,8 @@
 .diagnosis-list table :is(th,td):nth-child(2) { width:26%; }
 .diagnosis-list table :is(th,td):last-child { width:32px; }
 .product-diagnosis-table table :is(th,td):nth-child(3) { width:100px; }
-.product-diagnosis-table table :is(th,td):nth-last-child(3) { width:76px; }
-.product-diagnosis-table table :is(th,td):nth-last-child(2) { width:24%; }
+.product-diagnosis-table table :is(th,td):nth-child(4) { width:auto; }
+.product-diagnosis-table table :is(th,td):nth-last-child(2) { width:90px; }
 .baseline-gates-table table :is(th,td):first-child { width:28%; }
 .baseline-gates-table table :is(th,td):nth-child(2), .baseline-gates-table table :is(th,td):nth-child(3) { width:14%; }
 .baseline-gates-table table :is(th,td):nth-last-child(2) { width:90px; }
@@ -345,3 +345,11 @@
 .regression-cases-table table :is(th,td):first-child { width:64px; }
 .regression-cases-table table :is(th,td):nth-child(2) { width:30%; }
 .regression-cases-table table :is(th,td):last-child { width:180px; }
+
+/* 022b: keep two-line diagnosis rows level and severity verdicts fully visible. */
+.product-diagnosis-table tbody tr { height:72px; }
+.product-diagnosis-table td:nth-child(4) .ui-clamp { line-height:22px; max-height:44px; }
+.product-diagnosis-table td:nth-last-child(2) .truncated-text { overflow:visible; }
+.baseline-gate-grid [role="button"] { cursor:pointer; }
+.baseline-gate-grid [role="button"]:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+.baseline-gate-grid [data-status="unknown"] .ui-hg-dot { background:var(--ui-faint); }

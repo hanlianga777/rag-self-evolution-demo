@@ -20,7 +20,7 @@ it("filters persisted Baseline cases and opens their diagnostic detail", async (
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("未召回题");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("正常题");
   const all = document.querySelector<HTMLButtonElement>('[aria-label="Bad Case 分类"] button')!;
-  expect(all.textContent).toBe("全部1");
+  expect(all.querySelector("strong")?.textContent).toBe("1");
   await act(async () => all.click());
   expect(document.querySelectorAll('.product-diagnosis-table tbody tr')).toHaveLength(1);
   expect(document.querySelector('.product-diagnosis-table tbody')?.textContent).not.toContain("正常题");

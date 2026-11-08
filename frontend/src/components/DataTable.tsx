@@ -1,4 +1,5 @@
 import { Children, cloneElement, isValidElement, useLayoutEffect, useRef, type ReactElement, type ReactNode, type TableHTMLAttributes } from "react";
+import { ClampText } from "../ui/ClampText";
 import { TruncatedText } from "./Primitives";
 
 // Keep form controls and multi-action cells usable; prose shares one hover surface.
@@ -9,7 +10,7 @@ function controls(node: ReactNode): number {
   }, 0);
 }
 function hasClamp(node: ReactNode): boolean {
-  return Children.toArray(node).some(child => isValidElement<{ children?: ReactNode }>(child) && (child.type === TruncatedText || hasClamp(child.props.children)));
+  return Children.toArray(node).some(child => isValidElement<{ children?: ReactNode }>(child) && (child.type === TruncatedText || child.type === ClampText || hasClamp(child.props.children)));
 }
 function cells(node: ReactNode, clickable = false): ReactNode {
   return Children.map(node, child => {

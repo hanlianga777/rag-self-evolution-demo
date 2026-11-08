@@ -14,13 +14,13 @@ const categories=['检索失败','检索噪声','回答问题','过度拒答','�
 it('shares six backend categories and keeps latency outside case totals',async()=>{
  const rows=[{question_id:'CSV-20261101100758945425-04',question:'长问题',passed:false,diagnostic_view:{display_question_id:'Q04',diagnosis_category:'检索噪声',subfeature:'候选有证据，最终未保留',severity_label:'严重',tuning_directions:['多保留几段内容'],retrieval_position_label:'候选第 10 → 重排第 5 → 未进最终',missing_points:['保留安全警告']}},{question_id:'x37',question:'需要追问',passed:false,diagnostic_view:{display_question_id:'Q37',diagnosis_category:'回答问题',subfeature:'澄清不足',severity_label:'中等',tuning_directions:['补问设备状态']}}];
  const onSelect=vi.fn();await mount(<BadCaseOverview rows={rows} categories={categories} latencyGates={[{metric:'latency_p50_seconds',status:'FAIL',actual:16,threshold:10}]} onSelect={onSelect}/>);
- expect(document.querySelectorAll('[aria-label="Bad Case 分类"] button')).toHaveLength(7);
- expect(document.querySelector('[aria-label="Bad Case 分类"]')?.textContent).toContain('全部2');
+ expect(document.querySelectorAll('[aria-label="Bad Case 分类"] button')).toHaveLength(5);
+ expect(document.querySelector('.ui-bcl-all strong')?.textContent).toBe('2');
  expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
- expect(document.body.textContent).toContain('延迟：');expect(document.querySelector('.diagnosis-list')?.textContent).toContain('Q04');
+ expect(document.querySelector('.ui-bcl')?.textContent).toContain('超出 Hard Gate');expect(document.querySelector('.diagnosis-list')?.textContent).toContain('Q04');
  expect(document.querySelector('.diagnosis-list')?.textContent).not.toContain('CSV-');
  expect(document.querySelector('.diagnosis-list')?.textContent).toContain('候选有证据，最终未保留');expect(document.querySelectorAll('.diagnosis-list button')).toHaveLength(0);
- await click('回答问题1');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
+ await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('.ui-bcl button')].find(b=>b.textContent?.includes('生成层'))!.click());expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
  await act(async()=>document.querySelector<HTMLElement>('.diagnosis-list tbody tr')!.click());expect(onSelect).toHaveBeenCalledWith(rows[1]);
 });
 it('shows saved comparison columns, differences and excludes judge timing',async()=>{
@@ -38,8 +38,8 @@ it('keeps legacy prompt labels and promotes gate-blocking categories with saved 
  expect(formatValue('Abstention')).toBe('谨慎拒答');expect(formatValue('Tiered')).toBe('分级回答');
  const rows=[{question_id:'Q37',passed:false,diagnostic_view:{diagnosis_category:'回答问题',subfeature:'澄清不足'}}];
  await mount(<BadCaseOverview rows={rows} categories={categories} priorities={[{label:'回答问题',priority:1,priority_note:'导致门槛未过：安全拒答率'}]} latencyGates={[{metric:'latency_p50_seconds',actual:8.4,threshold:26,status:'PASS'},{metric:'latency_p99_seconds',actual:23.7,threshold:61,status:'PASS'}]} onSelect={()=>{}}/>);
- expect(document.querySelector('.priority-table')?.textContent).toContain('导致门槛未过：安全拒答率');
- expect(document.querySelector('.latency-notice')?.textContent).toBe('延迟：本轮回答耗时在 Hard Gate 内（中位数 8.4 秒，要求 ≤26 秒；最慢 1% 为 23.7 秒，要求 ≤61 秒），不计入单题 Bad Case。');
+ expect(document.querySelector('.ui-bcl')?.textContent).toContain('导致门槛未过：安全拒答率');
+ expect(document.querySelector('.ui-bcl')?.textContent).toContain('P50 8.4 秒、P99 23.7 秒，在 Hard Gate 内；不计入单题 Bad Case');
 });
 it('sorts stages, folds tiny shares and uses seconds and plain comparison labels',async()=>{
  const columns=['max','high'].map(id=>({id,label:id==='high'?'高':'最高',current:id==='high',metrics:{ttft_median_ms:4710.5}}));
