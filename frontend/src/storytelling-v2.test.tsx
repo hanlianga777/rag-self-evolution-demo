@@ -19,9 +19,9 @@ it('uses one finite filter per dimension, real counts and resets on returning to
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/bad-cases')?badCases:evaluation))));
  await mount(<EvaluationPage data={{evaluation,badCases}}/>);await click('Bad Case 诊断');
  expect(document.querySelector('.diagnosis-filters [role=combobox]')).toBeNull();
- const retrieval=[...document.querySelectorAll<HTMLButtonElement>('[aria-label="错题分类"] button')].find(b=>b.textContent?.includes('检索失败'))!;
+ const retrieval=[...document.querySelectorAll<HTMLButtonElement>('[aria-label="Bad Case 分类"] button')].find(b=>b.textContent?.includes('检索失败'))!;
  await act(async()=>retrieval.click());expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
- await click('门槛');await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
+ await click('Hard Gate');await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
  expect(document.body.textContent).not.toContain('恢复全部');expect(document.body.textContent).not.toContain('每类首例');
 });
 it('links multiple saved candidate hypotheses to the same actual problem and keeps raw rationale folded',async()=>{
@@ -30,7 +30,7 @@ it('links multiple saved candidate hypotheses to the same actual problem and kee
  const data={evaluation,badCases,optimization:{id:'EXP',candidates}};const before=JSON.stringify(data);
  await mount(<EvolutionPage data={data}/>);await click('进化路线');
  expect(document.querySelectorAll('.agent-fact')).toHaveLength(2);expect(document.querySelectorAll('.agent-hypotheses > section')).toHaveLength(2);for (const hypothesis of document.querySelectorAll('.agent-hypotheses > section')) { expect(hypothesis.textContent).toContain('Q71');expect(hypothesis.textContent).not.toContain('Q72'); }expect(document.querySelector('.experiment-plan')).toBeNull();
- await click('候选方案 A · 详情');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
+ await click('A/B/C/D');await click('查看方案与完整报告');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
 });
 it('compares a pending release against current Production rather than unrelated Baseline configuration',async()=>{
  const candidate={id:'A',config:{candidate_k:24},reasoning:{candidate_label:'A'},release_state:{sandbox:true,qualified:true,recommended:true,round_complete:true}};

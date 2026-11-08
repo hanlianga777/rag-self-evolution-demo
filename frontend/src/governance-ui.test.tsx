@@ -12,18 +12,21 @@ import { OperationProvider } from "./operation";
 const tableValue=(label:string)=>{const index=[...document.querySelectorAll(".review-table th")].findIndex(e=>e.textContent===label);return document.querySelector(`.review-table tbody td:nth-child(${index+1})`)?.textContent;};
 afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it("counts delegated AI approval as machine qualified without claiming human review", async () => {
+it("counts the frozen delegated paper without claiming human review", async () => {
   const run = { id: "GGEN-owner-fixture", status: "completed", profile: { expected_count: 1 }, question_ids: ["owner-Q01"], artifacts: {} };
   const row = { id: "owner-Q01", slot: "Q01", question: "fixture", test_category: "positive", stage: "golden", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", qualification_status: "owner_delegated_approved" };
   const snapshot = { id: "GD-owner-fixture", source: "owner_delegated", snapshot: { generation_run_id: run.id, question_ids: [row.id], approval_mode: "owner_delegated" } };
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.includes("/candidates?") ? goldenFixture(url, [row]) : url.includes("snapshots") ? [snapshot] : [])))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [row], snapshots: [snapshot] }} />));
-  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("机器合格 1");
+  expect(document.querySelector(".ui-gp-left > strong")?.textContent).toBe("1 题");
+  expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(1);
   expect(document.querySelector(".golden-metrics")).toBeNull();
-  expect(document.querySelector(".stage-stepper")?.textContent).toContain("1 / 1 通过");
-  expect(document.querySelector('.golden-summary-strip')?.textContent).toContain("人工确认 · 已冻结");
-  expect(document.body.textContent).not.toContain("已人工确认");
+  expect([...document.querySelectorAll(".ui-gp-steps li.done")].map(node => node.textContent)).toEqual(["覆盖规划冻结记录", "出题1/1", "硬校验1/1", "Probe1/1", "QC1/1", "人工确认1/1"]);
+  expect(document.querySelector('.ui-gp .ui-badge')?.textContent || document.querySelector('.ui-gp')?.textContent).toContain("已冻结");
+  await act(async () => document.querySelector<HTMLElement>(".review-table tbody tr")!.click());
+  expect(document.querySelector(".frozen-question-details")?.textContent).toContain("fixture");
+  expect(document.querySelector(".frozen-question-details")?.textContent).not.toContain("已人工确认");
   await act(async () => root.unmount());
 });
 
@@ -215,11 +218,11 @@ it("shows negative expected behavior and reveals evidence and quality records on
   expect(document.querySelector(".review-workspace")?.textContent).toContain("应拒绝危险操作请求");
   expect(document.querySelector(".review-workspace")?.textContent).toContain("负向子类与题目不符");
   expect(document.querySelector(".review-workspace .golden-quality-results")?.textContent).not.toContain("Negative subtype does not match the question");
-  expect(document.querySelector<HTMLDetailsElement>(".review-workspace .disclosure")?.open).toBe(false);
+  expect(document.querySelector(".review-workspace .disclosure")).toBeNull();
   expect(document.querySelector(".review-workspace")?.textContent).not.toContain("Retrieved TopK");
   await act(async () => ([...document.querySelectorAll(".candidate-menu button")].find(button => button.textContent === "质量审计记录") as HTMLButtonElement).click());
   await act(async () => ([...document.querySelectorAll(".audit-tabs button")].find(button => button.textContent === "Probe") as HTMLButtonElement).click());
-  expect(document.querySelector(".audit-workspace")?.textContent).toContain("检索 TopK");
+  expect(document.querySelector(".audit-workspace")?.textContent).toContain("Candidate Recall");
   expect(document.querySelector(".audit-workspace")?.textContent).toContain("55 / 90");
   expect(document.querySelector(".audit-workspace")?.textContent).toContain("C4");
   await act(async () => root.unmount());
@@ -230,7 +233,9 @@ it("shows Gate 1 complete without a separate Snapshot action", async () => {
   vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(goldenFixture(url, questions)), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(row => row.id), artifacts: {} }], dataset: questions, snapshots: [{ id: "GD-20", snapshot: { generation_run_id: "GGEN-20", question_ids: questions.map(row => row.id) } }] }} />));
-  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("人工确认 · 已冻结");
+  expect(document.querySelector(".ui-gp")?.textContent).toContain("已冻结");
+  expect(document.querySelector(".ui-gp-steps li:last-child")?.classList.contains("done")).toBe(true);
+  expect(document.querySelector(".ui-gp-steps li:last-child small")?.textContent).toBe("20/20");
   expect(document.querySelectorAll(".snapshot-next button")).toHaveLength(0);
   await act(async () => root.unmount());
 });
@@ -349,7 +354,7 @@ it("starts Q09 independently and keeps Q01 as read-only context", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(item => item.id), artifacts: {} }], dataset: questions }} />));
   await act(async () => (document.querySelector<HTMLElement>('.review-table tbody tr[aria-label^="Q09"]')!).click());
-  expect(document.body.textContent).toContain("关联 正向：Q01");
+  expect(document.body.textContent).toContain("关联 正向（Positive）：Q01");
   await act(async () => ([...document.querySelectorAll(".candidate-actionbar button")].find(button => button.textContent === "编辑") as HTMLButtonElement).click());
   expect(document.querySelector(".revision-pair input[type='checkbox']")).toBeNull();
   expect(document.querySelectorAll(".draft-workspace")).toHaveLength(0);

@@ -20,14 +20,14 @@ it('opens a case by keyboard and disables zero categories without losing review 
 it('derives comparison differences and defaults to changed gates',async()=>{
  const columns=[{id:'max',label:'最高',metrics:{correct_count:45,latency_p50_seconds:15,average_estimated_cost:{amount:0.002,currency:'USD'}},gates:[{metric:'safe_rejection_rate',actual:100,threshold:95,status:'PASS'},{metric:'positive_correctness',actual:95,status:'PASS'}]},{id:'high',label:'高',current:true,metrics:{correct_count:43,latency_p50_seconds:5,average_estimated_cost:{amount:0.001,currency:'USD'}},gates:[{metric:'safe_rejection_rate',actual:90,threshold:95,status:'FAIL'},{metric:'positive_correctness',actual:95,status:'PASS'}]}];
  await mount(<ProductDiagnostics diagnostics={{thinking_comparison:{columns}}}/>);await click('查看对照');
- expect(document.body.textContent).toContain('最高档多答对 2 题');expect(document.body.textContent).toContain('高档快约 3.0 倍');expect(document.body.textContent).toContain('50.0%');
- expect(document.querySelector('.thinking-gates tbody')?.textContent).not.toContain('正向题正确性');await click('显示全部 2 项');expect(document.querySelector('.thinking-gates tbody')?.textContent).toContain('正向题正确性');
+ expect(document.body.textContent).toContain('Max多答对 2 题');expect(document.body.textContent).toContain('High快约 3.0 倍');expect(document.body.textContent).toContain('50.0%');
+ expect(document.querySelector('.thinking-gates tbody')?.textContent).not.toContain('正向题（Positive）正确性');await click('显示全部 2 项');expect(document.querySelector('.thinking-gates tbody')?.textContent).toContain('正向题（Positive）正确性');
 });
 it('resolves frozen evidence through saved candidate chunks and marks final evidence',async()=>{
  const item={question_id:'Q04',test_category:'positive',passed:false,question:'存放设备',diagnostic_view:{missing_points:['室内'],retrieval_positions:[{evidence_index:1,candidate_rank:10,rerank_rank:5,final_rank:null}]},programmatic_metrics:{retrieval_trace:{candidates:[{chunk_id:'c1',document:'KIRA 手册',page_start:85}],final:[{matched_child_ids:['c2'],document:'KIRA 手册',page_start:86,content:'充电'}]}}};
  await mount(<BaselineCaseDetails item={item} snapshot={{questions:[{id:'Q04',evidence:[{source_chunk_ids:['c1'],evidence_key_points:['室内']},{source_chunk_ids:['c2']}]}]}} config={{}} gates={[]}/>);
- expect(document.body.textContent).toContain('KIRA 手册 · 第85页');expect(document.body.textContent).not.toContain('来源文档名称未记录');expect(document.body.textContent).toContain('未进最终 1 段');
- expect(document.body.textContent).toContain('含标准证据');expect(document.querySelectorAll('.bad-case-details > details')).toHaveLength(1);expect(document.querySelector('.case-answer-stack')?.children).toHaveLength(2);
+ expect(document.body.textContent).toContain('KIRA 手册 · 第85页');expect(document.body.textContent).not.toContain('来源文档名称未记录');expect(document.body.textContent).toContain('未进 Top-K 1 条');
+ expect(document.querySelectorAll('.evidence-path')).toHaveLength(2);expect(document.querySelectorAll('.evidence-path')[1].textContent).toContain('KIRA 手册 · 第86页');expect(document.querySelectorAll('.bad-case-details > details')).toHaveLength(0);expect(document.querySelector('.case-answer-stack')?.children).toHaveLength(2);
 });
 
 it('opens real monitoring source objects without rendering them as React children',async()=>{

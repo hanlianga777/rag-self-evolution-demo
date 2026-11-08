@@ -11,10 +11,11 @@ afterEach(async () => { if (root) await act(async () => root.unmount()); documen
 it("Pipeline serves verified memory during revalidation, partitions identities and hides absent Baseline", async () => {
   const data = { workspace: { current_corpus_fingerprint: "C1", current_golden_id: "G1" }, versions: [{ status:"active", id:"P1" }] };
   const payload = { data_version:"v1", config:{top_k:4}, search_space:{top_k:{allowed:[4,6]}}, baseline_config:null };
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(payload))));
+  const fetcher = vi.fn<(...args: any[]) => Promise<Response>>(async () => new Response(JSON.stringify(payload)));
+  vi.stubGlobal("fetch", fetcher);
   await pipelineFetch(pipelineIdentity(data));
   expect(pipelineCached(pipelineIdentity({ ...data, workspace:{current_corpus_fingerprint:"C2"} }))).toBeUndefined();
-  vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+  fetcher.mockImplementation(() => new Promise(() => {}));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={data} />));
   expect(document.querySelector('[data-parameter="top_k"]')).not.toBeNull();

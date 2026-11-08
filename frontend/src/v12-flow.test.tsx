@@ -65,7 +65,9 @@ it("keeps Gate 1 available when every question is approved but the current run h
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [{ id: "OLD", snapshot: { generation_run_id: "G1", question_ids: ["old-question"] } }] }} />));
-  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("人工确认");
+  expect(document.querySelector(".ui-gp-steps li:last-child")?.textContent).toBe("人工确认20/20");
+  expect(document.querySelector(".ui-gp-steps li:last-child")?.classList.contains("done")).toBe(false);
+  expect(document.querySelector(".ui-gp")?.textContent).toContain("尚未冻结");
   const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "冻结 Golden Dataset")!;
   expect(confirm).toBeTruthy();
   await act(async () => document.querySelector<HTMLInputElement>(".review-batch input")!.click());
@@ -106,7 +108,8 @@ it("shows persisted partial slots, failure details, and only the refill action",
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
   expect(document.body.textContent).toContain("已处理 20/20 · 100%");
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
-  expect(document.querySelector(".golden-summary-strip")?.textContent).toContain("12 / 20 题位");
+  expect(document.querySelector(".ui-gp-left > strong")?.textContent).toBe("12 题");
+  expect(document.querySelectorAll(".ui-gp-steps small")[1].textContent).toBe("12/20");
   expect(document.body.textContent).toContain("补齐失败题（8）");
   expect(document.body.textContent).not.toContain("生成 V1 Mini 8 / 4 / 8");
   expect(document.querySelector(".review-batch")).toBeNull();
@@ -227,7 +230,7 @@ it.each([{ max: 13, canContinue: true }, { max: 12, canContinue: false }])("keep
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: {}, badCases: [] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "进化路线")!.click());
-  expect(document.body.textContent).toContain("第 3 轮 · 2/2");
+  expect(document.body.textContent).toContain("Round 3 · 2/2");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "A/B/C/D")!.click());
   expect(document.body.textContent?.includes("继续优化下一轮")).toBe(canContinue);
   await act(async () => root.unmount());

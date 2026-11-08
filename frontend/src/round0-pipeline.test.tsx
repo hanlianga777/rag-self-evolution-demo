@@ -58,13 +58,32 @@ it("uses a new Run's saved Thinking and knowledge identities consistently in sum
   expect(document.body.textContent).not.toContain("完整配置快照");
 });
 
-it("starts a new unsaved Baseline draft with approved defaults while leaving historical values visible", async () => {
-  const pipeline = { config: { prompt_strategy: "abstention" }, baseline_config: { prompt_strategy: "abstention" }, baseline_defaults: { prompt_strategy: "grounded", generation_thinking: "max" }, search_space: { prompt_strategy: { allowed: ["grounded", "abstention"] }, generation_thinking: contract.generation_thinking } };
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(pipeline))));
+it.each([false, true])("starts from saved Max Baseline without phantom changes (stale draft: %s)", async draft_stale => {
+  const pipeline: any = { baseline_config: { generation_thinking: "max" }, baseline_defaults: { generation_thinking: "high" }, search_space: { generation_thinking: contract.generation_thinking }, draft_stale, ...(draft_stale ? { config_draft: { config: { generation_thinking: "low" } } } : {}) };
+  const saved = JSON.stringify(pipeline.baseline_config);
+  const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
+    if (init?.method === "POST") { expect(JSON.parse(String(init.body)).config).toBeNull(); delete pipeline.config_draft; pipeline.draft_stale = false; }
+    return new Response(JSON.stringify(pipeline));
+  });
+  vi.stubGlobal("fetch", fetcher);
   await render(<SettingsPage data={{}} />);
-  expect(document.querySelector('[data-parameter="prompt_strategy"] button[aria-checked="true"]')?.textContent).toBe("grounded");
-  expect(document.querySelector('.pipeline-draft-chips')?.textContent).toContain("abstention → grounded");
-  expect(pipeline.baseline_config.prompt_strategy).toBe("abstention");
+  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe("Max");
+  expect(document.querySelectorAll('.pipeline-draft-chips > *')).toHaveLength(0);
+  expect(document.body.textContent).not.toContain("1 项已修改");
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="generation_thinking"] button')].find(button => button.textContent === "High")!.click());
+  expect(document.body.textContent).toContain("1 项已修改");
+  expect(document.querySelector('.pipeline-draft-chips')?.textContent).toContain("Max → High");
+  await click("放弃修改");
+  expect(document.body.textContent).not.toContain("已修改");
+  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe("Max");
+  expect(JSON.stringify(pipeline.baseline_config)).toBe(saved);
+  expect(pipeline.baseline_defaults.generation_thinking).toBe("high");
+});
+it("uses approved defaults before the first Baseline exists", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ config: { generation_thinking: "low" }, baseline_defaults: { generation_thinking: "high" }, search_space: { generation_thinking: contract.generation_thinking } }))));
+  await render(<SettingsPage data={{}} />);
+  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe("High");
+  expect(document.body.textContent).not.toContain("已修改");
 });
 
 it.each([
@@ -93,12 +112,15 @@ it("keeps a saved lower Thinking draft editable",async()=>{
  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe('Low');
  expect(document.body.textContent).not.toContain('已放弃旧草稿');
 });
-it('keeps the fixed full Baseline when active-task lookup returns a different completed historical run', async () => {
- const run={id:'FIXED-HIGH',status:'completed',config:{generation_thinking:'high'},result:{bad_case_count:8,total:50,completed:50},cases:[],product_diagnostics:{thinking_comparison:{note:'固定Baseline完整档位对照'},objective_metrics:{recall_at_k:81}}};
- vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('active_task')?{id:'HISTORICAL-MAX',status:'completed',config:{generation_thinking:'max'},result:{bad_case_count:6},product_diagnostics:{}}:url.includes('preflight')?{}:{id:'HISTORICAL-MAX',status:'completed',cases:[],config:{generation_thinking:'max'},result:{bad_case_count:6},product_diagnostics:{}}))));
+it('keeps the fixed Max Baseline when active-task lookup returns a different completed High run', async () => {
+ const run={id:'FIXED-MAX',status:'completed',config:{generation_thinking:'max'},result:{bad_case_count:8,total:50,completed:50},cases:[],product_diagnostics:{thinking_comparison:{note:'固定Baseline完整档位对照'},objective_metrics:{recall_at_k:81}}};
+ const historical={id:'HISTORICAL-HIGH',status:'completed',config:{generation_thinking:'high'},result:{bad_case_count:6},cases:[]};
+ const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('active_task')?historical:url.includes('preflight')?{}:url.endsWith('/evaluations/FIXED-MAX')?run:{})));
+ vi.stubGlobal('fetch',fetcher);
  await render(<EvaluationPage data={{evaluation:run}}/>);
- expect(document.querySelector('.baseline-run-summary')?.textContent).toContain('High');
- expect(document.body.textContent).toContain('固定Baseline完整档位对照');
+ expect(fetcher.mock.calls.some(([url])=>url.endsWith('/evaluations/FIXED-MAX'))).toBe(true);
+ expect(document.querySelector('.baseline-run-summary')?.textContent).toContain('Max');
+ expect(document.querySelector('.baseline-run-summary')?.textContent).not.toContain('High');
  await click('Bad Case 诊断');
  expect(document.body.textContent).toContain('8 个 Bad Case');
 });

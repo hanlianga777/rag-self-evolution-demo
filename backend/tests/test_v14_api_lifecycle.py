@@ -139,6 +139,8 @@ class ApiLifecycleTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='rag-v14-api-fixture-')
         self.addCleanup(self.temp.cleanup)
         self.store = GovernanceStore(Path(self.temp.name) / 'test.db')
+        from app.paid_schedule import set_settings
+        set_settings(self.store, False)
         patcher = patch.dict(os.environ, {'RAG_DEMO_DB_PATH':str(self.store.database_path),'RAG_DIAGNOSTIC_DIR':self.temp.name + '/diagnostics'}); patcher.start(); self.addCleanup(patcher.stop)
         self.corpus = LifecycleCorpus()
         self.service = LifecycleService(self.store, self.corpus, LifecycleProvider(), False)
@@ -257,7 +259,7 @@ class ApiLifecycleTests(unittest.TestCase):
         d = next(row for row in current['candidates'] if row['id'] == composite['id'])
         self.assertFalse(d['result']['qualification']['qualified'], json.dumps({'config': d['config'], 'reasoning': d['reasoning'], 'result': d['result']}, ensure_ascii=False))
         self.assertTrue(d['result']['gates']['passed'])
-        self.assertTrue(d['result']['regression']['passed'], 'Ordinary new failures are recorded; critical new failures block Regression')
+        self.assertFalse(d['result']['regression']['passed'], 'Two ordinary new failures exceed the saved Regression limit of one')
         self.assertEqual(d['result']['regression']['new_ordinary_failures'],2)
         self.assertFalse(d['result']['release_qualification']['qualified'])
         self.post('candidates/' + composite['id'] + '/publish', {'decision': 'approved'}, status=409)

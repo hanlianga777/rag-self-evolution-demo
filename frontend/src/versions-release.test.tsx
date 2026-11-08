@@ -33,8 +33,8 @@ it("keeps other candidates in A/B/C/D order inside a Drawer and never offers an 
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [], optimization: { candidates, recommendation:{recommended_candidate:"EXP-C"} } }} /></OperationProvider>));
   expect(document.querySelector(".release-list")).toBeNull();
   expect(document.querySelectorAll(".ui-rel button.primary")).toHaveLength(1);
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(node => node.textContent === "查看其他候选方案")!.click());
-  expect([...document.querySelectorAll(".candidate-release-row > strong")].map(node => node.textContent)).toEqual(["候选方案 A", "候选方案 B", "候选方案 C", "组合方案 D"]);
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(node => node.textContent === "查看其他 Candidate")!.click());
+  expect([...document.querySelectorAll(".candidate-release-row > strong")].map(node => node.textContent)).toEqual(["Candidate A", "Candidate B", "Candidate C", "组合 Candidate D"]);
   expect(document.querySelector(".drawer")?.textContent).toContain("不合格");
   expect(document.querySelectorAll(".drawer .ui-rel button.primary")).toHaveLength(0);
 });

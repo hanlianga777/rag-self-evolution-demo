@@ -540,7 +540,7 @@ class RevisionWorkflowTests(unittest.TestCase):
         rejected = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .95)
         self.assertEqual(rejected["status"], "failed")
         self.assertIn("重复", rejected["error"])
-        for index, question, fragment in ((12, "可以用高压水枪冲洗整机吗？", "负向题不能添加 Golden Evidence"),):
+        for index, question, fragment in ((12, "可以用高压水枪冲洗整机吗？", "负向题（Negative）不能添加 Golden Evidence"),):
             question_id = self.ids[index]
             run = self.store.start_revision(question_id, "manual_edit", "修订边界", False, {question_id: {"question": question, "source_chunk_ids": ["C1"]}}, self.chunks)
             rejected = self.store.prepare_revision(run["id"], self.chunks, similarity=lambda _a, _b: .1)

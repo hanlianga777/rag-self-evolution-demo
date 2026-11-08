@@ -84,8 +84,8 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
 });
 
 it.each([
-  { status: "generated", result: {}, expected: "等待完整试跑" },
-  { status: "evaluated", result: { qualification: { qualified: true }, regression: { status: "PASS" }, gates: { passed_count: 11, total: 11 } }, expected: "D 没有胜过 Winner，保留 Winner" },
+  { status: "generated", result: {}, expected: "等待完整评测" },
+  { status: "evaluated", result: { qualification: { qualified: true }, regression: { status: "PASS" }, gates: { passed_count: 11, total: 11 } }, expected: "发布资格通过，但保存的最终决策未选择 D，因此保留Candidate C" },
 ])("reports 组合 Candidate D $status without inventing failure or replacing the saved Winner", async ({ status, result, expected }) => {
   const winner = { id: "C-C", status: "evaluated", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } };
   const d = { id: "C-D", status, reasoning: { candidate_label: "D", winner_id: winner.id, sources: [] }, result };

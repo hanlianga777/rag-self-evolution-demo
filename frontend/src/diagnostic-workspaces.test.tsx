@@ -9,6 +9,10 @@ let root:ReturnType<typeof createRoot>;
 afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';vi.unstubAllGlobals()});
 const render=async(node:React.ReactNode)=>{root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node))};
 const click=async(label:string)=>act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label)!.click());
+const openSavedReport = async () => {
+ const disclosure = [...document.querySelectorAll<HTMLDetailsElement>('.drawer details')].find(node => node.querySelector('summary')?.textContent === '完整逐题报告与原始候选审计')!;
+ await act(async () => { disclosure.open = true; disclosure.dispatchEvent(new Event('toggle')); });
+};
 const evaluation={id:'offline',status:'completed',cases:[],result:{metrics:{positive_correctness:75,safe_rejection_rate:100,latency_p50_seconds:2},comparison_metrics:{recall_at_k:0},gates:{gates:[]}}};
 it('keeps the report while removing the technical-metrics entry',async()=>{
  const calls=vi.fn(async()=>new Response(JSON.stringify(evaluation)));vi.stubGlobal('fetch',calls);
@@ -19,11 +23,11 @@ it('keeps the report while removing the technical-metrics entry',async()=>{
  expect(JSON.stringify(evaluation)).toBe(original);
 });
 it('keeps insufficient candidate evidence explicit and renders saved candidate reasoning in one Drawer',async()=>{
- vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const candidate={id:'a',status:'generated',config:{top_k:3},reasoning:{candidate_label:'A',hypothesis:'保存假设',proposal:'保存理由',root_cause:'Generation',root_cause_evidence:['case1'],intervention_direction:'Generation',evidence_assertions:[{target_id:'case1',observation:'保存的原文观察'}],expected_improvement:'保存改善',risk:'保存风险',target_bad_cases:['case1']}};
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/candidates/')?candidate:{search_space:{}}))));
  await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[candidate],result:{generation_status:'insufficient_evidence',insufficient_evidence:'其余候选缺少Trace依据'}}}}/>);
  expect(document.body.textContent).toContain('其余候选缺少Trace依据');
- await click('A/B/C/D');await click('查看方案与完整报告');
+ await click('A/B/C/D');await click('查看方案与完整报告');await openSavedReport();
  expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
  const text=document.querySelector('[role="dialog"]')!.textContent;
  for(const saved of ['保存假设','保存理由','保存的原文观察','保存改善','保存风险','intervention_direction','root_cause_evidence'])expect(text).toContain(saved);
@@ -77,7 +81,7 @@ it('keeps all hundred saved Candidate report cases accessible in the existing Dr
  const cases=Array.from({length:100},(_,i)=>({question_id:`Q${i+1}`,question:`Candidate题目${i+1}`,passed:true}));
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/evaluations/')?{cases}:{search_space:{}}))));
  await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'candidate-run'}}]}}}/>);
- await click('A/B/C/D');await click('查看方案与完整报告');
+ await click('A/B/C/D');await click('查看方案与完整报告');await openSavedReport();
  expect(document.querySelectorAll('.drawer tbody tr')).toHaveLength(50);await click('下一页');expect(document.querySelectorAll('.drawer tbody tr')).toHaveLength(50);expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目100');
  await click('上一页');expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目1');expect(cases).toHaveLength(100);
 });

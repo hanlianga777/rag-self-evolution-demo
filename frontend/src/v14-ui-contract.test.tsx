@@ -26,6 +26,10 @@ const data = (baseline = "B0") => ({ workspace: identity(baseline), evaluation: 
 const fill = async (question: string) => act(async () => { const input = document.querySelector("textarea")!; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(input, question); input.dispatchEvent(new Event("input", { bubbles: true })); });
 
 const clickText = async (label: string) => act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === label)!.click());
+const openSavedReport = async () => {
+ const disclosure = [...document.querySelectorAll<HTMLDetailsElement>('.drawer details')].find(node => node.querySelector('summary')?.textContent === '完整逐题报告与原始候选审计')!;
+ await act(async () => { disclosure.open = true; disclosure.dispatchEvent(new Event('toggle')); });
+};
 const previewPlan = (profile = "mini", corpus = { D: "fixture" }) => ({ plan_id: `PLAN-${profile}`, planner_version: "fixture-v2", profile: { name: profile }, corpus_fingerprint: corpus, chunk_clusters: { C1: 0 }, initial_k: 2, final_k: 1, merge_mapping: [{ from: 1, to: 0 }], clusters: [{ cluster_id: 0, size: 1, anchor_quota: 20, quotas: { positive: 8, ablation: 4, negative: 8 }, representative_chunk_ids: ["C1"] }], slots: [{ slot_id: "Q01", topic_cluster: 0, document_id: "D", material_chunk_ids: ["C1"], construction_type: "Fact" }], reuse_statistics: { reused_slots: 0 }, gaps: [] });
 
 it.each([true, false])("I4 manual current Preview is available with legacy Run=%s and preserves saved objects", async legacy => {
@@ -67,8 +71,9 @@ it.each(["mini", "medium", "full"])("I4 Preview carries selected %s Profile and 
 it.each([{ proposal: "实际持久化 proposal" }, { why: "兼容 Why 字段" }, {}])("I5 candidate report renders persisted rationale %j", async reasoning => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   const candidate = { id: "E1-A", status: "generated", config: {}, reasoning: { candidate_label: "A", hypothesis: "假设", risk: "风险", observed_evidence: [], ...reasoning }, result: {} };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/api/candidates/") ? candidate : { search_space: {} }))));
   await render(<EvolutionPage data={{ ...data("B1"), optimization: { id: "E1", candidates: [candidate] } }} />);
-  await clickText("A/B/C/D"); await clickText("查看方案与完整报告");
+  await clickText("A/B/C/D"); await clickText("查看方案与完整报告");await openSavedReport();
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain((reasoning as any).proposal || (reasoning as any).why || "尚未保存策略名");
 });
 
@@ -82,7 +87,7 @@ it.each([0, 1.25, null])("M4 Sandbox and release keep frozen estimated cost %s a
   await clickText("查看高级指标");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
   expect(document.body.textContent).not.toContain("暂未配置单价");
-  await act(async () => root.render(<VersionsPage data={input} />)); await clickText("查看其他候选方案"); await clickText("查看候选方案评测报告");
+  await act(async () => root.render(<VersionsPage data={input} />)); await clickText("查看其他 Candidate"); await clickText("查看 Candidate 评测报告");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("暂未配置单价");
 });
@@ -164,6 +169,8 @@ it("ID-08 clears Candidate Drawer and rejects an old candidate report after iden
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "A/B/C/D")!.click());
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent?.includes("查看方案与完整报告"))!.click());
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  await openSavedReport();
+  expect(resolveReport).toBeTypeOf('function');
   await act(async () => root.render(<EvolutionPage data={{ workspace: identity("B1"), evaluation: { id: "B1" }, optimization: { status: "not_run" } }} />));
   await act(async () => resolveReport(new Response(JSON.stringify({ cases: [{ question: "旧身份案例" }] }))));
   expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -228,15 +235,17 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   const d = { id: "E1-D", status: "evaluated", config: {}, reasoning: { candidate_label: "D" }, result: { gates: { passed: true, passed_count: 11, total: 11 }, regression: { passed: false, status: "FAIL" }, qualification: { qualified: false }, release_qualification: { qualified: false } } };
   await render(<EvolutionPage data={{ workspace: identity("B1", "E1"), evaluation: { id: "B1", status: "completed", config: {} }, optimization: { id: "E1", candidates: [d], result: { report_confirmation: { winner_id: "A" }, composite: { candidate_id: d.id } } } }} />);
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Sandbox")!.click());
+  expect([...document.querySelectorAll('.sandbox-core-table tbody th')].map(node=>node.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "P99", "安全拒答率"]);
+  await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ct-more')!.click());
   const coreRows = [...document.querySelectorAll(".sandbox-core-table tbody tr")];
-  expect(coreRows.map(row => row.querySelector("td")?.textContent)).toEqual(["运行状态", "门槛", "Bad Case", "修复原 Bad Case", "新增失败", "回归检查", "候选合格", "可发布"]);
-  expect(coreRows.find(row => row.querySelector("td")?.textContent === "门槛")?.lastElementChild?.textContent).toBe("11 / 11");
-  expect(coreRows.find(row => row.querySelector("td")?.textContent === "回归检查")?.lastElementChild?.textContent).toBe("未通过");
-  expect(coreRows.find(row => row.querySelector("td")?.textContent === "候选合格")?.lastElementChild?.textContent).toBe("不合格");
+  const value = (label: string) => coreRows.find(row => row.querySelector("th")?.textContent === label)?.lastElementChild?.textContent;
+  expect(value("Hard Gate")).toBe("11 / 11");
+  expect(value("Regression Check")).toBe("未通过");
+  expect(value("候选合格")).toBe("不合格");
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "A/B/C/D")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(x => x.textContent === "查看 D 完整报告")!.click());
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不可发布 · 门槛：通过");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("回归检查：未通过");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不可发布 · Hard Gate：通过");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Regression Check：未通过");
 });
 
 it.each([undefined, "running", "failed"])("review R2 keeps %s Baseline at Evaluation before Agent", async status => {
@@ -253,8 +262,8 @@ it("review R2 an older Production does not finish a new recommendation Gate3", a
   expect(document.querySelector(".ui-ov-action")?.textContent).toBe("去发布");
   await act(async () => root.render(<VersionsPage data={input} />));
   expect(document.querySelector('[aria-label="发布阶段"]')).toBeNull();
-  expect(document.querySelector(".ui-rel")?.textContent).toContain("方案 A");
-  expect(document.querySelector(".ui-rel")?.textContent).toContain("本轮推荐，尚未发布");
+  expect(document.querySelector(".ui-rel")?.textContent).toContain("Candidate A");
+  expect(document.querySelector(".ui-rel")?.textContent).toContain("待发布");
   expect(document.querySelector<HTMLButtonElement>(".ui-rel button.primary")?.disabled).toBe(false);
   expect(document.querySelector(".ui-rel button.primary")?.textContent).toBe("确认发布");
   expect(input.versions[0].snapshot.candidate_id).toBe("E0-C");
@@ -305,21 +314,22 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
   expect(document.body.textContent).not.toContain("old-A");
   await clickText("人工确认");
   expect(posts[0]).toEqual({ url: expect.stringContaining("/api/monitoring/triggers/T1/confirm"), body: { decision: "approved" } });
-  expect(document.querySelector(".monitoring-context")?.textContent).toContain("待启动第 1 轮");
-  expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "启动此上下文 Agent · 第 1 轮")?.disabled).toBe(false);
+  expect(document.querySelector(".monitoring-context")?.textContent).toContain("Round 1启动");
+  expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "启动此上下文 Agent · Round 1")?.disabled).toBe(false);
   await clickText("查看进化上下文");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Trigger：T1");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联实验：E-monitor");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联优化：已建立");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Baseline：当前 Baseline");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("待启动Round 1");
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("E-prior");
   await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());
-  await clickText("启动此上下文 Agent · 第 1 轮");
+  await clickText("启动此上下文 Agent · Round 1");
   expect(posts[1]).toEqual({ url: expect.stringContaining("/api/experiments/run"), body: { trigger_id: "T1" } });
   expect(posts).toHaveLength(2);
-  expect(document.querySelector(".monitoring-context")?.textContent).toContain("Agent 状态：已完成 · 第 1 轮");
+  expect(document.querySelector(".monitoring-context")?.textContent).toContain("Agent 状态：已完成 · Round 1");
   expect([...document.querySelectorAll("button")].some(button => button.textContent?.includes("启动此上下文"))).toBe(false);
   await clickText("查看进化上下文");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联实验：E-monitor");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("第 1 轮");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联优化：已建立");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Round 1");
   expect(document.querySelector('a[href="#evolution"]')).toBeNull();
 });
 

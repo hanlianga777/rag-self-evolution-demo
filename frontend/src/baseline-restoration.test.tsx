@@ -31,10 +31,9 @@ it("orders business evidence before diagnosis and preserves negative anchors and
   const heads = [...document.querySelectorAll(".case-details > section > h3")].map(h => h.textContent);
   expect(heads.indexOf("答案对比")).toBeLessThan(heads.indexOf("检索路径"));
   expect(heads.indexOf("检索路径")).toBeLessThan(heads.indexOf("优化方向"));
-  expect(document.body.textContent).toContain("负向题的材料锚点用于来源追溯");
-  expect(document.body.textContent).toContain("业务材料锚点");
-  expect(document.body.textContent).toContain("保存的证据观察");
-  expect(document.body.textContent).toContain("Generation");
+  expect(document.querySelectorAll(".case-details > section")[2].textContent).toContain("不适用（负向题（Negative）不定位标准证据）");
+  expect(document.querySelectorAll(".evidence-path")).toHaveLength(0);
+  expect(document.querySelector(".case-answer-stack")?.textContent).toContain("回答");
 });
 
 it("shows Partial progress and timeout without calling it unrun or identity stale", async () => {
@@ -68,7 +67,7 @@ it("keeps partial technical exceptions separate from business failures on all Ba
   expect(document.body.textContent).toContain("已完成 49 / 50");
   expect(document.body.textContent).toContain("题目级技术异常 1（不计入 Bad Case）");
   expect(document.body.textContent).not.toContain("Baseline 群组Gate通过");
-  for(const label of ["门槛","Bad Case 诊断"]){
+  for(const label of ["Hard Gate","Bad Case 诊断"]){
     await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent===label)!.click());
     expect(document.body.textContent).toContain("题目级技术异常 1（不计入 Bad Case）");
   }

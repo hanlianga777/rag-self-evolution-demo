@@ -59,7 +59,7 @@ class RefinementTests(unittest.TestCase):
         v=self.suggestion();del v['changes'][0]['side_effect_check'];cases.append((v,'副作用'))
         v=self.suggestion();v['proposed_config_diff']={'hyde':True};v['changes'][0].update(parameter='hyde',source_type='new_attempt',source_candidates=[]);cases.append((v,'已验证'))
         v=self.suggestion();v['changes'][0]['source_type']='partial';cases.append((v,'拆分'))
-        v=self.suggestion();v['changes'][0]['target_question_ids']=['q3'];cases.append((v,'剩余错题'))
+        v=self.suggestion();v['changes'][0]['target_question_ids']=['q3'];cases.append((v,'剩余 Bad Case'))
         for value,message in cases:
             with self.subTest(message=message),self.assertRaisesRegex(ValueError,message):self.validate(value)
 

@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { FrozenQuestionDetails } from './pages/FrozenQuestionDetails';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { document.body.innerHTML = ''; });
-it('groups saved scoring points, resolves QC citations and keeps original IDs in technical details', async () => {
+it('groups saved scoring points, resolves QC citations and hides original IDs from the retired technical details', async () => {
  const row={id:'internal-question',question:'如何维护？',test_category:'positive',reference_answer:'先断电',probe_status:'probe_passed',qc_status:'qc_passed',raw:{business_scenario:'现场维护',business_requirements:{required_checks:[{requirement:'断开电源'}],auxiliary_information:['擦干表面'],prohibited:['带电清洗']}},evidence_details:[{chunks:[{chunk_id:'DOC-001-C-00180',document_name:'维护手册.pdf',page_start:12,chunk_text:'先断开电源。'}]}],qc:{score:90,reason:'DOC-001-C-00180 支持答案'},probe:{score:95}};
  const root=createRoot(document.body.appendChild(document.createElement('div')));
  await act(async()=>root.render(<FrozenQuestionDetails row={row}/>));
@@ -15,7 +15,8 @@ it('groups saved scoring points, resolves QC citations and keeps original IDs in
  expect(document.querySelector('.golden-scoring-points')?.textContent).toContain('禁止带电清洗');
  expect(document.querySelector('.golden-quality-results')?.textContent).toContain('维护手册.pdf · 第 12 页 支持答案');
  expect(document.querySelector('.golden-quality-results')?.textContent).not.toContain('DOC-001');
- expect(document.querySelector('.disclosure')?.textContent).toContain('DOC-001-C-00180');
+ expect(document.querySelector('.disclosure')).toBeNull();
+ expect(document.body.textContent).not.toContain('DOC-001-C-00180');
  await act(async()=>root.unmount());
 });
 it('runs the selected quality check through the existing callback without enabling frozen edits', async()=>{

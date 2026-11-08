@@ -64,7 +64,7 @@ class AgentRetryTests(unittest.TestCase):
 
 
 class CompositeEfficiencyTests(unittest.TestCase):
-    def test_gate_safe_efficiency_without_fixed_question_enters_d_sources(self):
+    def test_gate_safe_efficiency_without_fixed_question_remains_context_without_fake_d(self):
         import json
         import tempfile
         from pathlib import Path
@@ -75,8 +75,8 @@ class CompositeEfficiencyTests(unittest.TestCase):
             def complete(self,system,user,**kwargs):
                 self.system=system
                 self.prompt=json.loads(user)
-                return json.dumps({'source_reasons':{self.prompt['winner']['id']:'保留单参数质量改善',self.prompt['sources'][0]['id']:'保留效率整组'},'should_generate_d':True,'source_candidates':[self.prompt['winner']['id'], self.prompt['sources'][0]['id']],
-                    'proposed_config_diff':{'generation_thinking':'off','hyde':True},
+                return json.dumps({'source_reasons':{self.prompt['winner']['id']:'保留单参数质量改善',self.prompt['sources'][0]['id']:'保留效率整组'},'should_generate_d':False,'changes':[],'source_candidates':[self.prompt['winner']['id'], self.prompt['sources'][0]['id']],
+                    'proposed_config_diff':{},
                     'hypothesis':'检索补偿支持降档','root_cause':'生成层问题','intervention_direction':'stage_performance',
                     'evidence_assertions':[{'target_id':'Q1','observation':'final_sufficient'}],
                     'root_cause_alignment':'相同题卷','complementary_capabilities':'降档与检索补偿',
@@ -97,7 +97,7 @@ class CompositeEfficiencyTests(unittest.TestCase):
                      'observed_evidence':['Q1'],'hypothesis':'保存证据支持改动','proposal':'组合质量与效率','risk':'质量','expected_improvement':'质量或耗时改善',
                      'unstable_cases':['Q1'],'review_pending_cases':['Q1']})
                 store.finish_candidate(experiment+'-'+label,'evaluated',{**comparison_identity(store,baseline),
-                    'qualification':{'qualified':label=='A'},'gates':{'passed':True},
+                    'qualification':{'qualified':label=='A'},'release_qualification':{'qualified':label=='A'},'gates':{'passed':True},
                     'regression':{'passed':True,'new_critical_failures':0,'new_ordinary_failures':1,
                                   'fluctuation_question_ids':['Q1'],'pending_regression_question_ids':['Q1'],
                                   'regression_interpretation':'不稳定题 / 随机波动 / 复核未完成'},
@@ -106,14 +106,10 @@ class CompositeEfficiencyTests(unittest.TestCase):
             provider=Stub()
             composite=store.create_composite(experiment,provider,True)
             self.assertEqual([row['id'] for row in provider.prompt['sources']],[experiment+'-B'])
-            self.assertEqual(composite['status'],'generated',composite)
-            self.assertEqual(composite['config']['generation_thinking'],'off')
-            self.assertEqual(composite['config']['top_k'],6)
-            self.assertTrue(composite['config']['hyde'])
-            self.assertIn(experiment+'-B',[s['candidate_id'] for s in composite['reasoning']['sources']])
+            self.assertEqual(composite['status'],'no_effective_composite',composite)
+            self.assertIsNone(store.candidate(experiment+'-D'))
+            self.assertEqual(store.recommendation(experiment)['result']['recommended_candidate'],experiment+'-A')
             for field in ('unstable_cases','review_pending_cases','fluctuation_question_ids',
                           'pending_regression_question_ids','不稳定题','随机波动','复核未完成'):
                 self.assertNotIn(field,json.dumps(provider.prompt,ensure_ascii=False))
             self.assertEqual(provider.prompt['bad_cases'][0]['category'],'生成层问题')
-            for category in ('检索层问题','生成层问题','安全边界问题','性能问题'):
-                self.assertIn(category,provider.system)

@@ -18,6 +18,13 @@ class GovernanceApiTests(unittest.TestCase):
         self.previous_store = main.store
         main.store = GovernanceStore(Path(self.directory.name) / "demo.db")
         self.addCleanup(setattr, main, "store", self.previous_store)
+        from app.paid_schedule import set_settings
+        from app.corpus import DOCUMENT_CATALOG
+        from types import SimpleNamespace
+        set_settings(main.store, False)
+        from test_v11_e2e import FixtureCorpus
+        corpus = SimpleNamespace(documents=lambda: [dict(row) for row in DOCUMENT_CATALOG], chunks=FixtureCorpus().chunks, index_info=lambda: {"embedding_model":"fixture"}, index_dir=Path(self.directory.name))
+        patcher = patch.object(main, 'corpus', corpus); patcher.start(); self.addCleanup(patcher.stop)
         self.client = TestClient(main.app)
 
     def test_full_pool_request_uses_current_profile_capacity(self):
@@ -80,7 +87,7 @@ class GovernanceApiTests(unittest.TestCase):
         self.addCleanup(setattr, main, "ai_service", previous_service)
         self.addCleanup(release.set)
         response = self.client.post("/api/governance/generate-mini", headers={"Origin": "http://127.0.0.1:5174"})
-        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.status_code, 202, response.text)
         run_id = response.json()["run_id"]
         self.assertTrue(entered.wait(2))
         status = self.client.get(f"/api/governance/generation-runs/{run_id}")

@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -6,7 +7,9 @@ from pathlib import Path
 from app.governance import GovernanceStore
 from app.policy import DEFAULT_PIPELINE_CONFIG
 from identity_fixture import completed_baseline, comparison_identity
+from app.corpus import current_manifest, manifest_identity
 from test_optimization_contract import trace_case
+from test_v11_e2e import FixtureProvider
 
 
 class TuningV12Tests(unittest.TestCase):
@@ -16,14 +19,24 @@ class TuningV12Tests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.store = GovernanceStore(Path(self.directory.name) / 'demo.db')
-        self.baseline = completed_baseline(self.store)
+        snapshot={'id':'GD-current','question_ids':['Q1','Q2'],'questions':[{'id':key,'question':key,'test_category':'positive','evidence':[{'evidence_key_points':['操作前关闭设备。']}]} for key in ('Q1','Q2')], 'corpus_fingerprint':manifest_identity(current_manifest())}
+        with self.store.connection() as db:
+            db.execute("INSERT INTO dataset_versions VALUES (?, 'approved', 'human_review', ?, '2026-09-30')", (snapshot['id'],json.dumps(snapshot)))
+        self.baseline = completed_baseline(self.store,snapshot=snapshot)
+        self.store.record_evaluation_case(self.baseline,'Q2',trace_case())
         self.store.record_bad_case(self.baseline,"Q1","Retrieval","ordinary",trace_case())
         self.experiment = self.store.create_experiment(self.baseline)
 
     def candidate(self, label, diff, qualified=True, fixed=1):
         self.store.save_candidate(self.experiment, label, {**DEFAULT_PIPELINE_CONFIG, **diff}, {'round': 1, 'candidate_label': label, 'changed_parameters': diff, 'observed_evidence':['Q1']})
         key = f'{self.experiment}-{label}'
-        self.store.finish_candidate(key, 'evaluated', {**comparison_identity(self.store,self.baseline), 'qualification': {'qualified': qualified},'release_qualification':{'qualified':qualified},'bad_case_count':0 if qualified else 1, 'regression': {'passed': True, 'new_critical_failures': 0}, 'gates': {'passed': qualified}, 'target_bad_cases_fixed': fixed, 'all_fixed_question_ids':['Q1'] if fixed else [], 'net_improvement':fixed})
+        snapshot=json.loads(self.store.evaluation_run(self.baseline)['dataset_snapshot_json'])
+        run=self.store.create_evaluation_run(snapshot,self.store.candidate(key)['config'],self.store.evaluation_run(self.baseline)['judge'])
+        repaired=['Q1' if label=='A' else 'Q2'] if fixed else []
+        for question in ('Q1','Q2'):
+            self.store.record_evaluation_case(run,question,{'passed':question in repaired})
+        self.store.finish_evaluation_run(run,'completed',{'evaluation_complete':True})
+        self.store.finish_candidate(key, 'evaluated', {**comparison_identity(self.store,self.baseline), 'evaluation_run_id':run, 'qualification': {'qualified': qualified},'release_qualification':{'qualified':qualified},'bad_case_count':2-len(repaired), 'regression': {'passed': True, 'new_critical_failures': 0}, 'gates': {'passed': qualified}, 'target_bad_cases_fixed': fixed, 'all_fixed_question_ids':repaired, 'net_improvement':fixed})
         return key
 
     def test_report_accepts_one_qualified_after_all_started_work_finishes(self):
@@ -45,13 +58,12 @@ class TuningV12Tests(unittest.TestCase):
         source = self.candidate('B', {'top_k':4,'min_score':.2}, False)
         ineffective = self.candidate('C', {'top_k': 4, 'min_score': .1}, False, fixed=0)
         self.store.confirm_experiment_report(self.experiment, winner, 'test_human')
-        from test_v11_e2e import FixtureProvider
         composite = self.store.create_composite(self.experiment, FixtureProvider(), True)
         self.assertEqual(composite['config']['top_k'], 6)
         self.assertEqual(composite['config']['candidate_k'], DEFAULT_PIPELINE_CONFIG['candidate_k'])
         self.assertEqual(composite['config']['min_score'], .2)
-        self.assertIn(source, [item['candidate_id'] for item in composite['reasoning']['sources']])
-        self.assertNotIn(ineffective,[item['candidate_id'] for item in composite['reasoning']['sources']])
+        self.assertIn(source, [cid for item in composite['reasoning']['sources'] for cid in item['source_candidates']])
+        self.assertNotIn(ineffective,[cid for item in composite['reasoning']['sources'] for cid in item['source_candidates']])
         self.assertEqual(self.store.candidate(source)['config']['top_k'],4)
         self.assertEqual(composite['reasoning']['intervention_direction'],'context_selection')
         self.assertEqual(composite['status'], 'generated')
@@ -59,7 +71,7 @@ class TuningV12Tests(unittest.TestCase):
     def test_no_effective_composite_keeps_winner_without_fake_d(self):
         winner = self.candidate('A', {'top_k': 6})
         self.store.confirm_experiment_report(self.experiment, winner, 'test_human')
-        result = self.store.create_composite(self.experiment)
+        result = self.store.create_composite(self.experiment, FixtureProvider(), True)
         self.assertEqual(result['status'], 'no_effective_composite')
         self.assertEqual(result['winner_id'], winner)
         self.assertEqual(len(self.store.candidates(self.experiment)), 1)
@@ -78,7 +90,7 @@ class TuningV12Tests(unittest.TestCase):
     def test_late_agent_trace_cannot_erase_report(self):
         winner = self.candidate('A', {'top_k': 6})
         self.store.confirm_experiment_report(self.experiment, winner, 'test_human')
-        self.store.create_composite(self.experiment)
+        self.store.create_composite(self.experiment, FixtureProvider(), True)
         before = self.store.experiment(self.experiment)['result']
         self.store.save_agent_trace(self.experiment, 'failed', {}, 'late response')
         after = self.store.experiment(self.experiment)['result']
@@ -113,7 +125,6 @@ class TuningV12Tests(unittest.TestCase):
         winner = self.candidate('A', {'top_k': 6})
         self.candidate('B', {'min_score':.2}, False)
         self.store.confirm_experiment_report(self.experiment, winner, 'test_human')
-        from test_v11_e2e import FixtureProvider
         composite = self.store.create_composite(self.experiment, FixtureProvider(), True)
         self.store.reserve_candidate_evaluation(composite['id'])
         self.store.refresh_recommendation(self.experiment)

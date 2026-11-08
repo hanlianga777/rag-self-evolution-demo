@@ -24,7 +24,7 @@ class ResponseTests(unittest.TestCase):
 
     def test_invalid_candidate_rejects_entire_round_with_reason(self):
         for mutate in [lambda c:c['target_bad_cases'].append('unknown'),
-                       lambda c:c['config_diff'].update(min_score='0.1'),
+                       lambda c:c['config_diff'].update(min_score='not-a-number'),
                        lambda c:c['config_diff'].update(min_score=True)]:
             with self.subTest(mutate=mutate):
                 response=drafts();mutate(response['candidates'][1])
@@ -53,7 +53,7 @@ class ResponseTests(unittest.TestCase):
         response=drafts()
         for c in response['candidates']:
             key=next(k for k in c['config_diff'] if k!='generation_thinking')
-            c['config_diff'][key]='6'
+            c['config_diff'][key]='not-a-number'
         experiment,trace,audit,_,_=self.run_drafts(response)
         self.assertEqual(trace['status'],'analysis_exhausted');self.assertFalse(experiment['candidates'])
         self.assertEqual(len(audit['rejected_candidates']),3)

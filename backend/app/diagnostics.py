@@ -61,7 +61,7 @@ def standard_evidence(item):
     locations = item.get('evidence_locations') or raw.get('evidence_locations') or []
     if locations:
         return [entry.get('quote', '') if isinstance(entry, dict) else '' for entry in locations]
-    evidence = item.get('evidence') or raw.get('evidence') or []
+    evidence = item.get('evidence') or item.get('acceptable_evidence') or raw.get('evidence') or raw.get('acceptable_evidence') or []
     if evidence:
         quotes = []
         for entry in evidence:

@@ -3,6 +3,7 @@
 import json
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 
 from identity_fixture import completed_baseline, comparison_identity
@@ -49,7 +50,10 @@ class V11ClosureTests(unittest.TestCase):
             })
         candidate_id = f"{experiment_id}-A"
         self.store.confirm_experiment_report(experiment_id, candidate_id, "test_human")
-        self.store.create_composite(experiment_id)
+        self.store.create_composite(experiment_id, SimpleNamespace(settings=SimpleNamespace(model="fixture"),complete=lambda *a, **k: json.dumps({
+            'should_generate_d':False,'proposed_config_diff':{},'changes':[],
+            **{field:'没有保存的 Winner 剩余修题参数，保留 Winner。' for field in ('root_cause_alignment','complementary_capabilities','expected_improvement','risks','explanation')}
+        })), True)
         before = len(self.store.production_versions())
         published = self.store.publish_candidate(candidate_id, "human_reviewer")
         self.assertEqual(len(self.store.production_versions()), before + 1)

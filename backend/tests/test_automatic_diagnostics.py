@@ -61,3 +61,9 @@ class AutomaticDiagnosticTests(unittest.TestCase):
         trace['final']=[{'chunk_id':'parent','content':'父段落：检查外壳，检查传感器是否脏污。'}]
         trace['parent_expand']=True
         self.assertEqual(diagnostic_view(case)['diagnosis_category'],'生成层问题')
+
+class SavedEvidenceCompatibilityTests(unittest.TestCase):
+    def test_legacy_frozen_acceptable_evidence_supplies_saved_quotes(self):
+        from app.diagnostics import standard_evidence
+        question = {'acceptable_evidence': [{'source_chunk_ids': ['frozen-child'], 'evidence_key_points': ['先停止设备再检查。']}]}
+        self.assertEqual(standard_evidence(question), ['先停止设备再检查。'])

@@ -27,7 +27,7 @@ const parameterNotes: Record<string, string> = {
 
 export function SettingsPage({ data }: { data: any }) {
   const identity = pipelineIdentity(data);
-  const startDraft = (value: any) => { const start = value?.draft_stale ? value.baseline_defaults || value.baseline_config || value.config : value?.config_draft?.config || value?.baseline_defaults || value?.baseline_config || value?.config; const merged = { ...draftDefaults, ...start }; return Object.fromEntries(Object.keys(value?.search_space || {}).filter(key => merged[key] !== undefined).map(key => [key, merged[key]])); };
+  const startDraft = (value: any) => { const start = value?.draft_stale ? value.baseline_config || value.baseline_defaults || value.config : value?.config_draft?.config || value?.baseline_config || value?.baseline_defaults || value?.config; const merged = { ...draftDefaults, ...start }; return Object.fromEntries(Object.keys(value?.search_space || {}).filter(key => merged[key] !== undefined).map(key => [key, merged[key]])); };
   const [record, setRecord] = useState<any>(() => ({ identity, value: pipelineCached(identity) }));
   const pipeline = record.identity === identity ? record.value : pipelineCached(identity);
   const [draft, setDraft] = useState<Record<string, any>>(() => startDraft(pipeline));

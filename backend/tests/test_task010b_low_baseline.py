@@ -87,14 +87,17 @@ class BudgetTests(unittest.TestCase):
     def test_budget_is_available_without_experiment(self):
         from api_fixture import main
         from fastapi.testclient import TestClient
-        from unittest.mock import Mock, patch
-        store=Mock()
-        store.current_baseline_identity.return_value={'current_experiment_id':None,'baseline_unavailable_reason':None}
-        with patch.object(main,'store',store):
-            response=TestClient(main.app).get('/api/optimization?light=true')
-        self.assertEqual(response.status_code,200)
-        self.assertEqual(response.json()['evaluation_budget'],{'used':0,'max':12,'reserved_for_d':1,'remaining':12,'remaining_for_abc':11})
-        store.create_experiment.assert_not_called()
+        from unittest.mock import patch
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        from app.governance import GovernanceStore
+        with TemporaryDirectory() as directory:
+            store=GovernanceStore(Path(directory)/'test.db')
+            with patch.object(main,'store',store), patch.object(store,'current_baseline_identity',return_value={'current_experiment_id':None,'baseline_unavailable_reason':None}), patch.object(store,'create_experiment') as create:
+                response=TestClient(main.app).get('/api/optimization?light=true')
+            self.assertEqual(response.status_code,200)
+            self.assertEqual(response.json()['evaluation_budget'],{'used':0,'max':12,'reserved_for_d':1,'remaining':12,'remaining_for_abc':11})
+            create.assert_not_called()
 
 class ActualAgentAdmissionTests(unittest.TestCase):
     def setUp(self):

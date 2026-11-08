@@ -13,17 +13,17 @@ async function mount(node:React.ReactNode){vi.stubGlobal('fetch',vi.fn(async (ur
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
 it('keeps report summary out of gate/case tabs and separates symptoms and causes without confidence',async()=>{
  await mount(<EvaluationPage data={{evaluation:run}}/>);
- await click('门槛');expect(document.querySelector('.baseline-metrics')).toBeNull();expect(document.querySelector('.stage-stepper')).toBeNull();
+ await click('Hard Gate');expect(document.querySelector('.baseline-metrics')).toBeNull();expect(document.querySelector('.stage-stepper')).toBeNull();
  await click('Bad Case 诊断');expect(document.querySelector('.baseline-conclusion')).toBeNull();
  expect(document.body.textContent).toContain('缺了什么');expect(document.body.textContent).toContain('优化优先级');expect(document.body.textContent).not.toContain('诊断可信度');
  expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('版本尚未核实');expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('记录缺失');expect(document.querySelector('.quality-audit')).toBeNull();expect(document.querySelector('.diagnosis-list tbody')?.textContent).not.toContain('评测争议');
  expect(document.body.textContent).not.toMatch(/\bNone\b|undefined|null/);
 });
-it('retains six workstation stages and forbids old-rule candidate actions',async()=>{
+it('retains five workstation stages and forbids old-rule candidate actions',async()=>{
  await mount(<EvolutionPage data={{evaluation:{...run,requires_policy_upgrade:true},workspace:{requires_policy_upgrade:true},badCases:[{id:'bc',run_id:'saved',result:item}],optimization:{id:'e',candidates:['A','B','C'].map(candidate_label=>({id:candidate_label,status:'generated',config:{},reasoning:{candidate_label,round:1},result:{}}))}}}/>);
  expect(document.body.textContent).not.toMatch(/诊断可信度|Confirmed|Needs Review|Disputed|评测争议/);
  const tabs=[...document.querySelectorAll('.tabs button')].map(b=>b.textContent);
- expect(tabs).toEqual(['问题诊断','进化路线','A/B/C/D','Sandbox','回归检查','最终推荐']);
+ expect(tabs).toEqual(['进化路线','A/B/C/D','Sandbox','Regression Check','最终推荐']);
  await click('A/B/C/D');expect([...document.querySelectorAll<HTMLButtonElement>('.candidate-card-action button')].every(b=>b.disabled)).toBe(true);
  expect(document.body.textContent).not.toContain('Qualified Winner');
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method||init.method==='GET')).toBe(true);

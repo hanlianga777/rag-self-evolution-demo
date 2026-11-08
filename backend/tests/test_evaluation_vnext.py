@@ -292,7 +292,7 @@ class SandboxCriticalityTests(unittest.TestCase):
         store=MagicMock();store.evaluation_case_results.side_effect=[baseline,candidate]
         store.finish_candidate.side_effect=lambda _,status,result:{'status':status,'result':result}
         runner=EvaluationRunner(store,None)
-        runner.execute_baseline=MagicMock(return_value={'status':'completed','result':{'gates':{'passed':True},'bad_case_count':1,'evaluation_complete':True},'judge':{'evaluation_identity':'fixture'}})
+        runner.execute_baseline=MagicMock(return_value={'id':'new','status':'completed','result':{'gates':{'passed':True},'bad_case_count':1,'evaluation_complete':True},'judge':{'evaluation_identity':'fixture'}})
         result=runner.execute_candidate('new',[],{}, {'id':'candidate','experiment_id':'exp','reasoning':{'observed_evidence':['a']}},{'id':'baseline','judge':{'evaluation_identity':'fixture'}})['result']
         self.assertEqual(result['regression']['new_critical_failures'],0)
         self.assertEqual(result['regression']['new_ordinary_failures'],1)
