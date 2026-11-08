@@ -253,7 +253,7 @@ it("keeps Provider operations out of Pipeline configuration", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={{}} />));
   expect(document.querySelector(".provider-status-row")).toBeNull();
-  expect(fetcher.mock.calls.map(([url]) => new URL(String(url)).pathname).sort()).toEqual(["/api/pipeline", "/api/runtime-settings"]);
+  expect(fetcher.mock.calls.map(([url]) => new URL(String(url)).pathname).sort()).toEqual(["/api/pipeline"]);
   await act(async () => root.unmount());
 });
 

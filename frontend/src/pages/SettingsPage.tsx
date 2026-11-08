@@ -1,4 +1,3 @@
-import { RuntimeSettings } from "../components/RuntimeSettings";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { errorMessage, postJson } from "../api";
@@ -6,7 +5,11 @@ import { Badge, Section } from "../components/Primitives";
 import { pipelineCached, pipelineFetch, pipelineIdentity, invalidatePipeline } from "../pipelineCache";
 import { Drawer } from "../components/Dialog";
 import { draftDefaults, formatValue, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
-import { schemeName, storyParameterNames, storyValue } from "../components/EvolutionStory";
+import { schemeName } from "../components/EvolutionStory";
+
+import { ParamGrid, type ParamGroup } from "../ui/settings/ParamGrid";
+import { ParamChip } from "../ui/Primitives";
+import { HoverCard } from "../ui/HoverCard";
 
 const settingsGroups: Record<string, string[]> = {
   "查询理解": ["query_rewrite", "multi_query", "hyde"],
@@ -31,6 +34,7 @@ export function SettingsPage({ data }: { data: any }) {
   useEffect(() => { let cancelled = false; const cached = pipelineCached(identity); setRecord({ identity, value: cached }); setDraft(startDraft(cached)); void pipelineFetch(identity).then(value => { if (!cancelled && (!cached || cached.data_version !== value.data_version)) { setRecord({ identity, value }); setDraft(startDraft(value)); } }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); }); return () => { cancelled = true; }; }, [identity]);
   const baseline = pipeline?.baseline_config || {};
   const base = pipeline?.baseline_config || { ...draftDefaults, ...(pipeline?.baseline_defaults || pipeline?.config) };
+  const published = pipeline?.active_version?.provenance === "published";
   const contract = pipeline?.search_space || {};
   const changed = Object.keys(contract).filter(key => draft[key] !== base[key]);
   const index = pipeline?.index || {}, knowledge = index.knowledge_config || {};
@@ -54,26 +58,26 @@ export function SettingsPage({ data }: { data: any }) {
   return <PageShell className="page settings-page" header={<div className="page-title"><div><h1>Pipeline 配置</h1><p>固定知识处理与评测规则，让 Agent 在允许的参数范围内优化。</p></div><button className="secondary" onClick={() => setSpaceOpen(true)}>查看可选参数</button></div>}>
     {error && <p className="error-notice" role="alert">{error}</p>}
     <Section title="固定技术基座" action={<Badge>固定</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd title={String(value)}>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
-    {pipeline?.active_version?.provenance === "published" && <Section title="当前线上配置"><p>{schemeName(null,pipeline.active_version.snapshot?.candidate_id)}</p><dl className="baseline-strategy">{Object.entries(pipeline.config || {}).filter(([key])=>key in parameterNames).map(([key,value])=><div key={key}><dt>{storyParameterNames[key]}</dt><dd>{storyValue(value)}</dd></div>)}</dl></Section>}
     <Section title="Agent 可选参数" action={<Badge tone="accent">{Object.keys(contract).length} 项可调参数</Badge>}>
       {!pipeline?.baseline_config && <p className="muted">新 Baseline 待评测｜当前配置草稿 以已确认的 Baseline 默认配置作为起点</p>}
       {pipeline?.draft_stale && <p className="error-notice">已保存草稿的基准已变化，请重新核对并保存。</p>}
-      <div className="search-space-groups">{Object.entries(settingsGroups).map(([group, keys]) => <section key={group}><h3>{group}</h3><div className="search-space-controls">{keys.filter(key => contract[key]).map(key => {
-        const allowed: any[] = contract[key].allowed;
-        const disabled = busy || key === "hybrid_alpha" && !draft.hybrid_search;
-        const dependency = key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "仅开启 Hybrid Search 时生效" : "";
-        const note = parameterNotes[key];
-        return <div className="search-space-control" title={dependency || note} key={key} data-parameter={key}>
-          <div><strong>{parameterNames[key]}</strong></div>
-          <div className="parameter-options" role="group" aria-label={parameterNames[key]}>{allowed.map(value => <button key={JSON.stringify(value)} className={`secondary${draft[key] === value ? " active" : ""}${pipeline?.baseline_config && baseline[key] === value ? " baseline-option" : ""}`} title={pipeline?.baseline_config && baseline[key] === value ? "Baseline 使用此值" : undefined} aria-pressed={draft[key] === value} disabled={disabled || key === "top_k" && value > draft.candidate_k} onClick={() => change(key, value)}>{key === "retrieval_max_tokens" && value === false ? "不限" : key === "generation_thinking" && value === "off" ? "Off" : formatValue(value)}</button>)}</div>
-          <small className="parameter-description" title={note}>{note}</small>
-        </div>;
-      })}</div></section>)}</div>
-      {(changed.length > 0) && <div className="pipeline-draft-actions"><span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · 配置草稿已保存" : ""}</span><button className="secondary" disabled={busy || !changed.length && !pipeline?.config_draft} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length} onClick={() => void save()}>保存草稿</button></div>}
-      {(changed.length > 0 || pipeline?.config_draft) && <p className="muted">配置草稿尚未生效；需显式运行新的 Baseline 才会成为评测基线。Candidate 的优化使用独立实验配置。</p>}
-      {pipeline?.baseline_config && (changed.length > 0 || pipeline?.config_draft) && <div className="pipeline-draft-diff"><h3>Baseline → 草稿参数变化</h3><dl className="baseline-strategy">{changed.map(key => <div key={key}><dt>{parameterNames[key] || key}</dt><dd>{formatValue(baseline[key])} → {formatValue(draft[key])}</dd></div>)}</dl>{!changed.length && <p className="muted">草稿与 冻结 Baseline 参数一致。</p>}</div>}
+      <ParamGrid groups={Object.entries(settingsGroups).map(([name, keys], index) => ({
+        name, icon: (["target", "data", "layers", "thinking"] as const)[index],
+        items: keys.filter(key => contract[key]).map(key => ({
+          key, label: parameterNames[key],
+          note: [parameterNotes[key], key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "仅开启 Hybrid Search 时生效" : ""].filter(Boolean).join("；"),
+          options: contract[key].allowed.filter((value: any) => key !== "top_k" || value <= draft.candidate_k).map((value: any) => ({ value, label: key === "retrieval_max_tokens" && value === false ? "不限" : key === "generation_thinking" && value === "off" ? "Off" : formatValue(value) })),
+          value: draft[key], baseline: baseline[key], online: published ? pipeline.config?.[key] : undefined,
+          disabled: busy || key === "hybrid_alpha" && !draft.hybrid_search, changed: changed.includes(key),
+        })),
+      })) as ParamGroup[]} onChange={change} legend={{baseline: pipeline?.baseline_config ? "Baseline" : undefined, online: published ? `当前线上：${schemeName(null, pipeline.active_version.snapshot?.candidate_id).replace(/^Round \d+ · /, "")}` : undefined}} />
+      {(changed.length > 0 || pipeline?.config_draft) && <div className="pipeline-draft-actions">
+        <span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · 配置草稿已保存" : ""}</span>
+        <div className="pipeline-draft-chips">{changed.map(key => <ParamChip key={key} label={parameterNames[key] || key} from={formatValue(base[key])} to={formatValue(draft[key])} />)}</div>
+        <HoverCard content="保存后需运行新的 Baseline 才会成为评测基线。Candidate 使用独立实验配置。"><span tabIndex={0} aria-label="草稿生效说明">ⓘ</span></HoverCard>
+        <button className="secondary" disabled={busy} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length} onClick={() => void save()}>保存草稿</button>
+      </div>}
     </Section>
-    <RuntimeSettings />
 
     <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="可选参数范围" className="parameter-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={contract} baseline={baseline} /></div></Drawer>
   </PageShell>;

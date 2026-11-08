@@ -23,7 +23,7 @@ it('tells every round, attaches the NEXT review, and marks only the first qualif
  expect(document.body.textContent).toContain('去发布');
 });
 it.each([
- [{composite_schedule:{status:'scheduled'},composite:{outcome:'validation_failed'}},'Candidate D · 等待非高峰时段'],
+ [{composite_schedule:{status:'scheduled'},composite:{outcome:'validation_failed'}},'Candidate D · 排队中'],
  [{composite:{status:'no_effective_composite',reason:'保留当前 Winner'}},'Agent 判断不做 D'],
  [{composite:{outcome:'validation_failed',reason:'来源未通过校验'}},'Candidate D 未形成'],
 ])('uses the current D state ahead of old decisions',async(result,label)=>{

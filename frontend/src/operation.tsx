@@ -34,7 +34,7 @@ function evaluation(run: any): Partial<Operation> {
   try { total ??= JSON.parse(run.dataset_snapshot_json || "{}").question_ids?.length; } catch { /* old run has no readable snapshot */ }
   if (run.result?.stop_request) {
     const active = ["queued", "running"].includes(run.status);
-    return { status: active ? "running" : "stopped", stopping: active, stage: active ? "正在停止，等待当前请求结束并保存断点" : "已停止，断点已保存", current, total, ...(!active ? { endedAt: Date.now() } : {}) };
+    return { status: active ? "running" : "stopped", stopping: active, stage: active ? "正在停止，等待当前请求结束并保存进度" : "已停止，进度已保存", current, total, ...(!active ? { endedAt: Date.now() } : {}) };
   }
   return { status: ["queued", "running"].includes(run.status) ? "running" : run.status === "completed" ? "completed" : "failed", stage: ["queued", "running"].includes(run.status) ? "正在运行 Golden Case" : run.status === "completed" ? "评测完成" : "评测失败", current, total, pricePause: run.result?.price_pause, error: run.error_message };
 }
@@ -46,7 +46,7 @@ function cycleProgress(saved: any): Partial<Operation> {
     stopping: cycle.status === "running" && !!cycle.stop_request, error: cycle.last_error,
     current: budget?.used ?? cycle.used, total: budget?.max ?? 12,
     pricePause: [cycle.price_pause, saved.result.price_pause].find(pause => pause?.paused) || cycle.price_pause,
-    stage: cycle.stop_request ? "正在停止，等待当前请求结束并保存断点" : `已用 ${budget?.used ?? cycle.used} 次，剩余 ${cycle.remaining} 次（含合并方案预留）` };
+    stage: cycle.stop_request ? "正在停止，等待当前请求结束并保存进度" : `已用 ${budget?.used ?? cycle.used} 次，剩余 ${cycle.remaining} 次（含合并方案预留）` };
 }
 
 const revisionStages: Record<string, string> = {
@@ -246,7 +246,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       } else {
         const source = item.runId || item.id;
         const preflight = await getJson<any>(`/api/evaluation/preflight?resume_source_id=${encodeURIComponent(source)}`);
-        if (!preflight.can_start || !preflight.can_resume || preflight.resume_source_id !== source) throw new Error(preflight.reason || preflight.resume_reason || "当前断点不能继续，请回到 Baseline 查看预检");
+        if (!preflight.can_start || !preflight.can_resume || preflight.resume_source_id !== source) throw new Error(preflight.reason || preflight.resume_reason || "当前进度不能继续，请回到 Baseline 查看预检");
         const started = await postJson<{ id: string }>("/api/evaluations/run", { resume_source_id: source });
         update(item.id, { kind: "evaluation", runId: started.id });
       }

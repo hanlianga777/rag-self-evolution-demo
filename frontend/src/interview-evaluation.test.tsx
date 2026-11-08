@@ -65,7 +65,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect(document.querySelectorAll(".diagnosis-cards")).toHaveLength(0);
   await click("进化路线");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
-  expect([...document.querySelectorAll(".route-planning .panel > .section-head h2")].map(header => header.textContent)).toEqual(["Baseline 运行参数", "无人值守设置", "Agent 读到了什么事实", "Agent 提出了什么假设", "Agent 得出了哪些方案"]);
+  expect([...document.querySelectorAll(".route-planning .panel > .section-head h2")].map(header => header.textContent)).toEqual(["Baseline 运行参数", "Agent 读到了什么事实", "Agent 提出了什么假设", "Agent 得出了哪些方案"]);
   expect(document.body.textContent).toContain("保存假设 A");
   expect(document.body.textContent).toContain("可调参数 · 2");
   await click("A/B/C/D");

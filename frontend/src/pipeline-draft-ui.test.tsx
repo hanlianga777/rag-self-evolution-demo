@@ -27,7 +27,7 @@ it("saves and reloads an isolated Config Draft, removes inactive Alpha and disca
   expect(document.body.textContent).toContain("配置草稿已保存");
   await act(async () => root.unmount()); root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={{}} />));
-  expect(document.querySelector('[data-parameter="query_rewrite"] button[aria-pressed="true"]')?.textContent).toBe("开启");
+  expect(document.querySelector('[data-parameter="query_rewrite"] button[aria-checked="true"]')?.textContent).toBe("开启");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "放弃修改")!.click());
   expect(posts[1].config).toBeNull();
   expect(pipeline.baseline_config).toBeNull();

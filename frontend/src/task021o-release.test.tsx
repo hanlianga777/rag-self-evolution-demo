@@ -45,14 +45,17 @@ it('labels released status and the archived initial config without calling it cu
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看 Candidate 评测报告')!.click());
  expect(document.querySelector('[role="dialog"]')?.textContent).not.toMatch(/待发布|尚未发布/);
 });
-it('shows the production config separately from the baseline draft after release',async()=>{
+it('marks the production config separately from the baseline draft after release',async()=>{
  invalidatePipeline();
- vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/pipeline')?{active_version_id:'production-new',active_version:{provenance:'published',snapshot:{candidate_id:'EXP-D'}},config:{candidate_k:24,top_k:6,generation_thinking:'high'},baseline_config:{candidate_k:12,top_k:4,generation_thinking:'max'},search_space:{}}:{}))));
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/pipeline')?{active_version_id:'production-new',active_version:{provenance:'published',snapshot:{candidate_id:'EXP-D'}},config:{candidate_k:24,top_k:6,generation_thinking:'high'},baseline_config:{candidate_k:12,top_k:4,generation_thinking:'max'},search_space:{candidate_k:{allowed:[12,24]},top_k:{allowed:[4,6]},generation_thinking:{allowed:['high','max']}}}:{}))));
  await mount(<SettingsPage data={{workspace:{active_version:'production-new'}}}/>);
- const section=[...document.querySelectorAll('section')].find(e=>e.querySelector('h2')?.textContent==='当前线上配置');
- expect(section?.textContent).toContain('Candidate D');
- expect(section?.textContent).toContain('24');expect(section?.textContent).toContain('6');expect(section?.textContent).toContain('High');
- expect(section?.querySelectorAll('button')).toHaveLength(0);
+ expect(document.querySelector('.ui-pg-legend')?.textContent).toContain('当前线上：Candidate D');
+ for(const [key,value] of [['candidate_k','24'],['top_k','6'],['generation_thinking','High']]) {
+  const row=document.querySelector(`[data-parameter="${key}"]`)!;
+  expect(row.querySelector('.dot.online')?.closest('button')?.textContent).toBe(value);
+  expect(row.querySelector('.dot.base')?.closest('button')).not.toBe(row.querySelector('.dot.online')?.closest('button'));
+ }
+ expect([...document.querySelectorAll('h2')].some(h=>h.textContent==='当前线上配置')).toBe(false);
 });
 it('links to published records once the recommended candidate has been released',async()=>{
  const d={...candidate('EXP-D',{qualification:{qualified:true}}),release_state:{human_release:true}};

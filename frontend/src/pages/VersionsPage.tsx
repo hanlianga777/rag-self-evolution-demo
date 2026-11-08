@@ -2,7 +2,7 @@ import {ChangedParameters, QualityComparison, recommendationOf, schemeName, stor
 import { DataTable } from "../components/DataTable";
 import "./evaluation-workspaces.css";
 import { StoryDisclosure, StoryEmpty } from "../components/Storytelling";
-import { displayText, narrativeText } from "../display";
+import { displayText, narrativeText, localShortTime } from "../display";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { errorMessage, getJson, postJson } from "../api";
@@ -16,7 +16,7 @@ function candidateName(candidate: any, candidateId?: string) {
   return label === "D" ? "组合 Candidate D" : label ? `Candidate ${label}` : "Candidate（标签未记录）";
 }
 
-const versionTime = (value?: string) => value && !Number.isNaN(Date.parse(value)) ? new Intl.DateTimeFormat("zh-CN", { timeZone:"Asia/Shanghai",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false }).format(new Date(value)) : "未记录";
+const versionTime = localShortTime;
 
 const versionLabel = (version: any) => !version ? "暂无" : version.status === "active" ? "当前线上配置" : `历史配置 · ${versionTime(version.created_at)}`;
 

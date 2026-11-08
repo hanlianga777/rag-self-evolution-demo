@@ -121,3 +121,10 @@ export const descriptions: Record<string, string> = {
   query_rewrite: "生成标准化检索问法", multi_query: "生成互补检索问法", hyde: "先写一段假设答案，再拿去检索",
   metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "分级回答：能确定的先回答，条件缺失时追问，资料无关时转人工，并保留安全警告",
 };
+
+export function localShortTime(value?: string): string {
+  if (!value || Number.isNaN(Date.parse(value))) return "时间未知";
+  const parts = new Intl.DateTimeFormat("en-CA", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(value));
+  const part = (name: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === name)?.value;
+  return `${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
+}

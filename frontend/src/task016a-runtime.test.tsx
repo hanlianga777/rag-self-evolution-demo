@@ -22,9 +22,9 @@ it("refreshes saved pause state after the worker automatically resumes without a
   const fetcher = vi.fn((_url:string,_init?:RequestInit) => response({off_peak_only:true,peak_now:reads++ === 0,active_pauses:reads===1 ? [{task_label:"Candidate A",price_pause:pause,target:{evaluation_id:"offline"}}] : []}));
   vi.stubGlobal("fetch",fetcher);
   await mount(<RuntimeSettings />);
-  expect(document.body.textContent).toContain("高峰时段暂停");
+  expect(document.body.textContent).toContain("已暂停，稍后自动继续");
   await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
-  expect(document.body.textContent).not.toContain("高峰时段暂停");
+  expect(document.body.textContent).not.toContain("已暂停，稍后自动继续");
   expect(fetcher).toHaveBeenCalledTimes(2);
   expect(fetcher.mock.calls.every(args => !args[1]?.method || args[1].method === "GET")).toBe(true);
 });
@@ -48,12 +48,12 @@ it("requires the task-specific peak-price acknowledgement before a temporary ove
   const fetcher = vi.fn(() => response({ status: "running" })), changed = vi.fn();
   vi.stubGlobal("fetch", fetcher);
   await mount(<PricePauseNotice pause={pause} experimentId="EXP-private" onChanged={changed} />);
-  expect(document.body.textContent).toContain("高峰时段暂停，预计 23:00 自动继续（多伦多时间）");
+  expect(document.body.textContent).toContain("已暂停，稍后自动继续");
   expect(document.body.textContent).not.toContain("EXP-private");
   await click("立即运行");
   expect(fetcher).not.toHaveBeenCalled();
-  expect(document.body.textContent).toContain("立即运行会按高峰价计费");
-  await click("确认按高峰价运行本任务");
+  expect(document.body.textContent).toContain("立即运行本任务将产生模型费用");
+  await click("确认立即运行本任务");
   expect(JSON.parse(String((fetcher.mock.calls as any)[0][1].body))).toEqual({ experiment_id: "EXP-private", acknowledge_peak_price: true });
   expect(changed).toHaveBeenCalledOnce();
 });
@@ -62,10 +62,10 @@ it("preserves the pause and explains a failed override without claiming the task
   const changed = vi.fn();
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail: "任务未获授权" }), { status: 409 })));
   await mount(<PricePauseNotice pause={pause} evaluationId="EVAL-private" onChanged={changed} />);
-  await click("立即运行"); await click("确认按高峰价运行本任务");
+  await click("立即运行"); await click("确认立即运行本任务");
   expect(document.querySelector("[role=alert]")?.textContent).toContain("任务未获授权");
   expect(changed).not.toHaveBeenCalled();
-  expect(document.body.textContent).toContain("高峰时段暂停");
+  expect(document.body.textContent).toContain("已暂停，稍后自动继续");
 });
 
 it("restores friendly operation names, saved counts and the price pause after a reload", async () => {
@@ -83,15 +83,15 @@ it("restores friendly operation names, saved counts and the price pause after a 
   run.result.price_pause = { paused: false };
   await act(async () => vi.advanceTimersByTimeAsync(1000));
   expect(console.textContent).toContain("正在运行 Golden Case");
-  expect(console.textContent).not.toContain("高峰时段暂停");
+  expect(console.textContent).not.toContain("已暂停，稍后自动继续");
 });
 
-it("shows the same pause on Baseline and uses Toronto time when only the timestamp is saved", async () => {
+it("shows a neutral pause on Baseline without exposing the internal schedule", async () => {
   const run = { id: "EVAL-private", status: "running", result: { completed: 7, total: 50, price_pause: pause } };
   vi.stubGlobal("fetch", vi.fn((url: string) => response(url.includes("preflight") ? { can_start: false } : run)));
   await mount(<EvaluationPage data={{ evaluation: run, badCases: [] }} />);
-  expect(document.querySelector(".price-pause-notice")?.textContent).toContain("23:00 自动继续（多伦多时间）");
-  expect(pricePauseText({ paused: true, resume_at: "2026-11-04T04:00:00Z" })).toContain("23:00");
+  expect(document.querySelector(".price-pause-notice")?.textContent).toContain("已暂停，稍后自动继续");
+  expect(pricePauseText({ paused: true, resume_at: "2026-11-04T04:00:00Z" })).toBe("已暂停，稍后自动继续");
 });
 
 it("shows scheduled D as queued and keeps configuration identifiers inside technical details", async () => {
@@ -99,16 +99,13 @@ it("shows scheduled D as queued and keeps configuration identifiers inside techn
   const experiment = { id: "EXP-private", candidates: [], result: { report_confirmation: { winner_id: "a" }, composite_schedule: { status: "scheduled", price_pause: pause }, processing_progress: { verified_configuration_id: "CONFIG-private", fixed_question_ids: ["Q01"], remaining_question_ids: ["Q02"] } } };
   vi.stubGlobal("fetch", vi.fn((url: string) => response(url.includes("/api/experiments") ? experiment : { search_space: {} })));
   await mount(<EvolutionPage data={{ evaluation: { id: "baseline", status: "completed" }, optimization: experiment }} />);
-  expect(document.querySelector(".price-pause-notice")?.textContent).toContain("高峰时段暂停");
-  await click("问题诊断");
-  const progress = [...document.querySelectorAll(".workbench-status")].find(node => node.textContent?.includes("修复 1 题"))!;
-  expect(progress.textContent).toContain("已有经完整试跑验证的方案");
-  expect(progress.textContent).not.toContain("CONFIG-private");
-  const technical = [...document.querySelectorAll("details")].find(node => node.querySelector("summary")?.textContent === "技术详情")!;
-  expect(technical).toBeUndefined();
+  expect(document.querySelector(".price-pause-notice")?.textContent).toContain("已暂停，稍后自动继续");
+  const planning = document.querySelector('.route-planning')!;
+  expect(planning.textContent).toContain("修复 1 题");
+  expect(planning.textContent).toContain("已有经完整评测验证的方案");
   expect(document.body.textContent).not.toContain("CONFIG-private");
   await click("A/B/C/D");
-  expect(document.body.textContent).toContain("Candidate D · 等待非高峰时段");
+  expect(document.body.textContent).toContain("Candidate D · 排队中");
   await click("最终推荐");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "生成智能组合建议")).toBe(false);
 });
@@ -135,18 +132,18 @@ it("shows all paused batch tasks by business name and forwards their exact overr
   for (const task of tasks) {
     const section = [...document.querySelectorAll("section")].find(node => node.querySelector("h3")?.textContent === task.task_label)!;
     await act(async () => [...section.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "立即运行")!.click());
-    await act(async () => [...section.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "确认按高峰价运行本任务")!.click());
+    await act(async () => [...section.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "确认立即运行本任务")!.click());
     const lastPost = fetcher.mock.calls.filter(([, init]) => init?.method === "POST").at(-1)!;
     expect(lastPost[0]).toContain("/api/runtime-settings/run-now");
     expect(JSON.parse(String(lastPost[1]?.body))).toEqual({ ...task.target, acknowledge_peak_price: true });
   }
 });
 
-it("uses the backend explanation when the price snapshot cannot establish a peak period", async () => {
+it("keeps internal price diagnostics out of the business pause notice", async () => {
   const message = "价格快照暂不可用，任务已暂停；待价格信息恢复后继续。";
-  expect(pricePauseText({ paused: true, message })).toBe(message);
+  expect(pricePauseText({ paused: true, message })).toBe("已暂停，稍后自动继续");
   await mount(<PricePauseNotice pause={{ paused: true, message }} target={{ generation_id: "GGEN-private" }} />);
-  expect(document.querySelector(".price-pause-notice")?.textContent).toContain(message);
-  expect(document.body.textContent).not.toContain("高峰时段暂停");
+  expect(document.querySelector(".price-pause-notice")?.textContent).toContain("已暂停，稍后自动继续");
+  expect(document.body.textContent).not.toContain(message);
   expect(document.body.textContent).not.toContain("预计 未知");
 });

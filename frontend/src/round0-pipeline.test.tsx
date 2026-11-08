@@ -22,8 +22,9 @@ it("saves freely selected Thinking and context, preserves saved drafts and remov
  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[data-parameter="retrieval_max_tokens"] button')].find(b=>b.textContent==='4096')!.click());
  await click("保存草稿");
  expect(posts[0].config).toEqual({generation_thinking:"max",retrieval_max_tokens:4096,min_score:0.2});
- expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe('Max');
- expect(document.body.textContent).toContain('字符数估算');
+ expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe('Max');
+ await act(async()=>{document.querySelector<HTMLElement>('[data-parameter="retrieval_max_tokens"] .ui-pg-info')!.focus();await new Promise(resolve=>setTimeout(resolve,150));});
+ expect(document.querySelector('[role=tooltip]')?.textContent).toContain('字符数估算');
 });
 it("reports saved Run values and absent historical Thinking as unknown in report and drawer", async () => {
   const run = { id: "R-OLD", status: "completed", dataset_version_id: "G-OLD", config: { candidate_k: 12, top_k: 4, hybrid_search: true, rerank: true }, judge: { model: "judge-old", generation_prompt_version: "generation-vnext-1", execution_snapshot: { generation_model: "gen-old" } }, result: {}, dataset_snapshot: { id: "G-OLD" } };
@@ -61,8 +62,8 @@ it("starts a new unsaved Baseline draft with approved defaults while leaving his
   const pipeline = { config: { prompt_strategy: "abstention" }, baseline_config: { prompt_strategy: "abstention" }, baseline_defaults: { prompt_strategy: "grounded", generation_thinking: "max" }, search_space: { prompt_strategy: { allowed: ["grounded", "abstention"] }, generation_thinking: contract.generation_thinking } };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(pipeline))));
   await render(<SettingsPage data={{}} />);
-  expect(document.querySelector('[data-parameter="prompt_strategy"] button[aria-pressed="true"]')?.textContent).toBe("grounded");
-  expect(document.querySelector('.pipeline-draft-diff')?.textContent).toContain("abstention → grounded");
+  expect(document.querySelector('[data-parameter="prompt_strategy"] button[aria-checked="true"]')?.textContent).toBe("grounded");
+  expect(document.querySelector('.pipeline-draft-chips')?.textContent).toContain("abstention → grounded");
   expect(pipeline.baseline_config.prompt_strategy).toBe("abstention");
 });
 
@@ -89,7 +90,7 @@ it("does not present partial case rows as the whole dataset composition", async 
 it("keeps a saved lower Thinking draft editable",async()=>{
  vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({baseline_config:{generation_thinking:"max"},config_draft:{config:{generation_thinking:"low"}},search_space:contract}))));
  await render(<SettingsPage data={{}}/>);
- expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-pressed="true"]')?.textContent).toBe('Low');
+ expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe('Low');
  expect(document.body.textContent).not.toContain('已放弃旧草稿');
 });
 it('keeps the fixed full Baseline when active-task lookup returns a different completed historical run', async () => {

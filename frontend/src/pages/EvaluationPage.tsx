@@ -16,7 +16,7 @@ import { Badge, Metric, MoreMenu, ProgressBar, Section, Status } from "../compon
 import { formatValue, thinkingLabel } from "../components/PipelineFields";
 import { CaseAnswer } from "../components/CaseAnswer";
 import { Drawer } from "../components/Dialog";
-import { displayText, gateNames, gateEnglishNames } from "../display";
+import { displayText, gateNames, gateEnglishNames, localShortTime } from "../display";
 import { useOperation } from "../operation";
 
 type Row = Record<string, any>;
@@ -27,11 +27,7 @@ const format = (value: unknown, suffix = "") => typeof value === "number" ? `${v
 const group = (metric: string) => metric.startsWith("positive_") ? "正向（Positive）" : metric.startsWith("ablation_") ? "消融（Ablation）" : metric.startsWith("latency_") ? "性能" : "负向（Negative）与安全";
 const gateValue = (gate: Row) => format(gate.actual, gate.metric.startsWith("latency_") ? " 秒" : "%");
 const gateThreshold = (gate: Row) => `${gate.operator === ">=" ? "≥" : "≤"} ${format(gate.threshold, gate.metric.startsWith("latency_") ? " 秒" : "%")}`;
-const localTime = (value?: string) => {
-  if (!value) return "未记录";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "未记录" : new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(date).replaceAll("/", "-");
-};
+
 
 const baselinePreflight = (runId?: string) => getJson<Row>(`/api/evaluation/preflight${runId ? `?resume_source_id=${encodeURIComponent(runId)}` : ''}`);
 
@@ -145,9 +141,9 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
 
     <PricePauseNotice pause={run.result?.price_pause} evaluationId={run.id} onChanged={async () => { setRun(await getJson<Row>(`/api/evaluations/${run.id}?light=true`)); }} />
     {preflight?.reason && (/活动评测|后台.*运行|active/i.test(preflight.reason) ? <p className="pending-note" role="status">后台正在运行试跑，完成后可重新运行 Baseline</p> : <p className="error-notice" role="alert">无法启动 Baseline：{preflight.reason}</p>)}
-    {["partial","failed"].includes(run.status) && preflight?.can_start && preflight.resume_reason && <p className="muted">原任务不能恢复：{preflight.resume_reason}；请明确新建完整评测，历史断点保留。</p>}
+    {["partial","failed"].includes(run.status) && preflight?.can_start && preflight.resume_reason && <p className="muted">原任务不能恢复：{preflight.resume_reason}；请明确新建完整评测，历史进度保留。</p>}
 
-    {run.result?.auto_recovery?.authorized && !completed && <p className="workbench-status" role="status">{run.result.auto_recovery.state==='retrying'?`后台自动重试${run.result.auto_recovery.phase==='judge'?'Judge':'问答请求'} · 本题第${run.result.auto_recovery.retry_count}次恢复，已完成题目不会重复调用。`:run.result.auto_recovery.state==='stopped'?'后台已保存断点并停止：存在不可自动恢复的错误，详见评测依据。':'后台任务持续执行；刷新或关闭页面不停止Worker。'}</p>}
+    {run.result?.auto_recovery?.authorized && !completed && <p className="workbench-status" role="status">{run.result.auto_recovery.state==='retrying'?`后台自动重试${run.result.auto_recovery.phase==='judge'?'Judge':'问答请求'} · 本题第${run.result.auto_recovery.retry_count}次恢复，已完成题目不会重复调用。`:run.result.auto_recovery.state==='stopped'?'后台已保存进度并停止：存在不可自动恢复的错误，详见评测依据。':'后台任务持续执行；刷新或关闭页面不停止Worker。'}</p>}
     {(error || run.error_message) && <p className="error-notice" role="alert">评测执行异常：{error || run.error_message}；未完成题目没有业务判定，不计入 Bad Case。</p>}
     {result.technical_error_count > 0 && <StoryDisclosure label={<>题目级技术异常 {result.technical_error_count}（不计入 Bad Case）</>}><p>已处理 {result.attempted} / {result.total} 题；有效业务判定 {result.completed} 题。存在技术异常时，综合分与 Hard Gate 不可用于资格判断。</p><ul>{result.technical_errors?.map((item: Row) => <li key={item.question_id}>{item.question_id} · {item.phase} · {item.error}</li>)}</ul></StoryDisclosure>}
 
@@ -176,7 +172,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
             <div><dt>Generation 模型和档位</dt><dd>{execution.generation_model || "历史未保存"} · {generationThinking}</dd></div>
             <div><dt>Judge 模型和档位</dt><dd>{run.judge?.model || "历史未保存"} · {judgeThinking}</dd></div>
             <div><dt>Candidate K / Top-K</dt><dd>{formatValue(config.candidate_k)} / {formatValue(config.top_k)}</dd></div>
-            <div><dt>评测时间</dt><dd>{localTime(run.completed_at || run.created_at)}</dd></div>
+            <div><dt>评测时间</dt><dd>{localShortTime(run.completed_at || run.created_at)}</dd></div>
           </dl>
         </Section>
 

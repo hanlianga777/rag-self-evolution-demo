@@ -24,7 +24,7 @@ it.each([false,true])("keeps compact progress on all five tabs and displays save
   const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "Sandbox")!;
   await act(async()=>sandbox.click());
   expect(document.querySelector(".tabs button.active")?.textContent).toBe("Sandbox");
-  expect(document.querySelector(".sandbox-core-table")?.textContent).toContain(paused?"高峰时段暂停 7/50":"运行中 7/50");
+  expect(document.querySelector(".sandbox-core-table")?.textContent).toContain(paused?"已暂停 7/50":"运行中 7/50");
   expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method)).toBe(true);
 });
 it("removes repeated strategy fields and keeps one before/after parameter list",async()=>{

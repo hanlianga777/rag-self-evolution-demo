@@ -328,9 +328,9 @@ it("review R4 selected historical Monitoring context is identified and cannot st
   await render(<VerificationPage data={{ ...data("B1"), monitoring: { triggers: [{ id: "T-history", status: "human_confirmed", optimization_run_id: "E-history" }] } }} onOpenDocument={() => {}} onOpenCitation={() => {}} />);
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "线上反馈 → 再次进化")!.click());
   await clickText("查看进化上下文");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Trigger：T-history");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联实验：E-history");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Baseline：B0");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("反馈状态：");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联优化：已建立");
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Baseline：历史上下文，只读");
   expect(document.querySelector(".monitoring-context")?.textContent).toContain("历史上下文，只读");
   expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(x => x.textContent?.includes("启动此上下文"))?.disabled).toBe(true);
   expect((fetch as any).mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === "GET")).toBe(true);

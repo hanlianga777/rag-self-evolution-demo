@@ -6,9 +6,7 @@ import { Section } from "./Primitives";
 export type PricePause = { message?: string; paused?: boolean; resume_at_toronto?: string; resume_at?: string };
 
 export function pricePauseText(pause?: PricePause) {
-  if (pause?.message) return pause.message;
-  const time = pause?.resume_at_toronto || (pause?.resume_at && !Number.isNaN(Date.parse(pause.resume_at)) ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(pause.resume_at)) : "未知");
-  return `高峰时段暂停，预计 ${time} 自动继续（多伦多时间）`;
+  return pause?.paused ? "已暂停，稍后自动继续" : "排队中";
 }
 
 export function PricePauseNotice({ pause, evaluationId, experimentId, target, onChanged }: { pause?: PricePause; evaluationId?: string; experimentId?: string; target?: Record<string, string>; onChanged?: () => void | Promise<void> }) {
@@ -20,7 +18,7 @@ export function PricePauseNotice({ pause, evaluationId, experimentId, target, on
     try { await postJson("/api/runtime-settings/run-now", { ...runTarget, acknowledge_peak_price: true }); setConfirm(false); await onChanged?.(); }
     catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); }
   };
-  return <div className="price-pause-notice" role="status"><p>{pricePauseText(pause)}</p><p>已完成进度已保存，将从断点继续。</p>{runTarget && (confirm ? <div role="group" aria-label="高峰价运行确认"><p>立即运行会按高峰价计费；仅本任务临时忽略平价时段限制。</p><button className="secondary" disabled={busy} onClick={() => void runNow()}>{busy ? "处理中…" : "确认按高峰价运行本任务"}</button><button className="secondary" disabled={busy} onClick={() => setConfirm(false)}>继续等待平价时段</button></div> : <button className="secondary" onClick={() => setConfirm(true)}>立即运行</button>)}{error && <p role="alert">{error}</p>}</div>;
+  return <div className="price-pause-notice" role="status"><p>{pricePauseText(pause)}</p><p>已完成进度已保存。</p>{runTarget && (confirm ? <div role="group" aria-label="立即运行确认"><p>立即运行本任务将产生模型费用。</p><button className="secondary" disabled={busy} onClick={() => void runNow()}>{busy ? "处理中…" : "确认立即运行本任务"}</button><button className="secondary" disabled={busy} onClick={() => setConfirm(false)}>继续等待</button></div> : <button className="secondary" onClick={() => setConfirm(true)}>立即运行</button>)}{error && <p role="alert">{error}</p>}</div>;
 }
 
 export function RuntimeSettings() {

@@ -1479,3 +1479,13 @@ button { border-radius:8px; }
 
 /* QuestionBadge tone must not activate Tailwind position:fixed. */
 .ui-q.fixed { position:static; }
+
+/* Compact page-level adapters; shared UI component designs stay unchanged. */
+.settings-page .frozen-facts { gap: 10px 16px; }
+.settings-page .pipeline-draft-actions { margin-top: 12px; gap: 10px; flex-wrap: wrap; }
+.settings-page .pipeline-draft-actions > span { flex: 0 0 auto; }
+.pipeline-draft-chips { display: flex; flex: 1; flex-wrap: wrap; gap: 6px; min-width: 0; }
+@media (min-width:1200px) and (max-width:1320px) {
+  .evolution-page .ui-evo-facts { grid-template-columns:92px minmax(0,1fr); gap:8px 10px; }
+  .evolution-page .ui-evo-facts dd { margin-bottom:0; }
+}

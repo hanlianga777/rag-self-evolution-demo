@@ -8,7 +8,7 @@ import {categoryName, comparisonPoints, configChanges, explanation, metricRows, 
 import type {Citation} from '../types';
 import './SavedAnswerComparison.css';
 
-export function SavedAnswerComparison({data,onOpenCitation}:{data:any;onOpenCitation:(citation:Citation)=>void}) {
+export function SavedAnswerComparison({data,onOpenCitation,questionId}:{data:any;questionId?:string;onOpenCitation:(citation:Citation)=>void}) {
   const experiment=data.optimization,baseline=data.evaluation,recommendation=recommendationOf(experiment);
   const candidate=experiment?.candidates?.find((c:any)=>c.id===recommendation.recommended_candidate);
   const baselineId=data.workspace?.current_baseline_id===undefined ? baseline?.id : data.workspace.current_baseline_id,runId=candidate?.result?.evaluation_run_id;
@@ -27,13 +27,15 @@ export function SavedAnswerComparison({data,onOpenCitation}:{data:any;onOpenCita
     const accept=([before,after]:any[])=>{
       if(cancelled)return;
       const next=readRuns([before,after]);
-      setRuns(next);setSelected(previous=>previous || next.rows.find((row:any)=>row.passed===false && row.after?.passed===true)?.question_id || '');
+      const requested = next.rows.find((row:any)=>questionId && shortQuestionId(row.question_id)===shortQuestionId(questionId));
+      if(requested) setFilter('all');
+      setRuns(next);setSelected(previous=>previous || requested?.question_id || next.rows.find((row:any)=>row.passed===false && row.after?.passed===true)?.question_id || '');
     };
     const saved=paths.map(path=>cachedJson<any>(path));
     if(saved.every(Boolean)){try{accept(saved);}catch(reason){setError(errorMessage(reason));}}
     void Promise.all(paths.map(path=>getJson<any>(path))).then(accept).catch(reason=>{if(!cancelled)setError(errorMessage(reason));});
     return ()=>{cancelled=true;};
-  },[binding]);
+  },[binding,questionId]);
   const current=runs?.binding===binding ? runs : null;
   const rows:any[]=current?.rows || [],fixed=rows.filter(row=>row.passed===false && row.after?.passed===true),remaining=rows.filter(row=>row.after?.passed===false);
   const filtered=(filter==='fixed'?fixed:filter==='remaining'?remaining:rows).filter(row=>(row.question || '').includes(search));

@@ -20,6 +20,7 @@ it("renders inline architecture without reference upload or developer disclosure
   expect(document.querySelectorAll('svg[role="img"]')).toHaveLength(1);
   expect(document.body.textContent).toContain("RAG Pipeline");
   expect(document.body.textContent).toContain("Agent 可调参数（白名单）");
+  expect(document.body.textContent).not.toMatch(/平价|断点续跑/);
   expect(fetch).not.toHaveBeenCalled();
   const ids = [...document.querySelectorAll('svg [id]')].map(node => node.id);
   expect(new Set(ids).size).toBe(ids.length);
