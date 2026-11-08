@@ -65,3 +65,23 @@
   --ui-fs-meta: 12px;   /* 标签、说明、次要信息（400，muted） */
   --ui-fs-key: 24px;    /* 每张卡最多一个关键数字（600） */
 }
+
+/* —— Baseline 报告：题型答对 + Bad Case 列表 —— */
+.ui-blb { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; margin-top: 16px; }
+.ui-blb-card { background: var(--ui-surface); border-radius: var(--ui-r-card, 14px); box-shadow: var(--ui-shadow-1); padding: 18px 22px; min-width: 0; }
+.ui-blb-card h3 { margin: 0 0 12px; font-size: var(--ui-fs-sub); font-weight: 600; color: var(--ui-ink); }
+.ui-blb-cats { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.ui-blb-cats li { display: grid; grid-template-columns: 116px minmax(0, 1fr) 64px; gap: 12px; align-items: center; }
+.ui-blb-cat { font-size: var(--ui-fs-body); color: var(--ui-ink-2); }
+.ui-blb-bar { height: 6px; border-radius: 3px; background: var(--ui-rule-2); overflow: hidden; }
+.ui-blb-bar i { display: block; height: 100%; border-radius: 3px; background: var(--ui-ink); }
+.ui-blb-val { font-size: var(--ui-fs-meta); color: var(--ui-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.ui-blb-val b { font-size: var(--ui-fs-body); font-weight: 600; color: var(--ui-ink); }
+.ui-blb-bads { list-style: none; margin: 0; padding: 0; }
+.ui-blb-bads li + li { border-top: 1px solid var(--ui-rule-2); }
+.ui-blb-bads button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; width: calc(100% + 16px); margin: 0 -8px; padding: 7px 8px; border: 0; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.ui-blb-bads button:hover:not(:disabled) { background: var(--ui-rule-2); }
+.ui-blb-bads button:disabled { cursor: default; }
+.ui-blb-q { font-size: var(--ui-fs-body); color: var(--ui-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ui-blb-layer { font-size: var(--ui-fs-meta); color: var(--ui-muted); white-space: nowrap; }
+@media (max-width: 1100px) { .ui-blb { grid-template-columns: 1fr; } }

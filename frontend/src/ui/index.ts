@@ -11,3 +11,5 @@ export { OverviewStory } from "./overview/OverviewStory";
 export type { StoryTurn, FixedItem } from "./overview/OverviewStory";
 export { ParamGrid } from "./settings/ParamGrid";
 export type { ParamGroup, ParamItem, ParamOption } from "./settings/ParamGrid";
+export { BaselineBreakdown } from "./baseline/BaselineBreakdown";
+export type { CategoryScore, BaselineBadCase } from "./baseline/BaselineBreakdown";

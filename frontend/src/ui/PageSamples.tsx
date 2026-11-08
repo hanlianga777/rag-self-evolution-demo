@@ -6,6 +6,7 @@ import { AgentStats, OverviewSummary } from "./overview/OverviewSummary";
 import { ParamChip, QuestionBadge, StatTransition, StatusBadge } from "./Primitives";
 import { ReleasePanel } from "./release/ReleasePanel";
 import { BaselineHero } from "./baseline/BaselineHero";
+import { BaselineBreakdown } from "./baseline/BaselineBreakdown";
 import { FinalRecommendation } from "./evolution/FinalRecommendation";
 import { CompareTable, GoldenPipeline, KnowledgeCoverage } from "./pages3";
 import { IconTile } from "./icons";
@@ -123,6 +124,11 @@ export function PageSamples() {
       <h2 className="ui-sample-title">Baseline · Baseline 报告</h2>
       <BaselineHero gates={{ passed: 11, total: 11 }} correct={44} total={50} badCount={6} layers={[{ label: "检索层", count: 5 }, { label: "生成层", count: 1 }]} thinking="Max" p50={16.7} p99={42.2}
         stages={[{ label: "Generation", seconds: 838.4, share: 95.8 }, { label: "Embedding Retrieval", seconds: 17.3, share: 2.0 }, { label: "Rerank", seconds: 16.2, share: 1.9 }, { label: "其他", seconds: 2.8, share: 0.3 }]} />
+          <BaselineBreakdown
+        categories={[{ label: "正向题（Positive）", correct: 18, total: 20 }, { label: "消融题（Ablation）", correct: 7, total: 10 }, { label: "负向题（Negative）", correct: 19, total: 20 }]}
+        badCases={sampleBadCases.map(item => ({ id: item.id, layer: item.layer, question: sampleQuestions[item.id as keyof typeof sampleQuestions] }))}
+        onOpen={() => {}}
+      />
     </section>
 
     <section>
