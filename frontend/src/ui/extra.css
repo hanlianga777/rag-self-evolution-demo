@@ -53,3 +53,15 @@
 .ui-pg-marks { position: absolute; top: 3px; right: 4px; display: inline-flex; gap: 2px; }
 .ui-pg-marks .dot { width: 5px; height: 5px; }
 @media (max-width: 1100px) { .ui-pg-groups { grid-template-columns: 1fr; } }
+
+/* ==================================================================
+ * 全站字号与字重刻度（11-08 用户："字不是太大就是加粗太多……要么浅灰，要么变小"）
+ * 页面 CSS 只用这几档，不再自定义字号；加粗只给卡片标题和关键数字。
+ * ================================================================== */
+:root {
+  --ui-fs-card: 15px;   /* 卡片标题（600） */
+  --ui-fs-sub: 13px;    /* 卡片内小标题（600）、表头不加粗 */
+  --ui-fs-body: 13px;   /* 正文、表格、回答（400，颜色 ink-2 或 muted） */
+  --ui-fs-meta: 12px;   /* 标签、说明、次要信息（400，muted） */
+  --ui-fs-key: 24px;    /* 每张卡最多一个关键数字（600） */
+}
