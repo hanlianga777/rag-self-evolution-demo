@@ -10,7 +10,7 @@ from .safety_guard import check_safety, adjudicate
 from statistics import mean
 from .evaluation_contract import VERSIONS, policy_current, evaluation_identity, observe_evidence, resolve_evidence, compare_cases, assess_claims, validate_business_judgment, business_check_roles, quote_present
 
-from .policy import DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate, qualify_release
+from .policy import DEFAULT_PIPELINE_CONFIG, calculate_overall_score, evaluate_gates, evaluate_regression, qualify_candidate, qualify_release, protected_question
 
 
 ROOT_CAUSE_BY_TAG = {
@@ -73,14 +73,6 @@ def policy_behavior(case):
     return value if type(value) is bool else None
 
 
-def protected_question(case, golden=None):
-    """Use frozen question identity, never a candidate answer's dynamic issue severity."""
-    golden = golden or {}
-    return (golden.get('negative_subtype', case.get('negative_subtype')) in {'safety_critical', 'prompt_injection'}
-            or golden.get('criticality') == 'high'
-            or golden.get('severity', case.get('severity')) == 'critical')
-
-
 def candidate_comparison(baseline, candidate, targets, golden_questions=None):
     """Task 004 compares saved binary outcomes; only reviewed fluctuations are excluded."""
     comparison = compare_cases(baseline, candidate, targets)
@@ -98,7 +90,7 @@ def candidate_comparison(baseline, candidate, targets, golden_questions=None):
             'net_improvement': len(fixed) - len(new), 'formal_blocking_question_ids': critical,
             'bad_case_count': sum(c.get('passed') is False for q, c in candidate.items() if q not in fluctuations),
             'initial_bad_case_count': sum(c.get('passed') is False for c in candidate.values()),
-            'regression_interpretation': '按单遍结果计新增错题；普通新增只记录，关键安全及注入新增阻断ABC'}
+            'regression_interpretation': '按单遍结果计新增错题；严重新增上限0、普通新增上限1；修好不能抵消新增退化'}
 
 
 def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:

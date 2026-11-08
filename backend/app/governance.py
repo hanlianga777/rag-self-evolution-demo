@@ -12,7 +12,7 @@ from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, search_space_contract
+from .policy import ALLOWED_SEARCH_SPACE, DEFAULT_PIPELINE_CONFIG, MAX_EVALS, search_space_contract, evaluate_regression, protected_question
 from .corpus import EMBEDDING_MODEL, CorpusStore, current_manifest, manifest_identity
 
 
@@ -2876,8 +2876,36 @@ class GovernanceStore:
         self.save_candidate(experiment_id, "DIRECT", config, {"root_cause_cluster": "Human Direct Release", "observed_evidence": [], "hypothesis": "Human-confirmed configuration", "proposal": "Skip Agent search only; preserve Sandbox validation", "risk": "Requires complete Gate and Regression verification", "changed_parameters": config, "operator": actor})
         return self.candidate(f"{experiment_id}-DIRECT")
 
+    def _regression_review(self, connection, row, result):
+        """Read-only current-rule view; persisted regression and qualifications stay intact."""
+        unavailable = {**evaluate_regression(new_critical_failures=None, new_ordinary_failures=None),
+                       'fixed_count': None, 'case_severities': {}}
+        if row['status'] != 'evaluated' or result.get('evaluation_complete') is False:
+            return unavailable
+        baseline = connection.execute('SELECT status,dataset_version_id,dataset_snapshot_json,judge_json FROM evaluation_runs WHERE id=?', (result.get('baseline_run_id'),)).fetchone()
+        current = connection.execute('SELECT status,dataset_version_id,judge_json FROM evaluation_runs WHERE id=?', (result.get('evaluation_run_id'),)).fetchone()
+        if not baseline or not current or baseline['status'] != 'completed' or current['status'] != 'completed':
+            return unavailable
+        identity = _load(baseline['judge_json'], {}).get('evaluation_identity')
+        if not identity or identity != _load(current['judge_json'], {}).get('evaluation_identity') or not baseline['dataset_version_id'] or baseline['dataset_version_id'] != current['dataset_version_id']:
+            return unavailable
+        golden = {q['id']: q for q in _load(baseline['dataset_snapshot_json'], {}).get('questions', [])}
+        def cases(run_id):
+            return {item['question_id']: {'passed': item['passed'], 'severity': item['severity'], 'negative_subtype': item['negative_subtype']}
+                    for item in connection.execute("SELECT question_id, json_extract(result_json,'$.passed') AS passed, json_extract(result_json,'$.severity') AS severity, json_extract(result_json,'$.negative_subtype') AS negative_subtype FROM evaluation_case_results WHERE run_id=?", (run_id,))}
+        before, after = cases(result.get('baseline_run_id')), cases(result.get('evaluation_run_id'))
+        if not before or set(before) != set(after) or set(before) != set(golden) or any(type(v['passed']) is not int or v['passed'] not in (0, 1) for v in [*before.values(), *after.values()]):
+            return unavailable
+        severities = {q: 'critical' if protected_question(case, golden[q]) else 'ordinary'
+                      for q, case in before.items() if case['passed'] == 1 and after[q]['passed'] == 0}
+        critical = sum(value == 'critical' for value in severities.values())
+        return {**evaluate_regression(new_critical_failures=critical, new_ordinary_failures=len(severities) - critical),
+                'fixed_count': sum(case['passed'] == 0 and after[q]['passed'] == 1 for q, case in before.items()),
+                'case_severities': severities}
+
     def _candidate_result(self, connection, row, *, light=False):
         result=_load(row['result_json'],{})
+        result['regression_review'] = self._regression_review(connection, row, result)
         if light:
             return {key:value for key,value in result.items() if key!='checkpoints'}
         if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_checkpoints'").fetchone():
@@ -2888,7 +2916,7 @@ class GovernanceStore:
     def _save_candidate_result(self, connection, candidate_id, result):
         for question_id,checkpoint in result.get('checkpoints',{}).items():
             connection.execute('INSERT INTO job_checkpoints VALUES (?,?,?) ON CONFLICT(run_id,question_id) DO UPDATE SET checkpoint_json=excluded.checkpoint_json',('candidate:'+candidate_id,question_id,_json(checkpoint)))
-        return {key:({} if key=='checkpoints' else value) for key,value in result.items()}
+        return {key:({} if key=='checkpoints' else value) for key,value in result.items() if key != 'regression_review'}
 
     def candidate(self, candidate_id: str):
         with self.connection() as connection:

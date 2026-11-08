@@ -134,6 +134,7 @@
 .strategy-hypotheses .compact-config-diff {padding:8px 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);}
 .evolution-page.page-shell .candidate-story-block p {line-height:1.5;}
 .regression-cases-table table {min-width:760px;table-layout:fixed;}
+.evolution-page .page-content .table-scroll.regression-summary-table table {min-width:880px !important;}
 .regression-cases-table th:first-child {width:34%;}
 .regression-cases-table th:last-child {width:24%;}
 .comparison-evidence-actions {display:flex;flex-wrap:wrap;gap:6px;}

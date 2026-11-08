@@ -9,10 +9,10 @@ from app.followups import FollowupJobs
 
 
 class Task004PolicyTests(unittest.TestCase):
-    def test_abc_allows_many_ordinary_regressions_but_needs_net_target_improvement(self):
+    def test_abc_blocks_ordinary_over_limit_despite_net_target_improvement(self):
         regression = policy.evaluate_regression(new_critical_failures=0, new_ordinary_failures=3)
-        self.assertTrue(regression['passed'])
-        self.assertTrue(policy.qualify_candidate({'passed': True}, regression, 4, 6, 5)['qualified'])
+        self.assertFalse(regression['passed'])
+        self.assertFalse(policy.qualify_candidate({'passed': True}, regression, 4, 6, 5)['qualified'])
         self.assertFalse(policy.qualify_candidate({'passed': True}, regression, 0, 6, 5)['qualified'])
         self.assertFalse(policy.qualify_candidate({'passed': True}, regression, 4, 6, 6)['qualified'])
         self.assertFalse(policy.evaluate_regression(new_critical_failures=1, new_ordinary_failures=0)['passed'])
