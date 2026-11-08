@@ -373,6 +373,49 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-fin-gates { color: var(--ui-red); }
 .ui-fin-ok { color: var(--ui-muted); }
 
+
+/* —— Golden 出题流水线摘要 —— */
+.ui-gp { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 16px 22px; }
+.ui-gp-left strong { display: block; font-size: 22px; font-weight: 700; }
+.ui-gp-split { display: flex; gap: 12px; font-size: 12.5px; color: var(--ui-muted); margin-top: 2px; }
+.ui-gp-split b { color: var(--ui-ink); font-weight: 650; }
+.ui-gp-steps { list-style: none; margin: 0; padding: 0; display: flex; flex: 1; gap: 0; min-width: 0; }
+.ui-gp-steps li { position: relative; flex: 1; display: grid; justify-items: center; gap: 2px; text-align: center; padding: 0 4px; min-width: 0; }
+.ui-gp-steps li::before { content: ""; position: absolute; top: 6px; left: -50%; right: 50%; height: 2px; background: var(--ui-rule); }
+.ui-gp-steps li:first-child::before { display: none; }
+.ui-gp-steps li.done::before { background: var(--ui-green); }
+.ui-gp-steps i { position: relative; width: 14px; height: 14px; border-radius: 50%; background: var(--ui-surface); border: 2px solid var(--ui-faint); }
+.ui-gp-steps li.done i { background: var(--ui-green); border-color: var(--ui-green); }
+.ui-gp-steps strong { font-size: 12.5px; font-weight: 600; color: var(--ui-ink); }
+.ui-gp-steps small { font-size: 11.5px; color: var(--ui-muted); }
+
+/* —— 知识主题覆盖 —— */
+.ui-kc { background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 18px 22px 10px; }
+.ui-kc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.ui-kc-head h3 { margin: 0; font-size: 15px; }
+.ui-kc-head span { color: var(--ui-muted); font-size: 12.5px; }
+.ui-kc-row { display: grid; grid-template-columns: minmax(160px, 1.4fr) minmax(160px, 2fr) 80px 80px 80px; align-items: center; gap: 12px; padding: 9px 6px; border-top: 1px solid var(--ui-rule-2); font-size: 13.5px; border-radius: 8px; }
+.ui-kc-row.head { border-top: 0; color: var(--ui-muted); font-size: 12px; font-weight: 600; }
+.ui-kc-row.clickable { cursor: pointer; }
+.ui-kc-row.clickable:hover { background: var(--ui-page); }
+.ui-kc-name { display: flex; align-items: center; gap: 8px; color: var(--ui-ink); font-weight: 550; min-width: 0; }
+.ui-kc-tag { font-size: 11px; font-weight: 650; color: var(--ui-navy-2); background: #e6eaf2; border-radius: var(--ui-r-pill); padding: 2px 8px; }
+.ui-kc-bar { display: flex; align-items: center; gap: 8px; }
+.ui-kc-bar i { display: block; height: 8px; border-radius: 4px; background: #c7d0dc; min-width: 4px; }
+.ui-kc-bar b { font-weight: 600; color: var(--ui-ink-2); font-size: 12.5px; }
+
+/* —— Sandbox 对比表 —— */
+.ui-ct { background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 14px 20px 10px; overflow-x: auto; }
+.ui-ct table { width: 100%; border-collapse: collapse; }
+.ui-ct thead th { text-align: left; vertical-align: bottom; padding: 4px 12px 10px; font-size: 13px; color: var(--ui-ink); font-weight: 650; white-space: nowrap; }
+.ui-ct thead th .ui-ct-name { display: block; margin-bottom: 6px; }
+.ui-ct tbody th { text-align: left; font-weight: 500; color: var(--ui-muted); font-size: 13px; padding: 10px 12px 10px 0; border-top: 1px solid var(--ui-rule-2); white-space: nowrap; }
+.ui-ct td { padding: 10px 12px; border-top: 1px solid var(--ui-rule-2); font-size: 14px; font-weight: 400; }
+.ui-ct .hl { background: #f3f5fa; }
+.ui-ct thead th.hl { border-radius: 10px 10px 0 0; }
+.ui-ct td.best { font-weight: 700; color: var(--ui-ink); }
+.ui-ct-more { margin-top: 6px; color: var(--ui-ink-2); background: none; padding: 6px 0; }
+
 .ui-sample-title { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--ui-muted); }
 
 /* —— 减少动态效果 —— */

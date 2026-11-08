@@ -7,6 +7,7 @@ import { ParamChip, QuestionBadge, StatTransition, StatusBadge } from "./Primiti
 import { ReleasePanel } from "./release/ReleasePanel";
 import { BaselineHero } from "./baseline/BaselineHero";
 import { FinalRecommendation } from "./evolution/FinalRecommendation";
+import { CompareTable, GoldenPipeline, KnowledgeCoverage } from "./pages3";
 
 /** 页面级样板：概览首屏、Agent 顶部统计、进化路线。数据来自 fixture（与正式库一致）。 */
 const GATE: Record<string, string> = { safe_rejection_rate: "安全拒答率", latency_p50_seconds: "P50", latency_p99_seconds: "P99" };
@@ -34,6 +35,45 @@ export function PageSamples() {
       />
     </section>
 
+
+
+    <section>
+      <h2 className="ui-sample-title">知识库 · 知识资产</h2>
+      <KnowledgeCoverage onOpen={() => {}} topics={[
+        { name: "设备运行与操作", chunks: 56, positive: 6, ablation: 3, negative: 6 },
+        { name: "一般提示", chunks: 56, positive: 6, ablation: 3, negative: 6 },
+        { name: "机器人如何与环境通信", chunks: 63, positive: 7, ablation: 3, negative: 7 },
+        { name: "蓄电池", chunks: 43, positive: 5, ablation: 2, negative: 5 },
+        { name: "开启清洁机组", chunks: 41, positive: 4, ablation: 2, negative: 5 },
+        { name: "位置代码", chunks: 36, positive: 4, ablation: 2, negative: 3 },
+        { name: "显示屏显示故障", chunks: 36, positive: 4, ablation: 1, negative: 4 },
+        { name: "示教新路线的准备工作", chunks: 24, positive: 2, ablation: 1, negative: 3 },
+        { name: "警告", chunks: 13, positive: 2, ablation: 1, negative: 1, protectedSlot: true },
+      ]} />
+    </section>
+
+    <section>
+      <h2 className="ui-sample-title">Golden Dataset · 当前测试集</h2>
+      <GoldenPipeline total={50} split={[{ label: "Positive", count: 20 }, { label: "Ablation", count: 10 }, { label: "Negative", count: 20 }]}
+        steps={[{ label: "覆盖规划", value: "9 个主题", done: true }, { label: "出题", value: "50 / 50", done: true }, { label: "硬校验", value: "50 / 50", done: true }, { label: "Probe", value: "50 / 50", done: true }, { label: "QC", value: "50 / 50", done: true }, { label: "人工确认", value: "50 / 50", done: true }]}
+        frozen={{ ok: true, text: "已冻结 · 11-04" }} />
+    </section>
+
+    <section>
+      <h2 className="ui-sample-title">Agent 工作台 · Sandbox（Round 3）</h2>
+      <CompareTable highlight={[3, 4]}
+        columns={[{ name: "Baseline" }, { name: "Candidate A", status: "failed" }, { name: "Candidate B", status: "failed" }, { name: "Candidate C", status: "winner" }, { name: "Candidate D", status: "recommended" }]}
+        rows={[
+          { label: "答对", values: [44, 42, 43, 47, 48], better: "higher" },
+          { label: "新增 Bad Case", values: ["—", 3, 2, 0, 0] },
+          { label: "Hard Gate", values: ["11 / 11", "9 / 11", "11 / 11", "11 / 11", "11 / 11"] },
+          { label: "P99", values: [42.2, 75.6, 54.2, 22.6, 36.7], better: "lower", unit: " 秒", digits: 1 },
+          { label: "安全拒答率", values: [95, 90, 100, 100, 100], better: "higher", unit: "%" },
+          { label: "P50", values: [16.7, 16.9, 13.6, 6.7, 8.1], better: "lower", unit: " 秒", digits: 1, primary: false },
+          { label: "全部原 Bad Case 修好", values: ["—", 1, 1, 3, 4], primary: false },
+          { label: "指定目标修好", values: ["—", 1, 1, 2, 1], primary: false },
+        ]} />
+    </section>
 
     <section>
       <h2 className="ui-sample-title">Baseline · Baseline 报告</h2>
