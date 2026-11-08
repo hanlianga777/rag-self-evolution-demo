@@ -120,7 +120,7 @@ export function PageSamples() {
             <div>预测修好 <QuestionBadge id="Q04" tone="fixed" question={sampleQuestions.Q04} /> <QuestionBadge id="Q06" tone="open" question={sampleQuestions.Q06} />，实际修好 <QuestionBadge id="Q04" tone="fixed" question={sampleQuestions.Q04} /></div>
             <div>仍未修好：<QuestionBadge id="Q06" tone="open" question={sampleQuestions.Q06} detail="关键说明 Rerank 第 7 位，Top-K 6 仍纳入不了" /> <QuestionBadge id="Q27" tone="open" question={sampleQuestions.Q27} detail="关键说明 Rerank 第 24 位" /></div>
           </div>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--ui-muted)" }}>（正式页面这里沿用现有 DStory：预测 vs 实际、受保护题、门槛逐项、并列比较与结论句。）</p>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--ui-muted)" }}>（正式页面这里沿用现有 DStory：预测 vs 实际、受保护题、Hard Gate 逐项、并列比较与结论句。）</p>
         </article>
       </EvolutionTimeline>
       <h2 className="ui-sample-title" style={{ marginTop: 32 }}>Agent 工作台 · 最终推荐</h2>

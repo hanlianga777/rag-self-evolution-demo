@@ -72,7 +72,7 @@ def project_question_rows(store, rows, *, snapshot=None):
             category = None
         result.append({**row, 'probe':probe, 'qc':qcs.get(row['id'],row.get('qc')),
             'knowledge_topic':(q.get('topic_cluster') or (row.get('raw') or {}).get('topic_cluster')),
-            'source_summary':'；'.join(dict.fromkeys(labels)) or ('不适用（负向题无标准证据）' if q.get('test_category')=='negative' else None),
+            'source_summary':'；'.join(dict.fromkeys(labels)) or ('不适用（负向题（Negative）无标准证据）' if q.get('test_category')=='negative' else None),
             'scoring_summary':{'required':len(requirements['required_checks']),'auxiliary':len(requirements.get('auxiliary_information',[]))} if 'required_checks' in requirements else None,
             'baseline_result':{**cases[row['id']], 'diagnosis_category':category} if row['id'] in cases else None})
     return result

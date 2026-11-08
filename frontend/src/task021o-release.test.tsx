@@ -21,14 +21,14 @@ it('explains alternatives from saved repairs, regressions and gates rather than 
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{id:'exp',status:'completed',evaluation_budget:{used:10,max:12},candidates:[broken,slow,c,d],result:{composite:{status:'generated',candidate_id:'D'}},recommendation:{result:{status:'Recommended',recommended_candidate:'D',not_recommended:[{candidate_id:'broken',reason:'资格未通过'},{candidate_id:'slow',reason:'资格未通过'}]}}}}}/>);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='最终推荐')!.click());
  const rows=[...document.querySelectorAll('.story-alternatives > div')].map(e=>e.textContent);
- expect(rows[0]).toContain('修好 Q24');expect(rows[0]).toContain('新弄坏 Q13');expect(rows[0]).toContain('不满足零新增错题');
+ expect(rows[0]).toContain('修好 Q24');expect(rows[0]).toContain('新弄坏 Q13');expect(rows[0]).toContain('不满足零新增 Bad Case');
  expect(rows[1]).toContain('最慢回答 P99');expect(rows[1]).toContain('超过 60 秒');
- expect(rows[2]).toContain('合格，但比方案 D 多错 1 道（Q04）');
- expect(document.querySelector('.experiment-budget')?.textContent).toBe('已评测 10 / 12 次（含方案 D）');
+ expect(rows[2]).toContain('合格，但比 Round 3 · Candidate D 多错 1 个（Q04）');
+ expect(document.querySelector('.experiment-budget')?.textContent).toBe('已评测 10 / 12 次（含 Candidate D）');
 });
 it('hides the entire thinking comparison section when no columns exist',async()=>{
  await mount(<ProductDiagnostics diagnostics={{thinking_comparison:{columns:[],note:'尚无可比较的回答档位记录'}}}/>);
- expect(document.body.textContent).not.toContain('回答思考档位对照');
+ expect(document.body.textContent).not.toContain('Thinking 档位对照');
  expect(document.body.textContent).not.toContain('尚无可比较');
  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看对照')).toBe(false);
  expect(document.body.textContent).toContain('耗时拆解');
@@ -41,8 +41,8 @@ it('labels released status and the archived initial config without calling it cu
  expect(document.querySelector('.release-history-table tbody tr:last-child')?.textContent).toContain('初始配置');
  expect(document.querySelector('.release-history-table tbody tr:last-child')?.textContent).not.toContain('当前线上配置');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent==='回滚至此版本')?.disabled).toBe(false);
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看其他候选方案')!.click());
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看候选方案评测报告')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看其他 Candidate')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看 Candidate 评测报告')!.click());
  expect(document.querySelector('[role="dialog"]')?.textContent).not.toMatch(/待发布|尚未发布/);
 });
 it('shows the production config separately from the baseline draft after release',async()=>{
@@ -50,8 +50,8 @@ it('shows the production config separately from the baseline draft after release
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/pipeline')?{active_version_id:'production-new',active_version:{provenance:'published',snapshot:{candidate_id:'EXP-D'}},config:{candidate_k:24,top_k:6,generation_thinking:'high'},baseline_config:{candidate_k:12,top_k:4,generation_thinking:'max'},search_space:{}}:{}))));
  await mount(<SettingsPage data={{workspace:{active_version:'production-new'}}}/>);
  const section=[...document.querySelectorAll('section')].find(e=>e.querySelector('h2')?.textContent==='当前线上配置');
- expect(section?.textContent).toContain('方案 D');
- expect(section?.textContent).toContain('24');expect(section?.textContent).toContain('6');expect(section?.textContent).toContain('高');
+ expect(section?.textContent).toContain('Candidate D');
+ expect(section?.textContent).toContain('24');expect(section?.textContent).toContain('6');expect(section?.textContent).toContain('High');
  expect(section?.querySelectorAll('button')).toHaveLength(0);
 });
 it('links to published records once the recommended candidate has been released',async()=>{

@@ -70,7 +70,7 @@ def retrieval_facts(case, question=None, config=None, review=None):
     saved_config = {**(config or {}), **(trace.get('config') or {})}
     unmet = unmet_required_points(case, question)
     positions = evidence_positions(question, trace)
-    return {'standard_evidence_positions': '不适用（负向题不定位标准证据）' if case.get('test_category') == 'negative' and positions == MISSING else positions,
+    return {'standard_evidence_positions': '不适用（负向题（Negative）不定位标准证据）' if case.get('test_category') == 'negative' and positions == MISSING else positions,
             'candidate_k': saved_config.get('candidate_k', MISSING), 'top_k': saved_config.get('top_k', MISSING),
             'unmet_required_points': unmet,
             'baseline_review': {'conclusion': '单遍判错' if case.get('passed') is False else '单遍判对'}}

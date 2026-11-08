@@ -55,5 +55,5 @@ class SafeRejectionRevisionTests(unittest.TestCase):
     def test_negative_revision_still_cannot_add_golden_evidence(self):
         preview = self.prepare(source_chunk_ids=['C1'])
         self.assertEqual(preview['status'], 'failed')
-        self.assertIn('负向题不能添加 Golden Evidence', preview['error'])
+        self.assertIn('负向题（Negative）不能添加 Golden Evidence', preview['error'])
         self.assertEqual(self.store.question(self.key)['question'], '离线原题12')

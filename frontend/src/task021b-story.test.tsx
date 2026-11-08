@@ -23,9 +23,9 @@ it('tells every round, attaches the NEXT review, and marks only the first qualif
  expect(document.body.textContent).toContain('去发布');
 });
 it.each([
- [{composite_schedule:{status:'scheduled'},composite:{outcome:'validation_failed'}},'方案 D · 等待非高峰时段'],
- [{composite:{status:'no_effective_composite',reason:'保留当前赢家'}},'Agent 判断不做 D'],
- [{composite:{outcome:'validation_failed',reason:'来源未通过校验'}},'方案 D 未形成'],
+ [{composite_schedule:{status:'scheduled'},composite:{outcome:'validation_failed'}},'Candidate D · 等待非高峰时段'],
+ [{composite:{status:'no_effective_composite',reason:'保留当前 Winner'}},'Agent 判断不做 D'],
+ [{composite:{outcome:'validation_failed',reason:'来源未通过校验'}},'Candidate D 未形成'],
 ])('uses the current D state ahead of old decisions',async(result,label)=>{
  await mount(<DStory experiment={{candidates:[],result}}/>);expect(document.body.textContent).toContain(label);
 });
@@ -50,8 +50,8 @@ it('puts only the saved recommendation first, shows unmet checks, and keeps publ
  const c=candidate(3,'C',true);c.result.new_regression_question_ids=['q2'];
  await mount(<VersionsPage data={{evaluation:baseline,versions:[{id:'v',status:'active',provenance:'bootstrap',config:{top_k:4}}],optimization:{candidates:[candidate(1,'A'),c],recommendation:{recommended_candidate:c.id},result:{report_confirmation:{winner_id:c.id}}}}}/>);
  expect(document.querySelector('.page-content .panel h2')?.textContent).toBe('待发布方案');
- expect(document.querySelector('.pending-release')?.textContent).not.toContain('第 1 轮');
- expect(document.querySelector('.pending-release')?.textContent).toContain('新增 1 道错题');
+ expect(document.querySelector('.pending-release')?.textContent).not.toContain('Round 1');
+ expect(document.querySelector('.pending-release')?.textContent).toContain('新增 1 个 Bad Case');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent==='确认发布')?.disabled).toBe(true);
 });
 it('keeps internal IDs, conclusion labels, English states and forbidden narratives off the story',()=>{
@@ -61,7 +61,7 @@ it('keeps internal IDs, conclusion labels, English states and forbidden narrativ
 it('shows generated D provenance, historical repairs, side effects and its saved final outcome',async()=>{
  const winner=candidate(2,'B',true),d={...candidate(3,'D',true),reasoning:{candidate_label:'D',winner_id:winner.id,changes:[{parameter:'top_k',source_type:'verified',source_candidates:[winner.id],reason:'多保留一段说明',side_effect_check:{historical_effects:'曾伴随安全拒答下降',protected_overlap:['q2'],winner_fixed_risk:'保留已修好的清洁题',gate_risk:'核对最慢回答时间',mitigation:'完整题卷验证'}}]}};
  await mount(<DStory evaluation={baseline} badCases={[{question_id:'q1',result:{question:'怎样清洁？'}}]} experiment={{candidates:[winner,d],result:{d_facts:{winner_id:winner.id,remaining_failures:[{question_id:'q1',evidence_positions:[{candidates:10,final:'未进入'}],historical_fixes:[{candidate_id:winner.id}]}]}},recommendation:{recommended_candidate:d.id}}}/>);
- expect(document.body.textContent).toContain('已验证 · 来自 第 2 轮方案 B');expect(document.body.textContent).toContain('相关说明排在候选第 10 位，没被选进回答');expect(document.body.textContent).toContain('曾伴随安全拒答下降');expect(document.body.textContent).toContain('D 胜出，推荐 D');
+ expect(document.body.textContent).toContain('已验证 · 来自 Round 2 · Candidate B');expect(document.body.textContent).toContain('相关说明排在召回第 10 位，没被选进回答');expect(document.body.textContent).toContain('曾伴随安全拒答下降');expect(document.body.textContent).toContain('D 胜出，推荐 D');
 });
 it('honors an explicitly unavailable current Baseline without reading historical answers',async()=>{
  const c=candidate(3,'C',true),fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
@@ -77,9 +77,9 @@ it('waits for a completed candidate before fetching its saved answers',async()=>
 it('switches historical rounds on all three detailed tabs while preserving the expanded progress',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({}))));
  await mount(<EvolutionPage data={{evaluation:baseline,optimization:{id:'experiment',candidates:[candidate(1,'A'),candidate(3,'C',true)]}}}/>);
- for(const tab of ['A/B/C/D','Sandbox','回归检查']){
+ for(const tab of ['A/B/C/D','Sandbox','Regression Check']){
   await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===tab)!.click());
-  await act(async()=>[...document.querySelectorAll('.story-round-switch button')].find(b=>b.textContent==='第 1 轮')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
-  expect(document.querySelector('.story-round-switch button[aria-pressed="true"]')?.textContent).toBe('第 1 轮');expect(document.querySelectorAll('.experiment-progress .stage-stepper li')).toHaveLength(6);
+  await act(async()=>[...document.querySelectorAll('.story-round-switch button')].find(b=>b.textContent==='Round 1')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+  expect(document.querySelector('.story-round-switch button[aria-pressed="true"]')?.textContent).toBe('Round 1');expect(document.querySelectorAll('.experiment-progress .stage-stepper li')).toHaveLength(6);
  }
 });

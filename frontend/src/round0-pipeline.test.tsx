@@ -34,9 +34,8 @@ it("reports saved Run values and absent historical Thinking as unknown in report
   expect(summary.textContent).toContain("judge-old");
   expect(summary.textContent).toContain("历史未知");
   expect([...summary.querySelectorAll("dt")].filter(node => node.textContent === "题卷")).toHaveLength(1);
-  await click("完整配置快照");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("历史未知");
-  expect([...document.querySelectorAll('[role="dialog"] dd')].some(node => node.textContent === "Max")).toBe(false);
+  expect(document.body.textContent).not.toContain("完整配置快照");
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
 it("does not show a frozen configuration when Baseline has not run", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({}))));
@@ -52,14 +51,10 @@ it("uses a new Run's saved Thinking and knowledge identities consistently in sum
   const summary = document.querySelector('.baseline-run-summary')!;
   expect(summary.textContent).toContain("gen-saved · OFF");
   expect(summary.textContent).toContain("judge-saved · Max");
-  expect(document.querySelector("details")?.textContent).toContain("CORPUS-SAVED / IDX-SAVED");
-  expect(document.querySelector("details")?.textContent).toContain("RESULT-CONFIG-SAVED");
+  expect(document.body.textContent).not.toContain("CORPUS-SAVED");
+  expect(document.body.textContent).not.toContain("RESULT-CONFIG-SAVED");
   expect(summary.textContent).not.toContain("corpus-old-fallback");
-  await click("完整配置快照");
-  const rows = [...document.querySelectorAll('[role="dialog"] dl > div')];
-  expect(rows.find(row => row.querySelector('dt')?.textContent === "Thinking 档位")?.querySelector('dd')?.textContent).toBe("OFF");
-  expect(rows.find(row => row.querySelector('dt')?.textContent === "Judge Thinking")?.querySelector('dd')?.textContent).toBe("Max");
-  expect(rows.find(row => row.querySelector('dt')?.textContent === "上下文容量")?.querySelector('dd')?.textContent).toBe("8192");
+  expect(document.body.textContent).not.toContain("完整配置快照");
 });
 
 it("starts a new unsaved Baseline draft with approved defaults while leaving historical values visible", async () => {
@@ -75,16 +70,14 @@ it.each([
   [{ corpus_snapshot_id: "CORPUS-HISTORICAL", index_artifact_id: "IDX-HISTORICAL" }, "CORPUS-HISTORICAL / IDX-HISTORICAL"],
   [{ manifest_digest: "legacy-manifest-digest" }, "历史 Manifest 对象"],
   ["CORPUS-HISTORICAL-STRING", "CORPUS-HISTORICAL-STRING"],
-])("renders saved historical Corpus fingerprints safely without a config binding: %j", async (fingerprint, expected) => {
+])("renders saved historical Corpus fingerprints safely without a config binding: %j", async (fingerprint, _expected) => {
   const run = { id: "R-HISTORICAL-FINGERPRINT", status: "completed", dataset_snapshot: { id: "G-HISTORY", corpus_fingerprint: fingerprint } };
   const frozen = JSON.stringify(run);
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(run))));
   await render(<EvaluationPage data={{ evaluation: run }} />);
-  expect(document.querySelector("details")?.textContent).toContain(expected);
   expect(document.body.textContent).not.toContain("[object Object]");
-  await click("完整配置快照");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("完整 Corpus / Index 身份");
-  expect(document.querySelector('[role="dialog"] pre')?.textContent).toBe(JSON.stringify(fingerprint, null, 2));
+  expect(document.body.textContent).not.toContain("完整配置快照");
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(JSON.stringify(run)).toBe(frozen);
 });
 it("does not present partial case rows as the whole dataset composition", async () => {
@@ -106,5 +99,5 @@ it('keeps the fixed full Baseline when active-task lookup returns a different co
  expect(document.querySelector('.baseline-run-summary')?.textContent).toContain('High');
  expect(document.body.textContent).toContain('固定Baseline完整档位对照');
  await click('Bad Case 诊断');
- expect(document.body.textContent).toContain('8 道错题');
+ expect(document.body.textContent).toContain('8 个 Bad Case');
 });

@@ -127,13 +127,13 @@ def probe_reason_fields(result):
     classification = details.get('classification') or result.get('classification')
     positive = classification in {'RETRIEVAL_INCOHERENT', 'EVIDENCE_VALID', 'EVIDENCE_INVALID'}
     valid = validity == 'valid' or classification in {'RETRIEVAL_INCOHERENT', 'EVIDENCE_VALID', 'NEGATIVE_VALID'}
-    question = ('题目有效，原始证据支持参考答案' if positive else '题目有效，负向题检查通过') if valid else (
+    question = ('题目有效，原始证据支持参考答案' if positive else '题目有效，负向题（Negative）检查通过') if valid else (
         '题目有效性待复核' if validity == 'needs_review' or not classification else '题目或参考证据检查未通过')
     recalled = details.get('retrieval_coherent')
     observation = ('当前 Pipeline 未完整召回题目证据' if recalled is False or classification == 'RETRIEVAL_INCOHERENT'
                    else '当前 Pipeline 已召回题目证据' if recalled is True
                    else '检索执行失败' if classification == 'RETRIEVAL_EXECUTION_FAILED'
-                   else '负向题召回观察见检索详情' if classification and not positive else '召回观察未知')
+                   else '负向题（Negative）召回观察见检索详情' if classification and not positive else '召回观察未知')
     return {'question_validity_reason': question, 'retrieval_observation': observation}
 
 

@@ -9,7 +9,7 @@ let root:ReturnType<typeof createRoot>;
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 async function mount(element:any){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(element));}
 const old={status:'no_effective_composite',outcome:'declined',suggestion:{explanation:'旧结论：风险大所以放弃'}};
-const current={status:'generated',outcome:'generated',suggestion:{explanation:'最新结论：在赢家上验证更多证据'}};
+const current={status:'generated',outcome:'generated',suggestion:{explanation:'最新结论：在Winner上验证更多证据'}};
 it('shows the latest D decision and keeps the old raw decision inside technical details',async()=>{
  const d={id:'experiment-D',status:'running',config:{top_k:6},reasoning:{candidate_label:'D',hypothesis:current.suggestion.explanation}};
  const exp={id:'experiment',candidates:[d],result:{composite:current,composite_history:[old]},recommendation:{d_outcome:'declined'}};
@@ -18,8 +18,9 @@ it('shows the latest D decision and keeps the old raw decision inside technical 
  expect(document.querySelector('.d-story')?.textContent).toContain('最新结论');
  expect(document.querySelector('.d-story')?.textContent).not.toContain('旧结论');
  const details=[...document.querySelectorAll('details')].find(e=>e.querySelector('summary')?.textContent==='技术详情');
- expect(details?.open).toBe(false);
- expect(details?.textContent).toContain('旧结论：风险大所以放弃');
+ expect(details).toBeUndefined();
+ expect(document.body.textContent).not.toContain('旧结论：风险大所以放弃');
+ expect(exp.result.composite_history[0]).toEqual(old);
 });
 it('does not let a stale recommendation decline override the current failed decision',async()=>{
  const exp={result:{composite:{status:'failed',outcome:'validation_failed',reason:'新建议三次不合规'},composite_history:[old]},recommendation:{d_outcome:'declined'}};
@@ -30,7 +31,7 @@ it('does not let a stale recommendation decline override the current failed deci
 });
 it('shows premise evidence and the protected question and gate risk checklist',async()=>{
  const d={status:'generated',config:{top_k:6},reasoning:{candidate_label:'D',changes:[{parameter:'top_k',side_effect_check:{
-  same_premise_evidence:'相同前提尚未观察',different_premise_evidence:'候选池12与24不同',risk_checklist:'核对Q17和安全拒答95门槛'}}]}};
+  same_premise_evidence:'相同前提尚未观察',different_premise_evidence:'候选池12与24不同',risk_checklist:'核对Q17和安全拒答95Hard Gate'}}]}};
  await mount(<DStory experiment={{candidates:[d],result:{composite:current}}}/>);
- for(const text of ['相同前提尚未观察','候选池12与24不同','核对Q17和安全拒答95门槛'])expect(document.querySelector('.d-story')?.textContent).toContain(text);
+ for(const text of ['相同前提尚未观察','候选池12与24不同','核对Q17和安全拒答95Hard Gate'])expect(document.querySelector('.d-story')?.textContent).toContain(text);
 });

@@ -19,7 +19,7 @@ it.each(["generating", "needs_regeneration", "failed"])("keeps the frozen Golden
   expect(document.querySelector('[aria-label="进化主链路"]')?.textContent).toContain("Golden 题卷已冻结");
   expect(document.querySelector(".next-action h2")?.textContent).toBe("运行优化 Agent");
   expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#evolution");
-  expect(document.querySelector(".overview-work-run")?.textContent).toContain("工作 Run");
+  expect(document.querySelector(".overview-work-run")).toBeNull();
   expect(document.querySelectorAll(".story-chain a")).toHaveLength(6);
   expect(JSON.stringify(data)).toBe(before);
   expect(fetch).not.toHaveBeenCalled();

@@ -2,7 +2,7 @@ import { RuntimeSettings } from "../components/RuntimeSettings";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { errorMessage, postJson } from "../api";
-import { Badge, Section, TechnicalDetails } from "../components/Primitives";
+import { Badge, Section } from "../components/Primitives";
 import { pipelineCached, pipelineFetch, pipelineIdentity, invalidatePipeline } from "../pipelineCache";
 import { Drawer } from "../components/Dialog";
 import { draftDefaults, formatValue, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
@@ -12,13 +12,13 @@ const settingsGroups: Record<string, string[]> = {
   "查询理解": ["query_rewrite", "multi_query", "hyde"],
   "检索召回": ["candidate_k", "hybrid_search", "hybrid_alpha"],
   "筛选排序": ["rerank", "top_k", "min_score", "retrieval_max_tokens"],
-  "回答生成": ["prompt_strategy", "generation_thinking"],
+  "Generation": ["prompt_strategy", "generation_thinking"],
 };
 const parameterNotes: Record<string, string> = {
   query_rewrite: "把原问题改写为更适合检索的问法。", multi_query: "用多个互补问法查找资料。", hyde: "用假设答案辅助查找，假设文本不作为证据。",
-  candidate_k: "决定进入筛选排序的候选资料数量。", hybrid_search: "结合语义相似度和关键词查找资料。", hybrid_alpha: "分配语义与关键词检索的权重。",
-  rerank: "调整候选资料进入回答前的排序。", top_k: "决定最终送给回答模型的资料段数。", min_score: "过滤相关分低于门槛的资料。", retrieval_max_tokens: "限制送给回答模型的上下文长度；没有 tokenizer 时按字符数估算 token。",
-  prompt_strategy: "决定怎样使用证据并处理缺失条件。", generation_thinking: "控制回答模型的思考投入。",
+  candidate_k: "决定进入筛选排序的候选资料数量。", hybrid_search: "结合语义相似度和关键词查找资料。", hybrid_alpha: "分配语义与BM25的权重。",
+  rerank: "调整候选资料进入回答前的排序。", top_k: "决定最终送给 Generation 模型的资料段数。", min_score: "过滤相关分低于 Hard Gate 的资料。", retrieval_max_tokens: "限制送给 Generation 模型的上下文长度；没有 tokenizer 时按字符数估算 token。",
+  prompt_strategy: "决定怎样使用证据并处理缺失条件。", generation_thinking: "控制 Generation 模型的思考投入。",
 };
 
 export function SettingsPage({ data }: { data: any }) {
@@ -36,10 +36,10 @@ export function SettingsPage({ data }: { data: any }) {
   const index = pipeline?.index || {}, knowledge = index.knowledge_config || {};
   const facts = [
     ["解析", knowledge.parser ? `${knowledge.parser} ${knowledge.parser_mode || ""}` : data.documents?.[0]?.parser],
-    ["分块", knowledge.chunk_strategy ? `父子分块 · 父段 ${knowledge.parent_tokens} / 子段 ${knowledge.child_tokens} / 重叠 ${knowledge.overlap_tokens}` : data.documents?.[0]?.chunk_strategy],
-    ["向量模型", knowledge.embedding_model || index.embedding_model], ["实际维度", index.dimension != null ? `${index.dimension} 维` : null],
-    ["索引", index.vector_index], ["重排模型", knowledge.rerank_model],
-    ["回答模型", pipeline?.frozen_models?.generation], ["判分模型", pipeline?.frozen_models?.judge],
+    ["分块", knowledge.chunk_strategy ? `Parent-Child 分块 · Parent ${knowledge.parent_tokens} / Child ${knowledge.child_tokens} / 重叠 ${knowledge.overlap_tokens}` : data.documents?.[0]?.chunk_strategy],
+    ["Embedding 模型", knowledge.embedding_model || index.embedding_model], ["实际维度", index.dimension != null ? `${index.dimension} 维` : null],
+    ["索引", index.vector_index], ["Rerank 模型", knowledge.rerank_model],
+    ["Generation 模型", pipeline?.frozen_models?.generation], ["Judge 模型", pipeline?.frozen_models?.judge],
   ];
   const change = (key: string, value: any) => setDraft(previous => {
     const next = { ...previous, [key]: value };
@@ -61,7 +61,7 @@ export function SettingsPage({ data }: { data: any }) {
       <div className="search-space-groups">{Object.entries(settingsGroups).map(([group, keys]) => <section key={group}><h3>{group}</h3><div className="search-space-controls">{keys.filter(key => contract[key]).map(key => {
         const allowed: any[] = contract[key].allowed;
         const disabled = busy || key === "hybrid_alpha" && !draft.hybrid_search;
-        const dependency = key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "仅开启混合检索时生效" : "";
+        const dependency = key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "仅开启 Hybrid Search 时生效" : "";
         const note = parameterNotes[key];
         return <div className="search-space-control" title={dependency || note} key={key} data-parameter={key}>
           <div><strong>{parameterNames[key]}</strong></div>
@@ -70,11 +70,11 @@ export function SettingsPage({ data }: { data: any }) {
         </div>;
       })}</div></section>)}</div>
       {(changed.length > 0) && <div className="pipeline-draft-actions"><span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · 配置草稿已保存" : ""}</span><button className="secondary" disabled={busy || !changed.length && !pipeline?.config_draft} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length} onClick={() => void save()}>保存草稿</button></div>}
-      {(changed.length > 0 || pipeline?.config_draft) && <p className="muted">配置草稿尚未生效；需显式运行新的 Baseline 才会成为评测基线。候选方案的优化使用独立实验配置。</p>}
+      {(changed.length > 0 || pipeline?.config_draft) && <p className="muted">配置草稿尚未生效；需显式运行新的 Baseline 才会成为评测基线。Candidate 的优化使用独立实验配置。</p>}
       {pipeline?.baseline_config && (changed.length > 0 || pipeline?.config_draft) && <div className="pipeline-draft-diff"><h3>Baseline → 草稿参数变化</h3><dl className="baseline-strategy">{changed.map(key => <div key={key}><dt>{parameterNames[key] || key}</dt><dd>{formatValue(baseline[key])} → {formatValue(draft[key])}</dd></div>)}</dl>{!changed.length && <p className="muted">草稿与 冻结 Baseline 参数一致。</p>}</div>}
     </Section>
     <RuntimeSettings />
-    <TechnicalDetails><p>评测与治理：判分规则和门槛固定。</p></TechnicalDetails>
+
     <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="可选参数范围" className="parameter-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={contract} baseline={baseline} /></div></Drawer>
   </PageShell>;
 }

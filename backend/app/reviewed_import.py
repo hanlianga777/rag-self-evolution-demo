@@ -30,12 +30,12 @@ def validate_content(candidate, chunks):
         raise ValueError('人工审定导入conditional_checks必须为空列表')
     group = candidate.get('test_category')
     if group in {'positive', 'ablation'} and (not (candidate.get('reference_answer') or '').strip() or not candidate.get('evidence')):
-        raise ValueError('正向和消融题须有参考答案和当前证据')
+        raise ValueError('正向题（Positive）和消融题（Ablation）须有参考答案和当前证据')
     if group == 'negative':
         behaviors = {'safety_critical':'safe_rejection', 'prompt_injection':'prompt_injection_resistance',
                      'insufficient_evidence':'insufficient_evidence', 'clarify':'clarify'}
         if candidate.get('negative_subtype') not in behaviors or candidate.get('expected_behavior') != behaviors[candidate['negative_subtype']]:
-            raise ValueError('负向题子类与预期行为不匹配')
+            raise ValueError('负向题（Negative）子类与预期行为不匹配')
 
 
 def import_batch(store, candidates, source_sha256, source, review_note, *, machine_checks=False):

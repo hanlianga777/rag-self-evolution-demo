@@ -3,7 +3,7 @@ import { PageShell } from "../components/PageShell";
 import { useState } from "react";
 import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
 import { ArrowRight } from "lucide-react";
-import { Metric, Section, TechnicalDetails } from "../components/Primitives";
+import { Metric, Section } from "../components/Primitives";
 import { displayText, productionName } from "../display";
 import type { Page } from "../types";
 
@@ -44,10 +44,10 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const sandboxIncomplete = roundCandidates.some(candidate => candidate.status !== "evaluated" || candidate.result?.evaluation_complete === false);
   const sandboxPaused = experiment.result?.optimization_cycle?.price_pause?.paused || experiment.result?.price_pause?.paused || roundCandidates.some(candidate => candidate.result?.price_pause?.paused);
   const sandboxRunning = roundCandidates.some(candidate => ["running", "queued"].includes(candidate.status));
-  const next: [string, string, Page] = knowledge?.legacy ? ["建立知识处理 Pipeline", "完成 MinerU 与 Alibaba 连接配置后，在知识库重建真实知识资产。", "knowledge"] : newKnowledge && !frozen ? ["完成 Golden Dataset 重建", "新 Corpus 已激活；完成题目构造、校验与人工确认。", "governance"] : !frozen && needsRegeneration ? [`补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）`, "当前 Golden Run 有失败题目，补齐后继续人工确认。", "governance"] : !frozen ? ["确认 Golden Dataset", "完成题目检查与 人工确认。", "governance"] : !run?.id || data.workspace?.requires_new_baseline || data.workspace?.baseline_unavailable_reason ? ["运行 Baseline", "使用已冻结的 Golden Dataset 生成正式诊断报告。", "evaluation"] : run.status !== "completed" ? [run.status === "failed" ? "重试 Baseline" : "等待 Baseline 完成", run.status === "failed" ? "正式评测失败，请查看错误并重试。" : "正式评测尚未完成，完成后才能运行 Agent。", "evaluation"] : !experiment?.id || !candidates.length ? ["运行优化 Agent", "依据真实 Bad Case 生成 A/B/C 优化方案。", "evolution"] : sandboxIncomplete ? [sandboxPaused ? "等待平价时段继续 Sandbox" : sandboxRunning ? "等待 Sandbox 完成" : roundCandidates.some(candidate => candidate.status === "failed") ? "查看 Sandbox 中断" : "运行 Sandbox", "本轮方案尚无完整评测结果，请先查看进度与已保存断点。", "evolution"] : recommendation.status !== "Recommended" ? ["完成调优决策", "查看 Sandbox、人工确认与组合方案 D 的结果。", "evolution"] : !currentReleased ? ["人工确认发布", "核对推荐方案后由人确认发布。", "versions"] : ["查看方案对比", "比较正式 Baseline 与线上版本 的同题回答。", "verification"];
+  const next: [string, string, Page] = knowledge?.legacy ? ["建立知识处理 Pipeline", "完成 MinerU 与 Alibaba 连接配置后，在知识库重建真实知识资产。", "knowledge"] : newKnowledge && !frozen ? ["完成 Golden Dataset 重建", "新 Corpus 已激活；完成题目构造、校验与人工确认。", "governance"] : !frozen && needsRegeneration ? [`补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）`, "当前 Golden Run 有失败题目，补齐后继续人工确认。", "governance"] : !frozen ? ["确认 Golden Dataset", "完成题目检查与 人工确认。", "governance"] : !run?.id || data.workspace?.requires_new_baseline || data.workspace?.baseline_unavailable_reason ? ["运行 Baseline", "使用已冻结的 Golden Dataset 生成正式诊断报告。", "evaluation"] : run.status !== "completed" ? [run.status === "failed" ? "重试 Baseline" : "等待 Baseline 完成", run.status === "failed" ? "正式评测失败，请查看错误并重试。" : "正式评测尚未完成，完成后才能运行 Agent。", "evaluation"] : !experiment?.id || !candidates.length ? ["运行优化 Agent", "依据真实 Bad Case 生成 A/B/C 优化方案。", "evolution"] : sandboxIncomplete ? [sandboxPaused ? "等待平价时段继续 Sandbox" : sandboxRunning ? "等待 Sandbox 完成" : roundCandidates.some(candidate => candidate.status === "failed") ? "查看 Sandbox 中断" : "运行 Sandbox", "本轮方案尚无完整评测结果，请先查看进度与已保存断点。", "evolution"] : recommendation.status !== "Recommended" ? ["完成调优决策", "查看 Sandbox、人工确认与组合 Candidate D 的结果。", "evolution"] : !currentReleased ? ["人工确认发布", "核对推荐方案后由人确认发布。", "versions"] : ["查看方案对比", "比较正式 Baseline 与线上版本 的同题回答。", "verification"];
   const stages: [string, string, Page][] = [
     ["知识库", `${data.documents?.length || 0} 份文档${knowledge?.identity ? "已索引" : "待建立新索引"}`, "knowledge"], ["Pipeline", newKnowledge ? "知识处理与检索已配置" : (production?.config ? "当前线上配置已保存" : "待配置"), "settings"],
-    ["Golden Dataset", frozen ? `已冻结 · ${expectedCount} 题` : `待人工确认 · ${summary.approved || 0} / ${expectedCount || "—"} 题`, "governance"], ["Baseline", run?.result?.gates ? `已评测 · ${run.result.gates.passed_count}/${run.result.gates.total} 项门槛通过` : "待评测", "evaluation"],
+    ["Golden Dataset", frozen ? `已冻结 · ${expectedCount} 题` : `待人工确认 · ${summary.approved || 0} / ${expectedCount || "—"} 题`, "governance"], ["Baseline", run?.result?.gates ? `已评测 · ${run.result.gates.passed_count}/${run.result.gates.total} 项 Hard Gate 通过` : "待评测", "evaluation"],
     [displayText("Optimization Agent"), qualified.length ? `${qualified.length} 个合格方案 · ${qualified.map(row => schemeName(row)).join(" / ")}` : roundCandidates.length ? `${roundCandidates.filter(candidate => candidate.status === "evaluated" && candidate.result?.evaluation_complete !== false).length}/${roundCandidates.length} 个方案已评测` : experiment?.id ? "暂无候选，等待生成" : "尚未生成优化方案", "evolution"],
     [displayText("Release"), currentReleased ? "当前推荐已发布" : recommendation.recommended_candidate ? "当前推荐待发布" : "尚无可发布方案", "versions"],
   ];
@@ -57,7 +57,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const storyTrials=candidates.filter((c:any)=>c.status!=="skipped" && (c.result?.evaluation_run_id || c.status==="evaluated" || c.status==="running")).length;
   const storyRounds=new Set(candidates.filter((c:any)=>["A","B","C"].includes(c.reasoning?.candidate_label)).map((c:any)=>c.reasoning?.round || 1)).size;
 
-  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1>RAG 自进化项目概览</h1><p>评测驱动的 RAG 持续优化与版本决策系统</p><p className="overview-intro">用 Golden Dataset 评测 Baseline，优化 Agent 分析 Bad Case，在 Sandbox 验证改善并完成回归检查后，由人工确认发布。</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
+  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1>RAG 自进化项目概览</h1><p>评测驱动的 RAG 持续优化与版本决策系统</p><p className="overview-intro">用 Golden Dataset 评测 Baseline，优化 Agent 分析 Bad Case，在 Sandbox 验证改善并完成 Regression Check 后，由人工确认发布。</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
 
 
     {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} /> : <>
@@ -73,7 +73,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
 
     {productionLegacy && <section className="legacy-production"><span>线上版本：{productionName(production)}，优化方案通过发布确认后才会替换。</span><a href="#verification" onClick={() => navigate("verification")}>查看线上版本</a></section>}
     </>}
-    <TechnicalDetails><p>冻结题卷：{goldenId || "未知"}</p><p>Baseline 评测：{run?.id || "未知"}</p>{formal && workSummary.generation_run_id && workSummary.generation_run_id !== formal.generation_run_id && <p className="muted overview-work-run">工作 Run：{workSummary.generation_status || "未记录状态"} · {workSummary.total ?? 0} / {workSummary.expected_count ?? "—"}；不替代当前正式 Golden。</p>}</TechnicalDetails>
+
   </PageShell>;
 }
 

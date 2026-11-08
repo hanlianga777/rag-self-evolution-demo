@@ -20,7 +20,6 @@
 .governance-page .review-table td { font-size: 13px; }
 .governance-page .review-table td:nth-child(3) { white-space: normal; }
 .governance-page .review-table td .badge { white-space: normal; }
-.governance-page .golden-technical-details { margin-top: 24px; }
 .governance-page .golden-summary-strip { display: grid; gap: 16px; }
 .governance-page .golden-summary-strip p { margin: 0; }
 .governance-page .golden-initial-skeleton { padding: 24px 0; }

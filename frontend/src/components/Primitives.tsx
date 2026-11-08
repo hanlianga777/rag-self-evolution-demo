@@ -126,7 +126,7 @@ export function ActionMenu({ label, children, triggerText = "⋯" }: { label:str
 /** One track style for both completion and proportions; thresholds are optional. */
 export function ProgressBar({ value, max = 100, label, failed = false, threshold }: { value: number; max?: number; label: string; failed?: boolean; threshold?: number }) {
   const percent = max > 0 ? Math.max(0, Math.min(100, value / max * 100)) : 0;
-  return <div className={`progress-track${failed ? " failed" : ""}`} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value}><span style={{ width: `${percent}%` }} />{threshold != null && max > 0 && <i className="progress-threshold" style={{ left: `${Math.max(0, Math.min(100, threshold / max * 100))}%` }} title={`门槛 ${threshold}`} />}</div>;
+  return <div className={`progress-track${failed ? " failed" : ""}`} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value}><span style={{ width: `${percent}%` }} />{threshold != null && max > 0 && <i className="progress-threshold" style={{ left: `${Math.max(0, Math.min(100, threshold / max * 100))}%` }} title={`Hard Gate ${threshold}`} />}</div>;
 }
 
 export function DrawerSection({ title, children }: { title: string; children: ReactNode }) {
@@ -140,5 +140,3 @@ export function EmptyState({ title, children, action }: { title: string; childre
 }
 
 export function MoreMenu({ children }: { children: ReactNode }) { return <ActionMenu label="页面更多操作" triggerText="更多">{children}</ActionMenu>; }
-
-export function TechnicalDetails({ children }: { children: ReactNode }) { return <Disclosure label="技术详情">{children}</Disclosure>; }

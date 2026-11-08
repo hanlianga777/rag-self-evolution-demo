@@ -62,19 +62,19 @@ EXCLUDED_AUTOMATIC_PARAMETERS = frozenset({
 # Descriptions follow ALLOWED_SEARCH_SPACE order; values remain validator-owned.
 PARAMETER_EXPLANATIONS = {
     'candidate_k': ('候选数：初次查找保留多少段资料，供后续排序。', ['先保留12段候选资料。', '先保留24段候选资料，扩大查找范围。']),
-    'top_k': ('保留条数：最终送给回答模型的资料段数。', ['最多保留4段资料用于回答。', '最多保留6段资料用于回答，可能增加耗时。']),
-    'min_score': ('最低分数线：低于该相关分的内容不进入回答。', ['不额外提高相关分门槛。', '仅保留相关分至少0.1的内容。', '仅保留相关分至少0.2的内容。', '仅保留相关分至少0.3的内容，过滤更严格。', '仅保留相关分至少0.4的内容。']),
-    'hybrid_search': ('混合检索：是否结合向量和关键词查找。', ['结合语义相似度和关键词检索。', '按向量相关分排序，不混合关键词分数。']),
-    'hybrid_alpha': ('向量检索权重：仅在混合检索开启时使用。', ['向量权重0.3、关键词权重0.7，更重视原词。', '向量和关键词各占0.5。', '向量权重0.7、关键词权重0.3，更重视语义。']),
-    'rerank': ('重排方式：决定候选资料进入回答前如何排序。', ['调用重排模型重新排序。', '保留检索原排序，不调用重排模型。', '只按原问题做关键词排序，不调用重排模型。']),
-    'query_rewrite': ('查询改写：是否先把原问题改写为检索问法。', ['调用模型生成标准化检索问法。', '不生成改写问法。']),
-    'multi_query': ('多路查询：是否生成互补问法一起查找。', ['不生成多路查询。', '生成2个互补问法并检索。', '生成4个互补问法并检索。', '生成6个互补问法并检索，检索量和耗时可能增加。']),
+    'top_k': ('保留条数：最终送给 Generation 模型的资料段数。', ['最多保留4段资料用于回答。', '最多保留6段资料用于回答，可能增加耗时。']),
+    'min_score': ('最低分数线：低于该相关分的内容不进入回答。', ['不额外提高相关分 Hard Gate。', '仅保留相关分至少0.1的内容。', '仅保留相关分至少0.2的内容。', '仅保留相关分至少0.3的内容，过滤更严格。', '仅保留相关分至少0.4的内容。']),
+    'hybrid_search': ('Hybrid Search：是否结合向量和关键词查找。', ['结合语义相似度和BM25。', '按向量相关分排序，不混合关键词分数。']),
+    'hybrid_alpha': ('Embedding Retrieval 权重：仅在 Hybrid Search 开启时使用。', ['向量权重0.3、关键词权重0.7，更重视原词。', '向量和关键词各占0.5。', '向量权重0.7、关键词权重0.3，更重视语义。']),
+    'rerank': ('Rerank 方式：决定候选资料进入回答前如何排序。', ['调用 Rerank 模型重新排序。', '保留检索原排序，不调用 Rerank 模型。', '只按原问题做关键词排序，不调用 Rerank 模型。']),
+    'query_rewrite': ('Query Rewrite：是否先把原问题改写为检索问法。', ['调用模型生成标准化检索问法。', '不生成改写问法。']),
+    'multi_query': ('Multi-Query：是否生成互补问法一起查找。', ['不生成 Multi-Query。', '生成2个互补问法并检索。', '生成4个互补问法并检索。', '生成6个互补问法并检索，检索量和耗时可能增加。']),
     'hyde': ('HyDE：先写一段假设答案再拿去检索，假设文本不作为证据。', ['调用模型生成假设答案辅助检索。', '不生成假设答案。']),
     'prompt_strategy': ('回答策略：决定怎样使用证据和处理缺失条件；历史Abstention仍为谨慎拒答，不可新选。', [
         '有据生成：只能基于给定证据回答；证据不足时明确说明。',
         '完整性优先：在不超出证据的前提下覆盖用户问题的所有必要步骤；证据不足时明确说明。',
         '分级回答：证据能明确回答时直接给出步骤和结论；只覆盖一部分或缺关键条件时，先说清能确定的部分，再追问1–2个最关键的信息，不猜；证据完全不相关或超出知识库时说明无法回答，建议联系售后或人工；安全警告必须完整保留。']),
-    'generation_thinking': ('回答思考档位：控制回答模型的思考投入，可能影响质量、耗时和费用。', ['关闭思考。', '低档思考，投入较少。', '高档思考。', '最高档思考，投入较多。']),
+    'generation_thinking': ('Thinking 档位：控制 Generation 模型的思考投入，可能影响质量、耗时和费用。', ['关闭思考。', '低档思考，投入较少。', '高档思考。', '最高档思考，投入较多。']),
     'retrieval_max_tokens': ('上下文窗口：保留完整来源块；缺少分词器时按字符数估算 token。', ['不限，不截断检索内容。', '限制为8192 token。', '限制为4096 token。']),
 }
 
@@ -160,7 +160,7 @@ def composite_source_grade(candidate, baseline):
     critical = candidate.get('result', {}).get('regression', {}).get('new_critical_failures')
     excluded = critical != 0 or bool(candidate.get('result', {}).get('continued_failure_new_critical_question_ids'))
     return {'parameter_diff':diff, 'grade':'excluded' if excluded else 'whole_bundle' if len(diff)>1 else 'single_parameter',
-            'rule':'新增关键错题或关键回归记录缺失，排除' if excluded else '无法单独归因，只能整组取用' if len(diff)>1 else '单参数可单独取用'}
+            'rule':'新增关键 Bad Case 或关键 Regression 记录缺失，排除' if excluded else '无法单独归因，只能整组取用' if len(diff)>1 else '单参数可单独取用'}
 
 
 def validate_composite_sources(sources, config, baseline, reasons):
@@ -168,7 +168,7 @@ def validate_composite_sources(sources, config, baseline, reasons):
     for source in sources:
         grade = composite_source_grade(source, baseline)
         if grade['grade']=='excluded':
-            raise ValueError('D来源有新增关键错题或记录缺失，排除')
+            raise ValueError('D来源有新增关键 Bad Case 或记录缺失，排除')
         if not isinstance(reasons, dict) or not isinstance(reasons.get(source['id']), str) or not reasons[source['id']].strip():
             raise ValueError('每个D来源必须写明选择理由 source_reasons')
         diff = grade['parameter_diff']
@@ -213,10 +213,10 @@ def select_final_candidate(candidates: list[dict], final_candidate: dict | None 
     if (final_candidate and final_candidate.get('status') == 'evaluated'
             and final_candidate.get('result', {}).get('release_qualification', {}).get('qualified') is True
             and d_improves_winner(final_candidate, winner)):
-        return {'decision':'推荐方案 D', 'candidate_id':final_candidate['id'], 'reason':'D具备发布资格且优于赢家：错题更少，或错题相同且P99、费用均更低'}
+        return {'decision':'推荐 Candidate D', 'candidate_id':final_candidate['id'], 'reason':'D具备发布资格且优于 Winner：Bad Case 更少，或 Bad Case 相同且P99、费用均更低'}
     if winner['result'].get('release_qualification', {}).get('qualified') is not True:
-        return {'decision':'保持 Baseline', 'candidate_id':None, 'reason':'赢家候选合格但不具备发布资格，D也未满足推荐条件', 'winner_id':winner['id']}
-    return {'decision': '保留赢家方案', 'candidate_id': winner['id'], 'reason': 'D未同时满足发布资格与优于赢家；保留具有发布资格的赢家'}
+        return {'decision':'保持 Baseline', 'candidate_id':None, 'reason':'Winner 候选合格但不具备发布资格，D也未满足推荐条件', 'winner_id':winner['id']}
+    return {'decision': '保留 Winner 方案', 'candidate_id': winner['id'], 'reason': 'D未同时满足发布资格与优于 Winner；保留具有发布资格的 Winner'}
 
 
 def canonicalize_config(config: dict) -> str:

@@ -13,7 +13,7 @@ afterEach(() => { if (root) act(() => root!.unmount()); root = undefined; docume
 it("supports keyboard selection with a labelled listbox", async () => {
   const onChange = vi.fn();
   root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root!.render(<CustomSelect ariaLabel="方案" value="a" onChange={onChange} options={[{ value: "a", label: "方案 A" }, { value: "b", label: "方案 B", description: "已评测" }]} />));
+  await act(async () => root!.render(<CustomSelect ariaLabel="方案" value="a" onChange={onChange} options={[{ value: "a", label: "Candidate A" }, { value: "b", label: "Candidate B", description: "已评测" }]} />));
   const trigger = document.querySelector('[role="combobox"]') as HTMLButtonElement;
   await act(async () => { trigger.focus(); trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })); });
   expect(document.querySelector('[role="listbox"]')).not.toBeNull();
@@ -46,9 +46,8 @@ it("formats Baseline time locally and shortens the run ID", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
   expect(document.querySelector(".baseline-run-summary")?.textContent).toContain("2026-09-27 22:04:23");
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "查看评测依据")!.click());
-  expect(document.querySelector("[role=dialog]")?.textContent).toContain("2026-09-27 22:04:23");
-  expect(document.querySelector(".short-id")?.textContent).not.toBe(run.id);
+  expect([...document.querySelectorAll("button")].some(button=>button.textContent==="查看评测依据")).toBe(false);
+  expect(document.body.textContent).not.toContain(run.id);
   expect(document.body.textContent).not.toContain("查看原始时间");
 
 });

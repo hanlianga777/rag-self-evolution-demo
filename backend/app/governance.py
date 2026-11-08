@@ -348,7 +348,7 @@ class GovernanceStore:
             connection.execute("CREATE INDEX IF NOT EXISTS qc_question_latest ON qc_results(question_id,id)")
             connection.execute("CREATE INDEX IF NOT EXISTS quality_audit_latest ON question_quality_audits(question_id,id)")
             for name, availability, description in (
-                ("top_k", "available", "调整向量检索返回条数"),
+                ("top_k", "available", "调整 Embedding Retrieval 返回条数"),
                 ("min_score", "available", "过滤低相关度向量结果"),
                 ("rerank", "unavailable", "当前运行时未实现"),
                 ("query_rewrite", "unavailable", "当前运行时未实现"),
@@ -1527,7 +1527,7 @@ class GovernanceStore:
                 errors.append(f"{item_id}: 证据只能在当前产品文档内改选")
                 continue
             if old["test_category"] == "negative" and source_ids:
-                errors.append(f"{item_id}: 负向题不能添加 Golden Evidence")
+                errors.append(f"{item_id}: 负向题（Negative）不能添加 Golden Evidence")
                 continue
             evidence = [] if old["test_category"] == "negative" else [{"source_chunk_ids": source_ids, "evidence_key_points": [by_chunk[key].get("chunk_text", by_chunk[key].get("text", "")) for key in source_ids if key in by_chunk]}]
             candidate = {**old["raw"], "question": str(change.get("question", old["question"])).strip(), "reference_answer": change.get("reference_answer", old["reference_answer"]), "evidence": evidence, "test_category": old["test_category"], "expected_behavior": old["raw"].get("expected_behavior"), "ablation_attribute": old["raw"].get("ablation_attribute"), "ablation_metadata": change.get("ablation_metadata", old["raw"].get("ablation_metadata", {}))}
@@ -2108,7 +2108,7 @@ class GovernanceStore:
             "reason": "Evidence exists but the production pipeline did not recall it" if classification == "RETRIEVAL_INCOHERENT" else "Programmatic evidence check" if evidence_valid else "Negative subtype does not match the question" if subtype_mismatch else "Negative may be answerable" if classification == "FAKE_NEGATIVE_RISK" else "Answerability could not be established" if not positive else "Evidence or required fields cannot support Golden",
             "rule_version": "v1.2",
             "model_version": "programmatic-probe-v1",
-            "probe_details": {"probe_execution_status": "uncertain" if uncertain else "completed", "question_validity": "needs_review" if uncertain else "valid" if evidence_valid else "invalid", "risk": "P1" if classification == 'RETRIEVAL_INCOHERENT' else None, "retrieval_trace": trace, "evidence_coverage": coverage, "pipeline": "CandidateK → Hybrid → Lightweight second-stage ranking → MinScore → TopK" if positive else "vector + full-text fake-negative check", "vector": {"top_k": hits, "best_similarity": best}, "full_text": full_text, "negative_checks": negative_checks, "classification": classification, "retrieval_coherent": recalled},
+            "probe_details": {"probe_execution_status": "uncertain" if uncertain else "completed", "question_validity": "needs_review" if uncertain else "valid" if evidence_valid else "invalid", "risk": "P1" if classification == 'RETRIEVAL_INCOHERENT' else None, "retrieval_trace": trace, "evidence_coverage": coverage, "pipeline": "Candidate K → Hybrid → Lightweight second-stage ranking → MinScore → Top-K" if positive else "vector + full-text fake-negative check", "vector": {"top_k": hits, "best_similarity": best}, "full_text": full_text, "negative_checks": negative_checks, "classification": classification, "retrieval_coherent": recalled},
         }, execution=execution)
         return {**result, "classification": classification, "programmatic": {"checks": programmatic, "passed": all(programmatic.values())}, "vector": {"top_k": hits, "best_similarity": best, "signal": "observed_only"}, "full_text": full_text, "passed": result["status"] == "passed"}
 
@@ -2468,7 +2468,7 @@ class GovernanceStore:
                 compared.append((_load(row['judge_json'],{}).get('judge_thinking',{}).get('reasoning_effort'), config.get('generation_thinking')))
             comparison_label = (f'判分档位对照（当前 {compared[0][0]} / 原 {compared[1][0]}，回答 {compared[0][1]}）'
                                 if compared[0][0] != compared[1][0] else
-                                f'思考档位对照（回答 {compared[1][1] or "未知"}）' if compared[0][1] != compared[1][1] else
+                                f'Thinking 档位对照（回答 {compared[1][1] or "未知"}）' if compared[0][1] != compared[1][1] else
                                 f'保存回答对照（回答 {compared[1][1] or "未知"}）')
             connection.execute('CREATE TABLE IF NOT EXISTS baseline_designations (id INTEGER PRIMARY KEY, baseline_run_id TEXT NOT NULL, comparison_run_id TEXT NOT NULL, comparison_label TEXT NOT NULL, actor TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL)')
             connection.execute('INSERT INTO baseline_designations(baseline_run_id,comparison_run_id,comparison_label,actor,reason,created_at) VALUES (?,?,?,?,?,?)',
@@ -3042,7 +3042,7 @@ class GovernanceStore:
             if winner and winner['result'].get('evaluation_identity') != baseline['judge'].get('evaluation_identity'):
                 raise ValueError('Winner评测身份不一致')
             if not winner or winner['status'] != 'evaluated' or not winner['result'].get('qualification', {}).get('qualified'):
-                raise ValueError('至少需要一个合格 A/B/C 赢家')
+                raise ValueError('至少需要一个合格 A/B/C Winner')
             if experiment['evaluation_budget']['used'] >= MAX_EVALS:
                 raise ValueError('缺少 D 评测额度')
             confirmation = {'winner_id': winner_id, 'actor': actor, 'confirmed_at': _now(), 'candidates': [{'id': item['id'], 'status': item['status'], 'result': item['result'], 'config': item['config']} for item in candidates]}
@@ -3293,9 +3293,9 @@ class GovernanceStore:
                 else:
                     status, selected = 'Recommended', decision['candidate_id']
             result = {'status': status, 'recommended_candidate': selected, 'final_decision': decision, 'report_confirmation': confirmation, 'composite': composite, 'd_outcome':('evaluation_failed' if composite and composite.get('candidate_id') and self.candidate(composite['candidate_id'])['status']=='failed' else (composite or {}).get('outcome')),
-                      'suggested_winner': qualified[0]['id'] if qualified else None, 'why': decision['reason'], 'alternatives': [{'candidate_id': c['id'], 'reason': '按错题数由少到多比较', 'rank': i + 1} for i, c in enumerate(qualified)],
+                      'suggested_winner': qualified[0]['id'] if qualified else None, 'why': decision['reason'], 'alternatives': [{'candidate_id': c['id'], 'reason': '按 Bad Case 数由少到多比较', 'rank': i + 1} for i, c in enumerate(qualified)],
                       'pareto_frontier': [item['id'] for item in qualified if item['reasoning'].get('candidate_label') != 'D'],
-                      'not_recommended': [{'candidate_id': item['id'], 'reason': '未完成完整Sandbox' if item['status'] != 'evaluated' else '规则身份不一致' if item['result'].get('evaluation_identity') != identity else '资格未通过' if not item['result'].get('qualification', {}).get('qualified') else '错题数未优于首选'} for item in candidates if not qualified or item['id'] != qualified[0]['id']],
+                      'not_recommended': [{'candidate_id': item['id'], 'reason': '未完成完整Sandbox' if item['status'] != 'evaluated' else '规则身份不一致' if item['result'].get('evaluation_identity') != identity else '资格未通过' if not item['result'].get('qualification', {}).get('qualified') else 'Bad Case 数未优于首选'} for item in candidates if not qualified or item['id'] != qualified[0]['id']],
                       'comparison': [{'candidate_id': item['id'], 'status': item['status'], **item['result'], 'parameter_diff': item['reasoning'].get('changed_parameters', {})} for item in candidates]}
             connection.execute('INSERT OR REPLACE INTO recommendations VALUES (?, ?, ?, ?, ?)', (experiment_id, selected, status, _json(result), _now()))
             return result
@@ -3341,7 +3341,7 @@ class GovernanceStore:
         if candidate is None or candidate["status"] != "evaluated":
             raise ValueError("仅已完成 Sandbox 的 Candidate 可发布")
         if not candidate["result"].get("release_qualification", {}).get("qualified"):
-            raise ValueError("未通过发布规则：需要11项门槛全过、零新增错题且至少修好1道")
+            raise ValueError("未通过发布规则：需要11项 Hard Gate 全过、零新增 Bad Case 且至少修好1道")
         if error := self.release_gate_error(candidate):
             raise ValueError(error)
         if not candidate["result"].get("gates", {}).get("passed") or not candidate["result"].get("regression", {}).get("passed"):

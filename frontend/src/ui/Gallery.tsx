@@ -15,7 +15,7 @@ const Q: Record<string, string> = {
   Q06: "客户操作工准备对 KIRA B 50 做日常外部清洁，想直接拿湿抹布擦机身和对接站。按说明书，做这种清洁前在电气安全上有什么必须注意的？",
 };
 
-const LONG = "把回答思考档位从 Max 降到 High，用来压低 P99；同时把 Candidate K 从 12 扩到 24，让更多候选进入 Rerank，补偿降档可能带来的证据遗漏。重点观察 Q24、Q29 这类关键说明原本没进候选的题，同时盯住 Q15、Q17、Q37、Q43、Q46 这些已经答对、但对检索变化敏感的题，避免修好一题又弄坏一题。";
+const LONG = "把 Thinking 档位从 Max 降到 High，用来压低 P99；同时把 Candidate K 从 12 扩到 24，让更多候选进入 Rerank，补偿降档可能带来的证据遗漏。重点观察 Q24、Q29 这类关键说明原本没进候选的题，同时盯住 Q15、Q17、Q37、Q43、Q46 这些已经答对、但对检索变化敏感的题，避免修好一题又弄坏一题。";
 
 export function Gallery() {
   const [status, setStatus] = useState<RunStatus>("running");

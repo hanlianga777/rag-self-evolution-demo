@@ -1,5 +1,5 @@
-import { Badge, DrawerSection, TechnicalDetails } from "../components/Primitives";
-import { displayText, questionSource } from "../display";
+import { Badge, DrawerSection } from "../components/Primitives";
+import { displayText } from "../display";
 
 type Candidate = Record<string, any>;
 const behaviorText: Record<string, string> = {
@@ -35,7 +35,7 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true 
     <DrawerSection title="核心证据"><div className="golden-evidence-scroll">{evidence.map((chunk: Candidate, index: number) => <div className="golden-evidence" key={index}><strong>{sourceLabel(chunk)}</strong><blockquote>{chunk.chunk_text || "暂无"}</blockquote></div>)}{!evidence.length && <p>暂无</p>}</div></DrawerSection>
     <DrawerSection title="评分要点"><div className="golden-scoring-points">{groups.map(([label, points]) => <section key={label}><h4>{label}</h4>{points.length ? <ul>{points.map((point, index) => <li key={index}>{readable(typeof point === "string" ? point : point.requirement || point.description || "暂无")}{point.trigger && <small>适用条件：{readable(String(point.trigger))}</small>}</li>)}</ul> : <p>暂无</p>}</section>)}</div></DrawerSection>
     <DrawerSection title="质检结果"><div className="golden-quality-results quality-grid"><div className="golden-probe-result"><strong>Probe · {probeExecutionFailed ? "执行失败" : goldenScore(probe.score)}</strong><Badge tone={probePassed ? "good" : "warning"}>{probeExecutionFailed ? "未完成" : probePassed ? "通过" : row.probe_status === "needs_revision" ? "未通过" : "未运行"}</Badge><p>{probeExecutionFailed ? "执行情况" : "题目有效"}：{validityReason}</p><p>召回观察：{retrievalReason}</p><button className="secondary" disabled={busy || !onRun} title={!onRun ? "即将支持" : undefined} onClick={() => onRun?.(row.id, "probe")}>运行 Probe</button></div><div><strong>QC · {goldenScore(qc.score)}</strong><Badge tone={qcPassed ? "good" : "warning"}>{qcPassed ? "通过" : row.qc_status === "qc_failed" ? "未通过" : "未运行"}</Badge><p>{readable(qc.reason || "暂无")}</p><button className="secondary" disabled={busy || !onRun || !probePassed} title={!onRun ? "即将支持" : !probePassed ? "Probe 通过后可运行 QC" : undefined} onClick={() => onRun?.(row.id, "qc")}>运行 QC</button></div></div></DrawerSection>
-    <TechnicalDetails><p>来源：{questionSource(row)}</p><p>题目编号：{row.id}</p><p>证据编号：{evidence.map((chunk: Candidate) => chunk.chunk_id).filter(Boolean).join("、") || "暂无"}</p><p>Probe 原始理由：{probe.reason || "暂无"}</p><p>Probe 分类：{probe.probe_details?.classification || probe.classification || "暂无"}</p>{retrievalObservation && <p>P1 表示检索链路观察，题目与证据有效性由 Probe 分数及 QC 分开判定。</p>}<pre>{JSON.stringify({ probe, qc, business_requirements: requirements, qualification_status: row.qualification_status, review_history: row.review_history }, null, 2)}</pre></TechnicalDetails>
+
   </div>
   {frozen && <div className="candidate-actionbar"><button className="secondary" disabled title="已冻结，修改需新建题卷版本">编辑</button><button className="secondary" disabled title="已冻结，修改需新建题卷版本">替换</button><button className="secondary" disabled title="题卷已冻结，已完成批准">批准</button></div>}
   </>;

@@ -33,7 +33,7 @@ class FollowupJobs:
 
     def start(self, run_id, group):
         if group == 'review':
-            raise ValueError('当前评测以单遍结果为准，已关闭错题复核；历史记录只读保留')
+            raise ValueError('当前评测以单遍结果为准，已关闭 Bad Case 复核；历史记录只读保留')
         read_baseline(self.store.database_path, run_id)
         path = self.path(run_id, group)
         with self.lock:

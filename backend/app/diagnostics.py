@@ -215,7 +215,7 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
         if subtype=='insufficient_evidence':
             result['subfeature']='回答了知识库外内容'
             return conclude('安全边界','Safety','证据不足题的已保存判分为错：回答越过资料边界。')
-        gaps.append('缺少负向题子类')
+        gaps.append('缺少负向题（Negative）子类')
     if 'model_answer' not in case or not isinstance(case.get('model_answer'), str):
         gaps.append('缺少已保存的模型回答')
     if gaps:
@@ -286,9 +286,9 @@ def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_finger
         return f'{stage}第 {value} 位' if isinstance(value,int) else f'{stage}记录缺失' if value=='记录缺失' else f'未进{stage}'
     missing_positions=[p for p in positions if not isinstance(p['final_rank'],int)]
     chosen=(missing_positions or positions)[:1]
-    position_label=' → '.join(location(p[k],label) for p in chosen for k,label in [('candidate_rank','候选'),('rerank_rank','重排'),('final_rank','最终')]) if chosen else '无标准证据检索要求'
+    position_label=' → '.join(location(p[k],label) for p in chosen for k,label in [('candidate_rank','召回'),('rerank_rank','Rerank'),('final_rank','Top-K')]) if chosen else '无标准证据检索要求'
     if case.get('test_category') == 'negative':
-        position_label = '不适用（负向题不定位标准证据）'
+        position_label = '不适用（负向题（Negative）不定位标准证据）'
     missing_points=unmet_required_points(case, golden)
     subfeature=analysis.get('subfeature','')
     phenomena = [{'name': subfeature, 'status': 'observed', 'basis': [analysis['analysis_reason']]}] if subfeature else []
@@ -297,7 +297,7 @@ def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_finger
                             if gate['metric'] == 'latency_p99_seconds')
     if type(latency['question_ms']) in (int, float) and latency['question_ms'] > latency_limit_ms:
         phenomena.append({'name': 'Latency 过高', 'status': 'observed',
-                          'basis': [f"已保存单题耗时 {latency['question_ms']} ms，超过现有 P99 门槛对照 {latency_limit_ms} ms；不改变业务判分"]})
+                          'basis': [f"已保存单题耗时 {latency['question_ms']} ms，超过现有 P99 Hard Gate 对照 {latency_limit_ms} ms；不改变业务判分"]})
     return {**analysis, 'view_version': 'diagnosis-view-v7',
             'display_question_id':display_id,'subfeature':subfeature,'subfeatures':[subfeature] if subfeature else [],
             'retrieval_positions':positions,'retrieval_position_label':position_label,'missing_points':missing_points,
@@ -323,4 +323,4 @@ def experiment_plan(case, analysis, *, corpus_chunks=None, corpus_fingerprint=No
             'directions': directions, 'observations': [],
             'next_action': 'controlled_sandbox' if directions else 'repair_sources_or_trace',
             'blockers': [] if directions else [analysis['analysis_reason']],
-            'falsification': '同一题卷重新评测，检查错题是否修好及11项门槛是否通过。'}
+            'falsification': '同一题卷重新评测，检查 Bad Case 是否修好及11项 Hard Gate 是否通过。'}

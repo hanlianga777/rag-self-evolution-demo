@@ -31,52 +31,16 @@ it('latest candidate cards and history Drawer keep round provenance',async()=>{
  await click('更多');await click('查看历史实验');expect(document.querySelector('[role=dialog]')?.textContent).toContain('saved 1-A');
  expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('saved 2-A');
 });
-it('new Judge-only baseline checks eligibility before starting',async()=>{
- const plan={can_replay:true,can_start_replay:true,reusable:50,total:50,judge_calls:50,max_judge_calls:150,new_evaluation_identity:'v5-identity',source_sha256:'source-sha',eligibility:[{question_id:'new-q',eligible:true,origin:'generation_checkpoint'}]};
- const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?plan:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
- await render(<EvaluationPage data={{evaluation:run}}/>);await click('新版Baseline判分（复用回答）');
- expect(document.body.textContent).toContain('50 / 50');expect(document.body.textContent).not.toContain('恢复 Baseline');
- await click('授权新版 Judge-only Baseline');expect(document.querySelector('[role=dialog]')).toBeNull();
- expect(calls.mock.calls.some((c:any[])=>c[1]?.method==='POST')).toBe(true);
-});
-it('ineligible saved execution blocks Judge-only baseline without falling back to generation',async()=>{
- const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?{can_replay:false,reusable:49,total:50,eligibility:[{question_id:'missing-q',eligible:false,blockers:['complete_generated_answer_missing']}]}:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
- await render(<EvaluationPage data={{evaluation:run}}/>);await click('新版Baseline判分（复用回答）');
- expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='授权新版 Judge-only Baseline')?.disabled).toBe(true);
- expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
-});
-
-it('keeps a saved replay blocker read-only without prescribing an obsolete question review',async()=>{
- const plan={can_replay:true,can_start_replay:false,reusable:50,total:50,probe_blocker:'saved execution eligibility requires verification',eligibility:[]};
- const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?plan:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
- await render(<EvaluationPage data={{evaluation:run}}/>);await click('新版Baseline判分（复用回答）');
- expect(document.body.textContent).toContain('50 / 50');expect(document.body.textContent).toContain('新版判分暂不可用');
- await click('授权新版 Judge-only Baseline');expect(document.querySelector('[role=dialog]')).toBeNull();
- expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
-});
-
-it('restores the read-only replay preflight after remount without starting a run',async()=>{
- const plan={can_replay:true,can_start_replay:true,reusable:50,total:50,judge_calls:50,max_judge_calls:150,new_evaluation_identity:'v5-restored',source_sha256:'saved',eligibility:[]};
- const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('judge-replay/preflight')?plan:url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
- await render(<EvaluationPage data={{evaluation:run}}/>);
- expect(document.body.textContent).toContain('50 / 50');
- expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='授权新版 Judge-only Baseline')?.disabled).toBe(false);
- act(()=>root.unmount());document.body.innerHTML='';
- await render(<EvaluationPage data={{evaluation:run}}/>);
- expect(document.body.textContent).toContain('50 / 50');
- expect(calls.mock.calls.filter((c:any[])=>c[0].includes('judge-replay/preflight')).length).toBe(2);
- await click('授权新版 Judge-only Baseline');
- expect(document.querySelector('[role=dialog]')).toBeNull();
- expect(calls.mock.calls.some((c:any[])=>c[1]?.method==='POST')).toBe(true);
-});
-it('shows a preflight error and retries it instead of leaving an empty card',async()=>{
- let failed=true;
+it.each([true,false,'error'])('removes the Judge-only entry and its automatic preflight (%s)',async(eligible)=>{
  const calls=vi.fn(async(url:string)=>{
-  if(url.includes('judge-replay/preflight')){if(failed)throw new Error('offline preflight unavailable');return new Response(JSON.stringify({can_start_replay:true,reusable:50,total:50,eligibility:[]}));}
-  return new Response(JSON.stringify(url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run));
+  if(url.includes('judge-replay'))throw new Error('the retired entry must not request a preflight');
+  return new Response(JSON.stringify(url.includes('/preflight')?{can_start:true}:run));
  });vi.stubGlobal('fetch',calls);
- await render(<EvaluationPage data={{evaluation:run}}/>);
- expect(document.body.textContent).toContain('offline preflight unavailable');
- failed=false;await click('新版Baseline判分（复用回答）');expect(document.body.textContent).toContain('50 / 50');
+ const input={evaluation:{...run,result:{...run.result,replay:{eligible}}}},before=JSON.stringify(input);
+ await render(<EvaluationPage data={input}/>);
+ expect(document.body.textContent).not.toContain('新版Baseline判分（复用回答）');
+ expect(document.body.textContent).not.toContain('授权新版 Judge-only Baseline');
+ expect(calls.mock.calls.some(([url])=>url.includes('judge-replay'))).toBe(false);
  expect(calls.mock.calls.every((c:any[])=>!c[1]?.method||c[1].method==='GET')).toBe(true);
+ expect(JSON.stringify(input)).toBe(before);
 });

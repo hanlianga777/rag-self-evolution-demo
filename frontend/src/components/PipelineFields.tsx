@@ -22,7 +22,7 @@ export function formatValue(value: unknown): string {
 }
 
 export function SearchSpaceTable({ contract, baseline }: { contract: Record<string, { type: string; allowed: unknown[] }>; baseline: Record<string, unknown> }) {
-  return <div className="table-scroll"><DataTable className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th>当前 Baseline</th>}<th>允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td>{parameterNames[key] || key}</td>{Object.keys(baseline).length > 0 && <td>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key])}</td>}<td>{rule.allowed.map(formatValue).join(" / ")}</td><td>{key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "混合检索已开启" : "—"}</td><td>{descriptions[key] || "—"}</td></tr>)}</tbody></DataTable></div>;
+  return <div className="table-scroll"><DataTable className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th>当前 Baseline</th>}<th>允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td>{parameterNames[key] || key}</td>{Object.keys(baseline).length > 0 && <td>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key])}</td>}<td>{rule.allowed.map(formatValue).join(" / ")}</td><td>{key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "Hybrid Search 已开启" : "—"}</td><td>{descriptions[key] || "—"}</td></tr>)}</tbody></DataTable></div>;
 }
 
 export const parameterGroups: Record<string, string[]> = { Query: ["query_rewrite", "multi_query", "hyde", "query_decompose", "alias_mapping"], Retrieval: ["candidate_k", "top_k", "min_score", "hybrid_search", "hybrid_alpha", "metadata_filter", "retrieval_max_tokens"], Rerank: ["rerank"], Generation: ["prompt_strategy", "generation_thinking"] };
@@ -43,7 +43,7 @@ export function estimatedCostText(metrics?: any): string | null {
 
 export function ExecutionMetrics({ metrics, compact = false }: { metrics?: any; compact?: boolean }) {
   const stages: any[] = Array.isArray(metrics?.stages) ? metrics.stages.filter((row: any) => row && typeof row.stage_name === "string" && typeof row.duration_ms === "number") : [];
-  const names: Record<string, string> = { query_processing: "查询处理", retrieval: "检索总计", vector_search: "向量检索", bm25: "BM25", hybrid_fusion: "Hybrid 融合", candidate_selection: "候选筛选", rerank: "重排方式", context_build: "上下文构建", generation: "回答生成", judge: "Judge" };
+  const names: Record<string, string> = { query_processing: "查询处理", retrieval: "检索总计", vector_search: "Embedding Retrieval", bm25: "BM25", hybrid_fusion: "Hybrid 融合", candidate_selection: "候选筛选", rerank: "Rerank 方式", context_build: "上下文构建", generation: "Generation", judge: "Judge" };
   const grouped = stages.reduce((result: Record<string, { duration: number; parent?: string }>, stage) => { const value = result[stage.stage_name] || { duration: 0, parent: stage.parent }; value.duration += stage.duration_ms; result[stage.stage_name] = value; return result; }, {});
   const usage = metrics?.token_usage;
   const cost = metrics?.cost_estimation || metrics?.estimated_cost;

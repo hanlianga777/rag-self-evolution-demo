@@ -90,7 +90,7 @@ def candidate_comparison(baseline, candidate, targets, golden_questions=None):
             'net_improvement': len(fixed) - len(new), 'formal_blocking_question_ids': critical,
             'bad_case_count': sum(c.get('passed') is False for q, c in candidate.items() if q not in fluctuations),
             'initial_bad_case_count': sum(c.get('passed') is False for c in candidate.values()),
-            'regression_interpretation': '按单遍结果计新增错题；严重新增上限0、普通新增上限1；修好不能抵消新增退化'}
+            'regression_interpretation': '按单遍结果计新增 Bad Case；严重新增上限0、普通新增上限1；修好不能抵消新增退化'}
 
 
 def summarize_evaluation_cases(cases: list[dict], *, complete=True) -> dict:
@@ -168,7 +168,7 @@ def gate_details(cases: list[dict], gates: list[dict], *, statistics_version='fr
         elif metric in {"safe_rejection_rate", "safety_critical_accuracy", "prompt_injection_resistance"}:
             selected = [item for item in cases if item.get("test_category") == "negative" and (metric != "safety_critical_accuracy" or (item.get("negative_subtype") == "safety_critical" if statistics_version == "frozen-negative-subtype-2" else item.get("severity") == "critical")) and (metric != "prompt_injection_resistance" or item.get("negative_subtype") == "prompt_injection")]
             contributions = [{"question_id": item.get("question_id"), "value": None if policy_behavior(item) is None else 100.0 if policy_behavior(item) else 0.0, "passed": item.get("passed")} for item in selected]
-            formula = "适用负向题政策行为通过比例；旧记录使用保存的 behavior_pass"
+            formula = "适用负向题（Negative）政策行为通过比例；旧记录使用保存的 behavior_pass"
         else:
             contributions = [{"question_id": item.get("question_id"), "value": round(item["programmatic_metrics"]["latency_ms"] / 1000, 2), "passed": item.get("passed")} for item in cases if isinstance(item.get("programmatic_metrics", {}).get("latency_ms"), (int, float))]
             formula = "排序后取 floor((n-1)×p) 位；p=0.50" if metric == "latency_p50_seconds" else "排序后取 floor((n-1)×p) 位；p=0.99"
@@ -199,11 +199,11 @@ class EvaluationRunner:
         if isinstance(contract, dict) and any(judge.get(k) != v for k, v in contract.items()):
             raise ValueError('Generation contract不匹配，禁止跨版本生成或续跑')
         if isinstance(contract, dict) and judge.get('common_identity_version') != 'round0-common-1':
-            raise ValueError('Generation/Thinking共同合同缺失（历史未知），禁止新生成或比较')
+            raise ValueError('Generation/Thinking 共同合同缺失（历史未知），禁止新生成或比较')
         if judge.get('common_identity_version') == 'round0-common-1':
             from .providers import thinking_config
             if judge.get('judge_thinking') != thinking_config('judge'):
-                raise ValueError('Judge Thinking合同不匹配，禁止跨身份比较或续跑')
+                raise ValueError('Judge Thinking 合同不匹配，禁止跨身份比较或续跑')
             if judge.get('generation_model_constraint') != self.runtime.model or judge.get('model') != self.runtime.model:
                 raise ValueError('共同模型合同不匹配，禁止跨身份比较或续跑')
 
@@ -353,7 +353,7 @@ class EvaluationRunner:
         result = run['result'] if run else {}
         if (not run or run['status'] != 'completed' or run['config'].get('run_target') != 'baseline'
                 or result.get('evaluation_complete') is not True or result.get('technical_failed') != 0):
-            raise ValueError('错题复核需要完整且无技术失败的 Baseline')
+            raise ValueError('Bad Case 复核需要完整且无技术失败的 Baseline')
         snapshot = json.loads(run['dataset_snapshot_json'])
         cases = self.store.evaluation_case_results(run_id)
         if (len(cases) != result.get('completed') or {c['question_id'] for c in cases} != set(snapshot['question_ids'])
@@ -915,7 +915,7 @@ class EvaluationRunner:
             execute=lambda:self.execute_replay(run_id,items,executions)
         elif run['config'].get('candidate_id'):
             items,config,candidate,baseline=self.candidate_inputs(run['config']['candidate_id'])
-            if config!=run['config'] or baseline['judge']!=run['judge']:raise ValueError('自动恢复Candidate身份不匹配')
+            if config!=run['config'] or baseline['judge']!=run['judge']:raise ValueError('自动恢复 Candidate 身份不匹配')
             execute=lambda:self.execute_candidate(run_id,items,config,candidate,baseline)
         else:
             current,items,config,judge=self.baseline_inputs(run_id)
@@ -943,7 +943,7 @@ class EvaluationRunner:
         with judge_thinking(baseline['judge'].get('judge_thinking',{}).get('reasoning_effort')):
             self._require_generation_contract(baseline['judge'])
         if not policy_current(baseline['judge']):
-            raise ValueError('评测规则已升级，请建立新Baseline；旧Candidate只读')
+            raise ValueError('评测规则已升级，请建立新Baseline；旧 Candidate 只读')
         from .policy import validate_candidate_config
         if not validate_candidate_config(candidate["config"])["valid"]:
             raise ValueError("Candidate 参数超出 Search Space")
@@ -954,7 +954,7 @@ class EvaluationRunner:
             if (candidate['reasoning'].get('candidate_label')!='D' or not winner
                     or decision.get('candidate_id')!=candidate_id
                     or (experiment['result'].get('report_confirmation') or {}).get('winner_id')!=winner['id']):
-                raise ValueError('D缺少已确认Winner和保存建议')
+                raise ValueError('D缺少已确认 Winner 和保存建议')
             history = [c for c in experiment['candidates'] if c['status']=='evaluated' and c['reasoning'].get('candidate_label')!='D' and c['result'].get('evaluation_identity')==baseline['judge'].get('evaluation_identity')]
             facts = build_d_facts(self.store,baseline,winner,history)
             if facts != decision.get('facts'):raise ValueError('D事实表对应的保存结果已变化')
@@ -971,7 +971,7 @@ class EvaluationRunner:
             targets={ref:{**row['result'], 'standard_evidence': standard_evidence(frozen.get(row['question_id'], {}))} for row in self.store.bad_case_rows() if row['run_id']==baseline['id'] for ref in (row['id'],row['question_id'])}
             reasoning=candidate['reasoning']
             actual={k:v for k,v in candidate['config'].items() if v!=base.get(k)}
-            if actual!=reasoning.get('changed_parameters'):raise ValueError('Candidate配置与已审查干预不一致')
+            if actual!=reasoning.get('changed_parameters'):raise ValueError('Candidate 配置与已审查干预不一致')
             sources=[candidate]
             if reasoning.get('candidate_label')=='D':
                 sources=[self.store.candidate(s['candidate_id']) for s in reasoning.get('sources',[])]
@@ -1047,7 +1047,7 @@ class EvaluationRunner:
             raise ValueError('保存的Sandbox尚未完成')
         run_id = run['id']
         if run['judge'].get('evaluation_identity') != baseline['judge'].get('evaluation_identity'):
-            raise ValueError('判分身份不同，禁止比较门槛或计算修好和弄坏')
+            raise ValueError('判分身份不同，禁止比较 Hard Gate 或计算修好和弄坏')
         baseline_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(baseline["id"])}
         candidate_cases = {item["question_id"]: item for item in self.store.evaluation_case_results(run_id)}
         failed = [question_id for question_id, item in baseline_cases.items() if not item.get("passed")]

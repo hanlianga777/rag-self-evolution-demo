@@ -42,7 +42,7 @@ class ReleaseWiringTests(unittest.TestCase):
         result=self.store.refresh_recommendation('E0')
         self.assertEqual(result['recommended_candidate'],'A')
         self.assertEqual(result['suggested_winner'],'B')
-        self.assertEqual(result['final_decision']['decision'],'保留赢家方案')
+        self.assertEqual(result['final_decision']['decision'],'保留 Winner 方案')
 
     def test_no_qualified_candidate_records_keep_baseline(self):
         result=self.store.refresh_recommendation('E0')

@@ -190,7 +190,7 @@ class ThinkingTests(unittest.TestCase):
                 proposal['evidence_assertions']=[]
                 validate_intervention(proposal, {'Q1':case}, DEFAULT_PIPELINE_CONFIG)
                 proposal['target_bad_cases']=['missing']
-                with self.assertRaisesRegex(ValueError, '目标不是本次运行保存的错题'):
+                with self.assertRaisesRegex(ValueError, '目标不是本次运行保存的 Bad Case'):
                     validate_intervention(proposal, {'Q1':case}, DEFAULT_PIPELINE_CONFIG)
 
     def test_agent_new_stage_parameters_allow_advisory_bottleneck_but_reject_illegal_values(self):

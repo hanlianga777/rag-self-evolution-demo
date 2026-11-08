@@ -27,11 +27,11 @@ class AcceptanceTests(unittest.TestCase):
                 self.assertTrue(rule['description'])
                 self.assertEqual([option['value'] for option in rule['options']], rule['allowed'])
                 self.assertTrue(all(option['description'] for option in rule['options']))
-        self.assertIn('不调用重排模型', contract['rerank']['options'][2]['description'])
+        self.assertIn('不调用 Rerank 模型', contract['rerank']['options'][2]['description'])
 
     def test_negative_and_unreviewed_are_not_missing_records(self):
         facts = retrieval_facts({'test_category': 'negative', 'judge_result': {'checks': []}})
-        self.assertEqual(facts['standard_evidence_positions'], '不适用（负向题不定位标准证据）')
+        self.assertEqual(facts['standard_evidence_positions'], '不适用（负向题（Negative）不定位标准证据）')
         self.assertEqual(set(facts['baseline_review'].values()), {'单遍判对'})
         self.assertEqual(retrieval_facts({}, review={'regression_review': {'status': 'running'}})['baseline_review']['conclusion'], '单遍判对')
 
@@ -62,7 +62,7 @@ class AcceptanceTests(unittest.TestCase):
         _, prompt = build_agent_prompt(rows, DEFAULT_PIPELINE_CONFIG, [], gates, list('ABC'))
         priority = next(p for p in prompt['optimization_priorities'] if p['label'] == '生成层问题')
         self.assertEqual(priority['priority'], 1)
-        self.assertEqual(priority['priority_note'], '导致门槛未过：安全拒答率')
+        self.assertEqual(priority['priority_note'], '导致 Hard Gate 未过：安全拒答率')
         self.assertEqual(prompt['bad_cases'][0]['priority'], 1)
         self.assertEqual(prompt['baseline_diagnosis_summary'][0]['root_causes'][0]['priority'], 1)
         gates[0].update(passed=True, status='PASS', actual=95)

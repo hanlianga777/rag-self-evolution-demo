@@ -16,9 +16,9 @@ afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML =
 const mount = async (node: React.ReactNode) => { root = createRoot(document.body.appendChild(document.createElement('div'))); await act(async () => root.render(node)); };
 const response = (value: any) => ({ ok: true, json: async () => value });
 it('uses the shared vocabulary while preserving common RAG terms', () => {
- for (const [key, value] of Object.entries({ 'Hard Gate': '门槛', Overall: '综合分', Candidate: '候选方案', Regression: '回归检查', Recommendation: '推荐方案', Release: '发布', Production: '线上版本', Monitoring: '监控', Snapshot: '冻结版本', Slot: '题位', Coverage: '覆盖规划', 'Human Gate': '人工确认', positive: '正向' })) expect(displayText(key)).toBe(value);
+ for (const [key, value] of Object.entries({ 'Hard Gate': 'Hard Gate', Overall: '综合分', Candidate: 'Candidate', Regression: 'Regression Check', Recommendation: '推荐方案', Release: '发布', Production: '线上版本', Monitoring: '监控', Snapshot: '冻结版本', Slot: '题位', Coverage: '覆盖规划', 'Human Gate': '人工确认', positive: '正向（Positive）' })) expect(displayText(key)).toBe(value);
  for (const key of ['Pipeline', 'Agent', 'Sandbox', 'HyDE', 'Rerank']) expect(displayText(key)).toBe(key);
- expect(parameterNames.hyde).toBe('HyDE'); expect(parameterNames.top_k).toBe('TopK');
+ expect(parameterNames.hyde).toBe('HyDE'); expect(parameterNames.top_k).toBe('Top-K');
  expect(gateNames.safe_rejection_rate).toBe('安全拒答率');
 });
 it('reads overview metrics from the selected saved evaluation, and never fabricates pending results', async () => {
@@ -33,11 +33,11 @@ it('shows a plain failed-gate sentence and hides IDs in collapsed technical deta
  const run = { id: 'EVAL-internal', status: 'completed', created_at: '2026-11-01T12:00:00Z', dataset_version_id: 'GD-test', config: { generation_thinking: 'high' }, result: { judge_replay: { source_run_id: 'saved-source' }, bad_case_count: 1, gates: { passed: false, passed_count: 1, total: 2, gates: [{ metric: 'safe_rejection_rate', status: 'FAIL', actual: 87, threshold: 96, operator: '>=' }] } } };
  vi.stubGlobal('fetch', vi.fn(async (url:string) => new Response(JSON.stringify(url.includes('/preflight')?{can_start:false,can_start_replay:false}:run))));
  await mount(<EvaluationPage data={{ evaluation: run }} />);
- expect(document.querySelector('.baseline-conclusion h2')?.textContent).toBe('本轮有 1 项门槛未达标：安全拒答率 87.0%（要求 ≥96.0%）。');
+ expect(document.querySelector('.baseline-conclusion h2')?.textContent).toBe('本轮有 1 项 Hard Gate 未达标：安全拒答率 87.0%（要求 ≥96.0%）。');
  expect(document.querySelector('.baseline-run-summary')?.textContent).not.toContain('EVAL-internal');
- expect(document.body.textContent).not.toContain('新版Judge判分；生成回答与检索耗时来自已核验历史执行，不代表本次重新生成或当前性能实测。');
+ expect(document.body.textContent).not.toContain('新版Judge判分；Generation与检索耗时来自已核验历史执行，不代表本次重新生成或当前性能实测。');
  const details = [...document.querySelectorAll('details')].find(d => d.querySelector('summary')?.textContent === '技术详情');
- expect(details?.open).toBe(false); expect(details?.textContent).toContain('EVAL-internal');
+ expect(details).toBeUndefined();expect(document.body.textContent).not.toContain('EVAL-internal');
 });
 it('shows the current frozen paper and the saved reviewed-import source', async () => {
  const row = { id: 'q1', question: '人工题', slot: 'Q01', test_category: 'positive', stage: 'golden', raw: { generation_run_id: 'run', source: 'reviewed_csv_machine_checks' }, qualification_status: 'human_approved' };
@@ -45,7 +45,7 @@ it('shows the current frozen paper and the saved reviewed-import source', async 
  vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.endsWith('/questions/q1') ? row : url.includes('candidates?') ? { rows: [row], candidate_index: [row], total: 1, has_more: false } : [])));
  await mount(<GovernancePage data={{ workspace: { current_golden_id: 'GD-saved' }, dataset: [row], generationRuns: [run], snapshots: [{ id: 'GD-saved', status: 'approved', created_at: '2026-11-01T15:19:40Z', snapshot: { generation_run_id: 'run', question_ids: ['q1'], questions: [row] } }] }} />);
  expect(document.querySelector('.page-title p')?.textContent).toBe('1 题 · 已冻结 · 11-01');
- expect(document.querySelector('.golden-technical-details')?.textContent).toContain('GD-saved');
+ expect(document.querySelector('.golden-technical-details')).toBeNull();
  expect(document.querySelector('.question-provenance')).toBeNull();
  await act(async () => document.querySelector<HTMLElement>('.review-table tbody tr[role=button]')!.click());
  expect(document.querySelector('.frozen-question-details')?.textContent).toContain('人工审核导入');
@@ -62,15 +62,15 @@ it('keeps the freeze action hidden while the current paper is being read', async
 it('reads Agent progress from the saved budget and keeps the internal Baseline ID in details', async () => {
  vi.stubGlobal('fetch', vi.fn(async () => response({ search_space: {} })));
  await mount(<EvolutionPage data={{ evaluation: { id: 'internal-agent-baseline', status: 'completed', created_at: '2026-11-01T02:00:00Z', config: { generation_thinking: 'high' } }, optimization: { id: 'exp', evaluation_budget: { used: 4, max: 17, reserved_for_d: 2 }, candidates: [] } }} />);
- expect(document.querySelector('.page-shell-header .experiment-progress')?.textContent).toContain('已评测 4 / 17 次（含方案 D）');
- expect(document.querySelector('.agent-identity')?.textContent).toContain('Baseline · 高档 · 11-01');
+ expect(document.querySelector('.page-shell-header .experiment-progress')?.textContent).toContain('已评测 4 / 17 次（含 Candidate D）');
+ expect(document.querySelector('.agent-identity')?.textContent).toContain('Baseline · High · 11-01');
  expect(document.querySelector('.agent-identity')?.textContent).not.toContain('internal-agent-baseline');
 });
 it('names a runtime version from its saved date and hides its internal ID', async () => {
  await mount(<VersionsPage data={{ versions: [{ id: 'runtime-internal-123', created_at: '2026-10-14T03:00:00Z', status: 'active', provenance: 'bootstrap', config: {} }] }} />);
  expect(document.querySelector('.release-history-table')?.textContent).toContain('当前线上配置');
  expect(document.querySelector('.release-decision')?.textContent).not.toContain('runtime-internal-123');
- expect(document.querySelector('details')?.textContent).toContain('runtime-internal-123');
+ expect(document.querySelector('details')).toBeNull();
 });
 it('uses an honest empty monitoring state and never invents records', async () => {
  sessionStorage.clear();
@@ -95,6 +95,6 @@ it('counts the frozen Golden paper instead of a newer unfinished work Run', asyn
  vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.includes('/snapshots') ? [{ id: snapshot.id, status: 'approved', snapshot }] : { index: {}, knowledge: { identity: { corpus_snapshot_id: 'current' }, coverage: { final_k: 1, clusters: [] } } })));
  await mount(<KnowledgePage data={{ workspace: { current_golden_id: snapshot.id }, overview: { current_golden_id: snapshot.id, dataset: { approved: 0, total: 2 }, knowledge: {} }, documents: [] }} />);
  expect(document.querySelector('.asset-summary')?.textContent).toContain('K-means 聚类得到');
- expect(document.querySelector('.knowledge-page .disclosure')?.textContent).toContain('当前冻结题卷：4 题');
- expect(document.querySelector('.knowledge-page .disclosure')?.textContent).not.toContain('当前冻结题卷：0 题');
+ expect(document.querySelector('.knowledge-page .disclosure')).toBeNull();
+ expect(snapshot.question_ids).toHaveLength(4);
 });

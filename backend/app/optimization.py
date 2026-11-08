@@ -30,19 +30,19 @@ INTERVENTIONS = {
 
 
 DIRECTION_PARAMETERS = {
-    '改写查询':['query_rewrite'], 'HyDE':['hyde'], '多路查询':['multi_query'],
-    '候选数':['candidate_k'], '混合检索':['hybrid_search','hybrid_alpha'],
-    '重排':['rerank'], '保留条数':['top_k'], '最低分数线':['min_score'],
-    '回答策略':['prompt_strategy'], '上下文窗口':['retrieval_max_tokens'], '思考档位':['generation_thinking'], '降低思考档位':['generation_thinking'],
+    'Query Rewrite':['query_rewrite'], 'HyDE':['hyde'], 'Multi-Query':['multi_query'],
+    '候选数':['candidate_k'], 'Hybrid Search':['hybrid_search','hybrid_alpha'],
+    'Rerank':['rerank'], '保留条数':['top_k'], '最低分数线':['min_score'],
+    '回答策略':['prompt_strategy'], '上下文窗口':['retrieval_max_tokens'], 'Thinking 档位':['generation_thinking'], '降低 Thinking 档位':['generation_thinking'],
     '关闭耗时环节':['hyde','multi_query','query_rewrite','rerank'], '调整检索参数':['candidate_k','top_k'],
 }
 PRIORITY_PARAMETERS = {row['label']:list(dict.fromkeys(key for direction in row['directions'] for key in DIRECTION_PARAMETERS.get(direction, []))) for row in DIAGNOSTIC_CATEGORIES}
 
 PARAMETER_ACTIONS = {
-    'candidate_k':'调整候选池','top_k':'调整TopK','min_score':'调整最低分数线',
-    'hybrid_search':'调整混合检索','hybrid_alpha':'调整混合比例','rerank':'调整重排',
-    'query_rewrite':'调整查询改写','multi_query':'调整多路查询','hyde':'调整HyDE',
-    'prompt_strategy':'调整回答策略','generation_thinking':'调整思考档位',
+    'candidate_k':'调整候选池','top_k':'调整 Top-K','min_score':'调整最低分数线',
+    'hybrid_search':'调整 Hybrid Search','hybrid_alpha':'调整混合比例','rerank':'调整 Rerank',
+    'query_rewrite':'调整 Query Rewrite','multi_query':'调整 Multi-Query','hyde':'调整 HyDE',
+    'prompt_strategy':'调整回答策略','generation_thinking':'调整 Thinking 档位',
     'retrieval_max_tokens':'调整检索长度上限',
 }
 
@@ -101,7 +101,7 @@ def validate_round_contract(candidates, baseline, prior_candidates, baseline_gat
         for previous in gate_harming_changes(prior_candidates,baseline_gates):
             harmed=previous['config_diff']
             if harmed and diff == harmed:
-                raise ValueError('不得照搬已证明伤害门槛的相同改动')
+                raise ValueError('不得照搬已证明伤害 Hard Gate 的相同改动')
 
 
 def validate_prior_round_review(result, prior_candidates):
@@ -146,9 +146,9 @@ def validate_intervention(candidate, targets, baseline):
     if not check['valid']:raise ValueError('非法参数：'+'；'.join(check['errors']))
     references=candidate.get('target_bad_cases')
     if not isinstance(references,list) or not references:
-        raise ValueError('方案必须有目标错题')
+        raise ValueError('方案必须有目标 Bad Case')
     for reference in references:
-        if reference not in targets:raise ValueError('目标不是本次运行保存的错题')
+        if reference not in targets:raise ValueError('目标不是本次运行保存的 Bad Case')
         if not diagnostic_view(targets[reference])['target_eligible']:
             raise ValueError('目标记录缺失，先补齐记录')
     for field in ('hypothesis','why','expected_improvement','risk'):
@@ -191,21 +191,21 @@ def baseline_diagnosis_summary(bad_cases, gates):
                 view = row.get('diagnostic_view') or diagnostic_view(case)
                 groups.setdefault(view.get('diagnosis_category', '记录缺失：缺分类记录'), []).append(view.get('display_question_id') or row['question_id'])
                 (targets if is_optimization_target(row) else unstable if is_unstable_case(row) else pending).append(view.get('display_question_id') or row['question_id'])
-        labels={'positive_correctness':'正向题正确性','positive_faithfulness':'正向题忠实性','positive_completeness':'正向题完整性','ablation_correctness':'消融题正确性','ablation_faithfulness':'消融题忠实性','ablation_completeness':'消融题完整性','safe_rejection_rate':'安全拒答率','safety_critical_accuracy':'安全关键准确率','prompt_injection_resistance':'提示注入抵抗','latency_p50_seconds':'回答耗时中位数','latency_p99_seconds':'回答耗时第99百分位'}
+        labels={'positive_correctness':'正向题（Positive）正确性','positive_faithfulness':'正向题（Positive）忠实性','positive_completeness':'正向题（Positive）完整性','ablation_correctness':'消融题（Ablation）正确性','ablation_faithfulness':'消融题（Ablation）忠实性','ablation_completeness':'消融题（Ablation）完整性','safe_rejection_rate':'安全拒答率','safety_critical_accuracy':'安全关键准确率','prompt_injection_resistance':'提示注入抵抗','latency_p50_seconds':'回答耗时中位数','latency_p99_seconds':'回答耗时第99百分位'}
         failed = gate.get('passed') is False or gate.get('status') == 'FAIL'
         unstable_only = failed and bool(unstable) and not targets and not pending
-        unstable_note = 'Baseline 该门槛未过由不稳定题造成（复核多数判对），方案仍须通过该门槛' if unstable_only else ''
-        pending_note = '复核技术异常或未完成，门槛归因未知；方案仍须通过该门槛' if failed and pending else ''
+        unstable_note = 'Baseline 该 Hard Gate 未过由不稳定题造成（复核多数判对），方案仍须通过该 Hard Gate' if unstable_only else ''
+        pending_note = '复核技术异常或未完成，Hard Gate 归因未知；方案仍须通过该 Hard Gate' if failed and pending else ''
         summary.append({'dimension': metric, 'dimension_label':labels.get(metric,'维度记录缺失'), 'baseline_value': actual, 'target_value': target,
                         'operator': gate.get('operator'), 'gap': max(0, -margin),
-                        'status': '未通过' if failed else '接近门槛',
+                        'status': '未通过' if failed else '接近 Hard Gate',
                         'root_causes': [{'diagnosis_category': key, 'question_ids': ids,
                                          'priority': 1 if failed and any(q in targets for q in ids) else next((c['priority'] for c in DIAGNOSTIC_CATEGORIES if c['label']==key), None),
-                                         'priority_note': '导致门槛未过：'+labels.get(metric,'维度记录缺失') if failed and any(q in targets for q in ids) else unstable_note} for key, ids in groups.items()],
+                                         'priority_note': '导致 Hard Gate 未过：'+labels.get(metric,'维度记录缺失') if failed and any(q in targets for q in ids) else unstable_note} for key, ids in groups.items()],
                         'target_question_ids': targets,
-                        'root_cause_note': pending_note or unstable_note or ('整轮耗时问题，需结合已保存耗时拆解' if str(metric).startswith('latency_') else None if groups else '记录缺失：没有该维度对应的错题诊断')})
+                        'root_cause_note': pending_note or unstable_note or ('整轮耗时问题，需结合已保存耗时拆解' if str(metric).startswith('latency_') else None if groups else '记录缺失：没有该维度对应的 Bad Case 诊断')})
     for item in summary:
-        if item.get('root_cause_note') and any(word in item['root_cause_note'] for word in ('复核','不稳定')):item['root_cause_note']='记录不足，门槛归因未知'
+        if item.get('root_cause_note') and any(word in item['root_cause_note'] for word in ('复核','不稳定')):item['root_cause_note']='记录不足，Hard Gate 归因未知'
         for cause in item['root_causes']:
             if '不稳定' in (cause.get('priority_note') or ''):cause['priority_note']=''
     return summary
@@ -222,7 +222,7 @@ def optimization_priorities(bad_cases, gates):
                       and (g.get('passed') is False or g.get('status') == 'FAIL')]
             if failed:
                 priorities.append({**definition, 'count': counts[label], 'priority': 1,
-                                   'priority_note': '回答耗时门槛未过；整轮性能问题不增加业务错题数'})
+                                   'priority_note': '回答耗时 Hard Gate 未过；整轮性能问题不增加业务 Bad Case 数'})
                 continue
         if not counts[label]:continue
         causes = [cause for item in summary if item['status']=='未通过' for cause in item['root_causes'] if cause['diagnosis_category']==label and cause['priority']==1]

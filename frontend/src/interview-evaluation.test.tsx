@@ -21,13 +21,13 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   await render(<EvaluationPage data={input} />);
   expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(0);
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("10 / 11");
-  expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("1 项门槛未达标");
+  expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("1 项 Hard Gate 未达标");
   expect(document.querySelectorAll(".baseline-metrics > div")).toHaveLength(4);
-  expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("消融正确性");
+  expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("消融（Ablation）正确性");
   expect(document.querySelector(".baseline-run-summary")?.textContent).toContain("judge-only-model");
   expect(document.querySelector(".baseline-run-summary")?.textContent).not.toContain("EVAL-stored");
-  expect(document.querySelector("details")?.textContent).toContain("EVAL-stored");
-  await click("门槛");
+  expect(document.body.textContent).not.toContain("EVAL-stored");
+  await click("Hard Gate");
   expect(document.querySelectorAll("tbody tr")).toHaveLength(11);
   expect(document.querySelectorAll(".baseline-gates-table")[1]?.textContent).toContain("72.0%");
   expect(document.querySelector(".baseline-gates-table tbody")?.textContent).toContain("≥ 90.0%");
@@ -37,8 +37,8 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   expect(document.querySelector(".product-diagnosis-table tbody tr td:nth-child(2)")?.textContent).toBe("检索失败");
   await act(async()=>document.querySelector<HTMLElement>(".product-diagnosis-table tbody tr")!.click());
   expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["业务问题", "答案对比", "检索路径", "优化方向"]);
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Retrieval");
-  expect(document.querySelector<HTMLDetailsElement>(".bad-case-details > details")?.open).toBe(false);
+  expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("技术详情");
+  expect(document.querySelector(".bad-case-details > details")).toBeNull();
   expect(JSON.stringify(input)).toBe(frozen);
   expect((fetch as any).mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === "GET")).toBe(true);
 });
@@ -47,9 +47,9 @@ it("uses saved generation evidence only and keeps technical identity in its Draw
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/api/bad-cases") ? [bad] : run))));
   await render(<EvaluationPage data={{ evaluation: run, badCases: [bad] }} />);
   expect(document.querySelector(".config-summary-grid")).toBeNull();
-  await click("查看评测依据");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("judge-only-model");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("EVAL-stored");
+  expect([...document.querySelectorAll("button")].some(button=>button.textContent==="查看评测依据")).toBe(false);
+  expect(document.body.textContent).toContain("judge-only-model");
+  expect(document.body.textContent).not.toContain("EVAL-stored");
 });
 
 it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restores the experiment plan and six Sandbox decision rows", async () => {
@@ -75,7 +75,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["方向", "核心思路", "参数变化", "针对的题", "预期效果", "风险", "结果"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("持久化问题");
   await click("Sandbox");
-  expect([...document.querySelectorAll("tbody tr > td:first-child")].map(cell => cell.textContent)).toEqual(["运行状态", "门槛", "Bad Case", "修复原 Bad Case", "新增失败", "回归检查", "候选合格", "可发布"]);
+  expect([...document.querySelectorAll("tbody tr > td:first-child")].map(cell => cell.textContent)).toEqual(["运行状态", "Hard Gate", "Bad Case", "修复原 Bad Case", "新增失败", "Regression Check", "候选合格", "可发布"]);
   expect(document.body.textContent).not.toContain("Input Tokens");
   await click("查看高级指标");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Input Tokens");
@@ -85,8 +85,8 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
 
 it.each([
   { status: "generated", result: {}, expected: "等待完整试跑" },
-  { status: "evaluated", result: { qualification: { qualified: true }, regression: { status: "PASS" }, gates: { passed_count: 11, total: 11 } }, expected: "D 没有胜过赢家，保留赢家" },
-])("reports 组合方案 D $status without inventing failure or replacing the saved Winner", async ({ status, result, expected }) => {
+  { status: "evaluated", result: { qualification: { qualified: true }, regression: { status: "PASS" }, gates: { passed_count: 11, total: 11 } }, expected: "D 没有胜过 Winner，保留 Winner" },
+])("reports 组合 Candidate D $status without inventing failure or replacing the saved Winner", async ({ status, result, expected }) => {
   const winner = { id: "C-C", status: "evaluated", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } };
   const d = { id: "C-D", status, reasoning: { candidate_label: "D", winner_id: winner.id, sources: [] }, result };
   const optimization = { id: "EXP-stored", candidates: [winner, d], result: { report_confirmation: { winner_id: winner.id } }, recommendation: { result: { recommended_candidate: status === "evaluated" ? winner.id : null } } };

@@ -10,13 +10,13 @@ afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';vi.uns
 const render=async(node:React.ReactNode)=>{root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node))};
 const click=async(label:string)=>act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label)!.click());
 const evaluation={id:'offline',status:'completed',cases:[],result:{metrics:{positive_correctness:75,safe_rejection_rate:100,latency_p50_seconds:2},comparison_metrics:{recall_at_k:0},gates:{gates:[]}}};
-it('groups saved metrics in four dimensions and explains missing observations without zero substitution',async()=>{
- vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/bad-cases')?[]:evaluation))));
- await render(<EvaluationPage data={{evaluation}}/>);await click('查看评测依据');
- const sections=[...document.querySelectorAll('.evaluation-dimensions > section')];
- expect(sections.map(s=>s.querySelector('h3')?.textContent)).toEqual(['答案质量','检索效果','安全鲁棒','性能体验']);
- expect(sections[0].textContent).toContain('75.0%');expect(sections[1].textContent).toContain('0.0%');
- expect(sections[1].textContent).toContain('未保存该指标');expect(sections[3].textContent).toContain('2.0 s');
+it('keeps the report while removing the technical-metrics entry',async()=>{
+ const calls=vi.fn(async()=>new Response(JSON.stringify(evaluation)));vi.stubGlobal('fetch',calls);
+ const original=JSON.stringify(evaluation);await render(<EvaluationPage data={{evaluation}}/>);
+ expect(document.querySelector('.baseline-metrics')).not.toBeNull();
+ expect(document.body.textContent).not.toContain('查看评测依据');
+ expect(document.querySelector('.evaluation-dimensions')).toBeNull();
+ expect(JSON.stringify(evaluation)).toBe(original);
 });
 it('keeps insufficient candidate evidence explicit and renders saved candidate reasoning in one Drawer',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
@@ -28,11 +28,11 @@ it('keeps insufficient candidate evidence explicit and renders saved candidate r
  const text=document.querySelector('[role="dialog"]')!.textContent;
  for(const saved of ['保存假设','保存理由','保存的原文观察','保存改善','保存风险','intervention_direction','root_cause_evidence'])expect(text).toContain(saved);
 });
-it('requests evaluation history in bounded server pages',async()=>{
- const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/evaluations?')?Array.from({length:50},(_,i)=>({id:`history-${i}`})):url.endsWith('/api/bad-cases')?[]:evaluation)));
- vi.stubGlobal('fetch',fetcher);await render(<EvaluationPage data={{evaluation}}/>);await click('历史评测');
- expect(fetcher.mock.calls.some(([url])=>url.endsWith('/api/evaluations?page=1&limit=50'))).toBe(true);
- await click('下一页');expect(fetcher.mock.calls.some(([url])=>url.endsWith('/api/evaluations?page=2&limit=50'))).toBe(true);
+it('removes the history entry contained in technical details without requesting history pages',async()=>{
+ const calls=vi.fn(async()=>new Response(JSON.stringify(evaluation)));vi.stubGlobal('fetch',calls);
+ await render(<EvaluationPage data={{evaluation}}/>);
+ expect([...document.querySelectorAll('button')].some(b=>b.textContent==='历史评测')).toBe(false);
+ expect(calls.mock.calls.some((c:any[])=>c[0].includes('/api/evaluations?'))).toBe(false);
 });
 it('pages version history without dropping the active runtime summary',async()=>{
  const {VersionsPage}=await import('./pages/VersionsPage');
@@ -42,7 +42,7 @@ it('pages version history without dropping the active runtime summary',async()=>
  await render(<VersionsPage data={{versions}}/>);await click('下一页');
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/versions?page=2&limit=50'))).toBe(true);
  expect(document.querySelector('.release-decision')?.textContent).toContain('当前线上配置');
- expect(document.querySelector('details')?.textContent).toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(1);
+ expect(document.body.textContent).not.toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(1);
 });
 it('pages monitoring events and triggers with bounded read requests',async()=>{
  const {VerificationPage}=await import('./pages/VerificationPage');
@@ -87,7 +87,7 @@ it('shows every current business failure in Agent including pending diagnoses',a
  await click('问题诊断');
  expect(document.querySelectorAll('tbody tr')).toHaveLength(10);
  expect([...document.querySelectorAll('button')].find(button=>button.textContent?.includes('生成 A / B / C'))?.disabled).toBe(false);
- expect(document.body.textContent).toContain('错题进入 Agent 优化');
+ expect(document.body.textContent).toContain('Bad Case 进入 Agent 优化');
 });
 it('connects an unknown exploratory target to its saved candidate without calling it confirmed',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));

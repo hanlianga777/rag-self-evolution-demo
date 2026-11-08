@@ -38,12 +38,12 @@ it('replaces citations before markdown, keeps only cited sources and highlights 
 });
 it('never guesses highlights or missing metrics, and derives the critical parameter from evidence',()=>{
  const points=comparisonPoints(before,after);expect(points).toHaveLength(2);expect(explanation(before,after,{top_k:4},{top_k:6},points).key).toBe('top_k');
- const rows=metricRows(before,after,points);expect(rows.find(r=>r.label==='首字时间')?.after).toBeNull();expect(rows.find(r=>r.label==='本题回答耗时')?.delta).toBe('+3 秒');
+ const rows=metricRows(before,after,points);expect(rows.find(r=>r.label==='TTFT')?.after).toBeNull();expect(rows.find(r=>r.label==='本题回答耗时')?.delta).toBe('+3 秒');
  expect(citationText('按《操作_说明.pdf》“存放”（第8页），原文。',[source]).text).toContain('按');
 });
 it('counts qualified D alongside the qualified saved round candidate',async()=>{
  await mount(<OverviewPage data={{optimization:{candidates:[{id:'C',reasoning:{round:3,candidate_label:'C'},result:{qualification:{qualified:true}}},{id:'D',reasoning:{candidate_label:'D'},result:{qualification:{qualified:true}}}]}}} navigate={()=>{}}/>);
- expect(document.querySelector('.story-chain')?.textContent).toContain('2 个合格方案 · 第 3 轮方案 C / 方案 D');
+ expect(document.querySelector('.story-chain')?.textContent).toContain('2 个合格方案 · Round 3 · Candidate C / Candidate D');
 });
 it('handles repeated chapters, alternate document titles and multiple page references without deleting surrounding prose',()=>{
  const evidence=[source,{...source,document:'宇树_B2电池与充电器使用说明_中文版.pdf',page_start:12,section_path:'检查'},{...source,document:'宇树_B2四足机器人用户手册_中文版.pdf',page_start:18,section_path:'检查表'}];
@@ -58,7 +58,7 @@ it('does not highlight an invented quote or expose configuration identity metada
  await mount(<ComparisonAnswer row={row} points={points} side="after" onOpenCitation={()=>{}}/>);
  expect(document.querySelector('mark')).toBeNull();
  const {configChanges}=await import('./components/comparisonData');
- expect(configChanges({top_k:4,run_target:'baseline'},{top_k:6,run_target:'sandbox_candidate',candidate_id:'EXP-sensitive'})).toEqual([{key:'top_k',label:'回答证据条数',before:'4',after:'6'}]);
+ expect(configChanges({top_k:4,run_target:'baseline'},{top_k:6,run_target:'sandbox_candidate',candidate_id:'EXP-sensitive'})).toEqual([{key:'top_k',label:'Top-K',before:'4',after:'6'}]);
 });
 it('uses explicit pages after unquoted sections and keeps prose around bare filenames',()=>{
  const evidence=[{...source,document:'宇树_B2四足机器人用户手册_中文版.pdf',page_start:11},{...source,document:'宇树_B2四足机器人用户手册_中文版.pdf',page_start:18}];

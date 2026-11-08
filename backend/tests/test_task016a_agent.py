@@ -60,7 +60,7 @@ class AgentRetryTests(unittest.TestCase):
         _,prompt=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[prior],[],list('ABC'),baseline_gates=[gate])
         self.assertEqual(prompt['gate_harming_changes'][0]['config_diff'],{'top_k':6})
         self.assertEqual(prompt['gate_harming_changes'][0]['new_failure_question_ids'],['Q1'])
-        with self.assertRaisesRegex(ValueError,'照搬已证明伤害门槛'):
+        with self.assertRaisesRegex(ValueError,'照搬已证明伤害 Hard Gate'):
             validate_round_contract(valid['candidates'],DEFAULT_PIPELINE_CONFIG,[prior],[gate])
         prior['reasoning']={}
         _,prompt=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[prior],[],list('ABC'),baseline_gates=[gate])
@@ -135,4 +135,3 @@ class SavedFactsTests(unittest.TestCase):
         self.assertEqual(harmful['new_failure_question_ids'],['question-2'])
         self.assertEqual(harmful['harmed_gates'][0]['actual'],80)
         self.assertNotIn('建议',json.dumps(facts,ensure_ascii=False))
-

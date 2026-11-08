@@ -1,7 +1,7 @@
 export const isMachineQualified = (status?: string) => status === "machine_qualified" || status === "owner_delegated_approved";
 
 export const vocabulary: Record<string, string> = {
-  "Hard Gate": "门槛", Gate: "门槛", Overall: "综合分", Candidate: "候选方案", Regression: "回归检查",
+  "Hard Gate": "Hard Gate", Gate: "Hard Gate", Overall: "综合分", Candidate: "Candidate", Regression: "Regression Check",
   Recommendation: "推荐方案", Release: "发布", Production: "线上版本", "Legacy Production": "线上版本",
   Rollback: "回滚", Monitoring: "监控", Coverage: "覆盖规划", "Coverage Planning": "覆盖规划",
   "Hard Validation": "硬校验", "Question Generation": "出题", "Human Gate": "人工确认", Snapshot: "冻结版本", Slot: "题位",
@@ -13,7 +13,7 @@ const translations: Record<string, string> = {
   "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "机器合格", "ai_agent": "AI 代理",
   "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "query_only": "原问题排序", "STRICT": "严格", "FALLBACK": "回退", "ON": "开启", "OFF": "关闭",
   "Grounded": "有据生成", "Completeness": "完整性优先", "Abstention": "谨慎拒答", "Tiered": "分级回答",
-  "Query": "查询处理", "Retrieval": "检索", "Generation": "回答生成",
+  "Query": "查询处理", "Retrieval": "检索", "Generation": "Generation",
   "Pending": "待处理", "pending": "待处理", "needs_human_review": "待确认", "machine_qualified": "机器合格",
   "expected_improvement": "预期收益", "root_cause": "技术根因", "new_failures": "新增失败",
   "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
@@ -23,8 +23,8 @@ const translations: Record<string, string> = {
   "Recommended": "推荐", "Archived": "已归档", "Passed": "通过", "Failed": "未通过", "PASS": "通过", "FAIL": "未通过",
   "Rejected": "已拒绝", "Demo Active": "已启用", "Retrieval Failure": "检索失败",
   "Retrieval Noise": "检索噪声", "Over-Rejection": "过度拒答",
-  "High": "高", "Medium": "中", "Low": "低", "Positive": "正向", "Ablation": "消融",
-  "Negative": "负向", "AI Generated": "AI 生成", "Human Added": "人工补充",
+  "High": "High", "Medium": "Medium", "Low": "Low", "Positive": "正向（Positive）", "Ablation": "消融（Ablation）",
+  "Negative": "负向（Negative）", "AI Generated": "AI 生成", "Human Added": "人工补充",
   "Evaluation": "评测", "Optimization": "优化", "Bad Cases": "问题案例", "Agent Analysis": "Agent 分析", "Experiments": "实验",
   "Qualified": "合格", "Not Qualified": "不合格", "qualified": "合格", "not_qualified": "不合格",
   "Generated": "已生成", "generated": "已生成", "Evaluated": "已评测", "evaluated": "已评测", "Released": "已发布", "released": "已发布",
@@ -32,11 +32,11 @@ const translations: Record<string, string> = {
   "Overall Score": "综合分", "Overall": "综合分", "Correctness": "正确性", "Faithfulness": "忠实性", "Recall": "召回率", "P95 Latency": "P95 延迟",
   "Relevant": "相关", "Irrelevant": "不相关", "Not Configured": "未配置", "Configured": "已配置",
   "Recall First": "召回优先", "Balanced": "均衡方案", "Performance First": "性能优先",
-  "Quality": "质量", "Safety": "安全", "Latency": "延迟", "Regression": "回归检查", "Result": "结果",
-  "quality": "质量", "safety": "安全", "latency": "延迟", "regression": "回归", "result": "结果",
+  "Quality": "质量", "Safety": "安全", "Latency": "延迟", "Regression": "Regression Check", "Result": "结果",
+  "quality": "质量", "safety": "安全", "latency": "延迟", "regression": "Regression", "result": "结果",
   "Load Evaluation Report": "加载评测报告", "Analyze 8 Bad Cases": "分析 8 个问题案例", "Cluster Failure Patterns": "聚类失败模式",
   "Identify Root Causes": "识别根因", "Generate Optimization Hypotheses": "生成优化假设", "Build Candidate Configurations": "构建候选配置",
-  "Run Sandbox Experiments": "运行沙箱实验", "Regression Evaluation": "回归评测", "Recommendation": "推荐方案",
+  "Run Sandbox Experiments": "运行沙箱实验", "Regression Evaluation": "Regression 评测", "Recommendation": "推荐方案",
   "Balanced quality and latency": "平衡质量与延迟", "Quality ceiling remains": "质量提升空间有限",
   "EVAL-0042 loaded": "EVAL-0042 已加载", "Failure patterns extracted": "已提取失败模式", "4 retrieval failures": "4 个检索失败",
   "Query semantic gap": "Query 语义偏差", "3 viable strategies": "3 个可行策略", "A / B / C ready": "A / B / C 已就绪",
@@ -46,13 +46,13 @@ const translations: Record<string, string> = {
   "Today 14:32": "今天 14:32", "Today 14:12": "今天 14:12", "Today 14:36": "今天 14:36", "Yesterday": "昨天", "Mon": "周一",
   "PDF text parser": "PDF 文本解析器", "512 tokens / 80 overlap": "512 tokens / 80 重叠", "Logical isolation · no containers": "逻辑隔离 · 不使用容器",
   "not_run": "未运行", "not_evaluable": "不可评测", "NOT_EVALUABLE": "不可评测",
-  "positive": "正向", "ablation": "消融", "negative": "负向",
+  "positive": "正向（Positive）", "ablation": "消融（Ablation）", "negative": "负向（Negative）",
   "alias_entity": "实体别名", "colloquial": "口语化表达", "cross_chunk": "跨 Chunk", "weak_keywords": "弱关键词", "weak_clues": "弱线索",
   "clarify": "需要澄清", "insufficient_evidence": "证据不足", "prompt_injection_resistance": "提示注入抵抗", "safe_rejection": "安全拒答",
   "prompt_injection": "提示注入", "safety_critical": "安全关键",
   "probe_pending": "待 Probe", "probe_passed": "Probe 通过", "qc_pending": "待 QC", "qc_passed": "QC 通过", "qc_failed": "QC 未通过", "needs_revision": "待修订", "approved": "已批准", "rejected": "已拒绝", "human_review_pending": "待人工审核", "legacy_unverified": "历史未验证", "pending_human_confirm": "待人工确认",
   "QUALIFIED": "合格", "NOT_QUALIFIED": "不合格", "RETRIEVAL_INCOHERENT": "检索不一致（保留人工审核）", "EVIDENCE_VALID": "证据有效", "EVIDENCE_INVALID": "证据无效", "NEGATIVE_VALID": "负向边界有效", "FAKE_NEGATIVE_RISK": "疑似伪负向", "NEGATIVE_SUBTYPE_MISMATCH": "负向子类与题目不符", "NEGATIVE_UNDETERMINED": "负向可回答性未判定",
-  "Programmatic evidence check": "证据检索已完成", "Negative may be answerable": "负向题可能可由现有证据回答", "Negative subtype does not match the question": "负向子类与题目不符",
+  "Programmatic evidence check": "证据检索已完成", "Negative may be answerable": "负向题（Negative）可能可由现有证据回答", "Negative subtype does not match the question": "负向子类与题目不符",
   "active": "生产中", "archived": "已归档", "partial": "部分完成",
   "generating": "生成草案中", "validating": "硬校验中", "preview_ready": "草案待确认", "probing": "检索验证中", "qc": "质量检查中", "failed_quality": "质量未通过", "interrupted": "运行已中断", "cancelled": "已放弃", "discarded": "草案已放弃", "manual_edit": "人工编辑", "ai_regenerate": "AI 单题重生成", "hard_validation": "硬校验", "revision_applied": "已应用修订",
   "question": "问题", "reference_answer": "参考答案", "evidence": "证据", "raw": "元数据",
@@ -79,8 +79,8 @@ export function narrativeText(value: string): string {
 
 // These are display names only; metric keys and saved rules stay unchanged.
 export const gateNames: Record<string, string> = {
-  positive_correctness: "正向正确性", positive_faithfulness: "正向忠实性", positive_completeness: "正向完整性",
-  ablation_correctness: "消融正确性", ablation_faithfulness: "消融忠实性", ablation_completeness: "消融完整性",
+  positive_correctness: "正向（Positive）正确性", positive_faithfulness: "正向（Positive）忠实性", positive_completeness: "正向（Positive）完整性",
+  ablation_correctness: "消融（Ablation）正确性", ablation_faithfulness: "消融（Ablation）忠实性", ablation_completeness: "消融（Ablation）完整性",
   safe_rejection_rate: "安全拒答率", safety_critical_accuracy: "安全关键准确率", prompt_injection_resistance: "提示注入抵抗",
   latency_p50_seconds: "回答耗时 P50", latency_p99_seconds: "回答耗时 P99",
 };
@@ -94,7 +94,7 @@ export const gateEnglishNames: Record<string, string> = {
 export const shortDate = (value?: string) => value && !Number.isNaN(Date.parse(value))
   ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit" }).format(new Date(value)).replace("/", "-") : "日期未知";
 export function baselineName(run: any): string {
-  const level = { off: "关闭", low: "低档", high: "高档", max: "最高档" }[run?.config?.generation_thinking as string] || "档位未知";
+  const level = { off: "OFF", low: "Low", high: "High", max: "Max" }[run?.config?.generation_thinking as string] || "档位未知";
   return `Baseline · ${level} · ${shortDate(run?.created_at)}`;
 }
 export function productionName(version: any): string {
@@ -108,7 +108,7 @@ export function questionSource(row: any): string {
 }
 
 export const parameterNames: Record<string, string> = {
-  candidate_k: "CandidateK", top_k: "TopK", min_score: "MinScore", hybrid_search: "Hybrid Search", hybrid_alpha: "向量检索权重",
+  candidate_k: "Candidate K", top_k: "Top-K", min_score: "MinScore", hybrid_search: "Hybrid Search", hybrid_alpha: "Embedding Retrieval 权重",
   generation_thinking: "Thinking 档位", query_decompose: "Query Decompose", retrieval_max_tokens: "上下文容量",
   rerank: "Rerank", query_rewrite: "Query Rewrite", multi_query: "Multi-Query", hyde: "HyDE",
   metadata_filter: "元数据筛选", alias_mapping: "别名映射", prompt_strategy: "Prompt 策略",
@@ -117,7 +117,7 @@ export const parameterNames: Record<string, string> = {
 export const descriptions: Record<string, string> = {
   generation_thinking: "可选择 OFF / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "不限 / 8192 / 4096；缺少 tokenizer 时按字符数估算 token",
   candidate_k: "初始候选召回数量", top_k: "进入回答上下文的证据数量", min_score: "进入上下文前的最低相关分",
-  hybrid_search: "组合向量与关键词检索", hybrid_alpha: "向量检索在混合检索中的权重", rerank: "模型重排、原排序或仅原问题的 BM25 排序",
+  hybrid_search: "组合向量与BM25", hybrid_alpha: "Embedding Retrieval 在 Hybrid Search 中的权重", rerank: "模型 Rerank、原排序或仅原问题的 BM25 排序",
   query_rewrite: "生成标准化检索问法", multi_query: "生成互补检索问法", hyde: "先写一段假设答案，再拿去检索",
   metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "分级回答：能确定的先回答，条件缺失时追问，资料无关时转人工，并保留安全警告",
 };

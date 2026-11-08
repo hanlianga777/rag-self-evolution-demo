@@ -19,7 +19,7 @@ const pause = { paused: true, resume_at_toronto: "23:00", resume_at: "2026-11-04
 it("refreshes saved pause state after the worker automatically resumes without a POST", async () => {
   vi.useFakeTimers();
   let reads = 0;
-  const fetcher = vi.fn((_url:string,_init?:RequestInit) => response({off_peak_only:true,peak_now:reads++ === 0,active_pauses:reads===1 ? [{task_label:"方案 A · Sandbox 试跑",price_pause:pause,target:{evaluation_id:"offline"}}] : []}));
+  const fetcher = vi.fn((_url:string,_init?:RequestInit) => response({off_peak_only:true,peak_now:reads++ === 0,active_pauses:reads===1 ? [{task_label:"Candidate A · Sandbox 试跑",price_pause:pause,target:{evaluation_id:"offline"}}] : []}));
   vi.stubGlobal("fetch",fetcher);
   await mount(<RuntimeSettings />);
   expect(document.body.textContent).toContain("高峰时段暂停");
@@ -74,7 +74,7 @@ it("restores friendly operation names, saved counts and the price pause after a 
   vi.stubGlobal("fetch", vi.fn((url: string) => response(url.includes("/api/evaluations?") ? [run] : url.includes("/api/governance") ? [] : run)));
   await mount(<OperationProvider><span>页面</span></OperationProvider>);
   const console = document.querySelector(".operation-console")!;
-  expect(console.querySelector("strong")?.textContent).toBe("方案 A · Sandbox 试跑");
+  expect(console.querySelector("strong")?.textContent).toBe("Candidate A · Sandbox 试跑");
   expect(console.textContent).toContain("2 分 5 秒");
   expect(console.textContent).toContain("高峰时段暂停，预计 23:00 自动继续");
   expect(console.textContent).not.toMatch(/EXP-|EVAL-|Worker 未确认/);
@@ -105,17 +105,17 @@ it("shows scheduled D as queued and keeps configuration identifiers inside techn
   expect(progress.textContent).toContain("已有经完整试跑验证的方案");
   expect(progress.textContent).not.toContain("CONFIG-private");
   const technical = [...document.querySelectorAll("details")].find(node => node.querySelector("summary")?.textContent === "技术详情")!;
-  expect(technical.open).toBe(false);
-  expect(technical.textContent).toContain("CONFIG-private");
+  expect(technical).toBeUndefined();
+  expect(document.body.textContent).not.toContain("CONFIG-private");
   await click("A/B/C/D");
-  expect(document.body.textContent).toContain("方案 D · 等待非高峰时段");
+  expect(document.body.textContent).toContain("Candidate D · 等待非高峰时段");
   await click("最终推荐");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "生成智能组合建议")).toBe(false);
 });
 
 it("keeps resumed operation language and elapsed units understandable", () => {
   expect(elapsedText(125900)).toBe("2 分 5 秒");
-  expect(evaluationTitle({ config: { candidate_id: "opaque" } })).toBe("候选方案 · Sandbox 试跑");
+  expect(evaluationTitle({ config: { candidate_id: "opaque" } })).toBe("Candidate · Sandbox 试跑");
   expect(evaluationTitle({ config: { run_target: "answer_replay" } })).toBe("历史回答判分回放");
   expect(displayText("needs_human_review")).toBe("待确认");
 });

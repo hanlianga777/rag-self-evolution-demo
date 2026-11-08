@@ -149,7 +149,7 @@ def usable_repairs(facts):
                     repairs.append({'question_id':failure['question_id'],'parameter':key,'value':value,
                         'source_candidate_id':source['candidate_id'],'source_type':kind,
                         'proposed_config_diff':diff,'contrast_ids':contrast_ids if kind=='partial' else [],
-                        'evidence_basis':'Winner保存的证据位置支持验证：'+json.dumps(evidence,ensure_ascii=False),
+                        'evidence_basis':'Winner 保存的证据位置支持验证：'+json.dumps(evidence,ensure_ascii=False),
                         'note':'历史伴随修好，不承诺D修好；副作用必须通过Sandbox验证'})
                     break
     return repairs
@@ -163,12 +163,12 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
     config = pipeline_config({**winner_config, **diff})
     effective_config = {k:v for k,v in config.items() if k!='hybrid_alpha' or config['hybrid_search'] is not False}
     if ('hybrid_alpha' in diff and config['hybrid_search'] is False) or not validate_candidate_config(effective_config)['valid']:
-        raise ValueError('取值不在Pipeline ALLOWED_SEARCH_SPACE选项里，hybrid_alpha仅在混合检索开启时可选')
+        raise ValueError('取值不在Pipeline ALLOWED_SEARCH_SPACE选项里，hybrid_alpha仅在 Hybrid Search 开启时可选')
     changes = parameter_diff(config,winner_config)
-    if len(changes)>2:raise ValueError('相对Winner最多改2个参数')
+    if len(changes)>2:raise ValueError('相对 Winner 最多改2个参数')
     if any(k not in effective_config or effective_config[k]!=v or type(effective_config[k]) is not type(v) for k,v in parameter_diff(winner_config,base).items()):
-        raise ValueError('不得撤销或改变Winner自己的改动')
-    if not changes:raise ValueError('D必须不同于Winner')
+        raise ValueError('不得撤销或改变 Winner 自己的改动')
+    if not changes:raise ValueError('D必须不同于 Winner')
     rows = suggestion.get('changes')
     if not isinstance(rows,list) or len(rows)!=len(changes) or any(not isinstance(r,dict) for r in rows) or {r.get('parameter') for r in rows}!=set(changes):
         raise ValueError('每个改动须给changes来源标签和副作用检查')
@@ -181,14 +181,14 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
         kind={'已验证':'verified','部分取用':'partial','新尝试':'new_attempt'}.get(row.get('source_type'),row.get('source_type'))
         if kind not in {'verified','partial','new_attempt'}:raise ValueError('改动来源标签须为已验证/部分取用/新尝试')
         targets=row.get('target_question_ids')
-        if not isinstance(targets,list) or not targets or not set(targets)<=remaining:raise ValueError('改动必须针对Winner剩余错题')
+        if not isinstance(targets,list) or not targets or not set(targets)<=remaining:raise ValueError('改动必须针对 Winner 剩余 Bad Case')
         if any(not isinstance(row.get(k),str) or not row[k].strip() for k in ('evidence_basis','reason')):raise ValueError('改动须说明事实表证据位置和理由')
         side=row.get('side_effect_check')
         if (not isinstance(side,dict) or any(not isinstance(side.get(k),str) or not side[k].strip() for k in ('historical_effects','winner_fixed_risk','gate_risk','mitigation'))
-            or not isinstance(side.get('protected_overlap'),list)):raise ValueError('改动缺副作用检查：历史伴随现象、保护题重叠、赢家修好题、门槛及规避措施必填')
+            or not isinstance(side.get('protected_overlap'),list)):raise ValueError('改动缺副作用检查：历史伴随现象、保护题重叠、Winner 修好题、Hard Gate 及规避措施必填')
         if facts.get('version')==D_FACTS_VERSION and any(not isinstance(side.get(k),str) or not side[k].strip()
                 for k in ('same_premise_evidence','different_premise_evidence','risk_checklist')):
-            raise ValueError('副作用检查须分别写前提相同证据、前提不同证据和重点保护题/临界门槛风险清单；没有证据写未观察到')
+            raise ValueError('副作用检查须分别写前提相同证据、前提不同证据和重点保护题/临界 Hard Gate 风险清单；没有证据写未观察到')
         if any(type(row.get(k)) is not int or row[k]<0 for k in ('expected_fixed_count','possible_broken_count')):raise ValueError('预期修好/可能弄坏几道须为非负整数')
         profile=next(p for p in facts['parameter_profiles'][key] if type(p['value']) is type(value) and p['value']==value)
         overlap={q for p in profile['observations'] for q in p['new_failure_question_ids']} & protected
@@ -207,7 +207,7 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
                 source=sources[cid];source_config=pipeline_config(source['config'])
                 if type(source_config[key]) is not type(value) or source_config[key]!=value:raise ValueError('来源取值与D不一致')
                 record=next(r for r in facts['history'] if r['candidate_id']==cid)
-                if not set(record['fixed_question_ids']) & set(targets):raise ValueError('已验证来源须曾修好针对的剩余错题')
+                if not set(record['fixed_question_ids']) & set(targets):raise ValueError('已验证来源须曾修好针对的剩余 Bad Case')
                 bundle=parameter_diff(source_config,base)
                 whole=all(config[k]==v and type(config[k]) is type(v) for k,v in bundle.items())
                 if not whole and (kind!='partial' or not valid_contrasts):raise ValueError('多参数来源必须整组取用；部分取用必须引用拆分对照证据')

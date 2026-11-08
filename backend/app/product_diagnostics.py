@@ -5,9 +5,9 @@ from statistics import mean, median
 
 from .diagnostics import automatic_analysis, diagnostic_view
 
-STAGE_LABELS = {'query_processing':'查询处理','vector_search':'向量检索','bm25':'关键词检索',
-    'rerank':'重排','metadata_filter':'资料筛选','hybrid_fusion':'检索合并','parent_expand':'补齐上下文',
-    'retrieval_other':'检索其他处理','generation':'生成回答','context_budget':'上下文容量处理','context_build':'拼接上下文'}
+STAGE_LABELS = {'query_processing':'查询处理','vector_search':'Embedding Retrieval','bm25':'BM25',
+    'rerank':'Rerank','metadata_filter':'资料筛选','hybrid_fusion':'检索合并','parent_expand':'补齐上下文',
+    'retrieval_other':'检索其他处理','generation':'Generation','context_budget':'上下文容量处理','context_build':'拼接上下文'}
 
 
 def objective_metrics(cases, questions):
@@ -46,12 +46,12 @@ def objective_metrics(cases, questions):
     return {'recall_at_k':mean(r['recall_at_k'] for r in retrieval)*100 if retrieval else None,
         'precision_at_k':mean(r['precision_at_k'] for r in retrieval)*100 if retrieval else None,
         'mrr':mean(r['mrr'] for r in retrieval) if retrieval else None,
-        'retrieval_evaluable_cases':len(retrieval),'retrieval_scope':'正向题和消融题，按逐题标准证据原文匹配最终内容后取平均；负向题不纳入',
+        'retrieval_evaluable_cases':len(retrieval),'retrieval_scope':'正向题（Positive）和消融题（Ablation），按逐题标准证据原文匹配最终内容后取平均；负向题（Negative）不纳入',
         'ttft_median_ms':median(ttft) if ttft else None,'ttft_recorded_cases':len(ttft),
         'average_tokens':mean(tokens) if len(tokens)==count and count else None,
-        'token_scope':'每道保存回答的输入加输出词元，包含思考词元，不含判分和向量、重排',
+        'token_scope':'每道保存回答的输入加输出 Token，包含 Thinking Token，不含判分和向量、Rerank',
         'average_estimated_cost':{'amount':mean(costs) if len(costs)==count and count else None,'currency':'USD',
-            'recorded_cases':len(costs),'scope':'保存的回答请求费用估算；不含判分、向量、重排；不是整轮账单'},
+            'recorded_cases':len(costs),'scope':'保存的回答请求费用估算；不含判分、向量、Rerank；不是整轮账单'},
         'stage_breakdown':[{'stage':name,'label':STAGE_LABELS.get(name,'其他回答处理'),'total_ms':ms,'share_percent':ms/total*100 if total else 0} for name,ms in stages.items()],
         'stage_scope':'累计已保存回答阶段；检索按直接子环节拆开，子环节不重复累计；不含判分',
         'enhancement_counts':{key:None if usage_missing else count for key,count in enhancements.items()},
@@ -61,7 +61,7 @@ def objective_metrics(cases, questions):
 def thinking_comparison(runs,current_id):
     identities={run['judge'].get('evaluation_identity') for run,_ in runs}
     if None in identities or len(identities)>1:
-        return {'columns':[],'different_cases':[],'note':'判分身份不同，不能比较门槛或逐题修好、弄坏。'}
+        return {'columns':[],'different_cases':[],'note':'判分身份不同，不能比较 Hard Gate 或逐题修好、弄坏。'}
     columns=[];by_id={};all_ids=set()
     for run,cases in runs:
         questions={q['id']:q for q in json.loads(run['dataset_snapshot_json']).get('questions',[])}
@@ -69,7 +69,7 @@ def thinking_comparison(runs,current_id):
         gate_rows=gates.get('gates',[])
         latency={g['metric']:g.get('actual') for g in gate_rows if g['metric'].startswith('latency_')}
         effort=run['config'].get('generation_thinking')
-        columns.append({'id':run['id'],'label':{'max':'最高','high':'高','low':'低','off':'关闭'}.get(effort,'档位记录缺失'),
+        columns.append({'id':run['id'],'label':{'max':'Max','high':'High','low':'Low','off':'OFF'}.get(effort,'档位记录缺失'),
             'current':run['id']==current_id,'metrics':{**metrics,**latency,'gate_passed':gates.get('passed_count'),
             'gate_total':gates.get('total'),'correct_count':sum(c.get('passed') is True for c in cases),
             'bad_case_count':sum(c.get('passed') is False for c in cases)},'gates':gate_rows})
@@ -83,7 +83,7 @@ def thinking_comparison(runs,current_id):
         different.append({'question_id':key,'display_question_id':view['display_question_id'],'question':case.get('question'),
             'diagnosis_category':view['diagnosis_category'],'subfeature':view['subfeature'],'results':results})
     all_current_failures = all(by_id[current_id].get(row['question_id'],{}).get('passed') is False for row in different)
-    note = f'两档结果不同的题目共 {len(different)} 道，均已列入本轮错题。' if all_current_failures else f'结果不同的题目共 {len(different)} 道，已按保存结果列出。'
+    note = f'两档结果不同的题目共 {len(different)} 道，均已列入本轮 Bad Case。' if all_current_failures else f'结果不同的题目共 {len(different)} 道，已按保存结果列出。'
     return {'columns':columns,'different_cases':different,'note':note,
             'judge_thinking':runs[0][0]['judge'].get('judge_thinking',{}).get('reasoning_effort')}
 

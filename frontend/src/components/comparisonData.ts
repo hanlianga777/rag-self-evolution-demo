@@ -1,9 +1,9 @@
 export type Point = {number:number; text:string; before:boolean; after:boolean; fresh:boolean; beforeQuotes:string[]; afterQuotes:string[]};
-export const categoryName = (value:string) => ({positive:'正向题',ablation:'消融题',negative:'应拒答题'}[value] || '题型未知');
+export const categoryName = (value:string) => ({positive:'正向题（Positive）',ablation:'消融题（Ablation）',negative:'负向题（Negative）'}[value] || '题型未知');
 export const verdict = (row:any) => row?.passed===true ? '答对' : row?.passed===false ? '答错' : '未知';
 export const finalEvidence = (row:any):any[] | undefined => row?.programmatic_metrics?.retrieval_trace?.final;
-export const parameterNames:Record<string,string> = {top_k:'回答证据条数',candidate_k:'查找候选条数',generation_thinking:'回答思考档位',rerank:'重排',min_score:'最低相关度',hybrid_search:'混合检索',hybrid_alpha:'混合检索权重',query_rewrite:'问题改写',multi_query:'多路查询',hyde:'假设文档检索',prompt_strategy:'回答提示策略',retrieval_max_tokens:'检索上下文长度',retrieval_mode:'检索方式',temperature:'回答温度',max_tokens:'回答长度上限',context_budget:'上下文预算'};
-export const parameterValue = (value:any):string => ({max:'最高',high:'高',medium:'中',low:'低',true:'开启',false:'关闭'}[String(value)] || (value == null ? '未知' : typeof value==='object' ? JSON.stringify(value) : String(value)));
+export const parameterNames:Record<string,string> = {top_k:'Top-K',candidate_k:'Candidate K',generation_thinking:'Thinking 档位',rerank:'Rerank',min_score:'最低相关度',hybrid_search:'Hybrid Search',hybrid_alpha:'Hybrid Search 权重',query_rewrite:'Query Rewrite',multi_query:'Multi-Query',hyde:'HyDE 检索',prompt_strategy:'回答提示策略',retrieval_max_tokens:'检索上下文长度',retrieval_mode:'检索方式',temperature:'回答温度',max_tokens:'回答长度上限',context_budget:'上下文预算'};
+export const parameterValue = (value:any):string => ({max:'Max',high:'High',medium:'Medium',low:'Low',off:'OFF',true:'开启',false:'关闭'}[String(value)] || (value == null ? '未知' : typeof value==='object' ? JSON.stringify(value) : String(value)));
 export function configChanges(before:any,after:any){return [...new Set([...Object.keys(before || {}),...Object.keys(after || {})])].filter(key=>key in parameterNames && JSON.stringify(before?.[key])!==JSON.stringify(after?.[key])).map(key=>({key,label:parameterNames[key] || '其他配置',before:parameterValue(before?.[key]),after:parameterValue(after?.[key])}));}
 
 export function comparisonPoints(before:any,after:any,question:any={}):Point[] {
@@ -36,11 +36,11 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
     const characters=Array.from(cleaned),excerpt=/[\u4e00-\u9fff]{4}/.test(cleaned) && !/[={}\[\]]/.test(cleaned)?(characters.length>24?characters.slice(0,23).join('')+'…':cleaned):'关键说明';
     const {a,b}=pair;
     let movement:string;
-    if(expanded)movement=`重排第 ${a.rerank_rank} 位：优化前被截掉，优化后进入回答第 ${b.final_rank} 位`;
-    else if(recalled)movement=`优化前没进候选，优化后${b.final_rank!=null?`进入回答第 ${b.final_rank} 位`:'进入候选'}`;
+    if(expanded)movement=`Rerank 第 ${a.rerank_rank} 位：优化前被截掉，优化后进入 Top-K 第 ${b.final_rank} 位`;
+    else if(recalled)movement=`优化前没进候选，优化后${b.final_rank!=null?`进入 Top-K 第 ${b.final_rank} 位`:'进入候选'}`;
     else {
       const stage=a.final_rank!==b.final_rank?'final_rank':a.rerank_rank!==b.rerank_rank?'rerank_rank':'candidate_rank';
-      const label={final_rank:'进入回答的位置',rerank_rank:'重排位置',candidate_rank:'候选位置'}[stage];
+      const label={final_rank:'进入回答的位置',rerank_rank:'Rerank 位置',candidate_rank:'候选位置'}[stage];
       const position=(rank:number|null|undefined)=>rank==null?(stage==='final_rank'?'未进入':'未知'):`第 ${rank} 位`;
       movement=`${label}：${position(a[stage])}→${position(b[stage])}`;
     }
@@ -57,7 +57,7 @@ export function metricRows(before:any,after:any,points:Point[]):MetricRow[] {
   const stage=(row:any,key:string)=>{const value=row?.programmatic_metrics?.stages?.find((stage:any)=>stage.stage_name===key)?.duration_ms;return typeof value==='number'?value:null;};
   const totalScale=Math.max(metric(before,'latency_ms') || 0,metric(after,'latency_ms') || 0);
   const count=(row:any)=>Array.isArray(finalEvidence(row))?finalEvidence(row)!.length:null;
-  const definitions:[string,number|null,number|null,string,boolean][]=[['必答要点',points.length?points.filter(p=>p.before).length:null,points.length?points.filter(p=>p.after).length:null,'条',false],['本题回答耗时',metric(before,'latency_ms'),metric(after,'latency_ms'),'秒',true],['首字时间',metric(before,'ttft_ms'),metric(after,'ttft_ms'),'秒',true],['其中：检索',stage(before,'retrieval'),stage(after,'retrieval'),'秒',true],['其中：生成',stage(before,'generation'),stage(after,'generation'),'秒',true],['进入回答的证据',count(before),count(after),'段',false]];
+  const definitions:[string,number|null,number|null,string,boolean][]=[['必答要点',points.length?points.filter(p=>p.before).length:null,points.length?points.filter(p=>p.after).length:null,'条',false],['本题回答耗时',metric(before,'latency_ms'),metric(after,'latency_ms'),'秒',true],['TTFT',metric(before,'ttft_ms'),metric(after,'ttft_ms'),'秒',true],['其中：检索',stage(before,'retrieval'),stage(after,'retrieval'),'秒',true],['其中：生成',stage(before,'generation'),stage(after,'generation'),'秒',true],['进入回答的证据',count(before),count(after),'段',false]];
   const number=(n:number)=>Number(n.toFixed(Math.abs(n)<1?2:1)).toString();
   return definitions.map(([label,a,b,unit,time])=>{
     const format=(n:number|null)=>n==null?'未知':label==='必答要点'?`${n} / ${points.length}`:`${number(time?n/1000:n)} ${unit}`;

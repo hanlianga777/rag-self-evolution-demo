@@ -75,7 +75,7 @@ export function elapsedText(milliseconds: number) {
 export function evaluationTitle(run: any) {
   if (!run.config?.candidate_id) return run.config?.run_target === "answer_replay" || run.result?.judge_replay ? "历史回答判分回放" : "Baseline 评测";
   const label = run.config.candidate_label || String(run.config.candidate_id).match(/[-_]([ABCD])$/)?.[1];
-  return `${/^[ABCD]$/.test(label || "") ? `方案 ${label}` : "候选方案"} · Sandbox 试跑`;
+  return `${/^[ABCD]$/.test(label || "") ? `Candidate ${label}` : "Candidate"} · Sandbox 试跑`;
 }
 
 export function shortError(error?: string) {
@@ -126,7 +126,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     const id = `sandbox-round:${request.experimentId}:${request.round}`;
     if (activeBatches.current.has(id)) return;
     activeBatches.current.add(id);
-    start(`第 ${request.round} 轮 A/B/C · Sandbox 试跑`, { id, experimentId: request.experimentId, current: 0, total: request.candidateIds.length, stage: "核对当前实验" });
+    start(`Round ${request.round} A/B/C · Sandbox 试跑`, { id, experimentId: request.experimentId, current: 0, total: request.candidateIds.length, stage: "核对当前实验" });
     try {
       const [workspace, experiment] = await Promise.all([getJson<any>("/api/workspace"), getJson<any>(`/api/experiments/${request.experimentId}`)]);
       if (workspace.current_baseline_id !== request.baselineId || (request.identity && identityKey(workspace) !== request.identity) || experiment.baseline_run_id !== request.baselineId) throw new Error("当前实验身份已变化，请刷新");

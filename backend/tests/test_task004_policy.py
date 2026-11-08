@@ -27,14 +27,14 @@ class Task004PolicyTests(unittest.TestCase):
         self.assertEqual(policy.select_final_candidate([*rows, {'id': 'missing', 'status': 'evaluated', 'reasoning': {'candidate_label': 'A'}, 'result': {'qualification': {'qualified': True}, 'bad_case_count': None}}])['candidate_id'], 'B')
         self.assertEqual(policy.select_final_candidate([])['decision'], '保持 Baseline')
         self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'failed', 'result': {'release_qualification': {'qualified': True}}})['candidate_id'], 'B')
-        self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'evaluated', 'result': {'release_qualification': {'qualified': True},'bad_case_count':1}})['decision'], '推荐方案 D')
+        self.assertEqual(policy.select_final_candidate(rows, {'id': 'D', 'status': 'evaluated', 'result': {'release_qualification': {'qualified': True},'bad_case_count':1}})['decision'], '推荐 Candidate D')
 
     def test_review_request_is_disabled_without_new_answers_or_judgments(self):
         with tempfile.TemporaryDirectory() as directory:
             runtime = Mock()
             jobs = FollowupJobs(SimpleNamespace(database_path=Path(directory) / 'isolated.db'), runtime)
             for _ in range(2):
-                with self.assertRaisesRegex(ValueError, '以单遍结果为准，已关闭错题复核'):
+                with self.assertRaisesRegex(ValueError, '以单遍结果为准，已关闭 Bad Case 复核'):
                     jobs.start('run', 'review')
             self.assertFalse(jobs.root.exists())
             self.assertEqual(jobs.threads, {})
@@ -53,7 +53,7 @@ class Task004PolicyTests(unittest.TestCase):
             path.write_text(json.dumps(history))
             for _ in range(2):
                 jobs.recover()
-                with self.assertRaisesRegex(ValueError, '已关闭错题复核'):
+                with self.assertRaisesRegex(ValueError, '已关闭 Bad Case 复核'):
                     jobs.start('run', 'review')
             self.assertEqual(json.loads(path.read_text()), history)
             self.assertEqual(jobs.threads, {})

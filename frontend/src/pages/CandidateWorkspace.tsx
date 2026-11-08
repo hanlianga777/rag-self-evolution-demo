@@ -24,7 +24,7 @@ const reasonDescriptions: Record<string, string> = {
   "表达过于接近原文": "当前问题直接复述原文，请改为用户自然提问。",
   "证据不足": "当前证据不足以支持参考答案，请重新选材或收窄答案。",
   "答案不完整": "当前参考答案未覆盖问题所需信息，请依据证据补全。",
-  "Subtype 错误": "当前负向题与所选 Subtype 不符，请修订问题。",
+  "Subtype 错误": "当前负向题（Negative）与所选 Subtype 不符，请修订问题。",
   "与其他题重复": "当前题目与本轮其他题知识点重复，请更换知识点。",
 };
 
@@ -36,7 +36,7 @@ const checkNames: Record<string, string> = {
   question_format: "题目格式", required_fields: "必填字段", evidence_existence: "证据是否存在",
   evidence_location: "证据位置", answer_anchor: "答案锚点", duplicate: "重复题目",
   forbidden_structure: "禁用结构", cross_chunk_requirement: "跨 Chunk 要求",
-  negative_structural_check: "负向题结构检查", quota_slot_consistency: "配额与 题位 一致性",
+  negative_structural_check: "负向题（Negative）结构检查", quota_slot_consistency: "配额与 题位 一致性",
 };
 
 function ProbeDetails({ row, probe, topK, rank }: { row: Candidate; probe: Candidate; topK: Candidate[]; rank: number }) {
@@ -45,7 +45,7 @@ function ProbeDetails({ row, probe, topK, rank }: { row: Candidate; probe: Candi
   const expected = (row.evidence || []).flatMap((source: Candidate) => source.source_chunk_ids || []);
   return <div className="probe-details"><RetrievalEvidence metrics={details} />
     <details><summary>硬校验项目</summary>{row.hard_validation_checks ? <dl>{Object.entries(checkNames).map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{row.hard_validation_checks[key] === true ? "通过" : row.hard_validation_checks[key] === false ? "未通过" : "不适用"}</dd></div>)}</dl> : <p>旧记录未保存逐项检查，未记录。</p>}</details>
-    <details><summary>{row.test_category === "negative" ? "向量负向 Probe" : "检索召回 Probe"}</summary><p>策略：{details.pipeline || "未记录"}</p><p>输入：{row.question}</p>{row.test_category === "negative" ? <p>最近相似度：{details.vector?.best_similarity ?? "未采集"}</p> : <p>预期 Chunk：{expected.join("、") || "未记录"} · TopK：{topK.length || "未记录"} · {rank >= 0 ? `命中第 ${rank + 1} 位` : "未命中"}</p>}<p>结果：{displayText(details.classification || "not_run")} · 原因：{probe.reason || "未记录"}</p><h4>检索 TopK</h4><EvidenceRecords value={topK.map((hit: Candidate, index: number) => ({ rank: index + 1, chunk_id: hit.chunk_id, document: hit.document || hit.document_id, score: hit.score ?? null }))} /></details>
+    <details><summary>{row.test_category === "negative" ? "向量负向 Probe" : "检索召回 Probe"}</summary><p>策略：{details.pipeline || "未记录"}</p><p>输入：{row.question}</p>{row.test_category === "negative" ? <p>最近相似度：{details.vector?.best_similarity ?? "未采集"}</p> : <p>预期 Chunk：{expected.join("、") || "未记录"} · Top-K：{topK.length || "未记录"} · {rank >= 0 ? `命中第 ${rank + 1} 位` : "未命中"}</p>}<p>结果：{displayText(details.classification || "not_run")} · 原因：{probe.reason || "未记录"}</p><h4>检索 Top-K</h4><EvidenceRecords value={topK.map((hit: Candidate, index: number) => ({ rank: index + 1, chunk_id: hit.chunk_id, document: hit.document || hit.document_id, score: hit.score ?? null }))} /></details>
     {row.test_category === "negative" && <><details><summary>全文 / 精确匹配 Probe</summary><p>输入：{row.question}</p><p>匹配数：{negative.full_text_probe?.exact_match_count ?? "未记录"}</p><EvidenceRecords value={negative.full_text_probe?.matches || negative.full_text_probe || "未记录"} /></details><details><summary>语义可回答性 / 题目子类</summary><p>可回答性：{negative.answerability?.answerable === true ? "可回答" : negative.answerability?.answerable === false ? "不可回答" : "未判定"}</p><p>子类：{row.negative_subtype || "未记录"}</p><EvidenceRecords value={{ answerability: negative.answerability, subtype: negative.subtype_semantic, check: negative.fake_negative_check }} /></details></>}
     {details.probe_execution_status !== "failed" && <p>Probe 分数 / 阈值：{numberText(probe.score)} / {thresholdText(probe.threshold)} · {probeLabel(row.probe_status)}</p>}
   </div>;
@@ -295,7 +295,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
       {view !== "review" && <button className="text-button workspace-back" onClick={() => { setChunkSelector(null); setView(view === "audit" ? auditReturn : "review"); }}>{view === "audit" && auditReturn === "draft" ? "← 返回修订草案" : "← 返回审核"}</button>}
       {revisionError && <p className="error-notice" role="alert">{revisionError}</p>}
       {chunkPicker || <>
-        {view === "revision" && row.test_category === "negative" && <section className="candidate-card"><h3>负向题生成上下文</h3><p className="muted">所选材料只供生成草案参考，不成为 Golden Evidence。</p><p>{selectedChunks(row.id, false).join("、") || "未手动指定；AI 将按修订意图选材"}</p><button className="secondary" onClick={() => { openChunkPicker(row.id); }}>手动选材</button></section>}
+        {view === "revision" && row.test_category === "negative" && <section className="candidate-card"><h3>负向题（Negative）生成上下文</h3><p className="muted">所选材料只供生成草案参考，不成为 Golden Evidence。</p><p>{selectedChunks(row.id, false).join("、") || "未手动指定；AI 将按修订意图选材"}</p><button className="secondary" onClick={() => { openChunkPicker(row.id); }}>手动选材</button></section>}
         {view === "draft" && currentDraftId && revisionRun?.material_selection?.[currentDraftId] && <section className="candidate-card"><h3>材料决策</h3><p>{revisionRun.active_draft?.kind === "reselect" ? "正在重新选材，旧草案暂不变化" : revisionRun.material_selection[currentDraftId].method === "manual" ? "人工指定材料" : revisionRun.material_selection[currentDraftId].method === "retained" ? "沿用证据 · 保留原 Evidence" : "重新选材 · 系统按最新修订意图自动选材"} · {revisionRun.material_selection[currentDraftId].reason}</p><p>{revisionRun.material_selection[currentDraftId].chunk_ids?.map((id: string) => { const chunk = chunks.find(value => value.chunk_id === id); return `${chunk?.document_name || chunk?.document_id || "当前索引未匹配"} · ${chunk?.section_path || "未标注章节"} · P.${chunk?.page_start ?? "—"} · ${id}`; }).join("；")}</p>{currentBefore?.test_category === "negative" && <p className="muted">仅作生成上下文，不写入 Golden Evidence。</p>}</section>}
         {view === "review" && <div className="review-workspace">
           <div className="workspace-badges"><span>{isMachineQualified(row.qualification_status) ? "机器合格" : reviewLabel(row)}</span><span>{displayText(row.test_category)}</span>{row.raw?.ablation_attribute && <span>{displayText(row.raw.ablation_attribute)}</span>}{linked && <span>关联 {displayText(linked.test_category)}：{linked.slot}</span>}</div>

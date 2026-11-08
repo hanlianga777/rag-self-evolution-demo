@@ -111,7 +111,8 @@ it("joins legacy Frozen question IDs to persisted categories without replacing f
   const before = JSON.stringify(frozen);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: frozen.id }, snapshots: [frozen], generationRuns: [], dataset: ["positive", "ablation", "negative"].map((test_category, i) => ({ id: `Q${i + 1}`, test_category })) }} />));
-  expect(document.querySelector(".golden-summary-strip")).not.toBeNull();
+  expect(document.querySelector(".golden-summary-strip")).toBeNull();
+  expect(document.body.textContent).not.toContain("技术详情");
   expect(JSON.stringify(frozen)).toBe(before);
   await act(async () => root.unmount());
 });
