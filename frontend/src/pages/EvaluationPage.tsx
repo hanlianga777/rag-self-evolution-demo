@@ -190,7 +190,6 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
 
 
     <PricePauseNotice pause={run.result?.price_pause} evaluationId={run.id} onChanged={async () => { setRun(await getJson<Row>(`/api/evaluations/${run.id}?light=true`)); }} />
-    {run.result?.judge_replay && <p className="muted">新版Judge判分；生成回答与检索耗时来自已核验历史执行，不代表本次重新生成或当前性能实测。</p>}
     {preflight?.reason && (/活动评测|后台.*运行|active/i.test(preflight.reason) ? <p className="pending-note" role="status">后台正在运行试跑，完成后可重新运行 Baseline</p> : <p className="error-notice" role="alert">无法启动 Baseline：{preflight.reason}</p>)}
     {["partial","failed"].includes(run.status) && preflight?.can_start && preflight.resume_reason && <p className="muted">原任务不能恢复：{preflight.resume_reason}；请明确新建完整评测，历史断点保留。</p>}
 

@@ -30,11 +30,12 @@ it('reads overview metrics from the selected saved evaluation, and never fabrica
  expect(document.querySelector('[aria-label="优化成果"]')?.textContent).toContain('待完整结果');
 });
 it('shows a plain failed-gate sentence and hides IDs in collapsed technical details', async () => {
- const run = { id: 'EVAL-internal', status: 'completed', created_at: '2026-11-01T12:00:00Z', dataset_version_id: 'GD-test', config: { generation_thinking: 'high' }, result: { bad_case_count: 1, gates: { passed: false, passed_count: 1, total: 2, gates: [{ metric: 'safe_rejection_rate', status: 'FAIL', actual: 87, threshold: 96, operator: '>=' }] } } };
- vi.stubGlobal('fetch', vi.fn(async (url:string) => response(url.includes('/preflight')?{can_start:false,can_start_replay:false}:run)));
+ const run = { id: 'EVAL-internal', status: 'completed', created_at: '2026-11-01T12:00:00Z', dataset_version_id: 'GD-test', config: { generation_thinking: 'high' }, result: { judge_replay: { source_run_id: 'saved-source' }, bad_case_count: 1, gates: { passed: false, passed_count: 1, total: 2, gates: [{ metric: 'safe_rejection_rate', status: 'FAIL', actual: 87, threshold: 96, operator: '>=' }] } } };
+ vi.stubGlobal('fetch', vi.fn(async (url:string) => new Response(JSON.stringify(url.includes('/preflight')?{can_start:false,can_start_replay:false}:run))));
  await mount(<EvaluationPage data={{ evaluation: run }} />);
  expect(document.querySelector('.baseline-conclusion h2')?.textContent).toBe('本轮有 1 项门槛未达标：安全拒答率 87.0%（要求 ≥96.0%）。');
  expect(document.querySelector('.baseline-run-summary')?.textContent).not.toContain('EVAL-internal');
+ expect(document.body.textContent).not.toContain('新版Judge判分；生成回答与检索耗时来自已核验历史执行，不代表本次重新生成或当前性能实测。');
  const details = [...document.querySelectorAll('details')].find(d => d.querySelector('summary')?.textContent === '技术详情');
  expect(details?.open).toBe(false); expect(details?.textContent).toContain('EVAL-internal');
 });
@@ -73,10 +74,12 @@ it('names a runtime version from its saved date and hides its internal ID', asyn
 });
 it('uses an honest empty monitoring state and never invents records', async () => {
  sessionStorage.clear();
- vi.stubGlobal('fetch', vi.fn(async () => response({ events: [], triggers: [] })));
+ vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ events: [], triggers: [] }))));
  await mount(<VerificationPage data={{ monitoring: { events: [], triggers: [] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '线上反馈 → 再次进化')!.click());
  expect(document.querySelector('.story-empty')?.textContent).toContain('当前尚无反馈记录');
+ expect(document.querySelector('.story-empty')?.textContent).toContain('请到「实时问答」提问');
+ expect(document.querySelector('.verification-page')?.textContent).not.toContain('未知');
  expect(document.querySelector('.monitoring-table')).toBeNull();
  expect((fetch as any).mock.calls.every(([, init]: any[]) => !init?.method || init.method === 'GET')).toBe(true);
 });
