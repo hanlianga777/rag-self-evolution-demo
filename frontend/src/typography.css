@@ -1,0 +1,47 @@
+/* 021w4: legacy page copy follows the saved-answer sample. Shared ui/ designs
+   and SavedAnswerComparison keep their own scale and emphasis. */
+:is(.page-shell .page-content, .drawer .detail-content, .confirm-dialog) {
+  font-size: var(--ui-fs-body);
+  font-weight: 400;
+  color: var(--ui-ink-2);
+}
+:is(.page-shell, .drawer, .confirm-dialog) :is(p, blockquote, .muted-prose, .clamp-text-host, .truncated-text):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison) *) {
+  font-size: var(--ui-fs-body);
+  font-weight: 400;
+  color: var(--ui-muted);
+}
+:is(.page-shell, .drawer, .confirm-dialog) :is(td, th, dd, li, label, strong, b, button):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison) *):not([class^="ui-"]):not([class*=" ui-"]) {
+  font-size: var(--ui-fs-body);
+  font-weight: 400;
+}
+:is(.page-shell, .drawer, .confirm-dialog) :is(.badge, small, dt, .field-label, .source-tag):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison) *) {
+  font-size: var(--ui-fs-meta);
+  font-weight: 400;
+  color: var(--ui-muted);
+}
+:is(.page-shell .page-content, .drawer .detail-content, .confirm-dialog) :is(h2, h3):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison) *) {
+  font-size: var(--ui-fs-card);
+  font-weight: 600;
+  color: var(--ui-ink);
+}
+:is(.page-shell, .drawer, .confirm-dialog) :is(h4, h5, .chat-header strong):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison) *) {
+  font-size: var(--ui-fs-sub);
+  font-weight: 600;
+  color: var(--ui-ink);
+}
+:is(.page-shell, .drawer) .metric > strong,
+.page-shell .asset-card > strong {
+  font-size: var(--ui-fs-key);
+  font-weight: 600;
+  color: var(--ui-ink);
+}
+:is(.page-shell, .drawer, .confirm-dialog) :is(p, blockquote, li, td, dd) :is(strong, b):not(:where([class^="ui-"], [class*=" ui-"], .saved-answer-comparison) *) {
+  font-size: inherit;
+  font-weight: 400;
+  color: inherit;
+}
+.drawer .drawer-head h2, .confirm-dialog > h2 {
+  font-size: var(--ui-fs-card);
+  font-weight: 600;
+}
+.muted-prose { margin: 6px 0; line-height: 1.65; overflow-wrap: anywhere; }

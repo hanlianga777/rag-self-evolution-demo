@@ -1,4 +1,5 @@
 import { IconLabel, IconTile } from "../ui/icons";
+import { BaselineBreakdown } from "../ui/baseline/BaselineBreakdown";
 import { BaselineHero } from "../ui/baseline/BaselineHero";
 import { caseData } from "../components/EvaluationDiagnosis";
 import { usePageTab } from "../usePageTab";
@@ -15,7 +16,7 @@ import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { Play } from "lucide-react";
 import { cachedJson, errorMessage, getJson, postJson } from "../api";
-import { Badge, Metric, MoreMenu, ProgressBar, Section, Status } from "../components/Primitives";
+import { Badge, Metric, MoreMenu, ProgressBar, Section, Status, TruncatedText } from "../components/Primitives";
 import { formatValue, thinkingLabel } from "../components/PipelineFields";
 import { CaseAnswer } from "../components/CaseAnswer";
 import { Drawer } from "../components/Dialog";
@@ -137,6 +138,11 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const completed = run.status === "completed";
   const diagnosisRows = cases.length ? cases : relatedBad;
   const businessCases = businessDiagnosisRows(diagnosisRows);
+  const categoryScores = ([['positive', '正向题（Positive）'], ['ablation', '消融题（Ablation）'], ['negative', '负向题（Negative）']] as const).map(([category, label]) => {
+    const rows = cases.filter(row => (snapshot.questions?.find((question: Row) => question.id === row.question_id)?.test_category || row.test_category) === category);
+    return { label, correct: rows.filter(row => businessVerdict(row) === 'PASS').length, total: rows.length };
+  });
+  const breakdownReady = completed && cases.length === result.total && categoryScores.reduce((sum, row) => sum + row.total, 0) === result.total && cases.every(row => businessVerdict(row) !== null);
   const historicalPolicy=!!(run.requires_policy_upgrade ?? data.workspace?.requires_policy_upgrade);
   const stale = data.workspace?.requires_new_golden || data.workspace?.requires_new_baseline && (completed || data.workspace?.current_golden_id && snapshot.id !== data.workspace.current_golden_id);
 
@@ -144,7 +150,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
 
     <PricePauseNotice pause={run.result?.price_pause} evaluationId={run.id} onChanged={async () => { setRun(await getJson<Row>(`/api/evaluations/${run.id}?light=true`)); }} />
     {preflight?.reason && (/活动评测|后台.*运行|active/i.test(preflight.reason) ? <p className="pending-note" role="status">后台正在运行试跑，完成后可重新运行 Baseline</p> : <p className="error-notice" role="alert">无法启动 Baseline：{preflight.reason}</p>)}
-    {["partial","failed"].includes(run.status) && preflight?.can_start && preflight.resume_reason && <p className="muted">原任务不能恢复：{preflight.resume_reason}；请明确新建完整评测，历史进度保留。</p>}
+    {["partial","failed"].includes(run.status) && preflight?.can_start && preflight.resume_reason && <div className="muted-prose muted"><TruncatedText lines={3}>原任务不能恢复：{preflight.resume_reason}；请明确新建完整评测，历史进度保留。</TruncatedText></div>}
 
     {run.result?.auto_recovery?.authorized && !completed && <p className="workbench-status" role="status">{run.result.auto_recovery.state==='retrying'?`后台自动重试${run.result.auto_recovery.phase==='judge'?'Judge':'问答请求'} · 本题第${run.result.auto_recovery.retry_count}次恢复，已完成题目不会重复调用。`:run.result.auto_recovery.state==='stopped'?'后台已保存进度并停止：存在不可自动恢复的错误，详见评测依据。':'后台任务持续执行；刷新或关闭页面不停止Worker。'}</p>}
     {(error || run.error_message) && <p className="error-notice" role="alert">评测执行异常：{error || run.error_message}；未完成题目没有业务判定，不计入 Bad Case。</p>}
@@ -178,6 +184,10 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
       </>}
 
       {tab === "report" && <div className="baseline-report">
+        {breakdownReady && <BaselineBreakdown categories={categoryScores} badCases={businessCases.map(row => {
+          const item = caseData(row), category = item.diagnostic_view?.diagnosis_category;
+          return { id: productQuestionLabel(row), question: item.question, layer: category === '检索层问题' ? '检索层' : category === '生成层问题' ? '生成层' : category || '未知' };
+        })} onOpen={id => { setTab('cases'); setSelectedCase(businessCases.find(row => productQuestionLabel(row) === id) || null); }} />}
         <StoryDisclosure label="更多指标">
           <Metric label="综合分" value={format(result.overall_score)} note="用于比较整体表现"/>
           <ProductDiagnostics diagnostics={run.product_diagnostics} judgeThinking={judgeThinking} />
@@ -238,10 +248,10 @@ export function BaselineCaseDetails({ item, snapshot, config, gates }: { item: R
 
   return <div className="case-details bad-case-details">
     <div className="case-review"><Badge tone={passed?"good":businessVerdict(item)==="FAIL"?"bad":"neutral"}>{conclusion}</Badge>{item.baseline_review_label && <Badge tone={item.baseline_review?.status==='confirmed_regression'?'bad':item.baseline_review?.status==='fluctuation'?'warning':'neutral'}>{item.baseline_review_label}</Badge>}</div>
-    <section className="candidate-card"><h3>业务问题</h3><p className="muted">{displayText(item.test_category || golden.test_category || '')}{item.negative_subtype && ` · ${displayText(item.negative_subtype)}`}</p><CaseAnswer text={item.question || golden.question || '历史未保存问题原文'} />{golden.business_scenario && <p>业务场景：{golden.business_scenario}</p>}</section>
-    <section className="candidate-card"><h3>答案对比</h3><div className="case-answer-stack"><div><h4>参考答案 / 必答要点</h4><CaseAnswer text={reference} />{typeof view.missing_points==='string' && <p className="muted">{view.missing_points}</p>}{missing.length>0 && <div className="missing-points"><strong>未答到的要点</strong><ul>{missing.map(point=><li key={point}>{point}</li>)}</ul></div>}</div><div><h4>实际回答</h4><CaseAnswer text={item.model_answer || '历史未保存回答'} final={final} /></div></div><p className="case-difference">{summary}</p></section>
-    <section className="candidate-card"><h3>检索路径</h3>{negative?<p>不适用（负向题（Negative）不定位标准证据）</p>:<>{evidence.map((source,index)=>{const position=positions.find(position=>position.evidence_index===index+1);return <article className="evidence-path" key={index}><p>{source.evidence_key_points?.join('；') || '历史未保存关键事实摘要'}</p><p className="muted">{sourceLocation(source) || '来源位置未记录'}</p>{position?<ol aria-label={`第 ${index+1} 段标准证据检索路径`}><li>{position.candidate_rank!=null?`召回第 ${position.candidate_rank} 位`:'未进候选'}</li><li>{position.rerank_rank!=null?`Rerank 第 ${position.rerank_rank} 位`:'Rerank 位置未记录'}</li><li>{position.final_rank!=null?`进入 Top-K 第 ${position.final_rank} 位`:`未进 Top-K ${final.length} 条`}</li></ol>:<p className="muted">该段证据的检索位置未记录。</p>}</article>})}{!evidence.length && <p>历史冻结题卷未保存标准证据。</p>}</>}</section>
-    <section className="candidate-card"><h3>优化方向</h3><p>{passed?'本题已答对，无失败优化目标。':view.repair_hint || savedDirections(item)}</p></section>
+    <section className="candidate-card"><h3>业务问题</h3><p className="muted">{displayText(item.test_category || golden.test_category || '')}{item.negative_subtype && ` · ${displayText(item.negative_subtype)}`}</p><CaseAnswer text={item.question || golden.question || '历史未保存问题原文'} />{golden.business_scenario && <div className="muted-prose"><TruncatedText lines={3}>业务场景：{golden.business_scenario}</TruncatedText></div>}</section>
+    <section className="candidate-card"><h3>答案对比</h3><div className="case-answer-stack"><div><h4>参考答案 / 必答要点</h4><CaseAnswer text={reference} />{typeof view.missing_points==='string' && <div className="muted-prose muted"><TruncatedText lines={3}>{view.missing_points}</TruncatedText></div>}{missing.length>0 && <div className="missing-points"><strong>未答到的要点</strong><ul>{missing.map(point=><li key={point}>{point}</li>)}</ul></div>}</div><div><h4>实际回答</h4><CaseAnswer text={item.model_answer || '历史未保存回答'} final={final} /></div></div><div className="muted-prose case-difference"><TruncatedText lines={3}>{summary}</TruncatedText></div></section>
+    <section className="candidate-card"><h3>检索路径</h3>{negative?<p>不适用（负向题（Negative）不定位标准证据）</p>:<>{evidence.map((source,index)=>{const position=positions.find(position=>position.evidence_index===index+1);return <article className="evidence-path" key={index}><div className="muted-prose"><TruncatedText lines={3}>{source.evidence_key_points?.join('；') || '历史未保存关键事实摘要'}</TruncatedText></div><p className="muted">{sourceLocation(source) || '来源位置未记录'}</p>{position?<ol aria-label={`第 ${index+1} 段标准证据检索路径`}><li>{position.candidate_rank!=null?`召回第 ${position.candidate_rank} 位`:'未进候选'}</li><li>{position.rerank_rank!=null?`Rerank 第 ${position.rerank_rank} 位`:'Rerank 位置未记录'}</li><li>{position.final_rank!=null?`进入 Top-K 第 ${position.final_rank} 位`:`未进 Top-K ${final.length} 条`}</li></ol>:<p className="muted">该段证据的检索位置未记录。</p>}</article>})}{!evidence.length && <p>历史冻结题卷未保存标准证据。</p>}</>}</section>
+    <section className="candidate-card"><h3>优化方向</h3><div className="muted-prose"><TruncatedText lines={3}>{passed?'本题已答对，无失败优化目标。':view.repair_hint || savedDirections(item)}</TruncatedText></div></section>
 
   </div>;
 }

@@ -41,7 +41,7 @@ it('pages version history without dropping the active runtime summary',async()=>
  const fetcher=vi.fn(async()=>new Response(JSON.stringify([{id:'older',status:'archived'}])));vi.stubGlobal('fetch',fetcher);
  await render(<VersionsPage data={{versions}}/>);await click('下一页');
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/versions?page=2&limit=50'))).toBe(true);
- expect(document.querySelector('.release-decision')?.textContent).toContain('当前线上配置');
+ await click('查看完整配置');expect(document.querySelector('[role=dialog]')?.textContent).toContain('当前线上配置');
  expect(document.body.textContent).not.toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(1);
 });
 it('pages monitoring events and triggers with bounded read requests',async()=>{

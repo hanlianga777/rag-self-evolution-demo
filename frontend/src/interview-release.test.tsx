@@ -17,7 +17,7 @@ const production = { id: "PROD-old-C", status: "active", provenance: "published"
 it("centres the actual published snapshot while a newer recommendation remains unpublished", async () => {
   const candidate = { id: "EXP-new-A", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
   await render(<VersionsPage data={{ versions: [production, { id: "baseline-v1", status: "archived", config: { prompt_strategy: "Grounded", rerank: false } }], optimization: { candidates: [candidate], recommendation: { result: { recommended_candidate: candidate.id } } } }} />);
-  expect(document.querySelector(".release-decision")?.textContent).toContain("配置来源Candidate C");
+  expect(document.querySelector(".release-decision")?.textContent).not.toContain("配置来源");
   expect(document.querySelector(".release-decision")?.textContent).toContain("11 / 11");
   expect(document.querySelector(".release-decision")?.textContent).toContain("线上 Regression Check通过");
   expect(document.querySelector(".release-decision")?.textContent).toContain("线上发布批准已批准");

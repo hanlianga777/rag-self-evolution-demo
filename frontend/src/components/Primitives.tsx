@@ -1,4 +1,4 @@
-import { Children, createContext, useContext, useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Children, createContext, useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { ClampText } from "../ui/ClampText";
@@ -24,9 +24,8 @@ export function Status({ value }: { value: string }) {
 export const FullTextContext = createContext(false);
 
 export function TruncatedText({ children, lines = 2 }: { children: ReactNode; lines?: 2 | 3 | 4 }) {
-  const fullDetails = useContext(FullTextContext);
   const parts = Children.toArray(children);
-  if (!fullDetails && parts.every(part => typeof part === "string" || typeof part === "number")) return <div className="clamp-text-host" onClick={event => { if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation(); }}><ClampText text={parts.join("")} lines={lines} /></div>;
+  if (parts.every(part => typeof part === "string" || typeof part === "number")) return <div className="clamp-text-host" onClick={event => { if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation(); }}><ClampText text={parts.join("")} lines={lines} /></div>;
   return <LegacyTruncatedText lines={lines}>{children}</LegacyTruncatedText>;
 }
 

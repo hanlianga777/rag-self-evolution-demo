@@ -59,7 +59,7 @@ it('shows saved question validity and retrieval observation in separate Probe li
   const {FrozenQuestionDetails}=await import('./pages/FrozenQuestionDetails');
   root=createRoot(document.body.appendChild(document.createElement('div')));
   await act(async()=>root.render(<FrozenQuestionDetails row={{question:'测试题',test_category:'positive',probe_status:'probe_passed',probe:{score:95,question_validity_reason:'题目与标准证据一致。',retrieval_observation:'最终上下文少了一段标准证据。'},qc:{}}}/>));
-  const lines=[...document.querySelectorAll('.golden-probe-result p')].map(node=>node.textContent);
+  const lines=[...document.querySelectorAll('.golden-probe-result .muted-prose')].map(node=>node.textContent);
   expect(lines).toEqual(['题目有效：题目与标准证据一致。','召回观察：最终上下文少了一段标准证据。']);
 });
 it('loads saved cases once when a running evaluation case drawer opens', async () => {

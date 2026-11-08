@@ -4,5 +4,7 @@ import App from "./App";
 import { OperationProvider } from "./operation";
 import "./styles.css";
 import "./ui/ui.css";
+import "./ui/extra.css";
+import "./typography.css";
 
 createRoot(document.getElementById("root")!).render(<StrictMode><OperationProvider><App /></OperationProvider></StrictMode>);

@@ -1,3 +1,4 @@
+import { TruncatedText } from './Primitives';
 import { answerCitationDisplay } from '../answerCitations';
 import { StoryDisclosure } from './Storytelling';
 import { createElement, Fragment, type ReactNode } from 'react';
@@ -13,7 +14,7 @@ const inline = (text: string): ReactNode => text.split(/(\*\*[^*]+\*\*|__[^_]+__
 });
 const marker = /^(\s*)(?:(\d+)[.、)）](?!\d)\s*|[-*+]\s+)(.+)$/;
 
-function markdown(text: string): ReactNode[] {
+function markdown(text: string, clamp = false): ReactNode[] {
   // Only split a run that starts at 1 and continues sequentially. Numbers inside
   // decimals, model names, versions and chapter references are not list markers.
   const normalized = text.replace(/(^|[：:。；;！!？?\s])1[.、)）](?!\d)\s*([^\n]+)(?=\n|$)/gm, (whole, prefix: string, body: string) => {
@@ -37,7 +38,7 @@ function markdown(text: string): ReactNode[] {
           const item = lines[cursor].match(marker);
           if (!item || item[1].length !== level || !!item[2] !== ordered) break;
           cursor++;
-          const content: ReactNode[] = [<Fragment key="text">{inline(item[3])}</Fragment>];
+          const content: ReactNode[] = [<Fragment key="text">{clamp ? <TruncatedText lines={3}>{inline(item[3])}</TruncatedText> : inline(item[3])}</Fragment>];
           while (cursor < lines.length && lines[cursor].trim() && /^\s+/.test(lines[cursor]) && (lines[cursor].match(/^\s*/)?.[0].length || 0) > level) {
             if (marker.test(lines[cursor])) content.push(...blocks((lines[cursor].match(/^\s*/)?.[0].length || 0)));
             else { content.push(<Fragment key={`continuation-${cursor}`}><br />{inline(lines[cursor].trim())}</Fragment>); cursor++; }
@@ -48,7 +49,7 @@ function markdown(text: string): ReactNode[] {
       } else {
         cursor++;
         const heading = line.match(/^#{1,6}\s+(.+)$/);
-        result.push(heading ? <h5 key={result.length}>{inline(heading[1])}</h5> : <p key={result.length}>{inline(line.replace(/^>\s?/, ''))}</p>);
+        result.push(heading ? <h5 key={result.length}>{inline(heading[1])}</h5> : clamp ? <div className="answer-paragraph" key={result.length}><TruncatedText lines={3}>{inline(line.replace(/^>\s?/, ''))}</TruncatedText></div> : <p key={result.length}>{inline(line.replace(/^>\s?/, ''))}</p>);
       }
     }
     return result;
@@ -61,18 +62,18 @@ export function CaseAnswer({ text, final }: { text: string; final?: Parameters<t
     const display=answerCitationDisplay(text,final);
     if (display.changed) return <><CaseAnswer text={display.text}/>{display.unverified > 0 && <p className="error-notice">{display.unverified}处引用未与本次保存的Final对应，不能据此认定回答有据。</p>}<StoryDisclosure label="原始回答与引用审计"><pre className="technical-record">{text}</pre></StoryDisclosure></>;
   }
-  return answerMarkup(text);
+  return answerMarkup(text, true);
 }
 
 /** Parsed React nodes, also used by the saved comparison's exact-quote decoration. */
-export function answerMarkup(text: string) {
-  if (!/<\/?[a-z][^>]*>/i.test(text)) return <div className="case-answer">{markdown(text)}</div>;
+export function answerMarkup(text: string, clamp = false) {
+  if (!/<\/?[a-z][^>]*>/i.test(text)) return <div className="case-answer">{markdown(text, clamp)}</div>;
   const document = new DOMParser().parseFromString(text, 'text/html');
   const allowed = new Set(['p', 'div', 'br', 'ol', 'ul', 'li', 'strong', 'b', 'em', 'i', 'code', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span']);
   function node(value: Node, index: number): ReactNode {
     if (value.nodeType === 3) {
       const text = value.textContent || '';
-      return ['BODY', 'P', 'DIV', 'LI', 'BLOCKQUOTE'].includes(value.parentElement?.tagName || '') && /(?:^|[\n：:])\s*(?:\d+[.、)）](?!\d)|[-*+]\s|#{1,6}\s)/.test(text) ? markdown(text) : inline(text);
+      return ['BODY', 'P', 'DIV', 'LI', 'BLOCKQUOTE'].includes(value.parentElement?.tagName || '') && /(?:^|[\n：:])\s*(?:\d+[.、)）](?!\d)|[-*+]\s|#{1,6}\s)/.test(text) ? markdown(text, clamp) : inline(text);
     }
     if (value.nodeType !== 1) return null;
     const element = value as HTMLElement, tag = element.tagName.toLowerCase();
@@ -82,7 +83,7 @@ export function answerMarkup(text: string) {
     if (tag === 'img') return <span key={index}>{element.getAttribute('alt') || ''}</span>;
     if (!allowed.has(tag)) return <Fragment key={index}>{children}</Fragment>;
     const safeTag = /^h\d$/.test(tag) ? 'h5' : tag === 'p' ? 'div' : tag;
-    return createElement(safeTag, { key: index, ...(tag === 'ol' && /^\d+$/.test(element.getAttribute('start') || '') ? { start: Number(element.getAttribute('start')) } : {}) }, ...(tag === 'br' ? [] : children));
+    return createElement(safeTag, { key: index, ...(tag === 'ol' && /^\d+$/.test(element.getAttribute('start') || '') ? { start: Number(element.getAttribute('start')) } : {}) }, ...(tag === 'br' ? [] : clamp && ['p', 'div', 'li', 'blockquote'].includes(tag) && !element.querySelector('p,div,ol,ul,li,blockquote') ? [<TruncatedText key="prose" lines={3}>{children}</TruncatedText>] : children));
   }
   return <div className="case-answer">{Array.from(document.body.childNodes).map(node)}</div>;
 }
