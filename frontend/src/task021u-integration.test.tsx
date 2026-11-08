@@ -18,7 +18,7 @@ const data=(released=false)=>{const optimization=experiment(),id=optimization.ca
 it.each([false,true])('uses saved overview numbers and actual production identity (released %s)',async released=>{
  const d=data(released),navigate=vi.fn();await mount(<OverviewPage data={d} navigate={navigate}/>);
  expect(document.querySelector('.ui-ov-big')?.textContent).toMatch(/44.*48.*50/);
- expect(document.querySelector('.ui-ov-status')?.textContent).toContain(released?'Candidate D 已发布':'Candidate D 推荐待发布');
+ expect(document.querySelector('.ui-ov-status')?.textContent).toContain(released?'已发布 Candidate D':'待发布 Candidate D');expect(document.querySelector('.ui-ov-status')?.textContent?.includes('当前线上')).toBe(!released);
  await click(released?'去问答验证':'去发布');expect(navigate).toHaveBeenCalledWith(released?'verification':'versions');
  expect(document.querySelectorAll('.ui-ov-step')).toHaveLength(6);
 });

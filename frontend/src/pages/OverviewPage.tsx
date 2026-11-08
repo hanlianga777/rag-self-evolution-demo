@@ -126,8 +126,8 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
       p99={pair("latency_p99_seconds")} p50={pair("latency_p50_seconds")} safeRefusal={pair("safe_rejection_rate")}
       budget={Number.isFinite(budget?.used) && Number.isFinite(budget?.max) ? budget : null}
       status={{kind: currentReleased ? "released" : readyToRelease ? "pending_release" : sandboxRunning ? "running" : "waiting",
-        candidate: currentReleased ? `${candidateName} 已发布` : readyToRelease ? `${candidateName} 推荐待发布` : next[1],
-        online: currentReleased ? candidateName : released ? productionName(production) : "初始配置"}}
+        candidate: currentReleased ? candidateName : readyToRelease ? candidateName : next[1],
+        online: currentReleased ? undefined : released ? productionName(production) : "初始配置"}}
       primaryAction={{label: primaryLabel, onClick: () => navigate(currentReleased ? "verification" : next[2])}} flow={flow} />
     {turns.length > 0 && <OverviewStory turns={turns} fixed={fixed} onOpenFixed={id => { location.hash = `verification?tab=compare&q=${encodeURIComponent(id)}`; }} />}
     </>}
