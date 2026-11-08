@@ -1445,3 +1445,7 @@ button { border-radius:8px; }
 .settings-page .ui-param b { font-weight:600; }
 
 .line-clamp-1 { -webkit-line-clamp:1; line-clamp:1; }
+
+/* Keep complete versions and parameter values visible inside prose-clamped tables. */
+.release-history-table td:is(:first-child,:nth-child(3)) > .truncated-text,
+.search-space-table td:nth-child(-n+3) :is(.truncated-text,.ui-clamp) { display:block; -webkit-line-clamp:unset; line-clamp:unset; }

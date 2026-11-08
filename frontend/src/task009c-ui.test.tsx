@@ -44,7 +44,7 @@ it('shows the current frozen paper and the saved reviewed-import source', async 
  const run = { id: 'run', status: 'completed', profile: { name: 'mini', expected_count: 1, positive: 1 }, question_ids: ['q1'], artifacts: {}, human_gate: { status: 'ready' } };
  vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.endsWith('/questions/q1') ? row : url.includes('candidates?') ? { rows: [row], candidate_index: [row], total: 1, has_more: false } : [])));
  await mount(<GovernancePage data={{ workspace: { current_golden_id: 'GD-saved' }, dataset: [row], generationRuns: [run], snapshots: [{ id: 'GD-saved', status: 'approved', created_at: '2026-11-01T15:19:40Z', snapshot: { generation_run_id: 'run', question_ids: ['q1'], questions: [row] } }] }} />);
- expect(document.querySelector('.ui-gp')?.textContent).toContain('已冻结 2026-11-01');
+ expect(document.querySelector('.ui-gp')?.textContent).toContain('已冻结 · 11-01');
  expect(document.querySelector('.golden-technical-details')).toBeNull();
  expect(document.querySelector('.question-provenance')).toBeNull();
  await act(async () => document.querySelector<HTMLElement>('.review-table tbody tr[role=button]')!.click());

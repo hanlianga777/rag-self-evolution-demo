@@ -47,3 +47,8 @@
 .frozen-question-details .golden-quality-results .badge { align-self:start; }
 
 .governance-page .review-table th { white-space:nowrap; }
+
+.golden-baseline-verdict { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.golden-baseline-verdict small { display:inline; color:var(--ui-muted); font-size:var(--ui-fs-meta); }
+
+.governance-page .review-table tbody tr { height:48px; }

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Icon, IconLabel } from "../icons";
 import "../extra.css";
 
@@ -8,9 +9,9 @@ import "../extra.css";
  */
 export type PipelineStep = { label: string; value: string; meta?: string };
 
-export function KnowledgePipeline({ steps, online, title = "知识处理链路" }: { steps: PipelineStep[]; online?: string[]; title?: string }) {
+export function KnowledgePipeline({ steps, online, action, title = "知识处理链路" }: { steps: PipelineStep[]; online?: string[]; title?: string; action?: ReactNode }) {
   return <section className="ui-kp" aria-label={title}>
-    <h3><IconLabel name="data">{title}</IconLabel></h3>
+    <div className="ui-kp-heading"><h3><IconLabel name="data">{title}</IconLabel></h3>{action}</div>
     <ol className="ui-kp-steps">
       {steps.map((step, index) => <li key={step.label}>
         <span className="ui-kp-k">{step.label}</span>

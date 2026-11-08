@@ -40,12 +40,13 @@ it('uses saved API parameters in one knowledge chain and keeps the sample Child/
   expect((fetch as any).mock.calls.every(([, init]: any[]) => !init?.method || init.method === 'GET')).toBe(true);
 });
 
-it('does not invent parser, clustering, retrieval or model selection when the API has not recorded them', async () => {
+it('keeps the implemented clustering default without inventing parser, retrieval or model selection', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ knowledge: {}, index: {} }))));
   await mount(<KnowledgePage data={{ documents: [] }} />);
   const text = document.querySelector('[aria-label="知识处理链路"]')?.textContent;
   expect(text).toBeDefined();
-  expect(text).not.toMatch(/MinerU|K-means|qwen3|Hybrid/);
+  expect(text).not.toMatch(/MinerU|qwen3|Hybrid/);
+  expect(text).toContain('K-means 聚类');
   expect(text).toContain('未记录');
 });
 

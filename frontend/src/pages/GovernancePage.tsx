@@ -1,3 +1,4 @@
+import { HoverCard } from "../ui/HoverCard";
 import { Icon, IconLabel, IconTile } from "../ui/icons";
 import { GoldenPipeline } from "../ui/pages3";
 import { readableSourceName } from "../components/ComparisonAnswer";
@@ -7,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { apiUrl, errorMessage, getJson, cachedJson, postJson } from "../api";
 import { CustomSelect, TableVerdict, MoreMenu, Section, ShortId, Status, TruncatedText } from "../components/Primitives";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
-import { displayText, isMachineQualified } from "../display";
+import { displayText, isMachineQualified, localShortTime } from "../display";
 import { useOperation } from "../operation";
 import { BusinessImportPanel, CurrentCoveragePreview } from "./BusinessImportPanel";
 import { FrozenQuestionDetails, goldenScore } from "./FrozenQuestionDetails";
@@ -78,7 +79,7 @@ export function GovernancePage({ data }: { data: any }) {
   const currentIds: string[] = workRun?.question_ids || [];
   const gate1Snapshot = snapshots.find(snapshot => snapshot.snapshot?.generation_run_id === workRun?.id && JSON.stringify(snapshot.snapshot?.question_ids) === JSON.stringify(currentIds));
   const frozen = !!gate1Snapshot;
-  const frozenDate = gate1Snapshot?.created_at && !Number.isNaN(Date.parse(gate1Snapshot.created_at)) ? `${new Date(gate1Snapshot.created_at).toISOString().slice(0, 16).replace("T", " ")} UTC` : "冻结时间未知";
+  const frozenDate = localShortTime(gate1Snapshot?.created_at);
   const plannedSlots = new Map((workRun?.artifacts?.question_plan || []).map((row: Candidate) => [row.question_id, row.coverage_slot]));
   const current: Candidate[] = currentIds.map(id => currentIndex.find(row => row.id === id) || review.find(row => row.id === id) || items.find(row => row.id === id)).filter((row): row is Candidate => !!row).map(row => ({ ...row, slot: row.slot || row.raw?.coverage_slot || plannedSlots.get(row.id) }));
   const historical = items.filter(row => !currentIds.includes(row.id) && row.stage !== "golden");
@@ -237,7 +238,7 @@ export function GovernancePage({ data }: { data: any }) {
         { label: "Probe", done: current.length === expectedCount && current.every(row => row.probe_status === "probe_passed"), value: `${current.filter(row => row.probe_status === "probe_passed").length}/${expectedCount}${current.some(row => row.probe_status === "needs_revision") ? " 待处理" : ""}` },
         { label: "QC", done: current.length === expectedCount && current.every(row => row.qc_status === "qc_passed"), value: `${current.filter(row => row.qc_status === "qc_passed").length}/${expectedCount}${current.some(row => row.qc_status === "qc_failed") ? " 待处理" : ""}` },
         { label: displayText("Human Gate"), done: !!gate1Snapshot, value: `${gate1Snapshot ? gate1Snapshot.snapshot?.question_ids?.length ?? "未知" : current.filter(row => ["approved", "owner_delegated_approved"].includes(row.review_status || row.status)).length}/${expectedCount}` },
-      ]} frozen={{ ok: frozen, text: frozen ? `已冻结 ${frozenDate}` : "尚未冻结" }} />
+      ]} frozen={{ ok: frozen, text: frozen ? `已冻结 · ${frozenDate}` : "尚未冻结" }} />
       {workRun ? <Section title={<IconLabel name="golden">题目审核</IconLabel>}>
         <div className="review-filters" aria-label="题目筛选">{filters.filter(item => item.key !== "attention" || item.count > 0).filter(item => !frozen || item.key !== "pending").map(item => <button key={item.key} aria-pressed={filter === item.key} className={filter === item.key ? "active" : ""} onClick={() => setFilter(item.key)}>{item.label} {item.count}</button>)}        <small className="muted golden-review-role" role="status">{syncing || listing ? "正在同步…" : ""}</small></div>
 
@@ -258,15 +259,23 @@ export function GovernancePage({ data }: { data: any }) {
   </PageShell>;
 }
 
+const tableSourceNames: Record<string, string> = {
+  "KIRA B 50 操作说明": "KIRA 操作说明",
+  "B2 用户手册": "B2 用户手册",
+  "B2 电池与充电器使用说明": "B2 电池说明",
+  "B2 遥控器使用说明": "B2 遥控器说明",
+};
+const tableSources = (summary?: string) => summary?.split(/[；;]/).map(source => source.split(" · ").map(part => tableSourceNames[readableSourceName(part)] || readableSourceName(part)).join(" · ").replace(/第\s*(\d+(?:[–—−-]\d+)?)\s*页/g, "p$1"));
+
 export function QuestionTable({ rows, onDetail, paging, resetKey }: { rows: Candidate[]; onDetail: (row: Candidate) => void; paging?: any; resetKey?: string }) {
   const hover = useHoverPrefetch();
   const optional = [
     {label:"知识主题",width:100,style:"muted",value:(row:Candidate)=>typeof row.knowledge_topic === "string" ? row.knowledge_topic : row.knowledge_topic?.semantic_label || row.topic_cluster?.semantic_label},
-    {label:"出处",width:140,style:"muted",value:(row:Candidate)=>row.source_summary?.split(/( · |；)/).map((part: string) => /^( · |；)$/.test(part) ? part : readableSourceName(part)).join("").replace(/第\s*(\d+(?:[–—−-]\d+)?)\s*页/g,"p$1")},
+    {label:"出处",width:210,style:"muted",value:(row:Candidate)=>{ if (row.source_summary === "不适用（负向题（Negative）无标准证据）") return "不适用 · 无标准证据"; const sources = tableSources(row.source_summary); return sources?.length ? `${sources[0]}${sources.length > 1 ? ` +${sources.length - 1}` : ""}` : null; }},
     {label:"评分要点",width:72,style:"num",value:(row:Candidate)=>row.scoring_summary ? `${row.scoring_summary.required} 条` : null},
     {label:"Probe",width:60,style:"num",value:(row:Candidate)=>typeof row.probe?.score === "number" ? goldenScore(row.probe.score) : null},
     {label:"QC",width:60,style:"num",value:(row:Candidate)=>typeof row.qc?.score === "number" ? goldenScore(row.qc.score) : null},
     {label:"Baseline",width:118,style:"",value:(row:Candidate)=>row.baseline_result?.passed},
   ].filter(column=>rows.some(row=>column.value(row)!=null));
-  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><DataTable><colgroup><col style={{width:60}}/><col style={{width:60}}/><col/>{optional.map(column=><col key={column.label} style={{width:column.width}}/>)}<col style={{width:32}}/></colgroup><thead><tr><th>题号</th><th>题型</th><th>问题</th>{optional.map(column=><th key={column.label} className={column.style}>{column.label}</th>)}<th aria-label="打开详情"/></tr></thead><tbody>{rows.slice(0, paging?.visibleCount ?? rows.length).map(row => <tr key={row.id} tabIndex={0} role="button" aria-label={`${row.slot || "题目"} · ${row.question}`} {...hover(row.failed ? [] : [`/api/governance/questions/${row.id}`])} onClick={() => onDetail(row)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDetail(row); } }}><td className="id">{row.slot || row.raw?.coverage_slot || row.id}</td><td className="muted">{({positive:"正向",ablation:"消融",negative:"负向"} as Record<string,string>)[row.test_category] || displayText(row.test_category || (row.failed ? "生成失败" : "类型未记录"))}</td><td><TruncatedText lines={1}>{row.question}</TruncatedText></td>{optional.map(column=><td key={column.label} className={column.style}>{column.label === "Baseline" ? <><TableVerdict value={row.baseline_result?.passed}/>{row.baseline_result?.passed === false && row.baseline_result.diagnosis_category && <small><TruncatedText lines={1}>{row.baseline_result.diagnosis_category}</TruncatedText></small>}</> : <TruncatedText lines={1}>{column.value(row) ?? "未记录"}</TruncatedText>}</td>)}<td><span className="ui-row-go"><Icon name="go" size={15}/></span></td></tr>)}{!rows.length && !paging?.error && <tr><td colSpan={4+optional.length} className="empty-state">还没有符合筛选条件的题目。<p>题目完成生成与校验后会显示在这里。</p></td></tr>}</tbody></DataTable></ScrollablePagedTable>;
+  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><DataTable><colgroup><col style={{width:60}}/><col style={{width:60}}/><col/>{optional.map(column=><col key={column.label} style={{width:column.width}}/>)}<col style={{width:32}}/></colgroup><thead><tr><th>题号</th><th>题型</th><th>问题</th>{optional.map(column=><th key={column.label} className={column.style}>{column.label}</th>)}<th aria-label="打开详情"/></tr></thead><tbody>{rows.slice(0, paging?.visibleCount ?? rows.length).map(row => <tr key={row.id} tabIndex={0} role="button" aria-label={`${row.slot || "题目"} · ${row.question}`} {...hover(row.failed ? [] : [`/api/governance/questions/${row.id}`])} onClick={() => onDetail(row)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDetail(row); } }}><td className="id">{row.slot || row.raw?.coverage_slot || row.id}</td><td className="muted">{({positive:"正向",ablation:"消融",negative:"负向"} as Record<string,string>)[row.test_category] || displayText(row.test_category || (row.failed ? "生成失败" : "类型未记录"))}</td><td><TruncatedText lines={1}>{row.question}</TruncatedText></td>{optional.map(column=><td key={column.label} className={column.style}>{column.label === "Baseline" ? <TruncatedText lines={1}><span className="golden-baseline-verdict"><TableVerdict value={row.baseline_result?.passed}/>{row.baseline_result?.passed === false && row.baseline_result.diagnosis_category && <small>{row.baseline_result.diagnosis_category.replace(/问题$/, "")}</small>}</span></TruncatedText> : <TruncatedText lines={1}>{column.label === "出处" ? <HoverCard content={row.source_summary || "未记录"}><span title={row.source_summary}>{column.value(row) ?? "未记录"}</span></HoverCard> : column.value(row) ?? "未记录"}</TruncatedText>}</td>)}<td><span className="ui-row-go"><Icon name="go" size={15}/></span></td></tr>)}{!rows.length && !paging?.error && <tr><td colSpan={4+optional.length} className="empty-state">还没有符合筛选条件的题目。<p>题目完成生成与校验后会显示在这里。</p></td></tr>}</tbody></DataTable></ScrollablePagedTable>;
 }
