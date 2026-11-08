@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageSamples } from "./PageSamples";
 import { ClampText, ParamChip, QuestionBadge, QuestionList, RunProgressPanel, StatTransition, StatusBadge, type RunStatus } from "./index";
 
 /**
@@ -18,8 +19,10 @@ const LONG = "把回答思考档位从 Max 降到 High，用来压低 P99；同�
 
 export function Gallery() {
   const [status, setStatus] = useState<RunStatus>("running");
-  return <div style={{ padding: 32, display: "grid", gap: 28, maxWidth: 1100 }}>
-    <h1 style={{ margin: 0, fontSize: 26 }}>UI 组件样板</h1>
+  return <div style={{ padding: 32, display: "grid", gap: 28, maxWidth: 1180 }}>
+    <h1 style={{ margin: 0, fontSize: 26 }}>UI 样板</h1>
+    <PageSamples />
+    <h2 className="ui-sample-title">基础组件</h2>
 
     <section className="panel" style={{ display: "grid", gap: 14 }}>
       <h2 style={{ margin: 0, fontSize: 16 }}>StatTransition 前后对比数值</h2>

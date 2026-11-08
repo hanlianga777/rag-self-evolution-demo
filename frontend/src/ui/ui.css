@@ -200,6 +200,99 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-run-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: ui-pulse 1.6s ease-in-out infinite; }
 .ui-run-pill.idle::before { animation: none; opacity: .6; }
 
+
+/* ============================================================
+ * 页面级布局：概览首屏 / Agent 顶部统计 / 进化路线
+ * ============================================================ */
+
+/* —— 概览首屏 —— */
+.ui-ov { display: grid; gap: 16px; }
+.ui-ov-hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 28px 32px; }
+.ui-ov-label { color: var(--ui-muted); font-size: 13px; }
+.ui-ov-big { font-size: 56px; line-height: 1.1; letter-spacing: -.02em; margin: 6px 0 14px; }
+.ui-ov-big .unit { font-size: 22px; }
+.ui-ov-facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.ui-ov-fact { display: inline-flex; align-items: baseline; gap: 6px; border-radius: var(--ui-r-pill); background: var(--ui-rule-2); color: var(--ui-ink-2); font-size: 13px; padding: 5px 12px; }
+.ui-ov-fact b { color: var(--ui-ink); font-weight: 700; }
+.ui-ov-fact.good { background: var(--ui-green-tint); color: var(--ui-green); }
+.ui-ov-fact.good b { color: var(--ui-green); }
+.ui-ov-side { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 0; border-left: 1px solid var(--ui-rule-2); padding-left: 24px; align-content: center; }
+.ui-ov-side > div { padding: 12px 0; border-bottom: 1px solid var(--ui-rule-2); }
+.ui-ov-side > div:nth-last-child(-n+2) { border-bottom: 0; }
+.ui-ov-side dt { color: var(--ui-muted); font-size: 12.5px; margin-bottom: 4px; }
+.ui-ov-side dd { margin: 0; font-size: 20px; }
+.ui-ov-side dd b { font-weight: 700; color: var(--ui-ink); }
+.ui-ov-of { color: var(--ui-muted); font-size: 13px; }
+.ui-ov-status { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 12px 16px 12px 20px; font-size: 13.5px; color: var(--ui-ink-2); }
+.ui-ov-status-item { display: inline-flex; align-items: center; gap: 8px; }
+.ui-ov-divider { width: 1px; height: 18px; background: var(--ui-rule); }
+.ui-ov-action { margin-left: auto; }
+.ui-ov-flow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 8px; }
+.ui-ov-step-wrap { position: relative; display: flex; align-items: stretch; min-width: 0; }
+.ui-ov-step-wrap .ui-hover-trigger { display: flex; flex: 1; min-width: 0; }
+.ui-ov-step { flex: 1; min-width: 0; display: flex; gap: 10px; align-items: flex-start; text-align: left; border: 0; background: transparent; border-radius: 10px; padding: 12px 14px; transition: background-color var(--ui-t-fast) var(--ui-ease); }
+.ui-ov-step:hover, .ui-ov-step:focus-visible { background: var(--ui-page); }
+.ui-ov-step-no { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--ui-rule-2); color: var(--ui-ink-2); font-size: 12px; font-weight: 650; display: inline-flex; align-items: center; justify-content: center; }
+.ui-ov-step-text { display: grid; gap: 3px; min-width: 0; }
+.ui-ov-step-text strong { font-size: 13.5px; color: var(--ui-ink); font-weight: 650; }
+.ui-ov-step-text small { font-size: 12px; color: var(--ui-muted); line-height: 1.45; }
+.ui-ov-arrow { position: absolute; right: -4px; top: 50%; width: 8px; height: 8px; border-top: 1.5px solid var(--ui-faint); border-right: 1.5px solid var(--ui-faint); transform: translateY(-50%) rotate(45deg); }
+@media (max-width: 1320px) { .ui-ov-big { font-size: 48px; } .ui-ov-flow { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ui-ov-step-wrap:nth-child(3) .ui-ov-arrow { display: none; } }
+
+/* —— Agent 顶部统计 —— */
+.ui-agent-stats { display: flex; align-items: stretch; gap: 0; margin: 0 0 4px; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 12px 8px; }
+.ui-agent-stats > div { padding: 2px 20px; border-right: 1px solid var(--ui-rule-2); min-width: 92px; }
+.ui-agent-stats > div:last-child { border-right: 0; }
+.ui-agent-stats > div.wide { flex: 1; }
+.ui-agent-stats dt { color: var(--ui-muted); font-size: 12px; margin-bottom: 4px; }
+.ui-agent-stats dd { margin: 0; font-size: 20px; font-weight: 700; color: var(--ui-ink); display: flex; align-items: center; gap: 8px; }
+.ui-agent-stats dd span { color: var(--ui-muted); font-size: 13px; font-weight: 500; }
+.ui-agent-stats .ui-agent-status-text { color: var(--ui-ink-2); font-size: 13.5px; font-weight: 500; }
+
+/* —— 进化路线 —— */
+.ui-evo { display: grid; gap: 4px; }
+.ui-evo-start { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 14px 20px; margin-bottom: 12px; }
+.ui-evo-start-main { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13.5px; color: var(--ui-ink-2); }
+.ui-evo-start-main strong { font-size: 18px; color: var(--ui-ink); }
+.ui-evo-step { font-weight: 650; color: var(--ui-ink); }
+.ui-evo-sep { width: 1px; height: 18px; background: var(--ui-rule); }
+.ui-evo-layer { display: inline-flex; align-items: center; gap: 8px; }
+.ui-evo-link { color: var(--ui-ink-2); background: none; padding: 6px 4px; }
+.ui-evo-link:hover { color: var(--ui-ink); text-decoration: underline; }
+.ui-evo-round { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; }
+.ui-evo-rail { position: relative; display: flex; justify-content: center; }
+.ui-evo-rail::before { content: ""; position: absolute; top: 0; bottom: -4px; width: 2px; background: var(--ui-rule); }
+.ui-evo-round:last-child .ui-evo-rail::before { bottom: auto; height: 22px; }
+.ui-evo-dot { position: relative; margin-top: 16px; width: 12px; height: 12px; border-radius: 50%; background: var(--ui-surface); border: 2px solid var(--ui-faint); }
+.ui-evo-dot.win { border-color: var(--ui-navy); background: var(--ui-navy); }
+.ui-evo-body { padding-bottom: 20px; min-width: 0; }
+.ui-evo-round-head { display: flex; align-items: baseline; gap: 14px; margin: 10px 0 12px; }
+.ui-evo-round-head h3 { margin: 0; font-size: 16px; font-weight: 700; color: var(--ui-ink); }
+.ui-evo-round-head p { margin: 0; color: var(--ui-muted); font-size: 13px; }
+.ui-evo-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.ui-evo-card { display: flex; flex-direction: column; gap: 12px; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 16px 18px; border: 1.5px solid transparent; cursor: default; transition: box-shadow var(--ui-t-fast) var(--ui-ease), border-color var(--ui-t-fast) var(--ui-ease); min-width: 0; }
+.ui-evo-card[role="button"] { cursor: pointer; }
+.ui-evo-card[role="button"]:hover { box-shadow: var(--ui-shadow-2); }
+.ui-evo-card:focus-visible { outline: 2px solid var(--ui-navy-3); outline-offset: 2px; }
+.ui-evo-card.winner { border-color: var(--ui-navy); }
+.ui-evo-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ui-evo-card-head strong { font-size: 15px; color: var(--ui-ink); }
+.ui-evo-dir { display: flex; align-items: center; gap: 8px; color: var(--ui-ink-2); font-size: 13px; min-width: 0; }
+.ui-evo-dir .ui-clamp { min-width: 0; }
+.ui-evo-tag { flex: none; font-size: 11px; font-weight: 650; color: var(--ui-navy-2); background: #e6eaf2; border-radius: var(--ui-r-pill); padding: 2px 8px; }
+.ui-evo-params { display: flex; flex-wrap: wrap; gap: 6px; }
+.ui-evo-none { color: var(--ui-faint); font-size: 12.5px; }
+.ui-evo-facts { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px 10px; margin: 0; font-size: 13px; }
+.ui-evo-facts dt { color: var(--ui-muted); padding-top: 2px; }
+.ui-evo-facts dd { margin: 0; min-width: 0; }
+.ui-evo-fail { color: var(--ui-red); }
+.ui-evo-pass { color: var(--ui-green); font-weight: 600; }
+.ui-evo-card-foot { margin-top: auto; display: flex; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--ui-rule-2); color: var(--ui-muted); font-size: 12.5px; }
+.ui-evo-card-foot b { color: var(--ui-ink); font-weight: 700; }
+@media (max-width: 1320px) { .ui-evo-facts { grid-template-columns: 1fr; gap: 4px; } .ui-evo-facts dd { margin-bottom: 6px; } }
+
+.ui-sample-title { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--ui-muted); }
+
 /* —— 减少动态效果 —— */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
