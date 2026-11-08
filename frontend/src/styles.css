@@ -1455,8 +1455,14 @@ button { border-radius:8px; }
 .drawer .drawer-section.panel { box-shadow: none; }
 .drawer .quality-grid { align-items: stretch; }
 .drawer .quality-grid p { display: block; overflow: visible; }
-.drawer :is(.chunk-card, .parent-context, .table-normalize-example, .slot-detail, .retrieval-evidence, .parameter-diff > div, .story-disclosure) { background: var(--ui-surface); border: 1px solid var(--ui-rule); border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; }
+.drawer :is(.current-coverage-preview, .drawer-body > .table-scroll, .chunk-card, .parent-context, .table-normalize-example, .slot-detail, .retrieval-evidence, .parameter-diff > div, .story-disclosure) { background: var(--ui-surface); border: 1px solid var(--ui-rule); border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; }
 .settings-page .frozen-facts { gap: 6px 14px; }
 .settings-page .frozen-facts dd { margin: 0; line-height: 1.35; }
 .settings-page .frozen-facts dt { line-height: 1.35; }
 .agent-secondary-actions, .golden-new-run-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+
+/* 发布组件保持原设计，在页面接入处套用总指挥的辅助动作色阶。 */
+.versions-page .ui-rel-actions .text-button { background: var(--ui-accent-tint); color: var(--ui-accent); border: 1px solid transparent; }
+.versions-page .ui-rel-actions .text-button:hover:not(:disabled) { background: #dcebfc; }
+
+.drawer .generation-progress:empty { display: none; }

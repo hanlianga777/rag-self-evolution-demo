@@ -15,8 +15,8 @@
 .governance-page .golden-initial-skeleton { padding: 24px 0; }
 .governance-page .candidate-pool-table { table-layout: fixed; }
 .governance-page .candidate-pool-toolbar { gap: 16px; }
-.frozen-question-details { display: grid; gap: 16px; }
-.frozen-question-details .drawer-section { margin: 0; padding: 12px 0; background: var(--surface); }
+.frozen-question-details { display: grid; align-content: start; gap: 12px; }
+.drawer .frozen-question-details .drawer-section { margin: 0; padding: 14px 18px; }
 .frozen-question-details .drawer-section h3 { margin: 0 0 16px;  }
 .frozen-question-details .drawer-section p, .frozen-question-details li, .frozen-question-details blockquote {  line-height: 1.7; }
 .frozen-question-details .drawer-section p:last-child { margin-bottom: 0; }
@@ -33,9 +33,9 @@
   .governance-page .stage-stepper { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-.frozen-question-details .golden-quality-results > div { border:1px solid var(--line); border-radius:var(--card-radius); padding:16px; min-width:0; height:240px; display:flex; flex-direction:column; overflow:auto; }
+.frozen-question-details .golden-quality-results > div { border:1px solid var(--line); border-radius:var(--card-radius); padding:16px; min-width:0; display:flex; flex-direction:column; overflow:auto; }
 .frozen-question-details .golden-quality-results button { margin-top:auto; align-self:start; }
-.golden-evidence-scroll { height:240px; overflow:auto; }
+.golden-evidence-scroll { max-height:240px; overflow:auto; }
 .golden-scoring-points { display:grid; gap:12px; }
 .golden-scoring-points h4 { margin:0 0 8px; }
 .golden-scoring-points ul { margin:0; padding-left:22px; }

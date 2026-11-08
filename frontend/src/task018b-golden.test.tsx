@@ -13,7 +13,7 @@ it('groups saved scoring points, resolves QC citations and hides original IDs fr
  expect(document.querySelector('.golden-scoring-points')?.textContent).toContain('必答断开电源');
  expect(document.querySelector('.golden-scoring-points')?.textContent).toContain('加分擦干表面');
  expect(document.querySelector('.golden-scoring-points')?.textContent).toContain('禁止带电清洗');
- expect(document.querySelector('.golden-quality-results')?.textContent).toContain('维护手册.pdf · 第 12 页 支持答案');
+ expect(document.querySelector('.golden-quality-results')?.textContent).toContain('维护手册 · p12 支持答案');
  expect(document.querySelector('.golden-quality-results')?.textContent).not.toContain('DOC-001');
  expect(document.querySelector('.disclosure')).toBeNull();
  expect(document.body.textContent).not.toContain('DOC-001-C-00180');
@@ -33,5 +33,18 @@ it('keeps a Probe execution error separate from a completed question score',asyn
  expect(probe.textContent).toContain('执行失败');
  expect(probe.textContent).not.toContain('Probe · 0');
  expect(probe.textContent).not.toContain('未通过');
+ await act(async()=>root.unmount());
+});
+
+it('hides empty optional cards, groups duplicate evidence and preserves the saved record', async()=>{
+ const chunk={document_name:'设备手册.pdf',page_start:12,chunk_text:'先断电'};
+ const row={id:'q',question:'怎样维护？',reference_answer:'先断电',raw:{business_scenario:'暂无',business_requirements:{auxiliary_information:[]}},evidence_details:[{chunks:[chunk,{...chunk,chunk_id:'b'},{...chunk,chunk_id:'c'}]}]};
+ const saved=JSON.stringify(row),root=createRoot(document.body.appendChild(document.createElement('div')));
+ await act(async()=>root.render(<FrozenQuestionDetails row={row}/>));
+ expect([...document.querySelectorAll('.drawer-section h3')].map(e=>e.textContent)).toEqual(['问题','参考答案','核心证据','质检结果']);
+ expect(document.querySelectorAll('.golden-evidence')).toHaveLength(1);
+ expect(document.querySelector('.golden-evidence strong')?.textContent).toBe('设备手册 · p12 · 命中 3 处');
+ expect(document.querySelectorAll('.golden-quality-results .ui-clamp').length).toBeGreaterThanOrEqual(3);
+ expect(JSON.stringify(row)).toBe(saved);
  await act(async()=>root.unmount());
 });

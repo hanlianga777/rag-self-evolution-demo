@@ -86,7 +86,7 @@ it("keeps compact pool toolbar and stashes selections across browse mode", async
   const toolbar = document.querySelector(".candidate-pool-toolbar")!;
   expect(toolbar.querySelectorAll('[role="combobox"]')).toHaveLength(0);
   expect(toolbar.querySelector('input[type="search"]')).toBeNull();
-  expect(toolbar.textContent).toContain("业务用例 ▾");
+  expect(toolbar.textContent).toContain("上传业务用例");
   expect(toolbar.textContent).toContain("创建Golden");
   expect(toolbar.querySelector('[aria-label="候选质量筛选"]')).not.toBeNull();
   expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("机器合格");

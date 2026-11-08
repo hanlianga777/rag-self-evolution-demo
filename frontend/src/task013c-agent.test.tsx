@@ -46,16 +46,15 @@ it('keeps every single-pass failed question as a target even with a legacy exclu
  await mount(experiment([]),[true,false].map((target,index)=>({id:'bad-'+index,run_id:'baseline',question_id:'Q0'+index,result:{passed:false,optimization_target:target,question:'问题'+index}})));
  expect(document.querySelector('.ui-evo-start')?.textContent).toContain('2 个 Bad Case'); expect(document.querySelectorAll('.agent-fact')).toHaveLength(2);
 });
-it('moves unfinished planning into More after a Sandbox exists and makes progress the primary action',async()=>{
+it('keeps unfinished planning in the flat toolbar after a Sandbox exists and makes progress the primary action',async()=>{
  await mount(experiment([candidate('A','failed',{evaluation_run_id:'saved-run',evaluation_complete:false},{product_interruption:true})],{coverage_plan:{status:'incomplete',covered_count:0,total:1,binding:'binding',matrix:[{question_id:'CSV-20261101100758945425-41',candidates:[],gap:'本轮剩余A/B/C容量不足，需明确调整规划，不能宣称完成'}]}}));
  expect(document.querySelector('.page-title .primary')?.textContent).toBe('查看 Sandbox 进度');
  expect(document.querySelector('.page-title .primary')?.textContent).not.toContain('补齐本轮规划');
- expect(document.querySelector('.page-title [role="menu"]')?.textContent).toContain('补齐本轮规划');
- expect(document.querySelector('.page-title button[aria-haspopup="menu"]')?.getAttribute('aria-expanded')).toBe('false');
+ expect(document.querySelector('.agent-secondary-actions')?.textContent).toContain('补齐本轮规划');
+ expect(document.querySelector('.page-title button[aria-haspopup="menu"]')).toBeNull();
  await click('查看 Sandbox 进度');
  expect(document.querySelector('.tabs button.active')?.textContent).toBe('Sandbox');
- await click('更多');
- expect(document.querySelector('[role="menu"]')?.textContent).toContain('补齐本轮规划（不收费）');
+ expect(document.querySelector('.agent-secondary-actions')?.textContent).toContain('补齐本轮规划（不收费）');
  expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('有覆盖缺口');
  await click('进化路线');
  const detail=document.querySelector('.page-content')!.textContent;

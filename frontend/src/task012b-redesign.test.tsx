@@ -26,8 +26,8 @@ it('derives comparison differences and defaults to changed gates',async()=>{
 it('resolves frozen evidence through saved candidate chunks and marks final evidence',async()=>{
  const item={question_id:'Q04',test_category:'positive',passed:false,question:'存放设备',diagnostic_view:{missing_points:['室内'],retrieval_positions:[{evidence_index:1,candidate_rank:10,rerank_rank:5,final_rank:null}]},programmatic_metrics:{retrieval_trace:{candidates:[{chunk_id:'c1',document:'KIRA 手册',page_start:85}],final:[{matched_child_ids:['c2'],document:'KIRA 手册',page_start:86,content:'充电'}]}}};
  await mount(<BaselineCaseDetails item={item} snapshot={{questions:[{id:'Q04',evidence:[{source_chunk_ids:['c1'],evidence_key_points:['室内']},{source_chunk_ids:['c2']}]}]}} config={{}} gates={[]}/>);
- expect(document.body.textContent).toContain('KIRA 手册 · 第85页');expect(document.body.textContent).not.toContain('来源文档名称未记录');expect(document.body.textContent).toContain('未进 Top-K 1 条');
- expect(document.querySelectorAll('.evidence-path')).toHaveLength(2);expect(document.querySelectorAll('.evidence-path')[1].textContent).toContain('KIRA 手册 · 第86页');expect(document.querySelectorAll('.bad-case-details > details')).toHaveLength(0);expect(document.querySelector('.case-answer-stack')?.children).toHaveLength(2);
+ expect(document.body.textContent).toContain('KIRA 手册 · p85');expect(document.body.textContent).not.toContain('来源文档名称未记录');expect(document.body.textContent).toContain('未进 Top-K 1 条');
+ expect(document.querySelectorAll('.evidence-path')).toHaveLength(2);expect(document.querySelectorAll('.evidence-path')[1].textContent).toContain('KIRA 手册 · p86');expect(document.querySelectorAll('.bad-case-details > details')).toHaveLength(0);expect(document.querySelector('.case-answer-stack')?.children).toHaveLength(2);
 });
 
 it('opens real monitoring source objects without rendering them as React children',async()=>{
@@ -48,6 +48,6 @@ it('waits for saved case details instead of reporting missing sources from a lig
   expect(dialog.querySelector('[role="status"]')?.getAttribute('aria-label')).toBe('正在读取保存的案例详情');
   expect(dialog.textContent).not.toContain('来源位置未记录');
   await act(async()=>resolveDetails(new Response(JSON.stringify({...run,cases:[{...row,programmatic_metrics:{retrieval_trace:{candidates:[{chunk_id:'c1',document:'KIRA 手册',page_start:85}]}}}]}))));
-  expect(dialog.textContent).toContain('KIRA 手册 · 第85页');expect(dialog.querySelector('[role="status"]')).toBeNull();
+  expect(dialog.textContent).toContain('KIRA 手册 · p85');expect(dialog.querySelector('[role="status"]')).toBeNull();
  }finally{vi.unstubAllGlobals();}
 });

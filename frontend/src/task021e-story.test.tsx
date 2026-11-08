@@ -73,6 +73,7 @@ it.each([
  expect(document.querySelector('.ui-agent-stats')?.textContent).toContain(label);
  expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('Round 3 · Candidate C');
  expect([...document.querySelectorAll('button')].some(b=>/^历史实验 · \d/.test(b.textContent || ''))).toBe(false);
- await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label="页面更多操作"]')!.click());
- expect([...document.querySelectorAll('[role="menuitem"]')].some(b=>b.textContent==='查看历史实验')).toBe(true);
+ expect([...document.querySelectorAll('.page-title button')].some(b=>b.textContent==='查看历史实验')).toBe(true);
+ expect(document.querySelectorAll('.page-title button')).toHaveLength(2);
+ expect(document.querySelector('[aria-label="页面更多操作"]')).toBeNull();
 });

@@ -28,7 +28,7 @@ it('latest candidate cards and history Drawer keep round provenance',async()=>{
  const candidates=[1,2].flatMap(round=>['A','B','C'].map(label=>({id:`fixture-${round}-${label}`,status:round===1?'evaluated':'generated',config:{top_k:6},reasoning:{round,candidate_label:label,hypothesis:`saved ${round}-${label}`},result:{}})));
  await render(<EvolutionPage data={{evaluation:run,optimization:{id:'fixture-E',candidates}}}/>);await click('A/B/C/D');
  expect(document.querySelectorAll('.candidate-card')).toHaveLength(3);expect(document.querySelector('.candidate-card')?.textContent).toContain('saved 2-A');
- await click('更多');await click('查看历史实验');expect(document.querySelector('[role=dialog]')?.textContent).toContain('saved 1-A');
+ await click('查看历史实验');expect(document.querySelector('[role=dialog]')?.textContent).toContain('saved 1-A');
  expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('saved 2-A');
 });
 it.each([true,false,'error'])('removes the Judge-only entry and its automatic preflight (%s)',async(eligible)=>{

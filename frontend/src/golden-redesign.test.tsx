@@ -68,7 +68,7 @@ it("keeps frozen controls visible and renders numbered answers and source eviden
   expect(document.querySelector(".review-table")?.textContent).not.toContain("人工审核导入");
   await act(async () => document.querySelector<HTMLElement>(".review-table tbody tr")!.click());
   expect(document.querySelectorAll(".golden-answer-list li")).toHaveLength(2);
-  expect(document.querySelector(".frozen-question-details")?.textContent).toContain("设备手册.pdf · 第 85 页");
+  expect(document.querySelector(".frozen-question-details")?.textContent).toContain("设备手册 · p85");
   expect(document.querySelector(".golden-probe-result")?.textContent).toContain("题目与证据校验通过");
   expect(document.querySelector(".golden-probe-result")?.textContent).toContain("P1 召回观察");
   for (const label of ["运行 Probe", "运行 QC", "编辑", "替换", "批准"]) {
