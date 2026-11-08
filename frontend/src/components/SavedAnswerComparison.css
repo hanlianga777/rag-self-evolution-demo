@@ -121,4 +121,3 @@
 .saved-answer-comparison .comparison-source-title { font-weight:600; color:var(--ink-2); margin-bottom:4px; }
 .saved-answer-comparison .comparison-dtable th:nth-child(4) { padding-left:28px; }
 .verification-page:has(.saved-answer-comparison) .tabs button { border-radius:0; }
-@media(max-height:760px) { 
