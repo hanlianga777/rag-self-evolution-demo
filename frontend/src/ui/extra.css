@@ -90,3 +90,9 @@
 
 /* 自带卡片外观的组件放进已有 .panel / Section 时，不再出现"卡片套卡片" */
 :is(.panel, section.section, .section) :is(.ui-kc, .ui-ct, .ui-gp) { background: transparent; box-shadow: none; border: 0; padding-left: 0; padding-right: 0; }
+
+/* 列表行按钮是"整行可点"，不是按钮文字：不继承页面里 button 一律 600 的规则 */
+.page-shell .ui-blb .ui-blb-bads li button,
+.page-shell .ui-ovs .ui-ovs-fixed li button,
+.page-shell .ui-ovs .ui-ovs-turns li button,
+.page-shell .ui-pg .ui-pg-seg button:not(.on) { font-weight: 400; }
