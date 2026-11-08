@@ -37,19 +37,13 @@
 
 ## 闭环流程
 
-```mermaid
-flowchart LR
-  KB["知识库<br/>说明书切块 · 可溯源"] --> GD["Golden Dataset<br/>覆盖规划 · 质检"]
-  GD --> G1{{"人工关口 ①<br/>题卷冻结"}}
-  G1 --> BL["Baseline 评测<br/>Judge · 11 项 Hard Gate"]
-  BL --> AG["Agent 优化<br/>Candidate A/B/C"]
-  AG --> SB["Sandbox<br/>同卷评测"] --> RG["Regression Check<br/>零新增 Bad Case"]
-  RG -- "无合格方案：进入下一轮" --> AG
-  RG -- "出现合格方案" --> G2{{"人工关口 ②<br/>实验报告确认"}}
-  G2 --> D["Candidate D<br/>在 Winner 上精修"] --> G3{{"人工关口 ③<br/>发布授权 · 可回滚"}}
-  G3 --> QA["问答验证<br/>实时问答 · Before/After · 线上反馈"]
-  QA -. "人工标记 Bad Case" .-> AG
-```
+![业务架构：从可信评测到受控优化，再到人工发布](docs/images/architecture-business.png)
+
+## 技术架构
+
+![技术架构：治理服务调度，RAG Pipeline 受控演进](docs/images/architecture-technical.png)
+
+![知识处理与证据链路](docs/images/knowledge-evidence-flow.png)
 
 ---
 
