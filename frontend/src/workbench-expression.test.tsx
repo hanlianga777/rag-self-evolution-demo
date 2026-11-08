@@ -53,7 +53,7 @@ it('counts all saved regression records even when they are evaluator audits',asy
  const rows=[{question_id:'Q82',passed:false,diagnostic_view:{analysis_category:'evaluation_issue',is_technical_bad_case:false}}];
  expect(filterDiagnosis(rows,allDiagnosis)).toHaveLength(1);
  await mount(<DiagnosisTable rows={rows} business onSelect={()=>{}}/>);
- expect(document.querySelectorAll('tbody tr')).toHaveLength(1);expect(document.body.textContent).toContain('Q82');expect(document.body.textContent).toContain('FAIL · Bad Case');
+ expect(document.querySelectorAll('tbody tr')).toHaveLength(1);expect(document.body.textContent).toContain('Q82');expect(document.querySelector('tbody .ui-verdict.bad')?.textContent).toBe('错');
 });
 
 it('keeps missing Baseline counts unknown rather than reporting zero failures',async()=>{

@@ -1,11 +1,11 @@
-import { IconLabel, IconTile } from "../ui/icons";
+import { Icon, IconLabel, IconTile } from "../ui/icons";
 import { GoldenPipeline } from "../ui/pages3";
 import { readableSourceName } from "../components/ComparisonAnswer";
 import { DataTable } from "../components/DataTable";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiUrl, errorMessage, getJson, cachedJson, postJson } from "../api";
-import { CustomSelect, MoreMenu, Section, ShortId, Status, TruncatedText } from "../components/Primitives";
+import { CustomSelect, TableVerdict, MoreMenu, Section, ShortId, Status, TruncatedText } from "../components/Primitives";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { displayText, isMachineQualified } from "../display";
 import { useOperation } from "../operation";
@@ -257,12 +257,12 @@ export function GovernancePage({ data }: { data: any }) {
 
 export function QuestionTable({ rows, onDetail, paging, resetKey }: { rows: Candidate[]; onDetail: (row: Candidate) => void; paging?: any; resetKey?: string }) {
   const optional = [
-    {label:"知识主题",value:(row:Candidate)=>typeof row.knowledge_topic === "string" ? row.knowledge_topic : row.knowledge_topic?.semantic_label || row.topic_cluster?.semantic_label},
-    {label:"出处",value:(row:Candidate)=>row.source_summary?.split(/( · |；)/).map((part: string) => /^( · |；)$/.test(part) ? part : readableSourceName(part)).join("")},
-    {label:"评分要点",value:(row:Candidate)=>row.scoring_summary ? `${row.scoring_summary.required} 条必答` : null},
-    {label:"Probe",value:(row:Candidate)=>typeof row.probe?.score === "number" ? goldenScore(row.probe.score) : null},
-    {label:"QC",value:(row:Candidate)=>typeof row.qc?.score === "number" ? goldenScore(row.qc.score) : null},
-    {label:"Baseline",value:(row:Candidate)=>typeof row.baseline_result?.passed === "boolean" ? row.baseline_result.passed ? "对" : row.baseline_result.diagnosis_category ? `错 · ${row.baseline_result.diagnosis_category}` : null : null},
-  ].filter(column=>rows.length>0 && rows.every(row=>column.value(row)!=null));
-  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><DataTable><thead><tr>{["题号", "题型", "问题",...optional.map(c=>c.label),"操作"].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row.id} tabIndex={0} role="button" aria-label={`${row.slot || "题目"} · ${row.question}`} onClick={() => onDetail(row)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDetail(row); } }}><td>{row.slot || row.raw?.coverage_slot || row.id}</td><td>{displayText(row.test_category || (row.failed ? "生成失败" : "类型未记录"))}{row.test_category === "negative" && row.negative_subtype && <small>{displayText(row.negative_subtype)}</small>}</td><td><TruncatedText lines={2}>{row.question}</TruncatedText></td>{optional.map(column=><td key={column.label}><TruncatedText lines={2}>{column.value(row)}</TruncatedText></td>)}<td><button className="text-button" onMouseEnter={()=>{if(!row.failed)void getJson(`/api/governance/questions/${row.id}`).catch(()=>{});}} onFocus={()=>{if(!row.failed)void getJson(`/api/governance/questions/${row.id}`).catch(()=>{});}} onClick={event => { event.stopPropagation(); onDetail(row); }}>查看详情</button></td></tr>)}{!rows.length && !paging?.error && <tr><td colSpan={4+optional.length} className="empty-state">还没有符合筛选条件的题目。<p>题目完成生成与校验后会显示在这里。</p></td></tr>}</tbody></DataTable></ScrollablePagedTable>;
+    {label:"知识主题",width:100,style:"muted",value:(row:Candidate)=>typeof row.knowledge_topic === "string" ? row.knowledge_topic : row.knowledge_topic?.semantic_label || row.topic_cluster?.semantic_label},
+    {label:"出处",width:140,style:"muted",value:(row:Candidate)=>row.source_summary?.split(/( · |；)/).map((part: string) => /^( · |；)$/.test(part) ? part : readableSourceName(part)).join("").replace(/第\s*(\d+(?:[–—−-]\d+)?)\s*页/g,"p$1")},
+    {label:"评分要点",width:72,style:"num",value:(row:Candidate)=>row.scoring_summary ? `${row.scoring_summary.required} 条` : null},
+    {label:"Probe",width:60,style:"num",value:(row:Candidate)=>typeof row.probe?.score === "number" ? goldenScore(row.probe.score) : null},
+    {label:"QC",width:60,style:"num",value:(row:Candidate)=>typeof row.qc?.score === "number" ? goldenScore(row.qc.score) : null},
+    {label:"Baseline",width:118,style:"",value:(row:Candidate)=>row.baseline_result?.passed},
+  ].filter(column=>rows.some(row=>column.value(row)!=null));
+  return <ScrollablePagedTable className="review-table" resetKey={resetKey} loading={paging?.loading} hasMore={paging?.hasMore} onMore={paging?.loadMore}><DataTable><colgroup><col style={{width:60}}/><col style={{width:60}}/><col/>{optional.map(column=><col key={column.label} style={{width:column.width}}/>)}<col style={{width:32}}/></colgroup><thead><tr><th>题号</th><th>题型</th><th>问题</th>{optional.map(column=><th key={column.label} className={column.style}>{column.label}</th>)}<th aria-label="打开详情"/></tr></thead><tbody>{rows.map(row => <tr key={row.id} tabIndex={0} role="button" aria-label={`${row.slot || "题目"} · ${row.question}`} onMouseEnter={()=>{if(!row.failed)void getJson(`/api/governance/questions/${row.id}`).catch(()=>{});}} onFocus={()=>{if(!row.failed)void getJson(`/api/governance/questions/${row.id}`).catch(()=>{});}} onClick={() => onDetail(row)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDetail(row); } }}><td className="id">{row.slot || row.raw?.coverage_slot || row.id}</td><td className="muted">{({positive:"正向",ablation:"消融",negative:"负向"} as Record<string,string>)[row.test_category] || displayText(row.test_category || (row.failed ? "生成失败" : "类型未记录"))}</td><td><TruncatedText lines={1}>{row.question}</TruncatedText></td>{optional.map(column=><td key={column.label} className={column.style}>{column.label === "Baseline" ? <><TableVerdict value={row.baseline_result?.passed}/>{row.baseline_result?.passed === false && row.baseline_result.diagnosis_category && <small><TruncatedText lines={1}>{row.baseline_result.diagnosis_category}</TruncatedText></small>}</> : <TruncatedText lines={1}>{column.value(row) ?? "未记录"}</TruncatedText>}</td>)}<td><span className="ui-row-go"><Icon name="go" size={15}/></span></td></tr>)}{!rows.length && !paging?.error && <tr><td colSpan={4+optional.length} className="empty-state">还没有符合筛选条件的题目。<p>题目完成生成与校验后会显示在这里。</p></td></tr>}</tbody></DataTable></ScrollablePagedTable>;
 }

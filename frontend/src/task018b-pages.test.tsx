@@ -28,7 +28,7 @@ it('shows the saved Judge reason instead of the diagnostic category in Baseline 
  const row={question_id:'Q01',result:{question:'如何维护',passed:false,judge_result:{reason:'未明确说明先断开电源。'},diagnostic_view:{diagnosis_category:'回答缺项',subfeature:'旧标签不能代替原因',severity_label:'严重'}}};
  await mount(<BadCaseOverview rows={[row]} showJudgeReason onSelect={()=>{}}/>);
  expect([...document.querySelectorAll('.product-diagnosis-table th')].map(e=>e.textContent)).toContain('缺了什么');
- expect(document.querySelector('.product-diagnosis-table tbody tr td:nth-child(3)')?.textContent).toBe('未明确说明先断开电源。');
+ expect(document.querySelector('.product-diagnosis-table tbody tr td:nth-child(4)')?.textContent).toBe('未明确说明先断开电源。');
 });
 it('orders publication cards and hides internal IDs outside technical details',async()=>{
  await mount(<VersionsPage data={{versions:[{id:'v1',status:'active',provenance:'bootstrap',config:{top_k:4,knowledge_identity:{corpus_snapshot_id:'INTERNAL-corpus'}}}]}}/>);

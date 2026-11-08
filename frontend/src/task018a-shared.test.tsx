@@ -17,7 +17,7 @@ it("keeps stage navigation available as a keyboard accessible button", async () 
   await act(async () => button.click());
   expect(select).toHaveBeenCalledOnce();
 });
-it("clips table prose to two lines while preserving actions and full hover text", async () => {
+it("clips table prose to one line while preserving actions and full hover text", async () => {
   const open = vi.fn(), text = "已保存的完整问题与证据正文".repeat(30);
   vi.useFakeTimers();
   vi.spyOn(Element.prototype,"scrollHeight","get").mockReturnValue(100);
@@ -25,7 +25,7 @@ it("clips table prose to two lines while preserving actions and full hover text"
   await mount(<div className="table-scroll"><DataTable><thead><tr><th>问题</th><th>操作</th></tr></thead><tbody><tr><td>{text}</td><td><button onClick={open}>查看</button><button>重试</button></td></tr></tbody></DataTable></div>);
   const prose = document.querySelector("td .ui-clamp") as HTMLElement;
   expect(prose.textContent).toBe(text);
-  expect(prose.style.webkitLineClamp).toBe("2");
+  expect(prose.style.webkitLineClamp).toBe("1");
   await act(async () => prose.dispatchEvent(new MouseEvent("mouseover",{bubbles:true})));
   await act(async () => vi.advanceTimersByTime(300));
   expect(document.querySelector('[role="tooltip"]')?.textContent).toBe(text);

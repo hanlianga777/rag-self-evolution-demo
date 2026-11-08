@@ -11,13 +11,15 @@ function controls(node: ReactNode): number {
 function hasClamp(node: ReactNode): boolean {
   return Children.toArray(node).some(child => isValidElement<{ children?: ReactNode }>(child) && (child.type === TruncatedText || hasClamp(child.props.children)));
 }
-function cells(node: ReactNode): ReactNode {
+function cells(node: ReactNode, clickable = false): ReactNode {
   return Children.map(node, child => {
-    if (!isValidElement<{ children?: ReactNode; colSpan?: number }>(child)) return child;
+    if (!isValidElement<{ children?: ReactNode; colSpan?: number; onClick?: unknown; hoverOnly?: boolean }>(child)) return child;
+    const rowAction = clickable || child.type === "tr" && typeof child.props.onClick === "function";
+    if (child.type === TruncatedText && rowAction) return cloneElement(child, { hoverOnly: true });
     if (child.type === "td" && !child.props.colSpan && controls(child.props.children) < 2 && !hasClamp(child.props.children)) {
-      return cloneElement(child, {}, <TruncatedText lines={2}>{child.props.children}</TruncatedText>);
+      return cloneElement(child, {}, <TruncatedText lines={1} hoverOnly={rowAction}>{child.props.children}</TruncatedText>);
     }
-    return child.props.children ? cloneElement(child as ReactElement, {}, cells(child.props.children)) : child;
+    return child.props.children ? cloneElement(child as ReactElement, {}, cells(child.props.children, rowAction)) : child;
   });
 }
 

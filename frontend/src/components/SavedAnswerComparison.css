@@ -52,11 +52,11 @@
 .saved-answer-comparison .comparison-v { font-size:13px; line-height:1.6; color:var(--ink-2); overflow-wrap:anywhere; }
 .saved-answer-comparison .comparison-step.key .comparison-v { color:var(--ink); font-weight:600; }
 .saved-answer-comparison .comparison-points { padding:18px 22px 20px; border-left:1px solid var(--rule-2); }
-.saved-answer-comparison table { width:100%; border-collapse:collapse; font-size:12.5px; table-layout:auto; }
-.saved-answer-comparison table th { font-weight:400; color:var(--muted); font-size:12px; background:transparent; }
-.saved-answer-comparison .comparison-ptable th { text-align:center; padding:0 0 8px; width:62px; }
+.saved-answer-comparison table  { width:100%; border-collapse:collapse; table-layout:auto; }
+.saved-answer-comparison table th  { color:var(--muted); }
+.saved-answer-comparison .comparison-ptable th  { text-align:center; width:62px; }
 .saved-answer-comparison .comparison-ptable th:first-child { text-align:left; width:auto; }
-.saved-answer-comparison .comparison-ptable td { padding:7px 0; color:var(--ink-2); border-top:1px solid var(--rule-2); vertical-align:middle; }
+.saved-answer-comparison .comparison-ptable td  { color:var(--ink-2); }
 .saved-answer-comparison .comparison-ptable td:not(:first-child) { text-align:center; }
 .saved-answer-comparison .comparison-pn { display:inline-flex; width:18px; height:18px; border-radius:50%; background:var(--ink); color:var(--ui-surface); font-size:11px; align-items:center; justify-content:center; margin-right:8px; font-weight:600; vertical-align:1px; }
 .saved-answer-comparison .new .comparison-pn { background:var(--accent); }
@@ -95,12 +95,10 @@
 .saved-answer-comparison .comparison-chip b { color:var(--ink); font-weight:600; }
 .saved-answer-comparison .comparison-chip.key { border-color:var(--accent); background:transparent; }
 .saved-answer-comparison .comparison-chip small { color:var(--accent); font-weight:400; font-size:12px; }
-.saved-answer-comparison .comparison-dtable th { text-align:left; padding:0 0 8px; }
+.saved-answer-comparison .comparison-dtable th  { text-align:left; }
 .saved-answer-comparison .comparison-dtable :is(th,td):is(:nth-child(2),:nth-child(3)) { text-align:right; width:110px; }
-.saved-answer-comparison .comparison-dtable td { padding:9px 0; border-top:1px solid var(--rule-2); }
 .saved-answer-comparison .comparison-dtable td:first-child { width:132px; color:var(--ink-2); }
-.saved-answer-comparison .comparison-dtable td.comparison-bar { padding-left:28px; padding-right:20px; }
-.saved-answer-comparison .comparison-dtable :is(th,td):last-child { width:96px; text-align:right; color:var(--muted); font-size:12.5px; }
+.saved-answer-comparison .comparison-dtable :is(th,td):last-child  { width:96px; text-align:right; color:var(--muted); }
 .saved-answer-comparison .comparison-dtable strong { font-weight:600; color:var(--ink); }
 .saved-answer-comparison .comparison-pair { display:grid; gap:3px; }
 .saved-answer-comparison .comparison-pair i { display:block; height:6px; border-radius:3px; background:var(--ui-faint); }
@@ -119,5 +117,4 @@
 .saved-answer-comparison .comparison-body ol { list-style:decimal; }
 .saved-answer-comparison .comparison-body ul { list-style:disc; }
 .saved-answer-comparison .comparison-source-title { font-weight:600; color:var(--ink-2); margin-bottom:4px; }
-.saved-answer-comparison .comparison-dtable th:nth-child(4) { padding-left:28px; }
 .verification-page:has(.saved-answer-comparison) .tabs button { border-radius:0; }

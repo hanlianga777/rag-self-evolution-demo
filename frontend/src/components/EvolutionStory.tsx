@@ -181,7 +181,7 @@ export function qualityValue(item:any,key:string):string {
   return typeof value==='number' ? key==='safe_rejection_rate' ? `${value}%` : `${value.toFixed(1)} 秒` : '未知';
 }
 export function QualityComparison({baseline,candidate,baselineLabel='Baseline',candidateLabel,includeNewFailures=false}:{baseline:any;candidate:any;baselineLabel?:string;candidateLabel?:string;includeNewFailures?:boolean}) {
-  return <div className="story-quality"><DataTable aria-label="方案质量对比"><thead><tr><th>指标</th><th>{baselineLabel}</th><th>{candidateLabel || schemeName(candidate)}</th></tr></thead><tbody>{[['答对数','correct'],...(includeNewFailures ? [['新增 Bad Case 数','new_failures']] : []),['Hard Gate 通过','gates'],['最慢回答 P99','latency_p99_seconds'],['安全拒答率','safe_rejection_rate']].map(([label,key])=><tr key={key}><td>{label}</td><td>{qualityValue(baseline,key)}</td><td>{qualityValue(candidate,key)}</td></tr>)}</tbody></DataTable></div>;
+  return <div className="story-quality"><DataTable aria-label="方案质量对比"><thead><tr><th>指标</th><th className="num">{baselineLabel}</th><th className="num">{candidateLabel || schemeName(candidate)}</th></tr></thead><tbody>{[['答对数','correct'],...(includeNewFailures ? [['新增 Bad Case 数','new_failures']] : []),['Hard Gate 通过','gates'],['最慢回答 P99','latency_p99_seconds'],['安全拒答率','safe_rejection_rate']].map(([label,key])=><tr key={key}><td>{label}</td><td className="num">{qualityValue(baseline,key)}</td><td className="num">{qualityValue(candidate,key)}</td></tr>)}</tbody></DataTable></div>;
 }
 
 export function ChangedParameters({before,after}:{before:any;after:any}) {

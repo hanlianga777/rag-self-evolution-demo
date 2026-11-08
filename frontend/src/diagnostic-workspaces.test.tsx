@@ -73,7 +73,7 @@ it('keeps all Full100 diagnosis rows available in pages of fifty and resets afte
  await render(<DiagnosisTable rows={rows} onSelect={onSelect}/>);
  expect(document.querySelectorAll('tbody tr')).toHaveLength(50);expect(document.querySelector('tbody')?.textContent).toContain('完整题目50');expect(document.querySelector('tbody')?.textContent).not.toContain('完整题目51');
  await click('下一页');expect(document.querySelectorAll('tbody tr')).toHaveLength(50);expect(document.querySelector('tbody')?.textContent).toContain('完整题目100');
- await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('tbody button')].at(-1)!.click());expect(onSelect).toHaveBeenCalledWith(rows[99]);
+ await act(async()=>[...document.querySelectorAll<HTMLTableRowElement>('tbody tr')].at(-1)!.click());expect(onSelect).toHaveBeenCalledWith(rows[99]);
  await click('上一页');expect(document.querySelector('tbody')?.textContent).toContain('完整题目1');
  await click('下一页');await act(async()=>root.render(<DiagnosisTable rows={rows.slice(0,3)} onSelect={onSelect}/>));expect(document.querySelectorAll('tbody tr')).toHaveLength(3);expect(document.querySelector('tbody')?.textContent).toContain('完整题目1');expect(rows).toHaveLength(100);
 });

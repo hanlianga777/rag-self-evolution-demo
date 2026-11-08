@@ -27,9 +27,9 @@ it('uses the frozen record and saved quality states in the Golden summary',async
  await mount(<GovernancePage data={{workspace:{current_golden_id:'gd'},generationRuns:[run],snapshots:[snapshot],dataset:questions}}/>);
  const summary=document.querySelector('.ui-gp');expect(summary).not.toBeNull();expect(summary?.textContent).toContain('1 题');expect(summary?.textContent).toContain('11-04');expect(summary?.textContent).toContain('Probe');expect(summary?.querySelectorAll('li.done')).toHaveLength(6);expect(document.querySelector('.stage-stepper')).toBeNull();await click('候选池');expect(document.querySelector('.ui-gp')).toBeNull();
 });
-it('keeps full questions in two-line ClampText and shortens sources using the existing filename rule',async()=>{
+it('keeps full questions in single-line ClampText and shortens sources using the existing filename rule',async()=>{
  const detail=vi.fn();await mount(<QuestionTable rows={questions} onDetail={detail}/>);
- expect(document.body.textContent).toContain('B2 用户手册 · 第 8 页');expect(document.body.textContent).toContain('2 条必答');expect(document.body.textContent).not.toContain('加分 1');expect(document.querySelector('td:nth-child(3) .ui-clamp')?.textContent).toContain(questions[0].question);await click('查看详情');expect(detail).toHaveBeenCalledWith(questions[0]);
+ expect(document.body.textContent).toContain('B2 用户手册 · p8');expect(document.body.textContent).toContain('2 条');expect(document.body.textContent).not.toContain('加分 1');expect(document.querySelector('td:nth-child(3) .truncated-text')?.textContent).toContain(questions[0].question);await act(async()=>document.querySelector<HTMLTableRowElement>('tbody tr')!.click());expect(detail).toHaveBeenCalledWith(questions[0]);
 });
 it('shows saved numeric Sandbox metrics, highlights Winner/D, keeps round switching and denominator details',async()=>{
  const exp=structuredClone(sampleExperiment);(exp.candidates[0].result as any).initial_bad_case_count=2;await mount(<EvolutionPage data={{evaluation:{status:'completed',result:{total:50,bad_case_count:6,gates:{passed_count:11,total:11},metrics:{latency_p99_seconds:42.24,safe_rejection_rate:100}}},optimization:{...exp,id:"exp"}}}/>);await click('Sandbox');

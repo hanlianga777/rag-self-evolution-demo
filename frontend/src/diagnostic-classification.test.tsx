@@ -16,7 +16,7 @@ it('renders current technical list, preserves evidence action and explicit empty
  const host=document.body.appendChild(document.createElement('div')),root=createRoot(host),select=vi.fn();
  await act(async()=>root.render(<DiagnosisTable rows={rows} onSelect={select}/>));
  expect(host.querySelectorAll('tbody tr')).toHaveLength(2);expect(host.textContent).toContain('安全边界失守');expect(host.textContent).not.toContain('待定位');
- await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='查看案例')!.click());expect(select).toHaveBeenCalledWith(rows[0]);
+ await act(async()=>host.querySelector<HTMLTableRowElement>('tbody tr')!.click());expect(select).toHaveBeenCalledWith(rows[0]);
  await act(async()=>root.render(<DiagnosisTable rows={[]} onSelect={select}/>));expect(host.textContent).toContain('当前组合筛选无记录');await act(async()=>root.unmount());host.remove();
 });
 
@@ -27,7 +27,7 @@ it('shows saved per-question repairs and Regression without generating results',
  const host=document.body.appendChild(document.createElement('div')),root=createRoot(host),select=vi.fn();
  const candidate={id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'current',all_fixed_question_ids:['Q1','Q1']}};
  await act(async()=>root.render(<CandidateCaseComparison candidates={[candidate]} baselineId="baseline" kind="fixed" onSelect={select}/>));
- expect(host.querySelector('tbody tr td:nth-child(2)')?.textContent).toBe('未通过');expect(host.querySelector('tbody tr td:nth-child(3)')?.textContent).toBe('通过');expect(host.textContent).toContain('保存为已修复');expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
+ expect(host.querySelector('tbody tr td:nth-child(3)')?.textContent).toBe('未通过');expect(host.querySelector('tbody tr td:nth-child(4)')?.textContent).toBe('通过');expect(host.textContent).toContain('保存为已修复');expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Candidate证据')!.click());expect(select).toHaveBeenCalledWith(after);
  await act(async()=>root.render(<CandidateCaseComparison candidates={[{id:'b',status:'generated',reasoning:{candidate_label:'B'},result:{}}]} baselineId="baseline" kind="regression" onSelect={select}/>));
  expect(host.textContent).toContain('Regression 对照未判定');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method||init.method==='GET')).toBe(true);
@@ -53,7 +53,7 @@ it('uses current analysis root and evidence ahead of historical labels, counts u
  const host=document.body.appendChild(document.createElement('div')),root=createRoot(host);
  await act(async()=>root.render(<DiagnosisTable rows={[current,current,evaluator]} onSelect={()=>{}}/>));
  expect(host.textContent).not.toMatch(/可信度|Confirmed|Needs Review|Disputed|评测争议|已确认/);
- expect([...host.querySelectorAll('thead th')].map(el=>el.textContent)).toEqual(['题号 / 问题','失败现象','主要技术根因','核心证据','详情']);
+ expect([...host.querySelectorAll('thead th')].map(el=>el.textContent)).toEqual(['题号','问题','失败现象','主要技术根因','核心证据','']);
  expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
  expect(host.textContent).toContain('Generation · 生成');expect(host.textContent).not.toContain('Safety · 安全');
  await act(async()=>root.unmount());host.remove();
@@ -67,9 +67,9 @@ it('keeps unresolved business failures and their original audit payload availabl
  const host=document.body.appendChild(document.createElement('div')),root=createRoot(host),select=vi.fn();
  await act(async()=>root.render(<DiagnosisTable rows={[technical,audit]} business onSelect={select}/>));
  expect(host.querySelectorAll('tbody tr')).toHaveLength(2);expect(host.textContent).toContain('版本元数据断言未闭合');
- await act(async()=>host.querySelectorAll<HTMLButtonElement>('tbody button')[0].click());
+ await act(async()=>host.querySelectorAll<HTMLTableRowElement>('tbody tr')[0].click());
  expect(select).toHaveBeenCalledWith(technical);
  expect(select.mock.calls[0][0].diagnostic_view.evaluation_quality_audit.issues[0].evidence[0].reason).toBe('附加配置说明尚未闭合');
- await act(async()=>host.querySelectorAll<HTMLButtonElement>('tbody button')[1].click());expect(select).toHaveBeenLastCalledWith(audit);
+ await act(async()=>host.querySelectorAll<HTMLTableRowElement>('tbody tr')[1].click());expect(select).toHaveBeenLastCalledWith(audit);
  await act(async()=>root.unmount());host.remove();
 });

@@ -21,11 +21,15 @@ export function Status({ value }: { value: string }) {
   return <Badge tone={tone}>{displayText(value)}</Badge>;
 }
 
+export function TableVerdict({ value, pass = "对", fail = "错" }: { value: boolean | null | undefined; pass?: string; fail?: string }) {
+  return typeof value === "boolean" ? <span className={`ui-verdict ${value ? "ok" : "bad"}`}>{value ? pass : fail}</span> : <span className="muted">未判定</span>;
+}
+
 export const FullTextContext = createContext(false);
 
-export function TruncatedText({ children, lines = 2 }: { children: ReactNode; lines?: 2 | 3 | 4 }) {
+export function TruncatedText({ children, lines = 2, hoverOnly = false }: { children: ReactNode; lines?: 1 | 2 | 3 | 4; hoverOnly?: boolean }) {
   const parts = Children.toArray(children);
-  if (parts.every(part => typeof part === "string" || typeof part === "number")) return <div className="clamp-text-host" onClick={event => { if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation(); }}><ClampText text={parts.join("")} lines={lines} /></div>;
+  if (!hoverOnly && parts.every(part => typeof part === "string" || typeof part === "number")) return <div className="clamp-text-host" onClick={event => { if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation(); }}><ClampText text={parts.join("")} lines={lines} /></div>;
   return <LegacyTruncatedText lines={lines}>{children}</LegacyTruncatedText>;
 }
 

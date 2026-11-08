@@ -14,7 +14,7 @@ it('keeps scored business FAILs visible despite blocked attribution or toolbox l
  expect(host.querySelectorAll('tbody tr')).toHaveLength(2);
  expect(host.textContent).toContain('真实漏答');expect(host.textContent).toContain('已证实排序但无合法干预');
  expect(host.textContent).not.toContain('技术异常不可计业务失败');expect(host.querySelector('thead')?.textContent).not.toContain('主要技术根因');
- await act(async()=>host.querySelector('tbody button')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+ await act(async()=>host.querySelector('tbody tr')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
  expect(select).toHaveBeenCalledWith(rows[0]);
  await act(async()=>root.unmount());host.remove();
 });

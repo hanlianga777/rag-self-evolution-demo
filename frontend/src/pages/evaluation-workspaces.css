@@ -1,9 +1,6 @@
 /* Workspace geometry only; typography and surfaces share the Pipeline / Golden tokens. */
 .evaluation-page .baseline-metrics {grid-template-columns:repeat(4,minmax(0,1fr));}
 .evaluation-page .baseline-table th,.evolution-page .sandbox-core-table th {white-space:normal;}
-.evaluation-page .baseline-cases-table td {vertical-align:top;}
-.evaluation-page .baseline-cases-table th:first-child {width:28%;}
-.evaluation-page .baseline-cases-table th:last-child {width:90px;}
 :is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars {display:grid;gap:10px;margin:14px 0;}
 :is(.evaluation-page,.evolution-page) .diagnosis-distribution-bars > div {display:grid;grid-template-columns:minmax(130px,1fr) 2fr 60px;gap:12px;align-items:center;}
 :is(.evaluation-page,.evolution-page) meter {width:100%;height:6px;accent-color:var(--status);}
@@ -26,14 +23,8 @@
 .evolution-page .case-comparison > label {display:grid;gap:6px;max-width:340px;margin:14px 0;}
 @media(max-width:700px){:is(.evaluation-page,.evolution-page) .diagnosis-filters label{min-width:130px;}}
 .diagnosis-list table {table-layout:fixed;min-width:900px;width:100%;}
-.diagnosis-list td {vertical-align:top;overflow-wrap:anywhere;}
+.diagnosis-list td  { overflow-wrap:anywhere; }
 .diagnosis-list td.case-question {display:table-cell;max-width:none;}
-.diagnosis-list table :is(th,td):nth-child(1) {width:25%;}
-.diagnosis-list table :is(th,td):nth-child(2) {width:17%;}
-.diagnosis-list table :is(th,td):nth-child(3) {width:17%;}
-.diagnosis-list table :is(th,td):nth-child(4) {width:31%;}
-.diagnosis-list table :is(th,td):nth-child(5) {width:10%;}
-.case-comparison .diagnosis-list table :is(th,td) {width:auto;}
 .evaluation-page .evaluation-dimensions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--card-gap);}
 .evaluation-page .evaluation-dimensions > section {min-width:0;border:1px solid var(--card-border);border-radius:var(--card-radius);padding:var(--card-padding);}
 .evaluation-page .evaluation-dimensions dd small {display:block;color:var(--muted);}
@@ -70,12 +61,12 @@
 .agent-decision-flow strong {color:var(--card-good-ink);}
 .agent-decision-flow span {color:var(--muted);}
 .strategy-relations table {table-layout:fixed;min-width:760px;}
-.strategy-relations :is(th,td) {vertical-align:top;overflow-wrap:anywhere;}
+.strategy-relations :is(th,td)  { overflow-wrap:anywhere; }
 .strategy-relations th:nth-child(1) {width:35%;}
 .strategy-relations th:nth-child(2) {width:27%;}
 .strategy-relations th:nth-child(3) {width:25%;}
 .strategy-relations th:nth-child(4) {width:13%;}
-.strategy-relations td > div + div {margin-top:12px;padding-top:8px;border-top:1px solid var(--line-soft);}
+.strategy-relations td > div + div  { margin-top:12px; }
 .evolution-page.page-shell .candidate-cards > .candidate-card {display:flex;flex-direction:column;}
 .evolution-page.page-shell .candidate-card-action {margin-top:12px;}
 .compact-config-diff {display:grid;gap:8px;margin:8px 0;}
@@ -88,13 +79,8 @@
 .regression-impact .report-grid {grid-template-columns:1fr;margin:14px 0;}
 .regression-impact .report-grid > div {display:flex;justify-content:space-between;gap:8px;}
 .recommendation-comparison table {min-width:760px;table-layout:fixed;}
-.recommendation-comparison td {vertical-align:top;overflow-wrap:anywhere;}
+.recommendation-comparison td  { overflow-wrap:anywhere; }
 .recommendation-comparison th:last-child {width:30%;}
-.diagnosis-list.with-evidence table :is(th,td) {width:auto;}
-.diagnosis-list.with-evidence table :is(th,td):nth-child(1) {width:23%;}
-.diagnosis-list.with-evidence table :is(th,td):nth-child(4) {width:25%;}
-.diagnosis-list.with-evidence table :is(th,td):nth-child(5) {width:20%;}
-.diagnosis-list.with-evidence table :is(th,td):last-child {width:9%;}
 .drawer .evaluation-dimensions {display:grid;gap:16px;}
 .drawer .evaluation-dimensions h3 {}
 @media(max-width:900px){.regression-impact{grid-template-columns:1fr;}}
@@ -134,9 +120,7 @@
 .strategy-hypotheses .compact-config-diff {padding:8px 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);}
 .evolution-page.page-shell .candidate-story-block p {line-height:1.5;}
 .regression-cases-table table {min-width:760px;table-layout:fixed;}
-.evolution-page .page-content .table-scroll.regression-summary-table table {min-width:880px !important;}
-.regression-cases-table th:first-child {width:34%;}
-.regression-cases-table th:last-child {width:24%;}
+.evolution-page .page-content .table-scroll.regression-summary-table table {min-width:0 !important;}
 .comparison-evidence-actions {display:flex;flex-wrap:wrap;gap:6px;}
 .decision-chain {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));list-style:none;padding:0;margin:16px 0;gap:0;border:1px solid var(--card-border);border-radius:var(--card-radius);background:var(--card-bg);}
 .decision-chain li {padding:var(--card-padding);min-width:0;}
@@ -172,8 +156,8 @@
 .verification-page .experiment-answer-card .answer-scroll {overflow:visible;background:var(--surface);border:0;padding:0;}
 .verification-page :is(.answer-text,.chat-message,.empty-chat p) {line-height:1.5;}
 .verification-page .monitoring-table table {min-width:760px;table-layout:fixed;}
-.verification-page .monitoring-table th:first-child {width:38%;}
-.verification-page .monitoring-table th:last-child {width:26%;}
+.verification-page .monitoring-table th:first-child  { width:38%; }
+.verification-page .monitoring-table th:last-child  { width:26%; }
 .workbench-drawer .story-details {display:grid;gap:12px;}
 .workbench-drawer .story-details > .panel {padding:var(--card-padding);border:1px solid var(--card-border);border-radius:var(--card-radius);margin:0;background:var(--card-bg);}
 .workbench-drawer .candidate-release-row {padding:var(--card-padding);margin-bottom:12px;}
@@ -182,21 +166,14 @@
 @media(prefers-reduced-motion:reduce){.story-disclosure > summary svg{transition:none;}}
 .strategy-expectations {display:grid;gap:8px;color:var(--muted);margin-top:8px;}
 .workbench-drawer .story-details p {margin:6px 0;}
-.workbench-drawer .story-details .truncated-text {margin:8px 0;}
-.evaluation-page .baseline-gates-table :is(th,td):first-child {min-width:40px;white-space:nowrap;}
-.diagnosis-list.with-evidence table :is(th,td):nth-child(1) {width:23%;}
-.diagnosis-list.with-evidence table :is(th,td):nth-child(2) {width:16%;}
-.diagnosis-list.with-evidence table :is(th,td):nth-child(3) {width:15%;}
-.diagnosis-list.with-evidence table :is(th,td):nth-child(4) {width:23%;}
-.diagnosis-list.with-evidence table :is(th,td):nth-child(5) {width:15%;}
-.diagnosis-list.with-evidence table :is(th,td):last-child {width:8%;}
+.workbench-drawer .story-details .truncated-text:not(table *) {margin:8px 0;}
 .workbench-drawer .candidate-release-row > .badge {justify-self:start;}
 .evaluation-page .page-content .judge-replay-preflight {height:auto;min-height:0;flex:none;overflow:visible;}
 .evaluation-page .judge-replay-preflight > button {align-self:flex-start;white-space:normal;}
 /* Task 009: reuse workspace surfaces and type sizes, keep diagnosis details expandable. */
 .product-table {min-height:0;}
 .product-table table {width:100%;min-width:0 !important;table-layout:fixed;}
-.product-table :is(th,td) {white-space:normal;overflow-wrap:anywhere;vertical-align:top;}
+.product-table :is(th,td)  { white-space:normal; overflow-wrap:anywhere; }
 .product-table small {display:block;}
 .product-filters {display:flex;flex-wrap:wrap;gap:8px;margin:14px 0;}
 .product-filters button {display:flex;align-items:center;gap:8px;white-space:nowrap;}
@@ -206,14 +183,8 @@
 .bad-case-overview .priority-table :is(th,td):nth-child(2) {width:9%;}
 .bad-case-overview .priority-table :is(th,td):nth-child(3) {width:15%;}
 .bad-case-overview .priority-table :is(th,td):last-child {width:10%;}
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(1) {width:26%;}
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(2) {width:11%;}
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(3) {width:20%;}
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(4) {width:11%;}
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(5) {width:20%;}
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(6) {width:12%;}
 .product-diagnosis-table td:last-child .text-button {display:block;white-space:nowrap;}
-.bad-case-overview .product-case-expanded td {width:auto !important;background:var(--card-good-bg);}
+.bad-case-overview .product-case-expanded td  { width:auto !important; }
 .product-case-expanded dl {display:grid;gap:10px;margin:0;}
 .product-case-expanded dl > div {display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;}
 .product-case-expanded :is(dt,dd) {margin:0;white-space:normal;}
@@ -232,7 +203,7 @@
 .strategy-presentation :is(h3,h4) {margin:8px 0;}
 .strategy-presentation .product-table {border-radius:var(--card-radius);}
 .strategy-presentation .strategy-adjustments th:last-child {width:40%;}
-@media(max-width:1100px){.product-objective-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}.bad-case-overview .product-table :is(th,td){padding:10px 8px;}}
+@media(max-width:1100px){.product-objective-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}}
 /* Shared proportion bar: same six-pixel track on every workspace. */
 :is(.evaluation-page,.evolution-page) meter { height:6px; appearance:none; border:0; border-radius:999px; background:var(--line-soft); }
 :is(.evaluation-page,.evolution-page) meter::-webkit-meter-bar { height:6px; border:0; background:var(--line-soft); border-radius:999px; box-shadow:none; }
@@ -250,22 +221,10 @@
 .evaluation-page .baseline-report > .panel { margin:0; }
 .evaluation-page .baseline-run-summary { grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
 .evaluation-page .baseline-run-summary dd { overflow-wrap:anywhere; }
-.evaluation-page.page-shell .baseline-gates-table :is(th,td):first-child { width:28%; }
-.evaluation-page.page-shell .baseline-gates-table :is(th,td):nth-child(2) { width:14%; }
-.evaluation-page.page-shell .baseline-gates-table :is(th,td):nth-child(3) { width:16%; }
-.evaluation-page.page-shell .baseline-gates-table :is(th,td):nth-child(4) { width:30%; }
-.evaluation-page.page-shell .baseline-gates-table :is(th,td):nth-child(5) { width:12%; }
-.evaluation-page .baseline-gates-table td { vertical-align:middle; }
-.evaluation-page .baseline-gates-table .gate-failed td { background:var(--card-bad-bg); color:var(--card-bad-ink); }
+.evaluation-page .baseline-gates-table .gate-failed td  { color:var(--card-bad-ink); }
 .evaluation-page .baseline-gates-table tr { cursor:pointer; }
 .bad-case-overview .latency-notice {  line-height:1.6; }
 .product-filters button:disabled { color:var(--muted); border-color:var(--line); background:var(--canvas); cursor:default; }
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(1) { width:25%; }
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(2) { width:10%; }
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(3) { width:20%; }
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(4) { width:16%; }
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(5) { width:9%; }
-.bad-case-overview .product-diagnosis-table table :is(th,td):nth-child(6) { width:20%; }
 .product-diagnosis-table tbody tr { cursor:pointer; }
 .product-diagnosis-table tbody tr:focus-visible { outline:2px solid var(--focus); outline-offset:-2px; }
 .product-objective-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:24px; }
@@ -278,7 +237,6 @@
 .thinking-cards dt { color:var(--muted); }
 .thinking-cards dd { margin:0; font-variant-numeric:tabular-nums; }
 .thinking-deltas { display:flex; flex-wrap:wrap; gap:12px; }
-.comparison-difference td { background:var(--card-warning-bg); }
 .bad-case-details { display:grid; gap:24px; }
 .bad-case-details > .candidate-card { margin:0; padding:20px; }
 .bad-case-details .case-answer-stack { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
@@ -315,7 +273,7 @@
 .evolution-page.page-shell .candidate-story-block { padding:8px 0; }
 .evolution-page .compact-config-diff { display:block; }
 .compact-config-diff table { table-layout:fixed; width:100%; }
-.compact-config-diff :is(th,td) { padding:6px 4px;  overflow-wrap:anywhere; }
+.compact-config-diff :is(th,td)  { overflow-wrap:anywhere; }
 .compact-config-diff th:first-child { width:45%; }
 .evolution-page.page-shell .page-shell-header .stage-stepper li { height:100px; min-height:0; padding:10px; }
 .evolution-page .page-shell-header .stage-stepper { margin-bottom:0; }
@@ -356,11 +314,6 @@
 .evolution-page .d-param-changes { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
 .evolution-page .d-story-grid { margin-top:12px; }
 .evolution-page .d-story .d-result-conclusion { color:var(--ui-ink); background:var(--ui-surface); }
-
-/* 021v: use the shared palette and two text weights without changing page geometry. */
-:is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(strong,b,h2,h3,h4,th),
-:is(.evaluation-page,.evolution-page,.versions-page).page-shell .ui-fin-compare td.better { font-weight:600; }
-:is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(.ui-fin-compare th small,.ui-evo-pass) { font-weight:400; }
 :is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(.badge.good,.badge.bad,.badge.warning) { background:transparent; color:var(--ui-ink-2); }
 :is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(.badge.good,.badge.bad,.badge.warning)::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px; background:var(--ui-faint); }
 :is(.evaluation-page,.evolution-page,.versions-page).page-shell .badge.good::before { background:var(--ui-green); }
@@ -377,3 +330,18 @@
 .evaluation-page .ui-bl-time-head > small { display:none; }
 
 .evolution-page .ui-fin-top > button { flex-shrink:0; white-space:nowrap; }
+
+/* 021y: only column geometry; extra.css owns table appearance. */
+.diagnosis-list table :is(th,td):first-child { width:64px; }
+.diagnosis-list table :is(th,td):nth-child(2) { width:26%; }
+.diagnosis-list table :is(th,td):last-child { width:32px; }
+.product-diagnosis-table table :is(th,td):nth-child(3) { width:100px; }
+.product-diagnosis-table table :is(th,td):nth-last-child(3) { width:76px; }
+.product-diagnosis-table table :is(th,td):nth-last-child(2) { width:24%; }
+.baseline-gates-table table :is(th,td):first-child { width:28%; }
+.baseline-gates-table table :is(th,td):nth-child(2), .baseline-gates-table table :is(th,td):nth-child(3) { width:14%; }
+.baseline-gates-table table :is(th,td):nth-last-child(2) { width:90px; }
+.baseline-gates-table table :is(th,td):last-child { width:32px; }
+.regression-cases-table table :is(th,td):first-child { width:64px; }
+.regression-cases-table table :is(th,td):nth-child(2) { width:30%; }
+.regression-cases-table table :is(th,td):last-child { width:180px; }
