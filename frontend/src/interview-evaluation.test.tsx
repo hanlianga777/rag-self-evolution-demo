@@ -38,7 +38,7 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   await act(async()=>document.querySelector<HTMLElement>(".product-diagnosis-table tbody tr")!.click());
   expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["业务问题", "答案对比", "检索路径", "优化方向"]);
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("技术详情");
-  expect(document.querySelector(".bad-case-details > details")).toBeNull();
+  expect(document.querySelector<HTMLDetailsElement>(".bad-case-details > details")?.open).toBe(false);
   expect(JSON.stringify(input)).toBe(frozen);
   expect((fetch as any).mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === "GET")).toBe(true);
 });

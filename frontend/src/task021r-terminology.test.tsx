@@ -27,14 +27,14 @@ it('shows Before/After without the paid comparison entry',()=>{
  expect(html).toContain('Before/After');
  expect(html).not.toContain('自由提问 · 实时调用模型');
 });
-it('keeps saved Agent predictions and core ideas unchanged',async()=>{
+it('normalizes displayed parameter notation and keeps saved Agent evidence unchanged',async()=>{
  const {DStory}=await import('./components/EvolutionStory');
  const {StrategyPresentation}=await import('./components/ProductDiagnostics');
  const original='方案 D：父段、子段、重排和门槛原文；rerank=query_only，Q24，highest historical prediction.';
  const reasoning={candidate_label:'D',explanation:original,core_idea:original};
  const data={candidates:[{id:'d',status:'evaluated',reasoning,result:{evaluation_complete:true}}]};
  const before=JSON.stringify(data);
- expect(renderToStaticMarkup(createElement(DStory,{experiment:data}))).toContain(original);
- expect(renderToStaticMarkup(createElement(StrategyPresentation,{reasoning}))).toContain(original);
+ expect(renderToStaticMarkup(createElement(DStory,{experiment:data}))).toContain(original.replace("rerank=query_only", "Rerank query_only"));
+ expect(renderToStaticMarkup(createElement(StrategyPresentation,{reasoning}))).toContain(original.replace("rerank=query_only", "Rerank query_only"));
  expect(JSON.stringify(data)).toBe(before);
 });

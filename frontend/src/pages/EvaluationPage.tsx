@@ -1,3 +1,4 @@
+import { judgePresentation } from "../components/judgePresentation";
 import { shortSourceName } from "./FrozenQuestionDetails";
 import { Icon, IconLabel, IconTile } from "../ui/icons";
 import { BaselineBreakdown } from "../ui/baseline/BaselineBreakdown";
@@ -11,7 +12,7 @@ import { PricePauseNotice } from "../components/RuntimeSettings";
 import { mergeEvaluationProgress, hasEvaluationDetails } from "../evaluationProgress";
 import { StoryDisclosure } from "../components/Storytelling";
 import './evaluation-workspaces.css';
-import { savedDirections, businessDiagnosisRows, businessVerdict, coreEvidence } from '../components/EvaluationDiagnosis';
+import { savedDirections, businessDiagnosisRows, businessVerdict } from '../components/EvaluationDiagnosis';
 import { BadCaseOverview, ProductDiagnostics, productQuestionLabel, timingStages } from "../components/ProductDiagnostics";
 import { PageShell } from "../components/PageShell";
 
@@ -178,7 +179,9 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const historicalPolicy=!!(run.requires_policy_upgrade ?? data.workspace?.requires_policy_upgrade);
   const stale = data.workspace?.requires_new_golden || data.workspace?.requires_new_baseline && (completed || data.workspace?.current_golden_id && snapshot.id !== data.workspace.current_golden_id);
 
-  return <PageShell className="page evaluation-page" header={<div className="page-title"><div><h1><IconTile name="baseline" />Baseline</h1></div><div className="header-actions"><button className="secondary ui-btn-tint" disabled={busy || preflight?.can_start !== true} onClick={() => void prepareStart()}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "重新运行 Baseline（新版本）" : "运行 Baseline 评测"}</button></div></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>{displayText("Hard Gate")}</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
+  const versionedRerun = !!run.id && !canResume && !["queued", "running"].includes(run.status);
+  const startButton = <button className="secondary ui-btn-tint" disabled={busy || preflight?.can_start !== true} onClick={() => void prepareStart()}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "重新运行 Baseline（新版本）" : "运行 Baseline 评测"}</button>;
+  return <PageShell className="page evaluation-page" header={<div className="page-title"><div><h1><IconTile name="baseline" />Baseline</h1></div><div className="header-actions">{!versionedRerun && startButton}</div></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>{displayText("Hard Gate")}</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
 
     <PricePauseNotice pause={run.result?.price_pause} evaluationId={run.id} onChanged={async () => { setRun(await getJson<Row>(`/api/evaluations/${run.id}?light=true`)); }} />
     {preflight?.reason && (/活动评测|后台.*运行|active/i.test(preflight.reason) ? <p className="pending-note" role="status">后台正在运行试跑，完成后可重新运行 Baseline</p> : <p className="error-notice" role="alert">无法启动 Baseline：{preflight.reason}</p>)}
@@ -232,12 +235,13 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
             <div><dt>评测时间</dt><dd>{localShortTime(run.completed_at || run.created_at)}</dd></div>
           </dl>
         </Section>
+        {versionedRerun && <div className="header-actions">{startButton}</div>}
         </StoryDisclosure>
 
       </div>}
       {tab === "gates" && <BaselineGates gates={gates} passedCount={result.gates?.passed_count} onSelect={gate=>setSelectedGate(details.find(row=>row.metric===gate.metric) || gate)} />}
 
-      {tab === "cases" && <><Section title={<IconLabel name="bad">{`${badCount ?? '未知'} 个 Bad Case`}</IconLabel>} action={<button className="secondary ui-btn-tint" onClick={()=>navigate ? navigate('evolution') : location.hash='evolution'}>进入 Agent 处理</button>}><BadCaseOverview showJudgeReason rows={businessCases} categories={run.diagnostic_categories || data.evaluation?.diagnostic_categories} priorities={run.product_diagnostics?.optimization_priorities} latencyGates={gates} onSelect={setSelectedCase} /></Section></>}
+      {tab === "cases" && <><Section title={<IconLabel name="bad">{`${badCount ?? '未知'} 个 Bad Case`}</IconLabel>} action={<button className="secondary ui-btn-tint" onClick={()=>navigate ? navigate('evolution') : location.hash='evolution'}>进入 Agent 处理</button>}><BadCaseOverview showJudgeReason rows={businessCases} questions={snapshot.questions} categories={run.diagnostic_categories || data.evaluation?.diagnostic_categories} priorities={run.product_diagnostics?.optimization_priorities} latencyGates={gates} onSelect={setSelectedCase} /></Section></>}
 
     </>}
 
@@ -251,9 +255,8 @@ export function BaselineCaseDetails({ item, snapshot, config, gates }: { item: R
   const evidence: Row[] = golden.evidence || golden.acceptable_evidence || [];
   const view = item.diagnostic_view || {};
 
-  const guard = item.programmatic_metrics?.safety_guard;
   const passed = businessVerdict(item) === 'PASS';
-  const summary = passed ? item.judge_result?.reason || '已保存业务判定为 PASS，原始证据见下方详情。' : guard?.findings?.[0]?.description || coreEvidence(item);
+  const summary = judgePresentation(item, golden);
 
   const conclusion = businessVerdict(item) === 'PASS' ? '答对' : businessVerdict(item) === 'FAIL' ? '答错' : '评测执行未完成或判定无效；业务结果未产生';
   const behaviorNames: Record<string, string> = { safe_rejection: '应拒绝危险操作请求，并说明安全风险。', clarify: '缺失必要条件时，应请求澄清。', insufficient_evidence: '现有证据不足以完整回答时，应说明无法确定。', prompt_injection_resistance: '应抵抗提示注入，不泄露内部指令或伪造事实。' };
@@ -281,8 +284,9 @@ export function BaselineCaseDetails({ item, snapshot, config, gates }: { item: R
   return <div className="case-details bad-case-details">
     <div className="case-review"><Badge tone={passed?"good":businessVerdict(item)==="FAIL"?"bad":"neutral"}>{conclusion}</Badge>{item.baseline_review_label && <Badge tone={item.baseline_review?.status==='confirmed_regression'?'bad':item.baseline_review?.status==='fluctuation'?'warning':'neutral'}>{item.baseline_review_label}</Badge>}</div>
     <section className="candidate-card drawer-section"><h3>业务问题</h3><p className="muted">{displayText(item.test_category || golden.test_category || '')}{item.negative_subtype && ` · ${displayText(item.negative_subtype)}`}</p><CaseAnswer text={item.question || golden.question || '历史未保存问题原文'} />{golden.business_scenario && <div className="muted-prose"><TruncatedText lines={3}>业务场景：{golden.business_scenario}</TruncatedText></div>}</section>
-    <section className="candidate-card drawer-section"><h3>答案对比</h3><div className="case-answer-stack"><div><h4>参考答案 / 必答要点</h4><CaseAnswer text={reference} />{typeof view.missing_points==='string' && <div className="muted-prose muted"><TruncatedText lines={3}>{view.missing_points}</TruncatedText></div>}{missing.length>0 && <div className="missing-points"><strong>未答到的要点</strong><ul>{missing.map(point=><li key={point}>{point}</li>)}</ul></div>}</div><div><h4>实际回答</h4><CaseAnswer text={item.model_answer || '历史未保存回答'} final={final} /></div></div><div className="muted-prose case-difference"><TruncatedText lines={3}>{summary}</TruncatedText></div></section>
+    <section className="candidate-card drawer-section"><h3>答案对比</h3><div className="case-answer-stack"><div><h4>参考答案 / 必答要点</h4><CaseAnswer text={reference} />{typeof view.missing_points==='string' && <div className="muted-prose muted"><TruncatedText lines={3}>{view.missing_points}</TruncatedText></div>}{missing.length>0 && <div className="missing-points"><strong>未答到的要点</strong><ul>{missing.map(point=><li key={point}>{point}</li>)}</ul></div>}</div><div><h4>实际回答</h4><CaseAnswer text={item.model_answer || '历史未保存回答'} final={final} /></div></div><div className="muted-prose case-difference"><TruncatedText lines={3}><span title={summary.detail}>{summary.text}</span></TruncatedText></div></section>
     <section className="candidate-card drawer-section"><h3>检索路径</h3>{negative?<p>不适用（负向题（Negative）不定位标准证据）</p>:<>{evidence.map((source,index)=>{const position=positions.find(position=>position.evidence_index===index+1);return <article className="evidence-path" key={index}><div className="muted-prose"><TruncatedText lines={3}>{source.evidence_key_points?.join('；') || '历史未保存关键事实摘要'}</TruncatedText></div><p className="muted">{sourceLocation(source) || '保存记录缺少来源位置'}</p>{position?<ol aria-label={`第 ${index+1} 段标准证据检索路径`}><li>{position.candidate_rank!=null?`召回第 ${position.candidate_rank} 位`:'未进候选'}</li><li>{position.rerank_rank!=null?`Rerank 第 ${position.rerank_rank} 位`:'保存记录缺少 Rerank 位次'}</li><li>{position.final_rank!=null?`进入 Top-K 第 ${position.final_rank} 位`:`未进 Top-K ${final.length} 条`}</li></ol>:<p className="muted">保存记录缺少该段证据的检索位置。</p>}</article>})}{!evidence.length && <p>历史冻结题卷未保存标准证据。</p>}</>}</section>
+    {item.judge_result?.reason && <StoryDisclosure className="candidate-card drawer-section" label="判分原文"><p className="muted-prose">{item.judge_result.reason}</p></StoryDisclosure>}
     <section className="candidate-card drawer-section"><h3>优化方向</h3><div className="muted-prose"><TruncatedText lines={3}>{passed?'本题已答对，无失败优化目标。':view.repair_hint || savedDirections(item)}</TruncatedText></div></section>
 
   </div>;

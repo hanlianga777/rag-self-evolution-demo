@@ -14,7 +14,7 @@ export const shortSourceName = (name: string) => readableSourceName(name).replac
 export const sourceLabel = (source: Candidate) => source.document_name ? `${shortSourceName(source.document_name)} · ${source.page_start != null ? `p${source.page_start}${source.page_end != null && source.page_end !== source.page_start ? `–${source.page_end}` : ""}` : "页码暂无"}` : "暂无";
 export const questionSources = (row: Candidate) => [...new Set([...(row.evidence_details || []).flatMap((source: Candidate) => source.chunks || []), ...(row.raw?.business_requirements?.sources || [])].map(sourceLabel))].join("；") || (row.test_category === "negative" ? "不适用 · 无标准证据" : "保存记录缺少来源");
 
-export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true }: { row: Candidate; busy?: boolean; onRun?: (id: string, name: "probe" | "qc") => void; frozen?: boolean }) {
+export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true, showSource = true }: { row: Candidate; busy?: boolean; onRun?: (id: string, name: "probe" | "qc") => void; frozen?: boolean; showSource?: boolean }) {
   const probe = row.probe || {}, qc = row.qc || {};
   const retrievalObservation = probe.probe_details?.classification === "RETRIEVAL_INCOHERENT" || probe.classification === "RETRIEVAL_INCOHERENT";
   const probeExecutionFailed = probe.probe_details?.probe_execution_status === "failed";
@@ -38,7 +38,7 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true 
   const groups: [string, any[]][] = [["必答", [...(requirements.required_checks || []), ...(requirements.conditional_checks || [])]], ["加分", requirements.auxiliary_information || []], ["禁止", requirements.prohibited || []]];
   return <>
   <div className="drawer-body frozen-question-details">
-    {row.raw?.source === "reviewed_csv_machine_checks" && <p className="muted">来源：人工审核</p>}
+    {showSource && row.raw?.source === "reviewed_csv_machine_checks" && <p className="muted">来源：人工审核</p>}
     {scenario && scenario !== "暂无" && <DrawerSection title="业务场景"><div className="muted-prose"><TruncatedText lines={3}>{scenario}</TruncatedText></div></DrawerSection>}
     <DrawerSection title="问题"><p>{row.question}</p><p className="muted">出处：{questionSources(row)}</p></DrawerSection>
     <DrawerSection title="参考答案"><ol className="golden-answer-list candidate-answer">{answers.map((line, index) => <li key={index}>{line}</li>)}</ol>{row.test_category === "negative" && <small className="muted">按预期行为检查回答边界</small>}</DrawerSection>
@@ -47,6 +47,6 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true 
     <DrawerSection title="质检结果"><div className="golden-quality-results quality-grid"><div className="golden-probe-result"><strong>Probe · {probeExecutionFailed ? "执行失败" : goldenScore(probe.score)}</strong><Badge tone={probePassed ? "good" : "warning"}>{probeExecutionFailed ? "未完成" : probePassed ? "通过" : row.probe_status === "needs_revision" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{probeExecutionFailed ? "执行情况" : "题目有效"}：{validityReason}</TruncatedText></div><div className="muted-prose"><TruncatedText lines={3}>召回观察：{retrievalReason}</TruncatedText></div><button className="secondary ui-btn-tint" disabled={busy || !onRun} title={!onRun ? "即将支持" : undefined} onClick={() => onRun?.(row.id, "probe")}>运行 Probe</button></div><div><strong>QC · {goldenScore(qc.score)}</strong><Badge tone={qcPassed ? "good" : "warning"}>{qcPassed ? "通过" : row.qc_status === "qc_failed" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{readable(qc.reason || "暂无")}</TruncatedText></div><button className="secondary ui-btn-tint" disabled={busy || !onRun || !probePassed} title={!onRun ? "即将支持" : !probePassed ? "Probe 通过后可运行 QC" : undefined} onClick={() => onRun?.(row.id, "qc")}>运行 QC</button></div></div></DrawerSection>
 
   </div>
-  {frozen && <div className="candidate-actionbar"><button className="secondary ui-btn-tint" disabled title="已冻结，修改需新建题卷版本">编辑</button><button className="secondary ui-btn-tint" disabled title="已冻结，修改需新建题卷版本">替换</button><button className="primary" disabled title="题卷已冻结，已完成批准">批准</button></div>}
+  {frozen && <p className="candidate-readonly-hint muted">题卷已冻结，只读</p>}
   </>;
 }

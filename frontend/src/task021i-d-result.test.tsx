@@ -16,7 +16,7 @@ const d={id:'experiment-D',status:'evaluated',config:{top_k:6,rerank:true},reaso
 const facts={winner_id:winner.id,remaining_failures:[{question_id:q(4),evidence_positions:[{reranked:6,final:'未进入'}]},{question_id:q(6),evidence_positions:[{reranked:7,final:'未进入'}]},{question_id:q(27),evidence_positions:[{reranked:24,final:'未进入'}]}],protected_questions:[15,17,24,25,29,38].map(n=>({question_id:q(n)})),gate_margins:gates};
 const exp=():any=>({id:'experiment',candidates:[structuredClone(winner),structuredClone(d)],result:{d_facts:structuredClone(facts),report_confirmation:{winner_id:winner.id}},recommendation:{recommended_candidate:winner.id}});
 const evaluation={id:'base',status:'completed',dataset_snapshot:{questions:[4,6,15,17,24,25,27,29,38].map(n=>({id:q(n),question:`第${n}题的原题`} ))},result:{total:50,bad_case_count:6}};
-const run=()=>({id:'d-run',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'identity'},cases:[4,6,15,17,24,25,27,29,38].map(n=>({question_id:q(n),passed:![6,25,27].includes(n),judge_result:n===25?{issues:[{description:'答案新增“手册未给出固定充电时长”，但技术规格列有3小时20分，与手册矛盾。'}]}:{}}))});
+const run=()=>({id:'d-run',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'identity'},cases:[4,6,15,17,24,25,27,29,38].map(n=>({question_id:q(n),passed:![6,25,27].includes(n),judge_result:n===25?{issues:[{failure_kind:'contradiction',description:'答案新增“手册未给出固定充电时长”，但技术规格列有3小时20分，与手册矛盾。'}]}:{}}))});
 function mockRun(value:any=run()){const fetcher=vi.fn(async()=>new Response(JSON.stringify(value)));vi.stubGlobal('fetch',fetcher);return fetcher;}
 const expected='Candidate D 修好了 Q04，但新弄坏了 Q25；Bad Case 数与Round 3 · Candidate C 相同，且出现新增 Bad Case，不满足发布条件，因此保留Round 3 · Candidate C。';
 
@@ -37,7 +37,7 @@ it('explains all remaining failures from saved positions and new failures from t
  const reasons=document.querySelector('.d-result-causes')!.textContent;
  expect(reasons).toContain('关键说明排第 7 位，证据条数 6 仍纳入不了');
  expect(reasons).toContain('关键说明排第 24 位，证据条数 6 仍纳入不了');
- expect(reasons).toContain('手册未给出固定充电时长');expect(reasons).toContain('与手册矛盾');
+ expect(reasons).toContain('回答含与依据矛盾的内容');expect(reasons).not.toContain('答案新增');
  expect(document.querySelector('.d-result-causes .ui-q.is-broken')?.getAttribute('aria-label')).toBe('Q25 新增 Bad Case');
  expect(document.querySelector<HTMLDetailsElement>('details.d-result-causes')?.open).toBe(false);
  expect(fetcher.mock.calls).toHaveLength(1);expect(String(fetcher.mock.calls[0])).toContain('/api/evaluations/d-run');
@@ -60,7 +60,7 @@ it.each(['missing','wrong identity','error'])('never calls missing protected-cas
  await mount(<DStory experiment={exp()} evaluation={evaluation}/>);
  const text=document.querySelector('[aria-label="预测与实际"]')!.textContent;
  expect(text).toContain('Q17：待核对');expect(text).not.toContain('全部守住');
- if(kind!=='missing')expect(document.querySelector('.d-result-causes')!.textContent).toContain('判分违规说明未知');
+ if(kind!=='missing')expect(document.querySelector('.d-result-causes')!.textContent).toContain('具体失败原因未知');
 });
 it('reports a watched question flipping and a gate breach instead of claiming they held',async()=>{
  const value=run();value.cases.find(c=>c.question_id===q(15))!.passed=false;mockRun(value);
@@ -90,7 +90,7 @@ it('keeps results without a saved run source usable and marks case explanations 
  const fetcher=mockRun();const experiment=exp();delete experiment.candidates[1].result.evaluation_run_id;
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  expect(fetcher).not.toHaveBeenCalled();expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).toContain('Q17：待核对');
- expect(document.querySelector('.d-result-causes')!.textContent).toContain('判分违规说明未知');
+ expect(document.querySelector('.d-result-causes')!.textContent).toContain('具体失败原因未知');
 });
 it('does not present baseline repairs as improvements over the winner when that comparison is missing',async()=>{
  mockRun();const experiment=exp();delete experiment.candidates[1].result.winner_comparison;

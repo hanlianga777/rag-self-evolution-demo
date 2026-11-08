@@ -14,7 +14,7 @@ it('keeps all candidate fields in the same order, including empty and incomplete
  const cards=[...document.querySelectorAll('.candidate-cards > .candidate-card')];expect(cards).toHaveLength(3);expect(document.querySelectorAll(".d-story-grid > section")).toHaveLength(4);
  for(const card of cards){expect([...card.querySelectorAll('.candidate-story-block > .field-label')].map(e=>e.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);expect(card.querySelectorAll('.candidate-field-content')).toHaveLength(6);expect(card.querySelector('.candidate-card-footer')).not.toBeNull();}
  expect(cards[1].querySelector('.candidate-story-block:last-child')?.textContent).toContain('已完成 1/50');
- expect(cards[0].textContent).toContain(data.optimization.candidates[0].reasoning.hypothesis);expect(cards[1].textContent).toContain(data.optimization.candidates[1].reasoning.hypothesis);expect(JSON.stringify(data)).toBe(saved);
+ expect(cards[0].textContent).toContain(data.optimization.candidates[0].reasoning.hypothesis);expect(cards[1].textContent).toContain('调整参数；{"Rerank": "query_only"}');expect(JSON.stringify(data)).toBe(saved);
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
 });
 it('formats internal values without changing their meaning',()=>{

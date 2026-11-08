@@ -1,3 +1,4 @@
+import { agentDisplayText } from "../../display";
 import type { ReactNode } from "react";
 import { ClampText } from "../ClampText";
 import { ParamChip, QuestionList, StatusBadge, type QuestionTone } from "../Primitives";
@@ -36,7 +37,7 @@ export function EvolutionTimeline({ model, baseline, questionText, onOpen, onOpe
       <div className="ui-evo-rail" aria-hidden="true"><span className={`ui-evo-dot${round.candidates.some(item => item.winner) ? " win" : ""}`} /></div>
       <div className="ui-evo-body">
         <header className="ui-evo-round-head"><h3>Round {round.round}</h3><p>{round.summary}</p></header>
-        {round.lesson && <p className="ui-body-muted" title={round.lesson.source} tabIndex={0}>本轮经验：{round.lesson.text}</p>}
+        {round.lesson && <p className="ui-body-muted" title={round.lesson.source} tabIndex={0}>本轮经验：{agentDisplayText(round.lesson.text)}</p>}
         <div className="ui-evo-cards">{round.candidates.map(item => <CandidateCard key={item.id} item={item} fastest={item.id === round.fastestId} questionText={questionText} onOpen={onOpen} />)}</div>
       </div>
     </div>)}
@@ -55,7 +56,7 @@ function CandidateCard({ item, fastest, questionText, onOpen }: { item: Candidat
     onClick={open} onKeyDown={event => { if (open && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); open(); } }}>
     <header className="ui-evo-card-head"><strong>Candidate {item.label}</strong>{status}</header>
     <div className="ui-evo-dir">
-      <ClampText text={item.direction || "方向未保存"} lines={1} />
+      <ClampText text={agentDisplayText(item.direction || "方向未保存")} lines={1} />
       {item.efficiency && <span className="ui-evo-tag">效率方向</span>}
     </div>
     <div className="ui-evo-params">{item.params.length ? item.params.map(param => <ParamChip key={param.key} label={param.label} from={param.from} to={param.to} />) : <span className="ui-evo-none">参数变化未保存</span>}</div>

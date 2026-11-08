@@ -39,7 +39,7 @@ it('shows a plain failed-gate sentence and hides IDs in collapsed technical deta
  const details = [...document.querySelectorAll('details')].find(d => d.querySelector('summary')?.textContent === '技术详情');
  expect(details).toBeUndefined();expect(document.body.textContent).not.toContain('EVAL-internal');
 });
-it('shows the current frozen paper and the saved reviewed-import source', async () => {
+it('shows the frozen paper and hides its single repeated source', async () => {
  const row = { id: 'q1', question: '人工题', slot: 'Q01', test_category: 'positive', stage: 'golden', raw: { generation_run_id: 'run', source: 'reviewed_csv_machine_checks' }, qualification_status: 'human_approved' };
  const run = { id: 'run', status: 'completed', profile: { name: 'mini', expected_count: 1, positive: 1 }, question_ids: ['q1'], artifacts: {}, human_gate: { status: 'ready' } };
  vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.endsWith('/questions/q1') ? row : url.includes('candidates?') ? { rows: [row], candidate_index: [row], total: 1, has_more: false } : [])));
@@ -48,7 +48,7 @@ it('shows the current frozen paper and the saved reviewed-import source', async 
  expect(document.querySelector('.golden-technical-details')).toBeNull();
  expect(document.querySelector('.question-provenance')).toBeNull();
  await act(async () => document.querySelector<HTMLElement>('.review-table tbody tr[role=button]')!.click());
- expect(document.querySelector('.frozen-question-details')?.textContent).toContain('人工审核');
+ expect(document.querySelector('.frozen-question-details')?.textContent).not.toContain('来源：人工审核');
  expect([...document.querySelectorAll('button')].some(b => b.textContent === '冻结 Golden Dataset')).toBe(false);
  expect(document.querySelector('[aria-label="Golden Dataset 摘要"]')?.textContent).toContain('覆盖规划');
 });

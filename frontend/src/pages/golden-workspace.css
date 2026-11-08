@@ -7,7 +7,7 @@
 .governance-page .page-content .table-scroll table { min-width: 0 !important; }
 .governance-page .golden-workspace > .panel { flex:1; min-height:180px; overflow:hidden; margin:0; display:flex; flex-direction:column; }
 .governance-page .golden-workspace .review-table:has(tbody > tr:nth-child(6)) { flex:1; min-height:140px; }
-.candidate-workspace.frozen-question-workspace .detail-content { display:flex; flex-direction:column; overflow:hidden; }
+.candidate-workspace.frozen-question-workspace .detail-content { display:flex; flex-direction:column; overflow:hidden; background:var(--ui-page); }
 .frozen-question-workspace .frozen-question-details { flex:1; min-height:0; overflow-y:auto; }
 .governance-page .review-table table { width: 100%; table-layout: fixed; }
 .governance-page .golden-summary-strip { display: grid; gap: 16px; }

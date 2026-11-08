@@ -57,7 +57,7 @@ it("shows a skeleton until the initial run and frozen snapshot resolve", async (
   await act(async () => root.unmount());
 });
 
-it("keeps frozen controls visible and renders numbered answers and source evidence", async () => {
+it("hides frozen editing controls and renders numbered answers and source evidence", async () => {
   const fetcher = stubFrozen();
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={frozenData} />));
@@ -71,12 +71,13 @@ it("keeps frozen controls visible and renders numbered answers and source eviden
   expect(document.querySelector(".frozen-question-details")?.textContent).toContain("设备手册 · p85");
   expect(document.querySelector(".golden-probe-result")?.textContent).toContain("题目与证据校验通过");
   expect(document.querySelector(".golden-probe-result")?.textContent).toContain("P1 召回观察");
-  for (const label of ["运行 Probe", "运行 QC", "编辑", "替换", "批准"]) {
+  for (const label of ["运行 Probe", "运行 QC"]) {
     const button = [...document.querySelectorAll("button")].find(button => button.textContent === label)!;
     expect(button).toBeDefined();
-    expect(button.disabled).toBe(["编辑", "替换", "批准"].includes(label));
+    expect(button.disabled).toBe(false);
   }
-  expect(document.querySelector('button[title="已冻结，修改需新建题卷版本"]')).not.toBeNull();
+  expect(document.querySelector('button[title="已冻结，修改需新建题卷版本"]')).toBeNull();
+  expect(document.body.textContent).toContain("题卷已冻结，只读");
   expect(document.querySelector('.candidate-workspace [aria-label="更多操作"]')).toBeNull();
   expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
   await act(async () => root.unmount());

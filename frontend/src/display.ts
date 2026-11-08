@@ -70,11 +70,18 @@ const savedNarratives: Record<string, string> = {
   "If V1G-110926448917-08 still fails checks 5/6/8 with DOC-004-C-00032 absent from Final under top_k=6, or if any of the 50-question regression or 11 gates fail, this hypothesis is not supported.": "若 TopK 为 6 时，Q08 的最终上下文仍缺少 DOC-004-C-00032 且检查项 5、6、8 仍失败，或 50 题 Regression、11 项 Gate 中任一项未通过，则该假设不获支持。",
 };
 
+// Display-only normalization shared by saved Agent explanations and generated summaries.
+export function agentDisplayText(value: string): string {
+  const names: Record<string, string> = { ...parameterNames, ...gateNames, high: "High", max: "Max", low: "Low", safe_rejection: "安全拒答率", p99: "P99", p50: "P50" };
+  return value.replace(new RegExp(`\\b(?:${Object.keys(names).join('|')})\\b(\\s*=\\s*)?`, 'g'),
+    (key, equals) => `${names[key.replace(/\s*=\s*$/, '')]}${equals ? ' ' : ''}`);
+}
+
 export function narrativeText(value: string): string {
   const translated = savedNarratives[value] || translations[value];
-  if (translated) return translated;
+  if (translated) return agentDisplayText(translated);
   return /[a-z]+(?:[ ,;]+[a-z]+){3}/i.test(value)
-    ? `历史英文原文（未翻译）：${value}` : value;
+    ? `历史英文原文（未翻译）：${agentDisplayText(value)}` : agentDisplayText(value);
 }
 
 // These are display names only; metric keys and saved rules stay unchanged.
