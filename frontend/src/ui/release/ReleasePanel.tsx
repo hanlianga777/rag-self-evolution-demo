@@ -1,3 +1,4 @@
+import { Icon, IconLabel } from "../icons";
 import { ParamChip, StatTransition, StatusBadge } from "../Primitives";
 import type { Pair } from "../overview/OverviewSummary";
 
@@ -40,25 +41,25 @@ export function ReleasePanel({ online, candidate, changes, results, steps, canRe
         </div>
       </div>
 
-      <div className="ui-rel-changes"><span className="ui-rel-k">配置差异</span>{changes.length ? changes.map(item => <ParamChip key={item.key} label={item.label} from={item.from} to={item.to} />) : <span className="ui-evo-none">无差异</span>}</div>
+      <div className="ui-rel-changes"><span className="ui-rel-k"><IconLabel name="pipeline">配置差异</IconLabel></span>{changes.length ? changes.map(item => <ParamChip key={item.key} label={item.label} from={item.from} to={item.to} />) : <span className="ui-evo-none">无差异</span>}</div>
 
       {results && <div className="ui-rel-results">
-        <div><span className="ui-rel-k">答对</span><StatTransition from={results.correct.from} to={results.correct.to} unit={`/ ${results.total}`} /></div>
-        <div><span className="ui-rel-k">新增 Bad Case</span><b className="ui-num">{results.newBad ?? "未知"}</b></div>
-        <div><span className="ui-rel-k">Hard Gate</span><b className="ui-num">{results.gates ? `${results.gates.passed} / ${results.gates.total}` : "未知"}</b></div>
-        <div><span className="ui-rel-k">P99</span><StatTransition from={results.p99.from} to={results.p99.to} unit="秒" better="lower" digits={1} /></div>
+        <div><span className="ui-rel-k"><IconLabel name="correct">答对</IconLabel></span><StatTransition from={results.correct.from} to={results.correct.to} unit={`/ ${results.total}`} /></div>
+        <div><span className="ui-rel-k"><IconLabel name="bad">新增 Bad Case</IconLabel></span><b className="ui-num">{results.newBad ?? "未知"}</b></div>
+        <div><span className="ui-rel-k"><IconLabel name="gate">Hard Gate</IconLabel></span><b className="ui-num">{results.gates ? `${results.gates.passed} / ${results.gates.total}` : "未知"}</b></div>
+        <div><span className="ui-rel-k"><IconLabel name="p99">P99</IconLabel></span><StatTransition from={results.p99.from} to={results.p99.to} unit="秒" better="lower" digits={1} /></div>
       </div>}
 
       <ol className="ui-rel-steps">
         <li className={steps.reportConfirmed ? "ok" : ""}><i aria-hidden="true">1</i><div><strong>推荐报告确认</strong><small>{steps.reportConfirmed ? "实验报告与 Winner 已由人确认" : "尚未确认"}</small></div></li>
         <li className={steps.eligible.ok ? "ok" : ""}><i aria-hidden="true">2</i><div><strong>满足发布条件</strong><small>{steps.eligible.items.join(" · ")}</small></div></li>
-        <li className={released ? "ok" : "next"}><i aria-hidden="true">3</i><div><strong>发布批准</strong><small>{released ? `已发布${steps.released.at ? ` · ${steps.released.at}` : ""}` : "等待人工发布"}</small></div></li>
+        <li className={released ? "ok" : "next"}><i aria-hidden="true">3</i><div><strong>发布批准<Icon name="approval" size={13} className="ui-rel-lock" /></strong><small>{released ? `已发布${steps.released.at ? ` · ${steps.released.at}` : ""}` : "等待人工发布"}</small></div></li>
       </ol>
 
       <footer className="ui-rel-actions">
-        {!released && <button type="button" className="primary" disabled={!canRelease} onClick={onRelease}>确认发布</button>}
+        {!released && <button type="button" className="primary" disabled={!canRelease} onClick={onRelease}><Icon name="release" size={15} />确认发布</button>}
         {released && onSnapshot && <button type="button" className="secondary" onClick={onSnapshot}>查看发布快照</button>}
-        {onReport && <button type="button" className="text-button" onClick={onReport}>查看评测报告</button>}
+        {onReport && <button type="button" className="text-button" onClick={onReport}><Icon name="doc" size={15} />查看评测报告</button>}
         {released && <span className="ui-rel-note">如需撤回，可在下方版本历史回滚到上一个版本</span>}
       </footer>
     </> : <p className="ui-rel-empty">尚无保存的最终推荐方案，请先完成 Agent 决策。</p>}

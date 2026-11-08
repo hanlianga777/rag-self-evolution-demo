@@ -5,3 +5,5 @@ export type { StatusKind, QuestionTone, Direction } from "./Primitives";
 export { RunProgressPanel, formatDuration } from "./RunProgressPanel";
 export type { RunStatus } from "./RunProgressPanel";
 export { computeFloatPosition } from "./floating";
+export { Icon, IconTile, IconLabel, iconForStep, ICONS } from "./icons";
+export type { IconName } from "./icons";

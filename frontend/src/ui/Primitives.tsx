@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { HoverCard } from "./HoverCard";
+import { Icon } from "./icons";
 
 /* ------------------------------------------------------------------
  * StatTransition：前后对比数值，例如 44 → 48、42.2 → 36.7 秒
@@ -51,7 +52,8 @@ const STATUS: Record<StatusKind, { label: string; tone: string; live?: boolean }
 
 export function StatusBadge({ kind, label }: { kind: StatusKind; label?: string }) {
   const item = STATUS[kind];
-  return <span className={`ui-status ${item.tone}${item.live ? " live" : ""}`}>{label ?? item.label}</span>;
+  const glyph = kind === "winner" ? "winner" : kind === "recommended" ? "recommend" : kind === "released" ? "release" : null;
+  return <span className={`ui-status ${item.tone}${item.live ? " live" : ""}${glyph ? " has-icon" : ""}`}>{glyph && <Icon name={glyph} size={13} />}{label ?? item.label}</span>;
 }
 
 /* ------------------------------------------------------------------

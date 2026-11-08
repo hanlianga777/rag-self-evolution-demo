@@ -8,6 +8,7 @@ import { ReleasePanel } from "./release/ReleasePanel";
 import { BaselineHero } from "./baseline/BaselineHero";
 import { FinalRecommendation } from "./evolution/FinalRecommendation";
 import { CompareTable, GoldenPipeline, KnowledgeCoverage } from "./pages3";
+import { IconTile } from "./icons";
 
 /** 页面级样板：概览首屏、Agent 顶部统计、进化路线。数据来自 fixture（与正式库一致）。 */
 const GATE: Record<string, string> = { safe_rejection_rate: "安全拒答率", latency_p50_seconds: "P50", latency_p99_seconds: "P99" };
@@ -19,6 +20,7 @@ export function PageSamples() {
   return <div style={{ display: "grid", gap: 40 }}>
     <section>
       <h2 className="ui-sample-title">概览 · 项目概览</h2>
+      <div className="page-title" style={{ marginBottom: 16 }}><div><h1><IconTile name="overview" />RAG 自进化项目概览</h1></div></div>
       <OverviewSummary
         correct={{ from: 44, to: 48 }} total={50} fixedCount={4} newBadCount={0} gates={{ passed: 11, total: 11 }}
         p99={{ from: 42.2, to: 36.7 }} p50={{ from: 16.7, to: 8.1 }} safeRefusal={{ from: 95, to: 100 }} budget={{ used: 10, max: 12 }}

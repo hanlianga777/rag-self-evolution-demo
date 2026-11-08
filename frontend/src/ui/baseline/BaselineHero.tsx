@@ -1,3 +1,4 @@
+import { IconLabel } from "../icons";
 import { StatusBadge } from "../Primitives";
 
 /**
@@ -20,13 +21,13 @@ export function BaselineHero({ gates, correct, total, badCount, layers, thinking
   return <section className="ui-bl" aria-label="Baseline 报告摘要">
     <p className="ui-bl-turn">{allPassed ? `${gates.total} 项 Hard Gate 全部通过，仍有 ${badCount} 个 Bad Case` : `Hard Gate ${gates.passed} / ${gates.total}，有 ${badCount} 个 Bad Case`}</p>
     <div className="ui-bl-grid">
-      <div className="ui-bl-cell"><span>Hard Gate</span><strong className="ui-num">{gates.passed} / {gates.total}</strong><StatusBadge kind={allPassed ? "qualified" : "failed"} label={allPassed ? "全部通过" : "未全部通过"} /></div>
-      <div className="ui-bl-cell"><span>答对</span><strong className="ui-num">{correct} / {total}</strong><small>{badCount} 个 Bad Case</small></div>
-      <div className="ui-bl-cell"><span>Bad Case 分层</span><div className="ui-bl-layers">{layers.map(item => <span key={item.label}>{item.label} <b className="ui-num">{item.count}</b></span>)}</div></div>
-      <div className="ui-bl-cell"><span>Thinking 档位</span><strong>{thinking ?? "未知"}</strong><small className="ui-num">P50 {p50 != null ? `${p50.toFixed(1)} 秒` : "未知"} · P99 {p99 != null ? `${p99.toFixed(1)} 秒` : "未知"}</small></div>
+      <div className="ui-bl-cell"><span><IconLabel name="gate">Hard Gate</IconLabel></span><strong className="ui-num">{gates.passed} / {gates.total}</strong><StatusBadge kind={allPassed ? "qualified" : "failed"} label={allPassed ? "全部通过" : "未全部通过"} /></div>
+      <div className="ui-bl-cell"><span><IconLabel name="correct">答对</IconLabel></span><strong className="ui-num">{correct} / {total}</strong><small>{badCount} 个 Bad Case</small></div>
+      <div className="ui-bl-cell"><span><IconLabel name="layers">Bad Case 分层</IconLabel></span><div className="ui-bl-layers">{layers.map(item => <span key={item.label}>{item.label} <b className="ui-num">{item.count}</b></span>)}</div></div>
+      <div className="ui-bl-cell"><span><IconLabel name="thinking">Thinking 档位</IconLabel></span><strong>{thinking ?? "未知"}</strong><small className="ui-num">P50 {p50 != null ? `${p50.toFixed(1)} 秒` : "未知"} · P99 {p99 != null ? `${p99.toFixed(1)} 秒` : "未知"}</small></div>
     </div>
     {stages.length > 0 && <div className="ui-bl-time">
-      <div className="ui-bl-time-head"><span>耗时构成</span>{top && <small>{top.label} 占 {pctOf(top)}</small>}</div>
+      <div className="ui-bl-time-head"><span><IconLabel name="time">耗时构成</IconLabel></span>{top && <small>{top.label} 占 {pctOf(top)}</small>}</div>
       <div className="ui-bl-bar" role="img" aria-label={sorted.map(item => `${item.label} ${pctOf(item)}`).join("，")}>
         {sorted.map((item, index) => <i key={item.label} className={index === 0 ? "top" : ""} style={{ flexGrow: item.seconds }} title={`${item.label} ${item.seconds.toFixed(1)} 秒 · ${pctOf(item)}`} />)}
       </div>

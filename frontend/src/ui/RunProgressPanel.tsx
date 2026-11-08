@@ -1,3 +1,4 @@
+import { Icon } from "./icons";
 import { useState } from "react";
 import { StatusBadge, type StatusKind } from "./Primitives";
 
@@ -71,8 +72,8 @@ export function RunProgressPanel({ title, subtitle = "Sandbox 评测", status, c
         <button type="button" className="go" onClick={() => { setConfirmStop(false); onStop?.(); }}>确认停止</button>
       </div>
     </div> : <div className="ui-run-actions">
-      <button type="button" className="go" disabled={!canContinue} onClick={() => onContinue?.()}>继续运行</button>
-      <button type="button" disabled={!canStop} onClick={() => setConfirmStop(true)}>{stopping ? "正在停止…" : "停止运行"}</button>
+      <button type="button" className="go" disabled={!canContinue} onClick={() => onContinue?.()}><Icon name="play" size={14} />继续运行</button>
+      <button type="button" disabled={!canStop} onClick={() => setConfirmStop(true)}><Icon name="stop" size={13} />{stopping ? "正在停止…" : "停止运行"}</button>
     </div>}
   </section>;
 }

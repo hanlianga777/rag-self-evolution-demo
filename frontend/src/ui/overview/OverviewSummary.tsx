@@ -1,3 +1,4 @@
+import { Icon, IconLabel, IconTile, iconForStep, type IconName } from "../icons";
 import { HoverCard } from "../HoverCard";
 import { StatTransition, StatusBadge, type StatusKind } from "../Primitives";
 
@@ -8,7 +9,7 @@ import { StatTransition, StatusBadge, type StatusKind } from "../Primitives";
  * - 一条真实状态：Candidate D 推荐待发布 ｜ 当前线上：初始配置（状态由调用方从同一份线上版本数据算出，不写死）；
  * - 流程条：6 步，每步只写一个事实；悬停看补充；点击跳转。
  */
-export type FlowStep = { label: string; fact: string; tips?: string[]; onClick?: () => void };
+export type FlowStep = { label: string; fact: string; tips?: string[]; onClick?: () => void; icon?: IconName };
 export type Pair = { from: number | null; to: number | null };
 
 export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates, p99, p50, safeRefusal, budget, status, flow, primaryAction }: {
@@ -21,33 +22,33 @@ export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates
   return <div className="ui-ov">
     <section className="ui-ov-hero" aria-label="优化成果">
       <div className="ui-ov-main">
-        <span className="ui-ov-label">答对（Baseline → 最终推荐）</span>
+        <span className="ui-ov-label"><IconLabel name="correct">答对（Baseline → 最终推荐）</IconLabel></span>
         <div className="ui-ov-big"><StatTransition from={correct.from} to={correct.to} unit={`/ ${total}`} /></div>
         <div className="ui-ov-facts">
-          <span className="ui-ov-fact good">修好 <b className="ui-num">{fixedCount ?? "未知"}</b></span>
-          <span className="ui-ov-fact">新增 Bad Case <b className="ui-num">{newBadCount ?? "未知"}</b></span>
-          <span className="ui-ov-fact">Hard Gate <b className="ui-num">{gates ? `${gates.passed} / ${gates.total}` : "未知"}</b></span>
+          <span className="ui-ov-fact good"><Icon name="fixed" size={14} />修好 <b className="ui-num">{fixedCount ?? "未知"}</b></span>
+          <span className="ui-ov-fact"><Icon name="bad" size={14} />新增 Bad Case <b className="ui-num">{newBadCount ?? "未知"}</b></span>
+          <span className="ui-ov-fact"><Icon name="gate" size={14} />Hard Gate <b className="ui-num">{gates ? `${gates.passed} / ${gates.total}` : "未知"}</b></span>
         </div>
       </div>
       <dl className="ui-ov-side">
-        <div><dt>P99</dt><dd><StatTransition from={p99.from} to={p99.to} unit="秒" better="lower" digits={1} /></dd></div>
-        <div><dt>P50</dt><dd><StatTransition from={p50.from} to={p50.to} unit="秒" better="lower" digits={1} /></dd></div>
-        <div><dt>安全拒答率</dt><dd><StatTransition from={safeRefusal.from} to={safeRefusal.to} unit="%" /></dd></div>
-        <div><dt>评测预算</dt><dd className="ui-num"><b>{budget ? budget.used : "未知"}</b>{budget && <span className="ui-ov-of"> / {budget.max} 次</span>}</dd></div>
+        <div><dt><IconLabel name="p99">P99</IconLabel></dt><dd><StatTransition from={p99.from} to={p99.to} unit="秒" better="lower" digits={1} /></dd></div>
+        <div><dt><IconLabel name="p50">P50</IconLabel></dt><dd><StatTransition from={p50.from} to={p50.to} unit="秒" better="lower" digits={1} /></dd></div>
+        <div><dt><IconLabel name="refusal">安全拒答率</IconLabel></dt><dd><StatTransition from={safeRefusal.from} to={safeRefusal.to} unit="%" /></dd></div>
+        <div><dt><IconLabel name="budget">评测预算</IconLabel></dt><dd className="ui-num"><b>{budget ? budget.used : "未知"}</b>{budget && <span className="ui-ov-of"> / {budget.max} 次</span>}</dd></div>
       </dl>
     </section>
 
     <div className="ui-ov-status">
       <span className="ui-ov-status-item"><StatusBadge kind={status.kind} /> {status.candidate}</span>
       <span className="ui-ov-divider" aria-hidden="true" />
-      <span className="ui-ov-status-item">当前线上：{status.online}</span>
-      {primaryAction && <button type="button" className="primary ui-ov-action" onClick={primaryAction.onClick}>{primaryAction.label}</button>}
+      <span className="ui-ov-status-item"><Icon name="release" size={14} />当前线上：{status.online}</span>
+      {primaryAction && <button type="button" className="primary ui-ov-action" onClick={primaryAction.onClick}><Icon name="release" size={15} />{primaryAction.label}</button>}
     </div>
 
     <nav className="ui-ov-flow" aria-label="从知识到线上改善">
       {flow.map((step, index) => {
         const inner = <button type="button" className="ui-ov-step" onClick={step.onClick}>
-          <span className="ui-ov-step-no ui-num">{index + 1}</span>
+          {(() => { const icon = step.icon ?? iconForStep(step.label); return icon ? <IconTile name={icon} size={16} small /> : <span className="ui-ov-step-no ui-num">{index + 1}</span>; })()}
           <span className="ui-ov-step-text"><strong>{step.label}</strong><small>{step.fact}</small></span>
         </button>;
         return <div className="ui-ov-step-wrap" key={step.label}>
@@ -62,9 +63,9 @@ export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates
 /** Agent 工作台顶部的紧凑统计，替换原来六张同样的绿色"已完成"卡。 */
 export function AgentStats({ rounds, candidates, budget, status }: { rounds: number; candidates: number; budget: { used: number; max: number } | null; status: { kind: StatusKind; text: string } }) {
   return <dl className="ui-agent-stats">
-    <div><dt>轮次</dt><dd className="ui-num">{rounds}</dd></div>
-    <div><dt>Candidate</dt><dd className="ui-num">{candidates}</dd></div>
-    <div><dt>评测预算</dt><dd className="ui-num">{budget ? <>{budget.used}<span> / {budget.max}</span></> : "未知"}</dd></div>
-    <div className="wide"><dt>当前状态</dt><dd><StatusBadge kind={status.kind} /> <span className="ui-agent-status-text">{status.text}</span></dd></div>
+    <div><dt><IconLabel name="rounds">轮次</IconLabel></dt><dd className="ui-num">{rounds}</dd></div>
+    <div><dt><IconLabel name="candidate">Candidate</IconLabel></dt><dd className="ui-num">{candidates}</dd></div>
+    <div><dt><IconLabel name="budget">评测预算</IconLabel></dt><dd className="ui-num">{budget ? <>{budget.used}<span> / {budget.max}</span></> : "未知"}</dd></div>
+    <div className="wide"><dt><IconLabel name="status">当前状态</IconLabel></dt><dd><StatusBadge kind={status.kind} /> <span className="ui-agent-status-text">{status.text}</span></dd></div>
   </dl>;
 }

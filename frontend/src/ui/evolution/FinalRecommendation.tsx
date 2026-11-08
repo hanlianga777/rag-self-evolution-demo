@@ -1,3 +1,4 @@
+import { Icon, IconLabel } from "../icons";
 import { QuestionList, StatusBadge, type QuestionTone } from "../Primitives";
 import type { CandidateView } from "./model";
 
@@ -23,11 +24,11 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
   return <section className="ui-fin" aria-label="最终推荐">
     <div className="ui-fin-top">
       <div>
-        <span className="ui-rel-k">最终推荐</span>
+        <span className="ui-rel-k"><IconLabel name="recommend">最终推荐</IconLabel></span>
         <h2>{chosen.name} <StatusBadge kind="recommended" /></h2>
         <p className="ui-fin-reason">{reason}</p>
       </div>
-      {onRelease && <button type="button" className="primary" onClick={onRelease}>{releaseLabel}</button>}
+      {onRelease && <button type="button" className="primary" onClick={onRelease}><Icon name="release" size={15} />{releaseLabel}</button>}
     </div>
 
     {runnerUp && <div className="ui-fin-compare">
@@ -42,7 +43,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
     </div>}
 
     {others.length > 0 && <div className="ui-fin-others">
-      <h3>其他 Candidate 为什么没选</h3>
+      <h3><IconLabel name="rejected">其他 Candidate 为什么没选</IconLabel></h3>
       <table>
         <thead><tr><th>Candidate</th><th>修好</th><th>新增 Bad Case</th><th>未通过的 Hard Gate</th></tr></thead>
         <tbody>{others.map(item => <tr key={item.id} onClick={onOpen ? () => onOpen(item.id) : undefined} className={onOpen ? "clickable" : ""}>

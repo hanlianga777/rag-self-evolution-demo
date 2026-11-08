@@ -1,0 +1,19 @@
+/* ==================================================================
+ * 图标（lucide 线性图标；只导读、不替代文字）
+ * ================================================================== */
+.ui-icon { flex: none; color: var(--ui-muted); }
+.ui-icon-label { display: inline-flex; align-items: center; gap: 6px; }
+.ui-icon-label > .ui-icon { color: var(--ui-faint); }
+.ui-icon-tile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; background: var(--ui-surface); border: 1px solid var(--ui-rule); box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }
+.ui-icon-tile .ui-icon { color: var(--ui-ink); }
+.ui-icon-tile.sm { width: 28px; height: 28px; border-radius: 8px; }
+.page-title h1 { display: flex; align-items: center; gap: 12px; }
+button .ui-icon { color: currentColor; }
+button:has(> .ui-icon) { display: inline-flex; align-items: center; gap: 6px; }
+.ui-ov-fact, .ui-ov-status-item { display: inline-flex; align-items: center; gap: 6px; }
+.ui-rel-lock { margin-left: 5px; vertical-align: -2px; }
+.ui-rel-steps li.next .ui-rel-lock { color: var(--ui-accent); }
+.ui-status.has-icon::before { display: none; }
+.ui-status.has-icon .ui-icon { color: currentColor; }
+.ui-run .ui-icon { color: currentColor; }
+.ui-ov-step .ui-icon-tile { margin-right: 2px; }

@@ -1,3 +1,4 @@
+import { IconLabel } from "./icons";
 import { useState } from "react";
 import { HoverCard } from "./HoverCard";
 import { StatusBadge, type StatusKind } from "./Primitives";
@@ -31,7 +32,7 @@ export function KnowledgeCoverage({ topics, onOpen }: { topics: Topic[]; onOpen?
   const totals = topics.reduce((acc, t) => ({ chunks: acc.chunks + t.chunks, positive: acc.positive + t.positive, ablation: acc.ablation + t.ablation, negative: acc.negative + t.negative }), { chunks: 0, positive: 0, ablation: 0, negative: 0 });
   return <section className="ui-kc" aria-label="知识主题覆盖">
     <header className="ui-kc-head">
-      <h3>知识主题覆盖</h3>
+      <h3><IconLabel name="coverage">知识主题覆盖</IconLabel></h3>
       <span className="ui-num">{topics.length} 个主题 · {totals.chunks} 个知识片段 · 题位 Positive {totals.positive} / Ablation {totals.ablation} / Negative {totals.negative}</span>
     </header>
     <div className="ui-kc-table" role="table">
