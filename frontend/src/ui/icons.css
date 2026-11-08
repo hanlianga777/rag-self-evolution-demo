@@ -11,7 +11,8 @@
 button .ui-icon { color: currentColor; }
 button:has(> .ui-icon) { display: inline-flex; align-items: center; gap: 6px; }
 .ui-ov-fact, .ui-ov-status-item { display: inline-flex; align-items: center; gap: 6px; }
-.ui-rel-lock { margin-left: 5px; vertical-align: -2px; }
+.ui-rel-steps strong:has(.ui-rel-lock) { display: flex; align-items: center; gap: 5px; }
+.ui-rel-lock { flex: none; }
 .ui-rel-steps li.next .ui-rel-lock { color: var(--ui-accent); }
 .ui-status.has-icon::before { display: none; }
 .ui-status.has-icon .ui-icon { color: currentColor; }
