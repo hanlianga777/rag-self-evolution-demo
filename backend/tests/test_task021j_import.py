@@ -138,6 +138,8 @@ class ImportTests(unittest.TestCase):
                 response=client.get(path)
                 self.assertEqual(response.status_code,200,response.text[:200])
                 responses.append(response)
+                if path == '/api/pipeline':
+                    self.assertEqual(response.json()['active_version']['snapshot']['candidate_id'],self.did)
             # Exercise the real rollback response on this disposable fixture only.
             with patch('app.config.load_settings',return_value=type('Settings',(),{'model':'fixture'})()):
                 response=client.post('/api/versions/'+version_id+'/rollback',json={'decision':'approved','actor':'fixture human'})

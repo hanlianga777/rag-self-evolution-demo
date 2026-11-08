@@ -11,7 +11,7 @@ import {ProductDiagnostics} from './components/ProductDiagnostics';
 let root:ReturnType<typeof createRoot>;
 afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));};
-const candidate=(id:string,result:any)=>({id,status:'evaluated',config:{},reasoning:{candidate_label:id==='D'?'D':'C',round:3},result});
+const candidate=(id:string,result:any)=>({id,status:'evaluated',config:{},reasoning:{candidate_label:id.endsWith('D')?'D':'C',round:3},result});
 it('explains alternatives from saved repairs, regressions and gates rather than generic recommendation prose',async()=>{
  const d=candidate('D',{qualification:{qualified:true},bad_case_count:2,all_fixed_question_ids:['Q04','Q24','Q29','Q38']});
  const c=candidate('C',{qualification:{qualified:true},bad_case_count:3,all_fixed_question_ids:['Q24','Q29','Q38']});
@@ -36,11 +36,14 @@ it('hides the entire thinking comparison section when no columns exist',async()=
 
 it('labels released status and the archived initial config without calling it current',async()=>{
  const d={...candidate('EXP-D',{qualification:{qualified:true}}),release_state:{human_release:true}};
- await mount(<VersionsPage data={{versions:[{id:'production-new',status:'active',provenance:'published',config:{},snapshot:{candidate_id:'EXP-D'}},{id:'initial',status:'archived',provenance:'bootstrap',config:{}}],optimization:{candidates:[d],recommendation:{recommended_candidate:'EXP-D'}}}/>);
+ await mount(<VersionsPage data={{versions:[{id:'production-new',status:'active',provenance:'published',config:{},snapshot:{candidate_id:'EXP-D',human_release:{decision:'approved'}}},{id:'initial',status:'archived',provenance:'bootstrap',config:{}}],optimization:{candidates:[d],recommendation:{recommended_candidate:'EXP-D'}}}}/>);
  expect(document.querySelector('.versions-page')?.textContent).not.toContain('待发布方案');
  expect(document.querySelector('.release-history-table tbody tr:last-child')?.textContent).toContain('初始配置');
  expect(document.querySelector('.release-history-table tbody tr:last-child')?.textContent).not.toContain('当前线上配置');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent==='回滚至此版本')?.disabled).toBe(false);
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看其他候选方案')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看候选方案评测报告')!.click());
+ expect(document.querySelector('[role="dialog"]')?.textContent).not.toMatch(/待发布|尚未发布/);
 });
 it('shows the production config separately from the baseline draft after release',async()=>{
  invalidatePipeline();
@@ -54,7 +57,7 @@ it('shows the production config separately from the baseline draft after release
 it('links to published records once the recommended candidate has been released',async()=>{
  const d={...candidate('EXP-D',{qualification:{qualified:true}}),release_state:{human_release:true}};
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
- await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{id:'exp',candidates:[d],recommendation:{recommended_candidate:'EXP-D'}}}/>);
+ await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{id:'exp',candidates:[d],recommendation:{recommended_candidate:'EXP-D'}}}}/>);
  expect(document.querySelector('.evolution-route a[href="#versions"]')?.textContent).toBe('查看发布记录');
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='最终推荐')!.click());
  expect(document.querySelector('.page-content a[href="#versions"]')?.textContent).toBe('查看发布记录');

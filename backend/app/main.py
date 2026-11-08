@@ -1648,6 +1648,7 @@ def pipeline():
         "frozen_models": {"generation": ai_service.provider.settings.model, "judge": ai_service.provider.settings.model},
         "draft_stale": bool(draft and draft["identity"] != identity),
         "active_version_id": active["id"] if active else None,
+        "active_version": active,
         "config": active["config"] if active else DEFAULT_PIPELINE_CONFIG,
         "baseline_id": baseline["id"] if baseline else None,
         "baseline_config": baseline["config"] if baseline else None,

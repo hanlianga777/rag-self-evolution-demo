@@ -6,6 +6,7 @@ import { Badge, Section, TechnicalDetails } from "../components/Primitives";
 import { pipelineCached, pipelineFetch, pipelineIdentity, invalidatePipeline } from "../pipelineCache";
 import { Drawer } from "../components/Dialog";
 import { draftDefaults, formatValue, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
+import { schemeName, storyParameterNames, storyValue } from "../components/EvolutionStory";
 
 const settingsGroups: Record<string, string[]> = {
   "查询理解": ["query_rewrite", "multi_query", "hyde"],
@@ -53,6 +54,7 @@ export function SettingsPage({ data }: { data: any }) {
   return <PageShell className="page settings-page" header={<div className="page-title"><div><h1>Pipeline 配置</h1><p>固定知识处理与评测规则，让 Agent 在允许的参数范围内优化。</p></div><button className="secondary" onClick={() => setSpaceOpen(true)}>查看可选参数</button></div>}>
     {error && <p className="error-notice" role="alert">{error}</p>}
     <Section title="固定技术基座" action={<Badge>固定</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd title={String(value)}>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
+    {pipeline?.active_version?.provenance === "published" && <Section title="当前线上配置"><p>{schemeName(null,pipeline.active_version.snapshot?.candidate_id)}</p><dl className="baseline-strategy">{Object.entries(pipeline.config || {}).filter(([key])=>key in parameterNames).map(([key,value])=><div key={key}><dt>{storyParameterNames[key]}</dt><dd>{storyValue(value)}</dd></div>)}</dl></Section>}
     <Section title="Agent 可选参数" action={<Badge tone="accent">{Object.keys(contract).length} 项可调参数</Badge>}>
       {!pipeline?.baseline_config && <p className="muted">新 Baseline 待评测｜当前配置草稿 以已确认的 Baseline 默认配置作为起点</p>}
       {pipeline?.draft_stale && <p className="error-notice">已保存草稿的基准已变化，请重新核对并保存。</p>}

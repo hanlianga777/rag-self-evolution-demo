@@ -58,3 +58,5 @@ output/baseline-ab-root-cause-audit-20261014/
 *.tar.gz
 *.ses
 /*STORAGE*
+
+.playwright-cli/
