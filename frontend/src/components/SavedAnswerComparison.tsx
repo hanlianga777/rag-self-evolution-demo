@@ -72,6 +72,6 @@ function RunSummary({rows,fixed,remaining,changes,after}:{rows:any[];fixed:numbe
     <div className="comparison-summary-k">Baseline → {after} · 全部 {rows.length} 题</div>
     <div className="comparison-summary-big"><span className="from">{correctBefore}</span><span className="arrow">→</span><strong>{correctAfter}</strong><small>/ {rows.length} 答对</small></div>
     <dl className="comparison-summary-facts"><div><dt>修好</dt><dd>{fixed}</dd></div><div><dt>新增答错</dt><dd>{broken}</dd></div><div><dt>仍未修好</dt><dd>{remaining}</dd></div></dl>
-    {changes.length>0 && <><div className="comparison-summary-k">改了 {changes.length} 个参数</div><ul className="comparison-summary-changes">{changes.map(change=><li key={change.key}><span>{change.label}</span><b>{change.before} → {change.after}</b></li>)}</ul></>}
+    {changes.length>0 && <><ul className="comparison-summary-changes">{changes.map(change=><li key={change.key}><span>{change.label}</span><b>{change.before} → {change.after}</b></li>)}</ul></>}
   </section>;
 }
