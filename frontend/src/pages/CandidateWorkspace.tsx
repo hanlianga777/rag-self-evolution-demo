@@ -2,6 +2,7 @@ import { ConfirmDialog } from "../components/Dialog";
 import { RetrievalEvidence } from "../components/RetrievalEvidence";
 import { useEffect, useRef, useState } from "react";
 import { ActionMenu, CustomSelect, TruncatedText } from "../components/Primitives";
+import { detailJson, useDetailPrefetch } from "../preload";
 import { errorMessage, getJson, postJson } from "../api";
 import { displayText, isMachineQualified } from "../display";
 import { shortError, useOperation } from "../operation";
@@ -114,6 +115,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
     setAcceptingQc(false);
     setView(revision && !revision.applied_at && (["queued", "generating", "validating", "preview_ready", "interrupted"].includes(revision.status) || revision.status === "failed" && revision.question_ids?.every((id: string) => revision.drafts?.[id] && revision.new_hash?.[id])) ? "draft" : "review");
   }, [revision?.id, row?.id]);
+  useDetailPrefetch(documents.map(document => `/api/documents/${document.id}`));
   useEffect(() => {
     const documentIds = [...new Set([row, linked].map(item => item?.evidence_details?.[0]?.chunks?.[0]?.document_id).filter(Boolean))];
     setChunks([]);
@@ -121,7 +123,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
     void Promise.resolve().then(() => {
       if (cancelled) return;
       void getJson<Candidate[]>("/api/documents").then(value => { if (!cancelled) setDocuments(value); }).catch(() => { if (!cancelled) setDocuments([]); });
-      if (documentIds.length) void Promise.all(documentIds.map(id => getJson<Candidate>(`/api/documents/${id}`))).then(details => { if (!cancelled) setChunks(details.flatMap(document => document.chunks || [])); }).catch(() => { if (!cancelled) setChunks([]); });
+      if (documentIds.length) void Promise.all(documentIds.map(id => detailJson<Candidate>(`/api/documents/${id}`))).then(details => { if (!cancelled) setChunks(details.flatMap(document => document.chunks || [])); }).catch(() => { if (!cancelled) setChunks([]); });
     });
     return () => { cancelled = true; };
   }, [row?.id, linked?.id]);
@@ -137,7 +139,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
     const ids = [...new Set([...selected.flatMap(item => item.document_ids || []), ...(row?.test_category === "negative" && anchorDocumentId ? [anchorDocumentId] : [])])];
     if (!ids.length) return;
     let cancelled = false;
-    Promise.all(ids.map(id => getJson<Candidate>(`/api/documents/${id}`))).then(details => {
+    Promise.all(ids.map(id => detailJson<Candidate>(`/api/documents/${id}`))).then(details => {
       if (!cancelled) setChunks(previous => [...new Map([...previous, ...details.flatMap(detail => (detail.chunks || []).map((chunk: Candidate) => ({ ...chunk, document_name: detail.name, product: detail.product })))].map(chunk => [chunk.chunk_id, chunk])).values()]);
     }).catch(() => {});
     return () => { cancelled = true; };
@@ -149,7 +151,7 @@ export function CandidateWorkspace({ row, peers, revision, rerunSlot, busy, read
     const product = documents.find(document => document.id === anchorId)?.product;
     if (!product) return;
     let cancelled = false;
-    Promise.all(documents.filter(document => document.product === product).map(document => getJson<Candidate>(`/api/documents/${document.id}`))).then(details => {
+    Promise.all(documents.filter(document => document.product === product).map(document => detailJson<Candidate>(`/api/documents/${document.id}`))).then(details => {
       if (!cancelled) setChunks(details.flatMap(detail => (detail.chunks || []).map((chunk: Candidate) => ({ ...chunk, document_name: detail.name, product: detail.product }))));
     }).catch(error => { if (!cancelled) setRevisionError(errorMessage(error)); });
     return () => { cancelled = true; };

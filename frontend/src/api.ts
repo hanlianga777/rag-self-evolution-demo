@@ -1,4 +1,5 @@
 import type { AppData, Page } from "./types";
+import { preloadHistory } from "./listPreload";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8010";
 
@@ -40,10 +41,10 @@ export function getJson<T>(path: string, fetcher: Fetcher = fetch): Promise<T> {
       // Mutable lists and running jobs always go to the server; retain completed detail records only.
       const record = value as any;
       const completed = record?.status === 'completed' && !record.candidates?.some((item:any)=>['running','queued'].includes(item.status)) && !['running','queued'].includes(record.result?.optimization_cycle?.status) && !['running','queued','scheduled','waiting'].includes(record.result?.composite_schedule?.status);
-      if (cache === readCache(fetcher) && ((/^\/api\/(evaluations|experiments)\/[^/?]+(?:\/comparison-cases|\/cases\/[^/?]+)?$/.test(path) && completed) || /^\/api\/(documents|knowledge\/clusters|knowledge\/slots|governance\/questions)\/[^/?]+$/.test(path))) {
+      if (cache === readCache(fetcher) && ((/^\/api\/(evaluations|experiments)\/[^/?]+(?:\/comparison-cases|\/cases\/[^/?]+)?$/.test(path) && completed) || /^\/api\/(documents|knowledge\/clusters|knowledge\/slots|governance\/questions|bad-cases)\/[^/?]+$/.test(path))) {
         cache.values.delete(path);
         cache.values.set(path, { value, at: Date.now() });
-        if (cache.values.size > 128) cache.values.delete(cache.values.keys().next().value!);
+        if (cache.values.size > 512) cache.values.delete(cache.values.keys().next().value!);
       }
       return value;
     }).finally(() => cache.pending.delete(path));
@@ -81,6 +82,9 @@ export async function postJson<T>(path: string, body?: unknown): Promise<T> {
 
 export const identityKey = (value: any) => JSON.stringify([value?.current_baseline_id, value?.current_experiment_id, value?.current_golden_id, value?.current_corpus_fingerprint]);
 
+const appVersions = new WeakMap<AppData, string>();
+export function appDataVersion(data?: AppData) { return data && appVersions.get(data); }
+
 const pageInputs: Record<Page, (keyof AppData)[]> = {
   overview: ['workspace','overview','documents','optimization'],
   knowledge: ['workspace','overview','documents'], settings: ['workspace','documents'],
@@ -98,7 +102,8 @@ export async function loadAppData(retry = true, page?: Page): Promise<AppData> {
   }
   const data: AppData = {workspace:{},overview:{},documents:[],dataset:[],evaluation:{},badCases:[],optimization:{},versions:[],readiness:{},monitoring:{}};
   const keys=page ? pageInputs[page] : Object.keys(paths) as (keyof AppData)[];
-  await Promise.all(keys.map(async key => { (data as Record<string,unknown>)[key]=await getJson(paths[key]); }));
+  await Promise.all(keys.map(async key => { (data as Record<string,unknown>)[key]=await getJson(paths[key]);
+    if (key === "versions" || key === "monitoring") (data as Record<string, unknown>)[key] = await preloadHistory(paths[key], data[key]); }));
   if (page === 'overview') data.evaluation = (data.overview.latest_evaluation || {}) as AppData["evaluation"];
   const {workspace,overview,evaluation,optimization,monitoring}=data;
   const identities = [workspace, overview, evaluation, optimization, monitoring].filter((value: any) => value && "current_baseline_id" in value);
@@ -106,5 +111,6 @@ export async function loadAppData(retry = true, page?: Page): Promise<AppData> {
     if (retry) return loadAppData(false,page);
     throw new Error("工作区身份正在变化，请重试刷新当前 Baseline");
   }
+  if (readCacheToken().version) appVersions.set(data, readCacheToken().version!);
   return data;
 }

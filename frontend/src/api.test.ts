@@ -52,9 +52,9 @@ describe('display request reuse', () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({status:'completed'})));
     vi.stubGlobal('fetch', fetcher);
     try {
-      for (let index = 0; index < 128; index++) await getJson(`/api/evaluations/lru-${index}`);
+      for (let index = 0; index < 512; index++) await getJson(`/api/evaluations/lru-${index}`);
       expect(cachedJson('/api/evaluations/lru-0')).toBeDefined();
-      await getJson('/api/evaluations/lru-128');
+      await getJson('/api/evaluations/lru-512');
       expect(cachedJson('/api/evaluations/lru-0')).toBeDefined();
       expect(cachedJson('/api/evaluations/lru-1')).toBeUndefined();
     } finally { vi.unstubAllGlobals(); }

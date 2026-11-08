@@ -1,9 +1,12 @@
+import { LocalPagination, useLocalPage } from "./LocalPagination";
 import { DataTable } from "./DataTable";
 import { TableVerdict, TruncatedText } from "./Primitives";
 import { ClampText } from "../ui/ClampText";
 import { HoverCard } from "../ui/HoverCard";
 import {useEffect, useState} from 'react';
-import {cachedJson, errorMessage, getJson} from '../api';
+import {cachedJson, errorMessage} from '../api';
+import {detailJson, useHoverPrefetch} from '../preload';
+import {goldenCached, goldenFetch} from '../goldenCache';
 import { completeResult, recommendationOf, shortQuestionId } from './EvolutionStory';
 import {ComparisonAnswer} from './ComparisonAnswer';
 import {categoryName, comparisonPoints, configChanges, explanation, metricRows, verdict} from './comparisonData';
@@ -22,42 +25,56 @@ export function SavedAnswerComparison({data,onOpenCitation,questionId}:{data:any
     const rows=(before.cases || []).map((row:any)=>({...row,after:(after.cases || []).find((item:any)=>item.question_id===row.question_id)}));
     return {before,after,rows,binding};
   };
-  const [runs,setRuns]=useState<any>(()=>{if(baselineBlocked || !runId || !completeResult(candidate))return null;try{return readRuns(paths.map(path=>cachedJson<any>(path)));}catch{return null;}}),[selected,setSelected]=useState(''),[filter,setFilter]=useState('fixed'),[search,setSearch]=useState(''),[error,setError]=useState(''),[details,setDetails]=useState<any>({}),[dataMore,setDataMore]=useState(false);
+  const cachePath = '/comparison-preloaded';
+  const [runs,setRuns]=useState<any>(()=>goldenCached<any>(binding,cachePath)?.runs || null),[selected,setSelected]=useState(''),[filter,setFilter]=useState('fixed'),[search,setSearch]=useState(''),[error,setError]=useState(''),[details,setDetails]=useState<any>(()=>goldenCached<any>(binding,cachePath)?.details || {}),[detailErrors,setDetailErrors]=useState<Record<string,string>>({}),[dataMore,setDataMore]=useState(false);
   useEffect(()=>{
-    let cancelled=false;setRuns(null);setSelected('');setError('');setDetails({});setFilter('fixed');setSearch('');
+    let cancelled=false;const retained=goldenCached<any>(binding,cachePath);setRuns(retained?.runs || null);setSelected('');setError('');setDetails(retained?.details || {});setDetailErrors(retained?.errors || {});setFilter('fixed');setSearch('');
     if(baselineBlocked || !runId || !completeResult(candidate))return;
-    const accept=([before,after]:any[])=>{
+    const accept=(value:any)=>{
+      const {before,after}=value.runs;
       if(cancelled)return;
       const next=readRuns([before,after]);
       const requested = next.rows.find((row:any)=>questionId && shortQuestionId(row.question_id)===shortQuestionId(questionId));
       if(requested) setFilter('all');
-      setRuns(next);setSelected(previous=>previous || requested?.question_id || next.rows.find((row:any)=>row.passed===false && row.after?.passed===true)?.question_id || '');
+      setDetails(value.details);setDetailErrors(value.errors || {});setRuns(next);setSelected(previous=>previous || requested?.question_id || next.rows.find((row:any)=>row.passed===false && row.after?.passed===true)?.question_id || '');
     };
-    const saved=paths.map(path=>cachedJson<any>(path));
-    if(saved.every(Boolean)){try{accept(saved);}catch(reason){setError(errorMessage(reason));}}
-    void Promise.all(paths.map(path=>getJson<any>(path))).then(accept).catch(reason=>{if(!cancelled)setError(errorMessage(reason));});
+    if(retained) accept(retained);
+    void goldenFetch<any>(binding,cachePath,async()=>{
+      const next=readRuns(await Promise.all(paths.map(path=>detailJson<any>(path))));
+      const allDetails:Record<string,any>={},errors:Record<string,string>={};
+      for(let offset=0;offset<next.rows.length;offset+=4) await Promise.all(next.rows.slice(offset,offset+4).map(async(row:any)=>{
+        const key=JSON.stringify([binding,row.question_id]);
+        try { allDetails[key]=await Promise.all([baselineId,runId].map(run=>detailJson<any>(`/api/evaluations/${encodeURIComponent(run)}/cases/${encodeURIComponent(row.question_id)}`))); }
+        catch(reason) { errors[key]=errorMessage(reason); }
+      }));
+      return {runs:next,details:allDetails,errors};
+    }).then(accept).catch(reason=>{if(!cancelled)setError(errorMessage(reason));});
     return ()=>{cancelled=true;};
   },[binding,questionId]);
   const current=runs?.binding===binding ? runs : null;
   const rows:any[]=current?.rows || [],fixed=rows.filter(row=>row.passed===false && row.after?.passed===true),remaining=rows.filter(row=>row.after?.passed===false);
   const filtered=(filter==='fixed'?fixed:filter==='remaining'?remaining:rows).filter(row=>(row.question || '').includes(search));
-  const active=filtered.find(row=>row.question_id===selected) || filtered[0],id=active?.question_id;
+  const requestedId=questionId ? rows.find(row=>shortQuestionId(row.question_id)===shortQuestionId(questionId))?.question_id : undefined;
+  const pagination=useLocalPage<any>(filtered,JSON.stringify([binding,filter,search]),requestedId);
+  const active=pagination.rows.find(row=>row.question_id===selected) || pagination.rows[0],id=active?.question_id;
   const detailPaths=[baselineId,runId].map(run=>`/api/evaluations/${encodeURIComponent(run)}/cases/${encodeURIComponent(id)}`);
+  const hover=useHoverPrefetch();
   const detailKey=JSON.stringify([binding,id]);
   const savedDetail=details[detailKey] || detailPaths.map(path=>cachedJson<any>(path));
   const ready=savedDetail?.every(Boolean),before=ready?savedDetail[0].case:null,after=ready?savedDetail[1].case:null;
-  useEffect(()=>{
-    if(!current || !id)return;
-    let cancelled=false;setError('');
-    void Promise.all(detailPaths.map(path=>getJson<any>(path))).then(value=>{if(!cancelled)setDetails((previous:any)=>({...previous,[detailKey]:value}));}).catch(reason=>{if(!cancelled)setError(errorMessage(reason));});
-    return ()=>{cancelled=true;};
-  },[detailKey,!!current]);
+  const retryDetail=async()=>{
+    try {
+      const value=await Promise.all(detailPaths.map(path=>detailJson<any>(path)));
+      setDetails((previous:any)=>({...previous,[detailKey]:value}));
+      setDetailErrors(previous=>{const next={...previous};delete next[detailKey];return next;});
+    } catch(reason) {setDetailErrors(previous=>({...previous,[detailKey]:errorMessage(reason)}));}
+  };
   const points=before && after?comparisonPoints(before,after,savedDetail[1].question):[],why=explanation(before,after,current?.before.config,current?.after.config,points);
   const unavailable=baselineBlocked?'当前有效 Baseline 尚未就绪，暂不展示前后对比。':!candidate?'最终推荐尚未保存，代表题待确定。':!completeResult(candidate)?'推荐方案尚无完整评测结果。':!runId?'推荐方案的评测回答来源未保存。':'';
   return <section className="saved-answer-comparison" aria-label="已保存回答对比">{unavailable?<p>{unavailable}</p>:!current?<p role={error?'alert':'status'}>{error || '正在读取题目列表…'}</p>:<div className="comparison-workspace">
-    <div className="comparison-side"><aside className="comparison-rail" aria-label="选择题目"><div className="comparison-seg">{[['fixed','修好的',fixed.length],['remaining','仍未修好',remaining.length],['all','全部',rows.length]].map(([value,label,count])=><button key={value} aria-pressed={filter===value} onClick={()=>{setFilter(String(value));setSelected('');}}>{label}<b>{count}</b></button>)}</div><input className="comparison-search" aria-label="搜索题目内容" placeholder="搜索题目内容" value={search} onChange={event=>setSearch(event.target.value)}/><ul className="comparison-qlist">{filtered.map(row=><li key={row.question_id}><button className={id===row.question_id?'on':''} aria-pressed={id===row.question_id} onClick={event=>{if (!(event.target as Element).closest('.ui-clamp[data-truncated="true"]')) setSelected(row.question_id);}} title={row.question}><span className="comparison-qid">{shortQuestionId(row.question_id)}</span><ClampText className="comparison-qtext" text={row.question || "未保存问题"} lines={2} /><span className="comparison-qmeta"><span className="comparison-flip" aria-label={`优化前${verdict(row)}，优化后${verdict(row.after)}`}><i className={`comparison-dot ${verdict(row)}`}/><i>›</i><i className={`comparison-dot ${verdict(row.after)}`}/></span>{categoryName(row.test_category)}</span></button></li>)}</ul>{!filtered.length && <p className="comparison-empty">没有符合条件的题目。</p>}</aside></div>
+    <div className="comparison-side"><aside className="comparison-rail" aria-label="选择题目"><div className="comparison-seg">{[['fixed','修好的',fixed.length],['remaining','仍未修好',remaining.length],['all','全部',rows.length]].map(([value,label,count])=><button key={value} aria-pressed={filter===value} onClick={()=>{setFilter(String(value));setSelected('');}}>{label}<b>{count}</b></button>)}</div><input className="comparison-search" aria-label="搜索题目内容" placeholder="搜索题目内容" value={search} onChange={event=>setSearch(event.target.value)}/><LocalPagination {...pagination}/><ul className="comparison-qlist">{pagination.rows.map(row=><li key={row.question_id}><button {...hover([baselineId,runId].map(run=>`/api/evaluations/${encodeURIComponent(run)}/cases/${encodeURIComponent(row.question_id)}`))} className={id===row.question_id?'on':''} aria-pressed={id===row.question_id} onClick={event=>{if (!(event.target as Element).closest('.ui-clamp[data-truncated="true"]')) setSelected(row.question_id);}} title={row.question}><span className="comparison-qid">{shortQuestionId(row.question_id)}</span><ClampText className="comparison-qtext" text={row.question || "未保存问题"} lines={2} /><span className="comparison-qmeta"><span className="comparison-flip" aria-label={`优化前${verdict(row)}，优化后${verdict(row.after)}`}><i className={`comparison-dot ${verdict(row)}`}/><i>›</i><i className={`comparison-dot ${verdict(row.after)}`}/></span>{categoryName(row.test_category)}</span></button></li>)}</ul>{!filtered.length && <p className="comparison-empty">没有符合条件的题目。</p>}</aside></div>
     <div className="comparison-detail">{active && <header className="comparison-qhead"><div><div className="comparison-k">{shortQuestionId(id)}　{categoryName(active.test_category)}</div><h2>{active.question}</h2></div><div className="comparison-verdict"><span className={`comparison-badge ${verdict(active)}`}>优化前 {verdict(active)}</span><span>›</span><span className={`comparison-badge ${verdict(active.after)}`}>优化后 {verdict(active.after)}</span></div></header>}
-    {error && <p role="alert">{error}</p>}{id && !ready?<div className="case-detail-skeleton" role="status" aria-label="正在读取保存的单题详情"><span/><span/><span/></div>:before && after?<>
+    {error && <p role="alert">{error}</p>}{detailErrors[detailKey] && <p role="alert">{detailErrors[detailKey]} <button className="text-button" onClick={()=>void retryDetail()}>重试本题</button></p>}{id && !ready && !detailErrors[detailKey]?<div className="case-detail-skeleton" role="status" aria-label="正在读取保存的单题详情"><span/><span/><span/></div>:before && after?<>
       <section className="comparison-why"><div className="comparison-chain"><h3>{active.test_category==='negative'?'这道题的拒答变化':before.passed===false && after.passed===true?'这道题为什么变好':'这道题的前后变化'}</h3><ol className="comparison-steps">{why.steps.map(step=><li className={`comparison-step ${step.key?'key':''}`} key={step.label}><span className="comparison-t">{step.label}</span><span className="comparison-v">{step.text}</span></li>)}</ol>{!why.steps.length && <p>保存记录未提供变化依据。</p>}</div><div className="comparison-points"><h3>必答要点对照</h3><DataTable className="comparison-ptable"><thead><tr><th>要点</th><th className="num">优化前</th><th className="num">优化后</th></tr></thead><tbody>{points.map(point=><tr key={point.number} className={point.fresh?'new':''}><td><TruncatedText lines={1}><span className="comparison-pn">{point.number}</span>{point.text}{point.fresh && <span className="comparison-newtag">新满足</span>}</TruncatedText></td><td className="num"><TableVerdict value={point.before}/></td><td className="num"><TableVerdict value={point.after}/></td></tr>)}</tbody></DataTable>{!points.length && <p>必答要点判分未保存。</p>}</div></section>
       <div className="comparison-answers">{[['before',before,'Baseline'],['after',after,`Candidate ${candidate.reasoning?.candidate_label || '—'}`]].map(([side,row,name]:any)=>{
         const met=points.filter(point=>side==='before'?point.before:point.after).length;

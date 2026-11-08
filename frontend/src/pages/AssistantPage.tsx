@@ -17,7 +17,7 @@ function id(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().to
 function newConversation(): Conversation { return { id: id("chat"), title: "新对话", updatedAt: now(), messages: [] }; }
 function matchBadCase(question: string, badCases: any[]) { return badCases.find(item => (item.result?.question || item.question || "").trim() === question.trim()); }
 
-export function AssistantPage({ productionVersion, productionLabel, isReleased = false, badCases, onOpenBadCase, onOpenCitation, onOpenDocument, onOpenMonitoring }: { productionVersion?: string; productionLabel?: string; isReleased?: boolean; badCases: any[]; onOpenBadCase: (caseId: string) => void; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void; onOpenMonitoring?: () => void }) {
+export function AssistantPage({ productionVersion, productionLabel, isReleased = false, badCases, onOpenBadCase, onOpenCitation, onOpenDocument, onOpenMonitoring, onAnswered }: { productionVersion?: string; productionLabel?: string; isReleased?: boolean; badCases: any[]; onOpenBadCase: (caseId: string) => void; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void; onOpenMonitoring?: () => void; onAnswered?: () => void }) {
   const [saved] = useState(() => readSession("rag-qa-assistant", { activeId: undefined as string | undefined, draft: "", conversations: null as Conversation[] | null }));
   const [conversations, setConversations] = useState<Conversation[]>(() => Array.isArray(saved.conversations) && saved.conversations.every(isConversation) ? saved.conversations : loadConversations());
   const [blankConversation, setBlankConversation] = useState(newConversation);
@@ -64,6 +64,7 @@ export function AssistantPage({ productionVersion, productionLabel, isReleased =
       if (ticket !== requestId.current) return;
       const assistant: ChatMessage = { id: id("assistant"), role: "assistant", content: result.baseline.answer, question, createdAt: now(), mode: result.mode, model: result.model, latencyMs: typeof result.latency_ms === "number" ? result.latency_ms : null, fallbackReason: result.fallback_reason, sources: result.baseline.sources, evidence: result.baseline.evidence, metrics: result.baseline };
       updateConversation(started.id, conversation => ({ ...conversation, updatedAt: assistant.createdAt, messages: [...conversation.messages, assistant] }));
+      onAnswered?.();
     } catch (reason) { if (ticket === requestId.current) setError(reason instanceof Error ? reason.message : "请求失败，请重试"); }
     finally { if (ticket === requestId.current) { setBusy(false); setThinkingStartedAt(undefined); } }
   };

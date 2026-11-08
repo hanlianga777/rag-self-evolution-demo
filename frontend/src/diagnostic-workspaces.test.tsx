@@ -4,6 +4,7 @@ import {createRoot} from 'react-dom/client';
 import {afterEach,expect,it,vi} from 'vitest';
 import {EvaluationPage} from './pages/EvaluationPage';
 import {EvolutionPage} from './pages/EvolutionPage';
+import {loadAppData} from './api';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 let root:ReturnType<typeof createRoot>;
 afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';vi.unstubAllGlobals()});
@@ -38,22 +39,23 @@ it('removes the history entry contained in technical details without requesting 
  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='历史评测')).toBe(false);
  expect(calls.mock.calls.some((c:any[])=>c[0].includes('/api/evaluations?'))).toBe(false);
 });
-it('pages version history without dropping the active runtime summary',async()=>{
+it('preloads version history without dropping the active runtime summary',async()=>{
  const {VersionsPage}=await import('./pages/VersionsPage');
  const active={id:'runtime-active',status:'active',provenance:'bootstrap',config:{}};
  const versions=[active,...Array.from({length:49},(_,i)=>({id:`old-${i}`,status:'archived'}))];
- const fetcher=vi.fn(async()=>new Response(JSON.stringify([{id:'older',status:'archived'}])));vi.stubGlobal('fetch',fetcher);
- await render(<VersionsPage data={{versions}}/>);await click('下一页');
+ const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/versions')?versions:url.includes('/api/versions?page=2')?[{id:'older',status:'archived'}]:url.includes('/api/documents')?[]:{})));vi.stubGlobal('fetch',fetcher);
+ const data=await loadAppData(true,'versions');await render(<VersionsPage data={data}/>);
+ expect([...document.querySelectorAll('button')].some(b=>b.textContent==='下一页')).toBe(false);
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/versions?page=2&limit=50'))).toBe(true);
  await click('查看完整配置');expect(document.querySelector('[role=dialog]')?.textContent).toContain('当前线上配置');
- expect(document.body.textContent).not.toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(1);
+ expect(document.body.textContent).not.toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(51);
 });
-it('pages monitoring events and triggers with bounded read requests',async()=>{
+it('preloads monitoring events once and switches its tab without requests',async()=>{
  const {VerificationPage}=await import('./pages/VerificationPage');
  const page={events:Array.from({length:50},(_,i)=>({id:`event-${i}`,question:`问题${i}`})),triggers:[]};
- const fetcher=vi.fn(async()=>new Response(JSON.stringify(page)));vi.stubGlobal('fetch',fetcher);
- await render(<VerificationPage data={{monitoring:page}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('线上反馈 → 再次进化');await click('下一页');
- expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/monitoring?page=2&limit=50'))).toBe(true);expect(document.querySelectorAll('tbody tr')).toHaveLength(50);
+ const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/monitoring')?page:url.includes('/api/monitoring?page=2')?{events:[{id:'event-last',question:'最后的反馈'}],triggers:[]}:url.includes('/api/versions')?[]:{})));vi.stubGlobal('fetch',fetcher);
+ const data=await loadAppData(true,'verification');await render(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);const count=fetcher.mock.calls.length;await click('线上反馈 → 再次进化');expect(fetcher).toHaveBeenCalledTimes(count);
+ expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/monitoring?page=2&limit=50'))).toBe(true);expect(document.querySelectorAll('tbody tr')).toHaveLength(51);
 });
 it('separates saved formal blockers from confirmed regression without clearing pending risk',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
@@ -67,23 +69,23 @@ it('uses saved root evidence in the compact diagnosis column and keeps absent ev
  await render(<DiagnosisTable rows={[{question_id:'q1',diagnostic_view:{is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Generation',optimization_directions:['grounded_generation'],evidence_checks:[{answer_quote:'保存的答案原文'}]},diagnosis:{answer_quote:'保存的答案原文',reason:'保存原因'},judge_result:{reason:'非根因评语'}},{question_id:'q2',judge_result:{reason:'不能冒充核心证据'}}]} onSelect={()=>{}}/>);
  expect(document.querySelector('tbody')?.textContent).toContain('保存的答案原文');expect(document.querySelector('tbody')?.textContent).not.toContain('q2');expect(document.querySelector('tbody')?.textContent).not.toContain('不能冒充核心证据');
 });
-it('keeps all Full100 diagnosis rows available in pages of fifty and resets after filtering',async()=>{
+it('renders all Full100 diagnosis rows immediately and resets after filtering',async()=>{
  const {DiagnosisTable}=await import('./components/EvaluationDiagnosis');
  const rows=Array.from({length:100},(_,i)=>({question_id:`Q${i+1}`,question:`完整题目${i+1}`,diagnostic_view:{is_technical_bad_case:true,analysis_category:'rag_failure',primary_root_cause:'Retrieval',optimization_directions:['candidate_recall']}})),onSelect=vi.fn();
  await render(<DiagnosisTable rows={rows} onSelect={onSelect}/>);
- expect(document.querySelectorAll('tbody tr')).toHaveLength(50);expect(document.querySelector('tbody')?.textContent).toContain('完整题目50');expect(document.querySelector('tbody')?.textContent).not.toContain('完整题目51');
- await click('下一页');expect(document.querySelectorAll('tbody tr')).toHaveLength(50);expect(document.querySelector('tbody')?.textContent).toContain('完整题目100');
+ expect(document.querySelectorAll('tbody tr')).toHaveLength(100);expect(document.querySelector('tbody')?.textContent).toContain('完整题目100');
+ expect([...document.querySelectorAll('button')].some(b=>b.textContent==='下一页')).toBe(false);
  await act(async()=>[...document.querySelectorAll<HTMLTableRowElement>('tbody tr')].at(-1)!.click());expect(onSelect).toHaveBeenCalledWith(rows[99]);
- await click('上一页');expect(document.querySelector('tbody')?.textContent).toContain('完整题目1');
- await click('下一页');await act(async()=>root.render(<DiagnosisTable rows={rows.slice(0,3)} onSelect={onSelect}/>));expect(document.querySelectorAll('tbody tr')).toHaveLength(3);expect(document.querySelector('tbody')?.textContent).toContain('完整题目1');expect(rows).toHaveLength(100);
+ await act(async()=>root.render(<DiagnosisTable rows={rows.slice(0,3)} onSelect={onSelect}/>));expect(document.querySelectorAll('tbody tr')).toHaveLength(3);expect(document.querySelector('tbody')?.textContent).toContain('完整题目1');expect(rows).toHaveLength(100);
 });
 it('keeps all hundred saved Candidate report cases accessible in the existing Drawer',async()=>{
  const cases=Array.from({length:100},(_,i)=>({question_id:`Q${i+1}`,question:`Candidate题目${i+1}`,passed:true}));
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/evaluations/')?{cases}:{search_space:{}}))));
  await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'candidate-run'}}]}}}/>);
  await click('A/B/C/D');await click('查看方案与完整报告');await openSavedReport();
- expect(document.querySelectorAll('.drawer tbody tr')).toHaveLength(50);await click('下一页');expect(document.querySelectorAll('.drawer tbody tr')).toHaveLength(50);expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目100');
- await click('上一页');expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目1');expect(cases).toHaveLength(100);
+ expect(document.querySelectorAll('.drawer tbody tr')).toHaveLength(100);expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目100');
+ expect([...document.querySelectorAll('.drawer button')].some(b=>b.textContent==='下一页')).toBe(false);
+ expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目1');expect(cases).toHaveLength(100);
 });
 it('shows every current business failure in Agent including pending diagnoses',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));

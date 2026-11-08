@@ -9,7 +9,9 @@ import { CaseAnswer } from "../components/CaseAnswer";
 import { displayText, narrativeText, productionName } from "../display";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useRef, useState } from "react";
-import { errorMessage, getJson, postJson } from "../api";
+import { preloadHistory } from "../listPreload";
+import { detailJson, useDetailPrefetch } from "../preload";
+import { cachedJson, errorMessage, getJson, postJson } from "../api";
 import { ConclusionCard, Section, Status, TruncatedText } from "../components/Primitives";
 import { Drawer } from "../components/Dialog";
 import { ExecutionMetrics } from "../components/PipelineFields";
@@ -32,7 +34,7 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
     return () => window.removeEventListener("hashchange", sync);
   }, []);
   const [historyPage, setHistoryPage] = useState(1);
-  const [historyBusy, setHistoryBusy] = useState(false);
+  const historyRows = (monitoring.events || []).length <= 200 ? monitoring.events || [] : monitoring.events.slice((historyPage - 1) * 200, historyPage * 200);
   const [eventDetail, setEventDetail] = useState<any>(null);
   const [contextDetail, setContextDetail] = useState(false);
   const [triggerId, setTriggerId] = useState<string | null>(null);
@@ -43,20 +45,21 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
   const linkedContext = context?.id === contextId ? context : null;
   const currentContext = !!linkedContext && linkedContext.baseline_run_id === data.workspace?.current_baseline_id;
   useEffect(() => {
-    setContext(null);
+    setContext(contextId ? cachedJson(`/api/experiments/${encodeURIComponent(contextId)}`) || null : null);
     if (!contextId) return;
     let cancelled = false;
-    void getJson<any>(`/api/experiments/${encodeURIComponent(contextId)}`).then(value => { if (!cancelled) setContext(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); });
+    void detailJson<any>(`/api/experiments/${encodeURIComponent(contextId)}`).then(value => { if (!cancelled) setContext(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); });
     return () => { cancelled = true; };
   }, [contextId]);
 
+  useDetailPrefetch((monitoring.triggers || []).filter((row: any) => row.optimization_run_id).map((row: any) => `/api/experiments/${encodeURIComponent(row.optimization_run_id)}`));
   const requests = useRef(0);
   useEffect(() => { setMonitoring(data.monitoring || {}); setHistoryPage(1); }, [data.monitoring]);
   useEffect(() => () => { requests.current++; }, []);
   const [citation, setCitation] = useState<Citation | null>(null), [sourceText, setSourceText] = useState("");
   useEffect(() => writeSession("rag-qa-tab", { tab }), [tab]);
   useEffect(() => { setSourceText(""); if (!citation) return; if ((citation as any).savedEvidence) { setSourceText(citation.content_preview); return; } let cancelled = false; void getJson<any>(`/api/documents/${encodeURIComponent(citation.document_id)}`).then(value => { if (!cancelled) setSourceText(value.chunks?.find((chunk: any) => chunk.chunk_id === citation.chunk_id)?.chunk_text || citation.content_preview); }).catch(() => { if (!cancelled) setSourceText(citation.content_preview); }); return () => { cancelled = true; }; }, [citation]);
-  const refresh = async (page=historyPage) => { const ticket = ++requests.current; setHistoryBusy(true); try { const value = await getJson(`/api/monitoring?page=${page}&limit=50`); if (ticket === requests.current) { setMonitoring(value); setHistoryPage(page); } } finally { if(ticket===requests.current)setHistoryBusy(false); } };
+  const refresh = async () => { const ticket = ++requests.current; const value = await getJson<any>("/api/monitoring?page=1&limit=50").then(first => preloadHistory("/api/monitoring", first)); if (ticket === requests.current) { setMonitoring(value); setHistoryPage(1); } };
   const assess = async (event: any, bad_case: boolean, severity: "ordinary" | "critical") => { setBusy(true); setError(""); try { await operation.run("保存人工监控判定", () => postJson(`/api/monitoring/events/${event.id}/assessment`, { bad_case, severity })); await refresh(); } catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); } };
   const confirm = async (trigger: any) => { setBusy(true); setError(""); try { await operation.run("确认 Optimization Trigger", () => postJson(`/api/monitoring/triggers/${trigger.id}/confirm`, { decision: "approved" })); await refresh(); } catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); } };
   const startAgent = async () => {
@@ -75,14 +78,14 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
   };
   const production = data.versions?.find((version: any) => version.status === "active");
   const released = production?.provenance === "published";
-  return <PageShell className="page verification-page" header={<div className="page-title"><div><h1><IconTile name="verify" />问答验证</h1></div></div>} tabs={<div className="tabs"><button aria-pressed={tab === "qa"} className={tab === "qa" ? "selected" : ""} onClick={() => setTab("qa")}>实时问答</button><button aria-pressed={tab === "compare"} className={tab === "compare" ? "selected" : ""} onClick={() => setTab("compare")}>Before/After</button><button aria-pressed={tab === "monitoring"} className={tab === "monitoring" ? "selected" : ""} onClick={() => { setTab("monitoring"); void refresh().catch(reason => setError(errorMessage(reason))); }}>线上反馈 → 再次进化</button></div>} resetKey={tab}>
+  return <PageShell className="page verification-page" header={<div className="page-title"><div><h1><IconTile name="verify" />问答验证</h1></div></div>} tabs={<div className="tabs"><button aria-pressed={tab === "qa"} className={tab === "qa" ? "selected" : ""} onClick={() => setTab("qa")}>实时问答</button><button aria-pressed={tab === "compare"} className={tab === "compare" ? "selected" : ""} onClick={() => setTab("compare")}>Before/After</button><button aria-pressed={tab === "monitoring"} className={tab === "monitoring" ? "selected" : ""} onClick={() => setTab("monitoring")}>线上反馈 → 再次进化</button></div>} resetKey={tab}>
 
 
-    {tab === "qa" && <AssistantPage productionLabel={released ? `当前线上：${schemeName(data.optimization?.candidates?.find((c:any)=>c.id===production.snapshot?.candidate_id),production.snapshot?.candidate_id).replace(/^Round \d+ · /, "")}（Candidate K ${parameterValue(production.config?.candidate_k)} · Top-K ${parameterValue(production.config?.top_k)} · Thinking ${parameterValue(production.config?.generation_thinking)}）` : "当前线上：初始配置"} productionVersion={production?.id || data.workspace?.active_version} isReleased={released} badCases={data.badCases || []} onOpenBadCase={() => { location.hash = "evaluation"; }} onOpenCitation={setCitation} onOpenDocument={onOpenDocument} onOpenMonitoring={()=>{setTab("monitoring");void refresh().catch(reason=>setError(errorMessage(reason)));}} />}
-    {tab === "compare" && <><SavedAnswerComparison questionId={questionId} data={data} onOpenCitation={setCitation}/></>}
+    {tab === "qa" && <AssistantPage onAnswered={()=>{void refresh().catch(reason=>setError(errorMessage(reason)));}} productionLabel={released ? `当前线上：${schemeName(data.optimization?.candidates?.find((c:any)=>c.id===production.snapshot?.candidate_id),production.snapshot?.candidate_id).replace(/^Round \d+ · /, "")}（Candidate K ${parameterValue(production.config?.candidate_k)} · Top-K ${parameterValue(production.config?.top_k)} · Thinking ${parameterValue(production.config?.generation_thinking)}）` : "当前线上：初始配置"} productionVersion={production?.id || data.workspace?.active_version} isReleased={released} badCases={data.badCases || []} onOpenBadCase={() => { location.hash = "evaluation"; }} onOpenCitation={setCitation} onOpenDocument={onOpenDocument} onOpenMonitoring={()=>{setTab("monitoring");void refresh().catch(reason=>setError(errorMessage(reason)));}} />}
+    {<div hidden={tab !== "compare"}><SavedAnswerComparison questionId={questionId} data={data} onOpenCitation={setCitation}/></div>}
     {tab === "monitoring" && <><ConclusionCard title={monitoring.events?.length ? `${monitoring.events.length} 条本页实际问答反馈，等待或保留人工判定` : "当前尚无实际问答记录"} tone="neutral">问答产生记录，人工判断是否属于 Bad Case；符合现有触发规则后，再人工确认关联优化上下文。发现问题不会绕过诊断、评测或人工发布。</ConclusionCard><div className="feedback-loop" aria-label="线上反馈闭环">用户提问 <span>→</span> 人工标记坏例 <span>→</span> 触发新一轮 Agent</div><Section title={<IconLabel name="verify">实际反馈记录</IconLabel>}>
       {error && <p className="error-notice" role="alert">{error}</p>}
-      {(monitoring.events?.length || historyPage>1) ? <><div className="review-batch"><button disabled={historyBusy || historyPage===1} onClick={()=>void refresh(historyPage-1).catch(reason=>setError(errorMessage(reason)))}>上一页</button><span>第 {historyPage} 页 · 每页最多50条</span><button disabled={historyBusy || Math.max(monitoring.events?.length || 0,monitoring.triggers?.length || 0)<50} onClick={()=>void refresh(historyPage+1).catch(reason=>setError(errorMessage(reason)))}>下一页</button></div><div className="table-scroll monitoring-table"><DataTable><thead><tr><th>问题</th><th>当前状态</th><th>人工判断</th><th>操作</th></tr></thead><tbody>{(monitoring.events || []).map((event: any) => {
+      {(monitoring.events?.length || historyPage>1) ? <>{(monitoring.events?.length || 0) > 200 && <div className="review-batch"><button disabled={historyPage===1} onClick={()=>setHistoryPage(historyPage-1)}>上一页</button><span>第 {historyPage} 页 · 每页最多200条</span><button disabled={historyPage * 200 >= (monitoring.events?.length || 0)} onClick={()=>setHistoryPage(historyPage+1)}>下一页</button></div>}<div className="table-scroll monitoring-table"><DataTable><thead><tr><th>问题</th><th>当前状态</th><th>人工判断</th><th>操作</th></tr></thead><tbody>{historyRows.map((event: any) => {
         const eventTrigger = (monitoring.triggers || []).find((row: any) => row.event_id === event.id);
         return <tr key={event.id}><td><button className="text-button" onClick={() => setEventDetail(event)}><TruncatedText lines={1} hoverOnly>{event.question}</TruncatedText></button></td><td>{eventTrigger ? <Status value={eventTrigger.status === "human_confirmed" ? "已人工确认" : eventTrigger.status} /> : event.determinable ? "已判定" : "待人工判断"}</td><td>{event.determinable ? event.bad_case ? event.severity === "critical" ? "人工安全 Bad Case" : "人工 Bad Case" : "人工判定正常" : "待判定"}</td><td><div className="monitoring-assessment"><button className="text-button" disabled={busy} onClick={() => void assess(event, false, "ordinary")}>正常</button> <button className="text-button" disabled={busy} onClick={() => void assess(event, true, "ordinary")}>Bad Case</button> <button className="text-button" disabled={busy} onClick={() => void assess(event, true, "critical")}>安全问题</button></div></td></tr>;
       })}</tbody></DataTable></div></> : <StoryEmpty title="当前尚无反馈记录">请到「实时问答」提问，之后可以在这里查看记录并人工标注。</StoryEmpty>}

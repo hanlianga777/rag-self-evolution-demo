@@ -11,13 +11,15 @@ export function goldenCached<T>(identity: string, path: string): T | undefined {
   values.set(key, saved);
   return saved.value;
 }
-export function goldenFetch<T>(identity: string, path: string): Promise<T> {
+export function goldenFetch<T>(identity: string, path: string, load?: () => Promise<T>): Promise<T> {
   const key = JSON.stringify([identity, path]), captured = epoch, scope = readCacheToken();
   const previous = pending.get(key);
   if (previous && (previous.scope !== scope || previous.version !== scope.version)) pending.delete(key);
   if (!pending.has(key)) {
-    const request = getJson<any>(path).then(value => {
+    const request = (load ? load() : getJson<any>(path)).then(value => {
       if (captured === epoch && scope === readCacheToken()) {
+        const saved = values.get(key);
+        if (saved?.scope === scope && saved.version === scope.version && value?.data_version && saved.value?.data_version === value.data_version) value = saved.value;
         values.delete(key); values.set(key, { value, scope, version: scope.version });
         if (values.size > 128) values.delete(values.keys().next().value!);
       }

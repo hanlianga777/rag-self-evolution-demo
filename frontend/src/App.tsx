@@ -2,7 +2,7 @@ import { mergeEvaluationProgress, hasEvaluationDetails } from "./evaluationProgr
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { Bot, Menu } from "lucide-react";
 import { ICONS } from "./ui/icons";
-import { identityKey, loadAppData } from "./api";
+import { appDataVersion, identityKey, loadAppData } from "./api";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PageShell } from "./components/PageShell";
 import { useOperation } from "./operation";
@@ -44,6 +44,7 @@ export default function App() {
     try {
       const next = await loadAppData(true, page);
       if (request === requests.current) setPages(previous => {
+        if (appDataVersion(next) && appDataVersion(next) === appDataVersion(previous[page])) return previous;
         const old = Object.values(previous)[0];
         return { ...(old && identityKey(old.workspace) !== identityKey(next.workspace) ? {} : previous), [page]: previous[page]?.evaluation?.id && previous[page]?.evaluation?.id === next.evaluation?.id && !hasEvaluationDetails(next.evaluation || {}) ? { ...next, evaluation: mergeEvaluationProgress(previous[page]!.evaluation, next.evaluation) } : next };
       });

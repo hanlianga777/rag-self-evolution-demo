@@ -31,7 +31,7 @@ it("Frozen Baseline parameters come from the actual evaluation and Draft shows o
   expect(section.textContent).toContain('4 → 6');
   expect(section.textContent).not.toContain('CandidateK');
 });
-it("scroll loads the next backend page without duplicates or detail requests; filter resets rows", async () => {
+it("entry preloads every backend page without duplicates; scrolling does not request more", async () => {
   const calls: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     calls.push(url); const params = new URL(url).searchParams, offset = Number(params.get('offset')), group = params.get('group');
@@ -40,7 +40,7 @@ it("scroll loads the next backend page without duplicates or detail requests; fi
   }));
   function List({group}: {group:string}) { const page = usePagedCandidates('C1',`/api/governance/candidates?group=${group}`); return <ScrollablePagedTable loading={page.loading} hasMore={page.hasMore} onMore={page.loadMore} resetKey={group}><table><tbody>{page.rows.map((row:any)=><tr key={row.id}><td>{row.id}</td></tr>)}</tbody></table></ScrollablePagedTable>; }
   root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<List group="all" />));expect(document.querySelectorAll('tr')).toHaveLength(30);
+  await act(async () => root.render(<List group="all" />));expect(document.querySelectorAll('tr')).toHaveLength(60);
   const box = document.querySelector('.table-scroll')!;Object.defineProperties(box,{scrollHeight:{value:900},clientHeight:{value:400},scrollTop:{value:490,writable:true}});
   await act(async () => box.dispatchEvent(new Event('scroll',{bubbles:true})));
   expect(document.querySelectorAll('tr')).toHaveLength(60);expect(new Set([...document.querySelectorAll('td')].map(x=>x.textContent)).size).toBe(60);
@@ -78,7 +78,7 @@ it("shows a loading state instead of missing Evidence until lazy detail arrives"
   expect(document.querySelector('.candidate-answer')?.textContent).toContain('先关闭电池电源');expect(document.querySelector('.quality-grid')).not.toBeNull();
 });
 
-it.each([48,49,50])('machine filter paginates %i qualified rows and survives filter changes', async count => {
+it.each([48,49,50])('preloads %i qualified rows and retains complete rows on revisit', async count => {
   const calls: string[] = [];
   const rows = Array.from({length:50},(_,i)=>({id:`Q${i}`, qualification_status:i<count?(i%2?'owner_delegated_approved':'machine_qualified'):'needs_human_review'}));
   vi.stubGlobal('fetch',vi.fn(async (url:string)=>{
@@ -89,13 +89,13 @@ it.each([48,49,50])('machine filter paginates %i qualified rows and survives fil
   function List({status}:{status:string}) { const page=usePagedCandidates('fixture',`/api/governance/candidates?status=${status}`); return <><span>{page.rows.length}/{page.total}</span><button onClick={page.loadMore}>more</button><table><tbody>{page.rows.map((r:any)=><tr key={r.id}><td>{r.id}</td></tr>)}</tbody></table></>; }
   root=createRoot(document.body.appendChild(document.createElement('div')));
   await act(async()=>root.render(<List status="machine"/>));
-  expect(document.body.textContent).toContain(`30/${count}`);
+  expect(document.body.textContent).toContain(`${count}/${count}`);
   await act(async()=>document.querySelector('button')!.click());
   expect(document.querySelectorAll('tr')).toHaveLength(count);
   await act(async()=>root.render(<List status="all"/>));
-  expect(document.body.textContent).toContain('30/50');
+  expect(document.body.textContent).toContain('50/50');
   await act(async()=>root.render(<List status="machine"/>));
-  expect(document.body.textContent).toContain(`30/${count}`);
+  expect(document.body.textContent).toContain(`${count}/${count}`);
   expect(calls.some(url=>url.includes('status=machine')&&url.includes('offset=30'))).toBe(true);
   expect(calls.some(url=>url.includes('/questions/'))).toBe(false);
 });
