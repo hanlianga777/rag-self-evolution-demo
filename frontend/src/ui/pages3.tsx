@@ -1,5 +1,5 @@
-import { IconLabel } from "./icons";
-import { useState } from "react";
+import { Icon, IconLabel } from "./icons";
+import { useState, type ReactNode } from "react";
 import { HoverCard } from "./HoverCard";
 import { StatusBadge, type StatusKind } from "./Primitives";
 
@@ -27,13 +27,13 @@ export function GoldenPipeline({ total, split, steps, frozen }: {
  * ================================================================== */
 export type Topic = { name: string; chunks: number; positive: number; ablation: number; negative: number; protectedSlot?: boolean };
 
-export function KnowledgeCoverage({ topics, onOpen }: { topics: Topic[]; onOpen?: (name: string) => void }) {
+export function KnowledgeCoverage({ topics, onOpen, slotLabel = "题位", info }: { topics: Topic[]; onOpen?: (name: string) => void; slotLabel?: string; info?: ReactNode }) {
   const maxChunks = Math.max(1, ...topics.map(t => t.chunks));
   const totals = topics.reduce((acc, t) => ({ chunks: acc.chunks + t.chunks, positive: acc.positive + t.positive, ablation: acc.ablation + t.ablation, negative: acc.negative + t.negative }), { chunks: 0, positive: 0, ablation: 0, negative: 0 });
   return <section className="ui-kc" aria-label="知识主题覆盖">
     <header className="ui-kc-head">
-      <h3><IconLabel name="coverage">知识主题覆盖</IconLabel></h3>
-      <span className="ui-num">{topics.length} 个主题 · {totals.chunks} 个知识片段 · 题位 Positive {totals.positive} / Ablation {totals.ablation} / Negative {totals.negative}</span>
+      <h3><IconLabel name="coverage">知识主题覆盖</IconLabel>{info && <HoverCard content={info}><span className="ui-kc-info" tabIndex={0} aria-label="口径说明"><Icon name="info" size={13} /></span></HoverCard>}</h3>
+      <span className="ui-num">{topics.length} 个主题 · {totals.chunks} 个知识片段 · {slotLabel} Positive {totals.positive} / Ablation {totals.ablation} / Negative {totals.negative}</span>
     </header>
     <div className="ui-kc-table" role="table">
       <div className="ui-kc-row head" role="row"><span role="columnheader">主题</span><span role="columnheader">知识片段</span><span role="columnheader">Positive</span><span role="columnheader">Ablation</span><span role="columnheader">Negative</span></div>

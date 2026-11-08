@@ -85,3 +85,5 @@
 .ui-blb-q { font-size: var(--ui-fs-body); color: var(--ui-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ui-blb-layer { font-size: var(--ui-fs-meta); color: var(--ui-muted); white-space: nowrap; }
 @media (max-width: 1100px) { .ui-blb { grid-template-columns: 1fr; } }
+
+.ui-kc-info { display: inline-flex; margin-left: 6px; color: var(--ui-faint); cursor: help; vertical-align: -2px; }
