@@ -58,7 +58,7 @@
 .saved-answer-comparison .comparison-ptable th:first-child { text-align:left; width:auto; }
 .saved-answer-comparison .comparison-ptable td { padding:7px 0; color:var(--ink-2); border-top:1px solid var(--rule-2); vertical-align:middle; }
 .saved-answer-comparison .comparison-ptable td:not(:first-child) { text-align:center; }
-.saved-answer-comparison .saved-answer-comparison .saved-answer-comparison .saved-answer-comparison .comparison-pn { display:inline-flex; width:18px; height:18px; border-radius:50%; background:var(--ink); color:var(--ui-surface); font-size:11px; align-items:center; justify-content:center; margin-right:8px; font-weight:600; vertical-align:1px; }
+.saved-answer-comparison .comparison-pn { display:inline-flex; width:18px; height:18px; border-radius:50%; background:var(--ink); color:var(--ui-surface); font-size:11px; align-items:center; justify-content:center; margin-right:8px; font-weight:600; vertical-align:1px; }
 .saved-answer-comparison .new .comparison-pn { background:var(--accent); }
 .saved-answer-comparison .yes { color:var(--green); font-weight:600; }
 .saved-answer-comparison .no { color:var(--risk); font-weight:600; }

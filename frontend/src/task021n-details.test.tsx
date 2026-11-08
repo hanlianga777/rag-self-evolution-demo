@@ -51,5 +51,5 @@ it.each([1,2,3])('shows %i missing and newly met points once in the comparison t
  expect(rows.map(row=>row.querySelector('td')?.textContent)).toEqual(['结构完好','电池无损','摇杆在中位'].slice(0,count).map((text,i)=>`${i+1}${text}新满足`));
  for(const row of rows){expect(row.querySelector('td:nth-child(2)')?.textContent).toBe('✕');expect(row.querySelector('td:nth-child(3)')?.textContent).toBe('✓');}
  expect(document.querySelectorAll('.comparison-flag')).toHaveLength(0);
-
+ expect(document.querySelectorAll('.comparison-newtag')).toHaveLength(count);
 });
