@@ -12,13 +12,14 @@ it("renders inline architecture without reference upload or developer disclosure
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OverviewPage data={{}} navigate={() => {}} />));
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "业务架构")!.click());
-  expect(document.querySelector('.knowledge-diagrams')?.textContent).toContain("统一分析与优化");
+  expect(document.querySelector('.architecture-challenges')?.textContent).toContain("质量难以衡量");
+  expect(document.querySelector('.knowledge-diagrams')?.textContent).toContain("人工关口 ③");
   expect(document.body.textContent).not.toContain("已保存参考图");
   expect(document.querySelector('input[type="file"]')).toBeNull();
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "技术架构")!.click());
   expect(document.querySelectorAll('svg[role="img"]')).toHaveLength(1);
-  expect(document.body.textContent).toContain("Parent Expand");
-  expect(document.body.textContent).toContain("Small Cluster Protection");
+  expect(document.body.textContent).toContain("RAG Pipeline");
+  expect(document.body.textContent).toContain("Agent 可调参数（白名单）");
   expect(fetch).not.toHaveBeenCalled();
   const ids = [...document.querySelectorAll('svg [id]')].map(node => node.id);
   expect(new Set(ids).size).toBe(ids.length);
