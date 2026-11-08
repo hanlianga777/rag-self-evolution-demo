@@ -1,0 +1,22 @@
+flowchart LR
+  KB["知识库<br/>4 份设备说明书<br/>Parent-Child 切块 · 可溯源"]
+  GD["Golden Dataset<br/>覆盖规划 → 出题<br/>硬校验 · Probe · QC"]
+  G1{{"人工关口 ①<br/>题卷冻结"}}
+  BL["Baseline 评测<br/>Judge 逐题判分<br/>11 项 Hard Gate · Bad Case 诊断"]
+  subgraph LOOP["Agent 优化循环（≤ 12 次评测）"]
+    direction LR
+    AG["Agent 按 Bad Case 归因<br/>提出 Candidate A/B/C<br/>三个不同方向"]
+    SB["Sandbox<br/>同一套 Golden 评测"]
+    RG["Regression Check<br/>零新增 Bad Case"]
+    AG --> SB --> RG
+    RG -- "无合格 Candidate：带着经验进入下一轮" --> AG
+  end
+  W["Winner"]
+  G2{{"人工关口 ②<br/>实验报告确认"}}
+  D["Candidate D<br/>在 Winner 上精修<br/>预测 vs 实际"]
+  REC["最终推荐"]
+  G3{{"人工关口 ③<br/>发布授权 · 可回滚"}}
+  QA["问答验证<br/>实时问答 · Before/After<br/>线上反馈"]
+  KB --> GD --> G1 --> BL --> AG
+  RG -- "出现合格 Candidate" --> W --> G2 --> D --> REC --> G3 --> QA
+  QA -. "人工标记为 Bad Case<br/>触发新一轮优化" .-> AG

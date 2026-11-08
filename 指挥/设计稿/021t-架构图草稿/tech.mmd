@@ -1,0 +1,32 @@
+flowchart TB
+  subgraph L1["展示层"]
+    UI["React Demo · 8 个页面：概览 · 知识库 · Pipeline 配置 · Golden Dataset · Baseline · Agent 工作台 · 发布 · 问答验证"]
+  end
+  subgraph L2["治理服务层（FastAPI）"]
+    direction LR
+    EV["评测治理<br/>Golden 生命周期 · Judge<br/>Hard Gate · Regression"]
+    OPT["Agent 优化<br/>Candidate 生成 · Sandbox 执行<br/>Candidate D 精修"]
+    REL["版本发布<br/>推荐 · 发布快照 · 回滚"]
+    SCH["运行调度<br/>平价时段 · 断点续跑"]
+  end
+  subgraph L3["RAG Pipeline（被优化对象，★ = Agent 可调）"]
+    direction LR
+    Q["Query 理解<br/>★ Query Rewrite · Multi-Query · HyDE"]
+    R["Hybrid Search<br/>Embedding Retrieval + BM25<br/>★ Candidate K · 向量权重"]
+    RR["Rerank<br/>qwen3-rerank<br/>→ Parent 展开 · ★ Top-K"]
+    GEN["Generation<br/>DeepSeek<br/>★ Thinking 档位 · Prompt 策略"]
+    Q --> R --> RR --> GEN
+  end
+  subgraph L4["知识处理层（离线）"]
+    direction LR
+    P1["PDF 说明书"] --> P2["MinerU 解析"] --> P3["Parent-Child 分块<br/>1400 / 400 / 重叠 80"] --> P4["text-embedding-v4<br/>1024 维"] --> P5["FAISS 索引 + BM25"]
+  end
+  subgraph L5["数据与模型层"]
+    direction LR
+    DB["SQLite<br/>Run · Golden · 版本 · 审计"]
+    PV["模型 Provider<br/>DeepSeek：Generation · Judge<br/>Qwen：Embedding · Rerank"]
+  end
+  L1 --> L2 --> L3
+  L4 --> L3
+  L2 --> L5
+  L3 --> L5

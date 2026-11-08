@@ -1,0 +1,3 @@
+flowchart LR
+  A["PDF 说明书<br/>4 份"] --> B["MinerU 解析<br/>保留页码"] --> C["Parent-Child 分块<br/>Child 用于检索<br/>Parent 用于回答"]
+  C --> D["Embedding Retrieval<br/>+ BM25"] --> E["Hybrid 融合<br/>Candidate K 条"] --> F["Rerank"] --> G["Parent 展开<br/>Top-K 段进入回答"] --> H["回答引用<br/>文档 · 章节 · 页码"]
