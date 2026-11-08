@@ -1,0 +1,206 @@
+/*
+ * RAG Evolution · UI 基础层 v2（总指挥编写，Codex 接入）
+ *
+ * 作用：
+ * 1. 在 :root 上重新定义现有的设计变量，让全站自动换成新的配色、圆角、阴影；
+ * 2. 只对现有的通用类做"样式"层面的统一（.panel .badge .tabs .drawer .overlay 表格 按钮），不改任何结构和行为；
+ * 3. 提供新组件的样式（前缀 ui-）。
+ *
+ * 规则（详见 docs 中的 UI 规范）：
+ * - 深藏青是主操作色；绿色只表示"改善 / 通过 / 合格"；红色只表示"失败 / 退化"。
+ * - 圆角按尺寸分级：徽章胶囊、按钮 10、卡片 14、浮窗 16、抽屉 20、表格外框 12。
+ * - 柔和阴影代替硬边框；8px 网格；数字等宽对齐。
+ * - 动效：切换 150ms，抽屉 240ms，悬浮 120ms；尊重"减少动态效果"。
+ *
+ * 必须在 styles.css 之后引入（main.tsx 中 import "./ui/ui.css"）。
+ */
+
+:root {
+  /* —— 新的语义色板 —— */
+  --ui-page: #f3f5f8;
+  --ui-surface: #ffffff;
+  --ui-ink: #142033;
+  --ui-ink-2: #3a4a61;
+  --ui-muted: #6a7990;
+  --ui-faint: #a3afc0;
+  --ui-rule: #e3e8ef;
+  --ui-rule-2: #eef1f5;
+  --ui-navy: #111a2b;
+  --ui-navy-2: #1e2a40;
+  --ui-navy-3: #2b3a55;
+  --ui-green: #0e7a5a;
+  --ui-green-tint: #e5f3ec;
+  --ui-green-mark: #c9ebd9;
+  --ui-red: #b4432b;
+  --ui-red-tint: #fbede9;
+  --ui-amber: #8a5a12;
+  --ui-amber-tint: #faf1de;
+
+  --ui-r-pill: 999px;
+  --ui-r-btn: 10px;
+  --ui-r-card: 14px;
+  --ui-r-float: 16px;
+  --ui-r-drawer: 20px;
+  --ui-r-table: 12px;
+
+  --ui-shadow-1: 0 1px 2px rgb(20 32 51 / 4%), 0 4px 16px rgb(20 32 51 / 5%);
+  --ui-shadow-2: 0 2px 6px rgb(20 32 51 / 6%), 0 12px 32px rgb(20 32 51 / 10%);
+  --ui-shadow-float: 0 8px 28px rgb(17 26 43 / 22%);
+
+  --ui-ease: cubic-bezier(.2, .8, .2, 1);
+  --ui-t-fast: 120ms;
+  --ui-t-switch: 150ms;
+  --ui-t-drawer: 240ms;
+
+  /* —— 把现有变量映射到新色板（全站自动生效） —— */
+  --navy: var(--ui-navy);
+  --navy-soft: var(--ui-navy-2);
+  --ink: var(--ui-ink);
+  --muted: var(--ui-muted);
+  --canvas: var(--ui-page);
+  --surface: var(--ui-surface);
+  --line: var(--ui-rule);
+  --line-soft: var(--ui-rule-2);
+  --status: var(--ui-ink-2);
+  --status-bg: var(--ui-rule-2);
+  --card-radius: var(--ui-r-card);
+  --card-good-bg: var(--ui-green-tint);
+  --card-good-border: #cfe7da;
+  --card-good-ink: var(--ui-green);
+  --card-bad-bg: var(--ui-red-tint);
+  --card-bad-border: #f1d3cb;
+  --card-bad-ink: var(--ui-red);
+  --card-warning-bg: var(--ui-amber-tint);
+  --card-warning-ink: var(--ui-amber);
+  --focus: var(--ui-navy-3);
+  --overlay: rgb(17 26 43 / 32%);
+}
+
+body { background: var(--ui-page); }
+
+/* —— 数字等宽对齐 —— */
+.metric strong, td, .ui-num { font-variant-numeric: tabular-nums; }
+
+/* —— 卡片 / 面板：柔和阴影代替硬边框 —— */
+.panel, .metrics-grid { border-color: transparent; box-shadow: var(--ui-shadow-1); border-radius: var(--ui-r-card); }
+
+/* —— 按钮 —— */
+.primary, .secondary, .text-button { border-radius: var(--ui-r-btn); transition: background-color var(--ui-t-fast) var(--ui-ease), border-color var(--ui-t-fast) var(--ui-ease), box-shadow var(--ui-t-fast) var(--ui-ease); }
+.secondary { border-color: var(--ui-rule); color: var(--ui-ink-2); }
+.secondary:hover { border-color: var(--ui-faint); }
+
+/* —— 徽章 —— */
+.badge { border-radius: var(--ui-r-pill); font-weight: 600; }
+
+/* —— 页签：选中下划线平滑出现 —— */
+.tabs button { position: relative; border-bottom: 0 !important; transition: color var(--ui-t-switch) var(--ui-ease); }
+.tabs button::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--ui-navy); transform: scaleX(0); transition: transform var(--ui-t-switch) var(--ui-ease); }
+.tabs button.selected::after, .tabs button.active::after { transform: scaleX(1); }
+.tabs button:hover { color: var(--ui-ink); }
+
+/* —— 表格：外框圆角、表头更轻 —— */
+th { color: var(--ui-muted); font-weight: 600; }
+td { border-bottom-color: var(--ui-rule-2); }
+
+/* —— 抽屉：从右侧滑入，背景轻微变暗 —— */
+.drawer { border: 0; border-radius: var(--ui-r-drawer) 0 0 var(--ui-r-drawer); box-shadow: var(--ui-shadow-2); }
+.drawer[data-state="open"] { animation: ui-drawer-in var(--ui-t-drawer) var(--ui-ease); }
+.drawer[data-state="closed"] { animation: ui-drawer-out 180ms var(--ui-ease); }
+.overlay[data-state="open"] { animation: ui-fade-in var(--ui-t-drawer) var(--ui-ease); }
+.overlay[data-state="closed"] { animation: ui-fade-out 180ms var(--ui-ease); }
+.drawer-head { border-radius: var(--ui-r-drawer) 0 0 0; }
+
+@keyframes ui-drawer-in { from { transform: translateX(32px); opacity: .0; } to { transform: none; opacity: 1; } }
+@keyframes ui-drawer-out { from { transform: none; opacity: 1; } to { transform: translateX(32px); opacity: 0; } }
+@keyframes ui-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* ============================================================
+ * 新组件
+ * ============================================================ */
+
+/* —— ClampText：默认收起，悬停看全文 —— */
+.ui-clamp { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.ui-clamp[data-truncated="true"] { cursor: default; border-radius: 4px; }
+.ui-clamp[data-truncated="true"]:hover, .ui-clamp[data-truncated="true"]:focus-visible { background: var(--ui-rule-2); outline: none; }
+
+/* —— 浮层（ClampText 全文窗、HoverCard 深色提示卡）—— */
+.ui-float { box-sizing: border-box; position: fixed; z-index: 60; max-width: min(440px, calc(100vw - 24px)); animation: ui-fade-in var(--ui-t-fast) var(--ui-ease); }
+.ui-float.light { background: var(--ui-surface); color: var(--ui-ink); border-radius: 12px; box-shadow: var(--ui-shadow-2); padding: 12px 16px; max-height: 360px; overflow: auto; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+.ui-float.dark { background: var(--ui-navy); color: #e8edf4; border-radius: 12px; box-shadow: var(--ui-shadow-float); padding: 10px 14px; font-size: 12.5px; line-height: 1.6; pointer-events: none; }
+.ui-float.dark b, .ui-float.dark strong { color: #fff; font-weight: 600; }
+.ui-float.pinned { outline: 2px solid var(--ui-navy-3); outline-offset: 0; }
+.ui-hover-trigger { display: inline-flex; }
+
+/* —— StatTransition：44 → 48 —— */
+.ui-transition { display: inline-flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ui-transition .from { color: var(--ui-faint); font-weight: 500; }
+.ui-transition .arrow { color: var(--ui-faint); font-size: .7em; }
+.ui-transition .to { color: var(--ui-ink); font-weight: 700; }
+.ui-transition .to.better { color: var(--ui-ink); }
+.ui-transition .unit { color: var(--ui-muted); font-size: .55em; font-weight: 500; margin-left: 2px; }
+.ui-delta { display: inline-flex; align-items: center; border-radius: var(--ui-r-pill); font-size: 11.5px; font-weight: 600; padding: 2px 8px; font-variant-numeric: tabular-nums; }
+.ui-delta.good { background: var(--ui-green-tint); color: var(--ui-green); }
+.ui-delta.bad { background: var(--ui-red-tint); color: var(--ui-red); }
+.ui-delta.flat { background: var(--ui-rule-2); color: var(--ui-muted); }
+
+/* —— StatusBadge：状态分清，不全用绿色 —— */
+.ui-status { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--ui-r-pill); font-size: 12px; font-weight: 600; line-height: 1; padding: 6px 10px; white-space: nowrap; }
+.ui-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ui-status.neutral { background: var(--ui-rule-2); color: var(--ui-ink-2); }
+.ui-status.good { background: var(--ui-green-tint); color: var(--ui-green); }
+.ui-status.bad { background: var(--ui-red-tint); color: var(--ui-red); }
+.ui-status.navy { background: #e6eaf2; color: var(--ui-navy-2); }
+.ui-status.solid { background: var(--ui-navy); color: #fff; }
+.ui-status.amber { background: var(--ui-amber-tint); color: var(--ui-amber); }
+.ui-status.live::before { animation: ui-pulse 1.6s ease-in-out infinite; }
+@keyframes ui-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* —— QuestionBadge：Q04 —— */
+.ui-q { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 22px; padding: 0 7px; border-radius: 6px; font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; border: 1px solid transparent; cursor: default; }
+.ui-q.fixed { background: var(--ui-green-tint); color: var(--ui-green); }
+.ui-q.broken { background: var(--ui-red-tint); color: var(--ui-red); }
+.ui-q.open { background: var(--ui-surface); color: var(--ui-ink-2); border-color: var(--ui-rule); }
+.ui-q.neutral { background: var(--ui-rule-2); color: var(--ui-ink-2); }
+.ui-q:focus-visible { outline: 2px solid var(--ui-navy-3); outline-offset: 2px; }
+.ui-q-list { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+
+/* —— ParamChip：Candidate K 12 → 24 —— */
+.ui-param { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-rule); border-radius: var(--ui-r-pill); padding: 4px 11px; font-size: 12.5px; color: var(--ui-ink-2); background: var(--ui-surface); white-space: nowrap; }
+.ui-param b { color: var(--ui-ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+.ui-param.key { border-color: var(--ui-green); background: var(--ui-green-tint); }
+.ui-param.key small { color: var(--ui-green); font-weight: 650; font-size: 11px; }
+
+/* —— RunProgressPanel：右下角运行浮窗 —— */
+.ui-run { box-sizing: border-box; position: fixed; right: 24px; bottom: 24px; z-index: 45; width: 360px; max-width: calc(100vw - 32px); background: var(--ui-navy); color: #e8edf4; border-radius: var(--ui-r-float); box-shadow: var(--ui-shadow-float); padding: 16px 18px 16px; animation: ui-run-in var(--ui-t-drawer) var(--ui-ease); }
+@keyframes ui-run-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.ui-run-head { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: start; }
+.ui-run-title { color: #fff; font-size: 15px; font-weight: 650; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ui-run-sub { grid-column: 1; color: #9fb0c6; font-size: 12px; }
+.ui-run-min { grid-row: 1 / span 2; grid-column: 2; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: #9fb0c6; font-size: 18px; line-height: 1; }
+.ui-run-min:hover { background: var(--ui-navy-2); color: #fff; }
+.ui-run-state { display: flex; align-items: center; gap: 8px; margin: 14px 0 10px; font-size: 13px; color: #d5deea; min-height: 24px; }
+.ui-run-state .ui-status { background: rgb(255 255 255 / 10%); color: #fff; }
+.ui-run-state .ui-status.good { background: rgb(14 122 90 / 30%); color: #b9f0d8; }
+.ui-run-state .ui-status.bad { background: rgb(180 67 43 / 30%); color: #ffd2c6; }
+.ui-run-progress { display: flex; justify-content: space-between; font-size: 12.5px; color: #c6d1df; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
+.ui-run-progress b { color: #fff; font-weight: 650; }
+.ui-run-bar { height: 6px; border-radius: 999px; background: var(--ui-navy-3); overflow: hidden; }
+.ui-run-bar > i { display: block; height: 100%; border-radius: 999px; background: #ffffff; transition: width 400ms var(--ui-ease); }
+.ui-run-time { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #9fb0c6; min-height: 18px; font-variant-numeric: tabular-nums; }
+.ui-run-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.ui-run-actions button { height: 36px; border-radius: var(--ui-r-btn); font-size: 13px; font-weight: 650; border: 1px solid rgb(255 255 255 / 18%); background: transparent; color: #fff; }
+.ui-run-actions button.go { background: #fff; color: var(--ui-navy); border-color: #fff; }
+.ui-run-actions button:disabled { opacity: .38; cursor: not-allowed; }
+.ui-run-actions button:not(:disabled):hover { border-color: rgb(255 255 255 / 40%); }
+.ui-run-actions button.go:not(:disabled):hover { background: #eef2f7; }
+.ui-run-confirm { margin-top: 14px; padding: 12px; border-radius: 10px; background: var(--ui-navy-2); font-size: 12.5px; line-height: 1.6; color: #d5deea; }
+.ui-run-confirm .ui-run-actions { margin-top: 10px; }
+.ui-run-pill { position: fixed; right: 24px; bottom: 24px; z-index: 45; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 0; border-radius: var(--ui-r-pill); background: var(--ui-navy); color: #fff; box-shadow: var(--ui-shadow-float); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ui-run-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: ui-pulse 1.6s ease-in-out infinite; }
+.ui-run-pill.idle::before { animation: none; opacity: .6; }
+
+/* —— 减少动态效果 —— */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
