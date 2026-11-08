@@ -37,6 +37,9 @@
 - **`onOpenFixed(id)`**：跳到问答验证 → Before/After，并**直接选中这道题**。
   - 如果现在不支持带题号跳转，加一个最小实现（例如 hash `#verification?tab=compare&q=Q04`，或 App 级状态）。
   - 不影响直接点导航进入时的默认选中逻辑。
+- **状态行去重**：现在一行里出现了三次同一件事："已发布"徽章 + "Candidate D 已发布" + "当前线上：Candidate D"。
+  - 改成已发布时 `status.candidate` 只传 "Candidate D"，不传 `online`（总指挥已把 `online` 改成可选，不传就不显示"当前线上"那一段）；
+  - 未发布时照旧："待发布"徽章 + "Candidate D" + "当前线上：初始配置"。
 - **验收**：1440×900 下首屏到讲解区底部基本没有大块空白。不要为了填满再加别的内容。
 
 ## 3. Pipeline 配置页

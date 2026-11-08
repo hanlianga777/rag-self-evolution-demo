@@ -15,7 +15,7 @@ export type Pair = { from: number | null; to: number | null };
 export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates, p99, p50, safeRefusal, budget, status, flow, primaryAction }: {
   correct: Pair; total: number; fixedCount: number | null; newBadCount: number | null; gates: { passed: number; total: number } | null;
   p99: Pair; p50: Pair; safeRefusal: Pair; budget: { used: number; max: number } | null;
-  status: { kind: StatusKind; candidate: string; online: string };
+  status: { kind: StatusKind; candidate: string; online?: string };
   flow: FlowStep[];
   primaryAction?: { label: string; onClick: () => void };
 }) {
@@ -40,8 +40,8 @@ export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates
 
     <div className="ui-ov-status">
       <span className="ui-ov-status-item"><StatusBadge kind={status.kind} /> {status.candidate}</span>
-      <span className="ui-ov-divider" aria-hidden="true" />
-      <span className="ui-ov-status-item"><Icon name="release" size={14} />当前线上：{status.online}</span>
+      {status.online && <><span className="ui-ov-divider" aria-hidden="true" />
+      <span className="ui-ov-status-item"><Icon name="release" size={14} />当前线上：{status.online}</span></>}
       {primaryAction && <button type="button" className="primary ui-ov-action" onClick={primaryAction.onClick}><Icon name="release" size={15} />{primaryAction.label}</button>}
     </div>
 
