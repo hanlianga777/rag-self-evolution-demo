@@ -7,6 +7,8 @@ import { ParamChip, QuestionBadge, StatTransition, StatusBadge } from "./Primiti
 import { ReleasePanel } from "./release/ReleasePanel";
 import { BaselineHero } from "./baseline/BaselineHero";
 import { BaselineBreakdown } from "./baseline/BaselineBreakdown";
+import { HardGateGrid } from "./baseline/HardGateGrid";
+import { BadCaseLayers } from "./baseline/BadCaseLayers";
 import { FinalRecommendation } from "./evolution/FinalRecommendation";
 import { CompareTable, GoldenPipeline, KnowledgeCoverage } from "./pages3";
 import { Icon, IconTile } from "./icons";
@@ -99,6 +101,24 @@ export function PageSamples() {
           <td><span className="ui-row-go"><Icon name="go" size={15} /></span></td>
         </tr>)}</tbody>
       </table></div>
+    </section>
+    <section>
+      <h2 className="ui-sample-title">Baseline · Hard Gate（2×2）</h2>
+      <HardGateGrid summary="11 / 11 项通过；每项独立判断，综合分不能抵消未通过的 Hard Gate" groups={[
+        { name: "正向（Positive）", items: [{ label: "正确性", actual: "95.0%", requirement: "≥ 80%", pass: true, ratio: .95, threshold: .8 }, { label: "忠实性", actual: "99.5%", requirement: "≥ 80%", pass: true, ratio: .995, threshold: .8 }, { label: "完整性", actual: "95.6%", requirement: "≥ 75%", pass: true, ratio: .956, threshold: .75 }] },
+        { name: "消融（Ablation）", items: [{ label: "正确性", actual: "82.5%", requirement: "≥ 70%", pass: true, ratio: .825, threshold: .7 }, { label: "忠实性", actual: "99.0%", requirement: "≥ 75%", pass: true, ratio: .99, threshold: .75 }, { label: "完整性", actual: "79.0%", requirement: "≥ 65%", pass: true, ratio: .79, threshold: .65 }] },
+        { name: "负向（Negative）与安全", items: [{ label: "安全拒答率", actual: "95%", requirement: "≥ 95%", pass: true, ratio: .95, threshold: .95 }, { label: "安全关键", actual: "100%", requirement: "≥ 95%", pass: true, ratio: 1, threshold: .95 }, { label: "提示注入", actual: "100%", requirement: "≥ 95%", pass: true, ratio: 1, threshold: .95 }] },
+        { name: "性能", items: [{ label: "P50", actual: "16.7 秒", requirement: "≤ 25 秒", pass: true, ratio: 16.7 / 60, threshold: 25 / 60 }, { label: "P99", actual: "42.2 秒", requirement: "≤ 60 秒", pass: true, ratio: 42.2 / 60, threshold: 1 }] },
+      ]} />
+    </section>
+    <section>
+      <h2 className="ui-sample-title">Baseline · Bad Case 诊断顶部（归因卡片兼筛选）</h2>
+      <BadCaseLayers total={6} active="all" onSelect={() => {}} layers={[
+        { key: "retrieval", name: "检索层", count: 5, severity: "严重", remedy: "调整查找、排序和过滤，保留关键证据", icon: "data" },
+        { key: "generation", name: "生成层", count: 1, severity: "中等", remedy: "调整 Prompt 策略、Thinking 档位和上下文", icon: "thinking" },
+        { key: "safety", name: "安全边界", count: 0, note: "安全拒答 95%，本轮无单题问题", icon: "gate" },
+        { key: "performance", name: "性能", count: 0, note: "P50 16.7 秒、P99 42.2 秒，在 Hard Gate 内", icon: "p99" },
+      ]} />
     </section>
     <section>
       <h2 className="ui-sample-title">Pipeline 配置 · Agent 可调参数</h2>

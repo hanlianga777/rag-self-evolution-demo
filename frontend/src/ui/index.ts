@@ -15,3 +15,7 @@ export { BaselineBreakdown } from "./baseline/BaselineBreakdown";
 export type { CategoryScore, BaselineBadCase } from "./baseline/BaselineBreakdown";
 export { KnowledgePipeline } from "./knowledge/KnowledgePipeline";
 export type { PipelineStep } from "./knowledge/KnowledgePipeline";
+export { HardGateGrid } from "./baseline/HardGateGrid";
+export type { GateGroup, GateItem } from "./baseline/HardGateGrid";
+export { BadCaseLayers } from "./baseline/BadCaseLayers";
+export type { LayerCard } from "./baseline/BadCaseLayers";

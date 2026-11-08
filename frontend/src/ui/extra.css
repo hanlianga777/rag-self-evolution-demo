@@ -134,3 +134,68 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .ui-verdict.ok::before { background: var(--ui-green); }
 .ui-verdict.bad::before { background: var(--ui-red); }
 .ui-verdict small { color: var(--ui-muted); font-size: var(--ui-fs-meta); }
+
+/* ==================================================================
+ * 11-08 第二轮反馈（任务 022a–022c）
+ * ================================================================== */
+
+/* —— Hard Gate 2×2 —— */
+.ui-hg-summary { margin: 0 0 12px; font-size: var(--ui-fs-body); color: var(--ui-muted); }
+.ui-hg-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ui-hg-card { background: var(--ui-surface); border-radius: var(--ui-r-card, 14px); box-shadow: var(--ui-shadow-1); padding: 16px 20px 10px; min-width: 0; }
+.ui-hg-card header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.ui-hg-card h3 { margin: 0; font-size: var(--ui-fs-sub); font-weight: 600; color: var(--ui-ink); }
+.ui-hg-card header .ui-verdict { font-size: var(--ui-fs-meta); color: var(--ui-muted); }
+.ui-hg-card ul { list-style: none; margin: 0; padding: 0; }
+.ui-hg-card li { display: grid; grid-template-columns: minmax(84px, 1fr) minmax(80px, 1.2fr) 112px 10px; gap: 14px; align-items: center; padding: 10px 0; }
+.ui-hg-card li + li { border-top: 1px solid var(--ui-rule-2); }
+.ui-hg-name { font-size: var(--ui-fs-body); color: var(--ui-ink-2); }
+.ui-hg-bar { position: relative; height: 4px; border-radius: 2px; background: var(--ui-rule-2); }
+.ui-hg-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: var(--ui-ink); }
+.ui-hg-bar i.bad { background: var(--ui-red); }
+.ui-hg-bar b { position: absolute; top: -4px; width: 1.5px; height: 12px; background: var(--ui-muted); }
+.ui-hg-val { display: grid; justify-items: end; line-height: 1.25; }
+.ui-hg-val strong { font-size: 15px; font-weight: 600; color: var(--ui-ink); font-variant-numeric: tabular-nums; }
+.ui-hg-val small { font-size: 11.5px; color: var(--ui-muted); }
+.ui-hg-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ui-green); }
+.ui-hg-dot.bad { background: var(--ui-red); }
+@media (max-width: 1100px) { .ui-hg-grid { grid-template-columns: 1fr; } }
+
+/* —— Bad Case 归因卡片（兼筛选） —— */
+.ui-bcl { display: grid; grid-template-columns: 120px repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.ui-bcl > button { display: grid; align-content: start; gap: 4px; text-align: left; padding: 14px 16px; border: 1px solid var(--ui-rule); border-radius: 12px; background: var(--ui-surface); font: inherit; color: inherit; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; min-width: 0; }
+.ui-bcl > button:hover:not(:disabled) { border-color: var(--ui-faint); }
+.ui-bcl > button.on { border-color: var(--ui-accent); box-shadow: 0 0 0 1px var(--ui-accent) inset; background: var(--ui-accent-tint); }
+.ui-bcl > button:disabled { cursor: default; background: transparent; }
+.ui-bcl > button strong { font-size: var(--ui-fs-key); font-weight: 600; color: var(--ui-ink); line-height: 1.15; font-variant-numeric: tabular-nums; }
+.ui-bcl > button.empty strong, .ui-bcl > button.empty .ui-bcl-head { color: var(--ui-faint); }
+.ui-bcl-k { font-size: var(--ui-fs-meta); color: var(--ui-muted); }
+.ui-bcl-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: var(--ui-fs-meta); color: var(--ui-ink-2); }
+.ui-bcl-head em { font-style: normal; font-size: 11px; color: var(--ui-muted); }
+.ui-bcl-m { font-size: var(--ui-fs-meta); color: var(--ui-muted); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.page-shell .ui-bcl > button, .page-shell .ui-bcl > button * { font-weight: 400; }
+.page-shell .ui-bcl > button strong { font-weight: 600; }
+@media (max-width: 1100px) { .ui-bcl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* —— 抽屉：每个区块是一张小卡片（灰底上的白卡） —— */
+.drawer .drawer-body:has(> .drawer-section, > * > .drawer-section) { background: var(--ui-page); }
+.drawer .drawer-section { background: var(--ui-surface); border: 1px solid var(--ui-rule); border-radius: 12px; padding: 14px 18px; margin: 0 0 12px; }
+.drawer .drawer-section:first-child { padding-top: 14px; }
+.drawer .drawer-section h3 { margin: 0 0 10px; font-size: var(--ui-fs-sub); font-weight: 600; color: var(--ui-ink); }
+.drawer .drawer-section :is(p, li, .muted-prose) { font-size: var(--ui-fs-body); color: var(--ui-ink-2); }
+
+/* —— 按钮颜色：保持安静风格的三档 —— */
+/* primary：蓝底白字（每个区域最多一个，表示"最终动作"，例如批准、确认发布） */
+/* .ui-btn-tint：浅蓝底蓝字（主要的辅助动作，例如运行 Probe、运行 QC、编辑、替换） */
+/* .ui-btn-danger：浅红底红字（删除、回滚等不可逆动作） */
+.ui-btn-tint { background: var(--ui-accent-tint) !important; color: var(--ui-accent) !important; border: 1px solid transparent !important; }
+.ui-btn-tint:hover:not(:disabled) { background: #dcebfc !important; }
+.ui-btn-danger { background: #fdecee !important; color: var(--ui-red) !important; border: 1px solid transparent !important; }
+.ui-btn-danger:hover:not(:disabled) { background: #fbdde1 !important; }
+:is(.ui-btn-tint, .ui-btn-danger):disabled { opacity: .45; }
+
+/* —— 截断文字：悬停能看全文时给出提示光标 —— */
+.ui-clamp[data-truncated="true"] { cursor: help; }
+
+/* —— Pipeline：同一行两张参数卡等高 —— */
+.ui-pg-groups { align-items: stretch; }
