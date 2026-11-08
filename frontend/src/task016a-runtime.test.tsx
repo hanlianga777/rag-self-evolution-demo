@@ -132,7 +132,7 @@ it("shows all paused batch tasks by business name and forwards their exact overr
   for (const task of tasks) {
     const section = [...document.querySelectorAll("section")].find(node => node.querySelector("h3")?.textContent === task.task_label)!;
     await act(async () => [...section.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "立即运行")!.click());
-    await act(async () => [...section.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "确认立即运行本任务")!.click());
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".confirm-dialog button")].find(button => button.textContent === "确认立即运行本任务")!.click());
     const lastPost = fetcher.mock.calls.filter(([, init]) => init?.method === "POST").at(-1)!;
     expect(lastPost[0]).toContain("/api/runtime-settings/run-now");
     expect(JSON.parse(String(lastPost[1]?.body))).toEqual({ ...task.target, acknowledge_peak_price: true });

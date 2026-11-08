@@ -32,6 +32,7 @@ it('maps waiting, confirms stop and resumes the saved Candidate through the exis
  expect(fetcher.mock.calls[0][0]).toContain('/api/evaluations/old/stop');
  expect(document.querySelector('.ui-run-state')?.textContent).toContain('已停止');
  await act(async()=>document.querySelector<HTMLButtonElement>('.go')!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
  expect(fetcher.mock.calls[1][0]).toContain('/api/candidates/candidate-a/run');
  expect(op!.operations[0].runId).toBe('resumed');
  expect(document.body.textContent).not.toMatch(/Operation ID|Provider|Model|Attempt|高峰|平价/);
@@ -53,6 +54,7 @@ it.each([
  await act(async()=>root.render(<OperationProvider restore={false}><Harness/></OperationProvider>));
  await act(async()=>op.start(title,{id:'saved',status:'stopped',...detail}));
  await act(async()=>document.querySelector<HTMLButtonElement>('.go')!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
  const writes=calls.filter(c=>c.init?.method==='POST');expect(writes).toHaveLength(1);
  expect(writes[0].url).toContain(endpoint);expect(JSON.parse(String(writes[0].init?.body || '{}'))).toEqual(body);
  await act(async()=>root.unmount());
@@ -65,6 +67,7 @@ it('never creates a fresh Baseline when the saved resume preflight refuses it',a
  await act(async()=>root.render(<OperationProvider restore={false}><Harness/></OperationProvider>));
  await act(async()=>op.start('Baseline',{id:'saved',kind:'evaluation',status:'failed'}));
  await act(async()=>document.querySelector<HTMLButtonElement>('.go')!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
  expect(fetcher).toHaveBeenCalledOnce();expect(document.querySelector('.ui-run[role=alert]')?.textContent).toContain('断点不兼容');
  await act(async()=>op.start('没有续跑入口',{id:'other',status:'stopped'}));
  expect(document.querySelectorAll<HTMLButtonElement>('.go')[1].disabled).toBe(true);

@@ -122,6 +122,7 @@ it('refreshes the resident candidate pool after a saved quality change before sw
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<GovernancePage data={{generationRuns:[run],dataset:[row()]}}/>));
  await act(async()=>document.querySelector<HTMLElement>('.review-table tbody tr')!.click());
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='运行 QC')!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
  await act(async()=>document.querySelector<HTMLButtonElement>('.candidate-workspace [aria-label="关闭"]')!.click());
  const count=fetcher.mock.calls.length;
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='候选池')!.click());

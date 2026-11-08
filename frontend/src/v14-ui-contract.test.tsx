@@ -96,6 +96,7 @@ it("M7 restores completed comparison on same-identity remount and rejects a diff
   vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify({ answer: JSON.parse(init?.body as string).scheme_id === "baseline" ? "保留 Baseline 回答" : "保留 线上版本 回答", version: JSON.parse(init?.body as string).scheme_id === "baseline" ? "B1" : "P0", evidence: [] }))));
   await render(<ExperimentPage data={data("B1")} onOpenCitation={() => {}} />);
   await fill("保留同一个问题"); await act(async () => document.querySelector<HTMLButtonElement>(".query-action button")!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(document.body.textContent).toContain("保留 Baseline 回答");
   await act(async () => root.unmount());
   await render(<ExperimentPage data={data("B1")} onOpenCitation={() => {}} />);
@@ -145,6 +146,7 @@ it("M3 saved Candidate draft becomes clean and returning an edit to saved conten
   await edit("已编辑的问题"); expect(dirty).toHaveBeenLastCalledWith(true);
   await edit("原问题"); expect(dirty).toHaveBeenLastCalledWith(false);
   await edit("已编辑的问题"); await clickText("保存并校验草案");
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(dirty).toHaveBeenLastCalledWith(false);
 });
 
@@ -154,6 +156,7 @@ it("ID-08 ignores an old same-question comparison after Baseline changes", async
   await render(<ExperimentPage data={data()} onOpenCitation={() => {}} />);
   await fill("同一个问题");
   await act(async () => document.querySelector<HTMLButtonElement>(".query-action button")!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(replies).toHaveLength(2);
   await act(async () => root.render(<ExperimentPage data={data("B1")} onOpenCitation={() => {}} />));
   await act(async () => replies.forEach(reply => reply(new Response(JSON.stringify({ answer: "旧 B0 回答", version: "B0" })))));
@@ -323,6 +326,7 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("E-prior");
   await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());
   await clickText("启动此上下文 Agent · Round 1");
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(posts[1]).toEqual({ url: expect.stringContaining("/api/experiments/run"), body: { trigger_id: "T1" } });
   expect(posts).toHaveLength(2);
   expect(document.querySelector(".monitoring-context")?.textContent).toContain("Agent 状态：已完成 · Round 1");

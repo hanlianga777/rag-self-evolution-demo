@@ -92,6 +92,7 @@ it("requires human judgement and confirmation before starting only the linked Mo
   expect(posts[1].body).toEqual({ decision: "approved" });
   expect(document.querySelector(".monitoring-context")?.textContent).not.toContain("EXP-same");
   await click("启动此上下文 Agent · Round 1");
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(posts[2]).toEqual({ url: expect.stringContaining("/api/experiments/run"), body: { trigger_id: "T1" } });
   await click("查看进化上下文");
   expect(document.querySelector(".drawer")?.textContent).toContain("关联优化：已建立");

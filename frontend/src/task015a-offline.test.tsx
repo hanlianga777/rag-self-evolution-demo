@@ -36,6 +36,7 @@ it('compares the actual previous production config when Baseline differs',async(
  const textarea=document.querySelector('textarea')!;
  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!.call(textarea,'同一个问题');textarea.dispatchEvent(new Event('input',{bubbles:true}));});
  await act(async()=>document.querySelector<HTMLButtonElement>('.query-action button')!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
  expect((fetch as any).mock.calls.map(([,init]:any)=>JSON.parse(init.body).scheme_id)).toEqual(['old','new']);
  expect((fetch as any).mock.calls.map(([,init]:any)=>JSON.parse(init.body).question)).toEqual(['同一个问题','同一个问题']);
 });

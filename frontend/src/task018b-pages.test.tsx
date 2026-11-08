@@ -21,6 +21,7 @@ it('places real coverage first, totals its quotas, and restores the document del
  const button=[...document.querySelectorAll('button')].find(b=>b.textContent==='删除')!;
  expect(button).toBeDefined();
  await act(async()=>button.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
  expect(document.querySelector('.document-inspector')).toBeNull();
  expect(fetcher.mock.calls.some(([url,init])=>url.endsWith('/api/documents/D1') && init?.method==='DELETE')).toBe(true);
  expect(changed).toHaveBeenCalled();

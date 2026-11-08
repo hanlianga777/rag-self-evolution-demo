@@ -22,7 +22,9 @@ it('groups saved scoring points, resolves QC citations and hides original IDs fr
 it('runs the selected quality check through the existing callback without enabling frozen edits', async()=>{
  const onRun=vi.fn(),root=createRoot(document.body.appendChild(document.createElement('div')));
  await act(async()=>root.render(<FrozenQuestionDetails row={{id:'Q-frozen',question:'问题',probe_status:'probe_passed'}} onRun={onRun}/>));
- for(const label of ['运行 Probe','运行 QC']) await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===label)!.click());
+ for(const label of ['运行 Probe','运行 QC']) { await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===label)!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
+ }
  expect(onRun.mock.calls).toEqual([['Q-frozen','probe'],['Q-frozen','qc']]);
  await act(async()=>root.unmount());
 });

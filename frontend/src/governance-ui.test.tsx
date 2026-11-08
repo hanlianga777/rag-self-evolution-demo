@@ -123,8 +123,10 @@ it("refreshes single Probe and QC results in both table and open Drawer", async 
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [base] }} />));
   await act(async () => document.querySelector<HTMLButtonElement>(".review-table tbody tr[role=button]")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".quality-grid button")].find(button => button.textContent === "运行 Probe")!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(tableValue("Probe")).toBe("100");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".quality-grid button")].find(button => button.textContent === "运行 QC")!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(qc).toBe(true);
   expect(tableValue("Probe")).toBe("100");
   expect(tableValue("QC")).toBe("95");
@@ -164,6 +166,7 @@ it("lets an unapplied failed draft reselect material with a new reason without a
   const intent = document.querySelector<HTMLTextAreaElement>("textarea[aria-label='更新修订原因']")!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(intent, "改为操作安全知识点"); intent.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "确认重新选材并生成") as HTMLButtonElement).click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(requests.find(item => item.url.endsWith("/regenerate-draft"))?.body).toMatchObject({ question_id: "V1-Q01", expected_hash: "draft-hash", material_mode: "reselect", reason: "改为操作安全知识点" });
   expect(requests.some(item => item.url.endsWith("/apply"))).toBe(false);
   await act(async () => root.unmount());
@@ -372,6 +375,7 @@ it("starts Q09 independently and keeps Q01 as read-only context", async () => {
   const reason = document.querySelector<HTMLTextAreaElement>(".revision-workspace textarea")!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(reason, "独立修 Q09"); reason.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "生成修订草案") as HTMLButtonElement).click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   const started = requests.find(item => item.url.endsWith("/api/governance/questions/V1-9/revision"));
   expect(started).toBeTruthy();
   expect(requests.some(item => item.url.endsWith("/api/governance/questions/V1-9/review"))).toBe(false);
@@ -403,11 +407,13 @@ it("lets a paired preview regenerate only Q09 and discard without applying", asy
   const edited = document.querySelector<HTMLTextAreaElement>(".draft-workspace textarea")!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(edited, "新的 Q09 问法"); edited.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "保存并校验草案") as HTMLButtonElement).click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   const editRequest = requests.find(item => item.url.endsWith("/edit-draft"));
   expect(Object.keys(JSON.parse(editRequest!.init!.body as string).changes)).toEqual(["V1-9"]);
   expect((([...document.querySelectorAll("button")].find(button => button.textContent === "确认应用")) as HTMLButtonElement).disabled).toBe(true);
   expect((([...document.querySelectorAll("button")].find(button => button.textContent === "编辑草案")) as HTMLButtonElement).disabled).toBe(false);
   await act(async () => ([...document.querySelectorAll("button")].find(button => button.textContent === "重新生成") as HTMLButtonElement).click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   const regeneration = requests.find(item => item.url.endsWith("/regenerate-draft"));
   expect(regeneration).toBeTruthy();
   expect(JSON.parse(regeneration!.init!.body as string)).toEqual({ question_id: "V1-9", expected_hash: "hash-nine" });

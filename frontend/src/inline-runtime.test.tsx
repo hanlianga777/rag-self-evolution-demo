@@ -35,6 +35,7 @@ it("shows Before result without waiting for After and keeps a one-sided failure 
   await act(async () => root.render(<OperationProvider restore={false}><ExperimentPage data={{ workspace: { current_baseline_id: "EVAL-1" }, evaluation: { id: "EVAL-1" }, versions: [{ id: "PROD-C", status: "active", provenance: "published", snapshot: { candidate_id: "EXP-R1-C", human_release: { decision: "approved" } } }] }} onOpenCitation={() => {}} /></OperationProvider>));
   await act(async () => { const textarea = document.querySelector("textarea")!; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "测试"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => document.querySelector<HTMLButtonElement>(".query-action button")!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(document.querySelectorAll(".experiment-answer-card .running")).toHaveLength(2);
   expect(document.querySelector(".ui-run")).toBeNull();
   await act(async () => baseline(new Response(JSON.stringify({ answer: "Baseline 答案", version: "EVAL-1", latency_ms: 100, evidence: [] }), { status: 200 })));

@@ -21,7 +21,8 @@ async function chooseCase() {
   await act(async () => (document.querySelector('[role="combobox"][aria-label="选择真实 Bad Case"]') as HTMLButtonElement).click());
   await act(async () => (document.querySelector('[role="option"][data-value="BAD-1"]') as HTMLDivElement).click());
 }
-async function run() { await act(async () => { (document.querySelector(".query-action button") as HTMLButtonElement).click(); await Promise.resolve(); }); }
+async function run() { await act(async () => { (document.querySelector(".query-action button") as HTMLButtonElement).click(); await Promise.resolve(); });
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click()); }
 
 it("fixes Baseline and Production and selecting a Bad Case only fills the question", async () => {
   const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);

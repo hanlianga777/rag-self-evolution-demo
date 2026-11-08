@@ -32,6 +32,7 @@ async function scenario(wait = false) {
   await click("重新选材并生成"); await click("手动指定 Chunk（可选）");
   await act(async () => document.querySelectorAll<HTMLInputElement>('.chunk-option input')[1].click());
   await click("返回修订"); await click("确认重新选材并生成");
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   return { posts, finish: () => finish() };
 }
 it("C1 to C2 regenerated draft closes without false dirty and never discards", async () => {

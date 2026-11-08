@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "../components/Dialog";
 import { displayText } from "../display";
 import { answerCitationDisplay } from "../answerCitations";
 import { StoryDisclosure } from "../components/Storytelling";
@@ -28,6 +29,7 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
   const [selectedCase, setSelectedCase] = useState(saved.identity === identity ? saved.selectedCase : "");
   const [left, setLeft] = useState<Run>(saved.identity === identity && validRun(saved.left) ? saved.left : {});
   const [right, setRight] = useState<Run>(saved.identity === identity && validRun(saved.right) ? saved.right : {});
+  const [askConfirm, setAskConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const requests = useRef(0), currentIdentity = useRef(identity), previousIdentity = useRef(identity);
   currentIdentity.current = identity;
@@ -59,10 +61,11 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
 
   if (blocked) return <div className="page experiment-page"><EmptyState title={!baselineId || baselineId!==baseline.id?"还没有可用于对比的有效 Baseline":"还没有可对比的已发布方案"} action={<a className="secondary" href={!baselineId || baselineId!==baseline.id?"#evaluation":"#versions"}>{!baselineId || baselineId!==baseline.id?"查看 Baseline":"查看发布条件"}</a>}>发布新方案后，可以用同一个问题对比优化前后的回答。</EmptyState></div>;
   return <div className="page experiment-page"><ConclusionCard title={left.status === "completed" && right.status === "completed" ? "同题实际回答已保存，可核对内容与引用差异" : "对比发布前配置与已发布线上配置"} tone="neutral">{left.status === "completed" && right.status === "completed" ? "两侧均为本次主动运行返回的真实回答；未调用 Judge，不产生新评分或资格。" : "选择或输入同一道问题，再主动运行两套已保存配置。参数差异可展开核对，回答未运行时不预判改善。"}</ConclusionCard>
+    <ConfirmDialog open={askConfirm} onOpenChange={setAskConfirm} title="确认运行实时对比" busy={busy} onConfirm={() => { setAskConfirm(false); void ask(); }}><p>将对同一道问题运行两套配置，会调用模型并产生两次问答的费用。</p><p>不会影响当前线上版本，不生成评测成绩。</p></ConfirmDialog>
     <section className="experiment-query compare-toolbar">
       <CustomSelect ariaLabel="选择真实 Bad Case" value={selectedCase} onChange={id => { clearResults(); setSelectedCase(id); const item = badCases.find((row: any) => row.id === id); if (item) setQuestion(item.result?.question || ""); }} placeholder="Baseline Bad Case" options={[{ value: "", label: "Baseline Bad Case" }, ...badCases.map((item: any) => ({ value: item.id, label: item.result?.question || "题目内容未记录" }))]} />
       <textarea aria-label="试验问题" placeholder="输入或编辑同一道问题…" maxLength={1000} value={question} onChange={event => { clearResults(); setQuestion(event.target.value); }} />
-      <div className="query-action"><button className="primary" disabled={busy || !question.trim() || !!blocked} onClick={() => void ask()}><Send size={15} />{busy ? "正在回答…" : "运行实时对比（调用模型）"}</button></div>
+      <div className="query-action"><button className="primary" disabled={busy || !question.trim() || !!blocked} onClick={() => setAskConfirm(true)}><Send size={15} />{busy ? "正在回答…" : "运行实时对比（调用模型）"}</button></div>
     </section>
     <StoryDisclosure label="查看方案参数差异"><ParameterDiff before={leftScheme.config} after={rightScheme.config}/></StoryDisclosure>
     <section className="experiment-results" aria-label="实时回答"><AnswerCard scheme={leftScheme} run={left} onOpenCitation={onOpenCitation}/><AnswerCard scheme={rightScheme} run={right} onOpenCitation={onOpenCitation}/></section>

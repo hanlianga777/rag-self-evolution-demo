@@ -203,6 +203,7 @@ it("starts replacement as one slot draft without first changing a pending review
   const reason = document.querySelector<HTMLTextAreaElement>(".revision-workspace textarea")!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(reason, "换成另一知识点"); reason.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".candidate-actionbar button")].find(button => button.textContent === "生成修订草案")!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
   expect(requests[0]).toEqual({ url: expect.stringContaining("/api/governance/questions/Q9/revision"), body: expect.objectContaining({ replacement: true, actor: "human" }) });
   expect(Object.keys(requests[0].body.changes)).toEqual(["Q9"]);
   await act(async () => root.unmount());

@@ -22,7 +22,7 @@ import { cachedJson, errorMessage, getJson, postJson } from "../api";
 import { Badge, DrawerSection, Metric, Section, Status, TruncatedText } from "../components/Primitives";
 import { formatValue, thinkingLabel } from "../components/PipelineFields";
 import { CaseAnswer } from "../components/CaseAnswer";
-import { Drawer } from "../components/Dialog";
+import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { displayText, gateNames, gateEnglishNames, localShortTime } from "../display";
 import { useOperation } from "../operation";
 
@@ -82,6 +82,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const selectedDetail = run.cases?.find((row: Row) => row.question_id === selectedCase?.question_id) || selectedCase;
 
   const [busy, setBusy] = useState(false);
+  const [startConfirm, setStartConfirm] = useState(false);
   const [error, setError] = useState("");
   const [preflight,setPreflight]=useState<Row | null>(null);
   useEffect(() => {
@@ -180,9 +181,10 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const stale = data.workspace?.requires_new_golden || data.workspace?.requires_new_baseline && (completed || data.workspace?.current_golden_id && snapshot.id !== data.workspace.current_golden_id);
 
   const versionedRerun = !!run.id && !canResume && !["queued", "running"].includes(run.status);
-  const startButton = <button className="secondary ui-btn-tint" disabled={busy || preflight?.can_start !== true} onClick={() => void prepareStart()}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "重新运行 Baseline（新版本）" : "运行 Baseline 评测"}</button>;
+  const startButton = <button className="secondary ui-btn-tint" disabled={busy || preflight?.can_start !== true} onClick={() => setStartConfirm(true)}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "重新运行 Baseline（新版本）" : "运行 Baseline 评测"}</button>;
   return <PageShell className="page evaluation-page" header={<div className="page-title"><div><h1><IconTile name="baseline" />Baseline</h1></div><div className="header-actions">{!versionedRerun && startButton}</div></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>{displayText("Hard Gate")}</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
 
+    <ConfirmDialog open={startConfirm} onOpenChange={setStartConfirm} title={canResume ? "确认恢复 Baseline" : "确认重新运行 Baseline"} busy={busy} onConfirm={() => { setStartConfirm(false); void prepareStart(); }}><p>{canResume ? "将恢复原 Baseline 的未完成题目，已完成的题目保留。" : "会用当前 Pipeline 配置对 50 题重新评测，产生新版本正式评测。"}</p><p>会调用模型并产生费用。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
     <PricePauseNotice pause={run.result?.price_pause} evaluationId={run.id} onChanged={async () => { setRun(await getJson<Row>(`/api/evaluations/${run.id}?light=true`)); }} />
     {preflight?.reason && (/活动评测|后台.*运行|active/i.test(preflight.reason) ? <p className="pending-note" role="status">后台正在运行试跑，完成后可重新运行 Baseline</p> : <p className="error-notice" role="alert">无法启动 Baseline：{preflight.reason}</p>)}
     {["partial","failed"].includes(run.status) && preflight?.can_start && preflight.resume_reason && <div className="muted-prose muted"><TruncatedText lines={3}>原任务不能恢复：{preflight.resume_reason}；请明确新建完整评测，历史进度保留。</TruncatedText></div>}

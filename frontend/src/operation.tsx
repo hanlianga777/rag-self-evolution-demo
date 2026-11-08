@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { getJson, postJson, identityKey, invalidateReads } from "./api";
 import type { PricePause } from "./components/RuntimeSettings";
 
+import { ConfirmDialog } from "./components/Dialog";
 import { RunProgressPanel } from "./ui/RunProgressPanel";
 
 type Operation = { id: string; runId?: string; candidateId?: string; experimentId?: string; pricePause?: PricePause; title: string; status: "running" | "completed" | "failed" | "stopped"; stopping?: boolean; stopError?: string; kind?: "evaluation" | "revision" | "cycle"; stage?: string; stageCode?: string; current?: number; total?: number; error?: string; errorDetail?: string; provider?: string; model?: string; attempt?: number; startedAt?: number; endedAt?: number; dismissed?: boolean; restored?: boolean };
@@ -229,6 +230,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
     } finally { stoppingRuns.current.delete(item.id); }
   };
 
+  const [continueConfirm, setContinueConfirm] = useState<Operation | null>(null);
   const continuingRuns = useRef(new Set<string>());
   const continueOperation = async (item: Operation) => {
     if ((item.status === "running" && item.pricePause?.paused) || continuingRuns.current.has(item.id)) return;
@@ -264,7 +266,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
       current={item.current} total={item.total}
       elapsedMs={item.startedAt != null ? (item.endedAt ?? now) - item.startedAt : undefined}
       errorText={runErrorText(item.error)}
-      onContinue={item.experimentId || item.candidateId || item.kind === "revision" || item.kind === "evaluation" ? () => void continueOperation(item) : undefined}
+      onContinue={item.experimentId || item.candidateId || item.kind === "revision" || item.kind === "evaluation" ? () => setContinueConfirm(item) : undefined}
       onStop={item.experimentId || item.kind === "evaluation" || item.runId ? () => void stopEvaluation(item) : undefined}
       stopping={item.stopping}
     />
@@ -272,6 +274,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   </div>)}</div>;
   return <OperationContext.Provider value={{ operations, runCandidateBatch, start, update, succeed, fail, run, startEvaluation, watchEvaluation, watchRevision, registerCandidateRefresh, unregisterCandidateRefresh, registerDialogHost, unregisterDialogHost }}>
     {children}
+    <ConfirmDialog open={!!continueConfirm} onOpenChange={open => !open && setContinueConfirm(null)} title="确认继续运行" onConfirm={() => { const next = continueConfirm; setContinueConfirm(null); if (next) void continueOperation(next); }}><p>将继续运行{continueConfirm ? operationTitle(continueConfirm.title) : "当前任务"}，会调用模型并产生费用；已完成的步骤保留。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
     {dialogHosts.length ? createPortal(console, dialogHosts[dialogHosts.length - 1]) : console}
   </OperationContext.Provider>;
 }
