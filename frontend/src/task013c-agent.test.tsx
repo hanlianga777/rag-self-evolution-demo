@@ -19,7 +19,7 @@ it('separates running, product interruption, evaluated failure and qualified car
  await click('A/B/C/D');
  const cards=[...document.querySelectorAll('.candidate-card')];
  expect(cards.map(card=>card.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['运行中','评测中断','已评测未通过']);
- expect(document.querySelector('.d-story')?.textContent).toContain('评测状态：合格');
+ expect(document.querySelector('.d-story .ui-status')?.textContent).toBe('合格');
  expect(cards[1].querySelector('.candidate-card-header .badge')?.classList.contains('warning')).toBe(true);
  expect(cards[1].textContent).toContain('产品故障，会自动续跑');
  expect(cards[1].textContent).not.toContain('付费确认');

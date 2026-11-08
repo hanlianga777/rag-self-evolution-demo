@@ -14,7 +14,8 @@ it('places real coverage first, totals its quotas, and restores the document del
  const fetcher=vi.fn(async(_url:string,init?:RequestInit)=>new Response(JSON.stringify(init?.method==='DELETE'?{id:'operation',status:'completed'}:{knowledge,index:{}})));
  vi.stubGlobal('fetch',fetcher);
  await mount(<KnowledgePage data={{documents:[{id:'D1',name:'设备手册.pdf',chunks:7,status:'Indexed'}]}} onChanged={changed}/>);
- expect(document.querySelector('.page-content > .ui-kc')).not.toBeNull();
+ expect(document.querySelector('.page-content > details:first-child .ui-kc')).not.toBeNull();
+ expect(document.querySelector<HTMLDetailsElement>('.page-content > details:first-child')?.open).toBe(false);
  expect(document.querySelector('.ui-kc h3')?.textContent).toBe('知识主题覆盖');
  expect(document.querySelector('.ui-kc-head')?.textContent).toContain('Positive 2 / Ablation 1 / Negative 3');
  const button=[...document.querySelectorAll('button')].find(b=>b.textContent==='删除')!;
@@ -32,7 +33,7 @@ it('shows the saved Judge reason instead of the diagnostic category in Baseline 
 });
 it('orders publication cards and hides internal IDs outside technical details',async()=>{
  await mount(<VersionsPage data={{versions:[{id:'v1',status:'active',provenance:'bootstrap',config:{top_k:4,knowledge_identity:{corpus_snapshot_id:'INTERNAL-corpus'}}}]}}/>);
- expect([...document.querySelectorAll('.page-content > .panel > .section-head > h2')].map(e=>e.textContent)).toEqual(['配置与发布记录','版本历史与回滚']);
+ expect([...document.querySelectorAll('.page-content > .panel > .section-head > h2, .page-content > details > summary')].map(e=>e.textContent)).toEqual(['配置与发布记录','版本历史与回滚']);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看完整配置')!.click());
  expect(document.querySelector('.story-details > .panel')?.textContent).not.toContain('v1');
  expect(document.querySelector('.story-details .parameter-list')?.textContent).not.toContain('[object Object]');

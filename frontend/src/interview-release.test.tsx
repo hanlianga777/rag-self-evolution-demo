@@ -42,7 +42,8 @@ it("does not invent manual publication evidence for incomplete historical snapsh
   await render(<VersionsPage data={{ versions: [{ ...production, snapshot: { candidate_id: "EXP-old-C" } }] }} />);
   expect(document.querySelector(".release-decision")?.textContent).not.toContain("线上发布批准已批准");
   expect(document.querySelector(".release-decision")?.textContent).not.toContain("发布审计未完整保存");
-  expect(document.querySelector(".page-content > details")).toBeNull();
+  expect(document.querySelector<HTMLDetailsElement>(".page-content > details")?.open).toBe(false);
+  expect(document.querySelector(".page-content > details > summary")?.textContent).toBe("版本历史与回滚");
 });
 
 it("keeps answer telemetry and source IDs out of the chat until its audit Drawer opens", async () => {

@@ -22,7 +22,7 @@ it("restores stages and complete generated plans without inventing evaluated res
   expect(document.querySelectorAll(".strategy-hypotheses > section")).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/null|undefined|\[object Object\]/);
   await click("A/B/C/D");
-  expect([...document.querySelectorAll(".candidate-card:first-child .field-label")].map(e => e.textContent)).toEqual(["方向", "核心思路", "参数变化", "针对的题", "预期效果", "风险", "结果"]);
+  expect([...document.querySelectorAll(".candidate-card:first-child .field-label")].map(e => e.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("Sandbox 尚未运行");
   await click("查看目标 1 题");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(bad.result.question);

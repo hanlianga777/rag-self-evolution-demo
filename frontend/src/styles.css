@@ -1352,8 +1352,7 @@ button { border-radius:8px; }
 .d-story-grid > section { height:300px; overflow:auto; border:1px solid var(--line); border-radius:var(--card-radius); padding:16px; scrollbar-width:thin; }
 .d-story-grid :is(h4,p) { margin:0 0 10px; }
 .d-story-grid article { padding:8px 0; border-bottom:1px solid var(--line-soft); }
-.d-result-story { display:grid; grid-template-columns:1.15fr 1fr; gap:16px; margin:16px 0; }
-.d-result-story > section { min-width:0; height:clamp(280px,calc(100dvh - 500px),340px); overflow:auto; padding:12px; border:1px solid var(--line); border-radius:var(--card-radius); scrollbar-width:thin; }
+.d-result-story { display:grid; grid-template-columns:1fr; gap:16px; margin:16px 0; }
 .d-result-story :is(h4,p) { margin:0 0 8px; }
 .d-result-story .story-quality { margin:8px 0 12px; }
 .d-result-predictions th:first-child { width:26%; }

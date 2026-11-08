@@ -33,6 +33,6 @@ it("removes repeated strategy fields and keeps one before/after parameter list",
   const card=document.querySelector(".candidate-card")!;
   expect(card.textContent).toContain("扩大候选范围");
   expect(card.querySelector(".candidate-field-content")?.textContent).toContain("检索召回增强");
-  expect(card.querySelectorAll(".story-changes")).toHaveLength(1);
-  expect([...card.querySelectorAll(".field-label")].map(e=>e.textContent)).toEqual(["方向","核心思路","参数变化","针对的题","预期效果","风险","结果"]);
+  expect([...card.querySelectorAll(".ui-field")].find(field=>field.querySelector(".ui-kicker")?.textContent==="改动参数")?.textContent).toContain("Top-K 4 → 8");
+  expect([...card.querySelectorAll(".field-label")].map(e=>e.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
 });

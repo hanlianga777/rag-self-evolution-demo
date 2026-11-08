@@ -70,7 +70,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect(document.body.textContent).toContain("可调参数 · 2");
   await click("A/B/C/D");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
-  expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["方向", "核心思路", "参数变化", "针对的题", "预期效果", "风险", "结果"]);
+  expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("持久化问题");
   await click("Sandbox");
   expect([...document.querySelectorAll(".ui-ct tbody th")].map(cell => cell.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "P99", "安全拒答率"]);

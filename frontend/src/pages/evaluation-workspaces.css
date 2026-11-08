@@ -309,8 +309,7 @@
 
 /* 021u: D retains its saved evidence inside the shared quiet card surfaces. */
 .evolution-page .d-timeline { background:var(--ui-surface); border-radius:var(--ui-r-card); box-shadow:var(--ui-shadow-1); }
-.evolution-page .d-result-story > section,.evolution-page .d-story-grid > section { background:var(--ui-surface); border:1px solid var(--ui-rule); border-radius:var(--ui-r-card); box-shadow:var(--ui-shadow-1); }
-.evolution-page .d-result-story .d-result-comparison { border-color:var(--ui-ink); }
+.evolution-page .d-story-grid > section { background:var(--ui-surface); border:1px solid var(--ui-rule); border-radius:var(--ui-r-card); box-shadow:var(--ui-shadow-1); }
 .evolution-page .d-param-changes { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
 .evolution-page .d-story-grid { margin-top:12px; }
 .evolution-page .d-story .d-result-conclusion { color:var(--ui-ink); background:var(--ui-surface); }

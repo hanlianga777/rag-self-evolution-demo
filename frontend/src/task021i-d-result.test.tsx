@@ -38,7 +38,8 @@ it('explains all remaining failures from saved positions and new failures from t
  expect(reasons).toContain('关键说明排第 7 位，证据条数 6 仍纳入不了');
  expect(reasons).toContain('关键说明排第 24 位，证据条数 6 仍纳入不了');
  expect(reasons).toContain('手册未给出固定充电时长');expect(reasons).toContain('与手册矛盾');
- expect([...document.querySelectorAll(".d-result-causes .ui-clamp")].some(node=>node.textContent==="第25题的原题" && (node as HTMLElement).style.webkitLineClamp==="2")).toBe(true);
+ expect(document.querySelector('.d-result-causes .ui-q.is-broken')?.getAttribute('aria-label')).toBe('Q25 新增 Bad Case');
+ expect(document.querySelector<HTMLDetailsElement>('details.d-result-causes')?.open).toBe(false);
  expect(fetcher.mock.calls).toHaveLength(1);expect(String(fetcher.mock.calls[0])).toContain('/api/evaluations/d-run');
  expect(document.querySelector('.d-result-story')!.textContent).not.toMatch(/CSV-|EXP-|EVAL-|DOC-|随机|不稳定|复跑/);
  expect(document.querySelector('.d-result-story [aria-label="方案质量对比"]')!.textContent).toContain('新增 Bad Case 数0 个1 个');
@@ -83,7 +84,7 @@ it('keeps actual repairs separate from the prediction list and does not invent a
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  const table=document.querySelector('[aria-label="预测与实际"]')!;
  expect(table.textContent).toContain('实际修好的剩余 Bad Case：Q04');
- expect([...table.querySelectorAll('tr')].at(-1)!.textContent).toContain('未知');
+ expect(table.querySelector('tbody tr')!.textContent).toContain('风险清单未保存，未预测到的新问题未知');
 });
 it('keeps results without a saved run source usable and marks case explanations unknown',async()=>{
  const fetcher=mockRun();const experiment=exp();delete experiment.candidates[1].result.evaluation_run_id;
