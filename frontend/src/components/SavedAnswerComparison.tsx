@@ -13,7 +13,8 @@ import {categoryName, comparisonPoints, configChanges, explanation, metricRows, 
 import type {Citation} from '../types';
 import './SavedAnswerComparison.css';
 
-export function SavedAnswerComparison({data,onOpenCitation,questionId}:{data:any;questionId?:string;onOpenCitation:(citation:Citation)=>void}) {
+const cachePath = '/comparison-preloaded';
+function comparisonSource(data:any) {
   const experiment=data.optimization,baseline=data.evaluation,recommendation=recommendationOf(experiment);
   const candidate=experiment?.candidates?.find((c:any)=>c.id===recommendation.recommended_candidate);
   const baselineId=data.workspace?.current_baseline_id===undefined ? baseline?.id : data.workspace.current_baseline_id,runId=candidate?.result?.evaluation_run_id;
@@ -25,7 +26,26 @@ export function SavedAnswerComparison({data,onOpenCitation,questionId}:{data:any
     const rows=(before.cases || []).map((row:any)=>({...row,after:(after.cases || []).find((item:any)=>item.question_id===row.question_id)}));
     return {before,after,rows,binding};
   };
-  const cachePath = '/comparison-preloaded';
+  return {candidate,baselineId,runId,baselineBlocked,paths,binding,readRuns};
+}
+
+export function preloadComparison(data:any) {
+  const {candidate,baselineId,runId,baselineBlocked,paths,binding,readRuns}=comparisonSource(data);
+  if(baselineBlocked || !runId || !completeResult(candidate))return Promise.resolve(undefined);
+  return goldenFetch<any>(binding,cachePath,async()=>{
+    const next=readRuns(await Promise.all(paths.map(path=>detailJson<any>(path))));
+    const allDetails:Record<string,any>={},errors:Record<string,string>={};
+    for(let offset=0;offset<next.rows.length;offset+=4) await Promise.all(next.rows.slice(offset,offset+4).map(async(row:any)=>{
+      const key=JSON.stringify([binding,row.question_id]);
+      try { allDetails[key]=await Promise.all([baselineId,runId].map(run=>detailJson<any>(`/api/evaluations/${encodeURIComponent(run)}/cases/${encodeURIComponent(row.question_id)}`))); }
+      catch(reason) { errors[key]=errorMessage(reason); }
+    }));
+    return {runs:next,details:allDetails,errors};
+  });
+}
+
+export function SavedAnswerComparison({data,onOpenCitation,questionId}:{data:any;questionId?:string;onOpenCitation:(citation:Citation)=>void}) {
+  const {candidate,baselineId,runId,baselineBlocked,binding,readRuns}=comparisonSource(data);
   const [runs,setRuns]=useState<any>(()=>goldenCached<any>(binding,cachePath)?.runs || null),[selected,setSelected]=useState(''),[filter,setFilter]=useState('fixed'),[search,setSearch]=useState(''),[error,setError]=useState(''),[details,setDetails]=useState<any>(()=>goldenCached<any>(binding,cachePath)?.details || {}),[detailErrors,setDetailErrors]=useState<Record<string,string>>({}),[dataMore,setDataMore]=useState(false);
   useEffect(()=>{
     let cancelled=false;const retained=goldenCached<any>(binding,cachePath);setRuns(retained?.runs || null);setSelected('');setError('');setDetails(retained?.details || {});setDetailErrors(retained?.errors || {});setFilter('fixed');setSearch('');
@@ -39,16 +59,7 @@ export function SavedAnswerComparison({data,onOpenCitation,questionId}:{data:any
       setDetails(value.details);setDetailErrors(value.errors || {});setRuns(next);setSelected(previous=>previous || requested?.question_id || next.rows.find((row:any)=>row.passed===false && row.after?.passed===true)?.question_id || '');
     };
     if(retained) accept(retained);
-    void goldenFetch<any>(binding,cachePath,async()=>{
-      const next=readRuns(await Promise.all(paths.map(path=>detailJson<any>(path))));
-      const allDetails:Record<string,any>={},errors:Record<string,string>={};
-      for(let offset=0;offset<next.rows.length;offset+=4) await Promise.all(next.rows.slice(offset,offset+4).map(async(row:any)=>{
-        const key=JSON.stringify([binding,row.question_id]);
-        try { allDetails[key]=await Promise.all([baselineId,runId].map(run=>detailJson<any>(`/api/evaluations/${encodeURIComponent(run)}/cases/${encodeURIComponent(row.question_id)}`))); }
-        catch(reason) { errors[key]=errorMessage(reason); }
-      }));
-      return {runs:next,details:allDetails,errors};
-    }).then(accept).catch(reason=>{if(!cancelled)setError(errorMessage(reason));});
+    void preloadComparison(data).then(accept).catch(reason=>{if(!cancelled)setError(errorMessage(reason));});
     return ()=>{cancelled=true;};
   },[binding,questionId]);
   const current=runs?.binding===binding ? runs : null;

@@ -3,6 +3,7 @@ import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, ty
 import { Bot, Menu } from "lucide-react";
 import { ICONS } from "./ui/icons";
 import { appDataVersion, identityKey, loadAppData } from "./api";
+import { onIdle, warmPageData, warmupRoute } from "./pageWarmup";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PageShell } from "./components/PageShell";
 import { useOperation } from "./operation";
@@ -39,16 +40,21 @@ export default function App() {
   const data = pages[page];
   const [openedDocument, setOpenedDocument] = useState<{ name?: string; citation?: Citation }>(); const [menuOpen, setMenuOpen] = useState(false);
   const requests = useRef(0); const completed = useRef(new Set<string>()); const operation = useOperation();
-  const refresh = useCallback(async () => {
-    const request = ++requests.current; setError("");
-    try {
-      const next = await loadAppData(true, page);
-      if (request === requests.current) setPages(previous => {
-        if (appDataVersion(next) && appDataVersion(next) === appDataVersion(previous[page])) return previous;
-        const old = Object.values(previous)[0];
-        return { ...(old && identityKey(old.workspace) !== identityKey(next.workspace) ? {} : previous), [page]: previous[page]?.evaluation?.id && previous[page]?.evaluation?.id === next.evaluation?.id && !hasEvaluationDetails(next.evaluation || {}) ? { ...next, evaluation: mergeEvaluationProgress(previous[page]!.evaluation, next.evaluation) } : next };
-      });
-    } catch (reason) { if (request === requests.current) setError((reason as Error).message); }
+  const foreground = useRef<Promise<void>>(Promise.resolve());
+  const refresh = useCallback(() => {
+    const read = (async () => {
+      const request = ++requests.current; setError("");
+      try {
+        const next = await loadAppData(true, page);
+        if (request === requests.current) setPages(previous => {
+          if (appDataVersion(next) && appDataVersion(next) === appDataVersion(previous[page])) return previous;
+          const old = Object.values(previous)[0];
+          return { ...(old && identityKey(old.workspace) !== identityKey(next.workspace) ? {} : previous), [page]: previous[page]?.evaluation?.id && previous[page]?.evaluation?.id === next.evaluation?.id && !hasEvaluationDetails(next.evaluation || {}) ? { ...next, evaluation: mergeEvaluationProgress(previous[page]!.evaluation, next.evaluation) } : next };
+        });
+      } catch (reason) { if (request === requests.current) setError((reason as Error).message); }
+    })();
+    foreground.current = read;
+    return read;
   }, [page]);
   useEffect(() => { let cancelled=false; void Promise.resolve().then(()=>{if(!cancelled)void refresh();}); return()=>{cancelled=true;}; }, [refresh]);
   useEffect(() => { if (operation.operations.some(item => item.status !== "running" && !completed.current.has(item.id) && (completed.current.add(item.id), true))) void refresh(); }, [operation.operations, refresh]);
@@ -60,7 +66,8 @@ export default function App() {
   const prefetch = useCallback((target: Page) => {
     if (target !== "overview") void pageModules[target]().catch(()=>{});
     if (latestPages.current[target]) return Promise.resolve();
-    if (!prefetched.current.has(target)) prefetched.current.set(target, loadAppData(true, target).then(next => {
+    if (!prefetched.current.has(target)) prefetched.current.set(target, loadAppData(true, target).then(async next => {
+      await warmPageData(target, next);
       setPages(previous => {
         const current = Object.values(previous)[0];
         if (previous[target] || current && identityKey(current.workspace) !== identityKey(next.workspace)) return previous;
@@ -71,17 +78,21 @@ export default function App() {
   }, []);
   const workspaceIdentity = data ? identityKey(data.workspace) : '';
   useEffect(() => {
-    if (!workspaceIdentity) return;
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      for (const item of navigation) {
-        if (cancelled) break;
-        await prefetch(item.id);
-      }
-    }, 1000);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [workspaceIdentity, prefetch]);
-  const navigate = (next: Page) => { if (location.hash !== `#${next}`) location.hash = next; setPage(next); setMenuOpen(false); };
+    if (!workspaceIdentity || !pages.overview) return;
+    let cancelled = false, cancelIdle = () => {};
+    const queue = [...warmupRoute];
+    const next = () => { cancelIdle = onIdle(async () => {
+      await foreground.current;
+      if (cancelled) return;
+      const target = queue.shift();
+      if (!target) return;
+      await prefetch(target);
+      if (!cancelled) next();
+    }); };
+    next();
+    return () => { cancelled = true; cancelIdle(); };
+  }, [workspaceIdentity, !!pages.overview, prefetch]);
+  const navigate = (next: Page) => { void prefetch(next); if (location.hash !== `#${next}`) location.hash = next; setPage(next); setMenuOpen(false); };
   const openCitation = (citation: Citation) => { setOpenedDocument({ citation }); navigate("knowledge"); };
   const skeleton = <PageShell className="page page-loading" header={<div className="page-title"><h1>{navigation.find(item=>item.id===page)?.label}</h1></div>}><div className="golden-skeleton" role="status" aria-label="正在加载页面内容">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div></PageShell>;
   const content = !data ? error ? <div className="state" role="alert"><h1>无法加载当前页面</h1><p>{error}</p><button className="primary" onClick={() => void refresh()}>重试</button></div> : skeleton : page === "overview" ? <OverviewPage data={data} navigate={navigate} /> : page === "knowledge" ? <KnowledgePage data={data} onChanged={refresh} openedDocument={openedDocument} onOpenedDocument={() => setOpenedDocument(undefined)} /> : page === "governance" ? <GovernancePage data={data} /> : page === "evaluation" ? <EvaluationPage data={data} navigate={navigate} /> : page === "evolution" ? <EvolutionPage data={data} /> : page === "versions" ? <VersionsPage data={data} /> : page === "verification" ? <VerificationPage data={data} onOpenCitation={openCitation} onOpenDocument={name => { setOpenedDocument({ name }); navigate("knowledge"); }} /> : <SettingsPage data={data} />;

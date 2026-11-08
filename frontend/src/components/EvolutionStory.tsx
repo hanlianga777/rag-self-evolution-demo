@@ -1,6 +1,7 @@
 import { judgePresentation } from "./judgePresentation";
 import { ParamChip, QuestionBadge, StatusBadge } from '../ui/Primitives';
-import { paramValue } from '../ui/evolution/model';
+import { HoverCard } from "../ui/HoverCard";
+import { paramValue, topKLessonEvidence } from '../ui/evolution/model';
 import {Badge, Section, TruncatedText} from './Primitives';
 import {DataTable} from './DataTable';
 import {formatValue, parameterNames} from './PipelineFields';
@@ -241,6 +242,7 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false}:{exp
   // Ignore historical suggestion when a fresh suggestion is queued or running.
   const suggestion=(waiting || running) && !d ? {} : d?.reasoning || composite.suggestion || {};
   const changes=suggestion.changes || [];
+  const topKEvidence = topKLessonEvidence(cs);
   const title=waiting && !d ? 'Candidate D · 排队中' : d ? 'Candidate D · 在 Winner 基础上融合' : running ? 'Candidate D · Agent 正在分析' : dProgressLabel(experiment)==='Agent 判断不做 D' ? 'Agent 判断不做 D' : ['validation_failed','suggestion_failed'].includes(composite.outcome) || composite.status==='failed' ? 'Candidate D 未形成' : 'Candidate D · 等待融合决策';
   const reason=waiting && !d ? '已排队，稍后自动继续。' : d ? suggestion.explanation || suggestion.hypothesis : running ? '等待建议结果。' : composite.reason || suggestion.explanation || (composite.status==='no_effective_composite' ? '保留已确认 Winner；不生成的具体理由未保存。' : '等待保存的决策。');
   const source=(change:any)=>`${({verified:'已验证',partial:'部分取用',new_attempt:'新尝试'} as Record<string,string>)[change.source_type] || '来源未保存'}${change.source_candidates?.length ? ` · 来自 ${change.source_candidates.map((id:string)=>schemeName(cs.find((c:any)=>c.id===id),id)).join('、')}` : ''}`;
@@ -250,7 +252,10 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false}:{exp
   })() : '';
   const status=d?.status==='failed' ? 'stopped' : completeResult(d) ? d.result.qualification?.qualified===true ? 'qualified' : d.result.qualification?.qualified===false ? 'failed' : 'evaluated' : ['running','queued'].includes(d?.status) ? 'running' : 'waiting';
   return <article className="d-story"><section className="ui-card"><header className="section-head"><h3>{title}</h3>{d && <StatusBadge kind={status} label={d.status==='failed' ? '评测中断，尚无完整结果' : status==='waiting' ? '等待完整评测' : completeResult(d) && d.result.qualification?.qualified==null ? '资格未知' : undefined}/>}</header>
-    {d && <div className="d-param-changes">{Object.entries(suggestion.changed_parameters || suggestion.proposed_config_diff || {}).map(([key, value]) => <ParamChip key={key} label={storyParameterNames[key] || key} from={paramValue(key, evaluation.config?.[key])} to={paramValue(key, value)} keyParam={key === 'top_k' && winner?.config?.top_k !== d.config?.top_k} keyLabel="唯一新增" />)}</div>}
+    {d && <div className="d-param-changes">{Object.entries(suggestion.changed_parameters || suggestion.proposed_config_diff || {}).map(([key, value]) => {
+      const chip = <ParamChip label={storyParameterNames[key] || key} from={paramValue(key, evaluation.config?.[key])} to={paramValue(key, value)} keyParam={key === 'top_k' && winner?.config?.top_k !== d.config?.top_k} keyLabel="唯一新增" />;
+      return key === 'top_k' && value === 6 && topKEvidence ? <HoverCard key={key} content={topKEvidence}><span tabIndex={0}>{chip}</span></HoverCard> : <span key={key}>{chip}</span>;
+    })}</div>}
     {decision && <p className="ui-headline d-result-conclusion"><StoryText value={decision} evaluation={evaluation} badCases={badCases}/></p>}
     <div className="ui-body-muted" role="status"><ClampText lines={2} text={agentDisplayText(`${completeResult(d) ? 'Agent 当时的预测：' : ''}${reason || '未保存说明'}`)}/></div>
     {!d && dProgressLabel(experiment)==='Agent 判断不做 D' && <p className="ui-headline d-result-conclusion"><StoryText value={recommendationReason(experiment)} evaluation={evaluation} badCases={badCases}/></p>}

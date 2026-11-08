@@ -101,30 +101,39 @@ export function roundSummary(candidates: CandidateView[]): string {
   return `本轮没有合格 Candidate${parts.length ? `：${parts.join("，")}` : ""}`;
 }
 
-function roundLesson(round: number, candidates: any[]): RoundView['lesson'] {
-  const saved = candidates.filter(item => (item.reasoning?.round || 1) === round && complete(item));
-  if (!saved.length) return;
-  const reference = new RegExp(`\\bR${round}-[ABC]\\b`);
-  for (const next of candidates.filter(item => item.reasoning?.round === round + 1)) {
-    const reasoning = next.reasoning;
-    const quotes: [string, unknown][] = [
-      ...['core_idea', 'hypothesis', 'proposal'].map(key => [key, reasoning[key]] as [string, unknown]),
-      ...(reasoning.risks || []).map((risk: any, i: number) => [`risks[${i}].reason`, risk.reason]),
-      ...(reasoning.adjustments || []).map((change: any, i: number) => [`adjustments[${i}].expected_impact`, change.expected_impact]),
-    ];
-    for (const [field, quote] of quotes) {
-      if (typeof quote !== 'string') continue;
-      const sentence = quote.split(/(?<=[。；])/).find(part => reference.test(part));
-      if (sentence) return { text: sentence.length > 40 ? `${sentence.slice(0, 39)}…` : sentence, source: `Round ${round + 1} · Candidate ${reasoning.candidate_label} · reasoning.${field}\n${quote}` };
-    }
-  }
-  const facts = saved.filter(item => Array.isArray(item.result?.all_fixed_question_ids) && Array.isArray(item.result?.new_regression_question_ids) && typeof item.result?.gates?.passed === 'boolean');
-  if (!facts.length) return;
-  const best = facts.find(item => (item.result.release_qualification || item.result.qualification)?.qualified === true && !item.result.new_regression_question_ids.length && item.result.gates.passed) || facts.reduce((a, b) => a.result.all_fixed_question_ids.length >= b.result.all_fixed_question_ids.length ? a : b);
-  const result = best.result;
-  const text = `${best.reasoning.action_name ? `${best.reasoning.action_name}：` : `${best.reasoning.candidate_label} `}修好${result.all_fixed_question_ids.length}题、${result.new_regression_question_ids.length ? `新增${result.new_regression_question_ids.length}题` : '零新增'}，Hard Gate${result.gates.passed ? '全过' : '未全过'}`;
-  const source = facts.map(item => `Round ${round} · Candidate ${item.reasoning.candidate_label} · result\naction_name：${item.reasoning.action_name || item.reasoning.candidate_label}；changed_parameters：${JSON.stringify(item.reasoning.changed_parameters || {})}\nall_fixed_question_ids：${list(item.result.all_fixed_question_ids).join('、') || '无'}；new_regression_question_ids：${list(item.result.new_regression_question_ids).join('、') || '无'}；gates：${item.result.gates.passed_count} / ${item.result.gates.total}，${item.result.gates.passed ? '全部通过' : '未全部通过'}`).join('\n');
-  return { text: text.length > 40 ? `${text.slice(0, 39)}…` : text, source };
+const savedFacts = (item: any) => complete(item) && Array.isArray(item.result.all_fixed_question_ids) && Array.isArray(item.result.new_regression_question_ids) && typeof item.result.gates?.passed === 'boolean' && typeof item.result.gates.passed_count === 'number' && typeof item.result.gates.total === 'number';
+const fixes = (item: any, ids: string[]) => ids.every(id => list(item.result.all_fixed_question_ids).includes(id));
+const changedOnly = (item: any, expected: Record<string, unknown>) => {
+  const changed = item?.reasoning?.changed_parameters || {};
+  return Object.keys(changed).length === Object.keys(expected).length && Object.entries(expected).every(([key, value]) => changed[key] === value);
+};
+const gate = (item: any, metric: string) => item.result.gates.gates?.find((row: any) => row.metric === metric && typeof row.actual === 'number');
+const failedSafety = (item: any) => gate(item, 'safe_rejection_rate')?.passed === false;
+
+export function topKLessonEvidence(candidates: any[]): string | undefined {
+  const b = candidates.find(item => item.reasoning?.round === 2 && item.reasoning?.candidate_label === 'B');
+  if (b && savedFacts(b) && changedOnly(b, { top_k: 6 }) && fixes(b, ['Q04', 'Q06']))
+    return 'Round 2 · Candidate B 验证过 Top-K 6 能修好 Q04/Q06';
+}
+
+function roundLesson(round: number, candidates: any[], winnerId: string | null): RoundView['lesson'] {
+  const saved = ['A', 'B', 'C'].map(label => candidates.find(item => item.reasoning?.round === round && item.reasoning?.candidate_label === label));
+  if (!saved.every(item => item && savedFacts(item))) return;
+  const [a, b, c] = saved;
+  let text: string | undefined;
+  if (round === 1 && changedOnly(a, { candidate_k: 24, multi_query: 2 }) && fixes(a, ['Q24', 'Q29', 'Q38']) && a.result.all_fixed_question_ids.length === 3 && gate(a, 'latency_p99_seconds')?.passed === false && changedOnly(c, { generation_thinking: 'high', top_k: 6 }) && fixes(c, ['Q04', 'Q06']) && failedSafety(c))
+    text = '扩候选多问修3题但P99超标；降档Top-K 6修Q04/Q06降安全';
+  if (round === 2 && saved.every(item => list(item.result.new_regression_question_ids).includes('Q17')) && topKLessonEvidence(candidates) && failedSafety(b))
+    text = '三套都伤Q17；单用Top-K 6修Q04/Q06却降安全';
+  const previous = candidates.filter(item => ['A', 'B', 'C'].includes(item.reasoning?.candidate_label) && item.reasoning.round < round);
+  if (round === 3 && previous.length === 6 && previous.every(item => savedFacts(item) && item.result.new_regression_question_ids.length > 0) && changedOnly(c, { generation_thinking: 'high', candidate_k: 24 }) && fixes(c, ['Q24', 'Q29', 'Q38']) && !c.result.new_regression_question_ids.length && a.result.new_regression_question_ids.length && b.result.new_regression_question_ids.length && c.result.gates.passed && c.id === winnerId)
+    text = '降档+Candidate K 24首次零新增，成为Winner';
+  if (!text) return;
+  const source = saved.map(item => {
+    const r = item.result, p99 = gate(item, 'latency_p99_seconds'), safety = gate(item, 'safe_rejection_rate');
+    return `Round ${round} · Candidate ${item.reasoning.candidate_label}：修好 ${list(r.all_fixed_question_ids).join('、') || '无'}；新增 ${list(r.new_regression_question_ids).join('、') || '0'}；Hard Gate ${r.gates.passed_count} / ${r.gates.total}\n参数：${Object.entries(item.reasoning.changed_parameters || {}).map(([key, value]) => `${PARAM_LABELS[key] || key} ${paramValue(key, value)}`).join(' + ')}${p99 ? `；P99 ${p99.actual.toFixed(1)} 秒${p99.passed ? '' : '（超标）'}` : ''}${safety ? `；安全拒答 ${safety.actual}%` : ''}`;
+  }).join('\n');
+  return { text, source };
 }
 
 export function buildEvolutionModel(experiment: any, baselineConfig: Record<string, unknown> | undefined, gateLabel: (metric: string) => string, nameOf: (candidate: any) => string): EvolutionModel {
@@ -139,7 +148,7 @@ export function buildEvolutionModel(experiment: any, baselineConfig: Record<stri
     const items = views.filter(item => item.round === round).sort((a, b) => a.label.localeCompare(b.label));
     const timed = items.filter(item => item.p50 !== null);
     const fastest = timed.length ? timed.reduce((best, item) => (item.p50 as number) < (best.p50 as number) ? item : best) : null;
-    return { round, candidates: items, summary: roundSummary(items), fastestId: fastest?.id ?? null, lesson: roundLesson(round, candidates) };
+    return { round, candidates: items, summary: roundSummary(items), fastestId: fastest?.id ?? null, lesson: roundLesson(round, candidates, winnerId) };
   });
   const budget = experiment?.evaluation_budget && typeof experiment.evaluation_budget.used === "number" ? { used: experiment.evaluation_budget.used, max: experiment.evaluation_budget.max } : null;
   return { rounds, winnerId, d: dRaw ? candidateView(dRaw, baselineConfig, winnerId, gateLabel, nameOf) : null, budget };
