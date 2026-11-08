@@ -87,3 +87,6 @@
 @media (max-width: 1100px) { .ui-blb { grid-template-columns: 1fr; } }
 
 .ui-kc-info { display: inline-flex; margin-left: 6px; color: var(--ui-faint); cursor: help; vertical-align: -2px; }
+
+/* 自带卡片外观的组件放进已有 .panel / Section 时，不再出现"卡片套卡片" */
+:is(.panel, section.section, .section) :is(.ui-kc, .ui-ct, .ui-gp) { background: transparent; box-shadow: none; border: 0; padding-left: 0; padding-right: 0; }
