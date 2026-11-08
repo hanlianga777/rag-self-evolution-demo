@@ -9,7 +9,8 @@ import { BaselineHero } from "./baseline/BaselineHero";
 import { BaselineBreakdown } from "./baseline/BaselineBreakdown";
 import { FinalRecommendation } from "./evolution/FinalRecommendation";
 import { CompareTable, GoldenPipeline, KnowledgeCoverage } from "./pages3";
-import { IconTile } from "./icons";
+import { Icon, IconTile } from "./icons";
+import { KnowledgePipeline } from "./knowledge/KnowledgePipeline";
 import { OverviewStory } from "./overview/OverviewStory";
 import { ParamGrid } from "./settings/ParamGrid";
 
@@ -72,6 +73,33 @@ export function PageSamples() {
       ]} />
     </section>
 
+    <section>
+      <h2 className="ui-sample-title">知识库 · 知识处理链路（替换 6 张选型卡 + 6 张分块流程卡）</h2>
+      <div className="panel"><KnowledgePipeline
+        steps={[
+          { label: "文档解析", value: "4 份 · 157 页", meta: "MinerU VLM，保留表格与页码" },
+          { label: "Parent Chunk", value: "349", meta: "1400 Tokens，作为回答上下文" },
+          { label: "Child Chunk", value: "368", meta: "400 Tokens · 重叠 80，用于检索" },
+          { label: "Embedding", value: "1024 维", meta: "text-embedding-v4" },
+          { label: "知识主题", value: "9", meta: "K-means 聚类" },
+          { label: "检索索引", value: "368 已索引", meta: "Hybrid · qwen3-rerank" },
+        ]}
+        online={["命中 Child Chunk", "补齐所属 Parent Chunk", "作为回答上下文", "引用回溯到原页"]}
+      /></div>
+    </section>
+    <section>
+      <h2 className="ui-sample-title">全站数据表格（以 Golden 题表为例）</h2>
+      <div className="panel page-shell" style={{ padding: "8px 20px" }}><table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+        <thead><tr><th style={{ width: 64 }}>题号</th><th style={{ width: 104 }}>题型</th><th>问题</th><th style={{ width: 170 }}>出处</th><th className="num" style={{ width: 72 }}>评分要点</th><th className="num" style={{ width: 60 }}>Probe</th><th className="num" style={{ width: 52 }}>QC</th><th style={{ width: 120 }}>Baseline</th><th style={{ width: 28 }} /></tr></thead>
+        <tbody>{([["Q01", "正向", "我在客户现场发现 KIRA B 50 显示的时间不对，怎么修改时区？", "操作说明 · p54–55", 2, 100, 90, true, ""], ["Q04", "正向", sampleQuestions.Q04, "操作说明 · p85", 3, 100, 95, false, "检索层"], ["Q24", "消融", sampleQuestions.Q24, "操作说明 · p12", 2, 100, 93, false, "检索层"], ["Q38", "负向", sampleQuestions.Q38, "电池说明 · p3", 1, 100, 97, false, "生成层"]] as const).map(row => <tr key={row[0]} role="button" tabIndex={0}>
+          <td className="id">{row[0]}</td><td className="muted">{row[1]}</td>
+          <td style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={row[2]}>{row[2]}</td>
+          <td className="muted">{row[3]}</td><td className="num">{row[4]} 条</td><td className="num">{row[5]}</td><td className="num">{row[6]}</td>
+          <td><span className={`ui-verdict ${row[7] ? "ok" : "bad"}`}>{row[7] ? "对" : <>错 <small>{row[8]}</small></>}</span></td>
+          <td><span className="ui-row-go"><Icon name="go" size={15} /></span></td>
+        </tr>)}</tbody>
+      </table></div>
+    </section>
     <section>
       <h2 className="ui-sample-title">Pipeline 配置 · Agent 可调参数</h2>
       <div className="panel"><ParamGrid onChange={() => {}} groups={[

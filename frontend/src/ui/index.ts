@@ -13,3 +13,5 @@ export { ParamGrid } from "./settings/ParamGrid";
 export type { ParamGroup, ParamItem, ParamOption } from "./settings/ParamGrid";
 export { BaselineBreakdown } from "./baseline/BaselineBreakdown";
 export type { CategoryScore, BaselineBadCase } from "./baseline/BaselineBreakdown";
+export { KnowledgePipeline } from "./knowledge/KnowledgePipeline";
+export type { PipelineStep } from "./knowledge/KnowledgePipeline";

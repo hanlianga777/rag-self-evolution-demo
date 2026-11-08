@@ -96,3 +96,40 @@
 .page-shell .ui-ovs .ui-ovs-fixed li button,
 .page-shell .ui-ovs .ui-ovs-turns li button,
 .page-shell .ui-pg .ui-pg-seg button:not(.on) { font-weight: 400; }
+
+/* —— 知识库：知识处理链路 —— */
+.ui-kp h3 { margin: 0 0 14px; font-size: var(--ui-fs-sub); font-weight: 600; color: var(--ui-ink); }
+.ui-kp-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.ui-kp-steps li { position: relative; display: grid; gap: 4px; align-content: start; padding: 2px 20px 2px 0; min-width: 0; }
+.ui-kp-steps li + li { padding-left: 20px; }
+.ui-kp-k { font-size: var(--ui-fs-meta); color: var(--ui-muted); }
+.ui-kp-v { font-size: 18px; font-weight: 600; color: var(--ui-ink); line-height: 1.3; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ui-kp-m { font-size: var(--ui-fs-meta); color: var(--ui-muted); line-height: 1.45; }
+.ui-kp-arrow { position: absolute; right: -7px; top: 22px; color: var(--ui-faint); }
+.ui-kp-online { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ui-rule-2); font-size: var(--ui-fs-body); color: var(--ui-ink-2); }
+.ui-kp-online-k { font-size: var(--ui-fs-meta); color: var(--ui-muted); margin-right: 6px; }
+.ui-kp-online-step { display: inline-flex; align-items: center; gap: 8px; }
+.ui-kp-online-arrow { color: var(--ui-faint); }
+
+/* ==================================================================
+ * 全站数据表格（11-08 用户："列表风格跟其他页不一样，太 low……所有列表都一样"）
+ * 去掉外框和表头灰底；表头浅灰小字不加粗；行高统一、细分隔线；整行可点的行悬停变浅灰。
+ * ================================================================== */
+.page-shell .table-scroll, .drawer .table-scroll { border: 0; border-radius: 0; }
+:is(.page-shell, .drawer) table thead th:not(.ui-x):not(.ui-y) { background: var(--ui-surface); color: var(--ui-muted); font-size: var(--ui-fs-meta); font-weight: 400; padding: 8px 12px; border-bottom: 1px solid var(--ui-rule); vertical-align: bottom; text-align: left; }
+:is(.page-shell, .drawer) table thead th.num:not(.ui-x):not(.ui-y) { text-align: right; }
+.page-shell table td, .drawer table td { padding: 12px; border-bottom: 1px solid var(--ui-rule-2); color: var(--ui-ink-2); font-size: var(--ui-fs-body); vertical-align: middle; }
+.page-shell table tbody tr:last-child td, .drawer table tbody tr:last-child td { border-bottom: 0; }
+.page-shell table tbody tr:is([role="button"], .clickable), .drawer table tbody tr:is([role="button"], .clickable) { cursor: pointer; transition: background .12s ease; }
+.page-shell table tbody tr:is([role="button"], .clickable):hover td, .drawer table tbody tr:is([role="button"], .clickable):hover td { background: var(--ui-page); }
+.page-shell table tbody tr:is([role="button"], .clickable):focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+.page-shell table td.num, .page-shell table th.num, .drawer table td.num, .drawer table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.page-shell table td.id, .drawer table td.id { color: var(--ui-ink); font-weight: 600; white-space: nowrap; }
+.page-shell table td.muted, .drawer table td.muted { color: var(--ui-muted); font-size: var(--ui-fs-meta); }
+.ui-row-go { display: inline-flex; color: var(--ui-faint); opacity: 0; transition: opacity .12s ease; }
+tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
+.ui-verdict { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.ui-verdict::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ui-faint); }
+.ui-verdict.ok::before { background: var(--ui-green); }
+.ui-verdict.bad::before { background: var(--ui-red); }
+.ui-verdict small { color: var(--ui-muted); font-size: var(--ui-fs-meta); }
