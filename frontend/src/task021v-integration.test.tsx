@@ -19,7 +19,7 @@ async function click(label:string){await act(async()=>[...document.querySelector
 it('uses saved Baseline shares and gates and keeps the original detailed timing table under more metrics',async()=>{
  await mount(<EvaluationPage data={{evaluation:baseline}}/>);
  const hero=document.querySelector('[aria-label="Baseline 报告摘要"]');expect(hero).not.toBeNull();expect(hero?.textContent).toContain('11 项 Hard Gate 全部通过，仍有 6 个 Bad Case');expect(hero?.textContent).toContain('44 / 50');expect(hero?.textContent).toContain('Max');expect(hero?.textContent).toContain('P50 16.7 秒 · P99 42.2 秒');expect(hero?.textContent).toContain('生成层问题 1');
- expect(document.querySelector('.ui-bl-bar')?.getAttribute('aria-label')).toContain('Generation 95.8%');
+ expect(document.querySelector('.ui-bl-bar')?.getAttribute('aria-label')).toContain('回答生成 95.8%');
  const more=[...document.querySelectorAll('details')].find(d=>d.querySelector('summary')?.textContent==='更多指标');expect(more).toBeDefined();expect(more?.open).toBe(false);expect(more?.textContent).toContain('耗时拆解');expect(more?.textContent).toContain('Recall@K');expect(more?.textContent).toContain('综合分');
  await act(async()=>more!.querySelector('summary')!.click());await click('展开明细');expect(more?.textContent).toContain('BM25');
 });

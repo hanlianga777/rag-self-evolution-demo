@@ -36,6 +36,7 @@ export function EvolutionTimeline({ model, baseline, questionText, onOpen, onOpe
       <div className="ui-evo-rail" aria-hidden="true"><span className={`ui-evo-dot${round.candidates.some(item => item.winner) ? " win" : ""}`} /></div>
       <div className="ui-evo-body">
         <header className="ui-evo-round-head"><h3>Round {round.round}</h3><p>{round.summary}</p></header>
+        {round.lesson && <p className="ui-body-muted" title={round.lesson.source} tabIndex={0}>本轮经验：{round.lesson.text}</p>}
         <div className="ui-evo-cards">{round.candidates.map(item => <CandidateCard key={item.id} item={item} fastest={item.id === round.fastestId} questionText={questionText} onOpen={onOpen} />)}</div>
       </div>
     </div>)}
@@ -60,8 +61,8 @@ function CandidateCard({ item, fastest, questionText, onOpen }: { item: Candidat
     <div className="ui-evo-params">{item.params.length ? item.params.map(param => <ParamChip key={param.key} label={param.label} from={param.from} to={param.to} />) : <span className="ui-evo-none">参数变化未保存</span>}</div>
     <dl className="ui-evo-facts">
       <dt>修好</dt><dd><QuestionList items={item.fixed.map(id => ({ id, tone: "fixed" as QuestionTone, question: questionText?.(id) }))} /></dd>
-      <dt>新增 Bad Case</dt><dd><QuestionList items={item.broken.map(id => ({ id, tone: "broken" as QuestionTone, question: questionText?.(id), detail: "Baseline 答对 → 本 Candidate 答错" }))} /></dd>
-      <dt>Hard Gate</dt><dd>{item.gateFailures.length ? <span className="ui-evo-fail">{item.gateFailures.join("；")}</span> : item.complete ? <span className="ui-evo-pass">全部通过</span> : "评测中"}</dd>
+      <dt>新增 Bad Case</dt><dd>{item.complete && item.newFailures === 0 ? "0" : <QuestionList items={item.broken.map(id => ({ id, tone: "broken" as QuestionTone, question: questionText?.(id), detail: "Baseline 答对 → 本 Candidate 答错" }))} />}</dd>
+      <dt>Hard Gate</dt><dd>{item.gateFailures.length ? <span className="ui-evo-fail">{item.gateFailures.join("；")}</span> : item.complete ? <span className="ui-evo-pass">{item.gates ? `${item.gates.passed} / ${item.gates.total}` : '全部通过'}</span> : "评测中"}</dd>
     </dl>
     <footer className="ui-evo-card-foot ui-num">
       <span>答对 <b>{item.correct ?? "未知"}</b> / {item.total ?? 50}</span>

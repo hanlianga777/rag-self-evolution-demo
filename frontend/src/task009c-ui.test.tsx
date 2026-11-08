@@ -48,7 +48,7 @@ it('shows the current frozen paper and the saved reviewed-import source', async 
  expect(document.querySelector('.golden-technical-details')).toBeNull();
  expect(document.querySelector('.question-provenance')).toBeNull();
  await act(async () => document.querySelector<HTMLElement>('.review-table tbody tr[role=button]')!.click());
- expect(document.querySelector('.frozen-question-details')?.textContent).toContain('人工审核导入');
+ expect(document.querySelector('.frozen-question-details')?.textContent).toContain('人工审核');
  expect([...document.querySelectorAll('button')].some(b => b.textContent === '冻结 Golden Dataset')).toBe(false);
  expect(document.querySelector('[aria-label="Golden Dataset 摘要"]')?.textContent).toContain('覆盖规划');
 });

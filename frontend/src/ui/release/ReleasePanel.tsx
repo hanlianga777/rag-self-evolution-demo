@@ -44,10 +44,10 @@ export function ReleasePanel({ online, candidate, changes, results, steps, canRe
       <div className="ui-rel-changes"><span className="ui-rel-k"><IconLabel name="pipeline">配置差异</IconLabel></span>{changes.length ? changes.map(item => <ParamChip key={item.key} label={item.label} from={item.from} to={item.to} />) : <span className="ui-evo-none">无差异</span>}</div>
 
       {results && <div className="ui-rel-results">
-        <div><span className="ui-rel-k"><IconLabel name="correct">答对</IconLabel></span><StatTransition from={results.correct.from} to={results.correct.to} unit={`/ ${results.total}`} /></div>
+        <div><span className="ui-rel-k"><IconLabel name="correct">答对</IconLabel></span><StatTransition from={results.correct.from} to={results.correct.to} unit={` / ${results.total}`} /></div>
         <div><span className="ui-rel-k"><IconLabel name="bad">新增 Bad Case</IconLabel></span><b className="ui-num">{results.newBad ?? "未知"}</b></div>
         <div><span className="ui-rel-k"><IconLabel name="gate">Hard Gate</IconLabel></span><b className="ui-num">{results.gates ? `${results.gates.passed} / ${results.gates.total}` : "未知"}</b></div>
-        <div><span className="ui-rel-k"><IconLabel name="p99">P99</IconLabel></span><StatTransition from={results.p99.from} to={results.p99.to} unit="秒" better="lower" digits={1} /></div>
+        <div><span className="ui-rel-k"><IconLabel name="p99">P99</IconLabel></span><StatTransition from={results.p99.from} to={results.p99.to} unit=" 秒" better="lower" digits={1} /></div>
       </div>}
 
       <ol className="ui-rel-steps">

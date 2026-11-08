@@ -20,7 +20,7 @@ it('opens a case by keyboard and disables zero categories without losing review 
 it('derives comparison differences and defaults to changed gates',async()=>{
  const columns=[{id:'max',label:'最高',metrics:{correct_count:45,latency_p50_seconds:15,average_estimated_cost:{amount:0.002,currency:'USD'}},gates:[{metric:'safe_rejection_rate',actual:100,threshold:95,status:'PASS'},{metric:'positive_correctness',actual:95,status:'PASS'}]},{id:'high',label:'高',current:true,metrics:{correct_count:43,latency_p50_seconds:5,average_estimated_cost:{amount:0.001,currency:'USD'}},gates:[{metric:'safe_rejection_rate',actual:90,threshold:95,status:'FAIL'},{metric:'positive_correctness',actual:95,status:'PASS'}]}];
  await mount(<ProductDiagnostics diagnostics={{thinking_comparison:{columns}}}/>);await click('查看对照');
- expect(document.body.textContent).toContain('Max多答对 2 题');expect(document.body.textContent).toContain('High快约 3.0 倍');expect(document.body.textContent).toContain('50.0%');
+ expect(document.body.textContent).toContain('Max多答对 2 题');expect(document.body.textContent).toContain('High快约 3.0 倍');expect(document.body.textContent).toContain('50%');
  expect(document.querySelector('.thinking-gates tbody')?.textContent).not.toContain('正向题（Positive）正确性');await click('显示全部 2 项');expect(document.querySelector('.thinking-gates tbody')?.textContent).toContain('正向题（Positive）正确性');
 });
 it('resolves frozen evidence through saved candidate chunks and marks final evidence',async()=>{

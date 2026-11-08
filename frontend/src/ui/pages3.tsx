@@ -66,7 +66,7 @@ export function CompareTable({ columns, rows, highlight = [] }: { columns: { nam
     return <tr key={row.label}>
       <th scope="row">{row.label}</th>
       {row.values.map((value, index) => {
-        const text = value === null || value === undefined ? "未知" : typeof value === "number" ? `${row.digits != null ? value.toFixed(row.digits) : value}${row.unit ?? ""}` : value;
+        const text = value === null || value === undefined ? "未知" : typeof value === "number" ? `${row.digits != null ? row.unit === "%" ? Number(value.toFixed(row.digits)) : value.toFixed(row.digits) : value}${row.unit ?? ""}` : value;
         const isBest = best !== null && nums[index] === best && known.filter(v => v === best).length < known.length;
         return <td key={index} className={`ui-num${highlight.includes(index) ? " hl" : ""}${isBest ? " best" : ""}`}>{text}</td>;
       })}

@@ -65,7 +65,7 @@ it("keeps frozen controls visible and renders numbered answers and source eviden
   expect(document.querySelector(".review-filters")?.textContent).not.toContain("需要人工关注 0");
   expect(document.querySelectorAll(".review-table th")).toHaveLength(6);
   expect(document.querySelector(".review-table")?.textContent).toContain("95");
-  expect(document.querySelector(".review-table")?.textContent).not.toContain("人工审核导入");
+  expect(document.querySelector(".review-table")?.textContent).not.toContain("人工审核");
   await act(async () => document.querySelector<HTMLElement>(".review-table tbody tr")!.click());
   expect(document.querySelectorAll(".golden-answer-list li")).toHaveLength(2);
   expect(document.querySelector(".frozen-question-details")?.textContent).toContain("设备手册 · p85");
@@ -89,7 +89,7 @@ it("keeps the frozen pool read only even when an older selection is stashed", as
   await act(async () => root.render(<GovernancePage data={frozenData} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "候选池")!.click());
   expect(document.body.textContent).toContain("这些题已全部进入冻结题卷");
-  expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("人工审核导入");
+  expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("人工审核");
   expect(document.body.textContent).not.toContain("创建Golden");
   expect(document.querySelector('input[type="file"]')).toBeNull();
   expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);

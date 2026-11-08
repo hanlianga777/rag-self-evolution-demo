@@ -10,8 +10,9 @@ export type CandidateView = {
   params: ParamChange[]; fixed: string[]; broken: string[]; gateFailures: string[];
   qualified: boolean | null; winner: boolean; correct: number | null; total: number | null;
   p50: number | null; p99: number | null; complete: boolean;
+  gates?: { passed: number; total: number }; newFailures?: number;
 };
-export type RoundView = { round: number; candidates: CandidateView[]; summary: string; fastestId: string | null };
+export type RoundView = { round: number; candidates: CandidateView[]; summary: string; fastestId: string | null; lesson?: { text: string; source: string } };
 export type EvolutionModel = { rounds: RoundView[]; winnerId: string | null; d: CandidateView | null; budget: { used: number; max: number } | null };
 
 export const PARAM_LABELS: Record<string, string> = {
@@ -79,6 +80,8 @@ export function candidateView(candidate: any, baselineConfig: Record<string, unk
     fixed: firstList(result.all_fixed_question_ids, result.regression?.all_fixed_question_ids),
     broken: firstList(result.new_regression_question_ids, result.newly_failed, result.comparison?.newly_failed, result.regression?.new_regression_question_ids),
     gateFailures: gateFailures(result, gateLabel),
+    newFailures: Array.isArray(result.new_regression_question_ids) ? result.new_regression_question_ids.length : undefined,
+    gates: typeof result.gates?.passed_count === 'number' && typeof result.gates?.total === 'number' ? { passed: result.gates.passed_count, total: result.gates.total } : undefined,
     qualified: typeof qualification?.qualified === "boolean" ? qualification.qualified : null,
     winner: candidate.id === winnerId,
     correct: bad === null ? null : total - bad, total,
@@ -98,6 +101,32 @@ export function roundSummary(candidates: CandidateView[]): string {
   return `本轮没有合格 Candidate${parts.length ? `：${parts.join("，")}` : ""}`;
 }
 
+function roundLesson(round: number, candidates: any[]): RoundView['lesson'] {
+  const saved = candidates.filter(item => (item.reasoning?.round || 1) === round && complete(item));
+  if (!saved.length) return;
+  const reference = new RegExp(`\\bR${round}-[ABC]\\b`);
+  for (const next of candidates.filter(item => item.reasoning?.round === round + 1)) {
+    const reasoning = next.reasoning;
+    const quotes: [string, unknown][] = [
+      ...['core_idea', 'hypothesis', 'proposal'].map(key => [key, reasoning[key]] as [string, unknown]),
+      ...(reasoning.risks || []).map((risk: any, i: number) => [`risks[${i}].reason`, risk.reason]),
+      ...(reasoning.adjustments || []).map((change: any, i: number) => [`adjustments[${i}].expected_impact`, change.expected_impact]),
+    ];
+    for (const [field, quote] of quotes) {
+      if (typeof quote !== 'string') continue;
+      const sentence = quote.split(/(?<=[。；])/).find(part => reference.test(part));
+      if (sentence) return { text: sentence.length > 40 ? `${sentence.slice(0, 39)}…` : sentence, source: `Round ${round + 1} · Candidate ${reasoning.candidate_label} · reasoning.${field}\n${quote}` };
+    }
+  }
+  const facts = saved.filter(item => Array.isArray(item.result?.all_fixed_question_ids) && Array.isArray(item.result?.new_regression_question_ids) && typeof item.result?.gates?.passed === 'boolean');
+  if (!facts.length) return;
+  const best = facts.find(item => (item.result.release_qualification || item.result.qualification)?.qualified === true && !item.result.new_regression_question_ids.length && item.result.gates.passed) || facts.reduce((a, b) => a.result.all_fixed_question_ids.length >= b.result.all_fixed_question_ids.length ? a : b);
+  const result = best.result;
+  const text = `${best.reasoning.action_name ? `${best.reasoning.action_name}：` : `${best.reasoning.candidate_label} `}修好${result.all_fixed_question_ids.length}题、${result.new_regression_question_ids.length ? `新增${result.new_regression_question_ids.length}题` : '零新增'}，Hard Gate${result.gates.passed ? '全过' : '未全过'}`;
+  const source = facts.map(item => `Round ${round} · Candidate ${item.reasoning.candidate_label} · result\naction_name：${item.reasoning.action_name || item.reasoning.candidate_label}；changed_parameters：${JSON.stringify(item.reasoning.changed_parameters || {})}\nall_fixed_question_ids：${list(item.result.all_fixed_question_ids).join('、') || '无'}；new_regression_question_ids：${list(item.result.new_regression_question_ids).join('、') || '无'}；gates：${item.result.gates.passed_count} / ${item.result.gates.total}，${item.result.gates.passed ? '全部通过' : '未全部通过'}`).join('\n');
+  return { text: text.length > 40 ? `${text.slice(0, 39)}…` : text, source };
+}
+
 export function buildEvolutionModel(experiment: any, baselineConfig: Record<string, unknown> | undefined, gateLabel: (metric: string) => string, nameOf: (candidate: any) => string): EvolutionModel {
   const candidates: any[] = experiment?.candidates || [];
   const state = experiment?.result || {};
@@ -110,7 +139,7 @@ export function buildEvolutionModel(experiment: any, baselineConfig: Record<stri
     const items = views.filter(item => item.round === round).sort((a, b) => a.label.localeCompare(b.label));
     const timed = items.filter(item => item.p50 !== null);
     const fastest = timed.length ? timed.reduce((best, item) => (item.p50 as number) < (best.p50 as number) ? item : best) : null;
-    return { round, candidates: items, summary: roundSummary(items), fastestId: fastest?.id ?? null };
+    return { round, candidates: items, summary: roundSummary(items), fastestId: fastest?.id ?? null, lesson: roundLesson(round, candidates) };
   });
   const budget = experiment?.evaluation_budget && typeof experiment.evaluation_budget.used === "number" ? { used: experiment.evaluation_budget.used, max: experiment.evaluation_budget.max } : null;
   return { rounds, winnerId, d: dRaw ? candidateView(dRaw, baselineConfig, winnerId, gateLabel, nameOf) : null, budget };

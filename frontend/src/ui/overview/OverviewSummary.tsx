@@ -23,7 +23,7 @@ export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates
     <section className="ui-ov-hero" aria-label="优化成果">
       <div className="ui-ov-main">
         <span className="ui-ov-label"><IconLabel name="correct">答对（Baseline → 最终推荐）</IconLabel></span>
-        <div className="ui-ov-big"><StatTransition from={correct.from} to={correct.to} unit={`/ ${total}`} /></div>
+        <div className="ui-ov-big"><StatTransition from={correct.from} to={correct.to} unit={` / ${total}`} /></div>
         <div className="ui-ov-facts">
           <span className="ui-ov-fact good"><Icon name="fixed" size={14} />修好 <b className="ui-num">{fixedCount ?? "未知"}</b></span>
           <span className="ui-ov-fact"><Icon name="bad" size={14} />新增 Bad Case <b className="ui-num">{newBadCount ?? "未知"}</b></span>
@@ -31,8 +31,8 @@ export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates
         </div>
       </div>
       <dl className="ui-ov-side">
-        <div><dt><IconLabel name="p99">P99</IconLabel></dt><dd><StatTransition from={p99.from} to={p99.to} unit="秒" better="lower" digits={1} /></dd></div>
-        <div><dt><IconLabel name="p50">P50</IconLabel></dt><dd><StatTransition from={p50.from} to={p50.to} unit="秒" better="lower" digits={1} /></dd></div>
+        <div><dt><IconLabel name="p99">P99</IconLabel></dt><dd><StatTransition from={p99.from} to={p99.to} unit=" 秒" better="lower" digits={1} /></dd></div>
+        <div><dt><IconLabel name="p50">P50</IconLabel></dt><dd><StatTransition from={p50.from} to={p50.to} unit=" 秒" better="lower" digits={1} /></dd></div>
         <div><dt><IconLabel name="refusal">安全拒答率</IconLabel></dt><dd><StatTransition from={safeRefusal.from} to={safeRefusal.to} unit="%" /></dd></div>
         <div><dt><IconLabel name="budget">评测预算</IconLabel></dt><dd className="ui-num"><b>{budget ? budget.used : "未知"}</b>{budget && <span className="ui-ov-of"> / {budget.max} 次</span>}</dd></div>
       </dl>

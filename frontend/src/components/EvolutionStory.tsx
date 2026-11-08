@@ -163,7 +163,7 @@ function DResultStory({experiment,evaluation,badCases}:{experiment:any;evaluatio
     <section className="d-result-predictions ui-card"><h3>预测 vs 实际</h3><p className="ui-body-muted">Winner 还剩 {qualityValue(winner,'bad')} Bad Case</p><div className="story-quality"><table aria-label="预测与实际"><thead><tr><th>核对项</th><th>Agent 预测</th><th>实际结果</th></tr></thead><tbody>
       {[
         ['预计修好的题',targets.length ? questionList(targets) : '预测未保存',`实际修好的剩余 Bad Case：${questionList(fixed)}${unpredicted===null || unpredicted.length>0 ? `；${riskRecorded ? '未预测到的新问题' : '风险清单未保存，未预测到的新问题未知'}：${questionList(unpredicted)}` : ''}`],
-        ['重点盯的受保护题',watched.length ? questionList(watched) : '预测未保存',watched.length ? watched.map(id=>`${shortQuestionId(id)}：${rowFor(id)?.passed===true ? '守住' : rowFor(id)?.passed===false ? '翻错' : '未知'}`).join('；') : '重点保护题未保存，核对结果未知'],
+        ['重点盯的受保护题',watched.length ? questionList(watched) : '预测未保存',watched.length ? watched.map(id=>`${shortQuestionId(id)}：${rowFor(id)?.passed===true ? '守住' : rowFor(id)?.passed===false ? '翻错' : saved || error || !runId ? '待核对' : '读取中'}`).join('；') : '重点保护题未保存，核对结果未知'],
         ['临界 Hard Gate',watchedGates.length ? watchedGates.map((gate:any)=>`${gateName(gate.metric)} ${gate.operator} ${gate.threshold}${gate.metric.includes('latency')?' 秒':'%'}`).join('；') : '预测未保存',watchedGates.length ? watchedGates.map(gateActual).join('；') : '核对范围未知'],
       ].map(([label,prediction,actual])=><tr key={label}>{[label,prediction,actual].map((value,index)=><td key={index}><ClampText lines={2} text={value}/></td>)}</tr>)}
     </tbody></table></div>{error && <p role="status">{error}</p>}{!saved && !error && <p className="ui-body-muted">{runId ? '正在读取保存的逐题结果…' : '逐题结果来源未保存，保护题结果与判分原因未知。'}</p>}</section>
@@ -181,7 +181,7 @@ export function qualityValue(item:any,key:string):string {
   if(key==='correct')return typeof result.total==='number' && typeof result.bad_case_count==='number' ? `${result.total-result.bad_case_count} / ${result.total}` : '未知';
   if(key==='bad')return typeof result.bad_case_count==='number' ? `${result.bad_case_count} 个` : '未知';
   if(key==='gates')return result.gates?.passed_count!=null && result.gates.total!=null ? `${result.gates.passed_count} / ${result.gates.total}` : '未知';
-  if(key==='new_failures')return Array.isArray(result.new_regression_question_ids) ? `${result.new_regression_question_ids.length} 个` : '未知';
+  if(key==='new_failures')return Array.isArray(result.new_regression_question_ids) ? String(result.new_regression_question_ids.length) : '未知';
   const value=result.metrics?.[key] ?? result[key];
   return typeof value==='number' ? key==='safe_rejection_rate' ? `${value}%` : `${value.toFixed(1)} 秒` : '未知';
 }

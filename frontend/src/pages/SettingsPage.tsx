@@ -21,8 +21,8 @@ const settingsGroups: Record<string, string[]> = {
 const parameterNotes: Record<string, string> = {
   query_rewrite: "把原问题改写为更适合检索的问法。", multi_query: "用多个互补问法查找资料。", hyde: "用假设答案辅助查找，假设文本不作为证据。",
   candidate_k: "决定进入筛选排序的候选资料数量。", hybrid_search: "结合语义相似度和关键词查找资料。", hybrid_alpha: "分配语义与BM25的权重。",
-  rerank: "调整候选资料进入回答前的排序。", top_k: "决定最终送给 Generation 模型的资料段数。", min_score: "过滤相关分低于 Hard Gate 的资料。", retrieval_max_tokens: "限制送给 Generation 模型的上下文长度；没有 tokenizer 时按字符数估算 token。",
-  prompt_strategy: "决定怎样使用证据并处理缺失条件。", generation_thinking: "控制 Generation 模型的思考投入。",
+  rerank: "调整候选资料进入回答前的排序。", top_k: "决定最终送给 回答生成模型的资料段数。", min_score: "过滤相关分低于 Hard Gate 的资料。", retrieval_max_tokens: "限制送给 回答生成模型的上下文长度；没有 tokenizer 时按字符数估算 token。",
+  prompt_strategy: "决定怎样使用证据并处理缺失条件。", generation_thinking: "控制 回答生成模型的思考投入。",
 };
 
 export function SettingsPage({ data }: { data: any }) {
@@ -44,7 +44,7 @@ export function SettingsPage({ data }: { data: any }) {
     ["分块", knowledge.chunk_strategy ? `Parent-Child 分块 · Parent ${knowledge.parent_tokens} / Child ${knowledge.child_tokens} / 重叠 ${knowledge.overlap_tokens}` : data.documents?.[0]?.chunk_strategy],
     ["Embedding 模型", knowledge.embedding_model || index.embedding_model], ["实际维度", index.dimension != null ? `${index.dimension} 维` : null],
     ["索引", index.vector_index], ["Rerank 模型", knowledge.rerank_model],
-    ["Generation 模型", pipeline?.frozen_models?.generation], ["Judge 模型", pipeline?.frozen_models?.judge],
+    ["回答生成模型", pipeline?.frozen_models?.generation], ["Judge 模型", pipeline?.frozen_models?.judge],
   ];
   const change = (key: string, value: any) => setDraft(previous => {
     const next = { ...previous, [key]: value };

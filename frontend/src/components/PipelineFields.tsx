@@ -43,7 +43,7 @@ export function estimatedCostText(metrics?: any): string | null {
 
 export function ExecutionMetrics({ metrics, compact = false }: { metrics?: any; compact?: boolean }) {
   const stages: any[] = Array.isArray(metrics?.stages) ? metrics.stages.filter((row: any) => row && typeof row.stage_name === "string" && typeof row.duration_ms === "number") : [];
-  const names: Record<string, string> = { query_processing: "查询处理", retrieval: "检索总计", vector_search: "Embedding Retrieval", bm25: "BM25", hybrid_fusion: "Hybrid 融合", candidate_selection: "候选筛选", rerank: "Rerank 方式", context_build: "上下文构建", generation: "Generation", judge: "Judge" };
+  const names: Record<string, string> = { query_processing: "查询处理", retrieval: "检索总计", vector_search: "Embedding Retrieval", bm25: "BM25", hybrid_fusion: "Hybrid 融合", candidate_selection: "候选筛选", rerank: "Rerank 方式", context_build: "上下文构建", generation: "回答生成", judge: "Judge" };
   const grouped = stages.reduce((result: Record<string, { duration: number; parent?: string }>, stage) => { const value = result[stage.stage_name] || { duration: 0, parent: stage.parent }; value.duration += stage.duration_ms; result[stage.stage_name] = value; return result; }, {});
   const usage = metrics?.token_usage;
   const cost = metrics?.cost_estimation || metrics?.estimated_cost;

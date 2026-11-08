@@ -83,7 +83,7 @@ export function AssistantPage({ productionVersion, productionLabel, isReleased =
 function Thinking({ startedAt }: { startedAt: number }) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => { const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100); return () => window.clearInterval(timer); }, [startedAt]);
-  return <article className="chat-message assistant thinking-message" aria-live="polite"><div className="message-label"><span>AI助手</span></div><p>正在检索与 Generation · {elapsed.toFixed(1)}s<span className="thinking-dots" aria-hidden="true">...</span></p></article>;
+  return <article className="chat-message assistant thinking-message" aria-live="polite"><div className="message-label"><span>AI助手</span></div><p>正在检索与回答生成 · {elapsed.toFixed(1)}s<span className="thinking-dots" aria-hidden="true">...</span></p></article>;
 }
 
 function Message({ message, onOpenCitation, onOpenDocument, onSubmitClue, onOpenAudit }: { message: ChatMessage; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void; onSubmitClue: (message: ChatMessage) => void; onOpenAudit: (message: ChatMessage) => void }) {

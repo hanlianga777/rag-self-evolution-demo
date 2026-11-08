@@ -16,7 +16,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
   const rows: { label: string; a: string; b: string; better: "a" | "b" | null }[] = runnerUp ? [
     { label: "答对", a: cnt(runnerUp), b: cnt(chosen), better: cmp(runnerUp.correct, chosen.correct, "higher") },
     { label: "新增 Bad Case", a: String(runnerUp.broken.length), b: String(chosen.broken.length), better: cmp(runnerUp.broken.length, chosen.broken.length, "lower") },
-    { label: "Hard Gate", a: runnerUp.gateFailures.length ? "未全过" : "全部通过", b: chosen.gateFailures.length ? "未全过" : "全部通过", better: null },
+    { label: "Hard Gate", a: gateCount(runnerUp), b: gateCount(chosen), better: null },
     { label: "P50", a: sec(runnerUp.p50), b: sec(chosen.p50), better: cmp(runnerUp.p50, chosen.p50, "lower") },
     { label: "P99", a: sec(runnerUp.p99), b: sec(chosen.p99), better: cmp(runnerUp.p99, chosen.p99, "lower") },
   ] : [];
@@ -59,6 +59,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
 
 const cnt = (item: CandidateView) => item.correct == null ? "未知" : `${item.correct} / ${item.total ?? 50}`;
 const sec = (value: number | null) => value == null ? "未知" : `${value.toFixed(1)} 秒`;
+const gateCount = (item: CandidateView) => item.gates ? `${item.gates.passed} / ${item.gates.total}` : item.gateFailures.length ? "未全过" : "全部通过";
 function cmp(a: number | null, b: number | null, better: "higher" | "lower"): "a" | "b" | null {
   if (a == null || b == null || a === b) return null;
   return (better === "higher" ? a > b : a < b) ? "a" : "b";

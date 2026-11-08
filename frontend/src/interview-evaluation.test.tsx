@@ -29,8 +29,8 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   expect(document.body.textContent).not.toContain("EVAL-stored");
   await click("Hard Gate");
   expect(document.querySelectorAll(".ui-hg-card li")).toHaveLength(11);
-  expect(document.querySelectorAll(".ui-hg-card")[1]?.textContent).toContain("72.0%");
-  expect(document.querySelector(".ui-hg-card ul")?.textContent).toContain("≥ 90.0%");
+  expect(document.querySelectorAll(".ui-hg-card")[1]?.textContent).toContain("72%");
+  expect(document.querySelector(".ui-hg-card ul")?.textContent).toContain("≥ 90%");
   expect(document.querySelectorAll(".ui-hg-card")).toHaveLength(4);
   await click("Bad Case 诊断");
   expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(cell => cell.textContent)).toEqual(["题号", "问题", "分类", "缺了什么", "严重程度", ""]);

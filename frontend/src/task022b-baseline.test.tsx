@@ -28,7 +28,7 @@ it('maps saved gate values, thresholds and verdicts to cards while preserving mo
   expect(document.querySelectorAll('.ui-hg-card')).toHaveLength(4);
   const items = [...document.querySelectorAll<HTMLElement>('.ui-hg-card li')];
   expect(items[0].querySelector('.ui-hg-name')?.textContent).toBe('正确性');
-  expect(items[0].textContent).toContain('83.0%≥ 90.0%');
+  expect(items[0].textContent).toContain('83%≥ 90%');
   expect(items[0].querySelector<HTMLElement>('.ui-hg-bar i')?.style.width).toBe('83%');
   expect(items[0].querySelector<HTMLElement>('.ui-hg-bar b')?.style.left).toBe('90%');
   expect(items[0].querySelector('.ui-hg-dot')?.getAttribute('aria-label')).toBe('未通过');
@@ -58,7 +58,7 @@ it('groups existing categories, filters the saved rows, resets to all and keeps 
   expect(document.querySelectorAll('.ui-bcl button')).toHaveLength(5);
   expect(layer('检索层').querySelector('strong')?.textContent).toBe('2');
   expect(layer('检索层').textContent).toContain('保存的优先修复');
-  expect(layer('安全边界').textContent).toContain('安全拒答 97.0%');
+  expect(layer('安全边界').textContent).toContain('安全拒答 97%');
   expect(layer('性能').textContent).toContain('P50 12.3 秒、P99 38.9 秒');
   expect((layer('安全边界') as HTMLButtonElement).disabled).toBe(true);
   await click(layer('检索层'));

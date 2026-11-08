@@ -13,7 +13,7 @@ const translations: Record<string, string> = {
   "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "机器合格", "ai_agent": "AI 代理",
   "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "query_only": "原问题排序", "STRICT": "严格", "FALLBACK": "回退", "ON": "开启", "OFF": "关闭",
   "Grounded": "有据生成", "Completeness": "完整性优先", "Abstention": "谨慎拒答", "Tiered": "分级回答",
-  "Query": "查询处理", "Retrieval": "检索", "Generation": "Generation",
+  "Query": "查询处理", "Retrieval": "检索", "Generation": "回答生成",
   "Pending": "待处理", "pending": "待处理", "needs_human_review": "待确认", "machine_qualified": "机器合格",
   "expected_improvement": "预期收益", "root_cause": "技术根因", "new_failures": "新增失败",
   "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
@@ -102,8 +102,8 @@ export function productionName(version: any): string {
 }
 export function questionSource(row: any): string {
   const source = row?.raw?.source;
-  if (source === "reviewed_csv_machine_checks") return "人工审核导入";
-  if (source === "business_import") return "业务导入";
+  if (source === "reviewed_csv_machine_checks") return "人工审核";
+  if (source === "business_import") return "业务提供";
   return row?.raw?.generation_run_id ? "AI 生成" : "来源未知";
 }
 

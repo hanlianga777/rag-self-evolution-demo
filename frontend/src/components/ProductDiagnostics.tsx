@@ -9,9 +9,10 @@ import { Badge, EmptyState, Metric, ProgressBar, Section, TableVerdict, Truncate
 import { Drawer } from './Dialog';
 import { businessDiagnosisRows, caseData, caseId, questionLabel } from './EvaluationDiagnosis';
 import { formatValue, parameterNames } from './PipelineFields';
+import { displayText } from '../display';
 
 type Row = Record<string, any>;
-const numeric = (value: unknown, suffix = '', decimals = 1) => typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(decimals)}${suffix}` : '未采集';
+const numeric = (value: unknown, suffix = '', decimals = 1) => typeof value === 'number' && Number.isFinite(value) ? `${suffix === "%" ? Number(value.toFixed(decimals)) : value.toFixed(decimals)}${suffix}` : '未采集';
 const costText = (value: any) => typeof value?.amount === 'number' && value.currency ? `${value.currency === 'USD' ? '$' : value.currency + ' '}${value.amount.toFixed(4)}（估算）` : '未采集';
 const gateLabels: Record<string, string> = { positive_correctness:'正向题（Positive）正确性', positive_faithfulness:'正向题（Positive）忠实性', positive_completeness:'正向题（Positive）完整性', ablation_correctness:'消融题（Ablation）正确性', ablation_faithfulness:'消融题（Ablation）忠实性', ablation_completeness:'消融题（Ablation）完整性', safe_rejection_rate:'安全拒答率', safety_critical_accuracy:'安全关键准确率', prompt_injection_resistance:'提示注入抵抗', latency_p50_seconds:'回答耗时中位数', latency_p99_seconds:'回答耗时（最慢 1%）' };
 const listText = (value: unknown) => Array.isArray(value) ? value.filter(Boolean).join('；') : typeof value === 'string' ? value : '';
@@ -52,7 +53,7 @@ export function BadCaseOverview({rows,categories=[],priorities=[],latencyGates=[
 }
 
 export function timingStages(diagnostics?:Row) {
- const rawStages:Row[]=(diagnostics?.objective_metrics?.stage_breakdown || []).filter((row:Row)=>row.stage!=='judge');
+ const rawStages:Row[]=(diagnostics?.objective_metrics?.stage_breakdown || []).filter((row:Row)=>row.stage!=='judge').map((row:Row)=>({...row,label:displayText(row.label)}));
  const tiny=rawStages.filter(row=>typeof row.share_percent==='number' && row.share_percent<0.5).sort((a,b)=>b.total_ms-a.total_ms);
  const stages=[...rawStages.filter(row=>!tiny.includes(row)),...(tiny.length?[{stage:'other_stages',label:'其他环节',total_ms:tiny.reduce((sum,row)=>sum+row.total_ms,0),share_percent:tiny.reduce((sum,row)=>sum+row.share_percent,0)}]:[])].sort((a,b)=>b.total_ms-a.total_ms);
  return {stages,tiny};
@@ -90,7 +91,8 @@ export function ProductDiagnostics({diagnostics,judgeThinking}: {diagnostics?:Ro
 }
 
 export function StrategyPresentation({reasoning={}}: {reasoning?:Row}) {
+ const isD=reasoning.candidate_label==='D';
  const adjustments:Row[]=Array.isArray(reasoning.adjustments)?reasoning.adjustments:[];
- const risks:Row[]=Array.isArray(reasoning.risks)?reasoning.risks:[];
- return <div className="strategy-presentation"><h3>{reasoning.strategy_name || '尚未保存策略名'}</h3><h4>核心思路</h4><div className="muted-prose"><TruncatedText lines={3}>{reasoning.core_idea || '尚未保存核心思路。'}</TruncatedText></div><h4>调整项</h4>{adjustments.length ? <div className="table-scroll product-table strategy-adjustments"><DataTable><colgroup><col style={{width:140}}/><col style={{width:90}}/><col style={{width:90}}/><col/></colgroup><thead><tr><th>参数</th><th>基线值</th><th>方案值</th><th>预期影响</th></tr></thead><tbody>{adjustments.map((item,index)=><tr key={`${item.parameter}-${index}`}><td>{parameterNames[item.parameter] || '参数名称未采集'}</td><td className={typeof item.baseline_value === "number" ? "num" : "muted"}>{formatValue(item.baseline_value)}</td><td className={typeof item.candidate_value === "number" ? "num" : "muted"}>{formatValue(item.candidate_value)}</td><td>{item.expected_impact || '尚未保存预期影响'}</td></tr>)}</tbody></DataTable></div> : <p className="muted">尚未保存调整项。</p>}<h4>风险</h4>{risks.length ? <ul>{risks.map((risk,index)=><li key={index}>{(risk.question_ids || []).map(questionLabel).join('、')}{risk.metric && ` ${gateLabels[risk.metric] || '相关指标'}`}：{risk.reason || '尚未保存风险原因'}</li>)}</ul> : <p className="muted">尚未保存风险说明。</p>}</div>;
+ const risks:Row[]=Array.isArray(reasoning.risks) && reasoning.risks.length ? reasoning.risks : isD && reasoning.risk ? [{reason:reasoning.risk}] : [];
+ return <div className="strategy-presentation"><h3>{reasoning.strategy_name || (isD && reasoning.action_name) || '尚未保存策略名'}</h3><h4>核心思路</h4><div className="muted-prose"><TruncatedText lines={3}>{reasoning.core_idea || (isD && reasoning.hypothesis) || '尚未保存核心思路。'}</TruncatedText></div><h4>调整项</h4>{adjustments.length ? <div className="table-scroll product-table strategy-adjustments"><DataTable><colgroup><col style={{width:140}}/><col style={{width:90}}/><col style={{width:90}}/><col/></colgroup><thead><tr><th>参数</th><th>基线值</th><th>方案值</th><th>预期影响</th></tr></thead><tbody>{adjustments.map((item,index)=><tr key={`${item.parameter}-${index}`}><td>{parameterNames[item.parameter] || '参数名称未采集'}</td><td className={typeof item.baseline_value === "number" ? "num" : "muted"}>{formatValue(item.baseline_value)}</td><td className={typeof item.candidate_value === "number" ? "num" : "muted"}>{formatValue(item.candidate_value)}</td><td>{item.expected_impact || '尚未保存预期影响'}</td></tr>)}</tbody></DataTable></div> : <p className="muted">{isD && Object.keys(reasoning.changed_parameters || {}).length ? "调整参数见下方参数差异。" : "尚未保存调整项。"}</p>}<h4>风险</h4>{risks.length ? <ul>{risks.map((risk,index)=><li key={index}>{(risk.question_ids || []).map(questionLabel).join('、')}{risk.metric && ` ${gateLabels[risk.metric] || '相关指标'}`}：{risk.reason || '尚未保存风险原因'}</li>)}</ul> : <p className="muted">尚未保存风险说明。</p>}</div>;
 }

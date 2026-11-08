@@ -16,7 +16,7 @@ it("shows assistant waiting inline and renders a complete synchronous answer at 
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><AssistantPage badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} /></OperationProvider>));
   await act(async () => document.querySelector<HTMLButtonElement>(".empty-chat button")!.click());
-  expect(document.querySelector(".thinking-message")?.textContent).toContain("正在检索与 Generation");
+  expect(document.querySelector(".thinking-message")?.textContent).toContain("正在检索与回答生成");
   expect(document.querySelector(".ui-run")).toBeNull();
   await act(async () => respond(new Response(JSON.stringify({ baseline: { answer: "完整回答内容", sources: [], evidence: [] }, model: "DeepSeek", mode: "live" }), { status: 200 })));
   expect(document.querySelector(".thinking-message")).toBeNull();

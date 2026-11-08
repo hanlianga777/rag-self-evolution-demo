@@ -42,7 +42,7 @@ it('explains all remaining failures from saved positions and new failures from t
  expect(document.querySelector<HTMLDetailsElement>('details.d-result-causes')?.open).toBe(false);
  expect(fetcher.mock.calls).toHaveLength(1);expect(String(fetcher.mock.calls[0])).toContain('/api/evaluations/d-run');
  expect(document.querySelector('.d-result-story')!.textContent).not.toMatch(/CSV-|EXP-|EVAL-|DOC-|随机|不稳定|复跑/);
- expect(document.querySelector('.d-result-story [aria-label="方案质量对比"]')!.textContent).toContain('新增 Bad Case 数0 个1 个');
+ expect(document.querySelector('.d-result-story [aria-label="方案质量对比"]')!.textContent).toContain('新增 Bad Case 数01');
 });
 it('uses one concrete saved conclusion in the D node, route final node and final tab',async()=>{
  const experiment=exp();mockRun();expect(recommendationReason(experiment)).toBe(expected);
@@ -59,7 +59,7 @@ it.each(['missing','wrong identity','error'])('never calls missing protected-cas
  mockRun(value);if(kind==='error')vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('offline');}));
  await mount(<DStory experiment={exp()} evaluation={evaluation}/>);
  const text=document.querySelector('[aria-label="预测与实际"]')!.textContent;
- expect(text).toContain('Q17：未知');expect(text).not.toContain('全部守住');
+ expect(text).toContain('Q17：待核对');expect(text).not.toContain('全部守住');
  if(kind!=='missing')expect(document.querySelector('.d-result-causes')!.textContent).toContain('判分违规说明未知');
 });
 it('reports a watched question flipping and a gate breach instead of claiming they held',async()=>{
@@ -89,7 +89,7 @@ it('keeps actual repairs separate from the prediction list and does not invent a
 it('keeps results without a saved run source usable and marks case explanations unknown',async()=>{
  const fetcher=mockRun();const experiment=exp();delete experiment.candidates[1].result.evaluation_run_id;
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
- expect(fetcher).not.toHaveBeenCalled();expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).toContain('Q17：未知');
+ expect(fetcher).not.toHaveBeenCalled();expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).toContain('Q17：待核对');
  expect(document.querySelector('.d-result-causes')!.textContent).toContain('判分违规说明未知');
 });
 it('does not present baseline repairs as improvements over the winner when that comparison is missing',async()=>{
