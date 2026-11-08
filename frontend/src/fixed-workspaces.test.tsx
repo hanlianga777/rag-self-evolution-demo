@@ -30,7 +30,7 @@ it("keeps only the selected governance workspace visible", async () => {
 it("shows one Evolution stage instead of four stacked cards", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ evaluation: {}, badCases: [] }} />));
-  expect(document.body.textContent).toContain("问题诊断");
+  expect(document.body.textContent).toContain("查看 Bad Case 诊断"); expect(document.querySelectorAll(".tabs button")).toHaveLength(5);
   expect(document.body.textContent).not.toContain("Sandbox 对比");
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent?.includes("Sandbox"))!.click());
   expect(document.body.textContent).toContain("Sandbox 对比");

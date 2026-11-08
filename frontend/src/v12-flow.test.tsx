@@ -149,8 +149,8 @@ for (const count of [10, 12, 19]) {
 it("keeps the Overview target at 20 and points a partial Run to refill", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OverviewPage data={{ overview: { dataset: { total: 10, expected_count: 20, generation_status: "needs_regeneration", approved: 0, pending_review: 10 } }, workspace: {} }} navigate={() => {}} />));
-  expect(document.querySelector('[aria-label="进化主链路"]')?.textContent).toContain("0 / 20");
-  expect(document.querySelector("#next-action-title")?.textContent).toBe("补齐失败题（10）");
+  expect(document.querySelector('[aria-label="从知识到线上改善"]')?.textContent).toContain("0 / 20");
+  expect(document.querySelector(".ui-ov-action")?.textContent).toBe("补齐失败题（10）");
   await act(async () => root.unmount());
 });
 
@@ -215,6 +215,8 @@ it("confirms an evaluated qualified winner and then offers composite D", async (
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Sandbox")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "最终推荐")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("确认报告"))!.click());
+  expect(requests).toHaveLength(0);
+  await act(async()=>document.querySelector<HTMLButtonElement>(".confirm-dialog button.primary")!.click());
   expect(requests[0]).toEqual({ url: expect.stringContaining("/api/experiments/EXP1/recommendation"), body: { candidate_id: "A1", actor: "human" } });
   await act(async () => root.unmount());
 });

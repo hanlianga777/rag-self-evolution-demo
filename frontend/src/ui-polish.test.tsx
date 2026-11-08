@@ -25,7 +25,7 @@ it("uses the stage flow on Overview without redundant numbered storyline", async
   root = createRoot(document.body.appendChild(document.createElement("div")));
   const data = { documents: [], overview: { dataset: {}, production: { id: "production-long-id", provenance: "published", config: {} } }, versions: [], evaluation: {}, optimization: {} };
   await act(async () => root!.render(<OverviewPage data={data} navigate={() => {}} />));
-  expect(document.querySelector('nav[aria-label="进化主链路"].story-chain')).not.toBeNull();
+  expect(document.querySelector('nav[aria-label="从知识到线上改善"].ui-ov-flow')).not.toBeNull();
   expect(document.body.textContent).not.toContain("Baseline 发现问题 → Agent 提出假设");
   expect(document.body.textContent).not.toContain("01");
   expect(document.querySelector(".optimization-results")).toBeNull();

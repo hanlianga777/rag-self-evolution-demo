@@ -1,9 +1,8 @@
-import {qualityValue, recommendationOf, schemeName} from "../components/EvolutionStory";
+import {completeResult, recommendationOf, schemeName} from "../components/EvolutionStory";
 import { PageShell } from "../components/PageShell";
 import { useState } from "react";
 import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
-import { ArrowRight } from "lucide-react";
-import { Metric, Section } from "../components/Primitives";
+import { OverviewSummary } from "../ui/overview/OverviewSummary";
 import { displayText, productionName } from "../display";
 import type { Page } from "../types";
 
@@ -54,24 +53,43 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const metrics = run?.status === "completed" && !run.requires_policy_upgrade && !data.workspace?.requires_policy_upgrade && !data.workspace?.requires_new_golden && !data.workspace?.requires_new_baseline && !data.workspace?.baseline_unavailable_reason && (data.workspace?.current_baseline_id === undefined || data.workspace.current_baseline_id === run.id) ? run.result : null;
   const finalCandidate=candidates.find(c=>c.id===recommendationOf(experiment).recommended_candidate);
   const storyBaseline=metrics ? run : undefined;
-  const storyTrials=candidates.filter((c:any)=>c.status!=="skipped" && (c.result?.evaluation_run_id || c.status==="evaluated" || c.status==="running")).length;
   const storyRounds=new Set(candidates.filter((c:any)=>["A","B","C"].includes(c.reasoning?.candidate_label)).map((c:any)=>c.reasoning?.round || 1)).size;
+  const baseResult = completeResult(storyBaseline);
+  const finalResult = completeResult(finalCandidate);
+  const number = (result: any, key: string): number | null => {
+    if (!result) return null;
+    if (key === "correct") return typeof result.total === "number" && typeof result.bad_case_count === "number" ? result.total - result.bad_case_count : null;
+    const value = result.metrics?.[key] ?? result[key];
+    return typeof value === "number" ? value : null;
+  };
+  const pair = (key: string) => ({from: number(baseResult, key), to: number(finalResult, key)});
+  const candidateName = finalCandidate ? schemeName(finalCandidate).replace(/^Round \d+ · /, "") : "";
+  const readyToRelease = recommendation.status === "Recommended" && !!finalCandidate && next[2] === "versions";
+  const primaryLabel = currentReleased ? "去问答验证" : readyToRelease ? "去发布" : next[0];
+  const budget = experiment.evaluation_budget;
+  const flow = [
+    {label: "知识库", fact: stages[0][1], tips: [knowledge?.identity ? "当前知识资产已建立" : "请先建立知识处理 Pipeline", stages[1][1]], page: "knowledge"},
+    {label: "Golden Dataset", fact: stages[2][1], tips: [frozen ? "正式题卷已人工确认" : "完成审核后冻结正式题卷", completeGroups ? "正向、消融、负向分类完整" : "题目分类需核对"], page: "governance"},
+    {label: "Baseline", fact: stages[3][1], tips: [run?.status === "completed" ? "指标来自保存的正式评测" : "等待正式评测完成", data.workspace?.baseline_unavailable_reason || "同题卷用于候选对照"], page: "evaluation"},
+    {label: "Agent", fact: experiment.id ? `${storyRounds} 轮 · ${candidates.length} 个 Candidate` : stages[4][1], tips: [sandboxPaused ? "已保存断点，等待平价时段" : sandboxIncomplete ? "候选评测尚未完成" : stages[4][1], "修复与副作用由 Sandbox 核对"], page: "evolution"},
+    {label: "发布", fact: stages[5][1], tips: ["发布需要人工确认", "线上身份以保存的版本为准"], page: "versions"},
+    {label: "问答验证", fact: currentReleased ? "可验证线上回答" : "可查看当前线上配置", tips: ["逐题比较 Baseline 与线上回答", "反馈可作为再次进化的线索"], page: "verification"},
+  ].map(step => ({...step, onClick: () => navigate(step.page as Page)}));
 
-  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1>RAG 自进化项目概览</h1><p>评测驱动的 RAG 持续优化与版本决策系统</p><p className="overview-intro">用 Golden Dataset 评测 Baseline，优化 Agent 分析 Bad Case，在 Sandbox 验证改善并完成 Regression Check 后，由人工确认发布。</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
+  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1>RAG 自进化项目概览</h1><p>评测驱动的 RAG 持续优化与版本决策系统</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
 
 
     {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} /> : <>
-    <div className="metrics-grid story-achievements" aria-label="优化成果">
-      <Metric label="答对数" value={`${qualityValue(storyBaseline,'correct')} → ${qualityValue(finalCandidate,'correct')}`} note="Baseline → 最终推荐"/>
-      <Metric label="最慢回答 P99" value={`${qualityValue(storyBaseline,'latency_p99_seconds')} → ${qualityValue(finalCandidate,'latency_p99_seconds')}`} note="Baseline → 最终推荐"/>
-      <Metric label="安全拒答率" value={`${qualityValue(storyBaseline,'safe_rejection_rate')} → ${qualityValue(finalCandidate,'safe_rejection_rate')}`} note="Baseline → 最终推荐"/>
-      <Metric label="Agent 轮次" value={experiment?.id ? `${storyRounds} 轮` : '尚未开始'} note="从保存的方案统计"/>
-      <Metric label="评测方案数" value={experiment?.id ? `${storyTrials} 个` : '尚未开始'} note="含已启动的融合方案"/>
-    </div>
-    <Section title="从知识到线上改善"><nav className="story-chain" aria-label="进化主链路">{[['知识库','knowledge'],['Golden 题卷','governance'],['Baseline','evaluation'],['Agent','evolution'],['发布','versions'],['问答验证','verification']].map(([label,page],index)=><a key={page} href={`#${page}`} onClick={()=>navigate(page as Page)}><div><span>{label}</span><small>{page==="governance" ? frozen ? `已冻结 · ${expectedCount} 题` : `待人工确认 · ${summary.approved || 0} / ${expectedCount || "未知"} 题` : stages.find(item=>item[2]===page)?.[1] || "验证线上改善"}</small></div>{index<5 && <ArrowRight size={16} aria-hidden="true"/>}</a>)}</nav></Section>
-    <section className="next-action" aria-labelledby="next-action-title"><div><span className="next-action-label">{currentReleased ? "当前推荐演示 · Baseline 与线上版本" : "当前下一步"}</span><h2 id="next-action-title">{next[0]}</h2><p>{next[1]}</p></div><a className="primary" href={`#${next[2]}`} onClick={() => navigate(next[2])}>{currentReleased ? "开始方案对比" : next[0]}<ArrowRight size={15} aria-hidden="true" /></a></section>
-
-    {productionLegacy && <section className="legacy-production"><span>线上版本：{productionName(production)}，优化方案通过发布确认后才会替换。</span><a href="#verification" onClick={() => navigate("verification")}>查看线上版本</a></section>}
+    <OverviewSummary correct={pair("correct")} total={baseResult?.total ?? expectedCount}
+      fixedCount={Array.isArray(finalResult?.all_fixed_question_ids) ? finalResult.all_fixed_question_ids.length : null}
+      newBadCount={Array.isArray(finalResult?.new_regression_question_ids) ? finalResult.new_regression_question_ids.length : null}
+      gates={typeof finalResult?.gates?.passed_count === "number" && typeof finalResult?.gates?.total === "number" ? {passed: finalResult.gates.passed_count, total: finalResult.gates.total} : null}
+      p99={pair("latency_p99_seconds")} p50={pair("latency_p50_seconds")} safeRefusal={pair("safe_rejection_rate")}
+      budget={Number.isFinite(budget?.used) && Number.isFinite(budget?.max) ? budget : null}
+      status={{kind: currentReleased ? "released" : readyToRelease ? "pending_release" : sandboxRunning ? "running" : "waiting",
+        candidate: currentReleased ? `${candidateName} 已发布` : readyToRelease ? `${candidateName} 推荐待发布` : next[1],
+        online: currentReleased ? candidateName : released ? productionName(production) : "初始配置"}}
+      primaryAction={{label: primaryLabel, onClick: () => navigate(currentReleased ? "verification" : next[2])}} flow={flow} />
     </>}
 
   </PageShell>;

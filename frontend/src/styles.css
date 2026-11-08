@@ -1383,7 +1383,7 @@ button { border-radius:8px; }
 
 /* 021b: saved-evidence story, using the existing card and drawer system. */
 :is(.evolution-page,.overview-page,.versions-page,.verification-page) {
-  --status:#315a3b; --card-good-ink:#315a3b; --status-bg:#f2f7f3;
+  --status:var(--ui-ink-2); --card-good-ink:var(--ui-ink-2); --status-bg:var(--ui-rule-2);
 }
 .overlay { background:rgb(0 0 0 / 38%); }
 .evolution-route { border-left:2px solid var(--line); margin-left:8px; padding-left:20px; }
@@ -1476,3 +1476,6 @@ button { border-radius:8px; }
 .architecture-challenges span,.architecture-challenges small { color:var(--muted); font-size:12px; }
 .architecture-challenges strong { color:var(--ink); font-size:14px; font-weight:600; }
 @media (max-width:700px) { .architecture-challenges { grid-template-columns:1fr; } }
+
+/* QuestionBadge tone must not activate Tailwind position:fixed. */
+.ui-q.fixed { position:static; }

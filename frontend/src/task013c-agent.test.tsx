@@ -32,7 +32,7 @@ it('does not promise automatic continuation for permission or identity failures'
 });
 it('reads budget usage from the API even when several candidates are interrupted',async()=>{
  await mount(experiment(['A','B','C'].map(label=>candidate(label,'failed',{evaluation_complete:false},{product_interruption:true})),{evaluation_budget:{used:0,max:12,reserved_for_d:1}}));
- expect(document.querySelector('.stage-stepper')?.parentElement?.textContent).toContain('已评测 0 / 12 次');
+ expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('0 / 12');
  await click('进化路线');
  expect(document.body.textContent).not.toContain('3 / 12');
 });
@@ -44,8 +44,7 @@ it('does not infer paid usage from candidate statuses when the budget is missing
 });
 it('keeps every single-pass failed question as a target even with a legacy exclusion flag',async()=>{
  await mount(experiment([]),[true,false].map((target,index)=>({id:'bad-'+index,run_id:'baseline',question_id:'Q0'+index,result:{passed:false,optimization_target:target,question:'问题'+index}})));
- await click('问题诊断');
- expect(document.body.textContent).toContain('本轮 2 道错题，2 道作为优化目标');
+ expect(document.querySelector('.ui-evo-start')?.textContent).toContain('2 个 Bad Case'); expect(document.querySelectorAll('.agent-fact')).toHaveLength(2);
 });
 it('moves unfinished planning into More after a Sandbox exists and makes progress the primary action',async()=>{
  await mount(experiment([candidate('A','failed',{evaluation_run_id:'saved-run',evaluation_complete:false},{product_interruption:true})],{coverage_plan:{status:'incomplete',covered_count:0,total:1,binding:'binding',matrix:[{question_id:'CSV-20261101100758945425-41',candidates:[],gap:'本轮剩余A/B/C容量不足，需明确调整规划，不能宣称完成'}]}}));
@@ -57,7 +56,7 @@ it('moves unfinished planning into More after a Sandbox exists and makes progres
  expect(document.querySelector('.tabs button.active')?.textContent).toBe('Sandbox');
  await click('更多');
  expect(document.querySelector('[role="menu"]')?.textContent).toContain('补齐本轮规划（不收费）');
- expect(document.querySelectorAll('.stage-stepper li')[1].textContent).toContain('有覆盖缺口');
+ expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('有覆盖缺口');
  await click('进化路线');
  const detail=document.querySelector('.page-content')!.textContent;
  expect(detail).toContain('Q41 暂时没有方案覆盖');

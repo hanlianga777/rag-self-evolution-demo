@@ -31,7 +31,7 @@ const navigation: { id: Page; label: string; icon: typeof BarChart3 }[] = [
   { id: "versions", label: "发布", icon: Sparkles }, { id: "verification", label: "问答验证", icon: MessageCircle },
 ];
 const items = navigation;
-const pageFromHash = (): Page => items.find(item => `#${item.id}` === location.hash)?.id || "overview";
+const pageFromHash = (): Page => items.find(item => `#${item.id}` === location.hash.split("?")[0])?.id || "overview";
 
 export default function App() {
   const [pages, setPages] = useState<Partial<Record<Page, AppData>>>({}); const [error, setError] = useState(""); const [page, setPage] = useState<Page>(pageFromHash);

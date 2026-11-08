@@ -43,7 +43,7 @@ it('never guesses highlights or missing metrics, and derives the critical parame
 });
 it('counts qualified D alongside the qualified saved round candidate',async()=>{
  await mount(<OverviewPage data={{optimization:{candidates:[{id:'C',reasoning:{round:3,candidate_label:'C'},result:{qualification:{qualified:true}}},{id:'D',reasoning:{candidate_label:'D'},result:{qualification:{qualified:true}}}]}}} navigate={()=>{}}/>);
- expect(document.querySelector('.story-chain')?.textContent).toContain('2 个合格方案 · Round 3 · Candidate C / Candidate D');
+ await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ov-step-wrap:nth-child(4) button')!.focus()); expect(document.body.textContent).toContain('2 个合格方案');
 });
 it('handles repeated chapters, alternate document titles and multiple page references without deleting surrounding prose',()=>{
  const evidence=[source,{...source,document:'宇树_B2电池与充电器使用说明_中文版.pdf',page_start:12,section_path:'检查'},{...source,document:'宇树_B2四足机器人用户手册_中文版.pdf',page_start:18,section_path:'检查表'}];

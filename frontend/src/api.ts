@@ -85,7 +85,7 @@ const pageInputs: Record<Page, (keyof AppData)[]> = {
   overview: ['workspace','overview','documents','optimization'],
   knowledge: ['workspace','overview','documents'], settings: ['workspace','documents'],
   governance: ['workspace'], evaluation: ['workspace','evaluation','badCases','optimization'],
-  evolution: ['workspace','evaluation','badCases','optimization'],
+  evolution: ['workspace','evaluation','badCases','optimization','versions'],
   versions: ['workspace','evaluation','optimization','versions'],
   verification: ['workspace','evaluation','badCases','optimization','versions','readiness','monitoring'],
 };

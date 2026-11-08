@@ -52,7 +52,7 @@ it.each(['declined','lost','won','running','generated','failed','unknown'])('exp
  if(outcome==='unknown')d.result={...d.result,evaluation_complete:false} as any;
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
  await mount(<EvolutionPage data={{evaluation,optimization:exp}}/>);
- const route=document.querySelector('.evolution-route > .panel:last-of-type')?.textContent || '';
+ const route=document.querySelector('.ui-evo .d-story')?.textContent || '';
  await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='最终推荐')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
  const final=document.querySelector('.page-content')!.textContent || '';
  for(const text of [route,final]){
@@ -70,8 +70,8 @@ it.each([
  if(status!=='declined')exp.candidates.push({...winner,id:'EXP-20261105143048349606-D',status,reasoning:{candidate_label:'D'} as any});
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
  await mount(<EvolutionPage data={{evaluation,optimization:exp}}/>);
- expect(document.querySelector('.experiment-progress')?.textContent).toContain(label);
- expect(document.querySelector('.experiment-progress')?.textContent).toContain('Round 3 · Candidate C');
+ expect(document.querySelector('.ui-agent-stats')?.textContent).toContain(label);
+ expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('Round 3 · Candidate C');
  expect([...document.querySelectorAll('button')].some(b=>/^历史实验 · \d/.test(b.textContent || ''))).toBe(false);
  await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label="页面更多操作"]')!.click());
  expect([...document.querySelectorAll('[role="menuitem"]')].some(b=>b.textContent==='查看历史实验')).toBe(true);

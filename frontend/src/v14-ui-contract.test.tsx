@@ -242,15 +242,15 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
 it.each([undefined, "running", "failed"])("review R2 keeps %s Baseline at Evaluation before Agent", async status => {
   const input = { ...data("B1"), snapshots: [{ id: identity("B1").current_golden_id, status: "approved", snapshot: { question_ids: ["Q1"], questions: [{ id: "Q1", test_category: "positive" }] } }], overview: { dataset: { expected_count: 1, approved: 1 } }, evaluation: status ? { id: "B1", status } : {} };
   await render(<OverviewPage data={input} navigate={() => {}} />);
-  expect(document.querySelector(".next-action a")?.getAttribute("href")).toBe("#evaluation");
-  expect(document.querySelector(".next-action")?.textContent).not.toContain("运行 Optimization Agent");
+  expect(document.querySelector(".ui-ov-action")?.textContent).toMatch(/Baseline/);
+  expect(document.querySelector(".ui-ov-status")?.textContent).not.toContain("运行 Optimization Agent");
 });
 
 it("review R2 an older Production does not finish a new recommendation Gate3", async () => {
   const candidate = { id: "E1-A", status: "evaluated", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
   const input = { ...data("B1"), snapshots: [{ id: identity("B1").current_golden_id, status: "approved", snapshot: { question_ids: ["Q1"], questions: [{ id: "Q1", test_category: "positive" }] } }], overview: { dataset: { expected_count: 1, approved: 1 } }, evaluation: { id: "B1", status: "completed" }, optimization: { id: "E1", baseline_run_id: "B1", candidates: [candidate], recommendation: { result: { status: "Recommended", recommended_candidate: candidate.id } } }, versions: [{ id: "P0", status: "active", provenance: "published", snapshot: { candidate_id: "E0-C" } }] };
   await render(<OverviewPage data={input} navigate={() => {}} />);
-  expect(document.querySelector(".next-action h2")?.textContent).toContain("人工确认发布");
+  expect(document.querySelector(".ui-ov-action")?.textContent).toBe("去发布");
   await act(async () => root.render(<VersionsPage data={input} />));
   expect(document.querySelector('[aria-label="发布阶段"]')).toBeNull();
   expect(document.querySelector(".pending-release")?.textContent).toContain("方案 A");

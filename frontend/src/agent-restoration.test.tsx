@@ -15,8 +15,8 @@ async function click(label: string) { await act(async () => [...document.querySe
 
 it("restores stages and complete generated plans without inventing evaluated results", async () => {
   const frozen = JSON.stringify(data); await mount();
-  expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
-  expect(document.body.textContent).toContain("Bad Case 1 题");
+  expect(document.querySelectorAll(".tabs button")).toHaveLength(5); expect(document.querySelectorAll(".ui-agent-stats > div")).toHaveLength(4);
+  expect(document.body.textContent).toContain("1 个 Bad Case");
   await click("进化路线");
   expect(document.body.textContent).toContain("问题与策略关联");
   expect(document.querySelectorAll(".strategy-hypotheses > section")).toHaveLength(3);
@@ -41,18 +41,19 @@ it("shows a status row and separate candidate/release decision rows and blocks G
 
 it("keeps a failed next-round generation visible alongside prior saved candidates", async () => {
   await mount({ ...data, optimization: { ...data.optimization, status: "failed" } });
-  const generation = document.querySelectorAll(".stage-stepper li")[1];
-  expect(generation.classList.contains("blocked")).toBe(true);
+  const generation = document.querySelector(".ui-agent-stats")!;
   expect(generation.textContent).toContain("生成失败");
 });
 
-it("starts an eligible Sandbox continuation without another fee confirmation", async () => {
+it("confirms an eligible Sandbox continuation before executing it", async () => {
   await mount({ ...data, optimization:{ ...data.optimization, candidates:[{ ...candidates[0],status:"failed",result:{evaluation_run_id:"PARTIAL"}},candidates[1],candidates[2]] } });
   await click("A/B/C/D");
   const button=[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="继续 Sandbox")!;
   expect(button.disabled).toBe(false);
   await click("继续 Sandbox");
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.querySelector(".confirm-dialog")).not.toBeNull();
+  expect((fetch as any).mock.calls.some(([,init]:any)=>init?.method==="POST")).toBe(false);
+  await act(async()=>document.querySelector<HTMLButtonElement>(".confirm-dialog button.primary")!.click());
   expect((fetch as any).mock.calls.some(([,init]:any)=>init?.method==="POST")).toBe(true);
 });
 
@@ -63,6 +64,7 @@ it("allows manual continuation of an interrupted candidate when its cycle is no 
   expect(button).toBeDefined();
   expect(button!.disabled).toBe(false);
   await click('继续 Sandbox');
+  await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog button.primary')!.click());
   expect((fetch as any).mock.calls.some(([url,init]:any)=>url.endsWith('/candidates/EXP-R1-A/run') && init?.method==='POST')).toBe(true);
 });
 
@@ -72,6 +74,7 @@ it("runs three saved candidates while retaining an honest uncovered-question war
   const runButton=[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='运行 Sandbox')!;
   expect(runButton.disabled).toBe(false);
   await act(async()=>runButton.click());
+  await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog button.primary')!.click());
   expect((fetch as any).mock.calls.some(([url,init]:any)=>url.endsWith('/candidates/EXP-R1-A/run') && init?.method==='POST')).toBe(true);
 });
 

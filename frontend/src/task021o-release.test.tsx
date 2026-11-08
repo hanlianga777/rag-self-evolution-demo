@@ -24,7 +24,7 @@ it('explains alternatives from saved repairs, regressions and gates rather than 
  expect(rows[0]).toContain('修好 Q24');expect(rows[0]).toContain('新弄坏 Q13');expect(rows[0]).toContain('不满足零新增 Bad Case');
  expect(rows[1]).toContain('最慢回答 P99');expect(rows[1]).toContain('超过 60 秒');
  expect(rows[2]).toContain('合格，但比 Round 3 · Candidate D 多错 1 个（Q04）');
- expect(document.querySelector('.experiment-budget')?.textContent).toBe('已评测 10 / 12 次（含 Candidate D）');
+ expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('10 / 12');
 });
 it('hides the entire thinking comparison section when no columns exist',async()=>{
  await mount(<ProductDiagnostics diagnostics={{thinking_comparison:{columns:[],note:'尚无可比较的回答档位记录'}}}/>);
@@ -58,7 +58,7 @@ it('links to published records once the recommended candidate has been released'
  const d={...candidate('EXP-D',{qualification:{qualified:true}}),release_state:{human_release:true}};
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{id:'exp',candidates:[d],recommendation:{recommended_candidate:'EXP-D'}}}}/>);
- expect(document.querySelector('.evolution-route a[href="#versions"]')?.textContent).toBe('查看发布记录');
+ expect(document.querySelector('.ui-evo a[href="#versions"]')).toBeNull(); expect(document.querySelector('.ui-evo')?.textContent).toContain('查看最终推荐');
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='最终推荐')!.click());
  expect(document.querySelector('.page-content a[href="#versions"]')?.textContent).toBe('查看发布记录');
 });

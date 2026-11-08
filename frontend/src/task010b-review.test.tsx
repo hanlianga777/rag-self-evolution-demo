@@ -12,14 +12,13 @@ const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendCh
 it('shows the supplied budget before creating an experiment',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{status:'not_run',evaluation_budget:{used:0,max:12,reserved_for_d:1}}}}/>);
- expect(document.querySelector('.page-shell-header .experiment-progress')?.textContent).toContain('已评测 0 / 12 次（含方案 D）');
+ expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('0 / 12');
  expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });
 it('uses true errors in the overview while keeping saved correctness',async()=>{
  const run={id:'b',status:'completed',review_summary:{target_count:6,unstable_count:2},result:{total:50,bad_case_count:8}};
  await mount(<OverviewPage data={{overview:{dataset:{},latest_evaluation:run},workspace:{}}} navigate={()=>{}}/>);
- const cards=[...document.querySelectorAll('[aria-label="优化成果"] > *')];
- expect(cards.find(e=>e.textContent?.includes('答对数'))?.textContent).toContain('42 / 50');
+ expect(document.querySelector('.ui-ov-big .from')?.textContent).toBe('42'); expect(document.querySelector('.ui-ov-big')?.textContent).toContain('/ 50');
 });
 it('uses single-pass labels while retaining historical records',async()=>{
  const row={question_id:'Q37',result:{passed:false,question:'测试问题',baseline_review_label:'随机波动（3 次错 1 次）',baseline_review:{status:'fluctuation'},optimization_target:false,diagnostic_view:{diagnosis_category:'回答问题',display_question_id:'Q37'}}};

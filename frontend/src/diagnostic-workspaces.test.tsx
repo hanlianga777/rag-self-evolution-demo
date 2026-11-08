@@ -84,18 +84,16 @@ it('shows every current business failure in Agent including pending diagnoses',a
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const badCases=Array.from({length:10},(_,i)=>({run_id:'offline',question_id:`fresh-${i}`,result:{question:`真实问题${i}`,passed:false,evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL'},diagnostic_view:{primary_root_cause:i?'Unknown':'Ranking',target_eligible:!i,is_technical_bad_case:!i,analysis_category:i?'insufficient_evidence':'rag_failure',optimization_directions:i?[]:['context_selection']}}}));
  await render(<EvolutionPage data={{evaluation,badCases}}/>);
- await click('问题诊断');
- expect(document.querySelectorAll('tbody tr')).toHaveLength(10);
+ expect(document.querySelectorAll('.ui-evo-start .ui-q')).toHaveLength(10);
  expect([...document.querySelectorAll('button')].find(button=>button.textContent?.includes('生成 A / B / C'))?.disabled).toBe(false);
- expect(document.body.textContent).toContain('Bad Case 进入 Agent 优化');
+ expect(document.querySelectorAll('.agent-fact')).toHaveLength(10);
 });
 it('connects an unknown exploratory target to its saved candidate without calling it confirmed',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const badCases=[{run_id:'offline',question_id:'new-explore',result:{question:'未知原因的维护遗漏',passed:false,evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL'},diagnostic_view:{primary_root_cause:'Unknown',target_eligible:false,is_technical_bad_case:false,analysis_category:'insufficient_evidence',optimization_directions:[],experiment_plan:{status:'exploratory',directions:['candidate_recall'],next_action:'controlled_sandbox'}}}}];
  const optimization={id:'exp',result:{diagnostic_tasks:[{question_id:'new-explore',status:'exploratory',experiment_plan:{directions:['candidate_recall']}}]},candidates:[{id:'a',status:'generated',config:{candidate_k:24},reasoning:{candidate_label:'A',observed_evidence:['new-explore'],experiment_kind:'exploratory',hypothesis:'扩大候选池验证缺失来源',falsification:'目标仍失败则不支持'}}]};
  await render(<EvolutionPage data={{evaluation,badCases,optimization}}/>);
- await click('问题诊断');
- expect(document.querySelector('.diagnosis-list')?.textContent).toContain('记录缺失：调节方向');
+ expect(document.querySelector('.ui-evo-start')?.textContent).toContain('分类未知');
  await click('进化路线');
  expect(document.querySelector('.agent-facts')?.textContent).toContain('未知原因的维护遗漏');
  expect(document.querySelector('.agent-hypotheses')?.textContent).toContain('扩大候选池验证缺失来源');
@@ -109,7 +107,9 @@ it('opens Sandbox fee confirmation without a budget and submits only explicit co
  await click('A/B/C/D');
  expect(document.querySelector('input[aria-label="Sandbox人民币累计硬上限"]')).toBeNull();
  await click('运行 Sandbox');
- expect(document.querySelector('[role="dialog"]')).toBeNull();
+ expect(document.querySelector('.confirm-dialog')).not.toBeNull();
+ expect(fetcher.mock.calls.some(([,init]:any)=>init?.method==='POST')).toBe(false);
+ await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog button.primary')!.click());
  const request=fetcher.mock.calls.find(([url])=>url.endsWith('/api/candidates/c/run')) as any;
  expect(request).toBeTruthy();expect(JSON.parse(request[1].body)).toEqual({authorize_provider:true});
 });

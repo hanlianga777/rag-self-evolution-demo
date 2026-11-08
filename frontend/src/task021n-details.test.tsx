@@ -41,11 +41,15 @@ it('lists negative-question configuration changes directly and never marks a key
  expect(result.key).toBeUndefined();
  expect(result.steps).toEqual([{label:'配置变化',text:'Candidate K 12→24、Top-K 4→6、Thinking 档位 Max→High'},{label:'回答结果',text:'优化前拒答判定未通过，优化后正确拒答'}]);
 });
-it.each([1,2,3])('summarizes %i missing and newly met points without duplicating the table',async(count)=>{
+it.each([1,2,3])('shows %i missing and newly met points once in the comparison table',async(count)=>{
  const question_id=`Q${count}`,atomic_results=Array.from({length:count},(_,i)=>({atomic_id:`${question_id}-R${i+1}`,state:'NOT_MET'}));
  const before={question_id,question:'保存的问题',passed:false,reference_answer:'1. 结构完好\n2. 电池无损\n3. 摇杆在中位',model_answer:'保存的原回答',judge_result:{atomic_results}},after={...before,passed:true,judge_result:{atomic_results:atomic_results.map(r=>({...r,state:'MET'}))}};
  vi.stubGlobal('fetch',vi.fn(async(input:string)=>new Response(JSON.stringify(input.endsWith('/comparison-cases')?{id:input.includes('/n-base/')?'n-base':'n-after',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'same'},cases:[input.includes('/n-base/')?before:after]}:{case:input.includes('/n-base/')?before:after}))));
  await mount(<SavedAnswerComparison data={{evaluation:{id:'n-base'},optimization:{recommendation:{recommended_candidate:'D'},candidates:[{id:'D',status:'evaluated',result:{evaluation_run_id:'n-after',evaluation_complete:true,total:1}}]}}} onOpenCitation={()=>{}}/>);
- const expected={1:['缺少要点 1：结构完好','新满足要点 1：结构完好'],2:['缺少要点 1、2，见上方对照表','新满足要点 1、2，见上方对照表'],3:['缺少要点 1、2、3，见上方对照表','新满足要点 1、2、3，见上方对照表']}[count];
- expect([...document.querySelectorAll('.comparison-flag')].map(e=>e.textContent)).toEqual(expected);
+ const rows=[...document.querySelectorAll('.comparison-ptable tbody tr')];
+ expect(rows).toHaveLength(count);
+ expect(rows.map(row=>row.querySelector('td')?.textContent)).toEqual(['结构完好','电池无损','摇杆在中位'].slice(0,count).map((text,i)=>`${i+1}${text}新满足`));
+ for(const row of rows){expect(row.querySelector('td:nth-child(2)')?.textContent).toBe('✕');expect(row.querySelector('td:nth-child(3)')?.textContent).toBe('✓');}
+ expect(document.querySelectorAll('.comparison-flag')).toHaveLength(0);
+
 });

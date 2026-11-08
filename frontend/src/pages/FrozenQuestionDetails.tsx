@@ -29,6 +29,7 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true 
   const groups: [string, any[]][] = [["必答", [...(requirements.required_checks || []), ...(requirements.conditional_checks || [])]], ["加分", requirements.auxiliary_information || []], ["禁止", requirements.prohibited || []]];
   return <>
   <div className="drawer-body frozen-question-details">
+    {row.raw?.source === "reviewed_csv_machine_checks" && <p className="muted">来源：人工审核导入</p>}
     <DrawerSection title="业务场景"><p>{row.raw?.business_scenario || row.raw?.import_context?.scenario || "暂无"}</p></DrawerSection>
     <DrawerSection title="问题"><p>{row.question}</p><p className="muted">出处：{questionSources(row)}</p></DrawerSection>
     <DrawerSection title="参考答案"><ol className="golden-answer-list candidate-answer">{answers.map((line, index) => <li key={index}>{line}</li>)}</ol>{row.test_category === "negative" && <small className="muted">按预期行为检查回答边界</small>}</DrawerSection>

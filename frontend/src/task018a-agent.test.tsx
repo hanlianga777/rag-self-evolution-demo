@@ -13,15 +13,15 @@ async function mount(paused=false) {
   root=createRoot(document.body.appendChild(document.createElement("div")));
   await act(async()=>root.render(<EvolutionPage data={{evaluation:{id:"baseline",status:"completed",config:{top_k:4}},optimization,badCases:[]}}/>));
 }
-it.each([false,true])("keeps clickable progress on all six tabs and displays saved running or peak-pause progress (%s)",async paused=>{
+it.each([false,true])("keeps compact progress on all five tabs and displays saved running or peak-pause progress (%s)",async paused=>{
   await mount(paused);
   expect(document.querySelector('details > summary')?.textContent).not.toBe("实验进度");
   for(const button of [...document.querySelectorAll<HTMLButtonElement>(".tabs button")]) {
     await act(async()=>button.click());
-    expect(document.querySelectorAll(".page-shell-header .stage-stepper li")).toHaveLength(6);
-    expect(document.querySelectorAll(".page-shell-header .stage-stepper button")).toHaveLength(6);
+    expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(5);
+    expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("7/50");
   }
-  const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".stage-stepper button")].find(button => button.querySelector("strong")?.textContent === "Sandbox")!;
+  const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "Sandbox")!;
   await act(async()=>sandbox.click());
   expect(document.querySelector(".tabs button.active")?.textContent).toBe("Sandbox");
   expect(document.querySelector(".sandbox-core-table")?.textContent).toContain(paused?"高峰时段暂停 7/50":"运行中 7/50");

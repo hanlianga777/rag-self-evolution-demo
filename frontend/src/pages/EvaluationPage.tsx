@@ -1,3 +1,4 @@
+import { usePageTab } from "../usePageTab";
 import { savedSnapshot } from "../evaluationProgress";
 import { DataTable } from "../components/DataTable";
 import { PricePauseNotice } from "../components/RuntimeSettings";
@@ -19,7 +20,7 @@ import { displayText, gateNames, gateEnglishNames } from "../display";
 import { useOperation } from "../operation";
 
 type Row = Record<string, any>;
-type Tab = "report" | "gates" | "cases";
+
 
 export { gateNames } from "../display";
 const format = (value: unknown, suffix = "") => typeof value === "number" ? `${value.toFixed(1)}${suffix}` : "未采集";
@@ -37,7 +38,7 @@ const baselinePreflight = (runId?: string) => getJson<Row>(`/api/evaluation/pref
 export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page: any) => void }) {
   const operation = useOperation();
 
-  const [tab, setTab] = useState<Tab>("report");
+  const [tab, setTab] = usePageTab("evaluation", ["report", "gates", "cases"] as const, "report");
 
   const retainedRun = (value: Row) => value.status === "completed" && !hasEvaluationDetails(value) ? cachedJson<Row>(`/api/evaluations/${value.id}`) || value : value;
   const [run, setRun] = useState<Row>(() => retainedRun(data.evaluation || {}));
