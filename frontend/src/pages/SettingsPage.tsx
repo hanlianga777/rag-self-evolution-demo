@@ -16,7 +16,7 @@ const settingsGroups: Record<string, string[]> = {
   "查询理解": ["query_rewrite", "multi_query", "hyde"],
   "检索召回": ["candidate_k", "hybrid_search", "hybrid_alpha"],
   "筛选排序": ["rerank", "top_k", "min_score", "retrieval_max_tokens"],
-  "Generation": ["prompt_strategy", "generation_thinking"],
+  "回答生成": ["prompt_strategy", "generation_thinking"],
 };
 const parameterNotes: Record<string, string> = {
   query_rewrite: "把原问题改写为更适合检索的问法。", multi_query: "用多个互补问法查找资料。", hyde: "用假设答案辅助查找，假设文本不作为证据。",
@@ -76,7 +76,7 @@ export function SettingsPage({ data }: { data: any }) {
         <span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · 配置草稿已保存" : ""}</span>
         <div className="pipeline-draft-chips">{changed.map(key => <ParamChip key={key} label={parameterNames[key] || key} from={formatValue(base[key])} to={formatValue(draft[key])} />)}</div>
         <HoverCard content="保存后需运行新的 Baseline 才会成为评测基线。Candidate 使用独立实验配置。"><span tabIndex={0} aria-label="草稿生效说明">ⓘ</span></HoverCard>
-        <button className="secondary" disabled={busy} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length} onClick={() => void save()}>保存草稿</button>
+        <button className="secondary ui-btn-danger" disabled={busy} onClick={() => void save(true)}>放弃修改</button><button className="primary" disabled={busy || !changed.length} onClick={() => void save()}>保存草稿</button>
       </div>}
     </Section>
 

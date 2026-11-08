@@ -1449,3 +1449,14 @@ button { border-radius:8px; }
 /* Keep complete versions and parameter values visible inside prose-clamped tables. */
 .release-history-table td:is(:first-child,:nth-child(3)) > .truncated-text,
 .search-space-table td:nth-child(-n+3) :is(.truncated-text,.ui-clamp) { display:block; -webkit-line-clamp:unset; line-clamp:unset; }
+
+/* 022a：沿用总指挥的抽屉卡片与按钮色阶。 */
+.drawer .drawer-body, .drawer .candidate-scroll { background: var(--ui-page); }
+.drawer .drawer-section.panel { box-shadow: none; }
+.drawer .quality-grid { align-items: stretch; }
+.drawer .quality-grid p { display: block; overflow: visible; }
+.drawer :is(.chunk-card, .parent-context, .table-normalize-example, .slot-detail, .retrieval-evidence, .parameter-diff > div, .story-disclosure) { background: var(--ui-surface); border: 1px solid var(--ui-rule); border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; }
+.settings-page .frozen-facts { gap: 6px 14px; }
+.settings-page .frozen-facts dd { margin: 0; line-height: 1.35; }
+.settings-page .frozen-facts dt { line-height: 1.35; }
+.agent-secondary-actions, .golden-new-run-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }

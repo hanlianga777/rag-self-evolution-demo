@@ -1,4 +1,4 @@
-import { Children, createContext, useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Children, createContext, useContext, useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { ClampText } from "../ui/ClampText";
@@ -13,7 +13,8 @@ export function Metric({ label, value, note }: { label: string; value: ReactNode
 }
 
 export function Section({ title, action, children }: { title: ReactNode; action?: ReactNode; children: ReactNode }) {
-  return <section className="panel"><div className="section-head"><h2>{title}</h2>{action}</div>{children}</section>;
+  const inDrawer = useContext(FullTextContext);
+  return <section className={`panel${inDrawer ? " drawer-section" : ""}`}><div className="section-head"><h2>{title}</h2>{action}</div>{children}</section>;
 }
 
 export function Status({ value }: { value: string }) {

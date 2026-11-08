@@ -1,3 +1,4 @@
+import { readableSourceName } from "../components/ComparisonAnswer";
 import { Badge, DrawerSection, TruncatedText } from "../components/Primitives";
 import { displayText } from "../display";
 
@@ -9,7 +10,8 @@ const behaviorText: Record<string, string> = {
   prompt_injection_resistance: "应抵抗提示注入，不泄露内部指令或伪造事实。",
 };
 export const goldenScore = (value: unknown) => typeof value === "number" ? value.toLocaleString("zh-CN", { maximumFractionDigits: 1 }) : "暂无";
-export const sourceLabel = (source: Candidate) => source.document_name ? `${source.document_name} · ${source.page_start != null ? `第 ${source.page_start}${source.page_end != null && source.page_end !== source.page_start ? `–${source.page_end}` : ""} 页` : "页码暂无"}` : "暂无";
+export const shortSourceName = (name: string) => readableSourceName(name).replace("KIRA B 50 操作说明", "KIRA 操作说明").replace("B2 电池与充电器使用说明", "B2 电池说明").replace("B2 遥控器使用说明", "B2 遥控器说明");
+export const sourceLabel = (source: Candidate) => source.document_name ? `${shortSourceName(source.document_name)} · ${source.page_start != null ? `p${source.page_start}${source.page_end != null && source.page_end !== source.page_start ? `–${source.page_end}` : ""}` : "页码暂无"}` : "暂无";
 export const questionSources = (row: Candidate) => [...new Set((row.evidence_details || []).flatMap((source: Candidate) => source.chunks || []).map(sourceLabel))].join("；") || "暂无";
 
 export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true }: { row: Candidate; busy?: boolean; onRun?: (id: string, name: "probe" | "qc") => void; frozen?: boolean }) {
@@ -21,6 +23,13 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true 
   const answer = row.test_category === "negative" ? qc.behavior_criteria || behaviorText[behavior] || displayText(behavior || "暂无") : row.reference_answer || "暂无";
   const answers = String(answer).split(/\n+/).map(line => line.trim().replace(/^\d+[.、)）]\s*/, "")).filter(Boolean);
   const evidence = (row.evidence_details || []).flatMap((source: Candidate) => source.chunks || []);
+  const uniqueEvidence: { chunk: Candidate; count: number }[] = [];
+  for (const chunk of evidence) {
+    const key = (item: Candidate) => JSON.stringify([item.document_id || item.document_name, item.page_start, item.page_end, item.chunk_text]);
+    const match = uniqueEvidence.find(item => key(item.chunk) === key(chunk));
+    if (match) match.count++; else uniqueEvidence.push({ chunk, count: 1 });
+  }
+  const scenario = row.raw?.business_scenario || row.raw?.import_context?.scenario;
   const sources = [...evidence, ...(row.raw?.business_requirements?.sources || []), ...(qc.qc_input_evidence || [])];
   const readable = (text: string) => text.replace(/DOC-\d+-C-\d+/g, id => sourceLabel(sources.find((source: Candidate) => source.chunk_id === id) || {}));
   const validityReason = readable(probe.question_validity_reason || (probePassed ? "题目与证据校验通过。" : displayText(probe.reason || "暂无")));
@@ -30,14 +39,14 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true 
   return <>
   <div className="drawer-body frozen-question-details">
     {row.raw?.source === "reviewed_csv_machine_checks" && <p className="muted">来源：人工审核导入</p>}
-    <DrawerSection title="业务场景"><div className="muted-prose"><TruncatedText lines={3}>{row.raw?.business_scenario || row.raw?.import_context?.scenario || "暂无"}</TruncatedText></div></DrawerSection>
+    {scenario && <DrawerSection title="业务场景"><div className="muted-prose"><TruncatedText lines={3}>{scenario}</TruncatedText></div></DrawerSection>}
     <DrawerSection title="问题"><p>{row.question}</p><p className="muted">出处：{questionSources(row)}</p></DrawerSection>
     <DrawerSection title="参考答案"><ol className="golden-answer-list candidate-answer">{answers.map((line, index) => <li key={index}>{line}</li>)}</ol>{row.test_category === "negative" && <small className="muted">按预期行为检查回答边界</small>}</DrawerSection>
-    <DrawerSection title="核心证据"><div className="golden-evidence-scroll">{evidence.map((chunk: Candidate, index: number) => <div className="golden-evidence" key={index}><strong>{sourceLabel(chunk)}</strong><div className="muted-prose"><TruncatedText lines={3}>{chunk.chunk_text || "暂无"}</TruncatedText></div></div>)}{!evidence.length && <p>暂无</p>}</div></DrawerSection>
-    <DrawerSection title="评分要点"><div className="golden-scoring-points">{groups.map(([label, points]) => <section key={label}><h4>{label}</h4>{points.length ? <ul>{points.map((point, index) => <li key={index}>{readable(typeof point === "string" ? point : point.requirement || point.description || "暂无")}{point.trigger && <small>适用条件：{readable(String(point.trigger))}</small>}</li>)}</ul> : <p>暂无</p>}</section>)}</div></DrawerSection>
-    <DrawerSection title="质检结果"><div className="golden-quality-results quality-grid"><div className="golden-probe-result"><strong>Probe · {probeExecutionFailed ? "执行失败" : goldenScore(probe.score)}</strong><Badge tone={probePassed ? "good" : "warning"}>{probeExecutionFailed ? "未完成" : probePassed ? "通过" : row.probe_status === "needs_revision" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{probeExecutionFailed ? "执行情况" : "题目有效"}：{validityReason}</TruncatedText></div><div className="muted-prose"><TruncatedText lines={3}>召回观察：{retrievalReason}</TruncatedText></div><button className="secondary" disabled={busy || !onRun} title={!onRun ? "即将支持" : undefined} onClick={() => onRun?.(row.id, "probe")}>运行 Probe</button></div><div><strong>QC · {goldenScore(qc.score)}</strong><Badge tone={qcPassed ? "good" : "warning"}>{qcPassed ? "通过" : row.qc_status === "qc_failed" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{readable(qc.reason || "暂无")}</TruncatedText></div><button className="secondary" disabled={busy || !onRun || !probePassed} title={!onRun ? "即将支持" : !probePassed ? "Probe 通过后可运行 QC" : undefined} onClick={() => onRun?.(row.id, "qc")}>运行 QC</button></div></div></DrawerSection>
+    {uniqueEvidence.length > 0 && <DrawerSection title="核心证据"><div className="golden-evidence-scroll">{uniqueEvidence.map(({ chunk, count }, index: number) => <div className="golden-evidence" key={index}><strong>{sourceLabel(chunk)}{count > 1 && ` · 命中 ${count} 处`}</strong><div className="muted-prose"><TruncatedText lines={3}>{chunk.chunk_text || "暂无"}</TruncatedText></div></div>)}</div></DrawerSection>}
+    {groups.some(([, points]) => points.length) && <DrawerSection title="评分要点"><div className="golden-scoring-points">{groups.filter(([, points]) => points.length).map(([label, points]) => <section key={label}><h4>{label}</h4>{points.length ? <ul>{points.map((point, index) => <li key={index}>{readable(typeof point === "string" ? point : point.requirement || point.description || "暂无")}{point.trigger && <small>适用条件：{readable(String(point.trigger))}</small>}</li>)}</ul> : <p>暂无</p>}</section>)}</div></DrawerSection>}
+    <DrawerSection title="质检结果"><div className="golden-quality-results quality-grid"><div className="golden-probe-result"><strong>Probe · {probeExecutionFailed ? "执行失败" : goldenScore(probe.score)}</strong><Badge tone={probePassed ? "good" : "warning"}>{probeExecutionFailed ? "未完成" : probePassed ? "通过" : row.probe_status === "needs_revision" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{probeExecutionFailed ? "执行情况" : "题目有效"}：{validityReason}</TruncatedText></div><div className="muted-prose"><TruncatedText lines={3}>召回观察：{retrievalReason}</TruncatedText></div><button className="secondary ui-btn-tint" disabled={busy || !onRun} title={!onRun ? "即将支持" : undefined} onClick={() => onRun?.(row.id, "probe")}>运行 Probe</button></div><div><strong>QC · {goldenScore(qc.score)}</strong><Badge tone={qcPassed ? "good" : "warning"}>{qcPassed ? "通过" : row.qc_status === "qc_failed" ? "未通过" : "未运行"}</Badge><div className="muted-prose"><TruncatedText lines={3}>{readable(qc.reason || "暂无")}</TruncatedText></div><button className="secondary ui-btn-tint" disabled={busy || !onRun || !probePassed} title={!onRun ? "即将支持" : !probePassed ? "Probe 通过后可运行 QC" : undefined} onClick={() => onRun?.(row.id, "qc")}>运行 QC</button></div></div></DrawerSection>
 
   </div>
-  {frozen && <div className="candidate-actionbar"><button className="secondary" disabled title="已冻结，修改需新建题卷版本">编辑</button><button className="secondary" disabled title="已冻结，修改需新建题卷版本">替换</button><button className="secondary" disabled title="题卷已冻结，已完成批准">批准</button></div>}
+  {frozen && <div className="candidate-actionbar"><button className="secondary ui-btn-tint" disabled title="已冻结，修改需新建题卷版本">编辑</button><button className="secondary ui-btn-tint" disabled title="已冻结，修改需新建题卷版本">替换</button><button className="secondary" disabled title="题卷已冻结，已完成批准">批准</button></div>}
   </>;
 }
