@@ -1,3 +1,4 @@
+import { IconLabel, IconTile } from "../ui/icons";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { errorMessage, postJson } from "../api";
@@ -55,10 +56,10 @@ export function SettingsPage({ data }: { data: any }) {
     try { await postJson("/api/pipeline/draft", { config: discard ? null : draft, identity: pipeline.draft_identity }); invalidatePipeline(); const value = await pipelineFetch(identity); setRecord({ identity, value }); setDraft(startDraft(value)); }
     catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); }
   };
-  return <PageShell className="page settings-page" header={<div className="page-title"><div><h1>Pipeline 配置</h1></div><button className="secondary" onClick={() => setSpaceOpen(true)}>查看可选参数</button></div>}>
+  return <PageShell className="page settings-page" header={<div className="page-title"><div><h1><IconTile name="pipeline" />Pipeline 配置</h1></div><button className="secondary" onClick={() => setSpaceOpen(true)}>查看可选参数</button></div>}>
     {error && <p className="error-notice" role="alert">{error}</p>}
-    <Section title="固定技术基座" action={<Badge>固定</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd title={String(value)}>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
-    <Section title="Agent 可选参数" action={<Badge tone="accent">{Object.keys(contract).length} 项可调参数</Badge>}>
+    <Section title={<IconLabel name="data">固定技术基座</IconLabel>} action={<Badge>固定</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd title={String(value)}>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
+    <Section title={<IconLabel name="pipeline">Agent 可选参数</IconLabel>} action={<Badge tone="accent">{Object.keys(contract).length} 项可调参数</Badge>}>
       {!pipeline?.baseline_config && <p className="muted">新 Baseline 待评测｜当前配置草稿 以已确认的 Baseline 默认配置作为起点</p>}
       {pipeline?.draft_stale && <p className="error-notice">已保存草稿的基准已变化，请重新核对并保存。</p>}
       <ParamGrid groups={Object.entries(settingsGroups).map(([name, keys], index) => ({

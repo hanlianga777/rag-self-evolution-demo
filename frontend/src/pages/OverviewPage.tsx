@@ -1,3 +1,4 @@
+import { IconTile } from "../ui/icons";
 import {completeResult, recommendationOf, schemeName} from "../components/EvolutionStory";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
@@ -115,7 +116,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     {label: "问答验证", fact: currentReleased ? "可验证线上回答" : "可查看当前线上配置", tips: ["逐题比较 Baseline 与线上回答", "反馈可作为再次进化的线索"], page: "verification"},
   ].map(step => ({...step, onClick: () => navigate(step.page as Page)}));
 
-  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1>RAG 自进化项目概览</h1></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
+  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1><IconTile name="overview" />RAG 自进化项目概览</h1></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
 
 
     {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} /> : <>

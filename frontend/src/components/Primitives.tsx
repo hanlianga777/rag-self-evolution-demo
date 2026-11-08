@@ -12,7 +12,7 @@ export function Metric({ label, value, note }: { label: string; value: ReactNode
   return <div className="metric"><span>{label}</span><strong>{value}</strong>{note && <small>{note}</small>}</div>;
 }
 
-export function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+export function Section({ title, action, children }: { title: ReactNode; action?: ReactNode; children: ReactNode }) {
   return <section className="panel"><div className="section-head"><h2>{title}</h2>{action}</div>{children}</section>;
 }
 

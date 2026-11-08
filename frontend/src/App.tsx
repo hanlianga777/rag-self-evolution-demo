@@ -1,6 +1,7 @@
 import { mergeEvaluationProgress, hasEvaluationDetails } from "./evaluationProgress";
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react";
-import { BarChart3, BookOpen, Bot, ClipboardCheck, FlaskConical, Menu, MessageCircle, Settings, Sparkles, Waypoints } from "lucide-react";
+import { Bot, Menu } from "lucide-react";
+import { ICONS } from "./ui/icons";
 import { identityKey, loadAppData } from "./api";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PageShell } from "./components/PageShell";
@@ -24,11 +25,11 @@ const SettingsPage = lazy(() => pageModules.settings().then(module => ({ default
 const VerificationPage = lazy(() => pageModules.verification().then(module => ({ default: module.VerificationPage })));
 const VersionsPage = lazy(() => pageModules.versions().then(module => ({ default: module.VersionsPage })));
 
-const navigation: { id: Page; label: string; icon: typeof BarChart3 }[] = [
-  { id: "overview", label: "RAG 自进化项目概览", icon: BarChart3 }, { id: "knowledge", label: "知识库", icon: BookOpen },
-  { id: "settings", label: "Pipeline 配置", icon: Settings }, { id: "governance", label: "Golden Dataset", icon: ClipboardCheck },
-  { id: "evaluation", label: "Baseline", icon: Waypoints }, { id: "evolution", label: "Agent 工作台", icon: FlaskConical },
-  { id: "versions", label: "发布", icon: Sparkles }, { id: "verification", label: "问答验证", icon: MessageCircle },
+const navigation: { id: Page; label: string; icon: typeof ICONS.overview }[] = [
+  { id: "overview", label: "RAG 自进化项目概览", icon: ICONS.overview }, { id: "knowledge", label: "知识库", icon: ICONS.knowledge },
+  { id: "settings", label: "Pipeline 配置", icon: ICONS.pipeline }, { id: "governance", label: "Golden Dataset", icon: ICONS.golden },
+  { id: "evaluation", label: "Baseline", icon: ICONS.baseline }, { id: "evolution", label: "Agent 工作台", icon: ICONS.agent },
+  { id: "versions", label: "发布", icon: ICONS.release }, { id: "verification", label: "问答验证", icon: ICONS.verify },
 ];
 const items = navigation;
 const pageFromHash = (): Page => items.find(item => `#${item.id}` === location.hash.split("?")[0])?.id || "overview";
@@ -96,7 +97,7 @@ export class PageErrorBoundary extends Component<{ children: ReactNode }, { erro
   }
 }
 
-function NavigationLink({ item, page, navigate, prefetch }: { item: { id: Page; label: string; icon: typeof BarChart3 }; page: Page; navigate: (page: Page) => void; prefetch: (page: Page) => Promise<void> }) {
+function NavigationLink({ item, page, navigate, prefetch }: { item: { id: Page; label: string; icon: typeof ICONS.overview }; page: Page; navigate: (page: Page) => void; prefetch: (page: Page) => Promise<void> }) {
   const Icon = item.icon;
-  return <a href={`#${item.id}`} className={page === item.id ? "active" : ""} aria-current={page === item.id ? "page" : undefined} onMouseEnter={()=>void prefetch(item.id)} onFocus={()=>void prefetch(item.id)} onClick={() => navigate(item.id)}><Icon size={17} aria-hidden="true" />{item.label}</a>;
+  return <a href={`#${item.id}`} className={page === item.id ? "active" : ""} aria-current={page === item.id ? "page" : undefined} onMouseEnter={()=>void prefetch(item.id)} onFocus={()=>void prefetch(item.id)} onClick={() => navigate(item.id)}><Icon size={17} strokeWidth={1.75} aria-hidden="true" focusable="false" />{item.label}</a>;
 }
