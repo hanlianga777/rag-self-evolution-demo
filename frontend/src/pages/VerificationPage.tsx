@@ -1,10 +1,11 @@
+import { parameterValue } from "../components/comparisonData";
 import {SavedAnswerComparison} from "../components/SavedAnswerComparison";
 import {schemeName} from "../components/EvolutionStory";
 import { DataTable } from "../components/DataTable";
 import "./evaluation-workspaces.css";
 import { StoryDisclosure, StoryEmpty } from "../components/Storytelling";
 import { CaseAnswer } from "../components/CaseAnswer";
-import { displayText, narrativeText, productionName, localShortTime } from "../display";
+import { displayText, narrativeText, productionName } from "../display";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useRef, useState } from "react";
 import { errorMessage, getJson, postJson } from "../api";
@@ -73,10 +74,10 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
   };
   const production = data.versions?.find((version: any) => version.status === "active");
   const released = production?.provenance === "published";
-  return <PageShell className="page verification-page" header={<div className="page-title"><div><h1>问答验证</h1><p>{tab === "compare" ? "同一道题，看优化前后的真实回答差在哪里。" : "通过实时问答验证线上版本，并观察同一道问题优化前后的实际回答。"}</p></div></div>} tabs={<div className="tabs"><button aria-pressed={tab === "qa"} className={tab === "qa" ? "selected" : ""} onClick={() => setTab("qa")}>实时问答</button><button aria-pressed={tab === "compare"} className={tab === "compare" ? "selected" : ""} onClick={() => setTab("compare")}>Before/After</button><button aria-pressed={tab === "monitoring"} className={tab === "monitoring" ? "selected" : ""} onClick={() => { setTab("monitoring"); void refresh().catch(reason => setError(errorMessage(reason))); }}>线上反馈 → 再次进化</button></div>} resetKey={tab}>
+  return <PageShell className="page verification-page" header={<div className="page-title"><div><h1>问答验证</h1></div></div>} tabs={<div className="tabs"><button aria-pressed={tab === "qa"} className={tab === "qa" ? "selected" : ""} onClick={() => setTab("qa")}>实时问答</button><button aria-pressed={tab === "compare"} className={tab === "compare" ? "selected" : ""} onClick={() => setTab("compare")}>Before/After</button><button aria-pressed={tab === "monitoring"} className={tab === "monitoring" ? "selected" : ""} onClick={() => { setTab("monitoring"); void refresh().catch(reason => setError(errorMessage(reason))); }}>线上反馈 → 再次进化</button></div>} resetKey={tab}>
 
 
-    {tab === "qa" && <AssistantPage productionLabel={released ? `线上版本：${schemeName(data.optimization?.candidates?.find((c:any)=>c.id===production.snapshot?.candidate_id),production.snapshot?.candidate_id)} · 发布于 ${production?.created_at ? localShortTime(production.created_at) : "时间未保存"}` : "当前为初始配置"} productionVersion={production?.id || data.workspace?.active_version} isReleased={released} badCases={data.badCases || []} onOpenBadCase={() => { location.hash = "evaluation"; }} onOpenCitation={setCitation} onOpenDocument={onOpenDocument} onOpenMonitoring={()=>{setTab("monitoring");void refresh().catch(reason=>setError(errorMessage(reason)));}} />}
+    {tab === "qa" && <AssistantPage productionLabel={released ? `当前线上：${schemeName(data.optimization?.candidates?.find((c:any)=>c.id===production.snapshot?.candidate_id),production.snapshot?.candidate_id).replace(/^Round \d+ · /, "")}（Candidate K ${parameterValue(production.config?.candidate_k)} · Top-K ${parameterValue(production.config?.top_k)} · Thinking ${parameterValue(production.config?.generation_thinking)}）` : "当前线上：初始配置"} productionVersion={production?.id || data.workspace?.active_version} isReleased={released} badCases={data.badCases || []} onOpenBadCase={() => { location.hash = "evaluation"; }} onOpenCitation={setCitation} onOpenDocument={onOpenDocument} onOpenMonitoring={()=>{setTab("monitoring");void refresh().catch(reason=>setError(errorMessage(reason)));}} />}
     {tab === "compare" && <><SavedAnswerComparison questionId={questionId} data={data} onOpenCitation={setCitation}/></>}
     {tab === "monitoring" && <><ConclusionCard title={monitoring.events?.length ? `${monitoring.events.length} 条本页实际问答反馈，等待或保留人工判定` : "当前尚无实际问答记录"} tone="neutral">问答产生记录，人工判断是否属于 Bad Case；符合现有触发规则后，再人工确认关联优化上下文。发现问题不会绕过诊断、评测或人工发布。</ConclusionCard><div className="feedback-loop" aria-label="线上反馈闭环">用户提问 <span>→</span> 人工标记坏例 <span>→</span> 触发新一轮 Agent</div><Section title="实际反馈记录">
       {error && <p className="error-notice" role="alert">{error}</p>}

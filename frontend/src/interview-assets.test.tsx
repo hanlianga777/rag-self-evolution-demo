@@ -70,7 +70,7 @@ it("keeps current frozen Golden separate from the latest work Run and hides an e
   expect(summary.textContent).toContain("Frozen");
   expect(summary.textContent).toContain("Legacy");
   expect(document.querySelector(".review-table tbody")?.textContent).toContain("待审核的新题");
-  expect(document.querySelectorAll(".stage-stepper li")).toHaveLength(6);
+  expect(document.querySelectorAll(".ui-gp-steps li")).toHaveLength(6);
   expect(document.querySelector(".exception-summary")).toBeNull();
   expect(document.body.textContent).not.toContain("当前未记录质量异常");
   expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
@@ -123,8 +123,8 @@ it("shows a completed failed Probe as pending action rather than not started", a
   vi.stubGlobal("fetch", vi.fn(async (url:string) => new Response(JSON.stringify(goldenFixture(url,[row])))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{generationRuns:[run], snapshots:[], dataset:[row], documents:[]}} />));
-  const probe = [...document.querySelectorAll(".stage-stepper li")].find(item=>item.querySelector("strong")?.textContent==="Probe")!;
-  expect(probe.textContent).toContain("0 / 1 通过");
+  const probe = [...document.querySelectorAll(".ui-gp-steps li")].find(item=>item.querySelector("strong")?.textContent==="Probe")!;
+  expect(probe.textContent).toContain("0/1");
   expect(probe.textContent).toContain("待处理");
   expect(probe.textContent).not.toContain("待开始");
   await act(async () => root.unmount());

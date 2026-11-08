@@ -1,8 +1,10 @@
+import { GoldenPipeline } from "../ui/pages3";
+import { readableSourceName } from "../components/ComparisonAnswer";
 import { DataTable } from "../components/DataTable";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiUrl, errorMessage, getJson, cachedJson, postJson } from "../api";
-import { CustomSelect, MoreMenu, Section, ShortId, StageStepper, Status, TruncatedText } from "../components/Primitives";
+import { CustomSelect, MoreMenu, Section, ShortId, Status, TruncatedText } from "../components/Primitives";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { displayText, isMachineQualified } from "../display";
 import { useOperation } from "../operation";
@@ -73,7 +75,7 @@ export function GovernancePage({ data }: { data: any }) {
   const currentIds: string[] = workRun?.question_ids || [];
   const gate1Snapshot = snapshots.find(snapshot => snapshot.snapshot?.generation_run_id === workRun?.id && JSON.stringify(snapshot.snapshot?.question_ids) === JSON.stringify(currentIds));
   const frozen = !!gate1Snapshot;
-  const frozenDate = (gate1Snapshot?.created_at || currentGolden?.created_at || "").slice(5, 10) || "冻结日期未知";
+  const frozenDate = gate1Snapshot?.created_at && !Number.isNaN(Date.parse(gate1Snapshot.created_at)) ? `${new Date(gate1Snapshot.created_at).toISOString().slice(0, 16).replace("T", " ")} UTC` : "冻结时间未知";
   const plannedSlots = new Map((workRun?.artifacts?.question_plan || []).map((row: Candidate) => [row.question_id, row.coverage_slot]));
   const current: Candidate[] = currentIds.map(id => currentIndex.find(row => row.id === id) || review.find(row => row.id === id) || items.find(row => row.id === id)).filter((row): row is Candidate => !!row).map(row => ({ ...row, slot: row.slot || row.raw?.coverage_slot || plannedSlots.get(row.id) }));
   const historical = items.filter(row => !currentIds.includes(row.id) && row.stage !== "golden");
@@ -216,22 +218,22 @@ export function GovernancePage({ data }: { data: any }) {
 
   };
   const loadingWorkspace = !metadataLoaded || checkingSnapshot || !!workRun && !current.length && listing;
-  return <PageShell className={`page governance-page ${!workRun && tab === "run" ? "is-empty" : ""}`} header={<div className="page-title"><div><h1>Golden Dataset</h1><p>{loadingWorkspace ? checkingSnapshot ? "正在读取当前冻结题卷…" : "正在读取题卷…" : frozen ? `${current.length.toLocaleString()} 题 · 已冻结 · ${frozenDate}` : "检查题目与来源，完成人工确认后冻结题卷。"}</p></div>{!loadingWorkspace && <div className="header-actions">{!frozen && workRun?.status === "needs_regeneration" && <button className="primary" disabled={busy} onClick={() => void regenerate()}>补齐失败题（{expectedCount - current.length}）</button>}<MoreMenu><button role="menuitem" onClick={() => setHistoryOpen(true)}>历史版本</button>{tab === "run" && workRun?.status !== "needs_regeneration" && <><label className="profile-selector" onClick={event => event.stopPropagation()}><CustomSelect ariaLabel="测试集 Profile" value={profile} onChange={value => setProfile(value as typeof profile)} options={profileOptions} /></label><button role="menuitem" disabled={busy || running || qualityRunning} onClick={() => setNewRunConfirm(true)}>新建测试集</button></>}</MoreMenu></div>}</div>} tabs={<div className="tabs"><button aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前测试集</button><button aria-pressed={tab === "import"} className={tab === "import" ? "active" : ""} onClick={() => setTab("import")}>候选池</button></div>} resetKey={tab}>
+  return <PageShell className={`page governance-page ${!workRun && tab === "run" ? "is-empty" : ""}`} header={<div className="page-title"><div><h1>Golden Dataset</h1></div>{!loadingWorkspace && <div className="header-actions">{!frozen && workRun?.status === "needs_regeneration" && <button className="primary" disabled={busy} onClick={() => void regenerate()}>补齐失败题（{expectedCount - current.length}）</button>}<MoreMenu><button role="menuitem" onClick={() => setHistoryOpen(true)}>历史版本</button>{tab === "run" && workRun?.status !== "needs_regeneration" && <><label className="profile-selector" onClick={event => event.stopPropagation()}><CustomSelect ariaLabel="测试集 Profile" value={profile} onChange={value => setProfile(value as typeof profile)} options={profileOptions} /></label><button role="menuitem" disabled={busy || running || qualityRunning} onClick={() => setNewRunConfirm(true)}>新建测试集</button></>}</MoreMenu></div>}</div>} tabs={<div className="tabs"><button aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前测试集</button><button aria-pressed={tab === "import"} className={tab === "import" ? "active" : ""} onClick={() => setTab("import")}>候选池</button></div>} resetKey={tab}>
 
     {error && <p className="error-notice" role="alert">{error}</p>}
-    {loadingWorkspace ? <div className="golden-skeleton golden-initial-skeleton" role="status" aria-label="正在读取 Golden Dataset">{[1, 2, 3, 4, 5, 6].map(index => <span key={index} aria-hidden="true" />)}</div> : tab === "run" && <div className="golden-workspace">
+    {loadingWorkspace ? <div className="golden-skeleton golden-initial-skeleton" role="status" aria-label="正在读取 Golden Dataset"><span>{checkingSnapshot ? "正在读取当前冻结题卷…" : "正在读取题卷…"}</span>{[1, 2, 3, 4, 5, 6].map(index => <span key={index} aria-hidden="true" />)}</div> : tab === "run" && <div className="golden-workspace">
 
 
 
       <PricePauseNotice pause={workRun?.artifacts?.hard_validation?.price_pause} target={workRun ? {generation_id:workRun.id} : undefined} onChanged={reload} />
-      <StageStepper compact ariaLabel="Golden 治理阶段" steps={[
-        { label: displayText("Coverage"), state: gate1Snapshot || workRun?.artifacts?.coverage_plan?.length ? "completed" : "current", detail: workRun?.artifacts?.hard_validation?.frozen_plan ? `${workRun.artifacts.hard_validation.frozen_plan.clusters?.length ?? "暂无"} 个主题 · ${workRun.artifacts.hard_validation.frozen_plan.slots?.length ?? "暂无"} 个题位` : "覆盖规划明细暂无" },
-        { label: displayText("Question Generation"), state: current.length === expectedCount ? "completed" : running ? "current" : "pending", detail: `${current.length}/${expectedCount}` },
-        { label: displayText("Hard Validation"), state: current.length === expectedCount ? "completed" : "pending", detail: `${current.length}/${expectedCount}` },
-        { label: "Probe", state: current.length === expectedCount && current.every(row => row.probe_status === "probe_passed") ? "completed" : workRun?.status === "probing" ? "current" : current.some(row => ["probe_passed", "needs_revision"].includes(row.probe_status)) ? "blocked" : "pending", detail: `${current.filter(row => row.probe_status === "probe_passed").length} / ${expectedCount} 通过` },
-        { label: "QC", state: current.length === expectedCount && current.every(row => row.qc_status === "qc_passed") ? "completed" : workRun?.status === "qc" ? "current" : current.some(row => ["qc_passed", "qc_failed"].includes(row.qc_status)) ? "blocked" : "pending", detail: `${current.filter(row => row.qc_status === "qc_passed").length} / ${expectedCount} 通过` },
-        { label: displayText("Human Gate"), state: gate1Snapshot ? "completed" : workRun?.human_gate?.status === "ready" ? "current" : workRun?.status === "completed" && attention.length ? "blocked" : "pending", detail: `${gate1Snapshot ? gate1Snapshot.snapshot?.question_ids?.length ?? "暂无" : current.filter(row => ["approved", "owner_delegated_approved"].includes(row.review_status || row.status)).length}/${expectedCount} 已确认` },
-      ]} />
+      <GoldenPipeline total={current.length} split={["positive", "ablation", "negative"].map(group => ({ label: displayText(group), count: current.filter(row => row.test_category === group).length }))} steps={[
+        { label: displayText("Coverage"), done: !!(gate1Snapshot || workRun?.artifacts?.coverage_plan?.length), value: workRun?.artifacts?.hard_validation?.frozen_plan ? `${workRun.artifacts.hard_validation.frozen_plan.clusters?.length ?? "未知"} 个主题` : gate1Snapshot ? "冻结记录" : "待规划" },
+        { label: displayText("Question Generation"), done: current.length === expectedCount, value: `${current.length}/${expectedCount}` },
+        { label: displayText("Hard Validation"), done: current.length === expectedCount, value: `${current.length}/${expectedCount}` },
+        { label: "Probe", done: current.length === expectedCount && current.every(row => row.probe_status === "probe_passed"), value: `${current.filter(row => row.probe_status === "probe_passed").length}/${expectedCount}${current.some(row => row.probe_status === "needs_revision") ? " 待处理" : ""}` },
+        { label: "QC", done: current.length === expectedCount && current.every(row => row.qc_status === "qc_passed"), value: `${current.filter(row => row.qc_status === "qc_passed").length}/${expectedCount}${current.some(row => row.qc_status === "qc_failed") ? " 待处理" : ""}` },
+        { label: displayText("Human Gate"), done: !!gate1Snapshot, value: `${gate1Snapshot ? gate1Snapshot.snapshot?.question_ids?.length ?? "未知" : current.filter(row => ["approved", "owner_delegated_approved"].includes(row.review_status || row.status)).length}/${expectedCount}` },
+      ]} frozen={{ ok: frozen, text: frozen ? `已冻结 ${frozenDate}` : "尚未冻结" }} />
       {workRun ? <Section title="题目审核">
         <div className="review-filters" aria-label="题目筛选">{filters.filter(item => item.key !== "attention" || item.count > 0).filter(item => !frozen || item.key !== "pending").map(item => <button key={item.key} aria-pressed={filter === item.key} className={filter === item.key ? "active" : ""} onClick={() => setFilter(item.key)}>{item.label} {item.count}</button>)}        <small className="muted golden-review-role" role="status">{syncing || listing ? "正在同步…" : ""}</small></div>
 
@@ -255,8 +257,8 @@ export function GovernancePage({ data }: { data: any }) {
 export function QuestionTable({ rows, onDetail, paging, resetKey }: { rows: Candidate[]; onDetail: (row: Candidate) => void; paging?: any; resetKey?: string }) {
   const optional = [
     {label:"知识主题",value:(row:Candidate)=>typeof row.knowledge_topic === "string" ? row.knowledge_topic : row.knowledge_topic?.semantic_label || row.topic_cluster?.semantic_label},
-    {label:"出处",value:(row:Candidate)=>row.source_summary},
-    {label:"评分要点",value:(row:Candidate)=>row.scoring_summary ? `必答 ${row.scoring_summary.required} · 加分 ${row.scoring_summary.auxiliary}` : null},
+    {label:"出处",value:(row:Candidate)=>row.source_summary?.split(/( · |；)/).map((part: string) => /^( · |；)$/.test(part) ? part : readableSourceName(part)).join("")},
+    {label:"评分要点",value:(row:Candidate)=>row.scoring_summary ? `${row.scoring_summary.required} 条必答` : null},
     {label:"Probe",value:(row:Candidate)=>typeof row.probe?.score === "number" ? goldenScore(row.probe.score) : null},
     {label:"QC",value:(row:Candidate)=>typeof row.qc?.score === "number" ? goldenScore(row.qc.score) : null},
     {label:"Baseline",value:(row:Candidate)=>typeof row.baseline_result?.passed === "boolean" ? row.baseline_result.passed ? "对" : row.baseline_result.diagnosis_category ? `错 · ${row.baseline_result.diagnosis_category}` : null : null},

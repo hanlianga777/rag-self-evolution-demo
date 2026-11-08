@@ -13,7 +13,7 @@ afterEach(()=>{if(root)act(()=>root.unmount());vi.unstubAllGlobals();document.bo
 it('uses real Golden fields and omits unavailable columns without placeholder cells',async()=>{
  await mount(<QuestionTable rows={[{id:'q',slot:'Q07',question:'如何操作',test_category:'negative',negative_subtype:'clarify',source_summary:'不适用（负向题（Negative）无标准证据）',scoring_summary:{required:3,auxiliary:1},probe:{score:100},qc:{score:90},baseline_result:{passed:false,diagnosis_category:'检索层问题'}}]} onDetail={()=>{}}/>);
  expect([...document.querySelectorAll('th')].map(e=>e.textContent)).toEqual(['题号','题型','问题','出处','评分要点','Probe','QC','Baseline','操作']);
- expect(document.querySelector('tbody')?.textContent).toContain('必答 3 · 加分 1');
+ expect(document.querySelector('tbody')?.textContent).toContain('3 条必答');
  expect(document.querySelector('tbody')?.textContent).toContain('错 · 检索层问题');
  expect(document.querySelector('tbody')?.textContent).not.toContain('暂无');
 });

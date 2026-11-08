@@ -85,7 +85,7 @@ export function VersionsPage({ data }: { data: any }) {
   const blocker = (candidate: any) => released(candidate) ? "历史发布记录已保存" : canRelease(candidate) ? "满足本轮发布资格，等待人工 发布确认" : candidate.release_state?.human_release ? "已记录人工发布，请核对版本记录" : !candidate.release_state?.sandbox ? "Sandbox 尚未完成" : !candidate.release_state?.qualified ? "正式资格未通过" : !candidate.release_state?.recommended ? "尚未完成 人工确认方案 推荐确认" : "本轮 组合 Candidate D 决策尚未完成";
   const configFields = (config: any) => <div className="parameter-list">{Object.entries(config || {}).filter(([key,value]) => key in parameterNames && (value === null || typeof value !== "object")).map(([key,value])=><div key={key}><span>{parameterNames[key] || key}</span><strong>{formatValue(value)}</strong></div>)}</div>;
   const versionName = currentReleased ? `线上版本 来源 ${sourceName}` : currentVersion?.provenance === "bootstrap" ? "当前线上配置" : currentVersion ? "当前线上版本" : "尚无 线上版本 发布";
-  return <PageShell className="page versions-page" header={<div className="page-title"><div><h1>发布</h1><p>将已验证的优化方案交由人工决策，保留版本变化与回滚依据。</p></div></div>}>
+  return <PageShell className="page versions-page" header={<div className="page-title"><div><h1>发布</h1></div></div>}>
     {error && <p className="error-notice" role="alert">{error}</p>}
     <ReleasePanel
       online={{name: onlineVersion?.provenance === "bootstrap" ? "初始配置" : onlineVersion ? versionLabel(onlineVersion) : "发布前配置未知", params: params(onlineVersion?.config)}}

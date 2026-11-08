@@ -73,7 +73,9 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["方向", "核心思路", "参数变化", "针对的题", "预期效果", "风险", "结果"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("持久化问题");
   await click("Sandbox");
-  expect([...document.querySelectorAll("tbody tr > td:first-child")].map(cell => cell.textContent)).toEqual(["运行状态", "Hard Gate", "Bad Case", "修复原 Bad Case", "新增失败", "Regression Check", "候选合格", "可发布"]);
+  expect([...document.querySelectorAll(".ui-ct tbody th")].map(cell => cell.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "P99", "安全拒答率"]);
+  await act(async()=>document.querySelector<HTMLButtonElement>(".ui-ct-more")!.click());
+  for(const label of ["运行状态", "全部原 Bad Case 修好", "指定目标修好", "新增失败明细", "Regression Check", "候选合格", "可发布"]) expect(document.querySelector(".ui-ct")?.textContent).toContain(label);
   expect(document.body.textContent).not.toContain("Input Tokens");
   await click("查看高级指标");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Input Tokens");

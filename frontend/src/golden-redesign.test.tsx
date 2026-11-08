@@ -34,7 +34,7 @@ it("shows a cached frozen dataset after a minute while metadata revalidation is 
     await act(async () => root.render(<GovernancePage data={data} />));
     expect(document.querySelector('.golden-initial-skeleton')).toBeNull();
     expect(document.querySelector('.review-table')?.textContent).toContain(row.question);
-    expect(document.querySelector('.page-title p')?.textContent).toContain('已冻结');
+    expect(document.querySelector('.ui-gp')?.textContent).toContain('已冻结');
   } finally {
     await act(async () => root.unmount());
     await act(async () => pending.forEach(resolve => resolve()));
@@ -61,7 +61,7 @@ it("keeps frozen controls visible and renders numbered answers and source eviden
   const fetcher = stubFrozen();
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={frozenData} />));
-  expect(document.querySelector(".page-title p")?.textContent).toBe("1 题 · 已冻结 · 11-01");
+  expect(document.querySelector(".ui-gp")?.textContent).toContain("已冻结 2026-11-01");
   expect(document.querySelector(".review-filters")?.textContent).not.toContain("需要人工关注 0");
   expect(document.querySelectorAll(".review-table th")).toHaveLength(6);
   expect(document.querySelector(".review-table")?.textContent).toContain("95");

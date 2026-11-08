@@ -58,7 +58,7 @@
 .saved-answer-comparison .comparison-ptable th:first-child { text-align:left; width:auto; }
 .saved-answer-comparison .comparison-ptable td { padding:7px 0; color:var(--ink-2); border-top:1px solid var(--rule-2); vertical-align:middle; }
 .saved-answer-comparison .comparison-ptable td:not(:first-child) { text-align:center; }
-.saved-answer-comparison .saved-answer-comparison .saved-answer-comparison .saved-answer-comparison .comparison-pn { display:inline-flex; width:18px; height:18px; border-radius:50%; background:var(--ink); color:#fff; font-size:11px; align-items:center; justify-content:center; margin-right:8px; font-weight:600; vertical-align:1px; }
+.saved-answer-comparison .saved-answer-comparison .saved-answer-comparison .saved-answer-comparison .comparison-pn { display:inline-flex; width:18px; height:18px; border-radius:50%; background:var(--ink); color:var(--ui-surface); font-size:11px; align-items:center; justify-content:center; margin-right:8px; font-weight:600; vertical-align:1px; }
 .saved-answer-comparison .new .comparison-pn { background:var(--accent); }
 .saved-answer-comparison .yes { color:var(--green); font-weight:600; }
 .saved-answer-comparison .no { color:var(--risk); font-weight:600; }
@@ -80,7 +80,7 @@
 .saved-answer-comparison .comparison-note { background:var(--rule-2); border-radius:8px; padding:10px 12px; font-size:13px; color:var(--muted); margin:12px 0 10px; }
 .saved-answer-comparison mark { background:linear-gradient(transparent 12%,var(--accent-tint) 12%,var(--accent-tint) 92%,transparent 92%); color:var(--ink); padding:0 2px; border-radius:3px; }
 .saved-answer-comparison .comparison-met { background-image:linear-gradient(var(--accent),var(--accent)); background-size:100% 1px; background-position:0 100%; background-repeat:no-repeat; padding-bottom:1px; }
-.saved-answer-comparison .comparison-pin { display:inline-flex; width:15px; height:15px; border-radius:50%; background:var(--ink); color:#fff; font-size:10px; align-items:center; justify-content:center; margin:0 3px 0 1px; vertical-align:2px; font-weight:600; }
+.saved-answer-comparison .comparison-pin { display:inline-flex; width:15px; height:15px; border-radius:50%; background:var(--ink); color:var(--ui-surface); font-size:10px; align-items:center; justify-content:center; margin:0 3px 0 1px; vertical-align:2px; font-weight:600; }
 .saved-answer-comparison mark .comparison-pin { background:var(--accent); }
 .saved-answer-comparison .comparison-cite { display:inline-block; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:var(--rule-2); color:var(--ink-2); font-size:10.5px; line-height:16px; text-align:center; vertical-align:3px; margin-left:2px; font-weight:600; }
 .saved-answer-comparison .comparison-sources { border-top:1px solid var(--rule-2); padding:10px 20px 14px; font-size:12.5px; color:var(--muted); margin-top:auto; }
@@ -103,10 +103,10 @@
 .saved-answer-comparison .comparison-dtable :is(th,td):last-child { width:96px; text-align:right; color:var(--muted); font-size:12.5px; }
 .saved-answer-comparison .comparison-dtable strong { font-weight:600; color:var(--ink); }
 .saved-answer-comparison .comparison-pair { display:grid; gap:3px; }
-.saved-answer-comparison .comparison-pair i { display:block; height:6px; border-radius:3px; background:#d1d1d6; }
+.saved-answer-comparison .comparison-pair i { display:block; height:6px; border-radius:3px; background:var(--ui-faint); }
 .saved-answer-comparison .comparison-pair i+i { background:var(--accent); }
 .saved-answer-comparison .comparison-legend { display:flex; gap:16px; justify-content:flex-end; font-size:12px; color:var(--muted); margin:-30px 0 12px; }
-.saved-answer-comparison .comparison-legend span::before { content:""; display:inline-block; width:10px; height:6px; border-radius:3px; margin-right:6px; background:#d1d1d6; }
+.saved-answer-comparison .comparison-legend span::before { content:""; display:inline-block; width:10px; height:6px; border-radius:3px; margin-right:6px; background:var(--ui-faint); }
 .saved-answer-comparison .comparison-legend span+span::before { background:var(--accent); }
 .saved-answer-comparison .comparison-h3-row { display:flex; align-items:center; gap:6px; }
 .saved-answer-comparison .comparison-info { display:inline-flex; width:16px; height:16px; border-radius:50%; border:1px solid var(--rule); color:var(--muted); font-size:11px; align-items:center; justify-content:center; cursor:help; margin:0 0 14px; }

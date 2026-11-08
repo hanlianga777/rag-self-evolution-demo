@@ -14,8 +14,8 @@ it('places real coverage first, totals its quotas, and restores the document del
  const fetcher=vi.fn(async(_url:string,init?:RequestInit)=>new Response(JSON.stringify(init?.method==='DELETE'?{id:'operation',status:'completed'}:{knowledge,index:{}})));
  vi.stubGlobal('fetch',fetcher);
  await mount(<KnowledgePage data={{documents:[{id:'D1',name:'设备手册.pdf',chunks:7,status:'Indexed'}]}} onChanged={changed}/>);
- expect(document.querySelector('.page-content .panel h2')?.textContent).toBe('知识主题覆盖');
- expect(document.querySelector('.cluster-card')?.textContent).toContain('6 个题位');
+ expect(document.querySelector('.page-content .panel h2')?.textContent).toBe('规划题位');
+ expect(document.querySelector('.ui-kc-head')?.textContent).toContain('Positive 2 / Ablation 1 / Negative 3');
  const button=[...document.querySelectorAll('button')].find(b=>b.textContent==='删除')!;
  expect(button).toBeDefined();
  await act(async()=>button.click());

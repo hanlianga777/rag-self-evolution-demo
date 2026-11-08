@@ -5,7 +5,7 @@ import type {Citation} from '../types';
 
 type Source = {number:number; document:string; section:string; page?:number; end?:number; citation?:any};
 const sourceToken = /\uE000(\d+)\uE001/g;
-const readable = (text:string) => text.replace(/\.pdf$/i,'').replace(/^(?:卡赫|宇树)[_\s]*/,'').replace(/[_（(]?中文版[）)]?|完整|四足机器人(?=用户手册)/g,'').replace(/_/g,' ').replace(/([A-Za-z0-9])(?=[\u4e00-\u9fff])/g,'$1 ').replace(/\s+/g,' ').trim();
+export const readableSourceName = (text:string) => text.replace(/\.pdf$/i,'').replace(/^(?:卡赫|宇树)[_\s]*/,'').replace(/[_（(]?中文版[）)]?|完整|四足机器人(?=用户手册)/g,'').replace(/_/g,' ').replace(/([A-Za-z0-9])(?=[\u4e00-\u9fff])/g,'$1 ').replace(/\s+/g,' ').trim();
 const compact = (text:string) => text.toLowerCase().replace(/\.pdf|完整|操作说明|中文版|中文|用户手册|使用说明|使用手册|宇树|卡赫|v\d+(?:\.\d+)?|[\s_（）()&与和]/g,'');
 
 /** Replace source spans before Markdown sees underscores; keep all other characters. */
@@ -54,7 +54,7 @@ export function citationText(answer:string,evidence:any[]) {
     const tokens=pages.length?pages.map(match=>add(document,sectionBefore(match.index!),Number(match[1] || match[3]),match[2] || match[4]?Number(match[2] || match[4]):undefined)):[add(document,sectionBefore(whole.length),isSame?previous?.page:undefined,isSame?previous?.end:undefined)];
     if(!prose || !title)return tokens.join('');
     // In prose, only the filename and page references are citation syntax.
-    const named=whole.replace(whole.includes(`《${title}》`)?`《${title}》`:title,` ${readable(document)}`);
+    const named=whole.replace(whole.includes(`《${title}》`)?`《${title}》`:title,` ${readableSourceName(document)}`);
     let index=0;
     return pages.length?named.replace(new RegExp(String.raw`[（(]\s*${page}\s*[）)]|${page}`,'g'),()=>tokens[index++] || ''):named+tokens[0];
   };
@@ -109,5 +109,5 @@ export function ComparisonAnswer({row,points,side,onOpenCitation}:{row:any;point
     const note=node.type==='p' && /^(?:证据边界|未确认条件)[：:]/.test(flatten(node).replace(/\s/g,''));
     return cloneElement(node,{...(note?{className:'comparison-note'}:{})},decorate(node.props.children));
   }
-  return <><div className="comparison-body">{decorate(tree)}</div><footer className="comparison-sources"><div className="comparison-source-title">引用来源</div><ol>{display.sources.map(source=><li key={source.number}><sup className="comparison-cite">{source.number}</sup>{source.citation?<button onClick={()=>onOpenCitation({...source.citation,content_preview:source.citation.content || source.citation.content_preview,savedEvidence:true} as Citation)}>{readable(source.document)}{source.section && `，${source.section}`}{source.page!=null && `，第 ${source.page}${source.end?`–${source.end}`:''} 页`}</button>:<span>{readable(source.document)}{source.section && `，${source.section}`}{source.page!=null && `，第 ${source.page}${source.end?`–${source.end}`:''} 页`}（原文未保存）</span>}</li>)}</ol><div className="comparison-more">检索到 {final?.length ?? '未知'} 段证据，回答引用 {display.sources.length} 段</div></footer></>;
+  return <><div className="comparison-body">{decorate(tree)}</div><footer className="comparison-sources"><div className="comparison-source-title">引用来源</div><ol>{display.sources.map(source=><li key={source.number}><sup className="comparison-cite">{source.number}</sup>{source.citation?<button onClick={()=>onOpenCitation({...source.citation,content_preview:source.citation.content || source.citation.content_preview,savedEvidence:true} as Citation)}>{readableSourceName(source.document)}{source.section && `，${source.section}`}{source.page!=null && `，第 ${source.page}${source.end?`–${source.end}`:''} 页`}</button>:<span>{readableSourceName(source.document)}{source.section && `，${source.section}`}{source.page!=null && `，第 ${source.page}${source.end?`–${source.end}`:''} 页`}（原文未保存）</span>}</li>)}</ol><div className="comparison-more">检索到 {final?.length ?? '未知'} 段证据，回答引用 {display.sources.length} 段</div></footer></>;
 }
