@@ -16,25 +16,31 @@
  */
 
 :root {
-  /* —— 新的语义色板 —— */
-  --ui-page: #f3f5f8;
+  /* —— 色板 A · 苹果灰 + 蓝（用户 11-08 选定）——
+   * 规则：几乎不用彩色底色；对 / 错只用小圆点或 ✓ ✕；
+   *       唯一强调色（蓝）只标"焦点"：选中、Winner、推荐、关键参数、主按钮；
+   *       侧栏、运行浮窗、深色提示卡用近黑。 */
+  --ui-page: #f5f5f7;
   --ui-surface: #ffffff;
-  --ui-ink: #142033;
-  --ui-ink-2: #3a4a61;
-  --ui-muted: #6a7990;
-  --ui-faint: #a3afc0;
-  --ui-rule: #e3e8ef;
-  --ui-rule-2: #eef1f5;
-  --ui-navy: #111a2b;
-  --ui-navy-2: #1e2a40;
-  --ui-navy-3: #2b3a55;
-  --ui-green: #0e7a5a;
-  --ui-green-tint: #e5f3ec;
-  --ui-green-mark: #c9ebd9;
-  --ui-red: #b4432b;
-  --ui-red-tint: #fbede9;
-  --ui-amber: #8a5a12;
-  --ui-amber-tint: #faf1de;
+  --ui-ink: #1d1d1f;
+  --ui-ink-2: #424245;
+  --ui-muted: #6e6e73;
+  --ui-faint: #aeaeb2;
+  --ui-rule: #e5e5ea;
+  --ui-rule-2: #f0f0f3;
+  --ui-navy: #1d1d1f;      /* 近黑：侧栏、浮窗、页签下划线 */
+  --ui-navy-2: #2c2c2e;
+  --ui-navy-3: #3a3a3c;
+  --ui-accent: #0071e3;    /* 唯一强调色 */
+  --ui-accent-2: #0062c4;
+  --ui-accent-tint: #eaf3fe;
+  --ui-green: #248a3d;     /* 只用于小圆点、✓、细线 */
+  --ui-green-tint: #f0f0f3;
+  --ui-green-mark: #eaf3fe;
+  --ui-red: #d70015;       /* 只用于小圆点、✕、失败文字 */
+  --ui-red-tint: #f0f0f3;
+  --ui-amber: #b25000;
+  --ui-amber-tint: #f0f0f3;
 
   --ui-r-pill: 999px;
   --ui-r-btn: 10px;
@@ -43,9 +49,9 @@
   --ui-r-drawer: 20px;
   --ui-r-table: 12px;
 
-  --ui-shadow-1: 0 1px 2px rgb(20 32 51 / 4%), 0 4px 16px rgb(20 32 51 / 5%);
-  --ui-shadow-2: 0 2px 6px rgb(20 32 51 / 6%), 0 12px 32px rgb(20 32 51 / 10%);
-  --ui-shadow-float: 0 8px 28px rgb(17 26 43 / 22%);
+  --ui-shadow-1: 0 1px 2px rgb(0 0 0 / 4%), 0 4px 14px rgb(0 0 0 / 4%);
+  --ui-shadow-2: 0 2px 6px rgb(0 0 0 / 6%), 0 12px 32px rgb(0 0 0 / 9%);
+  --ui-shadow-float: 0 8px 28px rgb(0 0 0 / 22%);
 
   --ui-ease: cubic-bezier(.2, .8, .2, 1);
   --ui-t-fast: 120ms;
@@ -65,15 +71,15 @@
   --status-bg: var(--ui-rule-2);
   --card-radius: var(--ui-r-card);
   --card-good-bg: var(--ui-green-tint);
-  --card-good-border: #cfe7da;
+  --card-good-border: var(--ui-rule);
   --card-good-ink: var(--ui-green);
   --card-bad-bg: var(--ui-red-tint);
-  --card-bad-border: #f1d3cb;
+  --card-bad-border: var(--ui-rule);
   --card-bad-ink: var(--ui-red);
   --card-warning-bg: var(--ui-amber-tint);
   --card-warning-ink: var(--ui-amber);
   --focus: var(--ui-navy-3);
-  --overlay: rgb(17 26 43 / 32%);
+  --overlay: rgb(0 0 0 / 28%);
 }
 
 body { background: var(--ui-page); }
@@ -127,7 +133,7 @@ td { border-bottom-color: var(--ui-rule-2); }
 /* —— 浮层（ClampText 全文窗、HoverCard 深色提示卡）—— */
 .ui-float { box-sizing: border-box; position: fixed; z-index: 60; max-width: min(440px, calc(100vw - 24px)); animation: ui-fade-in var(--ui-t-fast) var(--ui-ease); }
 .ui-float.light { background: var(--ui-surface); color: var(--ui-ink); border-radius: 12px; box-shadow: var(--ui-shadow-2); padding: 12px 16px; max-height: 360px; overflow: auto; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
-.ui-float.dark { background: var(--ui-navy); color: #e8edf4; border-radius: 12px; box-shadow: var(--ui-shadow-float); padding: 10px 14px; font-size: 12.5px; line-height: 1.6; pointer-events: none; }
+.ui-float.dark { background: var(--ui-navy); color: #f2f2f7; border-radius: 12px; box-shadow: var(--ui-shadow-float); padding: 10px 14px; font-size: 12.5px; line-height: 1.6; pointer-events: none; }
 .ui-float.dark b, .ui-float.dark strong { color: #fff; font-weight: 600; }
 .ui-float.pinned { outline: 2px solid var(--ui-navy-3); outline-offset: 0; }
 .ui-hover-trigger { display: inline-flex; }
@@ -172,29 +178,29 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-param.key small { color: var(--ui-green); font-weight: 650; font-size: 11px; }
 
 /* —— RunProgressPanel：右下角运行浮窗 —— */
-.ui-run { box-sizing: border-box; position: fixed; right: 24px; bottom: 24px; z-index: 45; width: 360px; max-width: calc(100vw - 32px); background: var(--ui-navy); color: #e8edf4; border-radius: var(--ui-r-float); box-shadow: var(--ui-shadow-float); padding: 16px 18px 16px; animation: ui-run-in var(--ui-t-drawer) var(--ui-ease); }
+.ui-run { box-sizing: border-box; position: fixed; right: 24px; bottom: 24px; z-index: 45; width: 360px; max-width: calc(100vw - 32px); background: var(--ui-navy); color: #f2f2f7; border-radius: var(--ui-r-float); box-shadow: var(--ui-shadow-float); padding: 16px 18px 16px; animation: ui-run-in var(--ui-t-drawer) var(--ui-ease); }
 @keyframes ui-run-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .ui-run-head { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: start; }
 .ui-run-title { color: #fff; font-size: 15px; font-weight: 650; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ui-run-sub { grid-column: 1; color: #9fb0c6; font-size: 12px; }
-.ui-run-min { grid-row: 1 / span 2; grid-column: 2; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: #9fb0c6; font-size: 18px; line-height: 1; }
+.ui-run-sub { grid-column: 1; color: #a1a1a6; font-size: 12px; }
+.ui-run-min { grid-row: 1 / span 2; grid-column: 2; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: #a1a1a6; font-size: 18px; line-height: 1; }
 .ui-run-min:hover { background: var(--ui-navy-2); color: #fff; }
-.ui-run-state { display: flex; align-items: center; gap: 8px; margin: 14px 0 10px; font-size: 13px; color: #d5deea; min-height: 24px; }
+.ui-run-state { display: flex; align-items: center; gap: 8px; margin: 14px 0 10px; font-size: 13px; color: #d1d1d6; min-height: 24px; }
 .ui-run-state .ui-status { background: rgb(255 255 255 / 10%); color: #fff; }
 .ui-run-state .ui-status.good { background: rgb(14 122 90 / 30%); color: #b9f0d8; }
 .ui-run-state .ui-status.bad { background: rgb(180 67 43 / 30%); color: #ffd2c6; }
-.ui-run-progress { display: flex; justify-content: space-between; font-size: 12.5px; color: #c6d1df; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
+.ui-run-progress { display: flex; justify-content: space-between; font-size: 12.5px; color: #c7c7cc; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
 .ui-run-progress b { color: #fff; font-weight: 650; }
 .ui-run-bar { height: 6px; border-radius: 999px; background: var(--ui-navy-3); overflow: hidden; }
 .ui-run-bar > i { display: block; height: 100%; border-radius: 999px; background: #ffffff; transition: width 400ms var(--ui-ease); }
-.ui-run-time { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #9fb0c6; min-height: 18px; font-variant-numeric: tabular-nums; }
+.ui-run-time { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #a1a1a6; min-height: 18px; font-variant-numeric: tabular-nums; }
 .ui-run-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
 .ui-run-actions button { height: 36px; border-radius: var(--ui-r-btn); font-size: 13px; font-weight: 650; border: 1px solid rgb(255 255 255 / 18%); background: transparent; color: #fff; }
 .ui-run-actions button.go { background: #fff; color: var(--ui-navy); border-color: #fff; }
 .ui-run-actions button:disabled { opacity: .38; cursor: not-allowed; }
 .ui-run-actions button:not(:disabled):hover { border-color: rgb(255 255 255 / 40%); }
-.ui-run-actions button.go:not(:disabled):hover { background: #eef2f7; }
-.ui-run-confirm { margin-top: 14px; padding: 12px; border-radius: 10px; background: var(--ui-navy-2); font-size: 12.5px; line-height: 1.6; color: #d5deea; }
+.ui-run-actions button.go:not(:disabled):hover { background: #f2f2f7; }
+.ui-run-confirm { margin-top: 14px; padding: 12px; border-radius: 10px; background: var(--ui-navy-2); font-size: 12.5px; line-height: 1.6; color: #d1d1d6; }
 .ui-run-confirm .ui-run-actions { margin-top: 10px; }
 .ui-run-pill { position: fixed; right: 24px; bottom: 24px; z-index: 45; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 0; border-radius: var(--ui-r-pill); background: var(--ui-navy); color: #fff; box-shadow: var(--ui-shadow-float); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ui-run-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: ui-pulse 1.6s ease-in-out infinite; }
@@ -340,10 +346,10 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-bl-time-head { display: flex; justify-content: space-between; color: var(--ui-muted); font-size: 12.5px; }
 .ui-bl-time-head small { color: var(--ui-ink-2); font-size: 12.5px; font-weight: 600; }
 .ui-bl-bar { display: flex; gap: 2px; height: 12px; border-radius: 999px; overflow: hidden; background: var(--ui-rule-2); }
-.ui-bl-bar i { display: block; min-width: 3px; background: #c7d0dc; }
+.ui-bl-bar i { display: block; min-width: 3px; background: #d1d1d6; }
 .ui-bl-bar i.top { background: var(--ui-navy); }
 .ui-bl-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: var(--ui-muted); }
-.ui-bl-legend i { display: inline-block; width: 10px; height: 6px; border-radius: 3px; background: #c7d0dc; margin-right: 6px; vertical-align: 1px; }
+.ui-bl-legend i { display: inline-block; width: 10px; height: 6px; border-radius: 3px; background: #d1d1d6; margin-right: 6px; vertical-align: 1px; }
 .ui-bl-legend .top i { background: var(--ui-navy); }
 .ui-bl-legend .top { color: var(--ui-ink); }
 .ui-bl-legend b { color: inherit; font-weight: 650; }
@@ -401,7 +407,7 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-kc-name { display: flex; align-items: center; gap: 8px; color: var(--ui-ink); font-weight: 550; min-width: 0; }
 .ui-kc-tag { font-size: 11px; font-weight: 650; color: var(--ui-navy-2); background: #e6eaf2; border-radius: var(--ui-r-pill); padding: 2px 8px; }
 .ui-kc-bar { display: flex; align-items: center; gap: 8px; }
-.ui-kc-bar i { display: block; height: 8px; border-radius: 4px; background: #c7d0dc; min-width: 4px; }
+.ui-kc-bar i { display: block; height: 8px; border-radius: 4px; background: #d1d1d6; min-width: 4px; }
 .ui-kc-bar b { font-weight: 600; color: var(--ui-ink-2); font-size: 12.5px; }
 
 /* —— Sandbox 对比表 —— */
@@ -417,6 +423,66 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-ct-more { margin-top: 6px; color: var(--ui-ink-2); background: none; padding: 6px 0; }
 
 .ui-sample-title { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--ui-muted); }
+
+
+/* ============================================================
+ * 色板 A · 安静规则（覆盖上面的组件默认值）
+ * ============================================================ */
+.primary { background: var(--ui-accent); }
+.primary:hover { background: var(--ui-accent-2); }
+.badge.good, .badge.bad, .badge.warning { background: var(--ui-rule-2); }
+
+/* 状态：中性文字 + 彩色小圆点；只有 Winner / 推荐 用强调色 */
+.ui-status { background: transparent; padding: 4px 2px; color: var(--ui-ink-2); }
+.ui-status.neutral::before { background: var(--ui-faint); }
+.ui-status.good::before { background: var(--ui-green); }
+.ui-status.bad::before { background: var(--ui-red); }
+.ui-status.amber::before { background: var(--ui-amber); }
+.ui-status.good, .ui-status.bad, .ui-status.amber, .ui-status.neutral { background: transparent; color: var(--ui-ink-2); }
+.ui-status.navy { background: var(--ui-accent-tint); color: var(--ui-accent); padding: 5px 10px; }
+.ui-status.solid { background: var(--ui-accent); color: #fff; padding: 5px 10px; }
+.ui-status.navy::before, .ui-status.solid::before { background: currentColor; }
+
+/* 题号：灰底 + 小圆点 */
+.ui-q, .ui-q.fixed, .ui-q.broken, .ui-q.open, .ui-q.neutral { background: var(--ui-rule-2); color: var(--ui-ink); border-color: transparent; gap: 5px; }
+.ui-q.fixed::before, .ui-q.broken::before, .ui-q.open::before { content: ""; flex: none; width: 5px; height: 5px; border-radius: 50%; }
+.ui-q.fixed::before { background: var(--ui-green); }
+.ui-q.broken::before { background: var(--ui-red); }
+.ui-q.open::before { background: var(--ui-faint); }
+
+/* 变化胶囊、事实标签：去掉彩色底 */
+.ui-delta.good, .ui-delta.bad, .ui-delta.flat { background: var(--ui-rule-2); }
+.ui-delta.good { color: var(--ui-green); }
+.ui-delta.bad { color: var(--ui-red); }
+.ui-ov-fact, .ui-ov-fact.good { background: transparent; padding: 0 16px 0 0; color: var(--ui-muted); }
+.ui-ov-fact b, .ui-ov-fact.good b { color: var(--ui-ink); }
+
+/* 焦点：Winner / 推荐 / 关键参数 / 选中 */
+.ui-evo-card.winner { border-color: var(--ui-accent); }
+.ui-evo-dot.win { background: var(--ui-accent); border-color: var(--ui-accent); }
+.ui-param.key { background: var(--ui-accent-tint); border-color: var(--ui-accent); }
+.ui-param.key small { color: var(--ui-accent); }
+.ui-rel-side.to { background: var(--ui-accent-tint); box-shadow: inset 0 0 0 1.5px var(--ui-accent); }
+.ui-rel-steps li.ok { background: var(--ui-rule-2); }
+.ui-rel-steps li.ok i { background: var(--ui-green); }
+.ui-rel-steps li.next { box-shadow: inset 0 0 0 1.5px var(--ui-accent); }
+.ui-rel-steps li.next i { background: var(--ui-accent); }
+.ui-fin-compare .pick, .ui-ct .hl { background: var(--ui-accent-tint); }
+.ui-bl-bar i.top, .ui-bl-legend .top i { background: var(--ui-ink); }
+
+/* 通过 / 失败文字：通过用中性色，失败保留红色但只在文字上 */
+.ui-evo-pass { color: var(--ui-ink-2); font-weight: 500; }
+.ui-evo-tag, .ui-kc-tag { background: var(--ui-rule-2); color: var(--ui-ink-2); }
+.ui-gp-steps li.done::before { background: var(--ui-ink-2); }
+.ui-gp-steps li.done i { background: var(--ui-ink); border-color: var(--ui-ink); }
+.ui-float.light mark, .ui-float.pinned { outline-color: var(--ui-accent); }
+
+/* 侧栏、运行浮窗：近黑 */
+.ui-run-state .ui-status, .ui-run-state .ui-status.neutral, .ui-run-state .ui-status.amber { background: rgb(255 255 255 / 12%); color: #fff; padding: 5px 10px; }
+.ui-run-state .ui-status.good { background: rgb(36 138 61 / 35%); color: #d6f5de; padding: 5px 10px; }
+.ui-run-state .ui-status.bad { background: rgb(215 0 21 / 35%); color: #ffd9dc; padding: 5px 10px; }
+.ui-run, .ui-run-pill { background: var(--ui-navy); }
+.ui-run-actions button.go { color: var(--ui-ink); }
 
 /* —— 减少动态效果 —— */
 @media (prefers-reduced-motion: reduce) {
