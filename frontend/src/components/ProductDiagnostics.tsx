@@ -33,12 +33,17 @@ export function BadCaseOverview({rows,categories=[],priorities=[],latencyGates=[
  </div>;
 }
 
+export function timingStages(diagnostics?:Row) {
+ const rawStages:Row[]=(diagnostics?.objective_metrics?.stage_breakdown || []).filter((row:Row)=>row.stage!=='judge');
+ const tiny=rawStages.filter(row=>typeof row.share_percent==='number' && row.share_percent<0.5).sort((a,b)=>b.total_ms-a.total_ms);
+ const stages=[...rawStages.filter(row=>!tiny.includes(row)),...(tiny.length?[{stage:'other_stages',label:'其他环节',total_ms:tiny.reduce((sum,row)=>sum+row.total_ms,0),share_percent:tiny.reduce((sum,row)=>sum+row.share_percent,0)}]:[])].sort((a,b)=>b.total_ms-a.total_ms);
+ return {stages,tiny};
+}
+
 export function ProductDiagnostics({diagnostics,judgeThinking}: {diagnostics?:Row;judgeThinking?:string}) {
  const [open,setOpen]=useState(false),[showAll,setShowAll]=useState(false),[showOther,setShowOther]=useState(false);
  const comparison=diagnostics?.thinking_comparison || {},columns:Row[]=comparison.columns || [],metrics=diagnostics?.objective_metrics || {};
- const rawStages:Row[]=(metrics.stage_breakdown || []).filter((row:Row)=>row.stage!=='judge');
- const tiny=rawStages.filter(row=>typeof row.share_percent==='number' && row.share_percent<0.5).sort((a,b)=>b.total_ms-a.total_ms);
- const stages=[...rawStages.filter(row=>!tiny.includes(row)),...(tiny.length?[{stage:'other_stages',label:'其他环节',total_ms:tiny.reduce((sum,row)=>sum+row.total_ms,0),share_percent:tiny.reduce((sum,row)=>sum+row.share_percent,0)}]:[])].sort((a,b)=>b.total_ms-a.total_ms);
+ const {stages,tiny}=timingStages(diagnostics);
  const comparisonJudge=(comparison.judge_thinking || judgeThinking || '').toLowerCase();
  const sameThinking=columns.length>1 && new Set(columns.map(column=>column.label)).size===1;
  const comparisonTitle=sameThinking?'保存回答对照':'Thinking 档位对照';

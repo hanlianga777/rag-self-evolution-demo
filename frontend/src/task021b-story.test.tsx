@@ -49,9 +49,9 @@ it('refuses saved-answer comparison when identities differ',async()=>{
 it('puts only the saved recommendation first, shows unmet checks, and keeps publish disabled',async()=>{
  const c=candidate(3,'C',true);c.result.new_regression_question_ids=['q2'];
  await mount(<VersionsPage data={{evaluation:baseline,versions:[{id:'v',status:'active',provenance:'bootstrap',config:{top_k:4}}],optimization:{candidates:[candidate(1,'A'),c],recommendation:{recommended_candidate:c.id},result:{report_confirmation:{winner_id:c.id}}}}}/>);
- expect(document.querySelector('.page-content .panel h2')?.textContent).toBe('待发布方案');
- expect(document.querySelector('.pending-release')?.textContent).not.toContain('Round 1');
- expect(document.querySelector('.pending-release')?.textContent).toContain('新增 1 个 Bad Case');
+ expect(document.querySelector('.page-content .ui-rel h2')?.textContent).toBe('待发布方案');
+ expect(document.querySelector('.ui-rel')?.textContent).not.toContain('Round 1');
+ expect(document.querySelector('.ui-rel')?.textContent).toContain('新增 1 个 Bad Case');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent==='确认发布')?.disabled).toBe(true);
 });
 it('keeps internal IDs, conclusion labels, English states and forbidden narratives off the story',()=>{

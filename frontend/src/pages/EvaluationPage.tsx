@@ -1,3 +1,5 @@
+import { BaselineHero } from "../ui/baseline/BaselineHero";
+import { caseData } from "../components/EvaluationDiagnosis";
 import { usePageTab } from "../usePageTab";
 import { savedSnapshot } from "../evaluationProgress";
 import { DataTable } from "../components/DataTable";
@@ -6,7 +8,7 @@ import { mergeEvaluationProgress, hasEvaluationDetails } from "../evaluationProg
 import { StoryDisclosure } from "../components/Storytelling";
 import './evaluation-workspaces.css';
 import { savedDirections, businessDiagnosisRows, businessVerdict, coreEvidence } from '../components/EvaluationDiagnosis';
-import { BadCaseOverview, ProductDiagnostics, productQuestionLabel } from "../components/ProductDiagnostics";
+import { BadCaseOverview, ProductDiagnostics, productQuestionLabel, timingStages } from "../components/ProductDiagnostics";
 import { PageShell } from "../components/PageShell";
 
 import { useEffect, useState } from "react";
@@ -151,6 +153,15 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
     {!run.id ? <Section title="尚未运行 Baseline"><p>正式评测需要已批准 Golden {displayText("Snapshot")} 与可用 Provider。</p></Section> : <>
 
       {tab === "report" && <>
+      {completed && !historicalPolicy && !stale && !result.technical_error_count && result.evaluation_complete !== false && typeof badCount === "number" && typeof result.total === "number" && typeof result.gates?.passed_count === "number" && typeof result.gates?.total === "number" ? <BaselineHero
+        gates={{passed: result.gates.passed_count, total: result.gates.total}}
+        correct={result.total - badCount} total={result.total} badCount={badCount}
+        layers={Array.from(new Set<string>(businessCases.map(row => caseData(row).diagnostic_view?.diagnosis_category || "分类未知"))).map(label => ({label, count: businessCases.filter(row => (caseData(row).diagnostic_view?.diagnosis_category || "分类未知") === label).length}))}
+        thinking={generationThinking}
+        p50={gates.find(gate => gate.metric === "latency_p50_seconds")?.actual}
+        p99={gates.find(gate => gate.metric === "latency_p99_seconds")?.actual}
+        stages={timingStages(run.product_diagnostics).stages.map(stage => ({label: stage.label, seconds: stage.total_ms / 1000, share: stage.share_percent}))}
+      /> : <>
       <section className={`baseline-conclusion ${stale ? "warning" : result.gates?.passed === true ? "good" : "neutral"}`}>
         <h2>{historicalPolicy ? "历史Baseline · 旧规则成绩保留" : stale ? "历史评测 · 当前身份已失效" : completed ? result.gates?.passed === true ? "Baseline Hard Gate 已通过" : result.gates?.passed === false && failures.length ? `本轮有 ${failures.length} 项 Hard Gate 未达标：${failures.map(gate => `${gateNames[gate.metric] || gate.metric} ${Number(gate.actual).toFixed(1)}${gate.metric.startsWith("latency_") ? " 秒" : "%"}（要求 ${gate.operator === ">=" ? "≥" : "≤"}${Number(gate.threshold).toFixed(1)}${gate.metric.startsWith("latency_") ? " 秒" : "%"}）`).join("；")}。` : "评测已完成 · Hard Gate 无法评估" : displayText(run.status || "not_run")}</h2>
         {(historicalPolicy || !completed || badCount==null) && <p>{historicalPolicy ? '历史技术诊断仅供追溯，不作为新版 Agent 目标；新实验需先建立新版 Baseline。' : badCount==null && completed?'Bad Case 数量未采集，无法据此判断逐题质量。': `已完成 ${result.completed ?? cases.length} / ${result.total ?? '未知'} 题；保留已完成结果与检查点。`}</p>}
@@ -163,9 +174,12 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
       </div>
 
       </>}
+      </>}
 
       {tab === "report" && <div className="baseline-report">
-        <ProductDiagnostics diagnostics={run.product_diagnostics} judgeThinking={judgeThinking} />
+        <StoryDisclosure label="更多指标">
+          <Metric label="综合分" value={format(result.overall_score)} note="用于比较整体表现"/>
+          <ProductDiagnostics diagnostics={run.product_diagnostics} judgeThinking={judgeThinking} />
         <Section title="评测信息">
           <dl className="report-grid baseline-run-summary">
             <div><dt>题卷</dt><dd>{snapshot.name || snapshot.label || "冻结题卷"}{snapshot.question_ids?.length != null && ` · ${snapshot.question_ids.length} 题`}</dd></div>
@@ -175,6 +189,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
             <div><dt>评测时间</dt><dd>{localShortTime(run.completed_at || run.created_at)}</dd></div>
           </dl>
         </Section>
+        </StoryDisclosure>
 
       </div>}
       {tab === "gates" && <><p className="gate-intro">{result.gates?.passed_count ?? '未知'} / {gates.length || '未知'} 项通过；每项独立判断，综合分不能抵消未通过的 Hard Gate。</p>{['正向（Positive）','消融（Ablation）','负向（Negative）与安全','性能'].map(label=><Section key={label} title={`${label}（${gates.filter(gate=>group(gate.metric)===label).length}）`}><div className="table-scroll product-table baseline-gates-table"><DataTable><thead><tr><th>指标</th><th>实际值</th><th>要求</th><th>实际值与 Hard Gate</th><th>状态</th></tr></thead><tbody>{gates.filter(gate=>group(gate.metric)===label).map(gate=><tr className={gate.status==='FAIL'?'gate-failed':''} key={gate.metric} tabIndex={0} onClick={()=>setSelectedGate(details.find(row=>row.metric===gate.metric) || gate)} onKeyDown={event=>{if(event.key==='Enter' || event.key===' '){event.preventDefault();setSelectedGate(details.find(row=>row.metric===gate.metric) || gate);}}}><td title={gateEnglishNames[gate.metric]}>{gateNames[gate.metric] || gate.metric}</td><td>{gateValue(gate)}</td><td>{gateThreshold(gate)}</td><td>{typeof gate.actual==='number' && typeof gate.threshold==='number'?<ProgressBar label={`${gateNames[gate.metric] || gate.metric}实际值与 Hard Gate`} value={gate.actual} max={gate.metric.startsWith('latency_')?Math.max(gate.actual,gate.threshold)*1.2:100} threshold={gate.threshold} failed={gate.status==='FAIL'}/>: '未采集'}</td><td><Status value={gate.status || 'not_evaluable'}/></td></tr>)}</tbody></DataTable></div></Section>)}</>}

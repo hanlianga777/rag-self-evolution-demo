@@ -168,7 +168,7 @@ button, a, summary { touch-action: manipulation; }
 .pipeline-node strong { font-size: 15px; }
 .pipeline-arrow { display: none; }
 .candidate-list { display: grid; gap: 0; }
-.candidate-row { align-items: center; border-bottom: 1px solid var(--line-soft); display: grid; font-size: 13px; grid-template-columns: 1fr 60px auto; padding: 10px 0; }
+.candidate-row { align-items: center; border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: 1fr 60px auto; padding: 10px 0; }
 .candidate-row:last-child { border-bottom: 0; }
 .candidate-row strong { font-variant-numeric: tabular-nums; }
 .run-list > div { align-items: center; border-top: 1px solid var(--line-soft); display: grid; font-size: 12px; gap: 10px; grid-template-columns: minmax(0, 1fr) auto auto; padding: 11px 0; }
@@ -262,10 +262,9 @@ td svg { color: var(--muted); margin-right: 5px; vertical-align: middle; }
 .candidate-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 18px 24px 24px; }
 .candidate-scroll h2 { font-size: 20px; margin: 0 0 16px; }
 .candidate-card { margin-bottom: 16px; }
-.candidate-card h3 { font-weight: 650; margin: 0 0 10px; }
+.candidate-card h3 { margin: 0 0 10px; }
 .candidate-card p { margin: 7px 0; overflow-wrap: anywhere; }
 .candidate-card small, .candidate-evidence-meta { color: var(--muted); }
-.candidate-question { font-size:var(--card-body); font-weight:700; }
 .candidate-evidence-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; }
 .candidate-card details { margin-top: 10px; }
 .candidate-card details summary { color: var(--status); cursor: pointer; }
@@ -279,9 +278,9 @@ td svg { color: var(--muted); margin-right: 5px; vertical-align: middle; }
 .quality-grid strong, .quality-grid span { display: block; font-size: 13px; }
 .quality-grid p { color: var(--muted); display: -webkit-box; font-size: 12px; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .candidate-quality-links { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin-top: 8px; }
-.candidate-quality-links .text-button { color: var(--focus); font-size: 12px; font-weight: 400; padding-left: 11px; text-align: left; }
+.candidate-quality-links .text-button { color: var(--focus); padding-left: 11px; text-align: left; }
 .candidate-quality-links .text-button:hover { color: var(--status); }
-.candidate-readonly-hint { border-top: 1px solid var(--line); color: var(--muted); flex: none; font-size: 12px; margin: 0; padding: 10px 24px; }
+.candidate-readonly-hint { border-top: 1px solid var(--line); color: var(--muted); flex: none; margin: 0; padding: 10px 24px; }
 .candidate-actionbar { align-items: center; background: var(--surface); border-top: 1px solid var(--line); display: flex; flex: none; flex-wrap: wrap; gap: 8px; justify-content: flex-end; min-height: 72px; padding: 12px 24px; }
 .candidate-actionbar button { white-space: nowrap; }
 .action-reason { color: var(--muted); flex: 1; font-size: 12px; line-height: 1.35; min-width: 180px; }
@@ -402,7 +401,7 @@ td svg { color: var(--muted); margin-right: 5px; vertical-align: middle; }
 .candidate-card dl { margin: 0 0 12px; }
 .candidate-card dl div { border-bottom: 1px solid var(--line-soft); display: flex; justify-content: space-between; }
 .candidate-card dt { color: var(--muted); }
-.candidate-card dd { font-weight: 700; margin: 0; }
+.candidate-card dd { margin: 0; }
 .candidate-card p { margin: 12px 0 5px; }
 .candidate-card small { color: var(--muted); }
 .timeline { border-left: 1px solid var(--nav-muted); display: grid; gap: 0; margin-left: 7px; }
@@ -744,11 +743,11 @@ td, th { font-variant-numeric: tabular-nums; }
 .candidate-card-body p { margin: 5px 0 0; overflow-wrap: anywhere; }
 .candidate-config-diff { height: 140px; overflow: auto; }
 .candidate-config-diff table { table-layout: fixed; width: 100%; }
-.candidate-config-diff td, .candidate-config-diff th { font-size:12px; overflow: hidden; padding: 5px 4px; text-overflow: ellipsis; white-space: nowrap; }
+.candidate-config-diff td, .candidate-config-diff th { overflow: hidden; padding: 5px 4px; text-overflow: ellipsis; white-space: nowrap; }
 .candidate-config-diff td:first-child { max-width: 0; }
-.candidate-config-diff details { font-size:12px; margin-top: 4px; }
+.candidate-config-diff details { margin-top: 4px; }
 .candidate-result { border-top: 1px solid var(--line-soft); display: flex; flex-wrap: wrap; gap: 10px; padding-top: 10px; }
-.candidate-result span { color: var(--muted); font-size:12px; }
+.candidate-result span { color: var(--muted); }
 .candidate-result strong { color: var(--ink); }
 .candidate-card-action { margin-top: auto; padding-top: 16px; }
 .composite-decision { display: grid; gap: 22px; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); }
@@ -915,15 +914,14 @@ td, th { font-variant-numeric: tabular-nums; }
 .evolution-page .diagnosis-cards { grid-template-columns: repeat(auto-fit,minmax(min(250px,100%),1fr)); }
 .evolution-page .diagnosis-card { overflow: auto; display: flex; flex-direction: column; cursor: pointer; }
 .diagnosis-card-link { margin-top: auto; color: var(--muted); padding-top: 12px; }
-.agent-hypotheses { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.65; }
+.agent-hypotheses { margin: 0; padding-left: 18px; line-height: 1.65; }
 .evolution-page .candidate-result { display: grid; gap: 8px; margin: 0; }
 .evolution-page .candidate-result > div { display: flex; justify-content: space-between; gap: 10px; }
-.evolution-page .candidate-result dt { font-size: 12px; color: var(--muted); }
+.evolution-page .candidate-result dt { color: var(--muted); }
 .evolution-page .candidate-result dd { margin: 0; }
 .evolution-page .sandbox-core-table { height: auto; max-height: none; }
 .versions-page .release-summary { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 12px 0; }
-.release-summary span { display: block; color: var(--muted); font-size:12px; margin-bottom: 4px; }
-.release-summary strong { font-size: 13px; }
+.release-summary span { display: block; color: var(--muted); margin-bottom: 4px; }
 .release-history { margin-top: 24px; }
 .versions-page .release-history .table-scroll { height: auto; max-height: 240px; }
 .unpublished-candidates > div, .qa-answer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -1117,7 +1115,6 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .golden-workspace .gate-one-action label { font-size:var(--card-body); }
 .candidate-workspace .detail-content { display:flex; overflow:hidden; }
 .candidate-workspace .candidate-shell { flex:1; min-height:0; }
-.candidate-workspace .candidate-card h3 { font-size:var(--card-title); font-weight:700; }
 .candidate-workspace .candidate-card p,.candidate-workspace .candidate-card span { font-size:var(--card-body); }
 .candidate-workspace .candidate-card small { font-size:var(--card-support); }
 .quality-grid > div { display:flex; flex-direction:column; gap:4px; }
@@ -1140,8 +1137,7 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .golden-workspace .review-filters { align-items:center; }
 .golden-workspace .golden-review-role { font-size:var(--card-support); white-space:nowrap; }
 .candidate-workspace .candidate-menu { top:8px; right:8px; }
-.candidate-workspace .candidate-question { font-size:var(--card-body); font-weight:700; }
-.candidate-workspace .candidate-card { margin-bottom:var(--card-gap); }
+.candidate-workspace .candidate-workspace .candidate-card { margin-bottom:var(--card-gap); }
 .candidate-workspace .candidate-card h3,.candidate-workspace .candidate-card p { margin:4px 0; }
 .candidate-workspace .candidate-scroll { padding:var(--card-padding); }
 .candidate-workspace .workspace-badges { padding-right:44px; }
@@ -1210,7 +1206,7 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .evaluation-page .stage-stepper { grid-template-columns:repeat(4,minmax(0,1fr)); }
 .evolution-page .stage-stepper.compact { grid-template-columns:repeat(6,minmax(0,1fr)); }
 .baseline-conclusion { min-height:0; height:auto; }
-.baseline-run-summary,.comparison-identities { display:flex; flex-wrap:wrap; gap:8px 20px; font-size:var(--card-support); color:var(--muted); }
+.baseline-run-summary,.comparison-identities { display:flex; flex-wrap:wrap; gap:8px 20px; color:var(--muted); }
 .baseline-run-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); align-items:start; margin:10px 0 14px; }
 .baseline-answer-comparison,.experiment-plan { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--card-gap); }
 .experiment-plan { grid-template-columns:repeat(3,minmax(0,1fr)); }
@@ -1250,10 +1246,9 @@ html, body, #root, .app-shell { height: 100dvh; min-height: 0; overflow: hidden;
 .evolution-page .candidate-config-diff { height:auto; overflow:visible; }
 .evaluation-page .baseline-metrics { display:grid; gap:var(--card-gap); margin:12px 0; }
 .evaluation-page .baseline-metrics > div { display:grid; gap:4px; padding:var(--card-padding); border:1px solid var(--card-border); border-radius:var(--card-radius); background:var(--card-bg); }
-.evaluation-page .baseline-metrics span,.evaluation-page .baseline-metrics small { color:var(--muted); font-size:var(--card-support); }
-.evaluation-page .baseline-metrics strong { font-size:var(--text-metric); }
-.evaluation-page .baseline-conclusion { padding:var(--card-padding); margin-bottom:12px; border:1px solid var(--card-border); border-radius:var(--card-radius); font-size:var(--card-body); }
-.evaluation-page .baseline-conclusion h2 { font-size:var(--card-title); margin:0 0 5px; }
+.evaluation-page .baseline-metrics span,.evaluation-page .baseline-metrics small { color:var(--muted); }
+.evaluation-page .baseline-conclusion { padding:var(--card-padding); margin-bottom:12px; border:1px solid var(--card-border); border-radius:var(--card-radius); }
+.evaluation-page .baseline-conclusion h2 { margin:0 0 5px; }
 .evaluation-page .baseline-conclusion p { margin:0; line-height:1.6; }
 .evaluation-page .baseline-conclusion.good { background:var(--card-good-bg); border-color:var(--card-good-border); }
 .evaluation-page .baseline-conclusion.warning { background:var(--card-warning-bg); }
@@ -1406,7 +1401,6 @@ button { border-radius:8px; }
 .route-review p { margin:8px 0 0; line-height:1.6; }
 .route-planning { margin-bottom:20px; }
 .story-changes p { display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--line-soft); padding:8px 0; margin:0; }
-.story-changes strong { font-weight:500; }
 .story-quality table { width:100%; table-layout:fixed; border-collapse:collapse; }
 .story-quality :is(th,td) { padding:10px; border-bottom:1px solid var(--line-soft); text-align:left; }
 .story-quality { margin:12px 0 16px; }

@@ -201,11 +201,11 @@ it("RL-03/05 uses centered confirmation and keeps failed release visible without
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail: "提交时资格已失效" }), { status: 409 })));
   const candidate = { id: "A-fixture", status: "evaluated", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
   await render(<VersionsPage data={{ versions: [{ id: "P0", status: "active" }], optimization: { candidates: [candidate], recommendation:{recommended_candidate:candidate.id} } }} />);
-  await act(async () => document.querySelector<HTMLButtonElement>(".pending-release button.primary")!.click());
+  await act(async () => document.querySelector<HTMLButtonElement>(".ui-rel button.primary")!.click());
   expect(document.querySelector(".confirm-dialog")?.textContent).toContain("发布确认");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".confirm-dialog button")].find(button => button.textContent === "确认")!.click());
   expect(document.querySelector(".confirm-dialog")?.textContent).toContain("提交时资格已失效");
-  expect(document.querySelector(".pending-release button.primary")?.textContent).toBe("确认发布");
+  expect(document.querySelector(".ui-rel button.primary")?.textContent).toBe("确认发布");
   expect(document.querySelector(".version-records")?.textContent || "").not.toContain("P1");
   expect(fetch).toHaveBeenCalledTimes(1);
 });
@@ -253,10 +253,10 @@ it("review R2 an older Production does not finish a new recommendation Gate3", a
   expect(document.querySelector(".ui-ov-action")?.textContent).toBe("去发布");
   await act(async () => root.render(<VersionsPage data={input} />));
   expect(document.querySelector('[aria-label="发布阶段"]')).toBeNull();
-  expect(document.querySelector(".pending-release")?.textContent).toContain("方案 A");
-  expect(document.querySelector(".pending-release")?.textContent).toContain("本轮推荐，尚未发布");
-  expect(document.querySelector<HTMLButtonElement>(".pending-release button.primary")?.disabled).toBe(false);
-  expect(document.querySelector(".pending-release button.primary")?.textContent).toBe("确认发布");
+  expect(document.querySelector(".ui-rel")?.textContent).toContain("方案 A");
+  expect(document.querySelector(".ui-rel")?.textContent).toContain("本轮推荐，尚未发布");
+  expect(document.querySelector<HTMLButtonElement>(".ui-rel button.primary")?.disabled).toBe(false);
+  expect(document.querySelector(".ui-rel button.primary")?.textContent).toBe("确认发布");
   expect(input.versions[0].snapshot.candidate_id).toBe("E0-C");
 });
 

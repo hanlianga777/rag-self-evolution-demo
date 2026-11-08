@@ -1,4 +1,6 @@
-import {ChangedParameters, QualityComparison, recommendationOf, schemeName, storyText} from "../components/EvolutionStory";
+import {recommendationOf, schemeName} from "../components/EvolutionStory";
+import { ReleasePanel } from "../ui/release/ReleasePanel";
+import { PARAM_LABELS, paramValue } from "../ui/evolution/model";
 import { DataTable } from "../components/DataTable";
 import "./evaluation-workspaces.css";
 import { StoryDisclosure, StoryEmpty } from "../components/Storytelling";
@@ -39,18 +41,32 @@ export function VersionsPage({ data }: { data: any }) {
   const historicalSource = !!currentBaselineId && !!publishedBaselineId && currentBaselineId !== publishedBaselineId;
   const currentReleased = currentVersion?.provenance === "published" && !!snapshot.candidate_id && snapshot.human_release?.decision === "approved";
   const publishedCandidate = candidates.find(candidate => candidate.id === snapshot.candidate_id);
+  const publishedGates = snapshot.hard_gate_results || snapshot.evaluation_result?.gates;
   const sourceName = candidateName(publishedCandidate, snapshot.candidate_id);
   const previousVersion = versions.find(version => version.id === currentVersion?.previous_version_id);
-  const gates = snapshot.hard_gate_results || snapshot.evaluation_result?.gates;
-  const regression = snapshot.regression || snapshot.evaluation_result?.regression;
   const saved推荐方案 = snapshot.recommendation?.result || snapshot.recommendation || {};
   const gate2Confirmed = !!saved推荐方案.report_confirmation && saved推荐方案.recommended_candidate === snapshot.candidate_id;
   const released = (candidate: any) => versions.some(version => version.provenance === "published" && version.snapshot?.candidate_id === candidate.id);
   const canRelease = (candidate: any) => { const state = candidate.release_state || {}; return !released(candidate) && state.sandbox && state.qualified && state.recommended && state.round_complete && !state.human_release; };
   const recommendation=recommendationOf(data.optimization);
   const recommended=candidates.find(candidate=>candidate.id===recommendation.recommended_candidate);
-  const pendingCandidates=recommended && !released(recommended) ? [recommended] : [];
   const reportConfirmation=data.optimization?.result?.report_confirmation || recommendation.report_confirmation;
+  const panelCandidate = recommended || (currentReleased ? publishedCandidate || {id: snapshot.candidate_id, config: currentVersion.config, result: snapshot.evaluation_result} : null);
+  const panelReleased = currentReleased && panelCandidate?.id === snapshot.candidate_id;
+  const onlineVersion = panelReleased ? previousVersion || snapshot.previous_version : currentVersion;
+  const panelResult = panelCandidate?.result || {};
+  const fresh = panelResult.new_regression_question_ids, fixed = panelResult.all_fixed_question_ids;
+  const checks: [boolean, string][] = [
+    [panelResult.evaluation_complete !== false && panelResult.gates?.passed === true, panelResult.gates ? `Hard Gate ${panelResult.gates.passed_count} / ${panelResult.gates.total}` : "Hard Gate 结果未知"],
+    [Array.isArray(fresh) && fresh.length === 0, Array.isArray(fresh) ? `新增 ${fresh.length} 个 Bad Case` : "新增 Bad Case 未知"],
+    [Array.isArray(fixed) && fixed.length > 0, Array.isArray(fixed) ? `修好 ${fixed.length} 个原 Bad Case` : "修复记录未知"],
+  ];
+  const releaseValue = (key: string, value: unknown) => key === "prompt_strategy" && value != null ? formatValue(value) : paramValue(key, value);
+  const params = (config: any) => ["candidate_k", "top_k", "generation_thinking"].map(key => ({label: PARAM_LABELS[key], value: paramValue(key, config?.[key])}));
+  const changes = Object.entries(panelCandidate?.config || {}).filter(([key, value]) => key in PARAM_LABELS && (value === null || typeof value !== "object") && JSON.stringify(value) !== JSON.stringify(onlineVersion?.config?.[key])).map(([key, value]) => ({key, label: PARAM_LABELS[key], from: releaseValue(key, onlineVersion?.config?.[key]), to: releaseValue(key, value)}));
+  const baselineResult = data.evaluation?.result || {};
+  const correct = (result: any) => typeof result.total === "number" && typeof result.bad_case_count === "number" ? result.total - result.bad_case_count : null;
+  const p99 = (result: any) => result.gates?.gates?.find((gate: any) => gate.metric === "latency_p99_seconds")?.actual ?? result.metrics?.latency_p99_seconds ?? result.comparison_metrics?.latency_p99_seconds ?? null;
   useEffect(() => { setVersions((data.versions || []).slice(0,50)); setHistoryPage(1); setCandidates(data.optimization?.candidates || []); setReport(null); setDetail(null); }, [data]);
   const reload = async () => { const [versions, experiment] = await Promise.all([getJson<any[]>("/api/versions?page=1&limit=50"), getJson<any>("/api/optimization")]); setVersions(versions); setHistoryPage(1); setCandidates(experiment.candidates || []); };
   const loadHistory = async (page:number) => {
@@ -71,21 +87,22 @@ export function VersionsPage({ data }: { data: any }) {
   const versionName = currentReleased ? `线上版本 来源 ${sourceName}` : currentVersion?.provenance === "bootstrap" ? "当前线上配置" : currentVersion ? "当前线上版本" : "尚无 线上版本 发布";
   return <PageShell className="page versions-page" header={<div className="page-title"><div><h1>发布</h1><p>将已验证的优化方案交由人工决策，保留版本变化与回滚依据。</p></div></div>}>
     {error && <p className="error-notice" role="alert">{error}</p>}
-    <Section title={recommended && released(recommended) ? "已发布方案" : "待发布方案"} action={<a className="text-button" href="#evolution">查看最终推荐</a>}>{pendingCandidates.map(candidate=>{
-      const result=candidate.result || {},fresh=result.new_regression_question_ids,fixed=result.all_fixed_question_ids;
-      const checks=[
-        [result.evaluation_complete!==false && result.gates?.passed===true,'Hard Gate 全过',result.gates ? `已通过 ${result.gates.passed_count} / ${result.gates.total}` : 'Hard Gate 结果未保存'],
-        [Array.isArray(fresh) && fresh.length===0,'零新增 Bad Case',Array.isArray(fresh) ? `新增 ${fresh.length} 个 Bad Case` : '新增 Bad Case 记录未知'],
-        [Array.isArray(fixed) && fixed.length>0,'已有修好的题',Array.isArray(fixed) ? `修好 ${fixed.length} 个原 Bad Case` : '修复记录未知'],
-        [!!reportConfirmation,'人工确认',reportConfirmation ? '报告与 Winner 已确认' : '报告与 Winner 尚未确认'],
-      ];
-      return <article className="pending-release" key={candidate.id}><h3>{schemeName(candidate)}</h3><p>本轮推荐，尚未发布</p><div className="pending-release-grid"><div><h4>线上配置 → 推荐配置</h4><ChangedParameters before={currentVersion?.config} after={candidate.config}/><h4>Baseline → 推荐方案</h4><QualityComparison baseline={data.evaluation} candidate={candidate}/></div><div><h4>发布检查清单</h4><ul className="publication-checklist">{checks.map(([ok,label,reason])=><li key={String(label)}><strong>{ok?'✓':'待满足'} · {label}</strong><span>{ok ? (label==='已有修好的题' ? reason : '已满足') : reason}</span></li>)}</ul><div className="release-actions"><button className="primary" disabled={busy || !canRelease(candidate)} onClick={()=>setConfirmation({kind:"release",item:candidate})}>确认发布</button><button className="text-button" onClick={()=>setReport(candidate)}>查看评测报告</button></div>{!canRelease(candidate) && <p>{blocker(candidate)}</p>}</div></div></article>;
-    })}{!pendingCandidates.length && <p>{recommended && released(recommended) ? '最终推荐方案已发布。' : '尚无保存的最终推荐方案，请先完成 Agent 决策。'}</p>}</Section>
-    <section className="panel release-decision"><div className="section-head"><h2>当前线上配置</h2>{currentReleased && <Status value="Released" />}</div>
+    <ReleasePanel
+      online={{name: onlineVersion?.provenance === "bootstrap" ? "初始配置" : onlineVersion ? versionLabel(onlineVersion) : "发布前配置未知", params: params(onlineVersion?.config)}}
+      candidate={panelCandidate ? {name: schemeName(panelCandidate), params: params(panelCandidate.config)} : null}
+      changes={changes}
+      results={panelCandidate ? {correct: {from: historicalSource ? null : correct(baselineResult), to: correct(panelResult)}, total: panelResult.total ?? baselineResult.total ?? 50, newBad: Array.isArray(fresh) ? fresh.length : null, gates: typeof panelResult.gates?.passed_count === "number" && typeof panelResult.gates?.total === "number" ? {passed: panelResult.gates.passed_count, total: panelResult.gates.total} : null, p99: {from: historicalSource ? null : p99(baselineResult), to: p99(panelResult)}} : null}
+      steps={{reportConfirmed: !!(reportConfirmation || panelReleased && gate2Confirmed), eligible: {ok: checks.every(([ok]) => ok), items: checks.filter(([ok], index) => !ok || index === 2).map(([, text]) => text)}, released: {ok: panelReleased, at: panelReleased ? versionTime(snapshot.release_time || currentVersion.created_at) : undefined}}}
+      canRelease={!!panelCandidate && !busy && canRelease(panelCandidate)}
+      onRelease={() => panelCandidate && setConfirmation({kind: "release", item: panelCandidate})}
+      onReport={panelCandidate ? () => setReport(panelCandidate === recommended || publishedCandidate ? panelCandidate : {version: currentVersion}) : undefined}
+      onSnapshot={() => setDetail("config")}
+    />
+    <section className="panel release-decision"><div className="section-head"><h2>当前线上版本详情</h2><a className="text-button" href="#evolution?tab=recommendation">查看最终推荐</a></div>
 
       {historicalSource && <p className="release-source-note">当前线上版本 来自历史 Baseline；新 Baseline 尚未替换该已发布版本。</p>}
       <dl className="report-grid"><div><dt>运行版本</dt><dd>{versionLabel(currentVersion)}</dd></div><div><dt>配置来源</dt><dd>{currentReleased ? schemeName(publishedCandidate,snapshot.candidate_id) : currentVersion?.provenance === "bootstrap" ? "初始配置" : "当前运行配置"}</dd></div><div><dt>版本创建时间</dt><dd>{versionTime(currentVersion?.created_at)}</dd></div><div><dt>关键配置</dt><dd>Candidate K {currentVersion?.config?.candidate_k ?? "未采集"} · Top-K {currentVersion?.config?.top_k ?? "未采集"} · 回答策略 {formatValue(currentVersion?.config?.prompt_strategy)}</dd></div></dl>
-      {currentReleased && <><div className="release-summary"><div><span>Hard Gate</span><strong>{gates ? `${gates.passed_count} / ${gates.total}` : "快照未保存"}</strong></div><div><span>Regression Check</span><strong>Regression Check {displayText(regression?.status || "快照未保存")}</strong></div><div><span>人工确认方案</span><strong>{gate2Confirmed ? "人工确认方案 已确认" : "确认审计未保存"}</strong></div><div><span>发布确认</span><strong>发布确认 人工发布已确认</strong></div></div><h3>发布时参数变化</h3>{previousVersion?.config ? <ChangedParameters before={previousVersion.config} after={currentVersion.config}/> : <p>发布前配置未保存，无法核对参数变化。</p>}</>}
+      {currentReleased && !panelReleased && <dl className="report-grid"><div><dt>线上 Hard Gate</dt><dd>{publishedGates ? `${publishedGates.passed_count} / ${publishedGates.total}` : "未知"}</dd></div><div><dt>线上 Regression Check</dt><dd>{displayText(snapshot.regression?.status || snapshot.evaluation_result?.regression?.status || "未知")}</dd></div><div><dt>线上发布批准</dt><dd>已批准 · {versionTime(snapshot.release_time || currentVersion.created_at)}</dd></div></dl>}
       <div className="header-actions"><button className="secondary" disabled={!currentVersion} onClick={()=>setDetail("config")}>查看完整配置</button><button className="text-button" onClick={()=>setDetail("candidates")}>查看其他 Candidate</button></div>
     </section>
 

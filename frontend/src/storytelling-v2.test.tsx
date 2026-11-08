@@ -35,7 +35,7 @@ it('links multiple saved candidate hypotheses to the same actual problem and kee
 it('compares a pending release against current Production rather than unrelated Baseline configuration',async()=>{
  const candidate={id:'A',config:{candidate_k:24},reasoning:{candidate_label:'A'},release_state:{sandbox:true,qualified:true,recommended:true,round_complete:true}};
  await mount(<VersionsPage data={{evaluation:{config:{candidate_k:99}},versions:[{id:'initial',status:'active',provenance:'bootstrap',config:{candidate_k:12}}],optimization:{candidates:[candidate],recommendation:{recommended_candidate:candidate.id}}}}/>);
- const diff=document.querySelector('.pending-release .story-changes')!;expect(diff.textContent).toContain('12');expect(diff.textContent).toContain('24');expect(diff.textContent).not.toContain('99');
+ const diff=document.querySelector('.ui-rel-changes')!;expect(diff.textContent).toContain('12');expect(diff.textContent).toContain('24');expect(diff.textContent).not.toContain('99');
 });
 it('shows the real feedback chain with a compact empty state and no pretend monitoring rows',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({events:[],triggers:[]}))));

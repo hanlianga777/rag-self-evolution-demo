@@ -19,18 +19,18 @@ it("centres the actual published snapshot while a newer recommendation remains u
   await render(<VersionsPage data={{ versions: [production, { id: "baseline-v1", status: "archived", config: { prompt_strategy: "Grounded", rerank: false } }], optimization: { candidates: [candidate], recommendation: { result: { recommended_candidate: candidate.id } } } }} />);
   expect(document.querySelector(".release-decision")?.textContent).toContain("配置来源Candidate C");
   expect(document.querySelector(".release-decision")?.textContent).toContain("11 / 11");
-  expect(document.querySelector(".release-decision")?.textContent).toContain("Regression Check 通过");
-  expect(document.querySelector(".release-decision")?.textContent).toContain("发布确认 人工发布已确认");
-  expect(document.querySelector(".pending-release")?.textContent).toContain("Candidate A");
-  expect(document.querySelector(".pending-release button.primary")?.textContent).toBe("确认发布");
+  expect(document.querySelector(".release-decision")?.textContent).toContain("线上 Regression Check通过");
+  expect(document.querySelector(".release-decision")?.textContent).toContain("线上发布批准已批准");
+  expect(document.querySelector(".ui-rel")?.textContent).toContain("Candidate A");
+  expect(document.querySelector(".ui-rel button.primary")?.textContent).toBe("确认发布");
   expect(document.querySelector(".stage-stepper")).toBeNull();
   expect(document.querySelector(".release-checks")).toBeNull();
 });
 
 it("shows only changed parameters on the release main screen and opens full configuration in a Drawer", async () => {
   await render(<VersionsPage data={{ versions: [production, { id: "baseline-v1", status: "archived", config: { prompt_strategy: "Grounded", rerank: false } }] }} />);
-  expect(document.querySelector(".release-decision")?.textContent).toContain("有据生成");
-  expect(document.querySelector(".release-decision")?.textContent).toContain("谨慎拒答");
+  expect(document.querySelector(".ui-rel-changes")?.textContent).toContain("有据生成");
+  expect(document.querySelector(".ui-rel-changes")?.textContent).toContain("谨慎拒答");
   expect(document.querySelector(".release-decision")?.textContent).not.toContain("Rerank");
   expect(document.querySelector(".release-decision details")).toBeNull();
   await click("查看完整配置");
@@ -40,7 +40,7 @@ it("shows only changed parameters on the release main screen and opens full conf
 
 it("does not invent manual publication evidence for incomplete historical snapshots", async () => {
   await render(<VersionsPage data={{ versions: [{ ...production, snapshot: { candidate_id: "EXP-old-C" } }] }} />);
-  expect(document.querySelector(".release-decision")?.textContent).not.toContain("发布确认 人工发布已确认");
+  expect(document.querySelector(".release-decision")?.textContent).not.toContain("线上发布批准已批准");
   expect(document.querySelector(".release-decision")?.textContent).not.toContain("发布审计未完整保存");
   expect(document.querySelector(".page-content > details")).toBeNull();
 });

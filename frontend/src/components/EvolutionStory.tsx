@@ -203,27 +203,6 @@ export function schemeReason(candidate:any):string {
   return Object.entries(candidate.result.qualification?.checks || {}).filter(([,ok])=>ok===false).map(([key])=>labels[key] || '保存的资格条件未通过').join('；') || '未保存具体资格原因';
 }
 
-export function alternativeReason(candidate:any,selected:any):string {
-  const result=completeResult(candidate),chosen=completeResult(selected);
-  if(!result)return schemeReason(candidate);
-  if(result.qualification?.qualified===true){
-    const delta=chosen && typeof result.bad_case_count==='number' && typeof chosen.bad_case_count==='number' ? result.bad_case_count-chosen.bad_case_count : null;
-    const extra=Array.isArray(chosen?.all_fixed_question_ids) && Array.isArray(result.all_fixed_question_ids) ? chosen.all_fixed_question_ids.filter((id:string)=>!result.all_fixed_question_ids.includes(id)) : [];
-    if(delta!==null && delta>0)return `合格，但比 ${schemeName(selected)} 多错 ${delta} 个${extra.length===delta ? `（${questionList(extra)}）` : ''}`;
-    return '合格；保存的最终决策未选择此方案，具体优势比较未保存';
-  }
-  const fixed=result.all_fixed_question_ids || result.regression?.all_fixed_question_ids;
-  const fresh=result.new_regression_question_ids || result.newly_failed || result.comparison?.newly_failed || result.regression?.new_regression_question_ids;
-  const failures=(result.gates?.gates || []).filter((gate:any)=>gate.passed===false || gate.status==='FAIL');
-  const gates=failures.map((gate:any)=>{
-    const latency=gate.metric?.startsWith('latency_');
-    const label=gate.metric==='latency_p99_seconds' ? '最慢回答 P99' : gateNames[gate.metric] || gate.metric;
-    return `${label}${typeof gate.actual==='number' ? ` ${Math.round(gate.actual*10)/10}${latency?' 秒':'%'}` : ''}${typeof gate.threshold==='number' ? `，${gate.operator==='<=' ? '超过' : '低于'} ${gate.threshold}${latency?' 秒':'%'}` : '未达标'}`;
-  });
-  const reasons=[...(Array.isArray(fixed) && fixed.length ? [`修好 ${questionList(fixed)}`] : []),...(Array.isArray(fresh) && fresh.length ? [`但新弄坏 ${questionList(fresh)}，不满足零新增 Bad Case`] : []),...(gates.length ? [`Hard Gate 未过：${gates.join('、')}`] : [])];
-  return reasons.length ? reasons.join('；') : schemeReason(candidate);
-}
-
 export function EvolutionRoute({evaluation,experiment,badCases,children,onDetail}:{evaluation:any;experiment:any;badCases:any[];children?:React.ReactNode;onDetail?:(candidate:any)=>void}) {
   const candidates:any[]=experiment?.candidates || [],abc=candidates.filter(c=>['A','B','C'].includes(c.reasoning?.candidate_label));
   const rounds=[...new Set<number>(abc.map(c=>c.reasoning?.round || 1))].sort((a,b)=>a-b);

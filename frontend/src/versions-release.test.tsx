@@ -14,7 +14,7 @@ it("offers one human release action after recommendation without posting before 
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/versions?page=1&limit=50") ? [] : url.endsWith("/optimization") ? { candidates: [candidate] } : {}))));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [], optimization: { candidates: [candidate], recommendation:{recommended_candidate:candidate.id} } }} /></OperationProvider>));
-  const actions = document.querySelectorAll<HTMLButtonElement>(".pending-release button.primary");
+  const actions = document.querySelectorAll<HTMLButtonElement>(".ui-rel button.primary");
   expect(actions).toHaveLength(1);
   expect(actions[0].textContent).toContain("确认发布");
   expect(actions[0].disabled).toBe(false);
@@ -32,11 +32,11 @@ it("keeps other candidates in A/B/C/D order inside a Drawer and never offers an 
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [], optimization: { candidates, recommendation:{recommended_candidate:"EXP-C"} } }} /></OperationProvider>));
   expect(document.querySelector(".release-list")).toBeNull();
-  expect(document.querySelectorAll(".pending-release button.primary")).toHaveLength(1);
+  expect(document.querySelectorAll(".ui-rel button.primary")).toHaveLength(1);
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(node => node.textContent === "查看其他候选方案")!.click());
   expect([...document.querySelectorAll(".candidate-release-row > strong")].map(node => node.textContent)).toEqual(["候选方案 A", "候选方案 B", "候选方案 C", "组合方案 D"]);
   expect(document.querySelector(".drawer")?.textContent).toContain("不合格");
-  expect(document.querySelectorAll(".drawer .pending-release button.primary")).toHaveLength(0);
+  expect(document.querySelectorAll(".drawer .ui-rel button.primary")).toHaveLength(0);
 });
 
 it("requires every saved release eligibility guard and a separate rollback confirmation", async () => {

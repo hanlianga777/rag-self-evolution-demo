@@ -356,3 +356,24 @@
 .evolution-page .d-param-changes { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
 .evolution-page .d-story-grid { margin-top:12px; }
 .evolution-page .d-story .d-result-conclusion { color:var(--ui-ink); background:var(--ui-surface); }
+
+/* 021v: use the shared palette and two text weights without changing page geometry. */
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(strong,b,h2,h3,h4,th),
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell .ui-fin-compare td.better { font-weight:600; }
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(.ui-fin-compare th small,.ui-evo-pass) { font-weight:400; }
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(.badge.good,.badge.bad,.badge.warning) { background:transparent; color:var(--ui-ink-2); }
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(.badge.good,.badge.bad,.badge.warning)::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px; background:var(--ui-faint); }
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell .badge.good::before { background:var(--ui-green); }
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell .badge.bad::before { background:var(--ui-red); }
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(.ui-fin-gates,.ui-evo-fail) { color:var(--ui-ink-2); }
+
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(.ui-q,.ui-rel-side dd,.ui-rel-steps i,.ui-transition .to) { font-weight:600; }
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(.ui-transition .from,.ui-transition .unit) { font-weight:400; }
+
+:is(.evaluation-page,.evolution-page,.versions-page).page-shell :is(button,.ui-fin-others h3) { font-weight:600; }
+
+/* The turn line and legend already carry these two facts. */
+.evaluation-page .ui-bl-cell:nth-child(2) > small,
+.evaluation-page .ui-bl-time-head > small { display:none; }
+
+.evolution-page .ui-fin-top > button { flex-shrink:0; white-space:nowrap; }
