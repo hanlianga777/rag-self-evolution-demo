@@ -352,3 +352,14 @@
 .baseline-gate-grid [role="button"] { cursor:pointer; }
 .baseline-gate-grid [role="button"]:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
 .baseline-gate-grid [data-status="unknown"] .ui-hg-dot { background:var(--ui-faint); }
+
+/* 024a2: keep round lessons and candidate conclusions easy to scan. */
+.evolution-page .ui-evo-body > .ui-hover-trigger { display:block; margin-bottom:12px; }
+.evolution-page .ui-evo-body > .ui-hover-trigger > p { margin:0; }
+body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-block > .field-label { font-size:12px; font-weight:400; color:var(--ui-muted); }
+:is(.evolution-page,.workbench-drawer) .candidate-field-content { font-size:13px; }
+.evolution-page .review-qualified-summary { margin:0 0 12px; }
+.evolution-page .review-qualified-summary button { padding:0; font:inherit; }
+.evolution-page .regression-limit-note { font-size:12px; color:var(--ui-muted); margin:8px 0 16px; }
+.evolution-page .regression-summary-table th { white-space:nowrap; }
+.evolution-page .ui-fin-compare td small { display:inline-block; margin-left:12px; font-size:12px; font-weight:400; }

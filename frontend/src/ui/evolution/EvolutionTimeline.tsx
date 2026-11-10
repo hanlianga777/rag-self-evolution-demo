@@ -37,7 +37,7 @@ export function EvolutionTimeline({ model, baseline, questionText, onOpen, onOpe
     {model.rounds.map(round => <div className="ui-evo-round" key={round.round}>
       <div className="ui-evo-rail" aria-hidden="true"><span className={`ui-evo-dot${round.candidates.some(item => item.winner) ? " win" : ""}`} /></div>
       <div className="ui-evo-body">
-        <header className="ui-evo-round-head"><h3>Round {round.round}</h3><p>{round.summary}</p></header>
+        <header className="ui-evo-round-head"><h3>Round {round.round}</h3></header>
         {round.lesson && <HoverCard content={<div style={{ whiteSpace: "pre-line", maxWidth: 520 }}>{round.lesson.source}</div>}><p className="ui-body-muted" tabIndex={0}>本轮经验：{round.lesson.text}</p></HoverCard>}
         <div className="ui-evo-cards">{round.candidates.map(item => <CandidateCard key={item.id} item={item} fastest={item.id === round.fastestId} questionText={questionText} onOpen={onOpen} />)}</div>
       </div>

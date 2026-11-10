@@ -35,8 +35,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
       <table>
         <thead><tr><th>合格方案对比</th><th>{runnerUp.name}<small>Winner · 合格</small></th><th className="pick">{chosen.name}<small>推荐</small></th></tr></thead>
         <tbody>
-          {baselineCorrect != null && <tr className="muted"><td>Baseline 答对</td><td colSpan={2} className="ui-num">{baselineCorrect} / {chosen.total ?? 50}</td></tr>}
-          {rows.map(row => <tr key={row.label}><td>{row.label}</td><td className={`ui-num${row.better === "a" ? " better" : ""}`}>{row.a}</td><td className={`ui-num pick${row.better === "b" ? " better" : ""}`}>{row.b}</td></tr>)}
+          {rows.map(row => <tr key={row.label}><td>{row.label}</td><td className={`ui-num${row.better === "a" ? " better" : ""}`}>{row.a}{row.label === "答对" && baselineCorrect != null && runnerUp.correct != null && <small className="ui-body-muted">较 Baseline {delta(runnerUp.correct - baselineCorrect)}</small>}</td><td className={`ui-num pick${row.better === "b" ? " better" : ""}`}>{row.b}{row.label === "答对" && baselineCorrect != null && chosen.correct != null && <small className="ui-body-muted">较 Baseline {delta(chosen.correct - baselineCorrect)}</small>}</td></tr>)}
           <tr><td>比 Winner 多修好</td><td>—</td><td className="pick"><QuestionList items={extra.map(id => ({ id, tone: "fixed" as QuestionTone, question: questionText?.(id) }))} /></td></tr>
         </tbody>
       </table>
@@ -57,6 +56,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
   </section>;
 }
 
+const delta = (value: number) => value > 0 ? `+${value}` : String(value);
 const cnt = (item: CandidateView) => item.correct == null ? "未知" : `${item.correct} / ${item.total ?? 50}`;
 const sec = (value: number | null) => value == null ? "未知" : `${value.toFixed(1)} 秒`;
 const gateCount = (item: CandidateView) => item.gates ? `${item.gates.passed} / ${item.gates.total}` : item.gateFailures.length ? "未全过" : "全部通过";

@@ -33,7 +33,7 @@ it('hides idle Sandbox progress while keeping parameters and diagnosis on the ro
  expect(document.querySelector('.baseline-actions')!.textContent).toContain('查看可调参数');
  await click('查看可调参数');expect(document.querySelector('[role=dialog]')!.textContent).toContain('可调参数');
  await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());await click('回归与推荐');
- const rows=[...document.querySelectorAll('.regression-summary-table tbody tr')].filter(row=>!row.querySelector('[colspan]')).length;expect(document.querySelector('.regression-summary-table')!.closest('details')!.querySelector('summary')!.textContent).toContain(`${rows} 个方案`);
+ expect(document.querySelector('.regression-summary-table')).not.toBeNull();expect(document.querySelector('.regression-summary-table')!.closest('details')).toBeNull();
 });
 const questions=[{id:'slow',question:'慢的正向原题',test_category:'positive'},{id:'fast',question:'快的正向原题',test_category:'positive'},{id:'safety',question:'安全拒答原题',test_category:'negative',negative_subtype:'safety_critical'},{id:'clarify',question:'追问原题',test_category:'negative',negative_subtype:'clarify'},{id:'outside',question:'未冻结原题',test_category:'positive'}];
 const run={id:'base',status:'completed',dataset_version_id:'golden',dataset_snapshot:{question_ids:['slow','fast','safety','clarify'],questions},cases:questions.map((q,i)=>({question_id:q.id,passed:true,programmatic_metrics:{latency_ms:i===0?900:100}}))};

@@ -34,7 +34,7 @@ it('keeps candidate fields uniform and exposes complete risk prose without the q
   expect(card.querySelectorAll('.ui-field.lines-2')).toHaveLength(6);
   const risk=[...card.querySelectorAll('.ui-field')].find(f=>f.querySelector('.ui-kicker')?.textContent==='风险')!;
   expect(risk.textContent).not.toContain('完整内容见');expect(risk.textContent).toContain('安全风险');expect(risk.textContent).toContain('延迟风险');expect(risk.querySelectorAll('.ui-clamp')).toHaveLength(2);
-  expect(card.querySelector('.candidate-result + .ui-clamp')).not.toBeNull();
+  expect(card.querySelector('.candidate-result + .ui-clamp')).toBeNull();expect(card.querySelectorAll('.candidate-result > div')).toHaveLength(3);
   expect(card.querySelector('.ui-q.is-fixed')?.textContent).toBe('Q04');
  }
 });

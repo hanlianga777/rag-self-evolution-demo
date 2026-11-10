@@ -24,9 +24,9 @@ it('keeps round cards, comparison metrics, candidate drawer and regression trace
  expect([...document.querySelectorAll('.tabs button')].map(b=>b.textContent)).toEqual(['进化路线','方案对比','回归与推荐']);
  expect(document.querySelectorAll('.d-story')).toHaveLength(1);
  await click('方案对比');expect(document.querySelectorAll('.candidate-cards .candidate-card')).toHaveLength(3);expect(document.querySelector('.sandbox-core-table')).not.toBeNull();expect(document.querySelector('.d-story')).toBeNull();
- await click('Round 1');expect(document.querySelector('.candidate-card small')?.textContent).toBe('Round 1');
+ await click('Round 1');expect(document.querySelector('.story-round-switch [aria-pressed=true]')?.textContent).toBe('Round 1');expect(document.querySelector('.candidate-card-header small')).toBeNull();
  await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ct-more')!.click());expect(document.querySelector('.ui-ct')?.textContent).toContain('运行状态');
  await click('查看方案与完整报告');expect(document.querySelector('[role=dialog]')?.textContent).toContain('方案详情');await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());
- await click('回归与推荐');expect(document.querySelector('.regression-summary-table')?.closest('details')?.open).toBe(true);expect(document.body.textContent).toContain('逐题追踪');expect(document.body.textContent).toContain('最终推荐');
+ await click('回归与推荐');expect(document.querySelector('.regression-summary-table')).not.toBeNull();expect(document.querySelector('.regression-summary-table')?.closest('details')).toBeNull();expect(document.body.textContent).toContain('逐题追踪');expect(document.body.textContent).toContain('最终推荐');
  expect(JSON.stringify(data)).toBe(before);expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });

@@ -16,7 +16,7 @@ it('warms Golden and complete Before/After on overview idle time using only GETs
   const url=new URL(input),p=url.pathname;reads.push(p+url.search);if(init?.method && init.method!=='GET')writes.push(p);
   if(block)return new Promise<Response>(()=>{});
   const isBefore=p.includes('/base/');
-  const value=p==='/api/workspace'?workspace:p==='/api/documents'?[]:p==='/api/optimization'?experiment:p==='/api/evaluation'?{id:'base',status:'completed'}:p==='/api/versions'?[]:p.includes('generation-runs')?[{id:'run',status:'completed',profile:{name:'mini',expected_count:1},question_ids:['Q04'],artifacts:{}}]:p.includes('/snapshots')?[{id:'golden',snapshot:{generation_run_id:'run',question_ids:['Q04'],questions:[question]}}]:p.includes('/candidates')?{rows:[question],total:1,candidate_index:[question],data_version:'v1'}:p.endsWith('/comparison-cases')?{id:isBefore?'base':'after',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'same'},cases:[{question_id:'Q04',question:'保存的问题',passed:!isBefore}]}:p.includes('/cases/')?{status:'completed',case:{question_id:'Q04',passed:!isBefore,model_answer:'已保存回答'}}:{};
+  const value=p==='/api/workspace'?workspace:p==='/api/documents' || p==='/api/bad-cases'?[]:p==='/api/optimization'?experiment:p==='/api/evaluation'?{id:'base',status:'completed'}:p==='/api/versions'?[]:p.includes('generation-runs')?[{id:'run',status:'completed',profile:{name:'mini',expected_count:1},question_ids:['Q04'],artifacts:{}}]:p.includes('/snapshots')?[{id:'golden',snapshot:{generation_run_id:'run',question_ids:['Q04'],questions:[question]}}]:p.includes('/candidates')?{rows:[question],total:1,candidate_index:[question],data_version:'v1'}:p.endsWith('/comparison-cases')?{id:isBefore?'base':'after',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'same'},cases:[{question_id:'Q04',question:'保存的问题',passed:!isBefore}]}:p.includes('/cases/')?{status:'completed',case:{question_id:'Q04',passed:!isBefore,model_answer:'已保存回答'}}:{};
   return new Response(JSON.stringify(value));
  }));
  const node=document.body.appendChild(document.createElement('div')),root=createRoot(node);
@@ -25,7 +25,13 @@ it('warms Golden and complete Before/After on overview idle time using only GETs
   await act(async()=>new Promise(r=>setTimeout(r,1800)));
   expect(reads).toContain('/api/evaluations/base/cases/Q04');expect(reads).toContain('/api/evaluations/after/cases/Q04');
   expect(reads).toContain('/api/governance/candidates?run_id=run&status=all&group=all&limit=100&offset=0');expect(writes).toEqual([]);
+  expect(reads).toContain('/api/optimization?light=true&planning=true');expect(reads).toContain('/api/evaluation');expect(reads).toContain('/api/bad-cases?light=true');
   block=true;
+  await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#evolution"]')!.click());
+  expect(node.querySelector('.page-loading')).toBeNull();expect(node.querySelector('.ui-evo')).not.toBeNull();
+  for(const [tab,selector] of [['方案对比','.sandbox-core-table'],['回归与推荐','.regression-summary-table']]){
+   await act(async()=>[...node.querySelectorAll('button')].find(e=>e.textContent===tab)!.click());expect(node.querySelector(selector)).not.toBeNull();expect(node.querySelector('.page-loading')).toBeNull();
+  }
   await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#governance"]')!.click());
   expect(node.querySelector('.review-table')?.textContent).toContain('保存的问题');expect(node.querySelector('.golden-initial-skeleton')).toBeNull();
   await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#verification"]')!.click());

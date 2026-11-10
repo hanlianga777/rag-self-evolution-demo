@@ -18,7 +18,7 @@ it('separates running, product interruption, evaluated failure and qualified car
  await mount(experiment([candidate('A','running'),candidate('B','failed',{evaluation_complete:false,completed:7,total:50},{product_interruption:true}),candidate('C','evaluated',{qualification:{qualified:false}}),candidate('D','evaluated',{qualification:{qualified:true}})]));
  await click('方案对比');
  const cards=[...document.querySelectorAll('.candidate-card')];
- expect(cards.map(card=>card.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['运行中','评测中断','已评测未通过']);
+ expect(cards.map(card=>card.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['运行中','评测中断','未通过']);
 
  expect(cards[1].querySelector('.candidate-card-header .badge')?.classList.contains('warning')).toBe(true);
  expect(cards[1].textContent).toContain('产品故障，会自动续跑');

@@ -71,7 +71,10 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   await click("方案对比");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
   expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
-  expect(document.querySelector(".candidate-card")?.textContent).toContain("持久化问题");
+  expect(document.querySelector(".candidate-card")?.textContent).toContain("Q-stored");
+  const target=document.querySelector<HTMLElement>('.candidate-card .candidate-story-block:nth-child(3) .ui-q')!;
+  await act(async()=>{target.focus();await new Promise(resolve=>setTimeout(resolve,150));});
+  expect(document.querySelector('[role=tooltip]')?.textContent).toContain("持久化问题");
   await click("方案对比");
   expect([...document.querySelectorAll(".ui-ct tbody th")].map(cell => cell.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "P99", "安全拒答率"]);
   await act(async()=>document.querySelector<HTMLButtonElement>(".ui-ct-more")!.click());
