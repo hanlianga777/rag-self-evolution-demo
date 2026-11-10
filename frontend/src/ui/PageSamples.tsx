@@ -14,6 +14,7 @@ import { CompareTable, GoldenPipeline, KnowledgeCoverage } from "./pages3";
 import { Icon, IconTile } from "./icons";
 import { KnowledgePipeline } from "./knowledge/KnowledgePipeline";
 import { OverviewStory } from "./overview/OverviewStory";
+import { ValueChain } from "./overview/ValueChain";
 import { ParamGrid } from "./settings/ParamGrid";
 
 /** 页面级样板：概览首屏、Agent 顶部统计、进化路线。数据来自 fixture（与正式库一致）。 */
@@ -27,6 +28,11 @@ export function PageSamples() {
     <section>
       <h2 className="ui-sample-title">概览 · 项目概览</h2>
       <div className="page-title" style={{ marginBottom: 16 }}><div><h1><IconTile name="overview" />RAG 自进化项目概览</h1></div></div>
+      <ValueChain steps={[
+        { kicker: "问题", icon: "bad", title: "RAG 上线后答错难发现，调参靠试，修好一题又弄坏另一题", detail: "不知道该改哪里，也不敢上线" },
+        { kicker: "方法", icon: "agent", title: "冻结考卷量化 → Agent 在白名单内调参 → 人工批准发布", detail: "每一步可量化、可归因、可回滚" },
+        { kicker: "结果", icon: "correct", title: "答对 44 → 48，新增 Bad Case 0，P50 快 51%", detail: "11 项 Hard Gate 全过，安全拒答 95% → 100%", result: true },
+      ]} />
       <OverviewSummary
         correct={{ from: 44, to: 48 }} total={50} fixedCount={4} newBadCount={0} gates={{ passed: 11, total: 11 }}
         p99={{ from: 42.2, to: 36.7 }} p50={{ from: 16.7, to: 8.1 }} safeRefusal={{ from: 95, to: 100 }} budget={{ used: 10, max: 12 }}

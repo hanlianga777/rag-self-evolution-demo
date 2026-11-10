@@ -19,3 +19,5 @@ export { HardGateGrid } from "./baseline/HardGateGrid";
 export type { GateGroup, GateItem } from "./baseline/HardGateGrid";
 export { BadCaseLayers } from "./baseline/BadCaseLayers";
 export type { LayerCard } from "./baseline/BadCaseLayers";
+export { ValueChain } from "./overview/ValueChain";
+export type { ValueStep } from "./overview/ValueChain";

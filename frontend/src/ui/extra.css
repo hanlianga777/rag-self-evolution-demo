@@ -35,7 +35,7 @@
 .ui-pg .dot.base { background: var(--ui-faint); }
 .ui-pg .dot.online { background: var(--ui-accent); }
 .ui-pg-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.ui-pg-group { border: 1px solid var(--ui-rule); border-radius: 12px; padding: 12px 16px 6px; background: var(--ui-surface); min-width: 0; }
+.ui-pg-group { border: 1px solid var(--ui-rule); border-radius: var(--ui-r-inner); padding: 12px 16px 6px; background: var(--ui-surface); min-width: 0; }
 .ui-pg-group h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--ui-ink); }
 .ui-pg-row { display: grid; grid-template-columns: minmax(96px, 140px) minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 0; }
 .ui-pg-row + .ui-pg-row { border-top: 1px solid var(--ui-rule-2); }
@@ -163,7 +163,7 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 
 /* —— Bad Case 归因卡片（兼筛选） —— */
 .ui-bcl { display: grid; grid-template-columns: 120px repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
-.ui-bcl > button { display: grid; align-content: start; gap: 4px; text-align: left; padding: 14px 16px; border: 1px solid var(--ui-rule); border-radius: 12px; background: var(--ui-surface); font: inherit; color: inherit; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; min-width: 0; }
+.ui-bcl > button { display: grid; align-content: start; gap: 4px; text-align: left; padding: 14px 16px; border: 1px solid var(--ui-rule); border-radius: var(--ui-r-inner); background: var(--ui-surface); font: inherit; color: inherit; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; min-width: 0; }
 .ui-bcl > button:hover:not(:disabled) { border-color: var(--ui-faint); }
 .ui-bcl > button.on { border-color: var(--ui-accent); box-shadow: 0 0 0 1px var(--ui-accent) inset; background: var(--ui-accent-tint); }
 .ui-bcl > button:disabled { cursor: default; background: transparent; }
@@ -179,7 +179,7 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 
 /* —— 抽屉：每个区块是一张小卡片（灰底上的白卡） —— */
 .drawer .drawer-body:has(> .drawer-section, > * > .drawer-section) { background: var(--ui-page); }
-.drawer .drawer-section { background: var(--ui-surface); border: 1px solid var(--ui-rule); border-radius: 12px; padding: 14px 18px; margin: 0 0 12px; }
+.drawer .drawer-section { background: var(--ui-surface); border: 1px solid var(--ui-rule); border-radius: var(--ui-r-inner); padding: 14px 18px; margin: 0 0 12px; }
 .drawer .drawer-section:first-child { padding-top: 14px; }
 .drawer .drawer-section h3 { margin: 0 0 10px; font-size: var(--ui-fs-sub); font-weight: 600; color: var(--ui-ink); }
 .drawer .drawer-section :is(p, li, .muted-prose) { font-size: var(--ui-fs-body); color: var(--ui-ink-2); }
@@ -201,7 +201,7 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .ui-pg-groups { align-items: stretch; }
 
 /* —— 通用版式工具（022c）：卡片、等高行、结论标题、弱化正文 —— */
-.ui-card { background: var(--ui-surface); border: 1px solid var(--ui-rule); border-radius: 12px; padding: 16px 18px; min-width: 0; box-shadow: none; }
+.ui-card { background: var(--ui-surface); border: 1px solid var(--ui-rule); border-radius: var(--ui-r-inner); padding: 16px 18px; min-width: 0; box-shadow: none; }
 .ui-card > h3, .ui-card > header h3 { margin: 0 0 10px; font-size: var(--ui-fs-sub); font-weight: 600; color: var(--ui-ink); }
 .ui-card-row { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 16px; align-items: stretch; }
 .ui-card-row > * { height: 100%; }
@@ -214,3 +214,17 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 /* 并排卡片里的同名字段：固定 2 行高度，保证横向对齐；超出用 ClampText 悬停看全文 */
 .ui-field.lines-2 > :not(.ui-kicker) { min-height: calc(1.6em * 2); }
 @media (max-width: 1100px) { .ui-card-row { grid-template-columns: 1fr; } }
+
+/* —— 11-10：圆角升级（外层卡片 18px、内层卡片 14px、按钮 10px），卡片标题统一 —— */
+.page-shell .panel > :is(h2, h3):first-child, .page-shell .panel > header :is(h2, h3) { font-size: var(--ui-fs-card); font-weight: 600; letter-spacing: 0; }
+
+/* —— 概览：问题 → 方法 → 结果（给客户与面试官的逻辑链） —— */
+.ui-vc { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); margin-bottom: 16px; overflow: hidden; }
+.ui-vc > div { position: relative; padding: 16px 22px 16px 22px; min-width: 0; }
+.ui-vc > div + div { border-left: 1px solid var(--ui-rule-2); }
+.ui-vc > div + div::before { content: ""; position: absolute; left: -7px; top: 50%; width: 12px; height: 12px; margin-top: -6px; background: var(--ui-surface); border-top: 1px solid var(--ui-rule-2); border-right: 1px solid var(--ui-rule-2); transform: rotate(45deg); }
+.ui-vc-k { display: flex; align-items: center; gap: 6px; font-size: var(--ui-fs-meta); color: var(--ui-muted); margin-bottom: 6px; }
+.ui-vc-t { font-size: 15px; font-weight: 600; color: var(--ui-ink); line-height: 1.45; }
+.ui-vc-d { margin-top: 4px; font-size: var(--ui-fs-meta); color: var(--ui-muted); line-height: 1.55; }
+.ui-vc > div.result .ui-vc-t { color: var(--ui-accent); }
+@media (max-width: 1100px) { .ui-vc { grid-template-columns: 1fr; } .ui-vc > div + div { border-left: 0; border-top: 1px solid var(--ui-rule-2); } .ui-vc > div + div::before { display: none; } }
