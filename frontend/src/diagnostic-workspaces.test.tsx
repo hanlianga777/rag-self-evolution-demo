@@ -48,7 +48,7 @@ it('preloads version history without dropping the active runtime summary',async(
  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='下一页')).toBe(false);
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/versions?page=2&limit=50'))).toBe(true);
  await click('查看完整配置');expect(document.querySelector('[role=dialog]')?.textContent).toContain('当前线上配置');
- expect(document.body.textContent).not.toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(51);
+ expect(document.body.textContent).not.toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(3);await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());await click('查看全部 51 条记录');expect(document.querySelectorAll('tbody tr')).toHaveLength(51);
 });
 it('preloads monitoring events once and switches its tab without requests',async()=>{
  const {VerificationPage}=await import('./pages/VerificationPage');

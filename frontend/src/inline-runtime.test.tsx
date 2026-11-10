@@ -14,7 +14,7 @@ it("shows assistant waiting inline and renders a complete synchronous answer at 
   let respond!: (value: Response) => void;
   vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => { respond = resolve; })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<OperationProvider restore={false}><AssistantPage badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} /></OperationProvider>));
+  await act(async () => root.render(<OperationProvider restore={false}><AssistantPage examples={[{label:"正常问答",question:"冻结正向示例"}]} badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} /></OperationProvider>));
   await act(async () => document.querySelector<HTMLButtonElement>(".empty-chat button")!.click());
   expect(document.querySelector(".thinking-message")?.textContent).toContain("正在检索与回答生成");
   expect(document.querySelector(".ui-run")).toBeNull();

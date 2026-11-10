@@ -1,0 +1,60 @@
+/* 024a: page integration only; shared ui/ components retain their design. */
+.overview-page .ui-ov-hero { grid-area:1 / 1; padding-bottom:76px; }
+.overview-page .ui-ov-status { grid-area:1 / 1; align-self:end; justify-self:end; background:transparent; box-shadow:none; padding:0; margin:0 32px 20px; font-size:var(--ui-fs-meta); }
+.overview-page .ui-ov-action { padding:7px 12px; }
+.overview-page .ui-ov-flow { grid-row:2; }
+.overview-page .ui-ov-step { padding:10px 8px; gap:6px; }
+.overview-page .ui-ov-step-text small { white-space:nowrap; }
+
+.knowledge-page .document-delete { opacity:0; }
+.knowledge-page tr:is(:hover,:focus-within) .document-delete { opacity:1; }
+@media (hover:none) { .knowledge-page .document-delete { opacity:1; } }
+
+.agent-secondary-actions:empty, .page-data-actions:empty { display:none; }
+.page-data-actions { margin-bottom:12px; }
+.route-timeline { display:grid; }
+.route-timeline > .ui-evo { display:contents; }
+.route-timeline .ui-evo-start { grid-area:1 / 1; padding-right:320px; margin-bottom:12px; }
+.baseline-actions { grid-area:1 / 1; align-self:center; justify-self:end; display:flex; gap:12px; padding:0 20px 12px; }
+.route-timeline .ui-evo-round { grid-column:1; }
+.prediction-summary { line-height:1.6; }
+.d-result-causes { padding:0 18px; }
+.d-result-causes > summary { min-height:42px; margin:0; }
+.d-story-footer { display:flex; justify-content:flex-end; align-items:baseline; gap:18px; }
+.d-story-footer > details { border:0; margin:0; min-width:0; }
+.d-story-footer > button { flex:none; }
+
+.verification-page .assistant-workspace { grid-template-columns:190px minmax(0,1fr); }
+.verification-page .empty-chat { width:100%; }
+.verification-page .empty-chat .chat-guide { font-size:var(--ui-fs-meta); color:var(--ui-muted); margin-bottom:16px; }
+.verification-page .empty-chat .chat-examples { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.chat-example { display:flex; flex-direction:column; gap:10px; align-items:flex-start; text-align:left; padding:18px; border:1px solid var(--ui-rule); border-radius:var(--ui-r-inner); background:var(--ui-surface); color:var(--ui-ink-2); }
+.chat-example span { font-size:var(--ui-fs-meta); color:var(--ui-muted); }
+.chat-example strong { font-size:var(--ui-fs-body); line-height:1.7; font-weight:400; }
+.chat-example:hover:not(:disabled) { border-color:var(--ui-accent); background:var(--ui-accent-tint); }
+
+.release-panel-layout { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px 12px; background:var(--ui-surface); border-radius:var(--ui-r-card); box-shadow:var(--ui-shadow-1); padding:22px 24px; margin-bottom:12px; }
+.release-panel-layout > .ui-rel { display:contents; }
+.release-panel-layout .ui-rel > :not(.ui-rel-actions) { grid-column:1 / -1; }
+.release-panel-layout .ui-rel-actions { grid-column:1; }
+.release-extra-actions { grid-column:2; display:flex; align-items:center; gap:12px; }
+.release-extra-actions .text-button { white-space:nowrap; }
+.release-recommendation { display:flex; justify-content:flex-end; }
+.history-count { color:var(--ui-muted); margin-left:auto; font-size:var(--ui-fs-meta); }
+
+:is(.page-shell,.drawer,.confirm-dialog) :is(.quiet-danger,.ui-btn-danger) { background:transparent !important; color:var(--ui-muted) !important; border-color:transparent !important; box-shadow:none; }
+:is(.page-shell,.drawer,.confirm-dialog) :is(.quiet-danger,.ui-btn-danger):hover:not(:disabled) { background:var(--ui-rule-2) !important; color:var(--ui-ink) !important; }
+:is(.story-disclosure,.disclosure) > summary:not(:has(> svg))::after { content:"⌄"; display:inline-block; flex:none; margin-left:12px; color:var(--ui-muted); }
+:is(.story-disclosure,.disclosure)[open] > summary:not(:has(> svg))::after { transform:rotate(180deg); }
+.page-shell .page-content :is(h2,h3), .drawer :is(h2,h3) { font-size:var(--ui-fs-card); font-weight:600; }
+
+@media (max-width:900px) {
+  .baseline-actions { position:static; grid-area:auto; justify-self:stretch; justify-content:flex-end; }
+  .route-timeline .ui-evo-start { padding-right:20px; }
+  .release-panel-layout { grid-template-columns:minmax(0,1fr); }
+  .release-extra-actions { grid-column:1; flex-wrap:wrap; }
+  .verification-page .empty-chat .chat-examples { grid-template-columns:1fr; }
+}
+
+:is(.story-disclosure,.disclosure) > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; }
+:is(.story-disclosure,.disclosure) > summary::-webkit-details-marker { display:none; }

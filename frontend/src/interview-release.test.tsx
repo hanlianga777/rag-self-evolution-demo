@@ -17,10 +17,10 @@ const production = { id: "PROD-old-C", status: "active", provenance: "published"
 it("centres the actual published snapshot while a newer recommendation remains unpublished", async () => {
   const candidate = { id: "EXP-new-A", reasoning: { candidate_label: "A" }, release_state: { sandbox: true, qualified: true, recommended: true, round_complete: true } };
   await render(<VersionsPage data={{ versions: [production, { id: "baseline-v1", status: "archived", config: { prompt_strategy: "Grounded", rerank: false } }], optimization: { candidates: [candidate], recommendation: { result: { recommended_candidate: candidate.id } } } }} />);
-  expect(document.querySelector(".release-decision")?.textContent).not.toContain("配置来源");
-  expect(document.querySelector(".release-decision")?.textContent).toContain("11 / 11");
-  expect(document.querySelector(".release-decision")?.textContent).toContain("线上 Regression Check通过");
-  expect(document.querySelector(".release-decision")?.textContent).toContain("线上发布批准已批准");
+  expect(document.querySelector(".page-content")?.textContent).not.toContain("配置来源");
+  expect(document.querySelector(".page-content")?.textContent).toContain("11 / 11");
+  expect(document.querySelector(".page-content")?.textContent).toContain("线上 Regression Check通过");
+  expect(document.querySelector(".page-content")?.textContent).toContain("线上发布批准已批准");
   expect(document.querySelector(".ui-rel")?.textContent).toContain("Candidate A");
   expect(document.querySelector(".ui-rel button.primary")?.textContent).toBe("确认发布");
   expect(document.querySelector(".stage-stepper")).toBeNull();
@@ -31,8 +31,8 @@ it("shows only changed parameters on the release main screen and opens full conf
   await render(<VersionsPage data={{ versions: [production, { id: "baseline-v1", status: "archived", config: { prompt_strategy: "Grounded", rerank: false } }] }} />);
   expect(document.querySelector(".ui-rel-changes")?.textContent).toContain("有据生成");
   expect(document.querySelector(".ui-rel-changes")?.textContent).toContain("谨慎拒答");
-  expect(document.querySelector(".release-decision")?.textContent).not.toContain("Rerank");
-  expect(document.querySelector(".release-decision details")).toBeNull();
+  expect(document.querySelector(".page-content")?.textContent).not.toContain("Rerank");
+  expect(document.querySelector(".release-panel-layout details")).toBeNull();
   await click("查看完整配置");
   expect(document.querySelector(".drawer")?.textContent).toContain("Rerank");
   expect(document.querySelector(".drawer pre")).toBeNull();
@@ -40,15 +40,15 @@ it("shows only changed parameters on the release main screen and opens full conf
 
 it("does not invent manual publication evidence for incomplete historical snapshots", async () => {
   await render(<VersionsPage data={{ versions: [{ ...production, snapshot: { candidate_id: "EXP-old-C" } }] }} />);
-  expect(document.querySelector(".release-decision")?.textContent).not.toContain("线上发布批准已批准");
-  expect(document.querySelector(".release-decision")?.textContent).not.toContain("发布审计未完整保存");
-  expect(document.querySelector<HTMLDetailsElement>(".page-content > details")?.open).toBe(false);
-  expect(document.querySelector(".page-content > details > summary")?.textContent).toBe("版本历史与回滚");
+  expect(document.querySelector(".page-content")?.textContent).not.toContain("线上发布批准已批准");
+  expect(document.querySelector(".page-content")?.textContent).not.toContain("发布审计未完整保存");
+  expect(document.querySelector<HTMLDetailsElement>(".page-content > details")?.open).toBe(true);
+  expect(document.querySelector(".page-content > details > summary")?.textContent).toContain("版本历史与回滚");
 });
 
 it("keeps answer telemetry and source IDs out of the chat until its audit Drawer opens", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ baseline: { answer: "实际完整回答", evidence: [], sources: [], version: "PROD-audit", config: { prompt_strategy: "Abstention" }, latency_ms: 130, input_tokens: 41, output_tokens: 12, source: { provider_id: "internal-provider", corpus_fingerprint: "internal-corpus" } }, model: "internal-model", mode: "live", latency_ms: 130 }))));
-  await render(<AssistantPage productionVersion="PROD-audit" isReleased badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
+  await render(<AssistantPage examples={[{label:"正常问答",question:"冻结正向示例"}]} productionVersion="PROD-audit" isReleased badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
   await act(async () => document.querySelector<HTMLButtonElement>(".empty-chat button")!.click());
   expect(document.querySelector(".message-list")?.textContent).toContain("实际完整回答");
   expect(document.querySelector(".message-list")?.textContent).toContain("130 ms");

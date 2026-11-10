@@ -87,7 +87,7 @@ it.each([false, true])('uses current experiment publication and running state fo
   await mount(<EvolutionPage data={{ evaluation: { id: 'b', status: 'completed' }, optimization, versions: [{ status: 'active', provenance: 'published', snapshot: { candidate_id: '022e-d' } }] }} />);
   expect(document.body.textContent).not.toContain('补齐本轮规划（不收费）');
   const button = [...document.querySelectorAll('button')].find(b => b.textContent === '查看 Sandbox 进度')!;
-  expect(button.classList.contains('primary')).toBe(running);
+  expect(!!button).toBe(running);if(button)expect(button.classList.contains('secondary')).toBe(true);
 });
 
 it('never turns nine split checks into nine numbered requirements while atomic details are loading', () => {

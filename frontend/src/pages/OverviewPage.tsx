@@ -3,6 +3,7 @@ import {completeResult, recommendationOf, schemeName} from "../components/Evolut
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
+import { ValueChain } from "../ui/overview/ValueChain";
 import { OverviewSummary } from "../ui/overview/OverviewSummary";
 import { displayText, productionName, gateNames } from "../display";
 import { OverviewStory, type FixedItem } from "../ui/overview/OverviewStory";
@@ -51,7 +52,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const next: [string, string, Page] = knowledge?.legacy ? ["建立知识处理 Pipeline", "完成 MinerU 与 Alibaba 连接配置后，在知识库重建真实知识资产。", "knowledge"] : newKnowledge && !frozen ? ["完成 Golden Dataset 重建", "新 Corpus 已激活；完成题目构造、校验与人工确认。", "governance"] : !frozen && needsRegeneration ? [`补齐失败题（${Math.max(0, expectedCount - (summary.total || 0))}）`, "当前 Golden Run 有失败题目，补齐后继续人工确认。", "governance"] : !frozen ? ["确认 Golden Dataset", "完成题目检查与 人工确认。", "governance"] : !run?.id || data.workspace?.requires_new_baseline || data.workspace?.baseline_unavailable_reason ? ["运行 Baseline", "使用已冻结的 Golden Dataset 生成正式诊断报告。", "evaluation"] : run.status !== "completed" ? [run.status === "failed" ? "重试 Baseline" : "等待 Baseline 完成", run.status === "failed" ? "正式评测失败，请查看错误并重试。" : "正式评测尚未完成，完成后才能运行 Agent。", "evaluation"] : !experiment?.id || !candidates.length ? ["运行优化 Agent", "依据真实 Bad Case 生成 A/B/C 优化方案。", "evolution"] : sandboxIncomplete ? [sandboxPaused ? "Sandbox 已暂停" : sandboxRunning ? "等待 Sandbox 完成" : roundCandidates.some(candidate => candidate.status === "failed") ? "查看 Sandbox 中断" : "运行 Sandbox", "本轮方案尚无完整评测结果，请先查看进度。", "evolution"] : recommendation.status !== "Recommended" ? ["完成调优决策", "查看 Sandbox、人工确认与组合 Candidate D 的结果。", "evolution"] : !currentReleased ? ["人工确认发布", "核对推荐方案后由人确认发布。", "versions"] : ["查看方案对比", "比较正式 Baseline 与线上版本 的同题回答。", "verification"];
   const stages: [string, string, Page][] = [
     ["知识库", `${data.documents?.length || 0} 份文档${knowledge?.identity ? "已索引" : "待建立新索引"}`, "knowledge"], ["Pipeline", newKnowledge ? "知识处理与检索已配置" : (production?.config ? "当前线上配置已保存" : "待配置"), "settings"],
-    ["Golden Dataset", frozen ? `已冻结 · ${expectedCount} 题` : `待人工确认 · ${summary.approved || 0} / ${expectedCount || "—"} 题`, "governance"], ["Baseline", run?.result?.gates ? `已评测 · ${run.result.gates.passed_count} / ${run.result.gates.total} 项 Hard Gate 通过` : "待评测", "evaluation"],
+    ["Golden Dataset", frozen ? `已冻结 · ${expectedCount} 题` : `待人工确认 · ${summary.approved || 0} / ${expectedCount || "—"} 题`, "governance"], ["Baseline", run?.result?.gates ? `${run.result.gates.passed_count}/${run.result.gates.total} Hard Gate 通过` : "待评测", "evaluation"],
     [displayText("Optimization Agent"), qualified.length ? `${qualified.length} 个合格方案 · ${qualified.map(row => schemeName(row)).join(" / ")}` : roundCandidates.length ? `${roundCandidates.filter(candidate => candidate.status === "evaluated" && candidate.result?.evaluation_complete !== false).length}/${roundCandidates.length} 个方案已评测` : experiment?.id ? "暂无候选，等待生成" : "尚未生成优化方案", "evolution"],
     [displayText("Release"), currentReleased ? "当前推荐已发布" : recommendation.recommended_candidate ? "当前推荐待发布" : "尚无可发布方案", "versions"],
   ];
@@ -59,7 +60,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const finalCandidate=candidates.find(c=>c.id===recommendationOf(experiment).recommended_candidate);
   const evolution = buildEvolutionModel(experiment, run?.config, key => gateNames[key] || key, schemeName);
   const openRoute = () => { location.hash = "evolution?tab=route"; };
-  const turns = evolution.rounds.map(round => ({label: `Round ${round.round}`, text: round.summary, key: round.candidates.some(candidate => candidate.winner), onClick: openRoute}));
+  const turns = evolution.rounds.map(round => ({label: `Round ${round.round}`, text: round.round <= 2 && round.lesson ? `本轮经验：${round.lesson.text}` : round.summary, key: round.candidates.some(candidate => candidate.winner), onClick: openRoute}));
   if (evolution.d) {
     const winner = evolution.rounds.flatMap(round => round.candidates).find(candidate => candidate.id === evolution.winnerId);
     const extra = winner && evolution.d.complete && winner.complete ? evolution.d.fixed.filter(id => !winner.fixed.includes(id)) : null;
@@ -103,6 +104,12 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     return typeof value === "number" ? value : null;
   };
   const pair = (key: string) => ({from: number(baseResult, key), to: number(finalResult, key)});
+  const correct = pair("correct"), p50 = pair("latency_p50_seconds"), refusal = pair("safe_rejection_rate");
+  const newBad = Array.isArray(finalResult?.new_regression_question_ids) ? finalResult.new_regression_question_ids.length : "未知";
+  const speed = p50.from !== null && p50.to !== null && p50.from > 0 ? Math.round((p50.from - p50.to) / p50.from * 100) : null;
+  const gates = finalResult?.gates;
+  const resultTitle = `答对 ${correct.from ?? "未知"} → ${correct.to ?? "未知"}，新增 Bad Case ${newBad}，${speed === null ? "P50 变化未知" : speed >= 0 ? `P50 快 ${speed}%` : `P50 慢 ${-speed}%`}`;
+  const resultDetail = `${typeof gates?.total === "number" && typeof gates?.passed_count === "number" ? gates.passed_count === gates.total ? `${gates.total} 项 Hard Gate 全过` : `${gates.passed_count}/${gates.total} 项 Hard Gate 通过` : "Hard Gate 未知"}，安全拒答 ${refusal.from ?? "未知"}% → ${refusal.to ?? "未知"}%`;
   const candidateName = finalCandidate ? schemeName(finalCandidate).replace(/^Round \d+ · /, "") : "";
   const readyToRelease = recommendation.status === "Recommended" && !!finalCandidate && next[2] === "versions";
   const primaryLabel = currentReleased ? "去问答验证" : readyToRelease ? "去发布" : next[0];
@@ -111,15 +118,20 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     {label: "知识库", fact: stages[0][1], tips: [knowledge?.identity ? "当前知识资产已建立" : "请先建立知识处理 Pipeline", stages[1][1]], page: "knowledge"},
     {label: "Golden Dataset", fact: stages[2][1], tips: [frozen ? "正式题卷已人工确认" : "完成审核后冻结正式题卷", completeGroups ? "正向、消融、负向分类完整" : "题目分类需核对"], page: "governance"},
     {label: "Baseline", fact: stages[3][1], tips: [run?.status === "completed" ? "指标来自保存的正式评测" : "等待正式评测完成", data.workspace?.baseline_unavailable_reason || "同题卷用于候选对照"], page: "evaluation"},
-    {label: "Agent", fact: experiment.id ? `${storyRounds} 轮 · ${candidates.length} 个 Candidate` : stages[4][1], tips: [sandboxPaused ? "已暂停，进度已保存" : sandboxIncomplete ? "候选评测尚未完成" : stages[4][1], "修复与副作用由 Sandbox 核对"], page: "evolution"},
+    {label: "Agent", fact: experiment.id ? `${storyRounds} 轮 · ${candidates.length} 个方案` : stages[4][1], tips: [sandboxPaused ? "已暂停，进度已保存" : sandboxIncomplete ? "候选评测尚未完成" : stages[4][1], "修复与副作用由 Sandbox 核对"], page: "evolution"},
     {label: "发布", fact: stages[5][1], tips: ["发布需要人工确认", "线上身份以保存的版本为准"], page: "versions"},
-    {label: "问答验证", fact: currentReleased ? "可验证线上回答" : "可查看当前线上配置", tips: ["逐题比较 Baseline 与线上回答", "反馈可作为再次进化的线索"], page: "verification"},
+    {label: "问答验证", fact: currentReleased ? "可验证线上回答" : "可查看线上配置", tips: ["逐题比较 Baseline 与线上回答", "反馈可作为再次进化的线索"], page: "verification"},
   ].map(step => ({...step, onClick: () => navigate(step.page as Page)}));
 
   return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1><IconTile name="overview" />RAG 自进化项目概览</h1></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
 
 
     {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} /> : <>
+    <ValueChain steps={[
+      {kicker: "问题", title: "RAG 上线后答错难发现，调参靠试，修好一题又弄坏另一题", detail: "不知道该改哪里，也不敢上线"},
+      {kicker: "方法", title: "冻结考卷量化 → Agent 在白名单内调参 → 人工批准发布", detail: "每一步可量化、可归因、可回滚"},
+      {kicker: "结果", title: resultTitle, detail: resultDetail, result: true},
+    ]} />
     <OverviewSummary correct={pair("correct")} total={baseResult?.total ?? expectedCount}
       fixedCount={Array.isArray(finalResult?.all_fixed_question_ids) ? finalResult.all_fixed_question_ids.length : null}
       newBadCount={Array.isArray(finalResult?.new_regression_question_ids) ? finalResult.new_regression_question_ids.length : null}

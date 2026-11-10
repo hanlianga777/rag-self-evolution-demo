@@ -26,8 +26,10 @@ it('compares saved predictions with repairs relative to the winner, with identic
  const full=document.querySelector('[aria-label="预测与实际"]')!.textContent;
  expect(full).toContain('Q04、Q06');expect(full).toContain('实际修好的剩余 Bad Case：Q04');
  expect(full).toContain('未预测到的新问题');expect(full).toContain('Q25');
- expect(full).toContain('Q15：守住');expect(full).toContain('Q17：守住');expect(full).toContain('Q38：守住');
- expect(full).toContain('100%');expect(full).toContain('32.1 秒');expect(full).toContain('守住');
+ expect(full).toContain('5 题全部守住');
+ const summary=document.querySelectorAll<HTMLElement>('.prediction-summary')[1];await act(async()=>{summary.focus();await new Promise(resolve=>setTimeout(resolve,160));});
+ expect(document.querySelector('[role=tooltip]')!.textContent).toContain('Q15：守住');expect(document.querySelector('[role=tooltip]')!.textContent).toContain('Q17：守住');expect(document.querySelector('[role=tooltip]')!.textContent).toContain('Q38：守住');
+ expect(full).toContain('100%');const gateSummary=document.querySelectorAll<HTMLElement>('.prediction-summary')[3];await act(async()=>{gateSummary.focus();await new Promise(resolve=>setTimeout(resolve,160));});expect(document.querySelector('[role=tooltip]')!.textContent).toContain('32.1 秒');expect(full).toContain('守住');
  await act(async()=>root.render(<DStory experiment={experiment} evaluation={evaluation} compact/>));
  expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).toBe(full);
  expect(JSON.stringify(experiment)).toBe(original);
@@ -59,7 +61,7 @@ it.each(['missing','wrong identity','error'])('never calls missing protected-cas
  mockRun(value);if(kind==='error')vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('offline');}));
  await mount(<DStory experiment={exp()} evaluation={evaluation}/>);
  const text=document.querySelector('[aria-label="预测与实际"]')!.textContent;
- expect(text).toContain('Q17：待核对');expect(text).not.toContain('全部守住');
+ expect(text).toContain('题待核对');expect(document.querySelector('[aria-label="预测与实际"] tbody tr:nth-child(2)')!.textContent).not.toContain('全部守住');
  if(kind!=='missing')expect(document.querySelector('.d-result-causes')!.textContent).toContain('具体失败原因未知');
 });
 it('reports a watched question flipping and a gate breach instead of claiming they held',async()=>{
@@ -68,7 +70,7 @@ it('reports a watched question flipping and a gate breach instead of claiming th
  experiment.candidates[1].result.metrics!.safe_rejection_rate=90;
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  const text=document.querySelector('[aria-label="预测与实际"]')!.textContent;
- expect(text).toContain('Q15：翻错');expect(text).toContain('90%');expect(text).toContain('未守住');
+ expect(text).toContain('Q15 新增');expect(text).toContain('90%');expect(text).toContain('1/2 项守住');
 });
 it('does not invent predictions, evidence positions or unchanged losing-result counts',async()=>{
  mockRun();const experiment=exp();experiment.candidates[1].reasoning.changes=[];
@@ -89,7 +91,7 @@ it('keeps actual repairs separate from the prediction list and does not invent a
 it('keeps results without a saved run source usable and marks case explanations unknown',async()=>{
  const fetcher=mockRun();const experiment=exp();delete experiment.candidates[1].result.evaluation_run_id;
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
- expect(fetcher).not.toHaveBeenCalled();expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).toContain('Q17：待核对');
+ expect(fetcher).not.toHaveBeenCalled();expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).toContain('题待核对');
  expect(document.querySelector('.d-result-causes')!.textContent).toContain('具体失败原因未知');
 });
 it('does not present baseline repairs as improvements over the winner when that comparison is missing',async()=>{

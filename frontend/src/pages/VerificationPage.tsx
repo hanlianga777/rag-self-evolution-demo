@@ -17,7 +17,8 @@ import { ConclusionCard, Section, Status, TruncatedText } from "../components/Pr
 import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { ExecutionMetrics } from "../components/PipelineFields";
 import { readSession, writeSession } from "../session";
-import { AssistantPage } from "./AssistantPage";
+import { savedSnapshot } from "../evaluationProgress";
+import { AssistantPage, type ChatExample } from "./AssistantPage";
 import type { Citation } from "../types";
 import { useOperation } from "../operation";
 
@@ -78,12 +79,25 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
     } catch (reason) { if (selectedTrigger.current === captured) setError(errorMessage(reason)); }
     finally { setBusy(false); }
   };
+  const exampleBaseline = data.evaluation;
+  const exampleBaselineId = exampleBaseline?.id;
+  const [exampleRun, setExampleRun] = useState<any>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (tab !== "qa" || !exampleBaselineId || exampleBaseline.status !== "completed" || Array.isArray(exampleBaseline.cases)) return;
+    void getJson<any>(`/api/evaluations/${encodeURIComponent(exampleBaselineId)}`).then(run => {
+      if (!cancelled && run.id === exampleBaselineId) setExampleRun(run);
+    }).catch(() => { /* Keep unavailable examples empty; never invent a question. */ });
+    return () => { cancelled = true; };
+  }, [tab, exampleBaselineId, exampleBaseline?.status]);
+  const exampleSource = Array.isArray(exampleBaseline?.cases) ? exampleBaseline : exampleRun?.id === exampleBaselineId ? exampleRun : null;
+  const examples = !data.workspace?.requires_new_golden && !data.workspace?.requires_new_baseline && !data.workspace?.baseline_unavailable_reason && data.workspace?.current_baseline_id === exampleBaselineId ? frozenChatExamples(exampleSource, data.workspace?.current_golden_id) : [];
   const production = data.versions?.find((version: any) => version.status === "active");
   const released = production?.provenance === "published";
   return <PageShell className="page verification-page" header={<div className="page-title"><div><h1><IconTile name="verify" />问答验证</h1></div></div>} tabs={<div className="tabs"><button aria-pressed={tab === "qa"} className={tab === "qa" ? "selected" : ""} onClick={() => setTab("qa")}>实时问答</button><button aria-pressed={tab === "compare"} className={tab === "compare" ? "selected" : ""} onClick={() => setTab("compare")}>Before/After</button><button aria-pressed={tab === "monitoring"} className={tab === "monitoring" ? "selected" : ""} onClick={() => setTab("monitoring")}>线上反馈 → 再次进化</button></div>} resetKey={tab}>
 
 
-    {tab === "qa" && <AssistantPage onAnswered={()=>{void refresh().catch(reason=>setError(errorMessage(reason)));}} productionLabel={released ? `当前线上：${schemeName(data.optimization?.candidates?.find((c:any)=>c.id===production.snapshot?.candidate_id),production.snapshot?.candidate_id).replace(/^Round \d+ · /, "")}（Candidate K ${parameterValue(production.config?.candidate_k)} · Top-K ${parameterValue(production.config?.top_k)} · Thinking ${parameterValue(production.config?.generation_thinking)}）` : "当前线上：初始配置"} productionVersion={production?.id || data.workspace?.active_version} isReleased={released} badCases={data.badCases || []} onOpenBadCase={() => { location.hash = "evaluation"; }} onOpenCitation={setCitation} onOpenDocument={onOpenDocument} onOpenMonitoring={()=>{setTab("monitoring");void refresh().catch(reason=>setError(errorMessage(reason)));}} />}
+    {tab === "qa" && <AssistantPage examples={examples} onAnswered={()=>{void refresh().catch(reason=>setError(errorMessage(reason)));}} productionLabel={released ? `当前线上：${schemeName(data.optimization?.candidates?.find((c:any)=>c.id===production.snapshot?.candidate_id),production.snapshot?.candidate_id).replace(/^Round \d+ · /, "")}（Candidate K ${parameterValue(production.config?.candidate_k)} · Top-K ${parameterValue(production.config?.top_k)} · Thinking ${parameterValue(production.config?.generation_thinking)}）` : "当前线上：初始配置"} productionVersion={production?.id || data.workspace?.active_version} isReleased={released} badCases={data.badCases || []} onOpenBadCase={() => { location.hash = "evaluation"; }} onOpenCitation={setCitation} onOpenDocument={onOpenDocument} onOpenMonitoring={()=>{setTab("monitoring");void refresh().catch(reason=>setError(errorMessage(reason)));}} />}
     {<div hidden={tab !== "compare"}><SavedAnswerComparison questionId={questionId} data={data} onOpenCitation={setCitation}/></div>}
     {tab === "monitoring" && <><ConclusionCard title={monitoring.events?.length ? `${monitoring.events.length} 条本页实际问答反馈，等待或保留人工判定` : "当前尚无实际问答记录"} tone="neutral">问答产生记录，人工判断是否属于 Bad Case；符合现有触发规则后，再人工确认关联优化上下文。发现问题不会绕过诊断、评测或人工发布。</ConclusionCard><div className="feedback-loop" aria-label="线上反馈闭环">用户提问 <span>→</span> 人工标记坏例 <span>→</span> 触发新一轮 Agent</div><Section title={<IconLabel name="verify">实际反馈记录</IconLabel>}>
       {error && <p className="error-notice" role="alert">{error}</p>}
@@ -99,4 +113,17 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
     <Drawer className="workbench-drawer" open={contextDetail} onOpenChange={setContextDetail} title="监控触发与实验上下文"><div className="drawer-body"><Section title="反馈与实验上下文"><p>反馈状态：{trigger ? displayText(trigger.status) : "暂无反馈"}</p><p>关联优化：{linkedContext ? "已建立" : "尚未确认，未创建上下文"}</p>{linkedContext && <><p>Baseline：{currentContext ? "当前 Baseline" : "历史上下文，只读"}</p><p>{linkedContext.status === "pending_agent" ? "待启动Round 1" : `Agent 状态：${displayText(linkedContext.status)} · Round ${linkedContext.result?.round ?? linkedContext.rounds?.at(-1)?.round ?? "未记录"}`}</p></>}</Section></div></Drawer>
     <Drawer className="workbench-drawer" open={!!citation} onOpenChange={open => !open && setCitation(null)} title="问答证据"><div className="drawer-body story-details"><Section title="引用来源"><p>{shortSourceName(citation?.document || "")} · p{citation?.page_start} · {citation?.section_path}</p><CaseAnswer text={sourceText || citation?.content_preview || "未记录证据文本"}/></Section></div></Drawer>
   </PageShell>;
+}
+
+function frozenChatExamples(run: any, goldenId: string | undefined): ChatExample[] {
+  if (!run || run.status !== "completed" || !goldenId || run.dataset_version_id !== goldenId) return [];
+  const snapshot = savedSnapshot(run);
+  const questions = (snapshot.questions || []).filter((q: any) => snapshot.question_ids?.includes(q.id));
+  const positives = questions.filter((q: any) => q.test_category === "positive").map((q: any) => ({q, row: run.cases?.find((c: any) => c.question_id === q.id)})).filter(({row}: any) => row?.passed === true && typeof row.programmatic_metrics?.latency_ms === "number");
+  positives.sort((a: any, b: any) => a.row.programmatic_metrics.latency_ms - b.row.programmatic_metrics.latency_ms);
+  return [
+    {label: "正常问答", question: positives[0]?.q.question},
+    {label: "应拒答 / 安全", question: questions.find((q: any) => q.test_category === "negative" && q.negative_subtype === "safety_critical")?.question},
+    {label: "需要追问", question: questions.find((q: any) => q.test_category === "negative" && q.negative_subtype === "clarify")?.question},
+  ];
 }

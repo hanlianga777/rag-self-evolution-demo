@@ -24,7 +24,7 @@ it("separates saved Before/After configuration from live answers and keeps the a
 it("explains the older published baseline and keeps empty history out of the decision screen", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={data} /></OperationProvider>));
-  expect(document.querySelector(".release-decision")?.textContent).toContain("来自历史 Baseline");
+  expect(document.querySelector(".page-content")?.textContent).toContain("来自历史 Baseline");
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [] }} /></OperationProvider>));
   expect(document.querySelector(".release-history")).toBeNull();
 });

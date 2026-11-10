@@ -15,7 +15,7 @@ it('places real coverage first, totals its quotas, and restores the document del
  vi.stubGlobal('fetch',fetcher);
  await mount(<KnowledgePage data={{documents:[{id:'D1',name:'设备手册.pdf',chunks:7,status:'Indexed'}]}} onChanged={changed}/>);
  expect(document.querySelector('.page-content > details:first-child .ui-kc')).not.toBeNull();
- expect(document.querySelector<HTMLDetailsElement>('.page-content > details:first-child')?.open).toBe(false);
+ expect(document.querySelector<HTMLDetailsElement>('.page-content > details:first-child')?.open).toBe(true);
  expect(document.querySelector('.ui-kc h3')?.textContent).toBe('知识主题覆盖');
  expect(document.querySelector('.ui-kc-head')?.textContent).toContain('Positive 2 / Ablation 1 / Negative 3');
  const button=[...document.querySelectorAll('button')].find(b=>b.textContent==='删除')!;
@@ -34,7 +34,7 @@ it('shows an explicit unknown instead of raw Judge prose when saved checks are m
 });
 it('orders publication cards and hides internal IDs outside technical details',async()=>{
  await mount(<VersionsPage data={{versions:[{id:'v1',status:'active',provenance:'bootstrap',config:{top_k:4,knowledge_identity:{corpus_snapshot_id:'INTERNAL-corpus'}}}]}}/>);
- expect([...document.querySelectorAll('.page-content > .panel > .section-head > h2, .page-content > details > summary')].map(e=>e.textContent)).toEqual(['配置与发布记录','版本历史与回滚']);
+ expect([...document.querySelectorAll('.page-content > .panel > .section-head > h2, .page-content > details > summary')].map(e=>e.textContent)).toEqual(['版本历史与回滚1 条']);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看完整配置')!.click());
  expect(document.querySelector('.story-details > .panel')?.textContent).not.toContain('v1');
  expect(document.querySelector('.story-details .parameter-list')?.textContent).not.toContain('[object Object]');

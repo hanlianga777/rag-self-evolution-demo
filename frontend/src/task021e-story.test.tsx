@@ -74,6 +74,6 @@ it.each([
  expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('Round 3 · Candidate C');
  expect([...document.querySelectorAll('button')].some(b=>/^历史实验 · \d/.test(b.textContent || ''))).toBe(false);
  expect([...document.querySelectorAll('.page-title button')].some(b=>b.textContent==='查看历史实验')).toBe(true);
- expect(document.querySelectorAll('.page-title button')).toHaveLength(2);
+ expect(document.querySelectorAll('.page-title button')).toHaveLength(status==='running'?2:1);
  expect(document.querySelector('[aria-label="页面更多操作"]')).toBeNull();
 });

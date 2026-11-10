@@ -81,7 +81,7 @@ it('paginates more than 200 version and feedback records locally after all backe
  const release=await loadAppData(true,'versions'),feedback=await loadAppData(true,'verification');
  expect(release.versions).toHaveLength(205);expect((feedback.monitoring as any).events).toHaveLength(205);
  const count=fetcher.mock.calls.length;
- root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<VersionsPage data={release}/>));expect(document.querySelectorAll('tbody tr')).toHaveLength(200);
+ root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<VersionsPage data={release}/>));expect(document.querySelectorAll('tbody tr')).toHaveLength(3);await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看全部 200 条记录')!.click());expect(document.querySelectorAll('tbody tr')).toHaveLength(200);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('tbody tr')).toHaveLength(5);
  await act(async()=>root.render(<VerificationPage data={feedback} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>));await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='线上反馈 → 再次进化')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(200);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(5);expect(fetcher).toHaveBeenCalledTimes(count);
