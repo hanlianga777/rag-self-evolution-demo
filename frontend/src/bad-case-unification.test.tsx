@@ -42,7 +42,7 @@ it('offers Sandbox for one valid candidate while disclosing rejected candidates'
  expect(document.body.textContent).toContain('保留 1 个合法候选，拒绝 1 个候选');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent?.includes('运行本轮 A/B/C Sandbox'))?.disabled).toBe(false);
  expect(document.querySelector('.ui-agent-stats > div:nth-child(2) dd')?.textContent).toBe('1');
- await click('A/B/C/D');
+ await click('方案对比');
  expect(document.querySelectorAll('.candidate-cards > .candidate-card')).toHaveLength(1);
  expect(document.querySelector('.candidate-card')?.textContent).toContain('原始合法假设');
  expect(document.querySelector('details[open]')).toBeNull();

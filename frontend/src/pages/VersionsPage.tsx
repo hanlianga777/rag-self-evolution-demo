@@ -96,7 +96,7 @@ export function VersionsPage({ data }: { data: any }) {
       onReport={panelCandidate ? () => setReport(panelCandidate === recommended || publishedCandidate ? panelCandidate : {version: currentVersion}) : undefined}
       onSnapshot={() => setDetail("config")}
     />
-    <section className="panel release-decision"><div className="section-head"><h2><IconLabel name="release">配置与发布记录</IconLabel></h2><a className="text-button" href="#evolution?tab=recommendation">查看最终推荐</a></div>
+    <section className="panel release-decision"><div className="section-head"><h2><IconLabel name="release">配置与发布记录</IconLabel></h2><a className="text-button" href="#evolution?tab=review">查看最终推荐</a></div>
 
       {historicalSource && <p className="release-source-note">当前线上版本 来自历史 Baseline；新 Baseline 尚未替换该已发布版本。</p>}
 

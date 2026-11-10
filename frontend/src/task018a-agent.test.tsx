@@ -13,23 +13,23 @@ async function mount(paused=false) {
   root=createRoot(document.body.appendChild(document.createElement("div")));
   await act(async()=>root.render(<EvolutionPage data={{evaluation:{id:"baseline",status:"completed",config:{top_k:4}},optimization,badCases:[]}}/>));
 }
-it.each([false,true])("keeps compact progress on all five tabs and displays saved running or peak-pause progress (%s)",async paused=>{
+it.each([false,true])("keeps compact progress on all three tabs and displays saved running or peak-pause progress (%s)",async paused=>{
   await mount(paused);
   expect(document.querySelector('details > summary')?.textContent).not.toBe("实验进度");
   for(const button of [...document.querySelectorAll<HTMLButtonElement>(".tabs button")]) {
     await act(async()=>button.click());
-    expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(5);
+    expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(3);
     expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("7/50");
   }
-  const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "Sandbox")!;
+  const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "方案对比")!;
   await act(async()=>sandbox.click());
-  expect(document.querySelector(".tabs button.active")?.textContent).toBe("Sandbox");
+  expect(document.querySelector(".tabs button.active")?.textContent).toBe("方案对比");
   expect(document.querySelector(".sandbox-core-table")?.textContent).toContain(paused?"已暂停 7/50":"运行中 7/50");
   expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method)).toBe(true);
 });
 it("removes repeated strategy fields and keeps one before/after parameter list",async()=>{
   await mount();
-  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(b=>b.textContent==="A/B/C/D")!.click());
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(b=>b.textContent==="方案对比")!.click());
   const card=document.querySelector(".candidate-card")!;
   expect(card.textContent).toContain("扩大候选范围");
   expect(card.querySelector(".candidate-field-content")?.textContent).toContain("检索召回增强");

@@ -22,10 +22,10 @@ const experiment=(candidates:any[])=>({candidates,result:{report_confirmation:{w
 const build=(cs:any[])=>buildEvolutionModel(experiment(cs),{},x=>x,c=>c.id);
 it('derives cross-candidate lessons from saved results, keeping the combined R1 changes and all source facts',()=>{
  const model=build(savedCandidates());
- expect(model.rounds[0].lesson?.text).toContain('多问');
- expect(model.rounds[1].lesson?.text).toContain('三套都伤Q17');
- expect(model.rounds[2].lesson?.text).toContain('首次零新增');
- for(const round of model.rounds){expect(('本轮经验：'+round.lesson!.text).length).toBeLessThanOrEqual(40);for(const label of ['A','B','C'])expect(round.lesson?.source).toContain(`Round ${round.round} · Candidate ${label}：修好`);}
+ expect(model.rounds[0].lesson?.text).toContain('多路查询修好 3 题');
+ expect(model.rounds[1].lesson?.text).toContain('三套方案都弄坏了 Q17');
+ expect(model.rounds[2].lesson?.text).toContain('首次做到零新增 Bad Case');
+ for(const round of model.rounds){expect(('本轮经验：'+round.lesson!.text).length).toBeLessThanOrEqual(60);for(const label of ['A','B','C'])expect(round.lesson?.source).toContain(`Round ${round.round} · Candidate ${label}：修好`);}
  expect(model.rounds[0].lesson?.source).toContain('86.5 秒');expect(model.rounds[1].lesson?.source).toContain('安全拒答 90%');
 });
 it('omits unsupported lessons when saved parameters, results or the first-zero/Winner claim no longer match',()=>{

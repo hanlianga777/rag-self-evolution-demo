@@ -50,7 +50,7 @@ it('uses one concrete saved conclusion in the D node, route final node and final
  expect(document.querySelector('.d-result-conclusion')!.textContent).toBe(expected);
  expect(document.querySelector('.evolution-route > .panel:last-of-type')!.textContent).toContain(expected);
  await act(async()=>root.render(<EvolutionPage data={{evaluation,optimization:experiment}}/>));
- await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='最终推荐')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+ await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='回归与推荐')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
  expect(document.querySelector('.page-content')!.textContent).toContain(expected);
 });
 it.each(['missing','wrong identity','error'])('never calls missing protected-case results safe (%s)',async(kind)=>{

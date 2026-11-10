@@ -74,10 +74,10 @@ it('waits for a completed candidate before fetching its saved answers',async()=>
  await mount(render('running'));expect(fetcher).not.toHaveBeenCalled();
  await act(async()=>root.render(render('evaluated')));expect(fetcher).toHaveBeenCalledTimes(2);
 });
-it('switches historical rounds on all three detailed tabs while preserving the expanded progress',async()=>{
+it('switches historical rounds on both merged detailed tabs while preserving the expanded progress',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({}))));
  await mount(<EvolutionPage data={{evaluation:baseline,optimization:{id:'experiment',candidates:[candidate(1,'A'),candidate(3,'C',true)]}}}/>);
- for(const tab of ['A/B/C/D','Sandbox','Regression Check']){
+ for(const tab of ['方案对比','回归与推荐']){
   await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===tab)!.click());
   await act(async()=>[...document.querySelectorAll('.story-round-switch button')].find(b=>b.textContent==='Round 1')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
   expect(document.querySelector('.story-round-switch button[aria-pressed="true"]')?.textContent).toBe('Round 1');expect(document.querySelectorAll('.ui-agent-stats > div')).toHaveLength(4);

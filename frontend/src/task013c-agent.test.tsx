@@ -16,17 +16,18 @@ async function mount(optimization:any,badCases:any[]=[]){
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent===text)!.click());}
 it('separates running, product interruption, evaluated failure and qualified cards',async()=>{
  await mount(experiment([candidate('A','running'),candidate('B','failed',{evaluation_complete:false,completed:7,total:50},{product_interruption:true}),candidate('C','evaluated',{qualification:{qualified:false}}),candidate('D','evaluated',{qualification:{qualified:true}})]));
- await click('A/B/C/D');
+ await click('方案对比');
  const cards=[...document.querySelectorAll('.candidate-card')];
  expect(cards.map(card=>card.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['运行中','评测中断','已评测未通过']);
- expect(document.querySelector('.d-story .ui-status')?.textContent).toBe('合格');
+
  expect(cards[1].querySelector('.candidate-card-header .badge')?.classList.contains('warning')).toBe(true);
  expect(cards[1].textContent).toContain('产品故障，会自动续跑');
  expect(cards[1].textContent).not.toContain('付费确认');
+ await click('进化路线');expect(document.querySelector('.d-story .ui-status')?.textContent).toBe('合格');
 });
 it('does not promise automatic continuation for permission or identity failures',async()=>{
  await mount(experiment([candidate('A','failed',{evaluation_complete:false,error:'Provider权限不足'},{product_interruption:false})]));
- await click('A/B/C/D');
+ await click('方案对比');
  expect(document.querySelector('.candidate-card-header .badge')?.textContent).toBe('评测停止');
  expect(document.querySelector('.candidate-card')?.textContent).not.toContain('自动续跑');
 });
@@ -53,7 +54,7 @@ it('keeps unfinished planning in the flat toolbar after a Sandbox exists and mak
  expect(document.querySelector('.agent-secondary-actions')?.textContent).toContain('补齐本轮规划');
  expect(document.querySelector('.page-title button[aria-haspopup="menu"]')).toBeNull();
  await click('查看 Sandbox 进度');
- expect(document.querySelector('.tabs button.active')?.textContent).toBe('Sandbox');
+ expect(document.querySelector('.tabs button.active')?.textContent).toBe('方案对比');
  expect(document.querySelector('.agent-secondary-actions')?.textContent).toContain('补齐本轮规划（不收费）');
  expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('有覆盖缺口');
  await click('进化路线');

@@ -104,9 +104,9 @@ it("shows scheduled D as queued and keeps configuration identifiers inside techn
   expect(planning.textContent).toContain("修复 1 题");
   expect(planning.textContent).toContain("已有经完整评测验证的方案");
   expect(document.body.textContent).not.toContain("CONFIG-private");
-  await click("A/B/C/D");
+  await click("进化路线");
   expect(document.body.textContent).toContain("Candidate D · 排队中");
-  await click("最终推荐");
+  await click("回归与推荐");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "生成智能组合建议")).toBe(false);
 });
 

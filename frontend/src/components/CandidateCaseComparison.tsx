@@ -26,7 +26,7 @@ export function CandidateCaseComparison({candidates,baselineId,kind,onSelect,onC
   void Promise.all(paths.map(path=>detailJson<any>(path))).then(accept).catch(reason=>{if(!cancelled)setError(errorMessage(reason))});return()=>{cancelled=true};
  },[runId,baselineId,pendingRun]);
  const ids=candidate?.result?.[kind==='fixed'?'all_fixed_question_ids':'new_regression_question_ids'];
- const rows=runs?.runId===runId && Array.isArray(ids)?[...new Set<string>(ids)].map(question_id=>{const before=runs.baseline.cases?.find((c:any)=>c.question_id===question_id),after=runs.current.cases?.find((c:any)=>c.question_id===question_id);return {question_id,before,after,...(kind==='fixed'?before:after)}}):[];
+ const rows=runs && runs.runId===runId && Array.isArray(ids)?[...new Set<string>(ids)].map(question_id=>{const before=runs.baseline.cases?.find((c:any)=>c.question_id===question_id),after=runs.current.cases?.find((c:any)=>c.question_id===question_id);return {question_id,before,after,...(kind==='fixed'?before:after)}}):[];
  const regressionSeverity=(row:any)=>candidate?.result?.regression_review?.case_severities?.[row.question_id];
  const rowSeverity=(row:any)=>kind==='regression'?regressionSeverity(row):row.before?.severity;
  const visible=rows.filter(row=>severity==='all' || severity==='unknown' && !rowSeverity(row) || rowSeverity(row)===severity);

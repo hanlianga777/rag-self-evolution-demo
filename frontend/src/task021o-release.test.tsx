@@ -19,7 +19,7 @@ it('explains alternatives from saved repairs, regressions and gates rather than 
  const slow={...candidate('slow',{qualification:{qualified:false,checks:{hard_gates:false}},gates:{gates:[{metric:'latency_p99_seconds',actual:86.548,operator:'<=',threshold:60,passed:false,status:'FAIL'}]}}),reasoning:{candidate_label:'B',round:1}};
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{id:'exp',status:'completed',evaluation_budget:{used:10,max:12},candidates:[broken,slow,c,d],result:{composite:{status:'generated',candidate_id:'D'},report_confirmation:{winner_id:'C'}},recommendation:{result:{status:'Recommended',recommended_candidate:'D',not_recommended:[{candidate_id:'broken',reason:'资格未通过'},{candidate_id:'slow',reason:'资格未通过'}]}}}}}/>);
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='最终推荐')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='回归与推荐')!.click());
  const rows=[...document.querySelectorAll('.ui-fin-others tbody tr')].map(e=>e.textContent);
  expect(rows[0]).toContain('Q24');expect(rows[0]).toContain('Q13');expect(document.querySelector('.ui-fin-others thead')?.textContent).toContain('新增 Bad Case');
  expect(rows[1]).toContain('回答耗时 P99 86.5 秒');expect(rows[1]).toContain('上限 60 秒');
@@ -62,6 +62,6 @@ it('links to published records once the recommended candidate has been released'
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{id:'exp',candidates:[d],recommendation:{recommended_candidate:'EXP-D'}}}}/>);
  expect(document.querySelector('.ui-evo a[href="#versions"]')).toBeNull(); expect(document.querySelector('.ui-evo')?.textContent).toContain('查看最终推荐');
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='最终推荐')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='回归与推荐')!.click());
  const release=[...document.querySelectorAll('button')].find(b=>b.textContent==='查看发布记录')!;expect(release).toBeDefined();await act(async()=>release.click());expect(location.hash).toBe('#versions');
 });

@@ -53,7 +53,7 @@ it.each(['declined','lost','won','running','generated','failed','unknown'])('exp
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
  await mount(<EvolutionPage data={{evaluation,optimization:exp}}/>);
  const route=document.querySelector('.ui-evo .d-story')?.textContent || '';
- await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='最终推荐')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+ await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='回归与推荐')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
  const final=document.querySelector('.page-content')!.textContent || '';
  for(const text of [route,final]){
   expect(text).not.toContain('D未同时满足');

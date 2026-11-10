@@ -30,7 +30,7 @@ it('links multiple saved candidate hypotheses to the same actual problem and kee
  const data={evaluation,badCases,optimization:{id:'EXP',candidates}};const before=JSON.stringify(data);
  await mount(<EvolutionPage data={data}/>);await click('进化路线');
  expect(document.querySelectorAll('.agent-fact')).toHaveLength(2);expect(document.querySelectorAll('.agent-hypotheses > section')).toHaveLength(2);for (const hypothesis of document.querySelectorAll('.agent-hypotheses > section')) { expect(hypothesis.textContent).toContain('Q71');expect(hypothesis.textContent).not.toContain('Q72'); }expect(document.querySelector('.experiment-plan')).toBeNull();
- await click('A/B/C/D');await click('查看方案与完整报告');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
+ await click('方案对比');await click('查看方案与完整报告');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
 });
 it('compares a pending release against current Production rather than unrelated Baseline configuration',async()=>{
  const candidate={id:'A',config:{candidate_k:24},reasoning:{candidate_label:'A'},release_state:{sandbox:true,qualified:true,recommended:true,round_complete:true}};
