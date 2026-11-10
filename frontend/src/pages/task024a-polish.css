@@ -62,3 +62,12 @@
 /* 024b: one restrained purpose line and captions; retain the original SVGs. */
 .page-title .page-purpose, .architecture-figure figcaption { color:var(--ui-muted); font-size:12px; font-weight:400; line-height:1.6; }
 .architecture-figure figcaption { margin-top:8px; }
+
+/* 024c: keep one surface around each group of content. */
+.knowledge-page .story-disclosure > .ui-kc,
+.evolution-page .d-timeline .ui-card,
+.evolution-page .page-content > .panel:has(.candidate-cards) {
+  background:transparent; border:0; box-shadow:none;
+}
+.knowledge-page .story-disclosure > .ui-kc { padding:0; }
+.evolution-page .page-content > .panel:has(.candidate-cards) { padding:0; }

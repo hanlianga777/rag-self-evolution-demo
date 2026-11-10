@@ -39,6 +39,32 @@
 
 ![业务架构：从可信评测到受控优化，再到人工发布](docs/images/architecture-business.png)
 
+## 界面预览
+
+概览把问题、方法与保存结果连在一起：答对从 44 / 50 提升到 48 / 50，新增 Bad Case 为 0。
+
+![概览：问题、方法与结果](docs/images/screenshots/01-overview.jpg)
+
+Golden Dataset 展示冻结的 50 题，以及出题、硬校验、Probe、QC 和人工确认的治理记录。
+
+![Golden Dataset 当前测试集](docs/images/screenshots/02-golden-dataset.jpg)
+
+Baseline 报告说明 11 项 Hard Gate 全过仍有 6 个 Bad Case，并把问题分到检索层与生成层。
+
+![Baseline 报告](docs/images/screenshots/03-baseline.jpg)
+
+Agent 进化路线展示 Round 3 的 Winner，以及 Candidate D 在 Winner 基础上多修好 Q04 的结果。
+
+![Agent 进化路线：Round 3 与 Candidate D](docs/images/screenshots/04-agent-evolution.jpg)
+
+发布页展示已发布 Candidate D 的质量、回归检查与线上配置，并保留快照和回滚入口。
+
+![发布页](docs/images/screenshots/05-release.jpg)
+
+Q04 的 Before/After 用保存的回答与评分要点，解释 Top-K 4 → 6 后具体补齐了什么。
+
+![Q04 优化前后回答对比](docs/images/screenshots/06-before-after.jpg)
+
 ## 技术架构
 
 ![技术架构：治理服务调度，RAG Pipeline 受控演进](docs/images/architecture-technical.png)
