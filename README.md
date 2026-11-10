@@ -39,32 +39,6 @@
 
 ![业务架构：从可信评测到受控优化，再到人工发布](docs/images/architecture-business.png)
 
-## 界面预览
-
-![概览用同一套保存结果串起评测、优化、发布与问答验证。](docs/images/screenshots/01-overview.png)
-
-概览用同一套保存结果串起评测、优化、发布与问答验证。
-
-![Golden Dataset 展示当前冻结的 50 题测试集和质量状态。](docs/images/screenshots/02-golden-dataset.png)
-
-Golden Dataset 展示当前冻结的 50 题测试集和质量状态。
-
-![Baseline 展示 11 项门槛全部通过时仍需处理的 6 个 Bad Case。](docs/images/screenshots/03-baseline.png)
-
-Baseline 展示 11 项门槛全部通过时仍需处理的 6 个 Bad Case。
-
-![Agent 进化路线展示 Round 3 的 Winner 与 Candidate D 的进一步改善。](docs/images/screenshots/04-agent-evolution.png)
-
-Agent 进化路线展示 Round 3 的 Winner 与 Candidate D 的进一步改善。
-
-![发布页展示当前线上方案、参数差异与发布记录。](docs/images/screenshots/05-release.png)
-
-发布页展示当前线上方案、参数差异与发布记录。
-
-![Q04 的 Before/After 用保存回答和必答要点证明优化前后的变化。](docs/images/screenshots/06-before-after.jpg)
-
-Q04 的 Before/After 用保存回答和必答要点证明优化前后的变化。
-
 ## 技术架构
 
 ![技术架构：治理服务调度，RAG Pipeline 受控演进](docs/images/architecture-technical.png)
