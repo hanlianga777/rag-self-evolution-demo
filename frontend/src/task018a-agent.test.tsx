@@ -21,15 +21,15 @@ it.each([false,true])("keeps compact progress on all three tabs and displays sav
     expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(3);
     expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("7/50");
   }
-  const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "方案对比")!;
+  const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "Candidate 对比")!;
   await act(async()=>sandbox.click());
-  expect(document.querySelector(".tabs button.active")?.textContent).toBe("方案对比");
+  expect(document.querySelector(".tabs button.active")?.textContent).toBe("Candidate 对比");
   expect(document.querySelector(".sandbox-core-table")?.textContent).toContain(paused?"已暂停 7/50":"运行中 7/50");
   expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method)).toBe(true);
 });
 it("removes repeated strategy fields and keeps one before/after parameter list",async()=>{
   await mount();
-  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(b=>b.textContent==="方案对比")!.click());
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(b=>b.textContent==="Candidate 对比")!.click());
   const card=document.querySelector(".candidate-card")!;
   expect(card.textContent).toContain("扩大候选范围");
   expect(card.querySelector(".candidate-field-content")?.textContent).toContain("检索召回增强");

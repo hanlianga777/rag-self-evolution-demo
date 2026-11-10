@@ -21,8 +21,8 @@ const settingsGroups: Record<string, string[]> = {
 const parameterNotes: Record<string, string> = {
   query_rewrite: "把原问题改写为更适合检索的问法。", multi_query: "用多个互补问法查找资料。", hyde: "用假设答案辅助查找，假设文本不作为证据。",
   candidate_k: "决定进入筛选排序的候选资料数量。", hybrid_search: "结合语义相似度和关键词查找资料。", hybrid_alpha: "分配语义与BM25的权重。",
-  rerank: "调整候选资料进入回答前的排序。", top_k: "决定最终送给 回答生成模型的资料段数。", min_score: "过滤相关分低于 Hard Gate 的资料。", retrieval_max_tokens: "限制送给 回答生成模型的上下文长度；没有 tokenizer 时按字符数估算 token。",
-  prompt_strategy: "决定怎样使用证据并处理缺失条件。", generation_thinking: "控制 回答生成模型的思考投入。",
+  rerank: "调整候选资料进入回答前的排序。", top_k: "决定最终送给回答生成模型的资料段数。", min_score: "过滤相关分低于 Hard Gate 的资料。", retrieval_max_tokens: "限制送给回答生成模型的上下文长度；没有 tokenizer 时按字符数估算 token。",
+  prompt_strategy: "决定怎样使用证据并处理缺失条件。", generation_thinking: "控制回答生成模型的思考投入。",
 };
 
 export function SettingsPage({ data }: { data: any }) {
@@ -56,7 +56,7 @@ export function SettingsPage({ data }: { data: any }) {
     try { await postJson("/api/pipeline/draft", { config: discard ? null : draft, identity: pipeline.draft_identity }); invalidatePipeline(); const value = await pipelineFetch(identity); setRecord({ identity, value }); setDraft(startDraft(value)); }
     catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); }
   };
-  return <PageShell className="page settings-page" header={<div className="page-title"><div><h1><IconTile name="pipeline" />Pipeline 配置</h1></div><button className="secondary ui-btn-tint" onClick={() => setSpaceOpen(true)}>查看可选参数</button></div>}>
+  return <PageShell className="page settings-page" header={<div className="page-title"><div><h1><IconTile name="pipeline" />Pipeline 配置</h1><p className="ui-kicker page-purpose">固定底座 + Agent 可调的 12 项参数</p></div><button className="secondary ui-btn-tint" onClick={() => setSpaceOpen(true)}>查看可选参数</button></div>}>
     {error && <p className="error-notice" role="alert">{error}</p>}
     <Section title={<IconLabel name="data">固定技术基座</IconLabel>} action={<Badge>固定</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd title={String(value)}>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
     <Section title={<IconLabel name="pipeline">Agent 可选参数</IconLabel>} action={<Badge tone="accent">{Object.keys(contract).length} 项可调参数</Badge>}>

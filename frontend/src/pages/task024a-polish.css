@@ -58,3 +58,7 @@
 
 :is(.story-disclosure,.disclosure) > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; }
 :is(.story-disclosure,.disclosure) > summary::-webkit-details-marker { display:none; }
+
+/* 024b: one restrained purpose line and captions; retain the original SVGs. */
+.page-title .page-purpose, .architecture-figure figcaption { color:var(--ui-muted); font-size:12px; font-weight:400; line-height:1.6; }
+.architecture-figure figcaption { margin-top:8px; }

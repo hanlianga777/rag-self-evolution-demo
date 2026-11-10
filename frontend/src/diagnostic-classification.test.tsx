@@ -55,7 +55,7 @@ it('uses current analysis root and evidence ahead of historical labels, counts u
  expect(host.textContent).not.toMatch(/可信度|Confirmed|Needs Review|Disputed|评测争议|已确认/);
  expect([...host.querySelectorAll('thead th')].map(el=>el.textContent)).toEqual(['题号','问题','失败现象','主要技术根因','核心证据','']);
  expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
- expect(host.textContent).toContain('Generation · 生成');expect(host.textContent).not.toContain('Safety · 安全');
+ expect(host.textContent).toContain('回答生成');expect(host.textContent).not.toContain('Safety · 安全');
  await act(async()=>root.unmount());host.remove();
 });
 

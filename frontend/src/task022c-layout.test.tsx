@@ -19,7 +19,7 @@ it('puts the saved decision once above equal comparison cards and collapses caus
  expect(document.querySelectorAll('.d-story .ui-headline')).toHaveLength(1);
  expect(document.querySelectorAll('.d-result-story > .ui-card-row > .ui-card')).toHaveLength(2);
  expect(document.querySelectorAll('[aria-label="预测与实际"] tbody tr')).toHaveLength(3);
- expect([...document.querySelectorAll('[aria-label="方案质量对比"] tbody tr')].map(r=>r.firstChild?.textContent)).toEqual(['答对数','新增 Bad Case 数','最慢回答 P99','安全拒答率']);
+ expect([...document.querySelectorAll('[aria-label="Candidate 质量对比"] tbody tr')].map(r=>r.firstChild?.textContent)).toEqual(['答对数','新增 Bad Case 数','最慢回答 P99','安全拒答率']);
  const causes=document.querySelector('details.d-result-causes') as HTMLDetailsElement;
  expect(causes).not.toBeNull();expect(causes.open).toBe(false);expect(causes.closest('.d-result-comparison')).toBeNull();
  expect(document.querySelectorAll('.d-result-conclusion')).toHaveLength(1);
@@ -29,7 +29,7 @@ it('keeps candidate fields uniform and exposes complete risk prose without the q
  const candidates=['A','B','C'].map(label=>({...winner,id:`exp-R3-${label}`,reasoning:{round:3,candidate_label:label,risks,core_idea:'保存的思路'},result}));
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({}))));
  await mount(<EvolutionPage data={{evaluation:{id:'base',config:{top_k:4}},optimization:{id:'exp',candidates}}}/>);
- await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='方案对比')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+ await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='Candidate 对比')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
  for(const card of document.querySelectorAll('.candidate-card')){
   expect(card.querySelectorAll('.ui-field.lines-2')).toHaveLength(6);
   const risk=[...card.querySelectorAll('.ui-field')].find(f=>f.querySelector('.ui-kicker')?.textContent==='风险')!;

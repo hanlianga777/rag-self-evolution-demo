@@ -33,7 +33,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
 
     {runnerUp && <div className="ui-fin-compare">
       <table>
-        <thead><tr><th>合格方案对比</th><th>{runnerUp.name}<small>Winner · 合格</small></th><th className="pick">{chosen.name}<small>推荐</small></th></tr></thead>
+        <thead><tr><th>合格 Candidate 对比</th><th>{runnerUp.name}<small>Winner · 合格</small></th><th className="pick">{chosen.name}<small>推荐</small></th></tr></thead>
         <tbody>
           {rows.map(row => <tr key={row.label}><td>{row.label}</td><td className={`ui-num${row.better === "a" ? " better" : ""}`}>{row.a}{row.label === "答对" && baselineCorrect != null && runnerUp.correct != null && <small className="ui-body-muted">较 Baseline {delta(runnerUp.correct - baselineCorrect)}</small>}</td><td className={`ui-num pick${row.better === "b" ? " better" : ""}`}>{row.b}{row.label === "答对" && baselineCorrect != null && chosen.correct != null && <small className="ui-body-muted">较 Baseline {delta(chosen.correct - baselineCorrect)}</small>}</td></tr>)}
           <tr><td>比 Winner 多修好</td><td>—</td><td className="pick"><QuestionList items={extra.map(id => ({ id, tone: "fixed" as QuestionTone, question: questionText?.(id) }))} /></td></tr>

@@ -68,17 +68,17 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect([...document.querySelectorAll(".route-planning .panel > .section-head h2")].map(header => header.textContent)).toEqual(["Baseline 运行参数", "Agent 读到了什么事实", "Agent 提出了什么假设"]);
   expect(document.body.textContent).toContain("保存假设 A");
   expect(document.body.textContent).toContain("可调参数 · 2");
-  await click("方案对比");
+  await click("Candidate 对比");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
   expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("Q-stored");
   const target=document.querySelector<HTMLElement>('.candidate-card .candidate-story-block:nth-child(3) .ui-q')!;
   await act(async()=>{target.focus();await new Promise(resolve=>setTimeout(resolve,150));});
   expect(document.querySelector('[role=tooltip]')?.textContent).toContain("持久化问题");
-  await click("方案对比");
+  await click("Candidate 对比");
   expect([...document.querySelectorAll(".ui-ct tbody th")].map(cell => cell.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "P99", "安全拒答率"]);
   await act(async()=>document.querySelector<HTMLButtonElement>(".ui-ct-more")!.click());
-  for(const label of ["运行状态", "全部原 Bad Case 修好", "指定目标修好", "新增失败明细", "Regression Check", "候选合格", "可发布"]) expect(document.querySelector(".ui-ct")?.textContent).toContain(label);
+  for(const label of ["运行状态", "全部原 Bad Case 修好", "指定目标修好", "新增 Bad Case 明细", "Regression Check", "Candidate 合格", "可发布"]) expect(document.querySelector(".ui-ct")?.textContent).toContain(label);
   expect(document.body.textContent).not.toContain("Input Tokens");
   await click("查看高级指标");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Input Tokens");
@@ -88,7 +88,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
 
 it.each([
   { status: "generated", result: {}, expected: "等待完整评测" },
-  { status: "evaluated", result: { qualification: { qualified: true }, regression: { status: "PASS" }, gates: { passed_count: 11, total: 11 } }, expected: "发布资格通过，但保存的最终决策未选择 D，因此保留Candidate C" },
+  { status: "evaluated", result: { qualification: { qualified: true }, regression: { status: "PASS" }, gates: { passed_count: 11, total: 11 } }, expected: "发布资格通过，但保存的最终决策未选择 D，因此保留 Candidate C" },
 ])("reports 组合 Candidate D $status without inventing failure or replacing the saved Winner", async ({ status, result, expected }) => {
   const winner = { id: "C-C", status: "evaluated", reasoning: { candidate_label: "C" }, result: { qualification: { qualified: true } } };
   const d = { id: "C-D", status, reasoning: { candidate_label: "D", winner_id: winner.id, sources: [] }, result };

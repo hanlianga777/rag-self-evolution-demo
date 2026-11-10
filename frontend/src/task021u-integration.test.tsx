@@ -31,11 +31,11 @@ it('connects all round cards to the existing drawer and migrates diagnosis to Ba
  expect(document.querySelectorAll('.page-shell-header .tabs button')).toHaveLength(3);
  expect(document.querySelectorAll('.ui-evo-card')).toHaveLength(9);
  expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('10');
- await act(async()=>document.querySelector<HTMLElement>('.ui-evo-card')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('方案详情');
+ await act(async()=>document.querySelector<HTMLElement>('.ui-evo-card')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('Candidate 详情');
  await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());await click('查看 Bad Case 诊断');expect(location.hash).toBe('#evaluation?tab=cases');
 });
 it('restores Agent tab and redirects the old diagnosis deep link',async()=>{
- history.replaceState(null,'','#evolution?tab=sandbox');await mount(<EvolutionPage data={data()}/>);expect(document.querySelector('.tabs .active')?.textContent).toBe('方案对比');
+ history.replaceState(null,'','#evolution?tab=sandbox');await mount(<EvolutionPage data={data()}/>);expect(document.querySelector('.tabs .active')?.textContent).toBe('Candidate 对比');
  await click('回归与推荐');await act(async()=>root.unmount());root=undefined as any;await mount(<EvolutionPage data={data()}/>);expect(document.querySelector('.tabs .active')?.textContent).toBe('回归与推荐');
  await act(async()=>{location.hash='evolution?tab=bad';window.dispatchEvent(new HashChangeEvent('hashchange'));});expect(location.hash).toBe('#evaluation?tab=cases');
 });

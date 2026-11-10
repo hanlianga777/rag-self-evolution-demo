@@ -16,7 +16,7 @@ afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML =
 const mount = async (node: React.ReactNode) => { root = createRoot(document.body.appendChild(document.createElement('div'))); await act(async () => root.render(node)); };
 const response = (value: any) => new Response(JSON.stringify(value));
 it('uses the shared vocabulary while preserving common RAG terms', () => {
- for (const [key, value] of Object.entries({ 'Hard Gate': 'Hard Gate', Overall: '综合分', Candidate: 'Candidate', Regression: 'Regression Check', Recommendation: '推荐方案', Release: '发布', Production: '线上版本', Monitoring: '监控', Snapshot: '冻结版本', Slot: '题位', Coverage: '覆盖规划', 'Human Gate': '人工确认', positive: '正向（Positive）' })) expect(displayText(key)).toBe(value);
+ for (const [key, value] of Object.entries({ 'Hard Gate': 'Hard Gate', Overall: '综合分', Candidate: 'Candidate', Regression: 'Regression Check', Recommendation: '推荐 Candidate', Release: '发布', Production: '线上版本', Monitoring: '监控', Snapshot: '冻结版本', Slot: '题位', Coverage: '覆盖规划', 'Human Gate': '人工确认', positive: '正向（Positive）' })) expect(displayText(key)).toBe(value);
  for (const key of ['Pipeline', 'Agent', 'Sandbox', 'HyDE', 'Rerank']) expect(displayText(key)).toBe(key);
  expect(parameterNames.hyde).toBe('HyDE'); expect(parameterNames.top_k).toBe('Top-K');
  expect(gateNames.safe_rejection_rate).toBe('安全拒答率');

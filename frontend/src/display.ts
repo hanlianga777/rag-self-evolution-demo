@@ -2,20 +2,25 @@ export const isMachineQualified = (status?: string) => status === "machine_quali
 
 export const vocabulary: Record<string, string> = {
   "Hard Gate": "Hard Gate", Gate: "Hard Gate", Overall: "综合分", Candidate: "Candidate", Regression: "Regression Check",
-  Recommendation: "推荐方案", Release: "发布", Production: "线上版本", "Legacy Production": "线上版本",
+  Recommendation: "推荐 Candidate", Release: "发布", Production: "线上版本", "Legacy Production": "线上版本",
   Rollback: "回滚", Monitoring: "监控", Coverage: "覆盖规划", "Coverage Planning": "覆盖规划",
   "Hard Validation": "硬校验", "Question Generation": "出题", "Human Gate": "人工确认", Snapshot: "冻结版本", Slot: "题位",
   "Config Draft": "配置草稿", "Search Space": "可调参数", "Optimization Agent": "优化 Agent",
 };
 
 const translations: Record<string, string> = {
+  "MET": "满足", "NOT_MET": "未满足", "UNKNOWN": "未知", "INVALID": "无效",
+  "waiting": "等待中", "scheduled": "已安排", "paused": "已暂停", "stopping": "停止中", "stopped": "已停止",
+  "parsed": "已解析", "indexed": "已索引", "parsing": "解析中", "indexing": "索引中",
+  "pending_agent": "待启动 Agent", "human_confirmed": "已人工确认", "no_candidates": "未生成 Candidate",
+  "no_effective_composite": "无有效组合",
   "round_completed": "本轮评测完成",
   "owner_delegated": "所有者委托 AI 审核", "owner_delegated_confirmed": "所有者委托 AI 批准", "owner_delegated_approved": "机器合格", "ai_agent": "AI 代理",
   "unclassified": "待分类", "Ordinary": "普通", "ordinary": "普通", "Critical": "严重", "critical": "严重", "query_only": "原问题排序", "STRICT": "严格", "FALLBACK": "回退", "ON": "开启", "OFF": "关闭",
   "Grounded": "有据生成", "Completeness": "完整性优先", "Abstention": "谨慎拒答", "Tiered": "分级回答",
   "Query": "查询处理", "Retrieval": "检索", "Generation": "回答生成",
-  "Pending": "待处理", "pending": "待处理", "needs_human_review": "待确认", "machine_qualified": "机器合格",
-  "expected_improvement": "预期收益", "root_cause": "技术根因", "new_failures": "新增失败",
+  "Pending": "等待中", "pending": "等待中", "needs_human_review": "待确认", "machine_qualified": "机器合格",
+  "expected_improvement": "预期收益", "root_cause": "技术根因", "new_failures": "新增 Bad Case",
   "Completed": "已完成", "Running": "运行中", "Queued": "排队中", "Evaluating": "评测中",
   "completed": "已完成", "running": "运行中", "queued": "排队中", "evaluating": "评测中",
   "live": "服务回答", "mock": "本地响应", "Ready": "已验证可用", "Configured (Unverified)": "已配置（未验证）", "Unavailable": "不可用", "passed": "通过", "failed": "未通过", "skipped": "未执行",
@@ -25,18 +30,18 @@ const translations: Record<string, string> = {
   "Retrieval Noise": "检索噪声", "Over-Rejection": "过度拒答",
   "High": "High", "Medium": "Medium", "Low": "Low", "Positive": "正向（Positive）", "Ablation": "消融（Ablation）",
   "Negative": "负向（Negative）", "AI Generated": "AI 生成", "Human Added": "人工补充",
-  "Evaluation": "评测", "Optimization": "优化", "Bad Cases": "问题案例", "Agent Analysis": "Agent 分析", "Experiments": "实验",
+  "Evaluation": "评测", "Optimization": "优化", "Bad Cases": "Bad Case", "Agent Analysis": "Agent 分析", "Experiments": "实验",
   "Qualified": "合格", "Not Qualified": "不合格", "qualified": "合格", "not_qualified": "不合格",
   "Generated": "已生成", "generated": "已生成", "Evaluated": "已评测", "evaluated": "已评测", "Released": "已发布", "released": "已发布",
   "40 Cases": "40 个案例", "A / B / C": "A / B / C",
   "Overall Score": "综合分", "Overall": "综合分", "Correctness": "正确性", "Faithfulness": "忠实性", "Recall": "召回率", "P95 Latency": "P95 延迟",
   "Relevant": "相关", "Irrelevant": "不相关", "Not Configured": "未配置", "Configured": "已配置",
-  "Recall First": "召回优先", "Balanced": "均衡方案", "Performance First": "性能优先",
+  "Recall First": "召回优先", "Balanced": "均衡策略", "Performance First": "性能优先",
   "Quality": "质量", "Safety": "安全", "Latency": "延迟", "Regression": "Regression Check", "Result": "结果",
   "quality": "质量", "safety": "安全", "latency": "延迟", "regression": "Regression", "result": "结果",
-  "Load Evaluation Report": "加载评测报告", "Analyze 8 Bad Cases": "分析 8 个问题案例", "Cluster Failure Patterns": "聚类失败模式",
-  "Identify Root Causes": "识别根因", "Generate Optimization Hypotheses": "生成优化假设", "Build Candidate Configurations": "构建候选配置",
-  "Run Sandbox Experiments": "运行沙箱实验", "Regression Evaluation": "Regression 评测", "Recommendation": "推荐方案",
+  "Load Evaluation Report": "加载评测报告", "Analyze 8 Bad Cases": "分析 8 个 Bad Case", "Cluster Failure Patterns": "聚类失败模式",
+  "Identify Root Causes": "识别根因", "Generate Optimization Hypotheses": "生成优化假设", "Build Candidate Configurations": "构建 Candidate 配置",
+  "Run Sandbox Experiments": "运行沙箱实验", "Regression Evaluation": "Regression 评测", "Recommendation": "推荐 Candidate",
   "Balanced quality and latency": "平衡质量与延迟", "Quality ceiling remains": "质量提升空间有限",
   "EVAL-0042 loaded": "EVAL-0042 已加载", "Failure patterns extracted": "已提取失败模式", "4 retrieval failures": "4 个检索失败",
   "Query semantic gap": "Query 语义偏差", "3 viable strategies": "3 个可行策略", "A / B / C ready": "A / B / C 已就绪",
@@ -74,7 +79,9 @@ const savedNarratives: Record<string, string> = {
 export function agentDisplayText(value: string): string {
   const names: Record<string, string> = { ...parameterNames, ...gateNames, high: "High", max: "Max", low: "Low", safe_rejection: "安全拒答率", p99: "P99", p50: "P50" };
   return value.replace(new RegExp(`\\b(?:${Object.keys(names).join('|')})\\b(\\s*=\\s*)?`, 'g'),
-    (key, equals) => `${names[key.replace(/\s*=\s*$/, '')]}${equals ? ' ' : ''}`);
+    (key, equals) => `${names[key.replace(/\s*=\s*$/, '')]}${equals ? ' ' : ''}`)
+    .replace(/方案\s*([ABCD])\b/g, 'Candidate $1').replace(/错题/g, 'Bad Case').replace(/方案/g, 'Candidate').replace(/赢家/g, 'Winner')
+    .replace(/([\p{Script=Han}])(Bad Case|Candidate|Winner)/gu, '$1 $2').replace(/(Bad Case|Candidate|Winner)([\p{Script=Han}])/gu, '$1 $2');
 }
 
 export function narrativeText(value: string): string {

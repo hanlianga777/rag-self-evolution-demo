@@ -34,7 +34,7 @@ it('normalizes displayed parameter notation and keeps saved Agent evidence uncha
  const reasoning={candidate_label:'D',explanation:original,core_idea:original};
  const data={candidates:[{id:'d',status:'evaluated',reasoning,result:{evaluation_complete:true}}]};
  const before=JSON.stringify(data);
- expect(renderToStaticMarkup(createElement(DStory,{experiment:data}))).toContain(original.replace("rerank=query_only", "Rerank query_only"));
- expect(renderToStaticMarkup(createElement(StrategyPresentation,{reasoning}))).toContain(original.replace("rerank=query_only", "Rerank query_only"));
+ expect(renderToStaticMarkup(createElement(DStory,{experiment:data}))).toContain(original.replace("方案 D", "Candidate D").replace("rerank=query_only", "Rerank query_only"));
+ expect(renderToStaticMarkup(createElement(StrategyPresentation,{reasoning}))).toContain(original.replace("方案 D", "Candidate D").replace("rerank=query_only", "Rerank query_only"));
  expect(JSON.stringify(data)).toBe(before);
 });

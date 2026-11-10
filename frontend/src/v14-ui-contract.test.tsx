@@ -27,7 +27,7 @@ const fill = async (question: string) => act(async () => { const input = documen
 
 const clickText = async (label: string) => act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === label)!.click());
 const openSavedReport = async () => {
- const disclosure = [...document.querySelectorAll<HTMLDetailsElement>('.drawer details')].find(node => node.querySelector('summary')?.textContent === '完整逐题报告与原始候选审计')!;
+ const disclosure = [...document.querySelectorAll<HTMLDetailsElement>('.drawer details')].find(node => node.querySelector('summary')?.textContent === '完整逐题报告与原始 Candidate 审计')!;
  await act(async () => { disclosure.open = true; disclosure.dispatchEvent(new Event('toggle')); });
 };
 const previewPlan = (profile = "mini", corpus = { D: "fixture" }) => ({ plan_id: `PLAN-${profile}`, planner_version: "fixture-v2", profile: { name: profile }, corpus_fingerprint: corpus, chunk_clusters: { C1: 0 }, initial_k: 2, final_k: 1, merge_mapping: [{ from: 1, to: 0 }], clusters: [{ cluster_id: 0, size: 1, anchor_quota: 20, quotas: { positive: 8, ablation: 4, negative: 8 }, representative_chunk_ids: ["C1"] }], slots: [{ slot_id: "Q01", topic_cluster: 0, document_id: "D", material_chunk_ids: ["C1"], construction_type: "Fact" }], reuse_statistics: { reused_slots: 0 }, gaps: [] });
@@ -73,7 +73,7 @@ it.each([{ proposal: "实际持久化 proposal" }, { why: "兼容 Why 字段" },
   const candidate = { id: "E1-A", status: "generated", config: {}, reasoning: { candidate_label: "A", hypothesis: "假设", risk: "风险", observed_evidence: [], ...reasoning }, result: {} };
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/api/candidates/") ? candidate : { search_space: {} }))));
   await render(<EvolutionPage data={{ ...data("B1"), optimization: { id: "E1", candidates: [candidate] } }} />);
-  await clickText("方案对比"); await clickText("查看方案与完整报告");await openSavedReport();
+  await clickText("Candidate 对比"); await clickText("查看 Candidate 与完整报告");await openSavedReport();
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain((reasoning as any).proposal || (reasoning as any).why || "尚未保存策略名");
 });
 
@@ -81,7 +81,7 @@ it.each([0, 1.25, null])("M4 Sandbox and release keep frozen estimated cost %s a
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   const candidate = { id: "E1-A", status: "evaluated", config: {}, reasoning: { candidate_label: "A" }, result: { comparison_metrics: { token_cost: cost, token_cost_status: "Token Usage / Provider Cost unavailable", cost_estimation: cost == null ? { status: "unavailable", amount: null, reason: "usage_missing" } : { status: "estimated", amount: cost, currency: "USD", price_snapshot: { currency: "USD", version: "fixture-price-v1" }, calls: [{ model: "fixture-model", input_tokens: 5, output_tokens: 0, amount: cost, currency: "USD" }] } } } };
   const input = { ...data("B1"), optimization: { id: "E1", candidates: [candidate] } };
-  await render(<EvolutionPage data={input} />); await clickText("方案对比");
+  await render(<EvolutionPage data={input} />); await clickText("Candidate 对比");
   const expected = cost == null ? "费用未采集 · Token Usage / Provider Cost unavailable" : `$${cost}（估算费用）`;
   expect(document.querySelector(".sandbox-core-table")?.textContent).not.toContain("费用");
   await clickText("查看高级指标");
@@ -169,8 +169,8 @@ it("ID-08 clears Candidate Drawer and rejects an old candidate report after iden
   vi.stubGlobal("fetch", vi.fn((url: string) => url.includes("/evaluations/") ? new Promise<Response>(resolve => { resolveReport = resolve; }) : Promise.resolve(new Response(JSON.stringify({ search_space: {} })))));
   const old = { workspace: identity("B0", "E0"), evaluation: { id: "B0" }, optimization: { id: "E0", candidates: [{ id: "A0", status:"evaluated", config: {}, reasoning: { candidate_label: "A" }, result: { evaluation_run_id: "R0" } }] } };
   await render(<EvolutionPage data={old} />);
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "方案对比")!.click());
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent?.includes("查看方案与完整报告"))!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Candidate 对比")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent?.includes("查看 Candidate 与完整报告"))!.click());
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   await openSavedReport();
   expect(resolveReport).toBeTypeOf('function');
@@ -237,14 +237,14 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   const d = { id: "E1-D", status: "evaluated", config: {}, reasoning: { candidate_label: "D" }, result: { gates: { passed: true, passed_count: 11, total: 11 }, regression: { passed: false, status: "FAIL" }, qualification: { qualified: false }, release_qualification: { qualified: false } } };
   await render(<EvolutionPage data={{ workspace: identity("B1", "E1"), evaluation: { id: "B1", status: "completed", config: {} }, optimization: { id: "E1", candidates: [d], result: { report_confirmation: { winner_id: "A" }, composite: { candidate_id: d.id } } } }} />);
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "方案对比")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Candidate 对比")!.click());
   expect([...document.querySelectorAll('.sandbox-core-table tbody th')].map(node=>node.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "P99", "安全拒答率"]);
   await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ct-more')!.click());
   const coreRows = [...document.querySelectorAll(".sandbox-core-table tbody tr")];
   const value = (label: string) => coreRows.find(row => row.querySelector("th")?.textContent === label)?.lastElementChild?.textContent;
   expect(value("Hard Gate")).toBe("11 / 11");
   expect(value("Regression Check")).toBe("未通过");
-  expect(value("候选合格")).toBe("不合格");
+  expect(value("Candidate 合格")).toBe("不合格");
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "进化路线")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(x => x.textContent === "查看 D 完整报告")!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("发布资格：不可发布 · Hard Gate：通过");

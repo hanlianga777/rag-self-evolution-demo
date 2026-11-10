@@ -37,7 +37,7 @@ it('hides the entire thinking comparison section when no columns exist',async()=
 it('labels released status and the archived initial config without calling it current',async()=>{
  const d={...candidate('EXP-D',{qualification:{qualified:true}}),release_state:{human_release:true}};
  await mount(<VersionsPage data={{versions:[{id:'production-new',status:'active',provenance:'published',config:{},snapshot:{candidate_id:'EXP-D',human_release:{decision:'approved'}}},{id:'initial',status:'archived',provenance:'bootstrap',config:{}}],optimization:{candidates:[d],recommendation:{recommended_candidate:'EXP-D'}}}}/>);
- expect(document.querySelector('.versions-page')?.textContent).not.toContain('待发布方案');
+ expect(document.querySelector('.versions-page')?.textContent).not.toContain('待发布 Candidate');
  expect(document.querySelector('.release-history-table tbody tr:last-child')?.textContent).toContain('初始配置');
  expect(document.querySelector('.release-history-table tbody tr:last-child')?.textContent).not.toContain('当前线上配置');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent==='回滚至此版本')?.disabled).toBe(false);

@@ -20,9 +20,9 @@ export function ReleasePanel({ online, candidate, changes, results, steps, canRe
   canRelease: boolean; onRelease?: () => void; onReport?: () => void; onSnapshot?: () => void;
 }) {
   const released = steps.released.ok;
-  return <section className="ui-rel" aria-label={released ? "已发布方案" : "待发布方案"}>
+  return <section className="ui-rel" aria-label={released ? "已发布 Candidate" : "待发布 Candidate"}>
     <header className="ui-rel-head">
-      <h2>{released ? "已发布方案" : "待发布方案"}</h2>
+      <h2>{released ? "已发布 Candidate" : "待发布 Candidate"}</h2>
       <StatusBadge kind={released ? "released" : candidate ? "pending_release" : "evaluated"} label={released ? "已发布" : candidate ? "待发布" : "暂无推荐"} />
     </header>
 
@@ -62,6 +62,6 @@ export function ReleasePanel({ online, candidate, changes, results, steps, canRe
         {onReport && <button type="button" className="text-button" onClick={onReport}><Icon name="doc" size={15} />查看评测报告</button>}
         {released && <span className="ui-rel-note">如需撤回，可在下方版本历史回滚到上一个版本</span>}
       </footer>
-    </> : <p className="ui-rel-empty">尚无保存的最终推荐方案，请先完成 Agent 决策。</p>}
+    </> : <p className="ui-rel-empty">尚无保存的最终推荐 Candidate，请先完成 Agent 决策。</p>}
   </section>;
 }

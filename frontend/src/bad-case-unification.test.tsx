@@ -39,10 +39,10 @@ it('shows a single business count and agent entry in Baseline',async()=>{
 it('offers Sandbox for one valid candidate while disclosing rejected candidates',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  await render(<EvolutionPage data={{evaluation,badCases:rows,optimization:{id:'partial',evaluation_budget:{used:0,max:12,reserved_for_d:1},candidates:[{id:'valid-a',status:'generated',reasoning:{candidate_label:'A',round:1,hypothesis:'原始合法假设'}}],result:{generation_status:'partial',rejected_candidates:[{id:'B',reason:'参数类型错误'}]}}}}/>);
- expect(document.body.textContent).toContain('保留 1 个合法候选，拒绝 1 个候选');
+ expect(document.body.textContent).toContain('保留 1 个合法 Candidate，拒绝 1 个 Candidate');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent?.includes('运行本轮 A/B/C Sandbox'))?.disabled).toBe(false);
  expect(document.querySelector('.ui-agent-stats > div:nth-child(2) dd')?.textContent).toBe('1');
- await click('方案对比');
+ await click('Candidate 对比');
  expect(document.querySelectorAll('.candidate-cards > .candidate-card')).toHaveLength(1);
  expect(document.querySelector('.candidate-card')?.textContent).toContain('原始合法假设');
  expect(document.querySelector('details[open]')).toBeNull();

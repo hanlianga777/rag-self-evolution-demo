@@ -13,7 +13,7 @@ afterEach(() => { if (root) act(() => root!.unmount()); root = undefined; docume
 it("supports keyboard selection with a labelled listbox", async () => {
   const onChange = vi.fn();
   root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root!.render(<CustomSelect ariaLabel="方案" value="a" onChange={onChange} options={[{ value: "a", label: "Candidate A" }, { value: "b", label: "Candidate B", description: "已评测" }]} />));
+  await act(async () => root!.render(<CustomSelect ariaLabel="Candidate" value="a" onChange={onChange} options={[{ value: "a", label: "Candidate A" }, { value: "b", label: "Candidate B", description: "已评测" }]} />));
   const trigger = document.querySelector('[role="combobox"]') as HTMLButtonElement;
   await act(async () => { trigger.focus(); trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })); });
   expect(document.querySelector('[role="listbox"]')).not.toBeNull();

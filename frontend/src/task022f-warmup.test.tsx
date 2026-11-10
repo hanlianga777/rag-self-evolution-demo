@@ -29,7 +29,7 @@ it('warms Golden and complete Before/After on overview idle time using only GETs
   block=true;
   await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#evolution"]')!.click());
   expect(node.querySelector('.page-loading')).toBeNull();expect(node.querySelector('.ui-evo')).not.toBeNull();
-  for(const [tab,selector] of [['方案对比','.sandbox-core-table'],['回归与推荐','.regression-summary-table']]){
+  for(const [tab,selector] of [['Candidate 对比','.sandbox-core-table'],['回归与推荐','.regression-summary-table']]){
    await act(async()=>[...node.querySelectorAll('button')].find(e=>e.textContent===tab)!.click());expect(node.querySelector(selector)).not.toBeNull();expect(node.querySelector('.page-loading')).toBeNull();
   }
   await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#governance"]')!.click());

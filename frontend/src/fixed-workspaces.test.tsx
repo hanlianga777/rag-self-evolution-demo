@@ -32,7 +32,7 @@ it("shows one Evolution stage instead of four stacked cards", async () => {
   await act(async () => root.render(<EvolutionPage data={{ evaluation: {}, badCases: [] }} />));
   expect(document.body.textContent).toContain("查看 Bad Case 诊断"); expect(document.querySelectorAll(".tabs button")).toHaveLength(3);
   expect(document.body.textContent).not.toContain("Sandbox 对比");
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "方案对比")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Candidate 对比")!.click());
   expect(document.body.textContent).toContain("Sandbox 对比");
   expect(document.querySelector(".diagnosis-cards")).toBeNull();
   await act(async () => root.unmount());
@@ -42,7 +42,7 @@ it("shows no effective composite without inventing a D candidate", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   const optimization = { id: "EXP-1", candidates: [], result: { report_confirmation: { winner_id: "C-1" }, composite: { status: "no_effective_composite" } } };
   await act(async () => root.render(<EvolutionPage data={{ evaluation: {}, badCases: [], optimization }} />));
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "方案对比")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Candidate 对比")!.click());
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "进化路线")!.click());
   expect(document.body.textContent).toContain("保留已确认 Winner");
   expect(document.body.textContent).toContain("Agent 判断不做 D");

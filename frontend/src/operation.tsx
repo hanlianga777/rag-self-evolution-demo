@@ -47,7 +47,7 @@ function cycleProgress(saved: any): Partial<Operation> {
     stopping: cycle.status === "running" && !!cycle.stop_request, error: cycle.last_error,
     current: budget?.used ?? cycle.used, total: budget?.max ?? 12,
     pricePause: [cycle.price_pause, saved.result.price_pause].find(pause => pause?.paused) || cycle.price_pause,
-    stage: cycle.stop_request ? "正在停止，等待当前请求结束并保存进度" : `已用 ${budget?.used ?? cycle.used} 次，剩余 ${cycle.remaining} 次（含合并方案预留）` };
+    stage: cycle.stop_request ? "正在停止，等待当前请求结束并保存进度" : `已用 ${budget?.used ?? cycle.used} 次，剩余 ${cycle.remaining} 次（含合并 Candidate 预留）` };
 }
 
 const revisionStages: Record<string, string> = {
@@ -156,7 +156,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
         if (candidateRefresh.current) await candidateRefresh.current();
         if (cycle.status !== "running") {
           if (cycle.status === "failed") throw new Error(cycle.last_error || "本批次已停止");
-          if (cycle.status === "analysis_exhausted") { update(id,{status:"stopped",stage:cycle.last_error || "连续 3 次方案不合规，已停止",endedAt:Date.now()}); break; }
+          if (cycle.status === "analysis_exhausted") { update(id,{status:"stopped",stage:cycle.last_error || "连续 3 次 Candidate 不合规，已停止",endedAt:Date.now()}); break; }
           if (cycle.status === "stopped") { update(id,{status:"stopped",endedAt:Date.now()}); break; }
           succeed(id); break;
         }

@@ -10,7 +10,7 @@ let root: ReturnType<typeof createRoot>;
 afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.useRealTimers(); sessionStorage.clear(); vi.unstubAllGlobals(); });
 it("closes Select on outside pointer without requiring focus transfer", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<CustomSelect ariaLabel="方案" value="a" options={[{ value: "a", label: "A" }]} onChange={() => {}} />));
+  await act(async () => root.render(<CustomSelect ariaLabel="Candidate" value="a" options={[{ value: "a", label: "A" }]} onChange={() => {}} />));
   await act(async () => (document.querySelector('[role="combobox"]') as HTMLElement).click());
   await act(async () => document.body.dispatchEvent(new Event("pointerdown", { bubbles: true })));
   expect(document.querySelector('[role="listbox"]')).toBeNull();

@@ -23,8 +23,8 @@ it('retains five workstation stages and forbids old-rule candidate actions',asyn
  await mount(<EvolutionPage data={{evaluation:{...run,requires_policy_upgrade:true},workspace:{requires_policy_upgrade:true},badCases:[{id:'bc',run_id:'saved',result:item}],optimization:{id:'e',candidates:['A','B','C'].map(candidate_label=>({id:candidate_label,status:'generated',config:{},reasoning:{candidate_label,round:1},result:{}}))}}}/>);
  expect(document.body.textContent).not.toMatch(/诊断可信度|Confirmed|Needs Review|Disputed|评测争议/);
  const tabs=[...document.querySelectorAll('.tabs button')].map(b=>b.textContent);
- expect(tabs).toEqual(['进化路线','方案对比','回归与推荐']);
- await click('方案对比');expect([...document.querySelectorAll<HTMLButtonElement>('.candidate-card-action button')].every(b=>b.disabled)).toBe(true);
+ expect(tabs).toEqual(['进化路线','Candidate 对比','回归与推荐']);
+ await click('Candidate 对比');expect([...document.querySelectorAll<HTMLButtonElement>('.candidate-card-action button')].every(b=>b.disabled)).toBe(true);
  expect(document.body.textContent).not.toContain('Qualified Winner');
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method||init.method==='GET')).toBe(true);
 });

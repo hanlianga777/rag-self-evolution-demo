@@ -44,7 +44,7 @@ it('explains all remaining failures from saved positions and new failures from t
  expect(document.querySelector<HTMLDetailsElement>('details.d-result-causes')?.open).toBe(false);
  expect(fetcher.mock.calls).toHaveLength(1);expect(String(fetcher.mock.calls[0])).toContain('/api/evaluations/d-run');
  expect(document.querySelector('.d-result-story')!.textContent).not.toMatch(/CSV-|EXP-|EVAL-|DOC-|随机|不稳定|复跑/);
- expect(document.querySelector('.d-result-story [aria-label="方案质量对比"]')!.textContent).toContain('新增 Bad Case 数01');
+ expect(document.querySelector('.d-result-story [aria-label="Candidate 质量对比"]')!.textContent).toContain('新增 Bad Case 数01');
 });
 it('uses one concrete saved conclusion in the D node, route final node and final tab',async()=>{
  const experiment=exp();mockRun();expect(recommendationReason(experiment)).toBe(expected);

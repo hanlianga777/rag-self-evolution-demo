@@ -25,22 +25,22 @@ it('uses saved Baseline shares and gates and keeps the original detailed timing 
 });
 it('opens the existing release confirmation and cancelling makes no write request',async()=>{
  await mount(<VersionsPage data={{evaluation:baseline,versions:[initial],optimization}}/>);
- const panel=document.querySelector('[aria-label="待发布方案"]');expect(panel).not.toBeNull();expect(panel?.textContent).toContain('44');expect(panel?.textContent).toContain('48');expect(panel?.textContent).toContain('修好 4 个原 Bad Case');expect(panel?.querySelectorAll('.ui-rel-steps li')).toHaveLength(3);
+ const panel=document.querySelector('[aria-label="待发布 Candidate"]');expect(panel).not.toBeNull();expect(panel?.textContent).toContain('44');expect(panel?.textContent).toContain('48');expect(panel?.textContent).toContain('修好 4 个原 Bad Case');expect(panel?.querySelectorAll('.ui-rel-steps li')).toHaveLength(3);
  await click('确认发布');expect(document.querySelector('.confirm-dialog')?.textContent).toContain('发布确认');await click('取消');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });
 it('uses the saved previous configuration after release and preserves snapshot, history and rollback controls',async()=>{
  const active={id:'prod',status:'active',provenance:'published',created_at:'2026-11-08T08:08:31',previous_version_id:initial.id,config:candidate.config,snapshot:{candidate_id:candidate.id,human_release:{decision:'approved'},release_time:'2026-11-08T08:08:31'}};
  await mount(<VersionsPage data={{evaluation:baseline,versions:[active,{...initial,status:'archived'}],optimization}}/>);
- const panel=document.querySelector('[aria-label="已发布方案"]');expect(panel?.textContent).toContain('发布前线上');expect(panel?.querySelector('.ui-rel-side:first-child')?.textContent).toContain('12');expect(panel?.querySelector('.ui-rel-side.to')?.textContent).toContain('24');expect([...document.querySelectorAll('button')].find(b=>b.textContent==='确认发布')).toBeUndefined();
+ const panel=document.querySelector('[aria-label="已发布 Candidate"]');expect(panel?.textContent).toContain('发布前线上');expect(panel?.querySelector('.ui-rel-side:first-child')?.textContent).toContain('12');expect(panel?.querySelector('.ui-rel-side.to')?.textContent).toContain('24');expect([...document.querySelectorAll('button')].find(b=>b.textContent==='确认发布')).toBeUndefined();
  await click('查看发布快照');expect(document.querySelector('[role=dialog]')?.textContent).toContain('完整配置与发布快照');await click('关闭');await click('回滚至此版本');expect(document.querySelector('.confirm-dialog')?.textContent).toContain('确认回滚');await click('取消');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });
 it('does not label a new recommendation released merely because another version is online',async()=>{
  await mount(<VersionsPage data={{evaluation:baseline,versions:[{...initial,provenance:'published',snapshot:{candidate_id:'older',human_release:{decision:'approved'}}}],optimization}}/>);
- expect(document.querySelector('[aria-label="待发布方案"]')).not.toBeNull();expect(document.querySelector<HTMLButtonElement>('.ui-rel-actions .primary')?.disabled).toBe(false);
+ expect(document.querySelector('[aria-label="待发布 Candidate"]')).not.toBeNull();expect(document.querySelector<HTMLButtonElement>('.ui-rel-actions .primary')?.disabled).toBe(false);
 });
 it('compares the selected D with the saved Winner, highlights the faster Winner and opens alternative details',async()=>{
  const exp=structuredClone(sampleExperiment),d=exp.candidates.find(c=>c.reasoning.candidate_label==='D')!;
  await mount(<EvolutionPage data={{evaluation:baseline,optimization:{...exp,id:'exp',result:{report_confirmation:{winner_id:(d.reasoning as any).winner_id}},recommendation:{recommended_candidate:d.id},candidates:exp.candidates.map(c=>({...c,release_state:{human_release:c.id===d.id}}))}}}/>);await click('回归与推荐');
  expect(document.querySelector('.ui-fin')).not.toBeNull();expect(document.querySelectorAll('.ui-fin-others tbody tr')).toHaveLength(8);const rows=[...document.querySelectorAll('.ui-fin-compare tbody tr')];expect(rows.find(r=>r.firstChild?.textContent==='P99')?.querySelector('td:nth-child(2)')?.classList.contains('better')).toBe(true);expect(rows.find(r=>r.firstChild?.textContent==='答对')?.querySelector('td:nth-child(3)')?.classList.contains('better')).toBe(true);expect(document.body.textContent).toContain('人工报告确认已完成。');
- await act(async()=>document.querySelector<HTMLElement>('.ui-fin-others tbody tr')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('方案详情');await click('关闭');await click('查看发布记录');expect(location.hash).toBe('#versions');
+ await act(async()=>document.querySelector<HTMLElement>('.ui-fin-others tbody tr')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('Candidate 详情');await click('关闭');await click('查看发布记录');expect(location.hash).toBe('#versions');
 });
