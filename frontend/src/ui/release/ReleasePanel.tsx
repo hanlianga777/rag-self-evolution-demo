@@ -1,4 +1,5 @@
 import { Icon, IconLabel } from "../icons";
+import type { ReactNode } from "react";
 import { ParamChip, StatTransition, StatusBadge } from "../Primitives";
 import type { Pair } from "../overview/OverviewSummary";
 
@@ -11,13 +12,14 @@ import type { Pair } from "../overview/OverviewSummary";
 export type ReleaseParam = { label: string; value: string };
 export type ReleaseChange = { key: string; label: string; from?: string; to: string };
 
-export function ReleasePanel({ online, candidate, changes, results, steps, canRelease, onRelease, onReport, onSnapshot }: {
+export function ReleasePanel({ online, candidate, changes, results, steps, canRelease, onRelease, onReport, onSnapshot, actions }: {
   online: { name: string; params: ReleaseParam[] };
   candidate: { name: string; params: ReleaseParam[] } | null;
   changes: ReleaseChange[];
   results: { correct: Pair; total: number; newBad: number | null; gates: { passed: number; total: number } | null; p99: Pair } | null;
   steps: { reportConfirmed: boolean; eligible: { ok: boolean; items: string[] }; released: { ok: boolean; at?: string } };
   canRelease: boolean; onRelease?: () => void; onReport?: () => void; onSnapshot?: () => void;
+  actions?: ReactNode;
 }) {
   const released = steps.released.ok;
   return <section className="ui-rel" aria-label={released ? "已发布 Candidate" : "待发布 Candidate"}>
@@ -56,12 +58,13 @@ export function ReleasePanel({ online, candidate, changes, results, steps, canRe
         <li className={released ? "ok" : "next"}><i aria-hidden="true">3</i><div><strong>发布批准<Icon name="approval" size={13} className="ui-rel-lock" /></strong><small>{released ? `已发布${steps.released.at ? ` · ${steps.released.at}` : ""}` : "等待人工发布"}</small></div></li>
       </ol>
 
+    </> : <p className="ui-rel-empty">尚无保存的最终推荐 Candidate，请先完成 Agent 决策。</p>}
       <footer className="ui-rel-actions">
-        {!released && <button type="button" className="primary" disabled={!canRelease} onClick={onRelease}><Icon name="release" size={15} />确认发布</button>}
-        {released && onSnapshot && <button type="button" className="secondary" onClick={onSnapshot}>查看发布快照</button>}
-        {onReport && <button type="button" className="text-button" onClick={onReport}><Icon name="doc" size={15} />查看评测报告</button>}
+        {candidate && !released && <button type="button" className="primary" disabled={!canRelease} onClick={onRelease}><Icon name="release" size={15} />确认发布</button>}
+        {onReport && <button type="button" className="secondary" onClick={onReport}><Icon name="doc" size={15} />查看评测报告</button>}
+        {released && onSnapshot && <button type="button" className="text-button" onClick={onSnapshot}>查看发布快照</button>}
+        {actions}
         {released && <span className="ui-rel-note">如需撤回，可在下方版本历史回滚到上一个版本</span>}
       </footer>
-    </> : <p className="ui-rel-empty">尚无保存的最终推荐 Candidate，请先完成 Agent 决策。</p>}
   </section>;
 }

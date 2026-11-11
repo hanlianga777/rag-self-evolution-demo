@@ -20,7 +20,8 @@ it('preloads the light list and every case before local filtering/searching',asy
  await mount(<SavedAnswerComparison data={data} onOpenCitation={()=>{}}/>);
  expect(fetcher.mock.calls).toHaveLength(6);expect(fetcher.mock.calls.every(([p])=>/comparison-cases|\/cases\/Q0[46]/.test(p))).toBe(true);
  expect(document.querySelector('.comparison-rail')?.textContent).toContain('修好的1');
- expect(document.querySelector('.comparison-chain .ui-headline')?.textContent).toContain('Top-K 4 → 6');
+ expect(document.querySelector('.comparison-chain .ui-headline')?.textContent).toContain('放宽 Top-K 后进入上下文');
+ expect(document.querySelector('.comparison-steps')?.textContent).toContain('Top-K 4 → 6');
  expect(document.querySelector('.comparison-chain .ui-headline')?.textContent).toContain('补上要点 ①');
  expect(document.querySelectorAll('.comparison-ptable .ui-clamp')).toHaveLength(0);
  expect(document.querySelector('mark')?.textContent).toContain('只在室内');

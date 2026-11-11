@@ -27,16 +27,17 @@ export function GoldenPipeline({ total, split, steps, frozen }: {
  * ================================================================== */
 export type Topic = { name: string; chunks: number; positive: number; ablation: number; negative: number; protectedSlot?: boolean };
 
-export function KnowledgeCoverage({ topics, onOpen, slotLabel = "题位", info, hideTitle = false }: { topics: Topic[]; onOpen?: (name: string) => void; slotLabel?: string; info?: ReactNode; hideTitle?: boolean }) {
+export function KnowledgeCoverage({ topics, onOpen, slotLabel = "题位", info, note, hideTitle = false }: { topics: Topic[]; onOpen?: (name: string) => void; slotLabel?: string; info?: ReactNode; note?: string; hideTitle?: boolean }) {
   const maxChunks = Math.max(1, ...topics.map(t => t.chunks));
   const totals = topics.reduce((acc, t) => ({ chunks: acc.chunks + t.chunks, positive: acc.positive + t.positive, ablation: acc.ablation + t.ablation, negative: acc.negative + t.negative }), { chunks: 0, positive: 0, ablation: 0, negative: 0 });
   return <section className="ui-kc" aria-label="知识主题覆盖">
     <header className="ui-kc-head">
       {!hideTitle && <h3><IconLabel name="coverage">知识主题覆盖</IconLabel>{info && <HoverCard content={info}><span className="ui-kc-info" tabIndex={0} aria-label="口径说明"><Icon name="info" size={13} /></span></HoverCard>}</h3>}
-      <span className="ui-num">{topics.length} 个主题 · {totals.chunks} 个知识片段 · {slotLabel} Positive {totals.positive} / Ablation {totals.ablation} / Negative {totals.negative}</span>
+      <span className="ui-num">{topics.length} 个主题 · {totals.chunks} 个知识片段 · {slotLabel} 正向（Positive）{totals.positive} / 消融（Ablation）{totals.ablation} / 负向（Negative）{totals.negative}</span>
     </header>
+    {note && <p className="coverage-note">{note}</p>}
     <div className="ui-kc-table" role="table">
-      <div className="ui-kc-row head" role="row"><span role="columnheader">主题</span><span role="columnheader">知识片段</span><span role="columnheader">Positive</span><span role="columnheader">Ablation</span><span role="columnheader">Negative</span></div>
+      <div className="ui-kc-row head" role="row"><span role="columnheader">主题</span><span role="columnheader">知识片段</span><span role="columnheader" title="Positive">正向</span><span role="columnheader" title="Ablation">消融</span><span role="columnheader" title="Negative">负向</span></div>
       {topics.map(topic => <div key={topic.name} role="row" className={`ui-kc-row${onOpen ? " clickable" : ""}`} onClick={onOpen ? () => onOpen(topic.name) : undefined} tabIndex={onOpen ? 0 : undefined} onKeyDown={event => { if (onOpen && event.key === "Enter") onOpen(topic.name); }}>
         <span role="cell" className="ui-kc-name">{topic.name}{topic.protectedSlot && <HoverCard content="片段较少的主题也保留题位，避免冷门知识没有题考"><span className="ui-kc-tag">保底</span></HoverCard>}</span>
         <span role="cell" className="ui-kc-bar"><i style={{ width: `${topic.chunks / maxChunks * 100}%` }} /><b className="ui-num">{topic.chunks}</b></span>

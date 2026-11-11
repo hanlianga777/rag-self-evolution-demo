@@ -143,7 +143,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
       budget={Number.isFinite(budget?.used) && Number.isFinite(budget?.max) ? budget : null}
       status={{kind: currentReleased ? "released" : readyToRelease ? "pending_release" : sandboxRunning ? "running" : "waiting",
         candidate: currentReleased ? candidateName : readyToRelease ? candidateName : next[1],
-        online: currentReleased ? undefined : released ? productionName(production) : "初始配置"}}
+        online: currentReleased ? undefined : released ? productionName(production) : "Baseline（初始配置）"}}
       primaryAction={{label: primaryLabel, onClick: () => { if(currentReleased) location.hash="verification?tab=compare"; else navigate(next[2]); }}} flow={flow} />
     {turns.length > 0 && <OverviewStory turns={turns} fixed={fixed} remaining={remainingQuestionIds(experiment)?.map(shortId)} onOpenFixed={id => { location.hash = `verification?tab=compare&q=${encodeURIComponent(id)}`; }} />}
     </>}

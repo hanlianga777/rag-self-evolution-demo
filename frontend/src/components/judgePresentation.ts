@@ -2,7 +2,7 @@ type Row = Record<string, any>;
 const mark = (number: number) => number === 0 ? "（编号未知）" : number <= 20 ? String.fromCodePoint(0x2460 + number - 1) : `（${number}）`;
 
 // Read saved checks only. Never infer a verdict or an unsafe action from prose.
-export function judgePresentation(row: Row, question: Row = {}): { text: string; detail: string } {
+export function judgePresentation(row: Row, question: Row = {}): { text: string; detail: string; missingCount?: number } {
   const item = row.result || row, judge = item.judge_result || {};
   const answer = (text: string, detail = text) => ({ text, detail });
   const verdict = item.evaluation_outcome?.contract_version === 'business-vnext-1'
@@ -32,11 +32,11 @@ export function judgePresentation(row: Row, question: Row = {}): { text: string;
     .flatMap(atom => { const match = atom.atomic_id?.match(/^Q\d+-R(\d+)(?:-\d+)?$/); return match ? [Number(match[1])] : []; }))].sort((a, b) => a - b);
   const missing = numbers.length ? numbers.map(number => ({ number, text: requirements.required_checks?.find((check: Row) => check.id?.match(/-R(\d+)$/)?.[1] === String(number))?.requirement || reference[number - 1] || '要点原文未保存' }))
     : atoms.length ? [] : checks.flatMap(check => check.met === false && check.check_type !== 'negative_behavior' ? [{ number: reference.findIndex(line => line === check.requirement?.replace(/（语义等价即可）$/, '')) + 1, text: check.requirement || '要点原文未保存' }] : []);
-  if (missing.length) parts.push(missing.some(point => point.number === 0) ? `缺要点（编号未知）：${missing.map(point => point.text).join('；')}` : `缺要点 ${missing.map(point => mark(point.number)).join('')}${missing.length === 1 ? `：${missing[0].text}` : ''}`);
+  if (missing.length) parts.push(`缺要点 ${mark(missing[0].number)}：${missing[0].text}`);
   const issueNames: Record<string, string> = { contradiction: '回答含与依据矛盾的内容', unsupported: '回答含缺少依据的内容', scope: '回答未核清适用范围', forbidden_action: '回答给出了禁止的操作建议', unsafe_operation: '回答给出了不安全的操作建议' };
   parts.push(...new Set<string>((judge.issues || []).flatMap((issue: Row) => issueNames[issue.failure_kind] && !(negative && behaviorFailed && ['forbidden_action', 'unsafe_operation'].includes(issue.failure_kind)) ? [issueNames[issue.failure_kind]] : [])));
   const guard = item.programmatic_metrics?.safety_guard;
   if (guard?.status === 'confirmed_violation' && guard.findings?.[0]?.description) parts.push(`安全边界未通过：${guard.findings[0].description}`);
   const text = parts.join('；') || '具体失败原因未知：保存记录缺少可展示的逐条判定';
-  return answer(text, [...parts.filter(part => !part.startsWith('缺要点')), ...missing.map(point => `${mark(point.number)}：${point.text}`)].join('\n') || text);
+  return {text, detail: [...parts.filter(part => !part.startsWith('缺要点')), ...missing.map(point => `${mark(point.number)}：${point.text}`)].join('\n') || text, missingCount: missing.length};
 }

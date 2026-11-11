@@ -1461,7 +1461,7 @@ button { border-radius:8px; }
 .agent-secondary-actions, .golden-new-run-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 
 /* 发布组件保持原设计，在页面接入处套用总指挥的辅助动作色阶。 */
-.versions-page .ui-rel-actions .text-button { background: var(--ui-accent-tint); color: var(--ui-accent); border: 1px solid transparent; }
-.versions-page .ui-rel-actions .text-button:hover:not(:disabled) { background: #dcebfc; }
+.versions-page .ui-rel-actions .text-button { background:transparent; color:var(--ui-muted); border:0; }
+.versions-page .ui-rel-actions .text-button:hover:not(:disabled) { color:var(--ui-ink); }
 
 .drawer .generation-progress:empty { display: none; }

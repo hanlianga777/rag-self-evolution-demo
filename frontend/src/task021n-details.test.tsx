@@ -28,7 +28,7 @@ it('shows a short readable excerpt and only the recalled evidence movement',()=>
 });
 it('describes the cutoff change without repeating all ranks',()=>{
  const result=explanation(row({candidate_hit:true,candidate_rank:10,rerank_rank:5,final_rank:null}),row({candidate_hit:true,candidate_rank:10,rerank_rank:6,final_rank:6}),{top_k:4},{top_k:6},[]);
- expect(result.steps.find(s=>s.label==='关键证据位置')?.text).toContain('Rerank 第 5 位：优化前被截掉，优化后进入 Top-K 第 6 位');
+ expect(result.steps.find(s=>s.label==='关键证据位置')?.text).toContain('优化前 Rerank 第 5 位，被 Top-K 截掉；优化后 Rerank 第 6 位，进入 Top-K 第 6 位');
  expect(result.steps.find(s=>s.label==='关键证据位置')?.text).not.toContain('召回第');
 });
 it('uses a plain fallback when structured evidence contains no readable sentence',()=>{

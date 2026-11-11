@@ -11,6 +11,7 @@ export type CategoryScore = { label: string; correct: number; total: number };
 export type BaselineBadCase = { id: string; question?: string; layer: string };
 
 export function BaselineBreakdown({ categories, badCases, onOpen }: { categories: CategoryScore[]; badCases: BaselineBadCase[]; onOpen?: (id: string) => void }) {
+  const weakest = categories.filter(item => item.total > 0).sort((a, b) => a.correct / a.total - b.correct / b.total)[0];
   return <div className="ui-blb">
     <section className="ui-blb-card" aria-label="按题型答对">
       <h3><IconLabel name="golden">按题型答对</IconLabel></h3>
@@ -24,6 +25,7 @@ export function BaselineBreakdown({ categories, badCases, onOpen }: { categories
           </li>;
         })}
       </ul>
+      {weakest && <p className="ui-blb-conclusion">{weakest.label.replace(/（.*$/, '')}最弱：{weakest.correct} / {weakest.total}，{badCases.length} 个 Bad Case 中有 {weakest.total - weakest.correct} 个在这里</p>}
     </section>
     <section className="ui-blb-card" aria-label="Bad Case">
       <h3><IconLabel name="bad">{badCases.length} 个 Bad Case</IconLabel></h3>

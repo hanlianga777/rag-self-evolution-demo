@@ -227,7 +227,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
           const item = caseData(row), category = item.diagnostic_view?.diagnosis_category;
           return { id: productQuestionLabel(row), question: item.question, layer: category === '检索层问题' ? '检索层' : category === '生成层问题' ? '生成层' : category || '未知' };
         })} onOpen={id => { setTab('cases'); setSelectedCase(businessCases.find(row => productQuestionLabel(row) === id) || null); }} />}
-        <StoryDisclosure label="更多指标">
+        <StoryDisclosure className="ui-card baseline-more" label={<>更多指标 <span className="history-count">3 组</span></>}>
           <Metric label="综合分" value={format(result.overall_score)} note="用于比较整体表现"/>
           <ProductDiagnostics diagnostics={run.product_diagnostics} judgeThinking={judgeThinking} />
         <Section title="评测信息">

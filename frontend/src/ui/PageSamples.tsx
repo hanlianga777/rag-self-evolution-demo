@@ -36,7 +36,7 @@ export function PageSamples() {
       <OverviewSummary
         correct={{ from: 44, to: 48 }} total={50} fixedCount={4} newBadCount={0} gates={{ passed: 11, total: 11 }}
         p99={{ from: 42.2, to: 36.7 }} p50={{ from: 16.7, to: 8.1 }} safeRefusal={{ from: 95, to: 100 }} budget={{ used: 10, max: 12 }}
-        status={{ kind: "pending_release", candidate: "Candidate D 推荐待发布", online: "初始配置" }}
+        status={{ kind: "pending_release", candidate: "Candidate D 推荐待发布", online: "Baseline（初始配置）" }}
         primaryAction={{ label: "去发布", onClick: () => {} }}
         flow={[
           { label: "知识库", fact: "4 份文档已索引", tips: ["9 个知识主题", "Parent-Child 分块"] },
@@ -188,7 +188,7 @@ export function PageSamples() {
     <section>
       <h2 className="ui-sample-title">发布 · 发布前</h2>
       <ReleasePanel
-        online={{ name: "初始配置", params: [{ label: "Candidate K", value: "12" }, { label: "Top-K", value: "4" }, { label: "Thinking", value: "Max" }] }}
+        online={{ name: "Baseline（初始配置）", params: [{ label: "Candidate K", value: "12" }, { label: "Top-K", value: "4" }, { label: "Thinking", value: "Max" }] }}
         candidate={{ name: "Candidate D", params: [{ label: "Candidate K", value: "24" }, { label: "Top-K", value: "6" }, { label: "Thinking", value: "High" }] }}
         changes={[{ key: "candidate_k", label: "Candidate K", from: "12", to: "24" }, { key: "top_k", label: "Top-K", from: "4", to: "6" }, { key: "thinking", label: "Thinking", from: "Max", to: "High" }]}
         results={{ correct: { from: 44, to: 48 }, total: 50, newBad: 0, gates: { passed: 11, total: 11 }, p99: { from: 42.2, to: 36.7 } }}
@@ -197,7 +197,7 @@ export function PageSamples() {
       <div style={{ height: 16 }} />
       <h2 className="ui-sample-title">发布 · 发布后</h2>
       <ReleasePanel
-        online={{ name: "初始配置", params: [{ label: "Candidate K", value: "12" }, { label: "Top-K", value: "4" }, { label: "Thinking", value: "Max" }] }}
+        online={{ name: "Baseline（初始配置）", params: [{ label: "Candidate K", value: "12" }, { label: "Top-K", value: "4" }, { label: "Thinking", value: "Max" }] }}
         candidate={{ name: "Candidate D", params: [{ label: "Candidate K", value: "24" }, { label: "Top-K", value: "6" }, { label: "Thinking", value: "High" }] }}
         changes={[{ key: "candidate_k", label: "Candidate K", from: "12", to: "24" }, { key: "top_k", label: "Top-K", from: "4", to: "6" }, { key: "thinking", label: "Thinking", from: "Max", to: "High" }]}
         results={{ correct: { from: 44, to: 48 }, total: 50, newBad: 0, gates: { passed: 11, total: 11 }, p99: { from: 42.2, to: 36.7 } }}

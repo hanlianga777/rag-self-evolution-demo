@@ -36,7 +36,7 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
     const characters=Array.from(cleaned),excerpt=/[\u4e00-\u9fff]{4}/.test(cleaned) && !/[={}\[\]]/.test(cleaned)?(characters.length>24?characters.slice(0,23).join('')+'…':cleaned):'关键说明';
     const {a,b}=pair;
     let movement:string;
-    if(expanded)movement=`Rerank 第 ${a.rerank_rank} 位：优化前被截掉，优化后进入 Top-K 第 ${b.final_rank} 位`;
+    if(expanded)movement=`优化前 Rerank 第 ${a.rerank_rank} 位，被 Top-K 截掉；优化后 Rerank ${b.rerank_rank != null ? `第 ${b.rerank_rank} 位` : '位置未知'}，进入 Top-K 第 ${b.final_rank} 位`;
     else if(recalled)movement=`优化前没进候选，优化后${b.final_rank!=null?`进入 Top-K 第 ${b.final_rank} 位`:'进入候选'}`;
     else {
       const stage=a.final_rank!==b.final_rank?'final_rank':a.rerank_rank!==b.rerank_rank?'rerank_rank':'candidate_rank';
@@ -48,7 +48,14 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
   }
   if(before?.test_category==='negative' && typeof before.passed==='boolean' && typeof after.passed==='boolean')steps.push({label:'回答结果',text:`优化前${before.passed?'正确拒答':'拒答判定未通过'}，优化后${after.passed?'正确拒答':'拒答判定未通过'}`});
   else if(points.some(point=>point.fresh))steps.push({label:'回答结果',text:`补上了必答要点 ${points.filter(point=>point.fresh).map(point=>`${String.fromCodePoint(0x2460+point.number-1)} ${point.text}`).join('；')}`});
-  return {key:change ? key : undefined,steps};
+  const added = points.filter(point => point.fresh).map(point => String.fromCodePoint(0x2460 + point.number - 1)).join('、');
+  const outcome = added ? `补上要点 ${added}` : '满足本题保存的判定要求';
+  const headline = before?.passed === false && after?.passed === true
+    ? change && expanded ? `关键证据被截掉 → 放宽 Top-K 后进入上下文 → ${outcome}`
+      : change && recalled ? `关键证据未召回 → 扩大 Candidate K 后进入上下文 → ${outcome}`
+      : `判定未通过 → ${outcome}`
+    : steps.map(step => step.text.replace(/^“.*?”：/, '')).join('；') || '保存记录未提供变化依据。';
+  return {key:change ? key : undefined,steps,headline};
 }
 
 export type MetricRow = {label:string;before:number|null;after:number|null;beforeText:string;afterText:string;delta:string;scale:number;better:'before'|'after'|null};

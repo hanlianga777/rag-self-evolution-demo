@@ -20,10 +20,10 @@ it('builds missing points from saved judgments, preserves grouped numbering, and
   const before = JSON.stringify(item);
   expect(coreEvidence(item)).toBe('缺要点 ①：只在室内存放设备');
   const multi = { ...item, judge_result: { ...item.judge_result, atomic_results: [{ atomic_id: 'Q04-R1-1', state: 'NOT_MET' }, { atomic_id: 'Q04-R1-2', state: 'NOT_MET' }, { atomic_id: 'Q04-R3', state: 'NOT_MET' }] } };
-  expect(coreEvidence(multi)).toBe('缺要点 ①③');
+  expect(coreEvidence(multi)).toBe('缺要点 ①：只在室内存放设备');
   await mount(<BadCaseOverview rows={[multi]} showJudgeReason onSelect={() => {}} />);
   const cell = document.querySelector('.diagnosis-list td:nth-child(4)')!;
-  expect(cell.textContent).toContain('缺要点 ①③');
+  expect(cell.textContent).toContain('缺要点 ①：只在室内存放设备');
   expect(cell.querySelector('[title]')?.getAttribute('title')).toContain('③：每月充电');
   expect(cell.textContent).not.toContain('Required');
   expect(JSON.stringify(item)).toBe(before);

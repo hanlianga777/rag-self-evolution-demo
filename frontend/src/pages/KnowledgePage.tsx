@@ -26,6 +26,15 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
   const [selected, setSelected] = useState<any>();
   const [view, setView] = useState("assets");
   const [knowledge, setKnowledge] = useState<any>(retainedPipeline?.knowledge || data.overview?.knowledge || {});
+  const snapshotScope = JSON.stringify(data.workspace?.current_corpus_fingerprint);
+  const snapshotsPath = '/api/governance/snapshots?light=true';
+  const [snapshots, setSnapshots] = useState<any[]>(() => goldenCached<any[]>(snapshotScope, snapshotsPath) || []);
+  useEffect(() => {
+    let cancelled = false;
+    setSnapshots(goldenCached<any[]>(snapshotScope, snapshotsPath) || []);
+    if (data.workspace?.current_golden_id) void goldenFetch<any[]>(snapshotScope, snapshotsPath).then(rows => { if (!cancelled) setSnapshots(rows); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [snapshotScope, data.workspace?.current_golden_id]);
   const [clusterId, setClusterId] = useState<string>();
   const [clusterDetail, setCluster] = useState<any>();
   const cluster = clusterDetail || (clusterId ? cachedJson<any>(`/api/knowledge/clusters/${clusterId}`) : undefined);
@@ -112,6 +121,9 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
   }, [topicKey, pagesWarming]);
   const slotTotal = clusters.reduce((sum: number, item: any) => sum + ["positive", "ablation", "negative"].reduce((n, key) => n + (item.quotas?.[key] ?? 0), 0), 0);
   const topicName = (item: any) => item.semantic_label || item.label || item.cluster_id;
+  const golden = snapshots.find(row => row.id === data.workspace?.current_golden_id)?.snapshot || {};
+  const frozenCount = golden.question_ids?.length ?? data.overview?.dataset?.total ?? '未知';
+  const coverageNote = `规划 ${slotTotal} 个候选题位；${golden.reviewed_import ? `当前 ${frozenCount} 题由人工审核 CSV 导入后冻结` : `当前冻结考卷 ${frozenCount} 题，题位规划与冻结题量分别统计`}`;
   const topics = clusters.map((item: any) => ({ name: topicName(item), chunks: item.size, ...item.quotas,
     protectedSlot: (item.protected_slot ?? item.small_topic_protected) === true,
   }));
@@ -134,8 +146,8 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
     {view === "technical" ? <KnowledgeDiagrams kind="knowledge" active={!!knowledge.identity} /> : <>
     {(!knowledge.identity || knowledge.operation?.status === "failed") && <p className="knowledge-notice">{knowledge.identity ? "知识资产更新失败，保留上一个有效版本。" : "当前知识资产属于 Legacy。新 Knowledge Pipeline 待重建；下方策略展示目标配置。"}{knowledge.operation?.error && ` ${knowledge.operation.error}`}</p>}
     <section className="panel"><KnowledgePipeline steps={steps} online={["命中 Child", "补齐 Parent", "回答上下文", "引用回溯到原页"]} action={<button className="text-button" disabled={!knowledge.sample_children?.length} onClick={() => openChild(knowledge.sample_children[0])}>查看分块示例</button>} /></section>
-    <details open className="ui-card story-disclosure"><summary><span className="coverage-title">知识主题覆盖 · {clusters.length} 个主题 <HoverCard content={`按知识片段自动聚成 ${clusters.length} 个主题，再按主题规划 ${slotTotal} 个题位；最终从中选出 ${data.overview?.dataset?.total ?? "未知"} 题冻结为 Golden`}><span className="ui-kc-info" tabIndex={0} aria-label="口径说明"><Icon name="info" size={13} /></span></HoverCard></span></summary>
-    {operation?.status === "running" || !knowledge.coverage ? <p className="pending-note">{operation?.status === "running" || knowledge.coverage_status === "calculating" ? "覆盖规划 重新计算中" : "知识主题覆盖待更新"}</p> : clusters.every((item: any) => typeof item.size === "number" && ["positive", "ablation", "negative"].every(key => typeof item.quotas?.[key] === "number")) ? <KnowledgeCoverage hideTitle topics={topics} slotLabel="规划题位" onOpen={name => setClusterId(clusters.find((item: any) => topicName(item) === name)?.cluster_id)} /> : <div className="cluster-scroll">{clusters.map((item: any) => <button className="cluster-card" key={item.cluster_id} onClick={() => setClusterId(item.cluster_id)}><strong>{topicName(item)}</strong><small>{item.size ?? "未知"} 个知识片段</small><small>三类规划题位未完整记录</small></button>)}</div>}
+    <details open className="ui-card story-disclosure knowledge-coverage"><summary><span className="coverage-title"><IconLabel name="coverage">知识主题覆盖 · {clusters.length} 个主题</IconLabel> <HoverCard content={coverageNote}><span className="ui-kc-info" tabIndex={0} aria-label="口径说明"><Icon name="info" size={13} /></span></HoverCard></span></summary>
+    {operation?.status === "running" || !knowledge.coverage ? <p className="pending-note">{operation?.status === "running" || knowledge.coverage_status === "calculating" ? "覆盖规划 重新计算中" : "知识主题覆盖待更新"}</p> : clusters.every((item: any) => typeof item.size === "number" && ["positive", "ablation", "negative"].every(key => typeof item.quotas?.[key] === "number")) ? <KnowledgeCoverage hideTitle topics={topics} note={coverageNote} slotLabel="规划题位" onOpen={name => setClusterId(clusters.find((item: any) => topicName(item) === name)?.cluster_id)} /> : <div className="cluster-scroll">{clusters.map((item: any) => <button className="cluster-card" key={item.cluster_id} onClick={() => setClusterId(item.cluster_id)}><strong>{topicName(item)}</strong><small>{item.size ?? "未知"} 个知识片段</small><small>三类规划题位未完整记录</small></button>)}</div>}
     </details>
 
     <Section title={<IconLabel name="doc">文档列表</IconLabel>} action={<div className="header-actions"><button className="secondary" disabled={busy} onClick={() => setModelAction({ title: "确认重建 Knowledge Pipeline", url: "/api/knowledge/rebuild", method: "POST" })}>重建 Knowledge Pipeline</button><label className="search"><Search size={15} /><input aria-label="搜索文档" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索文档" /></label></div>}><LocalPagination {...documentPagination}/><div className="table-scroll"><DataTable><thead><tr><th>文档名</th><th className="num">页数</th><th className="num">Parent Chunks</th><th className="num">Child Chunks</th><th>解析状态</th><th>索引状态</th><th>操作</th></tr></thead><tbody>{documentPagination.rows.map((doc: any) => <tr key={doc.id} {...hover([`/api/documents/${doc.id}`])} role="button" tabIndex={0} onClick={() => open(doc)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); open(doc); } }}><td><button className="text-button detail-button" onClick={() => open(doc)}><FileText size={15} />{doc.name}</button></td><td className="num">{doc.pages ?? "待解析"}</td><td className="num">{doc.parent_chunks ?? "—"}</td><td className="num">{doc.chunks}</td><td className="muted">{doc.parse_status ? displayText(doc.parse_status) : doc.status === "Indexed" ? "已解析" : doc.status ? displayText(doc.status) : "待解析"}</td><td><Status value={doc.index_status || doc.status} /></td><td><div className="header-actions"><button className="text-button" onClick={event => { event.stopPropagation(); open(doc); }}>查看</button><button className="text-button quiet-danger document-delete" disabled={busy} onClick={event => { event.stopPropagation(); setModelAction({ title: `确认删除 ${doc.name}`, url: `/api/documents/${doc.id}`, method: "DELETE" }); }} onKeyDown={event => event.stopPropagation()}>删除</button></div></td></tr>)}{!documents.length && <tr><td colSpan={7}><EmptyState title="还没有匹配的文档">添加 PDF 文档后可查看解析和索引结果。</EmptyState></td></tr>}</tbody></DataTable></div></Section>

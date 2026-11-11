@@ -51,7 +51,7 @@ it('puts only the saved recommendation first, shows unmet checks, and keeps publ
  await mount(<VersionsPage data={{evaluation:baseline,versions:[{id:'v',status:'active',provenance:'bootstrap',config:{top_k:4}}],optimization:{candidates:[candidate(1,'A'),c],recommendation:{recommended_candidate:c.id},result:{report_confirmation:{winner_id:c.id}}}}}/>);
  expect(document.querySelector('.page-content .ui-rel h2')?.textContent).toBe('待发布 Candidate');
  expect(document.querySelector('.ui-rel')?.textContent).not.toContain('Round 1');
- expect(document.querySelector('.ui-rel')?.textContent).toContain('新增 1 个 Bad Case');
+ expect(document.querySelector('.ui-rel')?.textContent).toContain('新增 Bad Case 1');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent==='确认发布')?.disabled).toBe(true);
 });
 it('keeps internal IDs, conclusion labels, English states and forbidden narratives off the story',()=>{

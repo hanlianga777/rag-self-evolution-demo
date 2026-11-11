@@ -20,12 +20,12 @@ it('uses saved Baseline shares and gates and keeps the original detailed timing 
  await mount(<EvaluationPage data={{evaluation:baseline}}/>);
  const hero=document.querySelector('[aria-label="Baseline 报告摘要"]');expect(hero).not.toBeNull();expect(hero?.textContent).toContain('11 项 Hard Gate 全部通过，仍有 6 个 Bad Case');expect(hero?.textContent).toContain('44 / 50');expect(hero?.textContent).toContain('Max');expect(hero?.textContent).toContain('P50 16.7 秒 · P99 42.2 秒');expect(hero?.textContent).toContain('生成层问题 1');
  expect(document.querySelector('.ui-bl-bar')?.getAttribute('aria-label')).toContain('回答生成 95.8%');
- const more=[...document.querySelectorAll('details')].find(d=>d.querySelector('summary')?.textContent==='更多指标');expect(more).toBeDefined();expect(more?.open).toBe(false);expect(more?.textContent).toContain('耗时拆解');expect(more?.textContent).toContain('Recall@K');expect(more?.textContent).toContain('综合分');
+ const more=[...document.querySelectorAll('details')].find(d=>d.querySelector('summary')?.textContent?.includes('更多指标'));expect(more).toBeDefined();expect(more?.open).toBe(false);expect(more?.textContent).toContain('耗时拆解');expect(more?.textContent).toContain('Recall@K');expect(more?.textContent).toContain('综合分');
  await act(async()=>more!.querySelector('summary')!.click());await click('展开明细');expect(more?.textContent).toContain('BM25');
 });
 it('opens the existing release confirmation and cancelling makes no write request',async()=>{
  await mount(<VersionsPage data={{evaluation:baseline,versions:[initial],optimization}}/>);
- const panel=document.querySelector('[aria-label="待发布 Candidate"]');expect(panel).not.toBeNull();expect(panel?.textContent).toContain('44');expect(panel?.textContent).toContain('48');expect(panel?.textContent).toContain('修好 4 个原 Bad Case');expect(panel?.querySelectorAll('.ui-rel-steps li')).toHaveLength(3);
+ const panel=document.querySelector('[aria-label="待发布 Candidate"]');expect(panel).not.toBeNull();expect(panel?.textContent).toContain('44');expect(panel?.textContent).toContain('48');expect(panel?.querySelector('.ui-rel-steps li:nth-child(2)')?.textContent).toContain('Hard Gate 11/11 · 新增 Bad Case 0');expect(panel?.querySelectorAll('.ui-rel-steps li')).toHaveLength(3);
  await click('确认发布');expect(document.querySelector('.confirm-dialog')?.textContent).toContain('发布确认');await click('取消');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });
 it('uses the saved previous configuration after release and preserves snapshot, history and rollback controls',async()=>{

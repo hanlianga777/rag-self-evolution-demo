@@ -6,7 +6,7 @@ import { StatTransition, StatusBadge, type StatusKind } from "../Primitives";
  * 概览 →「项目概览」首屏。
  * - 主成果：答对 from → to（最大字号），下方三枚事实：修好 N、新增 Bad Case 0、Hard Gate x/y；
  * - 次要指标：P99、P50、安全拒答率、评测预算；
- * - 一条真实状态：Candidate D 推荐待发布 ｜ 当前线上：初始配置（状态由调用方从同一份线上版本数据算出，不写死）；
+ * - 一条真实状态：Candidate D 推荐待发布 ｜ 当前线上：Baseline（初始配置）（状态由调用方从同一份线上版本数据算出，不写死）；
  * - 流程条：6 步，每步只写一个事实；悬停看补充；点击跳转。
  */
 export type FlowStep = { label: string; fact: string; tips?: string[]; onClick?: () => void; icon?: IconName };
