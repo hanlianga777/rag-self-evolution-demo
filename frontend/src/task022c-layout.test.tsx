@@ -23,6 +23,7 @@ it('puts the saved decision once above equal comparison cards and collapses caus
  const causes=document.querySelector('details.d-result-causes') as HTMLDetailsElement;
  expect(causes).not.toBeNull();expect(causes.open).toBe(false);expect(causes.closest('.d-result-comparison')).toBeNull();
  expect(document.querySelectorAll('.d-result-conclusion')).toHaveLength(1);
+ expect(document.querySelector('.d-result-conclusion .ui-q')).toBeNull();
 });
 it('keeps candidate fields uniform and exposes complete risk prose without the question-count prefix',async()=>{
  const risks=[{question_ids:['Q04'],reason:'安全风险'},{question_ids:['Q06'],reason:'延迟风险'},{question_ids:['Q08'],reason:'受保护题风险'}];

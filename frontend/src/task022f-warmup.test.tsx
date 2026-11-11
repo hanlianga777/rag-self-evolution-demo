@@ -4,9 +4,9 @@ import {createRoot} from 'react-dom/client';
 import {expect,it,vi} from 'vitest';
 import App from './App';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
-it('warms Golden and complete Before/After on overview idle time using only GETs, then opens both without waiting for revalidation',async()=>{
+it.each(['overview','knowledge','evolution'])('warms Golden and complete Before/After on overview idle time using only GETs, then opens both without waiting for revalidation (%s)',async(start)=>{
  const {invalidateReads}=await import('./api');const {invalidateGolden}=await import('./goldenCache');invalidateReads();invalidateGolden();
- location.hash='#overview';sessionStorage.clear();
+ location.hash=`#${start}`;sessionStorage.clear();
  const reads:string[]=[],writes:string[]=[];let block=false;
  const workspace={current_baseline_id:'base',current_golden_id:'golden',current_experiment_id:'exp',current_corpus_fingerprint:'corpus'};
  const candidate={id:'D',status:'evaluated',reasoning:{candidate_label:'D'},result:{evaluation_complete:true,total:1,evaluation_run_id:'after'}};
@@ -16,7 +16,7 @@ it('warms Golden and complete Before/After on overview idle time using only GETs
   const url=new URL(input),p=url.pathname;reads.push(p+url.search);if(init?.method && init.method!=='GET')writes.push(p);
   if(block)return new Promise<Response>(()=>{});
   const isBefore=p.includes('/base/');
-  const value=p==='/api/workspace'?workspace:p==='/api/documents' || p==='/api/bad-cases'?[]:p==='/api/optimization'?experiment:p==='/api/evaluation'?{id:'base',status:'completed'}:p==='/api/versions'?[]:p.includes('generation-runs')?[{id:'run',status:'completed',profile:{name:'mini',expected_count:1},question_ids:['Q04'],artifacts:{}}]:p.includes('/snapshots')?[{id:'golden',snapshot:{generation_run_id:'run',question_ids:['Q04'],questions:[question]}}]:p.includes('/candidates')?{rows:[question],total:1,candidate_index:[question],data_version:'v1'}:p.endsWith('/comparison-cases')?{id:isBefore?'base':'after',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'same'},cases:[{question_id:'Q04',question:'保存的问题',passed:!isBefore}]}:p.includes('/cases/')?{status:'completed',case:{question_id:'Q04',passed:!isBefore,model_answer:'已保存回答'}}:{};
+  const value=p==='/api/workspace'?workspace:p==='/api/documents' || p==='/api/bad-cases'?[]:p==='/api/optimization'?experiment:p==='/api/evaluation'?{id:'base',status:'completed'}:p==='/api/versions'?[]:p.includes('generation-runs')?[{id:'run',status:'completed',profile:{name:'mini',expected_count:1},question_ids:['Q04'],artifacts:{}}]:p.includes('/snapshots')?[{id:'golden',snapshot:{generation_run_id:'run',question_ids:['Q04'],questions:[question]}}]:p.includes('/candidates')?{rows:[question],total:1,candidate_index:[question],data_version:'v1'}:p==='/api/evaluations/base'?{id:'base',status:'completed',dataset_version_id:'golden',cases:[]}:p.endsWith('/comparison-cases')?{id:isBefore?'base':'after',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'same'},cases:[{question_id:'Q04',question:'保存的问题',passed:!isBefore}]}:p.includes('/cases/')?{status:'completed',case:{question_id:'Q04',passed:!isBefore,model_answer:'已保存回答'}}:{};
   return new Response(JSON.stringify(value));
  }));
  const node=document.body.appendChild(document.createElement('div')),root=createRoot(node);
@@ -56,4 +56,12 @@ it('loads a clicked destination immediately while a background read is pending a
   act(()=>root.unmount());mounted=false;const count=reads.length;
   await act(async()=>{release();await new Promise(r=>setTimeout(r,150));});expect(reads).toHaveLength(count);
  }finally{release();if(mounted)act(()=>root.unmount());node.remove();location.hash='';vi.unstubAllGlobals();invalidateReads();invalidateGolden();}
+});
+it('warms saved Baseline cases into the page input even when its summary already has diagnostics',async()=>{
+ const {warmPageData}=await import('./pageWarmup');
+ const {invalidateReads}=await import('./api');
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({id:'base',status:'completed',cases:[{question_id:'Q04'}],product_diagnostics:{saved:true}}))));
+ const data:any={evaluation:{id:'base',status:'completed',product_diagnostics:{summary:true}}};
+ try {await warmPageData('evaluation',data);expect(data.evaluation.cases?.[0]?.question_id).toBe('Q04');}
+ finally {invalidateReads();vi.unstubAllGlobals();}
 });

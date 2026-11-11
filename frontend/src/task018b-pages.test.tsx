@@ -9,14 +9,16 @@ import { VersionsPage } from './pages/VersionsPage';
 let root: ReturnType<typeof createRoot>;
 const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));};
 afterEach(()=>{if(root)act(()=>root.unmount());vi.unstubAllGlobals();document.body.innerHTML='';});
-it('places real coverage first, totals its quotas, and restores the document delete request',async()=>{
+it('places processing before expanded coverage, keeps one title, and restores document deletion',async()=>{
  const changed=vi.fn(),knowledge={identity:{corpus_snapshot_id:'fixture'},coverage:{clusters:[{cluster_id:'T1',semantic_label:'设备维护',size:7,quotas:{positive:2,ablation:1,negative:3}}]}};
  const fetcher=vi.fn(async(_url:string,init?:RequestInit)=>new Response(JSON.stringify(init?.method==='DELETE'?{id:'operation',status:'completed'}:{knowledge,index:{}})));
  vi.stubGlobal('fetch',fetcher);
  await mount(<KnowledgePage data={{documents:[{id:'D1',name:'设备手册.pdf',chunks:7,status:'Indexed'}]}} onChanged={changed}/>);
- expect(document.querySelector('.page-content > details:first-child .ui-kc')).not.toBeNull();
- expect(document.querySelector<HTMLDetailsElement>('.page-content > details:first-child')?.open).toBe(true);
- expect(document.querySelector('.ui-kc h3')?.textContent).toBe('知识主题覆盖');
+ expect(document.querySelector('.page-content > section:first-child .ui-kp')).not.toBeNull();
+ expect(document.querySelector('.page-content > details .ui-kc')).not.toBeNull();
+ expect(document.querySelector<HTMLDetailsElement>('.page-content > details')?.open).toBe(true);
+ expect(document.querySelector('.ui-kc h3')).toBeNull();
+ expect(document.querySelector('.page-content > details > summary [aria-label="口径说明"]')).not.toBeNull();
  expect(document.querySelector('.ui-kc-head')?.textContent).toContain('Positive 2 / Ablation 1 / Negative 3');
  const button=[...document.querySelectorAll('button')].find(b=>b.textContent==='删除')!;
  expect(button).toBeDefined();

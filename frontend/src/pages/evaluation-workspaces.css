@@ -363,3 +363,12 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 .evolution-page .regression-limit-note { font-size:12px; color:var(--ui-muted); margin:8px 0 16px; }
 .evolution-page .regression-summary-table th { white-space:nowrap; }
 .evolution-page .ui-fin-compare td small { display:inline-block; margin-left:12px; font-size:12px; font-weight:400; }
+
+.chat-example > strong { width:100%; }
+.chat-example-skeleton { display:grid; gap:8px; padding:4px 0; }
+.chat-example-skeleton > span { height:10px; border-radius:4px; background:var(--line); opacity:.55; }
+.chat-example-skeleton > span:last-child { width:65%; }
+.chat-examples-unavailable { color:var(--muted); font-size:12px; }
+
+.knowledge-page .coverage-title { display:inline-flex; align-items:center; gap:8px; }
+.knowledge-page .coverage-title svg { transform:none; }

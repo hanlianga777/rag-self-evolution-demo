@@ -64,10 +64,11 @@ export default function App() {
   const prefetched = useRef(new Map<Page, Promise<void>>());
   const latestPages = useRef(pages); latestPages.current = pages;
   const prefetch = useCallback((target: Page) => {
-    if (target !== "overview") void pageModules[target]().catch(()=>{});
+    const module = target !== "overview" ? pageModules[target]() : Promise.resolve();
+    void module.catch(()=>{});
     if (latestPages.current[target]) return Promise.resolve();
     if (!prefetched.current.has(target)) prefetched.current.set(target, loadAppData(true, target).then(async next => {
-      await warmPageData(target, next);
+      await Promise.all([module, warmPageData(target, next)]);
       setPages(previous => {
         const current = Object.values(previous)[0];
         if (previous[target] || current && identityKey(current.workspace) !== identityKey(next.workspace)) return previous;
@@ -78,20 +79,14 @@ export default function App() {
   }, []);
   const workspaceIdentity = data ? identityKey(data.workspace) : '';
   useEffect(() => {
-    if (!workspaceIdentity || !pages.overview) return;
-    let cancelled = false, cancelIdle = () => {};
-    const queue = [...warmupRoute];
-    const next = () => { cancelIdle = onIdle(async () => {
+    if (!workspaceIdentity) return;
+    let cancelled = false;
+    const cancelIdle = onIdle(async () => {
       await foreground.current;
-      if (cancelled) return;
-      const target = queue.shift();
-      if (!target) return;
-      await prefetch(target);
-      if (!cancelled) next();
-    }); };
-    next();
+      if (!cancelled) await Promise.all(warmupRoute.map(target => prefetch(target)));
+    });
     return () => { cancelled = true; cancelIdle(); };
-  }, [workspaceIdentity, !!pages.overview, prefetch]);
+  }, [workspaceIdentity, prefetch]);
   const navigate = (next: Page) => { void prefetch(next); if (location.hash !== `#${next}`) location.hash = next; setPage(next); setMenuOpen(false); };
   const openCitation = (citation: Citation) => { setOpenedDocument({ citation }); navigate("knowledge"); };
   const skeleton = <PageShell className="page page-loading" header={<div className="page-title"><h1>{navigation.find(item=>item.id===page)?.label}</h1></div>}><div className="golden-skeleton" role="status" aria-label="正在加载页面内容">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div></PageShell>;

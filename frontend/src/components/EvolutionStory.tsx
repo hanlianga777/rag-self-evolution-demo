@@ -269,7 +269,7 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false,onRep
       const chip = <ParamChip label={storyParameterNames[key] || key} from={paramValue(key, evaluation.config?.[key])} to={paramValue(key, value)} keyParam={key === 'top_k' && winner?.config?.top_k !== d.config?.top_k} keyLabel="唯一新增" />;
       return key === 'top_k' && value === 6 && topKEvidence ? <HoverCard key={key} content={topKEvidence}><span tabIndex={0}>{chip}</span></HoverCard> : <span key={key}>{chip}</span>;
     })}</div>}
-    {decision && <p className="ui-headline d-result-conclusion"><StoryText value={decision} evaluation={evaluation} badCases={badCases}/></p>}
+    {decision && <p className="ui-headline d-result-conclusion">{storyText(decision)}</p>}
     <div className="ui-body-muted" role="status"><ClampText lines={2} text={agentDisplayText(`${completeResult(d) ? 'Agent 当时的预测：' : ''}${reason || '未保存说明'}`)}/></div>
     {!d && dProgressLabel(experiment)==='Agent 判断不做 D' && <p className="ui-headline d-result-conclusion"><StoryText value={recommendationReason(experiment)} evaluation={evaluation} badCases={badCases}/></p>}
     </section>{completeResult(d) && <DResultStory experiment={experiment} evaluation={evaluation} badCases={badCases}/>} {!compact && <div className="d-story-footer"><details className="story-disclosure"><summary>更多 · 剩余问题、采纳理由与副作用（{facts.remaining_failures?.length ?? 0}）</summary><div className="d-story-grid">

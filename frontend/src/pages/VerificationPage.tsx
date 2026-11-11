@@ -81,23 +81,27 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
   };
   const exampleBaseline = data.evaluation;
   const exampleBaselineId = exampleBaseline?.id;
-  const [exampleRun, setExampleRun] = useState<any>(null);
+  const [exampleRun, setExampleRun] = useState<any>(() => exampleBaselineId ? cachedJson(`/api/evaluations/${encodeURIComponent(exampleBaselineId)}`) || null : null);
+  const [exampleFailureId, setExampleFailureId] = useState<string>();
   useEffect(() => {
     let cancelled = false;
     if (tab !== "qa" || !exampleBaselineId || exampleBaseline.status !== "completed" || Array.isArray(exampleBaseline.cases)) return;
+    setExampleFailureId(undefined);
     void getJson<any>(`/api/evaluations/${encodeURIComponent(exampleBaselineId)}`).then(run => {
-      if (!cancelled && run.id === exampleBaselineId) setExampleRun(run);
-    }).catch(() => { /* Keep unavailable examples empty; never invent a question. */ });
+      if (run.id !== exampleBaselineId) throw new Error("示例身份不匹配");
+      if (!cancelled) setExampleRun(run);
+    }).catch(() => { if (!cancelled) setExampleFailureId(exampleBaselineId); });
     return () => { cancelled = true; };
   }, [tab, exampleBaselineId, exampleBaseline?.status]);
   const exampleSource = Array.isArray(exampleBaseline?.cases) ? exampleBaseline : exampleRun?.id === exampleBaselineId ? exampleRun : null;
   const examples = !data.workspace?.requires_new_golden && !data.workspace?.requires_new_baseline && !data.workspace?.baseline_unavailable_reason && data.workspace?.current_baseline_id === exampleBaselineId ? frozenChatExamples(exampleSource, data.workspace?.current_golden_id) : [];
+  const examplesLoading = !!exampleBaselineId && exampleBaseline?.status === "completed" && !exampleSource && exampleFailureId !== exampleBaselineId;
   const production = data.versions?.find((version: any) => version.status === "active");
   const released = production?.provenance === "published";
   return <PageShell className="page verification-page" header={<div className="page-title"><div><h1><IconTile name="verify" />问答验证</h1><p className="ui-kicker page-purpose">优化前后的真实回答对比</p></div></div>} tabs={<div className="tabs"><button aria-pressed={tab === "qa"} className={tab === "qa" ? "selected" : ""} onClick={() => setTab("qa")}>实时问答</button><button aria-pressed={tab === "compare"} className={tab === "compare" ? "selected" : ""} onClick={() => setTab("compare")}>Before/After</button><button aria-pressed={tab === "monitoring"} className={tab === "monitoring" ? "selected" : ""} onClick={() => setTab("monitoring")}>线上反馈 → 再次进化</button></div>} resetKey={tab}>
 
 
-    {tab === "qa" && <AssistantPage examples={examples} onAnswered={()=>{void refresh().catch(reason=>setError(errorMessage(reason)));}} productionLabel={released ? `当前线上：${schemeName(data.optimization?.candidates?.find((c:any)=>c.id===production.snapshot?.candidate_id),production.snapshot?.candidate_id).replace(/^Round \d+ · /, "")}（Candidate K ${parameterValue(production.config?.candidate_k)} · Top-K ${parameterValue(production.config?.top_k)} · Thinking ${parameterValue(production.config?.generation_thinking)}）` : "当前线上：初始配置"} productionVersion={production?.id || data.workspace?.active_version} isReleased={released} badCases={data.badCases || []} onOpenBadCase={() => { location.hash = "evaluation"; }} onOpenCitation={setCitation} onOpenDocument={onOpenDocument} onOpenMonitoring={()=>{setTab("monitoring");void refresh().catch(reason=>setError(errorMessage(reason)));}} />}
+    {tab === "qa" && <AssistantPage examples={examples} examplesLoading={examplesLoading} examplesFailed={!!exampleBaselineId && exampleFailureId === exampleBaselineId} onAnswered={()=>{void refresh().catch(reason=>setError(errorMessage(reason)));}} productionLabel={released ? `当前线上：${schemeName(data.optimization?.candidates?.find((c:any)=>c.id===production.snapshot?.candidate_id),production.snapshot?.candidate_id).replace(/^Round \d+ · /, "")}（Candidate K ${parameterValue(production.config?.candidate_k)} · Top-K ${parameterValue(production.config?.top_k)} · Thinking ${parameterValue(production.config?.generation_thinking)}）` : "当前线上：初始配置"} productionVersion={production?.id || data.workspace?.active_version} isReleased={released} badCases={data.badCases || []} onOpenBadCase={() => { location.hash = "evaluation"; }} onOpenCitation={setCitation} onOpenDocument={onOpenDocument} onOpenMonitoring={()=>{setTab("monitoring");void refresh().catch(reason=>setError(errorMessage(reason)));}} />}
     {<div hidden={tab !== "compare"}><SavedAnswerComparison questionId={questionId} data={data} onOpenCitation={setCitation}/></div>}
     {tab === "monitoring" && <><ConclusionCard title={monitoring.events?.length ? `${monitoring.events.length} 条本页实际问答反馈，等待或保留人工判定` : "当前尚无实际问答记录"} tone="neutral">问答产生记录，人工判断是否属于 Bad Case；符合现有触发规则后，再人工确认关联优化上下文。发现问题不会绕过诊断、评测或人工发布。</ConclusionCard><div className="feedback-loop" aria-label="线上反馈闭环">用户提问 <span>→</span> 人工标记坏例 <span>→</span> 触发新一轮 Agent</div><Section title={<IconLabel name="verify">实际反馈记录</IconLabel>}>
       {error && <p className="error-notice" role="alert">{error}</p>}

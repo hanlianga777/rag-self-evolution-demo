@@ -1,4 +1,5 @@
 import type { AppData, Page } from './types';
+import { getJson } from './api';
 import { goldenFetch } from './goldenCache';
 import { pipelineFetch, pipelineIdentity } from './pipelineCache';
 
@@ -19,15 +20,18 @@ export async function warmPageData(page: Page, data: AppData) {
       await preloadCandidates(JSON.stringify([identity, run.id, run.profile?.name]), `/api/governance/candidates?run_id=${run.id}&status=all&group=all`);
     }
   }
+  if ((page === 'evaluation' || page === 'verification') && data.evaluation?.status === 'completed' && typeof data.evaluation.id === 'string')
+    data.evaluation = await getJson(`/api/evaluations/${encodeURIComponent(data.evaluation.id)}`);
   if (page === 'verification') {
     const { preloadComparison } = await import('./components/SavedAnswerComparison');
-    await preloadComparison(data);
+    // Full case details continue in the background; they must not delay the live QA page.
+    void preloadComparison(data).catch(() => {});
   }
 }
 
-export const warmupRoute: Page[] = ['knowledge', 'governance', 'settings', 'evaluation', 'evolution', 'versions', 'verification'];
+export const warmupRoute: Page[] = ['overview', 'knowledge', 'governance', 'settings', 'evaluation', 'evolution', 'versions', 'verification'];
 
-// Run after paint, yield between pages, and support browsers without requestIdleCallback.
+// Run after paint and support browsers without requestIdleCallback.
 export function onIdle(callback: () => void) {
   if (window.requestIdleCallback) {
     const id = window.requestIdleCallback(callback, { timeout: 1000 });
