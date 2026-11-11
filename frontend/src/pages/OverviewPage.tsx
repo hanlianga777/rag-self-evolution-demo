@@ -1,5 +1,5 @@
 import { IconTile } from "../ui/icons";
-import {completeResult, recommendationOf, schemeName} from "../components/EvolutionStory";
+import {completeResult, remainingQuestionIds, recommendationOf, schemeName} from "../components/EvolutionStory";
 import { PageShell } from "../components/PageShell";
 import { useContext, useEffect, useState } from "react";
 import { PageWarmupContext } from "../preload";
@@ -62,7 +62,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const finalCandidate=candidates.find(c=>c.id===recommendationOf(experiment).recommended_candidate);
   const evolution = buildEvolutionModel(experiment, run?.config, key => gateNames[key] || key, schemeName);
   const openRoute = () => { location.hash = "evolution?tab=route"; };
-  const turns = evolution.rounds.map(round => ({label: `Round ${round.round}`, text: round.round <= 2 && round.lesson ? `本轮经验：${round.lesson.text}` : round.summary, key: round.candidates.some(candidate => candidate.winner), onClick: openRoute}));
+  const turns = evolution.rounds.map(round => ({label: `Round ${round.round}`, text: round.round <= 2 && round.lesson ? round.lesson.text : round.summary, key: round.candidates.some(candidate => candidate.winner), onClick: openRoute}));
   if (evolution.d) {
     const winner = evolution.rounds.flatMap(round => round.candidates).find(candidate => candidate.id === evolution.winnerId);
     const extra = winner && evolution.d.complete && winner.complete ? evolution.d.fixed.filter(id => !winner.fixed.includes(id)) : null;
@@ -144,8 +144,8 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
       status={{kind: currentReleased ? "released" : readyToRelease ? "pending_release" : sandboxRunning ? "running" : "waiting",
         candidate: currentReleased ? candidateName : readyToRelease ? candidateName : next[1],
         online: currentReleased ? undefined : released ? productionName(production) : "初始配置"}}
-      primaryAction={{label: primaryLabel, onClick: () => navigate(currentReleased ? "verification" : next[2])}} flow={flow} />
-    {turns.length > 0 && <OverviewStory turns={turns} fixed={fixed} onOpenFixed={id => { location.hash = `verification?tab=compare&q=${encodeURIComponent(id)}`; }} />}
+      primaryAction={{label: primaryLabel, onClick: () => { if(currentReleased) location.hash="verification?tab=compare"; else navigate(next[2]); }}} flow={flow} />
+    {turns.length > 0 && <OverviewStory turns={turns} fixed={fixed} remaining={remainingQuestionIds(experiment)?.map(shortId)} onOpenFixed={id => { location.hash = `verification?tab=compare&q=${encodeURIComponent(id)}`; }} />}
     </>}
 
   </PageShell>;

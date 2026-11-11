@@ -38,7 +38,7 @@ it('hides idle Sandbox progress while keeping parameters and diagnosis on the ro
 const questions=[{id:'slow',question:'慢的正向原题',test_category:'positive'},{id:'fast',question:'快的正向原题',test_category:'positive'},{id:'safety',question:'安全拒答原题',test_category:'negative',negative_subtype:'safety_critical'},{id:'clarify',question:'追问原题',test_category:'negative',negative_subtype:'clarify'},{id:'outside',question:'未冻结原题',test_category:'positive'}];
 const run={id:'base',status:'completed',dataset_version_id:'golden',dataset_snapshot:{question_ids:['slow','fast','safety','clarify'],questions},cases:questions.map((q,i)=>({question_id:q.id,passed:true,programmatic_metrics:{latency_ms:i===0?900:100}}))};
 it('uses frozen questions for three example types, ranks positives by saved latency and rejects other Golden identities',async()=>{
- history.replaceState(null,'','#verification');const data={evaluation:run,workspace:{current_golden_id:'golden',current_baseline_id:'base'},versions:[]};
+ history.replaceState(null,'','#verification?tab=qa');const data={evaluation:run,workspace:{current_golden_id:'golden',current_baseline_id:'base'},versions:[]};
  await mount(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
  expect([...document.querySelectorAll('.chat-example')].map(c=>c.textContent)).toEqual(['正常问答快的正向原题','应拒答 / 安全安全拒答原题','需要追问追问原题']);
  expect(document.body.textContent).not.toContain('未冻结原题');

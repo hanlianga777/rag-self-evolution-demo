@@ -100,7 +100,7 @@ it('keeps open page details on an unchanged read version and replaces them after
 });
 
 it('refreshes feedback when a new answer is saved, so opening its tab stays local',async()=>{
- const {VerificationPage}=await import('./pages/VerificationPage');let answered=false;
+ const {VerificationPage}=await import('./pages/VerificationPage');location.hash='#verification?tab=qa';let answered=false;
  const fetcher=vi.fn(async(input:string)=>new Response(JSON.stringify(input.endsWith('/api/preview')?(answered=true,{baseline:{answer:'合成回答，未调用模型',sources:[]}}):{events:answered?[{id:'new',question:'新保存的合成问答'}]:[],triggers:[]})));vi.stubGlobal('fetch',fetcher);
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<VerificationPage data={{monitoring:{events:[],triggers:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>));
  const input=document.querySelector<HTMLInputElement>('[aria-label="向机器人知识库提问"]')!;

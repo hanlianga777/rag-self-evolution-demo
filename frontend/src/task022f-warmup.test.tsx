@@ -27,8 +27,8 @@ it.each(['overview','knowledge','evolution','verification'])('warms page content
   await act(async()=>root.render(<App/>));
   await act(async()=>new Promise(r=>setTimeout(r,1800)));
   expect(reads).toContain('/api/pipeline');
-  expect(reads).not.toContain('/api/evaluations/after');
-  expect(reads.some(path=>path.endsWith('/comparison-cases'))).toBe(false);
+  expect(reads).toContain('/api/evaluations/after');
+  expect(reads.some(path=>path.endsWith('/comparison-cases'))).toBe(start==='verification');
   releasePipeline();
   await act(async()=>new Promise(r=>setTimeout(r,1800)));
   expect(reads).toContain('/api/evaluations/base/cases/Q04');expect(reads).toContain('/api/evaluations/after/cases/Q04');

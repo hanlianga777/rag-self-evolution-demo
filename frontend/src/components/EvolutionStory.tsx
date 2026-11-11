@@ -6,8 +6,7 @@ import {Badge, Section, TruncatedText} from './Primitives';
 import {DataTable} from './DataTable';
 import {formatValue, parameterNames} from './PipelineFields';
 import {agentDisplayText, gateNames, narrativeText} from '../display';
-import {useContext, useEffect, useState} from 'react';
-import { PageWarmupContext } from '../preload';
+import {useEffect, useState} from 'react';
 import {cachedJson, getJson} from '../api';
 import { ClampText } from '../ui/ClampText';
 import {savedSnapshot} from '../evaluationProgress';
@@ -82,6 +81,12 @@ export function completeResult(item:any):any {
   return result && result.evaluation_complete!==false && !result.technical_error_count && !result.technical_failed ? result : null;
 }
 
+export function remainingQuestionIds(experiment:any):string[]|null {
+  const candidate=experiment?.candidates?.find((c:any)=>c.id===recommendationOf(experiment).recommended_candidate);
+  const result=completeResult(candidate);
+  return Array.isArray(result?.continued_failure_question_ids) ? result.continued_failure_question_ids : null;
+}
+
 // D's saved baseline repairs include repairs already made by the winner.
 // Only winner_comparison describes D's extra benefit.
 function dResultData(experiment:any) {
@@ -126,13 +131,13 @@ function dWinningReason(experiment:any):string {
 }
 
 function DResultStory({experiment,evaluation,badCases}:{experiment:any;evaluation:any;badCases:any[]}) {
-  const pagesWarming=useContext(PageWarmupContext);
   const {d,winner,facts,result,fixed,broken,targets,watched,watchedGates,riskRecorded}=dResultData(experiment);
   const runId=result?.evaluation_run_id,identity=result?.evaluation_identity;
   const [saved,setSaved]=useState<any>(()=>{const run=runId && cachedJson<any>(`/api/evaluations/${runId}`);return run && run.id===runId && run.status==='completed' && identity && run.judge?.evaluation_identity===identity ? {runId,identity,cases:run.cases || []} : null;}),[error,setError]=useState('');
   useEffect(()=>{
-    let cancelled=false;setSaved(null);setError('');
-    if(!runId || pagesWarming)return;
+    let cancelled=false;setError('');
+    setSaved((current:any)=>current?.runId===runId && current?.identity===identity ? current : null);
+    if(!runId)return;
     const accept=(run:any)=>{
       if(cancelled)return;
       if(run.id!==runId || run.status!=='completed' || !identity || run.judge?.evaluation_identity!==identity)throw new Error('保存的评测身份不一致');
@@ -142,8 +147,10 @@ function DResultStory({experiment,evaluation,badCases}:{experiment:any;evaluatio
     if(cached){try{accept(cached);}catch{setError('保存的逐题结果读取失败，原因与保护题结果未知。');}}
     void getJson<any>(`/api/evaluations/${runId}`).then(accept).catch(()=>{if(!cancelled)setError('保存的逐题结果读取失败，原因与保护题结果未知。');});
     return ()=>{cancelled=true;};
-  },[runId,identity,pagesWarming]);
-  const cases=saved && saved.runId===runId && saved.identity===identity ? saved.cases : [];
+  },[runId,identity]);
+  const currentSaved=saved && saved.runId===runId && saved.identity===identity;
+  const loading=!!runId && !currentSaved && !error;
+  const cases=currentSaved ? saved.cases : [];
   const rowFor=(id:string)=>cases.find((row:any)=>row.question_id===id);
   const unpredicted=broken && riskRecorded ? broken.filter(id=>!watched.some(q=>shortQuestionId(q)===shortQuestionId(id))) : null;
   const remaining=(facts.remaining_failures || []).filter((row:any)=>rowFor(row.question_id)?.passed===false || fixed && !fixed.includes(row.question_id));
@@ -169,14 +176,18 @@ function DResultStory({experiment,evaluation,badCases}:{experiment:any;evaluatio
   const safeGate = result.gates?.gates?.find((item: any) => item.metric === 'safe_rejection_rate');
   const safety = result.metrics?.safe_rejection_rate ?? result.safe_rejection_rate ?? safeGate?.actual;
   const gateSummary = !watchedGates.length ? '核对范围未知' : `${gatesHeld === watchedGates.length ? '全部守住' : `${gatesHeld}/${watchedGates.length} 项守住`}${typeof safety === 'number' ? ` · 安全拒答 ${safety}%` : ''}`;
+  const unfixedTargets=fixed && targets.filter(id=>!fixed.includes(id));
+  const repairs=fixed===null ? '实际修好的剩余 Bad Case：未知' : <>修好 {questionList(fixed)}{unfixedTargets?.length ? <span className="ui-body-muted d-target-unfixed">；{questionList(unfixedTargets)} 未修好</span> : null}</>;
   return <div className="d-result-story"><div className="ui-card-row">
     <section className="d-result-predictions ui-card"><h3>预测 vs 实际</h3><p className="ui-body-muted">Winner 还剩 {qualityValue(winner,'bad')} Bad Case</p><div className="story-quality"><table aria-label="预测与实际"><thead><tr><th>核对项</th><th>Agent 预测</th><th>实际结果</th></tr></thead><tbody>
       {[
-        ['预计修好的题',targets.length ? questionList(targets) : '预测未保存',`实际修好的剩余 Bad Case：${questionList(fixed)}${unpredicted===null || unpredicted.length>0 ? `；${riskRecorded ? '未预测到的新问题' : '风险清单未保存，未预测到的新问题未知'}：${questionList(unpredicted)}` : ''}`],
+        ['预计修好的题',targets.length ? questionList(targets) : '预测未保存',questionList(fixed)],
         ['重点盯的受保护题',watched.length ? `${watched.length} 道受保护题` : '预测未保存',protectedSummary,questionList(watched),protectedDetail],
         ['临界 Hard Gate',watchedGates.length ? `${watchedGates.length} 项临界门槛` : '预测未保存',gateSummary,watchedGates.map((gate:any)=>`${gateName(gate.metric)} ${gate.operator} ${gate.threshold}${gate.metric.includes('latency')?' 秒':'%'}`).join('；'),gateDetail],
       ].map(([label,prediction,actual,predictionDetail,actualDetail])=><tr key={label}>{[label,prediction,actual].map((value,index)=>{
         const detail = index === 1 ? predictionDetail : index === 2 ? actualDetail : undefined;
+        if(index===2 && label==='重点盯的受保护题' && loading)return <td key={index}><span className="d-protected-skeleton" role="status" aria-label="正在读取受保护题结果" /></td>;
+        if(index===2 && label==='预计修好的题')return <td key={index}>{repairs}{unpredicted===null || unpredicted.length>0 ? `；${riskRecorded ? '未预测到的新问题' : '风险清单未保存，未预测到的新问题未知'}：${questionList(unpredicted)}` : ''}</td>;
         return <td key={index}>{detail ? <HoverCard content={detail}><span className="prediction-summary" tabIndex={0}>{value}</span></HoverCard> : <ClampText lines={2} text={value}/>}</td>;
       })}</tr>)}
     </tbody></table></div>{error && <p role="status">{error}</p>}{!saved && !error && <p className="ui-body-muted">{runId ? '正在读取保存的逐题结果…' : '逐题结果来源未保存，保护题结果与判分原因未知。'}</p>}</section>

@@ -5,7 +5,7 @@ import "../extra.css";
  * Baseline →「Hard Gate」：四类门槛做成 2×2 卡片，一屏看完（替换纵向滚动的四张长表）。
  * 每行：指标名 / 实际值（深色）/ 要求（灰小字）/ 细条 + 门槛刻度 / 通过小圆点。
  */
-export type GateItem = { label: string; actual: string; requirement: string; pass: boolean; ratio?: number | null; threshold?: number | null };
+export type GateItem = { label: string; actual: string; requirement: string; pass: boolean; ratio?: number | null; threshold?: number | null; tight?: boolean };
 export type GateGroup = { name: string; items: GateItem[] };
 
 export function HardGateGrid({ summary, groups }: { summary?: string; groups: GateGroup[] }) {
@@ -22,7 +22,7 @@ export function HardGateGrid({ summary, groups }: { summary?: string; groups: Ga
               {item.ratio != null && <i style={{ width: `${Math.max(0, Math.min(1, item.ratio)) * 100}%` }} className={item.pass ? "" : "bad"} />}
               {item.threshold != null && <b style={{ left: `${Math.max(0, Math.min(1, item.threshold)) * 100}%` }} />}
             </span>
-            <span className="ui-hg-val"><strong>{item.actual}</strong><small>{item.requirement}</small></span>
+            <span className="ui-hg-val"><strong>{item.actual}{item.tight && <span className="gate-tight" title="余量很小，后续 Candidate 容易在这一项失败">压线</span>}</strong><small>{item.requirement}</small></span>
             <span className={`ui-hg-dot${item.pass ? "" : " bad"}`} aria-label={item.pass ? "通过" : "未通过"} />
           </li>)}</ul>
         </section>;

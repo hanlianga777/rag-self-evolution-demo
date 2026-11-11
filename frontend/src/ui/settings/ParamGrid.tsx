@@ -12,7 +12,7 @@ import "../extra.css";
 export type ParamOption = { value: unknown; label: string };
 export type ParamItem = {
   key: string; label: string; note?: string; options: ParamOption[];
-  value: unknown; baseline?: unknown; online?: unknown; disabled?: boolean; changed?: boolean;
+  value: unknown; baseline?: unknown; online?: unknown; disabled?: boolean; changed?: boolean; onlineChanged?: boolean;
 };
 export type ParamGroup = { name: string; icon?: IconName; items: ParamItem[] };
 
@@ -29,7 +29,7 @@ export function ParamGrid({ groups, onChange, legend = { baseline: "Baseline", o
     <div className="ui-pg-groups">
       {groups.map(group => <section key={group.name} className="ui-pg-group" aria-label={group.name}>
         <h3><IconLabel name={group.icon}>{group.name}</IconLabel></h3>
-        {group.items.map(item => <div key={item.key} className={`ui-pg-row${item.changed ? " changed" : ""}`} data-parameter={item.key}>
+        {group.items.map(item => <div key={item.key} className={`ui-pg-row${item.changed ? " changed" : ""}${item.onlineChanged ? " online-changed" : ""}`} data-parameter={item.key}>
           <div className="ui-pg-name">
             <span>{item.label}</span>
             {item.note && <HoverCard content={item.note}><span className="ui-pg-info" tabIndex={0} aria-label={`${item.label}说明`}><Icon name="info" size={13} /></span></HoverCard>}

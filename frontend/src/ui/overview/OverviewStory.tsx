@@ -10,7 +10,7 @@ import "../extra.css";
 export type StoryTurn = { label: string; text: string; key?: boolean; onClick?: () => void };
 export type FixedItem = { id: string; question?: string; cause?: string };
 
-export function OverviewStory({ turns, fixed, onOpenFixed }: { turns: StoryTurn[]; fixed: FixedItem[]; onOpenFixed?: (id: string) => void }) {
+export function OverviewStory({ turns, fixed, remaining, onOpenFixed }: { turns: StoryTurn[]; fixed: FixedItem[]; remaining?: string[] | null; onOpenFixed?: (id: string) => void }) {
   return <div className="ui-ovs">
     <section className="ui-ovs-card" aria-label="优化过程">
       <h3><IconLabel name="rounds">优化过程</IconLabel></h3>
@@ -30,11 +30,12 @@ export function OverviewStory({ turns, fixed, onOpenFixed }: { turns: StoryTurn[
           <button type="button" onClick={onOpenFixed ? () => onOpenFixed(item.id) : undefined} disabled={!onOpenFixed} aria-label={`查看 ${item.id} 的 Before/After`}>
             <QuestionBadge id={item.id} tone="fixed" />
             <span className="ui-ovs-fixed-q" title={item.question}>{item.question ?? "题目未保存"}</span>
-            {item.cause && <span className="ui-ovs-fixed-c">{item.cause}</span>}
+            <span className={`ui-ovs-fixed-c${item.cause ? "" : " unknown"}`}>{item.cause || "—"}</span>
             {onOpenFixed && <Icon name="go" size={15} className="ui-ovs-go" />}
           </button>
         </li>)}
       </ul>
+      <p className="ui-ovs-remaining">仍未修好：{remaining==null ? "未知" : remaining.length ? remaining.map((id,index)=><span key={id}>{index>0 && "、"}<button className="text-button" onClick={()=>onOpenFixed?.(id)} disabled={!onOpenFixed}>{id}</button></span>) : "无"}</p>
     </section>
   </div>;
 }

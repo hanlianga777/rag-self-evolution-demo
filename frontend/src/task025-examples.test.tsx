@@ -7,7 +7,7 @@ import {VerificationPage} from './pages/VerificationPage';
 let root:ReturnType<typeof createRoot>;
 afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';sessionStorage.clear();vi.unstubAllGlobals();});
 it.each([false,true])('shows skeletons during the frozen read and a single quiet fallback only after failure (%s)',async(fail)=>{
- sessionStorage.clear();location.hash='#verification';
+ sessionStorage.clear();location.hash='#verification?tab=qa';
  let resolve!:(value:Response)=>void,reject!:(reason:Error)=>void;
  vi.stubGlobal('fetch',vi.fn(()=>new Promise<Response>((yes,no)=>{resolve=yes;reject=no;})));
  root=createRoot(document.body.appendChild(document.createElement('div')));

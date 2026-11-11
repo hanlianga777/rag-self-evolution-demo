@@ -29,6 +29,12 @@ export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates
           <span className="ui-ov-fact"><Icon name="bad" size={14} />新增 Bad Case <b className="ui-num">{newBadCount ?? "未知"}</b></span>
           <span className="ui-ov-fact"><Icon name="gate" size={14} />Hard Gate <b className="ui-num">{gates ? `${gates.passed} / ${gates.total}` : "未知"}</b></span>
         </div>
+        <div className="ui-ov-status">
+          <span className="ui-ov-status-item"><StatusBadge kind={status.kind} /> {status.candidate}</span>
+          {status.online && <><span className="ui-ov-divider" aria-hidden="true" />
+          <span className="ui-ov-status-item"><Icon name="release" size={14} />当前线上：{status.online}</span></>}
+          {primaryAction && <button type="button" className="primary ui-ov-action" onClick={primaryAction.onClick}><Icon name="release" size={15} />{primaryAction.label}</button>}
+        </div>
       </div>
       <dl className="ui-ov-side">
         <div><dt><IconLabel name="p99">P99</IconLabel></dt><dd><StatTransition from={p99.from} to={p99.to} unit=" 秒" better="lower" digits={1} /></dd></div>
@@ -38,12 +44,6 @@ export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates
       </dl>
     </section>
 
-    <div className="ui-ov-status">
-      <span className="ui-ov-status-item"><StatusBadge kind={status.kind} /> {status.candidate}</span>
-      {status.online && <><span className="ui-ov-divider" aria-hidden="true" />
-      <span className="ui-ov-status-item"><Icon name="release" size={14} />当前线上：{status.online}</span></>}
-      {primaryAction && <button type="button" className="primary ui-ov-action" onClick={primaryAction.onClick}><Icon name="release" size={15} />{primaryAction.label}</button>}
-    </div>
 
     <nav className="ui-ov-flow" aria-label="从知识到线上改善">
       {flow.map((step, index) => {

@@ -40,5 +40,5 @@ it('compares a pending release against current Production rather than unrelated 
 it('shows the real feedback chain with a compact empty state and no pretend monitoring rows',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({events:[],triggers:[]}))));
  await mount(<VerificationPage data={{monitoring:{events:[],triggers:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);await click('线上反馈 → 再次进化');
- expect(document.querySelector('.feedback-loop')?.textContent).toContain('用户提问 → 人工标记坏例 → 触发新一轮 Agent');expect(document.querySelector('.monitoring-table')).toBeNull();expect(document.querySelector('.story-empty')?.textContent).toContain('当前尚无反馈记录');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
+ expect(document.querySelectorAll('.feedback-loop-node')).toHaveLength(4);expect(document.querySelector('.feedback-loop')?.textContent).toContain('Agent 新一轮 → Golden 复测 → 人工发布');expect(document.querySelector('.monitoring-table')).toBeNull();expect(document.querySelector('.feedback-empty')?.textContent).toContain('暂无线上反馈');expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
 });

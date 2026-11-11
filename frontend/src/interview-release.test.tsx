@@ -63,7 +63,7 @@ it("orders verification tabs and reduces Monitoring to question, state, judgemen
   const monitoring = { events: [{ id: "MON-internal", question: "新问题", answer: "实际回答", determinable: false, source: { production_version_id: "PROD-source" }, metrics: { latency_ms: 33 } }], triggers: [] };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(monitoring))));
   await render(<VerificationPage data={{ monitoring }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  expect([...document.querySelectorAll(".tabs > button")].map(node => node.textContent)).toEqual(["实时问答", "Before/After", "线上反馈 → 再次进化"]);
+  expect([...document.querySelectorAll(".tabs > button")].map(node => node.textContent)).toEqual(["Before/After", "实时问答", "线上反馈 → 再次进化"]);
   await click("线上反馈 → 再次进化");
   expect([...document.querySelectorAll(".monitoring-table th")].map(node => node.textContent)).toEqual(["问题", "当前状态", "人工判断", "操作"]);
   expect(document.querySelector(".monitoring-table")?.textContent).not.toContain("33 ms");

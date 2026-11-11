@@ -60,6 +60,7 @@ function BaselineGates({ gates, passedCount, onSelect }: { gates: Row[]; passedC
   }}><HardGateGrid summary={`${passedCount ?? '未知'} / ${gates.length || '未知'} 项通过；每项独立判断，综合分不能抵消未通过的 Hard Gate。`} groups={groups.map(({ name, rows }) => ({name, items: rows.map(gate => ({
     label: (gateNames[gate.metric] || gate.metric).replace(/^(正向（Positive）|消融（Ablation）)/, ''),
     actual: gateValue(gate), requirement: gateThreshold(gate), pass: gate.status === 'PASS',
+    tight: Number.isFinite(gate.actual) && Number.isFinite(gate.threshold) && Math.abs(gate.actual-gate.threshold) <= (gate.metric.startsWith('latency_') ? Math.abs(gate.threshold)*0.05 : 1),
     ratio: typeof gate.actual === 'number' ? gate.actual / (gate.metric.startsWith('latency_') ? 60 : 100) : null,
     threshold: typeof gate.threshold === 'number' ? gate.threshold / (gate.metric.startsWith('latency_') ? 60 : 100) : null,
   }))}))} /></div>;

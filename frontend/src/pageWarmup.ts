@@ -8,6 +8,11 @@ export async function warmPageData(page: Page, data: AppData) {
   if (page === 'knowledge')
     await goldenFetch(JSON.stringify([data.workspace?.current_corpus_fingerprint, data.documents]), '/api/pipeline');
   if (page === 'settings') await pipelineFetch(pipelineIdentity(data));
+  if (page === 'evolution') {
+    const d=(data.optimization?.candidates as any[] | undefined)?.find((candidate:any)=>candidate.reasoning?.candidate_label==='D');
+    if (d?.status==='evaluated' && d.result?.evaluation_complete!==false && d.result?.evaluation_run_id)
+      await getJson(`/api/evaluations/${encodeURIComponent(d.result.evaluation_run_id)}`);
+  }
   if (page === 'governance') {
     const identity = JSON.stringify(data.workspace?.current_corpus_fingerprint);
     const [runs] = await Promise.all([

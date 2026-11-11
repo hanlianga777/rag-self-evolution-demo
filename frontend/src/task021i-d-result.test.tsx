@@ -24,7 +24,7 @@ it('compares saved predictions with repairs relative to the winner, with identic
  mockRun();const experiment=exp(),original=JSON.stringify(experiment);
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  const full=document.querySelector('[aria-label="预测与实际"]')!.textContent;
- expect(full).toContain('Q04、Q06');expect(full).toContain('实际修好的剩余 Bad Case：Q04');
+ expect(full).toContain('Q04、Q06');expect(full).toContain('修好 Q04；Q06 未修好');
  expect(full).toContain('未预测到的新问题');expect(full).toContain('Q25');
  expect(full).toContain('5 题全部守住');
  const summary=document.querySelectorAll<HTMLElement>('.prediction-summary')[1];await act(async()=>{summary.focus();await new Promise(resolve=>setTimeout(resolve,160));});
@@ -85,7 +85,7 @@ it('keeps actual repairs separate from the prediction list and does not invent a
  mockRun();const experiment=exp();experiment.candidates[1].reasoning.changes=[];
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  const table=document.querySelector('[aria-label="预测与实际"]')!;
- expect(table.textContent).toContain('实际修好的剩余 Bad Case：Q04');
+ expect(table.textContent).toContain('修好 Q04');
  expect(table.querySelector('tbody tr')!.textContent).toContain('风险清单未保存，未预测到的新问题未知');
 });
 it('keeps results without a saved run source usable and marks case explanations unknown',async()=>{
