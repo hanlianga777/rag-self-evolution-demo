@@ -4,6 +4,7 @@ import { Bot, Menu } from "lucide-react";
 import { ICONS } from "./ui/icons";
 import { appDataVersion, identityKey, loadAppData } from "./api";
 import { onIdle, warmPageData, warmupRoute } from "./pageWarmup";
+import { PageWarmupContext } from "./preload";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PageShell } from "./components/PageShell";
 import { useOperation } from "./operation";
@@ -37,6 +38,7 @@ const pageFromHash = (): Page => items.find(item => `#${item.id}` === location.h
 
 export default function App() {
   const [pages, setPages] = useState<Partial<Record<Page, AppData>>>({}); const [error, setError] = useState(""); const [page, setPage] = useState<Page>(pageFromHash);
+  const [pagesWarming, setPagesWarming] = useState(true);
   const data = pages[page];
   const [openedDocument, setOpenedDocument] = useState<{ name?: string; citation?: Citation }>(); const [menuOpen, setMenuOpen] = useState(false);
   const requests = useRef(0); const completed = useRef(new Set<string>()); const operation = useOperation();
@@ -61,12 +63,12 @@ export default function App() {
   useEffect(() => () => { requests.current++; }, []);
   useEffect(() => { window.addEventListener("focus", refresh); return () => window.removeEventListener("focus", refresh); }, [refresh]);
   useEffect(() => { const syncPage = () => { if (location.hash !== "#main-content") setPage(pageFromHash()); }; window.addEventListener("hashchange", syncPage); return () => window.removeEventListener("hashchange", syncPage); }, []);
-  const prefetched = useRef(new Map<Page, Promise<void>>());
+  const prefetched = useRef(new Map<Page, Promise<AppData | undefined>>());
   const latestPages = useRef(pages); latestPages.current = pages;
   const prefetch = useCallback((target: Page) => {
     const module = target !== "overview" ? pageModules[target]() : Promise.resolve();
     void module.catch(()=>{});
-    if (latestPages.current[target]) return Promise.resolve();
+    if (latestPages.current[target]) return Promise.resolve(latestPages.current[target]);
     if (!prefetched.current.has(target)) prefetched.current.set(target, loadAppData(true, target).then(async next => {
       await Promise.all([module, warmPageData(target, next)]);
       setPages(previous => {
@@ -74,16 +76,26 @@ export default function App() {
         if (previous[target] || current && identityKey(current.workspace) !== identityKey(next.workspace)) return previous;
         return { ...previous, [target]: next };
       });
-    }).catch(() => {}).finally(() => prefetched.current.delete(target)));
+      return next;
+    }).catch(() => undefined).finally(() => prefetched.current.delete(target)));
     return prefetched.current.get(target)!;
   }, []);
   const workspaceIdentity = data ? identityKey(data.workspace) : '';
   useEffect(() => {
     if (!workspaceIdentity) return;
+    setPagesWarming(true);
     let cancelled = false;
     const cancelIdle = onIdle(async () => {
       await foreground.current;
-      if (!cancelled) await Promise.all(warmupRoute.map(target => prefetch(target)));
+      if (cancelled) return;
+      const warmed = await Promise.all(warmupRoute.map(target => prefetch(target)));
+      if (!cancelled) setPagesWarming(false);
+      const verification = warmed[warmupRoute.indexOf("verification")];
+      if (!cancelled && verification) {
+        // All page content gets priority over the full saved-answer detail reads.
+        const { preloadComparison } = await import("./components/SavedAnswerComparison");
+        if (!cancelled) void preloadComparison(verification).catch(() => {});
+      }
     });
     return () => { cancelled = true; cancelIdle(); };
   }, [workspaceIdentity, prefetch]);
@@ -91,7 +103,7 @@ export default function App() {
   const openCitation = (citation: Citation) => { setOpenedDocument({ citation }); navigate("knowledge"); };
   const skeleton = <PageShell className="page page-loading" header={<div className="page-title"><h1>{navigation.find(item=>item.id===page)?.label}</h1></div>}><div className="golden-skeleton" role="status" aria-label="正在加载页面内容">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div></PageShell>;
   const content = !data ? error ? <div className="state" role="alert"><h1>无法加载当前页面</h1><p>{error}</p><button className="primary" onClick={() => void refresh()}>重试</button></div> : skeleton : page === "overview" ? <OverviewPage data={data} navigate={navigate} /> : page === "knowledge" ? <KnowledgePage data={data} onChanged={refresh} openedDocument={openedDocument} onOpenedDocument={() => setOpenedDocument(undefined)} /> : page === "governance" ? <GovernancePage data={data} /> : page === "evaluation" ? <EvaluationPage data={data} navigate={navigate} /> : page === "evolution" ? <EvolutionPage data={data} /> : page === "versions" ? <VersionsPage data={data} /> : page === "verification" ? <VerificationPage data={data} onOpenCitation={openCitation} onOpenDocument={name => { setOpenedDocument({ name }); navigate("knowledge"); }} /> : <SettingsPage data={data} />;
-  return <div className="app-shell"><a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>跳转到主内容</a><aside><div className="brand"><Bot size={21} aria-hidden="true" /><span>RAG Evolution</span></div><nav aria-label="主导航">{navigation.map(item => <NavigationLink key={item.id} item={item} page={page} navigate={navigate} prefetch={prefetch} />)}</nav></aside><main id="main-content" className="main" tabIndex={-1}><button className="secondary mobile-menu" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} aria-hidden="true" />菜单</button>{menuOpen && <nav id="mobile-navigation" className="mobile-navigation" aria-label="移动导航">{items.map(item => <a key={item.id} href={`#${item.id}`} aria-current={page === item.id ? "page" : undefined} onClick={() => navigate(item.id)}>{item.label}</a>)}</nav>}{data && error && <p className="error-notice" role="alert">{error}<button onClick={() => void refresh()}>重试</button></p>}<PageErrorBoundary key={`${page}:${identityKey(data?.workspace)}`}><Suspense fallback={skeleton}>{content}</Suspense></PageErrorBoundary></main></div>;
+  return <PageWarmupContext.Provider value={pagesWarming}><div className="app-shell"><a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>跳转到主内容</a><aside><div className="brand"><Bot size={21} aria-hidden="true" /><span>RAG Evolution</span></div><nav aria-label="主导航">{navigation.map(item => <NavigationLink key={item.id} item={item} page={page} navigate={navigate} prefetch={prefetch} />)}</nav></aside><main id="main-content" className="main" tabIndex={-1}><button className="secondary mobile-menu" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={16} aria-hidden="true" />菜单</button>{menuOpen && <nav id="mobile-navigation" className="mobile-navigation" aria-label="移动导航">{items.map(item => <a key={item.id} href={`#${item.id}`} aria-current={page === item.id ? "page" : undefined} onClick={() => navigate(item.id)}>{item.label}</a>)}</nav>}{data && error && <p className="error-notice" role="alert">{error}<button onClick={() => void refresh()}>重试</button></p>}<PageErrorBoundary key={`${page}:${identityKey(data?.workspace)}`}><Suspense fallback={skeleton}>{content}</Suspense></PageErrorBoundary></main></div></PageWarmupContext.Provider>;
 }
 
 export class PageErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -104,7 +116,7 @@ export class PageErrorBoundary extends Component<{ children: ReactNode }, { erro
   }
 }
 
-function NavigationLink({ item, page, navigate, prefetch }: { item: { id: Page; label: string; icon: typeof ICONS.overview }; page: Page; navigate: (page: Page) => void; prefetch: (page: Page) => Promise<void> }) {
+function NavigationLink({ item, page, navigate, prefetch }: { item: { id: Page; label: string; icon: typeof ICONS.overview }; page: Page; navigate: (page: Page) => void; prefetch: (page: Page) => Promise<unknown> }) {
   const Icon = item.icon;
   return <a href={`#${item.id}`} className={page === item.id ? "active" : ""} aria-current={page === item.id ? "page" : undefined} onMouseEnter={()=>void prefetch(item.id)} onFocus={()=>void prefetch(item.id)} onClick={() => navigate(item.id)}><Icon size={17} strokeWidth={1.75} aria-hidden="true" focusable="false" />{item.label}</a>;
 }

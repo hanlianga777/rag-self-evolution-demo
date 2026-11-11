@@ -5,13 +5,13 @@ import { KnowledgeCoverage } from "../ui/pages3";
 import { LocalPagination, useLocalPage } from "../components/LocalPagination";
 import { DataTable } from "../components/DataTable";
 import { PageShell } from "../components/PageShell";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
 import { FileText, Search } from "lucide-react";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { Badge, DrawerSection, Section, Status, EmptyState, TruncatedText } from "../components/Primitives";
 import { apiUrl, cachedJson, getJson, invalidateReads } from "../api";
-import { detailJson, useDetailPrefetch, useHoverPrefetch } from "../preload";
+import { detailJson, PageWarmupContext, useDetailPrefetch, useHoverPrefetch } from "../preload";
 import { goldenCached, goldenFetch } from "../goldenCache";
 import { displayText } from "../display";
 import type { Citation } from "../types";
@@ -20,6 +20,7 @@ type CorpusOperation = { id: string; status: string; stage: string; completed: n
 const stageName: Record<string, string> = { queued: "排队", validate: "校验文件", build: "准备索引", parse: "解析 PDF", chunk: "生成 Parent / Child", coverage: "K-means 覆盖规划", embedding: "生成 Embedding", index: "更新索引", activate: "切换当前 Corpus", completed: "已完成", failed: "更新失败" };
 
 export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChanged }: { data: any; openedDocument?: { name?: string; citation?: Citation }; onOpenedDocument?: () => void; onChanged?: () => void }) {
+  const pagesWarming = useContext(PageWarmupContext);
   const knowledgeScope = JSON.stringify([data.workspace?.current_corpus_fingerprint, data.documents]);
   const retainedPipeline = goldenCached<any>(knowledgeScope, "/api/pipeline");
   const [selected, setSelected] = useState<any>();
@@ -96,6 +97,7 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
   useDetailPrefetch((data.documents || []).map((doc: any) => `/api/documents/${doc.id}`));
   const topicKey = JSON.stringify([knowledge.identity?.corpus_snapshot_id, knowledge.coverage?.plan_id, clusters.map((item: any) => item.cluster_id)]);
   useEffect(() => {
+    if (pagesWarming) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       for (const item of clusters) {
@@ -107,7 +109,7 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
       }
     }, 150);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [topicKey]);
+  }, [topicKey, pagesWarming]);
   const slotTotal = clusters.reduce((sum: number, item: any) => sum + ["positive", "ablation", "negative"].reduce((n, key) => n + (item.quotas?.[key] ?? 0), 0), 0);
   const topicName = (item: any) => item.semantic_label || item.label || item.cluster_id;
   const topics = clusters.map((item: any) => ({ name: topicName(item), chunks: item.size, ...item.quotas,

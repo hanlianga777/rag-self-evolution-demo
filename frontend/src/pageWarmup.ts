@@ -22,11 +22,6 @@ export async function warmPageData(page: Page, data: AppData) {
   }
   if ((page === 'evaluation' || page === 'verification') && data.evaluation?.status === 'completed' && typeof data.evaluation.id === 'string')
     data.evaluation = await getJson(`/api/evaluations/${encodeURIComponent(data.evaluation.id)}`);
-  if (page === 'verification') {
-    const { preloadComparison } = await import('./components/SavedAnswerComparison');
-    // Full case details continue in the background; they must not delay the live QA page.
-    void preloadComparison(data).catch(() => {});
-  }
 }
 
 export const warmupRoute: Page[] = ['overview', 'knowledge', 'governance', 'settings', 'evaluation', 'evolution', 'versions', 'verification'];

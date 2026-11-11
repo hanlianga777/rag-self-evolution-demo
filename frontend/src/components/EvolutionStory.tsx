@@ -6,7 +6,8 @@ import {Badge, Section, TruncatedText} from './Primitives';
 import {DataTable} from './DataTable';
 import {formatValue, parameterNames} from './PipelineFields';
 import {agentDisplayText, gateNames, narrativeText} from '../display';
-import {useEffect, useState} from 'react';
+import {useContext, useEffect, useState} from 'react';
+import { PageWarmupContext } from '../preload';
 import {cachedJson, getJson} from '../api';
 import { ClampText } from '../ui/ClampText';
 import {savedSnapshot} from '../evaluationProgress';
@@ -125,12 +126,13 @@ function dWinningReason(experiment:any):string {
 }
 
 function DResultStory({experiment,evaluation,badCases}:{experiment:any;evaluation:any;badCases:any[]}) {
+  const pagesWarming=useContext(PageWarmupContext);
   const {d,winner,facts,result,fixed,broken,targets,watched,watchedGates,riskRecorded}=dResultData(experiment);
   const runId=result?.evaluation_run_id,identity=result?.evaluation_identity;
   const [saved,setSaved]=useState<any>(()=>{const run=runId && cachedJson<any>(`/api/evaluations/${runId}`);return run && run.id===runId && run.status==='completed' && identity && run.judge?.evaluation_identity===identity ? {runId,identity,cases:run.cases || []} : null;}),[error,setError]=useState('');
   useEffect(()=>{
     let cancelled=false;setSaved(null);setError('');
-    if(!runId)return;
+    if(!runId || pagesWarming)return;
     const accept=(run:any)=>{
       if(cancelled)return;
       if(run.id!==runId || run.status!=='completed' || !identity || run.judge?.evaluation_identity!==identity)throw new Error('保存的评测身份不一致');
@@ -140,7 +142,7 @@ function DResultStory({experiment,evaluation,badCases}:{experiment:any;evaluatio
     if(cached){try{accept(cached);}catch{setError('保存的逐题结果读取失败，原因与保护题结果未知。');}}
     void getJson<any>(`/api/evaluations/${runId}`).then(accept).catch(()=>{if(!cancelled)setError('保存的逐题结果读取失败，原因与保护题结果未知。');});
     return ()=>{cancelled=true;};
-  },[runId,identity]);
+  },[runId,identity,pagesWarming]);
   const cases=saved && saved.runId===runId && saved.identity===identity ? saved.cases : [];
   const rowFor=(id:string)=>cases.find((row:any)=>row.question_id===id);
   const unpredicted=broken && riskRecorded ? broken.filter(id=>!watched.some(q=>shortQuestionId(q)===shortQuestionId(id))) : null;

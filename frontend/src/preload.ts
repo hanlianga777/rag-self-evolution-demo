@@ -1,5 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useRef } from 'react';
 import { cachedJson, getJson } from './api';
+
+// Optional detail reads wait for page content during application startup.
+export const PageWarmupContext = createContext(false);
 
 // Interaction reads reuse the current persisted version. Page entry revalidates separately.
 export function detailJson<T = any>(path: string): Promise<T> {
@@ -8,8 +11,10 @@ export function detailJson<T = any>(path: string): Promise<T> {
 }
 
 export function useDetailPrefetch(paths: string[]) {
+  const pagesWarming = useContext(PageWarmupContext);
   const key = JSON.stringify([...new Set(paths)]);
   useEffect(() => {
+    if (pagesWarming) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       // Keep the local service responsive while warming a large set of details.
@@ -18,7 +23,7 @@ export function useDetailPrefetch(paths: string[]) {
         await Promise.all(queue.slice(offset, offset + 4).map(path => detailJson(path).catch(() => {})));
     }, 150);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [key]);
+  }, [key, pagesWarming]);
 }
 
 export function useHoverPrefetch() {

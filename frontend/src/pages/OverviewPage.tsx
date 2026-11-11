@@ -1,7 +1,8 @@
 import { IconTile } from "../ui/icons";
 import {completeResult, recommendationOf, schemeName} from "../components/EvolutionStory";
 import { PageShell } from "../components/PageShell";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { PageWarmupContext } from "../preload";
 import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
 import { ValueChain } from "../ui/overview/ValueChain";
 import { OverviewSummary } from "../ui/overview/OverviewSummary";
@@ -13,6 +14,7 @@ import { comparisonPoints, explanation, configChanges } from "../components/comp
 import type { Page } from "../types";
 
 export function OverviewPage({ data, navigate }: { data: any; navigate: (page: Page) => void }) {
+  const pagesWarming = useContext(PageWarmupContext);
   const [tab, setTab] = useState<"project" | "business" | "technical">("project");
   const item = data.overview || {};
   const knowledge = item.knowledge;
@@ -71,6 +73,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const comparisonBinding = JSON.stringify([run?.id, finalCandidate?.id, finalCandidate?.result?.evaluation_run_id, fixedIds]);
   const [fixedRecord, setFixedRecord] = useState<{binding: string; items: FixedItem[]}>({binding: "", items: []});
   useEffect(() => {
+    if (pagesWarming) return;
     let cancelled = false;
     const baselineId = run?.id, afterId = finalCandidate?.result?.evaluation_run_id;
     if (!baselineId || !afterId || !fixedIds.length || !completeResult(finalCandidate)) return;
@@ -91,7 +94,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
       if (!cancelled) setFixedRecord({binding: comparisonBinding, items: detailed});
     }).catch(() => { /* Saved evidence is optional; never infer a cause from the global config. */ });
     return () => { cancelled = true; };
-  }, [comparisonBinding]);
+  }, [comparisonBinding, pagesWarming]);
   const fixed = fixedRecord.binding === comparisonBinding ? fixedRecord.items : fixedIds.map(id => ({id: shortId(id), question: formal?.questions?.find((row: any) => shortId(row.id) === shortId(id))?.question}));
   const storyBaseline=metrics ? run : undefined;
   const storyRounds=new Set(candidates.filter((c:any)=>["A","B","C"].includes(c.reasoning?.candidate_label)).map((c:any)=>c.reasoning?.round || 1)).size;

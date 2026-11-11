@@ -4,10 +4,12 @@ import {createRoot} from 'react-dom/client';
 import {expect,it,vi} from 'vitest';
 import App from './App';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
-it.each(['overview','knowledge','evolution'])('warms Golden and complete Before/After on overview idle time using only GETs, then opens both without waiting for revalidation (%s)',async(start)=>{
+it.each(['overview','knowledge','evolution','verification'])('warms page content before complete Before/After using only GETs, then opens both without waiting for revalidation (%s)',async(start)=>{
  const {invalidateReads}=await import('./api');const {invalidateGolden}=await import('./goldenCache');invalidateReads();invalidateGolden();
  location.hash=`#${start}`;sessionStorage.clear();
  const reads:string[]=[],writes:string[]=[];let block=false;
+ let releasePipeline!:()=>void;
+ const pipelineReady=new Promise<void>(resolve=>{releasePipeline=resolve;});
  const workspace={current_baseline_id:'base',current_golden_id:'golden',current_experiment_id:'exp',current_corpus_fingerprint:'corpus'};
  const candidate={id:'D',status:'evaluated',reasoning:{candidate_label:'D'},result:{evaluation_complete:true,total:1,evaluation_run_id:'after'}};
  const experiment={id:'exp',candidates:[candidate],recommendation:{recommended_candidate:'D'}};
@@ -15,6 +17,7 @@ it.each(['overview','knowledge','evolution'])('warms Golden and complete Before/
  vi.stubGlobal('fetch',vi.fn(async(input:string,init?:RequestInit)=>{
   const url=new URL(input),p=url.pathname;reads.push(p+url.search);if(init?.method && init.method!=='GET')writes.push(p);
   if(block)return new Promise<Response>(()=>{});
+  if(p==='/api/pipeline')await pipelineReady;
   const isBefore=p.includes('/base/');
   const value=p==='/api/workspace'?workspace:p==='/api/documents' || p==='/api/bad-cases'?[]:p==='/api/optimization'?experiment:p==='/api/evaluation'?{id:'base',status:'completed'}:p==='/api/versions'?[]:p.includes('generation-runs')?[{id:'run',status:'completed',profile:{name:'mini',expected_count:1},question_ids:['Q04'],artifacts:{}}]:p.includes('/snapshots')?[{id:'golden',snapshot:{generation_run_id:'run',question_ids:['Q04'],questions:[question]}}]:p.includes('/candidates')?{rows:[question],total:1,candidate_index:[question],data_version:'v1'}:p==='/api/evaluations/base'?{id:'base',status:'completed',dataset_version_id:'golden',cases:[]}:p.endsWith('/comparison-cases')?{id:isBefore?'base':'after',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'same'},cases:[{question_id:'Q04',question:'保存的问题',passed:!isBefore}]}:p.includes('/cases/')?{status:'completed',case:{question_id:'Q04',passed:!isBefore,model_answer:'已保存回答'}}:{};
   return new Response(JSON.stringify(value));
@@ -22,6 +25,11 @@ it.each(['overview','knowledge','evolution'])('warms Golden and complete Before/
  const node=document.body.appendChild(document.createElement('div')),root=createRoot(node);
  try {
   await act(async()=>root.render(<App/>));
+  await act(async()=>new Promise(r=>setTimeout(r,1800)));
+  expect(reads).toContain('/api/pipeline');
+  expect(reads).not.toContain('/api/evaluations/after');
+  expect(reads.some(path=>path.endsWith('/comparison-cases'))).toBe(false);
+  releasePipeline();
   await act(async()=>new Promise(r=>setTimeout(r,1800)));
   expect(reads).toContain('/api/evaluations/base/cases/Q04');expect(reads).toContain('/api/evaluations/after/cases/Q04');
   expect(reads).toContain('/api/governance/candidates?run_id=run&status=all&group=all&limit=100&offset=0');expect(writes).toEqual([]);
@@ -37,7 +45,7 @@ it.each(['overview','knowledge','evolution'])('warms Golden and complete Before/
   await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#verification"]')!.click());
   await act(async()=>[...node.querySelectorAll('button')].find(e=>e.textContent==='Before/After')!.click());
   expect(node.querySelector('.comparison-answers')?.textContent).toContain('已保存回答');expect(node.querySelector('.case-detail-skeleton')).toBeNull();
- }finally{act(()=>root.unmount());node.remove();location.hash='';vi.unstubAllGlobals();invalidateReads();invalidateGolden();}
+ }finally{releasePipeline();act(()=>root.unmount());node.remove();location.hash='';vi.unstubAllGlobals();invalidateReads();invalidateGolden();}
 });
 it('loads a clicked destination immediately while a background read is pending and stops scheduling after unmount',async()=>{
  const {invalidateReads}=await import('./api');const {invalidateGolden}=await import('./goldenCache');invalidateReads();invalidateGolden();location.hash='#overview';

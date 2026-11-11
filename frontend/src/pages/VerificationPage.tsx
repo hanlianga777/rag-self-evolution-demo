@@ -9,9 +9,9 @@ import { StoryDisclosure, StoryEmpty } from "../components/Storytelling";
 import { CaseAnswer } from "../components/CaseAnswer";
 import { displayText, narrativeText, productionName } from "../display";
 import { PageShell } from "../components/PageShell";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { preloadHistory } from "../listPreload";
-import { detailJson, useDetailPrefetch } from "../preload";
+import { detailJson, PageWarmupContext, useDetailPrefetch } from "../preload";
 import { cachedJson, errorMessage, getJson, postJson } from "../api";
 import { ConclusionCard, Section, Status, TruncatedText } from "../components/Primitives";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
@@ -23,6 +23,7 @@ import type { Citation } from "../types";
 import { useOperation } from "../operation";
 
 export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void }) {
+  const pagesWarming = useContext(PageWarmupContext);
   const operation = useOperation();
   const [tab, setTab] = useState<"qa" | "compare" | "monitoring">(() => { const value = new URLSearchParams(location.hash.split("?")[1]).get("tab") || readSession("rag-qa-tab", { tab: "qa" }).tab; return ["qa", "compare", "monitoring"].includes(value) ? value as "qa" | "compare" | "monitoring" : "qa"; }), [busy, setBusy] = useState(false), [error, setError] = useState(""), [monitoring, setMonitoring] = useState<any>(data.monitoring || {});
   const [questionId, setQuestionId] = useState(() => new URLSearchParams(location.hash.split("?")[1]).get("q") || undefined);
@@ -102,7 +103,7 @@ export function VerificationPage({ data, onOpenDocument }: { data: any; onOpenCi
 
 
     {tab === "qa" && <AssistantPage examples={examples} examplesLoading={examplesLoading} examplesFailed={!!exampleBaselineId && exampleFailureId === exampleBaselineId} onAnswered={()=>{void refresh().catch(reason=>setError(errorMessage(reason)));}} productionLabel={released ? `当前线上：${schemeName(data.optimization?.candidates?.find((c:any)=>c.id===production.snapshot?.candidate_id),production.snapshot?.candidate_id).replace(/^Round \d+ · /, "")}（Candidate K ${parameterValue(production.config?.candidate_k)} · Top-K ${parameterValue(production.config?.top_k)} · Thinking ${parameterValue(production.config?.generation_thinking)}）` : "当前线上：初始配置"} productionVersion={production?.id || data.workspace?.active_version} isReleased={released} badCases={data.badCases || []} onOpenBadCase={() => { location.hash = "evaluation"; }} onOpenCitation={setCitation} onOpenDocument={onOpenDocument} onOpenMonitoring={()=>{setTab("monitoring");void refresh().catch(reason=>setError(errorMessage(reason)));}} />}
-    {<div hidden={tab !== "compare"}><SavedAnswerComparison questionId={questionId} data={data} onOpenCitation={setCitation}/></div>}
+    {(tab === "compare" || !pagesWarming) && <div hidden={tab !== "compare"}><SavedAnswerComparison questionId={questionId} data={data} onOpenCitation={setCitation}/></div>}
     {tab === "monitoring" && <><ConclusionCard title={monitoring.events?.length ? `${monitoring.events.length} 条本页实际问答反馈，等待或保留人工判定` : "当前尚无实际问答记录"} tone="neutral">问答产生记录，人工判断是否属于 Bad Case；符合现有触发规则后，再人工确认关联优化上下文。发现问题不会绕过诊断、评测或人工发布。</ConclusionCard><div className="feedback-loop" aria-label="线上反馈闭环">用户提问 <span>→</span> 人工标记坏例 <span>→</span> 触发新一轮 Agent</div><Section title={<IconLabel name="verify">实际反馈记录</IconLabel>}>
       {error && <p className="error-notice" role="alert">{error}</p>}
       {(monitoring.events?.length || historyPage>1) ? <>{(monitoring.events?.length || 0) > 200 && <div className="review-batch"><button disabled={historyPage===1} onClick={()=>setHistoryPage(historyPage-1)}>上一页</button><span>第 {historyPage} 页 · 每页最多200条</span><button disabled={historyPage * 200 >= (monitoring.events?.length || 0)} onClick={()=>setHistoryPage(historyPage+1)}>下一页</button></div>}<div className="table-scroll monitoring-table"><DataTable><thead><tr><th>问题</th><th>当前状态</th><th>人工判断</th><th>操作</th></tr></thead><tbody>{historyRows.map((event: any) => {
