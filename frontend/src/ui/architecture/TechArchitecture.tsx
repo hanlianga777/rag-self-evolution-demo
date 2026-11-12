@@ -46,7 +46,7 @@ export const TECH_LAYERS: TechLayer[] = [
     key: "knowledge", index: "04", name: "知识处理层", en: "离线", role: "把说明书变成可检索、可回溯的知识", icon: "knowledge",
     groups: [
       { title: "解析与分块", tags: t("MinerU VLM 解析", "Parent 1400 Tokens", "Child 400 Tokens · 重叠 80") },
-      { title: "向量与索引", tags: t("text-embedding-v4 · 1024 维", "FAISS 向量索引", "BM25 关键词索引") },
+      { title: "向量与索引", tags: t("text-embedding-v4 · 1024 维", "FAISS 内积索引", "BM25 查询时打分") },
       { title: "主题规划", tags: t("K-means 聚类 · 9 个主题") },
     ],
   },
