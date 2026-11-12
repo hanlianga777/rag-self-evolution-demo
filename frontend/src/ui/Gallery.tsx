@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { PageSamples } from "./PageSamples";
-import { ClampText, ParamChip, QuestionBadge, QuestionList, RunProgressPanel, StatTransition, StatusBadge, type RunStatus } from "./index";
+import { BusinessArchitecture, ClampText, KnowledgeFlow, ParamChip, ProjectProblems, QuestionBadge, QuestionList, RunProgressPanel, SAMPLE_KNOWLEDGE_LANES, StatTransition, StatusBadge, TechArchitecture, type RunStatus } from "./index";
 
 /**
  * UI 组件样板页（只在开发时用：打开 /ui-gallery.html）。
@@ -21,6 +21,10 @@ export function Gallery() {
   const [status, setStatus] = useState<RunStatus>("running");
   return <div style={{ padding: 32, display: "grid", gap: 28, maxWidth: 1180 }}>
     <h1 style={{ margin: 0, fontSize: 26 }}>UI 样板</h1>
+    <h2 className="ui-sample-title">027 · 业务架构 / 技术架构 / 知识处理链路</h2>
+    <div style={{ display: "grid", gap: 14 }}><ProjectProblems /><BusinessArchitecture /></div>
+    <TechArchitecture />
+    <section className="panel"><KnowledgeFlow lanes={SAMPLE_KNOWLEDGE_LANES} action={<button className="secondary">查看分块示例</button>} /></section>
     <PageSamples />
     <h2 className="ui-sample-title">基础组件</h2>
 

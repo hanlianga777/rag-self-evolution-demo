@@ -1,7 +1,8 @@
 import {
   Activity, Award, Ban, BarChart3, BookOpen, Brain, Bug, ChevronRight, CircleCheck, Info, ClipboardCheck, Clock3, Database, FileCheck, FileText,
   FlaskConical, Gauge, GitBranch, Hourglass, Layers, Library, ListChecks, ListX, Lock, MessageCircle, Play, Repeat, Rocket,
-  ShieldCheck, SlidersHorizontal, Square, Target, Timer, Trophy, Waypoints, Wrench, type LucideIcon,
+  ShieldCheck, SlidersHorizontal, Square, Target, Timer, Trophy, Waypoints, Wrench,
+  ScanText, Scissors, Search, ArrowDownUp, Merge, Quote, Server, Monitor, Cpu, Network, Boxes, GitCompare, RefreshCw, Split, type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import "./icons.css";
@@ -28,6 +29,9 @@ export const ICONS = {
   play: Play, stop: Square,
   // 导航与说明
   go: ChevronRight, info: Info,
+  // 架构图与知识流程（11-12 新增）
+  parse: ScanText, chunk: Scissors, search: Search, rerank: ArrowDownUp, merge: Merge, cite: Quote,
+  server: Server, screen: Monitor, model: Cpu, network: Network, boxes: Boxes, compare: GitCompare, loop: RefreshCw, split: Split,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
