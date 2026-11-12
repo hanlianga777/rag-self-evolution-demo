@@ -2,7 +2,7 @@ import { Icon, type IconName } from "../icons";
 import "./architecture.css";
 
 /**
- * 概览 →「业务架构」（11-12 重做，替换 docs/images/architecture-business.svg 的内嵌图）。
+ * 概览 →「业务架构」（11-12 重做）。
  *
  * 结构：
  * - 顶部 ProjectProblems：为什么要做（三个痛点，完整长句，替换原来的"问题 → 方法 → 结果"和"质量难以衡量"三张卡）；

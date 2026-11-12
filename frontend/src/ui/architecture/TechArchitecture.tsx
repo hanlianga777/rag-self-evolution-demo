@@ -2,7 +2,7 @@ import { Icon, type IconName } from "../icons";
 import "./architecture.css";
 
 /**
- * 概览 →「技术架构」（11-12 重做，替换 docs/images/architecture-technical.svg 的内嵌图）。
+ * 概览 →「技术架构」（11-12 重做）。
  *
  * 形式：五层大卡片自上而下；每层左侧是层名和职责，右侧是若干"分组小卡"，分组里用标签列出具体技术。
  * - RAG Pipeline 层是被优化对象：浅蓝底，四个分组之间有箭头表示请求顺序；
