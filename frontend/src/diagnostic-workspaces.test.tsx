@@ -47,14 +47,14 @@ it('preloads version history without dropping the active runtime summary',async(
  const data=await loadAppData(true,'versions');await render(<VersionsPage data={data}/>);
  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='下一页')).toBe(false);
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/versions?page=2&limit=50'))).toBe(true);
- await click('查看完整配置');expect(document.querySelector('[role=dialog]')?.textContent).toContain('当前线上配置');
+ await click('查看发布快照');expect(document.querySelector('[role=dialog]')?.textContent).toContain('当前线上配置');
  expect(document.body.textContent).not.toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(3);await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());await click('查看全部 51 条记录');expect(document.querySelectorAll('tbody tr')).toHaveLength(51);
 });
 it('preloads monitoring events once and switches its tab without requests',async()=>{
  const {VerificationPage}=await import('./pages/VerificationPage');
  const page={events:Array.from({length:50},(_,i)=>({id:`event-${i}`,question:`问题${i}`})),triggers:[]};
  const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/monitoring')?page:url.includes('/api/monitoring?page=2')?{events:[{id:'event-last',question:'最后的反馈'}],triggers:[]}:url.includes('/api/versions')?[]:{})));vi.stubGlobal('fetch',fetcher);
- const data=await loadAppData(true,'verification');await render(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);const count=fetcher.mock.calls.length;await click('线上反馈 → 再次进化');expect(fetcher).toHaveBeenCalledTimes(count);
+ const data=await loadAppData(true,'verification');await render(<VerificationPage data={data} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);const count=fetcher.mock.calls.length;await click('Monitoring');expect(fetcher).toHaveBeenCalledTimes(count);
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/monitoring?page=2&limit=50'))).toBe(true);expect(document.querySelectorAll('tbody tr')).toHaveLength(51);
 });
 it('separates saved formal blockers from confirmed regression without clearing pending risk',async()=>{

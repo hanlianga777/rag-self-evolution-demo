@@ -59,7 +59,7 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space }))));
   await render(<EvolutionPage data={input} />);
   expect(document.querySelectorAll(".tabs button")).toHaveLength(4);
-  expect(document.querySelector(".agent-case-destinations")?.textContent).toContain("1 个 Bad Case");
+  expect(document.querySelectorAll(".agent-case-destinations tbody tr")).toHaveLength(1);
   expect(document.querySelector(".agent-case-destinations")?.textContent).toContain("Candidate A");
   expect(document.querySelector(".agent-case-destinations")?.textContent).not.toContain("Evidence Miss");
   expect(document.querySelectorAll(".diagnosis-cards")).toHaveLength(0);

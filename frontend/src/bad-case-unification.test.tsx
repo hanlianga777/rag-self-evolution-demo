@@ -22,7 +22,7 @@ it('retains all ten planning targets under identity block and hides technical cl
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  await render(<EvolutionPage data={{evaluation,badCases:rows,workspace:{requires_policy_upgrade:true}}}/>);
  expect(document.querySelectorAll('.agent-case-destinations .ui-q')).toHaveLength(10);
- expect(document.querySelector('.agent-case-destinations')?.textContent).toContain('10 个 Bad Case');
+ expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(10);
  expect(document.body.textContent).not.toMatch(/已确认可干预|可探索 \d|saved_diagnostic_identity_changed/);
  expect([...document.querySelectorAll('button')].find(b=>b.textContent?.includes('生成 A / B / C'))?.disabled).toBe(true);
  expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(10);

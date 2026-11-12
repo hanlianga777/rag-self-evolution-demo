@@ -38,7 +38,7 @@ it('shows real release conditions regardless of how many failures were repaired'
  await mount(<VersionsPage data={{evaluation:{result:{}},versions:[{id:'initial',status:'archived',provenance:'bootstrap',config:{}}],optimization:{candidates:[candidate],recommendation:{recommended_candidate:'D'}}}}/>);
  expect(document.querySelector('.ui-rel-steps li:nth-child(2) small')?.textContent).toBe('Hard Gate 3/3 · 新增 Bad Case 0');
  expect(document.querySelector('.ui-rel-actions .secondary')?.textContent).toBe('查看评测报告');
- expect(document.querySelector('.ui-rel-actions a')?.getAttribute('href')).toBe('#evolution?tab=review');
+ expect(document.querySelector('.ui-rel-actions a')).toBeNull();expect(document.querySelector('.ui-rel-actions')?.textContent).not.toContain('查看最终推荐');
  expect(document.querySelector('.release-history-table tbody tr:first-child button')?.textContent).toBe('Baseline（初始配置）');
 });
 it('keeps missing release evidence unknown instead of claiming a zero regression',async()=>{

@@ -42,6 +42,7 @@ export function storyText(value:unknown):string {
   for(const [key,name] of Object.entries({...storyParameterNames,...gateNames,safe_rejection:'安全拒答率'}).sort(([a],[b])=>b.length-a.length)){
     text=text.replace(new RegExp(`\\b${key}\\s*=\\s*`,'g'),`${name} `).replaceAll(key,name);
   }
+  text=text.replace(/thinking/gi,'Thinking').replace(/topk/gi,'Top-K').replace(/Top-K\s*=\s*/g,'Top-K ').replace(/([\u4e00-\u9fff])(Thinking|Max|High|\d+)/g,'$1 $2').replace(/(Thinking|Max|High|\d+)([\u4e00-\u9fff])/g,'$1 $2');
   return narrativeText(text).replace(/\bp99\b/g,'最慢回答 P99').replace(/\bTop(\d+)\b/gi,'回答证据前 $1 条').replace(/\bquery_only\b/g,'只按问题').replace(/\bcompleted\b/g,'已完成').replace(/\brunning\b/g,'运行中').replace(/\bqueued\b/g,'排队中').replace(/Golden Chunk/g,'标准说明').replace(/\b(?:candidates|reranked|final)\b/g,word=>({candidates:'候选列表',reranked:'Rerank 列表',final:'回答证据'}[word]!)).trim() || '说明未保存';
 }
 

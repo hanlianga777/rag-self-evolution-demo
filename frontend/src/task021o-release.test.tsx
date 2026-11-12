@@ -41,8 +41,7 @@ it('labels released status and the archived initial config without calling it cu
  expect(document.querySelector('.release-history-table tbody tr:last-child')?.textContent).toContain('初始配置');
  expect(document.querySelector('.release-history-table tbody tr:last-child')?.textContent).not.toContain('当前线上配置');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent==='回滚至此版本')?.disabled).toBe(false);
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看其他 Candidate')!.click());
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看 Candidate 评测报告')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看评测报告')!.click());
  expect(document.querySelector('[role="dialog"]')?.textContent).not.toMatch(/待发布|尚未发布/);
 });
 it('marks the production config separately from the baseline draft after release',async()=>{

@@ -60,7 +60,7 @@ it.each(['regenerate', 'reselect', 'resume'])('confirms revision operation %s wi
 it('confirms monitoring Agent generation before starting its linked context', async () => {
   const fetcher = vi.fn(async () => response({ id: 'exp', baseline_run_id: 'b', status: 'pending_agent' })); vi.stubGlobal('fetch', fetcher);
   await mount(<VerificationPage data={{ workspace: { current_baseline_id: 'b' }, monitoring: { triggers: [{ id: 'trigger', status: 'human_confirmed', optimization_run_id: 'exp' }] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  await click('线上反馈 → 再次进化'); await cancelWithoutRequest(fetcher, '启动此上下文 Agent · Round 1');
+  await click('Monitoring'); await cancelWithoutRequest(fetcher, '启动此上下文 Agent · Round 1');
 });
 it('uses the shared dialog for a paid immediate resume', async () => {
   const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher); await mount(<PricePauseNotice pause={{ paused: true }} evaluationId="b" />);

@@ -18,12 +18,12 @@ afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllG
 async function mount(){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<EvolutionPage data={data}/>));}
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
 it('defaults to overview and computes published result, parameter lineage and all six case outcomes',async()=>{
- const before=JSON.stringify(data);await mount();
+ data.badCases.reverse();const before=JSON.stringify(data);await mount();
  expect([...document.querySelectorAll('.tabs button')].map(b=>b.textContent)).toEqual(['概览','进化路线','Candidate 对比','回归与推荐']);
  expect(document.querySelector('.tabs .active')?.textContent).toBe('概览');expect(document.querySelector('.page-title + .ui-agent-stats')).toBeNull();
  const overview=document.querySelector('.agent-overview')!;expect(overview.textContent).toContain('推荐并已发布 Candidate D');expect(overview.textContent).toContain('44 → 48');expect(overview.textContent).toContain('10 / 12');
  expect(document.querySelectorAll('.agent-overview-params > article')).toHaveLength(3);expect(overview.textContent).toContain('R3-C');expect(overview.textContent).toContain('R1-C、R2-B');
- const rows=[...document.querySelectorAll('.agent-case-destinations tbody tr')];expect(rows).toHaveLength(6);expect(rows.filter(r=>r.textContent?.includes('D 已修好'))).toHaveLength(4);expect(rows.filter(r=>r.textContent?.includes('仍未修好'))).toHaveLength(2);
+ const rows=[...document.querySelectorAll('.agent-case-destinations tbody tr')];expect(rows).toHaveLength(6);expect(rows.map(row=>row.querySelector('.ui-q')?.textContent)).toEqual(['Q04','Q06','Q24','Q27','Q29','Q38']);expect(document.querySelectorAll('.agent-case-destinations .ui-status.good')).toHaveLength(4);expect(document.querySelectorAll('.agent-case-destinations .ui-status.neutral')).toHaveLength(2);expect(document.querySelector('.agent-case-destinations h3 small')).toBeNull();expect(rows.filter(r=>r.textContent?.includes('D 已修好'))).toHaveLength(4);expect(rows.filter(r=>r.textContent?.includes('仍未修好'))).toHaveLength(2);
  expect(rows[0].textContent).toContain('R1-C');expect(document.querySelector('.route-planning')).toBeNull();
  expect(JSON.stringify(data)).toBe(before);expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });

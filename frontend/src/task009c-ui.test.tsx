@@ -77,10 +77,9 @@ it('uses an honest empty monitoring state and never invents records', async () =
  sessionStorage.clear();
  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ events: [], triggers: [] }))));
  await mount(<VerificationPage data={{ monitoring: { events: [], triggers: [] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
- await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '线上反馈 → 再次进化')!.click());
- expect(document.querySelector('.feedback-empty')?.textContent).toContain('暂无线上反馈');
- expect(document.querySelector('.feedback-empty')?.textContent).toContain('在「实时问答」提问后');
- expect(document.querySelector('.feedback-next-inputs')?.textContent).toContain('本轮仍未修好：未知');
+ await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === 'Monitoring')!.click());
+ expect(document.querySelector('.feedback-empty')?.textContent).toContain('暂无线上问答记录');
+ expect(document.querySelector('.feedback-next-inputs')?.textContent).toContain('本轮仍未修好的 未知题目');
  expect(document.querySelector('.monitoring-table')).toBeNull();
  expect((fetch as any).mock.calls.every(([, init]: any[]) => !init?.method || init.method === 'GET')).toBe(true);
 });

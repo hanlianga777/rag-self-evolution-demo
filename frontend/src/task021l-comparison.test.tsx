@@ -37,7 +37,7 @@ it('replaces citations before markdown, keeps only cited sources and highlights 
  await mount(<ComparisonAnswer row={after} points={points} side="after" onOpenCitation={open}/>);
  expect(document.querySelector('h5')?.textContent).toBe('存放');expect(document.querySelector('strong mark')?.textContent).toContain('只在室内');
  expect(document.body.textContent).not.toMatch(/\*\*|操作_说明\.pdf|同上/);expect(document.querySelectorAll('.comparison-sources li')).toHaveLength(1);
- expect(document.querySelector('.comparison-note')?.textContent).toContain('其他条件未知');
+ expect(document.querySelector('.comparison-note')).toBeNull();expect(document.querySelector('.comparison-body')?.textContent).not.toContain('其他条件未知');
  await act(async()=>document.querySelector<HTMLButtonElement>('.comparison-sources button')!.click());expect(open.mock.calls[0][0]).toMatchObject({chunk_id:'chunk',savedEvidence:true});
 });
 it('never guesses highlights or missing metrics, and derives the critical parameter from evidence',()=>{

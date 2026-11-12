@@ -83,7 +83,7 @@ it('paginates more than 200 version and feedback records locally after all backe
  const count=fetcher.mock.calls.length;
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<VersionsPage data={release}/>));expect(document.querySelectorAll('tbody tr')).toHaveLength(3);await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看全部 200 条记录')!.click());expect(document.querySelectorAll('tbody tr')).toHaveLength(200);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('tbody tr')).toHaveLength(5);
- await act(async()=>root.render(<VerificationPage data={feedback} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>));await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='线上反馈 → 再次进化')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(200);
+ await act(async()=>root.render(<VerificationPage data={feedback} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>));await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Monitoring')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(200);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(5);expect(fetcher).toHaveBeenCalledTimes(count);
 });
 
@@ -93,7 +93,7 @@ it('keeps open page details on an unchanged read version and replaces them after
  const fetcher=vi.fn(async(input:string)=>new Response(JSON.stringify(new URL(input).pathname==='/api/versions'?[{id:version,status:'active',provenance:'bootstrap',config:{top_k:version==='v1'?4:6}}]:new URL(input).pathname==='/api/documents'?[]:{}),{headers:{'X-Read-Version':version}}));vi.stubGlobal('fetch',fetcher);
  try {
   root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<App/>));
-  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看完整配置')!.click());expect(document.querySelector('[role=dialog]')).not.toBeNull();
+  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看发布快照')!.click());expect(document.querySelector('[role=dialog]')).not.toBeNull();
   await act(async()=>window.dispatchEvent(new Event('focus')));expect(document.querySelector('[role=dialog]')).not.toBeNull();
   version='v2';await act(async()=>window.dispatchEvent(new Event('focus')));expect(document.querySelector('[role=dialog]')).toBeNull();
  } finally {location.hash='';}
@@ -107,7 +107,7 @@ it('refreshes feedback when a new answer is saved, so opening its tab stays loca
  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'新保存的合成问答');input.dispatchEvent(new Event('input',{bubbles:true}));});
  await act(async()=>document.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
  const count=fetcher.mock.calls.length;
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='线上反馈 → 再次进化')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Monitoring')!.click());
  expect(document.querySelector('.monitoring-table')?.textContent).toContain('新保存的合成问答');expect(fetcher).toHaveBeenCalledTimes(count);
 });
 

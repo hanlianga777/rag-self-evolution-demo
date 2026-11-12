@@ -44,7 +44,7 @@ it('does not infer paid usage from candidate statuses when the budget is missing
 });
 it('keeps every single-pass failed question as a target even with a legacy exclusion flag',async()=>{
  await mount(experiment([]),[true,false].map((target,index)=>({id:'bad-'+index,run_id:'baseline',question_id:'Q0'+index,result:{passed:false,optimization_target:target,question:'问题'+index}})));
- expect(document.querySelector('.agent-case-destinations')?.textContent).toContain('2 个 Bad Case'); expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(2);
+ expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(2);
 });
 it('keeps unfinished planning in the flat toolbar after a Sandbox exists and keeps idle progress out of the header',async()=>{
  await mount(experiment([candidate('A','failed',{evaluation_run_id:'saved-run',evaluation_complete:false},{product_interruption:true})],{coverage_plan:{status:'incomplete',covered_count:0,total:1,binding:'binding',matrix:[{question_id:'CSV-20261101100758945425-41',candidates:[],gap:'本轮剩余A/B/C容量不足，需明确调整规划，不能宣称完成'}]}}));

@@ -16,7 +16,7 @@ async function click(label: string) { await act(async () => [...document.querySe
 it("restores stages and complete generated plans without inventing evaluated results", async () => {
   const frozen = JSON.stringify(data); await mount();
   expect(document.querySelectorAll(".tabs button")).toHaveLength(4); expect(document.querySelectorAll(".ui-agent-stats > div")).toHaveLength(4);
-  expect(document.body.textContent).toContain("1 个 Bad Case");
+  expect(document.querySelectorAll(".agent-case-destinations tbody tr")).toHaveLength(1);
   await click("进化路线");
   expect(document.querySelectorAll(".agent-design-intent")).toHaveLength(3);
   expect(document.querySelectorAll(".ui-evo-card")).toHaveLength(3);

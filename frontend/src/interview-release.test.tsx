@@ -33,7 +33,7 @@ it("shows only changed parameters on the release main screen and opens full conf
   expect(document.querySelector(".ui-rel-changes")?.textContent).toContain("谨慎拒答");
   expect(document.querySelector(".page-content")?.textContent).not.toContain("Rerank");
   expect(document.querySelector(".release-panel-layout details")).toBeNull();
-  await click("查看完整配置");
+  await click("查看发布快照");
   expect(document.querySelector(".drawer")?.textContent).toContain("Rerank");
   expect(document.querySelector(".drawer pre")).toBeNull();
 });
@@ -51,7 +51,7 @@ it("keeps answer telemetry and source IDs out of the chat until its audit Drawer
   await render(<AssistantPage examples={[{label:"正常问答",question:"冻结正向示例"}]} productionVersion="PROD-audit" isReleased badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
   await act(async () => document.querySelector<HTMLButtonElement>(".empty-chat button")!.click());
   expect(document.querySelector(".message-list")?.textContent).toContain("实际完整回答");
-  expect(document.querySelector(".message-list")?.textContent).toContain("130 ms");
+  expect(document.querySelector(".message-list")?.textContent).toContain("0.1 秒");
   for (const hidden of ["internal-provider", "internal-corpus", "internal-model", "未采集", "TTFT", "Judge"]) expect(document.querySelector(".message-list")?.textContent).not.toContain(hidden);
   await click("查看回答审计");
   expect(document.querySelector(".drawer")?.textContent).toContain("internal-model");
@@ -63,9 +63,9 @@ it("orders verification tabs and reduces Monitoring to question, state, judgemen
   const monitoring = { events: [{ id: "MON-internal", question: "新问题", answer: "实际回答", determinable: false, source: { production_version_id: "PROD-source" }, metrics: { latency_ms: 33 } }], triggers: [] };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(monitoring))));
   await render(<VerificationPage data={{ monitoring }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  expect([...document.querySelectorAll(".tabs > button")].map(node => node.textContent)).toEqual(["Before/After", "实时问答", "线上反馈 → 再次进化"]);
-  await click("线上反馈 → 再次进化");
-  expect([...document.querySelectorAll(".monitoring-table th")].map(node => node.textContent)).toEqual(["问题", "当前状态", "人工判断", "操作"]);
+  expect([...document.querySelectorAll(".tabs > button")].map(node => node.textContent)).toEqual(["Before/After", "实时问答", "Monitoring"]);
+  await click("Monitoring");
+  expect([...document.querySelectorAll(".monitoring-table th")].map(node => node.textContent)).toEqual(["时间", "问题", "耗时", "引用数", "标注状态", "操作"]);
   expect(document.querySelector(".monitoring-table")?.textContent).not.toContain("33 ms");
   expect(document.querySelector(".stage-stepper")).toBeNull();
   await act(async () => document.querySelector<HTMLButtonElement>(".monitoring-table tbody .text-button")!.click());
@@ -83,9 +83,9 @@ it("requires human judgement and confirmation before starting only the linked Mo
     return new Response(JSON.stringify(value));
   }));
   await render(<VerificationPage data={{ workspace: { current_baseline_id: "B1" }, monitoring: monitoring(), optimization: { id: "EXP-prior", candidates: [{ id: "prior-A" }] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  await click("线上反馈 → 再次进化");
+  await click("Monitoring");
   expect(posts).toHaveLength(0);
-  await click("Bad Case");
+  await click("标记为 Bad Case");
   expect(posts[0]).toEqual({ url: expect.stringContaining("/api/monitoring/events/M1/assessment"), body: { bad_case: true, severity: "ordinary" } });
   await click("人工确认");
   expect(posts).toHaveLength(2);

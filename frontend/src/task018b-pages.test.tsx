@@ -37,7 +37,7 @@ it('shows an explicit unknown instead of raw Judge prose when saved checks are m
 it('orders publication cards and hides internal IDs outside technical details',async()=>{
  await mount(<VersionsPage data={{versions:[{id:'v1',status:'active',provenance:'bootstrap',config:{top_k:4,knowledge_identity:{corpus_snapshot_id:'INTERNAL-corpus'}}}]}}/>);
  expect([...document.querySelectorAll('.page-content > .panel > .section-head > h2, .page-content > details > summary')].map(e=>e.textContent)).toEqual(['版本历史与回滚1 条']);
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看完整配置')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看发布快照')!.click());
  expect(document.querySelector('.story-details > .panel')?.textContent).not.toContain('v1');
  expect(document.querySelector('.story-details .parameter-list')?.textContent).not.toContain('[object Object]');
  expect(document.querySelector('.story-details .parameter-list')?.textContent).not.toContain('INTERNAL-corpus');

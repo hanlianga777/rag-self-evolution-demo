@@ -2,7 +2,7 @@ import { DataTable } from "../../components/DataTable";
 import { caseData, caseId, savedDirections } from "../../components/EvaluationDiagnosis";
 import { completeResult, schemeName, storyText } from "../../components/EvolutionStory";
 import { AgentStats } from "../overview/OverviewSummary";
-import { QuestionBadge } from "../Primitives";
+import { QuestionBadge, StatusBadge } from "../Primitives";
 import { ClampText } from "../ClampText";
 import type { EvolutionModel } from "./model";
 import { shortId } from "./model";
@@ -54,11 +54,11 @@ export function AgentOverview({ experiment, model, evaluation, chosenId, release
     {!chosen && experiment?.coverage_plan?.status === "incomplete" && <p className="ui-body-muted">规划未完成：{experiment.coverage_plan.covered_count}/{experiment.coverage_plan.total} 道已有 Candidate 覆盖。</p>}
     <section className="agent-overview-params" aria-label="最终改动的参数">{chosen?.params.map(param => <article className="ui-card" key={param.key}><strong>{param.label}　{param.from ?? "—"} → {param.to}</strong><small>{sourceFor(param.key, param.to)}</small></article>)}{!chosen?.params.length && <p className="ui-body-muted">最终参数变化：—</p>}</section>
     <section className="agent-overview-rules" aria-label="Agent 的三条规则">{RULES.map(([title, text]) => <article className="ui-card" key={title}><h3>{title}</h3><p>{text}</p></article>)}</section>
-    <section className="agent-case-destinations ui-card" aria-label="Bad Case 去向表"><h3>Bad Case 去向 <small>{cases.length} 个 Bad Case</small></h3><DataTable><thead><tr>{["题号", "所在层", "Agent 指派的方向或 Candidate", "第一次被修好的 Candidate", "最终状态"].map(text => <th key={text}>{text}</th>)}</tr></thead><tbody>{cases.map(row => {
+    <section className="agent-case-destinations ui-card" aria-label="Bad Case 去向表"><h3>Bad Case 去向</h3><DataTable><thead><tr>{["题号", "所在层", "Agent 指派的方向或 Candidate", "第一次被修好的 Candidate", "最终状态"].map(text => <th key={text}>{text}</th>)}</tr></thead><tbody>{[...cases].sort((a,b)=>shortId(caseId(a) || "").localeCompare(shortId(caseId(b) || ""),undefined,{numeric:true})).map(row => {
       const id = shortId(caseId(row) || ""), first = [...views, ...(model.d ? [model.d] : [])].find(item => item.complete && item.fixed.includes(id));
       const finalStatus = fixed?.includes(id) ? "D 已修好" : remaining?.includes(id) || fixed && finalResult?.evaluation_complete !== false ? "仍未修好" : "未知";
       return <tr key={caseId(row)} tabIndex={0} role="button" aria-label={`查看 ${id} 问题证据`} onClick={() => onCase(row)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onCase(row); } }}>
-        <td><QuestionBadge id={id} question={caseData(row).question}/></td><td>{caseData(row).diagnostic_view?.diagnosis_category?.replace(/问题$/, "") || "分类未知"}</td><td><ClampText text={storyText(assigned(row))} lines={1}/></td><td>{first?.name || "—"}</td><td>{finalStatus}</td>
+        <td><QuestionBadge id={id} question={caseData(row).question}/></td><td>{caseData(row).diagnostic_view?.diagnosis_category?.replace(/问题$/, "") || "分类未知"}</td><td><ClampText text={storyText(assigned(row))} lines={1}/></td><td>{first?.name || "—"}</td><td><StatusBadge kind={finalStatus === "D 已修好" ? "qualified" : "evaluated"} label={finalStatus}/></td>
       </tr>;
     })}{!cases.length && <tr><td colSpan={5}>暂无保存的 Bad Case</td></tr>}</tbody></DataTable></section>
   </div>;

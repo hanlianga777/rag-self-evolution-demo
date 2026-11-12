@@ -34,5 +34,5 @@ it('shows premise evidence and the protected question and gate risk checklist',a
  const d={status:'generated',config:{top_k:6},reasoning:{candidate_label:'D',changes:[{parameter:'top_k',side_effect_check:{
   same_premise_evidence:'相同前提尚未观察',different_premise_evidence:'候选池12与24不同',risk_checklist:'核对Q17和安全拒答95Hard Gate'}}]}};
  await mount(<DStory experiment={{candidates:[d],result:{composite:current}}}/>);
- for(const text of ['相同前提尚未观察','候选池12与24不同','核对Q17和安全拒答95Hard Gate'])expect(document.querySelector('.d-story')?.textContent).toContain(text);
+ for(const text of ['相同前提尚未观察','候选池 12 与 24 不同','核对Q17 和安全拒答 95Hard Gate'])expect(document.querySelector('.d-story')?.textContent).toContain(text);
 });

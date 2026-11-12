@@ -27,16 +27,18 @@ it("offers one human release action after recommendation without posting before 
   expect(document.body.textContent).not.toContain("Release Approval");
 });
 
-it("keeps other candidates in A/B/C/D order inside a Drawer and never offers an unqualified release", async () => {
+it("shows only the recommended candidate and never offers release controls for the others", async () => {
   const candidates = ["C", "D", "B", "A"].map(label => ({ id: `EXP-${label}`, status: "evaluated", reasoning: { candidate_label: label }, release_state: { sandbox: true, qualified: label === "C", recommended: label === "C", round_complete: true } }));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [], optimization: { candidates, recommendation:{recommended_candidate:"EXP-C"} } }} /></OperationProvider>));
-  expect(document.querySelector(".release-list")).toBeNull();
   expect(document.querySelectorAll(".ui-rel button.primary")).toHaveLength(1);
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(node => node.textContent === "查看其他 Candidate")!.click());
-  expect([...document.querySelectorAll(".candidate-release-row > strong")].map(node => node.textContent)).toEqual(["Candidate A", "Candidate B", "Candidate C", "组合 Candidate D"]);
-  expect(document.querySelector(".drawer")?.textContent).toContain("不合格");
-  expect(document.querySelectorAll(".drawer .ui-rel button.primary")).toHaveLength(0);
+  expect(document.querySelector<HTMLButtonElement>(".ui-rel button.primary")?.disabled).toBe(false);
+  expect(document.querySelector(".ui-rel-side.to")?.textContent).toContain("Candidate C");
+  expect(document.querySelector(".candidate-release-list")).toBeNull();
+  expect(document.body.textContent).not.toContain("查看其他 Candidate");
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(node=>node.textContent === "查看评测报告")!.click());
+  expect(document.querySelector(".drawer")?.textContent).toContain("满足本轮发布资格");
+  expect(document.querySelectorAll(".drawer button.primary")).toHaveLength(0);
 });
 
 it("requires every saved release eligibility guard and a separate rollback confirmation", async () => {

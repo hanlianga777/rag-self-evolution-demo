@@ -39,5 +39,5 @@ it('shows saved numeric Sandbox metrics, highlights Winner/D, keeps round switch
 it('labels the online candidate and configuration from the active version rather than experiment defaults',async()=>{
  history.replaceState(null,'','#verification?tab=qa');
  await mount(<VerificationPage data={{versions:[{id:'online',status:'active',provenance:'published',config:{candidate_k:24,top_k:6,generation_thinking:'high'},snapshot:{candidate_id:'exp-D'}}],optimization:{candidates:[{id:'exp-D',reasoning:{candidate_label:'D'},config:{candidate_k:99}}]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- expect(document.querySelector('.qa-version-status')?.textContent).toBe('当前线上：Candidate D（Candidate K 24 · Top-K 6 · Thinking High）');expect(document.querySelector('.qa-version-status')?.textContent).not.toContain('99');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
+ expect(document.querySelector('.qa-version-status')).toBeNull();expect(document.querySelector('.chat-guide')?.textContent).toContain('向线上版本提问');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });

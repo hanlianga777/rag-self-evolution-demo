@@ -87,7 +87,7 @@ it.each([0, 1.25, null])("M4 Sandbox and release keep frozen estimated cost %s a
   await clickText("查看高级指标");
   if(cost==null) expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("费用未采集");else expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
   expect(document.body.textContent).not.toContain("暂未配置单价");
-  await act(async () => root.render(<VersionsPage data={input} />)); await clickText("查看其他 Candidate"); await clickText("查看 Candidate 评测报告");
+  await act(async () => root.render(<VersionsPage data={{...input,optimization:{...input.optimization,recommendation:{recommended_candidate:candidate.id}}}} />)); await clickText("查看评测报告");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("暂未配置单价");
 });
@@ -311,7 +311,7 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
     return new Response(JSON.stringify(url.endsWith("/monitoring?page=1&limit=50") ? monitoring() : url.includes("/experiments/") ? context() : {}));
   }));
   await render(<VerificationPage data={{ ...data("B1"), monitoring: monitoring(), optimization: { id: "E-prior", candidates: [{ id: "old-A" }] } }} onOpenDocument={() => {}} onOpenCitation={() => {}} />);
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "线上反馈 → 再次进化")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Monitoring")!.click());
   expect(document.querySelector('[aria-label="监控阶段"]')).toBeNull();
   expect(document.querySelector(".monitoring-context")?.textContent).toContain("尚未人工确认，未创建 Optimization 上下文");
   expect([...document.querySelectorAll("button")].some(button => button.textContent?.includes("启动此上下文"))).toBe(false);
@@ -341,7 +341,7 @@ it("review R4 pending Trigger ignores prior ABC and explicitly starts its same R
 it("review R4 selected historical Monitoring context is identified and cannot start under a new Baseline", async () => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/experiments/") ? { id: "E-history", baseline_run_id: "B0", status: "pending_agent", result: { round: 0 }, candidates: [] } : { triggers: [{ id: "T-history", status: "human_confirmed", optimization_run_id: "E-history" }], events: [] }))));
   await render(<VerificationPage data={{ ...data("B1"), monitoring: { triggers: [{ id: "T-history", status: "human_confirmed", optimization_run_id: "E-history" }] } }} onOpenDocument={() => {}} onOpenCitation={() => {}} />);
-  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "线上反馈 → 再次进化")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Monitoring")!.click());
   await clickText("查看进化上下文");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("反馈状态：");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("关联优化：已建立");

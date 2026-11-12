@@ -21,7 +21,7 @@ it('keeps question labels distinct, hides technical IDs and translates parameter
  for(const name of ['Top-K 6','Rerank 方式：只按问题','Embedding Retrieval 权重','HyDE','安全拒答率','回答耗时 P99'])expect(text).toContain(name);
  expect(text).not.toMatch(/CSV-|DOC-|top_k|rerank|query_only|safe_rejection|hybrid_alpha|hyde|latency_p99_seconds/);
  expect(storyText('safe_rejection')).toBe('安全拒答率');
- expect(storyText('p99=65.614秒，Top4截断')).toBe('P99 65.614秒，回答证据前 4 条截断');
+ expect(storyText('p99=65.614秒，Top4截断')).toBe('P99 65.614 秒，回答证据前 4 条 截断');
 });
 it('normalizes displayed Agent reviews and predictions while preserving saved evidence',async()=>{
  const exp=experiment(),original=JSON.stringify(exp);

@@ -69,7 +69,8 @@ const plainQuote=(text:string)=>citationText(text,[]).text.replace(sourceToken,'
 export function ComparisonAnswer({row,points,side,onOpenCitation}:{row:any;points:Point[];side:'before'|'after';onOpenCitation:(citation:Citation)=>void}) {
   const final=finalEvidence(row),trace=row.programmatic_metrics?.retrieval_trace;
   const evidence=[...(final || []),...(row.retrieved_chunks || []),...(trace?.candidates || []),...(trace?.reranked || [])];
-  const display=citationText(row.model_answer || '回答未保存',evidence),tree=answerMarkup(display.text);
+  const answer=(row.model_answer || '回答未保存').split(/\r?\n/).filter((line:string)=>!/^(?:证据边界|未确认条件)[：:]/.test(line.replace(/[*_#>]/g,'').trim())).join('\n');
+  const display=citationText(answer,evidence),tree=answerMarkup(display.text);
   const flatten=(node:ReactNode):string=>typeof node==='string' || typeof node==='number'?String(node):isValidElement<{children?:ReactNode}>(node)?flatten(node.props.children):Array.isArray(node)?node.map(flatten).join(''):'';
   const text=flatten(tree),indexes:number[]=[],characters:string[]=[];
   // Map normalized visible characters back to React text offsets, across bold/list nodes.
@@ -106,8 +107,7 @@ export function ComparisonAnswer({row,points,side,onOpenCitation}:{row:any;point
     }
     if(Array.isArray(node))return Children.map(node,decorate);
     if(!isValidElement<{children?:ReactNode;className?:string}>(node))return node;
-    const note=node.type==='p' && /^(?:证据边界|未确认条件)[：:]/.test(flatten(node).replace(/\s/g,''));
-    return cloneElement(node,{...(note?{className:'comparison-note'}:{})},decorate(node.props.children));
+    return cloneElement(node,{},decorate(node.props.children));
   }
-  return <><div className="comparison-body">{decorate(tree)}</div><footer className="comparison-sources"><div className="comparison-source-title">引用来源</div><ol>{display.sources.map(source=><li key={source.number}><sup className="comparison-cite">{source.number}</sup>{source.citation?<button onClick={()=>onOpenCitation({...source.citation,content_preview:source.citation.content || source.citation.content_preview,savedEvidence:true} as Citation)}>{readableSourceName(source.document)}{source.section && `，${source.section}`}{source.page!=null && `，第 ${source.page}${source.end?`–${source.end}`:''} 页`}</button>:<span>{readableSourceName(source.document)}{source.section && `，${source.section}`}{source.page!=null && `，第 ${source.page}${source.end?`–${source.end}`:''} 页`}（原文未保存）</span>}</li>)}</ol><div className="comparison-more">检索到 {final?.length ?? '未知'} 段证据，回答引用 {display.sources.length} 段</div></footer></>;
+  return <><div className="comparison-body">{decorate(tree)}</div><footer className="comparison-sources"><div className="comparison-source-title">引用来源</div><ol>{display.sources.map(source=><li key={source.number}><sup className="comparison-cite">{source.number}</sup>{source.citation?<button onClick={()=>onOpenCitation({...source.citation,content_preview:source.citation.content || source.citation.content_preview,savedEvidence:true} as Citation)}>{readableSourceName(source.document)}{source.section && `，${source.section}`}{source.page!=null && `，第 ${source.page}${source.end?`–${source.end}`:''} 页`}</button>:<span>{readableSourceName(source.document)}{source.section && `，${source.section}`}{source.page!=null && `，第 ${source.page}${source.end?`–${source.end}`:''} 页`}（原文未保存）</span>}</li>)}</ol></footer></>;
 }
