@@ -33,7 +33,7 @@ it("restores stages and complete generated plans without inventing evaluated res
 it("shows a status row and separate candidate/release decision rows and blocks Gate2 while another candidate is generated", async () => {
   const value = { ...data, optimization: { ...data.optimization, candidates: [{ ...candidates[0], status: "evaluated", result: { qualification: { qualified: true }, gates: { total: 11, passed_count: 11 }, regression: { status: "PASS", new_critical_failures: 0, new_ordinary_failures: 0 }, target_bad_cases_fixed: 1 } }, candidates[1], candidates[2]] } };
   await mount(value); await click("Candidate 对比");
-  expect(document.querySelectorAll(".sandbox-core-table tbody tr")).toHaveLength(5);
+  expect(document.querySelectorAll(".sandbox-core-table tbody tr")).toHaveLength(6);
   await act(async()=>document.querySelector<HTMLButtonElement>(".ui-ct-more")!.click());
   expect(document.querySelector(".sandbox-core-table")?.textContent).toContain("全部原 Bad Case 修好");
   expect(document.body.textContent).not.toContain("确认报告与赢家");
@@ -93,7 +93,7 @@ it("suppresses incomplete final scores, preserves progress and blocks unreconcil
   const incomplete={evaluation_complete:false,completed:38,total:50,gates:{passed_count:0,total:11,passed:null},bad_case_count:6,regression:{status:"FAIL",new_critical_failures:12,new_ordinary_failures:3},qualification:{qualified:false},request_accounting:{call_events:156,unknown_usage_events:1}};
   await mount({...data,optimization:{...data.optimization,candidates:[{...candidates[0],status:"failed",result:incomplete,resume_plan:{can_resume:false,reusable:38,completed:38,total:50,next_question_id:"Q39",reason:"需先对账：Embedding请求结果未知"}},candidates[1],candidates[2]],recommendation:{status:"No Qualified Candidate"}}});
   await click("Candidate 对比");
-  await act(async()=>document.querySelector<HTMLButtonElement>(".ui-ct-more")!.click());
+  expect(document.querySelector(".ui-ct-more")).toBeNull();
   expect(document.querySelector('.sandbox-core-table')?.textContent).toContain("未完成");
   expect(document.querySelector('.sandbox-core-table')?.textContent).toContain("未完成");
   expect(document.querySelector('.sandbox-core-table')?.textContent).not.toContain("0 / 11");

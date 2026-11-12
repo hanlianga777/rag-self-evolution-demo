@@ -36,13 +36,13 @@ it.each(['evaluated','failed'])('does not infer a final recommendation from %s r
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const candidate={id:'A',status,reasoning:{candidate_label:'A'},result:{}};
  await mount(<EvolutionPage data={{evaluation,optimization:{id:'EXP',candidates:[candidate]}}}/>);await click('回归与推荐');
- expect([...document.querySelectorAll('.page-content > .panel')].at(-1)?.textContent).not.toContain('暂无合格 Candidate');
- expect([...document.querySelectorAll('.page-content > .panel')].at(-1)?.textContent).toContain(status==='failed'?'运行失败':'未采集');
+ expect([...document.querySelectorAll('.page-content > .panel')].find(e=>e.querySelector('h2')?.textContent==='最终推荐')?.textContent).not.toContain('暂无合格 Candidate');
+ expect([...document.querySelectorAll('.page-content > .panel')].find(e=>e.querySelector('h2')?.textContent==='最终推荐')?.textContent).toContain(status==='failed'?'运行失败':'未采集');
 });
 it('keeps a historical no-qualified record from becoming the current final decision while incomplete',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  await mount(<EvolutionPage data={{evaluation,optimization:{id:'EXP',candidates:[{id:'A',status:'failed',reasoning:{candidate_label:'A'},result:{}}],recommendation:{status:'No Qualified Candidate',reason:'保存的未推荐原因'}}}}/>);await click('回归与推荐');
- expect([...document.querySelectorAll('.page-content > .panel')].at(-1)?.textContent).toContain('本轮实验尚未完成');expect([...document.querySelectorAll('.page-content > .panel')].at(-1)?.textContent).not.toContain('暂无合格 Candidate');expect(document.body.textContent).toContain('保存的未推荐原因');
+ expect([...document.querySelectorAll('.page-content > .panel')].find(e=>e.querySelector('h2')?.textContent==='最终推荐')?.textContent).toContain('本轮实验尚未完成');expect([...document.querySelectorAll('.page-content > .panel')].find(e=>e.querySelector('h2')?.textContent==='最终推荐')?.textContent).not.toContain('暂无合格 Candidate');expect(document.body.textContent).toContain('保存的未推荐原因');
 });
 it('does not promote a failed candidate checkpoint into a completed Regression comparison',async()=>{
  const {CandidateCaseComparison}=await import('./components/CandidateCaseComparison');

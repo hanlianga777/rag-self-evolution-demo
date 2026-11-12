@@ -20,8 +20,8 @@ it('explains alternatives from saved repairs, regressions and gates rather than 
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{id:'exp',status:'completed',evaluation_budget:{used:10,max:12},candidates:[broken,slow,c,d],result:{composite:{status:'generated',candidate_id:'D'},report_confirmation:{winner_id:'C'}},recommendation:{result:{status:'Recommended',recommended_candidate:'D',not_recommended:[{candidate_id:'broken',reason:'资格未通过'},{candidate_id:'slow',reason:'资格未通过'}]}}}}}/>);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='回归与推荐')!.click());
- const rows=[...document.querySelectorAll('.ui-fin-others tbody tr')].map(e=>e.textContent);
- expect(rows[0]).toContain('Q24');expect(rows[0]).toContain('Q13');expect(document.querySelector('.ui-fin-others thead')?.textContent).toContain('新增 Bad Case');
+ const rows=[...document.querySelectorAll('.candidate-rejections > button')].map(e=>e.textContent);
+ expect(rows[0]).toContain('新增 1 个 Bad Case');expect(document.querySelector('.ui-fin-others h3')?.textContent).toContain('落选原因');
  expect(rows[1]).toContain('回答耗时 P99 86.5 秒');expect(rows[1]).toContain('上限 60 秒');
  expect(document.querySelector('.ui-fin-compare thead')?.textContent).toContain('Winner · 合格');expect(document.querySelector('.ui-fin-compare tbody tr:last-child')?.textContent).toContain('Q04');
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='概览')!.click());expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('10 / 12');

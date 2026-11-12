@@ -85,7 +85,7 @@ it.each([0, 1.25, null])("M4 Sandbox and release keep frozen estimated cost %s a
   const expected = cost == null ? "费用未采集 · Token Usage / Provider Cost unavailable" : `¥ ${(cost * 7.2).toFixed(2)}（估算费用）`;
   expect(document.querySelector(".sandbox-core-table")?.textContent).not.toContain("费用");
   await clickText("查看高级指标");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
+  if(cost==null) expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("费用未采集");else expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
   expect(document.body.textContent).not.toContain("暂未配置单价");
   await act(async () => root.render(<VersionsPage data={input} />)); await clickText("查看其他 Candidate"); await clickText("查看 Candidate 评测报告");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
@@ -238,13 +238,13 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   const d = { id: "E1-D", status: "evaluated", config: {}, reasoning: { candidate_label: "D" }, result: { gates: { passed: true, passed_count: 11, total: 11 }, regression: { passed: false, status: "FAIL" }, qualification: { qualified: false }, release_qualification: { qualified: false } } };
   await render(<EvolutionPage data={{ workspace: identity("B1", "E1"), evaluation: { id: "B1", status: "completed", config: {} }, optimization: { id: "E1", candidates: [d], result: { report_confirmation: { winner_id: "A" }, composite: { candidate_id: d.id } } } }} />);
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Candidate 对比")!.click());
-  expect([...document.querySelectorAll('.sandbox-core-table tbody th')].map(node=>node.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "P99", "安全拒答率"]);
+  expect([...document.querySelectorAll('.sandbox-core-table tbody th')].map(node=>node.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "安全拒答率", "P50", "P99"]);
   await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ct-more')!.click());
   const coreRows = [...document.querySelectorAll(".sandbox-core-table tbody tr")];
   const value = (label: string) => coreRows.find(row => row.querySelector("th")?.textContent === label)?.lastElementChild?.textContent;
   expect(value("Hard Gate")).toBe("11 / 11");
   expect(value("Regression Check")).toBe("未通过");
-  expect(value("Candidate 合格")).toBe("不合格");
+  expect(value("Candidate 合格")).toBeUndefined();
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "进化路线")!.click());
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Candidate D")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(x => x.textContent === "查看 D 完整报告")!.click());

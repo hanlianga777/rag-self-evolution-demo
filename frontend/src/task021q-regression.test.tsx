@@ -18,7 +18,9 @@ it('shows corrected regression and frozen severity while retaining final qualifi
  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='回归与推荐')!.click());
  const table=document.querySelector('.regression-summary-table')!;
  expect(table).not.toBeNull();
- expect([...table.querySelectorAll('tbody tr:first-child td')].map(c=>c.textContent)).toEqual(['Candidate A','1','0','3','未通过','不合格']);
+ expect([...table.querySelectorAll('tbody tr:first-child td')].map(c=>c.textContent)).toEqual(['R3-A','1','0','3','未判定','未通过']);
+ await act(async()=>document.querySelector<HTMLButtonElement>('.regression-candidate')!.click());
+ expect(document.querySelector('[role=dialog]')?.textContent).toContain('逐题追踪');
  expect(document.querySelector('.regression-cases-table')?.textContent).toContain('普通退化');
  expect(document.querySelector('.regression-cases-table')?.textContent).not.toContain('严重退化');
  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='严重')!.click());

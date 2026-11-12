@@ -11,7 +11,7 @@ async function mount(node:React.ReactNode){root=createRoot(document.body.appendC
 const result={evaluation_complete:true,total:50,bad_case_count:2,qualification:{qualified:true},gates:{passed_count:11,total:11},winner_comparison:{fixed_cases:['Q04'],new_failures:[]},new_regression_question_ids:[],all_fixed_question_ids:['Q04'],metrics:{latency_p99_seconds:32,safe_rejection_rate:100}};
 const winner={id:'exp-R3-C',status:'evaluated',reasoning:{round:3,candidate_label:'C'},config:{top_k:4},result:{...result,bad_case_count:3}};
 const d={id:'exp-D',status:'evaluated',reasoning:{candidate_label:'D',winner_id:winner.id,changed_parameters:{top_k:6},explanation:'保存的预测',changes:[{parameter:'top_k',target_question_ids:['Q04'],side_effect_check:{protected_overlap:[]}}]},config:{top_k:6},result};
-it('puts the saved decision once above equal comparison cards and collapses causes separately',async()=>{
+it('puts the saved decision once above equal comparison cards and keeps unresolved causes open',async()=>{
  await mount(<DStory evaluation={{config:{top_k:4}}} experiment={{candidates:[winner,d],recommendation:{recommended_candidate:d.id},result:{d_facts:{remaining_failures:[{question_id:'Q06'}]}}}}/>);
  const header=document.querySelector('.d-story > .ui-card')!;
  expect(header?.textContent).toContain('多修好 Q04，零新增 Bad Case，推荐 Candidate D');
@@ -20,8 +20,8 @@ it('puts the saved decision once above equal comparison cards and collapses caus
  expect(document.querySelectorAll('.d-result-story > .ui-card-row > .ui-card')).toHaveLength(2);
  expect(document.querySelectorAll('[aria-label="预测与实际"] tbody tr')).toHaveLength(3);
  expect([...document.querySelectorAll('[aria-label="Candidate 质量对比"] tbody tr')].map(r=>r.firstChild?.textContent)).toEqual(['答对数','新增 Bad Case 数','最慢回答 P99','安全拒答率']);
- const causes=document.querySelector('details.d-result-causes') as HTMLDetailsElement;
- expect(causes).not.toBeNull();expect(causes.open).toBe(false);expect(causes.closest('.d-result-comparison')).toBeNull();
+ const causes=document.querySelector('section.d-result-causes')!;
+ expect(causes).not.toBeNull();expect(causes.querySelector('summary')).toBeNull();expect(causes.closest('.d-result-comparison')).toBeNull();
  expect(document.querySelectorAll('.d-result-conclusion')).toHaveLength(1);
  expect(document.querySelector('.d-result-conclusion .ui-q')).toBeNull();
 });

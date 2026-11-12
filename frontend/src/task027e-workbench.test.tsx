@@ -44,6 +44,6 @@ it('does not invent release, repairs, parameter sources or design intent when ev
  await click('进化路线');expect(document.querySelector('.agent-design-intent')?.textContent).toBe('设计用意这一轮A的保存思路。');
 });
 it('qualifies round names when Regression includes the historical winner from another round',async()=>{
- await mount();await click('回归与推荐');await click('Round 1');const table=document.querySelector('.regression-summary-table')!;
+ await mount();await click('回归与推荐');expect(document.querySelector('.story-round-switch')).toBeNull();const table=document.querySelector('.regression-summary-table')!;
  expect(table.textContent).toContain('R1-A');expect(table.textContent).toContain('R3-C');expect(table.textContent).toContain('Candidate D');
 });

@@ -59,7 +59,7 @@ export type CompareRow = { label: string; values: (number | string | null)[]; be
 export function CompareTable({ columns, rows, highlight = [] }: { columns: { name: string; status?: StatusKind; statusLabel?: string }[]; rows: CompareRow[]; highlight?: number[] }) {
   const [more, setMore] = useState(false);
   const primary = rows.filter(row => row.primary !== false);
-  const secondary = rows.filter(row => row.primary === false);
+  const secondary = rows.filter(row => row.primary === false && !primary.some(item=>item.label===row.label) && row.values.some(value=>value!=null && !/^(?:—|未知|未采集|不适用|待运行|待完成|未判定)(?:\s*\/.*)?$/.test(String(value))));
   const render = (row: CompareRow) => {
     const nums = row.values.map(v => typeof v === "number" ? v : null);
     const known = nums.filter((v): v is number => v !== null);
@@ -74,10 +74,10 @@ export function CompareTable({ columns, rows, highlight = [] }: { columns: { nam
     </tr>;
   };
   return <div className="ui-ct">
-    <table>
+    <table style={{tableLayout:"fixed"}}><colgroup><col style={{width:"22%"}}/>{columns.map(column=><col key={column.name} style={{width:`${78/columns.length}%`}}/>)}</colgroup>
       <thead><tr><th />{columns.map((column, index) => <th key={column.name} className={highlight.includes(index) ? "hl" : ""}><span className="ui-ct-name">{column.name}</span>{column.status && <StatusBadge kind={column.status} label={column.statusLabel} />}</th>)}</tr></thead>
       <tbody>{primary.map(render)}{more && secondary.map(render)}</tbody>
     </table>
-    {secondary.length > 0 && <button type="button" className="text-button ui-ct-more" aria-expanded={more} onClick={() => setMore(value => !value)}>{more ? "收起更多指标" : `更多指标（${secondary.length}）`}</button>}
+    {secondary.length > 0 && <button type="button" className="secondary ui-ct-more" aria-expanded={more} onClick={() => setMore(value => !value)}>{more ? "收起更多指标" : `展开所有指标（${secondary.length}）`}</button>}
   </div>;
 }

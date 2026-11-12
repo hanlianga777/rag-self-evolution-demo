@@ -37,11 +37,11 @@ it('compares saved predictions with repairs relative to the winner, with identic
 it('explains all remaining failures from saved positions and new failures from the saved judge',async()=>{
  const fetcher=mockRun();await mount(<DStory experiment={exp()} evaluation={evaluation}/>);
  const reasons=document.querySelector('.d-result-causes')!.textContent;
- expect(reasons).toContain('关键说明排第 7 位，证据条数 6 仍纳入不了');
- expect(reasons).toContain('关键说明排第 24 位，证据条数 6 仍纳入不了');
+ expect(reasons).toContain('重排结果里排第 7 位，即使把 Top-K 放宽到 6 也拿不到');
+ expect(reasons).toContain('重排结果里排第 24 位，即使把 Top-K 放宽到 6 也拿不到');
  expect(reasons).toContain('回答含与依据矛盾的内容');expect(reasons).not.toContain('答案新增');
  expect(document.querySelector('.d-result-causes .ui-q.is-broken')?.getAttribute('aria-label')).toBe('Q25 新增 Bad Case');
- expect(document.querySelector<HTMLDetailsElement>('details.d-result-causes')?.open).toBe(false);
+ expect(document.querySelector('.d-result-causes')?.tagName).toBe('SECTION');
  expect(fetcher.mock.calls).toHaveLength(1);expect(String(fetcher.mock.calls[0])).toContain('/api/evaluations/d-run');
  expect(document.querySelector('.d-result-story')!.textContent).not.toMatch(/CSV-|EXP-|EVAL-|DOC-|随机|不稳定|复跑/);
  expect(document.querySelector('.d-result-story [aria-label="Candidate 质量对比"]')!.textContent).toContain('新增 Bad Case 数01');

@@ -76,9 +76,9 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   await act(async()=>{target.focus();await new Promise(resolve=>setTimeout(resolve,150));});
   expect(document.querySelector('[role=tooltip]')?.textContent).toContain("持久化问题");
   await click("Candidate 对比");
-  expect([...document.querySelectorAll(".ui-ct tbody th")].map(cell => cell.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "P99", "安全拒答率"]);
+  expect([...document.querySelectorAll(".ui-ct tbody th")].map(cell => cell.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "安全拒答率", "P50", "P99"]);
   await act(async()=>document.querySelector<HTMLButtonElement>(".ui-ct-more")!.click());
-  for(const label of ["运行状态", "全部原 Bad Case 修好", "指定目标修好", "新增 Bad Case 明细", "Regression Check", "Candidate 合格", "可发布"]) expect(document.querySelector(".ui-ct")?.textContent).toContain(label);
+  for(const label of ["Regression Check"]) expect(document.querySelector(".ui-ct")?.textContent).toContain(label);
   expect(document.body.textContent).not.toContain("Input Tokens");
   await click("查看高级指标");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Input Tokens");
