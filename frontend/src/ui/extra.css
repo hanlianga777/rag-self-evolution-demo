@@ -272,3 +272,13 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 /* 027b：架构页接入既有组件，长说明沿用全站 12px 刻度。 */
 .architecture-business { display:grid; gap:16px; }
 .page-title .page-purpose { max-width:none; font-size:12px; }
+
+/* 027c: existing page tokens, shared tables and two-lane knowledge flow. */
+.knowledge-coverage > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.knowledge-coverage-counts { display:flex; gap:8px; flex-wrap:wrap; color:var(--ui-muted); font-size:var(--ui-fs-meta); font-weight:400; }
+.knowledge-coverage-counts > span { padding:4px 8px; background:var(--ui-rule-2); border-radius:6px; }
+.knowledge-page .detail-button { max-width:100%; cursor:default; }
+.knowledge-page .detail-button .ui-clamp { text-align:left; }
+.parameter-space-drawer .search-space-table :is(th,td) { text-align:left; }
+.drawer.parameter-space-drawer table.search-space-table :is(th.parameter-value,td.parameter-value) { text-align:center; }
+.parameter-space-drawer .search-space-table td .ui-clamp { display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; white-space:normal; }

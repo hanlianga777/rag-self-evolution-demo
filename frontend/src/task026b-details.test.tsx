@@ -52,11 +52,12 @@ it('separates the short conclusion from before and after evidence ranks',()=>{
  expect(why).toHaveProperty('headline','关键证据被截掉 → 放宽 Top-K 后进入上下文 → 补上要点 ①');
  expect(why.steps[1].text).toContain('Before Rerank 第 5 位');expect(why.steps[1].text).toContain('After Rerank 第 6 位');
 });
-it.each([true,false])('uses the current frozen snapshot source, never an unrelated imported snapshot (%s)',async(matches)=>{
+it.each([true,false])('shows only knowledge coverage totals without snapshot provenance (%s)',async(matches)=>{
  const knowledge={identity:{},coverage:{clusters:[{cluster_id:'one',size:3,quotas:{positive:6,ablation:3,negative:6}}]}};
  vi.stubGlobal('fetch',vi.fn(async(input:string)=>new Response(JSON.stringify(input.includes('/snapshots')?[{id:matches?'current':'other',snapshot:{question_ids:Array(9).fill('q'),reviewed_import:{source:'csv'}}}]:{knowledge}))));
  await mount(<KnowledgePage data={{workspace:{current_golden_id:'current'},overview:{knowledge,dataset:{total:9}},documents:[]}}/>);
- const note=document.querySelector('.coverage-note')?.textContent;
- expect(note).toContain('规划 15 个候选题位');expect(note).toContain(matches?'当前 9 题由人工审核 CSV 添加后冻结':'当前冻结考卷 9 题');
- if(!matches)expect(note).not.toContain('CSV');
+ expect(document.querySelector('.coverage-note')).toBeNull();
+ expect(document.querySelector('.knowledge-coverage-counts')?.textContent).toContain('规划题位 · 正向 6 / 消融 3 / 负向 6');
+ expect(document.querySelector('.knowledge-coverage')?.textContent).not.toContain('CSV');
+ expect((fetch as any).mock.calls.some(([url]:any[])=>url.includes('/snapshots'))).toBe(false);
 });

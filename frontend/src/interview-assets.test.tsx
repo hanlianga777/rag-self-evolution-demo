@@ -20,10 +20,10 @@ it("uses persisted corpus totals and actual index dimensions in the compact know
   expect(document.querySelector(".light-stepper")).toBeNull();
   expect(document.querySelector(".metrics-grid")).toBeNull();
   expect(document.querySelectorAll(".knowledge-strategy-card")).toHaveLength(0);
-  expect(document.querySelector(".ui-kp")?.textContent).toContain("384d");
+  expect(document.querySelector(".ui-kf")?.textContent).toContain("384 维");
   expect(document.querySelector(".knowledge-notice")?.textContent).toContain("Legacy");
-  expect(document.querySelector(".ui-kp")?.textContent).toContain("9 页");
-  expect(document.querySelector(".ui-kp")?.textContent).toContain("检索索引6 已索引");
+  expect(document.querySelector(".ui-kf")?.textContent).toContain("9 页");
+  expect(document.querySelector(".ui-kf")?.textContent).toContain("建立索引6 已索引");
   expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["文档名", "页数", "Parent Chunks", "Child Chunks", "解析状态", "索引状态", "操作"]);
   expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
   await act(async () => root.unmount());
@@ -33,9 +33,9 @@ it("hides missing index measurements instead of deriving them from chunks", asyn
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: null, indexed_count: null } }), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<KnowledgePage data={{ documents: [{ id: "DOC-1", name: "说明.pdf", pages: 9, chunks: 7, parser: "PyMuPDF", status: "Indexed" }] }} />));
-  expect(document.querySelector(".ui-kp")?.textContent).toContain("检索索引— 已索引");
-  expect(document.querySelector(".ui-kp")?.textContent).not.toContain("512");
-  expect(document.querySelector(".ui-kp")?.textContent).toContain("维度未采集");
+  expect(document.querySelector(".ui-kf")?.textContent).toContain("建立索引— 已索引");
+  expect(document.querySelector(".ui-kf")?.textContent).not.toContain("512");
+  expect(document.querySelector(".ui-kf")?.textContent).toContain("维度未采集");
   await act(async () => root.unmount());
 });
 
@@ -57,8 +57,8 @@ it("groups pipeline configuration by purpose and marks parameters by their contr
 it("keeps current frozen Golden separate from the latest work Run and hides an empty risk area", async () => {
   const row = { id: "new-Q01", slot: "Q01", question: "待审核的新题", test_category: "positive", stage: "candidate", probe_status: "probe_passed", qc_status: "qc_passed", review_status: "human_review_pending", evidence: [] };
   const workRun = { id: "GGEN-new", status: "completed", profile: { expected_count: 1 }, question_ids: [row.id], artifacts: {} };
-  const snapshots = [{ id: "GD-other", status: "approved", snapshot: { questions: [{ id: "other", test_category: "positive" }], question_ids: ["other"] } }, { id: "GD-current", status: "approved", snapshot: { questions: [{ id: "old-1", test_category: "positive" }, { id: "old-2", test_category: "ablation" }, { id: "old-3", test_category: "negative" }], question_ids: ["old-1", "old-2", "old-3"] } }];
-  const fetcher = vi.fn((url: string, _init?: RequestInit) => Promise.resolve(new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, [row]) : []), { status: 200 })));
+  const snapshots = [{ id: "GD-other", status: "approved", snapshot: { questions: [{ id: "other", test_category: "positive" }], question_ids: ["other"] } }, { id: "GD-current", status: "approved", snapshot: { generation_run_id: workRun.id, questions: [{ id: "old-1", test_category: "positive" }, { id: "old-2", test_category: "ablation" }, { id: "old-3", test_category: "negative" }], question_ids: ["old-1", "old-2", "old-3"] } }];
+  const fetcher = vi.fn((url: string, _init?: RequestInit) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/generation-runs/GGEN-new") ? workRun : (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, [row]) : []), { status: 200 })));
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: "GD-current" }, generationRuns: [workRun], snapshots, dataset: [row], documents: [] }} />));
@@ -83,12 +83,14 @@ it("keeps compact pool toolbar and stashes selections across browse mode", async
   const rows = [{ id: "pool-1", question: "刷盘检查", stage: "candidate", test_category: "positive", qualification_status: "machine_qualified", review_status: "human_review_pending", raw: { source: "business_import" } }, { id: "pool-2", question: "电池维护", stage: "candidate", test_category: "negative", review_status: "human_review_pending", raw: { source: "business_import" } }];
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => new Response(JSON.stringify(init?.method === "POST" ? {valid:false,gaps:[]} : goldenFixture(url, rows)))); vi.stubGlobal("fetch", fetcher);
   await act(async () => root.render(<BusinessImportPanel profiles={{mini:{positive_count:8,ablation_count:4,negative_count:8}}} items={rows} onCreated={async () => {}} />));
-  const toolbar = document.querySelector(".candidate-pool-toolbar")!;
+  const toolbar = document.querySelector(".panel > .candidate-pool-toolbar")!;
+  const titleToolbar = document.querySelector(".section-head .candidate-pool-toolbar")!;
   expect(toolbar.querySelectorAll('[role="combobox"]')).toHaveLength(0);
   expect(toolbar.querySelector('input[type="search"]')).toBeNull();
   expect(toolbar.textContent).toContain("上传业务用例");
   expect(toolbar.textContent).toContain("创建Golden");
-  expect(toolbar.querySelector('[aria-label="候选质量筛选"]')).not.toBeNull();
+  expect(titleToolbar.querySelector('[aria-label="候选质量筛选"]')).not.toBeNull();
+  expect(titleToolbar.querySelector('input[aria-label="搜索候选池"]')).not.toBeNull();
   expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("机器合格");
   expect(document.querySelector('input[type="checkbox"]')).toBeNull();
   const click = async (text:string) => act(async () => { [...toolbar.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent===text)!.click(); });

@@ -31,12 +31,12 @@ it('keeps source pages visible with four short document names and exposes every 
   expect(rows[3].textContent).toContain('B2 电池说明 · p3');
 });
 
-it('keeps a compact diagnosis in the same verdict group without changing the saved value', async () => {
+it('omits Baseline verdict presentation without changing the saved value', async () => {
   const baseline_result = { passed: false, diagnosis_category: '检索层问题' };
   await mount(<QuestionTable rows={[{ id: 'q', question: '原题', baseline_result }]} onDetail={() => {}} />);
   const verdict = document.querySelector('.ui-verdict');
-  expect(verdict?.parentElement?.querySelector('small')?.textContent).toBe('检索层');
-  expect(verdict?.parentElement?.className).toBe('golden-baseline-verdict');
+  expect(verdict).toBeNull();
+  expect(document.querySelector('thead')?.textContent).not.toContain('Baseline');
   expect(baseline_result.diagnosis_category).toBe('检索层问题');
 });
 
@@ -54,8 +54,8 @@ it('uses the shared local short timestamp in the frozen Golden summary', async (
 it('places the sample button in the knowledge chain heading', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ knowledge: {}, index: {} }))));
   await mount(<KnowledgePage data={{ documents: [] }} />);
-  const heading = document.querySelector('.ui-kp h3')?.parentElement;
-  const sample = heading?.querySelector('button.text-button');
+  const heading = document.querySelector('.ui-kf h3')?.parentElement;
+  const sample = heading?.querySelector('button.secondary');
   expect(sample?.textContent).toBe('查看分块示例');
   expect((sample as HTMLButtonElement)?.disabled).toBe(true);
 });

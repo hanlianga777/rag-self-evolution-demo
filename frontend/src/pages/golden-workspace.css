@@ -9,7 +9,7 @@
 .governance-page .golden-workspace .review-table:has(tbody > tr:nth-child(6)) { flex:1; min-height:140px; }
 .candidate-workspace.frozen-question-workspace .detail-content { display:flex; flex-direction:column; overflow-y:auto; background:var(--ui-surface); }
 .frozen-question-workspace .frozen-question-details { flex:1; min-height:0; overflow-y:auto; }
-.governance-page .review-table table { width: 100%; table-layout: fixed; }
+.governance-page :is(.review-table,.candidate-pool-scroll) table { width: 100%; table-layout: fixed; }
 .governance-page .golden-summary-strip { display: grid; gap: 16px; }
 .governance-page .golden-summary-strip p { margin: 0; }
 .governance-page .golden-initial-skeleton { padding: 24px 0; }
@@ -46,9 +46,21 @@
 .frozen-question-details .golden-quality-results p { display:block; overflow:visible; }
 .frozen-question-details .golden-quality-results .badge { align-self:start; }
 
-.governance-page .review-table th { white-space:nowrap; }
+.governance-page :is(.review-table,.candidate-pool-scroll) th { white-space:nowrap; }
 
 .golden-baseline-verdict { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
 .golden-baseline-verdict small { display:inline; color:var(--ui-muted); font-size:var(--ui-fs-meta); }
 
-.governance-page .review-table tbody tr { height:48px; }
+.governance-page :is(.review-table,.candidate-pool-scroll) tbody tr { height:48px; }
+
+.governance-page .candidate-pool-toolbar { margin:0; gap:12px; }
+.governance-page .candidate-pool-toolbar .search input { padding:0; border:0; min-width:0; }
+.governance-page .candidate-pool-table { font-size:inherit; }
+.snapshot-history-toolbar { flex-wrap:wrap; gap:8px; }
+.snapshot-history-toolbar > span { flex:1 1 100%; color:var(--ui-muted); }
+.snapshot-version-row[aria-current=true] { border-color:var(--ui-accent); }
+.snapshot-version-row > button { margin-left:auto; }
+.snapshot-version-preview .review-table { height:auto; max-height:none; overflow:visible !important; }
+.run-list > .snapshot-version-row { grid-template-columns:minmax(0,1fr) auto auto auto; align-items:center; }
+.run-list > .snapshot-version-row > strong { min-width:0; }
+.governance-page :is(.review-table,.candidate-pool-scroll) .badge { padding:0 6px; line-height:18px; vertical-align:middle; }

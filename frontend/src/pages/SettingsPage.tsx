@@ -6,8 +6,6 @@ import { Badge, Section } from "../components/Primitives";
 import { pipelineCached, pipelineFetch, pipelineIdentity, invalidatePipeline } from "../pipelineCache";
 import { Drawer } from "../components/Dialog";
 import { draftDefaults, formatValue, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
-import { schemeName } from "../components/EvolutionStory";
-import { configChanges } from "../components/comparisonData";
 
 import { ParamGrid, type ParamGroup } from "../ui/settings/ParamGrid";
 import { ParamChip } from "../ui/Primitives";
@@ -39,8 +37,6 @@ export function SettingsPage({ data }: { data: any }) {
   const published = pipeline?.active_version?.provenance === "published";
   const contract = pipeline?.search_space || {};
   const onlineConfig = pipeline?.active_version?.config || pipeline?.config;
-  const onlineChanges = published && pipeline?.baseline_config ? configChanges(baseline,onlineConfig).filter(change=>change.key in contract) : [];
-  const onlineName = schemeName(null,pipeline?.active_version?.snapshot?.candidate_id).replace(/^Round \d+ · /, "");
   const changed = Object.keys(contract).filter(key => draft[key] !== base[key]);
   const index = pipeline?.index || {}, knowledge = index.knowledge_config || {};
   const facts = [
@@ -64,7 +60,7 @@ export function SettingsPage({ data }: { data: any }) {
     {error && <p className="error-notice" role="alert">{error}</p>}
     <Section title={<IconLabel name="data">固定技术基座</IconLabel>} action={<Badge>固定</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
     <Section title={<IconLabel name="pipeline">Agent 可选参数</IconLabel>} action={<Badge tone="accent">{Object.keys(contract).length} 项可调参数</Badge>}>
-      {published && pipeline?.baseline_config && <p className="pipeline-online-diff">当前线上 {onlineName} 相对 Baseline {onlineChanges.length ? `改了 ${onlineChanges.length} 项：${onlineChanges.map(change=>`${change.key==='generation_thinking' ? 'Thinking' : change.label} ${change.before} → ${change.after}`).join('、')}` : '可调参数没有变化'}。</p>}
+
       {!pipeline?.baseline_config && <p className="muted">新 Baseline 待评测｜当前配置草稿 以已确认的 Baseline 默认配置作为起点</p>}
       {pipeline?.draft_stale && <p className="error-notice">已保存草稿的基准已变化，请重新核对并保存。</p>}
       <ParamGrid groups={Object.entries(settingsGroups).map(([name, keys], index) => ({
@@ -74,10 +70,9 @@ export function SettingsPage({ data }: { data: any }) {
           note: [parameterNotes[key], key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "仅开启 Hybrid Search 时生效" : ""].filter(Boolean).join("；"),
           options: contract[key].allowed.filter((value: any) => key !== "top_k" || value <= draft.candidate_k).map((value: any) => ({ value, label: key === "retrieval_max_tokens" && value === false ? "不限" : key === "generation_thinking" && value === "off" ? "Off" : formatValue(value) })),
           value: draft[key], baseline: baseline[key], online: published ? onlineConfig?.[key] : undefined,
-          onlineChanged: onlineChanges.some(change=>change.key===key),
           disabled: busy || key === "hybrid_alpha" && !draft.hybrid_search, changed: changed.includes(key),
         })),
-      })) as ParamGroup[]} onChange={change} legend={{baseline: pipeline?.baseline_config ? changed.length ? "白底 = 当前草稿；灰点 = Baseline 起点" : "白底 = Baseline 起点" : undefined, online: published ? `蓝点 = 当前线上：${onlineName}` : undefined}} />
+      })) as ParamGroup[]} onChange={change} legend={{baseline: pipeline?.baseline_config ? changed.length ? "白底 = 当前草稿；灰点 = Baseline 起点" : "白底 = Baseline 起点" : undefined, online: published ? "蓝点 = 当前线上" : undefined}} />
       {(changed.length > 0 || pipeline?.config_draft) && <div className="pipeline-draft-actions">
         <span role="status">{changed.length} 项已修改{pipeline?.config_draft && !pipeline.draft_stale ? " · 配置草稿已保存" : ""}</span>
         <div className="pipeline-draft-chips">{changed.map(key => <ParamChip key={key} label={parameterNames[key] || key} from={formatValue(base[key])} to={formatValue(draft[key])} />)}</div>

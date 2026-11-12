@@ -12,9 +12,9 @@ const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendCh
 afterEach(()=>{if(root)act(()=>root.unmount());vi.unstubAllGlobals();document.body.innerHTML='';});
 it('uses real Golden fields and omits unavailable columns without placeholder cells',async()=>{
  await mount(<QuestionTable rows={[{id:'q',slot:'Q07',question:'如何操作',test_category:'negative',negative_subtype:'clarify',source_summary:'不适用（负向题（Negative）无标准证据）',scoring_summary:{required:3,auxiliary:1},probe:{score:100},qc:{score:90},baseline_result:{passed:false,diagnosis_category:'检索层问题'}}]} onDetail={()=>{}}/>);
- expect([...document.querySelectorAll('th')].map(e=>e.textContent)).toEqual(['题号','题型','问题','出处','评分要点','Probe','QC','Baseline','']);
+ expect([...document.querySelectorAll('th')].map(e=>e.textContent)).toEqual(['题号','题型','问题','出处','评分要点','Probe','QC','']);
  expect(document.querySelector('tbody')?.textContent).toContain('3 条');
- expect(document.querySelector('tbody .ui-verdict.bad')?.textContent).toBe('错');expect(document.querySelector('tbody small')?.textContent).toBe('检索层');
+ expect(document.querySelector('tbody .ui-verdict')).toBeNull();expect(document.querySelector('thead')?.textContent).not.toContain('Baseline');
  expect(document.querySelector('tbody')?.textContent).not.toContain('暂无');
 });
 it('shows saved changes, repaired and harmed questions with the corresponding retrospective',async()=>{

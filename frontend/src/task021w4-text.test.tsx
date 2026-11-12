@@ -18,7 +18,7 @@ it('shows only backend protection flags and distinguishes planned slots from fro
  expect(document.querySelector('.ui-kc-row.clickable')?.textContent).not.toContain('保底');
  expect(document.querySelector('.panel .ui-kc')).toBeNull();
  expect(document.body.textContent).not.toContain('FULL');
- expect(document.querySelector('.ui-kc')?.textContent).toContain('规划题位');
+ expect(document.querySelector('.knowledge-coverage-counts')?.textContent).toContain('规划题位');
 });
 it('computes category scores from saved verdicts and opens the same Bad Case details from the report', async () => {
  const cases = [{question_id:'q1',question:'正向原文',test_category:'positive',passed:true}, {question_id:'q2',question:'消融原文',test_category:'ablation',passed:false,diagnostic_view:{diagnosis_category:'检索层问题'}}, {question_id:'q3',question:'负向原文',test_category:'negative',passed:true}];

@@ -30,10 +30,12 @@ it('translates result and runtime codes while retaining professional names',()=>
  }
  for(const word of ['Bad Case','Candidate','Winner','Hard Gate','Top-K','Rerank','P50','P99'])expect(displayText(word)).toBe(word);
 });
-it('keeps the knowledge diagram and its caption while the architecture tabs use components',()=>{
- const html=renderToStaticMarkup(<KnowledgeDiagrams kind="knowledge"/>);
- expect(html).toContain('<figcaption');expect(html).toContain('<svg');
- expect(html).toContain('viewBox="0 0 1200');
+it('keeps the component architecture views after removing the duplicate knowledge diagram',()=>{
+ for(const kind of ['business','technical'] as const){
+  const html=renderToStaticMarkup(<KnowledgeDiagrams kind={kind}/>);
+  expect(html).toContain(`architecture-${kind}`);expect(html).toContain('<svg');
+  expect(html).not.toContain('知识视角：说明书解析');
+ }
 });
 
 it('normalizes terminology only in the display while keeping saved Agent text intact',()=>{

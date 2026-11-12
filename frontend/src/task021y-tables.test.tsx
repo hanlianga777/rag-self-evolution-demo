@@ -19,8 +19,8 @@ it('uses saved API parameters in one knowledge chain and keeps the sample Child/
   const knowledge = { identity: { corpus_snapshot_id: 'saved' }, documents: 1, pages: 12,
     target_config: { parser: 'Parser A', parser_mode: 'vlm', parent_tokens: 900, child_tokens: 240, overlap_tokens: 30, rerank_model: 'rank-A' },
     coverage: { final_k: 3, method: 'saved-cluster-method', clusters: [] },
-    sample_children: [{ document_id: 'doc', chunk_id: 'child-1', parent_chunk_id: 'parent-1', chunk_text: 'saved Child' }] };
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.includes('/api/documents/') ? { chunks: [], parents: [{ chunk_id: 'parent-1', chunk_text: 'saved Parent' }] } : { knowledge, index: { parent_count: 6, child_count: 19, indexed_count: 18, dimension: 768, embedding_model: 'embed-A' }, config: { hybrid_search: false, rerank: true } }))));
+    sample_children: [{ document_id: 'doc', chunk_id: 'child-1', parent_chunk_id: 'parent-1', section_path: '章节', chunk_text: 'saved Child'.repeat(30) }] };
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.includes('/api/documents/') ? { chunks: knowledge.sample_children, parents: [{ chunk_id: 'parent-1', chunk_text: 'saved Parent' }] } : { knowledge, index: { parent_count: 6, child_count: 19, indexed_count: 18, dimension: 768, embedding_model: 'embed-A' }, config: { hybrid_search: false, rerank: true } }))));
   await mount(<KnowledgePage data={{ documents: [sourceDocument] }} />);
   const chain = document.querySelector('[aria-label="知识处理链路"]');
   expect(chain).not.toBeNull();
@@ -65,7 +65,8 @@ it('opens a compact Golden row by clicking truncated text or pressing Enter whil
   expect(row.textContent).not.toContain('Positive');
   expect(row.textContent).toContain('操作说明 · p54–55');
   expect(row.textContent).toContain('2 条');
-  expect(row.querySelector('.ui-verdict.bad')?.textContent).toBe('错');
+  expect(row.querySelector('.ui-verdict')).toBeNull();
+  expect(document.querySelector('thead')?.textContent).not.toContain('Baseline');
   expect(document.querySelectorAll('tbody tr')[1].querySelector('.ui-verdict')).toBeNull();
   expect(document.querySelector('thead')?.textContent).not.toContain('操作');
   expect(document.querySelector('tbody button')).toBeNull();
