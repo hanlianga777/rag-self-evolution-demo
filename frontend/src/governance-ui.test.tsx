@@ -22,7 +22,7 @@ it("counts the frozen delegated paper without claiming human review", async () =
   expect(document.querySelector(".ui-gp-left > strong")?.textContent).toBe("1 题");
   expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(1);
   expect(document.querySelector(".golden-metrics")).toBeNull();
-  expect([...document.querySelectorAll(".ui-gp-steps li.done")].map(node => node.textContent)).toEqual(["覆盖规划冻结记录", "出题1/1", "硬校验1/1", "Probe1/1", "QC1/1", "Gate 1 · 人工审核1/1"]);
+  expect([...document.querySelectorAll(".ui-gp-steps li.done")].map(node => node.textContent)).toEqual(["覆盖规划未知 个主题", "出题1/1", "硬校验1/1", "Probe1/1", "QC1/1", "Gate 1人工审核"]);
   expect(document.querySelector('.ui-gp .ui-badge')?.textContent || document.querySelector('.ui-gp')?.textContent).toContain("已冻结");
   await act(async () => document.querySelector<HTMLElement>(".review-table tbody tr")!.click());
   expect(document.querySelector(".frozen-question-details")?.textContent).toContain("fixture");
@@ -238,7 +238,7 @@ it("shows Gate 1 complete without a separate Snapshot action", async () => {
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-20", status: "completed", question_ids: questions.map(row => row.id), artifacts: {} }], dataset: questions, snapshots: [{ id: "GD-20", snapshot: { generation_run_id: "GGEN-20", question_ids: questions.map(row => row.id) } }] }} />));
   expect(document.querySelector(".ui-gp")?.textContent).toContain("已冻结");
   expect(document.querySelector(".ui-gp-steps li:last-child")?.classList.contains("done")).toBe(true);
-  expect(document.querySelector(".ui-gp-steps li:last-child small")?.textContent).toBe("20/20");
+  expect(document.querySelector(".ui-gp-steps li:last-child small")?.textContent).toBe("人工审核");
   expect(document.querySelectorAll(".snapshot-next button")).toHaveLength(0);
   await act(async () => root.unmount());
 });
@@ -262,7 +262,7 @@ it("restores a running generation and reads persisted slot progress", async () =
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-live", status: "queued", question_ids: [], artifacts: {} }], dataset: [] }} />); });
   expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-live"), expect.objectContaining({ signal: expect.any(AbortSignal) }));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.body.textContent).toContain("Q03");
   expect(document.body.textContent).toContain("已处理 2/20 · 10%");
   expect((([...document.querySelectorAll("button")].find(button => button.textContent === "新建测试集")) as HTMLButtonElement).disabled).toBe(true);
@@ -275,7 +275,7 @@ it("shows the current automatic refill round and remaining slots", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.querySelector(".generation-progress")?.textContent).toContain("Round 2/3 · 剩余 6 道");
   await act(async () => root.unmount());
 });
@@ -318,7 +318,7 @@ it("shows persisted quality rerun progress and resumes polling after refresh", a
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [run], dataset: questions }} />); });
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "运行审计")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.body.textContent).toContain("4 / 20");
   expect(document.body.textContent).toContain("运行中");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "批量重跑异常项")).toBe(false);

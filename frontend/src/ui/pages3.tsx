@@ -8,14 +8,14 @@ import { StatusBadge, type StatusKind } from "./Primitives";
  * ================================================================== */
 export function GoldenPipeline({ total, split, steps, frozen }: {
   total: number; split: { label: string; count: number }[];
-  steps: { label: string; value: string; done: boolean }[]; frozen: { ok: boolean; text: string };
+  steps: { label: string; value: ReactNode; done: boolean; accent?: boolean }[]; frozen: { ok: boolean; text: string };
 }) {
   return <section className="ui-gp" aria-label="Golden Dataset 摘要">
     <div className="ui-gp-left">
       <strong className="ui-num">{total} 题</strong>
       <div className="ui-gp-split">{split.map(item => <span key={item.label}>{item.label} <b className="ui-num">{item.count}</b></span>)}</div>
     </div>
-    <ol className="ui-gp-steps">{steps.map(step => <li key={step.label} className={step.done ? "done" : ""}><i aria-hidden="true" /><strong>{step.label}</strong><small className="ui-num">{step.value}</small></li>)}</ol>
+    <ol className="ui-gp-steps">{steps.map(step => <li key={step.label} className={`${step.done ? "done" : ""}${step.accent ? " gate" : ""}`}><i aria-hidden="true" /><strong>{step.label}</strong><small className="ui-num">{step.value}</small></li>)}</ol>
     <StatusBadge kind={frozen.ok ? "qualified" : "waiting"} label={frozen.text} />
   </section>;
 }

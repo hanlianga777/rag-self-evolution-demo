@@ -56,11 +56,15 @@
 .governance-page .candidate-pool-toolbar { margin:0; gap:12px; }
 .governance-page .candidate-pool-toolbar .search input { padding:0; border:0; min-width:0; }
 .governance-page .candidate-pool-table { font-size:inherit; }
-.snapshot-history-toolbar { flex-wrap:wrap; gap:8px; }
-.snapshot-history-toolbar > span { flex:1 1 100%; color:var(--ui-muted); }
+.snapshot-history-toolbar { flex-wrap:wrap; gap:8px; justify-content:flex-end; }
+.snapshot-history .ui-action-sm { padding:4px 8px; font-size:var(--ui-fs-meta); }
 .snapshot-version-row[aria-current=true] { border-color:var(--ui-accent); }
-.snapshot-version-row > button { margin-left:auto; }
+.snapshot-version-row > button { margin-left:auto; grid-column:4; }
 .snapshot-version-preview .review-table { height:auto; max-height:none; overflow:visible !important; }
 .run-list > .snapshot-version-row { grid-template-columns:minmax(0,1fr) auto auto auto; align-items:center; }
-.run-list > .snapshot-version-row > strong { min-width:0; }
+.run-list > .snapshot-version-row > .ui-hover-trigger { min-width:0; }
+.snapshot-version-row strong { font-size:var(--ui-fs-body); font-weight:600; }
+.snapshot-version-row > .badge.accent { color:var(--ui-accent); background:var(--ui-accent-tint); border-color:var(--ui-accent-tint); }
+.governance-page .ui-gp-steps .gate strong { color:var(--ui-accent); font-size:11.5px; white-space:nowrap; }
+.governance-page .ui-gp-steps .gate small { color:var(--ui-ink); font-size:12.5px; white-space:nowrap; }
 .governance-page :is(.review-table,.candidate-pool-scroll) .badge { padding:0 6px; line-height:18px; vertical-align:middle; }

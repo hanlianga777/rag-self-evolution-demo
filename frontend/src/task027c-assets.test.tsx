@@ -42,5 +42,5 @@ it('keeps history audit and all exports bound to the selected version',async()=>
  const rows=[...document.querySelectorAll('.snapshot-version-row')];expect(rows).toHaveLength(2);for(const r of rows)expect([...r.querySelectorAll('button')].map(b=>b.textContent)).toEqual(['查看']);
  await act(async()=>rows[1].querySelector<HTMLButtonElement>('button')!.click());expect(documentQuery('.snapshot-version-preview')).toContain('历史题');expect(document.querySelector('.snapshot-version-preview td.id')?.textContent).toBe('Q01');
  const links=[...document.querySelectorAll<HTMLAnchorElement>('.snapshot-history-toolbar a')];expect(links.map(a=>a.getAttribute('href'))).toEqual(['markdown','csv','json'].map(format=>expect.stringContaining(`/old/export?format=${format}`)));
- await click('运行审计');expect(fetcher.mock.calls.some(([url])=>url.endsWith('/generation-runs/old'))).toBe(true);expect(document.querySelector('[role="dialog"]')?.textContent).toContain('old');
+ await click('查看审计');expect(fetcher.mock.calls.some(([url])=>url.endsWith('/generation-runs/old'))).toBe(true);expect(document.querySelector('[role="dialog"]')?.textContent).toContain('old');
 });
