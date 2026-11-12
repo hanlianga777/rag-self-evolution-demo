@@ -82,7 +82,7 @@ it.each([0, 1.25, null])("M4 Sandbox and release keep frozen estimated cost %s a
   const candidate = { id: "E1-A", status: "evaluated", config: {}, reasoning: { candidate_label: "A" }, result: { comparison_metrics: { token_cost: cost, token_cost_status: "Token Usage / Provider Cost unavailable", cost_estimation: cost == null ? { status: "unavailable", amount: null, reason: "usage_missing" } : { status: "estimated", amount: cost, currency: "USD", price_snapshot: { currency: "USD", version: "fixture-price-v1" }, calls: [{ model: "fixture-model", input_tokens: 5, output_tokens: 0, amount: cost, currency: "USD" }] } } } };
   const input = { ...data("B1"), optimization: { id: "E1", candidates: [candidate] } };
   await render(<EvolutionPage data={input} />); await clickText("Candidate 对比");
-  const expected = cost == null ? "费用未采集 · Token Usage / Provider Cost unavailable" : `$${cost}（估算费用）`;
+  const expected = cost == null ? "费用未采集 · Token Usage / Provider Cost unavailable" : `¥ ${(cost * 7.2).toFixed(2)}（估算费用）`;
   expect(document.querySelector(".sandbox-core-table")?.textContent).not.toContain("费用");
   await clickText("查看高级指标");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(expected);
@@ -182,7 +182,7 @@ it("ID-08 clears Candidate Drawer and rejects an old candidate report after iden
 
 it("CT-04 displays collected zero cost and unknown cost reason separately", async () => {
   await render(<><ExecutionMetrics metrics={{ ttft_ms: null, cost_estimation: { status: "estimated", amount: 0, currency: "USD", price_snapshot: { currency: "USD", version: "fixture-price-v1" }, calls: [{ model: "fixture-model", input_tokens: 0, output_tokens: 0, amount: 0, currency: "USD" }] } }} /><ExecutionMetrics metrics={{ cost_estimation: { status: "unavailable", amount: null, reason: "billing_period_ambiguous" } }} /></>);
-  expect(document.body.textContent).toContain("$0（按调用时配置估算）");
+  expect(document.body.textContent).toContain("¥ 0.00（按调用时配置估算）");
   expect(document.body.textContent).toContain("计费时段或节假日日历未确认");
   expect(document.body.textContent).toContain("未采集真实首输出时间");
 });

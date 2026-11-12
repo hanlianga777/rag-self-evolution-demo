@@ -63,8 +63,13 @@ const translations: Record<string, string> = {
   "question": "问题", "reference_answer": "参考答案", "evidence": "证据", "raw": "元数据",
 };
 
+export function presentationText(value: string): string {
+  const replacements: Record<string, string> = { "内部编号": "记录编号", "原始时间戳": "记录时间", "单遍判错": "本次判定未通过", "导入": "添加", "内部": "系统", "试跑": "评测", "复跑": "重新评测", "随机": "自动选取", "不稳定": "存在差异", MEDIUM: "中等", FULL: "完整" };
+  return value.replace(/内部编号|原始时间戳|单遍判错|导入|内部|试跑|复跑|随机|不稳定|\bMEDIUM\b|\bFULL\b/g, word => replacements[word]);
+}
+
 export function displayText(value: string): string {
-  return vocabulary[value] || translations[value] || value.replace("Demo", "运营系统");
+  return presentationText(vocabulary[value] || translations[value] || value.replace("Demo", "运营系统"));
 }
 
 // Exact whole-record translations only. Unknown prose stays explicitly marked; originals remain in the audit.
@@ -78,7 +83,7 @@ const savedNarratives: Record<string, string> = {
 // Display-only normalization shared by saved Agent explanations and generated summaries.
 export function agentDisplayText(value: string): string {
   const names: Record<string, string> = { ...parameterNames, ...gateNames, high: "High", max: "Max", low: "Low", safe_rejection: "安全拒答率", p99: "P99", p50: "P50" };
-  return value.replace(new RegExp(`\\b(?:${Object.keys(names).join('|')})\\b(\\s*=\\s*)?`, 'g'),
+  return presentationText(value).replace(new RegExp(`\\b(?:${Object.keys(names).join('|')})\\b(\\s*=\\s*)?`, 'g'),
     (key, equals) => `${names[key.replace(/\s*=\s*$/, '')]}${equals ? ' ' : ''}`)
     .replace(/方案\s*([ABCD])\b/g, 'Candidate $1').replace(/错题/g, 'Bad Case').replace(/方案/g, 'Candidate').replace(/赢家/g, 'Winner')
     .replace(/([\p{Script=Han}])(Bad Case|Candidate|Winner)/gu, '$1 $2').replace(/(Bad Case|Candidate|Winner)([\p{Script=Han}])/gu, '$1 $2');

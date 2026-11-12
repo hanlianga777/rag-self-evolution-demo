@@ -36,8 +36,8 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
     const characters=Array.from(cleaned),excerpt=/[\u4e00-\u9fff]{4}/.test(cleaned) && !/[={}\[\]]/.test(cleaned)?(characters.length>24?characters.slice(0,23).join('')+'…':cleaned):'关键说明';
     const {a,b}=pair;
     let movement:string;
-    if(expanded)movement=`优化前 Rerank 第 ${a.rerank_rank} 位，被 Top-K 截掉；优化后 Rerank ${b.rerank_rank != null ? `第 ${b.rerank_rank} 位` : '位置未知'}，进入 Top-K 第 ${b.final_rank} 位`;
-    else if(recalled)movement=`优化前没进候选，优化后${b.final_rank!=null?`进入 Top-K 第 ${b.final_rank} 位`:'进入候选'}`;
+    if(expanded)movement=`Before Rerank 第 ${a.rerank_rank} 位，被 Top-K 截掉；After Rerank ${b.rerank_rank != null ? `第 ${b.rerank_rank} 位` : '位置未知'}，进入 Top-K 第 ${b.final_rank} 位`;
+    else if(recalled)movement=`Before没进候选，After${b.final_rank!=null?`进入 Top-K 第 ${b.final_rank} 位`:'进入候选'}`;
     else {
       const stage=a.final_rank!==b.final_rank?'final_rank':a.rerank_rank!==b.rerank_rank?'rerank_rank':'candidate_rank';
       const label={final_rank:'进入回答的位置',rerank_rank:'Rerank 位置',candidate_rank:'候选位置'}[stage];
@@ -46,7 +46,7 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
     }
     steps.push({label:'关键证据位置',text:`“${excerpt}”：${movement}`});
   }
-  if(before?.test_category==='negative' && typeof before.passed==='boolean' && typeof after.passed==='boolean')steps.push({label:'回答结果',text:`优化前${before.passed?'正确拒答':'拒答判定未通过'}，优化后${after.passed?'正确拒答':'拒答判定未通过'}`});
+  if(before?.test_category==='negative' && typeof before.passed==='boolean' && typeof after.passed==='boolean')steps.push({label:'回答结果',text:`Before${before.passed?'正确拒答':'拒答判定未通过'}，After${after.passed?'正确拒答':'拒答判定未通过'}`});
   else if(points.some(point=>point.fresh))steps.push({label:'回答结果',text:`补上了必答要点 ${points.filter(point=>point.fresh).map(point=>`${String.fromCodePoint(0x2460+point.number-1)} ${point.text}`).join('；')}`});
   const added = points.filter(point => point.fresh).map(point => String.fromCodePoint(0x2460 + point.number - 1)).join('、');
   const outcome = added ? `补上要点 ${added}` : '满足本题保存的判定要求';

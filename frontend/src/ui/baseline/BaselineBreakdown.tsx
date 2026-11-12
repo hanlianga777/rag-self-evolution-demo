@@ -1,3 +1,4 @@
+import { ClampText } from "../ClampText";
 import { IconLabel } from "../icons";
 import { QuestionBadge } from "../Primitives";
 import "../extra.css";
@@ -33,7 +34,7 @@ export function BaselineBreakdown({ categories, badCases, onOpen }: { categories
         {badCases.map(item => <li key={item.id}>
           <button type="button" onClick={onOpen ? () => onOpen(item.id) : undefined} disabled={!onOpen} aria-label={`查看 ${item.id} 的诊断`}>
             <QuestionBadge id={item.id} tone="open" />
-            <span className="ui-blb-q" title={item.question}>{item.question ?? "题目未保存"}</span>
+            <ClampText className="ui-blb-q" text={item.question ?? "题目未保存"} lines={1} hoverOnly />
             <span className="ui-blb-layer">{item.layer}</span>
           </button>
         </li>)}

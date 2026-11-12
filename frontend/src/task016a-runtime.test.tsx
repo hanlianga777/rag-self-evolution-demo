@@ -112,7 +112,7 @@ it("shows scheduled D as queued and keeps configuration identifiers inside techn
 
 it("keeps resumed operation language and elapsed units understandable", () => {
   expect(elapsedText(125900)).toBe("2 分 5 秒");
-  expect(evaluationTitle({ config: { candidate_id: "opaque" } })).toBe("Candidate · Sandbox 试跑");
+  expect(evaluationTitle({ config: { candidate_id: "opaque" } })).toBe("Candidate · Sandbox 评测");
   expect(evaluationTitle({ config: { run_target: "answer_replay" } })).toBe("历史回答判分回放");
   expect(displayText("needs_human_review")).toBe("待确认");
 });

@@ -177,22 +177,18 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .page-shell .ui-bcl > button strong { font-weight: 600; }
 @media (max-width: 1100px) { .ui-bcl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-/* —— 抽屉：每个区块是一张小卡片（灰底上的白卡） —— */
-.drawer .drawer-body:has(> .drawer-section, > * > .drawer-section) { background: var(--ui-page); }
+/* —— 抽屉：每个区块是一张小卡片（白底细边卡） —— */
+.drawer .drawer-body:has(> .drawer-section, > * > .drawer-section) { background: var(--ui-surface); }
 .drawer .drawer-section { background: var(--ui-surface); border: 1px solid var(--ui-rule); border-radius: var(--ui-r-inner); padding: 14px 18px; margin: 0 0 12px; }
 .drawer .drawer-section:first-child { padding-top: 14px; }
 .drawer .drawer-section h3 { margin: 0 0 10px; font-size: var(--ui-fs-sub); font-weight: 600; color: var(--ui-ink); }
 .drawer .drawer-section :is(p, li, .muted-prose) { font-size: var(--ui-fs-body); color: var(--ui-ink-2); }
 
-/* —— 按钮颜色：保持安静风格的三档 —— */
-/* primary：蓝底白字（每个区域最多一个，表示"最终动作"，例如批准、确认发布） */
-/* .ui-btn-tint：浅蓝底蓝字（主要的辅助动作，例如运行 Probe、运行 QC、编辑、替换） */
-/* .ui-btn-danger：浅红底红字（删除、回滚等不可逆动作） */
-.ui-btn-tint { background: var(--ui-accent-tint) !important; color: var(--ui-accent) !important; border: 1px solid transparent !important; }
-.ui-btn-tint:hover:not(:disabled) { background: #dcebfc !important; }
+/* 主操作蓝底白字；其余操作沿用白底细边。旧 tint 类仅兼容为次要按钮。 */
+.ui-btn-tint { background: var(--ui-surface); color: var(--ui-ink-2); border: 1px solid var(--ui-rule); }
 .ui-btn-danger { background: #fdecee !important; color: var(--ui-red) !important; border: 1px solid transparent !important; }
 .ui-btn-danger:hover:not(:disabled) { background: #fbdde1 !important; }
-:is(.ui-btn-tint, .ui-btn-danger):disabled { opacity: .45; }
+.ui-btn-danger:disabled { opacity: .45; }
 
 /* —— 截断文字：悬停能看全文时给出提示光标 —— */
 .ui-clamp[data-truncated="true"] { cursor: help; }
@@ -228,3 +224,47 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .ui-vc-d { margin-top: 4px; font-size: var(--ui-fs-meta); color: var(--ui-muted); line-height: 1.55; }
 .ui-vc > div.result .ui-vc-t { color: var(--ui-accent); }
 @media (max-width: 1100px) { .ui-vc { grid-template-columns: 1fr; } .ui-vc > div + div { border-left: 0; border-top: 1px solid var(--ui-rule-2); } .ui-vc > div + div::before { display: none; } }
+
+/* 027a：页签、筛选按钮、全文提示和抽屉共用规则。 */
+.tabs button { border-radius:0; background:transparent; box-shadow:none; }
+.tabs button::after { border-radius:0; }
+.ui-clamp:not([data-truncated="true"]) { cursor:inherit; }
+.ui-clamp-float { pointer-events:auto !important; max-height:min(360px, calc(100vh - 24px)); overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
+.custom-select-trigger > .ui-clamp { flex:1; min-width:0; text-align:left; }
+.ui-ovs-fixed-q, .ui-blb-q, .ui-run-title { white-space:normal; }
+.short-id { max-width:180px; min-width:0; }
+
+.primary { background:var(--ui-accent); color:#fff; border-radius:10px; }
+.primary:hover:not(:disabled) { background:var(--ui-accent-2); }
+.ui-action, .ui-action-sm { display:inline-flex; align-items:center; justify-content:center; gap:6px; background:var(--ui-surface); border:1px solid var(--ui-rule); border-radius:10px; padding:8px 12px; color:var(--ui-ink-2); text-decoration:none; font:inherit; cursor:pointer; }
+.ui-action-sm { padding:4px 8px; font-size:var(--ui-fs-meta); }
+.ui-action:hover:not(:disabled), .ui-action-sm:hover:not(:disabled) { border-color:var(--ui-faint); }
+.ui-action:disabled, .ui-action-sm:disabled { opacity:.45; cursor:not-allowed; }
+
+/* 参数、轮次和表格筛选均为按钮组，页签仍使用 .tabs。 */
+:is(.story-round-switch, .filters, .review-filters, .filter-bar, .comparison-seg) { display:flex; flex-wrap:wrap; align-items:center; gap:6px; background:transparent; border-radius:0; padding:0; }
+:is(.story-round-switch, .filters, .review-filters, .filter-bar, .comparison-seg) > button { background:var(--ui-surface); border:1px solid var(--ui-rule); border-radius:10px; padding:6px 10px; color:var(--ui-ink-2); box-shadow:none; }
+:is(.story-round-switch, .filters, .review-filters, .filter-bar, .comparison-seg) > button:is(.selected,.active,.on,[aria-pressed="true"]) { background:var(--ui-accent-tint); color:var(--ui-accent); border-color:var(--ui-accent); }
+
+.drawer, .drawer .drawer-head, .drawer .detail-content, .drawer .drawer-body { background:var(--ui-surface); }
+.drawer .detail-content { overflow-y:auto; }
+.drawer .detail-content :is(.drawer-body,.candidate-scroll,.candidate-config-diff,.parameter-diff,.golden-evidence-scroll,.table-scroll,.draft-workspace,.audit-workspace) { height:auto; max-height:none; overflow:visible !important; }
+.drawer .candidate-config-diff :is(td,th) { overflow:visible; white-space:normal; }
+.drawer .table-scroll table { min-width:0; }
+.drawer .candidate-workspace-layout { overflow:visible; }
+
+/* 1440×900：少量内容的页面留在首屏，长页面继续整体滚动。 */
+@media (min-width:1200px) and (min-height:800px) {
+  .overview-page .ui-ov { gap:12px; }
+  .overview-page .ui-ov-hero { padding-top:20px; padding-bottom:20px; }
+  .overview-page .ui-ovs-card { padding-top:14px; padding-bottom:14px; }
+  .overview-page .ui-vc { margin-bottom:4px; }
+  .page.settings-page .page-content { gap:12px; }
+  .page.settings-page .page-content > .panel { padding:16px 20px; }
+  .settings-page .frozen-facts > div { padding-top:8px; padding-bottom:8px; }
+  .settings-page .ui-pg-row { padding-top:4px; padding-bottom:4px; }
+}
+
+.drawer.candidate-workspace .detail-content { display:block; overflow-y:auto; }
+.drawer .detail-content > .candidate-shell { display:block; flex:none; }
+.drawer .detail-content .audit-workspace pre { max-height:none; overflow:visible; }

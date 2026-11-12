@@ -1,5 +1,4 @@
 import { Children, createContext, useContext, useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { ClampText } from "../ui/ClampText";
 import { displayText } from "../display";
@@ -30,17 +29,8 @@ export const FullTextContext = createContext(false);
 
 export function TruncatedText({ children, lines = 2, hoverOnly = false }: { children: ReactNode; lines?: 1 | 2 | 3 | 4; hoverOnly?: boolean }) {
   const parts = Children.toArray(children);
-  if (!hoverOnly && parts.every(part => typeof part === "string" || typeof part === "number")) return <div className="clamp-text-host" onClick={event => { if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation(); }}><ClampText text={parts.join("")} lines={lines} /></div>;
-  return <LegacyTruncatedText lines={lines}>{children}</LegacyTruncatedText>;
-}
-
-// Rich cells retain their buttons and markup; drawer details keep their existing presentation.
-function LegacyTruncatedText({ children, lines }: { children: ReactNode; lines: number }) {
-  const id = useId(), ref = useRef<HTMLSpanElement>(null);
-  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
-  const show = () => { const node=ref.current; if (!node || node.scrollHeight<=node.clientHeight && node.scrollWidth<=node.clientWidth) return; const box = node.getBoundingClientRect(); if (box) setPosition({ left: Math.max(8, Math.min(box.left, window.innerWidth - 368)), top: Math.max(8, Math.min(box.bottom + 6, window.innerHeight - 210)) }); };
-  useEffect(()=>{ if(!position)return; const close=(event:Event)=>{if(!(event.target instanceof Element && event.target.closest('[role="tooltip"]')))setPosition(null);}; window.addEventListener("resize",close); document.addEventListener("scroll",close,true); return ()=>{window.removeEventListener("resize",close);document.removeEventListener("scroll",close,true);}; },[position]);
-  return <><span ref={ref} tabIndex={0} className={`truncated-text line-clamp-${lines}`} aria-describedby={position ? id : undefined} onMouseEnter={show} onMouseLeave={() => setPosition(null)} onFocus={show} onBlur={() => setPosition(null)} onKeyDown={event => { if (event.key === "Escape") setPosition(null); }}>{children}</span>{position && createPortal(<div id={id} role="tooltip" className="text-tooltip" style={position}>{children}</div>, document.body)}</>;
+  const plain = parts.every(part => typeof part === "string" || typeof part === "number");
+  return <div className="clamp-text-host" onClick={event => { if (!hoverOnly && (event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation(); }}><ClampText text={plain ? parts.join("") : ""} lines={lines} hoverOnly={hoverOnly} className={plain && !hoverOnly ? "" : `truncated-text line-clamp-${lines}`}>{plain ? undefined : children}</ClampText></div>;
 }
 
 export function FixedTableCard({ children }: { children: ReactNode }) { return <div className="table-scroll fixed-table">{children}</div>; }
@@ -95,9 +85,9 @@ export function CustomSelect({ ariaLabel, value, options, onChange, disabled = f
   };
   return <div ref={host} className={`custom-select${open ? " open" : ""}`} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false); }}>
     <button ref={trigger} type="button" role="combobox" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-listbox`} aria-activedescendant={open ? `${id}-option-${active}` : undefined} disabled={disabled} className="custom-select-trigger" onClick={() => { setActive(Math.max(0, options.findIndex(option => option.value === value))); setOpen(current => !current); }} onKeyDown={onKeyDown}>
-      <span title={selected?.title || selected?.label}>{selected?.label || placeholder || "请选择"}</span><ChevronDown size={15} aria-hidden="true" />
+      <ClampText text={selected?.label || placeholder || "请选择"} lines={1} hoverOnly /><ChevronDown size={15} aria-hidden="true" />
     </button>
-    {open && <div ref={list} {...{popover:"manual"}} role="listbox" id={`${id}-listbox`} aria-label={ariaLabel} className="custom-select-listbox">{options.map((option, index) => <div id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value === value} data-value={option.value} className={index === active ? "active" : ""} title={option.title || option.label} onMouseEnter={() => move(index)} onMouseDown={event => event.preventDefault()} onClick={event => { event.preventDefault(); event.stopPropagation(); choose(option); }}><span>{option.label}</span>{option.description && <small>{option.description}</small>}</div>)}</div>}
+    {open && <div ref={list} {...{popover:"manual"}} role="listbox" id={`${id}-listbox`} aria-label={ariaLabel} className="custom-select-listbox">{options.map((option, index) => <div id={`${id}-option-${index}`} key={option.value} role="option" aria-selected={option.value === value} data-value={option.value} className={index === active ? "active" : ""} onMouseEnter={() => move(index)} onMouseDown={event => event.preventDefault()} onClick={event => { event.preventDefault(); event.stopPropagation(); choose(option); }}><ClampText text={option.label} lines={2} hoverOnly />{option.description && <small>{option.description}</small>}</div>)}</div>}
   </div>;
 }
 
@@ -116,7 +106,7 @@ export function ConclusionCard({ title, children, status, tone = "good" }: { tit
 
 export function ShortId({ value }: { value?: string | null }) {
   if (!value) return <span className="muted">未记录</span>;
-  return <button type="button" className="short-id" title={`${value} · 点击复制`} aria-label={`复制 ID ${value}`} onClick={() => void navigator.clipboard?.writeText(value)}>{value.length > 24 ? `${value.slice(0, 7)}…${value.slice(-7)}` : value}</button>;
+  return <button type="button" className="short-id" aria-label={`复制 ID ${value}`} onClick={() => void navigator.clipboard?.writeText(value)}><ClampText text={value} lines={1} hoverOnly /></button>;
 }
 
 export function ActionMenu({ label, children, triggerText = "⋯" }: { label:string; children:ReactNode; triggerText?: string }) {
@@ -141,7 +131,7 @@ export function ActionMenu({ label, children, triggerText = "⋯" }: { label:str
 /** One track style for both completion and proportions; thresholds are optional. */
 export function ProgressBar({ value, max = 100, label, failed = false, threshold }: { value: number; max?: number; label: string; failed?: boolean; threshold?: number }) {
   const percent = max > 0 ? Math.max(0, Math.min(100, value / max * 100)) : 0;
-  return <div className={`progress-track${failed ? " failed" : ""}`} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value}><span style={{ width: `${percent}%` }} />{threshold != null && max > 0 && <i className="progress-threshold" style={{ left: `${Math.max(0, Math.min(100, threshold / max * 100))}%` }} title={`Hard Gate ${threshold}`} />}</div>;
+  return <div className={`progress-track${failed ? " failed" : ""}`} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value}><span style={{ width: `${percent}%` }} />{threshold != null && max > 0 && <i className="progress-threshold" style={{ left: `${Math.max(0, Math.min(100, threshold / max * 100))}%` }} aria-label={`Hard Gate ${threshold}`} />}</div>;
 }
 
 export function DrawerSection({ title, children }: { title: string; children: ReactNode }) {

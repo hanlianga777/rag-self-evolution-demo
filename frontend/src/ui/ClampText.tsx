@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { computeFloatPosition, type FloatPosition } from "./floating";
 
@@ -11,7 +11,7 @@ const CLOSE_GRACE = 150;
  * - 点击"钉住"，再点外面或按 Esc 关闭；
  * - 关键数字和判定不要只放在这里——它们必须始终显示在主画面。
  */
-export function ClampText({ text, lines = 2, className = "", style }: { text: string; lines?: 2 | 3 | 4 | number; className?: string; style?: CSSProperties }) {
+export function ClampText({ text, children, hoverOnly = false, lines = 2, className = "", style }: { text: string; children?: ReactNode; hoverOnly?: boolean; lines?: number; className?: string; style?: CSSProperties }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const floatRef = useRef<HTMLDivElement | null>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -24,10 +24,12 @@ export function ClampText({ text, lines = 2, className = "", style }: { text: st
   const measure = useCallback(() => {
     const node = ref.current;
     if (!node) return;
-    setTruncated(node.scrollHeight - node.clientHeight > 1);
+    const clipped = node.scrollHeight - node.clientHeight > 1 || node.scrollWidth - node.clientWidth > 1;
+    setTruncated(clipped);
+    if (!clipped) { setOpen(false); setPinned(false); }
   }, []);
 
-  useLayoutEffect(() => { measure(); }, [measure, text, lines]);
+  useLayoutEffect(() => { measure(); }, [measure, text, children, lines]);
   useEffect(() => {
     const node = ref.current;
     if (!node || typeof ResizeObserver === "undefined") return;
@@ -75,18 +77,18 @@ export function ClampText({ text, lines = 2, className = "", style }: { text: st
       onMouseLeave={hide}
       onFocus={() => show(0)}
       onBlur={() => { if (!pinned) close(); }}
-      onClick={() => { if (!truncated) return; if (pinned) { close(); return; } clear(); setOpen(true); setPinned(true); }}
-    >{text}</div>
+      onClick={() => { if (!truncated || hoverOnly) return; if (pinned) { close(); return; } clear(); setOpen(true); setPinned(true); }}
+    >{children ?? text}</div>
     {open && truncated && createPortal(
       <div
         ref={floatRef}
         id={floatId}
         role="tooltip"
-        className={`ui-float light${pinned ? " pinned" : ""}`}
+        className={`ui-float dark ui-clamp-float${pinned ? " pinned" : ""}`}
         style={{ top: position?.top ?? -9999, left: position?.left ?? -9999 }}
         onMouseEnter={clear}
         onMouseLeave={hide}
-      >{text}</div>,
+      >{children ?? text}</div>,
       document.body)}
   </>;
 }

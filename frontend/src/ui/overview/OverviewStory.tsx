@@ -1,3 +1,4 @@
+import { ClampText } from "../ClampText";
 import { Icon, IconLabel } from "../icons";
 import { QuestionBadge } from "../Primitives";
 import "../extra.css";
@@ -29,7 +30,7 @@ export function OverviewStory({ turns, fixed, remaining, onOpenFixed }: { turns:
         {fixed.map(item => <li key={item.id}>
           <button type="button" onClick={onOpenFixed ? () => onOpenFixed(item.id) : undefined} disabled={!onOpenFixed} aria-label={`查看 ${item.id} 的 Before/After`}>
             <QuestionBadge id={item.id} tone="fixed" />
-            <span className="ui-ovs-fixed-q" title={item.question}>{item.question ?? "题目未保存"}</span>
+            <ClampText className="ui-ovs-fixed-q" text={item.question ?? "题目未保存"} lines={1} hoverOnly />
             <span className={`ui-ovs-fixed-c${item.cause ? "" : " unknown"}`}>{item.cause || "—"}</span>
             {onOpenFixed && <Icon name="go" size={15} className="ui-ovs-go" />}
           </button>

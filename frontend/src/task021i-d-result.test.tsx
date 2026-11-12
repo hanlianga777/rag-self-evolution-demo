@@ -18,7 +18,7 @@ const exp=():any=>({id:'experiment',candidates:[structuredClone(winner),structur
 const evaluation={id:'base',status:'completed',dataset_snapshot:{questions:[4,6,15,17,24,25,27,29,38].map(n=>({id:q(n),question:`第${n}题的原题`} ))},result:{total:50,bad_case_count:6}};
 const run=()=>({id:'d-run',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'identity'},cases:[4,6,15,17,24,25,27,29,38].map(n=>({question_id:q(n),passed:![6,25,27].includes(n),judge_result:n===25?{issues:[{failure_kind:'contradiction',description:'答案新增“手册未给出固定充电时长”，但技术规格列有3小时20分，与手册矛盾。'}]}:{}}))});
 function mockRun(value:any=run()){const fetcher=vi.fn(async()=>new Response(JSON.stringify(value)));vi.stubGlobal('fetch',fetcher);return fetcher;}
-const expected='Candidate D 修好了 Q04，但新弄坏了 Q25；Bad Case 数与Round 3 · Candidate C 相同，且出现新增 Bad Case，不满足发布条件，因此保留Round 3 · Candidate C。';
+const expected='Candidate D 修好了 Q04，但新弄坏了 Q25；Bad Case 数与R3-C 相同，且出现新增 Bad Case，不满足发布条件，因此保留R3-C。';
 
 it('compares saved predictions with repairs relative to the winner, with identical route/card data',async()=>{
  mockRun();const experiment=exp(),original=JSON.stringify(experiment);
@@ -79,7 +79,7 @@ it('does not invent predictions, evidence positions or unchanged losing-result c
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).toContain('预测未保存');
  expect(document.querySelector('.d-result-causes')!.textContent).toContain('证据位置不足，原因未知');
- expect(recommendationReason(experiment)).toContain('Bad Case 数比Round 3 · Candidate C 多 1 个');
+ expect(recommendationReason(experiment)).toContain('Bad Case 数比R3-C 多 1 个');
 });
 it('keeps actual repairs separate from the prediction list and does not invent an unpredicted classification',async()=>{
  mockRun();const experiment=exp();experiment.candidates[1].reasoning.changes=[];
@@ -109,5 +109,5 @@ it('shows the promoted D result with concrete repairs and no empty new-problem r
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).not.toContain('未预测到的新问题');
  expect(document.querySelector('.d-story')!.textContent).not.toMatch(/导入|内部|试跑|复跑|第二次/);
- expect(recommendationReason(experiment)).toContain('Candidate D 修好了 Q04，Bad Case 比 Round 3 · Candidate C 少 1 个，且没有新增 Bad Case，满足发布条件，推荐 Candidate D');
+ expect(recommendationReason(experiment)).toContain('Candidate D 修好了 Q04，Bad Case 比 R3-C 少 1 个，且没有新增 Bad Case，满足发布条件，推荐 Candidate D');
 });

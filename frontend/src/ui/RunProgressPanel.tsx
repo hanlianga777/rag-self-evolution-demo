@@ -1,3 +1,4 @@
+import { ClampText } from "./ClampText";
 import { Icon } from "./icons";
 import { useState } from "react";
 import { StatusBadge, type StatusKind } from "./Primitives";
@@ -51,7 +52,7 @@ export function RunProgressPanel({ title, subtitle = "Sandbox 评测", status, c
 
   return <section className="ui-run" role={status === "failed" ? "alert" : "status"} aria-label={`运行状态：${title}`}>
     <div className="ui-run-head">
-      <div className="ui-run-title" title={title}>{title}</div>
+      <ClampText className="ui-run-title" text={title} lines={1} />
       <button type="button" className="ui-run-min" aria-label="最小化运行状态" onClick={() => setMinimized(true)}>–</button>
       <div className="ui-run-sub">{subtitle}</div>
     </div>

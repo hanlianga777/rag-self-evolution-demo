@@ -57,8 +57,8 @@ it.each(['declined','lost','won','running','generated','failed','unknown'])('exp
  const final=document.querySelector('.page-content')!.textContent || '';
  for(const text of [route,final]){
   expect(text).not.toContain('D未同时满足');
-  if(outcome==='declined'){expect(text).toContain('Agent 判断不做 D');expect(text).toContain('保留Round 3 · Candidate C');expect(text).not.toContain('没有胜过');}
-  else if(outcome==='lost'){expect(text).toContain('Bad Case 数与Round 3 · Candidate C 相同');expect(text).toContain('保留Round 3 · Candidate C');}
+  if(outcome==='declined'){expect(text).toContain('Agent 判断不做 D');expect(text).toContain('保留R3-C');expect(text).not.toContain('没有胜过');}
+  else if(outcome==='lost'){expect(text).toContain('Bad Case 数与R3-C 相同');expect(text).toContain('保留R3-C');}
   else if(outcome==='won')expect(text).toContain('D 胜过 Winner，推荐 D');
   else {expect(text).not.toContain('D 已完成评测');expect(text).not.toContain('D 胜过 Winner');}
  }
@@ -71,7 +71,7 @@ it.each([
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
  await mount(<EvolutionPage data={{evaluation,optimization:exp}}/>);
  expect(document.querySelector('.ui-agent-stats')?.textContent).toContain(label);
- expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('Round 3 · Candidate C');
+ expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('R3-C');
  expect([...document.querySelectorAll('button')].some(b=>/^历史实验 · \d/.test(b.textContent || ''))).toBe(false);
  expect([...document.querySelectorAll('.page-title button')].some(b=>b.textContent==='查看历史实验')).toBe(true);
  expect(document.querySelectorAll('.page-title button')).toHaveLength(status==='running'?2:1);

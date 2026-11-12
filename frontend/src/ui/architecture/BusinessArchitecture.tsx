@@ -46,7 +46,7 @@ export const BUSINESS_LANES: ArchLane[] = [
       { icon: "checks", title: "发布资格", detail: "程序复核 Hard Gate 与回归结果" },
       { icon: "release", title: "发布授权", detail: "保存完整快照，可回滚到任一版本", gate: "Gate 3", gateRole: "人工审批" },
       { icon: "verify", title: "线上问答", detail: "每句回答附出处，可回溯原页" },
-      { icon: "compare", title: "Before / After", detail: "同一道题优化前后的回答对照" },
+      { icon: "compare", title: "Before / After", detail: "同一道题Before后的回答对照" },
       { icon: "loop", title: "线上反馈", detail: "人工标记 Bad Case，回到受控优化" },
     ],
   },

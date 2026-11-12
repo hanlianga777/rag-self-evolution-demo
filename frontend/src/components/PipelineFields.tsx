@@ -1,6 +1,7 @@
 import { DataTable } from "./DataTable";
 import { useState } from "react";
 import { displayText, parameterNames, descriptions } from "../display";
+import { TruncatedText } from "./Primitives";
 import { Drawer } from "./Dialog";
 
 export { parameterNames, descriptions } from "../display";
@@ -22,7 +23,7 @@ export function formatValue(value: unknown): string {
 }
 
 export function SearchSpaceTable({ contract, baseline }: { contract: Record<string, { type: string; allowed: unknown[] }>; baseline: Record<string, unknown> }) {
-  return <div className="table-scroll"><DataTable className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th>当前 Baseline</th>}<th>允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td className="muted">{parameterNames[key] || key}</td>{Object.keys(baseline).length > 0 && <td className={typeof baseline[key] === "number" ? "num" : "muted"}>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key])}</td>}<td className="muted">{rule.allowed.map(formatValue).join(" / ")}</td><td className="muted">{key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "Hybrid Search 已开启" : "—"}</td><td className="muted">{descriptions[key] || "—"}</td></tr>)}</tbody></DataTable></div>;
+  return <div className="table-scroll"><DataTable className="search-space-table"><thead><tr><th>参数</th>{Object.keys(baseline).length > 0 && <th>当前 Baseline</th>}<th>允许范围</th><th>依赖关系</th><th>说明</th></tr></thead><tbody>{Object.entries(contract).map(([key, rule]) => <tr key={key}><td className="muted">{parameterNames[key] || key}</td>{Object.keys(baseline).length > 0 && <td className={typeof baseline[key] === "number" ? "num" : "muted"}>{key === "generation_thinking" ? thinkingLabel(baseline[key]) : formatValue(baseline[key])}</td>}<td className="muted">{rule.allowed.map(formatValue).join(" / ")}</td><td className="muted">{key === "top_k" ? "候选数不能少于保留条数" : key === "hybrid_alpha" ? "Hybrid Search 已开启" : "—"}</td><td className="muted"><TruncatedText lines={2}>{descriptions[key] || "—"}</TruncatedText></td></tr>)}</tbody></DataTable></div>;
 }
 
 export const parameterGroups: Record<string, string[]> = { Query: ["query_rewrite", "multi_query", "hyde", "query_decompose", "alias_mapping"], Retrieval: ["candidate_k", "top_k", "min_score", "hybrid_search", "hybrid_alpha", "metadata_filter", "retrieval_max_tokens"], Rerank: ["rerank"], Generation: ["prompt_strategy", "generation_thinking"] };
@@ -30,15 +31,21 @@ export function ParameterDiff({ before = {}, after = {} }: { before?: Record<str
   const [open, setOpen] = useState(false);
   const keys = Object.values(parameterGroups).flat().filter(key => key in before || key in after);
   const changed = keys.filter(key => before[key] !== after[key]);
-  const render = (selected: string[]) => Object.entries(parameterGroups).map(([name, members]) => { const rows = members.filter(key => selected.includes(key)); return rows.length ? <section className="parameter-group drawer-section" key={name}><h3>{displayText(name)}</h3><div className="table-scroll"><DataTable><thead><tr><th>参数</th><th>优化前</th><th>优化后</th></tr></thead><tbody>{rows.map(key => <tr key={key} className={changed.includes(key) ? "parameter-changed" : ""}><td className="muted">{parameterNames[key] || key}</td><td className={typeof before[key] === "number" ? "num" : "muted"}>{formatValue(before[key])}</td><td className={typeof after[key] === "number" ? "num" : "muted"}>{formatValue(after[key])}</td></tr>)}</tbody></DataTable></div></section> : null; });
+  const render = (selected: string[]) => Object.entries(parameterGroups).map(([name, members]) => { const rows = members.filter(key => selected.includes(key)); return rows.length ? <section className="parameter-group drawer-section" key={name}><h3>{displayText(name)}</h3><div className="table-scroll"><DataTable><thead><tr><th>参数</th><th>Before</th><th>After</th></tr></thead><tbody>{rows.map(key => <tr key={key} className={changed.includes(key) ? "parameter-changed" : ""}><td className="muted">{parameterNames[key] || key}</td><td className={typeof before[key] === "number" ? "num" : "muted"}>{formatValue(before[key])}</td><td className={typeof after[key] === "number" ? "num" : "muted"}>{formatValue(after[key])}</td></tr>)}</tbody></DataTable></div></section> : null; });
   return <div className="parameter-diff">{render(changed)}{!changed.length && <p className="muted">{keys.length ? "两个保存配置的参数一致。" : "未保存可比较的配置。"}</p>}{keys.length > changed.length && <><button className="text-button" onClick={() => setOpen(true)}>{changed.length} 项变化 · 未变参数 {keys.length - changed.length}</button><Drawer open={open} onOpenChange={setOpen} title="完整配置与未变参数"><div className="drawer-body">{render(keys)}</div></Drawer></>}</div>;
+}
+
+// Fixed presentation conversion, not a live exchange-rate or a billing recalculation.
+export const DISPLAY_USD_TO_CNY = 7.2;
+export function yuanText(amount: unknown, currency: string): string | null {
+  if (typeof amount !== "number" || !Number.isFinite(amount) || amount < 0 || !["CNY", "USD"].includes(currency)) return null;
+  return `¥ ${(amount * (currency === "USD" ? DISPLAY_USD_TO_CNY : 1)).toFixed(2)}`;
 }
 
 export function estimatedCostText(metrics?: any): string | null {
   const cost = metrics?.cost_estimation || metrics?.estimated_cost;
   if (cost?.status !== "estimated" || typeof cost.amount !== "number" || !Number.isFinite(cost.amount) || cost.amount < 0 || !cost.currency || cost.price_snapshot?.currency !== cost.currency || !Array.isArray(cost.calls) || !cost.calls.length) return null;
-  const prefix = cost.currency === "CNY" ? "¥" : cost.currency === "USD" ? "$" : `${cost.currency} `;
-  return `${prefix}${cost.amount}`;
+  return yuanText(cost.amount, cost.currency);
 }
 
 export function ExecutionMetrics({ metrics, compact = false }: { metrics?: any; compact?: boolean }) {
@@ -64,7 +71,7 @@ export function costReason(reason?: string): string {
 export function billedCostText(metrics?: any): string {
   const estimate = estimatedCostText(metrics);
   if (estimate != null) return `${estimate}（估算费用）`;
-  if (typeof metrics?.token_cost === "number" && metrics.token_cost_status === "MEASURED" && metrics.token_cost_currency && metrics.token_cost_source === "provider_billing") return `${metrics.token_cost} ${metrics.token_cost_currency}（Provider 账单费用）`;
+  if (typeof metrics?.token_cost === "number" && metrics.token_cost_status === "MEASURED" && metrics.token_cost_currency && metrics.token_cost_source === "provider_billing") return yuanText(metrics.token_cost, metrics.token_cost_currency) ? `${yuanText(metrics.token_cost, metrics.token_cost_currency)}（Provider 账单费用）` : "费用未采集";
   const reason = metrics?.token_cost_reason || metrics?.token_cost_status;
   return reason && reason !== "MEASURED" ? `费用未采集 · ${reason}` : "费用未采集";
 }

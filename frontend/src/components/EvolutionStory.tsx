@@ -15,11 +15,11 @@ export const storyParameterNames:Record<string,string>={...parameterNames,candid
 export const storyValue=(value:unknown):string => typeof value==='string' && ['off','low','high','max'].includes(value) ? ({off:'OFF',low:'Low',high:'High',max:'Max'}[value]!) : formatValue(value);
 
 export const recommendationOf = (experiment:any) => experiment?.recommendation?.result || experiment?.recommendation || {};
-export const schemeName = (candidate:any, id?:string):string => {
+export const schemeName = (candidate:any, id?:string, includeRound = true):string => {
   const match=(candidate?.id || id || '').match(/-R(\d+)-([ABCD])$/);
   const label=candidate?.reasoning?.candidate_label || match?.[2] || id?.match(/-([ABCD])$/)?.[1];
   const round=candidate?.reasoning?.round || match?.[1];
-  return label ? `${round ? `Round ${round} · ` : ''}Candidate ${label}` : 'Candidate 信息未保存';
+  return label ? includeRound && round && label !== 'D' ? `R${round}-${label}` : `Candidate ${label}` : 'Candidate 信息未保存';
 };
 
 export const shortQuestionId=(id:string):string => {

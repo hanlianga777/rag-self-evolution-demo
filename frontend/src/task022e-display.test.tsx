@@ -24,7 +24,8 @@ it('builds missing points from saved judgments, preserves grouped numbering, and
   await mount(<BadCaseOverview rows={[multi]} showJudgeReason onSelect={() => {}} />);
   const cell = document.querySelector('.diagnosis-list td:nth-child(4)')!;
   expect(cell.textContent).toContain('缺要点 ①：只在室内存放设备');
-  expect(cell.querySelector('[title]')?.getAttribute('title')).toContain('③：每月充电');
+  await act(async()=>{cell.querySelector('.ui-hover-trigger')!.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,160));});
+ expect(document.querySelector('[role=tooltip]')?.textContent).toContain('③：每月充电');
   expect(cell.textContent).not.toContain('Required');
   expect(JSON.stringify(item)).toBe(before);
 });

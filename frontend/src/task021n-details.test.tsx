@@ -24,11 +24,11 @@ const quote='类型=结构；要点=1. 目视及触摸检查机身、各个关�
 const row=(check:any)=>({diagnostic_view:{evidence_checks:[{quote,...check}]},programmatic_metrics:{retrieval_trace:{final:Array(6).fill({})}}});
 it('shows a short readable excerpt and only the recalled evidence movement',()=>{
  const result=explanation(row({candidate_hit:false,final_rank:null}),row({candidate_hit:true,candidate_rank:22,rerank_rank:3,final_rank:3}),{candidate_k:12},{candidate_k:24},[]);
- expect(result.steps.find(s=>s.label==='关键证据位置')?.text).toBe('“目视及触摸检查机身、各个关节及连接处、足端组件…”：优化前没进候选，优化后进入 Top-K 第 3 位');
+ expect(result.steps.find(s=>s.label==='关键证据位置')?.text).toBe('“目视及触摸检查机身、各个关节及连接处、足端组件…”：Before没进候选，After进入 Top-K 第 3 位');
 });
 it('describes the cutoff change without repeating all ranks',()=>{
  const result=explanation(row({candidate_hit:true,candidate_rank:10,rerank_rank:5,final_rank:null}),row({candidate_hit:true,candidate_rank:10,rerank_rank:6,final_rank:6}),{top_k:4},{top_k:6},[]);
- expect(result.steps.find(s=>s.label==='关键证据位置')?.text).toContain('优化前 Rerank 第 5 位，被 Top-K 截掉；优化后 Rerank 第 6 位，进入 Top-K 第 6 位');
+ expect(result.steps.find(s=>s.label==='关键证据位置')?.text).toContain('Before Rerank 第 5 位，被 Top-K 截掉；After Rerank 第 6 位，进入 Top-K 第 6 位');
  expect(result.steps.find(s=>s.label==='关键证据位置')?.text).not.toContain('召回第');
 });
 it('uses a plain fallback when structured evidence contains no readable sentence',()=>{
@@ -39,7 +39,7 @@ it('lists negative-question configuration changes directly and never marks a key
  const a={...row({candidate_hit:false,final_rank:null}),test_category:'negative',passed:false},b={...row({candidate_hit:true,final_rank:3}),test_category:'negative',passed:true};
  const result=explanation(a,b,{candidate_k:12,top_k:4,generation_thinking:'max'},{candidate_k:24,top_k:6,generation_thinking:'high'},[]);
  expect(result.key).toBeUndefined();
- expect(result.steps).toEqual([{label:'配置变化',text:'Candidate K 12→24、Top-K 4→6、Thinking 档位 Max→High'},{label:'回答结果',text:'优化前拒答判定未通过，优化后正确拒答'}]);
+ expect(result.steps).toEqual([{label:'配置变化',text:'Candidate K 12→24、Top-K 4→6、Thinking 档位 Max→High'},{label:'回答结果',text:'Before拒答判定未通过，After正确拒答'}]);
 });
 it.each([1,2,3])('shows %i missing and newly met points once in the comparison table',async(count)=>{
  const question_id=`Q${count}`,atomic_results=Array.from({length:count},(_,i)=>({atomic_id:`${question_id}-R${i+1}`,state:'NOT_MET'}));

@@ -38,7 +38,7 @@ it("ClampText: truncated → hover opens after delay, leave closes after grace",
   await act(async () => { clamp.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); vi.advanceTimersByTime(100); });
   expect(document.querySelector(".ui-float")).toBeNull();
   await act(async () => { vi.advanceTimersByTime(200); });
-  expect(document.querySelector(".ui-float.light")?.textContent).toContain("很长的文字");
+  expect(document.querySelector(".ui-float.dark")?.textContent).toContain("很长的文字");
   await act(async () => { clamp.dispatchEvent(new MouseEvent("mouseout", { bubbles: true })); vi.advanceTimersByTime(200); });
   expect(document.querySelector(".ui-float")).toBeNull();
 });

@@ -16,7 +16,7 @@ it('uses the requested industry labels and real thinking values',()=>{
  expect(storyValue('max')).toBe('Max');
  expect(storyValue('off')).toBe('OFF');
  expect(baselineName({config:{generation_thinking:'high'}})).toContain('High');
- expect(schemeName({reasoning:{round:3,candidate_label:'D'}})).toBe('Round 3 · Candidate D');
+ expect(schemeName({reasoning:{round:3,candidate_label:'D'}})).toBe('Candidate D');
 });
 it('removes technical entry sections from every source page',()=>{
  const sources=import.meta.glob('./{pages,components}/*.tsx',{query:'?raw',import:'default',eager:true});

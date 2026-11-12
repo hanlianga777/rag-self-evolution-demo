@@ -24,7 +24,8 @@ it('keeps source pages visible with four short document names and exposes every 
   await mount(<QuestionTable rows={sources.map((source_summary, i) => ({ id: String(i), question: '原题', source_summary }))} onDetail={() => {}} />);
   const rows = [...document.querySelectorAll('tbody tr')];
   expect(rows[0].querySelector('td:nth-child(4)')?.textContent).toBe('KIRA 操作说明 · p54–55 +1');
-  expect(rows[0].querySelector('[title]')?.getAttribute('title')).toBe(sources[0]);
+  await act(async()=>{rows[0].querySelector('.ui-hover-trigger')!.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,160));});
+  expect(document.querySelector('[role=tooltip]')?.textContent).toBe(sources[0]);
   expect(rows[1].textContent).toContain('B2 用户手册 · p8');
   expect(rows[2].textContent).toContain('B2 遥控器说明 · p2');
   expect(rows[3].textContent).toContain('B2 电池说明 · p3');

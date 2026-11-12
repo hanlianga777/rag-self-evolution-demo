@@ -30,7 +30,7 @@ export function BaselineHero({ gates, correct, total, badCount, layers, thinking
     {stages.length > 0 && <div className="ui-bl-time">
       <div className="ui-bl-time-head"><span><IconLabel name="time">耗时构成</IconLabel></span>{top && <small>{top.label} 占 {pctOf(top)}</small>}</div>
       <div className="ui-bl-bar" role="img" aria-label={sorted.map(item => `${item.label} ${pctOf(item)}`).join("，")}>
-        {sorted.map((item, index) => <i key={item.label} className={index === 0 ? "top" : ""} style={{ flexGrow: item.seconds }} title={`${item.label} ${item.seconds.toFixed(1)} 秒 · ${pctOf(item)}`} />)}
+        {sorted.map((item, index) => <i key={item.label} className={index === 0 ? "top" : ""} style={{ flexGrow: item.seconds }} />)}
       </div>
       <div className="ui-bl-legend">{sorted.map((item, index) => <span key={item.label} className={index === 0 ? "top" : ""}><i aria-hidden="true" />{item.label} <b className="ui-num">{pctOf(item)}</b></span>)}{generation && <small className="ui-bl-time-note">回答生成占 {pctOf(generation)}{(generation.share ?? generation.seconds / sum * 100) > 50 ? ' → 降 Thinking 档位是提速主要抓手' : ''}</small>}</div>
     </div>}

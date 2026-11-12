@@ -37,7 +37,7 @@ export function KnowledgeCoverage({ topics, onOpen, slotLabel = "题位", info, 
     </header>
     {note && <p className="coverage-note">{note}</p>}
     <div className="ui-kc-table" role="table">
-      <div className="ui-kc-row head" role="row"><span role="columnheader">主题</span><span role="columnheader">知识片段</span><span role="columnheader" title="Positive">正向</span><span role="columnheader" title="Ablation">消融</span><span role="columnheader" title="Negative">负向</span></div>
+      <div className="ui-kc-row head" role="row"><span role="columnheader">主题</span><span role="columnheader">知识片段</span><span role="columnheader">正向</span><span role="columnheader">消融</span><span role="columnheader">负向</span></div>
       {topics.map(topic => <div key={topic.name} role="row" className={`ui-kc-row${onOpen ? " clickable" : ""}`} onClick={onOpen ? () => onOpen(topic.name) : undefined} tabIndex={onOpen ? 0 : undefined} onKeyDown={event => { if (onOpen && event.key === "Enter") onOpen(topic.name); }}>
         <span role="cell" className="ui-kc-name">{topic.name}{topic.protectedSlot && <HoverCard content="片段较少的主题也保留题位，避免冷门知识没有题考"><span className="ui-kc-tag">保底</span></HoverCard>}</span>
         <span role="cell" className="ui-kc-bar"><i style={{ width: `${topic.chunks / maxChunks * 100}%` }} /><b className="ui-num">{topic.chunks}</b></span>

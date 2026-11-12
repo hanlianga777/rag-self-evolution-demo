@@ -37,7 +37,7 @@ it('keeps complete fixed IDs on cards and moves target counts to the target draw
 });
 it('summarizes actual qualifiers and links to the recommendation without repeating baseline rows',async()=>{
  await mount();await click('回归与推荐');
- const summary=document.querySelector('.review-qualified-summary')!;expect(summary?.textContent).toBe('合格 2 个：Round 3 · Candidate C（Winner）、Candidate D（推荐）');
+ const summary=document.querySelector('.review-qualified-summary')!;expect(summary?.textContent).toBe('合格 2 个：R3-C（Winner）、Candidate D（推荐）');
  const scroll=vi.fn();document.querySelector('[aria-label="最终推荐"]')!.scrollIntoView=scroll;
  await act(async()=>summary.querySelector<HTMLButtonElement>('button')!.click());expect(scroll).toHaveBeenCalledOnce();
  const table=document.querySelector('.regression-summary-table')!;

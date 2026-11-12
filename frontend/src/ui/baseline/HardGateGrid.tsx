@@ -1,3 +1,4 @@
+import { HoverCard } from "../HoverCard";
 import { IconLabel } from "../icons";
 import "../extra.css";
 
@@ -22,7 +23,7 @@ export function HardGateGrid({ summary, groups }: { summary?: string; groups: Ga
               {item.ratio != null && <i style={{ width: `${Math.max(0, Math.min(1, item.ratio)) * 100}%` }} className={item.pass ? "" : "bad"} />}
               {item.threshold != null && <b style={{ left: `${Math.max(0, Math.min(1, item.threshold)) * 100}%` }} />}
             </span>
-            <span className="ui-hg-val"><strong>{item.actual}{item.tight && <span className="gate-tight" title="余量很小，后续 Candidate 容易在这一项失败">压线</span>}</strong><small>{item.requirement}</small></span>
+            <span className="ui-hg-val"><strong>{item.actual}{item.tight && <HoverCard content="余量很小，后续 Candidate 容易在这一项失败"><span className="gate-tight" tabIndex={0}>压线</span></HoverCard>}</strong><small>{item.requirement}</small></span>
             <span className={`ui-hg-dot${item.pass ? "" : " bad"}`} aria-label={item.pass ? "通过" : "未通过"} />
           </li>)}</ul>
         </section>;

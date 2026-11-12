@@ -1,3 +1,4 @@
+import { ClampText } from "./ClampText";
 import { useState } from "react";
 import { EvolutionTimeline } from "./evolution/EvolutionTimeline";
 import { buildEvolutionModel } from "./evolution/model";
@@ -101,7 +102,7 @@ export function PageSamples() {
         <thead><tr><th style={{ width: 64 }}>题号</th><th style={{ width: 104 }}>题型</th><th>问题</th><th style={{ width: 170 }}>出处</th><th className="num" style={{ width: 72 }}>评分要点</th><th className="num" style={{ width: 60 }}>Probe</th><th className="num" style={{ width: 52 }}>QC</th><th style={{ width: 120 }}>Baseline</th><th style={{ width: 28 }} /></tr></thead>
         <tbody>{([["Q01", "正向", "我在客户现场发现 KIRA B 50 显示的时间不对，怎么修改时区？", "操作说明 · p54–55", 2, 100, 90, true, ""], ["Q04", "正向", sampleQuestions.Q04, "操作说明 · p85", 3, 100, 95, false, "检索层"], ["Q24", "消融", sampleQuestions.Q24, "操作说明 · p12", 2, 100, 93, false, "检索层"], ["Q38", "负向", sampleQuestions.Q38, "电池说明 · p3", 1, 100, 97, false, "生成层"]] as const).map(row => <tr key={row[0]} role="button" tabIndex={0}>
           <td className="id">{row[0]}</td><td className="muted">{row[1]}</td>
-          <td style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={row[2]}>{row[2]}</td>
+          <td><ClampText text={row[2]} lines={1}/></td>
           <td className="muted">{row[3]}</td><td className="num">{row[4]} 条</td><td className="num">{row[5]}</td><td className="num">{row[6]}</td>
           <td><span className={`ui-verdict ${row[7] ? "ok" : "bad"}`}>{row[7] ? "对" : <>错 <small>{row[8]}</small></>}</span></td>
           <td><span className="ui-row-go"><Icon name="go" size={15} /></span></td>

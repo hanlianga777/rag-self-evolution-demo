@@ -41,7 +41,7 @@ export function ParamGrid({ groups, onChange, legend = { baseline: "Baseline", o
               const isOnline = item.online !== undefined && same(item.online, option.value);
               const marks = [isBase ? "Baseline 使用此值" : "", isOnline ? "当前线上使用此值" : ""].filter(Boolean).join("；");
               return <button key={JSON.stringify(option.value)} type="button" role="radio" aria-checked={selected}
-                className={selected ? "on" : ""} disabled={item.disabled} title={marks || undefined}
+                className={selected ? "on" : ""} disabled={item.disabled} aria-label={[option.label, marks].filter(Boolean).join("；")}
                 onClick={() => onChange(item.key, option.value)}>
                 {option.label}
                 {(isBase || isOnline) && <span className="ui-pg-marks" aria-hidden="true">{isBase && <i className="dot base" />}{isOnline && <i className="dot online" />}</span>}

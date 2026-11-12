@@ -19,7 +19,7 @@ export function PricePauseNotice({ pause, evaluationId, experimentId, target, on
     try { await postJson("/api/runtime-settings/run-now", { ...runTarget, acknowledge_peak_price: true }); setConfirm(false); await onChanged?.(); }
     catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); }
   };
-  return <div className="price-pause-notice" role="status"><p>{pricePauseText(pause)}</p><p>已完成进度已保存。</p>{runTarget && <><button className="secondary ui-btn-tint" onClick={() => setConfirm(true)}>立即运行</button><ConfirmDialog open={confirm} onOpenChange={setConfirm} title="立即运行确认" busy={busy} confirmLabel="确认立即运行本任务" onConfirm={() => void runNow()}><p>立即运行本任务将产生模型费用。</p><p>按当前时段价格计费；不会影响当前线上版本。</p>{error && <p role="alert">{error}</p>}</ConfirmDialog></>}{error && <p role="alert">{error}</p>}</div>;
+  return <div className="price-pause-notice" role="status"><p>{pricePauseText(pause)}</p><p>已完成进度已保存。</p>{runTarget && <><button className="secondary" onClick={() => setConfirm(true)}>立即运行</button><ConfirmDialog open={confirm} onOpenChange={setConfirm} title="立即运行确认" busy={busy} confirmLabel="确认立即运行本任务" onConfirm={() => void runNow()}><p>立即运行本任务将产生模型费用。</p><p>按当前时段价格计费；不会影响当前线上版本。</p>{error && <p role="alert">{error}</p>}</ConfirmDialog></>}{error && <p role="alert">{error}</p>}</div>;
 }
 
 export function RuntimeSettings() {

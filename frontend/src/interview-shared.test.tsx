@@ -14,21 +14,22 @@ it("compact metrics keeps measured zero tokens and hides absent costs and TTFT",
   expect(document.body.textContent).not.toContain("TTFT");
   await act(async () => root.unmount());
 });
-it("costs require frozen price and Usage and retain the stored currency", async () => {
+it("costs require frozen price and Usage and convert display currency only", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   const cost = { status: "estimated", amount: 0, currency: "USD", price_snapshot: { currency: "USD", cost_config_version: "price-1" }, calls: [{ amount: 0 }] };
   await act(async () => root.render(<ExecutionMetrics compact metrics={{ cost_estimation: cost }} />));
-  expect(document.body.textContent).toContain("估算费用$0");
-  expect(document.body.textContent).not.toContain("¥");
+  expect(document.body.textContent).toContain("估算费用¥ 0.00");
+  expect(cost.currency).toBe("USD");
   await act(async () => root.render(<ExecutionMetrics compact metrics={{ cost_estimation: { ...cost, price_snapshot: null } }} />));
   expect(document.body.textContent).not.toContain("费用");
   await act(async () => root.unmount());
 });
-it.each([["CNY", "¥0"], ["USD", "$0"], ["EUR", "EUR 0"]])("preserves %s without converting currency and hides mismatched price snapshots", async (currency, amount) => {
+it.each([["CNY", "¥ 0.00"], ["USD", "¥ 0.00"], ["EUR", null]])("displays %s in yuan when supported and hides mismatched price snapshots", async (currency, amount) => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   const cost = { status: "estimated", amount: 0, currency, price_snapshot: { currency, cost_config_version: "frozen-price" }, calls: [{ amount: 0 }] };
   await act(async () => root.render(<ExecutionMetrics compact metrics={{ cost_estimation: cost }} />));
-  expect(document.body.textContent).toContain(`估算费用${amount}`);
+  if (amount) expect(document.body.textContent).toContain(`估算费用${amount}`);
+  else expect(document.body.textContent).not.toContain("费用");
   await act(async () => root.render(<ExecutionMetrics compact metrics={{ cost_estimation: { ...cost, price_snapshot: { currency: "OTHER" } } }} />));
   expect(document.body.textContent).not.toContain("费用");
   await act(async () => root.unmount());

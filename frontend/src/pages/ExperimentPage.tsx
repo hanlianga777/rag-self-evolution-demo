@@ -59,7 +59,7 @@ export function ExperimentPage({ data = {}, onOpenCitation }: { data?: any; onOp
     if (ticket === requests.current && captured === currentIdentity.current) setBusy(false);
   };
 
-  if (blocked) return <div className="page experiment-page"><EmptyState title={!baselineId || baselineId!==baseline.id?"还没有可用于对比的有效 Baseline":"还没有可对比的已发布 Candidate"} action={<a className="secondary" href={!baselineId || baselineId!==baseline.id?"#evaluation":"#versions"}>{!baselineId || baselineId!==baseline.id?"查看 Baseline":"查看发布条件"}</a>}>发布新 Candidate 后，可以用同一个问题对比优化前后的回答。</EmptyState></div>;
+  if (blocked) return <div className="page experiment-page"><EmptyState title={!baselineId || baselineId!==baseline.id?"还没有可用于对比的有效 Baseline":"还没有可对比的已发布 Candidate"} action={<a className="secondary" href={!baselineId || baselineId!==baseline.id?"#evaluation":"#versions"}>{!baselineId || baselineId!==baseline.id?"查看 Baseline":"查看发布条件"}</a>}>发布新 Candidate 后，可以用同一个问题对比Before后的回答。</EmptyState></div>;
   return <div className="page experiment-page"><ConclusionCard title={left.status === "completed" && right.status === "completed" ? "同题实际回答已保存，可核对内容与引用差异" : "对比发布前配置与已发布线上配置"} tone="neutral">{left.status === "completed" && right.status === "completed" ? "两侧均为本次主动运行返回的真实回答；未调用 Judge，不产生新评分或资格。" : "选择或输入同一道问题，再主动运行两套已保存配置。参数差异可展开核对，回答未运行时不预判改善。"}</ConclusionCard>
     <ConfirmDialog open={askConfirm} onOpenChange={setAskConfirm} title="确认运行实时对比" busy={busy} onConfirm={() => { setAskConfirm(false); void ask(); }}><p>将对同一道问题运行两套配置，会调用模型并产生两次问答的费用。</p><p>不会影响当前线上版本，不生成评测成绩。</p></ConfirmDialog>
     <section className="experiment-query compare-toolbar">

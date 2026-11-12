@@ -132,8 +132,8 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-clamp[data-truncated="true"]:hover, .ui-clamp[data-truncated="true"]:focus-visible { background: var(--ui-rule-2); outline: none; }
 
 /* —— 浮层（ClampText 全文窗、HoverCard 深色提示卡）—— */
-.ui-float { box-sizing: border-box; position: fixed; z-index: 60; max-width: min(440px, calc(100vw - 24px)); animation: ui-fade-in var(--ui-t-fast) var(--ui-ease); }
-.ui-float.light { background: var(--ui-surface); color: var(--ui-ink); border-radius: 12px; box-shadow: var(--ui-shadow-2); padding: 12px 16px; max-height: 360px; overflow: auto; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+.ui-float { box-sizing: border-box; position: fixed; z-index: 120; max-width: min(440px, calc(100vw - 24px)); animation: ui-fade-in var(--ui-t-fast) var(--ui-ease); }
+
 .ui-float.dark { background: var(--ui-navy); color: #f2f2f7; border-radius: 12px; box-shadow: var(--ui-shadow-float); padding: 10px 14px; font-size: 12.5px; line-height: 1.6; pointer-events: none; }
 .ui-float.dark b, .ui-float.dark strong { color: #fff; font-weight: 600; }
 .ui-float.pinned { outline: 2px solid var(--ui-navy-3); outline-offset: 0; }
