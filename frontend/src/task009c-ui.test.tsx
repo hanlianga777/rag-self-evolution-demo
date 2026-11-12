@@ -79,7 +79,7 @@ it('uses an honest empty monitoring state and never invents records', async () =
  await mount(<VerificationPage data={{ monitoring: { events: [], triggers: [] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === 'Monitoring')!.click());
  expect(document.querySelector('.feedback-empty')?.textContent).toContain('暂无线上问答记录');
- expect(document.querySelector('.feedback-next-inputs')?.textContent).toContain('本轮仍未修好的 未知题目');
+ expect(document.querySelector('.monitoring-next-inputs')?.textContent).toContain('未修好题目未知');
  expect(document.querySelector('.monitoring-table')).toBeNull();
  expect((fetch as any).mock.calls.every(([, init]: any[]) => !init?.method || init.method === 'GET')).toBe(true);
 });

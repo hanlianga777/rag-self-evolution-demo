@@ -89,6 +89,11 @@ export function remainingQuestionIds(experiment:any):string[]|null {
   return Array.isArray(result?.continued_failure_question_ids) ? result.continued_failure_question_ids : null;
 }
 
+export function missedEvidenceRank(candidate:any,row:any):number|undefined {
+  const stage=candidate?.config?.rerank===false ? 'candidates' : 'reranked';
+  return row?.evidence_positions?.find((pos:any)=>pos.final==='未进入' && typeof pos[stage]==='number' && pos[stage]>candidate?.config?.top_k)?.[stage];
+}
+
 // D's saved baseline repairs include repairs already made by the winner.
 // Only winner_comparison describes D's extra benefit.
 function dResultData(experiment:any) {
@@ -156,11 +161,9 @@ function DResultStory({experiment,evaluation,badCases,footer}:{experiment:any;ev
   const rowFor=(id:string)=>cases.find((row:any)=>row.question_id===id);
   const unpredicted=broken && riskRecorded ? broken.filter(id=>!watched.some(q=>shortQuestionId(q)===shortQuestionId(id))) : null;
   const remaining=(facts.remaining_failures || []).filter((row:any)=>rowFor(row.question_id)?.passed===false || rowFor(row.question_id)?.passed!==true && (fixed===null || !fixed.includes(row.question_id)));
-  const missedPosition=(row:any)=>row.evidence_positions?.find((pos:any)=>pos.final==='未进入' && typeof (d.config?.rerank===false ? pos.candidates : pos.reranked)==='number' && (d.config?.rerank===false ? pos.candidates : pos.reranked)>d.config?.top_k);
-  const rankOf=(pos:any)=>d.config?.rerank===false ? pos?.candidates : pos?.reranked;
   const missedReason=(row:any)=>{
-    const pos=missedPosition(row);
-    return pos ? `关键说明在 Winner 的${d.config?.rerank===false ? '候选' : '重排'}结果里排第 ${rankOf(pos)} 位，即使把 Top-K 放宽到 ${d.config.top_k} 也拿不到；这个位置提示下一轮应先检查${d.config?.rerank===false ? '召回顺序' : '重排顺序'}，而不是继续增加条数。` : '保存的证据位置不足，原因未知。';
+    const rank=missedEvidenceRank(d,row);
+    return rank!==undefined ? `关键说明在 Winner 的${d.config?.rerank===false ? '候选' : '重排'}结果里排第 ${rank} 位，即使把 Top-K 放宽到 ${d.config.top_k} 也拿不到；这个位置提示下一轮应先检查${d.config?.rerank===false ? '召回顺序' : '重排顺序'}，而不是继续增加条数。` : '保存的证据位置不足，原因未知。';
   };
   const issueReason=(id:string)=>judgePresentation(rowFor(id) || {}, savedSnapshot(evaluation).questions?.find((question:any)=>question.id===id)).text;
 
@@ -197,7 +200,7 @@ function DResultStory({experiment,evaluation,badCases,footer}:{experiment:any;ev
     </tbody></table></div>{error && <p role="status">{error}</p>}{!saved && !error && <p className="ui-body-muted">{runId ? '正在读取保存的逐题结果…' : '逐题结果来源未保存，保护题结果与判分原因未知。'}</p>}</section>
     <section className="d-result-comparison ui-card"><h3>{schemeName(winner)} vs D</h3><QualityComparison baseline={winner} baselineLabel={schemeName(winner)} candidate={d} candidateLabel="Candidate D" includeNewFailures hideGates/></section>
     </div><section className="d-result-causes ui-card"><h3>还没解决的问题</h3><div className="d-issue-grid">
-      {remaining.map((row:any)=>{const rank=rankOf(missedPosition(row)),topK=d.config?.top_k,failed=rowFor(row.question_id)?.passed===false || fixed!==null && !fixed.includes(row.question_id);return <article className="d-unresolved-card" key={row.question_id}><h4><QuestionBadge id={shortQuestionId(row.question_id)} tone="open" question={questionText(row.question_id,evaluation,badCases)}/> <span>{!failed ? '实际是否修好未知' : targets.includes(row.question_id) ? '预测会修好，实际没修好' : '未列为修复目标，实际仍未修好'}</span></h4><p>{missedReason(row)}</p>{typeof rank==='number' && <div className="d-ranking" aria-label={`Winner 证据排名：第 ${rank} 位，截止线 Top-K ${topK}`}><div className="d-rank-labels"><span>截止线 Top-K {topK}</span><span>证据排第 {rank} 位</span></div><div className="d-rank-bar"><i style={{width:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><b style={{left:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><em style={{left:`${rank/Math.max(rank+2,topK+2)*100}%`}}/></div></div>}</article>;})}
+      {remaining.map((row:any)=>{const rank=missedEvidenceRank(d,row),topK=d.config?.top_k,failed=rowFor(row.question_id)?.passed===false || fixed!==null && !fixed.includes(row.question_id);return <article className="d-unresolved-card" key={row.question_id}><h4><QuestionBadge id={shortQuestionId(row.question_id)} tone="open" question={questionText(row.question_id,evaluation,badCases)}/> <span>{!failed ? '实际是否修好未知' : targets.includes(row.question_id) ? '预测会修好，实际没修好' : '未列为修复目标，实际仍未修好'}</span></h4><p>{missedReason(row)}</p>{typeof rank==='number' && <div className="d-ranking" aria-label={`Winner 证据排名：第 ${rank} 位，截止线 Top-K ${topK}`}><div className="d-rank-labels"><span>截止线 Top-K {topK}</span><span>证据排第 {rank} 位</span></div><div className="d-rank-bar"><i style={{width:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><b style={{left:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><em style={{left:`${rank/Math.max(rank+2,topK+2)*100}%`}}/></div></div>}</article>;})}
       {broken?.map(id=><article className="d-unresolved-card" key={id}><h4><QuestionBadge id={shortQuestionId(id)} tone="broken" question={questionText(id,evaluation,badCases)}/> 新增 Bad Case</h4><p>{issueReason(id)}</p></article>)}
       {!remaining.length && !broken?.length && <p className="ui-body-muted">没有保存的未修好或新增 Bad Case 原因。</p>}
       <DSideEffects changes={d.reasoning?.changes || []} candidates={experiment.candidates} summary={`${watched.length && held===watched.length ? `${held} 道受保护题全部守住` : protectedSummary}，安全拒答 ${typeof safety==='number' ? `${safety}%` : '未知'}。`}/>
