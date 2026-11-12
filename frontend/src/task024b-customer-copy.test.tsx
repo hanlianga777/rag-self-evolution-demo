@@ -15,10 +15,11 @@ it('keeps the one-line page purpose through architecture tab switches',async()=>
  const root=createRoot(document.body.appendChild(document.createElement('div')));
  try{
   await act(async()=>root.render(<OverviewPage data={{}} navigate={()=>{}}/>));
-  expect(document.querySelector('.page-title .ui-kicker')?.textContent).toBe('从知识到上线的完整闭环');
+  expect(document.querySelector('.page-title .ui-kicker')?.textContent).toBe('用一组数字和一条闭环，说明这套系统让智能客服变好了多少，又是怎样一步步做到的。');
   await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='业务架构')!.click());
-  expect(document.querySelector('.page-title .ui-kicker')?.textContent).toBe('从知识到上线的完整闭环');
-  expect(document.querySelector('figcaption')?.textContent).toBe('业务视角：可信评测 → 受控优化 → 人工发布');
+  expect(document.querySelector('.page-title .ui-kicker')?.textContent).toBe('用一组数字和一条闭环，说明这套系统让智能客服变好了多少，又是怎样一步步做到的。');
+  expect(document.querySelector('.ui-problems')).not.toBeNull();
+  expect(document.querySelector('.ui-arch')).not.toBeNull();
   expect(fetch).not.toHaveBeenCalled();
  }finally{await act(async()=>root.unmount());}
 });
@@ -29,12 +30,10 @@ it('translates result and runtime codes while retaining professional names',()=>
  }
  for(const word of ['Bad Case','Candidate','Winner','Hard Gate','Top-K','Rerank','P50','P99'])expect(displayText(word)).toBe(word);
 });
-it('adds a caption to each original inline diagram',()=>{
- for(const kind of ['business','technical','knowledge'] as const){
-  const html=renderToStaticMarkup(<KnowledgeDiagrams kind={kind}/>);
-  expect(html).toContain('<figcaption');expect(html).toContain('<svg');
-  expect(html).toContain('viewBox="0 0 1200');
- }
+it('keeps the knowledge diagram and its caption while the architecture tabs use components',()=>{
+ const html=renderToStaticMarkup(<KnowledgeDiagrams kind="knowledge"/>);
+ expect(html).toContain('<figcaption');expect(html).toContain('<svg');
+ expect(html).toContain('viewBox="0 0 1200');
 });
 
 it('normalizes terminology only in the display while keeping saved Agent text intact',()=>{

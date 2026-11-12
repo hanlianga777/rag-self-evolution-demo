@@ -4,7 +4,6 @@ import { PageShell } from "../components/PageShell";
 import { useContext, useEffect, useState } from "react";
 import { PageWarmupContext } from "../preload";
 import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
-import { ValueChain } from "../ui/overview/ValueChain";
 import { OverviewSummary } from "../ui/overview/OverviewSummary";
 import { displayText, productionName, gateNames } from "../display";
 import { OverviewStory, type FixedItem } from "../ui/overview/OverviewStory";
@@ -107,12 +106,6 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     return typeof value === "number" ? value : null;
   };
   const pair = (key: string) => ({from: number(baseResult, key), to: number(finalResult, key)});
-  const correct = pair("correct"), p50 = pair("latency_p50_seconds"), refusal = pair("safe_rejection_rate");
-  const newBad = Array.isArray(finalResult?.new_regression_question_ids) ? finalResult.new_regression_question_ids.length : "未知";
-  const speed = p50.from !== null && p50.to !== null && p50.from > 0 ? Math.round((p50.from - p50.to) / p50.from * 100) : null;
-  const gates = finalResult?.gates;
-  const resultTitle = `答对 ${correct.from ?? "未知"} → ${correct.to ?? "未知"}，新增 Bad Case ${newBad}，${speed === null ? "P50 变化未知" : speed >= 0 ? `P50 快 ${speed}%` : `P50 慢 ${-speed}%`}`;
-  const resultDetail = `${typeof gates?.total === "number" && typeof gates?.passed_count === "number" ? gates.passed_count === gates.total ? `${gates.total} 项 Hard Gate 全过` : `${gates.passed_count}/${gates.total} 项 Hard Gate 通过` : "Hard Gate 未知"}，安全拒答 ${refusal.from ?? "未知"}% → ${refusal.to ?? "未知"}%`;
   const candidateName = finalCandidate ? schemeName(finalCandidate).replace(/^Round \d+ · /, "") : "";
   const readyToRelease = recommendation.status === "Recommended" && !!finalCandidate && next[2] === "versions";
   const primaryLabel = currentReleased ? "去问答验证" : readyToRelease ? "去发布" : next[0];
@@ -126,15 +119,10 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     {label: "问答验证", fact: currentReleased ? "可验证线上回答" : "可查看线上配置", tips: ["逐题比较 Baseline 与线上回答", "反馈可作为再次进化的线索"], page: "verification"},
   ].map(step => ({...step, onClick: () => navigate(step.page as Page)}));
 
-  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1><IconTile name="overview" />RAG 自进化项目概览</h1><p className="ui-kicker page-purpose">从知识到上线的完整闭环</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
+  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1><IconTile name="overview" />RAG 自进化项目概览</h1><p className="ui-kicker page-purpose">用一组数字和一条闭环，说明这套系统让智能客服变好了多少，又是怎样一步步做到的。</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
 
 
     {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} /> : <>
-    <ValueChain steps={[
-      {kicker: "问题", title: "RAG 上线后答错难发现，调参靠试，修好一题又弄坏另一题", detail: "不知道该改哪里，也不敢上线"},
-      {kicker: "方法", title: "冻结考卷量化 → Agent 在白名单内调参 → 人工批准发布", detail: "每一步可量化、可归因、可回滚"},
-      {kicker: "结果", title: resultTitle, detail: resultDetail, result: true},
-    ]} />
     <OverviewSummary correct={pair("correct")} total={baseResult?.total ?? expectedCount}
       fixedCount={Array.isArray(finalResult?.all_fixed_question_ids) ? finalResult.all_fixed_question_ids.length : null}
       newBadCount={Array.isArray(finalResult?.new_regression_question_ids) ? finalResult.new_regression_question_ids.length : null}

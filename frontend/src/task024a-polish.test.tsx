@@ -14,18 +14,18 @@ beforeEach(()=>{sessionStorage.clear();localStorage.clear();history.replaceState
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 async function mount(node:React.ReactNode){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));}
 async function click(label:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label)!.click());}
-it('calculates value-chain results and reuses route lessons without inventing missing results',async()=>{
+it('shows saved results in the summary and reuses route lessons without inventing missing results',async()=>{
  const exp:any={...structuredClone(sampleExperiment),id:'exp',baseline_run_id:'base'};
  const d=exp.candidates.find((c:any)=>c.reasoning.candidate_label==='D')!;
  exp.recommendation={...exp.recommendation,recommended_candidate:d.id};
  d.result={...d.result,total:50,bad_case_count:2,metrics:{latency_p50_seconds:8,safe_rejection_rate:100},gates:{passed_count:11,total:11,gates:[]},new_regression_question_ids:[]};
  const data={evaluation:{id:'base',status:'completed',config:sampleBaselineConfig,result:{total:50,bad_case_count:6,metrics:{latency_p50_seconds:16,safe_rejection_rate:95}}},optimization:exp,workspace:{},overview:{dataset:{total:50,approved:50}}};
  await mount(<OverviewPage data={data} navigate={()=>{}}/>);
- const chain=document.querySelector('.ui-vc')!;expect(chain.textContent).toContain('答对 44 → 48');expect(chain.textContent).toContain('P50 快 50%');expect(chain.textContent).toContain('11 项 Hard Gate 全过');
+ const summary=document.querySelector('.ui-ov-hero')!;expect(document.querySelector('.ui-ov-big')?.textContent).toMatch(/44.*48/);expect(summary.textContent).toMatch(/P50.*16\.0.*8\.0/);expect(summary.textContent).toContain('Hard Gate 11 / 11');
  const model=buildEvolutionModel(exp,sampleBaselineConfig,key=>key,item=>item.id);
  for(const round of model.rounds.filter(r=>r.round<=2 && r.lesson))expect(document.querySelector('[aria-label="优化过程"]')!.textContent).toContain(round.lesson!.text);
  await act(async()=>root.render(<OverviewPage data={{}} navigate={()=>{}}/>));
- expect(document.querySelector('.ui-vc')!.textContent).toContain('未知');expect(document.querySelector('.ui-vc')!.textContent).not.toContain('44 → 48');
+ expect(document.querySelector('.ui-ov-hero')!.textContent).toContain('未知');expect(document.querySelector('.ui-ov-big')!.textContent).not.toMatch(/44.*48/);
 });
 it('hides idle Sandbox progress while keeping parameters and diagnosis on the route',async()=>{
  history.replaceState(null,'','#evolution');await mount(<EvolutionPage data={{evaluation:{id:'base',status:'completed',config:sampleBaselineConfig,result:{total:50,bad_case_count:6}},optimization:{...sampleExperiment,baseline_run_id:'base'},workspace:{}}}/>);

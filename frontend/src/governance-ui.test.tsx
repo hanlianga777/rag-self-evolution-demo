@@ -22,7 +22,7 @@ it("counts the frozen delegated paper without claiming human review", async () =
   expect(document.querySelector(".ui-gp-left > strong")?.textContent).toBe("1 题");
   expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(1);
   expect(document.querySelector(".golden-metrics")).toBeNull();
-  expect([...document.querySelectorAll(".ui-gp-steps li.done")].map(node => node.textContent)).toEqual(["覆盖规划冻结记录", "出题1/1", "硬校验1/1", "Probe1/1", "QC1/1", "人工确认1/1"]);
+  expect([...document.querySelectorAll(".ui-gp-steps li.done")].map(node => node.textContent)).toEqual(["覆盖规划冻结记录", "出题1/1", "硬校验1/1", "Probe1/1", "QC1/1", "Gate 1 · 人工审核1/1"]);
   expect(document.querySelector('.ui-gp .ui-badge')?.textContent || document.querySelector('.ui-gp')?.textContent).toContain("已冻结");
   await act(async () => document.querySelector<HTMLElement>(".review-table tbody tr")!.click());
   expect(document.querySelector(".frozen-question-details")?.textContent).toContain("fixture");

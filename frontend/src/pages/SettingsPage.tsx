@@ -60,7 +60,7 @@ export function SettingsPage({ data }: { data: any }) {
     try { await postJson("/api/pipeline/draft", { config: discard ? null : draft, identity: pipeline.draft_identity }); invalidatePipeline(); const value = await pipelineFetch(identity); setRecord({ identity, value }); setDraft(startDraft(value)); }
     catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); }
   };
-  return <PageShell className="page settings-page" header={<div className="page-title"><div><h1><IconTile name="pipeline" />Pipeline 配置</h1><p className="ui-kicker page-purpose">固定底座 + Agent 可调的 12 项参数</p></div><button className="secondary" onClick={() => setSpaceOpen(true)}>参数说明</button></div>}>
+  return <PageShell className="page settings-page" header={<div className="page-title"><div><h1><IconTile name="pipeline" />Pipeline 配置</h1><p className="ui-kicker page-purpose">这里放着固定不变的技术底座和 Agent 可以调整的 12 项参数，也就划定了自动优化的边界。</p></div><button className="secondary" onClick={() => setSpaceOpen(true)}>参数说明</button></div>}>
     {error && <p className="error-notice" role="alert">{error}</p>}
     <Section title={<IconLabel name="data">固定技术基座</IconLabel>} action={<Badge>固定</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
     <Section title={<IconLabel name="pipeline">Agent 可选参数</IconLabel>} action={<Badge tone="accent">{Object.keys(contract).length} 项可调参数</Badge>}>

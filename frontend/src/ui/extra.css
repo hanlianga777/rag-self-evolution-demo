@@ -268,3 +268,7 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .drawer.candidate-workspace .detail-content { display:block; overflow-y:auto; }
 .drawer .detail-content > .candidate-shell { display:block; flex:none; }
 .drawer .detail-content .audit-workspace pre { max-height:none; overflow:visible; }
+
+/* 027b：架构页接入既有组件，长说明沿用全站 12px 刻度。 */
+.architecture-business { display:grid; gap:16px; }
+.page-title .page-purpose { max-width:none; font-size:12px; }

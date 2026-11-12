@@ -65,7 +65,7 @@ it("keeps Gate 1 available when every question is approved but the current run h
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, rows) : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [{ id: "OLD", snapshot: { generation_run_id: "G1", question_ids: ["old-question"] } }] }} />));
-  expect(document.querySelector(".ui-gp-steps li:last-child")?.textContent).toBe("人工确认20/20");
+  expect(document.querySelector(".ui-gp-steps li:last-child")?.textContent).toBe("Gate 1 · 人工审核20/20");
   expect(document.querySelector(".ui-gp-steps li:last-child")?.classList.contains("done")).toBe(false);
   expect(document.querySelector(".ui-gp")?.textContent).toContain("尚未冻结");
   const confirm = [...document.querySelectorAll<HTMLButtonElement>(".review-batch button")].find(button => button.textContent === "冻结 Golden Dataset")!;

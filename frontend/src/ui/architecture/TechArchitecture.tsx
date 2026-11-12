@@ -37,7 +37,7 @@ export const TECH_LAYERS: TechLayer[] = [
     key: "pipeline", index: "03", name: "RAG Pipeline", en: "被优化对象", role: "一次问答依次经过的四个环节", icon: "pipeline", focus: true, flow: true,
     groups: [
       { title: "查询理解", tags: p("Query Rewrite", "Multi-Query", "HyDE") },
-      { title: "检索召回", tags: p("Hybrid Search", "Candidate K", "Embedding 权重") },
+      { title: "检索召回", tags: p("Candidate K", "Hybrid Search", "Embedding Retrieval 权重") },
       { title: "筛选排序", tags: p("Rerank", "Top-K", "MinScore", "上下文容量") },
       { title: "回答生成", tags: p("Prompt 策略", "Thinking 档位") },
     ],
@@ -54,7 +54,7 @@ export const TECH_LAYERS: TechLayer[] = [
     key: "data", index: "05", name: "数据与模型层", en: "Data & Models", role: "所有结果落库，模型按用途分开", icon: "data",
     groups: [
       { title: "存储", tags: t("SQLite", "评测记录", "Golden 版本", "发布快照", "审计日志") },
-      { title: "大模型", tags: t("DeepSeek · 回答生成", "DeepSeek · Judge", "DeepSeek · Agent") },
+      { title: "大模型", tags: t("deepseek-flash · 回答生成", "deepseek-flash · Judge", "deepseek-flash · Agent") },
       { title: "检索模型", tags: t("Qwen text-embedding-v4", "Qwen qwen3-rerank") },
     ],
   },
@@ -62,7 +62,7 @@ export const TECH_LAYERS: TechLayer[] = [
 
 const LINKS: Record<string, string> = {
   service: "下发候选配置，回收逐题评测结果",
-  pipeline: "检索时读取向量索引和关键词索引",
+  pipeline: "检索时读取向量索引，并按查询计算 BM25 分数",
 };
 
 export function TechArchitecture({ layers = TECH_LAYERS, links = LINKS }: { layers?: TechLayer[]; links?: Record<string, string> }) {
