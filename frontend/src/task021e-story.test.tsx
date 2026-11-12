@@ -52,6 +52,7 @@ it.each(['declined','lost','won','running','generated','failed','unknown'])('exp
  if(outcome==='unknown')d.result={...d.result,evaluation_complete:false} as any;
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
  await mount(<EvolutionPage data={{evaluation,optimization:exp}}/>);
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='进化路线')!.click());await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
  const route=document.querySelector('.ui-evo .d-story')?.textContent || '';
  await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='回归与推荐')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
  const final=document.querySelector('.page-content')!.textContent || '';

@@ -36,7 +36,7 @@ it.each(['overview','knowledge','evolution','verification'])('warms page content
   expect(reads).toContain('/api/optimization?light=true&planning=true');expect(reads).toContain('/api/evaluation');expect(reads).toContain('/api/bad-cases?light=true');
   block=true;
   await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#evolution"]')!.click());
-  expect(node.querySelector('.page-loading')).toBeNull();expect(node.querySelector('.ui-evo')).not.toBeNull();
+  expect(node.querySelector('.page-loading')).toBeNull();expect(node.querySelector('.agent-overview')).not.toBeNull();
   for(const [tab,selector] of [['Candidate 对比','.sandbox-core-table'],['回归与推荐','.regression-summary-table']]){
    await act(async()=>[...node.querySelectorAll('button')].find(e=>e.textContent===tab)!.click());expect(node.querySelector(selector)).not.toBeNull();expect(node.querySelector('.page-loading')).toBeNull();
   }

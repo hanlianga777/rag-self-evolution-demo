@@ -23,7 +23,7 @@ it('separates running, product interruption, evaluated failure and qualified car
  expect(cards[1].querySelector('.candidate-card-header .badge')?.classList.contains('warning')).toBe(true);
  expect(cards[1].textContent).toContain('产品故障，会自动续跑');
  expect(cards[1].textContent).not.toContain('付费确认');
- await click('进化路线');expect(document.querySelector('.d-story .ui-status')?.textContent).toBe('合格');
+ await click('进化路线');await click('Candidate D');expect(document.querySelector('.d-story .ui-status')?.textContent).toBe('合格');
 });
 it('does not promise automatic continuation for permission or identity failures',async()=>{
  await mount(experiment([candidate('A','failed',{evaluation_complete:false,error:'Provider权限不足'},{product_interruption:false})]));
@@ -39,13 +39,12 @@ it('reads budget usage from the API even when several candidates are interrupted
 });
 it('does not infer paid usage from candidate statuses when the budget is missing',async()=>{
  await mount(experiment([candidate('A','failed')],{evaluation_budget:undefined}));
- await click('进化路线');
- expect(document.body.textContent).toContain('预算尚未同步');
+ expect(document.querySelector('.agent-overview')?.textContent).toContain('预算尚未同步');
  expect(document.body.textContent).not.toContain('1 / 12');
 });
 it('keeps every single-pass failed question as a target even with a legacy exclusion flag',async()=>{
  await mount(experiment([]),[true,false].map((target,index)=>({id:'bad-'+index,run_id:'baseline',question_id:'Q0'+index,result:{passed:false,optimization_target:target,question:'问题'+index}})));
- expect(document.querySelector('.ui-evo-start')?.textContent).toContain('2 个 Bad Case'); expect(document.querySelectorAll('.agent-fact')).toHaveLength(2);
+ expect(document.querySelector('.agent-case-destinations')?.textContent).toContain('2 个 Bad Case'); expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(2);
 });
 it('keeps unfinished planning in the flat toolbar after a Sandbox exists and keeps idle progress out of the header',async()=>{
  await mount(experiment([candidate('A','failed',{evaluation_run_id:'saved-run',evaluation_complete:false},{product_interruption:true})],{coverage_plan:{status:'incomplete',covered_count:0,total:1,binding:'binding',matrix:[{question_id:'CSV-20261101100758945425-41',candidates:[],gap:'本轮剩余A/B/C容量不足，需明确调整规划，不能宣称完成'}]}}));
@@ -56,11 +55,9 @@ it('keeps unfinished planning in the flat toolbar after a Sandbox exists and kee
  await click('Candidate 对比');
  expect(document.querySelector('.tabs button.active')?.textContent).toBe('Candidate 对比');
  expect(document.querySelector('.agent-secondary-actions')?.textContent).toContain('补齐本轮规划（不收费）');
- expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('有覆盖缺口');
- await click('进化路线');
+ await click('概览');expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('有覆盖缺口');
  const detail=document.querySelector('.page-content')!.textContent;
- expect(detail).toContain('Q41 暂时没有 Candidate 覆盖');
- expect(detail).toContain('三个 Candidate 的名额已用完');
+ expect(document.querySelector('.agent-secondary-actions')?.textContent).toContain('补齐本轮规划');
  expect(detail).not.toContain('Q27');
  expect(detail).toContain('规划未完成');
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method)).toBe(true);

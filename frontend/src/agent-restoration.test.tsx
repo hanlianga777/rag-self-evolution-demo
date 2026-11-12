@@ -15,11 +15,11 @@ async function click(label: string) { await act(async () => [...document.querySe
 
 it("restores stages and complete generated plans without inventing evaluated results", async () => {
   const frozen = JSON.stringify(data); await mount();
-  expect(document.querySelectorAll(".tabs button")).toHaveLength(3); expect(document.querySelectorAll(".ui-agent-stats > div")).toHaveLength(4);
+  expect(document.querySelectorAll(".tabs button")).toHaveLength(4); expect(document.querySelectorAll(".ui-agent-stats > div")).toHaveLength(4);
   expect(document.body.textContent).toContain("1 个 Bad Case");
   await click("进化路线");
-  expect(document.body.textContent).toContain("问题与策略关联");
-  expect(document.querySelectorAll(".strategy-hypotheses > section")).toHaveLength(3);
+  expect(document.querySelectorAll(".agent-design-intent")).toHaveLength(3);
+  expect(document.querySelectorAll(".ui-evo-card")).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/null|undefined|\[object Object\]/);
   await click("Candidate 对比");
   expect([...document.querySelectorAll(".candidate-card:first-child .field-label")].map(e => e.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
@@ -83,8 +83,7 @@ it("keeps incomplete coverage out of Sandbox and offers same-round zero-call com
   await mount({ ...data, optimization:{...data.optimization,candidates:[candidates[0]],coverage_plan:{status:"incomplete",covered_count:1,total:10,binding:"reviewed",matrix:[{question_id:"Q1",candidates:[],gap:"缺口待记录"}]}}});
   expect(document.body.textContent).toContain("补齐本轮规划（不收费）");
   expect(document.body.textContent).not.toContain("运行本轮 A/B/C Sandbox");
-  await click("进化路线");
-  expect(document.body.textContent).toContain("规划未完成");
+  expect(document.querySelector(".agent-overview")?.textContent).toContain("规划未完成");
   await click("Candidate 对比");
   expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="运行 Sandbox")?.disabled).toBe(true);
   expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);

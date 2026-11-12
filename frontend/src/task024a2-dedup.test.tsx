@@ -18,8 +18,8 @@ afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllG
 async function mount(){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<EvolutionPage data={data}/>));}
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
 it('shows only round and saved lesson above route cards',async()=>{
- await mount();expect(document.querySelectorAll('.ui-evo-round-head p')).toHaveLength(0);
- expect(document.querySelectorAll('.ui-evo-body > .ui-hover-trigger')).toHaveLength(3);
+ await mount();await click('进化路线');expect(document.querySelectorAll('.ui-evo-round-head p')).toHaveLength(0);
+ expect(document.querySelectorAll('.agent-round-strategy .ui-hover-trigger')).toHaveLength(1);
  expect(document.body.textContent).not.toContain('本轮没有合格 Candidate：');
 });
 it('keeps complete fixed IDs on cards and moves target counts to the target drawer',async()=>{

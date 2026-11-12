@@ -231,7 +231,7 @@ it.each([{ max: 13, canContinue: true }, { max: 12, canContinue: false }])("keep
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: {}, badCases: [] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "进化路线")!.click());
-  expect(document.body.textContent).toContain("Round 3 · 2/2");
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="概览")!.click());expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("Round 3 · 2/2");
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Candidate 对比")!.click());
   expect(document.body.textContent?.includes("继续优化下一轮")).toBe(canContinue);
   await act(async () => root.unmount());

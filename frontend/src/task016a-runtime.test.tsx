@@ -100,11 +100,11 @@ it("shows scheduled D as queued and keeps configuration identifiers inside techn
   vi.stubGlobal("fetch", vi.fn((url: string) => response(url.includes("/api/experiments") ? experiment : { search_space: {} })));
   await mount(<EvolutionPage data={{ evaluation: { id: "baseline", status: "completed" }, optimization: experiment }} />);
   expect(document.querySelector(".price-pause-notice")?.textContent).toContain("已暂停，稍后自动继续");
-  const planning = document.querySelector('.route-planning')!;
+  const planning = document.querySelector('.agent-overview')!;
   expect(planning.textContent).toContain("修复 1 题");
   expect(planning.textContent).toContain("已有经完整评测验证的 Candidate");
   expect(document.body.textContent).not.toContain("CONFIG-private");
-  await click("进化路线");
+  await click("进化路线");await click("Candidate D");
   expect(document.body.textContent).toContain("Candidate D · 排队中");
   await click("回归与推荐");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "生成智能组合建议")).toBe(false);

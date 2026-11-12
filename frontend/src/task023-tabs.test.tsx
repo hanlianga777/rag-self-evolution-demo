@@ -21,8 +21,8 @@ it.each([['candidates','comparison','Candidate 对比'],['sandbox','comparison',
 });
 it('keeps round cards, comparison metrics, candidate drawer and regression trace reachable in three tabs',async()=>{
  const before=JSON.stringify(data);await mount();
- expect([...document.querySelectorAll('.tabs button')].map(b=>b.textContent)).toEqual(['进化路线','Candidate 对比','回归与推荐']);
- expect(document.querySelectorAll('.d-story')).toHaveLength(1);
+ expect([...document.querySelectorAll('.tabs button')].map(b=>b.textContent)).toEqual(['概览','进化路线','Candidate 对比','回归与推荐']);
+ await click('进化路线');await click('Candidate D');expect(document.querySelectorAll('.d-story')).toHaveLength(1);
  await click('Candidate 对比');expect(document.querySelectorAll('.candidate-cards .candidate-card')).toHaveLength(3);expect(document.querySelector('.sandbox-core-table')).not.toBeNull();expect(document.querySelector('.d-story')).toBeNull();
  await click('Round 1');expect(document.querySelector('.story-round-switch [aria-pressed=true]')?.textContent).toBe('Round 1');expect(document.querySelector('.candidate-card-header small')).toBeNull();
  await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ct-more')!.click());expect(document.querySelector('.ui-ct')?.textContent).toContain('运行状态');

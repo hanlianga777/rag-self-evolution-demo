@@ -28,11 +28,11 @@ it('shows saved results in the summary and reuses route lessons without inventin
  expect(document.querySelector('.ui-ov-hero')!.textContent).toContain('未知');expect(document.querySelector('.ui-ov-big')!.textContent).not.toMatch(/44.*48/);
 });
 it('hides idle Sandbox progress while keeping parameters and diagnosis on the route',async()=>{
- history.replaceState(null,'','#evolution');await mount(<EvolutionPage data={{evaluation:{id:'base',status:'completed',config:sampleBaselineConfig,result:{total:50,bad_case_count:6}},optimization:{...sampleExperiment,baseline_run_id:'base'},workspace:{}}}/>);
+ history.replaceState(null,'','#evolution');await mount(<EvolutionPage data={{evaluation:{id:'base',status:'completed',config:sampleBaselineConfig,result:{total:50,bad_case_count:6}},optimization:{...sampleExperiment,id:"exp",baseline_run_id:'base'},workspace:{}}}/>);
  expect(document.querySelector('.page-title')!.textContent).not.toContain('查看 Sandbox 进度');
- expect(document.querySelector('.baseline-actions')!.textContent).toContain('查看可调参数');
+ await click('进化路线');expect(document.querySelector('.baseline-actions')).toBeNull();await act(async()=>document.querySelector<HTMLElement>('.ui-evo-card')!.click());
  await click('查看可调参数');expect(document.querySelector('[role=dialog]')!.textContent).toContain('可调参数');
- await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());await click('回归与推荐');
+ await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());await click('回归与推荐');
  expect(document.querySelector('.regression-summary-table')).not.toBeNull();expect(document.querySelector('.regression-summary-table')!.closest('details')).toBeNull();
 });
 const questions=[{id:'slow',question:'慢的正向原题',test_category:'positive'},{id:'fast',question:'快的正向原题',test_category:'positive'},{id:'safety',question:'安全拒答原题',test_category:'negative',negative_subtype:'safety_critical'},{id:'clarify',question:'追问原题',test_category:'negative',negative_subtype:'clarify'},{id:'outside',question:'未冻结原题',test_category:'positive'}];

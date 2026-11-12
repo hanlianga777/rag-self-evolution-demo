@@ -80,6 +80,6 @@ it('switches historical rounds on both merged detailed tabs while preserving the
  for(const tab of ['Candidate 对比','回归与推荐']){
   await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===tab)!.click());
   await act(async()=>[...document.querySelectorAll('.story-round-switch button')].find(b=>b.textContent==='Round 1')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
-  expect(document.querySelector('.story-round-switch button[aria-pressed="true"]')?.textContent).toBe('Round 1');expect(document.querySelectorAll('.ui-agent-stats > div')).toHaveLength(4);
+  expect(document.querySelector('.story-round-switch button[aria-pressed="true"]')?.textContent).toBe('Round 1');expect(document.querySelector('.page-shell-header .ui-agent-stats')).toBeNull();
  }
 });

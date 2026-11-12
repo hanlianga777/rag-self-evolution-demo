@@ -7,12 +7,13 @@
 export type ParamChange = { key: string; label: string; from?: string; to: string };
 export type CandidateView = {
   id: string; label: string; round: number; name: string; direction: string; efficiency: boolean;
+  intent?: string;
   params: ParamChange[]; fixed: string[]; broken: string[]; gateFailures: string[];
   qualified: boolean | null; winner: boolean; correct: number | null; total: number | null;
   p50: number | null; p99: number | null; complete: boolean;
   gates?: { passed: number; total: number }; newFailures?: number;
 };
-export type RoundView = { round: number; candidates: CandidateView[]; summary: string; fastestId: string | null; lesson?: { text: string; source: string } };
+export type RoundView = { round: number; candidates: CandidateView[]; summary: string; fastestId: string | null; thought?: string; lesson?: { text: string; source: string } };
 export type EvolutionModel = { rounds: RoundView[]; winnerId: string | null; d: CandidateView | null; budget: { used: number; max: number } | null };
 
 export const PARAM_LABELS: Record<string, string> = {
@@ -62,6 +63,8 @@ function latency(result: any, metric: string): number | null {
   return typeof gate?.actual === "number" ? gate.actual : null;
 }
 
+export const firstSentence = (value: unknown): string | undefined => typeof value === "string" && value.trim() ? value.trim().match(/^[^。！？\n]+[。！？]?/)?.[0] : undefined;
+
 export function candidateView(candidate: any, baselineConfig: Record<string, unknown> | undefined, winnerId: string | null, gateLabel: (metric: string) => string, nameOf: (candidate: any) => string): CandidateView {
   const result = candidate?.result || {};
   const reasoning = candidate?.reasoning || {};
@@ -76,6 +79,7 @@ export function candidateView(candidate: any, baselineConfig: Record<string, unk
   return {
     id: candidate.id, label: reasoning.candidate_label || candidate.id.slice(-1), round: reasoning.round || 1, name: nameOf(candidate),
     direction: reasoning.direction || reasoning.optimization_direction || "", efficiency: /效率/.test(reasoning.direction || ""),
+    intent: firstSentence(reasoning.hypothesis || reasoning.proposal || reasoning.core_idea),
     params,
     fixed: firstList(result.all_fixed_question_ids, result.regression?.all_fixed_question_ids),
     broken: firstList(result.new_regression_question_ids, result.newly_failed, result.comparison?.newly_failed, result.regression?.new_regression_question_ids),
@@ -148,7 +152,7 @@ export function buildEvolutionModel(experiment: any, baselineConfig: Record<stri
     const items = views.filter(item => item.round === round).sort((a, b) => a.label.localeCompare(b.label));
     const timed = items.filter(item => item.p50 !== null);
     const fastest = timed.length ? timed.reduce((best, item) => (item.p50 as number) < (best.p50 as number) ? item : best) : null;
-    return { round, candidates: items, summary: roundSummary(items), fastestId: fastest?.id ?? null, lesson: roundLesson(round, candidates, winnerId) };
+    return { round, candidates: items, summary: roundSummary(items), fastestId: fastest?.id ?? null, thought: candidates.filter(item => item.reasoning?.round === round && ["A", "B", "C"].includes(item.reasoning?.candidate_label)).sort((a, b) => a.reasoning.candidate_label.localeCompare(b.reasoning.candidate_label)).map(item => firstSentence(item.reasoning.core_idea || item.reasoning.hypothesis)).filter(Boolean).join(" ") || undefined, lesson: roundLesson(round, candidates, winnerId) };
   });
   const budget = experiment?.evaluation_budget && typeof experiment.evaluation_budget.used === "number" ? { used: experiment.evaluation_budget.used, max: experiment.evaluation_budget.max } : null;
   return { rounds, winnerId, d: dRaw ? candidateView(dRaw, baselineConfig, winnerId, gateLabel, nameOf) : null, budget };

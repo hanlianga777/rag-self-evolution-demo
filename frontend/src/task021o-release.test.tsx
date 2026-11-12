@@ -24,7 +24,7 @@ it('explains alternatives from saved repairs, regressions and gates rather than 
  expect(rows[0]).toContain('Q24');expect(rows[0]).toContain('Q13');expect(document.querySelector('.ui-fin-others thead')?.textContent).toContain('新增 Bad Case');
  expect(rows[1]).toContain('回答耗时 P99 86.5 秒');expect(rows[1]).toContain('上限 60 秒');
  expect(document.querySelector('.ui-fin-compare thead')?.textContent).toContain('Winner · 合格');expect(document.querySelector('.ui-fin-compare tbody tr:last-child')?.textContent).toContain('Q04');
- expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('10 / 12');
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='概览')!.click());expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('10 / 12');
 });
 it('hides the entire thinking comparison section when no columns exist',async()=>{
  await mount(<ProductDiagnostics diagnostics={{thinking_comparison:{columns:[],note:'尚无可比较的回答档位记录'}}}/>);
@@ -61,6 +61,7 @@ it('links to published records once the recommended candidate has been released'
  const d={...candidate('EXP-D',{qualification:{qualified:true}}),release_state:{human_release:true}};
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{id:'exp',candidates:[d],recommendation:{recommended_candidate:'EXP-D'}}}}/>);
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='进化路线')!.click());await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
  expect(document.querySelector('.ui-evo a[href="#versions"]')).toBeNull(); expect(document.querySelector('.ui-evo')?.textContent).toContain('查看最终推荐');
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='回归与推荐')!.click());
  const release=[...document.querySelectorAll('button')].find(b=>b.textContent==='查看发布记录')!;expect(release).toBeDefined();await act(async()=>release.click());expect(location.hash).toBe('#versions');

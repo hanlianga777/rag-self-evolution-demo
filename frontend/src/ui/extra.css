@@ -327,3 +327,50 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 
 .baseline-more .story-disclosure-content > .header-actions { justify-content:flex-end; }
 .evaluation-page .ui-bl-time-note { justify-self:stretch; text-align:left; margin-left:0; width:auto; }
+
+/* 027e: saved Agent results and one selected evolution round. */
+.evolution-page .agent-overview { display:grid; gap:12px; margin:0; }
+.agent-overview-result { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:18px 22px; }
+.evolution-page .agent-overview .agent-overview-result h2 { margin:0 0 10px; font-size:25px; }
+.agent-overview-result p { display:flex; flex-wrap:wrap; gap:18px; margin:0; font-size:13px; color:var(--ui-ink-2); }
+.agent-overview-result .ui-agent-stats { display:grid; grid-template-columns:repeat(3,auto); gap:22px; padding:0; margin:0; background:transparent; box-shadow:none; border:0; }
+.agent-overview-result .ui-agent-stats .wide { grid-column:1 / -1; max-width:440px; font-size:12px; }
+.agent-overview-result.released .ui-agent-stats .wide { display:none; }
+.agent-case-destinations h3 small { font-size:12px; font-weight:400; color:var(--ui-muted); margin-left:8px; }
+.agent-overview-params, .agent-overview-rules { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.agent-overview-params article { padding:14px 18px; }
+.agent-overview-params strong { font-size:15px; }
+.agent-overview-params small { display:block; margin-top:7px; font-size:12px; color:var(--ui-muted); }
+.agent-overview-rules article { padding:14px 18px; }
+.agent-overview h3 { font-size:14px; margin:0 0 8px; }
+.agent-overview-rules p { font-size:12.5px; line-height:1.65; color:var(--ui-ink-2); margin:0; }
+.agent-case-destinations { padding:14px 18px 6px; min-width:0; }
+.agent-case-destinations table { table-layout:fixed; width:100%; }
+.agent-case-destinations th:nth-child(1) { width:8%; }
+.agent-case-destinations th:nth-child(2) { width:11%; }
+.agent-case-destinations th:nth-child(3) { width:39%; }
+.agent-case-destinations th:nth-child(4) { width:24%; }
+.evolution-page .agent-case-destinations td { padding-top:7px; padding-bottom:7px; font-size:12.5px; }
+.agent-case-destinations tr[role=button] { cursor:pointer; }
+.agent-case-destinations tr[role=button]:focus-visible { outline:2px solid var(--ui-accent); outline-offset:-2px; }
+.evolution-page .route-timeline > .ui-evo { display:grid; gap:16px; }
+.route-timeline .ui-evo-round { display:block; }
+.route-timeline .ui-evo-rail { display:none; }
+.route-timeline .ui-evo-body { padding-bottom:0; }
+.agent-round-strategy, .agent-design-intent { border:1.5px solid var(--ui-accent); border-radius:14px; background:var(--ui-accent-tint); padding:14px 16px; }
+.agent-round-strategy { margin-bottom:16px; }
+.agent-round-strategy h3 { margin:0 0 8px; font-size:15px; }
+.agent-round-strategy p { margin:6px 0 0; font-size:13px; line-height:1.7; color:var(--ui-ink-2); }
+.agent-design-intent { font-size:13px; line-height:1.7; }
+.agent-design-intent strong { font-size:12px; color:var(--ui-accent); }
+.agent-design-intent p { margin:4px 0 0; }
+.route-timeline .ui-evo-card { display:grid; grid-row:span 8; grid-template-rows:subgrid; gap:12px; }
+.route-timeline .ui-evo-facts { display:grid; grid-row:span 3; grid-template-rows:subgrid; grid-template-columns:92px minmax(0,1fr); }
+.route-timeline .ui-evo-card-foot { flex-wrap:wrap; }
+@media (max-width:900px) {
+  .agent-overview-result { align-items:flex-start; flex-direction:column; }
+  .agent-overview-params, .agent-overview-rules, .route-timeline .ui-evo-cards { grid-template-columns:1fr; }
+  .route-timeline .ui-evo-card, .route-timeline .ui-evo-facts { grid-row:auto; grid-template-rows:none; }
+  .agent-case-destinations { overflow-x:auto; }
+  .agent-case-destinations table { min-width:700px; }
+}

@@ -58,16 +58,16 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   const input = { evaluation: run, badCases: [bad], optimization: { id: "EXP-stored", candidates, evaluation_budget: { used: 3, max: 12, reserved_for_d: 1 }, result: { root_cause_cluster: "保存的诊断" } } }, frozen = JSON.stringify(input);
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space }))));
   await render(<EvolutionPage data={input} />);
-  expect(document.querySelectorAll(".tabs button")).toHaveLength(3);
-  expect(document.querySelector(".ui-evo-start")?.textContent).toContain("1 个 Bad Case");
-  expect(document.querySelector(".agent-facts")?.textContent).toContain("持久化问题");
-  expect(document.querySelector(".ui-evo-start")?.textContent).not.toContain("Evidence Miss");
+  expect(document.querySelectorAll(".tabs button")).toHaveLength(4);
+  expect(document.querySelector(".agent-case-destinations")?.textContent).toContain("1 个 Bad Case");
+  expect(document.querySelector(".agent-case-destinations")?.textContent).toContain("Candidate A");
+  expect(document.querySelector(".agent-case-destinations")?.textContent).not.toContain("Evidence Miss");
   expect(document.querySelectorAll(".diagnosis-cards")).toHaveLength(0);
   await click("进化路线");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(0);
-  expect([...document.querySelectorAll(".route-planning .panel > .section-head h2")].map(header => header.textContent)).toEqual(["Baseline 运行参数", "Agent 读到了什么事实", "Agent 提出了什么假设"]);
+  expect(document.querySelectorAll(".agent-design-intent")).toHaveLength(3);expect(document.querySelector(".route-planning")).toBeNull();
   expect(document.body.textContent).toContain("保存假设 A");
-  expect(document.body.textContent).toContain("可调参数 · 2");
+
   await click("Candidate 对比");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
   expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
@@ -95,6 +95,6 @@ it.each([
   const optimization = { id: "EXP-stored", candidates: [winner, d], result: { report_confirmation: { winner_id: winner.id } }, recommendation: { result: { recommended_candidate: status === "evaluated" ? winner.id : null } } };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   await render(<EvolutionPage data={{ evaluation: run, badCases: [bad], optimization }} />);
-  await click("进化路线");
+  await click("进化路线");await click("Candidate D");
   expect(document.querySelector(".d-story")?.textContent).toContain(expected);
 });

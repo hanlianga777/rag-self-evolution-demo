@@ -25,9 +25,11 @@ it('links saved evidence and hypothesis to actual parameter changes without eval
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const audit={id:'AUDIT',run_id:'BASE',question_id:'Q92',result:{question:'仅评测核验问题',diagnostic_view:{analysis_category:'evaluation_issue',is_technical_bad_case:false}}};
  const candidate={id:'A',status:'generated',config:{candidate_k:40,top_k:4},reasoning:{candidate_label:'A',hypothesis:'保存的召回假设',intervention_direction:'candidate_recall',observed_evidence:['BC','AUDIT']}};
- const data={evaluation,badCases:[technical,audit],optimization:{id:'EXP',candidates:[candidate]}};const before=JSON.stringify(data);await mount(<EvolutionPage data={data}/>);await click('进化路线');
- const relation=document.querySelector('.page-content')!;expect(relation.textContent).toContain('保存的必要事实');expect(relation.textContent).toContain('保存的召回假设');expect(relation.textContent).toContain('Candidate K');expect(relation.textContent).not.toContain('仅评测核验问题');expect(document.querySelector('.diagnosis-distribution')).toBeNull();expect(JSON.stringify(data)).toBe(before);
- await click('Candidate A · 详情');expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('仅评测核验问题');
+ const data={evaluation,badCases:[technical,audit],optimization:{id:'EXP',candidates:[candidate]}};const before=JSON.stringify(data);await mount(<EvolutionPage data={data}/>);
+ expect(document.querySelector('.agent-case-destinations')?.textContent).toContain('Candidate A');expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(1);
+ await act(async()=>document.querySelector<HTMLElement>('.agent-case-destinations tbody tr')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('保存的必要事实');await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());
+ await click('进化路线');expect(document.querySelector('.agent-design-intent')?.textContent).toContain('保存的召回假设');expect(document.querySelector('.diagnosis-distribution')).toBeNull();expect(JSON.stringify(data)).toBe(before);
+ await act(async()=>document.querySelector<HTMLElement>('.ui-evo-card')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('Candidate K');expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('仅评测核验问题');
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method || init.method==='GET')).toBe(true);
 });
 it.each(['evaluated','failed'])('does not infer a final recommendation from %s records with missing decision',async(status)=>{
