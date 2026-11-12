@@ -354,6 +354,7 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .agent-case-destinations tr[role=button] { cursor:pointer; }
 .agent-case-destinations tr[role=button]:focus-visible { outline:2px solid var(--ui-accent); outline-offset:-2px; }
 .evolution-page .route-timeline > .ui-evo { display:grid; gap:16px; }
+.route-timeline .route-round-switch { margin:0; }
 .route-timeline .ui-evo-round { display:block; }
 .route-timeline .ui-evo-rail { display:none; }
 .route-timeline .ui-evo-body { padding-bottom:0; }

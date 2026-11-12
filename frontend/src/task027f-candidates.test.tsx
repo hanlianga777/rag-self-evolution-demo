@@ -51,3 +51,32 @@ it('keeps unknown ranking unknown and omits empty side-effect cards',async()=>{
  const d=data.optimization.candidates[0];delete d.reasoning.changes[0].side_effect_check;data.optimization.result.d_facts.remaining_failures[0].evidence_positions=[];
  await mount();await click('进化路线');await click('Candidate D');expect(document.querySelector('.d-side-effects')).toBeNull();expect(document.querySelector('.d-unresolved-card')?.textContent).toContain('原因未知');expect(document.querySelectorAll('.d-rank-bar')).toHaveLength(1);
 });
+it('027f2 removes redundant card wrappers and the comparison subtitle',async()=>{
+ await mount();await click('进化路线');await click('Candidate D');
+ expect(document.querySelector('.d-timeline')?.classList.contains('panel')).toBe(false);
+ await click('Candidate 对比');expect([...document.querySelectorAll('h2')].some(e=>e.textContent==='Candidate A / B / C')).toBe(false);
+ expect(document.querySelectorAll('.candidate-cards > .candidate-card')).toHaveLength(3);
+});
+it('027f2 explains regression limits alongside every failed Hard Gate',async()=>{
+ const ordinary=data.optimization.candidates.find((c:any)=>c.reasoning.round===2 && c.reasoning.candidate_label==='A');
+ const mixed=data.optimization.candidates.find((c:any)=>c.reasoning.round===1 && c.reasoning.candidate_label==='C');
+ ordinary.result.regression_review.limits={critical:0,ordinary:1};
+ mixed.result.regression_review={...mixed.result.regression_review,new_critical_failures:1,new_ordinary_failures:2,limits:{critical:0,ordinary:1}};
+ await mount();await click('回归与推荐');
+ const rows=[...document.querySelectorAll('.candidate-rejections > button')];
+ expect(rows.find(e=>e.querySelector('strong')?.textContent==='R2-A')?.textContent).toContain('新增 3 个 Bad Case，超过普通新增最多 1 个的上限。');
+ const text=rows.find(e=>e.querySelector('strong')?.textContent==='R1-C')?.textContent;
+ expect(text).toContain('严重新增 1 个，超过最多 0 个的上限');expect(text).toContain('普通新增 2 个，超过最多 1 个的上限');expect(text).toContain('未通过 Hard Gate');
+});
+it('027f2 uses saved values in two concise recommendation sentences and natural risk prose',async()=>{
+ const d=data.optimization.candidates[0];
+ d.reasoning.changes=[{parameter:'top_k',target_question_ids:['Q04','Q06'],reason:'剩余Q04、Q06属于已进入候选/重排但被Top4截断的context_selection问题；历史保存结果中top_k=6伴随修好Q04和Q06，且该值在search_space允许范围内，不撤销Winner的candidate_k=24与generation_thinking=high。',source_candidates:data.optimization.candidates.filter((c:any)=>c.reasoning.round===1 && c.reasoning.candidate_label==='C' || c.reasoning.round===2 && c.reasoning.candidate_label==='B').map((c:any)=>c.id),side_effect_check:{historical_effects:'保存的历史风险'}}];
+ const before=JSON.stringify(data);await mount();await click('回归与推荐');
+ const text=document.querySelector('.ui-fin-reason')?.textContent || '';
+ expect(text).toBe('Candidate D 在 R3-C 的基础上多修好了 Q04，新增 Bad Case 仍为 0；它的 P99 是 36.7 秒，比 R3-C 慢一些，但仍在 60 秒门槛以内，按质量优先的规则推荐 D。 采纳依据：Q04、Q06 的关键证据已经进入候选，却被“只取 4 条”的上限截掉；前几轮的结果显示 Top-K 6 能修好这两题，所以 D 只在 Winner 上加了这一项。');
+ await click('进化路线');await click('Candidate D');
+ const side=document.querySelector('.d-side-effects')?.textContent || '';
+ expect(side).toContain('前几轮里，Top-K 6 出现时伴随过副作用：R1-C 新增了 Q15、Q17、Q43，安全拒答降到 90%；R2-B 新增了 Q17、Q37、Q46，安全拒答 90%、P99 64.8 秒。');
+ expect(side).toContain('不能证明是 Top-K 造成的');expect(side).toContain('实际结果：');expect(side).not.toContain('全部守住');
+ expect(JSON.stringify(data)).toBe(before);
+});

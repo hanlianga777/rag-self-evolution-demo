@@ -200,16 +200,25 @@ function DResultStory({experiment,evaluation,badCases,footer}:{experiment:any;ev
       {remaining.map((row:any)=>{const rank=rankOf(missedPosition(row)),topK=d.config?.top_k,failed=rowFor(row.question_id)?.passed===false || fixed!==null && !fixed.includes(row.question_id);return <article className="d-unresolved-card" key={row.question_id}><h4><QuestionBadge id={shortQuestionId(row.question_id)} tone="open" question={questionText(row.question_id,evaluation,badCases)}/> <span>{!failed ? '实际是否修好未知' : targets.includes(row.question_id) ? '预测会修好，实际没修好' : '未列为修复目标，实际仍未修好'}</span></h4><p>{missedReason(row)}</p>{typeof rank==='number' && <div className="d-ranking" aria-label={`Winner 证据排名：第 ${rank} 位，截止线 Top-K ${topK}`}><div className="d-rank-labels"><span>截止线 Top-K {topK}</span><span>证据排第 {rank} 位</span></div><div className="d-rank-bar"><i style={{width:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><b style={{left:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><em style={{left:`${rank/Math.max(rank+2,topK+2)*100}%`}}/></div></div>}</article>;})}
       {broken?.map(id=><article className="d-unresolved-card" key={id}><h4><QuestionBadge id={shortQuestionId(id)} tone="broken" question={questionText(id,evaluation,badCases)}/> 新增 Bad Case</h4><p>{issueReason(id)}</p></article>)}
       {!remaining.length && !broken?.length && <p className="ui-body-muted">没有保存的未修好或新增 Bad Case 原因。</p>}
-      <DSideEffects changes={d.reasoning?.changes || []} summary={`${protectedSummary}；${gateSummary}。`}/>
+      <DSideEffects changes={d.reasoning?.changes || []} candidates={experiment.candidates} summary={`${watched.length && held===watched.length ? `${held} 道受保护题全部守住` : protectedSummary}，安全拒答 ${typeof safety==='number' ? `${safety}%` : '未知'}。`}/>
     </div>{footer && <footer className="d-story-footer">{footer}</footer>}</section></div>;
 
 }
 
-export function DSideEffects({changes,summary}:{changes:any[];summary?:string}) {
+export function DSideEffects({changes,summary,candidates=[]}:{changes:any[];summary?:string;candidates?:any[]}) {
   return <>{changes.filter(change=>Object.values(change.side_effect_check || {}).some(value=>typeof value==='string' && value.trim())).map((change,index)=>{
     const side=change.side_effect_check;
     const fields=Object.entries({历史伴随:side.historical_effects,已修好题:side.winner_fixed_risk,门槛风险:side.gate_risk,规避方式:side.mitigation,相同前提:side.same_premise_evidence,不同前提:side.different_premise_evidence,风险清单:side.risk_checklist}).filter(([,value])=>typeof value==='string' && value.trim());
-    return <article className="d-side-effects" key={index}><h4>{storyParameterNames[change.parameter] || '参数调整'} · 副作用检查</h4>{(summary ? fields.slice(0,1) : fields).map(([label,value])=><p key={label}><span className="ui-body-muted">{label}：</span><StoryText value={value}/></p>)}{summary && <p><span className="ui-body-muted">实际核对：</span>{summary}</p>}</article>;
+    const sources:any[]=(change.source_candidates || []).map((id:string)=>candidates.find(candidate=>candidate.id===id));
+    const topK=sources[0]?.config?.top_k ?? sources[0]?.reasoning?.changed_parameters?.top_k;
+    const history=summary && change.parameter==='top_k' && typeof topK==='number' && sources.length && sources.every(source=>completeResult(source) && (source.config?.top_k ?? source.reasoning?.changed_parameters?.top_k)===topK && Array.isArray(source.result.new_regression_question_ids) && source.result.new_regression_question_ids.length>0) ? sources.map(source=>{
+      const result=source.result,gates=result.gates?.gates || [];
+      const safetyGate=gates.find((gate:any)=>gate.metric==='safe_rejection_rate');
+      const safety=result.metrics?.safe_rejection_rate ?? safetyGate?.actual;
+      const p99=gates.find((gate:any)=>gate.metric==='latency_p99_seconds' && gate.passed===false);
+      return `${schemeName(source)} 新增了 ${questionList(result.new_regression_question_ids)}，安全拒答${!p99 && safetyGate?.passed===false ? '降到 ' : ' '}${typeof safety==='number' ? `${safety}%` : '未知'}${typeof p99?.actual==='number' ? `、P99 ${p99.actual.toFixed(1)} 秒` : ''}`;
+    }).join('；') : '';
+    return <article className="d-side-effects" key={index}><h4>{storyParameterNames[change.parameter] || '参数调整'} · 副作用检查</h4>{history ? <p>前几轮里，Top-K {topK} 出现时伴随过副作用：{history}。这些只是同时出现，不能证明是 Top-K 造成的，所以 D 把这些题列为重点盯防。</p> : (summary ? fields.slice(0,1) : fields).map(([label,value])=><p key={label}><span className="ui-body-muted">{label}：</span><StoryText value={value}/></p>)}{summary && <p>实际结果：{summary}</p>}</article>;
   })}</>;
 }
 
@@ -303,13 +312,20 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false,onRep
 }
 
 export function recommendationTradeoff(experiment:any):string {
-  const base=recommendationReason(experiment),{d,winner,result}=dResultData(experiment);
+  const base=recommendationReason(experiment),{d,winner,result,fixed,broken}=dResultData(experiment);
   if(!result || recommendationOf(experiment).recommended_candidate!==d?.id)return base;
   const gate=result.gates?.gates?.find((item:any)=>item.metric==='latency_p99_seconds');
   const winnerGate=winner?.result?.gates?.gates?.find((item:any)=>item.metric==='latency_p99_seconds');
   const actual=result.metrics?.latency_p99_seconds ?? gate?.actual;
   const before=winner?.result?.metrics?.latency_p99_seconds ?? winnerGate?.actual;
-  const adoption=(d.reasoning?.changes || []).map((change:any)=>change.reason || change.rationale).filter((value:any)=>typeof value==='string' && value.trim()).map((value:string)=>storyText(value).replaceAll('context_selection','上下文选择').replaceAll('search_space','允许调整范围')).join('；');
-  const tradeoff=typeof actual==='number' && typeof before==='number' && typeof gate?.threshold==='number' && gate.passed===true ? `D 的 P99 为 ${actual.toFixed(1)} 秒，${actual>before ? `比 ${schemeName(winner)} 的 ${before.toFixed(1)} 秒慢一些，但仍在` : '仍在'} ${gate.threshold} 秒门槛以内，按质量优先的规则推荐 D。` : '';
-  return [base,tradeoff,adoption ? `采纳时的依据：${adoption}` : ''].filter(Boolean).join(' ');
+  const changes=d.reasoning?.changes || [];
+  const adoption=changes.map((change:any)=>{
+    const value=change.reason || change.rationale;
+    if(typeof value!=='string' || !value.trim())return '';
+    const saved=value.match(/^剩余(.+?)属于已进入候选\/重排但被Top(\d+)截断的context_selection问题；历史保存结果中top_k=(\d+)伴随修好(.+?)，且该值在search_space允许范围内，不撤销Winner的/);
+    if(saved && changes.length===1 && change.parameter==='top_k')return `${saved[1]} 的关键证据已经进入候选，却被“只取 ${saved[2]} 条”的上限截掉；前几轮的结果显示 Top-K ${saved[3]} 能修好${saved[1].split('、').length===2 ? '这两题' : '这些题'}，所以 D 只在 Winner 上加了这一项。`;
+    return storyText(value).replaceAll('context_selection','上下文选择').replaceAll('search_space','允许调整范围');
+  }).filter(Boolean).join('；');
+  const tradeoff=fixed?.length && broken && typeof actual==='number' && typeof before==='number' && typeof gate?.threshold==='number' && gate.passed===true ? `Candidate D 在 ${schemeName(winner)} 的基础上多修好了 ${questionList(fixed)}，新增 Bad Case ${broken.length ? `为 ${broken.length}` : '仍为 0'}；它的 P99 是 ${actual.toFixed(1)} 秒，${actual>before ? `比 ${schemeName(winner)} 慢一些，但仍在` : '仍在'} ${gate.threshold} 秒门槛以内，按质量优先的规则推荐 D。` : base;
+  return [tradeoff,adoption ? `采纳依据：${adoption}` : ''].filter(Boolean).join(' ');
 }

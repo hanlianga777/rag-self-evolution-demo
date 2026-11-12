@@ -45,7 +45,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
 
     {others.length > 0 && <div className="ui-fin-others">
       <h3><IconLabel name="rejected">落选原因（{others.length}）</IconLabel></h3>
-      <div className="candidate-rejections">{others.map(item=><button type="button" key={item.id} onClick={()=>onOpen?.(item.id)} disabled={!onOpen}><strong>{item.name}</strong><span>{!item.complete ? '评测尚未完成，不能据此确定资格。' : item.qualified===true ? '本次保存的最终推荐未选择该方案，具体取舍见完整报告。' : item.gateFailures.length ? `${item.gateFailures.join('；')}，未通过 Hard Gate。` : item.broken.length ? `新增 ${item.broken.length} 个 Bad Case，保存的最终资格未通过。` : '保存的最终资格未通过，具体原因见完整报告。'}</span><Icon name="go" size={14}/></button>)}</div>
+      <div className="candidate-rejections">{others.map(item=><button type="button" key={item.id} onClick={()=>onOpen?.(item.id)} disabled={!onOpen}><strong>{item.name}</strong><span>{rejectionReason(item)}</span><Icon name="go" size={14}/></button>)}</div>
     </div>}
   </section>;
 }
@@ -56,4 +56,14 @@ const sec = (value: number | null) => value == null ? "未知" : `${value.toFixe
 function cmp(a: number | null, b: number | null, better: "higher" | "lower"): "a" | "b" | null {
   if (a == null || b == null || a === b) return null;
   return (better === "higher" ? a > b : a < b) ? "a" : "b";
+}
+
+function rejectionReason(item: CandidateView): string {
+  if (!item.complete) return '评测尚未完成，不能据此确定资格。';
+  if (item.qualified===true) return '本次保存的最终推荐未选择该方案，具体取舍见完整报告。';
+  const review=item.regression;
+  const failures=review?.limits ? (['critical','ordinary'] as const).filter(key=>review[`new_${key}_failures`]>review.limits![key]) : [];
+  const regression=failures.length===1 ? `新增 ${item.broken.length} 个 Bad Case，超过${failures[0]==='critical' ? '严重' : '普通'}新增最多 ${review!.limits![failures[0]]} 个的上限。` : failures.length ? `新增 ${item.broken.length} 个 Bad Case；${failures.map(key=>`${key==='critical' ? '严重' : '普通'}新增 ${review![`new_${key}_failures`]} 个，超过最多 ${review!.limits![key]} 个的上限`).join('；')}。` : '';
+  const gates=item.gateFailures.length ? `${item.gateFailures.join('；')}，未通过 Hard Gate。` : '';
+  return [regression,gates].filter(Boolean).join(' ') || (item.broken.length ? `新增 ${item.broken.length} 个 Bad Case，保存记录未提供超限明细，具体落选原因见完整报告。` : '保存记录未提供具体落选原因，见完整报告。');
 }
