@@ -5,8 +5,8 @@ import { Icon } from "../ui/icons";
 import { HoverCard } from "../ui/HoverCard";
 import { thinkingLabel } from "./PipelineFields";
 import { DataTable } from "./DataTable";
-import { Fragment, useEffect, useState } from 'react';
-import { Badge, EmptyState, Metric, ProgressBar, Section, TableVerdict, TruncatedText } from './Primitives';
+import { useEffect, useState } from 'react';
+import { Badge, EmptyState, Section, TableVerdict, TruncatedText } from './Primitives';
 import { Drawer } from './Dialog';
 import { businessDiagnosisRows, caseData, caseId, questionLabel } from './EvaluationDiagnosis';
 import { formatValue, parameterNames } from './PipelineFields';
@@ -17,7 +17,6 @@ type Row = Record<string, any>;
 const numeric = (value: unknown, suffix = '', decimals = 1) => typeof value === 'number' && Number.isFinite(value) ? `${suffix === "%" ? Number(value.toFixed(decimals)) : value.toFixed(decimals)}${suffix}` : '未采集';
 const costText = (value: any) => yuanText(value?.amount, value?.currency) ? `${yuanText(value.amount, value.currency)}（估算）` : '未采集';
 const gateLabels: Record<string, string> = { positive_correctness:'正向题（Positive）正确性', positive_faithfulness:'正向题（Positive）忠实性', positive_completeness:'正向题（Positive）完整性', ablation_correctness:'消融题（Ablation）正确性', ablation_faithfulness:'消融题（Ablation）忠实性', ablation_completeness:'消融题（Ablation）完整性', safe_rejection_rate:'安全拒答率', safety_critical_accuracy:'安全关键准确率', prompt_injection_resistance:'提示注入抵抗', latency_p50_seconds:'回答耗时中位数', latency_p99_seconds:'回答耗时（最慢 1%）' };
-const listText = (value: unknown) => Array.isArray(value) ? value.filter(Boolean).join('；') : typeof value === 'string' ? value : '';
 export const productQuestionLabel = (row: Row) => caseData(row).diagnostic_view?.display_question_id || row.display_question_id || questionLabel(caseId(row));
 
 export function BadCaseOverview({rows,categories=[],priorities=[],latencyGates=[],showJudgeReason=false,questions=[],onSelect}: {rows:Row[];categories?:Row[];priorities?:Row[];latencyGates?:Row[];showJudgeReason?:boolean;questions?:Row[];onSelect:(row:Row)=>void}) {
@@ -33,19 +32,18 @@ export function BadCaseOverview({rows,categories=[],priorities=[],latencyGates=[
  const layerKey=(row:Row)=>layerDefinitions.find(layer=>layer.labels.includes(caseData(row).diagnostic_view?.diagnosis_category))?.key;
  const visible=selected==='all'?cases:cases.filter(row=>layerKey(row)===selected);
  const incomplete=cases.filter(row=>!layerKey(row));
- const slow=latencyGates.filter(gate=>gate.metric?.startsWith('latency_'));
- const failed=slow.some(gate=>gate.status==='FAIL' || gate.passed===false);
- const timingComplete=['latency_p50_seconds','latency_p99_seconds'].every(metric=>slow.some(gate=>gate.metric===metric && (gate.status==='PASS' || gate.passed===true)));
- const latencyDetail=slow.map(gate=>`${gate.metric==='latency_p50_seconds'?'P50':'P99'} ${numeric(gate.actual,' 秒')}`).join('、');
- const safety=latencyGates.find(gate=>gate.metric==='safe_rejection_rate');
  const ranked=categories.map(category=>({...category,...priorities.find(item=>item.label===category.label)}));
  const severityOrder=['致命','严重','中等','轻微'];
  const layers=layerDefinitions.map(layer=>{
   const definitions=ranked.filter(category=>layer.labels.includes(category.label) && cases.some(row=>caseData(row).diagnostic_view?.diagnosis_category===category.label)).sort((a,b)=>(a.priority ?? Infinity)-(b.priority ?? Infinity));
   const severity=definitions.map(category=>category.severity_label || category.severity).filter(Boolean).sort((a,b)=>(severityOrder.indexOf(a)<0?99:severityOrder.indexOf(a))-(severityOrder.indexOf(b)<0?99:severityOrder.indexOf(b)))[0];
-  const remedy=[...new Set(definitions.map(category=>[category.repair_hint || listText(category.directions),category.priority_note].filter(Boolean).join('；')).filter(Boolean))].join('；');
-  return {...layer,count:cases.filter(row=>layerKey(row)===layer.key).length,severity,remedy:remedy || '记录缺失：修复思路',
-   note:layer.key==='safety' ? `安全拒答 ${numeric(safety?.actual,'%')}，本轮无单题问题` : layer.key==='performance' ? `${latencyDetail || '耗时未采集'}，${failed?'超出 Hard Gate':timingComplete?'在 Hard Gate 内':'Hard Gate 未完整采集'}；不计入单题 Bad Case` : '本轮无单题问题'};
+  const notes: Record<string, string> = {
+   retrieval:'关键证据没有被找到，或者找到了却排得太靠后，没能交给模型。',
+   generation:'证据已经交给模型，但回答漏了要点，或者该追问的时候没有追问。',
+   safety:'该拒绝、该提醒风险的题，回答没有守住安全底线。',
+   performance:'单题回答时间超出了 Hard Gate 规定的上限。',
+  };
+  return {...layer,count:cases.filter(row=>layerKey(row)===layer.key).length,severity,note:notes[layer.key]};
  });
  return <div className="bad-case-overview">
   <div role="group" aria-label="Bad Case 分类"><BadCaseLayers total={cases.length} layers={layers} active={selected} onSelect={setSelected}/></div>
@@ -62,15 +60,13 @@ export function timingStages(diagnostics?:Row) {
 }
 
 export function ProductDiagnostics({diagnostics,judgeThinking}: {diagnostics?:Row;judgeThinking?:string}) {
- const [open,setOpen]=useState(false),[showAll,setShowAll]=useState(false),[showOther,setShowOther]=useState(false);
+ const [open,setOpen]=useState(false),[showAll,setShowAll]=useState(false);
  const comparison=diagnostics?.thinking_comparison || {},columns:Row[]=comparison.columns || [],metrics=diagnostics?.objective_metrics || {};
- const {stages,tiny}=timingStages(diagnostics);
  const comparisonJudge=(comparison.judge_thinking || judgeThinking || '').toLowerCase();
  const sameThinking=columns.length>1 && new Set(columns.map(column=>column.label)).size===1;
  const comparisonTitle=sameThinking?'保存回答对照':'Thinking 档位对照';
  const columnName=(column:Row)=>sameThinking?(column.current?'当前 Baseline':'历史对照'):thinkingLabel(({最高:'max',高:'high',低:'low',关闭:'off'} as Record<string,string>)[column.label] || String(column.label || '').toLowerCase());
  const columnLabel=(column:Row)=>`${columnName(column)}${column.current && !sameThinking?' · 当前回答档位':''}`;
- const timingRow=(stage:Row)=><tr key={stage.stage}><td>{stage.label || '记录缺失：环节名称'}{stage.stage==='other_stages' && <button className="text-button" aria-expanded={showOther} onClick={()=>setShowOther(!showOther)}>{showOther?'收起明细':'展开明细'}</button>}</td><td className="num">{numeric(typeof stage.total_ms==='number'?stage.total_ms/1000:null,' 秒')} · {typeof stage.share_percent==='number' && stage.share_percent>0 && stage.share_percent<0.1?'<0.1%':numeric(stage.share_percent,'%')}</td><td><ProgressBar label={`${stage.label}占比`} value={stage.share_percent || 0}/></td></tr>;
  const gateKeys=[...new Set<string>(columns.flatMap(column=>(column.gates || []).map((gate:Row)=>gate.metric)))];
  const differentGates=gateKeys.filter(key=>new Set(columns.map(column=>column.gates?.find((gate:Row)=>gate.metric===key)?.status)).size>1);
  const overview:[string,(m:Row)=>string][]=[['答对',m=>m.correct_count==null?'未采集':`${m.correct_count} 题`],['Hard Gate',m=>m.gate_passed!=null && m.gate_total!=null?`${m.gate_passed} / ${m.gate_total}`:'未采集'],['回答耗时 P50',m=>numeric(m.latency_p50_seconds,' 秒')],['回答耗时 P99',m=>numeric(m.latency_p99_seconds,' 秒')],['TTFT',m=>numeric(typeof m.ttft_median_ms==='number'?m.ttft_median_ms/1000:null,' 秒')],['每题回答费用',m=>costText(m.average_estimated_cost)]];
@@ -78,10 +74,15 @@ export function ProductDiagnostics({diagnostics,judgeThinking}: {diagnostics?:Ro
  const maxMetrics=max?.metrics || {},highMetrics=high?.metrics || {};
  const maxCost=maxMetrics.average_estimated_cost,highCost=highMetrics.average_estimated_cost;
  return <>
-  {columns.length>0 && <Section title={`${comparisonTitle}${columns.length?`（同为 ${comparisonJudge || '未知档位'} 判分）`:''}`} action={<button className="secondary" onClick={()=>setOpen(true)}>查看对照</button>}><p>{columns.length?columns.map(column=>`${columnName(column)}：答对 ${column.metrics?.correct_count ?? '未采集'} · Hard Gate ${column.metrics?.gate_passed ?? '未知'}/${column.metrics?.gate_total ?? '未知'} · P50 ${numeric(column.metrics?.latency_p50_seconds,' 秒')}`).join('｜'):comparison.note || '尚无可比较的回答档位记录；保存相同判分身份的评测后可查看对照。'}</p></Section>}
-  <Section title="耗时拆解"><div aria-label="耗时拆解">{stages.length ? <div className="table-scroll product-table"><DataTable><thead><tr><th>环节</th><th className="num">累计耗时 · 占比</th><th>占比条</th></tr></thead><tbody>{stages.map(stage=><Fragment key={stage.stage}>{timingRow(stage)}{stage.stage==='other_stages' && showOther && tiny.map(timingRow)}</Fragment>)}</tbody></DataTable></div> : <p className="muted">记录缺失：本轮各环节耗时。</p>}<HoverCard content="判分耗时不计入回答延迟。耗时和占比来自本轮保存的回答阶段记录。"><button className="text-button" aria-label="回答耗时口径">ⓘ 耗时口径</button></HoverCard></div>
-   <div className="product-objective-metrics">{[['Recall@K',numeric(metrics.recall_at_k,'%')],['Precision@K',numeric(metrics.precision_at_k,'%')],['MRR',numeric(metrics.mrr,'',3)],['TTFT',numeric(typeof metrics.ttft_median_ms==='number'?metrics.ttft_median_ms/1000:null,' 秒')],['每题 Token',typeof metrics.average_tokens==='number'?Math.round(metrics.average_tokens).toLocaleString('en-US'):'未采集'],['每题回答费用',costText(metrics.average_estimated_cost)]].map(([label,value])=><Metric key={label} label={label} value={value}/>)}</div>
-  </Section>
+  {columns.length>0 && <Section title={`${comparisonTitle}${columns.length?`（同为 ${comparisonJudge || '未知档位'} 判分）`:''}`} action={<button className="secondary" onClick={()=>setOpen(true)}>查看对照</button>}><p>{columns.length?columns.map(column=>`${columnName(column)}：答对 ${column.metrics?.correct_count ?? '未采集'} · Hard Gate ${column.metrics?.gate_passed ?? '未知'}/${column.metrics?.gate_total ?? '未知'}`).join('｜'):comparison.note || '尚无可比较的回答档位记录；保存相同判分身份的评测后可查看对照。'}</p></Section>}
+  <Section title="检索与用量"><div className="product-objective-metrics">{[
+   ['Recall@K',numeric(metrics.recall_at_k,'%'),'标准证据原文有多少进入最终前 K 条上下文；按可评估的正向题和消融题逐题取平均。'],
+   ['Precision@K',numeric(metrics.precision_at_k,'%'),'最终上下文中，包含任一标准证据原文的条目占比；按可评估的正向题和消融题逐题取平均。'],
+   ['MRR',numeric(metrics.mrr,'',3),'第一条包含标准证据原文的最终上下文排名的倒数，未命中记为 0；逐题平均，越接近 1 越好。'],
+   ['TTFT',numeric(typeof metrics.ttft_median_ms==='number'?metrics.ttft_median_ms/1000:null,' 秒'),'已记录回答请求的首个 Token 等待时间中位数。'],
+   ['每题 Token',typeof metrics.average_tokens==='number'?Math.round(metrics.average_tokens).toLocaleString('en-US'):'未采集','每道保存回答的输入加输出 Token 均值，含思考用量，不含判分、向量检索和重排。'],
+   ['每题回答费用',costText(metrics.average_estimated_cost),'保存回答请求的平均估算费用，不含判分、向量检索和重排。'],
+   ].map(([label,value,note])=><div className="metric" key={label}><span>{label}</span><small>{note}</small><strong>{value}</strong></div>)}</div></Section>
   <Drawer className="workbench-drawer thinking-comparison-drawer" open={open} onOpenChange={setOpen} title={comparisonTitle}><div className="drawer-body story-details">{columns.length ? <>
    <div className="thinking-overview thinking-cards">{columns.map(column=><Section key={column.id} title={columnLabel(column)}><dl>{overview.map(([label,render])=><div key={label}><dt>{label}</dt><dd>{render(column.metrics || {})}</dd></div>)}</dl></Section>)}</div>
    <div className="thinking-deltas">{Number.isFinite(maxMetrics.correct_count) && Number.isFinite(highMetrics.correct_count) && <Badge>{maxMetrics.correct_count===highMetrics.correct_count?'两档答对题数相同':`${maxMetrics.correct_count>highMetrics.correct_count?'Max':'High'}多答对 ${Math.abs(maxMetrics.correct_count-highMetrics.correct_count)} 题`}</Badge>}{maxMetrics.latency_p50_seconds>0 && highMetrics.latency_p50_seconds>0 && <Badge>{maxMetrics.latency_p50_seconds>=highMetrics.latency_p50_seconds?'High':'Max'}快约 {numeric(Math.max(maxMetrics.latency_p50_seconds,highMetrics.latency_p50_seconds)/Math.min(maxMetrics.latency_p50_seconds,highMetrics.latency_p50_seconds))} 倍</Badge>}{maxCost?.amount>0 && typeof highCost?.amount==='number' && maxCost.currency===highCost.currency && <Badge>High 费用约为 Max 的 {numeric(highCost.amount/maxCost.amount*100,'%')}</Badge>}</div>

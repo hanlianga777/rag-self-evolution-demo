@@ -24,7 +24,7 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("1 项 Hard Gate 未达标");
   expect(document.querySelectorAll(".baseline-metrics > div")).toHaveLength(4);
   expect(document.querySelector(".baseline-conclusion")?.textContent).toContain("消融（Ablation）正确性");
-  expect(document.querySelector(".baseline-run-summary")?.textContent).toContain("judge-only-model");
+  expect(document.querySelector(".baseline-run-summary")?.textContent).not.toContain("judge-only-model");
   expect(document.querySelector(".baseline-run-summary")?.textContent).not.toContain("EVAL-stored");
   expect(document.body.textContent).not.toContain("EVAL-stored");
   await click("Hard Gate");
@@ -48,7 +48,7 @@ it("uses saved generation evidence only and keeps technical identity in its Draw
   await render(<EvaluationPage data={{ evaluation: run, badCases: [bad] }} />);
   expect(document.querySelector(".config-summary-grid")).toBeNull();
   expect([...document.querySelectorAll("button")].some(button=>button.textContent==="查看评测依据")).toBe(false);
-  expect(document.body.textContent).toContain("judge-only-model");
+  expect(document.body.textContent).not.toContain("judge-only-model");
   expect(document.body.textContent).not.toContain("EVAL-stored");
 });
 

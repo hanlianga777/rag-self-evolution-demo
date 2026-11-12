@@ -19,7 +19,7 @@ export function BadCaseLayers({ total, layers, active, onSelect }: { total: numb
       className={`ui-bcl-card${active === layer.key ? " on" : ""}${layer.count ? "" : " empty"}`} onClick={() => onSelect(layer.key)}>
       <span className="ui-bcl-head"><IconLabel name={layer.icon ?? "layers"}>{layer.name}</IconLabel>{layer.severity && layer.count > 0 && <em>{layer.severity}</em>}</span>
       <strong>{layer.count}</strong>
-      <ClampText className="ui-bcl-m" text={(layer.count ? layer.remedy : layer.note) ?? "本轮无"} lines={2} hoverOnly />
+      <ClampText className="ui-bcl-m" text={layer.note ?? "本轮无"} lines={2} hoverOnly />
     </button>)}
   </div>;
 }

@@ -27,7 +27,7 @@ it('maps saved gate values, thresholds and verdicts to cards while preserving mo
   await click([...document.querySelectorAll('button')].find(button => button.textContent === 'Hard Gate')!);
   expect(document.querySelectorAll('.ui-hg-card')).toHaveLength(4);
   const items = [...document.querySelectorAll<HTMLElement>('.ui-hg-card li')];
-  expect(items[0].querySelector('.ui-hg-name')?.textContent).toBe('正确性');
+  expect(items[0].querySelector('.ui-hg-name')?.textContent).toContain('正确性 Correctness');
   expect(items[0].textContent).toContain('83%≥ 90%');
   expect(items[0].querySelector<HTMLElement>('.ui-hg-bar i')?.style.width).toBe('83%');
   expect(items[0].querySelector<HTMLElement>('.ui-hg-bar b')?.style.left).toBe('90%');
@@ -57,9 +57,9 @@ it('groups existing categories, filters the saved rows, resets to all and keeps 
   ]} onSelect={onSelect} />);
   expect(document.querySelectorAll('.ui-bcl button')).toHaveLength(5);
   expect(layer('检索层').querySelector('strong')?.textContent).toBe('2');
-  expect(layer('检索层').textContent).toContain('保存的优先修复');
-  expect(layer('安全边界').textContent).toContain('安全拒答 97%');
-  expect(layer('性能').textContent).toContain('P50 12.3 秒、P99 38.9 秒');
+  expect(layer('检索层').textContent).toContain('关键证据没有被找到');
+  expect(layer('安全边界').textContent).toContain('该拒绝、该提醒风险的题');
+  expect(layer('性能').textContent).toContain('单题回答时间超出了 Hard Gate 规定的上限。');
   expect((layer('安全边界') as HTMLButtonElement).disabled).toBe(true);
   await click(layer('检索层'));
   expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('Q01');
@@ -79,12 +79,12 @@ it('groups existing categories, filters the saved rows, resets to all and keeps 
 it('keeps unknown cases in all and never declares missing or failing timing data within the gates', async () => {
   await mount(<BadCaseOverview rows={[row('Q09', '未归因')]} onSelect={() => {}} latencyGates={[{ metric: 'latency_p50_seconds', actual: 29, threshold: 20, status: 'FAIL' }]} />);
   expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('Q09');
-  expect(layer('性能').textContent).toContain('超出 Hard Gate');
+  expect(layer('性能').textContent).toContain('超出了 Hard Gate');
   expect(layer('性能').textContent).not.toContain('在 Hard Gate 内');
-  expect(layer('安全边界').textContent).toContain('未采集');
+  expect(layer('安全边界').textContent).toContain('回答没有守住安全底线');
   await act(async () => root.render(<BadCaseOverview rows={[]} onSelect={() => {}} />));
   expect(layer('性能').textContent).not.toContain('在 Hard Gate 内');
-  expect(layer('性能').textContent).toContain('未采集');
+  expect(layer('性能').textContent).toContain('Hard Gate 规定的上限');
 });
 
 it('uses the current saved layer definitions and resets a filter when the run rows change', async () => {
@@ -92,7 +92,7 @@ it('uses the current saved layer definitions and resets a filter when the run ro
   const categories = [{ label: '检索层问题', severity: '严重', repair_hint: '当前检索修复' }, { label: '生成层问题', severity: '中等', repair_hint: '当前生成修复' }, { label: '安全边界问题', severity: '致命', repair_hint: '当前安全修复' }];
   await mount(<BadCaseOverview rows={rows} categories={categories} onSelect={() => {}} />);
   for (const name of ['检索层', '生成层', '安全边界']) expect(layer(name).querySelector('strong')?.textContent).toBe('1');
-  expect(layer('安全边界').textContent).toContain('当前安全修复');
+  expect(layer('安全边界').textContent).toContain('回答没有守住安全底线');
   expect(layer('安全边界').textContent).toContain('致命');
   await click(layer('安全边界'));
   expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('Q13');

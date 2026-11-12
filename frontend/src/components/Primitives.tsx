@@ -11,6 +11,10 @@ export function Metric({ label, value, note }: { label: string; value: ReactNode
   return <div className="metric"><span>{label}</span><strong>{value}</strong>{note && <small>{note}</small>}</div>;
 }
 
+export function LoadingSkeleton({ label }: { label: string }) {
+  return <div className="loading-skeleton" role="status" aria-label={label}><span /><span /><span /></div>;
+}
+
 export function Section({ title, action, children }: { title: ReactNode; action?: ReactNode; children: ReactNode }) {
   const inDrawer = useContext(FullTextContext);
   return <section className={`panel${inDrawer ? " drawer-section" : ""}`}><div className="section-head"><h2>{title}</h2>{action}</div>{children}</section>;

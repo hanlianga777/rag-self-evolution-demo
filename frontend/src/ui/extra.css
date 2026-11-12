@@ -282,3 +282,48 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .parameter-space-drawer .search-space-table :is(th,td) { text-align:left; }
 .drawer.parameter-space-drawer table.search-space-table :is(th.parameter-value,td.parameter-value) { text-align:center; }
 .parameter-space-drawer .search-space-table td .ui-clamp { display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; white-space:normal; }
+
+/* 027d：报告沿用现有卡片；读取中的字段用骨架，不提前下结论。 */
+.loading-line { display:inline-block; width:100%; min-width:48px; height:12px; border-radius:4px; background:var(--ui-rule-2); }
+.ui-bl-time-note { display:block; margin-top:0; font-size:12px; color:var(--ui-muted); line-height:1.65; }
+.ui-blb { align-items:start; }
+.ui-blb-cats { gap:24px; padding:8px 0; }
+.ui-blb-cats li { grid-template-columns:144px minmax(0,1fr) 64px; }
+.ui-blb-cat { white-space:nowrap; }
+.ui-blb-cat small { margin-left:6px; font-size:12px; color:var(--ui-muted); }
+.baseline-more .product-objective-metrics .metric { height:auto; min-height:132px; }
+.baseline-more .product-objective-metrics .metric small { font-size:12px; color:var(--ui-muted); line-height:1.65; }
+.ui-hg-card li { grid-template-columns:minmax(0,1fr) 60px 100px 7px; gap:10px; min-height:88px; }
+.ui-hg-name { display:grid; gap:7px; }
+.ui-hg-english, .ui-hg-description { font-size:12px; font-weight:400; color:var(--ui-muted); line-height:1.5; }
+.ui-hg-english { margin-left:4px; }
+.gate-definition { background:var(--ui-rule-2); border-radius:var(--ui-r-inner); padding:16px 20px; }
+.gate-definition h3 { margin:0 0 8px; font-size:13px; }
+.gate-definition p { margin:8px 0 0; color:var(--ui-muted); font-size:12px; line-height:1.65; }
+.ui-bcl-card .ui-bcl-m { font-size:12px; }
+@media (min-width:1101px) and (min-height:800px) {
+ .evaluation-gates .page-content { display:flex; flex-direction:column; padding-bottom:16px; }
+ .evaluation-gates .baseline-gate-grid { flex:1; min-height:640px; }
+ .evaluation-gates .ui-hg { height:100%; display:flex; flex-direction:column; }
+ .evaluation-gates .ui-hg-grid { flex:1; grid-template-rows:repeat(2,minmax(0,1fr)); }
+ .evaluation-gates .ui-hg-card { display:flex; flex-direction:column; }
+ .evaluation-gates .ui-hg-card ul { flex:1; display:grid; grid-auto-rows:1fr; }
+}
+@media (max-width:700px) {
+ .ui-hg-card li { grid-template-columns:minmax(0,1fr) 90px 7px; }
+ .ui-hg-bar { display:none; }
+ .ui-blb-cats li { grid-template-columns:140px minmax(0,1fr) 54px; gap:8px; }
+}
+
+.loading-skeleton { display:grid; gap:12px; padding:16px 0; }
+.loading-skeleton > span { display:block; height:24px; border-radius:6px; background:var(--ui-rule-2); }
+.loading-skeleton > span:last-child { width:70%; }
+
+.overview-page.architecture-view :is(.ui-problems,.ui-arch,.ui-tech) { background:transparent; box-shadow:none; border:0; padding:0; }
+
+.drawer.workbench-drawer .case-answer { max-height:none; overflow:visible; }
+.evaluation-page .page-content { padding-bottom:16px; }
+.evaluation-page .page-content > .panel { margin:16px 0; }
+
+.baseline-more .story-disclosure-content > .header-actions { justify-content:flex-end; }
+.evaluation-page .ui-bl-time-note { justify-self:stretch; text-align:left; margin-left:0; width:auto; }

@@ -12,7 +12,7 @@ async function click(text:string){await act(async()=>[...document.querySelectorA
 const run={id:'fixture-B',status:'completed',config:{top_k:3},cases:[],result:{gates:{passed:true,passed_count:11,total:11},bad_case_count:0},dataset_snapshot:{id:'fixture-g',question_ids:['q']}};
 it('starts an eligible Baseline only after the fee confirmation',async()=>{
  const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
- await render(<EvaluationPage data={{evaluation:run}}/>);await click('重新运行 Baseline（新版本）');
+ await render(<EvaluationPage data={{evaluation:run}}/>);await click('重新评测 Baseline');
  expect(document.querySelector('[role=dialog]')).not.toBeNull();
  expect(calls.mock.calls.some((c:any[])=>c[1]?.method==='POST')).toBe(false);
  await click('确认');

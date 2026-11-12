@@ -32,7 +32,7 @@ export function BaselineHero({ gates, correct, total, badCount, layers, thinking
       <div className="ui-bl-bar" role="img" aria-label={sorted.map(item => `${item.label} ${pctOf(item)}`).join("，")}>
         {sorted.map((item, index) => <i key={item.label} className={index === 0 ? "top" : ""} style={{ flexGrow: item.seconds }} />)}
       </div>
-      <div className="ui-bl-legend">{sorted.map((item, index) => <span key={item.label} className={index === 0 ? "top" : ""}><i aria-hidden="true" />{item.label} <b className="ui-num">{pctOf(item)}</b></span>)}{generation && <small className="ui-bl-time-note">回答生成占 {pctOf(generation)}{(generation.share ?? generation.seconds / sum * 100) > 50 ? ' → 降 Thinking 档位是提速主要抓手' : ''}</small>}</div>
+      <div className="ui-bl-legend">{sorted.map((item, index) => <span key={item.label} className={index === 0 ? "top" : ""}><i aria-hidden="true" />{item.label} <b className="ui-num">{pctOf(item)}</b></span>)}</div>{generation && <small className="ui-bl-time-note">Baseline 特意把思考档位拉到最高（Max），先用模型最强的能力证明这套知识检索能够跑通；耗时有 {pctOf(generation)} 花在回答生成上，这也给后面 Agent 尝试降档留出了空间。</small>}
     </div>}
   </section>;
 }

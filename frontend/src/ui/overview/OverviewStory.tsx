@@ -9,7 +9,7 @@ import "../extra.css";
  * 右：修好的题（题号 + 题目一行 + 本题关键变化），点击直接去问答验证的 Before/After。
  */
 export type StoryTurn = { label: string; text: string; key?: boolean; onClick?: () => void };
-export type FixedItem = { id: string; question?: string; cause?: string };
+export type FixedItem = { id: string; question?: string; cause?: string; questionLoading?: boolean; causeLoading?: boolean };
 
 export function OverviewStory({ turns, fixed, remaining, onOpenFixed }: { turns: StoryTurn[]; fixed: FixedItem[]; remaining?: string[] | null; onOpenFixed?: (id: string) => void }) {
   return <div className="ui-ovs">
@@ -30,8 +30,8 @@ export function OverviewStory({ turns, fixed, remaining, onOpenFixed }: { turns:
         {fixed.map(item => <li key={item.id}>
           <button type="button" onClick={onOpenFixed ? () => onOpenFixed(item.id) : undefined} disabled={!onOpenFixed} aria-label={`查看 ${item.id} 的 Before/After`}>
             <QuestionBadge id={item.id} tone="fixed" />
-            <ClampText className="ui-ovs-fixed-q" text={item.question ?? "题目未保存"} lines={1} hoverOnly />
-            <span className={`ui-ovs-fixed-c${item.cause ? "" : " unknown"}`}>{item.cause || "—"}</span>
+            {item.questionLoading ? <span className="loading-line" role="status" aria-label="正在读取题目" /> : <ClampText className="ui-ovs-fixed-q" text={item.question ?? "题目未保存"} lines={1} hoverOnly />}
+            {item.causeLoading ? <span className="loading-line" role="status" aria-label="正在读取本题归因" /> : <span className={`ui-ovs-fixed-c${item.cause ? "" : " unknown"}`}>{item.cause || "—"}</span>}
             {onOpenFixed && <Icon name="go" size={15} className="ui-ovs-go" />}
           </button>
         </li>)}

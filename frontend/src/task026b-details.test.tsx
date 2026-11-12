@@ -15,13 +15,14 @@ beforeEach(()=>{invalidateReads();vi.stubGlobal('fetch',vi.fn(async()=>new Respo
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();invalidateReads();});
 async function mount(node:React.ReactNode){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));}
 
-it('selects the lowest saved pass rate, not the largest absolute failure count',async()=>{
+it('keeps saved category values without an extra weakest-category conclusion',async()=>{
  await mount(<BaselineBreakdown categories={[{label:'正向题（Positive）',correct:15,total:20},{label:'消融题（Ablation）',correct:2,total:4}]} badCases={Array.from({length:7},(_,i)=>({id:`Q${i}`,layer:'检索层'}))}/>);
- expect(document.querySelector('.ui-blb-conclusion')?.textContent).toBe('消融题最弱：2 / 4，7 个 Bad Case 中有 2 个在这里');
+ expect(document.querySelector('.ui-blb-conclusion')).toBeNull();
+ expect([...document.querySelectorAll('.ui-blb-val')].map(e=>e.textContent)).toEqual(['15 / 20','2 / 4']);
 });
 it('uses the generation share even when a different stage is the largest',async()=>{
  await mount(<BaselineHero gates={{passed:1,total:1}} correct={1} total={2} badCount={1} layers={[]} stages={[{label:'检索',seconds:8,share:80},{label:'回答生成',seconds:2,share:20}]}/>);
- expect(document.querySelector('.ui-bl-time-note')?.textContent).toContain('回答生成占 20.0%');
+ expect(document.querySelector('.ui-bl-time-note')?.textContent).toContain('耗时有 20.0% 花在回答生成上');
  expect(document.querySelector('.ui-bl-time-note')?.textContent).not.toContain('主要抓手');
 });
 it('shows the first missing source requirement and keeps every requirement in hover details',async()=>{

@@ -2,7 +2,7 @@
 import {act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {afterEach,expect,it,vi} from 'vitest';
-import {BadCaseOverview, ProductDiagnostics, StrategyPresentation} from './components/ProductDiagnostics';
+import {BadCaseOverview, ProductDiagnostics, StrategyPresentation, timingStages} from './components/ProductDiagnostics';
 import {formatValue} from './components/PipelineFields';
 import {BaselineCaseDetails} from './pages/EvaluationPage';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
@@ -17,7 +17,7 @@ it('shares six backend categories and keeps latency outside case totals',async()
  expect(document.querySelectorAll('[aria-label="Bad Case 分类"] button')).toHaveLength(5);
  expect(document.querySelector('.ui-bcl-all strong')?.textContent).toBe('2');
  expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
- expect(document.querySelector('.ui-bcl')?.textContent).toContain('超出 Hard Gate');expect(document.querySelector('.diagnosis-list')?.textContent).toContain('Q04');
+ expect(document.querySelector('.ui-bcl')?.textContent).toContain('超出了 Hard Gate');expect(document.querySelector('.diagnosis-list')?.textContent).toContain('Q04');
  expect(document.querySelector('.diagnosis-list')?.textContent).not.toContain('CSV-');
  expect(document.querySelector('.diagnosis-list')?.textContent).toContain('候选有证据，最终未保留');expect(document.querySelectorAll('.diagnosis-list button')).toHaveLength(0);
  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('.ui-bcl button')].find(b=>b.textContent?.includes('生成层'))!.click());expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
@@ -26,7 +26,8 @@ it('shares six backend categories and keeps latency outside case totals',async()
 it('shows saved comparison columns, differences and excludes judge timing',async()=>{
  const columns=['max','high','final'].map(id=>({id,label:id==='high'?'「高」档':'「最高」档',current:id==='high',metrics:{gate_passed:10,gate_total:11,correct_count:43,bad_case_count:7,latency_p50_seconds:7.3,latency_p99_seconds:22.6,ttft_median_ms:200,average_estimated_cost:{amount:0.01,currency:'CNY'}},gates:[{metric:'safe_rejection_rate',label:'安全拒答率',actual:90,threshold:95,operator:'>=',status:'FAIL'}]}));
  await mount(<ProductDiagnostics diagnostics={{objective_metrics:{stage_breakdown:[{stage:'generation',label:'回答生成',total_ms:100,share_percent:100},{stage:'judge',label:'判分',total_ms:900,share_percent:90}],recall_at_k:80},thinking_comparison:{columns,different_cases:[{question_id:'Q37',question:'缺少状态',diagnosis_category:'回答问题',results:{max:{passed:true},high:{passed:false}}}],note:'差异题已纳入本轮优化。'}}}/>);
- expect(document.querySelector('[aria-label="耗时拆解"]')?.textContent).not.toContain('900');
+ expect(document.querySelector('[aria-label="耗时拆解"]')).toBeNull();
+ expect(document.querySelector('.product-objective-metrics .metric strong')?.textContent).toBe('80%');
  await click('查看对照');expect(document.querySelectorAll('.thinking-cards > .panel')).toHaveLength(3);await click('显示全部 1 项');expect(document.querySelector('.drawer')?.textContent).toContain('安全拒答率');expect(document.querySelector('.drawer')?.textContent).toContain('Q37');
 });
 it('renders real strategy fields and explicitly leaves absent data empty',async()=>{
@@ -38,15 +39,16 @@ it('keeps legacy prompt labels and promotes gate-blocking categories with saved 
  expect(formatValue('Abstention')).toBe('谨慎拒答');expect(formatValue('Tiered')).toBe('分级回答');
  const rows=[{question_id:'Q37',passed:false,diagnostic_view:{diagnosis_category:'回答问题',subfeature:'澄清不足'}}];
  await mount(<BadCaseOverview rows={rows} categories={categories} priorities={[{label:'回答问题',priority:1,priority_note:'导致门槛未过：安全拒答率'}]} latencyGates={[{metric:'latency_p50_seconds',actual:8.4,threshold:26,status:'PASS'},{metric:'latency_p99_seconds',actual:23.7,threshold:61,status:'PASS'}]} onSelect={()=>{}}/>);
- expect(document.querySelector('.ui-bcl')?.textContent).toContain('导致门槛未过：安全拒答率');
- expect(document.querySelector('.ui-bcl')?.textContent).toContain('P50 8.4 秒、P99 23.7 秒，在 Hard Gate 内；不计入单题 Bad Case');
+ expect(document.querySelector('.ui-bcl')?.textContent).toContain('证据已经交给模型');
+ expect(document.querySelector('.ui-bcl')?.textContent).toContain('单题回答时间超出了 Hard Gate 规定的上限。');
 });
 it('sorts stages, folds tiny shares and uses seconds and plain comparison labels',async()=>{
  const columns=['max','high'].map(id=>({id,label:id==='high'?'高':'最高',current:id==='high',metrics:{ttft_median_ms:4710.5}}));
  await mount(<ProductDiagnostics diagnostics={{objective_metrics:{stage_breakdown:[{stage:'tiny1',label:'拼接上下文',total_ms:2,share_percent:0.2},{stage:'vector',label:'向量检索',total_ms:100,share_percent:10},{stage:'generation',label:'生成回答',total_ms:895,share_percent:89.5},{stage:'tiny2',label:'查询处理',total_ms:3,share_percent:0.3}]},thinking_comparison:{columns,different_cases:[{question_id:'Q37',diagnosis_category:'回答问题',subfeature:'澄清不足'}]}}}/>);
- const table=document.querySelector('[aria-label="耗时拆解"] table')!;
- expect([...table.querySelectorAll('tbody tr')].map(row=>row.querySelector('td')!.textContent)).toEqual(['生成回答','向量检索','其他环节展开明细']);
- expect(table.textContent).not.toContain('拼接上下文');await click('展开明细');expect(table.textContent).toContain('拼接上下文');
+ const timing=timingStages({objective_metrics:{stage_breakdown:[{stage:'tiny1',label:'拼接上下文',total_ms:2,share_percent:.2},{stage:'vector',label:'向量检索',total_ms:100,share_percent:10},{stage:'generation',label:'生成回答',total_ms:895,share_percent:89.5},{stage:'tiny2',label:'查询处理',total_ms:3,share_percent:.3}]}});
+ expect(timing.stages.map(stage=>stage.total_ms)).toEqual([895,100,5]);
+ expect(timing.tiny.map(stage=>stage.stage)).toEqual(['tiny2','tiny1']);
+ expect(document.querySelector('[aria-label="耗时拆解"]')).toBeNull();
  await click('查看对照');const dialog=document.querySelector('[role="dialog"]')!;
  expect(dialog.textContent).toContain('Max');expect(dialog.textContent).toContain('High · 当前回答档位');
  expect(dialog.textContent).toContain('4.7 秒');expect(dialog.textContent).not.toContain('毫秒');

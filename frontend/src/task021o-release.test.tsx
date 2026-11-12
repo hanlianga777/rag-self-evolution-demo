@@ -31,7 +31,7 @@ it('hides the entire thinking comparison section when no columns exist',async()=
  expect(document.body.textContent).not.toContain('Thinking 档位对照');
  expect(document.body.textContent).not.toContain('尚无可比较');
  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看对照')).toBe(false);
- expect(document.body.textContent).toContain('耗时拆解');
+ expect(document.body.textContent).toContain('检索与用量');
 });
 
 it('labels released status and the archived initial config without calling it current',async()=>{

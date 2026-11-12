@@ -31,9 +31,9 @@ it("reports saved Run values and absent historical Thinking as unknown in report
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(run))));
   await render(<EvaluationPage data={{ evaluation: run, pipeline: { config: { generation_thinking: "max" } } }} />);
   const summary = document.querySelector('.baseline-run-summary')!;
-  expect(summary.textContent).toContain("gen-old");
-  expect(summary.textContent).toContain("judge-old");
-  expect(summary.textContent).toContain("历史未知");
+  expect(summary.textContent).not.toContain("gen-old");
+  expect(summary.textContent).not.toContain("judge-old");
+  expect(summary.textContent).not.toContain("历史未知");
   expect([...summary.querySelectorAll("dt")].filter(node => node.textContent === "题卷")).toHaveLength(1);
   expect(document.body.textContent).not.toContain("完整配置快照");
   expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -50,8 +50,8 @@ it("uses a new Run's saved Thinking and knowledge identities consistently in sum
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(run))));
   await render(<EvaluationPage data={{ evaluation: run }} />);
   const summary = document.querySelector('.baseline-run-summary')!;
-  expect(summary.textContent).toContain("gen-saved · OFF");
-  expect(summary.textContent).toContain("judge-saved · Max");
+  expect(summary.textContent).not.toContain("gen-saved · OFF");
+  expect(summary.textContent).not.toContain("judge-saved · Max");
   expect(document.body.textContent).not.toContain("CORPUS-SAVED");
   expect(document.body.textContent).not.toContain("RESULT-CONFIG-SAVED");
   expect(summary.textContent).not.toContain("corpus-old-fallback");
@@ -119,7 +119,8 @@ it('keeps the fixed Max Baseline when active-task lookup returns a different com
  vi.stubGlobal('fetch',fetcher);
  await render(<EvaluationPage data={{evaluation:run}}/>);
  expect(fetcher.mock.calls.some(([url])=>url.endsWith('/evaluations/FIXED-MAX'))).toBe(true);
- expect(document.querySelector('.baseline-run-summary')?.textContent).toContain('Max');
+ expect(document.querySelector('.page-title')?.textContent).toContain('Baseline');
+ expect(document.querySelector('.baseline-metrics')?.textContent).toContain('42 / 50');
  expect(document.querySelector('.baseline-run-summary')?.textContent).not.toContain('High');
  await click('Bad Case 诊断');
  expect(document.body.textContent).toContain('8 个 Bad Case');

@@ -2,7 +2,7 @@ import { IconLabel, IconTile } from "../ui/icons";
 import { PageShell } from "../components/PageShell";
 import { useEffect, useState } from "react";
 import { errorMessage, postJson } from "../api";
-import { Badge, Section } from "../components/Primitives";
+import { LoadingSkeleton, Badge, Section } from "../components/Primitives";
 import { pipelineCached, pipelineFetch, pipelineIdentity, invalidatePipeline } from "../pipelineCache";
 import { Drawer } from "../components/Dialog";
 import { draftDefaults, formatValue, parameterNames, SearchSpaceTable } from "../components/PipelineFields";
@@ -58,6 +58,7 @@ export function SettingsPage({ data }: { data: any }) {
   };
   return <PageShell className="page settings-page" header={<div className="page-title"><div><h1><IconTile name="pipeline" />Pipeline 配置</h1><p className="ui-kicker page-purpose">这里放着固定不变的技术底座和 Agent 可以调整的 12 项参数，也就划定了自动优化的边界。</p></div><button className="secondary" onClick={() => setSpaceOpen(true)}>参数说明</button></div>}>
     {error && <p className="error-notice" role="alert">{error}</p>}
+    {!pipeline && !error ? <LoadingSkeleton label="正在读取 Pipeline 配置" /> : <>
     <Section title={<IconLabel name="data">固定技术基座</IconLabel>} action={<Badge>固定</Badge>}><dl className="frozen-facts">{facts.filter(([, value]) => value != null && value !== "").map(([name, value]) => <div key={String(name)}><dt>{name}</dt><dd>{name === "索引" && /FAISS/i.test(String(value)) ? "FAISS 向量索引" : String(value)}</dd></div>)}</dl></Section>
     <Section title={<IconLabel name="pipeline">Agent 可选参数</IconLabel>} action={<Badge tone="accent">{Object.keys(contract).length} 项可调参数</Badge>}>
 
@@ -81,6 +82,7 @@ export function SettingsPage({ data }: { data: any }) {
       </div>}
     </Section>
 
-    <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="可选参数范围" className="parameter-space-drawer"><div className="drawer-body"><SearchSpaceTable contract={contract} baseline={baseline} /></div></Drawer>
+    </>}
+    <Drawer showCloseFooter={false} open={spaceOpen} onOpenChange={setSpaceOpen} title="可选参数范围" className="parameter-space-drawer"><div className="drawer-body">{!pipeline && !error ? <LoadingSkeleton label="正在读取参数说明" /> : <SearchSpaceTable contract={contract} baseline={baseline} />}</div></Drawer>
   </PageShell>;
 }

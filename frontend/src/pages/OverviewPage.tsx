@@ -77,24 +77,25 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     const baselineId = run?.id, afterId = finalCandidate?.result?.evaluation_run_id;
     if (!baselineId || !afterId || !fixedIds.length || !completeResult(finalCandidate)) return;
     void Promise.all([baselineId, afterId].map(id => getJson<any>(`/api/evaluations/${encodeURIComponent(id)}/comparison-cases`))).then(async ([before, after]) => {
-      if (cancelled || before.id !== baselineId || after.id !== afterId || before.status !== "completed" || after.status !== "completed" || !before.judge?.evaluation_identity || before.judge.evaluation_identity !== after.judge?.evaluation_identity || !before.dataset_version_id || before.dataset_version_id !== after.dataset_version_id) return;
-      const items: FixedItem[] = fixedIds.map(id => ({id: shortId(id), question: before.cases?.find((row: any) => shortId(row.question_id) === shortId(id))?.question}));
+      if (cancelled) return;
+      if (before.id !== baselineId || after.id !== afterId || before.status !== "completed" || after.status !== "completed" || !before.judge?.evaluation_identity || before.judge.evaluation_identity !== after.judge?.evaluation_identity || !before.dataset_version_id || before.dataset_version_id !== after.dataset_version_id) throw new Error('保存的比较身份不一致');
+      const items: FixedItem[] = fixedIds.map(id => ({id: shortId(id), question: before.cases?.find((row: any) => shortId(row.question_id) === shortId(id))?.question, causeLoading: true}));
       setFixedRecord({binding: comparisonBinding, items});
       const detailed = await Promise.all(items.map(async item => {
         const sourceId = before.cases?.find((row: any) => shortId(row.question_id) === item.id)?.question_id;
-        if (!sourceId) return item;
+        if (!sourceId) return {...item, causeLoading: false};
         try {
           const [left, right] = await Promise.all([baselineId, afterId].map(id => getJson<any>(`/api/evaluations/${encodeURIComponent(id)}/cases/${encodeURIComponent(sourceId)}`)));
           const why = explanation(left.case, right.case, before.config, after.config, comparisonPoints(left.case, right.case, right.question));
           const change = configChanges(before.config, after.config).find(change => change.key === why.key);
-          return {...item, cause: change ? `${change.label} ${change.before} → ${change.after}` : undefined};
-        } catch { return item; }
+          return {...item, causeLoading: false, cause: change ? `${change.label} ${change.before} → ${change.after}` : undefined};
+        } catch { return {...item, causeLoading: false}; }
       }));
       if (!cancelled) setFixedRecord({binding: comparisonBinding, items: detailed});
-    }).catch(() => { /* Saved evidence is optional; never infer a cause from the global config. */ });
+    }).catch(() => { if (!cancelled) setFixedRecord({binding: comparisonBinding, items: fixedIds.map(id => ({id: shortId(id), question: formal?.questions?.find((row: any) => shortId(row.id) === shortId(id))?.question}))}); });
     return () => { cancelled = true; };
   }, [comparisonBinding, pagesWarming]);
-  const fixed = fixedRecord.binding === comparisonBinding ? fixedRecord.items : fixedIds.map(id => ({id: shortId(id), question: formal?.questions?.find((row: any) => shortId(row.id) === shortId(id))?.question}));
+  const fixed: FixedItem[] = fixedRecord.binding === comparisonBinding ? fixedRecord.items : fixedIds.map(id => ({id: shortId(id), question: formal?.questions?.find((row: any) => shortId(row.id) === shortId(id))?.question, questionLoading: !!run?.id && !!finalCandidate?.result?.evaluation_run_id, causeLoading: !!run?.id && !!finalCandidate?.result?.evaluation_run_id}));
   const storyBaseline=metrics ? run : undefined;
   const storyRounds=new Set(candidates.filter((c:any)=>["A","B","C"].includes(c.reasoning?.candidate_label)).map((c:any)=>c.reasoning?.round || 1)).size;
   const baseResult = completeResult(storyBaseline);

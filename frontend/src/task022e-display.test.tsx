@@ -75,7 +75,7 @@ it('moves only the versioned Baseline rerun into more metrics and retains the pr
   await mount(<EvaluationPage data={{ evaluation: run }} />);
   expect(document.querySelector('.page-title')?.textContent).not.toContain('重新运行 Baseline');
   const more = [...document.querySelectorAll('details')].find(e => e.querySelector('summary')?.textContent?.includes('更多指标'))!;
-  const button = [...more.querySelectorAll('button')].find(b => b.textContent?.includes('重新运行 Baseline'))!;
+  const button = [...more.querySelectorAll('button')].find(b => b.textContent?.includes('重新评测 Baseline'))!;
   expect(button).toBeTruthy();
   expect(button.disabled).toBe(true);
   expect(document.body.textContent).toContain('保存的预检阻断');

@@ -65,5 +65,5 @@ export function ScrollablePagedTable({ children, className = "", resetKey, loadi
   return <div ref={box} className={`table-scroll ${className}`} aria-busy={loading} tabIndex={0} onScroll={event => {
     const node = event.currentTarget;
     if (hasMore && !loading && node.scrollHeight - node.scrollTop - node.clientHeight < 96) onMore?.();
-  }}>{children}{loading && <div className="list-loading" role="status">正在读取候选题…</div>}</div>;
+  }}>{children}{loading && <div className="list-loading" role="status" aria-label="正在读取候选题"><span className="loading-line" /></div>}</div>;
 }

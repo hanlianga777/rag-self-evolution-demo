@@ -73,7 +73,7 @@ it("shows a loading state instead of missing Evidence until lazy detail arrives"
   root=createRoot(document.body.appendChild(document.createElement('div')));
   await act(async()=>root.render(<GovernancePage data={{generationRuns:[run],dataset:[row]}} />));
   await act(async()=>document.querySelector<HTMLButtonElement>('.review-table tbody tr[role=button]')!.click());
-  expect(document.querySelector('.candidate-workspace')?.textContent).toContain('正在读取候选题详情');expect(document.querySelector('.quality-grid')).toBeNull();
+  expect(document.querySelector('.candidate-workspace [role=status]')?.getAttribute('aria-label')).toContain('正在读取候选题详情');expect(document.querySelector('.quality-grid')).toBeNull();
   await act(async()=>resolve(new Response(JSON.stringify({...row,reference_answer:'先关闭电池电源。',evidence:[],raw:{},probe:{score:95},qc:{score:90}}))));
   expect(document.querySelector('.candidate-answer')?.textContent).toContain('先关闭电池电源');expect(document.querySelector('.quality-grid')).not.toBeNull();
 });

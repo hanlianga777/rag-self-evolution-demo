@@ -29,6 +29,6 @@ it('computes category scores from saved verdicts and opens the same Bad Case det
  expect(document.querySelector('.ui-blb-bads')?.textContent).toContain('消融原文');
  expect(document.querySelector('.ui-blb-layer')?.textContent).toBe('检索层');
  await act(async()=>document.querySelector<HTMLButtonElement>('.ui-blb-bads button')!.click());
- expect(document.querySelector('.tabs .active')?.textContent).toBe('Bad Case 诊断');
+ expect(document.querySelector('.tabs .active')?.textContent).toBe('Baseline 报告');
  expect(document.querySelector('[role=dialog]')).not.toBeNull();
 });
