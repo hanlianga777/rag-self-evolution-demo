@@ -130,7 +130,7 @@ function roundLesson(round: number, candidates: any[], winnerId: string | null):
   if (round === 1 && changedOnly(a, { candidate_k: 24, multi_query: 2 }) && fixes(a, ['Q24', 'Q29', 'Q38']) && a.result.all_fixed_question_ids.length === 3 && gate(a, 'latency_p99_seconds')?.passed === false && changedOnly(c, { generation_thinking: 'high', top_k: 6 }) && fixes(c, ['Q04', 'Q06']) && failedSafety(c))
     text = '扩候选+多路查询修好 3 题，但 P99 超标；降档+Top-K 6 修好 Q04、Q06，却拉低了安全拒答。';
   if (round === 2 && saved.every(item => list(item.result.new_regression_question_ids).includes('Q17')) && topKLessonEvidence(candidates) && failedSafety(b))
-    text = '三个 Candidate 新增 Q17；Top-K 6 修好 Q04、Q06，但安全拒答下降。';
+    text = '三套方案都弄坏了 Q17；单独把 Top-K 提到 6 能修好 Q04、Q06，但会拉低安全拒答。';
   const previous = candidates.filter(item => ['A', 'B', 'C'].includes(item.reasoning?.candidate_label) && item.reasoning.round < round);
   if (round === 3 && previous.length === 6 && previous.every(item => savedFacts(item) && item.result.new_regression_question_ids.length > 0) && changedOnly(c, { generation_thinking: 'high', candidate_k: 24 }) && fixes(c, ['Q24', 'Q29', 'Q38']) && !c.result.new_regression_question_ids.length && a.result.new_regression_question_ids.length && b.result.new_regression_question_ids.length && c.result.gates.passed && c.id === winnerId)
     text = '降低思考档、同时把候选扩到 24，首次做到零新增 Bad Case，成为 Winner。';

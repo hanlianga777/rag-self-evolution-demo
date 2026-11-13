@@ -9,20 +9,25 @@ import type { CandidateView, EvolutionModel } from "./model";
 
 /**
  * Agent 工作台 →「进化路线」主视图。
- * 结构：轮次按钮切换单轮策略与三张等高卡；D 按钮展示现有 DStory。
+ * 结构：Baseline 起点、轮次策略与三张等高卡；最后一轮下方及 D 按钮展示现有 DStory。
  * - 卡片字段顺序固定：方向 → 参数变化 → 修好 → 新增 Bad Case → Hard Gate → 答对与耗时。
  * - Winner 卡用深色描边；效率方向标注小标签；每轮最快的 Candidate 的 P50 加粗。
  * - 点击卡片打开现有的方案详情抽屉（onOpen）。
  */
 export type BaselineView = { correct: number | null; total: number; badCases: { id: string; layer: string; question?: string }[] };
 
-export function EvolutionTimeline({ model, questionText, onOpen, children }: {
+export function EvolutionTimeline({ model, baseline, questionText, onOpen, onOpenDiagnosis, children }: {
   model: EvolutionModel; baseline?: BaselineView; questionText?: (id: string) => string | undefined;
   onOpen?: (candidateId: string) => void; onOpenDiagnosis?: () => void; children?: ReactNode;
 }) {
   const [selection, setSelection] = useState<number | "D">(1);
   const selected = model.rounds.some(round => round.round === selection) ? selection : selection === "D" ? "D" : model.rounds[0]?.round;
   return <section className="ui-evo" aria-label="进化路线">
+    {baseline && <div className="ui-evo-start">
+      <div className="ui-evo-start-main"><span className="ui-evo-step">Baseline</span><strong className="ui-num">{baseline.correct ?? "未知"} / {baseline.total}</strong><span className="ui-evo-sep" aria-hidden="true"/><span>{baseline.badCases.length} 个 Bad Case</span>
+        {[...new Set(baseline.badCases.map(item => item.layer))].map(layer => { const items = baseline.badCases.filter(item => item.layer === layer); return <span key={layer} className="ui-evo-layer">{layer} {items.length}<QuestionList items={items.map(item => ({id: item.id, tone: "open" as QuestionTone, question: item.question ?? questionText?.(item.id)}))}/></span>; })}
+      </div>{onOpenDiagnosis && <button type="button" className="text-button ui-evo-link" onClick={onOpenDiagnosis}>查看 Bad Case 诊断</button>}
+    </div>}
     <div className="story-round-switch route-round-switch" role="group" aria-label="进化轮次">
       {model.rounds.map(round => <button type="button" className="secondary" key={round.round} aria-pressed={selected === round.round} onClick={() => setSelection(round.round)}>Round {round.round}</button>)}
       <button type="button" className="secondary" aria-pressed={selected === "D"} onClick={() => setSelection("D")}>Candidate D</button>
@@ -32,14 +37,14 @@ export function EvolutionTimeline({ model, questionText, onOpen, children }: {
       <div className="ui-evo-rail" aria-hidden="true"><span className={`ui-evo-dot${round.candidates.some(item => item.winner) ? " win" : ""}`} /></div>
       <div className="ui-evo-body">
         <section className="agent-round-strategy" aria-label="本轮策略">
-          <h3>本轮策略</h3><p><strong>本轮思路：</strong>{round.thought ? storyText(round.thought) : "—"}</p>
+          <h3>Round {round.round} · 本轮策略</h3><p><strong>本轮思路：</strong>{round.thought ? storyText(round.thought) : "—"}</p>
           {round.lesson ? <HoverCard content={<div style={{ whiteSpace: "pre-line", maxWidth: 520 }}>{round.lesson.source}</div>}><p className="ui-body-muted" tabIndex={0}>本轮经验：{round.lesson.text}</p></HoverCard> : <p className="ui-body-muted">本轮经验：—</p>}
         </section>
         <div className="ui-evo-cards">{round.candidates.map(item => <CandidateCard key={item.id} item={item} fastest={item.id === round.fastestId} questionText={questionText} onOpen={onOpen} />)}</div>
       </div>
     </div>)}
 
-    {selected === "D" && children && <div className="ui-evo-round ui-evo-final">
+    {(selected === "D" || selected === model.rounds.at(-1)?.round) && children && <div className="ui-evo-round ui-evo-final">
       <div className="ui-evo-rail" aria-hidden="true"><span className="ui-evo-dot win" /></div>
       <div className="ui-evo-body">{children}</div>
     </div>}

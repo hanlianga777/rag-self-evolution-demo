@@ -23,7 +23,7 @@ it('explains exhausted complete-batch allowance after a page reload',async()=>{
  await show({status:'budget_exhausted',used:9,remaining:3,last_error:'剩余额度不足完整 A/B/C 三套，并须保留 1 次给 D'});
  expect(document.querySelector('[role="status"]')?.textContent).toContain('完整 A/B/C');
  expect(document.querySelector('[role="status"]')?.textContent).toContain('9 / 12');
- await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='Candidate 对比')!.click());
+ await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='方案对比')!.click());
  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='继续优化下一轮')).toBe(false);
 });
 it('compares the actual previous production config when Baseline differs',async()=>{

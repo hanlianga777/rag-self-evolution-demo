@@ -30,7 +30,7 @@ it('keeps candidate fields uniform and exposes complete risk prose without the q
  const candidates=['A','B','C'].map(label=>({...winner,id:`exp-R3-${label}`,reasoning:{round:3,candidate_label:label,risks,core_idea:'保存的思路'},result}));
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({}))));
  await mount(<EvolutionPage data={{evaluation:{id:'base',config:{top_k:4}},optimization:{id:'exp',candidates}}}/>);
- await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='Candidate 对比')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+ await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='方案对比')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
  for(const card of document.querySelectorAll('.candidate-card')){
   expect(card.querySelectorAll('.ui-field.lines-2')).toHaveLength(6);
   const risk=[...card.querySelectorAll('.ui-field')].find(f=>f.querySelector('.ui-kicker')?.textContent==='风险')!;
