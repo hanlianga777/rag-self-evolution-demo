@@ -15,13 +15,13 @@ async function click(label: string) { await act(async () => [...document.querySe
 
 it("restores stages and complete generated plans without inventing evaluated results", async () => {
   const frozen = JSON.stringify(data); await mount();
-  expect(document.querySelectorAll(".tabs button")).toHaveLength(3); expect(document.querySelectorAll(".ui-agent-stats > div")).toHaveLength(4);
+  expect(document.querySelectorAll(".tabs button")).toHaveLength(4); expect(document.querySelectorAll(".ui-agent-stats > div")).toHaveLength(4);
   expect(document.querySelectorAll(".agent-case-destinations tbody tr")).toHaveLength(1);
   await click("进化路线");
   expect(document.querySelectorAll(".agent-design-intent")).toHaveLength(3);
   expect(document.querySelectorAll(".ui-evo-card")).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/null|undefined|\[object Object\]/);
-  await click("方案对比");
+  await click("Candidate 对比");
   expect([...document.querySelectorAll(".candidate-card:first-child .field-label")].map(e => e.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
   expect(document.querySelector(".candidate-card")?.textContent).toContain("Sandbox 尚未运行");
   await click("查看目标 1 题");
@@ -32,7 +32,7 @@ it("restores stages and complete generated plans without inventing evaluated res
 
 it("shows a status row and separate candidate/release decision rows and blocks Gate2 while another candidate is generated", async () => {
   const value = { ...data, optimization: { ...data.optimization, candidates: [{ ...candidates[0], status: "evaluated", result: { qualification: { qualified: true }, gates: { total: 11, passed_count: 11 }, regression: { status: "PASS", new_critical_failures: 0, new_ordinary_failures: 0 }, target_bad_cases_fixed: 1 } }, candidates[1], candidates[2]] } };
-  await mount(value); await click("方案对比");
+  await mount(value); await click("Candidate 对比");
   expect(document.querySelectorAll(".sandbox-core-table tbody tr")).toHaveLength(6);
   await act(async()=>document.querySelector<HTMLButtonElement>(".ui-ct-more")!.click());
   expect(document.querySelector(".sandbox-core-table")?.textContent).toContain("全部原 Bad Case 修好");
@@ -48,7 +48,7 @@ it("keeps a failed next-round generation visible alongside prior saved candidate
 
 it("confirms an eligible Sandbox continuation before executing it", async () => {
   await mount({ ...data, optimization:{ ...data.optimization, candidates:[{ ...candidates[0],status:"failed",result:{evaluation_run_id:"PARTIAL"}},candidates[1],candidates[2]] } });
-  await click("方案对比");
+  await click("Candidate 对比");
   const button=[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="继续 Sandbox")!;
   expect(button.disabled).toBe(false);
   await click("继续 Sandbox");
@@ -60,7 +60,7 @@ it("confirms an eligible Sandbox continuation before executing it", async () => 
 
 it("allows manual continuation of an interrupted candidate when its cycle is no longer running", async () => {
   await mount({...data,optimization:{...data.optimization,result:{optimization_cycle:{status:'failed'}},candidates:[{...candidates[0],status:'failed',product_interruption:true,result:{evaluation_complete:false,completed:17,total:50,evaluation_run_id:'PARTIAL'}},candidates[1],candidates[2]]}});
-  await click('方案对比');
+  await click('Candidate 对比');
   const button=[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='继续 Sandbox');
   expect(button).toBeDefined();
   expect(button!.disabled).toBe(false);
@@ -71,7 +71,7 @@ it("allows manual continuation of an interrupted candidate when its cycle is no 
 
 it("runs three saved candidates while retaining an honest uncovered-question warning", async () => {
   await mount({...data,optimization:{...data.optimization,coverage_plan:{status:'incomplete',covered_count:5,total:6,matrix:[{question_id:'Q38',candidates:[],gap:'本轮剩余A/B/C容量不足'}]}}});
-  await click('方案对比');
+  await click('Candidate 对比');
   const runButton=[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='运行 Sandbox')!;
   expect(runButton.disabled).toBe(false);
   await act(async()=>runButton.click());
@@ -84,7 +84,7 @@ it("keeps incomplete coverage out of Sandbox and offers same-round zero-call com
   expect(document.body.textContent).toContain("补齐本轮规划（不收费）");
   expect(document.body.textContent).not.toContain("运行本轮 A/B/C Sandbox");
   expect(document.querySelector(".agent-overview")?.textContent).toContain("规划未完成");
-  await click("方案对比");
+  await click("Candidate 对比");
   expect([...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent==="运行 Sandbox")?.disabled).toBe(true);
   expect((fetch as any).mock.calls.every(([,init]:any)=>init?.method!=="POST")).toBe(true);
 });
@@ -92,7 +92,7 @@ it("keeps incomplete coverage out of Sandbox and offers same-round zero-call com
 it("suppresses incomplete final scores, preserves progress and blocks unreconciled paid continuation", async () => {
   const incomplete={evaluation_complete:false,completed:38,total:50,gates:{passed_count:0,total:11,passed:null},bad_case_count:6,regression:{status:"FAIL",new_critical_failures:12,new_ordinary_failures:3},qualification:{qualified:false},request_accounting:{call_events:156,unknown_usage_events:1}};
   await mount({...data,optimization:{...data.optimization,candidates:[{...candidates[0],status:"failed",result:incomplete,resume_plan:{can_resume:false,reusable:38,completed:38,total:50,next_question_id:"Q39",reason:"需先对账：Embedding请求结果未知"}},candidates[1],candidates[2]],recommendation:{status:"No Qualified Candidate"}}});
-  await click("方案对比");
+  await click("Candidate 对比");
   expect(document.querySelector(".ui-ct-more")).toBeNull();
   expect(document.querySelector('.sandbox-core-table')?.textContent).toContain("未完成");
   expect(document.querySelector('.sandbox-core-table')?.textContent).toContain("未完成");
@@ -101,7 +101,7 @@ it("suppresses incomplete final scores, preserves progress and blocks unreconcil
   await click("回归与推荐");
   expect(document.body.textContent).toContain("本轮实验尚未完成");
   expect(document.body.textContent).not.toContain("保存结论：本轮暂无合格候选方案");
-  await click("方案对比");
+  await click("Candidate 对比");
   expect(document.body.textContent).toContain("已完成 38/50");
   expect(document.body.textContent).toContain("需先对账");
   expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='继续 Sandbox')?.disabled).toBe(false);

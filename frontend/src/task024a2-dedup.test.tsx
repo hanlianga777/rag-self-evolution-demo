@@ -23,7 +23,7 @@ it('shows only round and saved lesson above route cards',async()=>{
  expect(document.body.textContent).not.toContain('本轮没有合格 Candidate：');
 });
 it('keeps complete fixed IDs on cards and moves target counts to the target drawer',async()=>{
- await mount();await click('方案对比');
+ await mount();await click('Candidate 对比');
  const cards=[...document.querySelectorAll('.candidate-cards .candidate-card')];const c=cards[2];
  expect(c.querySelector('small')).toBeNull();expect(cards.map(c=>c.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['未通过','未通过','合格']);
  const result=c.querySelector('.candidate-story-block:last-child')!;
@@ -43,7 +43,7 @@ it('summarizes actual qualifiers and links to the recommendation without repeati
  expect(table.closest('details')).toBeNull();expect(table.textContent).not.toContain('Round 3');expect(table.textContent).not.toContain('上限');expect(table.textContent).not.toContain('Regression 判定');
  expect(document.querySelector('.ui-fin-compare')?.textContent).not.toContain('Baseline 答对');
  expect(document.querySelector('.ui-fin-compare')?.textContent).toContain('47 / 50较 Baseline +3');expect(document.querySelector('.ui-fin-compare')?.textContent).toContain('48 / 50较 Baseline +4');
- expect(document.querySelector('.ui-fin-others h3')?.textContent).toContain('（8）');expect(document.querySelectorAll('.ui-fin-others tbody button')).toHaveLength(8);
+ expect(document.querySelector('.ui-fin-others h3')?.textContent).toContain('（8）');expect(document.querySelectorAll('.candidate-rejections > button')).toHaveLength(8);
  data.optimization.candidates.at(-1).result.qualification.qualified=false;
  await act(async()=>root.render(<EvolutionPage data={{...data,optimization:{...data.optimization}}}/>));
  expect(document.querySelector('.ui-fin-top h2')?.textContent).toContain('只有 1 个通过回归检查');

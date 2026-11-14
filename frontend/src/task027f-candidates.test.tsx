@@ -31,17 +31,17 @@ it('shows saved D design, open issue cards and ranking without old disclosures',
  expect(document.querySelector('.d-story details')).toBeNull();expect(document.querySelectorAll('.d-story-footer button.secondary')).toHaveLength(2);expect(document.querySelector('.d-story-footer svg')).not.toBeNull();
  expect(JSON.stringify(data)).toBe(before);
 });
-it('shows all ten saved checks above recommendation and tradeoff, with rejection details always open',async()=>{
+it('shows all ten saved checks between conclusion and tradeoff, with rejection details always open',async()=>{
  await mount();await click('回归与推荐');
  expect(document.querySelector('.story-round-switch')).toBeNull();expect(document.querySelector('.ui-fin-top h2')?.textContent).toContain('10 个 Candidate 中只有 2 个通过回归检查');
  const table=document.querySelector('.regression-summary-table')!;expect(table.querySelectorAll('tbody tr')).toHaveLength(10);expect(table.querySelectorAll('tbody tr.qualified')).toHaveLength(2);
  expect(table.querySelector('thead')?.textContent).toBe('Candidate修好新增严重新增普通Hard Gate判定');expect(table.querySelector('tbody tr')?.textContent).toContain('R1-A');
- const fin=document.querySelector('.ui-fin')!;expect([...fin.children].map(e=>e.className)).toEqual(['ui-fin-top','ui-fin-compare','ui-fin-others']);
- expect(document.querySelectorAll('.ui-fin-others tbody button')).toHaveLength(8);expect(document.querySelector('.ui-fin-others details')).toBeNull();expect(document.body.textContent).not.toContain('逐题追踪 ·');expect(document.querySelector('.ui-fin-reason')?.textContent).toContain('保存的采纳理由');
- await act(async()=>document.querySelector<HTMLButtonElement>('.ui-fin-others tbody button')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('逐题追踪');
+ const fin=document.querySelector('.ui-fin')!;expect([...fin.children].map(e=>e.className)).toEqual(['ui-fin-top','panel regression-check','ui-fin-compare','ui-fin-others']);
+ expect(document.querySelectorAll('.candidate-rejections > button')).toHaveLength(8);expect(document.querySelector('.ui-fin-others details')).toBeNull();expect(document.body.textContent).not.toContain('逐题追踪 ·');expect(document.querySelector('.ui-fin-reason')?.textContent).toContain('保存的采纳理由');
+ await act(async()=>document.querySelector<HTMLButtonElement>('.candidate-rejections > button')!.click());expect(document.querySelector('[role=dialog]')?.textContent).toContain('逐题追踪');
 });
 it('keeps six primary metrics in teaching order and uses white secondary actions',async()=>{
- await mount();await click('方案对比');
+ await mount();await click('Candidate 对比');
  const table=document.querySelector('.ui-ct table')!;expect([...table.querySelectorAll('tbody th')].map(e=>e.textContent)).toEqual(['答对','新增 Bad Case','Hard Gate','安全拒答率','P50','P99']);expect(table.querySelector('colgroup')).not.toBeNull();
  const more=document.querySelector<HTMLButtonElement>('.ui-ct-more')!;expect(more.classList.contains('secondary')).toBe(true);await act(async()=>more.click());
  expect(table.querySelectorAll('tbody tr').length).toBeGreaterThan(6);expect(table.textContent).not.toContain('运行状态');expect(table.textContent).not.toContain('Candidate 合格');expect(table.textContent).not.toContain('指定目标修好');
@@ -54,7 +54,7 @@ it('keeps unknown ranking unknown and omits empty side-effect cards',async()=>{
 it('027f2 removes redundant card wrappers and the comparison subtitle',async()=>{
  await mount();await click('进化路线');await click('Candidate D');
  expect(document.querySelector('.d-timeline')?.classList.contains('panel')).toBe(false);
- await click('方案对比');expect([...document.querySelectorAll('h2')].some(e=>e.textContent==='Candidate A / B / C')).toBe(false);
+ await click('Candidate 对比');expect([...document.querySelectorAll('h2')].some(e=>e.textContent==='Candidate A / B / C')).toBe(false);
  expect(document.querySelectorAll('.candidate-cards > .candidate-card')).toHaveLength(3);
 });
 it('027f2 explains regression limits alongside every failed Hard Gate',async()=>{
@@ -63,7 +63,7 @@ it('027f2 explains regression limits alongside every failed Hard Gate',async()=>
  ordinary.result.regression_review.limits={critical:0,ordinary:1};
  mixed.result.regression_review={...mixed.result.regression_review,new_critical_failures:1,new_ordinary_failures:2,limits:{critical:0,ordinary:1}};
  await mount();await click('回归与推荐');
- const rows=[...document.querySelectorAll('.ui-fin-others tbody tr')];
+ const rows=[...document.querySelectorAll('.candidate-rejections > button')];
  expect(rows.find(e=>e.querySelector('strong')?.textContent==='R2-A')?.textContent).toContain('新增 3 个 Bad Case，超过普通新增最多 1 个的上限。');
  const text=rows.find(e=>e.querySelector('strong')?.textContent==='R1-C')?.textContent;
  expect(text).toContain('严重新增 1 个，超过最多 0 个的上限');expect(text).toContain('普通新增 2 个，超过最多 1 个的上限');expect(text).toContain('未通过 Hard Gate');

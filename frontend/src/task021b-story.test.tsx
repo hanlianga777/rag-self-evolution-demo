@@ -77,8 +77,8 @@ it('waits for a completed candidate before fetching its saved answers',async()=>
 it('switches historical rounds on both merged detailed tabs while preserving the expanded progress',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({}))));
  await mount(<EvolutionPage data={{evaluation:baseline,optimization:{id:'experiment',candidates:[candidate(1,'A'),candidate(3,'C',true)]}}}/>);
- for(const tab of ['方案对比','回归与推荐']){
+ for(const tab of ['Candidate 对比','回归与推荐']){
   await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===tab)!.click());
-  if(tab==='方案对比'){await act(async()=>[...document.querySelectorAll('.story-round-switch button')].find(b=>b.textContent==='Round 1')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));expect(document.querySelector('.story-round-switch button[aria-pressed="true"]')?.textContent).toBe('Round 1');}else{expect(document.querySelector('.story-round-switch')).toBeNull();expect(document.querySelector('.regression-summary-table')?.textContent).toContain('R1-A');expect(document.querySelector('.regression-summary-table')?.textContent).toContain('R3-C');}expect(document.querySelector('.page-shell-header .ui-agent-stats')).not.toBeNull();
+  if(tab==='Candidate 对比'){await act(async()=>[...document.querySelectorAll('.story-round-switch button')].find(b=>b.textContent==='Round 1')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));expect(document.querySelector('.story-round-switch button[aria-pressed="true"]')?.textContent).toBe('Round 1');}else{expect(document.querySelector('.story-round-switch')).toBeNull();expect(document.querySelector('.regression-summary-table')?.textContent).toContain('R1-A');expect(document.querySelector('.regression-summary-table')?.textContent).toContain('R3-C');}expect(document.querySelector('.page-shell-header .ui-agent-stats')).toBeNull();
  }
 });

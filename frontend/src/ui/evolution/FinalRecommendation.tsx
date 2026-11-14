@@ -1,4 +1,3 @@
-import { DataTable } from "../../components/DataTable";
 import { Icon, IconLabel } from "../icons";
 import { QuestionList, type QuestionTone } from "../Primitives";
 import type { CandidateView } from "./model";
@@ -10,8 +9,8 @@ import type { CandidateView } from "./model";
  * - 其余 Candidate 的落选理由放在下方一张表里（与进化路线同一套数据），不再是九段长文。
  * reason 用现有 recommendationReason() 的输出，不另写结论。
  */
-export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason, others, questionText, onRelease, releaseLabel = "去发布", onOpen, totalCandidates, qualifiedCount }: {
-  totalCandidates?: number; qualifiedCount?: number;
+export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason, others, questionText, onRelease, releaseLabel = "去发布", onOpen, totalCandidates, qualifiedCount, regressionSummary }: {
+  totalCandidates?: number; qualifiedCount?: number; regressionSummary?: React.ReactNode;
   chosen: CandidateView; runnerUp: CandidateView | null; baselineCorrect: number | null; reason: string; others: CandidateView[];
   questionText?: (id: string) => string | undefined; onRelease?: () => void; releaseLabel?: string; onOpen?: (id: string) => void;
 }) {
@@ -32,6 +31,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
       {onRelease && <button type="button" className="primary" onClick={onRelease}><Icon name="release" size={15} />{releaseLabel}</button>}
     </div>
 
+    {regressionSummary}
     {runnerUp && <div className="ui-fin-compare">
       <table>
         <thead><tr><th>合格 Candidate 对比</th><th>{runnerUp.name}<small>Winner · 合格</small></th><th className="pick">{chosen.name}<small>推荐</small></th></tr></thead>
@@ -45,7 +45,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
 
     {others.length > 0 && <div className="ui-fin-others">
       <h3><IconLabel name="rejected">落选原因（{others.length}）</IconLabel></h3>
-      <div className="table-scroll"><DataTable><thead><tr><th>Candidate</th><th>落选原因</th></tr></thead><tbody>{others.map(item=><tr key={item.id}><td><button type="button" className="text-button" onClick={()=>onOpen?.(item.id)} disabled={!onOpen}><strong>{item.name}</strong><Icon name="go" size={14}/></button></td><td>{rejectionReason(item)}</td></tr>)}</tbody></DataTable></div>
+      <div className="candidate-rejections">{others.map(item=><button type="button" key={item.id} onClick={()=>onOpen?.(item.id)} disabled={!onOpen}><strong>{item.name}</strong><span>{rejectionReason(item)}</span><Icon name="go" size={14}/></button>)}</div>
     </div>}
   </section>;
 }

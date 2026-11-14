@@ -28,7 +28,7 @@ it('keeps insufficient candidate evidence explicit and renders saved candidate r
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/candidates/')?candidate:{search_space:{}}))));
  await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[candidate],result:{generation_status:'insufficient_evidence',insufficient_evidence:'其余候选缺少Trace依据'}}}}/>);
  expect(document.body.textContent).toContain('其余候选缺少Trace依据');
- await click('方案对比');await click('查看 Candidate 与完整报告');await openSavedReport();
+ await click('Candidate 对比');await click('查看 Candidate 与完整报告');await openSavedReport();
  expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
  const text=document.querySelector('[role="dialog"]')!.textContent;
  for(const saved of ['保存假设','保存理由','保存的原文观察','保存改善','保存风险','intervention_direction','root_cause_evidence'])expect(text).toContain(saved);
@@ -60,7 +60,7 @@ it('preloads monitoring events once and switches its tab without requests',async
 it('separates saved formal blockers from confirmed regression without clearing pending risk',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const result={comparison_version:'offline',regression:{status:'FAIL',new_critical_failures:0,new_ordinary_failures:2},formal_blocking_question_ids:['q1','q2'],confirmed_regression_question_ids:[],pending_regression_question_ids:['q1'],disputed_regression_question_ids:['q2'],unclassified_regression_question_ids:[]};
- await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result}]}}}/>);await click('方案对比');
+ await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result}]}}}/>);await click('Candidate 对比');
  await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ct-more')!.click());
  expect(document.querySelector('.sandbox-core-table')?.textContent).toContain('正式阻断 · 严重 0 / 普通 2');expect(document.body.textContent).not.toMatch(/已确认失败|待复核|争议|未分类/);expect(document.body.textContent).toContain('未通过');expect(result.pending_regression_question_ids).toEqual(['q1']);expect(result.disputed_regression_question_ids).toEqual(['q2']);
 });
@@ -82,7 +82,7 @@ it('keeps all hundred saved Candidate report cases accessible in the existing Dr
  const cases=Array.from({length:100},(_,i)=>({question_id:`Q${i+1}`,question:`Candidate题目${i+1}`,passed:true}));
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/evaluations/')?{cases}:{search_space:{}}))));
  await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'candidate-run'}}]}}}/>);
- await click('方案对比');await click('查看 Candidate 与完整报告');await openSavedReport();
+ await click('Candidate 对比');await click('查看 Candidate 与完整报告');await openSavedReport();
  expect(document.querySelectorAll('.drawer tbody tr')).toHaveLength(100);expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目100');
  expect([...document.querySelectorAll('.drawer button')].some(b=>b.textContent==='下一页')).toBe(false);
  expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目1');expect(cases).toHaveLength(100);
@@ -113,7 +113,7 @@ it('opens Sandbox fee confirmation without a budget and submits only explicit co
  vi.stubGlobal('fetch',fetcher);
  const candidate={id:'c',status:'generated',config:{rerank:'query_only'},reasoning:{candidate_label:'C',round:1},resume_plan:{can_resume:true,completed:0,total:50}};
  await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[candidate],evaluation_budget:{used:2,max:12,reserved_for_d:1}}}}/>);
- await click('方案对比');
+ await click('Candidate 对比');
  expect(document.querySelector('input[aria-label="Sandbox人民币累计硬上限"]')).toBeNull();
  await click('运行 Sandbox');
  expect(document.querySelector('.confirm-dialog')).not.toBeNull();
@@ -125,7 +125,7 @@ it('opens Sandbox fee confirmation without a budget and submits only explicit co
 it('shows the saved unknown-charge reason when A cannot resume',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response('{}')));
  const candidate={id:'a',status:'failed',config:{},reasoning:{candidate_label:'A'},resume_plan:{can_resume:false,reason:'需先对账：历史请求执行结果未知'}};
- await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[candidate]}}}/>);await click('方案对比');await click('继续 Sandbox');
+ await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[candidate]}}}/>);await click('Candidate 对比');await click('继续 Sandbox');
  expect(document.querySelector('[role="alert"]')?.textContent).toContain('需先对账');
  expect(document.activeElement).toBe(document.querySelector('[role="alert"]'));
  expect(document.querySelector('[role="dialog"]')).toBeNull();

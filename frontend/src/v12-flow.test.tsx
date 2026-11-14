@@ -216,7 +216,7 @@ it("confirms an evaluated qualified winner and then offers composite D", async (
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") requests.push({ url, body: JSON.parse(init.body as string || "{}") }); return new Response(JSON.stringify(experiment), { status: 200 }); }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: { status: "completed" }, badCases: [{}] }} />));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "方案对比")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Candidate 对比")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "回归与推荐")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("确认报告"))!.click());
   expect(requests).toHaveLength(0);
@@ -231,8 +231,8 @@ it.each([{ max: 13, canContinue: true }, { max: 12, canContinue: false }])("keep
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: {}, badCases: [] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "进化路线")!.click());
-  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="进化路线")!.click());expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("Round 3 · 2/2");
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "方案对比")!.click());
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="概览")!.click());expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("Round 3 · 2/2");
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Candidate 对比")!.click());
   expect(document.body.textContent?.includes("继续优化下一轮")).toBe(canContinue);
   await act(async () => root.unmount());
 });

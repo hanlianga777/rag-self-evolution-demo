@@ -1,6 +1,7 @@
 import { DataTable } from "../../components/DataTable";
 import { caseData, caseId, savedDirections } from "../../components/EvaluationDiagnosis";
 import { completeResult, schemeName, storyText } from "../../components/EvolutionStory";
+import { AgentStats } from "../overview/OverviewSummary";
 import { QuestionBadge, StatusBadge } from "../Primitives";
 import { ClampText } from "../ClampText";
 import type { EvolutionModel } from "./model";
@@ -12,8 +13,8 @@ const RULES = [
   ["事先预测，事后对账", "Candidate D 在评测之前就写下预计修好哪些题、要盯住哪些题，跑完以后逐条核对，没修好的也要说清原因。"],
 ];
 
-export function AgentOverview({ experiment, model, evaluation, chosenId, released, cases, onCase }: {
-  experiment: any; model: EvolutionModel; evaluation: any; chosenId?: string; released: boolean; cases: any[]; onCase: (row: any) => void;
+export function AgentOverview({ experiment, model, evaluation, chosenId, released, status, cases, onCase }: {
+  experiment: any; model: EvolutionModel; evaluation: any; chosenId?: string; released: boolean; status: string; cases: any[]; onCase: (row: any) => void;
 }) {
   const candidates: any[] = experiment?.candidates || [];
   const chosen = [...model.rounds.flatMap(round => round.candidates), ...(model.d ? [model.d] : [])].find(item => item.id === chosenId);
@@ -47,6 +48,7 @@ export function AgentOverview({ experiment, model, evaluation, chosenId, release
       <div><h2>{chosen ? `${released ? "推荐并已发布" : "推荐"} ${chosen.name}` : "尚无最终推荐"}</h2>
         <p>答对 {baselineCorrect} → {chosen?.complete ? chosen.correct ?? "—" : "—"}<span>新增 Bad Case {chosen?.complete ? chosen.newFailures ?? "—" : "—"}</span><span>Hard Gate {chosen?.complete && chosen.gates ? `${chosen.gates.passed}/${chosen.gates.total}` : "—"}</span></p>
       </div>
+      <AgentStats rounds={model.rounds.length} candidates={candidates.length} budget={model.budget} status={{ kind: released ? "released" : chosen ? "recommended" : "waiting", text: status }}/>
     </section>
     {!chosen && experiment?.result?.processing_progress && <p className="ui-body-muted">{experiment.result.processing_progress.verified_configuration_id ? "已有经完整评测验证的 Candidate" : "尚无经完整评测验证的 Candidate"} · 修复 {experiment.result.processing_progress.fixed_question_ids?.length ?? "未知"} 题 · 待处理 {experiment.result.processing_progress.remaining_question_ids?.length ?? "未知"} 题</p>}
     {!chosen && experiment?.coverage_plan?.status === "incomplete" && <p className="ui-body-muted">规划未完成：{experiment.coverage_plan.covered_count}/{experiment.coverage_plan.total} 道已有 Candidate 覆盖。</p>}
