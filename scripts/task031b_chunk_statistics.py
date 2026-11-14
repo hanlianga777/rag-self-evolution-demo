@@ -148,6 +148,9 @@ def collect(index, database, tokenizer_path, dataset_id=GOLDEN_DATASET_ID):
             'noise_only_chunk_ids':noise_only,'single_child_parents':singleton,'children_under_60':small,
             'short_parents':[{key:p[key] for key in ('chunk_id','document_id','level_one_section','token_count','short_chapter')} for p in parents if p['token_count']<400],
             'sample_seed':31,'parent_samples':samples,'denoise':noise_summary,
+            'layout_adjustments':[{'document_id':doc,'block_id':p['block_id'],'page':p['page'],
+                                   'text':p['text'],**p['layout_adjustment']}
+                                  for doc, records in parsed.items() for p in records if p.get('layout_adjustment')],
             'discarded_header_footer':[n for n in noise if n.get('parser_type') in {'header','footer'}],'golden_evidence':audit,'checks':checks}
 
 

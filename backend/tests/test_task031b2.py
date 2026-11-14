@@ -10,6 +10,43 @@ from task031b_chunk_statistics import evidence_audit
 
 
 class DenoiseAndPathTests(unittest.TestCase):
+    def test_image_part_label_kept_after_contiguous_steps_with_source_offsets(self):
+        blocks = [{'type':'text','text':'保养','text_level':1,'page_idx':0},
+                  {'type':'text','text':'清洗滤网','text_level':2,'page_idx':0},
+                  {'type':'text','text':'1. 打开盖罩','page_idx':0},
+                  {'type':'page_number','text':'\ue258','page_idx':0},
+                  {'type':'image','image_footnote':['1 粗大污染物滤网'],'page_idx':1},
+                  {'type':'text','text':'2. 取出滤网','page_idx':1},
+                  {'type':'text','text':'3. 冲洗滤网','page_idx':1},
+                  {'type':'text','text':'4. 装回滤网','page_idx':1}]
+        parents, children, parsed = parent_child_v2({'id':'D','name':'说明书','pages':2}, blocks, len)
+        self.assertEqual(parents[0]['chunk_text'], '1. 打开盖罩\n2. 取出滤网\n3. 冲洗滤网\n4. 装回滤网\n1 粗大污染物滤网')
+        self.assertEqual(parsed[4]['layout_adjustment']['after_block_id'], 'D-BLOCK-00008')
+        self.assertEqual(parsed[4]['page'], 2)
+        self.assertEqual(parsed[4]['text'], '1 粗大污染物滤网')
+        self.assertTrue(any('D-BLOCK-00005' in c['block_ids'] and '1 粗大污染物滤网' in c['chunk_text'] for c in children))
+        for child in children:
+            self.assertEqual(parents[0]['chunk_text'][child['char_start']:child['char_end']], child['chunk_text'])
+
+    def test_image_instructions_and_unrelated_labels_keep_original_order(self):
+        for image, following, same_section in [
+            ({'image_footnote':['注意：请先断电']}, '2. 取出滤网', True),
+            ({'image_footnote':['1 请先断电']}, '2. 取出滤网', True),
+            ({'image_footnote':['2. 请先断电']}, '2. 取出滤网', True),
+            ({'image_caption':['部件图'],'image_footnote':['1 滤网']}, '2. 取出滤网', True),
+            ({'image_footnote':['1 滤网']}, '3. 取出滤网', True),
+            ({'image_footnote':['1 滤网']}, '2. 取出滤网', False),
+        ]:
+            with self.subTest(image=image, following=following, same_section=same_section):
+                blocks = [{'type':'text','text':'保养','text_level':1},
+                          {'type':'text','text':'1. 打开盖罩'}, {'type':'image',**image}]
+                if not same_section: blocks.append({'type':'text','text':'另一节','text_level':2})
+                blocks.append({'type':'text','text':following})
+                parents, _, parsed = parent_child_v2({'id':'D','name':'说明书'}, blocks, len)
+                body = parents[0]['chunk_text']
+                self.assertLess(body.index(parsed[2]['text']), body.index(following))
+                self.assertNotIn('layout_adjustment', parsed[2])
+
     def test_headers_footers_require_content_evidence_and_footnotes_always_survive(self):
         blocks = [{'type': kind, 'text': text, 'page_idx': page} for kind, text, page in [
             ('header', 'KIRA B 50', 0), ('footer', '第 1 页', 0), ('header', '***', 0),

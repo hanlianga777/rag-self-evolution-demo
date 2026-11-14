@@ -146,6 +146,7 @@ V2_CONFIG = {**CONFIG, 'chunk_strategy': 'parent-child-v2', 'parent_min_tokens':
              'repeat_page_fraction': 0.30, 'repeat_short_line_chars': 40, 'repeat_min_pages': 2,
              'table_normalize': 'table-kv-v2', 'denoise_version': 'mineru-noise-v3', 'heading_context': 'child-section-v2',
              'header_footer_identity_max_chars': 12,
+             'list_layout': 'numbered-steps-image-labels-v1',
              'heading_hierarchy': 'manual-chapters-v1'}
 DOCUMENT_CATEGORIES = ('清洁机器人说明书', '巡检机器人说明书', '遥控器说明书', '电池与充电器说明书', '其他')
 # MinerU flattened these manuals' headings. Chapter starts were checked against
@@ -230,6 +231,39 @@ def _v2_fit(text, start, limit, counter):
         else: hi = middle - 1
     if counter(text[start:lo]) > limit: raise ValueError('Tokenizer cannot fit one character')
     return lo
+
+
+def _v2_group_step_labels(units, parsed):
+    """Keep consecutive steps together, retaining interleaved image part labels.
+
+    Only a bare image footnote of the form '1 part name' may move. Instructions,
+    warnings, image captions and page footnotes keep their original order.
+    """
+    by_id = {p['block_id']: p for p in parsed}
+    index = 1
+    while index < len(units) - 1:
+        label, before, after = units[index], units[index - 1], units[index + 1]
+        raw = by_id[label['block_id']]['raw']
+        previous = re.match(r'^(\d+)[.、]\s*', before['text'])
+        following = re.match(r'^(\d+)[.、]\s*', after['text'])
+        if (raw.get('type') != 'image' or raw.get('image_caption') or
+                not re.fullmatch(r'\d+\s+[^\n。！？!?；;]+', label['text']) or
+                re.search(r'请|勿|不得|严禁|禁止|必须|务必|危险|警告|小心|注意', label['text']) or
+                not previous or not following or int(following[1]) != int(previous[1]) + 1 or
+                not before['section_path'] == label['section_path'] == after['section_path'] or
+                after['page'] != label['page'] or label['page'] - before['page'] not in (0, 1)):
+            index += 1; continue
+        end, number = index + 1, int(following[1])
+        while end + 1 < len(units):
+            next_unit = units[end + 1]
+            step = re.match(r'^(\d+)[.、]\s*', next_unit['text'])
+            if not step or int(step[1]) != number + 1 or next_unit['section_path'] != label['section_path'] or next_unit['page'] != label['page']: break
+            end += 1; number += 1
+        by_id[label['block_id']]['layout_adjustment'] = {
+            'reason': 'image_part_label_after_numbered_steps',
+            'after_block_id': units[end]['block_id']}
+        units[index:end + 1] = [*units[index + 1:end + 1], label]
+        index = end + 1
 
 
 def parent_child_v2(document, blocks, counter):
@@ -320,6 +354,7 @@ def parent_child_v2(document, blocks, counter):
     if current: chapters.append((top, current))
     parents, children = [], []
     for top, units in chapters:
+        _v2_group_step_labels(units, parsed)
         # Bind a short leading explanation to its table before packing Parents.
         bundles, index = [], 0
         while index < len(units):

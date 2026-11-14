@@ -31,6 +31,7 @@
     "denoise_version": "mineru-noise-v3",
     "heading_context": "child-section-v2",
     "header_footer_identity_max_chars": 12,
+    "list_layout": "numbered-steps-image-labels-v1",
     "heading_hierarchy": "manual-chapters-v1",
     "manual_chapters": {
       "DOC-001": [
@@ -190,7 +191,7 @@
         "p75": 254,
         "p95": 275,
         "max": 297,
-        "mean": 230,
+        "mean": 230.06,
         "bins": {
           "0-59": 2,
           "60-79": 2,
@@ -389,7 +390,7 @@
     "p75": 254,
     "p95": 280,
     "max": 297,
-    "mean": 216.15,
+    "mean": 216.18,
     "bins": {
       "0-59": 5,
       "60-79": 3,
@@ -1256,24 +1257,23 @@
         },
         {
           "child_id": "DOC-001-V2-C-00080",
-          "char_start": 960,
-          "char_end": 1259,
-          "preview": "4. 将粗大污染物滤网装入污水箱中\n1. 排干清水（参见“排",
-          "token_count": 256,
+          "char_start": 950,
+          "char_end": 1237,
+          "preview": "4. 将粗大污染物滤网装入污水箱中\n1 粗大污染物滤网\n1.",
+          "token_count": 243,
           "section_path": "保养和维护 / 清洗粗大污染物滤网",
           "section_paths": [
             "保养和维护 / 清洗粗大污染物滤网",
             "保养和维护 / 清洗清水过滤器",
-            "保养和维护 / 清洁吸水扒",
-            "保养和维护 / 更换或翻转吸水胶条"
+            "保养和维护 / 清洁吸水扒"
           ]
         },
         {
           "child_id": "DOC-001-V2-C-00081",
-          "char_start": 1211,
-          "char_end": 1491,
-          "preview": "7. 拧紧两个翼型螺钉\n8. 将抽吸软管连接吸水扒\n当吸水胶",
-          "token_count": 241,
+          "char_start": 1181,
+          "char_end": 1464,
+          "preview": "5. 使用抹布将吸水胶条擦拭干净\n6. 在设备上装入吸水扒\n",
+          "token_count": 244,
           "section_path": "保养和维护 / 清洁吸水扒",
           "section_paths": [
             "保养和维护 / 清洁吸水扒",
@@ -1283,10 +1283,10 @@
         },
         {
           "child_id": "DOC-001-V2-C-00082",
-          "char_start": 1445,
+          "char_start": 1427,
           "char_end": 1587,
-          "preview": "3. 清空粗大污染物容器，必要时清洁\n4. 重新装入粗大污染",
-          "token_count": 127,
+          "preview": "2. 提起粗大污染物容器并将其拉出\n3. 清空粗大污染物容器",
+          "token_count": 143,
           "section_path": "保养和维护 / 清空粗大污染物容器",
           "section_paths": [
             "保养和维护 / 清空粗大污染物容器",
@@ -1465,6 +1465,16 @@
       ]
     }
   },
+  "layout_adjustments": [
+    {
+      "document_id": "DOC-001",
+      "block_id": "DOC-001-BLOCK-01105",
+      "page": 89,
+      "text": "1 粗大污染物滤网",
+      "reason": "image_part_label_after_numbered_steps",
+      "after_block_id": "DOC-001-BLOCK-01108"
+    }
+  ],
   "discarded_header_footer": [
     {
       "document_id": "DOC-001",
@@ -1814,15 +1824,14 @@
     "dataset_id": "GD-20261104115533",
     "snapshot_sha256": "d49ad3560c36f09be4222d8e684689a95b714dc08209325ecd9e3190a6d9d8c3",
     "matching_rule": "normalized-literal-v1",
-    "all_source_quotes_exact": false,
+    "all_source_quotes_exact": true,
     "question_count": 50,
     "statuses": {
-      "exact": 35,
-      "missing": 1,
+      "exact": 36,
       "no_source_quote": 14
     },
     "quote_count": 63,
-    "exact_quotes": 62,
+    "exact_quotes": 63,
     "questions": [
       {
         "question_id": "CSV-20261101100758945425-01",
@@ -2244,7 +2253,7 @@
       {
         "question_id": "CSV-20261101100758945425-07",
         "display_id": "Q07",
-        "status": "missing",
+        "status": "exact",
         "quotes": [
           {
             "quote_sha256": "1f98977c87bd9cfe0c8026cbcc9b2be80d1a844c10c96f715545498c86715896",
@@ -2291,10 +2300,23 @@
               "headings_verified": true,
               "normalized_quote_sha256": "a1165deaa5aa19956f22a157b062a438e6962442f9677b58abbcd57fbd648d24"
             },
-            "parent_spans": [],
-            "direct_child_ids": [],
-            "exact_in_child_or_contiguous_children": false,
-            "reason": "规范化后原文未逐字命中连续Child，或移除的标题未出现在命中Child路径中"
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00015",
+                "char_start": 904,
+                "char_end": 967,
+                "child_ids": [
+                  "DOC-001-V2-C-00079",
+                  "DOC-001-V2-C-00080"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00079"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
           }
         ]
       },
@@ -4133,6 +4155,6 @@
     "parent_cap_1400": true,
     "short_parents_are_whole_chapters": true,
     "offsets_exact": true,
-    "all_saved_source_quotes_exact": false
+    "all_saved_source_quotes_exact": true
   }
 }
