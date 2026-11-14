@@ -401,8 +401,9 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .evolution-page .d-issue-grid > article { background:var(--ui-surface); border:1px solid var(--ui-rule); border-radius:12px; padding:14px 16px; min-width:0; }
 .evolution-page .d-issue-grid h4 { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin:0 0 10px; }
 .evolution-page .d-issue-grid p { font-size:13px; line-height:1.75; color:var(--ui-ink-2); }
-.evolution-page .d-issue-grid:has(.d-side-effects) { grid-template-columns:repeat(3,minmax(0,1fr)); align-items:start; }
-.evolution-page .d-ranking { margin-top:16px; }
+.evolution-page .d-issue-grid:has(.d-side-effects) { grid-template-columns:repeat(3,minmax(0,1fr)); align-items:stretch; }
+.evolution-page .d-unresolved-card { display:flex; flex-direction:column; }
+.evolution-page .d-ranking { margin-top:auto; padding-top:16px; }
 .evolution-page .d-rank-labels { display:flex; justify-content:space-between; font-size:12px; color:var(--ui-muted); margin-bottom:10px; }
 .evolution-page .d-rank-bar { position:relative; height:7px; background:var(--ui-rule-2); border-radius:4px; }
 .evolution-page .d-rank-bar i { display:block; height:100%; background:var(--ui-accent-tint); border-radius:4px 0 0 4px; }

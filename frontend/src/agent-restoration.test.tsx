@@ -33,8 +33,8 @@ it("restores stages and complete generated plans without inventing evaluated res
 it("shows a status row and separate candidate/release decision rows and blocks Gate2 while another candidate is generated", async () => {
   const value = { ...data, optimization: { ...data.optimization, candidates: [{ ...candidates[0], status: "evaluated", result: { qualification: { qualified: true }, gates: { total: 11, passed_count: 11 }, regression: { status: "PASS", new_critical_failures: 0, new_ordinary_failures: 0 }, target_bad_cases_fixed: 1 } }, candidates[1], candidates[2]] } };
   await mount(value); await click("Candidate 对比");
-  expect(document.querySelectorAll(".sandbox-core-table tbody tr")).toHaveLength(6);
-  await act(async()=>document.querySelector<HTMLButtonElement>(".ui-ct-more")!.click());
+  expect(document.querySelectorAll(".sandbox-core-table tbody tr").length).toBeGreaterThan(6);
+  expect(document.querySelector('.ui-ct-more')).toBeNull();
   expect(document.querySelector(".sandbox-core-table")?.textContent).toContain("全部原 Bad Case 修好");
   expect(document.body.textContent).not.toContain("确认报告与赢家");
   expect(document.body.textContent).toContain("运行本轮 A/B/C Sandbox");

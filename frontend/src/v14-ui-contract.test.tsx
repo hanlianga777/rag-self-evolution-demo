@@ -238,8 +238,8 @@ it("review R1 separates Gate PASS from unqualified Regression FAIL in Sandbox an
   const d = { id: "E1-D", status: "evaluated", config: {}, reasoning: { candidate_label: "D" }, result: { gates: { passed: true, passed_count: 11, total: 11 }, regression: { passed: false, status: "FAIL" }, qualification: { qualified: false }, release_qualification: { qualified: false } } };
   await render(<EvolutionPage data={{ workspace: identity("B1", "E1"), evaluation: { id: "B1", status: "completed", config: {} }, optimization: { id: "E1", candidates: [d], result: { report_confirmation: { winner_id: "A" }, composite: { candidate_id: d.id } } } }} />);
   await act(async () => [...document.querySelectorAll("button")].find(x => x.textContent === "Candidate 对比")!.click());
-  expect([...document.querySelectorAll('.sandbox-core-table tbody th')].map(node=>node.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "安全拒答率", "P50", "P99"]);
-  await act(async()=>document.querySelector<HTMLButtonElement>('.ui-ct-more')!.click());
+  expect([...document.querySelectorAll('.sandbox-core-table tbody th')].slice(0,6).map(node=>node.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "安全拒答率", "P50", "P99"]);
+  expect(document.querySelector('.ui-ct-more')).toBeNull();
   const coreRows = [...document.querySelectorAll(".sandbox-core-table tbody tr")];
   const value = (label: string) => coreRows.find(row => row.querySelector("th")?.textContent === label)?.lastElementChild?.textContent;
   expect(value("Hard Gate")).toBe("11 / 11");

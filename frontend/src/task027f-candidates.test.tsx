@@ -42,8 +42,8 @@ it('shows all ten saved checks between conclusion and tradeoff, with rejection d
 });
 it('keeps six primary metrics in teaching order and uses white secondary actions',async()=>{
  await mount();await click('Candidate 对比');
- const table=document.querySelector('.ui-ct table')!;expect([...table.querySelectorAll('tbody th')].map(e=>e.textContent)).toEqual(['答对','新增 Bad Case','Hard Gate','安全拒答率','P50','P99']);expect(table.querySelector('colgroup')).not.toBeNull();
- const more=document.querySelector<HTMLButtonElement>('.ui-ct-more')!;expect(more.classList.contains('secondary')).toBe(true);await act(async()=>more.click());
+ const table=document.querySelector('.ui-ct table')!;expect([...table.querySelectorAll('tbody th')].slice(0,6).map(e=>e.textContent)).toEqual(['答对','新增 Bad Case','Hard Gate','安全拒答率','P50','P99']);expect(table.querySelector('colgroup')).not.toBeNull();
+ expect(document.querySelector('.ui-ct-more')).toBeNull();
  expect(table.querySelectorAll('tbody tr').length).toBeGreaterThan(6);expect(table.textContent).not.toContain('运行状态');expect(table.textContent).not.toContain('Candidate 合格');expect(table.textContent).not.toContain('指定目标修好');
  await click('查看高级指标');expect(document.querySelector('[role=dialog]')?.textContent).not.toMatch(/Provider Cost|费用未采集|无法准确回算/);
 });

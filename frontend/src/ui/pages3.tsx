@@ -1,5 +1,5 @@
 import { Icon, IconLabel } from "./icons";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { HoverCard } from "./HoverCard";
 import { StatusBadge, type StatusKind } from "./Primitives";
 
@@ -51,13 +51,12 @@ export function KnowledgeCoverage({ topics, onOpen, slotLabel = "题位", info, 
 
 /* ==================================================================
  * Sandbox：同一份 Golden 上的并排对比表
- * - 主行默认显示：答对、新增 Bad Case、Hard Gate、P99、安全拒答率；其余行收进"更多指标"；
+ * - 答对、新增 Bad Case、Hard Gate、安全拒答率、P50、P99 在前，其余有效指标直接展示；
  * - 每行较好的值加粗（better 指明方向）；Winner / 推荐列加浅底。
  * ================================================================== */
 export type CompareRow = { label: string; values: (number | string | null)[]; better?: "higher" | "lower"; unit?: string; digits?: number; primary?: boolean };
 
 export function CompareTable({ columns, rows, highlight = [] }: { columns: { name: string; status?: StatusKind; statusLabel?: string }[]; rows: CompareRow[]; highlight?: number[] }) {
-  const [more, setMore] = useState(false);
   const primary = rows.filter(row => row.primary !== false);
   const secondary = rows.filter(row => row.primary === false && !primary.some(item=>item.label===row.label) && row.values.some(value=>value!=null && !/^(?:—|未知|未采集|不适用|待运行|待完成|未判定)(?:\s*\/.*)?$/.test(String(value))));
   const render = (row: CompareRow) => {
@@ -76,8 +75,7 @@ export function CompareTable({ columns, rows, highlight = [] }: { columns: { nam
   return <div className="ui-ct">
     <table style={{tableLayout:"fixed"}}><colgroup><col style={{width:"22%"}}/>{columns.map(column=><col key={column.name} style={{width:`${78/columns.length}%`}}/>)}</colgroup>
       <thead><tr><th />{columns.map((column, index) => <th key={column.name} className={highlight.includes(index) ? "hl" : ""}><span className="ui-ct-name">{column.name}</span>{column.status && <StatusBadge kind={column.status} label={column.statusLabel} />}</th>)}</tr></thead>
-      <tbody>{primary.map(render)}{more && secondary.map(render)}</tbody>
+      <tbody>{primary.map(render)}{secondary.map(render)}</tbody>
     </table>
-    {secondary.length > 0 && <button type="button" className="secondary ui-ct-more" aria-expanded={more} onClick={() => setMore(value => !value)}>{more ? "收起更多指标" : `展开所有指标（${secondary.length}）`}</button>}
   </div>;
 }
