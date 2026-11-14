@@ -75,7 +75,7 @@ export function Node({ x, y, w, h, icon, title, lines = [], badge, gate, focus, 
     {Glyph && <Glyph x={x + 10} y={y + 9} width={13} height={13} color={focus || mark ? C.accent : C.muted} strokeWidth={1.8} />}
     <text x={Glyph ? x + 29 : x + 11} y={top} fontSize={titleSize} fontWeight={600} fill={C.ink}>{title}</text>
     {corner && <text x={x + w - 10} y={top} fontSize={10} textAnchor="end" fill={C.faint}>{corner}</text>}
-    {tip && !corner && <text x={x + w - 11} y={top} fontSize={10.5} textAnchor="end" fill={C.faint}>ⓘ</text>}
+    {tip && <text x={x + w - 9} y={y + h - 8} fontSize={10.5} textAnchor="end" fill={C.faint}>ⓘ</text>}
     {dot && <circle cx={x + w - 11} cy={y + 15} r={3} fill={C.accent} />}
     {value && <text x={x + 11} y={top + 19} fontSize={14} fontWeight={600} fill={C.ink}>{value}</text>}
     {lines.map((line, index) => <text key={index} x={x + 11} y={top + (value ? 36 : 18) + index * 15} fontSize={11} fill={C.muted}>{line}</text>)}
