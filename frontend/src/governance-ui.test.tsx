@@ -445,3 +445,13 @@ it.each([48,49,50])('machine filter shows all %i qualified candidates locally an
   expect(document.querySelector('.review-table')?.textContent).not.toContain('暂无对应数据');
   await act(async()=>root.unmount());
 });
+
+it("maps presentation wording in question rows without changing frozen source text", async () => {
+  const { QuestionTable } = await import("./pages/GovernancePage");
+  const row = { id: "q20", slot: "Q20", question: "触摸屏出现内部错误，应该怎样处理？", test_category: "positive" };
+  const host = document.createElement("div"); document.body.append(host); const root = createRoot(host);
+  await act(async () => root.render(<QuestionTable rows={[row]} onDetail={() => {}} />));
+  expect(host.querySelector("tbody")?.textContent).toContain("触摸屏出现系统错误");
+  expect(row.question).toBe("触摸屏出现内部错误，应该怎样处理？");
+  await act(async () => root.unmount());
+});

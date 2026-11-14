@@ -136,3 +136,20 @@ it("closes a frozen question and opens the next question without rendering missi
   expect(document.querySelector(".candidate-workspace")).toBeNull();
   await act(async () => root.unmount());
 });
+
+it("searches displayed and original pool question wording without changing the source", async () => {
+  const { BusinessImportPanel } = await import("./pages/BusinessImportPanel");
+  const source = { ...row, id: "search-pool-20", question: "触摸屏出现内部错误，怎样处理？" };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(goldenFixture(url, [source])))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  try {
+    await act(async () => root.render(<BusinessImportPanel items={[source]} corpusFingerprint={{ id: "search-pool" }} readOnly onCreated={async () => {}} />));
+    expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("系统错误");
+    const input = document.querySelector<HTMLInputElement>('[aria-label="搜索候选池"]')!;
+    for (const query of ["系统错误", "内部错误"]) {
+      await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, query); input.dispatchEvent(new Event("input", { bubbles: true })); });
+      expect(document.querySelectorAll(".candidate-pool-table tbody tr")).toHaveLength(1);
+    }
+    expect(source.question).toContain("内部错误");
+  } finally { await act(async () => root.unmount()); }
+});

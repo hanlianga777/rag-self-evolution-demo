@@ -78,3 +78,17 @@ it('keeps a repeated source before a different document in the same citation',()
  const result=citationText('甲（《整机手册.pdf》，第14页）乙（同手册第14页；《遥控手册.pdf》“R1”，第11页；“R3”，第6页）丙',evidence);
  expect(result.sources.map(s=>[s.document,s.page])).toEqual([['整机手册.pdf',14],['遥控手册.pdf',11],['遥控手册.pdf',6]]);
 });
+it('searches both displayed question wording and unchanged source wording',async()=>{
+ const question='触摸屏出现内部错误，怎样处理？',base='search-base',next='search-after';
+ const candidate={...data.optimization.candidates[0],id:'search-D',result:{evaluation_run_id:next,evaluation_complete:true,total:1}};
+ const list=(id:string)=>({...run(id),cases:[{question_id:'Q20',question,test_category:'positive',passed:id!==base}]});
+ vi.stubGlobal('fetch',vi.fn(async(input:string)=>{const path=new URL(input).pathname,id=path.includes('/search-base/')?base:next;return new Response(JSON.stringify(path.endsWith('/comparison-cases')?list(id):{status:'completed',case:{...(id===base?before:after),question_id:'Q20',question}}));}));
+ await mount(<SavedAnswerComparison data={{evaluation:{id:base},optimization:{candidates:[candidate],recommendation:{recommended_candidate:candidate.id}}}} onOpenCitation={()=>{}}/>);
+ expect(document.querySelector('.comparison-qlist')?.textContent).toContain('系统错误');
+ const input=document.querySelector<HTMLInputElement>('.comparison-search')!;
+ for(const query of ['系统错误','内部错误']){
+  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,query);input.dispatchEvent(new Event('input',{bubbles:true}));});
+  expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(1);
+ }
+ expect(question).toContain('内部错误');
+});

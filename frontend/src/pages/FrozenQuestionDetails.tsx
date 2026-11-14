@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ConfirmDialog } from "../components/Dialog";
 import { readableSourceName } from "../components/ComparisonAnswer";
 import { Badge, DrawerSection, TruncatedText } from "../components/Primitives";
-import { displayText } from "../display";
+import { displayText, presentationText } from "../display";
 
 type Candidate = Record<string, any>;
 const behaviorText: Record<string, string> = {
@@ -44,7 +44,7 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true,
   <div className="drawer-body frozen-question-details">
     {showSource && row.raw?.source === "reviewed_csv_machine_checks" && <p className="muted">来源：人工审核</p>}
     {scenario && scenario !== "暂无" && <DrawerSection title="业务场景"><div className="muted-prose"><TruncatedText lines={3}>{scenario}</TruncatedText></div></DrawerSection>}
-    <DrawerSection title="问题"><p>{row.question}</p><p className="muted">出处：{questionSources(row)}</p></DrawerSection>
+    <DrawerSection title="问题"><p>{presentationText(row.question || "")}</p><p className="muted">出处：{questionSources(row)}</p></DrawerSection>
     <DrawerSection title="参考答案"><ol className="golden-answer-list candidate-answer">{answers.map((line, index) => <li key={index}>{line}</li>)}</ol>{row.test_category === "negative" && <small className="muted">按预期行为检查回答边界</small>}</DrawerSection>
     {uniqueEvidence.length > 0 && <DrawerSection title="核心证据"><div className="golden-evidence-scroll">{uniqueEvidence.map(({ chunk, count }, index: number) => <div className="golden-evidence" key={index}><strong>{sourceLabel(chunk)}{count > 1 && ` · 命中 ${count} 处`}</strong><div className="muted-prose"><TruncatedText lines={3}>{chunk.chunk_text || "暂无"}</TruncatedText></div></div>)}</div></DrawerSection>}
     {groups.some(([, points]) => points.length) && <DrawerSection title="评分要点"><div className="golden-scoring-points">{groups.filter(([, points]) => points.length).map(([label, points]) => <section key={label}><h4>{label}</h4>{points.length ? <ul>{points.map((point, index) => <li key={index}>{readable(typeof point === "string" ? point : point.requirement || point.description || "暂无")}{point.trigger && <small>适用条件：{readable(String(point.trigger))}</small>}</li>)}</ul> : <p>暂无</p>}</section>)}</div></DrawerSection>}

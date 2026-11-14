@@ -512,3 +512,16 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
  .evaluation-page.evaluation-report .baseline-more .section-head { margin-bottom:6px; }
  .evaluation-page.evaluation-report .product-objective-metrics .metric strong { line-height:1.2; }
 }
+
+/* 029：收掉小屏首屏最后一截溢出，图形和规则正文保持原样。 */
+@media(min-width:1101px) and (min-height:720px) {
+ .overview-page.architecture-view .page-content { padding-bottom:4px; }
+ .overview-page.architecture-view .architecture-business { gap:4px; }
+ .evolution-page:has(.agent-overview) .page-content { padding-bottom:16px; }
+ .evolution-page .agent-overview { gap:10px; }
+ .evolution-page .agent-overview-result { padding:12px 18px; }
+ .evolution-page .agent-overview .agent-overview-result h2 { margin-bottom:4px; }
+ .evolution-page .agent-overview-params article { padding-top:12px; padding-bottom:12px; }
+ .evolution-page .agent-overview-rules article { padding-top:10px; padding-bottom:10px; }
+ .evolution-page .agent-case-destinations td { padding-top:6px; padding-bottom:6px; }
+}
