@@ -19,7 +19,7 @@ it('keeps the one-line page purpose through architecture tab switches',async()=>
   await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='业务架构')!.click());
   expect(document.querySelector('.page-title .ui-kicker')?.textContent).toBe('用一组数字和一条闭环，说明这套系统让智能客服变好了多少，又是怎样一步步做到的。');
   expect(document.querySelector('.ui-problems')).not.toBeNull();
-  expect(document.querySelector('.ui-arch')).not.toBeNull();
+  expect(document.querySelector('[role="img"][aria-label^="业务架构"]')).not.toBeNull();
   expect(fetch).not.toHaveBeenCalled();
  }finally{await act(async()=>root.unmount());}
 });

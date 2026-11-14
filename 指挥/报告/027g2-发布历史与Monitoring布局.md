@@ -2,7 +2,7 @@
 
 ## 当前进度
 
-页面修改已完成，正在等本轮全量测试最终结束。任务单尚未移动，以下为已核实的阶段事实；最终结果会在验收结束后补全。
+页面改动沿用已有实现，本次从未完成的全量测试和页面验收接续。以下补充最终验收结果，历史阶段记录保留。
 
 - 发布历史的版本名和来源已拆成两行，关键配置已按“Candidate K / Top-K / Thinking”及回答策略拆成两行，来源与策略用 12px 灰字。仅取消这两列的自动截断，保留版本详情和回滚确认。来源：`frontend/src/pages/VersionsPage.tsx:106`、`frontend/src/pages/evaluation-workspaces.css:138`。
 - Monitoring 四个数字块下改为 2:1 双栏，右边显示保存的 Q06、Q27 原因及线上 Bad Case；原底部说明已经合并到右卡底部。来源：`frontend/src/pages/VerificationPage.tsx:105`、`:123`、`:136`。
@@ -21,4 +21,16 @@
 
 ## 待回答问题
 
-暂无。全量测试及最终数据不变核对仍在执行，本报告当前版本不代表任务已完成。
+暂无。
+
+
+## 本次接续的最终验收（2026-11-13）
+
+- 从 `30b9777` 接续，开始前按手动模式执行 `git pull --rebase`。此前的页面实现已经在仓库里，没有重写。
+- 新版流程图使 4 个测试文件的旧 DOM 选择器失效，导致起始全量前端 5 项失败。本次仅把结构断言改为新版图的可访问名称、关键文字及真实数据，保留无写入、旧响应隔离、线上配置和抽屉交互断言；没有改动总指挥的图形设计。来源：`frontend/src/knowledge-phase1.test.tsx`、`overview-architecture.test.tsx`、`task024b-customer-copy.test.tsx`、`task027c-assets.test.tsx`。
+- 前端全量：113 个文件、671 项通过；构建通过。后端全量：1459 项，0 失败、0 错误、21 项既有跳过，名称和原因与 027f2 完全一致。来源：`output/task027g2/frontend-delivery.txt`、`build-final.txt`、`backend-full.json`、`backend-full.txt`。后端使用临时数据目录、Mock 和拒绝外网的 audit hook，未复制正式数据库。
+- 1440×900 两页 fit-check：发布 790 / 790；Monitoring 737 / 737，比例均为 1.00，无全局横向滚动。两栏底部同高、宽度约 2:1；Q06、Q27 保存的原因与 D 视图一致；抽屉、报告、快照、取消回滚确认、题目跳转均可用。来源：`output/task027g2/browser.json`、`fit-check.json`、`browser_acceptance.py`。
+- 截图仅在本机：`output/task027g2/01-release.png`、`02-monitoring.png`，均为 1440×900，已目视核对。当前正式记录为 2 条，原脚本的 1 条历史断言已按实际数量更新；无新增问答或反馈。
+- 6 个正式接口验收前后 SHA-256 一致（评测、优化、版本、Monitoring、文档、工作区）。来源：`output/task028-run/data-before.json`、`data_check.py after`。浏览器只允许本机 GET / HEAD / OPTIONS，无脚本错误、控制台错误或被阻止的写请求。
+- 真实 DeepSeek / Provider 调用 0 次。没有发送问题、标注、发布或回滚；沿用用户 8010 / 5174 服务，本次无自行启动的服务器，验收浏览器已关闭。
+- 本次按最新 `指挥/当前任务.md` 的手动模式归档、提交并推送；此前报告中的“未运行 Git 写命令”仅是历史阶段记录，不代表当前手动流程。没有遗留未完成项。

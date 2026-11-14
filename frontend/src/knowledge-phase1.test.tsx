@@ -37,8 +37,8 @@ it('ignores an older Pipeline response after the document refresh', async () => 
   await act(async () => root.render(<OperationProvider><KnowledgePage data={{ documents: [] }} /></OperationProvider>));
   await act(async () => root.render(<OperationProvider><KnowledgePage data={{ documents: [{ id: 'D', name: 'new.pdf', status: 'Indexed', parser: 'MinerU', pages: 1, chunks: 80 }] }} /></OperationProvider>));
   await act(async () => releaseOld(new Response(JSON.stringify({ index: { child_count: 10 }, knowledge: { identity: { corpus_snapshot_id: 'old' } } }), { status: 200 })));
-  const cards = document.querySelectorAll('.ui-kf-lane .ui-kf-step');
-  expect(cards[2]?.textContent).toContain('80');
-  expect(cards[2]?.textContent).not.toContain('10');
+  const flow = document.querySelector('.ui-kf svg[role="img"]');
+  expect(flow?.textContent).toContain('80 段');
+  expect(flow?.textContent).not.toContain('10 段');
   await act(async () => root.unmount());
 });
