@@ -425,7 +425,7 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 .verification-page .monitoring-table th:nth-child(4) { width:9%; }
 .verification-page .monitoring-table th:nth-child(5) { width:14%; }
 .verification-page .monitoring-table th:last-child { width:28%; }
-.verification-page .monitoring-layout .monitoring-table :is(th,td) { padding-left:8px; padding-right:8px; }
+.verification-page.page-shell .monitoring-layout .monitoring-table :is(th,td) { padding-left:8px; padding-right:8px; }
 .verification-page .monitoring-question { width:100%; text-align:left; }
 .verification-page .monitoring-assessment { display:flex; flex-wrap:wrap; gap:5px; }
 .verification-page .feedback-next-inputs { color:var(--ui-muted); font-size:12px; margin:14px 0 0; padding:0; border:0; background:transparent; }

@@ -25,7 +25,7 @@ const baseline = () => ({ id: 'base', status: 'completed', config: { generation_
   result: { total: 1, bad_case_count: 1, gates: { passed_count: 1, total: 1, gates: [gate('positive_correctness')] } },
   product_diagnostics: { objective_metrics: { recall_at_k: 50, precision_at_k: 25, mrr: .5, stage_breakdown: [{ stage: 'generation', label: '回答生成', total_ms: 90, share_percent: 90 }] } } });
 
-it('opens report cases in place and keeps rerun confirmation at the end of nonduplicated metrics', async () => {
+it('opens report cases in place and keeps rerun confirmation in the metrics title row', async () => {
   const run = baseline(), original = JSON.stringify(run);
   vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.includes('preflight') ? { can_start: true } : run)));
   await mount(<EvaluationPage data={{ evaluation: run }} />);
@@ -37,7 +37,7 @@ it('opens report cases in place and keeps rerun confirmation at the end of nondu
   expect(more.textContent).not.toMatch(/综合分|耗时拆解|Candidate K|回答生成模型和档位/);
   expect(more.textContent).toContain('标准证据原文');
   expect(more.textContent).toContain('未命中记为 0');
-  expect(more.querySelector('.header-actions button')?.textContent).toBe('重新评测 Baseline');
+  expect(more.querySelector('.section-head .header-actions button')?.textContent).toBe('重新评测 Baseline');
   await click('重新评测 Baseline');
   expect(document.querySelector('.confirm-dialog')?.textContent).toContain('会调用模型并产生费用');
   await click('取消');

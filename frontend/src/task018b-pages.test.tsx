@@ -15,10 +15,11 @@ it('places processing before expanded coverage, keeps one title, and restores do
  vi.stubGlobal('fetch',fetcher);
  await mount(<KnowledgePage data={{documents:[{id:'D1',name:'设备手册.pdf',chunks:7,status:'Indexed'}]}} onChanged={changed}/>);
  expect(document.querySelector('.page-content > section:first-child .ui-kf')).not.toBeNull();
- expect(document.querySelector('.page-content > details .ui-kc')).not.toBeNull();
- expect(document.querySelector<HTMLDetailsElement>('.page-content > details')?.open).toBe(true);
+ expect(document.querySelector('.page-content > .knowledge-coverage .ui-kc')).not.toBeNull();
+ expect(document.querySelector('.knowledge-coverage')?.tagName).toBe('SECTION');
+ expect(document.querySelector('.knowledge-coverage summary')).toBeNull();
  expect(document.querySelector('.ui-kc h3')).toBeNull();
- expect(document.querySelector('.page-content > details > summary [aria-label="口径说明"]')).toBeNull();
+ expect(document.querySelector('.knowledge-coverage h2 [aria-label="口径说明"]')).toBeNull();
  expect(document.querySelector('.knowledge-coverage-counts')).toBeNull();expect([...document.querySelectorAll('.ui-kc-row.clickable [role=cell]')].slice(-3).map(n=>n.textContent)).toEqual(['2','1','3']);
  const button=[...document.querySelectorAll('button')].find(b=>b.textContent==='删除')!;
  expect(button).toBeDefined();

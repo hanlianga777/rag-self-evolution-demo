@@ -79,7 +79,7 @@
 .ui-blb-val b { font-size: var(--ui-fs-body); font-weight: 600; color: var(--ui-ink); }
 .ui-blb-bads { list-style: none; margin: 0; padding: 0; }
 .ui-blb-bads li + li { border-top: 1px solid var(--ui-rule-2); }
-.ui-blb-bads button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; width: calc(100% + 16px); margin: 0 -8px; padding: 7px 8px; border: 0; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.ui-blb-bads button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; margin: 0; padding: 7px 0; border: 0; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .ui-blb-bads button:hover:not(:disabled) { background: var(--ui-rule-2); }
 .ui-blb-bads button:disabled { cursor: default; }
 .ui-blb-q { font-size: var(--ui-fs-body); color: var(--ui-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -99,6 +99,12 @@
 
 /* —— 知识库：知识处理链路 —— */
 .ui-kp-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.knowledge-coverage { padding:20px 22px; }
+.knowledge-coverage > h2 { margin:0 0 14px; font-size:var(--ui-fs-card); }
+.knowledge-page .table-scroll td:last-child .header-actions { flex-wrap:nowrap; gap:6px; }
+.knowledge-page .table-scroll td .secondary.small { height:28px; min-height:28px; padding:0 8px; font-size:12px; font-weight:400; white-space:nowrap; }
+.verification-page .monitoring-question { justify-content:flex-start; min-width:0; }
+.verification-page .monitoring-question .clamp-text-host { width:100%; min-width:0; }
 .ui-kp h3 { margin: 0; font-size: var(--ui-fs-sub); font-weight: 600; color: var(--ui-ink); }
 .ui-kp-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .ui-kp-steps li { position: relative; display: grid; gap: 4px; align-content: start; padding: 2px 20px 2px 0; min-width: 0; }
@@ -274,7 +280,6 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .page-title .page-purpose { max-width:none; font-size:12px; }
 
 /* 027c: existing page tokens, shared tables and two-lane knowledge flow. */
-.knowledge-coverage > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .knowledge-coverage-counts { display:flex; gap:8px; flex-wrap:wrap; color:var(--ui-muted); font-size:var(--ui-fs-meta); font-weight:400; }
 .knowledge-coverage-counts > span { padding:4px 8px; background:var(--ui-rule-2); border-radius:6px; }
 .knowledge-page .detail-button { max-width:100%; cursor:default; }
@@ -445,6 +450,8 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .page-shell-header .tabs { gap:22px; margin:0; padding:0 0 12px; }
 .page.page-shell .page-shell-header .tabs > button { font-size:13px; font-weight:400; line-height:20px; padding:10px 2px; color:var(--ui-muted); background:transparent; }
 .page.page-shell .page-shell-header .tabs > button:is(.active,.selected) { font-weight:600; color:var(--ui-ink); }
+.tabs button[data-label] { display:inline-block; text-align:center; }
+.tabs button[data-label]::before { content:attr(data-label); display:block; height:0; font-weight:600; visibility:hidden; pointer-events:none; }
 .page.page-shell .page-shell-header .page-title :is(button.secondary,a.secondary) { font-weight:400; height:36px; padding:0 12px; font-size:13px; border-radius:10px; background:var(--ui-surface); border:1px solid var(--ui-rule); color:var(--ui-ink-2); }
 @media (min-width:1101px) and (min-height:720px) {
  .overview-page:not(.architecture-view) .page-content { display:flex; flex-direction:column; gap:12px; padding-bottom:16px; }
@@ -463,24 +470,26 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
  .governance-page.governance-import .golden-pool { flex:1; min-height:0; display:flex; flex-direction:column; }
  .governance-page.governance-import .golden-pool > .panel { flex:1; min-height:0; display:flex; flex-direction:column; margin:0; }
  .governance-page.governance-import .candidate-pool-scroll { flex:1; min-height:0; overflow:auto; max-height:none; }
- .evaluation-page.evaluation-report .page-content { display:flex; flex-direction:column; gap:12px; padding-bottom:12px; }
+ .evaluation-page.evaluation-report .page-content { display:flex; flex-direction:column; gap:6px; padding-bottom:8px; }
  .evaluation-page.evaluation-report .ui-bl { padding:14px 20px; gap:10px; flex:none; }
  .evaluation-page.evaluation-report .ui-bl-time { padding-top:10px; gap:6px; }
  .evaluation-page.evaluation-report .ui-bl-cell > strong { font-size:24px; }
- .evaluation-page.evaluation-report .baseline-report { flex:1; min-height:0; display:flex; flex-direction:column; gap:10px; overflow:visible; }
+ .evaluation-page.evaluation-report .baseline-report { flex:1; min-height:0; display:flex; flex-direction:column; gap:6px; overflow:visible; }
  .evaluation-page.evaluation-report .ui-blb { flex:1; min-height:150px; grid-template-rows:minmax(0,1fr); margin:0; gap:12px; }
  .evaluation-page.evaluation-report .ui-blb-card { padding:10px 16px; min-height:0; }
  .evaluation-page.evaluation-report .ui-blb-card h3 { margin-bottom:8px; }
  .evaluation-page.evaluation-report .ui-blb-cats { gap:6px; padding:0; }
  .evaluation-page.evaluation-report .ui-blb-bads { min-height:0; overflow:auto; }
- .evaluation-page.evaluation-report .ui-blb-bads button { padding-top:3px; padding-bottom:3px; }
+ .evaluation-page.evaluation-report .ui-blb-bads button { padding-top:1px; padding-bottom:1px; }
  .evaluation-page.evaluation-report .baseline-more { flex:none; padding:0; }
- .evaluation-page.evaluation-report .baseline-more > .panel { margin:0; padding:10px 16px; }
- .evaluation-page.evaluation-report .product-objective-metrics { gap:8px; margin-top:8px; }
- .evaluation-page.evaluation-report .baseline-more .product-objective-metrics .metric { display:grid; grid-template-columns:1fr auto; gap:2px 8px; min-height:0; height:auto; padding:7px 10px; }
- .evaluation-page.evaluation-report .product-objective-metrics .metric strong { grid-area:1/2; font-size:18px; }
- .evaluation-page.evaluation-report .product-objective-metrics .metric small { grid-column:1/-1; line-height:1.4; }
- .evaluation-page.evaluation-report .baseline-more .header-actions { margin-top:8px; }
+ .evaluation-page.evaluation-report .baseline-more > .panel { margin:0; padding:8px 16px; }
+ .evaluation-page.evaluation-report .product-objective-metrics { gap:8px; margin-top:4px; }
+ .evaluation-page.evaluation-report .baseline-more .product-objective-metrics .metric { display:grid; grid-template-columns:1fr auto; align-content:start; gap:2px 8px; min-height:0; height:auto; padding:4px 10px; }
+ .evaluation-page.evaluation-report .product-objective-metrics .metric > span { grid-area:1/1; margin:0; align-self:center; }
+ .evaluation-page.evaluation-report .product-objective-metrics .metric strong { grid-area:1/2; font-size:18px; white-space:nowrap; }
+ .evaluation-page.evaluation-report .product-objective-metrics .metric small { grid-area:2/1/3/-1; display:block; line-height:1.4; }
+ .evaluation-page.evaluation-report .product-objective-metrics .metric small .ui-clamp { font-size:12px; line-height:1.4; }
+ .evaluation-page.evaluation-report .baseline-more .header-actions { margin:0; }
  .evaluation-page.evaluation-report .baseline-more .header-actions button { min-height:30px; padding-top:4px; padding-bottom:4px; }
  .evaluation-page.evaluation-gates .page-content { display:flex; flex-direction:column; padding-bottom:16px; }
  .evaluation-page.evaluation-gates .baseline-gate-grid { flex:1; min-height:0; }
@@ -503,13 +512,15 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 }
 @media (min-width:1101px) and (min-height:720px) {
  .evaluation-page.evaluation-report .ui-bl-cell { padding-top:0; padding-bottom:0; gap:4px; }
+ .evaluation-page.evaluation-report .ui-bl-cell > span { line-height:18px; }
  .evaluation-page.evaluation-report .ui-bl-cell > strong { line-height:1.15; }
- .evaluation-page.evaluation-report .ui-bl { padding:12px 20px; gap:8px; }
+ .evaluation-page.evaluation-report .ui-bl-layers { display:flex; flex-wrap:wrap; gap:4px 12px; }
+ .evaluation-page.evaluation-report .ui-bl { padding:10px 20px; gap:6px; }
  .evaluation-page.evaluation-report .ui-bl-time { padding-top:6px; gap:4px; grid-template-columns:auto 1fr; }
  .evaluation-page.evaluation-report .ui-bl-time-head { grid-row:1; align-self:center; }
  .evaluation-page.evaluation-report .ui-bl-legend { grid-area:1/2; justify-content:flex-end; gap:10px; font-size:12px; }
  .evaluation-page.evaluation-report .ui-bl-bar,.evaluation-page.evaluation-report .ui-bl-time-note { grid-column:1/-1; }
- .evaluation-page.evaluation-report .baseline-more .section-head { margin-bottom:6px; }
+ .evaluation-page.evaluation-report .baseline-more .section-head { margin-bottom:0; }
  .evaluation-page.evaluation-report .product-objective-metrics .metric strong { line-height:1.2; }
 }
 
@@ -517,8 +528,11 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 @media(min-width:1101px) and (min-height:720px) {
  .overview-page.architecture-view .page-content { padding-bottom:4px; }
  .overview-page.architecture-view .architecture-business { gap:4px; }
- .evolution-page:has(.agent-overview) .page-content { padding-bottom:16px; }
- .evolution-page .agent-overview { gap:10px; }
+ .evolution-page:has(.agent-overview) .page-content { display:flex; flex-direction:column; padding-bottom:16px; }
+ .evolution-page .agent-overview { flex:1; min-height:0; display:flex; flex-direction:column; gap:10px; }
+ .evolution-page .agent-overview > section:not(.agent-case-destinations) { flex:none; }
+ .evolution-page .agent-case-destinations { flex:1; min-height:0; display:flex; flex-direction:column; }
+ .evolution-page .agent-case-destinations .table-scroll { flex:1; min-height:0; overflow:auto; max-height:none; }
  .evolution-page .agent-overview-result { padding:12px 18px; }
  .evolution-page .agent-overview .agent-overview-result h2 { margin-bottom:4px; }
  .evolution-page .agent-overview-params article { padding-top:12px; padding-bottom:12px; }

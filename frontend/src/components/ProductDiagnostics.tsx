@@ -75,14 +75,14 @@ export function ProductDiagnostics({diagnostics,judgeThinking,action}: {diagnost
  const maxCost=maxMetrics.average_estimated_cost,highCost=highMetrics.average_estimated_cost;
  return <>
   {columns.length>0 && <Section title={`${comparisonTitle}${columns.length?`（同为 ${comparisonJudge || '未知档位'} 判分）`:''}`} action={<button className="secondary" onClick={()=>setOpen(true)}>查看对照</button>}><p>{columns.length?columns.map(column=>`${columnName(column)}：答对 ${column.metrics?.correct_count ?? '未采集'} · Hard Gate ${column.metrics?.gate_passed ?? '未知'}/${column.metrics?.gate_total ?? '未知'}`).join('｜'):comparison.note || '尚无可比较的回答档位记录；保存相同判分身份的评测后可查看对照。'}</p></Section>}
-  <Section title={<IconLabel name="search">检索与用量</IconLabel>}><div className="product-objective-metrics">{[
+  <Section title={<IconLabel name="search">检索与用量</IconLabel>} action={action}><div className="product-objective-metrics">{[
    ['Recall@K',numeric(metrics.recall_at_k,'%'),'标准证据原文有多少进入最终前 K 条上下文；按可评估的正向题和消融题逐题取平均。'],
    ['Precision@K',numeric(metrics.precision_at_k,'%'),'最终上下文中，包含任一标准证据原文的条目占比；按可评估的正向题和消融题逐题取平均。'],
    ['MRR',numeric(metrics.mrr,'',3),'第一条包含标准证据原文的最终上下文排名的倒数，未命中记为 0；逐题平均，越接近 1 越好。'],
    ['TTFT',numeric(typeof metrics.ttft_median_ms==='number'?metrics.ttft_median_ms/1000:null,' 秒'),'已记录回答请求的首个 Token 等待时间中位数。'],
    ['每题 Token',typeof metrics.average_tokens==='number'?Math.round(metrics.average_tokens).toLocaleString('en-US'):'未采集','每道保存回答的输入加输出 Token 均值，含思考用量，不含判分、向量检索和重排。'],
    ['每题回答费用',costText(metrics.average_estimated_cost),'保存回答请求的平均估算费用，不含判分、向量检索和重排。'],
-   ].map(([label,value,note])=><div className="metric" key={label}><span>{label}</span><small><TruncatedText lines={2}>{note}</TruncatedText></small><strong>{value}</strong></div>)}</div>{action}</Section>
+   ].map(([label,value,note])=><div className="metric" key={label}><span>{label}</span><small><TruncatedText lines={2}>{note}</TruncatedText></small><strong>{value}</strong></div>)}</div></Section>
   <Drawer className="workbench-drawer thinking-comparison-drawer" open={open} onOpenChange={setOpen} title={comparisonTitle}><div className="drawer-body story-details">{columns.length ? <>
    <div className="thinking-overview thinking-cards">{columns.map(column=><Section key={column.id} title={columnLabel(column)}><dl>{overview.map(([label,render])=><div key={label}><dt>{label}</dt><dd>{render(column.metrics || {})}</dd></div>)}</dl></Section>)}</div>
    <div className="thinking-deltas">{Number.isFinite(maxMetrics.correct_count) && Number.isFinite(highMetrics.correct_count) && <Badge>{maxMetrics.correct_count===highMetrics.correct_count?'两档答对题数相同':`${maxMetrics.correct_count>highMetrics.correct_count?'Max':'High'}多答对 ${Math.abs(maxMetrics.correct_count-highMetrics.correct_count)} 题`}</Badge>}{maxMetrics.latency_p50_seconds>0 && highMetrics.latency_p50_seconds>0 && <Badge>{maxMetrics.latency_p50_seconds>=highMetrics.latency_p50_seconds?'High':'Max'}快约 {numeric(Math.max(maxMetrics.latency_p50_seconds,highMetrics.latency_p50_seconds)/Math.min(maxMetrics.latency_p50_seconds,highMetrics.latency_p50_seconds))} 倍</Badge>}{maxCost?.amount>0 && typeof highCost?.amount==='number' && maxCost.currency===highCost.currency && <Badge>High 费用约为 Max 的 {numeric(highCost.amount/maxCost.amount*100,'%')}</Badge>}</div>
