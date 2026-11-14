@@ -28,8 +28,9 @@
     "repeat_page_fraction": 0.3,
     "repeat_short_line_chars": 40,
     "repeat_min_pages": 2,
-    "denoise_version": "mineru-noise-v2",
-    "heading_context": "document-section-v1",
+    "denoise_version": "mineru-noise-v3",
+    "heading_context": "child-section-v2",
+    "header_footer_identity_max_chars": 12,
     "heading_hierarchy": "manual-chapters-v1",
     "manual_chapters": {
       "DOC-001": [
@@ -157,17 +158,17 @@
       "document_id": "DOC-001",
       "name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
       "category": "清洁机器人说明书",
-      "parents": 18,
-      "children": 101,
+      "parents": 19,
+      "children": 102,
       "parent_tokens": {
-        "count": 18,
-        "min": 458,
-        "p25": 805,
-        "median": 1374.5,
-        "p75": 1393,
-        "p95": 1399,
+        "count": 19,
+        "min": 469,
+        "p25": 760,
+        "median": 1332,
+        "p75": 1379,
+        "p95": 1396,
         "max": 1399,
-        "mean": 1144.44,
+        "mean": 1093.42,
         "bins": {
           "0-59": 0,
           "60-79": 0,
@@ -176,25 +177,25 @@
           "200-300": 0,
           "301-399": 0,
           "400-599": 2,
-          "600-999": 4,
-          "1000-1400": 12,
+          "600-999": 6,
+          "1000-1400": 11,
           "1401-100000": 0
         }
       },
       "child_tokens": {
-        "count": 101,
+        "count": 102,
         "min": 24,
-        "p25": 238,
-        "median": 248,
-        "p75": 255,
-        "p95": 283,
-        "max": 299,
-        "mean": 231.63,
+        "p25": 235,
+        "median": 247.0,
+        "p75": 254,
+        "p95": 275,
+        "max": 297,
+        "mean": 230,
         "bins": {
           "0-59": 2,
           "60-79": 2,
-          "80-149": 5,
-          "150-199": 8,
+          "80-149": 8,
+          "150-199": 6,
           "200-300": 84,
           "301-399": 0,
           "400-599": 0,
@@ -311,16 +312,16 @@
       "name": "宇树_B2遥控器使用说明_中文版.pdf",
       "category": "遥控器说明书",
       "parents": 6,
-      "children": 24,
+      "children": 25,
       "parent_tokens": {
         "count": 6,
         "min": 92,
         "p25": 162,
-        "median": 623.0,
-        "p75": 748,
-        "p95": 750,
-        "max": 1377,
-        "mean": 604.5,
+        "median": 680.0,
+        "p75": 760,
+        "p95": 815,
+        "max": 1393,
+        "mean": 637,
         "bins": {
           "0-59": 0,
           "60-79": 0,
@@ -328,27 +329,27 @@
           "150-199": 1,
           "200-300": 0,
           "301-399": 0,
-          "400-599": 1,
-          "600-999": 2,
+          "400-599": 0,
+          "600-999": 3,
           "1000-1400": 1,
           "1401-100000": 0
         }
       },
       "child_tokens": {
-        "count": 24,
+        "count": 25,
         "min": 29,
         "p25": 112,
-        "median": 160.0,
-        "p75": 197,
+        "median": 160,
+        "p75": 226,
         "p95": 254,
-        "max": 265,
-        "mean": 154.29,
+        "max": 262,
+        "mean": 157.68,
         "bins": {
           "0-59": 3,
           "60-79": 1,
           "80-149": 6,
-          "150-199": 8,
-          "200-300": 6,
+          "150-199": 7,
+          "200-300": 8,
           "301-399": 0,
           "400-599": 0,
           "600-999": 0,
@@ -359,14 +360,14 @@
     }
   ],
   "parent_token_distribution": {
-    "count": 39,
+    "count": 40,
     "min": 92,
     "p25": 749,
-    "median": 1089,
-    "p75": 1377,
-    "p95": 1398,
+    "median": 1014.5,
+    "p75": 1345,
+    "p95": 1393,
     "max": 1399,
-    "mean": 1001.85,
+    "mean": 986.05,
     "bins": {
       "0-59": 0,
       "60-79": 0,
@@ -374,27 +375,27 @@
       "150-199": 1,
       "200-300": 0,
       "301-399": 0,
-      "400-599": 4,
-      "600-999": 12,
-      "1000-1400": 21,
+      "400-599": 3,
+      "600-999": 15,
+      "1000-1400": 20,
       "1401-100000": 0
     }
   },
   "child_token_distribution": {
-    "count": 198,
+    "count": 200,
     "min": 24,
     "p25": 180,
     "median": 244.0,
     "p75": 254,
-    "p95": 283,
-    "max": 299,
-    "mean": 216.8,
+    "p95": 280,
+    "max": 297,
+    "mean": 216.15,
     "bins": {
       "0-59": 5,
       "60-79": 3,
-      "80-149": 22,
-      "150-199": 33,
-      "200-300": 135,
+      "80-149": 25,
+      "150-199": 30,
+      "200-300": 137,
       "301-399": 0,
       "400-599": 0,
       "600-999": 0,
@@ -411,9 +412,9 @@
       "single_child_parents": 336
     },
     "new": {
-      "parents": 39,
-      "children": 198,
-      "children_per_parent": 5.0769,
+      "parents": 40,
+      "children": 200,
+      "children_per_parent": 5.0,
       "children_under_60": 5,
       "single_child_parents": 2
     }
@@ -424,7 +425,7 @@
       "chunk_id": "DOC-003-V2-P-00001",
       "document_id": "DOC-003",
       "level_one_section": "用户须知",
-      "section_path": "宇树_B2遥控器使用说明_中文版.pdf / B2 遥控器 / 宇树_B2遥控器使用说明_中文版.pdf / Unitree / 用户须知",
+      "section_path": "用户须知",
       "token_count": 162,
       "short_chapter": true
     },
@@ -439,29 +440,29 @@
   ],
   "children_under_60": [
     {
-      "chunk_id": "DOC-001-V2-C-00055",
+      "chunk_id": "DOC-001-V2-C-00056",
       "document_id": "DOC-001",
       "token_count": 24,
       "table": true,
-      "parent_chunk_id": "DOC-001-V2-P-00010",
+      "parent_chunk_id": "DOC-001-V2-P-00011",
       "section_path": "操作元件 / 一般设置",
       "page_start": 55,
       "page_end": 55
     },
     {
-      "chunk_id": "DOC-001-V2-C-00063",
+      "chunk_id": "DOC-001-V2-C-00064",
       "document_id": "DOC-001",
       "token_count": 58,
       "table": true,
-      "parent_chunk_id": "DOC-001-V2-P-00011",
+      "parent_chunk_id": "DOC-001-V2-P-00012",
       "section_path": "操作元件 / 示教路线",
       "page_start": 61,
       "page_end": 61
     },
     {
-      "chunk_id": "DOC-003-V2-C-00010",
+      "chunk_id": "DOC-003-V2-C-00011",
       "document_id": "DOC-003",
-      "token_count": 38,
+      "token_count": 29,
       "table": true,
       "parent_chunk_id": "DOC-003-V2-P-00003",
       "section_path": "R3遥控器 / R3 遥控器基本操作",
@@ -469,7 +470,7 @@
       "page_end": 7
     },
     {
-      "chunk_id": "DOC-003-V2-C-00020",
+      "chunk_id": "DOC-003-V2-C-00021",
       "document_id": "DOC-003",
       "token_count": 29,
       "table": true,
@@ -479,7 +480,7 @@
       "page_end": 12
     },
     {
-      "chunk_id": "DOC-003-V2-C-00022",
+      "chunk_id": "DOC-003-V2-C-00023",
       "document_id": "DOC-003",
       "token_count": 40,
       "table": true,
@@ -510,7 +511,13 @@
     {
       "parent_id": "DOC-001-V2-P-00001",
       "document_id": "DOC-001",
-      "section_path": "卡赫_KIRA_B_50完整操作说明_中文版.pdf / 一般提示 / 一般提示 / 用户群体 / 一般提示 / 按规定使用",
+      "chapter": "一般提示",
+      "subsections": [
+        "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+        "用户群体",
+        "按规定使用"
+      ],
+      "section_path": "一般提示",
       "parent_preview": "59802530 (02/24)\n在您第一次使用设备之前，请先阅读原厂操作说明书并遵守\n为后续使用或者为后续的车主保管好操作说明书\n在第一次调试设备之前，请完整",
       "token_count": 630,
       "children": [
@@ -520,7 +527,12 @@
           "char_end": 264,
           "preview": "59802530 (02/24)\n在您第一次使用设备之前，请",
           "token_count": 245,
-          "section_path": "卡赫_KIRA_B_50完整操作说明_中文版.pdf / 一般提示 / 一般提示 / 用户群体"
+          "section_path": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+          "section_paths": [
+            "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "一般提示",
+            "一般提示 / 用户群体"
+          ]
         },
         {
           "child_id": "DOC-001-V2-C-00002",
@@ -528,7 +540,11 @@
           "char_end": 500,
           "preview": "本说明书面向用户群体 操作人员 和 主管\n可以通过设备触摸屏",
           "token_count": 239,
-          "section_path": "一般提示 / 用户群体 / 一般提示 / 按规定使用"
+          "section_path": "一般提示 / 用户群体",
+          "section_paths": [
+            "一般提示 / 用户群体",
+            "一般提示 / 按规定使用"
+          ]
         },
         {
           "child_id": "DOC-001-V2-C-00003",
@@ -536,258 +552,364 @@
           "char_end": 702,
           "preview": "\n本设备不适于清洁冰冻地面（例如冷库）\n该设备适用于最大水深",
           "token_count": 209,
-          "section_path": "一般提示 / 按规定使用"
+          "section_path": "一般提示 / 按规定使用",
+          "section_paths": [
+            "一般提示 / 按规定使用"
+          ]
         }
       ]
     },
     {
-      "parent_id": "DOC-004-V2-P-00004",
+      "parent_id": "DOC-004-V2-P-00003",
       "document_id": "DOC-004",
-      "section_path": "电池安全使用指引 / 电池安全使用指引 / - 推荐使用 / 电池安全使用指引 / - 充电 / 电池安全使用指引 / - 存储和运输",
-      "parent_preview": "不正确地使用，充电或存储电池包可能会导致火灾或物权和人身伤害。请务必参照如下安全说明使用电池。\n1. 每次使用之前，确保电池包有足够的电量。\n2. 在使用、移动",
-      "token_count": 1322,
+      "chapter": "电池充电",
+      "subsections": [
+        "插入式充电器",
+        "接触式充电器",
+        "电量指示",
+        "充电保护指示灯"
+      ],
+      "section_path": "电池充电",
+      "parent_preview": "1. 连接充电器到交流电源（100-240V，50/60Hz）。连接前必须确保外接电源电压与充电器额定输入电压匹配，否则会导致充电器损坏（在充电器铭牌上有标识该",
+      "token_count": 1109,
       "children": [
         {
-          "child_id": "DOC-004-V2-C-00017",
+          "child_id": "DOC-004-V2-C-00011",
           "char_start": 0,
-          "char_end": 261,
-          "preview": "不正确地使用，充电或存储电池包可能会导致火灾或物权和人身伤害",
-          "token_count": 251,
-          "section_path": "电池安全使用指引 / 电池安全使用指引 / - 推荐使用"
+          "char_end": 267,
+          "preview": "1. 连接充电器到交流电源（100-240V，50/60Hz",
+          "token_count": 243,
+          "section_path": "电池充电 / 插入式充电器",
+          "section_paths": [
+            "电池充电 / 插入式充电器"
+          ]
         },
         {
-          "child_id": "DOC-004-V2-C-00018",
-          "char_start": 221,
-          "char_end": 571,
-          "preview": "电池包内部接触到水后可能会发生短路和分解反应，引发电池包自燃",
-          "token_count": 288,
-          "section_path": "电池安全使用指引 / - 推荐使用"
+          "child_id": "DOC-004-V2-C-00012",
+          "char_start": 228,
+          "char_end": 504,
+          "preview": "\n6. 电量指示灯全部熄灭时表示电池包已充满。请取下电池包和",
+          "token_count": 249,
+          "section_path": "电池充电 / 插入式充电器",
+          "section_paths": [
+            "电池充电 / 插入式充电器",
+            "电池充电 / 接触式充电器"
+          ]
         },
         {
-          "child_id": "DOC-004-V2-C-00019",
-          "char_start": 571,
-          "char_end": 868,
-          "preview": "温度过低（低于 $-20^{\\circ}\\mathrm{C}",
-          "token_count": 261,
-          "section_path": "电池安全使用指引 / - 推荐使用"
+          "child_id": "DOC-004-V2-C-00013",
+          "char_start": 478,
+          "char_end": 639,
+          "preview": "\n交流电源\n①\n110-220V\n②\n锂电池充电器\n3. 充",
+          "token_count": 136,
+          "section_path": "电池充电 / 接触式充电器",
+          "section_paths": [
+            "电池充电 / 接触式充电器",
+            "电池充电 / 电量指示"
+          ]
         },
         {
-          "child_id": "DOC-004-V2-C-00020",
-          "char_start": 814,
-          "char_end": 1095,
-          "preview": "\n15.请勿将电池包放置于导电体平面。\n16. 禁止用任何导",
-          "token_count": 262,
-          "section_path": "电池安全使用指引 / - 推荐使用 / 电池安全使用指引 / - 充电"
+          "child_id": "DOC-004-V2-C-00014",
+          "char_start": 639,
+          "char_end": 874,
+          "preview": "充电指示灯\nLED1=；LED2=○；LED3=○；LED4",
+          "token_count": 158,
+          "section_path": "电池充电 / 电量指示",
+          "section_paths": [
+            "电池充电 / 电量指示"
+          ]
         },
         {
-          "child_id": "DOC-004-V2-C-00021",
-          "char_start": 1058,
-          "char_end": 1331,
-          "preview": "\n4. 充电时，请注意确保电池周边的环境散热良好，没有杂物等",
-          "token_count": 240,
-          "section_path": "电池安全使用指引 / - 充电"
+          "child_id": "DOC-004-V2-C-00015",
+          "char_start": 874,
+          "char_end": 1152,
+          "preview": "LED1=；LED2=○；LED3=○；LED4=○；显示=",
+          "token_count": 179,
+          "section_path": "电池充电 / 充电保护指示灯",
+          "section_paths": [
+            "电池充电 / 充电保护指示灯"
+          ]
         },
         {
-          "child_id": "DOC-004-V2-C-00022",
-          "char_start": 1283,
-          "char_end": 1484,
-          "preview": "此时，电池包处于高温状态，强制充电会对电池包寿命造成严重损害",
-          "token_count": 192,
-          "section_path": "电池安全使用指引 / - 充电 / 电池安全使用指引 / - 存储和运输"
+          "child_id": "DOC-004-V2-C-00016",
+          "char_start": 1152,
+          "char_end": 1360,
+          "preview": "\n出现故障（如电流过大，短路，电压过压或欠压，温度过高或过低",
+          "token_count": 196,
+          "section_path": "电池充电 / 充电保护指示灯",
+          "section_paths": [
+            "电池充电 / 充电保护指示灯"
+          ]
         }
       ]
     },
     {
       "parent_id": "DOC-001-V2-P-00008",
       "document_id": "DOC-001",
-      "section_path": "操作元件 / 正面 / 操作元件 / 清洁头 / 操作元件 / 背面 / 操作元件 / 控制面板 / 操作元件 / 颜色标记 / 操作元件 / 设备上的标志 / 操作元件 / 卸载 / 操作元件 / 给蓄电池充电 / 操作元件 / 断开系统与电源 / 操作元件 / 加注运行材料 / 操作元件 / 无对接站，含加注系统 / 操作元件 / 无对接站，无加注系统 / 操作元件 / 清洁剂",
-      "parent_preview": "1 进水口 2 清水加注口 3 污水浮子开关 4 浮子，涡轮机保护网\n1 粗大污染物容器的门2 粗大污染物容器\n5 污水箱冲洗系统6 污水箱盖罩7 粗大污染物滤",
-      "token_count": 1229,
+      "chapter": "快速指南",
+      "subsections": [
+        "机场",
+        "医院",
+        "设备如何辨认其环境？",
+        "该设备如何重复已示教的路线？",
+        "在清洁地面时，设备可以离墙多近？",
+        "按下紧急停机按钮会发生什么？",
+        "地图是否具备自学习功能，并补充新障碍物？",
+        "该设备是否能识别玻璃障碍物？",
+        "机器人如何与环境通信？"
+      ],
+      "section_path": "快速指南",
+      "parent_preview": "请确保智能填充 (Smart Fill) 场地内不含扁平物体（高度低于 15 cm），以便设备能够覆盖整个内部场地\n阳光直射会导致传感器和导航出现问题\n如果后方",
+      "token_count": 760,
       "children": [
         {
-          "child_id": "DOC-001-V2-C-00039",
+          "child_id": "DOC-001-V2-C-00035",
           "char_start": 0,
-          "char_end": 331,
-          "preview": "1 进水口 2 清水加注口 3 污水浮子开关 4 浮子，涡轮",
-          "token_count": 262,
-          "section_path": "操作元件 / 正面 / 操作元件 / 清洁头 / 操作元件 / 背面 / 操作元件 / 控制面板 / 操作元件 / 颜色标记 / 操作元件 / 设备上的标志"
+          "char_end": 274,
+          "preview": "请确保智能填充 (Smart Fill) 场地内不含扁平物体",
+          "token_count": 246,
+          "section_path": "快速指南 / 机场",
+          "section_paths": [
+            "快速指南 / 机场"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00040",
-          "char_start": 331,
-          "char_end": 425,
-          "preview": " | 换刷的解锁键\n | 先抬起粗大污染物容器,再将其拉出。",
-          "token_count": 71,
-          "section_path": "操作元件 / 设备上的标志"
+          "child_id": "DOC-001-V2-C-00036",
+          "char_start": 231,
+          "char_end": 498,
+          "preview": "提示\n请勿经过或紧挨着自动扶梯 电梯门，尤其是紧急出口布置清",
+          "token_count": 247,
+          "section_path": "快速指南 / 机场",
+          "section_paths": [
+            "快速指南 / 机场",
+            "快速指南 / 医院"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00041",
-          "char_start": 425,
-          "char_end": 707,
-          "preview": "\n1. 将纸箱连同加固木材从木质基座中取出\n3. 拧下两个大",
-          "token_count": 249,
-          "section_path": "操作元件 / 卸载 / 操作元件 / 给蓄电池充电"
+          "child_id": "DOC-001-V2-C-00037",
+          "char_start": 463,
+          "char_end": 722,
+          "preview": "如果后方存在坠落边缘，请遵守距离落地式窗户和护栏的极限值 1",
+          "token_count": 223,
+          "section_path": "快速指南 / 医院",
+          "section_paths": [
+            "快速指南 / 医院",
+            "快速指南 / 设备如何辨认其环境？",
+            "快速指南 / 该设备如何重复已示教的路线？",
+            "快速指南 / 在清洁地面时，设备可以离墙多近？",
+            "快速指南 / 按下紧急停机按钮会发生什么？"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00042",
-          "char_start": 657,
-          "char_end": 937,
-          "preview": "1 电源插口2 对接端口\n2. 将充电线的电源插头插入插座充",
-          "token_count": 242,
-          "section_path": "操作元件 / 给蓄电池充电 / 操作元件 / 断开系统与电源 / 操作元件 / 加注运行材料"
-        },
-        {
-          "child_id": "DOC-001-V2-C-00043",
-          "char_start": 889,
-          "char_end": 1173,
-          "preview": "4. 按下开机按钮启动设备现在系统正在启动。\n5. 重新装入",
-          "token_count": 242,
-          "section_path": "操作元件 / 断开系统与电源 / 操作元件 / 加注运行材料 / 操作元件 / 无对接站，含加注系统 / 操作元件 / 无对接站，无加注系统"
-        },
-        {
-          "child_id": "DOC-001-V2-C-00044",
-          "char_start": 1115,
-          "char_end": 1461,
-          "preview": "$\n1 软管接头\n3. 盖上污水箱盖\n4. 打开进水口\n填满",
-          "token_count": 298,
-          "section_path": "操作元件 / 无对接站，含加注系统 / 操作元件 / 无对接站，无加注系统 / 操作元件 / 清洁剂"
+          "child_id": "DOC-001-V2-C-00038",
+          "char_start": 715,
+          "char_end": 846,
+          "preview": "</sub>\n不，地图不具备自学习功能 对原始布局进行细微改",
+          "token_count": 120,
+          "section_path": "快速指南 / 按下紧急停机按钮会发生什么？",
+          "section_paths": [
+            "快速指南 / 按下紧急停机按钮会发生什么？",
+            "快速指南 / 地图是否具备自学习功能，并补充新障碍物？",
+            "快速指南 / 该设备是否能识别玻璃障碍物？",
+            "快速指南 / 机器人如何与环境通信？"
+          ]
         }
       ]
     },
     {
-      "parent_id": "DOC-002-V2-P-00008",
+      "parent_id": "DOC-002-V2-P-00007",
       "document_id": "DOC-002",
-      "section_path": "注意事项",
-      "parent_preview": "1. 关于运控切换：运控切换功能请务必确保控制机器狗先处于卧倒或阻尼模式，并且 1 米直径范围内不要有人，若因为非规范操作造成人员伤亡或财产损失的，宇树科技不承",
-      "token_count": 1249,
+      "chapter": "异常情况说明",
+      "subsections": [
+        "- 开机自检不成功",
+        "- 机器人跌倒自保护",
+        "- App 连接异常",
+        "- 如何在遥控模块失效时关闭机器人",
+        "- 机器人容易摔倒，开机无法站立",
+        "- 如何长时间待机"
+      ],
+      "section_path": "异常情况说明",
+      "parent_preview": "在使用B2四足机器人时，可能会出现机器人异常的情况。大部分异常情况是可控的（有解决方案），客户在遇到这些问题时不要慌张，详细阅读下列内容并按步骤解决问题。\n如有",
+      "token_count": 843,
       "children": [
         {
-          "child_id": "DOC-002-V2-C-00034",
+          "child_id": "DOC-002-V2-C-00030",
           "char_start": 0,
-          "char_end": 281,
-          "preview": "1. 关于运控切换：运控切换功能请务必确保控制机器狗先处于卧",
-          "token_count": 274,
-          "section_path": "注意事项"
+          "char_end": 321,
+          "preview": "在使用B2四足机器人时，可能会出现机器人异常的情况。大部分异",
+          "token_count": 289,
+          "section_path": "异常情况说明",
+          "section_paths": [
+            "异常情况说明",
+            "异常情况说明 / - 开机自检不成功",
+            "异常情况说明 / - 机器人跌倒自保护"
+          ]
         },
         {
-          "child_id": "DOC-002-V2-C-00035",
-          "char_start": 281,
-          "char_end": 560,
-          "preview": "\n4. 关于续航：机器人的综合运行续航约 4-6 小时左右，",
-          "token_count": 247,
-          "section_path": "注意事项"
+          "child_id": "DOC-002-V2-C-00031",
+          "char_start": 321,
+          "char_end": 599,
+          "preview": "\n若采用 AP 直连模式，可检查手机是否连上 B2 发出的 ",
+          "token_count": 253,
+          "section_path": "异常情况说明 / - App 连接异常",
+          "section_paths": [
+            "异常情况说明 / - App 连接异常",
+            "异常情况说明 / - 如何在遥控模块失效时关闭机器人"
+          ]
         },
         {
-          "child_id": "DOC-002-V2-C-00036",
-          "char_start": 514,
-          "char_end": 738,
-          "preview": "（机身高度较低，膝关节弯曲比较大时，电机的负担较大，故会显著",
-          "token_count": 195,
-          "section_path": "注意事项"
+          "child_id": "DOC-002-V2-C-00032",
+          "char_start": 563,
+          "char_end": 833,
+          "preview": "抬住机器人头部和尾部，短按电源开关一次，再长按电源开关3秒以",
+          "token_count": 228,
+          "section_path": "异常情况说明 / - 如何在遥控模块失效时关闭机器人",
+          "section_paths": [
+            "异常情况说明 / - 如何在遥控模块失效时关闭机器人",
+            "异常情况说明 / - 机器人容易摔倒，开机无法站立"
+          ]
         },
         {
-          "child_id": "DOC-002-V2-C-00037",
-          "char_start": 700,
-          "char_end": 1027,
-          "preview": "在遇到有起伏的地面时, 操控人员也应当小心谨慎, 并降低机器",
-          "token_count": 283,
-          "section_path": "注意事项"
-        },
-        {
-          "child_id": "DOC-002-V2-C-00038",
-          "char_start": 1027,
-          "char_end": 1222,
-          "preview": "\n8. 关于速度：在平整地形稳定操控下奔跑速度大于 $6 \\",
-          "token_count": 180,
-          "section_path": "注意事项"
-        },
-        {
-          "child_id": "DOC-002-V2-C-00039",
-          "char_start": 1222,
-          "char_end": 1397,
-          "preview": "\n10. 关于 IP67 等级防护：运行前，请先确定电池接口",
-          "token_count": 151,
-          "section_path": "注意事项"
+          "child_id": "DOC-002-V2-C-00033",
+          "char_start": 788,
+          "char_end": 948,
+          "preview": "！！\nApp 关节标定入口为 [设置] -> [数据] ->",
+          "token_count": 143,
+          "section_path": "异常情况说明 / - 机器人容易摔倒，开机无法站立",
+          "section_paths": [
+            "异常情况说明 / - 机器人容易摔倒，开机无法站立",
+            "异常情况说明 / - 如何长时间待机"
+          ]
         }
       ]
     },
     {
       "parent_id": "DOC-001-V2-P-00010",
       "document_id": "DOC-001",
-      "section_path": "操作元件 / 设置 / 操作元件 / 创建用户 / 操作元件 / 网络设置 / 操作元件 / 添加网络 / 操作元件 / 一般设置 / 操作元件 / 对接 / 操作元件 / 手动模式 / 操作元件 / 结束清洁 / 操作元件 / 自动运行 / 操作元件 / 位置码 / 操作元件 / 自动运行规定",
-      "parent_preview": "4 系统信息（工作时间<sub>、</sub>软件版本<sub>、</sub>材料编号<sub>、</sub>序列号<sub>、</sub>更新）<sub>。<",
-      "token_count": 1398,
+      "chapter": "操作元件",
+      "subsections": [
+        "清洁剂",
+        "更换清洁剂罐",
+        "装上吸水扒",
+        "调节倾斜度",
+        "调节高度",
+        "检查设备",
+        "接通设备",
+        "在触摸屏上显示操作说明书",
+        "设置"
+      ],
+      "section_path": "操作元件",
+      "parent_preview": "推荐的清洁剂：\n适用范围=所有防水地板的保养清洁；清洁剂=CA 50 CRM 756\n适用范围=保养清洁与护理组件；清洁剂=RM 746RM 780\n适用范围=",
+      "token_count": 1372,
       "children": [
         {
-          "child_id": "DOC-001-V2-C-00052",
+          "child_id": "DOC-001-V2-C-00046",
           "char_start": 0,
-          "char_end": 303,
-          "preview": "4 系统信息（工作时间<sub>、</sub>软件版本<su",
-          "token_count": 259,
-          "section_path": "操作元件 / 设置 / 操作元件 / 创建用户"
+          "char_end": 290,
+          "preview": "推荐的清洁剂：\n适用范围=所有防水地板的保养清洁；清洁剂=C",
+          "token_count": 241,
+          "section_path": "操作元件 / 清洁剂",
+          "section_paths": [
+            "操作元件 / 清洁剂"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00053",
-          "char_start": 246,
-          "char_end": 569,
-          "preview": "11. 按下“权限”按钮-\n1 确认2 “权限”按钮3 权限",
-          "token_count": 268,
-          "section_path": "操作元件 / 创建用户 / 操作元件 / 网络设置 / 操作元件 / 添加网络"
-        },
-        {
-          "child_id": "DOC-001-V2-C-00054",
-          "char_start": 516,
-          "char_end": 672,
-          "preview": "3. 输入无线接入点/路由器的 SSID4. 请选择加密方式",
-          "token_count": 136,
-          "section_path": "操作元件 / 添加网络 / 操作元件 / 一般设置"
-        },
-        {
-          "child_id": "DOC-001-V2-C-00055",
-          "char_start": 672,
-          "char_end": 704,
-          "preview": "快速模式已激活 | \n快速模式已停用 | 最大 3.6 km",
-          "token_count": 24,
-          "section_path": "操作元件 / 一般设置"
-        },
-        {
-          "child_id": "DOC-001-V2-C-00056",
-          "char_start": 704,
-          "char_end": 1011,
-          "preview": "\n对接时将设备连接到一个可选的对接站 成功对接后进行以下操作",
-          "token_count": 271,
-          "section_path": "操作元件 / 对接 / 操作元件 / 手动模式"
-        },
-        {
-          "child_id": "DOC-001-V2-C-00057",
-          "char_start": 962,
-          "char_end": 1248,
-          "preview": "1 隐藏/显示菜单项“刷子功率和抽吸功率”2 电池充电状态3",
+          "child_id": "DOC-001-V2-C-00047",
+          "char_start": 290,
+          "char_end": 584,
+          "preview": "\n1 清洁剂加注口\n填充口盖子\n3 清洁剂液位指示器\n2. ",
           "token_count": 247,
-          "section_path": "操作元件 / 手动模式 / 操作元件 / 结束清洁"
+          "section_path": "操作元件 / 清洁剂",
+          "section_paths": [
+            "操作元件 / 清洁剂",
+            "操作元件 / 更换清洁剂罐",
+            "操作元件 / 装上吸水扒"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00058",
-          "char_start": 1190,
-          "char_end": 1477,
-          "preview": "8. 将设备推到待清洁的场地上\n1. 停用清洁头和边刷\n2.",
+          "child_id": "DOC-001-V2-C-00048",
+          "char_start": 521,
+          "char_end": 811,
+          "preview": "1 吸水扒悬挂装置 2 抽吸软管 3 翼形螺钉 4 吸水扒 ",
+          "token_count": 247,
+          "section_path": "操作元件 / 装上吸水扒",
+          "section_paths": [
+            "操作元件 / 装上吸水扒",
+            "操作元件 / 调节倾斜度",
+            "操作元件 / 调节高度"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00049",
+          "char_start": 756,
+          "char_end": 1041,
+          "preview": "地面不平整：吸水扒上方 5 个垫片，下方 1 个垫片\n地面非",
           "token_count": 251,
-          "section_path": "操作元件 / 手动模式 / 操作元件 / 结束清洁 / 操作元件 / 自动运行 / 操作元件 / 位置码"
+          "section_path": "操作元件 / 调节高度",
+          "section_paths": [
+            "操作元件 / 调节高度",
+            "操作元件 / 检查设备"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00059",
-          "char_start": 1425,
-          "char_end": 1621,
-          "preview": "在不同路线中可以包含相同的 位置码\n必须将每个 位置码 固定",
-          "token_count": 166,
-          "section_path": "操作元件 / 位置码 / 操作元件 / 自动运行规定"
+          "child_id": "DOC-001-V2-C-00050",
+          "char_start": 994,
+          "char_end": 1272,
+          "preview": "请在使用前检查设备，如有任何损坏或故障，请向负责人报告\n如果",
+          "token_count": 255,
+          "section_path": "操作元件 / 检查设备",
+          "section_paths": [
+            "操作元件 / 检查设备",
+            "操作元件 / 接通设备"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00051",
+          "char_start": 1220,
+          "char_end": 1378,
+          "preview": "）\n1. 通过旋转解锁紧急停机按钮\n2. 按下启动键设备启动",
+          "token_count": 140,
+          "section_path": "操作元件 / 检查设备",
+          "section_paths": [
+            "操作元件 / 检查设备",
+            "操作元件 / 接通设备"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00052",
+          "char_start": 1343,
+          "char_end": 1614,
+          "preview": "4. 创建一个新用户资料\n5. 指定密码\n在主菜单中显示可执",
+          "token_count": 205,
+          "section_path": "操作元件 / 接通设备",
+          "section_paths": [
+            "操作元件 / 接通设备",
+            "操作元件 / 在触摸屏上显示操作说明书",
+            "操作元件 / 设置"
+          ]
         }
       ]
     },
     {
       "parent_id": "DOC-001-V2-P-00003",
       "document_id": "DOC-001",
-      "section_path": "安全提示 / 运行 / 安全提示 / 使用清洁剂运行 / 安全提示 / 蓄电池 / 安全提示 / 带旋转刷的设备 / 安全提示 / 保养和维护 / 安全提示 / 附件和备件 / 安全提示 / 运输 / 安全提示 / 安全装置 / 安全提示 / 紧急停机按钮 / 安全提示 / 安全开关 / 安全提示 / 距离传感器 / 安全提示 / 光学传感器 / 安全提示 / 对接站",
+      "chapter": "安全提示",
+      "subsections": [
+        "运行",
+        "使用清洁剂运行",
+        "蓄电池",
+        "带旋转刷的设备",
+        "保养和维护",
+        "附件和备件",
+        "运输",
+        "安全装置",
+        "紧急停机按钮",
+        "安全开关",
+        "距离传感器",
+        "光学传感器",
+        "对接站"
+      ],
+      "section_path": "安全提示",
       "parent_preview": "该设备适用于湿润到最大水深 1 cm 的潮湿地面 请勿运行到水深超过 1 cm 的区域\n注意\n处理脏水和碱液时，请遵守法律规定\n注意\n不得在室外使用该设备<su",
       "token_count": 1399,
       "children": [
@@ -797,7 +919,12 @@
           "char_end": 287,
           "preview": "该设备适用于湿润到最大水深 1 cm 的潮湿地面 请勿运行到",
           "token_count": 258,
-          "section_path": "安全提示 / 运行 / 安全提示 / 使用清洁剂运行 / 安全提示 / 蓄电池"
+          "section_path": "安全提示 / 运行",
+          "section_paths": [
+            "安全提示 / 运行",
+            "安全提示 / 使用清洁剂运行",
+            "安全提示 / 蓄电池"
+          ]
         },
         {
           "child_id": "DOC-001-V2-C-00011",
@@ -805,7 +932,10 @@
           "char_end": 570,
           "preview": "关于存放和运输的说明，请联系卡赫的客户服务部门获取\n危险\n不",
           "token_count": 265,
-          "section_path": "安全提示 / 蓄电池"
+          "section_path": "安全提示 / 蓄电池",
+          "section_paths": [
+            "安全提示 / 蓄电池"
+          ]
         },
         {
           "child_id": "DOC-001-V2-C-00012",
@@ -813,7 +943,12 @@
           "char_end": 873,
           "preview": "不要给损坏的电池充电 请卡赫客户服务部更换损坏的电池\n不要把",
           "token_count": 283,
-          "section_path": "安全提示 / 蓄电池 / 安全提示 / 带旋转刷的设备 / 安全提示 / 保养和维护"
+          "section_path": "安全提示 / 蓄电池",
+          "section_paths": [
+            "安全提示 / 蓄电池",
+            "安全提示 / 带旋转刷的设备",
+            "安全提示 / 保养和维护"
+          ]
         },
         {
           "child_id": "DOC-001-V2-C-00013",
@@ -821,7 +956,13 @@
           "char_end": 1139,
           "preview": "小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零",
           "token_count": 245,
-          "section_path": "安全提示 / 保养和维护 / 安全提示 / 附件和备件 / 安全提示 / 运输 / 安全提示 / 安全装置"
+          "section_path": "安全提示 / 保养和维护",
+          "section_paths": [
+            "安全提示 / 保养和维护",
+            "安全提示 / 附件和备件",
+            "安全提示 / 运输",
+            "安全提示 / 安全装置"
+          ]
         },
         {
           "child_id": "DOC-001-V2-C-00014",
@@ -829,7 +970,15 @@
           "char_end": 1399,
           "preview": "小心\n在运输之前请您关闭电机 在考虑到重量的情况下固定设备，",
           "token_count": 269,
-          "section_path": "安全提示 / 运输 / 安全提示 / 安全装置 / 安全提示 / 紧急停机按钮 / 安全提示 / 安全开关 / 安全提示 / 距离传感器 / 安全提示 / 光学传感器"
+          "section_path": "安全提示 / 运输",
+          "section_paths": [
+            "安全提示 / 运输",
+            "安全提示 / 安全装置",
+            "安全提示 / 紧急停机按钮",
+            "安全提示 / 安全开关",
+            "安全提示 / 距离传感器",
+            "安全提示 / 光学传感器"
+          ]
         },
         {
           "child_id": "DOC-001-V2-C-00015",
@@ -837,274 +986,398 @@
           "char_end": 1536,
           "preview": "光学传感器检测障碍物，并使设备绕过障碍物 光学传感器符合 I",
           "token_count": 168,
-          "section_path": "安全提示 / 光学传感器 / 安全提示 / 对接站"
+          "section_path": "安全提示 / 光学传感器",
+          "section_paths": [
+            "安全提示 / 光学传感器",
+            "安全提示 / 对接站"
+          ]
         }
       ]
     },
     {
       "parent_id": "DOC-001-V2-P-00009",
       "document_id": "DOC-001",
-      "section_path": "操作元件 / 清洁剂 / 操作元件 / 更换清洁剂罐 / 操作元件 / 装上吸水扒 / 操作元件 / 调节倾斜度 / 操作元件 / 调节高度 / 操作元件 / 检查设备 / 操作元件 / 接通设备 / 操作元件 / 在触摸屏上显示操作说明书 / 操作元件 / 设置",
-      "parent_preview": "推荐的清洁剂：\n适用范围=所有防水地板的保养清洁；清洁剂=CA 50 CRM 756\n适用范围=保养清洁与护理组件；清洁剂=RM 746RM 780\n适用范围=",
-      "token_count": 1370,
+      "chapter": "操作元件",
+      "subsections": [
+        "正面",
+        "清洁头",
+        "背面",
+        "控制面板",
+        "颜色标记",
+        "设备上的标志",
+        "卸载",
+        "给蓄电池充电",
+        "断开系统与电源",
+        "下载操作说明书",
+        "加注运行材料",
+        "无对接站，含加注系统",
+        "无对接站，无加注系统",
+        "清洁剂"
+      ],
+      "section_path": "操作元件",
+      "parent_preview": "1 进水口 2 清水加注口 3 污水浮子开关 4 浮子，涡轮机保护网\n1 粗大污染物容器的门2 粗大污染物容器\n5 污水箱冲洗系统6 污水箱盖罩7 粗大污染物滤",
+      "token_count": 1319,
       "children": [
         {
-          "child_id": "DOC-001-V2-C-00045",
+          "child_id": "DOC-001-V2-C-00039",
           "char_start": 0,
-          "char_end": 290,
-          "preview": "推荐的清洁剂：\n适用范围=所有防水地板的保养清洁；清洁剂=C",
-          "token_count": 241,
-          "section_path": "操作元件 / 清洁剂"
+          "char_end": 331,
+          "preview": "1 进水口 2 清水加注口 3 污水浮子开关 4 浮子，涡轮",
+          "token_count": 262,
+          "section_path": "操作元件 / 正面",
+          "section_paths": [
+            "操作元件 / 正面",
+            "操作元件 / 清洁头",
+            "操作元件 / 背面",
+            "操作元件 / 控制面板",
+            "操作元件 / 颜色标记",
+            "操作元件 / 设备上的标志"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00046",
-          "char_start": 290,
-          "char_end": 584,
-          "preview": "\n1 清洁剂加注口\n填充口盖子\n3 清洁剂液位指示器\n2. ",
+          "child_id": "DOC-001-V2-C-00040",
+          "char_start": 331,
+          "char_end": 425,
+          "preview": " | 换刷的解锁键\n | 先抬起粗大污染物容器,再将其拉出。",
+          "token_count": 71,
+          "section_path": "操作元件 / 设备上的标志",
+          "section_paths": [
+            "操作元件 / 设备上的标志"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00041",
+          "char_start": 425,
+          "char_end": 708,
+          "preview": "\n1. 将纸箱连同加固木材从木质基座中取出\n3. 拧下两个大",
           "token_count": 247,
-          "section_path": "操作元件 / 清洁剂 / 操作元件 / 更换清洁剂罐 / 操作元件 / 装上吸水扒"
+          "section_path": "操作元件 / 卸载",
+          "section_paths": [
+            "操作元件 / 卸载",
+            "操作元件 / 给蓄电池充电"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00047",
-          "char_start": 521,
-          "char_end": 811,
-          "preview": "1 吸水扒悬挂装置 2 抽吸软管 3 翼形螺钉 4 吸水扒 ",
-          "token_count": 247,
-          "section_path": "操作元件 / 装上吸水扒 / 操作元件 / 调节倾斜度 / 操作元件 / 调节高度"
+          "child_id": "DOC-001-V2-C-00042",
+          "char_start": 670,
+          "char_end": 947,
+          "preview": "1 电源插口2 对接端口\n2. 将充电线的电源插头插入插座充",
+          "token_count": 240,
+          "section_path": "操作元件 / 给蓄电池充电",
+          "section_paths": [
+            "操作元件 / 给蓄电池充电",
+            "操作元件 / 断开系统与电源"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00048",
-          "char_start": 756,
-          "char_end": 1041,
-          "preview": "地面不平整：吸水扒上方 5 个垫片，下方 1 个垫片\n地面非",
-          "token_count": 251,
-          "section_path": "操作元件 / 调节高度 / 操作元件 / 检查设备"
+          "child_id": "DOC-001-V2-C-00043",
+          "char_start": 879,
+          "char_end": 1146,
+          "preview": "\n3. 长按 RESET 按钮大约 10 秒\n4. 按下开机",
+          "token_count": 239,
+          "section_path": "操作元件 / 断开系统与电源",
+          "section_paths": [
+            "操作元件 / 断开系统与电源",
+            "操作元件 / 下载操作说明书",
+            "操作元件 / 加注运行材料",
+            "操作元件 / 无对接站，含加注系统"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00049",
-          "char_start": 994,
-          "char_end": 1272,
-          "preview": "请在使用前检查设备，如有任何损坏或故障，请向负责人报告\n如果",
-          "token_count": 255,
-          "section_path": "操作元件 / 检查设备 / 操作元件 / 接通设备"
+          "child_id": "DOC-001-V2-C-00044",
+          "char_start": 1136,
+          "char_end": 1444,
+          "preview": "向上翻转污水箱盖子\n2. 将进水软管连接到设备的软管接头上 ",
+          "token_count": 249,
+          "section_path": "操作元件 / 无对接站，含加注系统",
+          "section_paths": [
+            "操作元件 / 无对接站，含加注系统",
+            "操作元件 / 无对接站，无加注系统",
+            "操作元件 / 清洁剂"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00050",
-          "char_start": 1220,
-          "char_end": 1375,
-          "preview": "）\n1. 通过旋转解锁紧急停机按钮\n2. 按下启动键设备启动",
-          "token_count": 138,
-          "section_path": "操作元件 / 检查设备 / 操作元件 / 接通设备"
-        },
-        {
-          "child_id": "DOC-001-V2-C-00051",
-          "char_start": 1340,
-          "char_end": 1611,
-          "preview": "4. 创建一个新用户资料\n5. 指定密码\n在主菜单中显示可执",
-          "token_count": 205,
-          "section_path": "操作元件 / 接通设备 / 操作元件 / 在触摸屏上显示操作说明书 / 操作元件 / 设置"
+          "child_id": "DOC-001-V2-C-00045",
+          "char_start": 1404,
+          "char_end": 1558,
+          "preview": "$\n1 加注口\n3. 打开进水口\n4. 观察液位，在填满清水",
+          "token_count": 136,
+          "section_path": "操作元件 / 无对接站，无加注系统",
+          "section_paths": [
+            "操作元件 / 无对接站，无加注系统",
+            "操作元件 / 清洁剂"
+          ]
         }
       ]
     },
     {
       "parent_id": "DOC-003-V2-P-00004",
       "document_id": "DOC-003",
-      "section_path": "R1遥控器 / 简介 / R1遥控器 / 部件名称 / R1遥控器 / 技术规格 / R1遥控器 / 遥控器摇杆校准 / R1遥控器 / 开启/关闭遥控器 / R1遥控器 / 遥控器充电",
+      "chapter": "R1遥控器",
+      "subsections": [
+        "简介",
+        "部件名称",
+        "技术规格",
+        "遥控器摇杆校准",
+        "开启/关闭遥控器",
+        "遥控器充电"
+      ],
+      "section_path": "R1遥控器",
       "parent_preview": "遥控器属于 B2 遥控模块的一部分，遥控手柄内置数传模块、蓝牙模块。机器人与遥控器可以通过 Unitree Explore App 进行绑定，绑定成功后开机即可",
-      "token_count": 748,
+      "token_count": 760,
       "children": [
         {
-          "child_id": "DOC-003-V2-C-00014",
+          "child_id": "DOC-003-V2-C-00015",
           "char_start": 0,
           "char_end": 310,
           "preview": "遥控器属于 B2 遥控模块的一部分，遥控手柄内置数传模块、蓝",
           "token_count": 254,
-          "section_path": "R1遥控器 / 简介 / R1遥控器 / 部件名称"
+          "section_path": "R1遥控器 / 简介",
+          "section_paths": [
+            "R1遥控器 / 简介",
+            "R1遥控器 / 部件名称"
+          ]
         },
         {
-          "child_id": "DOC-003-V2-C-00015",
+          "child_id": "DOC-003-V2-C-00016",
           "char_start": 310,
           "char_end": 440,
           "preview": "参数=充电电压；规格=5.0V；备注=\n参数=充电电流；规格",
           "token_count": 114,
-          "section_path": "R1遥控器 / 技术规格"
-        },
-        {
-          "child_id": "DOC-003-V2-C-00016",
-          "char_start": 440,
-          "char_end": 724,
-          "preview": "\n手持遥控但不要触碰摇杆，按下遥控上按键 F1 和 F3 并",
-          "token_count": 265,
-          "section_path": "R1遥控器 / 遥控器摇杆校准 / R1遥控器 / 开启/关闭遥控器"
+          "section_path": "R1遥控器 / 技术规格",
+          "section_paths": [
+            "R1遥控器 / 技术规格"
+          ]
         },
         {
           "child_id": "DOC-003-V2-C-00017",
-          "char_start": 724,
-          "char_end": 863,
-          "preview": "\n当遥控器电量指示灯显示低电量时，应将遥控器连接充电器，如下",
-          "token_count": 115,
-          "section_path": "R1遥控器 / 遥控器充电"
+          "char_start": 440,
+          "char_end": 690,
+          "preview": "\n© 2024 宇树科技 版权所有 9\n手持遥控但不要触碰摇",
+          "token_count": 226,
+          "section_path": "R1遥控器 / 技术规格",
+          "section_paths": [
+            "R1遥控器 / 技术规格",
+            "R1遥控器 / 遥控器摇杆校准",
+            "R1遥控器 / 开启/关闭遥控器"
+          ]
+        },
+        {
+          "child_id": "DOC-003-V2-C-00018",
+          "char_start": 642,
+          "char_end": 882,
+          "preview": "\n\\- 开启遥控器：短按电源按键一次，再长按电源按键2秒以上",
+          "token_count": 212,
+          "section_path": "R1遥控器 / 开启/关闭遥控器",
+          "section_paths": [
+            "R1遥控器 / 开启/关闭遥控器",
+            "R1遥控器 / 遥控器充电"
+          ]
         }
       ]
     },
     {
-      "parent_id": "DOC-001-V2-P-00018",
+      "parent_id": "DOC-001-V2-P-00015",
       "document_id": "DOC-001",
-      "section_path": "技术参数 / 技术参数 / 内置充电器 / 技术参数 / 环境条件 / 技术参数 / 欧盟一致性声明 / 技术参数 / THANK YOU! MERCI! DANKE! GRACIAS! / 技术参数 / www.kaercher.com/welcome",
-      "parent_preview": "Allgemein\n行驶速度,自动(最大) | 4,3 km/h\n行驶速度,手动(最大) | 5,5 km/h\n理论清洁面积效率,自动 | 2365 m2/h\n",
-      "token_count": 1349,
+      "chapter": "保养和维护",
+      "subsections": [
+        "维护间隔",
+        "在每次运行之后",
+        "每周",
+        "每月一次",
+        "每年一次",
+        "以动画形式呈现的维护工作",
+        "清洁涡轮机保护网",
+        "清洗粗大污染物滤网",
+        "清洗清水过滤器",
+        "清洁吸水扒",
+        "更换或翻转吸水胶条",
+        "清空粗大污染物容器",
+        "冲洗污水箱，结合冲洗系统"
+      ],
+      "section_path": "保养和维护",
+      "parent_preview": "危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头\n注意\n损坏危险\n不得用水喷射本设备 不得使用腐蚀性",
+      "token_count": 1392,
       "children": [
         {
-          "child_id": "DOC-001-V2-C-00096",
+          "child_id": "DOC-001-V2-C-00076",
           "char_start": 0,
-          "char_end": 389,
-          "preview": "Allgemein\n行驶速度,自动(最大) | 4,3 km",
-          "token_count": 258,
-          "section_path": "技术参数"
+          "char_end": 291,
+          "preview": "危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任",
+          "token_count": 259,
+          "section_path": "保养和维护",
+          "section_paths": [
+            "保养和维护",
+            "保养和维护 / 维护间隔",
+            "保养和维护 / 在每次运行之后"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00097",
-          "char_start": 389,
-          "char_end": 845,
-          "preview": "轮胎\n前轮宽度 | 32 mm\n前轮直径 | 100 mm\n",
-          "token_count": 291,
-          "section_path": "技术参数"
+          "child_id": "DOC-001-V2-C-00077",
+          "char_start": 239,
+          "char_end": 523,
+          "preview": "8. 清洗清洁头上的分水条\n9. 清洁吸水扒中的吸水胶条，检",
+          "token_count": 254,
+          "section_path": "保养和维护 / 在每次运行之后",
+          "section_paths": [
+            "保养和维护 / 在每次运行之后",
+            "保养和维护 / 每周",
+            "保养和维护 / 每月一次"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00098",
-          "char_start": 845,
-          "char_end": 1229,
-          "preview": "\n刷子转速 1350 1/min\n额定电压 100...24",
+          "child_id": "DOC-001-V2-C-00078",
+          "char_start": 472,
+          "char_end": 755,
+          "preview": "2. ## 定期使用时，至少每周给蓄电池完全充电一次并且没有",
           "token_count": 252,
-          "section_path": "技术参数 / 技术参数 / 内置充电器 / 技术参数 / 环境条件"
+          "section_path": "保养和维护 / 每周",
+          "section_paths": [
+            "保养和维护 / 每周",
+            "保养和维护 / 每月一次",
+            "保养和维护 / 每年一次",
+            "保养和维护 / 以动画形式呈现的维护工作",
+            "保养和维护 / 清洁涡轮机保护网"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00099",
-          "char_start": 1169,
-          "char_end": 1559,
-          "preview": "不确定度 K <sub>pA</sub> 2 dB(A)\n声",
-          "token_count": 248,
-          "section_path": "技术参数 / 环境条件 / 技术参数 / 欧盟一致性声明"
+          "child_id": "DOC-001-V2-C-00079",
+          "char_start": 706,
+          "char_end": 998,
+          "preview": "4. 利用方向键调用动画的各个步骤\n1. 打开污水箱盖罩\n2",
+          "token_count": 254,
+          "section_path": "保养和维护 / 以动画形式呈现的维护工作",
+          "section_paths": [
+            "保养和维护 / 以动画形式呈现的维护工作",
+            "保养和维护 / 清洁涡轮机保护网",
+            "保养和维护 / 清洗粗大污染物滤网",
+            "保养和维护 / 清洗清水过滤器"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00100",
-          "char_start": 1451,
-          "char_end": 2080,
-          "preview": "EN 62311: 2008\nEN 55012: 2007 ",
-          "token_count": 244,
-          "section_path": "技术参数 / 欧盟一致性声明 / 技术参数 / THANK YOU! MERCI! DANKE! GRACIAS!"
+          "child_id": "DOC-001-V2-C-00080",
+          "char_start": 960,
+          "char_end": 1259,
+          "preview": "4. 将粗大污染物滤网装入污水箱中\n1. 排干清水（参见“排",
+          "token_count": 256,
+          "section_path": "保养和维护 / 清洗粗大污染物滤网",
+          "section_paths": [
+            "保养和维护 / 清洗粗大污染物滤网",
+            "保养和维护 / 清洗清水过滤器",
+            "保养和维护 / 清洁吸水扒",
+            "保养和维护 / 更换或翻转吸水胶条"
+          ]
         },
         {
-          "child_id": "DOC-001-V2-C-00101",
-          "char_start": 1942,
-          "char_end": 2549,
-          "preview": "电话：+49 7195 14-0\n传真：+49 7195 1",
-          "token_count": 187,
-          "section_path": "技术参数 / 欧盟一致性声明 / 技术参数 / THANK YOU! MERCI! DANKE! GRACIAS! / 技术参数 / www.kaercher.com/welcome"
+          "child_id": "DOC-001-V2-C-00081",
+          "char_start": 1211,
+          "char_end": 1491,
+          "preview": "7. 拧紧两个翼型螺钉\n8. 将抽吸软管连接吸水扒\n当吸水胶",
+          "token_count": 241,
+          "section_path": "保养和维护 / 清洁吸水扒",
+          "section_paths": [
+            "保养和维护 / 清洁吸水扒",
+            "保养和维护 / 更换或翻转吸水胶条",
+            "保养和维护 / 清空粗大污染物容器"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00082",
+          "char_start": 1445,
+          "char_end": 1587,
+          "preview": "3. 清空粗大污染物容器，必要时清洁\n4. 重新装入粗大污染",
+          "token_count": 127,
+          "section_path": "保养和维护 / 清空粗大污染物容器",
+          "section_paths": [
+            "保养和维护 / 清空粗大污染物容器",
+            "保养和维护 / 冲洗污水箱，结合冲洗系统"
+          ]
         }
       ]
     },
     {
-      "parent_id": "DOC-004-V2-P-00005",
-      "document_id": "DOC-004",
-      "section_path": "电池安全使用指引 / - 存储和运输 / 电池安全使用指引 / - 保养 / 电池安全使用指引 / - 废弃",
-      "parent_preview": "2. 禁止将电池包放在靠近热源的地方，比如阳光直射或热天的车内、火源或加热炉。电池包理想保存温度为 $20^{\\circ}$ C- $25^{\\circ}$ C",
-      "token_count": 578,
+      "parent_id": "DOC-002-V2-P-00004",
+      "document_id": "DOC-002",
+      "chapter": "如何充电",
+      "subsections": [
+        "电池充电",
+        "遥控器充电"
+      ],
+      "section_path": "如何充电",
+      "parent_preview": "由于运输和储存过程中电池自耗等原因，首次使用时电量偏低或电量为空属于正常现象，按照以下方式充电即可。\n① 将电池从 B2 机身中取出（向外拉出电池包提带）\n② ",
+      "token_count": 677,
       "children": [
         {
-          "child_id": "DOC-004-V2-C-00023",
+          "child_id": "DOC-002-V2-C-00015",
           "char_start": 0,
-          "char_end": 267,
-          "preview": "2. 禁止将电池包放在靠近热源的地方，比如阳光直射或热天的车",
-          "token_count": 244,
-          "section_path": "电池安全使用指引 / - 存储和运输"
+          "char_end": 292,
+          "preview": "由于运输和储存过程中电池自耗等原因，首次使用时电量偏低或电量",
+          "token_count": 253,
+          "section_path": "如何充电",
+          "section_paths": [
+            "如何充电",
+            "如何充电 / 电池充电"
+          ]
         },
         {
-          "child_id": "DOC-004-V2-C-00024",
-          "char_start": 251,
-          "char_end": 512,
-          "preview": "\n7. 切勿运输有破损的电池包。一旦需要运输电池包，务必将电",
-          "token_count": 235,
-          "section_path": "电池安全使用指引 / - 存储和运输 / 电池安全使用指引 / - 保养"
+          "child_id": "DOC-002-V2-C-00016",
+          "char_start": 256,
+          "char_end": 552,
+          "preview": "\n3. 给电池充电前，请确保电池包处于关闭状态，否则会损坏电",
+          "token_count": 265,
+          "section_path": "如何充电 / 电池充电",
+          "section_paths": [
+            "如何充电 / 电池充电",
+            "如何充电 / 遥控器充电"
+          ]
         },
         {
-          "child_id": "DOC-004-V2-C-00025",
-          "char_start": 500,
-          "char_end": 626,
-          "preview": "以免电池过放而损坏电池。\n鼓包、跌落、进水、破损等损坏的电池",
-          "token_count": 125,
-          "section_path": "电池安全使用指引 / - 保养 / 电池安全使用指引 / - 废弃"
+          "child_id": "DOC-002-V2-C-00017",
+          "char_start": 496,
+          "char_end": 669,
+          "preview": "1. 请使用官方USB充电器。如不使用官方充电器，推荐使用符",
+          "token_count": 146,
+          "section_path": "如何充电 / 遥控器充电",
+          "section_paths": [
+            "如何充电 / 遥控器充电"
+          ]
+        },
+        {
+          "child_id": "DOC-002-V2-C-00018",
+          "char_start": 669,
+          "char_end": 822,
+          "preview": "充电指示灯\nLED1=；LED2=；LED3=；LED4=；",
+          "token_count": 93,
+          "section_path": "如何充电 / 遥控器充电",
+          "section_paths": [
+            "如何充电 / 遥控器充电"
+          ]
         }
       ]
     }
   ],
   "denoise": {
-    "parser_footer": {
-      "count": 47,
-      "examples": [
-        {
-          "document_id": "DOC-001",
-          "page": 18,
-          "text": "若要记录新路线，请点击自动菜单中的“新路线” 在设备扫描位置代码后，屏幕上会显示示教菜单",
-          "reason": "parser_footer"
-        },
-        {
-          "document_id": "DOC-001",
-          "page": 36,
-          "text": "1 2",
-          "reason": "parser_footer"
-        },
-        {
-          "document_id": "DOC-001",
-          "page": 36,
-          "text": "充电线设备舱的门",
-          "reason": "parser_footer"
-        }
-      ]
-    },
-    "parser_header": {
-      "count": 20,
+    "header_footer_identity": {
+      "count": 1,
       "examples": [
         {
           "document_id": "DOC-001",
           "page": 1,
           "text": "KIRA B 50",
-          "reason": "parser_header"
-        },
-        {
-          "document_id": "DOC-001",
-          "page": 14,
-          "text": "X",
-          "reason": "parser_header"
-        },
-        {
-          "document_id": "DOC-001",
-          "page": 14,
-          "text": "请勿将电池扔进垃圾桶",
-          "reason": "parser_header"
+          "reason": "header_footer_identity",
+          "parser_type": "header"
         }
       ]
     },
-    "parser_page_footnote": {
-      "count": 5,
+    "page_number_content": {
+      "count": 1,
       "examples": [
         {
-          "document_id": "DOC-003",
-          "page": 6,
-          "text": "- 摇杆回中/中位：遥控器的摇杆处于中间位置。",
-          "reason": "parser_page_footnote"
-        },
-        {
-          "document_id": "DOC-003",
-          "page": 6,
-          "text": "- 摇杆杆量：遥控器摇杆偏离摇杆中位的偏移量。",
-          "reason": "parser_page_footnote"
-        },
-        {
-          "document_id": "DOC-003",
-          "page": 6,
-          "text": "- 墙面、门等阻挡物会极大削弱机器狗和遥控模块之间的信号，请务必在空旷的场地操作机器狗。",
-          "reason": "parser_page_footnote"
+          "document_id": "DOC-001",
+          "page": 54,
+          "text": "1",
+          "reason": "page_number_content",
+          "parser_type": "footer"
         }
       ]
     },
@@ -1115,19 +1388,48 @@
           "document_id": "DOC-001",
           "page": 1,
           "text": "ZH",
-          "reason": "parser_page_number"
+          "reason": "parser_page_number",
+          "parser_type": "page_number"
         },
         {
           "document_id": "DOC-001",
           "page": 1,
           "text": "",
-          "reason": "parser_page_number"
+          "reason": "parser_page_number",
+          "parser_type": "page_number"
         },
         {
           "document_id": "DOC-001",
           "page": 2,
           "text": "",
-          "reason": "parser_page_number"
+          "reason": "parser_page_number",
+          "parser_type": "page_number"
+        }
+      ]
+    },
+    "repeated_short_line": {
+      "count": 47,
+      "examples": [
+        {
+          "document_id": "DOC-002",
+          "page": 3,
+          "text": "© 2023 宇树科技 版权所有",
+          "reason": "repeated_short_line",
+          "parser_type": "footer"
+        },
+        {
+          "document_id": "DOC-002",
+          "page": 4,
+          "text": "© 2023 宇树科技 版权所有",
+          "reason": "repeated_short_line",
+          "parser_type": "footer"
+        },
+        {
+          "document_id": "DOC-002",
+          "page": 6,
+          "text": "© 2023 宇树科技 版权所有",
+          "reason": "repeated_short_line",
+          "parser_type": "footer"
         }
       ]
     },
@@ -1138,7 +1440,8 @@
           "document_id": "DOC-001",
           "page": 39,
           "text": "+",
-          "reason": "symbols_only"
+          "reason": "symbols_only",
+          "parser_type": "text"
         }
       ]
     },
@@ -1149,29 +1452,377 @@
           "document_id": "DOC-002",
           "page": 2,
           "text": "目录",
-          "reason": "table_of_contents"
+          "reason": "table_of_contents",
+          "parser_type": "text"
         },
         {
           "document_id": "DOC-002",
           "page": 2,
           "text": "免责申明....2\n安全须知....3\n产品概述....4\n简介....4\n部件名称....4\n功能亮点....5\n接口说明....6\n如何充电....7\n电池充电....7\n遥控器充电....8\n使",
-          "reason": "table_of_contents"
+          "reason": "table_of_contents",
+          "parser_type": "text"
         }
       ]
     }
   },
+  "discarded_header_footer": [
+    {
+      "document_id": "DOC-001",
+      "page": 1,
+      "text": "KIRA B 50",
+      "reason": "header_footer_identity",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-001",
+      "page": 54,
+      "text": "1",
+      "reason": "page_number_content",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 3,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 4,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 6,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 7,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 8,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 9,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 10,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 11,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 12,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 13,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 14,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 15,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 16,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 17,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 18,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 19,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 2,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 2,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 3,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 4,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 4,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 6,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 6,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 7,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 8,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 8,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 9,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 10,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 10,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 11,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 12,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 12,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 2,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 3,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 4,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 5,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 6,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 7,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 7,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 8,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 9,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 10,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 11,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 11,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 12,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 13,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 13,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    }
+  ],
   "golden_evidence": {
     "dataset_id": "GD-20261104115533",
     "snapshot_sha256": "d49ad3560c36f09be4222d8e684689a95b714dc08209325ecd9e3190a6d9d8c3",
+    "matching_rule": "normalized-literal-v1",
     "all_source_quotes_exact": false,
     "question_count": 50,
     "statuses": {
-      "exact": 32,
-      "missing": 4,
+      "exact": 35,
+      "missing": 1,
       "no_source_quote": 14
     },
     "quote_count": 63,
-    "exact_quotes": 57,
+    "exact_quotes": 62,
     "questions": [
       {
         "question_id": "CSV-20261101100758945425-01",
@@ -1185,21 +1836,28 @@
             "old_chunk_id": "DOC-001-C-00138",
             "old_parent_id": "DOC-001-P-00137",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00054"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "3bdff4950efe037ce75c287c957ab6f17dbde26269680adf06d7dd349f974f87"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
+                "parent_id": "DOC-001-V2-P-00011",
                 "char_start": 570,
                 "char_end": 591,
                 "child_ids": [
-                  "DOC-001-V2-C-00054"
+                  "DOC-001-V2-C-00055"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00055"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1209,21 +1867,28 @@
             "old_chunk_id": "DOC-001-C-00138",
             "old_parent_id": "DOC-001-P-00137",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00054"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0124e33663045057e850eadcd39398c7369e95d54e9d0e204b39c70112212d06"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
-                "char_start": 635,
-                "char_end": 651,
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 644,
+                "char_end": 660,
                 "child_ids": [
-                  "DOC-001-V2-C-00054"
+                  "DOC-001-V2-C-00055"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00055"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1240,21 +1905,28 @@
             "old_chunk_id": "DOC-001-C-00134",
             "old_parent_id": "DOC-001-P-00133",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00052"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "fa6f67c4027d1bb43bb53cffc0ac2bf3fa91f75c86809d3421f16285d676da25"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
+                "parent_id": "DOC-001-V2-P-00011",
                 "char_start": 86,
                 "char_end": 105,
                 "child_ids": [
-                  "DOC-001-V2-C-00052"
+                  "DOC-001-V2-C-00053"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00053"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1262,7 +1934,7 @@
       {
         "question_id": "CSV-20261101100758945425-03",
         "display_id": "Q03",
-        "status": "missing",
+        "status": "exact",
         "quotes": [
           {
             "quote_sha256": "989e5b579b1c0324dccb40f8069dad07801cadb0938e65652376ce4f664e4bd5",
@@ -1271,10 +1943,29 @@
             "old_chunk_id": "DOC-001-C-00134",
             "old_parent_id": "DOC-001-P-00133",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": false,
-            "direct_child_ids": [],
-            "parent_spans": [],
-            "reason": "原文含已去除的页码或页眉等噪声；逐字匹配不成立"
+            "normalization": {
+              "removed_private_use_count": 1,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "fa9a5f0c7408a2d4c770e18e860622183f532c2b312cd2549dbfbe2d52d8b6a9"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 106,
+                "char_end": 166,
+                "child_ids": [
+                  "DOC-001-V2-C-00053"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00053"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
           },
           {
             "quote_sha256": "617df092454263fbfc612555715fafc0f116506594f1d822c0c144b6ffef80df",
@@ -1283,21 +1974,28 @@
             "old_chunk_id": "DOC-001-C-00134",
             "old_parent_id": "DOC-001-P-00133",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00052"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0c9496e249128bda7316f56fc1c39544d0d2645d27a7027a0caf2af805ba4dc5"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
+                "parent_id": "DOC-001-V2-P-00011",
                 "char_start": 167,
                 "char_end": 234,
                 "child_ids": [
-                  "DOC-001-V2-C-00052"
+                  "DOC-001-V2-C-00053"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00053"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1307,22 +2005,29 @@
             "old_chunk_id": "DOC-001-C-00134",
             "old_parent_id": "DOC-001-P-00133",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00053"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "2cb6c87cf0ea4ea1e36ae2edf1b3cb9c761e66d0dc0037fb141ecd6102ada41b"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
+                "parent_id": "DOC-001-V2-P-00011",
                 "char_start": 246,
                 "char_end": 331,
                 "child_ids": [
-                  "DOC-001-V2-C-00052",
-                  "DOC-001-V2-C-00053"
+                  "DOC-001-V2-C-00053",
+                  "DOC-001-V2-C-00054"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00054"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1339,21 +2044,28 @@
             "old_chunk_id": "DOC-001-C-00180",
             "old_parent_id": "DOC-001-P-00178",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00074"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "4fe7dccaeb73de7489910303290def352639b7a64e543b75f20c691fe313e02f"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00013",
-                "char_start": 913,
-                "char_end": 921,
+                "parent_id": "DOC-001-V2-P-00014",
+                "char_start": 936,
+                "char_end": 944,
                 "child_ids": [
-                  "DOC-001-V2-C-00074"
+                  "DOC-001-V2-C-00075"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00075"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1363,21 +2075,28 @@
             "old_chunk_id": "DOC-001-C-00185",
             "old_parent_id": "DOC-001-P-00183",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00077"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "09e5c7f836a44075aa52b2615ef02c0365fed8fb3fed7b5b9d2f024c68788453"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00014",
+                "parent_id": "DOC-001-V2-P-00015",
                 "char_start": 571,
                 "char_end": 615,
                 "child_ids": [
-                  "DOC-001-V2-C-00077"
+                  "DOC-001-V2-C-00078"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00078"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1394,11 +2113,13 @@
             "old_chunk_id": "DOC-001-C-00010",
             "old_parent_id": "DOC-001-P-00010",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00004",
-              "DOC-001-V2-C-00005"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "3efef902a65dedec8a770e0f44a99333f27cdd4c47b08b761f110137c234ae31"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-001-V2-P-00002",
@@ -1411,6 +2132,11 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00004",
+              "DOC-001-V2-C-00005"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1427,21 +2153,28 @@
             "old_chunk_id": "DOC-001-C-00181",
             "old_parent_id": "DOC-001-P-00179",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00075"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "1f98977c87bd9cfe0c8026cbcc9b2be80d1a844c10c96f715545498c86715896"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00014",
+                "parent_id": "DOC-001-V2-P-00015",
                 "char_start": 26,
                 "char_end": 54,
                 "child_ids": [
-                  "DOC-001-V2-C-00075"
+                  "DOC-001-V2-C-00076"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00076"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1451,21 +2184,28 @@
             "old_chunk_id": "DOC-001-C-00204",
             "old_parent_id": "DOC-001-P-00202",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00085"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "1ec97889b9427a993e0565a601d76eda36f3ad37729cb9a8003e71c499d140ec"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00015",
+                "parent_id": "DOC-001-V2-P-00016",
                 "char_start": 862,
                 "char_end": 885,
                 "child_ids": [
-                  "DOC-001-V2-C-00085"
+                  "DOC-001-V2-C-00086"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00086"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1475,10 +2215,13 @@
             "old_chunk_id": "DOC-001-C-00017",
             "old_parent_id": "DOC-001-P-00017",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00006"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "5797d93027a255748396fd6acf2e305f6b78eb5a55403aba5feab5d27ad3ebe5"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-001-V2-P-00002",
@@ -1490,6 +2233,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00006"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1506,21 +2253,28 @@
             "old_chunk_id": "DOC-001-C-00181",
             "old_parent_id": "DOC-001-P-00179",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00075"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "1f98977c87bd9cfe0c8026cbcc9b2be80d1a844c10c96f715545498c86715896"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00014",
+                "parent_id": "DOC-001-V2-P-00015",
                 "char_start": 26,
                 "char_end": 54,
                 "child_ids": [
-                  "DOC-001-V2-C-00075"
+                  "DOC-001-V2-C-00076"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00076"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1530,10 +2284,17 @@
             "old_chunk_id": "DOC-001-C-00191",
             "old_parent_id": "DOC-001-P-00189",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": false,
-            "direct_child_ids": [],
+            "normalization": {
+              "removed_private_use_count": 1,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "a1165deaa5aa19956f22a157b062a438e6962442f9677b58abbcd57fbd648d24"
+            },
             "parent_spans": [],
-            "reason": "原文含已去除的页码或页眉等噪声；逐字匹配不成立"
+            "direct_child_ids": [],
+            "exact_in_child_or_contiguous_children": false,
+            "reason": "规范化后原文未逐字命中连续Child，或移除的标题未出现在命中Child路径中"
           }
         ]
       },
@@ -1549,10 +2310,13 @@
             "old_chunk_id": "DOC-004-C-00034",
             "old_parent_id": "DOC-004-P-00029",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-004-V2-C-00029"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "697d17a90ebb0e74351efd4b8f338b1d8d06086c90f32b003d891fe592defcfc"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-004-V2-P-00006",
@@ -1564,6 +2328,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00029"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1573,11 +2341,13 @@
             "old_chunk_id": "DOC-004-C-00025",
             "old_parent_id": "DOC-004-P-00021",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-004-V2-C-00022",
-              "DOC-004-V2-C-00028"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "35366218c8d0d8f2c7a4dface2560934a127d8f21dbda2f95991e77f3513069d"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-004-V2-P-00004",
@@ -1587,17 +2357,12 @@
                   "DOC-004-V2-C-00022"
                 ],
                 "covered": true
-              },
-              {
-                "parent_id": "DOC-004-V2-P-00006",
-                "char_start": 630,
-                "char_end": 648,
-                "child_ids": [
-                  "DOC-004-V2-C-00028"
-                ],
-                "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00022"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1614,10 +2379,13 @@
             "old_chunk_id": "DOC-004-C-00028",
             "old_parent_id": "DOC-004-P-00024",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-004-V2-C-00025"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "8f5b37483c472c72a555b63ce74898c1ce5c17d2f4f25f88f722b28d2d8a7246"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-004-V2-P-00005",
@@ -1629,6 +2397,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00025"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1645,10 +2417,13 @@
             "old_chunk_id": "DOC-002-C-00023",
             "old_parent_id": "DOC-002-P-00019",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-002-V2-C-00015"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0e57fbfae9eafd0f32f827910cc569d8b6ae2f2afbf9d776b9fef2353737a9ba"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-002-V2-P-00004",
@@ -1660,6 +2435,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00015"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1669,10 +2448,13 @@
             "old_chunk_id": "DOC-002-C-00023",
             "old_parent_id": "DOC-002-P-00019",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-002-V2-C-00016"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "4077fd9c44b68bad63e53608688b4c4a66424ac6249c255721cab9ebd0ac9ede"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-002-V2-P-00004",
@@ -1684,6 +2466,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00016"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1700,21 +2486,28 @@
             "old_chunk_id": "DOC-001-C-00144",
             "old_parent_id": "DOC-001-P-00143",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00058"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0099322c1683f696870cfa544861b4669a24c848f629209ef867817b238531ae"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
-                "char_start": 1399,
-                "char_end": 1424,
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1408,
+                "char_end": 1433,
                 "child_ids": [
-                  "DOC-001-V2-C-00058"
+                  "DOC-001-V2-C-00059"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00059"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1731,23 +2524,30 @@
             "old_chunk_id": "DOC-001-C-00176",
             "old_parent_id": "DOC-001-P-00174",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00071",
-              "DOC-001-V2-C-00072"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "adc4e431665b6badd502e6e9602eb67f28cd5e19393bd1648dd7380f6a157f59"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00013",
-                "char_start": 231,
-                "char_end": 244,
+                "parent_id": "DOC-001-V2-P-00014",
+                "char_start": 254,
+                "char_end": 267,
                 "child_ids": [
-                  "DOC-001-V2-C-00071",
-                  "DOC-001-V2-C-00072"
+                  "DOC-001-V2-C-00072",
+                  "DOC-001-V2-C-00073"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00072",
+              "DOC-001-V2-C-00073"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1757,23 +2557,28 @@
             "old_chunk_id": "DOC-001-C-00176",
             "old_parent_id": "DOC-001-P-00174",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00071",
-              "DOC-001-V2-C-00072"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "b172799ada4d399404ea99687621ac4f35765835e1e1020ab1b321e0b20bf04c"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00013",
-                "char_start": 270,
-                "char_end": 287,
+                "parent_id": "DOC-001-V2-P-00014",
+                "char_start": 293,
+                "char_end": 310,
                 "child_ids": [
-                  "DOC-001-V2-C-00071",
-                  "DOC-001-V2-C-00072"
+                  "DOC-001-V2-C-00073"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00073"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1790,21 +2595,28 @@
             "old_chunk_id": "DOC-001-C-00144",
             "old_parent_id": "DOC-001-P-00143",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00058"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "f65bf4dec478853918aa098ae46ced68993cd17f72cde25532b9122a58510457"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
-                "char_start": 1293,
-                "char_end": 1304,
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1302,
+                "char_end": 1313,
                 "child_ids": [
-                  "DOC-001-V2-C-00058"
+                  "DOC-001-V2-C-00059"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00059"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1814,21 +2626,28 @@
             "old_chunk_id": "DOC-001-C-00144",
             "old_parent_id": "DOC-001-P-00143",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00058"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0099322c1683f696870cfa544861b4669a24c848f629209ef867817b238531ae"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
-                "char_start": 1399,
-                "char_end": 1424,
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1408,
+                "char_end": 1433,
                 "child_ids": [
-                  "DOC-001-V2-C-00058"
+                  "DOC-001-V2-C-00059"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00059"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1838,23 +2657,30 @@
             "old_chunk_id": "DOC-001-C-00144",
             "old_parent_id": "DOC-001-P-00143",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00058",
-              "DOC-001-V2-C-00059"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "494f1abcd57bfd2a01b471db9c6457a0cf127d1dbac1cbcb0c0f1e013d45f448"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
-                "char_start": 1443,
-                "char_end": 1476,
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1452,
+                "char_end": 1485,
                 "child_ids": [
-                  "DOC-001-V2-C-00058",
-                  "DOC-001-V2-C-00059"
+                  "DOC-001-V2-C-00059",
+                  "DOC-001-V2-C-00060"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00059",
+              "DOC-001-V2-C-00060"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1871,10 +2697,13 @@
             "old_chunk_id": "DOC-001-C-00007",
             "old_parent_id": "DOC-001-P-00007",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00004"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "04edcbaa7e0f7352e227c60f9f8c4d55f03e88e886e873a1d1485d61bb3d00c3"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-001-V2-P-00002",
@@ -1886,6 +2715,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00004"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1902,21 +2735,28 @@
             "old_chunk_id": "DOC-001-C-00140",
             "old_parent_id": "DOC-001-P-00139",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00056"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "a5db81cba0e99ff4d58aad2c7d452f135db2c1c50f37ad63fd43de48e47e02d0"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
-                "char_start": 943,
-                "char_end": 961,
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 952,
+                "char_end": 970,
                 "child_ids": [
-                  "DOC-001-V2-C-00056"
+                  "DOC-001-V2-C-00057"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00057"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1926,21 +2766,28 @@
             "old_chunk_id": "DOC-001-C-00140",
             "old_parent_id": "DOC-001-P-00139",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00057"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "faef2f57943b7904e93ee57761061a96950424b770b6c517d0e49e225eb1208a"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
-                "char_start": 1063,
-                "char_end": 1157,
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1072,
+                "char_end": 1166,
                 "child_ids": [
-                  "DOC-001-V2-C-00057"
+                  "DOC-001-V2-C-00058"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00058"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -1950,22 +2797,29 @@
             "old_chunk_id": "DOC-001-C-00141",
             "old_parent_id": "DOC-001-P-00140",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00057"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "ae7451c904a3a19aeecc2c8d9a4c09cc7db5596d8cfc428ee16441e9c6410cf8"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00010",
-                "char_start": 1177,
-                "char_end": 1205,
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1186,
+                "char_end": 1214,
                 "child_ids": [
-                  "DOC-001-V2-C-00057",
-                  "DOC-001-V2-C-00058"
+                  "DOC-001-V2-C-00058",
+                  "DOC-001-V2-C-00059"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00058"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -1982,10 +2836,13 @@
             "old_chunk_id": "DOC-002-C-00020",
             "old_parent_id": "DOC-002-P-00016",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-002-V2-C-00014"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "3784073ddd5cd6bf37d2eea0617879b43915c30c947bd79cdbcf7aafbd9f5776"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-002-V2-P-00003",
@@ -1997,6 +2854,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00014"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2006,10 +2867,13 @@
             "old_chunk_id": "DOC-002-C-00021",
             "old_parent_id": "DOC-002-P-00017",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-002-V2-C-00014"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "7e45ce45594c2547ae59eba6bc2bd5e0b2d4b8e73e2fc3e75d05f6e337a52ddb"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-002-V2-P-00003",
@@ -2021,6 +2885,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00014"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2028,7 +2896,7 @@
       {
         "question_id": "CSV-20261101100758945425-17",
         "display_id": "Q17",
-        "status": "missing",
+        "status": "exact",
         "quotes": [
           {
             "quote_sha256": "4baff3ca09e31420d43064d964b70788cbe0d6e48440f38e680799f34a565741",
@@ -2037,10 +2905,31 @@
             "old_chunk_id": "DOC-003-C-00015",
             "old_parent_id": "DOC-003-P-00015",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": false,
-            "direct_child_ids": [],
-            "parent_spans": [],
-            "reason": "原文含标题；按本单规则标题只保存在section_path，不在Child正文"
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [
+                "R3 遥控器基本操作"
+              ],
+              "headings_verified": true,
+              "normalized_quote_sha256": "1bc8f7b736fae84d54e490dcce6bc379886b84be5b4090f23a874ca4a323541b"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-003-V2-P-00002",
+                "char_start": 1524,
+                "char_end": 1664,
+                "child_ids": [
+                  "DOC-003-V2-C-00009"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00009"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
           },
           {
             "quote_sha256": "5a8b79d36ffa1efc6b3a1a081a13786a3fcc60c6d5005ae5ac0856f51da962e0",
@@ -2049,10 +2938,31 @@
             "old_chunk_id": "DOC-003-C-00025",
             "old_parent_id": "DOC-003-P-00023",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": false,
-            "direct_child_ids": [],
-            "parent_spans": [],
-            "reason": "原文含标题；按本单规则标题只保存在section_path，不在Child正文"
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [
+                "R1 遥控器基本操作"
+              ],
+              "headings_verified": true,
+              "normalized_quote_sha256": "ed69913d0e07e56b204269f190fd5e00802d43f590dd7e2c71a806d73c62220f"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-003-V2-P-00005",
+                "char_start": 220,
+                "char_end": 352,
+                "child_ids": [
+                  "DOC-003-V2-C-00020"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00020"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
           }
         ]
       },
@@ -2068,31 +2978,29 @@
             "old_chunk_id": "DOC-003-C-00009",
             "old_parent_id": "DOC-003-P-00009",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-003-V2-C-00005",
-              "DOC-003-V2-C-00016"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "a49f2a05377cda64064def340ca39392ad8efed88243261458bf2a0e1aca5b60"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-003-V2-P-00002",
-                "char_start": 627,
-                "char_end": 756,
+                "char_start": 667,
+                "char_end": 796,
                 "child_ids": [
-                  "DOC-003-V2-C-00005"
-                ],
-                "covered": true
-              },
-              {
-                "parent_id": "DOC-003-V2-P-00004",
-                "char_start": 441,
-                "char_end": 570,
-                "child_ids": [
-                  "DOC-003-V2-C-00016"
+                  "DOC-003-V2-C-00005",
+                  "DOC-003-V2-C-00006"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00005"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2109,21 +3017,28 @@
             "old_chunk_id": "DOC-001-C-00235",
             "old_parent_id": "DOC-001-P-00233",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00094"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "7dc1520a51e8b7aa27108473dab5b8cd4dc370feb89d9841e953c7d834e6b563"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00017",
-                "char_start": 98,
-                "char_end": 123,
+                "parent_id": "DOC-001-V2-P-00018",
+                "char_start": 104,
+                "char_end": 129,
                 "child_ids": [
-                  "DOC-001-V2-C-00094"
+                  "DOC-001-V2-C-00095"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00095"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2140,21 +3055,28 @@
             "old_chunk_id": "DOC-001-C-00209",
             "old_parent_id": "DOC-001-P-00207",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00088"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "dcc12a1c2bf52558773f8d2b27c712eb8adb8b8a271974e17a03b471932740d5"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00016",
+                "parent_id": "DOC-001-V2-P-00017",
                 "char_start": 315,
                 "char_end": 338,
                 "child_ids": [
-                  "DOC-001-V2-C-00088"
+                  "DOC-001-V2-C-00089"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00089"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2171,10 +3093,13 @@
             "old_chunk_id": "DOC-003-C-00003",
             "old_parent_id": "DOC-003-P-00003",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-003-V2-C-00001"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "b29b92fa45a7fdbc534ba3c291ab9e5d8a82ce06975b8a8d4770b5b789bb52c7"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-003-V2-P-00001",
@@ -2186,6 +3111,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00001"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2195,10 +3124,13 @@
             "old_chunk_id": "DOC-003-C-00003",
             "old_parent_id": "DOC-003-P-00003",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-003-V2-C-00001"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "b0db43654bd74c6eb0e3ff4b09924ffe57e85fc2bb904f89b9c7f886c1c20eb3"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-003-V2-P-00001",
@@ -2210,6 +3142,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00001"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2219,10 +3155,13 @@
             "old_chunk_id": "DOC-003-C-00003",
             "old_parent_id": "DOC-003-P-00003",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-003-V2-C-00001"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "6dea49440a502fb55a6cf8de8b781e6ec8ef4dc66e3e1ee95953e4eba7043bc6"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-003-V2-P-00001",
@@ -2234,6 +3173,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00001"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2250,21 +3193,28 @@
             "old_chunk_id": "DOC-003-C-00010",
             "old_parent_id": "DOC-003-P-00010",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-003-V2-C-00006"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "c1db3743682e358d73d2e5580ccdcca833766b01e646831983c60d687005c64a"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-003-V2-P-00002",
-                "char_start": 813,
-                "char_end": 859,
+                "char_start": 853,
+                "char_end": 899,
                 "child_ids": [
                   "DOC-003-V2-C-00006"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00006"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2281,10 +3231,13 @@
             "old_chunk_id": "DOC-001-C-00008",
             "old_parent_id": "DOC-001-P-00008",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00004"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "fc72c605dada31de2fb37c9a18f79d2d6681ce76c291a3f43d9a92bbbe20456c"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-001-V2-P-00002",
@@ -2296,6 +3249,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00004"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2305,10 +3262,13 @@
             "old_chunk_id": "DOC-001-C-00009",
             "old_parent_id": "DOC-001-P-00009",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00004"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "e3b40a9cc482987d62ea2981752cfe6d6af9101e6f45219c01f7bfa649f74fa6"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-001-V2-P-00002",
@@ -2320,6 +3280,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00004"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2336,10 +3300,13 @@
             "old_chunk_id": "DOC-001-C-00022",
             "old_parent_id": "DOC-001-P-00022",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00010"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "015cf09545f7610029dc20a358f9c3648d72cf2404df26d12e35796e841dcc7d"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-001-V2-P-00003",
@@ -2351,6 +3318,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00010"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2360,10 +3331,13 @@
             "old_chunk_id": "DOC-001-C-00022",
             "old_parent_id": "DOC-001-P-00022",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00010"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "3d50430ede000c502a6144c1bd2a6ae5fcc3d012b88032f792edeabf341818d9"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-001-V2-P-00003",
@@ -2375,6 +3349,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00010"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2391,10 +3369,13 @@
             "old_chunk_id": "DOC-004-C-00016",
             "old_parent_id": "DOC-004-P-00015",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-004-V2-C-00011"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "d8601625d0c0b8d559ef539e4abb26a99f3a4b266346ecfdc9cc08e01368d4f9"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-004-V2-P-00003",
@@ -2406,6 +3387,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00011"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2415,10 +3400,13 @@
             "old_chunk_id": "DOC-004-C-00016",
             "old_parent_id": "DOC-004-P-00015",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-004-V2-C-00011"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "594572e74ef243032f669740b0cc83ce482803387a097bfe2a5a2eac7e881978"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-004-V2-P-00003",
@@ -2430,6 +3418,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00011"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2439,10 +3431,13 @@
             "old_chunk_id": "DOC-002-C-00023",
             "old_parent_id": "DOC-002-P-00019",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-002-V2-C-00015"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0e57fbfae9eafd0f32f827910cc569d8b6ae2f2afbf9d776b9fef2353737a9ba"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-002-V2-P-00004",
@@ -2454,6 +3449,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00015"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2470,21 +3469,28 @@
             "old_chunk_id": "DOC-001-C-00154",
             "old_parent_id": "DOC-001-P-00152",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00066"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "9a513cb010de57da79ada36ecd4f7465fb5e5ea0ffeeb16d8f6495218016e878"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00011",
-                "char_start": 1598,
-                "char_end": 1675,
+                "parent_id": "DOC-001-V2-P-00013",
+                "char_start": 0,
+                "char_end": 77,
                 "child_ids": [
-                  "DOC-001-V2-C-00066"
+                  "DOC-001-V2-C-00068"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00068"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2501,21 +3507,28 @@
             "old_chunk_id": "DOC-001-C-00096",
             "old_parent_id": "DOC-001-P-00095",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00038"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "8731cfede967bff4a488b9534f63f34613122e3ee6bda28dace96e6ee65ef96d"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00007",
-                "char_start": 1410,
-                "char_end": 1480,
+                "parent_id": "DOC-001-V2-P-00008",
+                "char_start": 722,
+                "char_end": 792,
                 "child_ids": [
                   "DOC-001-V2-C-00038"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00038"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2532,21 +3545,28 @@
             "old_chunk_id": "DOC-001-C-00200",
             "old_parent_id": "DOC-001-P-00198",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00084"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "eab18f3ce1f6365a4ec24ddd50136b5864ce8fcfb24e576b5482d563e6bbf2e4"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00015",
+                "parent_id": "DOC-001-V2-P-00016",
                 "char_start": 552,
                 "char_end": 578,
                 "child_ids": [
-                  "DOC-001-V2-C-00084"
+                  "DOC-001-V2-C-00085"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00085"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2556,21 +3576,28 @@
             "old_chunk_id": "DOC-001-C-00200",
             "old_parent_id": "DOC-001-P-00198",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00084"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "020712b4a9115514369e799cc02b59f0532ee4447f40cbb2db0cfdf2b3d47422"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00015",
+                "parent_id": "DOC-001-V2-P-00016",
                 "char_start": 610,
                 "char_end": 658,
                 "child_ids": [
-                  "DOC-001-V2-C-00084"
+                  "DOC-001-V2-C-00085"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00085"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2587,10 +3614,13 @@
             "old_chunk_id": "DOC-002-C-00056",
             "old_parent_id": "DOC-002-P-00048",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-002-V2-C-00041"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "930731dc86d3749d8ff1ade765c648686bd26a8e72621a1ce8f889a04b1adc79"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-002-V2-P-00009",
@@ -2602,6 +3632,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00041"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2611,10 +3645,13 @@
             "old_chunk_id": "DOC-002-C-00056",
             "old_parent_id": "DOC-002-P-00048",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-002-V2-C-00042"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "c7c7b5675474fb4668a31dc9e6e2bf2e39e267c462af63a8b13c09e825c18244"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-002-V2-P-00009",
@@ -2626,6 +3663,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00042"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2635,10 +3676,13 @@
             "old_chunk_id": "DOC-002-C-00056",
             "old_parent_id": "DOC-002-P-00048",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-002-V2-C-00042"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "53afc2c7eb7d6037109505d5576e19ee23a5d0f07d995ddf2af8685a28a0002e"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-002-V2-P-00009",
@@ -2650,6 +3694,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00042"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2666,21 +3714,28 @@
             "old_chunk_id": "DOC-001-C-00233",
             "old_parent_id": "DOC-001-P-00231",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00093"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "4734d60190a0ce1e5b99c4cd41a01fb6a96d67f8a9c55a6ff91cd377b152a095"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00016",
-                "char_start": 1486,
-                "char_end": 1503,
+                "parent_id": "DOC-001-V2-P-00017",
+                "char_start": 1490,
+                "char_end": 1507,
                 "child_ids": [
-                  "DOC-001-V2-C-00093"
+                  "DOC-001-V2-C-00094"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00094"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           },
           {
@@ -2690,21 +3745,28 @@
             "old_chunk_id": "DOC-001-C-00233",
             "old_parent_id": "DOC-001-P-00231",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00093"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "a83185122a5b05533d1b835b88fe2dc6231141092194c3ac6b1a5607ed4e2700"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00016",
-                "char_start": 1510,
-                "char_end": 1542,
+                "parent_id": "DOC-001-V2-P-00017",
+                "char_start": 1514,
+                "char_end": 1546,
                 "child_ids": [
-                  "DOC-001-V2-C-00093"
+                  "DOC-001-V2-C-00094"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00094"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2745,21 +3807,28 @@
             "old_chunk_id": "DOC-001-C-00128",
             "old_parent_id": "DOC-001-P-00127",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00049"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "ad432512cd40e1b9b74687fc867b73e1b5b6e58f0cdf33de57fdfdda4aa9ed2a"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00009",
+                "parent_id": "DOC-001-V2-P-00010",
                 "char_start": 1115,
                 "char_end": 1167,
                 "child_ids": [
-                  "DOC-001-V2-C-00049"
+                  "DOC-001-V2-C-00050"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00050"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2794,11 +3863,13 @@
             "old_chunk_id": "DOC-004-C-00025",
             "old_parent_id": "DOC-004-P-00021",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-004-V2-C-00022",
-              "DOC-004-V2-C-00028"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "35366218c8d0d8f2c7a4dface2560934a127d8f21dbda2f95991e77f3513069d"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-004-V2-P-00004",
@@ -2808,17 +3879,12 @@
                   "DOC-004-V2-C-00022"
                 ],
                 "covered": true
-              },
-              {
-                "parent_id": "DOC-004-V2-P-00006",
-                "char_start": 630,
-                "char_end": 648,
-                "child_ids": [
-                  "DOC-004-V2-C-00028"
-                ],
-                "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00022"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2835,10 +3901,13 @@
             "old_chunk_id": "DOC-004-C-00021",
             "old_parent_id": "DOC-004-P-00020",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-004-V2-C-00018"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "7f29713ee98323c7a8c7e5402f3110684671dc425b6ab60f1264f69f1dd9e0f6"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-004-V2-P-00004",
@@ -2850,6 +3919,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00018"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2884,21 +3957,28 @@
             "old_chunk_id": "DOC-001-C-00129",
             "old_parent_id": "DOC-001-P-00128",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-001-V2-C-00050"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "187a3967b37672048023214f3996b2d4012aee1b4bd74a9dad47a0a8cb9ea589"
+            },
             "parent_spans": [
               {
-                "parent_id": "DOC-001-V2-P-00009",
-                "char_start": 1295,
-                "char_end": 1306,
+                "parent_id": "DOC-001-V2-P-00010",
+                "char_start": 1298,
+                "char_end": 1309,
                 "child_ids": [
-                  "DOC-001-V2-C-00050"
+                  "DOC-001-V2-C-00051"
                 ],
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00051"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2915,10 +3995,13 @@
             "old_chunk_id": "DOC-004-C-00016",
             "old_parent_id": "DOC-004-P-00015",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": true,
-            "direct_child_ids": [
-              "DOC-004-V2-C-00012"
-            ],
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "a09d1091e4b439e829db6ca1fab1de9ba496998c299eb0703f2415527217b4e6"
+            },
             "parent_spans": [
               {
                 "parent_id": "DOC-004-V2-P-00003",
@@ -2930,6 +4013,10 @@
                 "covered": true
               }
             ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00012"
+            ],
+            "exact_in_child_or_contiguous_children": true,
             "reason": null
           }
         ]
@@ -2955,7 +4042,7 @@
       {
         "question_id": "CSV-20261101100758945425-49",
         "display_id": "Q49",
-        "status": "missing",
+        "status": "exact",
         "quotes": [
           {
             "quote_sha256": "84e58e335ae1987a734cc755d1eb15982c2b3eac683779efed87602644869359",
@@ -2964,10 +4051,32 @@
             "old_chunk_id": "DOC-001-C-00029",
             "old_parent_id": "DOC-001-P-00029",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": false,
-            "direct_child_ids": [],
-            "parent_spans": [],
-            "reason": "原文含标题；按本单规则标题只保存在section_path，不在Child正文"
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [
+                "安全装置"
+              ],
+              "headings_verified": true,
+              "normalized_quote_sha256": "c536ac52e61b7227632ccab3dd9ba14dac2e5f89c39aac0a83db0cc3639e6e24"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00003",
+                "char_start": 1136,
+                "char_end": 1175,
+                "child_ids": [
+                  "DOC-001-V2-C-00013",
+                  "DOC-001-V2-C-00014"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00014"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
           },
           {
             "quote_sha256": "5c6ffc9059cc6f30b7b1256024e4610c378b1c839b4685009faa094ea371c795",
@@ -2976,10 +4085,31 @@
             "old_chunk_id": "DOC-001-C-00224",
             "old_parent_id": "DOC-001-P-00222",
             "exact_in_old_parent": true,
-            "exact_in_child_or_contiguous_children": false,
-            "direct_child_ids": [],
-            "parent_spans": [],
-            "reason": "原文含标题；按本单规则标题只保存在section_path，不在Child正文"
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [
+                "后部激光扫描器脏了"
+              ],
+              "headings_verified": true,
+              "normalized_quote_sha256": "2aa0c72f013acd5e904c0bff2345e01a98acf49c05dda805a3d7c66cebc7fe0b"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00017",
+                "char_start": 1045,
+                "char_end": 1072,
+                "child_ids": [
+                  "DOC-001-V2-C-00092"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00092"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
           }
         ]
       },

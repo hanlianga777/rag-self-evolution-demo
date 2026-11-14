@@ -1,0 +1,4138 @@
+{
+  "mode": "offline_cached_parser_only",
+  "external_calls": 0,
+  "formal_index_written": false,
+  "source_index": "/Users/zhanghaohan/Documents/ChatGPT/智能客服RAG自进化项目/backend/data/index_versions/Q02-OWNER-20261012",
+  "source_evaluation_run_id": "EVAL-20261106132429591988",
+  "config": {
+    "parser": "MinerU",
+    "parser_mode": "vlm",
+    "table_normalize": "table-kv-v2",
+    "chunk_strategy": "parent-child-v2",
+    "parent_tokens": 1400,
+    "child_tokens": 300,
+    "overlap_tokens": 50,
+    "tokenizer_model": "BAAI/bge-small-zh-v1.5",
+    "embedding_model": "text-embedding-v4",
+    "dimension": 1024,
+    "rerank_model": "qwen3-rerank",
+    "candidate_k": 12,
+    "top_k": 4,
+    "parent_min_tokens": 400,
+    "child_target_tokens": 250,
+    "child_tail_min_tokens": 80,
+    "child_target_min_tokens": 200,
+    "table_intro_max_tokens": 200,
+    "toc_min_entries": 3,
+    "toc_min_fraction": 0.5,
+    "repeat_page_fraction": 0.3,
+    "repeat_short_line_chars": 40,
+    "repeat_min_pages": 2,
+    "denoise_version": "mineru-noise-v3",
+    "heading_context": "child-section-v2",
+    "header_footer_identity_max_chars": 12,
+    "heading_hierarchy": "manual-chapters-v1",
+    "manual_chapters": {
+      "DOC-001": [
+        [
+          2,
+          "一般提示"
+        ],
+        [
+          3,
+          "安全提示"
+        ],
+        [
+          15,
+          "快速指南"
+        ],
+        [
+          29,
+          "操作元件"
+        ],
+        [
+          85,
+          "保养和维护"
+        ],
+        [
+          98,
+          "显示屏显示故障"
+        ],
+        [
+          106,
+          "技术参数"
+        ]
+      ],
+      "DOC-002": [
+        [
+          3,
+          "免责申明"
+        ],
+        [
+          4,
+          "安全须知"
+        ],
+        [
+          5,
+          "产品概述"
+        ],
+        [
+          8,
+          "如何充电"
+        ],
+        [
+          10,
+          "使用说明"
+        ],
+        [
+          16,
+          "异常情况说明"
+        ],
+        [
+          17,
+          "注意事项"
+        ],
+        [
+          18,
+          "日常保养与维护"
+        ]
+      ],
+      "DOC-003": [
+        [
+          2,
+          "用户须知"
+        ],
+        [
+          2,
+          "R3遥控器"
+        ],
+        [
+          9,
+          "R1遥控器"
+        ],
+        [
+          13,
+          "修订历史"
+        ]
+      ],
+      "DOC-004": [
+        [
+          2,
+          "电池"
+        ],
+        [
+          5,
+          "充电器"
+        ],
+        [
+          7,
+          "电池充电"
+        ],
+        [
+          10,
+          "电池安全使用指引"
+        ],
+        [
+          12,
+          "注意事项"
+        ]
+      ]
+    }
+  },
+  "tokenizer": {
+    "model": "BAAI/bge-small-zh-v1.5",
+    "artifact_sha256": "48cea5d44424912a6fd1ea647bf4fe50b55ab8b1e5879c3275f80e339e8fae26",
+    "method": "exact_local_token_ids_without_special_tokens"
+  },
+  "parser_types": {
+    "image": 212,
+    "text": 1668,
+    "header": 20,
+    "page_number": 140,
+    "footer": 47,
+    "table": 27,
+    "page_footnote": 5
+  },
+  "documents": [
+    {
+      "document_id": "DOC-001",
+      "name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+      "category": "清洁机器人说明书",
+      "parents": 19,
+      "children": 102,
+      "parent_tokens": {
+        "count": 19,
+        "min": 469,
+        "p25": 760,
+        "median": 1332,
+        "p75": 1379,
+        "p95": 1396,
+        "max": 1399,
+        "mean": 1093.42,
+        "bins": {
+          "0-59": 0,
+          "60-79": 0,
+          "80-149": 0,
+          "150-199": 0,
+          "200-300": 0,
+          "301-399": 0,
+          "400-599": 2,
+          "600-999": 6,
+          "1000-1400": 11,
+          "1401-100000": 0
+        }
+      },
+      "child_tokens": {
+        "count": 102,
+        "min": 24,
+        "p25": 235,
+        "median": 247.0,
+        "p75": 254,
+        "p95": 275,
+        "max": 297,
+        "mean": 230,
+        "bins": {
+          "0-59": 2,
+          "60-79": 2,
+          "80-149": 8,
+          "150-199": 6,
+          "200-300": 84,
+          "301-399": 0,
+          "400-599": 0,
+          "600-999": 0,
+          "1000-1400": 0,
+          "1401-100000": 0
+        }
+      }
+    },
+    {
+      "document_id": "DOC-002",
+      "name": "宇树_B2四足机器人用户手册_中文版.pdf",
+      "category": "巡检机器人说明书",
+      "parents": 9,
+      "children": 44,
+      "parent_tokens": {
+        "count": 9,
+        "min": 677,
+        "p25": 843,
+        "median": 1068,
+        "p75": 1175,
+        "p95": 1249,
+        "max": 1393,
+        "mean": 1022.78,
+        "bins": {
+          "0-59": 0,
+          "60-79": 0,
+          "80-149": 0,
+          "150-199": 0,
+          "200-300": 0,
+          "301-399": 0,
+          "400-599": 0,
+          "600-999": 4,
+          "1000-1400": 5,
+          "1401-100000": 0
+        }
+      },
+      "child_tokens": {
+        "count": 44,
+        "min": 90,
+        "p25": 184,
+        "median": 244.0,
+        "p75": 266,
+        "p95": 283,
+        "max": 292,
+        "mean": 223.98,
+        "bins": {
+          "0-59": 0,
+          "60-79": 0,
+          "80-149": 5,
+          "150-199": 10,
+          "200-300": 29,
+          "301-399": 0,
+          "400-599": 0,
+          "600-999": 0,
+          "1000-1400": 0,
+          "1401-100000": 0
+        }
+      }
+    },
+    {
+      "document_id": "DOC-004",
+      "name": "宇树_B2电池与充电器使用说明_中文版.pdf",
+      "category": "电池与充电器说明书",
+      "parents": 6,
+      "children": 29,
+      "parent_tokens": {
+        "count": 6,
+        "min": 578,
+        "p25": 749,
+        "median": 941.0,
+        "p75": 1092,
+        "p95": 1109,
+        "max": 1322,
+        "mean": 940,
+        "bins": {
+          "0-59": 0,
+          "60-79": 0,
+          "80-149": 0,
+          "150-199": 0,
+          "200-300": 0,
+          "301-399": 0,
+          "400-599": 1,
+          "600-999": 2,
+          "1000-1400": 3,
+          "1401-100000": 0
+        }
+      },
+      "child_tokens": {
+        "count": 29,
+        "min": 80,
+        "p25": 158,
+        "median": 235,
+        "p75": 250,
+        "p95": 267,
+        "max": 288,
+        "mean": 205.97,
+        "bins": {
+          "0-59": 0,
+          "60-79": 0,
+          "80-149": 6,
+          "150-199": 7,
+          "200-300": 16,
+          "301-399": 0,
+          "400-599": 0,
+          "600-999": 0,
+          "1000-1400": 0,
+          "1401-100000": 0
+        }
+      }
+    },
+    {
+      "document_id": "DOC-003",
+      "name": "宇树_B2遥控器使用说明_中文版.pdf",
+      "category": "遥控器说明书",
+      "parents": 6,
+      "children": 25,
+      "parent_tokens": {
+        "count": 6,
+        "min": 92,
+        "p25": 162,
+        "median": 680.0,
+        "p75": 760,
+        "p95": 815,
+        "max": 1393,
+        "mean": 637,
+        "bins": {
+          "0-59": 0,
+          "60-79": 0,
+          "80-149": 1,
+          "150-199": 1,
+          "200-300": 0,
+          "301-399": 0,
+          "400-599": 0,
+          "600-999": 3,
+          "1000-1400": 1,
+          "1401-100000": 0
+        }
+      },
+      "child_tokens": {
+        "count": 25,
+        "min": 29,
+        "p25": 112,
+        "median": 160,
+        "p75": 226,
+        "p95": 254,
+        "max": 262,
+        "mean": 157.68,
+        "bins": {
+          "0-59": 3,
+          "60-79": 1,
+          "80-149": 6,
+          "150-199": 7,
+          "200-300": 8,
+          "301-399": 0,
+          "400-599": 0,
+          "600-999": 0,
+          "1000-1400": 0,
+          "1401-100000": 0
+        }
+      }
+    }
+  ],
+  "parent_token_distribution": {
+    "count": 40,
+    "min": 92,
+    "p25": 749,
+    "median": 1014.5,
+    "p75": 1345,
+    "p95": 1393,
+    "max": 1399,
+    "mean": 986.05,
+    "bins": {
+      "0-59": 0,
+      "60-79": 0,
+      "80-149": 1,
+      "150-199": 1,
+      "200-300": 0,
+      "301-399": 0,
+      "400-599": 3,
+      "600-999": 15,
+      "1000-1400": 20,
+      "1401-100000": 0
+    }
+  },
+  "child_token_distribution": {
+    "count": 200,
+    "min": 24,
+    "p25": 180,
+    "median": 244.0,
+    "p75": 254,
+    "p95": 280,
+    "max": 297,
+    "mean": 216.15,
+    "bins": {
+      "0-59": 5,
+      "60-79": 3,
+      "80-149": 25,
+      "150-199": 30,
+      "200-300": 137,
+      "301-399": 0,
+      "400-599": 0,
+      "600-999": 0,
+      "1000-1400": 0,
+      "1401-100000": 0
+    }
+  },
+  "comparison": {
+    "old": {
+      "parents": 349,
+      "children": 368,
+      "children_per_parent": 1.0544,
+      "children_under_60": 148,
+      "single_child_parents": 336
+    },
+    "new": {
+      "parents": 40,
+      "children": 200,
+      "children_per_parent": 5.0,
+      "children_under_60": 5,
+      "single_child_parents": 2
+    }
+  },
+  "noise_only_chunk_ids": [],
+  "single_child_parents": [
+    {
+      "chunk_id": "DOC-003-V2-P-00001",
+      "document_id": "DOC-003",
+      "level_one_section": "用户须知",
+      "section_path": "用户须知",
+      "token_count": 162,
+      "short_chapter": true
+    },
+    {
+      "chunk_id": "DOC-003-V2-P-00006",
+      "document_id": "DOC-003",
+      "level_one_section": "修订历史",
+      "section_path": "修订历史",
+      "token_count": 92,
+      "short_chapter": true
+    }
+  ],
+  "children_under_60": [
+    {
+      "chunk_id": "DOC-001-V2-C-00056",
+      "document_id": "DOC-001",
+      "token_count": 24,
+      "table": true,
+      "parent_chunk_id": "DOC-001-V2-P-00011",
+      "section_path": "操作元件 / 一般设置",
+      "page_start": 55,
+      "page_end": 55
+    },
+    {
+      "chunk_id": "DOC-001-V2-C-00064",
+      "document_id": "DOC-001",
+      "token_count": 58,
+      "table": true,
+      "parent_chunk_id": "DOC-001-V2-P-00012",
+      "section_path": "操作元件 / 示教路线",
+      "page_start": 61,
+      "page_end": 61
+    },
+    {
+      "chunk_id": "DOC-003-V2-C-00011",
+      "document_id": "DOC-003",
+      "token_count": 29,
+      "table": true,
+      "parent_chunk_id": "DOC-003-V2-P-00003",
+      "section_path": "R3遥控器 / R3 遥控器基本操作",
+      "page_start": 7,
+      "page_end": 7
+    },
+    {
+      "chunk_id": "DOC-003-V2-C-00021",
+      "document_id": "DOC-003",
+      "token_count": 29,
+      "table": true,
+      "parent_chunk_id": "DOC-003-V2-P-00005",
+      "section_path": "R1遥控器 / R1 遥控器基本操作",
+      "page_start": 12,
+      "page_end": 12
+    },
+    {
+      "chunk_id": "DOC-003-V2-C-00023",
+      "document_id": "DOC-003",
+      "token_count": 40,
+      "table": true,
+      "parent_chunk_id": "DOC-003-V2-P-00005",
+      "section_path": "R1遥控器 / R1 遥控器基本操作",
+      "page_start": 13,
+      "page_end": 13
+    }
+  ],
+  "short_parents": [
+    {
+      "chunk_id": "DOC-003-V2-P-00001",
+      "document_id": "DOC-003",
+      "level_one_section": "用户须知",
+      "token_count": 162,
+      "short_chapter": true
+    },
+    {
+      "chunk_id": "DOC-003-V2-P-00006",
+      "document_id": "DOC-003",
+      "level_one_section": "修订历史",
+      "token_count": 92,
+      "short_chapter": true
+    }
+  ],
+  "sample_seed": 31,
+  "parent_samples": [
+    {
+      "parent_id": "DOC-001-V2-P-00001",
+      "document_id": "DOC-001",
+      "chapter": "一般提示",
+      "subsections": [
+        "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+        "用户群体",
+        "按规定使用"
+      ],
+      "section_path": "一般提示",
+      "parent_preview": "59802530 (02/24)\n在您第一次使用设备之前，请先阅读原厂操作说明书并遵守\n为后续使用或者为后续的车主保管好操作说明书\n在第一次调试设备之前，请完整",
+      "token_count": 630,
+      "children": [
+        {
+          "child_id": "DOC-001-V2-C-00001",
+          "char_start": 0,
+          "char_end": 264,
+          "preview": "59802530 (02/24)\n在您第一次使用设备之前，请",
+          "token_count": 245,
+          "section_path": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+          "section_paths": [
+            "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
+            "一般提示",
+            "一般提示 / 用户群体"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00002",
+          "char_start": 214,
+          "char_end": 500,
+          "preview": "本说明书面向用户群体 操作人员 和 主管\n可以通过设备触摸屏",
+          "token_count": 239,
+          "section_path": "一般提示 / 用户群体",
+          "section_paths": [
+            "一般提示 / 用户群体",
+            "一般提示 / 按规定使用"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00003",
+          "char_start": 480,
+          "char_end": 702,
+          "preview": "\n本设备不适于清洁冰冻地面（例如冷库）\n该设备适用于最大水深",
+          "token_count": 209,
+          "section_path": "一般提示 / 按规定使用",
+          "section_paths": [
+            "一般提示 / 按规定使用"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "DOC-004-V2-P-00003",
+      "document_id": "DOC-004",
+      "chapter": "电池充电",
+      "subsections": [
+        "插入式充电器",
+        "接触式充电器",
+        "电量指示",
+        "充电保护指示灯"
+      ],
+      "section_path": "电池充电",
+      "parent_preview": "1. 连接充电器到交流电源（100-240V，50/60Hz）。连接前必须确保外接电源电压与充电器额定输入电压匹配，否则会导致充电器损坏（在充电器铭牌上有标识该",
+      "token_count": 1109,
+      "children": [
+        {
+          "child_id": "DOC-004-V2-C-00011",
+          "char_start": 0,
+          "char_end": 267,
+          "preview": "1. 连接充电器到交流电源（100-240V，50/60Hz",
+          "token_count": 243,
+          "section_path": "电池充电 / 插入式充电器",
+          "section_paths": [
+            "电池充电 / 插入式充电器"
+          ]
+        },
+        {
+          "child_id": "DOC-004-V2-C-00012",
+          "char_start": 228,
+          "char_end": 504,
+          "preview": "\n6. 电量指示灯全部熄灭时表示电池包已充满。请取下电池包和",
+          "token_count": 249,
+          "section_path": "电池充电 / 插入式充电器",
+          "section_paths": [
+            "电池充电 / 插入式充电器",
+            "电池充电 / 接触式充电器"
+          ]
+        },
+        {
+          "child_id": "DOC-004-V2-C-00013",
+          "char_start": 478,
+          "char_end": 639,
+          "preview": "\n交流电源\n①\n110-220V\n②\n锂电池充电器\n3. 充",
+          "token_count": 136,
+          "section_path": "电池充电 / 接触式充电器",
+          "section_paths": [
+            "电池充电 / 接触式充电器",
+            "电池充电 / 电量指示"
+          ]
+        },
+        {
+          "child_id": "DOC-004-V2-C-00014",
+          "char_start": 639,
+          "char_end": 874,
+          "preview": "充电指示灯\nLED1=；LED2=○；LED3=○；LED4",
+          "token_count": 158,
+          "section_path": "电池充电 / 电量指示",
+          "section_paths": [
+            "电池充电 / 电量指示"
+          ]
+        },
+        {
+          "child_id": "DOC-004-V2-C-00015",
+          "char_start": 874,
+          "char_end": 1152,
+          "preview": "LED1=；LED2=○；LED3=○；LED4=○；显示=",
+          "token_count": 179,
+          "section_path": "电池充电 / 充电保护指示灯",
+          "section_paths": [
+            "电池充电 / 充电保护指示灯"
+          ]
+        },
+        {
+          "child_id": "DOC-004-V2-C-00016",
+          "char_start": 1152,
+          "char_end": 1360,
+          "preview": "\n出现故障（如电流过大，短路，电压过压或欠压，温度过高或过低",
+          "token_count": 196,
+          "section_path": "电池充电 / 充电保护指示灯",
+          "section_paths": [
+            "电池充电 / 充电保护指示灯"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "DOC-001-V2-P-00008",
+      "document_id": "DOC-001",
+      "chapter": "快速指南",
+      "subsections": [
+        "机场",
+        "医院",
+        "设备如何辨认其环境？",
+        "该设备如何重复已示教的路线？",
+        "在清洁地面时，设备可以离墙多近？",
+        "按下紧急停机按钮会发生什么？",
+        "地图是否具备自学习功能，并补充新障碍物？",
+        "该设备是否能识别玻璃障碍物？",
+        "机器人如何与环境通信？"
+      ],
+      "section_path": "快速指南",
+      "parent_preview": "请确保智能填充 (Smart Fill) 场地内不含扁平物体（高度低于 15 cm），以便设备能够覆盖整个内部场地\n阳光直射会导致传感器和导航出现问题\n如果后方",
+      "token_count": 760,
+      "children": [
+        {
+          "child_id": "DOC-001-V2-C-00035",
+          "char_start": 0,
+          "char_end": 274,
+          "preview": "请确保智能填充 (Smart Fill) 场地内不含扁平物体",
+          "token_count": 246,
+          "section_path": "快速指南 / 机场",
+          "section_paths": [
+            "快速指南 / 机场"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00036",
+          "char_start": 231,
+          "char_end": 498,
+          "preview": "提示\n请勿经过或紧挨着自动扶梯 电梯门，尤其是紧急出口布置清",
+          "token_count": 247,
+          "section_path": "快速指南 / 机场",
+          "section_paths": [
+            "快速指南 / 机场",
+            "快速指南 / 医院"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00037",
+          "char_start": 463,
+          "char_end": 722,
+          "preview": "如果后方存在坠落边缘，请遵守距离落地式窗户和护栏的极限值 1",
+          "token_count": 223,
+          "section_path": "快速指南 / 医院",
+          "section_paths": [
+            "快速指南 / 医院",
+            "快速指南 / 设备如何辨认其环境？",
+            "快速指南 / 该设备如何重复已示教的路线？",
+            "快速指南 / 在清洁地面时，设备可以离墙多近？",
+            "快速指南 / 按下紧急停机按钮会发生什么？"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00038",
+          "char_start": 715,
+          "char_end": 846,
+          "preview": "</sub>\n不，地图不具备自学习功能 对原始布局进行细微改",
+          "token_count": 120,
+          "section_path": "快速指南 / 按下紧急停机按钮会发生什么？",
+          "section_paths": [
+            "快速指南 / 按下紧急停机按钮会发生什么？",
+            "快速指南 / 地图是否具备自学习功能，并补充新障碍物？",
+            "快速指南 / 该设备是否能识别玻璃障碍物？",
+            "快速指南 / 机器人如何与环境通信？"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "DOC-002-V2-P-00007",
+      "document_id": "DOC-002",
+      "chapter": "异常情况说明",
+      "subsections": [
+        "- 开机自检不成功",
+        "- 机器人跌倒自保护",
+        "- App 连接异常",
+        "- 如何在遥控模块失效时关闭机器人",
+        "- 机器人容易摔倒，开机无法站立",
+        "- 如何长时间待机"
+      ],
+      "section_path": "异常情况说明",
+      "parent_preview": "在使用B2四足机器人时，可能会出现机器人异常的情况。大部分异常情况是可控的（有解决方案），客户在遇到这些问题时不要慌张，详细阅读下列内容并按步骤解决问题。\n如有",
+      "token_count": 843,
+      "children": [
+        {
+          "child_id": "DOC-002-V2-C-00030",
+          "char_start": 0,
+          "char_end": 321,
+          "preview": "在使用B2四足机器人时，可能会出现机器人异常的情况。大部分异",
+          "token_count": 289,
+          "section_path": "异常情况说明",
+          "section_paths": [
+            "异常情况说明",
+            "异常情况说明 / - 开机自检不成功",
+            "异常情况说明 / - 机器人跌倒自保护"
+          ]
+        },
+        {
+          "child_id": "DOC-002-V2-C-00031",
+          "char_start": 321,
+          "char_end": 599,
+          "preview": "\n若采用 AP 直连模式，可检查手机是否连上 B2 发出的 ",
+          "token_count": 253,
+          "section_path": "异常情况说明 / - App 连接异常",
+          "section_paths": [
+            "异常情况说明 / - App 连接异常",
+            "异常情况说明 / - 如何在遥控模块失效时关闭机器人"
+          ]
+        },
+        {
+          "child_id": "DOC-002-V2-C-00032",
+          "char_start": 563,
+          "char_end": 833,
+          "preview": "抬住机器人头部和尾部，短按电源开关一次，再长按电源开关3秒以",
+          "token_count": 228,
+          "section_path": "异常情况说明 / - 如何在遥控模块失效时关闭机器人",
+          "section_paths": [
+            "异常情况说明 / - 如何在遥控模块失效时关闭机器人",
+            "异常情况说明 / - 机器人容易摔倒，开机无法站立"
+          ]
+        },
+        {
+          "child_id": "DOC-002-V2-C-00033",
+          "char_start": 788,
+          "char_end": 948,
+          "preview": "！！\nApp 关节标定入口为 [设置] -> [数据] ->",
+          "token_count": 143,
+          "section_path": "异常情况说明 / - 机器人容易摔倒，开机无法站立",
+          "section_paths": [
+            "异常情况说明 / - 机器人容易摔倒，开机无法站立",
+            "异常情况说明 / - 如何长时间待机"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "DOC-001-V2-P-00010",
+      "document_id": "DOC-001",
+      "chapter": "操作元件",
+      "subsections": [
+        "清洁剂",
+        "更换清洁剂罐",
+        "装上吸水扒",
+        "调节倾斜度",
+        "调节高度",
+        "检查设备",
+        "接通设备",
+        "在触摸屏上显示操作说明书",
+        "设置"
+      ],
+      "section_path": "操作元件",
+      "parent_preview": "推荐的清洁剂：\n适用范围=所有防水地板的保养清洁；清洁剂=CA 50 CRM 756\n适用范围=保养清洁与护理组件；清洁剂=RM 746RM 780\n适用范围=",
+      "token_count": 1372,
+      "children": [
+        {
+          "child_id": "DOC-001-V2-C-00046",
+          "char_start": 0,
+          "char_end": 290,
+          "preview": "推荐的清洁剂：\n适用范围=所有防水地板的保养清洁；清洁剂=C",
+          "token_count": 241,
+          "section_path": "操作元件 / 清洁剂",
+          "section_paths": [
+            "操作元件 / 清洁剂"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00047",
+          "char_start": 290,
+          "char_end": 584,
+          "preview": "\n1 清洁剂加注口\n填充口盖子\n3 清洁剂液位指示器\n2. ",
+          "token_count": 247,
+          "section_path": "操作元件 / 清洁剂",
+          "section_paths": [
+            "操作元件 / 清洁剂",
+            "操作元件 / 更换清洁剂罐",
+            "操作元件 / 装上吸水扒"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00048",
+          "char_start": 521,
+          "char_end": 811,
+          "preview": "1 吸水扒悬挂装置 2 抽吸软管 3 翼形螺钉 4 吸水扒 ",
+          "token_count": 247,
+          "section_path": "操作元件 / 装上吸水扒",
+          "section_paths": [
+            "操作元件 / 装上吸水扒",
+            "操作元件 / 调节倾斜度",
+            "操作元件 / 调节高度"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00049",
+          "char_start": 756,
+          "char_end": 1041,
+          "preview": "地面不平整：吸水扒上方 5 个垫片，下方 1 个垫片\n地面非",
+          "token_count": 251,
+          "section_path": "操作元件 / 调节高度",
+          "section_paths": [
+            "操作元件 / 调节高度",
+            "操作元件 / 检查设备"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00050",
+          "char_start": 994,
+          "char_end": 1272,
+          "preview": "请在使用前检查设备，如有任何损坏或故障，请向负责人报告\n如果",
+          "token_count": 255,
+          "section_path": "操作元件 / 检查设备",
+          "section_paths": [
+            "操作元件 / 检查设备",
+            "操作元件 / 接通设备"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00051",
+          "char_start": 1220,
+          "char_end": 1378,
+          "preview": "）\n1. 通过旋转解锁紧急停机按钮\n2. 按下启动键设备启动",
+          "token_count": 140,
+          "section_path": "操作元件 / 检查设备",
+          "section_paths": [
+            "操作元件 / 检查设备",
+            "操作元件 / 接通设备"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00052",
+          "char_start": 1343,
+          "char_end": 1614,
+          "preview": "4. 创建一个新用户资料\n5. 指定密码\n在主菜单中显示可执",
+          "token_count": 205,
+          "section_path": "操作元件 / 接通设备",
+          "section_paths": [
+            "操作元件 / 接通设备",
+            "操作元件 / 在触摸屏上显示操作说明书",
+            "操作元件 / 设置"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "DOC-001-V2-P-00003",
+      "document_id": "DOC-001",
+      "chapter": "安全提示",
+      "subsections": [
+        "运行",
+        "使用清洁剂运行",
+        "蓄电池",
+        "带旋转刷的设备",
+        "保养和维护",
+        "附件和备件",
+        "运输",
+        "安全装置",
+        "紧急停机按钮",
+        "安全开关",
+        "距离传感器",
+        "光学传感器",
+        "对接站"
+      ],
+      "section_path": "安全提示",
+      "parent_preview": "该设备适用于湿润到最大水深 1 cm 的潮湿地面 请勿运行到水深超过 1 cm 的区域\n注意\n处理脏水和碱液时，请遵守法律规定\n注意\n不得在室外使用该设备<su",
+      "token_count": 1399,
+      "children": [
+        {
+          "child_id": "DOC-001-V2-C-00010",
+          "char_start": 0,
+          "char_end": 287,
+          "preview": "该设备适用于湿润到最大水深 1 cm 的潮湿地面 请勿运行到",
+          "token_count": 258,
+          "section_path": "安全提示 / 运行",
+          "section_paths": [
+            "安全提示 / 运行",
+            "安全提示 / 使用清洁剂运行",
+            "安全提示 / 蓄电池"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00011",
+          "char_start": 287,
+          "char_end": 570,
+          "preview": "关于存放和运输的说明，请联系卡赫的客户服务部门获取\n危险\n不",
+          "token_count": 265,
+          "section_path": "安全提示 / 蓄电池",
+          "section_paths": [
+            "安全提示 / 蓄电池"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00012",
+          "char_start": 570,
+          "char_end": 873,
+          "preview": "不要给损坏的电池充电 请卡赫客户服务部更换损坏的电池\n不要把",
+          "token_count": 283,
+          "section_path": "安全提示 / 蓄电池",
+          "section_paths": [
+            "安全提示 / 蓄电池",
+            "安全提示 / 带旋转刷的设备",
+            "安全提示 / 保养和维护"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00013",
+          "char_start": 873,
+          "char_end": 1139,
+          "preview": "小心\n只允许授权的客户服务部进行维修工作 备件安装和在电气零",
+          "token_count": 245,
+          "section_path": "安全提示 / 保养和维护",
+          "section_paths": [
+            "安全提示 / 保养和维护",
+            "安全提示 / 附件和备件",
+            "安全提示 / 运输",
+            "安全提示 / 安全装置"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00014",
+          "char_start": 1087,
+          "char_end": 1399,
+          "preview": "小心\n在运输之前请您关闭电机 在考虑到重量的情况下固定设备，",
+          "token_count": 269,
+          "section_path": "安全提示 / 运输",
+          "section_paths": [
+            "安全提示 / 运输",
+            "安全提示 / 安全装置",
+            "安全提示 / 紧急停机按钮",
+            "安全提示 / 安全开关",
+            "安全提示 / 距离传感器",
+            "安全提示 / 光学传感器"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00015",
+          "char_start": 1343,
+          "char_end": 1536,
+          "preview": "光学传感器检测障碍物，并使设备绕过障碍物 光学传感器符合 I",
+          "token_count": 168,
+          "section_path": "安全提示 / 光学传感器",
+          "section_paths": [
+            "安全提示 / 光学传感器",
+            "安全提示 / 对接站"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "DOC-001-V2-P-00009",
+      "document_id": "DOC-001",
+      "chapter": "操作元件",
+      "subsections": [
+        "正面",
+        "清洁头",
+        "背面",
+        "控制面板",
+        "颜色标记",
+        "设备上的标志",
+        "卸载",
+        "给蓄电池充电",
+        "断开系统与电源",
+        "下载操作说明书",
+        "加注运行材料",
+        "无对接站，含加注系统",
+        "无对接站，无加注系统",
+        "清洁剂"
+      ],
+      "section_path": "操作元件",
+      "parent_preview": "1 进水口 2 清水加注口 3 污水浮子开关 4 浮子，涡轮机保护网\n1 粗大污染物容器的门2 粗大污染物容器\n5 污水箱冲洗系统6 污水箱盖罩7 粗大污染物滤",
+      "token_count": 1319,
+      "children": [
+        {
+          "child_id": "DOC-001-V2-C-00039",
+          "char_start": 0,
+          "char_end": 331,
+          "preview": "1 进水口 2 清水加注口 3 污水浮子开关 4 浮子，涡轮",
+          "token_count": 262,
+          "section_path": "操作元件 / 正面",
+          "section_paths": [
+            "操作元件 / 正面",
+            "操作元件 / 清洁头",
+            "操作元件 / 背面",
+            "操作元件 / 控制面板",
+            "操作元件 / 颜色标记",
+            "操作元件 / 设备上的标志"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00040",
+          "char_start": 331,
+          "char_end": 425,
+          "preview": " | 换刷的解锁键\n | 先抬起粗大污染物容器,再将其拉出。",
+          "token_count": 71,
+          "section_path": "操作元件 / 设备上的标志",
+          "section_paths": [
+            "操作元件 / 设备上的标志"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00041",
+          "char_start": 425,
+          "char_end": 708,
+          "preview": "\n1. 将纸箱连同加固木材从木质基座中取出\n3. 拧下两个大",
+          "token_count": 247,
+          "section_path": "操作元件 / 卸载",
+          "section_paths": [
+            "操作元件 / 卸载",
+            "操作元件 / 给蓄电池充电"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00042",
+          "char_start": 670,
+          "char_end": 947,
+          "preview": "1 电源插口2 对接端口\n2. 将充电线的电源插头插入插座充",
+          "token_count": 240,
+          "section_path": "操作元件 / 给蓄电池充电",
+          "section_paths": [
+            "操作元件 / 给蓄电池充电",
+            "操作元件 / 断开系统与电源"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00043",
+          "char_start": 879,
+          "char_end": 1146,
+          "preview": "\n3. 长按 RESET 按钮大约 10 秒\n4. 按下开机",
+          "token_count": 239,
+          "section_path": "操作元件 / 断开系统与电源",
+          "section_paths": [
+            "操作元件 / 断开系统与电源",
+            "操作元件 / 下载操作说明书",
+            "操作元件 / 加注运行材料",
+            "操作元件 / 无对接站，含加注系统"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00044",
+          "char_start": 1136,
+          "char_end": 1444,
+          "preview": "向上翻转污水箱盖子\n2. 将进水软管连接到设备的软管接头上 ",
+          "token_count": 249,
+          "section_path": "操作元件 / 无对接站，含加注系统",
+          "section_paths": [
+            "操作元件 / 无对接站，含加注系统",
+            "操作元件 / 无对接站，无加注系统",
+            "操作元件 / 清洁剂"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00045",
+          "char_start": 1404,
+          "char_end": 1558,
+          "preview": "$\n1 加注口\n3. 打开进水口\n4. 观察液位，在填满清水",
+          "token_count": 136,
+          "section_path": "操作元件 / 无对接站，无加注系统",
+          "section_paths": [
+            "操作元件 / 无对接站，无加注系统",
+            "操作元件 / 清洁剂"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "DOC-003-V2-P-00004",
+      "document_id": "DOC-003",
+      "chapter": "R1遥控器",
+      "subsections": [
+        "简介",
+        "部件名称",
+        "技术规格",
+        "遥控器摇杆校准",
+        "开启/关闭遥控器",
+        "遥控器充电"
+      ],
+      "section_path": "R1遥控器",
+      "parent_preview": "遥控器属于 B2 遥控模块的一部分，遥控手柄内置数传模块、蓝牙模块。机器人与遥控器可以通过 Unitree Explore App 进行绑定，绑定成功后开机即可",
+      "token_count": 760,
+      "children": [
+        {
+          "child_id": "DOC-003-V2-C-00015",
+          "char_start": 0,
+          "char_end": 310,
+          "preview": "遥控器属于 B2 遥控模块的一部分，遥控手柄内置数传模块、蓝",
+          "token_count": 254,
+          "section_path": "R1遥控器 / 简介",
+          "section_paths": [
+            "R1遥控器 / 简介",
+            "R1遥控器 / 部件名称"
+          ]
+        },
+        {
+          "child_id": "DOC-003-V2-C-00016",
+          "char_start": 310,
+          "char_end": 440,
+          "preview": "参数=充电电压；规格=5.0V；备注=\n参数=充电电流；规格",
+          "token_count": 114,
+          "section_path": "R1遥控器 / 技术规格",
+          "section_paths": [
+            "R1遥控器 / 技术规格"
+          ]
+        },
+        {
+          "child_id": "DOC-003-V2-C-00017",
+          "char_start": 440,
+          "char_end": 690,
+          "preview": "\n© 2024 宇树科技 版权所有 9\n手持遥控但不要触碰摇",
+          "token_count": 226,
+          "section_path": "R1遥控器 / 技术规格",
+          "section_paths": [
+            "R1遥控器 / 技术规格",
+            "R1遥控器 / 遥控器摇杆校准",
+            "R1遥控器 / 开启/关闭遥控器"
+          ]
+        },
+        {
+          "child_id": "DOC-003-V2-C-00018",
+          "char_start": 642,
+          "char_end": 882,
+          "preview": "\n\\- 开启遥控器：短按电源按键一次，再长按电源按键2秒以上",
+          "token_count": 212,
+          "section_path": "R1遥控器 / 开启/关闭遥控器",
+          "section_paths": [
+            "R1遥控器 / 开启/关闭遥控器",
+            "R1遥控器 / 遥控器充电"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "DOC-001-V2-P-00015",
+      "document_id": "DOC-001",
+      "chapter": "保养和维护",
+      "subsections": [
+        "维护间隔",
+        "在每次运行之后",
+        "每周",
+        "每月一次",
+        "每年一次",
+        "以动画形式呈现的维护工作",
+        "清洁涡轮机保护网",
+        "清洗粗大污染物滤网",
+        "清洗清水过滤器",
+        "清洁吸水扒",
+        "更换或翻转吸水胶条",
+        "清空粗大污染物容器",
+        "冲洗污水箱，结合冲洗系统"
+      ],
+      "section_path": "保养和维护",
+      "parent_preview": "危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任何工作之前，请将设备与对接站断开，或拔出电源插头\n注意\n损坏危险\n不得用水喷射本设备 不得使用腐蚀性",
+      "token_count": 1392,
+      "children": [
+        {
+          "child_id": "DOC-001-V2-C-00076",
+          "char_start": 0,
+          "char_end": 291,
+          "preview": "危险\n无意中启动设备，接触导电部件\n受伤危险，触电\n在执行任",
+          "token_count": 259,
+          "section_path": "保养和维护",
+          "section_paths": [
+            "保养和维护",
+            "保养和维护 / 维护间隔",
+            "保养和维护 / 在每次运行之后"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00077",
+          "char_start": 239,
+          "char_end": 523,
+          "preview": "8. 清洗清洁头上的分水条\n9. 清洁吸水扒中的吸水胶条，检",
+          "token_count": 254,
+          "section_path": "保养和维护 / 在每次运行之后",
+          "section_paths": [
+            "保养和维护 / 在每次运行之后",
+            "保养和维护 / 每周",
+            "保养和维护 / 每月一次"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00078",
+          "char_start": 472,
+          "char_end": 755,
+          "preview": "2. ## 定期使用时，至少每周给蓄电池完全充电一次并且没有",
+          "token_count": 252,
+          "section_path": "保养和维护 / 每周",
+          "section_paths": [
+            "保养和维护 / 每周",
+            "保养和维护 / 每月一次",
+            "保养和维护 / 每年一次",
+            "保养和维护 / 以动画形式呈现的维护工作",
+            "保养和维护 / 清洁涡轮机保护网"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00079",
+          "char_start": 706,
+          "char_end": 998,
+          "preview": "4. 利用方向键调用动画的各个步骤\n1. 打开污水箱盖罩\n2",
+          "token_count": 254,
+          "section_path": "保养和维护 / 以动画形式呈现的维护工作",
+          "section_paths": [
+            "保养和维护 / 以动画形式呈现的维护工作",
+            "保养和维护 / 清洁涡轮机保护网",
+            "保养和维护 / 清洗粗大污染物滤网",
+            "保养和维护 / 清洗清水过滤器"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00080",
+          "char_start": 960,
+          "char_end": 1259,
+          "preview": "4. 将粗大污染物滤网装入污水箱中\n1. 排干清水（参见“排",
+          "token_count": 256,
+          "section_path": "保养和维护 / 清洗粗大污染物滤网",
+          "section_paths": [
+            "保养和维护 / 清洗粗大污染物滤网",
+            "保养和维护 / 清洗清水过滤器",
+            "保养和维护 / 清洁吸水扒",
+            "保养和维护 / 更换或翻转吸水胶条"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00081",
+          "char_start": 1211,
+          "char_end": 1491,
+          "preview": "7. 拧紧两个翼型螺钉\n8. 将抽吸软管连接吸水扒\n当吸水胶",
+          "token_count": 241,
+          "section_path": "保养和维护 / 清洁吸水扒",
+          "section_paths": [
+            "保养和维护 / 清洁吸水扒",
+            "保养和维护 / 更换或翻转吸水胶条",
+            "保养和维护 / 清空粗大污染物容器"
+          ]
+        },
+        {
+          "child_id": "DOC-001-V2-C-00082",
+          "char_start": 1445,
+          "char_end": 1587,
+          "preview": "3. 清空粗大污染物容器，必要时清洁\n4. 重新装入粗大污染",
+          "token_count": 127,
+          "section_path": "保养和维护 / 清空粗大污染物容器",
+          "section_paths": [
+            "保养和维护 / 清空粗大污染物容器",
+            "保养和维护 / 冲洗污水箱，结合冲洗系统"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "DOC-002-V2-P-00004",
+      "document_id": "DOC-002",
+      "chapter": "如何充电",
+      "subsections": [
+        "电池充电",
+        "遥控器充电"
+      ],
+      "section_path": "如何充电",
+      "parent_preview": "由于运输和储存过程中电池自耗等原因，首次使用时电量偏低或电量为空属于正常现象，按照以下方式充电即可。\n① 将电池从 B2 机身中取出（向外拉出电池包提带）\n② ",
+      "token_count": 677,
+      "children": [
+        {
+          "child_id": "DOC-002-V2-C-00015",
+          "char_start": 0,
+          "char_end": 292,
+          "preview": "由于运输和储存过程中电池自耗等原因，首次使用时电量偏低或电量",
+          "token_count": 253,
+          "section_path": "如何充电",
+          "section_paths": [
+            "如何充电",
+            "如何充电 / 电池充电"
+          ]
+        },
+        {
+          "child_id": "DOC-002-V2-C-00016",
+          "char_start": 256,
+          "char_end": 552,
+          "preview": "\n3. 给电池充电前，请确保电池包处于关闭状态，否则会损坏电",
+          "token_count": 265,
+          "section_path": "如何充电 / 电池充电",
+          "section_paths": [
+            "如何充电 / 电池充电",
+            "如何充电 / 遥控器充电"
+          ]
+        },
+        {
+          "child_id": "DOC-002-V2-C-00017",
+          "char_start": 496,
+          "char_end": 669,
+          "preview": "1. 请使用官方USB充电器。如不使用官方充电器，推荐使用符",
+          "token_count": 146,
+          "section_path": "如何充电 / 遥控器充电",
+          "section_paths": [
+            "如何充电 / 遥控器充电"
+          ]
+        },
+        {
+          "child_id": "DOC-002-V2-C-00018",
+          "char_start": 669,
+          "char_end": 822,
+          "preview": "充电指示灯\nLED1=；LED2=；LED3=；LED4=；",
+          "token_count": 93,
+          "section_path": "如何充电 / 遥控器充电",
+          "section_paths": [
+            "如何充电 / 遥控器充电"
+          ]
+        }
+      ]
+    }
+  ],
+  "denoise": {
+    "header_footer_identity": {
+      "count": 1,
+      "examples": [
+        {
+          "document_id": "DOC-001",
+          "page": 1,
+          "text": "KIRA B 50",
+          "reason": "header_footer_identity",
+          "parser_type": "header"
+        }
+      ]
+    },
+    "page_number_content": {
+      "count": 1,
+      "examples": [
+        {
+          "document_id": "DOC-001",
+          "page": 54,
+          "text": "1",
+          "reason": "page_number_content",
+          "parser_type": "footer"
+        }
+      ]
+    },
+    "parser_page_number": {
+      "count": 140,
+      "examples": [
+        {
+          "document_id": "DOC-001",
+          "page": 1,
+          "text": "ZH",
+          "reason": "parser_page_number",
+          "parser_type": "page_number"
+        },
+        {
+          "document_id": "DOC-001",
+          "page": 1,
+          "text": "",
+          "reason": "parser_page_number",
+          "parser_type": "page_number"
+        },
+        {
+          "document_id": "DOC-001",
+          "page": 2,
+          "text": "",
+          "reason": "parser_page_number",
+          "parser_type": "page_number"
+        }
+      ]
+    },
+    "repeated_short_line": {
+      "count": 47,
+      "examples": [
+        {
+          "document_id": "DOC-002",
+          "page": 3,
+          "text": "© 2023 宇树科技 版权所有",
+          "reason": "repeated_short_line",
+          "parser_type": "footer"
+        },
+        {
+          "document_id": "DOC-002",
+          "page": 4,
+          "text": "© 2023 宇树科技 版权所有",
+          "reason": "repeated_short_line",
+          "parser_type": "footer"
+        },
+        {
+          "document_id": "DOC-002",
+          "page": 6,
+          "text": "© 2023 宇树科技 版权所有",
+          "reason": "repeated_short_line",
+          "parser_type": "footer"
+        }
+      ]
+    },
+    "symbols_only": {
+      "count": 1,
+      "examples": [
+        {
+          "document_id": "DOC-001",
+          "page": 39,
+          "text": "+",
+          "reason": "symbols_only",
+          "parser_type": "text"
+        }
+      ]
+    },
+    "table_of_contents": {
+      "count": 2,
+      "examples": [
+        {
+          "document_id": "DOC-002",
+          "page": 2,
+          "text": "目录",
+          "reason": "table_of_contents",
+          "parser_type": "text"
+        },
+        {
+          "document_id": "DOC-002",
+          "page": 2,
+          "text": "免责申明....2\n安全须知....3\n产品概述....4\n简介....4\n部件名称....4\n功能亮点....5\n接口说明....6\n如何充电....7\n电池充电....7\n遥控器充电....8\n使",
+          "reason": "table_of_contents",
+          "parser_type": "text"
+        }
+      ]
+    }
+  },
+  "discarded_header_footer": [
+    {
+      "document_id": "DOC-001",
+      "page": 1,
+      "text": "KIRA B 50",
+      "reason": "header_footer_identity",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-001",
+      "page": 54,
+      "text": "1",
+      "reason": "page_number_content",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 3,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 4,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 6,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 7,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 8,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 9,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 10,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 11,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 12,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 13,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 14,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 15,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 16,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 17,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 18,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-002",
+      "page": 19,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 2,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 2,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 3,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 4,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 4,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 6,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 6,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 7,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 8,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 8,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 9,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 10,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 10,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 11,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 12,
+      "text": "B2 电池&充电器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-004",
+      "page": 12,
+      "text": "© 2023 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 2,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 3,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 4,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 5,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 6,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 7,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 7,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 8,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 9,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 10,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 11,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 11,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 12,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 13,
+      "text": "B2 遥控器使用手册",
+      "reason": "repeated_short_line",
+      "parser_type": "header"
+    },
+    {
+      "document_id": "DOC-003",
+      "page": 13,
+      "text": "© 2024 宇树科技 版权所有",
+      "reason": "repeated_short_line",
+      "parser_type": "footer"
+    }
+  ],
+  "golden_evidence": {
+    "dataset_id": "GD-20261104115533",
+    "snapshot_sha256": "d49ad3560c36f09be4222d8e684689a95b714dc08209325ecd9e3190a6d9d8c3",
+    "matching_rule": "normalized-literal-v1",
+    "all_source_quotes_exact": false,
+    "question_count": 50,
+    "statuses": {
+      "exact": 35,
+      "missing": 1,
+      "no_source_quote": 14
+    },
+    "quote_count": 63,
+    "exact_quotes": 62,
+    "questions": [
+      {
+        "question_id": "CSV-20261101100758945425-01",
+        "display_id": "Q01",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "3bdff4950efe037ce75c287c957ab6f17dbde26269680adf06d7dd349f974f87",
+            "quote_preview": "1. 按下“设置”菜单中的“一般设置”按钮",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00138",
+            "old_parent_id": "DOC-001-P-00137",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "3bdff4950efe037ce75c287c957ab6f17dbde26269680adf06d7dd349f974f87"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 570,
+                "char_end": 591,
+                "child_ids": [
+                  "DOC-001-V2-C-00055"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00055"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "0124e33663045057e850eadcd39398c7369e95d54e9d0e204b39c70112212d06",
+            "quote_preview": "可以在“设定时区”下设置相应时区",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00138",
+            "old_parent_id": "DOC-001-P-00137",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0124e33663045057e850eadcd39398c7369e95d54e9d0e204b39c70112212d06"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 644,
+                "char_end": 660,
+                "child_ids": [
+                  "DOC-001-V2-C-00055"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00055"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-02",
+        "display_id": "Q02",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "fa6f67c4027d1bb43bb53cffc0ac2bf3fa91f75c86809d3421f16285d676da25",
+            "quote_preview": "1. 在设置菜单中按下“用户配置”按钮",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00134",
+            "old_parent_id": "DOC-001-P-00133",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "fa6f67c4027d1bb43bb53cffc0ac2bf3fa91f75c86809d3421f16285d676da25"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 86,
+                "char_end": 105,
+                "child_ids": [
+                  "DOC-001-V2-C-00053"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00053"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-03",
+        "display_id": "Q03",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "989e5b579b1c0324dccb40f8069dad07801cadb0938e65652376ce4f664e4bd5",
+            "quote_preview": "2. 按下“新用户”按钮\n\n3. 选择所需语言\n4. 点击用户名的输入栏\n5. 利用屏幕上的键盘输入用户名，点击回车键",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00134",
+            "old_parent_id": "DOC-001-P-00133",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 1,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "fa9a5f0c7408a2d4c770e18e860622183f532c2b312cd2549dbfbe2d52d8b6a9"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 106,
+                "char_end": 166,
+                "child_ids": [
+                  "DOC-001-V2-C-00053"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00053"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "617df092454263fbfc612555715fafc0f116506594f1d822c0c144b6ffef80df",
+            "quote_preview": "6. 按下“密码”按钮\n7. 点击“密码输入”输入栏\n8. 利用屏幕上的键盘输入密码\n9. 在“密码确认”输入栏中再次输",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00134",
+            "old_parent_id": "DOC-001-P-00133",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0c9496e249128bda7316f56fc1c39544d0d2645d27a7027a0caf2af805ba4dc5"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 167,
+                "char_end": 234,
+                "child_ids": [
+                  "DOC-001-V2-C-00053"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00053"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "16af4bd4bfb75955ef9648c90260c33aa4568bbc4ee1d78d24c0a3d9b0eccdc6",
+            "quote_preview": "11. 按下“权限”按钮-\n1 确认2 “权限”按钮3 权限列表4 出厂设置权限 操作人员5 出厂设置权限 主管\n12.",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00134",
+            "old_parent_id": "DOC-001-P-00133",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "2cb6c87cf0ea4ea1e36ae2edf1b3cb9c761e66d0dc0037fb141ecd6102ada41b"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 246,
+                "char_end": 331,
+                "child_ids": [
+                  "DOC-001-V2-C-00053",
+                  "DOC-001-V2-C-00054"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00054"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-04",
+        "display_id": "Q04",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "4fe7dccaeb73de7489910303290def352639b7a64e543b75f20c691fe313e02f",
+            "quote_preview": "只在室内存放设备",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00180",
+            "old_parent_id": "DOC-001-P-00178",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "4fe7dccaeb73de7489910303290def352639b7a64e543b75f20c691fe313e02f"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00014",
+                "char_start": 936,
+                "char_end": 944,
+                "child_ids": [
+                  "DOC-001-V2-C-00075"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00075"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "09e5c7f836a44075aa52b2615ef02c0365fed8fb3fed7b5b9d2f024c68788453",
+            "quote_preview": "5. 较长时间停机时，只有给电池完全充电后才能存储设备 至少每月一次给蓄电池重新完全充电",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00185",
+            "old_parent_id": "DOC-001-P-00183",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "09e5c7f836a44075aa52b2615ef02c0365fed8fb3fed7b5b9d2f024c68788453"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00015",
+                "char_start": 571,
+                "char_end": 615,
+                "child_ids": [
+                  "DOC-001-V2-C-00078"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00078"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-05",
+        "display_id": "Q05",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "3efef902a65dedec8a770e0f44a99333f27cdd4c47b08b761f110137c234ae31",
+            "quote_preview": "在设备上工作时请您佩戴合适的手套",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00010",
+            "old_parent_id": "DOC-001-P-00010",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "3efef902a65dedec8a770e0f44a99333f27cdd4c47b08b761f110137c234ae31"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00002",
+                "char_start": 238,
+                "char_end": 254,
+                "child_ids": [
+                  "DOC-001-V2-C-00004",
+                  "DOC-001-V2-C-00005"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00004",
+              "DOC-001-V2-C-00005"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-06",
+        "display_id": "Q06",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "1f98977c87bd9cfe0c8026cbcc9b2be80d1a844c10c96f715545498c86715896",
+            "quote_preview": "在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00181",
+            "old_parent_id": "DOC-001-P-00179",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "1f98977c87bd9cfe0c8026cbcc9b2be80d1a844c10c96f715545498c86715896"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00015",
+                "char_start": 26,
+                "char_end": 54,
+                "child_ids": [
+                  "DOC-001-V2-C-00076"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00076"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "1ec97889b9427a993e0565a601d76eda36f3ad37729cb9a8003e71c499d140ec",
+            "quote_preview": "触电危险在对接站上作业前将电源插头从插座中拔下",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00204",
+            "old_parent_id": "DOC-001-P-00202",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "1ec97889b9427a993e0565a601d76eda36f3ad37729cb9a8003e71c499d140ec"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00016",
+                "char_start": 862,
+                "char_end": 885,
+                "child_ids": [
+                  "DOC-001-V2-C-00086"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00086"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "5797d93027a255748396fd6acf2e305f6b78eb5a55403aba5feab5d27ad3ebe5",
+            "quote_preview": "决不能用湿手触及电源插头或者插座",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00017",
+            "old_parent_id": "DOC-001-P-00017",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "5797d93027a255748396fd6acf2e305f6b78eb5a55403aba5feab5d27ad3ebe5"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00002",
+                "char_start": 611,
+                "char_end": 627,
+                "child_ids": [
+                  "DOC-001-V2-C-00006"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00006"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-07",
+        "display_id": "Q07",
+        "status": "missing",
+        "quotes": [
+          {
+            "quote_sha256": "1f98977c87bd9cfe0c8026cbcc9b2be80d1a844c10c96f715545498c86715896",
+            "quote_preview": "在执行任何工作之前，请将设备与对接站断开，或拔出电源插头",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00181",
+            "old_parent_id": "DOC-001-P-00179",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "1f98977c87bd9cfe0c8026cbcc9b2be80d1a844c10c96f715545498c86715896"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00015",
+                "char_start": 26,
+                "char_end": 54,
+                "child_ids": [
+                  "DOC-001-V2-C-00076"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00076"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "ace5abd9829fc9b8a47c13403057378015960687f64546e3db33bd5884c1cdc2",
+            "quote_preview": "1. 打开污水箱盖罩\n\n2. 向上拉出粗大污染物滤网\n3. 将粗大污染物滤网放到自来水下冲洗\n4. 将粗大污染物滤网装",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00191",
+            "old_parent_id": "DOC-001-P-00189",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 1,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "a1165deaa5aa19956f22a157b062a438e6962442f9677b58abbcd57fbd648d24"
+            },
+            "parent_spans": [],
+            "direct_child_ids": [],
+            "exact_in_child_or_contiguous_children": false,
+            "reason": "规范化后原文未逐字命中连续Child，或移除的标题未出现在命中Child路径中"
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-08",
+        "display_id": "Q08",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "a7f28ea25a5cef225579b2a734520d1eca2dc32ff1dcdfb5e48c5f92d5c03850",
+            "quote_preview": "1. 检查充电器表面有无变形、鼓包等；\n2. 检查充电接口有无水渍、异物等。",
+            "document_id": "DOC-004",
+            "old_chunk_id": "DOC-004-C-00034",
+            "old_parent_id": "DOC-004-P-00029",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "697d17a90ebb0e74351efd4b8f338b1d8d06086c90f32b003d891fe592defcfc"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-004-V2-P-00006",
+                "char_start": 847,
+                "char_end": 885,
+                "child_ids": [
+                  "DOC-004-V2-C-00029"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00029"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "35366218c8d0d8f2c7a4dface2560934a127d8f21dbda2f95991e77f3513069d",
+            "quote_preview": "切勿使用酒精或其他可燃剂清洁充电器。",
+            "document_id": "DOC-004",
+            "old_chunk_id": "DOC-004-C-00025",
+            "old_parent_id": "DOC-004-P-00021",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "35366218c8d0d8f2c7a4dface2560934a127d8f21dbda2f95991e77f3513069d"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-004-V2-P-00004",
+                "char_start": 1415,
+                "char_end": 1433,
+                "child_ids": [
+                  "DOC-004-V2-C-00022"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00022"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-09",
+        "display_id": "Q09",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "8f5b37483c472c72a555b63ce74898c1ce5c17d2f4f25f88f722b28d2d8a7246",
+            "quote_preview": "务必将电池彻底放完电后，才将电池置于指定的电池回收箱中。电池是危险化学品，严禁废置于普通垃圾箱。相关细节，请遵循当地电池",
+            "document_id": "DOC-004",
+            "old_chunk_id": "DOC-004-C-00028",
+            "old_parent_id": "DOC-004-P-00024",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "8f5b37483c472c72a555b63ce74898c1ce5c17d2f4f25f88f722b28d2d8a7246"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-004-V2-P-00005",
+                "char_start": 555,
+                "char_end": 626,
+                "child_ids": [
+                  "DOC-004-V2-C-00025"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00025"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-10",
+        "display_id": "Q10",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "0e57fbfae9eafd0f32f827910cc569d8b6ae2f2afbf9d776b9fef2353737a9ba",
+            "quote_preview": "④ 充满电后手动断电",
+            "document_id": "DOC-002",
+            "old_chunk_id": "DOC-002-C-00023",
+            "old_parent_id": "DOC-002-P-00019",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0e57fbfae9eafd0f32f827910cc569d8b6ae2f2afbf9d776b9fef2353737a9ba"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-002-V2-P-00004",
+                "char_start": 123,
+                "char_end": 133,
+                "child_ids": [
+                  "DOC-002-V2-C-00015"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00015"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "4077fd9c44b68bad63e53608688b4c4a66424ac6249c255721cab9ebd0ac9ede",
+            "quote_preview": "6. 电量指示灯全部熄灭时表示电池包已充满。请取下电池包和充电器，完成充电。",
+            "document_id": "DOC-002",
+            "old_chunk_id": "DOC-002-C-00023",
+            "old_parent_id": "DOC-002-P-00019",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "4077fd9c44b68bad63e53608688b4c4a66424ac6249c255721cab9ebd0ac9ede"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-002-V2-P-00004",
+                "char_start": 378,
+                "char_end": 416,
+                "child_ids": [
+                  "DOC-002-V2-C-00016"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00016"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-11",
+        "display_id": "Q11",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "0099322c1683f696870cfa544861b4669a24c848f629209ef867817b238531ae",
+            "quote_preview": "在一个清洁对象中，所有 位置码 必须拥有不同的代码",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00144",
+            "old_parent_id": "DOC-001-P-00143",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0099322c1683f696870cfa544861b4669a24c848f629209ef867817b238531ae"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1408,
+                "char_end": 1433,
+                "child_ids": [
+                  "DOC-001-V2-C-00059"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00059"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-12",
+        "display_id": "Q12",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "adc4e431665b6badd502e6e9602eb67f28cd5e19393bd1648dd7380f6a157f59",
+            "quote_preview": "1. 按下 清洁报告 按钮",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00176",
+            "old_parent_id": "DOC-001-P-00174",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "adc4e431665b6badd502e6e9602eb67f28cd5e19393bd1648dd7380f6a157f59"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00014",
+                "char_start": 254,
+                "char_end": 267,
+                "child_ids": [
+                  "DOC-001-V2-C-00072",
+                  "DOC-001-V2-C-00073"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00072",
+              "DOC-001-V2-C-00073"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "b172799ada4d399404ea99687621ac4f35765835e1e1020ab1b321e0b20bf04c",
+            "quote_preview": "2. 点击所需清洁任务，以查看详情",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00176",
+            "old_parent_id": "DOC-001-P-00174",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "b172799ada4d399404ea99687621ac4f35765835e1e1020ab1b321e0b20bf04c"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00014",
+                "char_start": 293,
+                "char_end": 310,
+                "child_ids": [
+                  "DOC-001-V2-C-00073"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00073"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-13",
+        "display_id": "Q13",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "f65bf4dec478853918aa098ae46ced68993cd17f72cde25532b9122a58510457",
+            "quote_preview": "必须在起点固定 位置码",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00144",
+            "old_parent_id": "DOC-001-P-00143",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "f65bf4dec478853918aa098ae46ced68993cd17f72cde25532b9122a58510457"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1302,
+                "char_end": 1313,
+                "child_ids": [
+                  "DOC-001-V2-C-00059"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00059"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "0099322c1683f696870cfa544861b4669a24c848f629209ef867817b238531ae",
+            "quote_preview": "在一个清洁对象中，所有 位置码 必须拥有不同的代码",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00144",
+            "old_parent_id": "DOC-001-P-00143",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0099322c1683f696870cfa544861b4669a24c848f629209ef867817b238531ae"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1408,
+                "char_end": 1433,
+                "child_ids": [
+                  "DOC-001-V2-C-00059"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00059"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "494f1abcd57bfd2a01b471db9c6457a0cf127d1dbac1cbcb0c0f1e013d45f448",
+            "quote_preview": "必须将每个 位置码 固定在一个垂直表面上，高度为 66 cm cm",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00144",
+            "old_parent_id": "DOC-001-P-00143",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "494f1abcd57bfd2a01b471db9c6457a0cf127d1dbac1cbcb0c0f1e013d45f448"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1452,
+                "char_end": 1485,
+                "child_ids": [
+                  "DOC-001-V2-C-00059",
+                  "DOC-001-V2-C-00060"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00059",
+              "DOC-001-V2-C-00060"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-14",
+        "display_id": "Q14",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "04edcbaa7e0f7352e227c60f9f8c4d55f03e88e886e873a1d1485d61bb3d00c3",
+            "quote_preview": "按下紧急停机按钮，在紧急情况下立即停用",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00007",
+            "old_parent_id": "DOC-001-P-00007",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "04edcbaa7e0f7352e227c60f9f8c4d55f03e88e886e873a1d1485d61bb3d00c3"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00002",
+                "char_start": 72,
+                "char_end": 91,
+                "child_ids": [
+                  "DOC-001-V2-C-00004"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00004"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-15",
+        "display_id": "Q15",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "a5db81cba0e99ff4d58aad2c7d452f135db2c1c50f37ad63fd43de48e47e02d0",
+            "quote_preview": "1. 在触摸屏上选择功能“手动清洁”",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00140",
+            "old_parent_id": "DOC-001-P-00139",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "a5db81cba0e99ff4d58aad2c7d452f135db2c1c50f37ad63fd43de48e47e02d0"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 952,
+                "char_end": 970,
+                "child_ids": [
+                  "DOC-001-V2-C-00057"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00057"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "6e6b6887531fe46d32268aa6931c00e6fd281000e433df922cbe5071e9b2296a",
+            "quote_preview": "2. 操作并握紧安全开关3. 将设备推到使用地4. 松开安全开关\n5. 选择水量 清洁剂计量 刷子功率和抽吸功率的所需设",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00140",
+            "old_parent_id": "DOC-001-P-00139",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "faef2f57943b7904e93ee57761061a96950424b770b6c517d0e49e225eb1208a"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1072,
+                "char_end": 1166,
+                "child_ids": [
+                  "DOC-001-V2-C-00058"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00058"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "ed04acc5864423a1ece349b707b1eb397e9a18885ceed967c341ca637fdeb842",
+            "quote_preview": "7. 操作并握紧安全开关\n8. 将设备推到待清洁的场地上",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00141",
+            "old_parent_id": "DOC-001-P-00140",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "ae7451c904a3a19aeecc2c8d9a4c09cc7db5596d8cfc428ee16441e9c6410cf8"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00011",
+                "char_start": 1186,
+                "char_end": 1214,
+                "child_ids": [
+                  "DOC-001-V2-C-00058",
+                  "DOC-001-V2-C-00059"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00058"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-16",
+        "display_id": "Q16",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "3784073ddd5cd6bf37d2eea0617879b43915c30c947bd79cdbcf7aafbd9f5776",
+            "quote_preview": "B2 提供多个扩展接口，1000M-Base-Ethernet×4、USB3.0×4",
+            "document_id": "DOC-002",
+            "old_chunk_id": "DOC-002-C-00020",
+            "old_parent_id": "DOC-002-P-00016",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "3784073ddd5cd6bf37d2eea0617879b43915c30c947bd79cdbcf7aafbd9f5776"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-002-V2-P-00003",
+                "char_start": 1037,
+                "char_end": 1079,
+                "child_ids": [
+                  "DOC-002-V2-C-00014"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00014"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "7e45ce45594c2547ae59eba6bc2bd5e0b2d4b8e73e2fc3e75d05f6e337a52ddb",
+            "quote_preview": "B2 机身侧面提供 sdk 扩展口，以便开发者继续更多的扩展功能开发",
+            "document_id": "DOC-002",
+            "old_chunk_id": "DOC-002-C-00021",
+            "old_parent_id": "DOC-002-P-00017",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "7e45ce45594c2547ae59eba6bc2bd5e0b2d4b8e73e2fc3e75d05f6e337a52ddb"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-002-V2-P-00003",
+                "char_start": 1236,
+                "char_end": 1270,
+                "child_ids": [
+                  "DOC-002-V2-C-00014"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00014"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-17",
+        "display_id": "Q17",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "4baff3ca09e31420d43064d964b70788cbe0d6e48440f38e680799f34a565741",
+            "quote_preview": "R3 遥控器基本操作\n首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控",
+            "document_id": "DOC-003",
+            "old_chunk_id": "DOC-003-C-00015",
+            "old_parent_id": "DOC-003-P-00015",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [
+                "R3 遥控器基本操作"
+              ],
+              "headings_verified": true,
+              "normalized_quote_sha256": "1bc8f7b736fae84d54e490dcce6bc379886b84be5b4090f23a874ca4a323541b"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-003-V2-P-00002",
+                "char_start": 1524,
+                "char_end": 1664,
+                "child_ids": [
+                  "DOC-003-V2-C-00009"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00009"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "5a8b79d36ffa1efc6b3a1a081a13786a3fcc60c6d5005ae5ac0856f51da962e0",
+            "quote_preview": "R1 遥控器基本操作\n首次使用遥控器需要在 Unitree Explore App 上进行遥控器绑定，【设置】->【遥控",
+            "document_id": "DOC-003",
+            "old_chunk_id": "DOC-003-C-00025",
+            "old_parent_id": "DOC-003-P-00023",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [
+                "R1 遥控器基本操作"
+              ],
+              "headings_verified": true,
+              "normalized_quote_sha256": "ed69913d0e07e56b204269f190fd5e00802d43f590dd7e2c71a806d73c62220f"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-003-V2-P-00005",
+                "char_start": 220,
+                "char_end": 352,
+                "child_ids": [
+                  "DOC-003-V2-C-00020"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00020"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-18",
+        "display_id": "Q18",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "a49f2a05377cda64064def340ca39392ad8efed88243261458bf2a0e1aca5b60",
+            "quote_preview": "手持遥控但不要触碰摇杆，按下遥控上按键 F1 和 F3 并同时松开，此时遥控器发出连续“嘀\\~嘀\\~”声（1次/秒）代表",
+            "document_id": "DOC-003",
+            "old_chunk_id": "DOC-003-C-00009",
+            "old_parent_id": "DOC-003-P-00009",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "a49f2a05377cda64064def340ca39392ad8efed88243261458bf2a0e1aca5b60"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-003-V2-P-00002",
+                "char_start": 667,
+                "char_end": 796,
+                "child_ids": [
+                  "DOC-003-V2-C-00005",
+                  "DOC-003-V2-C-00006"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00005"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-19",
+        "display_id": "Q19",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "7dc1520a51e8b7aa27108473dab5b8cd4dc370feb89d9841e953c7d834e6b563",
+            "quote_preview": "1. 在悬崖附近操作机器人时，使用用户个人资料登录",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00235",
+            "old_parent_id": "DOC-001-P-00233",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "7dc1520a51e8b7aa27108473dab5b8cd4dc370feb89d9841e953c7d834e6b563"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00018",
+                "char_start": 104,
+                "char_end": 129,
+                "child_ids": [
+                  "DOC-001-V2-C-00095"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00095"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-20",
+        "display_id": "Q20",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "dcc12a1c2bf52558773f8d2b27c712eb8adb8b8a271974e17a03b471932740d5",
+            "quote_preview": "重启机器人 如果错误仍然存在，请致电售后服务部",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00209",
+            "old_parent_id": "DOC-001-P-00207",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "dcc12a1c2bf52558773f8d2b27c712eb8adb8b8a271974e17a03b471932740d5"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00017",
+                "char_start": 315,
+                "char_end": 338,
+                "child_ids": [
+                  "DOC-001-V2-C-00089"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00089"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-21",
+        "display_id": "Q21",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "b29b92fa45a7fdbc534ba3c291ab9e5d8a82ce06975b8a8d4770b5b789bb52c7",
+            "quote_preview": "自 2024 年 12 月起，R1 遥控器已全面升级至新一代 R3 遥控器。",
+            "document_id": "DOC-003",
+            "old_chunk_id": "DOC-003-C-00003",
+            "old_parent_id": "DOC-003-P-00003",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "b29b92fa45a7fdbc534ba3c291ab9e5d8a82ce06975b8a8d4770b5b789bb52c7"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-003-V2-P-00001",
+                "char_start": 77,
+                "char_end": 115,
+                "child_ids": [
+                  "DOC-003-V2-C-00001"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00001"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "b0db43654bd74c6eb0e3ff4b09924ffe57e85fc2bb904f89b9c7f886c1c20eb3",
+            "quote_preview": "新版遥控器的操作方式与旧版保持一致",
+            "document_id": "DOC-003",
+            "old_chunk_id": "DOC-003-C-00003",
+            "old_parent_id": "DOC-003-P-00003",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "b0db43654bd74c6eb0e3ff4b09924ffe57e85fc2bb904f89b9c7f886c1c20eb3"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-003-V2-P-00001",
+                "char_start": 115,
+                "char_end": 132,
+                "child_ids": [
+                  "DOC-003-V2-C-00001"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00001"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "6dea49440a502fb55a6cf8de8b781e6ec8ef4dc66e3e1ee95953e4eba7043bc6",
+            "quote_preview": "新旧版遥控器将随机发货，请以实物为准。",
+            "document_id": "DOC-003",
+            "old_chunk_id": "DOC-003-C-00003",
+            "old_parent_id": "DOC-003-P-00003",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "6dea49440a502fb55a6cf8de8b781e6ec8ef4dc66e3e1ee95953e4eba7043bc6"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-003-V2-P-00001",
+                "char_start": 154,
+                "char_end": 173,
+                "child_ids": [
+                  "DOC-003-V2-C-00001"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00001"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-22",
+        "display_id": "Q22",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "c1db3743682e358d73d2e5580ccdcca833766b01e646831983c60d687005c64a",
+            "quote_preview": "开启遥控器：短按电源按键一次，再长按电源按键2秒以上，听到“嘀\\~嘀\\~”两声，即遥控开启。",
+            "document_id": "DOC-003",
+            "old_chunk_id": "DOC-003-C-00010",
+            "old_parent_id": "DOC-003-P-00010",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "c1db3743682e358d73d2e5580ccdcca833766b01e646831983c60d687005c64a"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-003-V2-P-00002",
+                "char_start": 853,
+                "char_end": 899,
+                "child_ids": [
+                  "DOC-003-V2-C-00006"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-003-V2-C-00006"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-23",
+        "display_id": "Q23",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "ccf84da1dea0fd97d60e4d57d7d887a944bf5d450dbf84e15627c78a42bb8897",
+            "quote_preview": "危险\n提示导致人员重伤或死亡的直接威胁性危险",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00008",
+            "old_parent_id": "DOC-001-P-00008",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "fc72c605dada31de2fb37c9a18f79d2d6681ce76c291a3f43d9a92bbbe20456c"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00002",
+                "char_start": 152,
+                "char_end": 174,
+                "child_ids": [
+                  "DOC-001-V2-C-00004"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00004"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "8749abbca7dc56b4ab855d0a3b1bc876e1a2fce64e44228e24983ba3f5adf90f",
+            "quote_preview": "警告\n提示可能导致人员重伤或死亡的危险状况\n小心\n提示可能导致轻度伤害的危险状况",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00009",
+            "old_parent_id": "DOC-001-P-00009",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "e3b40a9cc482987d62ea2981752cfe6d6af9101e6f45219c01f7bfa649f74fa6"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00002",
+                "char_start": 175,
+                "char_end": 215,
+                "child_ids": [
+                  "DOC-001-V2-C-00004"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00004"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-24",
+        "display_id": "Q24",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "015cf09545f7610029dc20a358f9c3648d72cf2404df26d12e35796e841dcc7d",
+            "quote_preview": "不得未稀释使用推荐的洗涤剂",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00022",
+            "old_parent_id": "DOC-001-P-00022",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "015cf09545f7610029dc20a358f9c3648d72cf2404df26d12e35796e841dcc7d"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00003",
+                "char_start": 109,
+                "char_end": 122,
+                "child_ids": [
+                  "DOC-001-V2-C-00010"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00010"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "3d50430ede000c502a6144c1bd2a6ae5fcc3d012b88032f792edeabf341818d9",
+            "quote_preview": "仅使用制造商推荐的清洁剂，并遵守清洁剂制造商的使用 处置和警告说明",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00022",
+            "old_parent_id": "DOC-001-P-00022",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "3d50430ede000c502a6144c1bd2a6ae5fcc3d012b88032f792edeabf341818d9"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00003",
+                "char_start": 192,
+                "char_end": 225,
+                "child_ids": [
+                  "DOC-001-V2-C-00010"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00010"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-25",
+        "display_id": "Q25",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "d8601625d0c0b8d559ef539e4abb26a99f3a4b266346ecfdc9cc08e01368d4f9",
+            "quote_preview": "2. 给电池充电前，先插入输入交流电源，然后充电器接电池。",
+            "document_id": "DOC-004",
+            "old_chunk_id": "DOC-004-C-00016",
+            "old_parent_id": "DOC-004-P-00015",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "d8601625d0c0b8d559ef539e4abb26a99f3a4b266346ecfdc9cc08e01368d4f9"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-004-V2-P-00003",
+                "char_start": 93,
+                "char_end": 122,
+                "child_ids": [
+                  "DOC-004-V2-C-00011"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00011"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "594572e74ef243032f669740b0cc83ce482803387a097bfe2a5a2eac7e881978",
+            "quote_preview": "4. 对电池包进行充电时，需要将电池包从机身内取出。",
+            "document_id": "DOC-004",
+            "old_chunk_id": "DOC-004-C-00016",
+            "old_parent_id": "DOC-004-P-00015",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "594572e74ef243032f669740b0cc83ce482803387a097bfe2a5a2eac7e881978"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-004-V2-P-00003",
+                "char_start": 159,
+                "char_end": 185,
+                "child_ids": [
+                  "DOC-004-V2-C-00011"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00011"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "0e57fbfae9eafd0f32f827910cc569d8b6ae2f2afbf9d776b9fef2353737a9ba",
+            "quote_preview": "④ 充满电后手动断电",
+            "document_id": "DOC-002",
+            "old_chunk_id": "DOC-002-C-00023",
+            "old_parent_id": "DOC-002-P-00019",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "0e57fbfae9eafd0f32f827910cc569d8b6ae2f2afbf9d776b9fef2353737a9ba"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-002-V2-P-00004",
+                "char_start": 123,
+                "char_end": 133,
+                "child_ids": [
+                  "DOC-002-V2-C-00015"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00015"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-26",
+        "display_id": "Q26",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "9a513cb010de57da79ada36ecd4f7465fb5e5ea0ffeeb16d8f6495218016e878",
+            "quote_preview": "通过该功能，按照起点的 位置码 布置路线1. 点击“位置码”开关1 “位置码”开关现在可用路线按照“位置码”排序2. 点",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00154",
+            "old_parent_id": "DOC-001-P-00152",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "9a513cb010de57da79ada36ecd4f7465fb5e5ea0ffeeb16d8f6495218016e878"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00013",
+                "char_start": 0,
+                "char_end": 77,
+                "child_ids": [
+                  "DOC-001-V2-C-00068"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00068"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-27",
+        "display_id": "Q27",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "8731cfede967bff4a488b9534f63f34613122e3ee6bda28dace96e6ee65ef96d",
+            "quote_preview": "不，地图不具备自学习功能 对原始布局进行细微改动不成问题 对布局的改动越大，则设备的效率就越低 如果布局发生了重大变化，",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00096",
+            "old_parent_id": "DOC-001-P-00095",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "8731cfede967bff4a488b9534f63f34613122e3ee6bda28dace96e6ee65ef96d"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00008",
+                "char_start": 722,
+                "char_end": 792,
+                "child_ids": [
+                  "DOC-001-V2-C-00038"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00038"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-28",
+        "display_id": "Q28",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "fd9288b5d918c6e2e5bb10d888ed09fd7139d5aa4f626cc9718c3fcd1f33e567",
+            "quote_preview": "2. 按下解锁按钮\n3. 转出轴承盖\n4. 拉出刷辊",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00200",
+            "old_parent_id": "DOC-001-P-00198",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "eab18f3ce1f6365a4ec24ddd50136b5864ce8fcfb24e576b5482d563e6bbf2e4"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00016",
+                "char_start": 552,
+                "char_end": 578,
+                "child_ids": [
+                  "DOC-001-V2-C-00085"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00085"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "f7c86b3faf75204c5c302409d553fc0844d0cc2f080e71b5e97216f3dd5c2ea5",
+            "quote_preview": "5. 装入新刷辊，并来回转动刷辊，使其在从动件上方居中\n6. 摆回轴承盖，将刷辊的端盖卡入轴承盖",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00200",
+            "old_parent_id": "DOC-001-P-00198",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "020712b4a9115514369e799cc02b59f0532ee4447f40cbb2db0cfdf2b3d47422"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00016",
+                "char_start": 610,
+                "char_end": 658,
+                "child_ids": [
+                  "DOC-001-V2-C-00085"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00085"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-29",
+        "display_id": "Q29",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "930731dc86d3749d8ff1ade765c648686bd26a8e72621a1ce8f889a04b1adc79",
+            "quote_preview": "类型=结构；要点=1. 目视及触摸检查机身、各个关节及连接处、足端组件是否完好,有裂纹或者有破损需及时更换和联系 Uni",
+            "document_id": "DOC-002",
+            "old_chunk_id": "DOC-002-C-00056",
+            "old_parent_id": "DOC-002-P-00048",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "930731dc86d3749d8ff1ade765c648686bd26a8e72621a1ce8f889a04b1adc79"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-002-V2-P-00009",
+                "char_start": 352,
+                "char_end": 419,
+                "child_ids": [
+                  "DOC-002-V2-C-00041"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00041"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "c7c7b5675474fb4668a31dc9e6e2bf2e39e267c462af63a8b13c09e825c18244",
+            "quote_preview": "类型=电池包；要点=1. 机身的电池包接口有无异物,变形2. 电池包安装是否可靠,确保运行时不会松脱3. 电池包外壳是否",
+            "document_id": "DOC-002",
+            "old_chunk_id": "DOC-002-C-00056",
+            "old_parent_id": "DOC-002-P-00048",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "c7c7b5675474fb4668a31dc9e6e2bf2e39e267c462af63a8b13c09e825c18244"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-002-V2-P-00009",
+                "char_start": 504,
+                "char_end": 585,
+                "child_ids": [
+                  "DOC-002-V2-C-00042"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00042"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "53afc2c7eb7d6037109505d5576e19ee23a5d0f07d995ddf2af8685a28a0002e",
+            "quote_preview": "类型=遥控器；要点=1. 遥控器摇杆是都在中位,摇杆是否进入沙土等异物2. 遥控器的各个按键是否存在卡顿",
+            "document_id": "DOC-002",
+            "old_chunk_id": "DOC-002-C-00056",
+            "old_parent_id": "DOC-002-P-00048",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "53afc2c7eb7d6037109505d5576e19ee23a5d0f07d995ddf2af8685a28a0002e"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-002-V2-P-00009",
+                "char_start": 586,
+                "char_end": 638,
+                "child_ids": [
+                  "DOC-002-V2-C-00042"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-002-V2-C-00042"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-30",
+        "display_id": "Q30",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "4734d60190a0ce1e5b99c4cd41a01fb6a96d67f8a9c55a6ff91cd377b152a095",
+            "quote_preview": "机器人测试已接合制动器时检测到运动",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00233",
+            "old_parent_id": "DOC-001-P-00231",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "4734d60190a0ce1e5b99c4cd41a01fb6a96d67f8a9c55a6ff91cd377b152a095"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00017",
+                "char_start": 1490,
+                "char_end": 1507,
+                "child_ids": [
+                  "DOC-001-V2-C-00094"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00094"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "a83185122a5b05533d1b835b88fe2dc6231141092194c3ac6b1a5607ed4e2700",
+            "quote_preview": "1. 制动器很可能没有接合 将轮子之间的红色杠杆向右推，使其接合",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00233",
+            "old_parent_id": "DOC-001-P-00231",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "a83185122a5b05533d1b835b88fe2dc6231141092194c3ac6b1a5607ed4e2700"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00017",
+                "char_start": 1514,
+                "char_end": 1546,
+                "child_ids": [
+                  "DOC-001-V2-C-00094"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00094"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-31",
+        "display_id": "Q31",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-32",
+        "display_id": "Q32",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-33",
+        "display_id": "Q33",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-34",
+        "display_id": "Q34",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-35",
+        "display_id": "Q35",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "29d45a0aed28f926543d122acd83dfa4bd0df83e1786069e1a178cb379cc36d1",
+            "quote_preview": "危险\n由于安全开关故障而导致的事故危险\n如果一个或两个安全开关不能可靠地返回未操作的位置，请立即停止设备",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00128",
+            "old_parent_id": "DOC-001-P-00127",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "ad432512cd40e1b9b74687fc867b73e1b5b6e58f0cdf33de57fdfdda4aa9ed2a"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00010",
+                "char_start": 1115,
+                "char_end": 1167,
+                "child_ids": [
+                  "DOC-001-V2-C-00050"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00050"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-36",
+        "display_id": "Q36",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-37",
+        "display_id": "Q37",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-38",
+        "display_id": "Q38",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-39",
+        "display_id": "Q39",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "35366218c8d0d8f2c7a4dface2560934a127d8f21dbda2f95991e77f3513069d",
+            "quote_preview": "切勿使用酒精或其他可燃剂清洁充电器。",
+            "document_id": "DOC-004",
+            "old_chunk_id": "DOC-004-C-00025",
+            "old_parent_id": "DOC-004-P-00021",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "35366218c8d0d8f2c7a4dface2560934a127d8f21dbda2f95991e77f3513069d"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-004-V2-P-00004",
+                "char_start": 1415,
+                "char_end": 1433,
+                "child_ids": [
+                  "DOC-004-V2-C-00022"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00022"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-40",
+        "display_id": "Q40",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "7f29713ee98323c7a8c7e5402f3110684671dc425b6ab60f1264f69f1dd9e0f6",
+            "quote_preview": "8. 在将电池包安装或者拔出于机器人之前，请保持电池包的电源关闭。请勿在电池包电源打开的状态下插拔电池包，否则可能损坏电",
+            "document_id": "DOC-004",
+            "old_chunk_id": "DOC-004-C-00021",
+            "old_parent_id": "DOC-004-P-00020",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "7f29713ee98323c7a8c7e5402f3110684671dc425b6ab60f1264f69f1dd9e0f6"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-004-V2-P-00004",
+                "char_start": 390,
+                "char_end": 456,
+                "child_ids": [
+                  "DOC-004-V2-C-00018"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00018"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-41",
+        "display_id": "Q41",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-42",
+        "display_id": "Q42",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-43",
+        "display_id": "Q43",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-44",
+        "display_id": "Q44",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "187a3967b37672048023214f3996b2d4012aee1b4bd74a9dad47a0a8cb9ea589",
+            "quote_preview": "服务：只适用于客户服务",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00129",
+            "old_parent_id": "DOC-001-P-00128",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "187a3967b37672048023214f3996b2d4012aee1b4bd74a9dad47a0a8cb9ea589"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00010",
+                "char_start": 1298,
+                "char_end": 1309,
+                "child_ids": [
+                  "DOC-001-V2-C-00051"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00051"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-45",
+        "display_id": "Q45",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "a09d1091e4b439e829db6ca1fab1de9ba496998c299eb0703f2415527217b4e6",
+            "quote_preview": "7. 机器人运行结束后电池包温度可能较高，必须待电池包温度降至室温后再对电池包进行充电。",
+            "document_id": "DOC-004",
+            "old_chunk_id": "DOC-004-C-00016",
+            "old_parent_id": "DOC-004-P-00015",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": false,
+              "removed_heading_lines": [],
+              "headings_verified": true,
+              "normalized_quote_sha256": "a09d1091e4b439e829db6ca1fab1de9ba496998c299eb0703f2415527217b4e6"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-004-V2-P-00003",
+                "char_start": 268,
+                "char_end": 312,
+                "child_ids": [
+                  "DOC-004-V2-C-00012"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-004-V2-C-00012"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-46",
+        "display_id": "Q46",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-47",
+        "display_id": "Q47",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-48",
+        "display_id": "Q48",
+        "status": "no_source_quote",
+        "quotes": []
+      },
+      {
+        "question_id": "CSV-20261101100758945425-49",
+        "display_id": "Q49",
+        "status": "exact",
+        "quotes": [
+          {
+            "quote_sha256": "84e58e335ae1987a734cc755d1eb15982c2b3eac683779efed87602644869359",
+            "quote_preview": "安全装置\n小心\n安全装置缺失或被改动过\n安全装置用于保护您的安全\n不得变更或不用安全装置",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00029",
+            "old_parent_id": "DOC-001-P-00029",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [
+                "安全装置"
+              ],
+              "headings_verified": true,
+              "normalized_quote_sha256": "c536ac52e61b7227632ccab3dd9ba14dac2e5f89c39aac0a83db0cc3639e6e24"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00003",
+                "char_start": 1136,
+                "char_end": 1175,
+                "child_ids": [
+                  "DOC-001-V2-C-00013",
+                  "DOC-001-V2-C-00014"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00014"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          },
+          {
+            "quote_sha256": "5c6ffc9059cc6f30b7b1256024e4610c378b1c839b4685009faa094ea371c795",
+            "quote_preview": "后部激光扫描器脏了\n原因：\n检测发现后部激光扫描器上有污垢，无法再正常工作",
+            "document_id": "DOC-001",
+            "old_chunk_id": "DOC-001-C-00224",
+            "old_parent_id": "DOC-001-P-00222",
+            "exact_in_old_parent": true,
+            "normalization": {
+              "removed_private_use_count": 0,
+              "whitespace_unified": true,
+              "removed_heading_lines": [
+                "后部激光扫描器脏了"
+              ],
+              "headings_verified": true,
+              "normalized_quote_sha256": "2aa0c72f013acd5e904c0bff2345e01a98acf49c05dda805a3d7c66cebc7fe0b"
+            },
+            "parent_spans": [
+              {
+                "parent_id": "DOC-001-V2-P-00017",
+                "char_start": 1045,
+                "char_end": 1072,
+                "child_ids": [
+                  "DOC-001-V2-C-00092"
+                ],
+                "covered": true
+              }
+            ],
+            "direct_child_ids": [
+              "DOC-001-V2-C-00092"
+            ],
+            "exact_in_child_or_contiguous_children": true,
+            "reason": null
+          }
+        ]
+      },
+      {
+        "question_id": "CSV-20261101100758945425-50",
+        "display_id": "Q50",
+        "status": "no_source_quote",
+        "quotes": []
+      }
+    ]
+  },
+  "checks": {
+    "noise_only_chunks_zero": true,
+    "child_median_150_300": true,
+    "child_minimum_60_except_listed_tables": true,
+    "parent_median_at_least_600": true,
+    "children_per_parent_at_least_3": true,
+    "single_child_parent_fraction_at_most_15_percent": true,
+    "singletons_are_short_chapters": true,
+    "child_cap_300": true,
+    "parent_cap_1400": true,
+    "short_parents_are_whole_chapters": true,
+    "offsets_exact": true,
+    "all_saved_source_quotes_exact": false
+  }
+}

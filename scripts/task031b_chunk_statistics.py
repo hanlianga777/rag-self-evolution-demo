@@ -3,7 +3,7 @@
 No Store, parser, index builder, embedding, model, or network request is used.
 """
 import argparse
-from collections import Counter, defaultdict
+from collections import Counter
 import hashlib
 import json
 from pathlib import Path
@@ -14,6 +14,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'backend'))
+from app.evidence_anchoring import match_evidence_quote
 from app.knowledge_pipeline import V2_CONFIG, MANUAL_CHAPTERS, parent_child_v2, document_category
 
 
@@ -46,8 +47,6 @@ def evidence_audit(snapshot, old_parents, old_children, parents, children, parse
     result = []
     old_by_id = {c['chunk_id']:c for c in old_children}
     old_parent_by_id = {p['chunk_id']:p for p in old_parents}
-    by_parent = defaultdict(list)
-    for child in children: by_parent[child['parent_chunk_id']].append(child)
     for question in snapshot['questions']:
         sources = question.get('business_requirements', {}).get('sources', [])
         quotes = []
@@ -56,38 +55,19 @@ def evidence_audit(snapshot, old_parents, old_children, parents, children, parse
             if not quote: continue
             old_child = old_by_id.get(source.get('chunk_id'), {})
             old_parent = old_parent_by_id.get(old_child.get('parent_chunk_id'), {})
-            direct = [c['chunk_id'] for c in children if c['document_id'] == doc and quote in c['chunk_text']]
-            spans = []
-            for parent in parents:
-                if parent['document_id'] != doc: continue
-                offset = parent['chunk_text'].find(quote)
-                if offset < 0: continue
-                end = offset + len(quote)
-                matches = [c for c in by_parent[parent['chunk_id']] if c['char_start'] < end and c['char_end'] > offset]
-                cursor = offset
-                for child in sorted(matches, key=lambda c: c['char_start']):
-                    if child['char_start'] > cursor: break
-                    cursor = max(cursor, child['char_end'])
-                spans.append({'parent_id':parent['chunk_id'], 'char_start':offset,'char_end':end,
-                              'child_ids':[c['chunk_id'] for c in matches], 'covered':cursor >= end})
-            exact = bool(direct or any(s['covered'] for s in spans))
-            reason = None
-            if not exact:
-                headings = [p['text'] for p in parsed[doc] if p.get('heading_only') and p['text'] in quote]
-                dropped = [p for p in parsed[doc] if p.get('drop_reason') and p['text'] and p['text'] in quote]
-                if headings: reason = '原文含标题；按本单规则标题只保存在section_path，不在Child正文'
-                elif dropped: reason = '原文含已去除的页码或页眉等噪声；逐字匹配不成立'
-                elif not quote in old_parent.get('chunk_text',''): reason = '保存的证据原文在指定旧Parent中也不是逐字子串'
-                else: reason = '原文跨新Parent或表格规范化边界，未在单个新Parent中逐字命中'
+            match = match_evidence_quote(quote, doc, parents, children,
+                                         {p['text'] for p in parsed.get(doc, []) if p.get('heading_only')})
+            exact = match['exact_in_child_or_contiguous_children']
+            reason = None if exact else '规范化后原文未逐字命中连续Child，或移除的标题未出现在命中Child路径中'
             quotes.append({'quote_sha256':hashlib.sha256(quote.encode()).hexdigest(), 'quote_preview':quote[:60],
                            'document_id':doc,'old_chunk_id':source.get('chunk_id'), 'old_parent_id':old_parent.get('chunk_id'),
                            'exact_in_old_parent':quote in old_parent.get('chunk_text',''),
-                           'exact_in_child_or_contiguous_children':exact,'direct_child_ids':direct,
-                           'parent_spans':spans,'reason':reason})
+                           **match, 'reason':reason})
         result.append({'question_id':question['id'],'display_id':question.get('display_id'),
                        'status':'no_source_quote' if not quotes else 'exact' if all(q['exact_in_child_or_contiguous_children'] for q in quotes) else 'missing',
                        'quotes':quotes})
     return {'dataset_id':snapshot['id'],'snapshot_sha256':hashlib.sha256(json.dumps(snapshot,ensure_ascii=False,sort_keys=True).encode()).hexdigest(),
+            'matching_rule':'normalized-literal-v1',
             'all_source_quotes_exact':any(r['quotes'] for r in result) and all(q['exact_in_child_or_contiguous_children'] for r in result for q in r['quotes']),
             'question_count':len(result),'statuses':dict(Counter(r['status'] for r in result)),
             'quote_count':sum(len(r['quotes']) for r in result),
@@ -113,8 +93,8 @@ def collect(index, database, tokenizer_path, dataset_id=GOLDEN_DATASET_ID):
                                'child_tokens':distribution([c['token_count'] for c in cs])})
         for record in records:
             if record.get('drop_reason'):
-                noise.append({'document_id':doc['id'],'page':record['page'],'text':record['text'],'reason':record['drop_reason']})
-            noise.extend({'document_id':doc['id'],'page':record['page'],**line} for line in record.get('removed_lines',[]))
+                noise.append({'document_id':doc['id'],'page':record['page'],'text':record['text'],'reason':record['drop_reason'],'parser_type':record['raw'].get('type')})
+            noise.extend({'document_id':doc['id'],'page':record['page'],'parser_type':record['raw'].get('type'),**line} for line in record.get('removed_lines',[]))
     old_p = json.loads((index/'parents.json').read_text()); old_c = json.loads((index/'chunks.json').read_text())
     with sqlite3.connect(database.resolve().as_uri()+'?mode=ro', uri=True) as connection:
         connection.execute('PRAGMA query_only=ON')
@@ -130,10 +110,10 @@ def collect(index, database, tokenizer_path, dataset_id=GOLDEN_DATASET_ID):
     samples = []
     rng = random.Random(31)
     for parent in rng.sample(parents, min(10,len(parents))):
-        samples.append({'parent_id':parent['chunk_id'],'document_id':parent['document_id'], 'section_path':parent['section_path'],
+        samples.append({'parent_id':parent['chunk_id'],'document_id':parent['document_id'], 'chapter':parent['chapter'],'subsections':parent['subsections'],'section_path':parent['section_path'],
                         'parent_preview':parent['chunk_text'][:80],'token_count':parent['token_count'],
                         'children':[{'child_id':c['chunk_id'],'char_start':c['char_start'],'char_end':c['char_end'],
-                                     'preview':c['chunk_text'][:30],'token_count':c['token_count'],'section_path':c['section_path']}
+                                     'preview':c['chunk_text'][:30],'token_count':c['token_count'],'section_path':c['section_path'],'section_paths':c['section_paths']}
                                     for c in children if c['parent_chunk_id']==parent['chunk_id']]})
     noise_summary = {reason:{'count':sum(n['reason']==reason for n in noise),
                              'examples':[{**n,'text':n['text'][:100]} for n in noise if n['reason']==reason][:3]}
@@ -167,7 +147,8 @@ def collect(index, database, tokenizer_path, dataset_id=GOLDEN_DATASET_ID):
             'comparison':{'old':comparison(old_p,old_c),'new':comparison(parents,children)},
             'noise_only_chunk_ids':noise_only,'single_child_parents':singleton,'children_under_60':small,
             'short_parents':[{key:p[key] for key in ('chunk_id','document_id','level_one_section','token_count','short_chapter')} for p in parents if p['token_count']<400],
-            'sample_seed':31,'parent_samples':samples,'denoise':noise_summary,'golden_evidence':audit,'checks':checks}
+            'sample_seed':31,'parent_samples':samples,'denoise':noise_summary,
+            'discarded_header_footer':[n for n in noise if n.get('parser_type') in {'header','footer'}],'golden_evidence':audit,'checks':checks}
 
 
 def main():

@@ -22,7 +22,7 @@ class ChunkV2Tests(unittest.TestCase):
         return kp.parent_child_v2(self.document, blocks, len)
 
     def test_noise_is_audited_titles_are_metadata_and_offsets_are_exact(self):
-        blocks = [{'type': 'header', 'text': '品牌', 'page_idx': 0},
+        blocks = [{'type': 'header', 'text': '清洁机器人说明书', 'page_idx': 0},
                   {'type': 'text', 'text': '第 1 页', 'page_idx': 0},
                   {'type': 'text', 'text': '保养', 'text_level': 1, 'page_idx': 0},
                   {'type': 'text', 'text': '每月一次', 'text_level': 2, 'page_idx': 0},
@@ -31,7 +31,7 @@ class ChunkV2Tests(unittest.TestCase):
                   {'type': 'text', 'text': '请联系官方售后检查。' * 90, 'page_idx': 1}]
         parents, children, parsed = self.split(blocks)
         self.assertEqual(len([p for p in parsed if p.get('drop_reason')]), 2)
-        self.assertTrue(all(c['chunk_text'] not in {'保养', '每月一次', '每年一次', '品牌'} for c in children))
+        self.assertTrue(all(c['chunk_text'] not in {'保养', '每月一次', '每年一次', '清洁机器人说明书'} for c in children))
         self.assertTrue(any('保养 / 每月一次' in c['section_path'] for c in children))
         self.assertTrue(all(80 <= c['token_count'] <= 300 for c in children))
         for child in children:
@@ -123,7 +123,7 @@ class ChunkV2Tests(unittest.TestCase):
         from app.corpus import CorpusStore
         class Parser:
             def parse(inner, path, identifier):
-                return [{'type':'header','text':'页眉品牌'},
+                return [{'type':'header','text':'清洁机器人说明书'},
                         {'type':'text','text':'维护','text_level':1},
                         {'type':'text','text':'请关闭电源之后清洁设备。' * 100}], b'fixture'
         class Embedder:
@@ -140,9 +140,9 @@ class ChunkV2Tests(unittest.TestCase):
             self.assertEqual(manifest['knowledge_config']['chunk_strategy'], 'parent-child-v2')
             self.assertEqual(manifest['knowledge_config']['child_tokens'], 300)
             detail = CorpusStore(staging).detail('D')
-            self.assertEqual(detail['denoise'][0]['reason'], 'parser_header')
+            self.assertEqual(detail['denoise'][0]['reason'], 'header_footer_identity')
             self.assertEqual(detail['category'], '清洁机器人说明书')
-            self.assertTrue(all('页眉品牌' not in c['chunk_text'] for c in detail['chunks']))
+            self.assertTrue(all('清洁机器人说明书' not in c['chunk_text'] for c in detail['chunks']))
 
     def test_category_inference_and_manual_override(self):
         self.assertTrue(hasattr(kp, 'document_category'))

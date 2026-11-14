@@ -144,7 +144,8 @@ V2_CONFIG = {**CONFIG, 'chunk_strategy': 'parent-child-v2', 'parent_min_tokens':
              'child_tail_min_tokens': 80, 'child_target_min_tokens': 200, 'overlap_tokens': 50,
              'table_intro_max_tokens': 200, 'toc_min_entries': 3, 'toc_min_fraction': 0.5,
              'repeat_page_fraction': 0.30, 'repeat_short_line_chars': 40, 'repeat_min_pages': 2,
-             'table_normalize': 'table-kv-v2', 'denoise_version': 'mineru-noise-v2', 'heading_context': 'document-section-v1',
+             'table_normalize': 'table-kv-v2', 'denoise_version': 'mineru-noise-v3', 'heading_context': 'child-section-v2',
+             'header_footer_identity_max_chars': 12,
              'heading_hierarchy': 'manual-chapters-v1'}
 DOCUMENT_CATEGORIES = ('清洁机器人说明书', '巡检机器人说明书', '遥控器说明书', '电池与充电器说明书', '其他')
 # MinerU flattened these manuals' headings. Chapter starts were checked against
@@ -209,6 +210,13 @@ def _v2_noise(text):
     return None
 
 
+def _v2_header_footer_identity(text, document):
+    if not text or len(text) > V2_CONFIG['header_footer_identity_max_chars']: return False
+    identities = {document.get('product'), document.get('vendor'), Path(document['name']).stem}
+    identities.update(re.split(r'[_\s]+', Path(document['name']).stem))
+    return text in identities or bool(re.fullmatch(r'\d{5,}(?:\s*\(\d{2}/\d{2}\))?', text))
+
+
 def _v2_boundaries(text):
     return sorted({0, len(text), *(m.end() for m in re.finditer(r'[。！？!?；;](?:[”’」』])?|\n', text))})
 
@@ -260,19 +268,25 @@ def parent_child_v2(document, blocks, counter):
     has_level_one = any(p['raw'].get('text_level') == 1 for p in parsed)
     for part in parsed:
         block, text = part['raw'], part['text']
-        reason = ('parser_' + block['type'] if block.get('type') in {'header', 'footer', 'page_number', 'page_footnote'} else
+        footnote = block.get('type') == 'page_footnote'
+        safety_header = block.get('type') in {'header', 'footer'} and bool(re.search(r'请|勿|不得|严禁|禁止|必须|务必|危险|警告|小心|注意|^\s*\d+[.、]', text))
+        preserve = footnote or safety_header
+        reason = ('parser_page_number' if block.get('type') == 'page_number' else
+                  None if preserve else
                   'table_of_contents' if part['page'] in toc_pages else _v2_noise(text))
-        if not reason and text and all(line.strip() in repeated for line in text.splitlines() if line.strip()):
+        if not reason and not preserve and block.get('type') in {'header', 'footer'} and _v2_header_footer_identity(text, document):
+            reason = 'header_footer_identity'
+        if not reason and not preserve and text and all(line.strip() in repeated for line in text.splitlines() if line.strip()):
             reason = 'repeated_short_line'
         if reason:
             part['drop_reason'] = reason; part['section_path'] = ' / '.join(title_path); continue
         # Preserve non-repeated lines in a mixed block and audit each removed line.
-        kept = [line for line in text.splitlines() if line.strip() not in repeated]
-        removed = [line for line in text.splitlines() if line.strip() in repeated]
+        kept = [line for line in text.splitlines() if preserve or line.strip() not in repeated]
+        removed = [line for line in text.splitlines() if not preserve and line.strip() in repeated]
         if removed:
             part['removed_lines'] = [{'text': line, 'reason': 'repeated_short_line'} for line in removed]
             text = '\n'.join(kept)
-        level = block.get('text_level')
+        level = block.get('text_level') if block.get('type') not in {'header', 'footer', 'page_footnote'} else None
         # Warning labels and numbered executable instructions are body content,
         # even where MinerU mislabeled them as headings.
         if text in {'危险', '警告', '小心', '注意', '注意：', '提示', '提示：', '原因：'} or re.match(r'^\d+[.、]\s*.*(?:按下|点击|输入|拧|创建|选择|装|打开|拔|拉|检查)', text):
@@ -364,7 +378,9 @@ def parent_child_v2(document, blocks, counter):
             parent_id = f"{document['id']}-V2-P-{len(parents) + 1:05d}"
             parent = {**metadata, 'chunk_id': parent_id, 'chunk_text': text, 'text': text, 'token_count': counter(text),
                       'page_start': min(u['page'] for u in group), 'page_end': max(u['page'] for u in group),
-                      'section_path': ' / '.join(dict.fromkeys(u['section_path'] for u in group)),
+                      'chapter': top,
+                      'subsections': list(dict.fromkeys(u['section_path'].removeprefix(top + ' / ') for u in group if u['section_path'] != top)),
+                      'section_path': top,
                       'section_paths': list(dict.fromkeys(u['section_path'] for u in group)),
                       'block_ids': list(dict.fromkeys(u['block_id'] for u in group)),
                       'short_chapter': len(groups) == 1 and counter(text) < config['parent_min_tokens']}
@@ -394,7 +410,7 @@ def parent_child_v2(document, blocks, counter):
                 children.append({**metadata, 'chunk_id': f"{document['id']}-V2-C-{len(children) + 1:05d}",
                                  'parent_chunk_id': parent_id, 'char_start': start, 'char_end': end,
                                  'chunk_text': text[start:end], 'text': text[start:end], 'token_count': counter(text[start:end]),
-                                 'section_path': ' / '.join(paths), 'section_paths': paths, 'section': paths[0],
+                                 'section_path': paths[0], 'section_paths': paths, 'section': paths[0],
                                  'page_start': min(s['page'] for s in covered), 'page_end': max(s['page'] for s in covered),
                                  'block_ids': list(dict.fromkeys(s['block_id'] for s in covered)),
                                  'table': bool(table_span), 'embedding_status': 'Pending'})
@@ -417,12 +433,13 @@ def parent_child_v2(document, blocks, counter):
                 start, end = min(child['char_start'], neighbor['char_start']), max(child['char_end'], neighbor['char_end'])
                 body = parent['chunk_text'][start:end]
                 if counter(body) > config['child_tokens']: continue
+                ordered = sorted((child, neighbor), key=lambda c: c['char_start'])
                 merged = {**neighbor, 'char_start': start, 'char_end': end, 'chunk_text': body, 'text': body,
                           'token_count': counter(body), 'page_start': min(child['page_start'], neighbor['page_start']),
                           'page_end': max(child['page_end'], neighbor['page_end']),
-                          'section_paths': list(dict.fromkeys(child['section_paths'] + neighbor['section_paths'])),
-                          'block_ids': list(dict.fromkeys(child['block_ids'] + neighbor['block_ids']))}
-                merged['section_path'] = ' / '.join(merged['section_paths'])
+                          'section_paths': list(dict.fromkeys(path for c in ordered for path in c['section_paths'])),
+                          'block_ids': list(dict.fromkeys(key for c in ordered for key in c['block_ids']))}
+                merged['section_path'] = merged['section'] = merged['section_paths'][0]
                 children[min(index, neighbor_index)] = merged
                 children.pop(max(index, neighbor_index))
                 index = max(0, index - 1)
