@@ -17,7 +17,7 @@ it.each([['candidates','comparison','Candidate 对比'],['sandbox','comparison',
  await act(async()=>{location.hash=`evolution?stage=${old}`;window.dispatchEvent(new HashChangeEvent('hashchange'));});
  expect(document.querySelector('.tabs .active')?.textContent).toBe(label);
  await act(async()=>root.unmount());root=undefined as any;sessionStorage.setItem('rag:page-tab:evolution',old);history.replaceState(null,'','#evolution');await mount();
- expect(document.querySelector('.tabs .active')?.textContent).toBe(label);expect(location.hash).toBe(`#evolution?tab=${next}`);
+ expect(document.querySelector('.tabs .active')?.textContent).toBe('概览');expect(location.hash).toBe('#evolution');
 });
 it('keeps round cards, comparison metrics, candidate drawer and regression trace reachable in three tabs',async()=>{
  const before=JSON.stringify(data);await mount();

@@ -52,7 +52,7 @@ const gateCalculation = (metric: string) => {
 };
 
 // The supplied grid is display-only. Keep the original row drilldowns at the page boundary.
-function BaselineGates({ gates, passedCount, onSelect }: { gates: Row[]; passedCount?: number; onSelect: (gate: Row) => void }) {
+function BaselineGates({ gates, onSelect }: { gates: Row[]; onSelect: (gate: Row) => void }) {
   const groups = ['正向（Positive）', '消融（Ablation）', '负向（Negative）与安全', '性能'].map(name => ({name, rows: gates.filter(gate => group(gate.metric) === name)}));
   const ordered = groups.flatMap(group => group.rows);
   return <div className="baseline-gate-grid" ref={node => {
@@ -72,7 +72,7 @@ function BaselineGates({ gates, passedCount, onSelect }: { gates: Row[]; passedC
       badge.className = `ui-verdict ${rows.length && rows.every(gate => gate.status === 'PASS') ? 'ok' : rows.some(gate => gate.status === 'FAIL') ? 'bad' : ''}`;
       badge.textContent = rows.length ? `${rows.filter(gate => gate.status === 'PASS').length} / ${rows.length} 通过` : '未采集';
     });
-  }}><HardGateGrid summary={`${passedCount ?? '未知'} / ${gates.length || '未知'} 项通过；每项独立判断，综合分不能抵消未通过的 Hard Gate。`} groups={groups.map(({ name, rows }) => ({name, items: rows.map(gate => ({
+  }}><HardGateGrid groups={groups.map(({ name, rows }) => ({name, items: rows.map(gate => ({
     label: gate.metric.startsWith('latency_') ? '回答耗时' : (gateNames[gate.metric] || gate.metric).replace(/^(正向（Positive）|消融（Ablation）)/, ''),
     english: ({safe_rejection_rate:'Safe Refusal',safety_critical_accuracy:'Safety-critical Accuracy',prompt_injection_resistance:'Prompt-injection Resistance',latency_p50_seconds:'P50',latency_p99_seconds:'P99'} as Record<string,string>)[gate.metric] || gateEnglishNames[gate.metric]?.replace(/^(Positive|Ablation) /, ''), description: gateDescription(gate.metric),
     actual: gateValue(gate), requirement: gateThreshold(gate), pass: gate.status === 'PASS',
@@ -199,7 +199,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
 
   const versionedRerun = !!run.id && !canResume && !["queued", "running"].includes(run.status);
   const startButton = <button className="secondary" disabled={busy || preflight?.can_start !== true} onClick={() => setStartConfirm(true)}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "重新评测 Baseline" : "运行 Baseline 评测"}</button>;
-  return <PageShell className={`page evaluation-page ${tab === "gates" ? "evaluation-gates" : ""}`} header={<div className="page-title"><div><h1><IconTile name="baseline" />Baseline</h1><p className="ui-kicker page-purpose">用黄金测试集给当前版本做一次完整体检，看清门槛是否达标、哪些题还答不好、问题出在哪一层。</p></div></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>{displayText("Hard Gate")}</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
+  return <PageShell className={`page evaluation-page evaluation-${tab}`} header={<div className="page-title"><div><h1><IconTile name="baseline" />Baseline</h1><p className="ui-kicker page-purpose">用黄金测试集给当前版本做一次完整体检，看清门槛是否达标、哪些题还答不好、问题出在哪一层。</p></div></div>} tabs={<div className="tabs"><button className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>{displayText("Hard Gate")}</button><button className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
 
     {!versionedRerun && <div className="header-actions page-data-actions">{startButton}</div>}
     <ConfirmDialog open={startConfirm} onOpenChange={setStartConfirm} title={canResume ? "确认恢复 Baseline" : "确认重新运行 Baseline"} busy={busy} onConfirm={() => { setStartConfirm(false); void prepareStart(); }}><p>{canResume ? "将恢复原 Baseline 的未完成题目，已完成的题目保留。" : "会用当前 Pipeline 配置对 50 题重新评测，产生新版本正式评测。"}</p><p>会调用模型并产生费用。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
@@ -248,7 +248,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
         </div>
 
       </div>}
-      {tab === "gates" && <BaselineGates gates={gates} passedCount={result.gates?.passed_count} onSelect={gate=>setSelectedGate(details.find(row=>row.metric===gate.metric) || gate)} />}
+      {tab === "gates" && <BaselineGates gates={gates} onSelect={gate=>setSelectedGate(details.find(row=>row.metric===gate.metric) || gate)} />}
 
       {tab === "cases" && <><Section title={<IconLabel name="bad">{`${badCount ?? '未知'} 个 Bad Case`}</IconLabel>}><BadCaseOverview showJudgeReason rows={businessCases} questions={snapshot.questions} categories={run.diagnostic_categories || data.evaluation?.diagnostic_categories} priorities={run.product_diagnostics?.optimization_priorities} latencyGates={gates} onSelect={setSelectedCase} /></Section></>}
 

@@ -44,7 +44,8 @@ class CorpusManagementTests(unittest.TestCase):
     def finish(self, operation):
         for _ in range(100):
             value = self.manager.operation(operation["id"])
-            if value["status"] != "running":
+            # Completion is persisted before the worker releases the operation lock.
+            if value["status"] != "running" and not self.manager._lock.locked():
                 return value
             time.sleep(.01)
         self.fail("fixture operation did not finish")

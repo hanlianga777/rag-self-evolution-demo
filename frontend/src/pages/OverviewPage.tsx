@@ -1,3 +1,4 @@
+import { usePageTab } from "../usePageTab";
 import { IconTile } from "../ui/icons";
 import {completeResult, remainingQuestionIds, recommendationOf, schemeName} from "../components/EvolutionStory";
 import { PageShell } from "../components/PageShell";
@@ -14,7 +15,7 @@ import type { Page } from "../types";
 
 export function OverviewPage({ data, navigate }: { data: any; navigate: (page: Page) => void }) {
   const pagesWarming = useContext(PageWarmupContext);
-  const [tab, setTab] = useState<"project" | "business" | "technical">("project");
+  const [tab, setTab] = usePageTab("overview", ["project", "business", "technical"] as const, "project");
   const item = data.overview || {};
   const knowledge = item.knowledge;
   const newKnowledge = !!knowledge?.identity;

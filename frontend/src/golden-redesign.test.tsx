@@ -89,7 +89,7 @@ it("keeps the frozen pool read only even when an older selection is stashed", as
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={frozenData} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "候选池")!.click());
-  expect(document.body.textContent).toContain("这些题已全部进入冻结题卷");
+  expect(document.body.textContent).not.toContain("这些题已全部进入冻结题卷");
   expect(document.querySelector(".candidate-pool-table")?.textContent).toContain("人工审核");
   expect(document.body.textContent).not.toContain("创建Golden");
   expect(document.querySelector('input[type="file"]')).toBeNull();

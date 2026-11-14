@@ -14,7 +14,6 @@ export function BaselineHero({ gates, correct, total, badCount, layers, thinking
 }) {
   const sum = stages.reduce((acc, item) => acc + item.seconds, 0) || 1;
   const sorted = [...stages].sort((a, b) => b.seconds - a.seconds);
-  const top = sorted[0];
   const generation = stages.find(item => item.label === '回答生成');
   const pctOf = (item: Stage) => `${(item.share ?? item.seconds / sum * 100).toFixed(1)}%`;
   const allPassed = gates.passed === gates.total;
@@ -26,7 +25,7 @@ export function BaselineHero({ gates, correct, total, badCount, layers, thinking
       <div className="ui-bl-cell"><span><IconLabel name="thinking">Thinking 档位</IconLabel></span><strong>{thinking ?? "未知"}</strong><small className="ui-num">P50 {p50 != null ? `${p50.toFixed(1)} 秒` : "未知"} · P99 {p99 != null ? `${p99.toFixed(1)} 秒` : "未知"}</small></div>
     </div>
     {stages.length > 0 && <div className="ui-bl-time">
-      <div className="ui-bl-time-head"><span><IconLabel name="time">耗时构成</IconLabel></span>{top && <small>{top.label} 占 {pctOf(top)}</small>}</div>
+      <div className="ui-bl-time-head"><span><IconLabel name="time">耗时构成</IconLabel></span></div>
       <div className="ui-bl-bar" role="img" aria-label={sorted.map(item => `${item.label} ${pctOf(item)}`).join("，")}>
         {sorted.map((item, index) => <i key={item.label} className={index === 0 ? "top" : ""} style={{ flexGrow: item.seconds }} />)}
       </div>
