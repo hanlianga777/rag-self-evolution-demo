@@ -20,7 +20,7 @@ async function mount(node:React.ReactNode){root=createRoot(document.body.appendC
 async function click(label:string){await act(async()=>[...document.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label') || b.textContent)===label)!.click());}
 it('uses dynamic topic quotas and backend protection flags and keeps topic details reachable',async()=>{
  await mount(<KnowledgePage data={{documents:[],overview:{knowledge}}}/>);
- expect(document.querySelectorAll('.ui-kc-row.clickable')).toHaveLength(2);expect(document.querySelectorAll('.ui-kc-tag')).toHaveLength(0);expect(document.body.textContent).not.toContain('FULL');expect(document.querySelector('.knowledge-coverage-counts')?.textContent).toContain('规划题位');expect(document.body.textContent).not.toContain('主题聚类 · 初始');
+ expect(document.querySelectorAll('.ui-kc-row.clickable')).toHaveLength(2);expect(document.querySelectorAll('.ui-kc-tag')).toHaveLength(0);expect(document.body.textContent).not.toContain('FULL');expect(document.querySelector('.knowledge-coverage-counts')).toBeNull();expect(document.body.textContent).not.toContain('主题聚类 · 初始');
  await act(async()=>document.querySelector<HTMLElement>('.ui-kc-row.clickable')!.click());expect(document.querySelector('[role=dialog]')).not.toBeNull();expect((fetch as any).mock.calls.some(([url]:any[])=>url.endsWith('/clusters/tiny'))).toBe(true);
 });
 it('uses the frozen record and saved quality states in the Golden summary',async()=>{

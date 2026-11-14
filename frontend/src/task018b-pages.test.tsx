@@ -19,7 +19,7 @@ it('places processing before expanded coverage, keeps one title, and restores do
  expect(document.querySelector<HTMLDetailsElement>('.page-content > details')?.open).toBe(true);
  expect(document.querySelector('.ui-kc h3')).toBeNull();
  expect(document.querySelector('.page-content > details > summary [aria-label="口径说明"]')).toBeNull();
- expect(document.querySelector('.knowledge-coverage-counts')?.textContent).toContain('正向 2 / 消融 1 / 负向 3');
+ expect(document.querySelector('.knowledge-coverage-counts')).toBeNull();expect([...document.querySelectorAll('.ui-kc-row.clickable [role=cell]')].slice(-3).map(n=>n.textContent)).toEqual(['2','1','3']);
  const button=[...document.querySelectorAll('button')].find(b=>b.textContent==='删除')!;
  expect(button).toBeDefined();
  await act(async()=>button.click());

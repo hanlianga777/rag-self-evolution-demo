@@ -59,7 +59,7 @@ it.each([true,false])('shows only knowledge coverage totals without snapshot pro
  vi.stubGlobal('fetch',vi.fn(async(input:string)=>new Response(JSON.stringify(input.includes('/snapshots')?[{id:matches?'current':'other',snapshot:{question_ids:Array(9).fill('q'),reviewed_import:{source:'csv'}}}]:{knowledge}))));
  await mount(<KnowledgePage data={{workspace:{current_golden_id:'current'},overview:{knowledge,dataset:{total:9}},documents:[]}}/>);
  expect(document.querySelector('.coverage-note')).toBeNull();
- expect(document.querySelector('.knowledge-coverage-counts')?.textContent).toContain('规划题位 · 正向 6 / 消融 3 / 负向 6');
+ expect(document.querySelector('.knowledge-coverage-counts')).toBeNull();expect([...document.querySelectorAll('.ui-kc-row.clickable [role=cell]')].slice(-3).map(n=>n.textContent)).toEqual(['6','3','6']);
  expect(document.querySelector('.knowledge-coverage')?.textContent).not.toContain('CSV');
  expect((fetch as any).mock.calls.some(([url]:any[])=>url.includes('/snapshots'))).toBe(false);
 });

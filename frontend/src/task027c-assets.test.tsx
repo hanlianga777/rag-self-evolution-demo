@@ -23,7 +23,7 @@ it.each([true, false])('uses online configuration and opens a meaningful Child (
  expect(document.querySelector('.page-shell-header .tabs')).toBeNull();
  expect(document.querySelector('[aria-label="知识处理链路"]')?.textContent).toContain('离线入库'); expect(document.querySelector('[aria-label="知识处理链路"]')?.textContent).toContain('在线检索');
  const online=documentQuery('.ui-kf svg[role="img"]');expect(online).toContain('Candidate K 24');expect(online).toContain('Top-K 6');expect(online).toContain('Thinking High');expect(online).toContain('已启用 Query Rewrite');expect(online).not.toContain('Thinking Max');if(preferred)expect(online).toContain('Multi-Query 6 路');else expect(online).not.toContain('Multi-Query');
- expect(document.querySelector('.knowledge-coverage summary')?.textContent).toContain('正向 2 / 消融 1 / 负向 2');expect(document.querySelector('.ui-kc-name')?.textContent).toBe('环境与遥控');expect(document.querySelector('.coverage-note')).toBeNull();
+ expect(document.querySelector('.knowledge-coverage-counts')).toBeNull();expect([...document.querySelectorAll('.page-title .header-actions button')].map(b=>b.textContent)).toEqual(['新增文档','重建 Knowledge Pipeline']);expect(document.querySelector('.ui-kc-name')?.textContent).toBe('环境与遥控');expect(document.querySelector('.coverage-note')).toBeNull();
  await click('查看分块示例');expect(document.querySelector('.parent-context')?.textContent).toContain(preferred?'DOC-001-C-00180':'fallback');expect(document.querySelector('.parent-context')?.textContent).toContain('保存的 Parent');
  const info=documentQuery('.document-inspector .parameter-list');expect(info).toContain('产品KIRA B 50');expect(info).not.toMatch(/未记录|当前|Current|\/ 版本|\/ 索引/);expect(JSON.stringify(knowledge)).toBe(saved);
 });
