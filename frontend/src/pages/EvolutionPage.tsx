@@ -369,12 +369,15 @@ function CandidateCard({ candidate, baseline, onDetail, targets, onTargets, runn
   const evaluated = candidate.status === "evaluated" && result?.evaluation_complete !== false;
   const interrupted = candidate.status === "failed" && candidate.product_interruption === true;
   const state = candidateState(candidate, !!running);
-  const after=candidate.config || (reasoning.changed_parameters ? {...baseline,...reasoning.changed_parameters} : null);
-  const changes=after ? Object.keys(storyParameterNames).filter(key=>key in baseline && key in after && JSON.stringify(baseline[key])!==JSON.stringify(after[key])).map(key=>`${storyParameterNames[key]} ${storyValue(baseline[key])} → ${storyValue(after[key])}`).join('；') || '已保存参数没有变化。' : '配置快照未保存，变化未知。';
+  const inherited=reasoning.inherited_parameters || {};
+  const changeBase={...baseline,...inherited};
+  const after=candidate.config || (reasoning.changed_parameters ? {...changeBase,...reasoning.changed_parameters} : null);
+  const changes=after ? Object.keys(storyParameterNames).filter(key=>key in changeBase && key in after && JSON.stringify(changeBase[key])!==JSON.stringify(after[key])).map(key=>`${storyParameterNames[key]} ${storyValue(changeBase[key])} → ${storyValue(after[key])}`).join('；') || '已保存参数没有变化。' : '配置快照未保存，变化未知。';
   const risks:string[]=Array.isArray(reasoning.risks) && reasoning.risks.length ? reasoning.risks.map((risk:any)=>risk.reason || '暂无') : [reasoning.risk || '暂无'];
   const questionBadges=(ids:any,tone:'fixed'|'broken')=>Array.isArray(ids) ? ids.length ? ids.map((id:string)=><QuestionBadge key={id} id={shortQuestionId(id)} tone={tone} question={targets.find(row=>row.question_id===id) ? caseData(targets.find(row=>row.question_id===id)).question : undefined}/>) : '无' : '暂无';
   return <article className="candidate-card drawer-section"><div className="candidate-card-header"><div><h3>{schemeName(candidate, undefined, includeRound)}</h3></div><Badge tone={candidate.result?.price_pause?.paused ? "warning" : state.tone}>{candidate.result?.price_pause?.paused ? "已暂停" : state.label}</Badge></div><div className="candidate-card-body" tabIndex={0} role="region" aria-label={`Candidate ${reasoning.candidate_label} 正文`}>
     <CandidateField label="思路"><ClampText lines={2} text={agentDisplayText([reasoning.direction || (reasoning.intervention_direction ? optimizationDirection(reasoning.intervention_direction) : ''),reasoning.strategy_name,reasoning.core_idea || reasoning.hypothesis || '暂无'].filter(Boolean).join(' · '))}/></CandidateField>
+    {reasoning.inherited_from && <p className="muted" style={{fontSize:12}}>在 Candidate {String(reasoning.inherited_from).match(/(?:^|-)([ABC])$/)?.[1] || reasoning.inherited_from} 的基础上 · {Object.entries(inherited).map(([key,value])=>`${storyParameterNames[key] || key} ${storyValue(value)}`).join("；")}</p>}
     <CandidateField label="改动参数"><ClampText lines={2} text={changes}/></CandidateField>
     <CandidateField label="针对的题">{targets.length ? targets.map(row=><QuestionBadge key={row.question_id} id={shortQuestionId(row.question_id)} question={caseData(row).question}/>) : '暂无可匹配的题目'}</CandidateField>
     {reasoning.predicted_fixed_question_ids && <CandidateField label="预计修好">{reasoning.predicted_fixed_question_ids.map(shortQuestionId).join("、")}</CandidateField>}
@@ -389,7 +392,7 @@ function CandidateField({label,children}:{label:string;children:React.ReactNode}
 }
 
 function ConfigDiff({ base, candidate }: { base: Record<string, any>; candidate: any }) {
-  const after = candidate.config || (candidate.reasoning?.changed_parameters ? { ...base, ...candidate.reasoning.changed_parameters } : null);
+  const after = candidate.config || (candidate.reasoning?.changed_parameters ? { ...base, ...candidate.reasoning.inherited_parameters, ...candidate.reasoning.changed_parameters } : null);
   if(!after || !Object.keys(base).length)return <p className="muted">历史未保存完整Baseline配置，无法核对参数Diff。</p>;
   const keys=Object.keys(parameterNames).filter(key=>key in base && key in after);
   return <div className="candidate-config-diff"><ParameterDiff before={Object.fromEntries(keys.map(key=>[key,base[key]]))} after={Object.fromEntries(keys.map(key=>[key,after[key]]))}/>{keys.length<Object.keys(parameterNames).length && <p className="muted">部分参数缺少前后记录，未纳入Diff；原始配置保留在高级审计。</p>}</div>;

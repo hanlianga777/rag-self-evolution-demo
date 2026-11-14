@@ -145,7 +145,7 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                          and c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True]
             policy = experiment['result'].get('round_policy', {})
             full_rounds = policy.get('mode') == 'full_rounds'
-            finishing = not full_rounds or bool(experiment['result'].get('report_confirmation'))
+            finishing = not full_rounds or bool(experiment['result'].get('report_confirmation')) or bool(state.get('proposal_round_end'))
             if qualified and finishing:
                 if terminal := advance_qualified(experiment, qualified):
                     return terminal
@@ -237,7 +237,20 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                 wait_for_off_peak(store,'cycle:'+experiment_id,price_state,lambda:check_cycle_stop(store,experiment_id))
                 agent.generate(experiment['baseline_run_id'], experiment_id=experiment_id)
             except ProposalValidationExhausted as error:
-                return save('analysis_exhausted','analysis',str(error))
+                if not full_rounds:
+                    return save('analysis_exhausted','analysis',str(error))
+                number = max((c['reasoning'].get('round',1) for c in experiment['candidates']), default=0) + 1
+                failures = state.setdefault('proposal_generation_failures', [])
+                failures.append({'round':number, 'reason':str(error), 'sandbox_budget_used':0,
+                                 'at':datetime.now(timezone.utc).isoformat()})
+                if sum(f['round'] == number for f in failures) < 3:
+                    save('running','analysis',str(error))
+                    continue
+                if not qualified:
+                    return save('analysis_exhausted','analysis',str(error))
+                state['proposal_round_end'] = {'round':number, 'reason':f'第 {number} 轮未能生成合法方案'}
+                save('running','review',state['proposal_round_end']['reason'])
+                continue
             experiment = store.experiment(experiment_id, light=True)
             empty_rounds = empty_rounds+1 if len(experiment['candidates'])==before else 0
             if empty_rounds >= 3:

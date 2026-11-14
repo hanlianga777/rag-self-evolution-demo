@@ -971,7 +971,12 @@ class EvaluationRunner:
             targets={ref:{**row['result'], 'standard_evidence': standard_evidence(frozen.get(row['question_id'], {}))} for row in self.store.bad_case_rows() if row['run_id']==baseline['id'] for ref in (row['id'],row['question_id'])}
             reasoning=candidate['reasoning']
             actual={k:v for k,v in candidate['config'].items() if v!=base.get(k)}
-            if actual!=reasoning.get('changed_parameters'):raise ValueError('Candidate 配置与已审查干预不一致')
+            if actual!=reasoning.get('changed_parameters_vs_baseline', reasoning.get('changed_parameters')):raise ValueError('Candidate 配置与已审查干预不一致')
+            if reasoning.get('inherited_from') or reasoning.get('inherited_parameters'):
+                from .optimization import inherited_base
+                effective = inherited_base(reasoning, base, experiment['candidates'], reasoning['round'], experiment['result'].get('round_policy'))
+                if {**effective, **reasoning['changed_parameters']} != {**base, **candidate['config']}:
+                    raise ValueError('Candidate继承配置与已审查干预不一致')
             sources=[candidate]
             if reasoning.get('candidate_label')=='D':
                 sources=[self.store.candidate(s['candidate_id']) for s in reasoning.get('sources',[])]

@@ -3314,7 +3314,7 @@ class GovernanceStore:
                       'suggested_winner': qualified[0]['id'] if qualified else None, 'why': decision['reason'], 'alternatives': [{'candidate_id': c['id'], 'reason': '按 Bad Case 数由少到多比较', 'rank': i + 1} for i, c in enumerate(qualified)],
                       'pareto_frontier': [item['id'] for item in qualified if item['reasoning'].get('candidate_label') != 'D'],
                       'not_recommended': [{'candidate_id': item['id'], 'reason': '未完成完整Sandbox' if item['status'] != 'evaluated' else '规则身份不一致' if item['result'].get('evaluation_identity') != identity else '资格未通过' if not item['result'].get('qualification', {}).get('qualified') else 'Bad Case 数未优于首选'} for item in candidates if not qualified or item['id'] != qualified[0]['id']],
-                      'comparison': [{'candidate_id': item['id'], 'status': item['status'], **item['result'], 'parameter_diff': item['reasoning'].get('changed_parameters', {})} for item in candidates]}
+                      'comparison': [{'candidate_id': item['id'], 'status': item['status'], **item['result'], 'parameter_diff': item['reasoning'].get('changed_parameters_vs_baseline', item['reasoning'].get('changed_parameters', {}))} for item in candidates]}
             connection.execute('INSERT OR REPLACE INTO recommendations VALUES (?, ?, ?, ?, ?)', (experiment_id, selected, status, _json(result), _now()))
             return result
 

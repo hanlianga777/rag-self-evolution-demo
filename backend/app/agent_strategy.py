@@ -27,7 +27,7 @@ def validate_strategy(response, prior, audit, targets):
         raise ValueError('第1轮前几轮总结必须写无')
     for plan in review.get('plans', []):
         previous = next(c for c in prior if c['id'] == plan['candidate_id'])
-        if len(previous.get('reasoning', {}).get('changed_parameters', {})) > 1:
+        if len(previous.get('reasoning', {}).get('changed_parameters_vs_baseline', previous.get('reasoning', {}).get('changed_parameters', {}))) > 1:
             if any(not isinstance(plan.get(k), str) or not plan[k].strip() for k in ('most_likely_parameter', 'attribution_reason')):
                 raise ValueError('多参数复盘须说明无法单独确定、最可能参数及理由')
     summary = response.get('bad_case_summary')

@@ -185,7 +185,7 @@ def candidate_rank(candidate):
     latency = result.get('metrics', {}).get('latency_p99_seconds', result.get('latency_p99_seconds'))
     return (bad if type(bad) is int and bad >= 0 else float('inf'), len(new_failure_ids(result)),
             latency if type(latency) in (int,float) else float('inf'),
-            len(candidate.get('reasoning', {}).get('changed_parameters', {})), candidate['id'])
+            len(candidate.get('reasoning', {}).get('changed_parameters_vs_baseline', candidate.get('reasoning', {}).get('changed_parameters', {}))), candidate['id'])
 
 
 def d_improves_winner(final_candidate, winner):

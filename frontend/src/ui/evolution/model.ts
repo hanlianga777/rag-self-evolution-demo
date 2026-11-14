@@ -69,7 +69,7 @@ export const firstSentence = (value: unknown): string | undefined => typeof valu
 export function candidateView(candidate: any, baselineConfig: Record<string, unknown> | undefined, winnerId: string | null, gateLabel: (metric: string) => string, nameOf: (candidate: any) => string): CandidateView {
   const result = candidate?.result || {};
   const reasoning = candidate?.reasoning || {};
-  const changed: Record<string, unknown> = reasoning.changed_parameters || {};
+  const changed: Record<string, unknown> = reasoning.changed_parameters_vs_baseline || reasoning.changed_parameters || {};
   const params = Object.entries(changed).map(([key, value]) => ({
     key, label: PARAM_LABELS[key] ?? key, to: paramValue(key, value),
     from: baselineConfig && key in baselineConfig ? paramValue(key, baselineConfig[key]) : undefined,
@@ -110,7 +110,7 @@ export function roundSummary(candidates: CandidateView[]): string {
 const savedFacts = (item: any) => complete(item) && Array.isArray(item.result.all_fixed_question_ids) && Array.isArray(item.result.new_regression_question_ids) && typeof item.result.gates?.passed === 'boolean' && typeof item.result.gates.passed_count === 'number' && typeof item.result.gates.total === 'number';
 const fixes = (item: any, ids: string[]) => ids.every(id => list(item.result.all_fixed_question_ids).includes(id));
 const changedOnly = (item: any, expected: Record<string, unknown>) => {
-  const changed = item?.reasoning?.changed_parameters || {};
+  const changed = item?.reasoning?.changed_parameters_vs_baseline || item?.reasoning?.changed_parameters || {};
   return Object.keys(changed).length === Object.keys(expected).length && Object.entries(expected).every(([key, value]) => changed[key] === value);
 };
 const gate = (item: any, metric: string) => item.result.gates.gates?.find((row: any) => row.metric === metric && typeof row.actual === 'number');
@@ -137,7 +137,7 @@ function roundLesson(round: number, candidates: any[], winnerId: string | null):
   if (!text) return;
   const source = saved.map(item => {
     const r = item.result, p99 = gate(item, 'latency_p99_seconds'), safety = gate(item, 'safe_rejection_rate');
-    return `Round ${round} · Candidate ${item.reasoning.candidate_label}：修好 ${list(r.all_fixed_question_ids).join('、') || '无'}；新增 ${list(r.new_regression_question_ids).join('、') || '0'}；Hard Gate ${r.gates.passed_count} / ${r.gates.total}\n参数：${Object.entries(item.reasoning.changed_parameters || {}).map(([key, value]) => `${PARAM_LABELS[key] || key} ${paramValue(key, value)}`).join(' + ')}${p99 ? `；P99 ${p99.actual.toFixed(1)} 秒${p99.passed ? '' : '（超标）'}` : ''}${safety ? `；安全拒答 ${safety.actual}%` : ''}`;
+    return `Round ${round} · Candidate ${item.reasoning.candidate_label}：修好 ${list(r.all_fixed_question_ids).join('、') || '无'}；新增 ${list(r.new_regression_question_ids).join('、') || '0'}；Hard Gate ${r.gates.passed_count} / ${r.gates.total}\n参数：${Object.entries(item.reasoning.changed_parameters_vs_baseline || item.reasoning.changed_parameters || {}).map(([key, value]) => `${PARAM_LABELS[key] || key} ${paramValue(key, value)}`).join(' + ')}${p99 ? `；P99 ${p99.actual.toFixed(1)} 秒${p99.passed ? '' : '（超标）'}` : ''}${safety ? `；安全拒答 ${safety.actual}%` : ''}`;
   }).join('\n');
   return { text, source };
 }
