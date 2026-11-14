@@ -64,12 +64,20 @@ export function GovernancePage({ data }: { data: any }) {
   const [errorSlot, setErrorSlot] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [runDuration, setRunDuration] = useState<{ id: string; ms: number } | null>(null);
-  const workRun = runs[0];
+  const currentGolden = snapshots.find(snapshot => snapshot.id === data.workspace?.current_golden_id);
+  const reanchored = currentGolden?.snapshot?.reanchor && (!runs[0] || runs[0].id === currentGolden.snapshot.generation_run_id) ? currentGolden.snapshot : undefined;
+  const workRun = reanchored ? { id: reanchored.generation_run_id, status: "completed", profile: reanchored.profile, question_ids: reanchored.question_ids, artifacts: { hard_validation: { frozen_plan: reanchored.coverage_plan } } } : runs[0];
   const listPath = `/api/governance/candidates?run_id=${workRun?.id}&status=all&group=all`;
-  const paged = usePagedCandidates(JSON.stringify([cacheIdentity, workRun?.id, workRun?.profile?.name]), listPath, !!(workRun?.question_ids?.length || workRun?.artifacts?.hard_validation?.slot_persistence_v1));
+  const paged = usePagedCandidates(JSON.stringify([cacheIdentity, workRun?.id, workRun?.profile?.name]), listPath, !reanchored && !!(workRun?.question_ids?.length || workRun?.artifacts?.hard_validation?.slot_persistence_v1));
   const latestReview = useRef(paged.refresh); latestReview.current = paged.refresh;
   const review: Candidate[] = paged.rows, currentIndex: Candidate[] = paged.candidate_index || [], listing = paged.loading;
-  const currentGolden = snapshots.find(snapshot => snapshot.id === data.workspace?.current_golden_id);
+  const reanchorDetailsLoaded = !reanchored || reanchored.questions?.every((row: Candidate) => typeof row.question === "string");
+  useEffect(() => {
+    if (reanchorDetailsLoaded) return;
+    let cancelled = false;
+    void goldenFetch<Candidate[]>(cacheIdentity, "/api/governance/snapshots").then(value => { if (!cancelled) setSnapshots(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); });
+    return () => { cancelled = true; };
+  }, [currentGolden?.id, cacheIdentity, reanchorDetailsLoaded]);
   const historyVersions = [...snapshots, ...runs.filter(run => !snapshots.some(snapshot => snapshot.snapshot?.generation_run_id === run.id))];
   const versionNumbers = new Map([...historyVersions].reverse().sort((a, b) => (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0)).map((version, index) => [version.id, index + 1]));
   const historyVersion = historyVersions.find(version => version.id === historyId) || historyVersions.find(version => (version.snapshot?.generation_run_id || version.id) === workRun?.id) || currentGolden || historyVersions[0];
@@ -111,9 +119,10 @@ export function GovernancePage({ data }: { data: any }) {
   }, [cacheIdentity, workRun?.id, savedTopicCount]);
   const topicCount = savedTopicCount ?? coverage?.clusters?.length ?? coverage?.final_k;
   const frozen = !!gate1Snapshot;
-  const frozenDate = localShortTime(gate1Snapshot?.created_at);
+  const frozenDate = localShortTime(gate1Snapshot?.snapshot?.gate1?.confirmed_at || gate1Snapshot?.created_at);
   const plannedSlots = new Map((workRun?.artifacts?.question_plan || []).map((row: Candidate) => [row.question_id, row.coverage_slot]));
-  const current: Candidate[] = currentIds.map(id => currentIndex.find(row => row.id === id) || review.find(row => row.id === id) || items.find(row => row.id === id)).filter((row): row is Candidate => !!row).map(row => ({ ...row, slot: row.slot || row.raw?.coverage_slot || plannedSlots.get(row.id) }));
+  const frozenRows: Candidate[] = reanchored?.questions?.map((question: Candidate) => ({ ...question, raw: question, slot: question.display_id, stage: "golden", review_status: "approved", qualification_status: "human_approved", probe_status: "probe_passed", qc_status: reanchored.reanchor.qc_reuse?.[question.id]?.qc_status, probe: reanchored.reanchor.probe_results?.[question.id]?.observation })) || [];
+  const current: Candidate[] = currentIds.map(id => frozenRows.find(row => row.id === id) || currentIndex.find(row => row.id === id) || review.find(row => row.id === id) || items.find(row => row.id === id)).filter((row): row is Candidate => !!row).map(row => ({ ...row, slot: row.slot || row.raw?.coverage_slot || plannedSlots.get(row.id) }));
   const historical = items.filter(row => !currentIds.includes(row.id) && row.stage !== "golden");
   const selected = poolDetail?.id === selectedId ? poolDetail : current.find(row => row.id === selectedId) || items.find(row => row.id === selectedId);
   const candidateContentKey = JSON.stringify([selected?.id, selected?.question, selected?.reference_answer, selected?.evidence, selected?.raw?.revision_version]);
@@ -249,13 +258,27 @@ export function GovernancePage({ data }: { data: any }) {
   };
   const openPoolDetail = async (row: Candidate) => {
     const ticket = ++poolTicket.current;
-    const cached = cachedJson<Candidate>(`/api/governance/questions/${row.id}`);
+    const cached = reanchored ? undefined : cachedJson<Candidate>(`/api/governance/questions/${row.id}`);
     setPoolDetail(cached || row); setSelectedId(row.id); setDetailStatus(cached ? "" : "正在读取候选题详情…");
-    try { const result = await detailJson<Candidate>(`/api/governance/questions/${row.id}`); if (ticket === poolTicket.current) { setPoolDetail(result); setRevisions(result.revision_history || []); setDetailStatus(""); } }
+    try {
+      let result = await detailJson<Candidate>(`/api/governance/questions/${row.id}`);
+      if (frozen && gate1Snapshot?.snapshot?.reanchor && currentIds.includes(row.id)) {
+        const versions = await goldenFetch<Candidate[]>(cacheIdentity, "/api/governance/snapshots");
+        const snapshot = versions.find(version => version.id === gate1Snapshot.id)?.snapshot;
+        const question = snapshot?.questions?.find((item: Candidate) => item.id === row.id);
+        if (!question) throw new Error("冻结题卷缺少该题详情");
+        const observation = snapshot.reanchor.probe_results?.[row.id]?.observation;
+        result = { ...result, ...question, raw: question,
+          evidence_details: [{ chunks: (question.business_requirements?.sources || []).map((source: Candidate) => ({ ...source, chunk_text: source.quote })) }],
+          probe: observation || { score: null, question_validity_reason: "硬校验通过；沿用已保存的题目审核。", retrieval_observation: "详见本题已保存的检索诊断记录。" },
+          qc: { ...result.qc, association: snapshot.reanchor.qc_reuse?.[row.id] } };
+      }
+      if (ticket === poolTicket.current) { setPoolDetail(result); setRevisions(result.revision_history || []); setDetailStatus(""); }
+    }
     catch (reason) { if (ticket === poolTicket.current) setDetailStatus(errorMessage(reason)); }
 
   };
-  const loadingWorkspace = !metadataLoaded || checkingSnapshot || !!workRun && !current.length && listing;
+  const loadingWorkspace = !metadataLoaded || checkingSnapshot || !reanchorDetailsLoaded || !!workRun && !current.length && listing;
   return <PageShell className={`page governance-page governance-${tab} ${!workRun && tab === "run" ? "is-empty" : ""}`} header={<div className="page-title"><div><h1><IconTile name="golden" />Golden Dataset</h1><p className="ui-kicker page-purpose">黄金测试集是评测用的标准考卷，50 道题冻结之后，每一轮优化都用它来打分，前后结果才有可比性。</p></div>{!loadingWorkspace && <div className="header-actions"><button className="secondary" onClick={() => setHistoryOpen(true)}>历史版本</button></div>}</div>} tabs={<div className="tabs"><button data-label="当前测试集" aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前测试集</button><button data-label="候选池" aria-pressed={tab === "import"} className={tab === "import" ? "active" : ""} onClick={() => setTab("import")}>候选池</button></div>} resetKey={tab}>
 
 {!loadingWorkspace && tab === "run" && <div className="header-actions page-data-actions">{!frozen && workRun?.status === "needs_regeneration" && <button className="primary" disabled={busy} onClick={() => setRegenerateConfirm(true)}>补齐失败题（{expectedCount - current.length}）</button>}</div>}
@@ -277,7 +300,7 @@ export function GovernancePage({ data }: { data: any }) {
       {workRun ? <Section title={<IconLabel name="golden">题目审核</IconLabel>}>
         <div className="review-filters" aria-label="题目筛选">{filters.filter(item => item.key !== "attention" || item.count > 0).filter(item => !frozen || item.key !== "pending").map(item => <button key={item.key} aria-pressed={filter === item.key} className={filter === item.key ? "active" : ""} onClick={() => setFilter(item.key)}>{item.label} {item.count}</button>)}        <small className="muted golden-review-role" role="status">{syncing || listing ? "正在同步…" : ""}</small></div>
 
-        {(syncing || listing) && !listRows.length ? <div className="golden-skeleton" role="status" aria-label="正在读取候选题">{[1,2,3,4].map(index => <span key={index} aria-hidden="true" />)}</div> : <QuestionTable rows={["all", "attention"].includes(filter) ? [...visible, ...failedSlots.map(slot => ({ id: `missing-${slot}`, slot, question: "生成失败，待补齐", failed: true }))].sort((a, b) => String(a.slot || "").localeCompare(String(b.slot || ""))) : visible} onDetail={row => row.failed ? (setErrorSlot(row.slot), setRunErrorOpen(true)) : void openPoolDetail(row)} paging={paged} resetKey={filter} />}
+        {(syncing || listing) && !listRows.length ? <div className="golden-skeleton" role="status" aria-label="正在读取候选题">{[1,2,3,4].map(index => <span key={index} aria-hidden="true" />)}</div> : <QuestionTable rows={["all", "attention"].includes(filter) ? [...visible, ...failedSlots.map(slot => ({ id: `missing-${slot}`, slot, question: "生成失败，待补齐", failed: true }))].sort((a, b) => String(a.slot || "").localeCompare(String(b.slot || ""))) : visible} onDetail={row => row.failed ? (setErrorSlot(row.slot), setRunErrorOpen(true)) : void openPoolDetail(row)} paging={reanchored ? undefined : paged} resetKey={filter} />}
         {paged.error && <p role="alert" className="error-notice">{paged.error} <button className="text-button" onClick={() => void paged.refresh()}>重试</button></p>}
         {current.length === expectedCount && workRun.status === "completed" && !gate1Snapshot && !checkingSnapshot && <div className="review-batch gate-one-action"><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> {workRun?.human_gate?.status === "ready" ? "我确认冻结当前 Golden Dataset" : "我已人工审核当前完整题集"}</label><button className="primary" aria-description={batchReason} disabled={busy || !!batchReason} onClick={() => void action(() => workRun?.human_gate?.status === "ready" ? postJson(`/api/governance/generation-runs/${workRun.id}/snapshot`, {}) : postJson("/api/governance/review-batch", { question_ids: currentIds, confirmed_manual_review: true }), workRun?.human_gate?.status === "ready" ? "冻结 Golden 测试集" : "审核 Golden 测试集")}>{workRun?.human_gate?.status === "ready" ? "冻结 Golden Dataset" : "确认人工审核"}</button></div>}
       </Section> : <Section title={<IconLabel name="golden">题目审核</IconLabel>} action={<button className="secondary" onClick={() => setHistoryOpen(true)}>历史 {displayText("Snapshot")}</button>}><p className="muted">尚未生成工作 Run，可生成题目或从候选池创建测试集。</p><CurrentCoveragePreview profile={profile} corpusFingerprint={data.workspace?.current_corpus_fingerprint} documents={data.documents || []} /></Section>}

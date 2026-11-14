@@ -12,6 +12,49 @@ import { OperationProvider } from "./operation";
 const tableValue=(label:string)=>{const index=[...document.querySelectorAll(".review-table th")].findIndex(e=>e.textContent===label);return document.querySelector(`.review-table tbody td:nth-child(${index+1})`)?.textContent;};
 afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+it("shows frozen reanchored evidence and the saved recall diagnosis", async () => {
+  const row = { id: "reanchor-Q10", slot: "Q10", question: "充电顺序？", test_category: "positive", stage: "golden", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", probe: { score: 100 }, raw: {} };
+  const run = { id: "GGEN-reanchor", status: "completed", profile: { expected_count: 1 }, question_ids: [row.id], artifacts: {} };
+  const question = { id: row.id, question: row.question, reference_answer: "冻结答案", evidence: [], business_requirements: { sources: [{ chunk_id: "DOC-002-V2-C-00015", document_name: "B2用户手册", page_start: 8, quote: "冻结证据原文" }] } };
+  const snapshot = { id: "GD-reanchor", snapshot: { generation_run_id: run.id, question_ids: [row.id], questions: [question], reanchor: { probe_results: { [row.id]: { observation: { question_validity_reason: "硬校验通过", retrieval_observation: "默认配置下指定证据未召回（检索召回探针）", score: null } } } } } };
+  const fetcher = vi.fn((url: string, init?: RequestInit) => Promise.resolve(new Response(JSON.stringify(url.includes("/candidates?") ? goldenFixture(url, [row]) : url.includes("snapshots") ? [snapshot] : url.includes("/questions/") ? row : []))));
+  vi.stubGlobal("fetch", fetcher);
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [row], snapshots: [snapshot] }} />));
+  await act(async () => document.querySelector<HTMLElement>(".review-table tbody tr")!.click());
+  const detail = document.querySelector(".frozen-question-details")?.textContent;
+  expect(detail).toContain("默认配置下指定证据未召回（检索召回探针）");
+  expect(detail).toContain("冻结证据原文");
+  expect(detail).toContain("冻结答案");
+  expect(detail).not.toContain("Probe · 100");
+  expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+  await act(async () => root.unmount());
+});
+
+it("opens the current reanchored frozen paper without a current Corpus generation run", async () => {
+  const question = { id: "reanchor-Q10", display_id: "Q10", question: "冻结充电题", test_category: "positive" };
+  const snapshot = { id: "GD-reanchor", snapshot: { generation_run_id: "historical-run", profile: { expected_count: 1 }, question_ids: [question.id], questions: [question], reanchor: { qc_reuse: { [question.id]: { qc_status: "qc_passed" } } } } };
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.includes("snapshots") ? [snapshot] : [])))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: snapshot.id }, generationRuns: [], dataset: [], snapshots: [snapshot] }} />));
+  expect(document.querySelector(".ui-gp-left > strong")?.textContent).toBe("1 题");
+  expect(document.querySelector(".review-table")?.textContent).toContain("冻结充电题");
+  expect(document.querySelector(".ui-gp")?.textContent).toContain("已冻结");
+  await act(async () => root.unmount());
+});
+
+it("keeps a newer working run visible after a reanchored paper was frozen", async () => {
+  const row = { id: "new-Q01", slot: "Q01", question: "新的待审核题", test_category: "positive", raw: {} };
+  const run = { id: "new-run", status: "completed", profile: { expected_count: 1 }, question_ids: [row.id], artifacts: {} };
+  const snapshot = { id: "GD-old", snapshot: { generation_run_id: "old-run", question_ids: ["old-Q01"], questions: [{ id: "old-Q01", question: "旧冻结题" }], reanchor: {} } };
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.includes("/candidates?") ? goldenFixture(url, [row]) : url.includes("snapshots") ? [snapshot] : [])))));
+  const root = createRoot(document.body.appendChild(document.createElement("div")));
+  await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: snapshot.id }, generationRuns: [run], dataset: [row], snapshots: [snapshot] }} />));
+  expect(document.querySelector(".review-table")?.textContent).toContain("新的待审核题");
+  expect(document.querySelector(".review-table")?.textContent).not.toContain("旧冻结题");
+  await act(async () => root.unmount());
+});
+
 it("counts the frozen delegated paper without claiming human review", async () => {
   const run = { id: "GGEN-owner-fixture", status: "completed", profile: { expected_count: 1 }, question_ids: ["owner-Q01"], artifacts: {} };
   const row = { id: "owner-Q01", slot: "Q01", question: "fixture", test_category: "positive", stage: "golden", review_status: "approved", probe_status: "probe_passed", qc_status: "qc_passed", qualification_status: "owner_delegated_approved" };
