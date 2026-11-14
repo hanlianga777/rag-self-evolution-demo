@@ -22,7 +22,7 @@ it('keeps saved category values without an extra weakest-category conclusion',as
 });
 it('uses the generation share even when a different stage is the largest',async()=>{
  await mount(<BaselineHero gates={{passed:1,total:1}} correct={1} total={2} badCount={1} layers={[]} stages={[{label:'检索',seconds:8,share:80},{label:'回答生成',seconds:2,share:20}]}/>);
- expect(document.querySelector('.ui-bl-time-note')?.textContent).toContain('耗时有 20.0% 花在回答生成上');
+ expect(document.querySelector('.ui-bl-time-note')?.textContent).toContain('耗时中有 20.0% 来自回答生成');
  expect(document.querySelector('.ui-bl-time-note')?.textContent).not.toContain('主要抓手');
 });
 it('shows the first missing source requirement and keeps every requirement in hover details',async()=>{

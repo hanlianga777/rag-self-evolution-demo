@@ -41,7 +41,11 @@ it('opens report cases in place and keeps rerun confirmation at the end of nondu
   await click('重新评测 Baseline');
   expect(document.querySelector('.confirm-dialog')?.textContent).toContain('会调用模型并产生费用');
   await click('取消');
-  expect(document.querySelector('.ui-bl-time-note')?.textContent).toContain('耗时有 90.0% 花在回答生成上');
+  expect(document.querySelector('.ui-bl-time-note')?.textContent).toContain('耗时中有 90.0% 来自回答生成');
+  expect(document.querySelector('.ui-bl-turn')).toBeNull();
+  expect(more.tagName).not.toBe('DETAILS');
+  expect(more.textContent).not.toContain('评测信息');
+  expect(more.querySelector('h2 .ui-icon')).not.toBeNull();
   expect(document.querySelector('.ui-blb-cat small')?.textContent).toBe('Positive');
   expect(document.querySelector('.ui-blb-conclusion')).toBeNull();
   await click('Bad Case 诊断');

@@ -286,7 +286,9 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 /* 027d：报告沿用现有卡片；读取中的字段用骨架，不提前下结论。 */
 .loading-line { display:inline-block; width:100%; min-width:48px; height:12px; border-radius:4px; background:var(--ui-rule-2); }
 .ui-bl-time-note { display:block; margin-top:0; font-size:12px; color:var(--ui-muted); line-height:1.65; }
-.ui-blb { align-items:start; }
+.ui-blb { align-items:stretch; }
+.ui-blb-card { display:flex; flex-direction:column; }
+.ui-blb-cats { flex:1; grid-auto-rows:1fr; align-items:center; }
 .ui-blb-cats { gap:24px; padding:8px 0; }
 .ui-blb-cats li { grid-template-columns:144px minmax(0,1fr) 64px; }
 .ui-blb-cat { white-space:nowrap; }
@@ -325,7 +327,9 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
 .evaluation-page .page-content { padding-bottom:16px; }
 .evaluation-page .page-content > .panel { margin:16px 0; }
 
-.baseline-more .story-disclosure-content > .header-actions { justify-content:flex-end; }
+.baseline-more .header-actions { justify-content:flex-end; margin-top:12px; }
+.baseline-more { padding:0; }
+.ui-bl-time-note strong { color:var(--ui-ink-2); font-weight:600; }
 .evaluation-page .ui-bl-time-note { justify-self:stretch; text-align:left; margin-left:0; width:auto; }
 
 /* 027e: saved Agent results and one selected evolution round. */

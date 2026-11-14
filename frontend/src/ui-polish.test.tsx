@@ -40,12 +40,12 @@ it("marks completed and current lifecycle stages accessibly", async () => {
   expect(document.querySelectorAll(".stage-stepper li.pending")).toHaveLength(1);
 });
 
-it("formats Baseline time locally and shortens the run ID", async () => {
+it("hides Baseline evaluation metadata and keeps detail controls", async () => {
   const run = { id: "EVAL-20260927140423956071", status: "completed", created_at: "2026-09-27T14:04:23.956836+00:00", dataset_snapshot: { question_ids: [] }, result: { gates: { gates: [], total: 11, passed_count: 9 } } };
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(String(input).endsWith("/api/bad-cases") ? [] : run), { status: 200 })));
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
-  expect(document.querySelector(".baseline-run-summary")?.textContent).toContain(`09-27 ${String(new Date(run.created_at).getHours()).padStart(2,"0")}:04`);
+  expect(document.querySelector(".baseline-run-summary")).toBeNull();
   expect([...document.querySelectorAll("button")].some(button=>button.textContent==="查看评测依据")).toBe(false);
   expect(document.body.textContent).not.toContain(run.id);
   expect(document.body.textContent).not.toContain("查看原始时间");

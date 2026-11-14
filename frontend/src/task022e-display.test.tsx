@@ -69,12 +69,12 @@ it('hides frozen editing buttons and keeps the unfrozen quality controls', async
   expect(document.querySelectorAll('button')).toHaveLength(2);
 });
 
-it('moves only the versioned Baseline rerun into more metrics and retains the preflight path', async () => {
+it('moves only the versioned Baseline rerun into the retrieval metrics card and retains the preflight path', async () => {
   const run = { id: '022e-rerun', status: 'completed', cases: [], result: {}, dataset_snapshot: {} };
   vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.includes('preflight') ? { can_start: false, reason: '保存的预检阻断' } : run))));
   await mount(<EvaluationPage data={{ evaluation: run }} />);
   expect(document.querySelector('.page-title')?.textContent).not.toContain('重新运行 Baseline');
-  const more = [...document.querySelectorAll('details')].find(e => e.querySelector('summary')?.textContent?.includes('更多指标'))!;
+  const more = document.querySelector('.baseline-more')!;
   const button = [...more.querySelectorAll('button')].find(b => b.textContent?.includes('重新评测 Baseline'))!;
   expect(button).toBeTruthy();
   expect(button.disabled).toBe(true);

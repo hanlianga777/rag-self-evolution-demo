@@ -34,7 +34,7 @@ it('shows a plain failed-gate sentence and hides IDs in collapsed technical deta
  vi.stubGlobal('fetch', vi.fn(async (url:string) => new Response(JSON.stringify(url.includes('/preflight')?{can_start:false,can_start_replay:false}:run))));
  await mount(<EvaluationPage data={{ evaluation: run }} />);
  expect(document.querySelector('.baseline-conclusion h2')?.textContent).toBe('本轮有 1 项 Hard Gate 未达标：安全拒答率 87.0%（要求 ≥96.0%）。');
- expect(document.querySelector('.baseline-run-summary')?.textContent).not.toContain('EVAL-internal');
+ expect(document.querySelector('.baseline-run-summary')).toBeNull();
  expect(document.body.textContent).not.toContain('新版Judge判分；Generation与检索耗时来自已核验历史执行，不代表本次重新生成或当前性能实测。');
  const details = [...document.querySelectorAll('details')].find(d => d.querySelector('summary')?.textContent === '技术详情');
  expect(details).toBeUndefined();expect(document.body.textContent).not.toContain('EVAL-internal');
