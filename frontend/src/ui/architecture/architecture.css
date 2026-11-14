@@ -93,3 +93,16 @@
   .ui-tech-groups { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .ui-arch-arrow, .ui-kf-arrow, .ui-tech-arrow { display: none; }
 }
+
+/* ---------- 11-13 第二版：SVG 架构图 ---------- */
+.ui-arch-figure { margin: 0; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 16px 18px 12px; }
+.ui-arch-svg { display: block; width: 100%; height: auto; font-family: inherit; overflow: visible; }
+.ui-arch-svg text { font-family: inherit; }
+.ui-arch-legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--ui-rule-2); font-size: var(--ui-fs-meta); color: var(--ui-muted); }
+.ui-arch-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ui-arch-legend i { display: inline-block; }
+.ui-arch-legend .ln { width: 22px; border-top: 1.5px solid var(--ui-faint); }
+.ui-arch-legend .ln.dash { border-top-style: dashed; border-color: var(--ui-accent); }
+.ui-arch-legend .gate { width: 14px; height: 10px; border: 1.5px solid var(--ui-accent); border-radius: 3px; }
+.ui-arch-legend .tint { width: 14px; height: 10px; background: var(--ui-accent-tint); border-radius: 3px; }
+.ui-arch-legend .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ui-accent); }

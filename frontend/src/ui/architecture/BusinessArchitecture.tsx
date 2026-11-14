@@ -1,84 +1,88 @@
 import { Icon, type IconName } from "../icons";
+import { C, Defs, Figure, Lane, Node, Tag, Wire } from "./svgkit";
 import "./architecture.css";
 
 /**
- * 概览 →「业务架构」（11-12 重做）。
+ * 概览 →「业务架构」（11-13 第二版，总指挥编写）。
  *
- * 结构：
- * - 顶部 ProjectProblems：为什么要做（三个痛点，完整长句，替换原来的"问题 → 方法 → 结果"和"质量难以衡量"三张卡）；
- * - 下方一张架构流程图：三条泳道（可信评测 / 受控优化 / 人工发布），每条 6 个同尺寸节点，
- *   三道人工关口写作 Gate 1–3（人工审核 / 人工审批），蓝框；Agent 泳道浅蓝底；
- *   泳道之间用一句话连接，受控优化泳道下方是"带经验进入下一轮"的回路，人工发布最后一步回到受控优化。
- * 全部是 HTML + CSS，字体、字号与全站一致（标题 13/600，说明 12 灰）。
+ * 一张连贯的流程图，三段首尾相接成闭环：
+ * 01 可信评测（左 → 右）→ Bad Case 下行进入 02 受控优化（右 → 左，浅蓝底，内含"未合格回到下一轮"的回路）
+ * → Candidate D 下行进入 03 人工发布（左 → 右）→ 线上反馈沿右侧回流到受控优化。
+ * 另有一条虚线：Gate 1 冻结的同一套 50 题，直接供 Sandbox 评测使用。
+ * 三道人工关口写作 Gate 1–3，蓝框。
  */
 
-export type ArchNode = { icon: IconName; title: string; detail: string; gate?: string; gateRole?: string; loop?: boolean };
-export type ArchLane = { key: string; index: string; name: string; purpose: string; nodes: ArchNode[]; focus?: boolean; loopNote?: string };
+type N = { icon: IconName; title: string; lines: string[]; gate?: string; gateRole?: string; focus?: boolean };
 
-export const BUSINESS_LANES: ArchLane[] = [
-  {
-    key: "evaluate", index: "01", name: "可信评测", purpose: "先有一把每一轮都不变的尺子",
-    nodes: [
-      { icon: "knowledge", title: "知识入库", detail: "4 份说明书解析、分块并建立索引" },
-      { icon: "coverage", title: "主题规划", detail: "聚成 9 个知识主题，按主题分配题位" },
-      { icon: "golden", title: "出题", detail: "正向、消融、负向三类题型" },
-      { icon: "checks", title: "自动质检", detail: "硬校验、Probe 检索实测、QC 质检" },
-      { icon: "approval", title: "题卷冻结", detail: "50 题冻结，之后每轮都用它", gate: "Gate 1", gateRole: "人工审核" },
-      { icon: "baseline", title: "Baseline 评测", detail: "11 项 Hard Gate，Bad Case 定位到层" },
-    ],
-  },
-  {
-    key: "optimize", index: "02", name: "受控优化", purpose: "Agent 在规则内试错，每一步都能归因", focus: true,
-    loopNote: "没有合格的 Candidate 时，带着本轮经验进入下一轮，最多 12 次评测",
-    nodes: [
-      { icon: "bad", title: "读取诊断", detail: "Bad Case 所在层和前几轮的经验" },
-      { icon: "candidate", title: "提出 Candidate", detail: "白名单 12 项参数，A / B / C 三个方向互斥" },
-      { icon: "data", title: "Sandbox 评测", detail: "同一套 Golden、同一判分标准", loop: true },
-      { icon: "gate", title: "Regression Check", detail: "严重新增为 0，普通新增不超过 1", loop: true },
-      { icon: "winner", title: "选出 Winner", detail: "第一个通过全部检查的 Candidate", loop: true },
-      { icon: "target", title: "Candidate D 精修", detail: "在 Winner 上补一个参数，事先预测、事后对账" },
-    ],
-  },
-  {
-    key: "release", index: "03", name: "人工发布", purpose: "机器提议，人来拍板，随时可以回滚",
-    nodes: [
-      { icon: "report", title: "推荐确认", detail: "人读过推荐理由并确认结论", gate: "Gate 2", gateRole: "人工审核" },
-      { icon: "checks", title: "发布资格", detail: "程序复核 Hard Gate 与回归结果" },
-      { icon: "release", title: "发布授权", detail: "保存完整快照，可回滚到任一版本", gate: "Gate 3", gateRole: "人工审批" },
-      { icon: "verify", title: "线上问答", detail: "每句回答附出处，可回溯原页" },
-      { icon: "compare", title: "Before / After", detail: "同一道题Before后的回答对照" },
-      { icon: "loop", title: "线上反馈", detail: "人工标记 Bad Case，回到受控优化" },
-    ],
-  },
+const ROW1: N[] = [
+  { icon: "knowledge", title: "知识入库", lines: ["4 份说明书解析、分块", "并建立索引"] },
+  { icon: "coverage", title: "主题规划", lines: ["聚成 9 个知识主题", "按主题分配题位"] },
+  { icon: "golden", title: "出题", lines: ["正向、消融、负向", "三类题型"] },
+  { icon: "checks", title: "自动质检", lines: ["硬校验、Probe 检索", "实测、QC 质检"] },
+  { icon: "approval", title: "题卷冻结", lines: ["50 题冻结", "每轮同一把尺子"], gate: "Gate 1", gateRole: "人工审核" },
+  { icon: "baseline", title: "Baseline 评测", lines: ["11 项 Hard Gate", "Bad Case 定位到层"] },
+];
+/** 第二行从右往左读：读取诊断在最右。 */
+const ROW2: N[] = [
+  { icon: "target", title: "Candidate D 精修", lines: ["在 Winner 上补一个参数", "事先预测、事后对账"], focus: true },
+  { icon: "winner", title: "选出 Winner", lines: ["合格者里 Bad Case", "最少的一个"], focus: true },
+  { icon: "gate", title: "Regression Check", lines: ["严重新增为 0", "普通新增不超过 1"], focus: true },
+  { icon: "data", title: "Sandbox 评测", lines: ["同一套 Golden", "同一判分标准"], focus: true },
+  { icon: "candidate", title: "提出 Candidate", lines: ["白名单 12 项参数", "A / B / C 方向互斥"], focus: true },
+  { icon: "bad", title: "读取诊断", lines: ["Bad Case 所在层", "与前几轮经验"], focus: true },
+];
+const ROW3: N[] = [
+  { icon: "report", title: "推荐确认", lines: ["人读过推荐理由", "并确认结论"], gate: "Gate 2", gateRole: "人工审核" },
+  { icon: "checks", title: "发布资格", lines: ["程序复核 Hard Gate", "与回归结果"] },
+  { icon: "release", title: "发布授权", lines: ["保存完整快照", "可回滚到任一版本"], gate: "Gate 3", gateRole: "人工审批" },
+  { icon: "verify", title: "线上问答", lines: ["每句回答附出处", "可回溯原页"] },
+  { icon: "compare", title: "Before / After", lines: ["同一道题优化前后", "的回答对照"] },
+  { icon: "loop", title: "线上反馈", lines: ["人工标记 Bad Case", "进入下一轮"] },
 ];
 
-const LINKS = ["Bad Case 和归因结果交给 Agent", "Winner 与 Candidate D 进入发布评审"];
+const W = 152, H = 74, GAP = 34, X0 = 14;
+const xs = Array.from({ length: 6 }, (_, i) => X0 + i * (W + GAP));
+const Y1 = 34, Y2 = 196, Y3 = 384;
+const ID = "biz";
 
-export function BusinessArchitecture({ lanes = BUSINESS_LANES, links = LINKS }: { lanes?: ArchLane[]; links?: string[] }) {
-  return <section className="ui-arch" aria-label="业务架构：可信评测、受控优化、人工发布">
-    {lanes.map((lane, laneIndex) => <div key={lane.key} className="ui-arch-block">
-      <div className={`ui-arch-lane${lane.focus ? " focus" : ""}`}>
-        <div className="ui-arch-lane-head">
-          <span className="ui-arch-lane-k">{lane.index}</span>
-          <strong>{lane.name}</strong>
-          <small>{lane.purpose}</small>
-        </div>
-        <ol className="ui-arch-row">
-          {lane.nodes.map((node, index) => <li key={node.title} className={`ui-arch-node${node.gate ? " gate" : ""}${node.loop ? " in-loop" : ""}`}>
-            {node.gate
-              ? <span className="ui-arch-gate"><Icon name="approval" size={12} /><b>{node.gate}</b><span>{node.gateRole}</span></span>
-              : <span className="ui-arch-node-k"><Icon name={node.icon} size={14} /></span>}
-            <strong>{node.title}</strong>
-            <small>{node.detail}</small>
-            {index < lane.nodes.length - 1 && <Icon name="go" size={14} className="ui-arch-arrow" />}
-          </li>)}
-        </ol>
-        {lane.loopNote && <div className="ui-arch-loop"><Icon name="loop" size={12} /><span>{lane.loopNote}</span></div>}
-      </div>
-      {laneIndex < lanes.length - 1 && links[laneIndex] && <div className="ui-arch-link"><span>{links[laneIndex]}</span></div>}
-    </div>)}
-    <div className="ui-arch-return"><Icon name="loop" size={12} /><span>线上反馈经人工确认后，作为下一轮受控优化的输入，仍要重新走评测、回归和三道 Gate</span></div>
-  </section>;
+export function BusinessArchitecture(_: { lanes?: unknown } = {}) {
+  const mid = (i: number) => xs[i] + W / 2;
+  const right = xs[5] + W;
+  return <Figure label="业务架构：可信评测、受控优化、人工发布三段首尾相接成闭环" viewBox="0 0 1150 486"
+    legend={<><span><i className="ln" />主流程</span><span><i className="ln dash" />回流 / 同一份数据</span><span><i className="gate" />Gate：必须由人完成</span><span><i className="tint" />Agent 自动试错区</span></>}>
+    <Defs id={ID} />
+    {/* 受控优化区底色 */}
+    <rect x={4} y={Y2 - 34} width={right + 6} height={H + 120} rx={16} fill={C.tint} opacity={0.55} />
+    <Lane x={X0} y={20} index="01" name="可信评测" note="先有一把每一轮都不变的尺子" />
+    <Lane x={X0} y={Y2 - 14} index="02" name="受控优化" note="Agent 在规则内试错，每一步都能归因" accent />
+    <Lane x={X0 + W / 2 + 16} y={Y3 - 14} index="03" name="人工发布" note="机器提议，人来拍板，随时可以回滚" />
+
+    {/* 第一行箭头 */}
+    {xs.slice(0, 5).map((x, i) => <Wire key={`r1-${i}`} id={ID} d={`M${x + W + 3} ${Y1 + H / 2} H${xs[i + 1] - 4}`} />)}
+    {/* Baseline → 读取诊断 */}
+    <Wire id={ID} accent d={`M${mid(5)} ${Y1 + H + 3} V${Y2 - 5}`} />
+    <Tag x={mid(5) - 8} y={(Y1 + H + Y2) / 2 + 4} text="Bad Case 与归因" anchor="end" accent bg="transparent" />
+    {/* Gate 1 → Sandbox：同一套考卷 */}
+    <Wire id={ID} dashed d={`M${mid(4)} ${Y1 + H + 3} C${mid(4)} ${Y1 + H + 46}, ${mid(3)} ${Y2 - 50}, ${mid(3)} ${Y2 - 5}`} />
+    <Tag x={(mid(3) + mid(4)) / 2} y={(Y1 + H + Y2) / 2 - 6} text="同一套 50 题" bg="transparent" />
+    {/* 第二行箭头（向左） */}
+    {xs.slice(1).map((x, i) => <Wire key={`r2-${i}`} id={ID} accent d={`M${x - 3} ${Y2 + H / 2} H${xs[i] + W + 4}`} />)}
+    {/* 回路：Regression 未合格 → 回到提出 Candidate */}
+    <Wire id={ID} accent dashed d={`M${mid(2)} ${Y2 + H + 3} C${mid(2)} ${Y2 + H + 48}, ${mid(4)} ${Y2 + H + 48}, ${mid(4)} ${Y2 + H + 6}`} />
+    <Tag x={mid(3)} y={Y2 + H + 44} text="未合格：带着本轮经验进入下一轮，最多 12 次评测" accent bg={C.tint} />
+    {/* Candidate D → Gate 2 */}
+    <Wire id={ID} accent d={`M${mid(0)} ${Y2 + H + 3} V${Y3 - 5}`} />
+    <Tag x={mid(0) + 8} y={Y2 + H + 26} text="推荐" anchor="start" accent bg="transparent" />
+    {/* 第三行箭头 */}
+    {xs.slice(0, 5).map((x, i) => <Wire key={`r3-${i}`} id={ID} d={`M${x + W + 3} ${Y3 + H / 2} H${xs[i + 1] - 4}`} />)}
+    {/* 线上反馈回流到读取诊断 */}
+    <Wire id={ID} dashed accent d={`M${right + 3} ${Y3 + H / 2} C${right + 46} ${Y3 + H / 2}, ${right + 46} ${Y2 + H / 2}, ${right + 6} ${Y2 + H / 2}`} />
+    <Tag x={right - 4} y={(Y2 + H + Y3) / 2 + 12} text="人工确认后回流" anchor="end" accent bg="transparent" />
+
+    {ROW1.map((n, i) => <Node key={n.title} x={xs[i]} y={Y1} w={W} h={H} {...n} />)}
+    {ROW2.map((n, i) => <Node key={n.title} x={xs[i]} y={Y2} w={W} h={H} {...n} />)}
+    {ROW3.map((n, i) => <Node key={n.title} x={xs[i]} y={Y3} w={W} h={H} {...n} />)}
+  </Figure>;
 }
 
 export type Problem = { icon: IconName; title: string; text: string };
@@ -100,3 +104,8 @@ export function ProjectProblems({ items = PROJECT_PROBLEMS, title = "这个项�
     </div>
   </section>;
 }
+
+/** 兼容旧引用：BUSINESS_LANES / ArchLane / ArchNode 已不再使用，保留类型导出避免外部引用报错。 */
+export type ArchNode = N;
+export type ArchLane = { key: string; nodes: N[] };
+export const BUSINESS_LANES: ArchLane[] = [{ key: "evaluate", nodes: ROW1 }, { key: "optimize", nodes: [...ROW2].reverse() }, { key: "release", nodes: ROW3 }];
