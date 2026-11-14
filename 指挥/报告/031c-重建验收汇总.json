@@ -1,0 +1,163 @@
+{
+  "status": "stopped_before_gate1",
+  "corpus_snapshot_id": "CORPUS-bf24725c92cb4e191879",
+  "pipeline_version_id": "KP-67c8c39b3359ef92fcec",
+  "dataset_version_id": "GD-20261114160635",
+  "dataset_status": "draft",
+  "documents": 4,
+  "parents": 40,
+  "children": 200,
+  "clusters": [
+    {
+      "cluster_id": "T001",
+      "label": "安全操作须知",
+      "size": 65,
+      "quotas": {
+        "positive": 7,
+        "ablation": 3,
+        "negative": 6
+      },
+      "representative_chunk_ids": [
+        "DOC-001-V2-C-00013",
+        "DOC-001-V2-C-00076",
+        "DOC-001-V2-C-00043",
+        "DOC-001-V2-C-00014",
+        "DOC-001-V2-C-00005"
+      ]
+    },
+    {
+      "cluster_id": "T002",
+      "label": "示教运行",
+      "size": 37,
+      "quotas": {
+        "positive": 4,
+        "ablation": 2,
+        "negative": 3
+      },
+      "representative_chunk_ids": [
+        "DOC-001-V2-C-00029",
+        "DOC-001-V2-C-00061",
+        "DOC-001-V2-C-00019",
+        "DOC-001-V2-C-00059",
+        "DOC-001-V2-C-00070"
+      ]
+    },
+    {
+      "cluster_id": "T003",
+      "label": "使用前检查",
+      "size": 42,
+      "quotas": {
+        "positive": 4,
+        "ablation": 2,
+        "negative": 5
+      },
+      "representative_chunk_ids": [
+        "DOC-002-V2-C-00022",
+        "DOC-002-V2-C-00006",
+        "DOC-002-V2-C-00020",
+        "DOC-002-V2-C-00019",
+        "DOC-002-V2-C-00001"
+      ]
+    },
+    {
+      "cluster_id": "T004",
+      "label": "电池充电规范",
+      "size": 31,
+      "quotas": {
+        "positive": 3,
+        "ablation": 2,
+        "negative": 3
+      },
+      "representative_chunk_ids": [
+        "DOC-004-V2-C-00011",
+        "DOC-004-V2-C-00017",
+        "DOC-004-V2-C-00003",
+        "DOC-004-V2-C-00027",
+        "DOC-004-V2-C-00021"
+      ]
+    },
+    {
+      "cluster_id": "T005",
+      "label": "遥控器操作",
+      "size": 25,
+      "quotas": {
+        "positive": 2,
+        "ablation": 1,
+        "negative": 3
+      },
+      "representative_chunk_ids": [
+        "DOC-003-V2-C-00011",
+        "DOC-003-V2-C-00021",
+        "DOC-003-V2-C-00003",
+        "DOC-003-V2-C-00015",
+        "DOC-003-V2-C-00006"
+      ]
+    }
+  ],
+  "actual_question_topic_counts": {
+    "T001": {
+      "positive": 11,
+      "ablation": 4,
+      "negative": 10
+    },
+    "T002": {
+      "positive": 3,
+      "ablation": 2,
+      "negative": 4
+    },
+    "T003": {
+      "positive": 1,
+      "ablation": 1,
+      "negative": 1
+    },
+    "T004": {
+      "positive": 3,
+      "ablation": 1,
+      "negative": 4
+    },
+    "T005": {
+      "positive": 2,
+      "ablation": 2,
+      "negative": 1
+    }
+  },
+  "clustering_parameters": {
+    "target_cluster_size": 40,
+    "min_cluster_size": 3,
+    "seed": 42,
+    "n_init": 10,
+    "max_iter": 100,
+    "distance": "squared_euclidean_on_l2_normalized_vectors"
+  },
+  "initial_k": 5,
+  "final_k": 5,
+  "gate1": {
+    "status": "not_frozen",
+    "approval_id": null,
+    "blocking_questions": [
+      "Q10"
+    ]
+  },
+  "hard_validation": {
+    "passed": 50,
+    "total": 50
+  },
+  "quote_anchor_count": 63,
+  "probes": {
+    "positive_ablation": 30,
+    "specified_source_quote_recalled": 29,
+    "missing_specified_source": [
+      "Q10"
+    ],
+    "negative": 20
+  },
+  "qc_reused": 50,
+  "calls": {
+    "text-embedding-v4": 25,
+    "qwen3-rerank": 30,
+    "deepseek-flash": 6
+  },
+  "embedding_total_tokens": 41172,
+  "deepseek_estimate_usd": 0.00072225,
+  "actual_billed_cost": "未知"
+}
