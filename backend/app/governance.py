@@ -2753,7 +2753,8 @@ class GovernanceStore:
             current = [item for item in candidates if item["reasoning"].get("round") == current_round]
             if current and any(item["status"] not in {"evaluated", "failed"} for item in current):
                 raise ValueError("上一轮 A/B/C 必须全部完成 Sandbox 后才能继续优化")
-            if any(item["result"].get("qualification",{}).get("qualified") and item["result"].get("bad_case_count")==0 for item in current):
+            full_rounds = existing and existing['result'].get('round_policy',{}).get('mode') == 'full_rounds'
+            if not full_rounds and any(item["result"].get("qualification",{}).get("qualified") and item["result"].get("bad_case_count")==0 for item in current):
                 raise ValueError("本轮完整评测已无剩余业务问题")
             used = existing["evaluation_budget"]["used"] if existing else 0
             if used >= MAX_EVALS - 1:
@@ -2788,7 +2789,7 @@ class GovernanceStore:
             if result.get('prior_round_review') is not None and type(result.get('round')) is int:
                 reviews[str(result['round'])] = {'status':'saved', 'review':result['prior_round_review'], 'source':'save_agent_round'}
             strategies = dict(persisted.get('agent_strategies', {}))
-            if result.get('strategy_contract') == 'agent-strategy-3' and type(result.get('round')) is int:
+            if result.get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'} and type(result.get('round')) is int:
                 strategies[str(result['round'])] = {key:result.get(key) for key in ('prior_round_review','bad_case_summary','agent_strategy')}
             connection.execute("UPDATE experiments SET status='completed', result_json=? WHERE id=?", (_json({**persisted, **result, 'prior_round_reviews':reviews, 'agent_strategies':strategies}), experiment_id))
 
@@ -3159,7 +3160,7 @@ class GovernanceStore:
                         '优先合并或部分取用合格方案；仅一个合格方案时也可以综合全部历史做小改动。所有取值只能来自search_space的allowed；相对Winner最多改2个参数，不得改变或撤销winner_preserved_diff，D必须不同于Winner。'
                         'd_facts是代码从保存结果生成的事实表，不要自行重新统计。参数优先用已验证且修好过针对错题的取值。只要usable_repairs非空，就必须生成D，不得只凭预测副作用放弃；这些取值已有历史修好、Winner证据位置支持、Pipeline合法且不撤销Winner的改动。多个改动混在一起无法单独归因，只能写伴随出现，不能写导致。'
                         '参数档案observations提供winner_config_diff（含当前参数的全部差异）、prerequisite_differences（不含当前参数的前提差异）及premise_label。前提不同的副作用仅为风险提示，必须写进风险清单并在Sandbox重点核对，不能单独作为放弃理由。没有前提相同证据不等于证明安全。'
-                        '本次实验strategy_contract为agent-strategy-3时：必须给combination_mode(partial_fusion或winner_plus_verified)、mode_reason说明为什么、预计修好题号和风险；partial_fusion只融合至少两个合格方案的有效非冲突参数，winner_plus_verified在Winner上添加历史已验证有效参数，禁用new_attempt。round_conclusions是已保存的逐轮总结，作为决策依据。'
+                        '本次实验strategy_contract为agent-strategy-3或agent-strategy-4时：必须给combination_mode(partial_fusion或winner_plus_verified)、mode_reason说明为什么、预计修好题号和风险；partial_fusion只融合至少两个合格方案的有效非冲突参数，winner_plus_verified在Winner上添加历史已验证有效参数，禁用new_attempt。round_conclusions是已保存的逐轮总结，作为决策依据。'
                         '返回action_name,should_generate_d(bool),root_cause_alignment,complementary_capabilities,proposed_config_diff(平铺参数到值；只需相对Winner变化),expected_improvement,risks,explanation,hypothesis,root_cause,intervention_direction,evidence_assertions:[{target_id,observation}],parameter_dependencies。依据/收益/风险/解释均为非空字符串。'
                         'should_generate_d=true时每个改动必须在changes数组给一条：{parameter,source_type:verified或partial或new_attempt,source_candidates:[完整历史ID],reason,target_question_ids:[剩余错题的正式ID],evidence_basis:事实表证据位置说明,side_effect_check:{historical_effects:历史伴随的新错题及门槛/P99变化,protected_overlap:[受保护题正式ID，与该取值档案的新错题交集必须全覆盖],winner_fixed_risk:检查Winner已经修好的题,gate_risk:检查临界门槛余量,mitigation:规避办法,same_premise_evidence:前提相同的历史证据或未观察到,different_premise_evidence:前提不同的来源及差异或未观察到,risk_checklist:重点盯哪些受保护题和临界门槛},expected_fixed_count:非负整数,possible_broken_count:非负整数}。'
                         'verified引用历史来源和修好题/证据位置，多参数来源只能整组取用；partial须额外给contrast_ids:[d_facts.contrasts里只有该参数不同的真实对照ID]，有对照才允许拆分。new_attempt须是本实验未用过的取值，额外给why_not_verified说明为什么已验证参数不能解决或副作用不可接受。新尝试来源可为空，不要求两个来源。'
@@ -3227,7 +3228,7 @@ class GovernanceStore:
                     raise ValueError('D建议缺少依据/收益/风险：root_cause_alignment和complementary_capabilities须非空；expected_improvement、risks、explanation须非空字符串，不要数组或对象')
                 if not suggestion['should_generate_d'] and facts['usable_repairs']:
                     raise ValueError('事实表存在可用修题参数，必须生成D；预测副作用不能作为放弃理由：'+_json(facts['usable_repairs']))
-                if experiment['result'].get('strategy_contract') == 'agent-strategy-3':
+                if experiment['result'].get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'}:
                     from .agent_strategy import validate_d_mode
                     validate_d_mode(suggestion, winner, eligible)
                 if suggestion['should_generate_d']:

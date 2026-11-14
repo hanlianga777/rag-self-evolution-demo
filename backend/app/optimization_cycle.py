@@ -143,14 +143,17 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
             store.require_current_baseline(experiment['baseline_run_id'])
             qualified = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}
                          and c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True]
-            if qualified:
+            policy = experiment['result'].get('round_policy', {})
+            full_rounds = policy.get('mode') == 'full_rounds'
+            finishing = not full_rounds or bool(experiment['result'].get('report_confirmation'))
+            if qualified and finishing:
                 if terminal := advance_qualified(experiment, qualified):
                     return terminal
                 experiment = store.experiment(experiment_id, light=True)
-            labels = {'D'} if qualified else {'A','B','C'}
+            labels = {'D'} if qualified and finishing else {'A','B','C'}
             pending = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in labels
                        and (c['status'] in {'generated','running'} or c['status']=='failed' and c['result'].get('evaluation_run_id'))]
-            if qualified and not pending:
+            if qualified and finishing and not pending:
                 return save('failed','composite','D没有可安全续跑的结果或断点')
             for candidate in pending:
                 check_cycle_stop(store,experiment_id)
@@ -161,6 +164,8 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                             store.skip_candidate(unrun['id'], '用户', 'A/B/C预算已用完，D保留一次；已跳过（未运行）', automatic=True)
                     from .agent_strategy import conclude_round
                     conclude_round(store,runtime,experiment_id)
+                    if full_rounds:
+                        break
                     return save('budget_exhausted', 'review')
                 save('running', 'sandbox')
                 finished = candidate
@@ -195,17 +200,29 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                     recovery['resumes'] += 1
                     save('running','sandbox',f"断点续跑第{recovery['resumes']}次：{error}")
                     finished = runner.run_candidate(candidate['id'], automatic=True)
-                if finished['result'].get('qualification',{}).get('qualified') is True:
+                if not full_rounds and finished['result'].get('qualification',{}).get('qualified') is True:
                     break
             experiment = store.experiment(experiment_id, light=True)
-            if any(c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True for c in experiment['candidates']):
+            if not full_rounds and any(c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True for c in experiment['candidates']):
                 for candidate in experiment['candidates']:
                     if candidate['status']=='generated' and candidate['reasoning'].get('candidate_label') in {'A','B','C'}:
                         store.skip_candidate(candidate['id'], '用户', '出现合格方案，已跳过（未运行）', automatic=True)
             from .agent_strategy import conclude_round
             conclude_round(store,runtime,experiment_id)
             experiment = store.experiment(experiment_id, light=True)
-            if any(c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True for c in experiment['candidates']):
+            qualified = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}
+                         and c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True]
+            if full_rounds:
+                if experiment['result'].get('report_confirmation'):
+                    continue
+                number = max((c['reasoning'].get('round',1) for c in experiment['candidates']), default=0)
+                if number >= policy['max_rounds'] or experiment['evaluation_budget']['used'] >= MAX_EVALS-1:
+                    if not qualified:
+                        return save('budget_exhausted','review')
+                    if terminal := advance_qualified(experiment, qualified):
+                        return terminal
+                    continue
+            elif qualified:
                 continue
             if state.get('current_round_only'):
                 return save('round_completed','review')

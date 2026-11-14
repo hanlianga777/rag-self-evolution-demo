@@ -134,6 +134,8 @@ def build_status(database, data_dir):
             error = result['technical_errors'][-1]
         if not error and failed:
             error = 'unknown'
+        if not failed and not (type(technical) in (int,float) and technical > 0):
+            error = None
         # Use the real attempt ledger, not the stale result.evaluation_budget.used.
         used = budget = '未知'
         if experiments:

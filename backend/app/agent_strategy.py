@@ -85,7 +85,7 @@ def _save(store, experiment_id, number, saved):
 @provider_task('agent')
 def conclude_round(store, runtime, experiment_id):
     experiment = store.experiment(experiment_id, light=True)
-    if experiment['result'].get('strategy_contract') != 'agent-strategy-3':
+    if experiment['result'].get('strategy_contract') not in {'agent-strategy-3','agent-strategy-4'}:
         return
     abc = [c for c in experiment['candidates'] if c['reasoning'].get('candidate_label') in {'A','B','C'}]
     number = max((c['reasoning'].get('round', 1) for c in abc), default=0)

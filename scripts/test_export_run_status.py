@@ -88,6 +88,16 @@ class StatusExportTests(unittest.TestCase):
         self.assertIn('| EVAL-TEST | 8 / 10 | 9 / 11 | 4.5 | 20.0 |', text)
         self.assertNotIn('当前阶段：出错', text)
 
+    def test_recovered_errors_are_hidden_but_current_failures_remain(self):
+        self.run_row('completed', result={'technical_failed':0, 'technical_errors':[{'error':'IdentityMismatch'}]}, error='IdentityMismatch')
+        self.assertIn('最近一次错误：无',self.render())
+        with closing(sqlite3.connect(self.db)) as c, c:
+            c.execute("UPDATE evaluation_runs SET status='running'")
+        self.assertIn('最近一次错误：无',self.render())
+        with closing(sqlite3.connect(self.db)) as c, c:
+            c.execute('UPDATE evaluation_runs SET result_json=?',(json.dumps({'technical_failed':1}),))
+        self.assertIn('最近一次错误：IdentityMismatch',self.render())
+
     def test_rebuild_and_anchor_progress(self):
         ops = self.root / 'corpus_operations'
         ops.mkdir()

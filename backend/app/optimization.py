@@ -82,9 +82,10 @@ def efficiency_optimization(prior_candidates, completed):
                                      for c in prior_candidates if c.get('status') == 'evaluated')
 
 
-def validate_round_contract(candidates, baseline, prior_candidates, baseline_gates=None, *, completed=0):
-    if len(candidates)!=3 or any(not isinstance(c,dict) for c in candidates) or {c.get('id') for c in candidates}!={'A','B','C'}:
-        raise ValueError('每轮必须恰好提供A/B/C三套方案')
+def validate_round_contract(candidates, baseline, prior_candidates, baseline_gates=None, *, completed=0, labels=None):
+    labels = labels if labels is not None else list('ABC')
+    if len(candidates)!=len(labels) or any(not isinstance(c,dict) for c in candidates) or {c.get('id') for c in candidates}!=set(labels):
+        raise ValueError('每轮必须恰好提供A/B/C三套方案' if labels == list('ABC') else '每轮必须恰好提供'+ '/'.join(labels) +'方案')
     used=set()
     compensated_high = False
     for candidate in candidates:
@@ -279,7 +280,7 @@ def enhancement_latency_deltas(baseline_config, baseline_result, candidates):
 
 
 def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, labels, *, baseline_gates=None, evaluation_budget=None, failed_parameter_signatures=None,
-                       baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None, round_conclusions=None):
+                       baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None, round_conclusions=None, round_policy=None):
     """Build the exact Agent request without a Provider or persistence side effect."""
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
@@ -361,6 +362,25 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     latest = next((c for c in reversed(prior_candidates) if c['status']=='evaluated' and (candidate_cases or {}).get(c['id'])), None)
     prompt['bad_case_groups'] = bad_case_groups((candidate_cases or {})[latest['id']] if latest else [row['result'] | {'question_id':row['question_id']} for row in bad_cases])
     prompt['bad_case_scope'] = latest['id'] if latest else 'Baseline'
+    if (round_policy or {}).get('mode') == 'full_rounds':
+        from .policy import candidate_rank
+        system = system.replace('每轮恰好ABC三套', '每轮恰好提供goal.candidate_labels指定的方案，预算不足三套时按标签数量提供')
+        system += ('本实验按round_policy跑满轮次，合格后仍继续。针对best_qualified_candidate的剩余Bad Case和离门槛最近的指标提出不同方向；'
+                   '可以组合前几轮已验证有效的参数。所有config_diff仍相对Baseline填写且只用白名单；说明和理由均由你撰写。')
+        prompt['round_policy'] = round_policy
+        prompt['round_contract']['count'] = len(labels)
+        winner = min((c for c in prior_candidates if c['status']=='evaluated' and c.get('result',{}).get('qualification',{}).get('qualified') is True), key=candidate_rank, default=None)
+        if winner:
+            result = winner['result']
+            hard_gates = []
+            for gate in result.get('gates',{}).get('gates',[]):
+                actual, threshold = gate.get('actual'), gate.get('threshold')
+                margin = (actual-threshold if gate.get('operator')=='>=' else threshold-actual) if type(actual) in (int,float) and type(threshold) in (int,float) else None
+                hard_gates.append({**gate,'margin':margin})
+            metrics = result.get('metrics',{})
+            prompt['best_qualified_candidate'] = {'candidate_id':winner['id'],'configuration':winner['config'],
+                'remaining_bad_cases':bad_case_groups((candidate_cases or {}).get(winner['id'],[])), 'hard_gates':hard_gates,
+                **{key:metrics.get(key,result.get(key)) for key in ('latency_p50_seconds','latency_p99_seconds')}}
     return system,prompt
 
 
@@ -470,8 +490,9 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
     candidates = [normalize_agent_candidate(c) for c in result['candidates']]
     result = {**result, 'candidates': candidates}
     audit['prior_round_review'] = validate_prior_round_review(result, prior_candidates)
-    validate_round_contract(candidates,base_config,prior_candidates,(audit.get('baseline_gate_results') or {}).get('gates'),completed=completed)
-    if audit.get('strategy_contract') == 'agent-strategy-3':
+    validate_round_contract(candidates,base_config,prior_candidates,(audit.get('baseline_gate_results') or {}).get('gates'),completed=completed,
+                            labels=labels if audit.get('strategy_contract') == 'agent-strategy-4' else None)
+    if audit.get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'}:
         from .agent_strategy import validate_strategy
         validate_strategy(result, prior_candidates, audit, {item['question_id'] for item in bad_cases})
     audit.update(response_contract_version='agent-response-2',rejected_candidates=[],response_warnings=[])
@@ -575,7 +596,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
                 'stage':audit['validation_stage'],'field':audit.get('failed_field'),'reason':str(error),
                 'validation_issues':audit.get('validation_issues',[]),
                 'actual_value':audit.get('actual_value'),'expected_type':audit.get('expected_type'),'allowed_values':audit.get('allowed_values')})
-    if len(staged)!=3:
+    if len(staged)!=(len(labels) if audit.get('strategy_contract') == 'agent-strategy-4' else 3):
         raise ValueError('整轮ABC校验拒绝：'+'；'.join(r['reason'] for r in audit['rejected_candidates']))
     audit["validation_stage"] = "completed"
     audit['failed_parameter_signatures'] = sorted(failed_signatures)
@@ -705,6 +726,9 @@ class OptimizationAgent:
         persisted_gates = (gate_results or {}).get("gates")
         failed_gates = [gate for gate in persisted_gates if gate.get("passed") is False] if isinstance(persisted_gates, list) else None
         labels = ['A', 'B', 'C']
+        if context.get('round_policy',{}).get('mode') == 'full_rounds':
+            labels = labels[:min(3,evaluation_budget['remaining_for_abc'])]
+            context['strategy_contract'] = 'agent-strategy-4'
         audit = {"optimization_run_id": experiment_id, "baseline_id": baseline_run_id, "timestamp": datetime.now(timezone.utc).isoformat(), "provider_raw_text": None, "parsed_json": None, "parsed_candidates": None, "validation_stage": "provider", "failed_candidate_id": None, "failed_field": None, "actual_value": None, "expected_type": None, "allowed_values": None, "validation_issues": [], "diagnostic_tasks":diagnostic_tasks, "processing_progress":processing_progress, "all_bad_case_audit": [{k:v for k,v in row.items() if k!='result_json'} for row in audited_cases], "root_cause_counts": dict(Counter(item['diagnostic_view']['primary_root_cause'] for item in bad_cases)), "source_bad_case_ids": [item["id"] for item in bad_cases], "monitoring_context": monitoring_context, "monitoring_target_event_ids": monitoring_target_event_ids, "target_reference_map": target_reference_map, "evaluation_budget": evaluation_budget, "baseline_gate_results": gate_results, "failed_gates": failed_gates}
         failed_signatures = set(context.get('failed_parameter_signatures') or [])
         failed_signatures.update(parameter_signature(base_config,{key:value for key,value in c['config'].items() if value!=base_config.get(key)})
@@ -723,7 +747,7 @@ class OptimizationAgent:
             baseline_gates=persisted_gates,evaluation_budget=evaluation_budget,failed_parameter_signatures=audit['failed_parameter_signatures'],
             baseline_result=baseline['result'],baseline_cases=saved_cases(baseline_run_id),
             candidate_cases={c['id']:saved_cases(c.get('result',{}).get('evaluation_run_id')) for c in prior_candidates},
-            golden_questions=list(questions.values()),round_conclusions=context.get('round_conclusions'))
+            golden_questions=list(questions.values()),round_conclusions=context.get('round_conclusions'),round_policy=context.get('round_policy'))
         audit['strategy_contract'] = context.get('strategy_contract')
         audit['bad_case_groups'] = prompt['bad_case_groups']
         audit['agent_strategy'] = '效率优化' if prompt['round_contract']['efficiency_optimization'] else '自主优化'
@@ -782,7 +806,7 @@ class OptimizationAgent:
                                'stage':audit['validation_stage'],'rejected_candidates':list(audit.get('rejected_candidates') or [])}
                     audit.setdefault('validation_retries',[]).append(rejection)
                     audit.setdefault('format_retry',{'reason':str(validation_error),'first_raw_text':content,'sandbox_budget_used':0})
-                    retry_prompt={**prompt,'validation_rejection':{**rejection,'instruction':'按具体拒绝原因重出完整ABC；规则拒绝未占试跑预算'},
+                    retry_prompt={**prompt,'validation_rejection':{**rejection,'instruction':'按具体拒绝原因重出goal.candidate_labels指定的全部方案；规则拒绝未占试跑预算'},
                                   'validation_rejection_history':audit['validation_retries']}
                     wait_for_off_peak(self.store,'agent:'+experiment_id,
                         lambda pause:self._checkpoint(experiment_id,generation_token,{'price_pause':pause}))
