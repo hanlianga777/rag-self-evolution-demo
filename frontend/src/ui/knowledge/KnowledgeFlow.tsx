@@ -103,7 +103,7 @@ export const SAMPLE_KNOWLEDGE_LANES: FlowLane[] = [
       { icon: "network", label: "混合检索", value: "召回 24 段", detail: "向量与 BM25 分数按权重融合", tunable: true },
       { icon: "rerank", label: "Rerank 重排", value: "重排 24 段", detail: "qwen3-rerank 重排，再按 MinScore 过滤", tunable: true },
       { icon: "merge", label: "补齐 Parent", value: "取前 6 个", detail: "Child 换成所在 Parent，去重后取 Top-K", tunable: true },
-      { icon: "cite", label: "生成并引用", value: "Thinking High", detail: "每句标出处，可回溯到说明书原页", tunable: true },
+      { icon: "cite", label: "生成并引用", value: "Thinking High", detail: "回答附引用出处，可回溯说明书原页", tunable: true },
     ],
   },
 ];

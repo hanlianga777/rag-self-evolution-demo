@@ -34,8 +34,8 @@ const ROW2: N[] = [
 const ROW3: N[] = [
   { icon: "report", title: "推荐确认", lines: ["人读过推荐理由", "并确认结论"], gate: "Gate 2", gateRole: "人工审核" },
   { icon: "checks", title: "发布资格", lines: ["程序复核 Hard Gate", "与回归结果"] },
-  { icon: "release", title: "发布授权", lines: ["保存完整快照", "可回滚到任一版本"], gate: "Gate 3", gateRole: "人工审批" },
-  { icon: "verify", title: "线上问答", lines: ["每句回答附出处", "可回溯原页"] },
+  { icon: "release", title: "发布授权", lines: ["保存完整快照", "可回滚到兼容的历史版本"], gate: "Gate 3", gateRole: "人工审批" },
+  { icon: "verify", title: "线上问答", lines: ["回答附引用出处", "可回溯原页"] },
   { icon: "compare", title: "Before / After", lines: ["同一道题优化前后", "的回答对照"] },
   { icon: "loop", title: "线上反馈", lines: ["人工标记 Bad Case", "进入下一轮"] },
 ];
@@ -54,8 +54,8 @@ export function BusinessArchitecture(_: { lanes?: unknown } = {}) {
     {/* 受控优化区底色 */}
     <rect x={4} y={Y2 - 34} width={right + 6} height={H + 120} rx={16} fill={C.tint} opacity={0.55} />
     <Lane x={X0} y={20} index="01" name="可信评测" note="先有一把每一轮都不变的尺子" />
-    <Lane x={X0} y={Y2 - 14} index="02" name="受控优化" note="Agent 在规则内试错，每一步都能归因" accent />
-    <Lane x={X0 + W / 2 + 16} y={Y3 - 14} index="03" name="人工发布" note="机器提议，人来拍板，随时可以回滚" />
+    <Lane x={X0} y={Y2 - 14} index="02" name="受控优化" note="Agent 在规则内试错，每一步都有依据与对照" accent />
+    <Lane x={X0 + W / 2 + 16} y={Y3 - 14} index="03" name="人工发布" note="机器提议，人来拍板，发布留有快照可回滚" />
 
     {/* 第一行箭头 */}
     {xs.slice(0, 5).map((x, i) => <Wire key={`r1-${i}`} id={ID} d={`M${x + W + 3} ${Y1 + H / 2} H${xs[i + 1] - 4}`} />)}
