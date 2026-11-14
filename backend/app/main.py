@@ -131,6 +131,8 @@ def start_recovery_monitor():
                     prune_history(store);retention_due=False
                 had_jobs=active
                 recover_authorized_evaluations()
+                from .baseline_chain import advance_chain
+                advance_chain(store,ai_service)
                 from .optimization_cycle import recover_optimization_cycles, recover_agent_generations
                 recover_optimization_cycles(store,ai_service)
                 recover_agent_generations(store,ai_service)
@@ -1802,18 +1804,20 @@ class PaidActionRequest(BaseModel):
 
 class RuntimeSettingsRequest(BaseModel):
     off_peak_only: bool = Field(strict=True)
+    audit_note: str | None = None
 
 
 class UnattendedRequest(BaseModel):
     enabled: bool = Field(strict=True)
     actor: str = Field(min_length=1, max_length=200)
+    audit_note: str | None = None
 
 
 @app.post('/api/runtime-settings/unattended', dependencies=[Depends(require_trusted_origin)])
 def update_unattended_authorization(payload: UnattendedRequest):
     from .paid_schedule import set_unattended_authorization
     try:
-        return set_unattended_authorization(store, payload.enabled, payload.actor)
+        return set_unattended_authorization(store, payload.enabled, payload.actor, audit_note=payload.audit_note)
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
 
@@ -1831,13 +1835,17 @@ class RunNowRequest(BaseModel):
 @app.get('/api/runtime-settings')
 def runtime_settings():
     from .paid_schedule import schedule_status, active_pauses, unattended_authorization
-    return {**schedule_status(store), 'active_pauses':active_pauses(store), 'unattended_authorization':unattended_authorization(store)}
+    from .baseline_chain import chain_status
+    return {**schedule_status(store), 'active_pauses':active_pauses(store), 'unattended_authorization':unattended_authorization(store), 'baseline_agent_chain':chain_status(store)}
 
 
 @app.post('/api/runtime-settings', dependencies=[Depends(require_trusted_origin)])
 def update_runtime_settings(payload: RuntimeSettingsRequest):
     from .paid_schedule import set_settings
     set_settings(store, payload.off_peak_only)
+    if payload.audit_note:
+        from .paid_schedule import _write
+        _write(store,'off_peak_audit_note',payload.audit_note)
     return runtime_settings()
 
 
@@ -2159,6 +2167,7 @@ def baseline_preflight(resume_source_id: str | None = None):
 class BaselineRunRequest(BaseModel):
     resume_source_id: str | None = None
     fresh: bool = False
+    unattended_chain: bool = False
 
 
 @app.post("/api/evaluations/run", status_code=201, dependencies=[Depends(require_trusted_origin)])
@@ -2171,7 +2180,18 @@ def start_evaluation(payload: BaselineRunRequest | None = None):
         if payload.fresh and payload.resume_source_id:
             raise ValueError('fresh与resume_source_id不能同时指定')
         source_id = payload.resume_source_id if payload else None
+        if payload.unattended_chain:
+            from .baseline_chain import chain_status, restore_initial_config
+            from .paid_schedule import unattended_authorization
+            if not payload.fresh or source_id or not unattended_authorization(store).get('enabled'):
+                raise ValueError('新版本串联须显式fresh和无人值守授权')
+            if chain_status(store):
+                raise ValueError('已有串联记录，请查看或续接原记录，不重复付费启动')
+            restore_initial_config(store)
         run_id, approved, config = runner.start_baseline(source_id,automatic=True)
+        if payload.unattended_chain:
+            from .baseline_chain import arm_chain
+            arm_chain(store,run_id)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     threading.Thread(target=contextvars.copy_context().run, args=(runner.execute_baseline,run_id, approved, config), daemon=True).start()

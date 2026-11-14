@@ -1,0 +1,192 @@
+"""031d: temporary database only; no paid calls or external network."""
+import json
+import tempfile
+import unittest
+from copy import deepcopy
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch, MagicMock
+
+from app.governance import GovernanceStore
+from app.optimization import build_agent_prompt, validate_round_contract
+from app.policy import DEFAULT_PIPELINE_CONFIG
+from identity_fixture import completed_baseline
+
+
+class StrategyTests(unittest.TestCase):
+    def rows(self):
+        return [{'id':'A','direction':'检索召回增强','config_diff':{'candidate_k':24}},
+                {'id':'B','direction':'检索召回增强','config_diff':{'query_rewrite':True}},
+                {'id':'C','direction':'回答策略','config_diff':{'prompt_strategy':'Tiered'}}]
+
+    def test_no_preset_directions_and_trigger_after_six_only_without_winner(self):
+        rows=self.rows()
+        validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[],completed=0)
+        _,p=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[],[],list('ABC'),evaluation_budget={'used':6})
+        self.assertTrue(p['round_contract']['efficiency_optimization'])
+        with self.assertRaisesRegex(ValueError,'High'):
+            validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[],completed=6)
+        rows[2]['config_diff']={'generation_thinking':'high','top_k':6}
+        validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[],completed=6)
+        winner={'id':'old','status':'evaluated','config':DEFAULT_PIPELINE_CONFIG,'result':{'qualification':{'qualified':True}}}
+        _,p=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[winner],[],list('ABC'),evaluation_budget={'used':6})
+        self.assertFalse(p['round_contract']['efficiency_optimization'])
+        validate_round_contract(self.rows(),DEFAULT_PIPELINE_CONFIG,[winner],completed=6)
+
+    def test_disjoint_parameters_remain_required(self):
+        rows=self.rows();rows[1]['config_diff']={'candidate_k':24}
+        with self.assertRaisesRegex(ValueError,'共用'):
+            validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[])
+
+    def test_strict_four_parts_reject_missing_or_false_summary(self):
+        from app.agent_strategy import validate_strategy, validate_round_conclusion
+        audit={'bad_case_groups':[{'layer':'检索层问题','subtype':'召回遗漏','question_ids':['Q1'],'count':1}]}
+        response={'prior_round_review':{'summary':'无'},'bad_case_summary':{'groups':audit['bad_case_groups'],'focus':'召回遗漏','conclusions':[{'id':'B1','conclusion':'一题召回遗漏'}]},
+                  'candidates':[{'adjustments':[{'parameter':'top_k'}],'risks':[{'reason':'耗时'}],'review_conclusion_ids':['L1'],'bad_case_conclusion_ids':['B1'],'predicted_fixed_question_ids':['Q1']} for _ in 'ABC']}
+        validate_strategy(response,[],audit,{'Q1'})
+        for field in ('prior_round_review','bad_case_summary'):
+            broken=deepcopy(response);broken.pop(field)
+            with self.assertRaises(ValueError):validate_strategy(broken,[],audit,{'Q1'})
+        broken=deepcopy(response);broken['bad_case_summary']['groups'][0]['count']=2
+        with self.assertRaises(ValueError):validate_strategy(broken,[],audit,{'Q1'})
+        c={'id':'A','status':'evaluated','reasoning':{'predicted_fixed_question_ids':['Q1']},'result':{'all_fixed_question_ids':['Q1'],'new_regression_question_ids':[]}}
+        review={'plans':[{'candidate_id':'A','fixed_question_ids':['Q1'],'new_failure_question_ids':[], 'matched_question_ids':['Q1'],'prediction_match_count':1,'unmatched_reason':'全部符合预测','parameter_assessment':'top_k有效','evidence_reason':'保存Final命中','conclusion':'有效'}], 'lessons':['保留top_k']}
+        validate_round_conclusion(review,[c])
+        review['plans'][0]['matched_question_ids']=[]
+        with self.assertRaises(ValueError):validate_round_conclusion(review,[c])
+
+
+class ChainTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.store=GovernanceStore(Path(self.tmp.name)/'test.db')
+        completed_baseline(self.store,run_id='BASE')
+
+    def test_completed_chain_designates_once_new_experiment_and_never_publishes(self):
+        from app.baseline_chain import arm_chain, advance_chain, chain_status
+        from app.paid_schedule import set_unattended_authorization
+        set_unattended_authorization(self.store,True,'用户')
+        arm_chain(self.store,'BASE')
+        with self.store.connection() as db:
+            db.execute("UPDATE evaluation_runs SET result_json=? WHERE id='BASE'",(json.dumps({'evaluation_complete':True,'technical_failed':0,'gates':{'passed':False}}),))
+        with patch('app.baseline_chain.threading.Thread') as thread:
+            advance_chain(self.store,SimpleNamespace())
+            advance_chain(self.store,SimpleNamespace())
+            self.assertEqual(thread.call_count,1)
+        state=chain_status(self.store)
+        self.assertTrue(state['designated'])
+        self.assertEqual(state['status'],'agent_running')
+        exp=self.store.experiment(state['experiment_id'])
+        self.assertEqual(exp['baseline_run_id'],'BASE');self.assertEqual(exp['candidates'],[])
+        self.assertEqual(exp['result']['strategy_contract'],'agent-strategy-3')
+        self.assertEqual(self.store.current_baseline_identity()['current_baseline_id'],'BASE')
+        with self.store.connection() as db:
+            self.assertEqual(db.execute('select count(*) from experiments').fetchone()[0],1)
+            self.assertEqual(db.execute("select count(*) from approvals where gate='human_release'").fetchone()[0],0)
+
+    def test_partial_baseline_waits_and_never_starts_agent(self):
+        from app.baseline_chain import arm_chain, advance_chain, chain_status
+        arm_chain(self.store,'BASE')
+        with self.store.connection() as db:db.execute("UPDATE evaluation_runs SET status='running' WHERE id='BASE'")
+        with patch('app.baseline_chain.threading.Thread') as thread:
+            advance_chain(self.store,SimpleNamespace())
+            self.assertFalse(thread.called)
+        self.assertEqual(chain_status(self.store)['status'],'waiting_baseline')
+
+    def test_initial_version_preserves_old_config_and_clears_draft(self):
+        from app.baseline_chain import restore_initial_config
+        previous=self.store.active_production()
+        with self.store.connection() as db:
+            db.execute('update production_versions set config_json=? where id=?',(json.dumps({**DEFAULT_PIPELINE_CONFIG,'top_k':6}),previous['id']))
+        restored=restore_initial_config(self.store)
+        self.assertEqual(restored['config'],DEFAULT_PIPELINE_CONFIG)
+        versions=self.store.production_versions()
+        old=next(v for v in versions if v['id']==previous['id'])
+        self.assertEqual(old['config']['top_k'],6);self.assertEqual(old['status'],'archived')
+
+
+class ConclusionTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.store=GovernanceStore(Path(self.tmp.name)/'test.db')
+        completed_baseline(self.store,run_id='BASE')
+
+    def test_conclusion_rejects_then_saves_once_and_reuses_after_restart(self):
+        from app.agent_strategy import conclude_round
+        from app.paid_schedule import set_settings
+        set_settings(self.store,False)
+        exp=self.store.create_experiment('BASE')
+        with self.store.connection() as db:db.execute('UPDATE experiments SET result_json=? WHERE id=?',(json.dumps({'strategy_contract':'agent-strategy-3'}),exp))
+        self.store.save_candidate(exp,'R1-A',DEFAULT_PIPELINE_CONFIG,{'round':1,'candidate_label':'A','predicted_fixed_question_ids':['Q1']})
+        cid=exp+'-R1-A'
+        self.store.finish_candidate(cid,'evaluated',{'all_fixed_question_ids':['Q1'],'new_regression_question_ids':[]})
+        class Provider:
+            calls=0
+            def complete(provider,system,user,**kwargs):
+                provider.calls+=1
+                if provider.calls==1:return '{}'
+                return json.dumps({'plans':[{'candidate_id':cid,'fixed_question_ids':['Q1'],'new_failure_question_ids':[], 'matched_question_ids':['Q1'],'prediction_match_count':1,'unmatched_reason':'全部符合','parameter_assessment':'待验证','evidence_reason':'保存Final位置','conclusion':'有效'}],'lessons':['检查Final']})
+        provider=Provider();runtime=SimpleNamespace(provider=provider)
+        saved=conclude_round(self.store,runtime,exp)
+        self.assertEqual(saved['status'],'saved');self.assertEqual(provider.calls,2)
+        self.assertIn('error',saved['attempts'][0])
+        self.assertEqual(conclude_round(GovernanceStore(self.store.database_path,migrate=False),runtime,exp),saved)
+        self.assertEqual(provider.calls,2)
+
+    def test_d_only_uses_two_authorized_modes_and_verified_changes(self):
+        from app.agent_strategy import validate_d_mode
+        winner={'id':'A','result':{'qualification':{'qualified':True}}}
+        other={'id':'B','result':{'qualification':{'qualified':True}}}
+        suggestion={'should_generate_d':True,'combination_mode':'partial_fusion','mode_reason':'两套已验证且不冲突','changes':[{'source_type':'partial','source_candidates':['B']}]}
+        validate_d_mode(suggestion,winner,[winner,other])
+        other['result']['qualification']['qualified']=False
+        with self.assertRaises(ValueError):validate_d_mode(suggestion,winner,[winner,other])
+        suggestion['combination_mode']='winner_plus_verified'
+        validate_d_mode(suggestion,winner,[winner,other])
+        suggestion['changes'][0]['source_type']='new_attempt'
+        with self.assertRaises(ValueError):validate_d_mode(suggestion,winner,[winner,other])
+
+    def test_saved_stage_shares_are_visible_to_agent(self):
+        from app.optimization import performance_facts
+        facts=performance_facts({},[{'question_id':'Q1','programmatic_metrics':{'latency_ms':100,'stages':[{'stage_name':'generation','duration_ms':80,'parent':None},{'stage_name':'nested','duration_ms':20,'parent':'generation'}]}}])
+        self.assertEqual(facts['stage_shares'],[{'stage':'generation','duration_ms':80,'share_of_answer_latency':.8}])
+
+    def test_budget_exhaustion_finishes_round_summary_and_skips_unrun_candidates(self):
+        from app.optimization_cycle import run_until_qualified
+        store=self.store;exp=store.create_experiment('BASE')
+        for number in range(10):
+            store.save_candidate(exp,'old-'+str(number),DEFAULT_PIPELINE_CONFIG,{'candidate_label':'A','round':1,'sandbox_attempts':[{'id':'fixture'}]})
+            store.finish_candidate(exp+'-old-'+str(number),'evaluated',{'qualification':{'qualified':False}})
+        for label in 'ABC':store.save_candidate(exp,'R2-'+label,DEFAULT_PIPELINE_CONFIG,{'candidate_label':label,'round':2})
+        class Runner:
+            def __init__(self,*args):pass
+            def run_candidate(self,cid,**kwargs):
+                store.reserve_candidate_evaluation(cid)
+                return store.finish_candidate(cid,'evaluated',{'qualification':{'qualified':False}})
+        with patch('app.optimization_cycle.EvaluationRunner',Runner),patch('app.agent_strategy.conclude_round') as conclude:
+            state=run_until_qualified(store,SimpleNamespace(provider=object()),exp)
+        self.assertEqual(state['status'],'budget_exhausted')
+        self.assertTrue(conclude.called)
+        self.assertTrue(store.experiment(exp)['rounds'][-1]['complete'])
+
+
+class ChainApiTests(unittest.TestCase):
+    setUp=ChainTests.setUp
+
+    def test_explicit_chain_api_persists_authority_and_rejects_duplicate_start(self):
+        from fastapi.testclient import TestClient
+        from api_fixture import main
+        client=TestClient(main.app)
+        with patch.object(main,'store',self.store),patch.object(main.EvaluationRunner,'start_baseline',return_value=('BASE',[],DEFAULT_PIPELINE_CONFIG)),patch.object(main,'threading',SimpleNamespace(Thread=MagicMock())) as threads:
+            settings=client.post('/api/runtime-settings',json={'off_peak_only':False,'audit_note':'用户 2026-11-14 确认关闭平价限制'})
+            self.assertEqual(settings.status_code,200)
+            auth=client.post('/api/runtime-settings/unattended',json={'enabled':True,'actor':'用户','audit_note':'用户 2026-11-14 授权'})
+            self.assertEqual(auth.json()['audit_note'],'用户 2026-11-14 授权')
+            denied=client.post('/api/evaluations/run',headers={'Origin':'https://untrusted.invalid'},json={'fresh':True,'unattended_chain':True})
+            self.assertEqual(denied.status_code,403)
+            start=client.post('/api/evaluations/run',json={'fresh':True,'unattended_chain':True})
+            self.assertEqual(start.status_code,201,start.text)
+            duplicate=client.post('/api/evaluations/run',json={'fresh':True,'unattended_chain':True})
+            self.assertEqual(duplicate.status_code,409);self.assertEqual(threads.Thread.call_count,1)
+            state=client.get('/api/runtime-settings').json()
+            self.assertFalse(state['off_peak_only']);self.assertEqual(state['baseline_agent_chain']['baseline_id'],'BASE')

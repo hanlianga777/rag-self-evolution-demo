@@ -12,9 +12,9 @@ from test_optimization_contract import drafts
 class FullFlowTests(unittest.TestCase):
     setUp=sandbox_fixture.Sandbox50Tests.setUp
 
-    def exercise(self, better, *, string_types=False):
+    def exercise(self, better, *, string_types=False, chain=False):
         store, runtime=self.store,self.ai
-        exp=store.create_experiment(self.baseline['id'])
+        exp=None if chain else store.create_experiment(self.baseline['id'])
         set_unattended_authorization(store,True,'用户 2026-11-05 授权')
         original_answer=runtime.answer
         def answer(question,config):
@@ -41,6 +41,8 @@ class FullFlowTests(unittest.TestCase):
             if system.startswith(('只改写','生成仅用于检索')):
                 return user
             prompt=json.loads(user)
+            if 'predictions' in prompt:
+                return json.dumps({'plans':[{'candidate_id':p['id'], 'fixed_question_ids':p['result']['all_fixed_question_ids'], 'new_failure_question_ids':p['result']['new_failure_question_ids'], 'matched_question_ids':sorted(set(p['result']['all_fixed_question_ids']) & set(prompt['predictions'][p['id']])), 'prediction_match_count':len(set(p['result']['all_fixed_question_ids']) & set(prompt['predictions'][p['id']])), 'unmatched_reason':'未修好题看保存的证据位置，未知因果写待验证', 'parameter_assessment':'多参数无法单独确定，最可能为召回参数，依据Final', 'evidence_reason':'保存证据位置与耗时', 'conclusion':'有效或待验证'} for p in prompt['prior_sandbox_results']], 'lessons':['依据本轮保存结果保留有效组合']})
             if 'prior_sandbox_results' in prompt:
                 agent_prompts.append(prompt)
                 previous=prompt['prior_sandbox_results'];round_no=1 if not previous else 2
@@ -54,15 +56,35 @@ class FullFlowTests(unittest.TestCase):
                     'fixed_question_ids':p['result']['all_fixed_question_ids'],'new_failure_question_ids':p['result']['new_failure_question_ids'],
                     'evidence_reason':p['attribution']+'；保存P99及证据位置见输入','conclusion':'有害或无法判断：本方案未通过所有门槛'} for p in previous],
                     'baseline_remaining_assessment':'冻结Baseline的case-2仍需补足证据','conclusions':[{'id':'L1','conclusion':'尝试不同完整组合，不能把max+HyDE失败推断成high+HyDE失败'}]}
+                if chain:
+                    response['prior_round_review']['summary']='无' if not previous else '读取上一轮全部结果与本轮结论'
+                    for p in response['prior_round_review']['plans']:p.update(most_likely_parameter='hyde',attribution_reason='无法单独确定，最可能为召回参数，依据Final位置')
+                    response['bad_case_summary']={'groups':prompt['bad_case_groups'],'focus':'保存的检索缺口','conclusions':[{'id':'B1','conclusion':'按保存检索位置补足Final'}]}
+                    for c in response['candidates']:
+                        c.update(bad_case_conclusion_ids=['B1'],predicted_fixed_question_ids=['case-2'], expected_improvement='预计修好case-2', adjustments=[{'parameter':k,'baseline_value':prompt['goal']['baseline_configuration'][k],'candidate_value':v,'expected_impact':'预计修好case-2'} for k,v in c['config_diff'].items()], risks=[{'question_ids':[], 'metric':'latency_p99_seconds','reason':'可能变慢'}])
                 return json.dumps(response)
             winner=prompt['winner'];source=next(s for s in prompt['sources'] if s['config']['top_k']==6)
-            return json.dumps({'should_generate_d':'true' if string_types else True,'action_name':'合并已验证组合','source_candidates':[winner['id'],source['id']],
+            return json.dumps({'combination_mode':'winner_plus_verified','mode_reason':'保留Winner并加历史已验证的TopK，预计修好case-0，风险为变慢','should_generate_d':'true' if string_types else True,'action_name':'合并已验证组合','source_candidates':[winner['id'],source['id']],
                 'source_reasons':{winner['id']:'保留high+HyDE整组，不能拆分',source['id']:'单参数TopK的目标改善已保存'},
                 'root_cause_alignment':'保存检索证据缺口','complementary_capabilities':'保留召回与上下文选择',
                 'proposed_config_diff':{'top_k':'6' if string_types else 6},'expected_improvement':'覆盖case-2','risks':'可能增加延迟','explanation':'仅组合已经完整试跑的来源',
                 'changes':[{'parameter':'top_k','source_type':'verified','source_candidates':[source['id']], 'reason':'历史修好case-0','target_question_ids':['case-0'],'evidence_basis':'保存标准证据c5进入Final', 'side_effect_check':{'historical_effects':'伴随case-20翻错','protected_overlap':['case-20'],'winner_fixed_risk':'保留high+HyDE','gate_risk':'P99余量待验证','mitigation':'完整50题','same_premise_evidence':'没有相同前提的观察','different_premise_evidence':'来源与赢家的其他参数不同，不能直接归因','risk_checklist':'完整题卷核对保护题与安全拒答95和P99不超过60秒'},'expected_fixed_count':1,'possible_broken_count':1}], 'hypothesis':'补充上下文','root_cause':'Retrieval','intervention_direction':'combined','evidence_assertions':[], 'parameter_dependencies':[]})
         runtime.provider.complete=complete
-        state=run_until_qualified(store,runtime,exp)
+        if chain:
+            from app.baseline_chain import arm_chain, advance_chain, chain_status
+            from unittest.mock import patch
+            arm_chain(store,self.baseline['id'])
+            class InlineThread:
+                def __init__(self,target,args,kwargs,**ignored):self.work=lambda:target(*args,**kwargs)
+                def start(self):self.work()
+            with patch('app.baseline_chain.threading.Thread',InlineThread):advance_chain(store,runtime)
+            exp=chain_status(store)['experiment_id']
+            state=store.experiment(exp)['result']['optimization_cycle']
+            self.assertEqual(len(store.experiment(exp)['result']['round_conclusions']),2)
+            self.assertEqual(store.experiment(exp)['result']['report_confirmation']['actor'],'用户 2026-11-05 授权')
+            self.assertIn('previous_round_conclusions',agent_prompts[1])
+        else:
+            state=run_until_qualified(store,runtime,exp)
         self.assertEqual(state['status'],'recommended',(state,[(c['id'],c['result'].get('bad_case_count'),[g for g in c['result'].get('gates',{}).get('gates',[]) if not g.get('passed')]) for c in store.experiment(exp)['candidates']]))
         experiment=store.experiment(exp)
         self.assertEqual(experiment['evaluation_budget']['used'],5)
@@ -84,3 +106,5 @@ class FullFlowTests(unittest.TestCase):
     def test_full50_d_not_better_retains_winner(self):self.exercise(False)
     def test_full50_d_better_recommends_d(self):self.exercise(True)
     def test_full50_d_accepts_equivalent_string_types(self):self.exercise(True, string_types=True)
+
+    def test_031d_chain_mock50_stops_before_publish(self):self.exercise(True,chain=True)

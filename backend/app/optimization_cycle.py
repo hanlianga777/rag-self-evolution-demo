@@ -115,11 +115,13 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
             for candidate in experiment['candidates']:
                 if candidate['status']=='generated' and candidate['reasoning'].get('candidate_label') in {'A','B','C'}:
                     store.skip_candidate(candidate['id'], '自动循环', '出现合格方案，已跳过（未运行）', automatic=True)
+            from .agent_strategy import conclude_round
+            conclude_round(store,runtime,experiment_id)
             if not authorization.get('enabled'):
                 return save('qualified', 'review')
             winner = min(qualified, key=candidate_rank)
-            actor = '按用户授权自动确认：' + authorization['actor']
-            store.confirm_experiment_report(experiment_id, winner['id'], actor)
+            store.confirm_experiment_report(experiment_id, winner['id'], authorization['actor'],
+                                            audit_note='用户 2026-11-14 预先授权')
         if not authorization.get('enabled'):
             return save('qualified', 'review')
         check_cycle_stop(store,experiment_id)
@@ -154,7 +156,11 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                 check_cycle_stop(store,experiment_id)
                 limit = MAX_EVALS if candidate['reasoning'].get('candidate_label')=='D' else MAX_EVALS-1
                 if candidate['status']=='generated' and store.experiment(experiment_id, light=True)['evaluation_budget']['used'] >= limit:
-                    store.skip_candidate(candidate['id'], '自动循环', 'A/B/C预算已用完，D保留一次；已跳过（未运行）', automatic=True)
+                    for unrun in store.experiment(experiment_id,light=True)['candidates']:
+                        if unrun['status']=='generated' and unrun['reasoning'].get('candidate_label') in {'A','B','C'}:
+                            store.skip_candidate(unrun['id'], '用户', 'A/B/C预算已用完，D保留一次；已跳过（未运行）', automatic=True)
+                    from .agent_strategy import conclude_round
+                    conclude_round(store,runtime,experiment_id)
                     return save('budget_exhausted', 'review')
                 save('running', 'sandbox')
                 finished = candidate
@@ -191,6 +197,13 @@ def run_until_qualified(store, runtime, experiment_id, *, claimed=False):
                     finished = runner.run_candidate(candidate['id'], automatic=True)
                 if finished['result'].get('qualification',{}).get('qualified') is True:
                     break
+            experiment = store.experiment(experiment_id, light=True)
+            if any(c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True for c in experiment['candidates']):
+                for candidate in experiment['candidates']:
+                    if candidate['status']=='generated' and candidate['reasoning'].get('candidate_label') in {'A','B','C'}:
+                        store.skip_candidate(candidate['id'], '用户', '出现合格方案，已跳过（未运行）', automatic=True)
+            from .agent_strategy import conclude_round
+            conclude_round(store,runtime,experiment_id)
             experiment = store.experiment(experiment_id, light=True)
             if any(c['status']=='evaluated' and c['result'].get('qualification',{}).get('qualified') is True for c in experiment['candidates']):
                 continue

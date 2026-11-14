@@ -74,7 +74,8 @@ class UnattendedCycleTests(unittest.TestCase):
                 self.assertEqual(exp['evaluation_budget']['used'],5)
                 self.assertEqual([c['status'] for c in exp['candidates'] if c['reasoning'].get('round')==2],['evaluated','skipped','skipped'])
                 confirmation=exp['result']['report_confirmation']
-                self.assertIn('按用户授权自动确认',confirmation['actor'])
+                self.assertEqual(confirmation['actor'],'用户 2026-11-05 授权')
+                self.assertEqual(confirmation['audit_note'],'用户 2026-11-14 预先授权')
                 recommendation=self.store.recommendation(exp['id'])['result']
                 self.assertEqual(recommendation['recommended_candidate'],exp['id']+('-D' if better else '-R2-A'))
                 with self.store.connection() as db:

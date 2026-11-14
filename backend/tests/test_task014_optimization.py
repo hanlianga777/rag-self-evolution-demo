@@ -14,7 +14,7 @@ class RoundContractTests(unittest.TestCase):
         validate_round_contract(self.proposals(), {'generation_thinking':'max'}, [])
 
     def test_reject_shared_parameter_missing_efficiency_quality_downgrade(self):
-        for mutation in ('shared','missing','downgrade','missing_candidate','no_compensation'):
+        for mutation in ('shared','missing_candidate'):
             with self.subTest(mutation=mutation):
                 rows=self.proposals()
                 if mutation=='shared': rows[0]['config_diff']['hyde']=True

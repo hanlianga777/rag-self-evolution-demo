@@ -36,10 +36,12 @@ def unattended_authorization(store):
     return _settings(store).get('unattended_authorization', {'enabled':False, 'actor':None, 'authorized_at':None})
 
 
-def set_unattended_authorization(store, enabled, actor):
+def set_unattended_authorization(store, enabled, actor, *, audit_note=None):
     if not actor.strip():
         raise ValueError('授权人不能为空')
     value = {'enabled':enabled, 'actor':actor.strip(), 'authorized_at':utc_now().isoformat()}
+    if audit_note:
+        value['audit_note'] = audit_note
     _write(store, 'unattended_authorization', value)
     return value
 

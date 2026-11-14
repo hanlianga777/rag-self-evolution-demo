@@ -309,7 +309,7 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false,onRep
       return key === 'top_k' && value === 6 && topKEvidence ? <HoverCard key={key} content={topKEvidence}><span tabIndex={0}>{chip}</span></HoverCard> : <span key={key}>{chip}</span>;
     })}</div>}
     {decision && <p className="ui-headline d-result-conclusion">{storyText(decision)}</p>}
-    <div className={d ? "d-agent-prediction agent-round-strategy" : "ui-body-muted"} role="status">{d && <h3>Agent 的预测</h3>}<p>{agentDisplayText(reason || "未保存说明")}</p></div>
+    <div className={d ? "d-agent-prediction agent-round-strategy" : "ui-body-muted"} role="status">{d && <h3>Agent 的预测</h3>}<p>{agentDisplayText(reason || "未保存说明")}</p>{suggestion.combination_mode && <p>{suggestion.combination_mode === "partial_fusion" ? "部分融合" : "Winner 加有效参数"}：{suggestion.mode_reason || "未知"}</p>}</div>
     {!d && dProgressLabel(experiment)==='Agent 判断不做 D' && <p className="ui-headline d-result-conclusion"><StoryText value={recommendationReason(experiment)} evaluation={evaluation} badCases={badCases}/></p>}
     </section>{completeResult(d) && <DResultStory experiment={experiment} evaluation={evaluation} badCases={badCases} footer={footer}/>} {!completeResult(d) && changes.some((change:any)=>Object.values(change.side_effect_check || {}).some(value=>typeof value==='string' && value.trim())) && <section className="ui-card"><h3>副作用检查</h3><div className="d-issue-grid"><DSideEffects changes={changes}/></div></section>} {!completeResult(d) && footer && <div className="d-story-footer">{footer}</div>}</article>;
 }
