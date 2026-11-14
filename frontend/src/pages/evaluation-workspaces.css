@@ -431,3 +431,25 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 .verification-page .feedback-next-inputs { color:var(--ui-muted); font-size:12px; margin:14px 0 0; padding:0; border:0; background:transparent; }
 @media(max-width:1000px) { .verification-page .monitoring-layout { grid-template-columns:1fr; flex:none; } .verification-page .monitoring-layout > .panel { min-height:300px; } }
 @media(max-width:700px) { .verification-page .monitoring-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* 028e：历史回答的引用列表与问答标注动作。 */
+.verification-page .message-sources ol { list-style:none; margin:6px 0 0; padding:0; display:grid; gap:4px; }
+.verification-page .message-sources li { display:flex; align-items:baseline; gap:10px; }
+.verification-page .message-sources .qa-source-number { flex:none; min-width:10px; font-size:10px; color:var(--ui-muted); }
+.verification-page .message-sources .document-link { padding:0; border:0; background:transparent; text-align:left; font-weight:400; }
+.verification-page .monitoring-table th:first-child { width:15%; }
+.verification-page .monitoring-table th:nth-child(2) { width:auto; }
+.verification-page .monitoring-table th:nth-child(3) { width:9%; }
+.verification-page .monitoring-table th:nth-child(4) { width:8%; }
+.verification-page .monitoring-table th:nth-child(5) { width:13%; }
+.verification-page .monitoring-table th:last-child { width:194px; }
+.verification-page .monitoring-assessment { display:inline-flex; flex-wrap:nowrap; gap:0; border:1px solid var(--ui-rule); border-radius:8px; overflow:hidden; white-space:nowrap; }
+.verification-page .monitoring-assessment button { height:28px; min-height:28px; padding:0 7px; font-size:12px; font-weight:400; border:0; border-radius:0; box-shadow:none; }
+.verification-page .monitoring-assessment button + button { border-left:1px solid var(--ui-rule); }
+.verification-page .monitoring-table td:last-child > .secondary { height:30px; min-height:30px; padding:0 10px; font-size:12px; font-weight:400; }
+.verification-page .monitoring-table tbody tr { height:56px; }
+.verification-page .monitoring-table tbody td { height:56px; padding-top:10px; padding-bottom:10px; }
+.verification-page .message-sources { display:block; }
+.verification-page .message-sources .comparison-source-title { font-size:12px; font-weight:600; color:var(--ui-ink-2); margin-bottom:4px; }
+.verification-page .answer-text :is(.ui-clamp,.clamp-text-host) { color:inherit; font-weight:400; }
+.verification-page .monitoring-table th { white-space:nowrap; }

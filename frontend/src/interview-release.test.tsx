@@ -46,17 +46,18 @@ it("does not invent manual publication evidence for incomplete historical snapsh
   expect(document.querySelector(".page-content > details > summary")?.textContent).toContain("版本历史与回滚");
 });
 
-it("keeps answer telemetry and source IDs out of the chat until its audit Drawer opens", async () => {
+it("keeps answer telemetry out of chat and preserves request metadata in the local saved record", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ baseline: { answer: "实际完整回答", evidence: [], sources: [], version: "PROD-audit", config: { prompt_strategy: "Abstention" }, latency_ms: 130, input_tokens: 41, output_tokens: 12, source: { provider_id: "internal-provider", corpus_fingerprint: "internal-corpus" } }, model: "internal-model", mode: "live", latency_ms: 130 }))));
   await render(<AssistantPage examples={[{label:"正常问答",question:"冻结正向示例"}]} productionVersion="PROD-audit" isReleased badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
   await act(async () => document.querySelector<HTMLButtonElement>(".empty-chat button")!.click());
   expect(document.querySelector(".message-list")?.textContent).toContain("实际完整回答");
   expect(document.querySelector(".message-list")?.textContent).toContain("0.1 秒");
   for (const hidden of ["internal-provider", "internal-corpus", "internal-model", "未采集", "TTFT", "Judge"]) expect(document.querySelector(".message-list")?.textContent).not.toContain(hidden);
-  await click("查看回答审计");
-  expect(document.querySelector(".drawer")?.textContent).toContain("internal-model");
-  expect(document.querySelector(".drawer")?.textContent).toContain("internal-provider");
-  expect(document.querySelector(".drawer")?.textContent).toContain("谨慎拒答");
+  expect(document.querySelector(".qa-answer-audit")).toBeNull();
+  const saved = JSON.parse(localStorage.getItem("rag-evolution:conversations:v2")!)[0].messages.find((item:any)=>item.role==="assistant");
+  expect(saved.model).toBe("internal-model");
+  expect(saved.metrics.source.provider_id).toBe("internal-provider");
+  expect(saved.metrics.config.prompt_strategy).toBe("Abstention");
 });
 
 it("orders verification tabs and reduces Monitoring to question, state, judgement and actions", async () => {
@@ -85,7 +86,7 @@ it("requires human judgement and confirmation before starting only the linked Mo
   await render(<VerificationPage data={{ workspace: { current_baseline_id: "B1" }, monitoring: monitoring(), optimization: { id: "EXP-prior", candidates: [{ id: "prior-A" }] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
   await click("Monitoring");
   expect(posts).toHaveLength(0);
-  await click("标记为 Bad Case");
+  await click("Bad Case");
   expect(posts[0]).toEqual({ url: expect.stringContaining("/api/monitoring/events/M1/assessment"), body: { bad_case: true, severity: "ordinary" } });
   await click("人工确认");
   expect(posts).toHaveLength(2);

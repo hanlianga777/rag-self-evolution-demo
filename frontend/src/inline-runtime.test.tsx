@@ -23,7 +23,7 @@ it("shows assistant waiting inline and renders a complete synchronous answer at 
   expect(document.body.textContent).toContain("完整回答内容");
   expect(document.querySelector(".typing-cursor")).toBeNull();
   expect(document.querySelector(".message-list")?.textContent).not.toContain("未采集");
-  expect(document.querySelector(".message-list")?.textContent).toContain("查看回答审计");
+  expect(document.querySelector(".message-list")?.textContent).not.toContain("查看回答审计");
   await act(async () => root.unmount());
 });
 

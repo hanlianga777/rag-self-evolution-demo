@@ -108,7 +108,6 @@
 .saved-answer-comparison .comparison-legend span+span::before { background:var(--accent); }
 .saved-answer-comparison .comparison-h3-row { display:flex; align-items:center; gap:6px; }
 .saved-answer-comparison .comparison-info { display:inline-flex; width:16px; height:16px; border-radius:50%; border:1px solid var(--rule); color:var(--muted); font-size:11px; align-items:center; justify-content:center; cursor:help; margin:0 0 14px; }
-.saved-answer-comparison .comparison-dmore { display:block; margin:6px 0 8px; border:0; background:none; padding:0; color:var(--accent); font-size:13px; }
 .saved-answer-comparison .comparison-empty { padding:0 20px; color:var(--muted); }
 @media(max-width:1180px) { .saved-answer-comparison .comparison-why { grid-template-columns:1fr; } .saved-answer-comparison .comparison-points { border-left:0; border-top:1px solid var(--rule-2); } }
 @media(max-width:1350px) { .saved-answer-comparison .comparison-qhead { flex-direction:column; gap:8px; } .saved-answer-comparison .comparison-verdict { margin-top:0; } }
@@ -134,9 +133,14 @@
   .saved-answer-comparison .comparison-dtable :is(th,td) { padding-top:4px; padding-bottom:4px; font-size:12px; }
 }
 
-.saved-answer-comparison .comparison-telemetry summary { color:var(--muted); font-size:12px; cursor:pointer; padding:4px 0; }
-.saved-answer-comparison .comparison-telemetry[open] summary { margin-bottom:8px; }
 @media(min-width:1351px) {
   .saved-answer-comparison .comparison-ptable :is(th,td) { padding:5px 10px; font-size:12px; line-height:1.5; }
   .saved-answer-comparison .comparison-legend { margin:-24px 0 8px; }
+}
+
+/* 028e：右侧数据直接展示，左侧列表卡与最后一张卡同底。 */
+@media(min-width:701px) {
+ .saved-answer-comparison .comparison-workspace { align-items:stretch; }
+ .saved-answer-comparison .comparison-side { position:static; height:auto; }
+ .saved-answer-comparison .comparison-qlist { min-height:0; max-height:calc(100dvh - 280px); overflow:auto; }
 }

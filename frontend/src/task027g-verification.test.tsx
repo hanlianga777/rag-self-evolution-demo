@@ -26,10 +26,11 @@ it('structures a saved chat answer without changing its full audit copy or sourc
  expect(document.querySelector('.answer-text')?.textContent).toContain('正文中的依据：保留');
  expect(document.querySelector('.answer-text')?.textContent).not.toContain('操作说明的保存证据');
  expect(document.querySelector('.message-sources')?.textContent).toContain('依据：操作说明的保存证据');
- expect([...document.querySelectorAll('.message-sources button')].map(n=>n.textContent)).toEqual(['KIRA 操作说明 · p12','KIRA 操作说明 · p48']);
+ expect([...document.querySelectorAll('.message-sources button')].map(n=>n.textContent)).toEqual(['KIRA 操作说明，第 12 页','KIRA 操作说明，第 48 页']);
  expect(document.querySelector('.message-sources [title]')).toBeNull();
- expect(document.querySelectorAll('.qa-answer-actions button.secondary')).toHaveLength(2);
- await click('查看回答审计');expect(document.querySelector('.drawer')?.textContent).toContain('依据：操作说明的保存证据');
+ expect(document.querySelector('.qa-answer-audit')).toBeNull();
+ expect(document.querySelector('.qa-answer-actions .clue-button')?.classList.contains('primary')).toBe(true);
+ expect(document.querySelector('.chat-header')?.textContent).not.toContain('历史会话');
  expect(JSON.parse(localStorage.getItem(CONVERSATIONS_STORAGE_KEY)!)[0].messages[1].content).toBe(content);
 });
 it('combines saved feedback and local-only answers, counting linked answers once without writes',async()=>{
