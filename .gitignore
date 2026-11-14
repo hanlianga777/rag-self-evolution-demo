@@ -60,3 +60,9 @@ output/baseline-ab-root-cause-audit-20261014/
 /*STORAGE*
 
 .playwright-cli/
+
+# Private complete snapshots and status daemon artifacts
+/本机快照/
+/backend/*.before-restore-*/
+/.env.before-restore-*
+/指挥/运行状态.md.tmp
