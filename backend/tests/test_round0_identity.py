@@ -75,7 +75,7 @@ class BaselineConfigTests(unittest.TestCase):
         self.assertEqual(config['prompt_strategy'],'Abstention')
         self.assertEqual(config['generation_thinking'],'max')
         self.assertEqual(judge['judge_thinking']['reasoning_effort'],'low')
-        self.assertEqual(judge['generation_prompt_version'],'generation-vnext-2')
+        self.assertEqual(judge['generation_prompt_version'],'generation-vnext-3')
 
     def test_current_draft_is_consumed_but_stale_draft_blocks(self):
         from app.policy import DEFAULT_PIPELINE_CONFIG

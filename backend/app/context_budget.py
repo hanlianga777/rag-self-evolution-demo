@@ -39,10 +39,10 @@ def count_context_tokens(text):
 BUDGETS = (8192, 4096)
 
 
-def render_generation_context(entries):
+def render_generation_context(entries, *, numbered=True):
     """Share document identity once; retain each Chunk's scope and verbatim body."""
     sources = {}; blocks = []
-    for entry in entries:
+    for number, entry in enumerate(entries, 1):
         metadata = {key: entry[key] for key in ('document_id', 'document', 'product', 'vendor', 'version') if entry.get(key) is not None}
         identity = json.dumps(metadata, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
         if identity not in sources:
@@ -50,12 +50,12 @@ def render_generation_context(entries):
         start = entry.get('parent_page_start', entry.get('page_start'))
         end = entry.get('parent_page_end', entry.get('page_end'))
         scope = ' | '.join(str(v) for v in (entry.get('chunk_id'), sources[identity], entry.get('section_path') or entry.get('section'), (entry.get('source_scope') or {}).get('heading'), f'页{start}–{end}' if start is not None else None) if v is not None)
-        blocks.append('['+scope+']\n'+entry['content'])
+        blocks.append((f'[{number}] ' if numbered else '')+'['+scope+']\n'+entry['content'])
     legend = {ref: json.loads(identity) for identity, ref in sources.items()}
     return json.dumps({'sources': legend}, ensure_ascii=False, separators=(',', ':'))+'\n'+'\n'.join(blocks)
 
 
-def budget_context(entries, max_tokens=False):
+def budget_context(entries, max_tokens=False, *, numbered=True):
     """Keep complete blocks; any exclusion makes semantic completeness unknown.
 
 The caller must refuse generation when generation_allowed is false: no offline
@@ -77,7 +77,7 @@ The trace contains counts of the exact same rendering used by generation.
     except ValueError:
         trace.update(count_method='字符数估算 token', tokenizer_artifact_sha256=None)
     def count(blocks):
-        return count_context_tokens(render_generation_context(blocks))
+        return count_context_tokens(render_generation_context(blocks, numbered=numbered))
     trace['tokens_before'] = count(entries)
     selected = []
     for entry in entries:

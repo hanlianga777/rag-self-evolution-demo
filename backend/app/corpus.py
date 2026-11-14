@@ -23,7 +23,7 @@ DOCUMENT_CATALOG = [
         "id": "DOC-001",
         "chunk_prefix": "KIRA-B50",
         "name": "卡赫_KIRA_B_50完整操作说明_中文版.pdf",
-        "category": "商用清洁机器人",
+        "category": "清洁机器人说明书",
         "vendor": "卡赫",
         "product": "KIRA B 50",
         "document_type": "完整操作说明",
@@ -32,7 +32,7 @@ DOCUMENT_CATALOG = [
         "id": "DOC-002",
         "chunk_prefix": "B2-MANUAL",
         "name": "宇树_B2四足机器人用户手册_中文版.pdf",
-        "category": "工业巡检机器人",
+        "category": "巡检机器人说明书",
         "vendor": "宇树科技",
         "product": "B2 四足机器人",
         "document_type": "用户手册",
@@ -41,7 +41,7 @@ DOCUMENT_CATALOG = [
         "id": "DOC-003",
         "chunk_prefix": "B2-REMOTE",
         "name": "宇树_B2遥控器使用说明_中文版.pdf",
-        "category": "工业巡检机器人",
+        "category": "遥控器说明书",
         "vendor": "宇树科技",
         "product": "B2 遥控器",
         "document_type": "使用说明",
@@ -50,7 +50,7 @@ DOCUMENT_CATALOG = [
         "id": "DOC-004",
         "chunk_prefix": "B2-BATTERY",
         "name": "宇树_B2电池与充电器使用说明_中文版.pdf",
-        "category": "工业巡检机器人",
+        "category": "电池与充电器说明书",
         "vendor": "宇树科技",
         "product": "B2 电池与充电器",
         "document_type": "使用说明",
@@ -240,6 +240,7 @@ class CorpusStore:
         self.index_dir = index_dir
 
     def documents(self) -> list[dict]:
+        from .knowledge_pipeline import document_category
         persisted = _read_json(self.index_dir / "documents.json", [])
         by_id = {entry["id"]: entry for entry in persisted if entry.get("id")}
         catalog_by_id = {entry["id"]: entry for entry in discover_documents()}
@@ -251,6 +252,7 @@ class CorpusStore:
             records.append(
                 {
                     **catalog, **stored,
+                    "category": document_category({**catalog, **stored}),
                     "pages": stored.get("pages"),
                     "chunks": stored.get("chunks", 0),
                     "status": stored.get("status", "Needs OCR"),
@@ -278,7 +280,7 @@ class CorpusStore:
             return None
         children = self.chunks(document_id)
         tables = [{'block_id': block['block_id'], 'page': block['page'], 'original_html': block['raw'].get('table_body', ''), 'normalized_text': block['text'], 'child_ids': [c['chunk_id'] for c in children if block['block_id'] in c.get('block_ids', [])]} for block in _read_json(self.index_dir/f'{document_id}-blocks.json', []) if block.get('raw', {}).get('type') == 'table']
-        return {**document, "table_examples": tables, "chunk_count": document["chunks"], "index": self.index_info(), "chunks": children,
+        return {**document, "denoise": [row for row in _read_json(self.index_dir/'denoise.json', []) if row['document_id'] == document_id], "table_examples": tables, "chunk_count": document["chunks"], "index": self.index_info(), "chunks": children,
                 "parents": [p for p in _read_json(self.index_dir/'parents.json', []) if p['document_id'] == document_id]}
 
     def index_info(self) -> dict:

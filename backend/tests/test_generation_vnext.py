@@ -42,7 +42,7 @@ class GenerationVNextTests(unittest.TestCase):
             self.assertNotIn('required_checks', user)
             self.assertNotIn('历史Judge', user)
 
-    def test_explicit_legacy_remains_readable_and_new_default_uses_v2(self):
+    def test_explicit_legacy_versions_remain_readable(self):
         old, provider = self.service(generation_prompt_version='generation-vnext-1')
         new, _ = self.service(generation_prompt_version='generation-vnext-2')
         old.answer('问题')
@@ -94,10 +94,10 @@ class GenerationVNextTests(unittest.TestCase):
 
 class UserFacingCitationTests(GenerationVNextTests):
     def test_v2_requests_human_readable_sources_without_machine_ids(self):
-        service, provider = self.service()
+        service, provider = self.service(generation_prompt_version='generation-vnext-2')
         service.answer('问题')
         self.assertIn('不要输出机器Chunk ID', provider.requests[0][0])
     def test_v2_does_not_retain_conflicting_chunk_instruction(self):
-        service, provider = self.service()
+        service, provider = self.service(generation_prompt_version='generation-vnext-2')
         service.answer('问题')
         self.assertNotIn('有据正常回答并引用Chunk', provider.requests[0][0])

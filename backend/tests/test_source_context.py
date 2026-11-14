@@ -27,7 +27,7 @@ class SourceContextTests(unittest.TestCase):
             def complete_with_metrics(self,system,user,**kwargs):
                 self.request=(system,user)
                 return {'content':'离线占位，不是模型结果','ttft_ms':0,'input_tokens':0,'output_tokens':0,'usage':{}}
-        provider=Provider();service=AiService(object(),object(),provider,False)
+        provider=Provider();service=AiService(object(),object(),provider,False,generation_prompt_version='generation-vnext-2')
         entries=[{'chunk_id':'C1','document':'设备说明','product':'B2','section':'操作','page_start':1,'parent_page_start':1,'parent_page_end':2,'content':'仅适用于B2。'}]
         service.retriever=SimpleNamespace(retrieve=lambda *args,**kwargs:entries)
         service.answer('普通技术问题')

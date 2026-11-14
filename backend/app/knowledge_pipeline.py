@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 from io import BytesIO
 import json
+import re
+import math
+from collections import defaultdict
 import hashlib
 import http.client
 import ipaddress
@@ -132,6 +135,302 @@ def parent_child(document, blocks, counter, *, parent_tokens=1400, child_tokens=
             flush(); current = []
         current.append(unit)
     flush()
+    return parents, children, parsed
+
+
+# V1 stays the active build default until an explicit v2 rebuild.
+V2_CONFIG = {**CONFIG, 'chunk_strategy': 'parent-child-v2', 'parent_min_tokens': 400,
+             'parent_tokens': 1400, 'child_target_tokens': 250, 'child_tokens': 300,
+             'child_tail_min_tokens': 80, 'child_target_min_tokens': 200, 'overlap_tokens': 50,
+             'table_intro_max_tokens': 200, 'toc_min_entries': 3, 'toc_min_fraction': 0.5,
+             'repeat_page_fraction': 0.30, 'repeat_short_line_chars': 40, 'repeat_min_pages': 2,
+             'table_normalize': 'table-kv-v2', 'denoise_version': 'mineru-noise-v2', 'heading_context': 'document-section-v1',
+             'heading_hierarchy': 'manual-chapters-v1'}
+DOCUMENT_CATEGORIES = ('清洁机器人说明书', '巡检机器人说明书', '遥控器说明书', '电池与充电器说明书', '其他')
+# MinerU flattened these manuals' headings. Chapter starts were checked against
+# cached content, never inferred from Golden questions. Page is one-based.
+MANUAL_CHAPTERS = {
+    'DOC-001': [(2, '一般提示'), (3, '安全提示'), (15, '快速指南'), (29, '操作元件'),
+                (85, '保养和维护'), (98, '显示屏显示故障'), (106, '技术参数')],
+    'DOC-002': [(3, '免责申明'), (4, '安全须知'), (5, '产品概述'), (8, '如何充电'),
+                (10, '使用说明'), (16, '异常情况说明'), (17, '注意事项'), (18, '日常保养与维护')],
+    'DOC-003': [(2, '用户须知'), (2, 'R3遥控器'), (9, 'R1遥控器'), (13, '修订历史')],
+    'DOC-004': [(2, '电池'), (5, '充电器'), (7, '电池充电'), (10, '电池安全使用指引'), (12, '注意事项')],
+}
+
+
+def document_category(document):
+    if document.get('category') in DOCUMENT_CATEGORIES:
+        return document['category']
+    name = (document.get('name') or '') + ' ' + (document.get('product') or '')
+    for words, category in [(('电池', '充电器'), DOCUMENT_CATEGORIES[3]),
+                            (('遥控器',), DOCUMENT_CATEGORIES[2]),
+                            (('清洁', 'KIRA', '卡赫'), DOCUMENT_CATEGORIES[0]),
+                            (('四足', '巡检', 'B2'), DOCUMENT_CATEGORIES[1])]:
+        if any(word in name for word in words): return category
+    return '其他'
+
+
+def child_embedding_text(child):
+    if child.get('chunk_version') != 'parent-child-v2': return child['chunk_text']
+    return ' · '.join(v for v in (child['document_name'], child['section_path']) if v) + '\n' + child['chunk_text']
+
+
+def _v2_block_text(block):
+    if block.get('type') == 'table':
+        # KV rendering repeats column names in every row, including split tables.
+        reader = TableReader(); reader.feed(block.get('table_body', ''))
+        rows = reader.rows
+        captions = block.get('table_caption', [])
+        footnotes = block.get('table_footnote', [])
+        if not rows: return '\n'.join([*captions, *footnotes])
+        # A first row containing units/values is data, not a column header.
+        labels = {'参数', '规格', '备注', '类型', '要点', '适用范围', 'LED1', '日期', '版本', '修订内容'}
+        header_index = 1 if len(rows) > 1 and len(rows[0]) == 1 else 0
+        headers = rows[header_index]
+        has_header = any(cell in labels for cell in headers) or '<th' in block.get('table_body', '')
+        if has_header:
+            lines = [' | '.join(rows[0])] if header_index else []
+            for row in rows[header_index + 1:]:
+                lines.append('；'.join(f'{key}={value}' for key, value in zip(headers, row))
+                             if len(row) == len(headers) else ' | '.join(headers) + '：' + ' | '.join(row))
+            if not lines: lines = [' | '.join(headers)]
+        else:
+            lines = [' | '.join(row) for row in rows]
+        return '\n'.join([*captions, *lines, *footnotes])
+    return (block.get('text') or '\n'.join(block.get('list_items', []) + block.get('image_caption', []) +
+            block.get('image_footnote', [])) or block.get('code_body') or block.get('latex') or '').strip()
+
+
+def _v2_noise(text):
+    if not text.strip(): return None
+    if re.fullmatch(r'\s*(?:\d+|第\s*\d+\s*页|\d+\s*[/／–-]\s*\d+)\s*', text): return 'page_number_content'
+    if not any(char.isalnum() for char in text): return 'symbols_only'
+    return None
+
+
+def _v2_boundaries(text):
+    return sorted({0, len(text), *(m.end() for m in re.finditer(r'[。！？!?；;](?:[”’」』])?|\n', text))})
+
+
+def _v2_fit(text, start, limit, counter):
+    """Bound tokenization work for the exceptional overlong sentence/row."""
+    lo, hi = start + 1, len(text)
+    while lo < hi:
+        middle = (lo + hi + 1) // 2
+        if counter(text[start:middle]) <= limit: lo = middle
+        else: hi = middle - 1
+    if counter(text[start:lo]) > limit: raise ValueError('Tokenizer cannot fit one character')
+    return lo
+
+
+def parent_child_v2(document, blocks, counter):
+    """Offline, deterministic denoise/assemble/split; never calls a provider.
+
+    Parsed blocks keep raw content and drop reasons for the diagnostic artifact.
+    Child char_start/char_end are half-open Python character offsets into Parent.
+    """
+    config = V2_CONFIG
+    parsed = []
+    for index, block in enumerate(blocks):
+        page = int(block.get('page_idx', 0)) + 1
+        if page < 1: raise ValueError('Invalid parser page')
+        parsed.append({'block_id': f"{document['id']}-BLOCK-{index + 1:05d}", 'page': page,
+                       'text': _v2_block_text(block), 'raw': block})
+    page_count = document.get('pages') or max((p['page'] for p in parsed), default=0)
+    line_pages = defaultdict(set)
+    page_lines = defaultdict(list)
+    for part in parsed:
+        lines = [line for line in part['text'].splitlines() if line.strip()]
+        if part['raw'].get('type') not in {'header', 'footer', 'page_number', 'page_footnote'}:
+            page_lines[part['page']].extend(lines)
+        for line in lines:
+            if 0 < len(line.strip()) <= config['repeat_short_line_chars']:
+                line_pages[line.strip()].add(part['page'])
+    toc_pages = set()
+    for page, lines in page_lines.items():
+        toc_lines = sum(bool(re.search(r'(?:[.．…·]{2,}|\s{3,})\s*\d+\s*$', line)) for line in lines)
+        if toc_lines >= config['toc_min_entries'] and toc_lines >= len(lines) * config['toc_min_fraction']: toc_pages.add(page)
+    repeated = {line for line, pages in line_pages.items() if len(pages) >= config['repeat_min_pages'] and len(pages) / max(page_count, 1) > config['repeat_page_fraction']}
+    chapters, current, title_path = [], [], []
+    top = document['name']
+    # Use verified starts only for the four flattened cached manuals; other input
+    # honors the parser's real level 1/2 headings.
+    known = MANUAL_CHAPTERS.get(document['id'], [])
+    has_level_one = any(p['raw'].get('text_level') == 1 for p in parsed)
+    for part in parsed:
+        block, text = part['raw'], part['text']
+        reason = ('parser_' + block['type'] if block.get('type') in {'header', 'footer', 'page_number', 'page_footnote'} else
+                  'table_of_contents' if part['page'] in toc_pages else _v2_noise(text))
+        if not reason and text and all(line.strip() in repeated for line in text.splitlines() if line.strip()):
+            reason = 'repeated_short_line'
+        if reason:
+            part['drop_reason'] = reason; part['section_path'] = ' / '.join(title_path); continue
+        # Preserve non-repeated lines in a mixed block and audit each removed line.
+        kept = [line for line in text.splitlines() if line.strip() not in repeated]
+        removed = [line for line in text.splitlines() if line.strip() in repeated]
+        if removed:
+            part['removed_lines'] = [{'text': line, 'reason': 'repeated_short_line'} for line in removed]
+            text = '\n'.join(kept)
+        level = block.get('text_level')
+        # Warning labels and numbered executable instructions are body content,
+        # even where MinerU mislabeled them as headings.
+        if text in {'危险', '警告', '小心', '注意', '注意：', '提示', '提示：', '原因：'} or re.match(r'^\d+[.、]\s*.*(?:按下|点击|输入|拧|创建|选择|装|打开|拔|拉|检查)', text):
+            level = None
+        if level and text:
+            starts_chapter = any(part['page'] == page and text == heading for page, heading in known) if known else level == 1 or (not has_level_one and not title_path)
+            if starts_chapter:
+                if current and (chapters or top != document['name']):
+                    chapters.append((top, current)); current = []
+                top = text; title_path = [text]
+            elif not title_path:
+                title_path = [top, text]
+            else:
+                title_path = [top, text] if text != top else [top]
+            part['section_path'] = ' / '.join(title_path)
+            part['heading_only'] = True
+            continue
+        part['section_path'] = ' / '.join(title_path) or top
+        if not text: continue
+        # Split oversized parser blocks, respecting sentence/row boundaries first.
+        start = 0
+        boundaries = sorted({len(text), *(m.end() for m in re.finditer(r'\n', text))}) if block.get('type') == 'table' else _v2_boundaries(text)
+        while start < len(text):
+            remaining = counter(text[start:])
+            limit = config['parent_tokens'] if remaining <= config['parent_tokens'] else math.ceil(remaining / math.ceil(remaining / config['parent_tokens']))
+            candidates = [end for end in boundaries if end > start and counter(text[start:end]) <= limit]
+            end = max(candidates) if candidates else _v2_fit(text, start, limit, counter)
+            current.append({'text': text[start:end], 'page': part['page'], 'block_id': part['block_id'],
+                            'section_path': part['section_path'], 'table': block.get('type') == 'table'})
+            start = end
+    if current: chapters.append((top, current))
+    parents, children = [], []
+    for top, units in chapters:
+        # Bind a short leading explanation to its table before packing Parents.
+        bundles, index = [], 0
+        while index < len(units):
+            unit = units[index]
+            next_unit = units[index + 1] if index + 1 < len(units) else None
+            if next_unit and next_unit['table'] and not unit['table'] and unit['page'] == next_unit['page'] and counter(unit['text']) <= config['table_intro_max_tokens'] and counter(unit['text'] + '\n' + next_unit['text']) <= config['parent_tokens']:
+                unit = {**unit, 'keep_with_next': True}
+                bundles.append([unit, next_unit]); index += 2
+            else:
+                bundles.append([unit]); index += 1
+        groups, group = [], []
+        for bundle in bundles:
+            if group and counter('\n'.join(u['text'] for u in [*group, *bundle])) > config['parent_tokens']:
+                groups.append(group); group = []
+            group.extend(bundle)
+        if group: groups.append(group)
+        index = 0
+        while len(groups) > 1 and index < len(groups):
+            if counter('\n'.join(u['text'] for u in groups[index])) >= config['parent_min_tokens']:
+                index += 1; continue
+            neighbor = index - 1 if index else 1
+            first, last = sorted((index, neighbor))
+            combined = groups[first] + groups[last]
+            text = '\n'.join(u['text'] for u in combined)
+            if counter(text) <= config['parent_tokens']:
+                groups[first:last + 1] = [combined]
+                index = max(0, first - 1); continue
+            boundaries, forbidden, offset = set(), [], 0
+            for unit_index, unit in enumerate(combined):
+                ends = [m.end() for m in re.finditer(r'\n', unit['text'])] if unit['table'] else _v2_boundaries(unit['text'])
+                boundaries.update(offset + end for end in [0, len(unit['text']), *ends])
+                if unit.get('keep_with_next'):
+                    forbidden.append((offset, offset + len(unit['text']) + 1 + len(combined[unit_index + 1]['text'])))
+                offset += len(unit['text']) + 1
+            choices = [cut for cut in boundaries if not any(start < cut < end for start, end in forbidden) and all(config['parent_min_tokens'] <= counter(part) <= config['parent_tokens'] for part in (text[:cut], text[cut:]))]
+            if not choices and forbidden:
+                raise ValueError('Cannot rebalance Parent within token limits while preserving table rows and their explanation')
+            cut = min(choices, key=lambda cut: abs(counter(text[:cut]) - counter(text[cut:]))) if choices else _v2_fit(text, 0, math.ceil(counter(text) / 2), counter)
+            left, right, offset = [], [], 0
+            for unit in combined:
+                within = max(0, min(len(unit['text']), cut - offset))
+                if within: left.append({**unit, 'text': unit['text'][:within]})
+                if within < len(unit['text']): right.append({**unit, 'text': unit['text'][within:]})
+                offset += len(unit['text']) + 1
+            groups[first:last + 1] = [left, right]
+            index += 1
+        for group in groups:
+            text = '\n'.join(u['text'] for u in group)
+            spans, offset = [], 0
+            for unit in group:
+                spans.append({**unit, 'start': offset, 'end': offset + len(unit['text'])})
+                offset += len(unit['text']) + 1
+            metadata = {key: document.get(key) for key in ('product', 'vendor')}
+            metadata.update(document_id=document['id'], document_name=document['name'], category=document_category(document),
+                            chunk_version='parent-child-v2', level_one_section=top)
+            parent_id = f"{document['id']}-V2-P-{len(parents) + 1:05d}"
+            parent = {**metadata, 'chunk_id': parent_id, 'chunk_text': text, 'text': text, 'token_count': counter(text),
+                      'page_start': min(u['page'] for u in group), 'page_end': max(u['page'] for u in group),
+                      'section_path': ' / '.join(dict.fromkeys(u['section_path'] for u in group)),
+                      'section_paths': list(dict.fromkeys(u['section_path'] for u in group)),
+                      'block_ids': list(dict.fromkeys(u['block_id'] for u in group)),
+                      'short_chapter': len(groups) == 1 and counter(text) < config['parent_min_tokens']}
+            parents.append(parent)
+            bounds = _v2_boundaries(text)
+            start = 0
+            while start < len(text):
+                # A table that fits is kept whole; oversized KV tables split by rows.
+                table_span = next((s for s in spans if s['table'] and s['start'] <= start < s['end']), None)
+                next_table = next((s for s in spans if s['table'] and s['start'] > start), None)
+                stop = table_span['end'] if table_span else next_table['start'] if next_table else len(text)
+                if counter(text[start:stop]) <= config['child_tokens']:
+                    end = stop
+                else:
+                    cut_bounds = sorted({stop, *(m.end() + table_span['start'] for m in re.finditer(r'\n', table_span['text']))}) if table_span else bounds
+                    choices = [b for b in cut_bounds if start < b <= stop and counter(text[start:b]) <= config['child_tokens']]
+                    preferred = [b for b in choices if config['child_target_min_tokens'] <= counter(text[start:b]) <= config['child_tokens']]
+                    end = min(preferred, key=lambda b: abs(counter(text[start:b]) - config['child_target_tokens'])) if preferred else max(choices, default=start)
+                    if end == start: end = _v2_fit(text[:stop], start, config['child_tokens'], counter)
+                    # Avoid a tiny final child by moving the natural cut backwards.
+                    if 0 < counter(text[end:stop]) < config['child_tail_min_tokens']:
+                        balanced = [b for b in choices if config['child_tail_min_tokens'] <= counter(text[start:b]) <= config['child_tokens'] and config['child_tail_min_tokens'] <= counter(text[b:stop]) <= config['child_tokens']]
+                        if balanced: end = min(balanced, key=lambda b: abs(counter(text[start:b]) - counter(text[b:stop])))
+                covered = [s for s in spans if s['start'] < end and s['end'] > start]
+                if not covered: start = end; continue
+                paths = list(dict.fromkeys(s['section_path'] for s in covered))
+                children.append({**metadata, 'chunk_id': f"{document['id']}-V2-C-{len(children) + 1:05d}",
+                                 'parent_chunk_id': parent_id, 'char_start': start, 'char_end': end,
+                                 'chunk_text': text[start:end], 'text': text[start:end], 'token_count': counter(text[start:end]),
+                                 'section_path': ' / '.join(paths), 'section_paths': paths, 'section': paths[0],
+                                 'page_start': min(s['page'] for s in covered), 'page_end': max(s['page'] for s in covered),
+                                 'block_ids': list(dict.fromkeys(s['block_id'] for s in covered)),
+                                 'table': bool(table_span), 'embedding_status': 'Pending'})
+                if end == len(text): break
+                # Never overlap across table boundaries; otherwise only whole sentences.
+                overlaps = [b for b in bounds if start < b < end and 0 < counter(text[b:end]) <= config['overlap_tokens']]
+                next_start = min(overlaps) if overlaps and end < stop and not table_span else end
+                start = next_start
+    # Merge non-table short tails into an adjacent child whenever the cap allows.
+    index = 0
+    by_parent = {p['chunk_id']: p for p in parents}
+    while index < len(children):
+        child = children[index]
+        if child['token_count'] < config['child_tail_min_tokens'] and not child['table']:
+            for neighbor_index in (index - 1, index + 1):
+                if not 0 <= neighbor_index < len(children): continue
+                neighbor = children[neighbor_index]
+                if neighbor['parent_chunk_id'] != child['parent_chunk_id']: continue
+                parent = by_parent[child['parent_chunk_id']]
+                start, end = min(child['char_start'], neighbor['char_start']), max(child['char_end'], neighbor['char_end'])
+                body = parent['chunk_text'][start:end]
+                if counter(body) > config['child_tokens']: continue
+                merged = {**neighbor, 'char_start': start, 'char_end': end, 'chunk_text': body, 'text': body,
+                          'token_count': counter(body), 'page_start': min(child['page_start'], neighbor['page_start']),
+                          'page_end': max(child['page_end'], neighbor['page_end']),
+                          'section_paths': list(dict.fromkeys(child['section_paths'] + neighbor['section_paths'])),
+                          'block_ids': list(dict.fromkeys(child['block_ids'] + neighbor['block_ids']))}
+                merged['section_path'] = ' / '.join(merged['section_paths'])
+                children[min(index, neighbor_index)] = merged
+                children.pop(max(index, neighbor_index))
+                index = max(0, index - 1)
+                break
+            else:
+                index += 1
+        else: index += 1
+    for number, child in enumerate(children, 1): child['chunk_id'] = f"{document['id']}-V2-C-{number:05d}"
     return parents, children, parsed
 
 
@@ -324,7 +623,7 @@ class KnowledgePipeline:
     def __init__(self, index_dir, retriever):
         self.index_dir = Path(index_dir); self.retriever = retriever
 
-    def build(self, documents, values=None, *, progress=lambda *args: None, parser=None, embedder=None, counter=None):
+    def build(self, documents, values=None, *, progress=lambda *args: None, parser=None, embedder=None, counter=None, chunk_version='parent-child-v1'):
         import faiss
         from .governance import GENERATION_PROFILES
         from .golden_v2 import build_plan
@@ -338,7 +637,9 @@ class KnowledgePipeline:
             tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL, local_files_only=True)
             tokenizer_identity = checksum(tokenizer.backend_tokenizer.to_str().encode())
             counter = lambda text: len(tokenizer.encode(text, add_special_tokens=False, truncation=False))
-        config = dict(CONFIG)
+        if chunk_version not in {'parent-child-v1', 'parent-child-v2'}: raise ValueError('Unknown chunk version')
+        config = dict(V2_CONFIG if chunk_version == 'parent-child-v2' else CONFIG)
+        if chunk_version == 'parent-child-v2': config['manual_chapters'] = MANUAL_CHAPTERS
         if tokenizer_identity: config['tokenizer_artifact_id'] = tokenizer_identity
         identity = version_identity({doc['id']: source_fingerprint(doc) for doc in documents}, config)
         if any(not value for value in identity['sources'].values()): raise ValueError('Source PDF missing')
@@ -354,19 +655,31 @@ class KnowledgePipeline:
                 blocks, archive = parser.parse(path, doc['id'])
                 (staging/(doc['id'] + '-mineru.zip')).write_bytes(archive)
                 progress('chunk', number - 1, len(documents))
-                ps, cs, parsed = parent_child(doc, blocks, counter, parent_tokens=config['parent_tokens'], child_tokens=config['child_tokens'], overlap=config['overlap_tokens'])
+                if chunk_version == 'parent-child-v2':
+                    ps, cs, parsed = parent_child_v2(doc, blocks, counter)
+                else:
+                    ps, cs, parsed = parent_child(doc, blocks, counter, parent_tokens=config['parent_tokens'], child_tokens=config['child_tokens'], overlap=config['overlap_tokens'])
                 if not cs: raise ValueError('MinerU produced no searchable Child text')
                 parents.extend(ps); children.extend(cs)
                 (staging/(doc['id'] + '-blocks.json')).write_text(json.dumps(parsed, ensure_ascii=False))
                 import pymupdf
                 with pymupdf.open(path) as pdf: page_count = len(pdf)
                 if any(p['page'] > page_count for p in parsed): raise ValueError('MinerU page outside source PDF')
-                records.append({**{k: v for k, v in doc.items() if not k.startswith('_')}, 'pages': page_count, 'chunks': len(cs), 'parent_chunks': len(ps), 'status': 'Indexed', 'parser': 'MinerU · VLM', 'chunk_strategy': 'Parent-Child', 'source_fingerprint': identity['sources'][doc['id']]})
+                records.append({**{k: v for k, v in doc.items() if not k.startswith('_')}, 'pages': page_count, 'chunks': len(cs), 'parent_chunks': len(ps), 'status': 'Indexed', 'parser': 'MinerU · VLM', 'chunk_strategy': config['chunk_strategy'], 'category': document_category(doc), 'source_fingerprint': identity['sources'][doc['id']]})
                 for page in range(1, page_count + 1):
                     text = '\n'.join(p['text'] for p in parsed if p['page'] == page)
                     pages.append({'document_id': doc['id'], 'page': page, 'parser': 'MinerU/vlm', 'text': text, 'text_checksum': checksum(text.encode()), 'source_fingerprint': identity['sources'][doc['id']]})
             progress('embedding', 0, len(children))
-            vectors = embedder.embed([c['chunk_text'] for c in children], config['dimension'])
+            if chunk_version == 'parent-child-v2':
+                noise = []
+                for doc in documents:
+                    for part in json.loads((staging/(doc['id'] + '-blocks.json')).read_text()):
+                        if part.get('drop_reason'):
+                            noise.append({'document_id':doc['id'], 'document_name':doc['name'], 'page':part['page'], 'text':part['text'], 'reason':part['drop_reason']})
+                        noise.extend({'document_id':doc['id'], 'document_name':doc['name'], 'page':part['page'], **line} for line in part.get('removed_lines', []))
+                (staging/'denoise.json').write_text(json.dumps(noise, ensure_ascii=False))
+            vectors = embedder.embed([child_embedding_text(c) for c in children], config['dimension'])
+            for child in children: child['embedding_status'] = 'Indexed'
             if vectors.shape != (len(children), config['dimension']): raise ValueError('Embedding artifact mismatch')
             np.save(staging/'embeddings.npy', vectors)
             progress('index', len(children), len(children))

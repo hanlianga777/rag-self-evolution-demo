@@ -24,7 +24,7 @@ class FixtureProvider:
         # Deterministic answer omissions depend only on the request and visible Final.
         import re
         n = int(re.search(r'问题：fixture-(\d+)', user).group(1))
-        changed = len(re.findall(r'^\[c\d+ \|', user, re.M)) == 6
+        changed = len(re.findall(r'^(?:\[\d+\] )?\[c\d+ \|', user, re.M)) == 6
         passed = (n >= 10 or changed and n < 2) and not (changed and n == 20)
         answer = '证据不足，无法回答。' if n >= 30 else '请核对手册。' if passed else '暂未给出核对步骤。'
         return {'content':answer,'ttft_ms':1,'input_tokens':10,'output_tokens':5,'usage':{}}

@@ -16,10 +16,10 @@ class Task009AgentRulesTests(unittest.TestCase):
         baseline, row = fixture()
         return prepare_baseline_rows(baseline, [row])
 
-    def test_frozen_full_prompts_and_identity(self):
+    def test_historical_v2_full_prompts_and_identity(self):
         from app.ai_service import generation_contract
-        self.assertEqual(generation_contract()['generation_boundary_sha256'], 'ecc0a21cfb29dca1febb48f3c4f46f128cb12f8b94a8409b9ded08db427715af')
-        service, provider = generation_fixture.GenerationVNextTests().service()
+        self.assertEqual(generation_contract('generation-vnext-2')['generation_boundary_sha256'], 'ecc0a21cfb29dca1febb48f3c4f46f128cb12f8b94a8409b9ded08db427715af')
+        service, provider = generation_fixture.GenerationVNextTests().service(generation_prompt_version='generation-vnext-2')
         expected = {'Grounded': 'c6add1d575f33d70a8f62d32edde885bd6a7d8dc0a0a9c2843728be987634d5f', 'Completeness': '32ed7d08d045b32d4e87351b321208faf6e0ffd755ebdeba5012bb5a26f804b7'}
         for strategy, digest in expected.items():
             service.answer('问题', {'prompt_strategy': strategy})
