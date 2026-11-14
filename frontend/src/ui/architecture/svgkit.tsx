@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { ICONS, type IconName } from "../icons";
 
 /**
@@ -36,25 +36,49 @@ export function Defs({ id }: { id: string }) {
 export type NodeProps = {
   x: number; y: number; w: number; h: number;
   icon?: IconName; title: string; lines?: string[];
-  gate?: string; gateRole?: string; focus?: boolean; value?: string; dot?: boolean;
+  /** 人工关口徽标，例如 "Gate 1"：画在卡片右上角，不挤占标题位置。 */
+  badge?: string;
+  /** 兼容旧写法：gate 等同 badge，gateRole 不再显示。 */
+  gate?: string; gateRole?: string;
+  focus?: boolean; value?: string; dot?: boolean; dashed?: boolean;
   titleSize?: number;
+  /** 右上角的小号灰字，例如厂商名。 */
+  corner?: string;
+  /** 悬停提示（显示问号光标与深色说明卡）。 */
+  tip?: string;
 };
 
-/** 一个节点：白底细边圆角卡；Gate 节点蓝框；focus 节点浅蓝底。 */
-export function Node({ x, y, w, h, icon, title, lines = [], gate, gateRole, focus, value, dot, titleSize = 12.5 }: NodeProps) {
+type TipState = { text: string; x: number; y: number } | null;
+const TipContext = createContext<((tip: TipState) => void) | null>(null);
+
+/** 一个节点：白底细边圆角卡；Gate 节点蓝框 + 右上角徽标；focus 浅蓝底；dashed 虚线框。 */
+export function Node({ x, y, w, h, icon, title, lines = [], badge, gate, focus, value, dot, dashed, titleSize = 12.5, corner, tip }: NodeProps) {
+  const setTip = useContext(TipContext);
   const Glyph = icon ? ICONS[icon] : null;
-  const stroke = gate ? C.accent : focus ? "rgba(0,113,227,0.35)" : C.rule;
+  const mark = badge ?? gate;
+  const stroke = mark ? C.accent : focus ? "rgba(0,113,227,0.35)" : dashed ? C.faint : C.rule;
   const top = y + 20;
-  return <g>
-    {gate && <rect x={x - 3} y={y - 3} width={w + 6} height={h + 6} rx={13} fill="rgba(0,113,227,0.07)" />}
-    <rect x={x} y={y} width={w} height={h} rx={10} fill={focus ? C.tint : C.surface} stroke={stroke} strokeWidth={gate ? 1.5 : 1} />
-    {gate
-      ? <text x={x + 11} y={top - 2} fontSize={10.5} fontWeight={700} fill={C.accent}>{gate}<tspan fontWeight={400} fill={C.muted} dx={4}>{gateRole}</tspan></text>
-      : Glyph && <Glyph x={x + 10} y={y + 9} width={13} height={13} color={focus ? C.accent : C.muted} strokeWidth={1.8} />}
-    <text x={gate ? x + 11 : x + 29} y={gate ? top + 16 : top} fontSize={titleSize} fontWeight={600} fill={C.ink}>{title}</text>
+  const badgeWidth = mark ? textWidth(mark, 10) + 14 : 0;
+  const show = (event: MouseEvent<SVGGElement>) => {
+    if (!tip || !setTip) return;
+    const host = event.currentTarget.ownerSVGElement?.parentElement?.getBoundingClientRect();
+    if (host) setTip({ text: tip, x: event.clientX - host.left, y: event.clientY - host.top });
+  };
+  return <g className={tip ? "ui-arch-tip" : undefined} onMouseMove={show} onMouseLeave={() => tip && setTip?.(null)}>
+    {tip && <title>{tip}</title>}
+    {mark && <rect x={x - 3} y={y - 3} width={w + 6} height={h + 6} rx={13} fill="rgba(0,113,227,0.07)" />}
+    <rect x={x} y={y} width={w} height={h} rx={10} fill={focus ? C.tint : C.surface} stroke={stroke} strokeWidth={mark ? 1.5 : 1} strokeDasharray={dashed ? "4 3" : undefined} />
+    {mark && <g>
+      <rect x={x + w - badgeWidth - 8} y={y - 8} width={badgeWidth} height={16} rx={8} fill={C.accent} />
+      <text x={x + w - badgeWidth / 2 - 8} y={y + 3.5} fontSize={10} fontWeight={600} textAnchor="middle" fill="#fff">{mark}</text>
+    </g>}
+    {Glyph && <Glyph x={x + 10} y={y + 9} width={13} height={13} color={focus || mark ? C.accent : C.muted} strokeWidth={1.8} />}
+    <text x={Glyph ? x + 29 : x + 11} y={top} fontSize={titleSize} fontWeight={600} fill={C.ink}>{title}</text>
+    {corner && <text x={x + w - 10} y={top} fontSize={10} textAnchor="end" fill={C.faint}>{corner}</text>}
+    {tip && !corner && <text x={x + w - 11} y={top} fontSize={10.5} textAnchor="end" fill={C.faint}>ⓘ</text>}
     {dot && <circle cx={x + w - 11} cy={y + 15} r={3} fill={C.accent} />}
-    {value && <text x={x + 11} y={(gate ? top + 16 : top) + 19} fontSize={14} fontWeight={600} fill={C.ink}>{value}</text>}
-    {lines.map((line, index) => <text key={index} x={x + 11} y={(gate ? top + 16 : top) + (value ? 36 : 18) + index * 15} fontSize={11} fill={C.muted}>{line}</text>)}
+    {value && <text x={x + 11} y={top + 19} fontSize={14} fontWeight={600} fill={C.ink}>{value}</text>}
+    {lines.map((line, index) => <text key={index} x={x + 11} y={top + (value ? 36 : 18) + index * 15} fontSize={11} fill={C.muted}>{line}</text>)}
   </g>;
 }
 
@@ -80,9 +104,28 @@ export function Lane({ x, y, index, name, note, accent }: { x: number; y: number
   </text>;
 }
 
+/** 左侧泳道标签列 + 浅灰底带：标题在同一列严格对齐，不受连线影响。 */
+export function Band({ x, y, w, h, labelWidth, index, name, note, accent }: { x: number; y: number; w: number; h: number; labelWidth: number; index: string; name: string; note?: string[]; accent?: boolean }) {
+  return <g>
+    <rect x={x} y={y} width={w} height={h} rx={14} fill={accent ? "rgba(0,113,227,0.04)" : "#fafafb"} />
+    <text x={x + 14} y={y + 24} fontSize={11.5} fontWeight={600} fill={accent ? C.accent : C.faint}>{index}</text>
+    <text x={x + 14} y={y + 44} fontSize={14} fontWeight={600} fill={C.ink}>{name}</text>
+    {(note ?? []).map((line, i) => <text key={i} x={x + 14} y={y + 64 + i * 15} fontSize={11} fill={C.muted}>{line}</text>)}
+    <line x1={x + labelWidth - 8} x2={x + labelWidth - 8} y1={y + 14} y2={y + h - 14} stroke={C.rule} />
+  </g>;
+}
+
 export function Figure({ label, viewBox, children, legend }: { label: string; viewBox: string; children: ReactNode; legend?: ReactNode }) {
+  const [tip, setTip] = useState<TipState>(null);
+  const host = useRef<HTMLDivElement>(null);
+  const width = host.current?.clientWidth ?? 0;
   return <figure className="ui-arch-figure" aria-label={label}>
-    <svg viewBox={viewBox} role="img" aria-label={label} className="ui-arch-svg">{children}</svg>
+    <div className="ui-arch-host" ref={host}>
+      <TipContext.Provider value={setTip}>
+        <svg viewBox={viewBox} role="img" aria-label={label} className="ui-arch-svg">{children}</svg>
+      </TipContext.Provider>
+      {tip && <div className="ui-arch-tipcard" role="tooltip" style={{ left: Math.min(tip.x + 14, Math.max(0, width - 300)), top: tip.y + 16 }}>{tip.text}</div>}
+    </div>
     {legend && <figcaption className="ui-arch-legend">{legend}</figcaption>}
   </figure>;
 }
