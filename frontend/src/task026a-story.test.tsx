@@ -64,7 +64,7 @@ it('marks percentage and latency margins at their numeric boundaries, leaving mi
 });
 it('puts saved remaining failures and explicit unknown attribution in overview, with compare links',async()=>{
  const optimization=exp(),evaluation={id:'base',status:'completed',config:{},dataset_snapshot:{question_ids:['Q04','Q38','Q06','Q27'],questions:[]},result:{total:50,bad_case_count:6}};const navigate=vi.fn();await mount(<OverviewPage data={{evaluation,optimization,overview:{dataset:{total:50,approved:50},production:{provenance:'published',snapshot:{candidate_id:'exp-D'}}}}} navigate={navigate}/>);
- expect(document.querySelector('[aria-label="修好的题"]')?.textContent).toContain('仍未修好：Q06、Q27');expect(document.querySelectorAll('.ui-ovs-fixed-c')).toHaveLength(2);expect(document.querySelector('.ui-ovs-fixed-c')?.textContent).toBe('—');await click('Q06');expect(location.hash).toBe('#verification?tab=compare&q=Q06');await click('去问答验证');expect(location.hash).toBe('#verification?tab=compare');
+ expect(document.querySelector('[aria-label="修好的题目"]')?.textContent).toContain('仍未修好：Q06、Q27');expect(document.querySelectorAll('.ui-ovs-fixed-c')).toHaveLength(0);await click('Q06');expect(location.hash).toBe('#verification?tab=compare&q=Q06');await click('去问答验证');expect(location.hash).toBe('#verification?tab=compare');
 });
 
 it('defaults to Before/After even when an older session saved the live QA tab',async()=>{

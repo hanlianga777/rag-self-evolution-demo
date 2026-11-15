@@ -64,12 +64,15 @@ export function Node({ x, y, w, h, icon, title, lines = [], badge, gate, focus, 
       <text x={x + w - badgeWidth / 2 - 8} y={y + 3.5} fontSize={10} fontWeight={600} textAnchor="middle" fill="#fff">{mark}</text>
     </g>}
     {Glyph && <Glyph x={x + 10} y={y + 9} width={13} height={13} color={focus || mark ? C.accent : C.muted} strokeWidth={1.8} />}
-    <text x={Glyph ? x + 29 : x + 11} y={top} fontSize={titleSize} fontWeight={600} fill={C.ink}>{title}</text>
+    <text x={Glyph ? x + 29 : x + 11} y={top} fontSize={titleSize} fontWeight={600} fill={C.ink} textLength={textWidth(title, titleSize) > w - (Glyph ? 29 : 11) - 8 ? w - (Glyph ? 29 : 11) - 8 : undefined} lengthAdjust="spacingAndGlyphs">{title}</text>
     {corner && <text x={x + w - 10} y={top} fontSize={10} textAnchor="end" fill={C.faint}>{corner}</text>}
     {tip && <g aria-hidden="true"><circle cx={x + w - 12} cy={y + h - 12} r={6} fill="none" stroke={C.muted}/><text x={x + w - 12} y={y + h - 9} fontSize={10} textAnchor="middle" fill={C.muted}>i</text></g>}
     {dot && <circle cx={x + w - 11} cy={y + 15} r={3} fill={C.accent} />}
     {value && <text x={x + 11} y={top + 19} fontSize={14} fontWeight={600} fill={C.ink}>{value}</text>}
-    {lines.map((line, index) => <text key={index} x={x + 11} y={top + (value ? 36 : 18) + index * 15} fontSize={11} fill={C.muted}>{line}</text>)}
+    {lines.map((line, index) => {
+      const available = w - 22 - (tip && index === lines.length - 1 ? 14 : 0);
+      return <text key={index} x={x + 11} y={top + (value ? 36 : 18) + index * 15} fontSize={11} fill={C.muted} textLength={textWidth(line, 11) > available ? available : undefined} lengthAdjust="spacingAndGlyphs">{line}</text>;
+    })}
   </g>;
   return tip ? <HoverCard svg className="ui-arch-tip" content={tip}>{node}</HoverCard> : node;
 }

@@ -1,3 +1,4 @@
+import { helpText } from "../../helpText";
 import { ICONS, type IconName } from "../icons";
 import { Band, C, Defs, Figure, Node, Tag, Wire } from "./svgkit";
 import "./architecture.css";
@@ -77,7 +78,7 @@ export function TechArchitecture(_: { layers?: unknown } = {}) {
   const kw = (AW - 5 * 26) / 6, kx = (i: number) => X0 + i * (kw + 26);
   const ev = [
     { title: "规则计算", icon: "checks" as IconName, lines: ["Recall@K · Precision@K · MRR", "耗时 · Token 成本"], tip: "不用模型、由程序直接算的客观指标：标准证据有没有被检索到、排第几，以及回答耗时和花费。" },
-    { title: "LLM-as-Judge 判分", icon: "correct" as IconName, lines: ["答对程度 · 要点覆盖", "忠于证据 · 安全"], tip: "让判分模型拿着必答要点和证据原文逐题对照回答打分。这些分数汇总后就是 Hard Gate 里的质量指标。" },
+    { title: "LLM-as-Judge 判分", icon: "correct" as IconName, lines: ["答对程度 · 要点覆盖", "忠于证据 · 安全"], tip: helpText.judge },
     { title: "Hard Gate", icon: "gate" as IconName, lines: ["质量 · 安全 · 速度", "每一项单独过线"], tip: "上线门槛：每一项都要单独达标，综合分再高也不能抵消某一项没过。" },
   ];
   const ew = (AW - 2 * 14) / 3, ex = (i: number) => X0 + i * (ew + 14);

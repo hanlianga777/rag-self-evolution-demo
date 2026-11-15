@@ -1,5 +1,6 @@
 import { ClampText } from "../ClampText";
 import { Icon, IconLabel } from "../icons";
+import type { ParamChange } from "../evolution/model";
 import { QuestionBadge } from "../Primitives";
 import "../extra.css";
 
@@ -9,7 +10,7 @@ import "../extra.css";
  * 右：修好的题（题号 + 题目一行 + 本题关键变化），点击直接去问答验证的 Before/After。
  */
 export type StoryTurn = { label: string; text: string; key?: boolean; onClick?: () => void };
-export type FixedItem = { id: string; question?: string; cause?: string; questionLoading?: boolean; causeLoading?: boolean };
+export type FixedItem = { id: string; question?: string; relatedParameter?: string; parameters?: ParamChange[]; questionLoading?: boolean };
 
 export function OverviewStory({ turns, fixed, remaining, onOpenFixed }: { turns: StoryTurn[]; fixed: FixedItem[]; remaining?: string[] | null; onOpenFixed?: (id: string) => void }) {
   return <div className="ui-ovs">
@@ -24,19 +25,18 @@ export function OverviewStory({ turns, fixed, remaining, onOpenFixed }: { turns:
         })}
       </ol>
     </section>
-    <section className="ui-ovs-card" aria-label="修好的题">
-      <h3><IconLabel name="fixed">修好的 {fixed.length} 道题</IconLabel></h3>
+    <section className="ui-ovs-card" aria-label="修好的题目">
+      <h3><IconLabel name="fixed">修好的题目</IconLabel><span className="ui-ovs-remaining">仍未修好：{remaining==null ? "未知" : remaining.length ? remaining.map((id,index)=><span key={id}>{index>0 && "、"}<button className="text-button" onClick={()=>onOpenFixed?.(id)} disabled={!onOpenFixed}>{id}</button></span>) : "无"}</span></h3>
       <ul className="ui-ovs-fixed">
         {fixed.map(item => <li key={item.id}>
           <button type="button" onClick={onOpenFixed ? () => onOpenFixed(item.id) : undefined} disabled={!onOpenFixed} aria-label={`查看 ${item.id} 的 Before/After`}>
             <QuestionBadge id={item.id} tone="fixed" />
             {item.questionLoading ? <span className="loading-line" role="status" aria-label="正在读取题目" /> : <ClampText className="ui-ovs-fixed-q" text={item.question ?? "题目未保存"} lines={1} hoverOnly />}
-            {item.causeLoading ? <span className="loading-line" role="status" aria-label="正在读取本题归因" /> : <span className={`ui-ovs-fixed-c${item.cause ? "" : " unknown"}`}>{item.cause || "—"}</span>}
             {onOpenFixed && <Icon name="go" size={15} className="ui-ovs-go" />}
           </button>
+          {!!item.parameters?.length && <div className="ui-ovs-fixed-params">{item.parameters.map(change => <span key={change.key} className="ui-ovs-fixed-c">{change.label} {change.from} → {change.to}</span>)}</div>}
         </li>)}
       </ul>
-      <p className="ui-ovs-remaining">仍未修好：{remaining==null ? "未知" : remaining.length ? remaining.map((id,index)=><span key={id}>{index>0 && "、"}<button className="text-button" onClick={()=>onOpenFixed?.(id)} disabled={!onOpenFixed}>{id}</button></span>) : "无"}</p>
     </section>
   </div>;
 }

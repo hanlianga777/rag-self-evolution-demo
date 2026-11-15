@@ -10,9 +10,9 @@ import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
 import { OverviewSummary } from "../ui/overview/OverviewSummary";
 import { displayText, productionName, gateNames } from "../display";
 import { OverviewStory, type FixedItem } from "../ui/overview/OverviewStory";
-import { buildEvolutionModel, shortId } from "../ui/evolution/model";
+import { buildEvolutionModel, shortId, PARAM_LABELS, paramValue } from "../ui/evolution/model";
 import { getJson } from "../api";
-import { comparisonPoints, explanation, configChanges } from "../components/comparisonData";
+import { comparisonPoints, explanation } from "../components/comparisonData";
 import type { Page } from "../types";
 
 export function OverviewPage({ data, navigate }: { data: any; navigate: (page: Page) => void }) {
@@ -72,7 +72,12 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     turns.push({label: "Candidate D", text: `在 Winner 上精修，${extra ? extra.length ? `多修好 ${extra.join("、")}` : "没有多修好的题" : "修复差异待核对"}；${dReleased ? "已发布" : "待发布"}`, key: true, onClick: openRoute});
   }
   const fixedIds: string[] = completeResult(finalCandidate)?.all_fixed_question_ids || [];
-  const comparisonBinding = JSON.stringify([run?.id, finalCandidate?.id, finalCandidate?.result?.evaluation_run_id, fixedIds]);
+  const changedParameters = finalCandidate?.reasoning?.changed_parameters_vs_baseline ?? finalCandidate?.reasoning?.changed_parameters ?? {};
+  const changes = Object.entries(changedParameters).filter(([key, value]) => JSON.stringify(run?.config?.[key]) !== JSON.stringify(value)).map(([key, value]) => ({
+    key, label: ({candidate_k: "候选数", top_k: "保留条数", generation_thinking: "思考档位"} as Record<string, string>)[key] || PARAM_LABELS[key] || "其他参数",
+    from: paramValue(key, run?.config?.[key]), to: paramValue(key, value),
+  }));
+  const comparisonBinding = JSON.stringify([run?.id, finalCandidate?.id, finalCandidate?.result?.evaluation_run_id, fixedIds, run?.config, changedParameters]);
   const [fixedRecord, setFixedRecord] = useState<{binding: string; items: FixedItem[]}>({binding: "", items: []});
   useEffect(() => {
     if (pagesWarming) return;
@@ -82,23 +87,22 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     void Promise.all([baselineId, afterId].map(id => getJson<any>(`/api/evaluations/${encodeURIComponent(id)}/comparison-cases`))).then(async ([before, after]) => {
       if (cancelled) return;
       if (before.id !== baselineId || after.id !== afterId || before.status !== "completed" || after.status !== "completed" || !before.judge?.evaluation_identity || before.judge.evaluation_identity !== after.judge?.evaluation_identity || !before.dataset_version_id || before.dataset_version_id !== after.dataset_version_id) throw new Error('保存的比较身份不一致');
-      const items: FixedItem[] = fixedIds.map(id => ({id: shortId(id), question: before.cases?.find((row: any) => shortId(row.question_id) === shortId(id))?.question, causeLoading: true}));
+      const items: FixedItem[] = fixedIds.map(id => ({id: shortId(id), question: before.cases?.find((row: any) => shortId(row.question_id) === shortId(id))?.question}));
       setFixedRecord({binding: comparisonBinding, items});
       const detailed = await Promise.all(items.map(async item => {
         const sourceId = before.cases?.find((row: any) => shortId(row.question_id) === item.id)?.question_id;
-        if (!sourceId) return {...item, causeLoading: false};
+        if (!sourceId) return item;
         try {
           const [left, right] = await Promise.all([baselineId, afterId].map(id => getJson<any>(`/api/evaluations/${encodeURIComponent(id)}/cases/${encodeURIComponent(sourceId)}`)));
           const why = explanation(left.case, right.case, before.config, after.config, comparisonPoints(left.case, right.case, right.question));
-          const change = configChanges(before.config, after.config).find(change => change.key === why.key);
-          return {...item, causeLoading: false, cause: change ? `${change.label} ${change.before} → ${change.after}` : undefined};
-        } catch { return {...item, causeLoading: false}; }
+          return {...item, relatedParameter: why.key};
+        } catch { return item; }
       }));
       if (!cancelled) setFixedRecord({binding: comparisonBinding, items: detailed});
     }).catch(() => { if (!cancelled) setFixedRecord({binding: comparisonBinding, items: fixedIds.map(id => ({id: shortId(id), question: formal?.questions?.find((row: any) => shortId(row.id) === shortId(id))?.question}))}); });
     return () => { cancelled = true; };
   }, [comparisonBinding, pagesWarming]);
-  const fixed: FixedItem[] = fixedRecord.binding === comparisonBinding ? fixedRecord.items : fixedIds.map(id => ({id: shortId(id), question: formal?.questions?.find((row: any) => shortId(row.id) === shortId(id))?.question, questionLoading: !!run?.id && !!finalCandidate?.result?.evaluation_run_id, causeLoading: !!run?.id && !!finalCandidate?.result?.evaluation_run_id}));
+  const fixed: FixedItem[] = (fixedRecord.binding === comparisonBinding ? fixedRecord.items : fixedIds.map(id => ({id: shortId(id), question: formal?.questions?.find((row: any) => shortId(row.id) === shortId(id))?.question, questionLoading: !!run?.id && !!finalCandidate?.result?.evaluation_run_id}))).map((item: FixedItem) => ({...item, parameters: item.relatedParameter && changes.some(change => change.key === item.relatedParameter) ? changes.filter(change => change.key === item.relatedParameter) : changes}));
   const storyBaseline=metrics ? run : undefined;
   const storyRounds=new Set(candidates.filter((c:any)=>["A","B","C"].includes(c.reasoning?.candidate_label)).map((c:any)=>c.reasoning?.round || 1)).size;
   const baseResult = completeResult(storyBaseline);

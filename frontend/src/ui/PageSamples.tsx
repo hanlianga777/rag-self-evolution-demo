@@ -56,10 +56,10 @@ export function PageSamples() {
           { label: "Candidate D", text: "在 Winner 上精修，多修好 Q04；推荐并已发布", key: true },
         ]}
         fixed={[
-          { id: "Q04", question: sampleQuestions.Q04, cause: "Top-K 4 → 6" },
-          { id: "Q24", question: sampleQuestions.Q24, cause: "Candidate K 12 → 24" },
-          { id: "Q29", question: sampleQuestions.Q29, cause: "Candidate K 12 → 24" },
-          { id: "Q38", question: sampleQuestions.Q38, cause: "Thinking Max → High" },
+          { id: "Q04", question: sampleQuestions.Q04, parameters: [{key: "top_k", label: "保留条数", from: "4", to: "6"}] },
+          { id: "Q24", question: sampleQuestions.Q24, parameters: [{key: "candidate_k", label: "候选数", from: "12", to: "24"}] },
+          { id: "Q29", question: sampleQuestions.Q29, parameters: [{key: "candidate_k", label: "候选数", from: "12", to: "24"}] },
+          { id: "Q38", question: sampleQuestions.Q38, parameters: [{key: "generation_thinking", label: "思考档位", from: "Max", to: "High"}] },
         ]}
         onOpenFixed={() => {}}
       />

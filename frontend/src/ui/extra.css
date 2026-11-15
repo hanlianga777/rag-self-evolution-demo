@@ -3,27 +3,31 @@
  * ================================================================== */
 
 /* —— 概览讲解区 —— */
-.ui-ovs { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+.ui-ovs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
 .ui-ovs-card { background: var(--ui-surface); border-radius: var(--ui-r-card, 14px); box-shadow: var(--ui-shadow-1); padding: 18px 22px; min-width: 0; }
-.ui-ovs-card h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--ui-ink); }
+.ui-ovs-card h3 { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; flex:none; margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--ui-ink); }
 .ui-ovs-turns { list-style: none; margin: 0; padding: 0; position: relative; }
 .ui-ovs-turns::before { content: ""; position: absolute; left: 4px; top: 10px; bottom: 10px; width: 1px; background: var(--ui-rule); }
 .ui-ovs-turns li { position: relative; padding-left: 22px; }
 .ui-ovs-turns li::before { content: ""; position: absolute; left: 0; top: 13px; width: 9px; height: 9px; border-radius: 50%; background: var(--ui-surface); border: 1.5px solid var(--ui-faint); box-sizing: border-box; }
 .ui-ovs-turns li.key::before { background: var(--ui-accent); border-color: var(--ui-accent); }
-.ui-ovs-turns li > button, .ui-ovs-turns li > div { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: baseline; width: 100%; padding: 7px 8px; margin-left: -8px; border: 0; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; }
+.ui-ovs-turns li > button, .ui-ovs-turns li > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; align-items: baseline; width: 100%; padding: 7px 8px; margin-left: -8px; border: 0; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; }
 .ui-ovs-turns li > button { cursor: pointer; }
 .ui-ovs-turns li > button:hover { background: var(--ui-rule-2); }
 .ui-ovs-turn-k { font-size: 13px; color: var(--ui-muted); white-space: nowrap; }
 .ui-ovs-turn-t { font-size: 14px; line-height: 1.55; color: var(--ui-ink-2); }
 .ui-ovs-turns li.key .ui-ovs-turn-t { color: var(--ui-ink); font-weight: 600; }
-.ui-ovs-fixed { list-style: none; margin: 0; padding: 0; }
+.ui-ovs-fixed { list-style: none; margin: 0; padding: 0; min-height:0; }
+.ui-ovs-fixed li { padding:4px 0 8px; }
 .ui-ovs-fixed li + li { border-top: 1px solid var(--ui-rule-2); }
-.ui-ovs-fixed button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 10px; align-items: center; width: 100%; padding: 9px 8px; margin: 0 -8px; width: calc(100% + 16px); border: 0; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.ui-ovs-fixed button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 9px 0; margin: 0; border: 0; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .ui-ovs-fixed button:hover:not(:disabled) { background: var(--ui-rule-2); }
 .ui-ovs-fixed button:disabled { cursor: default; }
-.ui-ovs-fixed-q { font-size: 14px; color: var(--ui-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ui-ovs-fixed-c { font-size: 12px; color: var(--ui-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.overview-page .ui-ovs-fixed-q { display:block; font-size: 14px; color: var(--ui-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ui-ovs-fixed-params { display:flex; flex-wrap:wrap; gap:4px 6px; padding-left:0; }
+.ui-ovs-fixed-c { padding:2px 7px; border:1px solid var(--ui-rule); border-radius:var(--ui-r-pill); background:var(--ui-surface); font-size:11px; line-height:1.4; color:var(--ui-muted); font-variant-numeric:tabular-nums; }
+.ui-ovs-remaining { font-size:12px; font-weight:400; color:var(--ui-muted); }
+.ui-ovs-remaining button { font:inherit; }
 .ui-ovs-go { color: var(--ui-faint); }
 @media (max-width: 1100px) { .ui-ovs { grid-template-columns: 1fr; } }
 
@@ -454,9 +458,10 @@ tr:hover .ui-row-go, tr:focus-visible .ui-row-go { opacity: 1; }
  .overview-page:not(.architecture-view) .page-content { display:flex; flex-direction:column; gap:12px; padding-bottom:16px; }
  .overview-page:not(.architecture-view) .ui-ov { flex:none; gap:12px; }
  .overview-page .ui-ov-hero { padding:16px 22px; }
- .overview-page .ui-ovs { flex:1; min-height:0; margin:0; }
- .overview-page .ui-ovs-card { padding:14px 18px; overflow:auto; }
- .overview-page .ui-ovs-turns li > :is(button,div) { padding-top:5px; padding-bottom:5px; }
+ .overview-page .ui-ovs { flex:0 1 auto; grid-template-rows:minmax(0,1fr); min-height:0; margin:0; }
+ .overview-page .ui-ovs-card { padding:14px 18px; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+ .overview-page .ui-ovs-card > :is(ol,ul) { flex:1; display:flex; flex-direction:column; justify-content:space-between; gap:4px; overflow:auto; }
+ .overview-page .ui-ovs-turns li > :is(button,div) { padding-top:4px; padding-bottom:4px; }
  .overview-page .ui-ovs-fixed button { padding-top:6px; padding-bottom:6px; }
  .settings-page .page-content { display:flex; flex-direction:column; gap:12px; padding-bottom:16px; }
  .settings-page .page-content > .panel { margin:0; padding:14px 18px; }
