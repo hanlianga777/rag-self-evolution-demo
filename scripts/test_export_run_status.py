@@ -42,6 +42,24 @@ class StatusExportTests(unittest.TestCase):
         self.assertEqual(before, self.db.read_bytes())
         return text
 
+    def test_failed_cycle_reports_nested_judge_error_without_private_text(self):
+        private = 'PRIVATE_ANSWER sk-secret-value'
+        error = {'phase':'judge','error_type':'ProviderInvalidResponse',
+                 'error':'support is not located in actual full Final; ' + private}
+        self.run_row('completed', {'technical_errors':[error]})
+        with closing(sqlite3.connect(self.db)) as c, c:
+            c.execute('INSERT INTO candidate_configs VALUES(?,?,?,?,?,?)', ('C-1','EXP-1','failed','{}',
+                json.dumps({'completed':49,'total':50,'technical_failed':1,'technical_errors':[error]}),
+                '2026-11-14T12:00:00Z'))
+            c.execute('INSERT INTO experiments VALUES(?,?,?,?)', ('EXP-1','completed',
+                json.dumps({'optimization_cycle':{'status':'failed','last_error':'同一故障连续2次续跑仍未恢复'}}),
+                '2026-11-15T12:00:00Z'))
+        text = self.render()
+        self.assertIn('ProviderInvalidResponse', text)
+        self.assertIn('Judge引用未绑定实际Final', text)
+        self.assertNotIn('UnknownError', text)
+        self.assertNotIn(private, text)
+
     def test_idle_and_no_timestamp_only_change(self):
         text = self.render()
         self.assertIn('当前阶段：已完成（空闲）', text)

@@ -36,7 +36,14 @@ def toronto(value):
 
 def safe_error(error):
     # Error messages may contain prompts, answers, keys or HTTP bodies. Never echo them.
-    text = str(error or '')
+    detail = error if isinstance(error, dict) else {}
+    text = str(detail.get('error') or error or '')
+    if 'support is not located in actual full Final' in text:
+        return 'ProviderInvalidResponse：Judge引用未绑定实际Final，判分合同校验失败'
+    if 'Paid task USD limit reached' in text:
+        return 'BudgetLimitReached：累计费用及请求预留达到既定上限'
+    known_types = {'ProviderInvalidResponse', 'ProviderAPIError', 'ProviderNetworkError', 'ProviderTimeout',
+                   'ValueError', 'RuntimeError', 'OperationalError', 'OSError'}
     for terms, kind, explanation in [
         (('ProviderTimeout', 'timeout', '超时'), 'ProviderTimeout', '外部请求超时，详见本机记录'),
         (('401', '403', 'auth', '认证'), 'AuthenticationError', '外部服务认证失败'),
@@ -46,6 +53,9 @@ def safe_error(error):
     ]:
         if any(term.lower() in text.lower() for term in terms):
             return f'{kind}：{explanation}'
+    if detail.get('error_type') in known_types:
+        phase = {'judge':'Judge判分', 'generation':'回答生成', 'storage':'写库'}.get(detail.get('phase'), '任务执行')
+        return f'{detail["error_type"]}：{phase}失败，详见本机原始异常'
     return 'UnknownError：任务失败，具体原因请查本机记录' if error else '无'
 
 
@@ -85,9 +95,11 @@ def build_status(database, data_dir):
             composite = result.get('composite_schedule', {})
             active = exp['status'] in ACTIVE or cycle.get('status') in ACTIVE or composite.get('status') in ACTIVE
             if active or cycle.get('status') == 'failed':
+                failure = next((load(c) for c in candidates if c['experiment_id'] == exp['id']
+                                and c['status'] == 'failed' and load(c).get('technical_errors')), {})
                 tasks.append({**exp, 'status': 'running' if active else 'failed',
                     'created_at': cycle.get('updated_at', exp['created_at']),
-                    'result': {**result, 'price_pause': cycle.get('price_pause') or composite.get('price_pause') or result.get('price_pause', {}),
+                    'result': {**result, **{k:failure[k] for k in ('completed','total','technical_failed','technical_errors') if k in failure}, 'price_pause': cycle.get('price_pause') or composite.get('price_pause') or result.get('price_pause', {}),
                                'error': cycle.get('last_error') or result.get('error')},
                     'stage': 'Candidate D' if cycle.get('phase') == 'composite' or composite.get('status') in ACTIVE else f'第{number(cycle.get("round", result.get("round")))}轮第未知个 Candidate（Agent分析）'})
         for rev in rows('candidate_revision_runs'):
@@ -130,7 +142,7 @@ def build_status(database, data_dir):
         pause = result.get('price_pause') or progress.get('price_pause') or {}
         paused = pause.get('paused') is True and bool(active)
         error = current.get('error_message') or result.get('error') or result.get('last_error')
-        if not error and result.get('technical_errors'):
+        if result.get('technical_errors') and (not error or failed):
             error = result['technical_errors'][-1]
         if not error and failed:
             error = 'unknown'

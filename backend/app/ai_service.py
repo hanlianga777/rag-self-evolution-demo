@@ -286,6 +286,9 @@ class AiService:
         # to generation. Frozen canonical sources and scoring versions are in scope.
         semantic = {k:v for k,v in context.items() if k not in {'retrieval_candidates','final_context','judge_correction','programmatic_evidence_observation'} and not k.startswith('_')}
         semantic['final_context'] = generation_context(context.get('final_context', []))
+        # Identical Parent text can expose different valid Child citation IDs.
+        semantic['final_source_bindings'] = [{k:e[k] for k in ('chunk_id','parent_chunk_id','matched_child_ids','source_scope') if k in e}
+                                             for e in context.get('final_context', [])]
         from .evaluation_contract import BUSINESS_JUDGE_PROMPT, VERSIONS
         contract = [thinking_config('judge'), VERSIONS, hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest()]
         result = reuse_result('judge', [question,expected,answer,category,semantic,contract],

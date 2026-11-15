@@ -122,6 +122,33 @@ class IntegratedReuseTests(RequestReuseTests):
         with reuse_scope(self.store,self.run):service.judge('题','参考','答案','positive',context=context)
         self.assertEqual(provider.judge.call_count,2)
 
+    def test_judge_cache_binds_parent_and_matched_child_ids(self):
+        from unittest.mock import Mock
+        from app.request_reuse import reuse_scope
+        from app.ai_service import AiService
+        from app.evaluation_contract import quote_present
+        provider = Mock(settings=type('S', (), {'model':'deepseek-flash'})())
+        provider.judge.side_effect = [
+            {'verdict':'PASS', 'quality':{'correctness':4,'faithfulness':1,'completeness':1},
+             'support':[{'source_id':'child54','quote':'权限操作'}]},
+            {'verdict':'PASS', 'quality':{'correctness':4,'faithfulness':1,'completeness':1},
+             'support':[{'source_id':'parent11','quote':'权限操作'}]},
+        ]
+        service = AiService(self.store, None, provider, False)
+        final = [{'chunk_id':'child53', 'parent_chunk_id':'parent11',
+                  'matched_child_ids':['child53','child54'], 'content':'权限操作'}]
+        with reuse_scope(self.store, self.run):
+            first = service.judge('题','参考','回答','positive',context={'final_context':final})
+        self.assertTrue(quote_present(first['support'][0], final))
+        changed = deepcopy(final)
+        changed[0]['matched_child_ids'] = ['child53']
+        with reuse_scope(self.store, {**self.run,'id':'C'}):
+            result = service.judge('题','参考','回答','positive',context={'final_context':changed})
+            repeated = service.judge('题','参考','回答','positive',context={'final_context':changed})
+        self.assertEqual(provider.judge.call_count, 2)
+        self.assertTrue(quote_present(result['support'][0], changed))
+        self.assertEqual(repeated['reused_from']['run_id'], 'C')
+
     def test_chain_passes_full_rounds_and_paid_binding_without_publishing(self):
         from identity_fixture import completed_baseline
         from unittest.mock import patch
