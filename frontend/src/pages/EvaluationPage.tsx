@@ -1,3 +1,4 @@
+import {failureLabel} from "../components/questionTaxonomy";
 import { InfoTip, HoverCard } from "../ui/HoverCard";
 import { pagePurpose, helpText } from "../helpText";
 import { judgePresentation } from "../components/judgePresentation";
@@ -27,7 +28,7 @@ import {savedAnswerPoints} from '../components/savedAnswerPoints';
 import {circle} from '../components/answerPresentation';
 import { CaseAnswer } from "../components/CaseAnswer";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
-import { displayText, gateNames, gateEnglishNames, localShortTime } from "../display";
+import { displayText, gateNames, localShortTime } from "../display";
 import { useOperation } from "../operation";
 
 type Row = Record<string, any>;
@@ -56,6 +57,32 @@ const gateCalculation = (metric: string) => {
   return `${metric === 'safe_rejection_rate' ? '全部负向题' : metric === 'safety_critical_accuracy' ? '冻结 negative_subtype 为 safety_critical 的负向题' : '冻结 negative_subtype 为 prompt_injection 的负向题'}中，预期行为通过的题目数 ÷ 纳入题目数 × 100%；优先取 behavior_contract.effective_pass，旧记录取 behavior_pass。`;
 };
 
+const lowersGate = (row:Row, gate:Row) => typeof row.value === 'number' && typeof gate.threshold === 'number' && (gate.operator === '>=' ? row.value < gate.threshold : row.value > gate.threshold);
+const loweredCases = (gate:Row) => Array.isArray(gate.contributing_cases) ? gate.contributing_cases.filter((row:Row)=>lowersGate(row,gate)) : gate.failed_cases;
+function GateContributions({rows,gate,cases,onSelect}:{rows:Row[];gate:Row;cases:Row[];onSelect?:(row:Row)=>void}) {
+  return <div className="gate-contributions">{rows.map(row=>{
+    const item=cases.find(item=>item.question_id===row.question_id);
+    return <div className="gate-contribution" key={row.question_id}><span>{item ? productQuestionLabel(item) : '题号未知'}</span><p>{item?.question || '历史题目未记录'}</p><strong>{format(row.value,gate.metric.startsWith('latency_')?' 秒':'%')}</strong><span>{typeof row.value==='number' ? lowersGate(row,gate)?'未达标':'达标':'未知'}</span>{onSelect && <button className="secondary" disabled={!item} onClick={()=>item && onSelect(item)}>查看案例</button>}</div>;
+  })}</div>;
+}
+function GateSummary({gate,cases,onSelect}:{gate:Row;cases:Row[];onSelect:(row:Row)=>void}) {
+  const lowered=loweredCases(gate);
+  return <>
+    <DrawerSection title="这项门槛是什么"><p>{gateDescription(gate.metric)}<InfoTip term="judge" label="判分"/></p></DrawerSection>
+    <DrawerSection title="这次结果如何"><div className="gate-result"><span>实际值 <strong>{gateValue(gate)}</strong></span><span>门槛 <strong>{gateThreshold(gate)}</strong></span><Status value={gate.status}/></div></DrawerSection>
+    <DrawerSection title="哪几题拉低了它">{Array.isArray(lowered) ? lowered.length ? <GateContributions rows={lowered} gate={gate} cases={cases} onSelect={onSelect}/> : <p>没有低于该项要求的题目。</p> : <p>历史记录未保存逐题贡献，影响题目未知。</p>}</DrawerSection>
+  </>;
+}
+function GateCaseSummary({gate,item,cases}:{gate:Row;item:Row;cases:Row[]}) {
+  const contribution=gate.contributing_cases?.find((row:Row)=>row.question_id===item.question_id);
+  const lowered=loweredCases(gate);
+  return <div className="gate-case-summary">
+    <DrawerSection title="这项门槛是什么"><p>{gateDescription(gate.metric)}</p></DrawerSection>
+    <DrawerSection title="这次结果如何"><p>本题贡献：{contribution?format(contribution.value,gate.metric.startsWith('latency_')?' 秒':'%'):'未知'} · 门槛 {gateThreshold(gate)} · {contribution && typeof contribution.value==='number' ? lowersGate(contribution,gate)?'未达标':'达标':'未知'}</p><p>整体实际值 {gateValue(gate)} · <Status value={gate.status}/></p></DrawerSection>
+    <DrawerSection title="哪几题拉低了它"><p>{Array.isArray(lowered) ? lowered.map((row:Row)=>{const saved=cases.find(c=>c.question_id===row.question_id);return saved?productQuestionLabel(saved):'题号未知';}).join('、') || '没有低于该项要求的题目。' : '历史记录未保存逐题贡献，影响题目未知。'}</p><p>{item.question}</p></DrawerSection>
+  </div>;
+}
+
 // The supplied grid is display-only. Keep the original row drilldowns at the page boundary.
 function BaselineGates({ gates, onSelect }: { gates: Row[]; onSelect: (gate: Row) => void }) {
   const groups = ['正向（Positive）', '消融（Ablation）', '负向（Negative）与安全', '性能'].map(name => ({name, rows: gates.filter(gate => group(gate.metric) === name)}));
@@ -77,8 +104,8 @@ function BaselineGates({ gates, onSelect }: { gates: Row[]; onSelect: (gate: Row
       badge.textContent = rows.length ? `${rows.filter(gate => gate.status === 'PASS').length} / ${rows.length} 通过` : '未采集';
     });
   }}><HardGateGrid groups={groups.map(({ name, rows }) => ({name, items: rows.map(gate => ({
-    label: gate.metric.startsWith('latency_') ? '回答耗时' : (gateNames[gate.metric] || gate.metric).replace(/^(正向（Positive）|消融（Ablation）)/, ''),
-    english: ({safe_rejection_rate:'Safe Refusal',safety_critical_accuracy:'Safety-critical Accuracy',prompt_injection_resistance:'Prompt-injection Resistance',latency_p50_seconds:'P50',latency_p99_seconds:'P99'} as Record<string,string>)[gate.metric] || gateEnglishNames[gate.metric]?.replace(/^(Positive|Ablation) /, ''), description: gateDescription(gate.metric),
+    label: gate.metric === 'latency_p50_seconds' ? '中位耗时 P50' : gate.metric === 'latency_p99_seconds' ? '最慢耗时 P99' : (gateNames[gate.metric] || gate.metric).replace(/^(正向（Positive）|消融（Ablation）)/, ''),
+    description: gateDescription(gate.metric),
     actual: gateValue(gate), requirement: gateThreshold(gate), pass: gate.status === 'PASS',
     tight: Number.isFinite(gate.actual) && Number.isFinite(gate.threshold) && Math.abs(gate.actual-gate.threshold) <= (gate.metric.startsWith('latency_') ? Math.abs(gate.threshold)*0.05 : 1),
     ratio: typeof gate.actual === 'number' ? gate.actual / (gate.metric.startsWith('latency_') ? 60 : 100) : null,
@@ -201,12 +228,13 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const historicalPolicy=!!(run.requires_policy_upgrade ?? data.workspace?.requires_policy_upgrade);
   const stale = data.workspace?.requires_new_golden || data.workspace?.requires_new_baseline && (completed || data.workspace?.current_golden_id && snapshot.id !== data.workspace.current_golden_id);
 
-  const versionedRerun = !!run.id && !canResume && !["queued", "running"].includes(run.status);
-  const startButton = <button className="secondary" disabled={busy || preflight?.can_start !== true} onClick={() => setStartConfirm(true)}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "重新评测 Baseline" : "运行 Baseline 评测"}</button>;
+  const canStartOrResume = !run.id || canResume || ["queued", "running"].includes(run.status);
+  const startButton = <button className="secondary" disabled={busy || preflight?.can_start !== true} onClick={() => setStartConfirm(true)}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : "运行 Baseline 评测"}</button>;
+  const withStrategy = (item:Row) => ({...item,optimization_strategy:(data.optimization?.candidates || []).filter((candidate:Row)=>(candidate.reasoning?.observed_evidence || candidate.reasoning?.target_bad_cases || []).some((id:string)=>id===item.question_id || relatedBad.some(row=>row.id===id && row.question_id===item.question_id))).map((candidate:Row)=>`${candidate.reasoning?.candidate_label || '未采集'}：${candidate.reasoning?.hypothesis || '假设未采集'}`).join('；')});
   return <PageShell className={`page evaluation-page evaluation-${tab}`} header={<div className="page-title"><div><h1><IconTile name="baseline" />Baseline</h1><p className="ui-kicker page-purpose">{pagePurpose.evaluation}</p></div></div>} tabs={<div className="tabs"><button data-label="Baseline 报告" className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button data-label={displayText("Hard Gate")} className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>{displayText("Hard Gate")}</button><button data-label="Bad Case 诊断" className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
 
-    {!versionedRerun && <div className="header-actions page-data-actions">{startButton}</div>}
-    <ConfirmDialog open={startConfirm} onOpenChange={setStartConfirm} title={canResume ? "确认恢复 Baseline" : "确认重新运行 Baseline"} busy={busy} onConfirm={() => { setStartConfirm(false); void prepareStart(); }}><p>{canResume ? "将恢复原 Baseline 的未完成题目，已完成的题目保留。" : "会用当前 Pipeline 配置对 50 题重新评测，产生新版本正式评测。"}</p><p>会调用模型并产生费用。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
+    {canStartOrResume && <div className="header-actions page-data-actions">{startButton}</div>}
+    <ConfirmDialog open={startConfirm} onOpenChange={setStartConfirm} title={canResume ? "确认恢复 Baseline" : "确认运行 Baseline"} busy={busy} onConfirm={() => { setStartConfirm(false); void prepareStart(); }}><p>{canResume ? "将恢复原 Baseline 的未完成题目，已完成的题目保留。" : "会用当前 Pipeline 配置评测整套题卷，保存新的评测结果。"}</p><p>会调用模型并产生费用。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
     <PricePauseNotice pause={run.result?.price_pause} evaluationId={run.id} onChanged={async () => { setRun(await getJson<Row>(`/api/evaluations/${run.id}?light=true`)); }} />
     {preflight?.reason && (/活动评测|后台.*运行|active/i.test(preflight.reason) ? <p className="pending-note" role="status">后台正在运行评测，完成后可重新运行 Baseline</p> : <p className="error-notice" role="alert">无法启动 Baseline：{preflight.reason}</p>)}
     {["partial","failed"].includes(run.status) && preflight?.can_start && preflight.resume_reason && <div className="muted-prose muted"><TruncatedText lines={3}>原任务不能恢复：{preflight.resume_reason}；请明确新建完整评测，历史进度保留。</TruncatedText></div>}
@@ -244,11 +272,11 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
 
       {tab === "report" && <div className="baseline-report">
         {breakdownReady && <BaselineBreakdown categories={categoryScores} badCases={businessCases.map(row => {
-          const item = caseData(row), category = item.diagnostic_view?.diagnosis_category;
-          return { id: productQuestionLabel(row), question: item.question, layer: category === '检索层问题' ? '检索层' : category === '生成层问题' ? '生成层' : category || '未知' };
+          const item = caseData(row);
+          return { id: productQuestionLabel(row), question: item.question, layer: failureLabel(item.diagnostic_view || {}) };
         })} onOpen={id => { setSelectedCase(businessCases.find(row => productQuestionLabel(row) === id) || null); }} />}
         <div className="baseline-more">
-          <ProductDiagnostics diagnostics={run.product_diagnostics} judgeThinking={judgeThinking} action={versionedRerun ? <div className="header-actions">{startButton}</div> : undefined} />
+          <ProductDiagnostics diagnostics={run.product_diagnostics} judgeThinking={judgeThinking} />
         </div>
 
       </div>}
@@ -258,8 +286,14 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
 
     </>}
 
-    <Drawer className="workbench-drawer" open={!!selectedGate} onOpenChange={open => !open && setSelectedGate(null)} title={selectedGate ? gateNames[selectedGate.metric] || selectedGate.metric : "Hard Gate 详情"}><div className="drawer-body">{selectedGate && <><section className="gate-definition" aria-label="指标含义与门槛"><h3>{group(selectedGate.metric)} · {(gateNames[selectedGate.metric] || selectedGate.metric).replace(/^(正向（Positive）|消融（Ablation）)/, '')}</h3><p>{gateDescription(selectedGate.metric)}</p><p>{gateCalculation(selectedGate.metric)}</p><p>本次保存的门槛：{gateThreshold(selectedGate)}。</p></section><DrawerSection title="指标状态"><p>{group(selectedGate.metric)} · {gateValue(selectedGate)} / {gateThreshold(selectedGate)} · <Status value={selectedGate.status} /></p></DrawerSection><DrawerSection title="业务影响"><p>{selectedGate.metric.startsWith("latency_") ? "响应体验是否达到既有性能 Hard Gate。" : selectedGate.metric.startsWith("positive_") || selectedGate.metric.startsWith("ablation_") ? "对应题组的正确性、依据和完整性 Hard Gate；通过不代表逐题无失败。" : "拒答、安全关键或注入防护是否达到既有安全 Hard Gate。"}</p></DrawerSection><DrawerSection title="评测版本与数据来源"><p>{run.judge?.scoring_policy || "历史规则未采集"} · 保存的逐题Judge与回答阶段观测</p></DrawerSection><DrawerSection title="指标定义与公式"><InfoTip term="judge" label="判分" /><p>{selectedGate.formula || "历史记录未保存计算说明"}</p><p>纳入题数：{selectedGate.included_cases ?? "保存记录缺少题数"} · Judge：{run.judge?.model || "未采集"}</p></DrawerSection><DrawerSection title="贡献题目"><p className="muted">数值为本指标贡献；状态为题目整体判定。</p><div className="run-list gate-contributions">{(selectedGate.contributing_cases || []).map((item: Row) => <div key={item.question_id}><p className="gate-question">{cases.find(row => row.question_id === item.question_id)?.question || "历史题目未记录"}</p><span>{format(item.value, selectedGate.metric.startsWith("latency_") ? " 秒" : "%")}</span><Status value={typeof item.passed === "boolean" ? item.passed ? "passed" : "failed" : "not_evaluable"} /><button className="text-button" disabled={!cases.some(row => row.question_id === item.question_id)} onClick={() => { setSelectedGate(null); setSelectedCase(cases.find(row => row.question_id === item.question_id) || null); }}>查看案例</button></div>)}</div></DrawerSection><DrawerSection title="关联 Baseline 配置"><p>Candidate K {config.candidate_k ?? "未采集"} · Top-K {config.top_k ?? "未采集"}</p></DrawerSection></>}</div></Drawer>
-    <Drawer className="workbench-drawer" open={!!selectedCase} onOpenChange={open => !open && setSelectedCase(null)} title={selectedDetail ? `${productQuestionLabel(selectedDetail)} · ${selectedDetail.diagnostic_view?.diagnosis_category || '案例诊断'}${selectedDetail.diagnostic_view?.severity_label?` · ${selectedDetail.diagnostic_view.severity_label}`:''}` : '案例诊断'}><div className="drawer-body">{selectedDetail && (!run.cases ? error ? <p role="alert">案例详情读取失败：{error}</p> : <div className="case-detail-skeleton" role="status" aria-label="正在读取保存的案例详情">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div> : <BaselineCaseDetails item={{...selectedDetail,optimization_strategy:(data.optimization?.candidates || []).filter((candidate:Row)=>(candidate.reasoning?.observed_evidence || candidate.reasoning?.target_bad_cases || []).some((id:string)=>id===selectedDetail.question_id || relatedBad.some(row=>row.id===id && row.question_id===selectedDetail.question_id))).map((candidate:Row)=>`${candidate.reasoning?.candidate_label || '未采集'}：${candidate.reasoning?.hypothesis || '假设未采集'}`).join('；')}} snapshot={snapshot} config={config} gates={details} />)}</div></Drawer>
+    <Drawer className="workbench-drawer gate-drawer" open={!!selectedGate} onOpenChange={open => !open && setSelectedGate(null)} title={selectedGate ? gateNames[selectedGate.metric] || "上线门槛" : "上线门槛"}><div className="drawer-body">{selectedGate && <>
+      <GateSummary gate={selectedGate} cases={cases} onSelect={setSelectedCase}/>
+      <StoryDisclosure label="技术详情"><DrawerSection title="指标定义与公式"><InfoTip term="judge" label="判分"/><p>{gateCalculation(selectedGate.metric)}</p><p>{selectedGate.formula || "历史记录未保存计算说明"}</p><p>纳入题数：{selectedGate.included_cases ?? "未知"} · 判分模型：{run.judge?.model || "未知"}</p></DrawerSection><DrawerSection title="全部贡献题目"><GateContributions rows={selectedGate.contributing_cases || []} gate={selectedGate} cases={cases} onSelect={setSelectedCase}/></DrawerSection><DrawerSection title="关联配置"><p>候选数 {config.candidate_k ?? "未知"} · 保留条数 {config.top_k ?? "未知"}</p><p>{run.judge?.scoring_policy || "历史规则未知"}</p></DrawerSection></StoryDisclosure>
+    </>}</div></Drawer>
+    <Drawer className="workbench-drawer" open={!!selectedCase} onOpenChange={open => !open && setSelectedCase(null)} title={selectedDetail ? `${productQuestionLabel(selectedDetail)} · ${failureLabel(selectedDetail.diagnostic_view || {})}` : '案例诊断'}><div className="drawer-body">{selectedDetail && (!run.cases ? error ? <p role="alert">案例详情读取失败：{error}</p> : <div className="case-detail-skeleton" role="status" aria-label="正在读取保存的案例详情">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div> : <>
+      {selectedGate && <GateCaseSummary gate={selectedGate} item={selectedDetail} cases={cases}/>}
+      {selectedGate ? <StoryDisclosure label="案例详情"><BaselineCaseDetails item={withStrategy(selectedDetail)} snapshot={snapshot} config={config} gates={details}/></StoryDisclosure> : <BaselineCaseDetails item={withStrategy(selectedDetail)} snapshot={snapshot} config={config} gates={details}/>}
+    </>)}</div></Drawer>
   </PageShell>;
 }
 

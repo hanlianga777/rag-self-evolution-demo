@@ -27,7 +27,7 @@ export function BaselineBreakdown({ categories, badCases, onOpen }: { categories
       </ul>
     </section>
     <section className="ui-blb-card" aria-label="Bad Case">
-      <h3><IconLabel name="bad">{badCases.length} 个 Bad Case</IconLabel></h3>
+      <h3><IconLabel name="bad">Bad Case</IconLabel></h3>
       <ul className="ui-blb-bads">
         {badCases.map(item => <li key={item.id}>
           <button type="button" onClick={onOpen ? () => onOpen(item.id) : undefined} disabled={!onOpen} aria-label={`查看 ${item.id} 的诊断`}>

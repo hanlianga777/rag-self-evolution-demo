@@ -254,6 +254,50 @@ def automatic_analysis(case, *, golden_item=None, corpus_chunks=None, corpus_fin
     return conclude('回答问题' , 'Generation', '标准证据已交给模型，已保存判分仍为错，回答存在遗漏或错误。', 3)
 
 
+def display_diagnosis(case, analysis, golden):
+    """032e presentation only: never change saved scores or Agent eligibility.
+
+    Less than half of Final paragraphs matching standard quotations is low
+    precision. Rank truncation requires a saved rerank position and Top-K;
+    filtering/budget loss without that evidence keeps only the layer name.
+    Parent expansion that recovers evidence takes precedence over candidate loss.
+    """
+    judge = case.get('judge_result') or {}
+    subtype = case.get('negative_subtype') or golden.get('negative_subtype')
+    severe = subtype == 'safety_critical' or judge.get('critical_error') is True or any(
+        isinstance(issue, dict) and issue.get('critical') is True for issue in judge.get('issues', []))
+    layer = {'Retrieval':'检索层', 'Ranking':'检索层', 'Generation':'生成层',
+             'Safety':'安全层', 'Performance':'性能层'}.get(analysis['primary_root_cause'], '')
+    detail = ''
+    if _saved_verdict(case) == 'FAIL' and analysis['primary_root_cause'] != 'MissingRecord':
+        if (case.get('test_category') or golden.get('test_category')) == 'negative':
+            detail = {'safety_critical':'该拒没拒', 'prompt_injection':'被提示词注入绕过',
+                      'insufficient_evidence':'答了库外内容'}.get(subtype, '')
+        elif analysis.get('execution_verified'):
+            checks = analysis['evidence_checks']
+            missing = [check for check in checks if check['final_hit'] is False]
+            trace = (case.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
+            top_k = (trace.get('config') or {}).get('top_k')
+            if any(check['candidate_hit'] is False for check in missing):
+                layer, detail = '检索层', '关键证据没找回来'
+            elif missing:
+                if type(top_k) is int and top_k > 0 and any(
+                        type(check['rerank_rank']) is int and check['rerank_rank'] > top_k for check in missing):
+                    layer, detail = '检索层', '排名靠后被截掉'
+            elif checks:
+                precision = analysis['retrieval_metrics'].get('precision_at_k')
+                if precision is not None and precision < .5:
+                    layer, detail = '检索层', '找回的大多不相关'
+                elif isinstance(unmet_required_points(case, golden), list) and unmet_required_points(case, golden):
+                    layer, detail = '生成层', '证据给到了却漏了要点'
+                elif judge.get('over_refusal') is True or 'Over Refusal' in (case.get('failure_tags') or []):
+                    layer, detail = '生成层', '过度拒答'
+                elif judge.get('hallucination') is True or 'Hallucination' in (case.get('failure_tags') or []) or any(
+                        isinstance(issue, dict) and issue.get('failure_kind') == 'unsupported' for issue in judge.get('issues', [])):
+                    layer, detail = '生成层', '编造内容'
+    return {'display_layer':layer, 'display_subtype':detail, 'display_severity':'严重' if severe else '一般'}
+
+
 @memoized_view
 def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_fingerprint=None):
     """Expose one conclusion and keep the minimal shape consumed by existing pages."""
@@ -298,7 +342,7 @@ def diagnostic_view(case, *, golden_item=None, corpus_chunks=None, corpus_finger
     if type(latency['question_ms']) in (int, float) and latency['question_ms'] > latency_limit_ms:
         phenomena.append({'name': 'Latency 过高', 'status': 'observed',
                           'basis': [f"已保存单题耗时 {latency['question_ms']} ms，超过现有 P99 Hard Gate 对照 {latency_limit_ms} ms；不改变业务判分"]})
-    return {**analysis, 'view_version': 'diagnosis-view-v7',
+    return {**analysis, **display_diagnosis(case, analysis, golden), 'view_version': 'diagnosis-view-v7',
             'display_question_id':display_id,'subfeature':subfeature,'subfeatures':[subfeature] if subfeature else [],
             'retrieval_positions':positions,'retrieval_position_label':position_label,'missing_points':missing_points,
             'phenomena': phenomena,

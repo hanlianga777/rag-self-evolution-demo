@@ -1,3 +1,4 @@
+import {questionTaxonomy,failureLabel,severityHelp} from "./questionTaxonomy";
 import { helpText } from "../helpText";
 import { yuanText } from "./PipelineFields";
 import { ClampText } from "../ui/ClampText";
@@ -25,12 +26,12 @@ export function BadCaseOverview({rows,categories=[],priorities=[],latencyGates=[
  useEffect(()=>{setSelected('all');},[rows]);
  const cases=businessDiagnosisRows(rows).filter(row=>caseData(row).diagnostic_view?.diagnosis_category!=='延迟' && caseData(row).diagnostic_view?.diagnosis_category!=='性能问题');
  const layerDefinitions: (Pick<LayerCard, 'key' | 'name' | 'icon'> & {labels:string[]})[] = [
-  {key:'retrieval',name:'检索层',labels:['检索层问题','检索失败','检索噪声'],icon:'layers' as const},
-  {key:'generation',name:'生成层',labels:['生成层问题','回答问题','过度拒答'],icon:'verify' as const},
-  {key:'safety',name:'安全边界',labels:['安全边界问题','安全边界'],icon:'gate' as const},
+  {key:'retrieval',name:'检索层',labels:['检索层','检索层问题','检索失败','检索噪声'],icon:'layers' as const},
+  {key:'generation',name:'生成层',labels:['生成层','生成层问题','回答问题','过度拒答'],icon:'verify' as const},
+  {key:'safety',name:'安全边界',labels:['安全层','安全边界问题','安全边界'],icon:'gate' as const},
   {key:'performance',name:'性能',labels:[],icon:'time' as const},
  ];
- const layerKey=(row:Row)=>layerDefinitions.find(layer=>layer.labels.includes(caseData(row).diagnostic_view?.diagnosis_category))?.key;
+ const layerKey=(row:Row)=>layerDefinitions.find(layer=>layer.labels.includes(caseData(row).diagnostic_view?.display_layer) || layer.labels.includes(caseData(row).diagnostic_view?.diagnosis_category))?.key;
  const visible=selected==='all'?cases:cases.filter(row=>layerKey(row)===selected);
  const incomplete=cases.filter(row=>!layerKey(row));
  const ranked=categories.map(category=>({...category,...priorities.find(item=>item.label===category.label)}));
@@ -49,7 +50,10 @@ export function BadCaseOverview({rows,categories=[],priorities=[],latencyGates=[
  return <div className="bad-case-overview">
   <div role="group" aria-label="Bad Case 分类"><BadCaseLayers total={cases.length} layers={layers} active={selected} onSelect={setSelected}/></div>
   {incomplete.length>0 && <p className="muted">{incomplete.length} 道题记录缺失：分类定义或诊断字段；保留在全部列表中。</p>}
-  <div className="table-scroll product-table diagnosis-list product-diagnosis-table"><DataTable><thead><tr><th>题号</th><th>问题</th><th>分类</th><th>{showJudgeReason ? "缺了什么" : "现象（子特征）"}</th><th>严重程度</th><th aria-label="打开详情"/></tr></thead><tbody>{visible.map(row=>{const item=caseData(row),view=item.diagnostic_view || {},summary=judgePresentation(item,questions.find(question=>question.id===caseId(row)));return <tr key={caseId(row)} role="button" tabIndex={0} onClick={()=>onSelect(row)} onKeyDown={event=>{if(event.target!==event.currentTarget)return;if(event.key==='Enter' || event.key===' '){event.preventDefault();onSelect(row);}}}><td className="id">{productQuestionLabel(row)}</td><td className="case-question"><TruncatedText lines={1}>{item.question || '记录缺失：问题原文'}</TruncatedText></td><td className="muted">{view.diagnosis_category || '记录缺失：分类'}</td><td onClick={event=>{if ((event.target as Element).closest('.ui-clamp[data-truncated="true"]')) event.stopPropagation();}}><HoverCard content={showJudgeReason ? summary.detail : view.subfeature || '记录缺失：子特征'}><span className="missing-point-summary" tabIndex={0}><ClampText lines={2} text={showJudgeReason ? summary.text : view.subfeature || '记录缺失：子特征'}/>{showJudgeReason && (summary.missingCount ?? 0) > 1 && <span className="missing-points-count">等 {summary.missingCount} 条</span>}</span></HoverCard></td><td><span className={`ui-verdict ${['致命','严重'].includes(view.severity_label)?'bad':''}`}>{view.severity_label || '记录缺失'}</span></td><td><span className="ui-row-go"><Icon name="go" size={15}/></span></td></tr>})}{!visible.length && <tr><td colSpan={6}>该分类暂无单题 Bad Case。</td></tr>}</tbody></DataTable></div>
+  <div className="table-scroll product-table diagnosis-list product-diagnosis-table"><DataTable><colgroup>{[60,280,65,100,120,230,220,90,32].map((width,i)=><col key={i} style={{width}}/>)}</colgroup><thead><tr><th>题号</th><th>问题</th><th>题型</th><th>负向子类</th><th>主题簇<InfoTip term="cluster" label="主题簇"/></th><th>问题层级与细分类型</th><th>{showJudgeReason ? "缺了什么" : "判分现象"}</th><th>严重程度<InfoTip label="严重程度" content={severityHelp}/></th><th aria-label="打开详情"/></tr></thead><tbody>{visible.map(row=>{
+   const item=caseData(row),view=item.diagnostic_view || {},golden=questions.find(question=>question.id===caseId(row)) || {},summary=judgePresentation(item,golden),taxonomy=questionTaxonomy({...golden,...item});
+   const severe=view.display_severity ? view.display_severity==='严重' : (item.negative_subtype || golden.negative_subtype)==='safety_critical' || item.judge_result?.critical_error===true || item.judge_result?.issues?.some((issue:Row)=>issue.critical===true);
+   return <tr key={caseId(row)} role="button" tabIndex={0} onClick={()=>onSelect(row)} onKeyDown={event=>{if(event.target!==event.currentTarget)return;if(event.key==='Enter' || event.key===' '){event.preventDefault();onSelect(row);}}}><td className="id">{productQuestionLabel(row)}</td><td className="case-question"><TruncatedText lines={2}>{item.question || '未知'}</TruncatedText></td><td>{taxonomy.category}</td><td>{taxonomy.negative}</td><td>{taxonomy.topic}</td><td><TruncatedText lines={2}>{failureLabel(view)}</TruncatedText></td><td><HoverCard content={summary.detail}><span className="missing-point-summary" tabIndex={0}><ClampText lines={2} text={summary.text}/>{(summary.missingCount ?? 0) > 1 && <span className="missing-points-count">等 {summary.missingCount} 条</span>}</span></HoverCard></td><td><span className="case-severity"><i className={`severity-dot ${severe?'severe':'ordinary'}`} role="img" aria-label={severe?'严重':'一般'}/>{severe?'严重':'一般'}</span></td><td><span className="ui-row-go"><Icon name="go" size={15}/></span></td></tr>})}{!visible.length && <tr><td colSpan={9}>该分类暂无单题 Bad Case。</td></tr>}</tbody></DataTable></div>
  </div>;
 }
 
@@ -79,7 +83,7 @@ export function ProductDiagnostics({diagnostics,judgeThinking,action}: {diagnost
   <Section title={<IconLabel name="search">检索与用量</IconLabel>} action={action}><div className="product-objective-metrics">{[
    ['Recall@K',numeric(metrics.recall_at_k,'%'),helpText.recall],
    ['Precision@K',numeric(metrics.precision_at_k,'%'),helpText.precision],
-   ['MRR',numeric(metrics.mrr,'',3),helpText.mrr],
+   ['MRR',numeric(metrics.mrr,'',2),helpText.mrr],
    ['TTFT',numeric(typeof metrics.ttft_median_ms==='number'?metrics.ttft_median_ms/1000:null,' 秒'),helpText.ttft],
    ['每题 Token',typeof metrics.average_tokens==='number'?Math.round(metrics.average_tokens).toLocaleString('en-US'):'未采集','每道保存回答的输入加输出 Token 均值，含思考用量，不含判分、向量检索和重排。'],
    ['每题回答费用',costText(metrics.average_estimated_cost),'保存回答请求的平均估算费用，不含判分、向量检索和重排。'],

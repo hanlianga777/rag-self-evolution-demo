@@ -27,7 +27,7 @@ it('maps saved gate values, thresholds and verdicts to cards while preserving mo
   await click([...document.querySelectorAll('button')].find(button => button.textContent === 'Hard Gate')!);
   expect(document.querySelectorAll('.ui-hg-card')).toHaveLength(4);
   const items = [...document.querySelectorAll<HTMLElement>('.ui-hg-card li')];
-  expect(items[0].querySelector('.ui-hg-name')?.textContent).toContain('正确性 Correctness');
+  expect(items[0].querySelector('.ui-hg-name')?.textContent).toContain('正确性');
   expect(items[0].textContent).toContain('83%≥ 90%');
   expect(items[0].querySelector<HTMLElement>('.ui-hg-bar i')?.style.width).toBe('83%');
   expect(items[0].querySelector<HTMLElement>('.ui-hg-bar b')?.style.left).toBe('90%');
@@ -71,9 +71,9 @@ it('groups existing categories, filters the saved rows, resets to all and keeps 
   expect(onSelect).toHaveBeenCalledWith(rows[2]);
   await click(document.querySelector('.ui-bcl-all')!);
   expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(4);
-  expect([...document.querySelectorAll('thead th')].map(cell => cell.textContent)).toEqual(['题号', '问题', '分类', '缺了什么', '严重程度', '']);
-  expect(document.querySelector('.diagnosis-list td:nth-child(4) .ui-clamp')?.getAttribute('style')).toContain('-webkit-line-clamp: 2');
-  expect(document.querySelector('.diagnosis-list td:nth-child(5) .ui-verdict')?.textContent).toBe('严重');
+  expect([...document.querySelectorAll('thead th')].map(cell => cell.textContent)).toEqual(['题号', '问题', '题型', '负向子类', '主题簇i', '问题层级与细分类型', '缺了什么', '严重程度i', '']);
+  expect(document.querySelector('.diagnosis-list td:nth-child(7) .ui-clamp')?.getAttribute('style')).toContain('-webkit-line-clamp: 2');
+  expect(document.querySelector('.diagnosis-list .severity-dot.ordinary')?.getAttribute('aria-label')).toBe('一般');
 });
 
 it('keeps unknown cases in all and never declares missing or failing timing data within the gates', async () => {

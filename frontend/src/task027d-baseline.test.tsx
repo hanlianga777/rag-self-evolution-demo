@@ -25,7 +25,7 @@ const baseline = () => ({ id: 'base', status: 'completed', config: { generation_
   result: { total: 1, bad_case_count: 1, gates: { passed_count: 1, total: 1, gates: [gate('positive_correctness')] } },
   product_diagnostics: { objective_metrics: { recall_at_k: 50, precision_at_k: 25, mrr: .5, stage_breakdown: [{ stage: 'generation', label: '回答生成', total_ms: 90, share_percent: 90 }] } } });
 
-it('opens report cases in place and keeps rerun confirmation in the metrics title row', async () => {
+it('opens report cases in place and keeps report metrics without rerun', async () => {
   const run = baseline(), original = JSON.stringify(run);
   vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.includes('preflight') ? { can_start: true } : run)));
   await mount(<EvaluationPage data={{ evaluation: run }} />);
@@ -35,13 +35,13 @@ it('opens report cases in place and keeps rerun confirmation in the metrics titl
   await act(async () => document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());
   const more = document.querySelector('.baseline-more')!;
   expect(more.textContent).not.toMatch(/综合分|耗时拆解|Candidate K|回答生成模型和档位/);
-  expect(more.textContent).toContain('标准证据原文');
-  expect(more.textContent).toContain('未命中记为 0');
-  expect(more.querySelector('.section-head .header-actions button')?.textContent).toBe('重新评测 Baseline');
-  await click('重新评测 Baseline');
-  expect(document.querySelector('.confirm-dialog')?.textContent).toContain('会调用模型并产生费用');
-  await click('取消');
-  expect(document.querySelector('.ui-bl-time-note')?.textContent).toContain('耗时中有 90.0% 来自回答生成');
+  expect(more.querySelectorAll('.ui-info-tip')).toHaveLength(6);
+  expect(more.textContent).not.toContain('重新评测 Baseline');
+  const tip=more.querySelector<HTMLElement>('[aria-label="Recall@K说明"]')!;
+  await act(async()=>tip.dispatchEvent(new FocusEvent('focusin',{bubbles:true})));
+  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,150));});
+  expect(document.querySelector('[role=tooltip]')?.textContent).toContain('标准证据');
+  expect(document.querySelector('.ui-bl-time-note')?.textContent).toBe('设计巧思：先建立质量基准，再让 Agent 在受控范围内兼顾质量与速度。');
   expect(document.querySelector('.ui-bl-turn')).toBeNull();
   expect(more.tagName).not.toBe('DETAILS');
   expect(more.textContent).not.toContain('评测信息');
@@ -59,12 +59,10 @@ it('explains each gate in its own module and shows the saved threshold and formu
   vi.stubGlobal('fetch', vi.fn(async () => response(run)));
   await mount(<EvaluationPage data={{ evaluation: run }} />); await click('Hard Gate');
   const rows = [...document.querySelectorAll<HTMLElement>('.ui-hg-card li')];
-  expect(rows[0].textContent).toContain('回答的事实与说明书一致');
-  expect(rows[1].textContent).toContain('问法改成口语或带干扰后，事实仍然答对');
-  expect(rows[0].textContent).toContain('Correctness');
-  expect(rows[2].textContent).toContain('所有负向题');
+  expect(rows.every(row=>row.querySelector('.ui-info-tip'))).toBe(true);
   await act(async () => rows[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-  const definition = document.querySelector('[role=dialog] .gate-definition')!;
+  const definition = document.querySelector('[role=dialog]')!;
+  expect(definition.textContent).toContain('按消融题计算平均分');
   expect(definition.textContent).toContain('0–4 分乘以 25');
   expect(definition.textContent).toContain('≥ 77%');
   expect(document.querySelector('[role=dialog]')?.textContent).toContain('保存公式');

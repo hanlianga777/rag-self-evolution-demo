@@ -68,3 +68,10 @@
 .governance-page .ui-gp-steps .gate strong { color:var(--ui-accent); font-size:11.5px; white-space:nowrap; }
 .governance-page .ui-gp-steps .gate small { color:var(--ui-ink); font-size:12.5px; white-space:nowrap; }
 .governance-page :is(.review-table,.candidate-pool-scroll) .badge { padding:0 6px; line-height:18px; vertical-align:middle; }
+
+/* 032e：列保留完整，横向滚动限制在表格内。 */
+.governance-page.governance-run .review-table, .governance-page.governance-import .candidate-pool-scroll { min-width:0; max-width:100%; overflow:auto !important; }
+.governance-page.governance-run .review-table table { min-width:1300px !important; }
+.governance-page.governance-import .candidate-pool-table { min-width:1200px !important; }
+.governance-page :is(.review-table,.candidate-pool-scroll) th .ui-info-tip { margin-left:4px; }
+.snapshot-version-preview .review-table { overflow:auto !important; }

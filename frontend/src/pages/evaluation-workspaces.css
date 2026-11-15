@@ -453,3 +453,35 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 .verification-page .message-sources .comparison-source-title { font-size:12px; font-weight:600; color:var(--ui-ink-2); margin-bottom:4px; }
 .verification-page .answer-text :is(.ui-clamp,.clamp-text-host) { color:inherit; font-weight:400; }
 .verification-page .monitoring-table th { white-space:nowrap; }
+
+/* 032e：首屏讲结果与错题，用量移到滚动后的报告下方。 */
+.evaluation-page.evaluation-report .baseline-report { flex:none; gap:24px; }
+.evaluation-page.evaluation-report .ui-blb { flex:none; min-height:max(300px,calc(100dvh - 360px)); margin:0; }
+.evaluation-page.evaluation-report .ui-blb-bads { flex:1; display:grid; grid-auto-rows:minmax(40px,1fr); align-content:stretch; }
+.evaluation-page.evaluation-report .ui-blb-bads button { height:100%; padding:8px 0; grid-template-columns:auto minmax(0,1fr); grid-template-rows:auto auto; row-gap:4px; align-content:center; }
+.evaluation-page .ui-blb-layer { grid-column:2; white-space:normal; line-height:1.5; }
+.evaluation-page.evaluation-report .baseline-more > .panel { padding:18px 20px; margin-bottom:16px; }
+.evaluation-page.evaluation-report .baseline-more .product-objective-metrics .metric { display:flex; flex-direction:column; align-items:flex-start; gap:12px; padding:16px; min-height:100px; }
+.evaluation-page.evaluation-report .product-objective-metrics .metric strong { font-size:24px; font-weight:600; font-variant-numeric:tabular-nums; }
+.evaluation-page .product-objective-metrics .metric > span { display:flex; align-items:center; gap:4px; }
+.evaluation-page .ui-hg-card header { gap:12px; align-items:flex-start; }
+.evaluation-page .ui-hg-card h3 { font-size:14px; line-height:1.5; }
+.evaluation-page .ui-hg-name { line-height:1.7; }
+.evaluation-page .ui-hg-val small { font-size:12px; }
+.evaluation-page.evaluation-cases .diagnosis-list table { min-width:1300px !important; table-layout:fixed; }
+.evaluation-page.evaluation-cases .diagnosis-list { min-width:0; max-width:100%; overflow:auto !important; }
+.case-severity { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.severity-dot { display:inline-block; width:8px; height:8px; border-radius:50%; flex:none; }
+.severity-dot.severe { background:var(--ui-red); }
+.severity-dot.ordinary { background:var(--ui-amber,#b58a35); }
+.gate-result { display:flex; flex-wrap:wrap; align-items:center; gap:16px; }
+.gate-contributions { display:grid; gap:8px; }
+.gate-contribution { display:grid; grid-template-columns:44px minmax(0,1fr) auto auto auto; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--ui-rule-2); font-size:13px; }
+.gate-contribution p { margin:0; overflow-wrap:anywhere; }
+.gate-contribution strong { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.gate-contribution .secondary { white-space:nowrap; border-radius:10px; }
+.gate-case-summary .drawer-section { margin-bottom:12px; }
+@media(max-width:700px) { .gate-contribution { grid-template-columns:44px minmax(0,1fr); } }
+.evaluation-page .ui-bl-cell .baseline-latencies { display:flex; flex-wrap:wrap; gap:4px 12px; }
+.evaluation-page .baseline-latencies > span { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
+.evaluation-page.evaluation-report .baseline-more .product-objective-metrics .metric > span { width:100%; justify-content:flex-start; text-align:left; }
