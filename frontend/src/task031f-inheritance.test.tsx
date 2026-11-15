@@ -14,10 +14,10 @@ it('shows inherited parameters in muted text and keeps only new changes in the c
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(experiment))));
  root=createRoot(document.body.appendChild(document.createElement('div')));
  await act(async()=>root.render(<EvolutionPage data={{evaluation:{id:'BASE',config:base},optimization:experiment}}/>));
- const card=document.querySelector('.candidate-card')!;
- const inherited=[...card.querySelectorAll('p.muted')].find(p=>p.textContent?.includes('在 Candidate A 的基础上'))!;
- expect(inherited).toBeTruthy();expect(inherited.textContent).toContain('分级回答');
- const change=[...card.querySelectorAll('section')].find(p=>p.querySelector('h4')?.textContent==='改动参数')!;
+ const plan=document.querySelector('.agent-strategy-plans article')!;
+ const inherited=plan.querySelector('.agent-inherited')!;
+ expect(inherited).toBeTruthy();expect(inherited.textContent).toContain('第 1 轮 Candidate A');expect(inherited.textContent).toContain('分级回答');
+ const change=plan.querySelector('.agent-new-changes')!;
  expect(change.textContent).toContain('4 → 6');expect(change.textContent).not.toContain('分级回答');
  expect(change.textContent).not.toContain('max');
 });

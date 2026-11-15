@@ -49,7 +49,7 @@ it('explains all remaining failures from saved positions and new failures from t
 it('uses one concrete saved conclusion in the D node, route final node and final tab',async()=>{
  const experiment=exp();mockRun();expect(recommendationReason(experiment)).toBe(expected);
  await mount(<EvolutionRoute experiment={experiment} evaluation={evaluation} badCases={[]}/>);
- expect(document.querySelector('.d-result-conclusion')!.textContent).toBe(expected);
+ expect(document.querySelector('.d-result-conclusion')!.textContent).toBe('保留 Winner。'+expected);
  expect(document.querySelector('.evolution-route > .panel:last-of-type')!.textContent).toContain(expected);
  await act(async()=>root.render(<EvolutionPage data={{evaluation,optimization:experiment}}/>));
  await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='回归与推荐')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
@@ -70,7 +70,7 @@ it('reports a watched question flipping and a gate breach instead of claiming th
  experiment.candidates[1].result.metrics!.safe_rejection_rate=90;
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  const text=document.querySelector('[aria-label="预测与实际"]')!.textContent;
- expect(text).toContain('Q15 新增');expect(text).toContain('90%');expect(text).toContain('1/2 项守住');
+ expect(text).toContain('Q15 未通过');expect(text).toContain('90%');expect(text).toContain('1/2 项守住');
 });
 it('does not invent predictions, evidence positions or unchanged losing-result counts',async()=>{
  mockRun();const experiment=exp();experiment.candidates[1].reasoning.changes=[];

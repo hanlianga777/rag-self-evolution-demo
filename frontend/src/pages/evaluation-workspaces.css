@@ -485,3 +485,41 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 .evaluation-page .ui-bl-cell .baseline-latencies { display:flex; flex-wrap:wrap; gap:4px 12px; }
 .evaluation-page .baseline-latencies > span { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
 .evaluation-page.evaluation-report .baseline-more .product-objective-metrics .metric > span { width:100%; justify-content:flex-start; text-align:left; }
+
+/* 032f: saved strategy → results → review, within the existing workspace. */
+.agent-overview-compact { display:grid; gap:16px; max-width:1180px; }
+.agent-overview-compact .ui-card { padding:20px; }
+.agent-overview-compact h2 { font-size:24px; }
+.agent-overview-compact h3 { margin:0 0 12px; }
+.agent-parameter-tags,.agent-overview-principles,.agent-case-groups { display:flex; flex-wrap:wrap; gap:12px; }
+.agent-parameter-tag,.agent-principle { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); font-size:14px; }
+.agent-round-switch { position:sticky; top:0; z-index:8; background:var(--canvas); padding:12px 0; margin:0 0 16px; }
+.agent-round-strategy h4,.agent-round-conclusion h4 { margin:16px 0 8px; }
+.agent-round-strategy p,.agent-round-conclusion p,.d-story p { overflow-wrap:anywhere; }
+.agent-strategy-plans { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.agent-strategy-plans>article { min-width:0; padding:12px; border:1px solid var(--line); border-radius:8px; }
+.agent-inherited { color:var(--muted); }
+.agent-new-changes { border-left:3px solid var(--status); padding-left:8px; }
+.evolution-page .agent-result-card { height:auto; min-height:230px; padding:16px; }
+.agent-candidate-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:16px 0; }
+.agent-candidate-metrics dt { color:var(--muted); font-size:12px; }
+.evolution-page .agent-result-card .agent-candidate-metrics dd { margin:4px 0 0; font-size:24px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.25; }
+.agent-candidate-metrics small { font-size:12px; font-weight:400; }
+.agent-result-card .candidate-card-footer { display:flex; flex-wrap:wrap; gap:8px; margin-top:auto; }
+.agent-recommendation-points p { margin:0; padding:12px 0; border-bottom:1px solid var(--line); }
+.agent-sandbox-disclosure { margin-top:16px; }
+.agent-sandbox-disclosure>summary,.agent-saved-recommendation>summary { cursor:pointer; font-size:14px; font-weight:600; }
+.evolution-page .ui-fin-others table { width:100%; table-layout:fixed; }
+.evolution-page .ui-fin-others th:first-child { width:18%; }
+.evolution-page .ui-fin-others th:nth-child(2) { width:52%; }
+.evolution-page .ui-fin-others td { overflow-wrap:anywhere; }
+.d-story>.ui-card { margin-bottom:16px; }
+.d-story .d-result-story>.ui-card-row { display:block; }
+.d-result-comparison { margin-top:16px; }
+.evolution-page .agent-overview .agent-principle,.evolution-page .agent-overview .agent-parameter-tag { display:inline-flex; }
+.evolution-page .agent-overview .agent-principle .ui-hover-trigger { display:inline-flex; }
+.agent-inherited .story-changes strong,.agent-inherited .story-changes span { color:var(--muted); font-weight:400; }
+.evolution-page .agent-result-card .agent-candidate-metrics>div { display:block; }
+.evolution-page .d-agent-prediction { background:var(--surface); border-color:var(--line); }
+.evolution-page .ui-fin-top { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border:1px solid var(--line); box-shadow:none; }
+.evolution-page .ui-fin-top h2 { margin:8px 0 0; }
