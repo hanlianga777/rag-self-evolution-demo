@@ -31,10 +31,11 @@ it('shows two strategy cards, saved prior status and conclusion cards with close
  expect(document.querySelector<HTMLDetailsElement>('.agent-round-strategy details')?.open).toBe(false);
  expect(document.querySelector('.agent-lessons')?.textContent).toContain('保留已验证前提');
 });
-it('shows literal short excerpts and exposes the entire saved text on keyboard focus',async()=>{
+it('keeps the complete literal text for width-based clamping and exposes it on keyboard focus',async()=>{
  const {AgentExcerpt}=await import('./components/AgentExcerpt');const text='保存的原文。'.repeat(25);
- root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<AgentExcerpt text={text}/>));
- expect(document.querySelector('.ui-clamp')?.textContent).toBe(text.slice(0,36)+'…');
+ root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<AgentExcerpt text={text} lines={2}/>));
+ expect(document.querySelector('.ui-clamp')?.textContent).toBe(text);
+ expect(document.querySelector<HTMLElement>('.ui-clamp')?.style.webkitLineClamp).toBe('2');
  await act(async()=>{document.querySelector<HTMLElement>('.ui-clamp')!.focus();await new Promise(resolve=>setTimeout(resolve,160));});
  expect(document.querySelector('[role=tooltip]')?.textContent).toBe(text);
 });
@@ -46,4 +47,12 @@ it('groups D regressions with missing saved judgments once without hiding their 
  expect(document.querySelector('.d-unknown-failures')?.textContent).toBe('Q21、Q50、Q06 新增 Bad Case（逐条原因未保存）');
  expect(document.querySelectorAll('.d-unknown-failures')).toHaveLength(1);
  expect(document.querySelector('.d-result-causes')?.textContent).not.toContain('具体失败原因未知');
+});
+
+it('keeps prior summaries, lessons and card fields within the one-line default',async()=>{
+ await mount();
+ expect(document.querySelector<HTMLElement>('.agent-prior-row .ui-clamp')?.style.webkitLineClamp).toBe('1');
+ expect(document.querySelector<HTMLElement>('.agent-lessons .ui-clamp')?.style.webkitLineClamp).toBe('1');
+ expect(document.querySelector<HTMLElement>('.candidate-card .agent-excerpt .ui-clamp')?.style.webkitLineClamp).toBe('1');
+ expect(document.querySelector<HTMLElement>('.agent-conclusion-card .agent-excerpt .ui-clamp')?.style.webkitLineClamp).toBe('1');
 });

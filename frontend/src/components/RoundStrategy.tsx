@@ -48,8 +48,8 @@ export function RoundStrategy({experiment, round}: {experiment: any; round: numb
   return <section className="panel agent-round-strategy" aria-label="Agent 策略"><h3>① Agent 策略{saved?.agent_strategy === '效率优化' ? ' · 效率优化' : ''}</h3>
     {!saved && <p className="muted">本轮策略未保存；以下仅展示已保存的方案计划。</p>}
     <div className="agent-strategy-summary"><article><h4>{round === 1 ? 'Baseline 诊断' : '上一轮总结'}</h4>
-      {review?.plans?.map((plan: any) => <div className="agent-prior-row" key={plan.candidate_id}><strong>{name(experiment, plan.candidate_id)}</strong><SavedPlanStatus plan={plan} candidate={experiment.candidates?.find((c: any) => c.id === plan.candidate_id)}/><AgentExcerpt lines={1} limit={36} text={prose(plan.conclusion)}/></div>)}
-      {!review?.plans?.length && <AgentExcerpt text={prose(round === 1 ? review?.baseline_remaining_assessment : review?.summary)}/>}
+      {review?.plans?.map((plan: any) => <div className="agent-prior-row" key={plan.candidate_id}><strong>{name(experiment, plan.candidate_id)}</strong><SavedPlanStatus plan={plan} candidate={experiment.candidates?.find((c: any) => c.id === plan.candidate_id)}/><AgentExcerpt lines={1} text={prose(plan.conclusion)}/></div>)}
+      {!review?.plans?.length && <AgentExcerpt lines={1} text={prose(round === 1 ? review?.baseline_remaining_assessment : review?.summary)}/>}
       <details><summary>展开完整复盘</summary><p>{prose(review?.summary)}</p><p>{prose(review?.baseline_remaining_assessment)}</p>
         {round === 1 && !review?.baseline_remaining_assessment && state.baseline_diagnosis_summary?.map((row: any, i: number) => <p key={i}>{prose(row.dimension_label)}：{row.baseline_value ?? '未知'}；{prose(row.root_cause_note)}</p>)}
         {review?.plans?.map((plan: any) => <section key={plan.candidate_id}><h4>{name(experiment, plan.candidate_id)}</h4><p>{prose(plan.conclusion)}</p><p>参数：{prose(typeof plan.changes === 'string' ? plan.changes : JSON.stringify(plan.changes))}</p><p>{prose(plan.evidence_reason)}</p>{plan.most_likely_parameter && <p>最可能参数：{prose(plan.most_likely_parameter)}；{prose(plan.attribution_reason)}</p>}</section>)}
@@ -70,6 +70,6 @@ export function RoundConclusion({experiment, round}: {experiment: any; round: nu
           <div><dt>预测修好</dt><dd><AgentQuestions ids={predicted}/></dd></div><div><dt>实际修好</dt><dd><AgentQuestions ids={plan?.fixed_question_ids} tone="fixed"/></dd></div><div><dt>新错</dt><dd><AgentQuestions ids={plan?.new_failure_question_ids} tone="broken"/></dd></div></dl>
         <details><summary>展开 Agent 分析</summary><p>参数判断：{prose(plan?.parameter_assessment)}</p><p>未符原因：{prose(plan?.unmatched_reason)}</p><p>依据：{prose(plan?.evidence_reason)}</p></details>
       </article>;
-    })}</div><article className="agent-lessons"><h4>带入下一轮的经验</h4><ul>{saved.review.lessons?.map((lesson: string, index: number) => <li key={index}><AgentExcerpt text={prose(lesson)}/></li>)}</ul></article>
+    })}</div><article className="agent-lessons"><h4>带入下一轮的经验</h4><ul>{saved.review.lessons?.map((lesson: string, index: number) => <li key={index}><AgentExcerpt lines={1} text={prose(lesson)}/></li>)}</ul></article>
   </> : <p>{saved ? '等待 Agent 保存本轮结论' : '本轮结论未保存'}</p>}</section>;
 }
