@@ -20,7 +20,7 @@ async function click(text:string){await act(async()=>[...document.querySelectorA
 it('shows saved strategy once above the three result cards',async()=>{
  await mount();await click('Candidates 对比');
  expect(document.querySelectorAll('.agent-round-strategy')).toHaveLength(1);
- expect(document.querySelectorAll('.agent-strategy-plans > article')).toHaveLength(3);
+ expect(document.querySelectorAll('.agent-result-card')).toHaveLength(3);
  expect(document.querySelectorAll('.agent-result-card')).toHaveLength(3);
  expect(document.querySelectorAll('.agent-round-conclusion')).toHaveLength(1);
  expect(document.body.textContent).not.toContain('本轮没有合格 Candidate：');
@@ -30,8 +30,8 @@ it('keeps saved repair counts on result cards and full target IDs in the target 
  const cards=[...document.querySelectorAll('.candidate-cards .candidate-card')],c=cards[2];expect(cards).toHaveLength(3);
  expect(cards.map(c=>c.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['不合格','不合格','合格']);
  expect(c.querySelector('.agent-candidate-metrics')?.textContent).toContain('答对47 / 50');
- expect(c.querySelector('.agent-candidate-metrics')?.textContent).toContain('修好3');
- expect(c.querySelector('.agent-candidate-metrics')?.textContent).toContain('新错0');
+ expect(c.querySelectorAll('.agent-candidate-metrics .ui-q.is-fixed')).toHaveLength(3);
+ expect(c.querySelector('.agent-candidate-metrics')?.textContent).toContain('新错无');
  expect([...c.querySelectorAll('button')].map(b=>b.textContent)).toEqual(['查看目标 1 题','查看 Candidate 与完整报告']);
  await act(async()=>c.querySelector<HTMLButtonElement>('.candidate-card-footer button')!.click());
  expect(document.querySelector('[role=dialog]')?.textContent).toContain('指定目标修好 1 / 1');

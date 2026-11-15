@@ -2,7 +2,7 @@
 import {act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {expect,it} from 'vitest';
-import {RoundStrategy} from './components/RoundStrategy';
+import {CandidatePlan} from './components/RoundStrategy';
 import {judgePresentation} from './components/judgePresentation';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
@@ -10,7 +10,7 @@ it('joins saved risk sentences without doubled punctuation and preserves the sav
  const experiment={candidates:[{id:'a',reasoning:{round:1,candidate_label:'A',risks:[{reason:'可能变慢。'},{reason:'可能漏要点。'}]}}]};
  const original=JSON.stringify(experiment),host=document.body.appendChild(document.createElement('div')),root=createRoot(host);
  try {
-  act(()=>root.render(<RoundStrategy experiment={experiment} round={1}/>));
+  act(()=>root.render(<CandidatePlan experiment={experiment} candidate={experiment.candidates[0]} baseline={{}} targetIds={[]}/>));
   expect(host.textContent).toContain('可能变慢；可能漏要点。');
   expect(host.textContent).not.toContain('。；');
   expect(JSON.stringify(experiment)).toBe(original);

@@ -49,7 +49,7 @@ it('keeps Judge prose intact in a closed card for both passed and failed case de
 
 it('formats saved Agent parameters everywhere without touching originals or substrings', async () => {
   const prose = 'top_k=6 candidate_k=24 multi_query=2 high / max / low safe_rejection p99 / p50';
-  const expected = 'Top-K 6 Candidate K 24 Multi-Query 2 High / Max / Low 安全拒答率 P99 / P50';
+  const expected = 'Top-K 6 Candidate K 24 Multi-Query 2 High / Max / Low 安全拒答率 最慢耗时 / 中位耗时';
   expect((display as any).agentDisplayText?.(prose)).toBe(expected);
   expect((display as any).agentDisplayText?.('safe_rejection_rate latency_p99_seconds latency_p50_seconds')).toBe('安全拒答率 回答耗时 P99 回答耗时 P50');
   expect((display as any).agentDisplayText?.('highlight max_tokens low_latency')).toBe('highlight max_tokens low_latency');

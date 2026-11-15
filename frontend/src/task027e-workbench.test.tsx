@@ -29,7 +29,7 @@ it('defaults to compact overview with saved publication, results and parameter t
 it('switches a single visible route round and D container while retaining candidate details',async()=>{
  await mount();await click('Candidates 对比');await click('Round 1');expect(document.querySelector('.agent-round-switch [aria-pressed=true]')?.textContent).toBe('Round 1');
  expect(document.querySelectorAll('.agent-result-card')).toHaveLength(3);expect(document.querySelector('.ui-evo-start')).toBeNull();expect(document.body.textContent).not.toContain('查看轮次');expect(document.querySelector('.d-story')).toBeNull();
- expect(document.querySelector('.agent-round-strategy')?.textContent).toContain('这项设计用来验证A的假设。第二句话不摘录。');
+ expect(document.querySelector('.candidate-cards')?.textContent).toContain('这一轮A的保存思路。');
  await click('Round 3');expect(document.querySelectorAll('.agent-result-card')).toHaveLength(3);expect(document.querySelector('.agent-result-card')?.textContent).toContain('Candidate A');
  await click('查看 Candidate 与完整报告');expect(document.querySelector('[role=dialog]')?.textContent).toContain('Candidate 详情');await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());
  await click('Candidate D');expect(document.querySelectorAll('.agent-result-card')).toHaveLength(0);expect(document.querySelector('.d-story')).not.toBeNull();
@@ -40,7 +40,7 @@ it('does not invent release, repairs, parameter sources or design intent when ev
  delete data.optimization.result.report_confirmation;delete data.optimization.candidates[1].reasoning.hypothesis;
  await mount();expect(document.querySelector('.agent-overview')?.textContent).not.toContain('最终方案 · 已发布');expect(document.querySelector('.agent-case-destinations')).toBeNull();expect(document.querySelector('.agent-overview')?.textContent).toContain('未知');
  expect(document.querySelector('.agent-overview')?.textContent).not.toContain('R1-C、R2-B');
- await click('Candidates 对比');await click('Round 1');expect(document.querySelector('.agent-round-strategy')?.textContent).toContain('这一轮A的保存思路。');
+ await click('Candidates 对比');await click('Round 1');expect(document.querySelector('.candidate-cards')?.textContent).toContain('这一轮A的保存思路。');
 });
 it('qualifies round names when Regression includes the historical winner from another round',async()=>{
  await mount();await click('回归与推荐');expect(document.querySelector('.story-round-switch')).toBeNull();const table=document.querySelector('[aria-label="合格方案对比"]')!;

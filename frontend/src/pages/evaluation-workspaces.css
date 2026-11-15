@@ -562,3 +562,54 @@ body :is(.evolution-page.page-shell,.drawer.workbench-drawer) .candidate-story-b
 .versions-page .ui-rel-side strong { margin:4px 0 0; }
 .versions-page .release-checks { display:block; }
 .assistant-page .thinking-dots { width:auto; overflow:visible; }
+
+/* 032i: saved Agent plans and reviews, with analysis closed by default. */
+.agent-strategy-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.agent-strategy-summary>article,.agent-conclusion-card,.agent-lessons { min-width:0; padding:14px; border:1px solid var(--line); border-radius:12px; }
+.evolution-page :is(.agent-strategy-summary,.agent-conclusion-grid,.agent-plan-fields) h4 { margin:0 0 6px; font-size:13px; }
+.agent-prior-row { display:grid; grid-template-columns:42px auto minmax(0,1fr); align-items:center; gap:8px; margin:8px 0; font-size:12px; }
+.agent-prior-row .badge { font-size:11px; white-space:nowrap; }
+.evolution-page :is(.agent-round-strategy,.agent-round-conclusion,.agent-result-card) .ui-clamp { font-size:13px; line-height:1.6; }
+.agent-strategy-summary .agent-case-groups { gap:6px; margin-bottom:8px; }
+.evolution-page .agent-parameter-tag { padding:4px 7px; font-size:12px; line-height:1.4; }
+.agent-plan-fields { display:grid; gap:12px; margin:14px 0; }
+.agent-plan-fields section { min-width:0; }
+.agent-plan-fields .agent-parameter-tags { gap:5px; }
+.agent-plan-fields .agent-new-changes { border:0; padding:0; }
+.agent-plan-fields .agent-inherited { font-size:12px; }
+.agent-plan-fields .agent-inherited p { margin:0; }
+.agent-plan-fields .agent-inherited .agent-parameter-tag { color:var(--muted); background:var(--canvas); margin-top:5px; }
+.agent-plan-evidence { order:1; }
+.agent-question-list { display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px; font-size:13px; }
+.agent-conclusion-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--card-gap); }
+.agent-conclusion-card { display:flex; flex-direction:column; gap:10px; }
+.agent-conclusion-card h4 { display:flex; align-items:center; justify-content:space-between; }
+.agent-conclusion-card>.ui-clamp { min-height:3.2em; }
+.agent-conclusion-card dl { display:grid; gap:8px; margin:0; font-size:13px; }
+.agent-conclusion-card dl>div { display:grid; grid-template-columns:64px minmax(0,1fr); gap:8px; align-items:start; min-height:27px; }
+.agent-conclusion-card dt { color:var(--muted); padding-top:3px; }
+.agent-conclusion-card dd { margin:0; }
+.agent-conclusion-card details { margin-top:auto; }
+.agent-lessons { margin-top:16px; }
+.agent-lessons ul { padding-left:18px; margin:8px 0 0; display:grid; gap:6px; }
+.agent-result-card .agent-candidate-metrics { gap:12px; margin:8px 0 16px; }
+.agent-result-card>h4 { font-size:13px; margin:0; }
+.agent-result-card .agent-candidate-metrics dd:has(.agent-question-list) { font-size:13px; }
+.evolution-page :is(.agent-round-strategy,.agent-round-conclusion,.agent-result-card,.d-story) details>summary { cursor:pointer; font-size:12px; color:var(--muted); margin:10px 0 0; }
+.evolution-page :is(.agent-round-strategy,.agent-round-conclusion,.agent-result-card,.d-story) details[open]>summary { margin-bottom:10px; }
+.evolution-page .d-story .ui-clamp { font-size:13px; line-height:1.6; }
+.evolution-page .d-story .d-unknown-failures { grid-column:1 / -1; margin:0; font-size:13px; }
+@media(max-width:900px) { .agent-strategy-summary,.agent-conclusion-grid { grid-template-columns:1fr; } }
+.evolution-page .agent-excerpt { display:block; min-width:0; }
+.evolution-page .agent-excerpt .ui-clamp { cursor:help; }
+.agent-plan-fields>.agent-candidate-metrics { margin:0; }
+.evolution-page.page-shell .agent-round-conclusion { padding:0; border:0; background:transparent; box-shadow:none; }
+.evolution-page.page-shell .agent-result-card .candidate-card-header { min-height:28px; height:28px; }
+.agent-plan-fields { gap:8px; }
+.agent-plan-fields section>.agent-excerpt { min-height:3.2em; }
+.agent-question-overflow { min-width:0; max-width:100%; }
+.agent-question-list { max-height:48px; overflow:hidden; vertical-align:top; }
+.agent-plan-parameters { display:flex; flex-wrap:wrap; gap:5px; max-height:56px; overflow:hidden; }
+.agent-plan-parameters>.agent-parameter-tags { display:contents; }
+.agent-plan-parameters .agent-inherited .agent-parameter-tag { margin-top:0; }
+.agent-conclusion-card,.agent-lessons { background:var(--surface); }

@@ -104,7 +104,7 @@ it('connects an unknown exploratory target to its saved candidate without callin
  const optimization={coverage_plan:{status:'complete',matrix:[]},id:'exp',result:{diagnostic_tasks:[{question_id:'new-explore',status:'exploratory',experiment_plan:{directions:['candidate_recall']}}]},candidates:[{id:'a',status:'generated',config:{candidate_k:24},reasoning:{candidate_label:'A',observed_evidence:['new-explore'],experiment_kind:'exploratory',hypothesis:'扩大候选池验证缺失来源',falsification:'目标仍失败则不支持'}}]};
  await render(<EvolutionPage data={{evaluation,badCases,optimization}}/>);
  expect(document.querySelector('.agent-case-destinations')).toBeNull();
- await click('Candidates 对比');expect(document.querySelector('.agent-round-strategy')?.textContent).toContain('扩大候选池验证缺失来源');
+ await click('Candidates 对比');expect(document.querySelector('.candidate-cards')?.textContent).toContain('扩大候选池验证缺失来源');
  await click('查看目标 1 题');
  expect(document.querySelector('[role=dialog]')?.textContent).toContain('未知原因的维护遗漏');
  expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('已确认');

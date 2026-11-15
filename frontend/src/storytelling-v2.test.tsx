@@ -31,7 +31,7 @@ it('links multiple saved candidate hypotheses to the same actual problem and kee
  await mount(<EvolutionPage data={data}/>);
  expect(document.querySelector('.agent-case-destinations')).toBeNull();expect(document.querySelector('.experiment-plan')).toBeNull();
  await click('Candidates 对比');
- const plans=[...document.querySelectorAll('.agent-strategy-plans > article')];expect(plans).toHaveLength(2);expect(plans.map(p=>p.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('假设A'),expect.stringContaining('假设B')]));
+ const plans=[...document.querySelectorAll('.agent-result-card')];expect(plans).toHaveLength(2);expect(plans.map(p=>p.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('假设A'),expect.stringContaining('假设B')]));
  expect(plans.every(plan=>plan.textContent?.includes('Q71') && !plan.textContent?.includes('Q72'))).toBe(true);
  expect(plans.every(plan=>[...plan.querySelectorAll('p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details')))).toBe(true);
  await click('查看 Candidate 与完整报告');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details'))).toBe(true);expect(JSON.stringify(data)).toBe(before);

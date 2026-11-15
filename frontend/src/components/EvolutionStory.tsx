@@ -1,3 +1,4 @@
+import { AgentExcerpt } from './AgentExcerpt';
 import { Icon } from '../ui/icons';
 import { judgePresentation } from "./judgePresentation";
 import { ParamChip, QuestionBadge, StatusBadge } from '../ui/Primitives';
@@ -6,13 +7,13 @@ import { paramValue } from '../ui/evolution/model';
 import {Badge, Section, TruncatedText} from './Primitives';
 import {DataTable} from './DataTable';
 import {formatValue, parameterNames} from './PipelineFields';
-import {agentDisplayText, gateNames, narrativeText} from '../display';
+import {agentDisplayText, agentQuestionId, gateNames, narrativeText} from '../display';
 import {useEffect, useState} from 'react';
 import {cachedJson, getJson} from '../api';
 import { ClampText } from '../ui/ClampText';
 import {savedSnapshot} from '../evaluationProgress';
 
-export const storyParameterNames:Record<string,string>={...parameterNames,candidate_k:'Candidate K',top_k:'Top-K',generation_thinking:'Thinking 档位',multi_query:'Multi-Query 条数',query_rewrite:'Query Rewrite',query_decompose:'Query Decompose',hyde:'HyDE',hybrid_search:'Hybrid Search',hybrid_alpha:'Embedding Retrieval 权重',rerank:'Rerank 方式',prompt_strategy:'回答策略',retrieval_max_tokens:'证据长度上限',min_score:'最低相关度'};
+export const storyParameterNames:Record<string,string>={...parameterNames,candidate_k:'Candidate K',top_k:'Top-K',generation_thinking:'思考档位',multi_query:'Multi-Query 条数',query_rewrite:'Query Rewrite',query_decompose:'Query Decompose',hyde:'HyDE',hybrid_search:'Hybrid Search',hybrid_alpha:'向量权重',rerank:'Rerank 方式',prompt_strategy:'回答策略',retrieval_max_tokens:'证据长度上限',min_score:'最低相关度'};
 export const storyValue=(value:unknown):string => typeof value==='string' && ['off','low','high','max'].includes(value) ? ({off:'OFF',low:'Low',high:'High',max:'Max'}[value]!) : formatValue(value);
 
 export const recommendationOf = (experiment:any) => experiment?.recommendation?.result || experiment?.recommendation || {};
@@ -23,10 +24,7 @@ export const schemeName = (candidate:any, id?:string, includeRound = true):strin
   return label ? includeRound && round && label !== 'D' ? `R${round}-${label}` : `Candidate ${label}` : 'Candidate 信息未保存';
 };
 
-export const shortQuestionId=(id:string):string => {
-  const number=id.match(/^Q(\d+)$/i)?.[1] || id.match(/^(?:CSV|V1G)-[\dA-Za-z-]*?-(\d{1,3})(?:-R[\dA-Za-z-]+)?$/)?.[1];
-  return number ? `Q${number.padStart(2,'0')}` : id;
-};
+export const shortQuestionId = agentQuestionId;
 
 // Presentation only; saved Agent reasoning remains unchanged.
 export function storyText(value:unknown, preserveSource = false):string {
@@ -38,12 +36,11 @@ export function storyText(value:unknown, preserveSource = false):string {
   text=text.replace(/(?:EXP|EVAL)-[\w-]+/g,id=>schemeName(null,id))
     .replace(/(?:CSV|V1G)-[\dA-Za-z-]*\d[\dA-Za-z-]*|\bQ\d+\b/gi,shortQuestionId)
     .replace(/DOC-[\dA-Za-z-]+/g,'相关说明段落')
-    .replace(/(?:BC|GD|GGEN)-?[\dA-Za-z-]*\d[\dA-Za-z-]*/g,'相关记录')
+    .replace(/(?:GD|GGEN)-[\dA-Za-z-]+/g,shortQuestionId)
+    .replace(/BC-?[\dA-Za-z-]*\d[\dA-Za-z-]*/g,'相关记录')
     .replace(/\bL\d+\b/g,'').replace(/\b[a-f0-9]{32,64}\b/gi,'')
     .replace(/\brerank\s*=\s*query_only\b/g,'Rerank 方式：只按问题');
-  for(const [key,name] of Object.entries({...storyParameterNames,...gateNames,safe_rejection:'安全拒答率'}).sort(([a],[b])=>b.length-a.length)){
-    text=text.replace(new RegExp(`\\b${key}\\s*=\\s*`,'g'),`${name} `).replaceAll(key,name);
-  }
+  text=agentDisplayText(text);
   text=text.replace(/thinking/gi,'Thinking').replace(/topk/gi,'Top-K').replace(/Top-K\s*=\s*/g,'Top-K ').replace(/([\u4e00-\u9fff])(Thinking|Max|High|\d+)/g,'$1 $2').replace(/(Thinking|Max|High|\d+)([\u4e00-\u9fff])/g,'$1 $2');
   return narrativeText(text).replace(/\bp99\b/g,'最慢回答 P99').replace(/\bTop(\d+)\b/gi,'回答证据前 $1 条').replace(/\bquery_only\b/g,'只按问题').replace(/\bcompleted\b/g,'已完成').replace(/\brunning\b/g,'运行中').replace(/\bqueued\b/g,'排队中').replace(/Golden Chunk/g,'标准说明').replace(/\b(?:candidates|reranked|final)\b/g,word=>({candidates:'候选列表',reranked:'Rerank 列表',final:'回答证据'}[word]!)).trim() || '说明未保存';
 }
@@ -168,6 +165,8 @@ function DResultStory({experiment,evaluation,badCases,footer}:{experiment:any;ev
     return rank!==undefined ? `关键说明在 Winner 的${d.config?.rerank===false ? '候选' : '重排'}结果里排第 ${rank} 位，即使把 Top-K 放宽到 ${d.config.top_k} 也拿不到；这个位置提示下一轮应先检查${d.config?.rerank===false ? '召回顺序' : '重排顺序'}，而不是继续增加条数。` : '保存的证据位置不足，原因未知。';
   };
   const issueReason=(id:string)=>judgePresentation(rowFor(id) || {}, savedSnapshot(evaluation).questions?.find((question:any)=>question.id===id)).text;
+  const unknownFailures = (broken || []).filter(id => /逐条判定|具体失败原因未知/.test(issueReason(id)));
+  const explainedFailures = (broken || []).filter(id => !unknownFailures.includes(id));
 
   const gateName=(metric:string)=>metric==='latency_p99_seconds' ? '最慢回答 P99' : metric==='latency_p50_seconds' ? '回答耗时 P50' : gateNames[metric] || '保存的 Hard Gate';
   const gateActual=(gate:any)=>{
@@ -196,17 +195,17 @@ function DResultStory({experiment,evaluation,badCases,footer}:{experiment:any;ev
       ].map(([label,prediction,actual,predictionDetail,actualDetail])=><tr key={label}>{[label,prediction,actual].map((value,index)=>{
         const detail = index === 1 ? predictionDetail : index === 2 ? actualDetail : undefined;
         if(index===2 && label==='重点核对题' && loading)return <td key={index}><span className="d-protected-skeleton" role="status" aria-label="正在读取受保护题结果" /></td>;
-        if(index===2 && label==='预计修好的题')return <td key={index}>{repairs}{unpredicted===null || unpredicted.length>0 ? `；${riskRecorded ? '未预测到的新问题' : '风险清单未保存，未预测到的新问题未知'}：${questionList(unpredicted)}` : ''}</td>;
+        if(index===2 && label==='预计修好的题')return <td key={index}>{repairs}</td>;
         return <td key={index}>{detail ? <HoverCard content={detail}><span className="prediction-summary" tabIndex={0}>{value}</span></HoverCard> : <ClampText lines={2} text={value}/>}</td>;
       })}</tr>)}
-      {targets.map(id => <tr key={id}><td>{shortQuestionId(id)}</td><td>预计修好</td><td>{fixed === null ? '未知' : fixed.some(q => shortQuestionId(q) === shortQuestionId(id)) ? '已修好' : '未修好'}</td></tr>)}
-    </tbody></table></div>{error && <p role="status">{error}</p>}{!saved && !error && <p className="ui-body-muted">{runId ? '正在读取保存的逐题结果…' : '逐题结果来源未保存，保护题结果与判分原因未知。'}</p>}</section>
+    </tbody></table></div>{unpredicted===null || unpredicted.length>0 ? <details><summary>未预测到的新问题</summary><p>{riskRecorded ? questionList(unpredicted) : '风险清单未保存，未预测到的新问题未知'}</p></details> : null}{error && <p role="status">{error}</p>}{!saved && !error && <p className="ui-body-muted">{runId ? '正在读取保存的逐题结果…' : '逐题结果来源未保存，保护题结果与判分原因未知。'}</p>}</section>
     <details className="d-result-comparison ui-card"><summary>与 Winner 的指标对比</summary><section><h3>{schemeName(winner)} vs D</h3><QualityComparison baseline={winner} baselineLabel={schemeName(winner)} candidate={d} candidateLabel="Candidate D" includeNewFailures hideGates/></section></details>
     </div><section className="d-result-causes ui-card"><h3>还没解决的问题</h3><div className="d-issue-grid">
-      {remaining.map((row:any)=>{const rank=missedEvidenceRank(d,row),topK=d.config?.top_k,failed=rowFor(row.question_id)?.passed===false || fixed!==null && !fixed.includes(row.question_id);return <article className="d-unresolved-card" key={row.question_id}><h4><QuestionBadge id={shortQuestionId(row.question_id)} tone="open" question={questionText(row.question_id,evaluation,badCases)}/> <span>{!failed ? '实际是否修好未知' : targets.includes(row.question_id) ? '预测会修好，实际没修好' : '未列为修复目标，实际仍未修好'}</span></h4><p>{missedReason(row)}</p>{typeof rank==='number' && <div className="d-ranking" aria-label={`Winner 证据排名：第 ${rank} 位，截止线 Top-K ${topK}`}><div className="d-rank-labels"><span>截止线 Top-K {topK}</span><span>证据排第 {rank} 位</span></div><div className="d-rank-bar"><i style={{width:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><b style={{left:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><em style={{left:`${rank/Math.max(rank+2,topK+2)*100}%`}}/></div></div>}</article>;})}
-      {broken?.map(id=><article className="d-unresolved-card" key={id}><h4><QuestionBadge id={shortQuestionId(id)} tone="broken" question={questionText(id,evaluation,badCases)}/> 新增 Bad Case</h4><p>{issueReason(id)}</p></article>)}
+      {remaining.map((row:any)=>{const rank=missedEvidenceRank(d,row),topK=d.config?.top_k,failed=rowFor(row.question_id)?.passed===false || fixed!==null && !fixed.includes(row.question_id);return <article className="d-unresolved-card" key={row.question_id}><h4><QuestionBadge id={shortQuestionId(row.question_id)} tone="open" question={questionText(row.question_id,evaluation,badCases)}/> <span>{!failed ? '实际是否修好未知' : targets.includes(row.question_id) ? '预测会修好，实际没修好' : '未列为修复目标，实际仍未修好'}</span></h4><AgentExcerpt text={missedReason(row)}/>{typeof rank==='number' && <div className="d-ranking" aria-label={`Winner 证据排名：第 ${rank} 位，截止线 Top-K ${topK}`}><div className="d-rank-labels"><span>截止线 Top-K {topK}</span><span>证据排第 {rank} 位</span></div><div className="d-rank-bar"><i style={{width:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><b style={{left:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><em style={{left:`${rank/Math.max(rank+2,topK+2)*100}%`}}/></div></div>}</article>;})}
+      {explainedFailures.map(id=><article className="d-unresolved-card" key={id}><h4><QuestionBadge id={shortQuestionId(id)} tone="broken" question={questionText(id,evaluation,badCases)}/> 新增 Bad Case</h4><AgentExcerpt text={issueReason(id)}/></article>)}
+      {unknownFailures.length > 0 && <p className="d-unknown-failures">{questionList(unknownFailures)} 新增 Bad Case（逐条原因未保存）</p>}
       {!remaining.length && !broken?.length && <p className="ui-body-muted">没有保存的未修好或新增 Bad Case 原因。</p>}
-      <DSideEffects changes={d.reasoning?.changes || []} candidates={experiment.candidates} summary={`${watched.length && held===watched.length ? `${held} 道受保护题全部守住` : protectedSummary}，安全拒答 ${typeof safety==='number' ? `${safety}%` : '未知'}。`}/>
+      <details className="d-result-analysis"><summary>展开 Agent 分析</summary><DSideEffects changes={d.reasoning?.changes || []} candidates={experiment.candidates} summary={`${watched.length && held===watched.length ? `${held} 道受保护题全部守住` : protectedSummary}，安全拒答 ${typeof safety==='number' ? `${safety}%` : '未知'}。`}/></details>
     </div>{footer && <footer className="d-story-footer">{footer}</footer>}</section></div>;
 
 }
@@ -313,13 +312,15 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false,onRep
     {d && <div className="d-param-changes">{Object.entries(suggestion.changed_parameters || suggestion.proposed_config_diff || {}).map(([key, value]) => {
       return <ParamChip key={key} label={storyParameterNames[key] || key} from={paramValue(key, evaluation.config?.[key])} to={paramValue(key, value)} keyParam={!!winner?.config && key in winner.config && JSON.stringify(winner.config[key]) !== JSON.stringify(value)} keyLabel="新改动"/>;
     })}</div>}
-    {d && <><p>基础方案：{schemeName(winner)}</p>{changes.map((change:any,index:number)=><p key={index}>{storyParameterNames[change.parameter] || change.parameter || "合并参数未保存"} · 来源：{(change.source_candidates || []).map((id:string)=>schemeName(cs.find((c:any)=>c.id===id),id)).join('、') || '未保存'}；{storyText(change.reason || change.rationale, true)}</p>)}</>}
-    <p>组合方式：{suggestion.combination_mode === 'partial_fusion' ? '部分融合' : suggestion.combination_mode === 'winner_plus_verified' ? 'Winner + 已验证参数' : '未保存'}；{storyText(suggestion.mode_reason || '未知', true)}</p>
+    {d && <><p>基础方案：{schemeName(winner)}</p><div className="agent-parameter-tags">{changes.map((change:any,index:number)=><span className="agent-parameter-tag" key={index}>{agentDisplayText(storyParameterNames[change.parameter] || change.parameter || '合并参数未保存')} · 来源：{(change.source_candidates || []).map((id:string)=>schemeName(cs.find((c:any)=>c.id===id),id)).join('、') || '未保存'}</span>)}</div></>}
+    <p>组合方式：{suggestion.combination_mode === 'partial_fusion' ? '部分融合' : suggestion.combination_mode === 'winner_plus_verified' ? 'Winner + 已验证参数' : '未保存'}</p>
+    <details><summary>展开合并依据</summary>{changes.map((change:any,index:number)=><p key={index}>{storyText(change.reason || change.rationale, true)}</p>)}<p>{storyText(suggestion.mode_reason || '未知', true)}</p></details>
     </section><section className="ui-card d-prediction">
-    <div className={d ? "d-agent-prediction agent-round-strategy" : "ui-body-muted"} role="status"><h3>② 事先预测</h3><p>{storyText(!d && (composite.status === "failed" || ["validation_failed","suggestion_failed"].includes(composite.outcome)) ? "尚无可用的合并方案" : reason || "未保存说明", true)}</p>{changes.map((change:any,index:number)=><div key={index}><p>预计修好：{questionList(change.target_question_ids || null)}；预计修好 {change.expected_fixed_count ?? '未知'} 题，可能弄坏 {change.possible_broken_count ?? '未知'} 题</p></div>)}<DSideEffects changes={changes}/></div>
+    <div className={d ? "d-agent-prediction agent-round-strategy" : "ui-body-muted"} role="status"><h3>② 事先预测</h3>{changes.map((change:any,index:number)=><div key={index}><p>预计修好：{questionList(change.target_question_ids || null)}（{change.expected_fixed_count ?? '未知'} 题）；可能弄坏 {change.possible_broken_count ?? '未知'} 题</p></div>)}
+      <details><summary>展开 Agent 分析</summary><p>{storyText(!d && (composite.status === "failed" || ["validation_failed","suggestion_failed"].includes(composite.outcome)) ? "尚无可用的合并方案" : reason || "未保存说明", true)}</p><DSideEffects changes={changes}/></details></div>
     {!d && dProgressLabel(experiment)==='Agent 判断不做 D' && <p className="ui-headline d-result-conclusion"><StoryText value={recommendationReason(experiment)} evaluation={evaluation} badCases={badCases}/></p>}
     </section>{completeResult(d) ? <DResultStory experiment={experiment} evaluation={evaluation} badCases={badCases}/> : <section className="ui-card"><h3>③ 事后对账</h3><p>尚无完整的 D 评测结果</p></section>}
-    <section className="ui-card d-decision"><h3>④ 结论</h3><p className="d-result-conclusion">{decision ? `${recommendationOf(experiment).recommended_candidate === winner?.id ? '保留 Winner。' : ''}${storyText(decision)}` : '等待保存的完整评测与推荐结论'}</p>{completeResult(d) && d.result.gates?.gates?.some((gate:any)=>gate.passed===false) && <p>没过的门槛：{d.result.gates.gates.filter((gate:any)=>gate.passed===false).map((gate:any)=>gateNames[gate.metric] || gate.metric).join('、')}</p>}{footer && <footer className="d-story-footer">{footer}</footer>}</section>
+    <section className="ui-card d-decision"><h3>④ 结论</h3><AgentExcerpt className="d-result-conclusion" text={decision ? `${recommendationOf(experiment).recommended_candidate === winner?.id ? '保留 Winner。' : ''}${storyText(decision)}` : '等待保存的完整评测与推荐结论'}/>{completeResult(d) && d.result.gates?.gates?.some((gate:any)=>gate.passed===false) && <p>没过的门槛：{d.result.gates.gates.filter((gate:any)=>gate.passed===false).map((gate:any)=>agentDisplayText(gateNames[gate.metric] || gate.metric)).join('、')}</p>}{footer && <footer className="d-story-footer">{footer}</footer>}</section>
     <details className="ui-card"><summary>技术详情</summary><pre className="technical-record">{JSON.stringify({composite_history:state.composite_history,analysis_attempts:composite.attempts,composite:!d ? composite : undefined},null,2)}</pre></details>
     </article>;
 }

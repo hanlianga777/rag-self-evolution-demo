@@ -32,8 +32,8 @@ it("removes repeated strategy fields and keeps one before/after parameter list",
   await mount();
   await act(async()=>[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(b=>b.textContent==="Candidates 对比")!.click());
   const card=document.querySelector(".candidate-card")!;
-  expect(document.querySelector(".agent-round-strategy")?.textContent).toContain("扩大候选范围");
-  expect(document.querySelector(".agent-new-changes")?.textContent).toContain("Top-K4 → 8");
+  expect(document.querySelector(".candidate-cards")?.textContent).toContain("扩大候选范围");
+  expect(document.querySelector(".agent-new-changes")?.textContent).toContain("Top-K 4 → 8");
   expect([...card.querySelectorAll("dt")].map(e=>e.textContent)).toEqual(["答对","门槛通过","修好","新错"]);
   expect(card.querySelector(".candidate-field-content")).toBeNull();
 });

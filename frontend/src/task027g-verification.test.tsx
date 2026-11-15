@@ -61,7 +61,7 @@ it('removes answer boundary notes and citation counts while preserving the saved
 });
 it('normalizes parameter prose without touching saved Agent reasoning',()=>{
  const text='降thinking档位，TopK=6，topk=4，Thinking 档位从Max降到High，修好2题。';
- expect(storyText(text)).toBe('降 Thinking 档位，Top-K 6，Top-K 4，Thinking 档位从 Max 降到 High，修好 2 题。');
+ expect(storyText(text)).toBe('降思考档位，Top-K 6，Top-K 4，思考档位从 Max 降到 High，修好 2 题。');
 });
 
 it('keeps unsplittable basis prose and distinct repeated saved answers',()=>{

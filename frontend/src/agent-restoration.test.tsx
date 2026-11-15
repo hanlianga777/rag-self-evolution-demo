@@ -18,12 +18,12 @@ it("restores stages and complete generated plans without inventing evaluated res
   expect(document.querySelectorAll(".tabs button")).toHaveLength(3); expect(document.querySelectorAll(".agent-principle")).toHaveLength(4);
   expect(document.querySelector(".agent-case-destinations")).toBeNull();
   await click("Candidates 对比");
-  expect(document.querySelectorAll(".agent-strategy-plans > article")).toHaveLength(3);
+  expect(document.querySelectorAll(".agent-result-card")).toHaveLength(3);
   expect(document.querySelectorAll(".agent-result-card")).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/null|undefined|\[object Object\]/);
   await click("Candidates 对比");
   expect([...document.querySelectorAll(".agent-result-card:first-child dt")].map(e => e.textContent)).toEqual(["答对","门槛通过","修好","新错"]);
-  expect(document.querySelector(".agent-round-strategy")?.textContent).toContain("验证假设A");
+  expect(document.querySelector(".candidate-cards")?.textContent).toContain("验证假设A");
   expect(document.querySelector(".candidate-card")?.textContent).toContain("待评测");
   await click("查看目标 1 题");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(bad.result.question);

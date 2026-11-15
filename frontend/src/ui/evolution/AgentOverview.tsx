@@ -1,3 +1,4 @@
+import { AgentExcerpt } from '../../components/AgentExcerpt';
 import { storyText } from '../../components/EvolutionStory';
 import { InfoTip } from '../HoverCard';
 import type { EvolutionModel } from './model';
@@ -23,7 +24,7 @@ export function AgentOverview({ experiment, model, chosenId, released }: {
       {chosen && <p>答对 {chosen.correct ?? '未知'} / {chosen.total ?? '未知'} 题 · 门槛通过 {chosen.gates ? `${chosen.gates.passed} / ${chosen.gates.total}` : '未知'} · 新错 {chosen.newFailures ?? '未知'} 题</p>}
     </div></section>
     <section className="ui-card" aria-label="最终改动的参数"><h3>相对 Baseline 的改动</h3><div className="agent-parameter-tags">{chosen?.params.map(param => <span className="agent-parameter-tag" key={param.key}>{param.label} {param.from ?? '未知'} → {param.to}</span>)}{!chosen?.params.length && <p className="ui-body-muted">{chosen ? '未保存参数变化' : '最终方案确定后显示参数变化'}</p>}</div></section>
-    <section className="ui-card"><h3>优化思路</h3><p>{idea ? storyText(idea, true) : '尚未保存推荐理由或轮次结论'}</p></section>
+    <section className="ui-card"><h3>优化思路</h3><AgentExcerpt text={idea ? storyText(idea, true) : '尚未保存推荐理由或轮次结论'}/></section>
     <section className="agent-overview-principles" aria-label="Agent 的四条原则">{RULES.map(([title, text]) => <span className="agent-principle" key={title}>{title}<InfoTip label={title} content={text}/></span>)}</section>
   </div>;
 }

@@ -7,6 +7,13 @@ import { EvolutionPage } from "./pages/EvolutionPage";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let root: ReturnType<typeof createRoot>;
+async function hoverText(selector:string) {
+ const node=document.querySelector<HTMLElement>(selector);
+ if (!node) return document.body.textContent;
+ await act(async()=>{node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,160));});
+ const id=node.closest('.agent-excerpt')?.getAttribute('aria-describedby');
+ return (id ? document.getElementById(id)?.textContent : null) || [...document.querySelectorAll('[role=tooltip]')].at(-1)?.textContent || node.textContent;
+}
 afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 const render = async (node: ReactNode) => { root = createRoot(document.body.appendChild(document.createElement("div"))); await act(async () => { root.render(node); await Promise.resolve(); }); };
 const click = async (label: string) => act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === label)!.click());
@@ -63,8 +70,8 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   expect(document.querySelectorAll(".diagnosis-cards")).toHaveLength(0);
   await click("Candidates 对比");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
-  expect(document.querySelectorAll(".agent-strategy-plans > article")).toHaveLength(3);
-  expect(document.querySelector(".agent-round-strategy")?.textContent).toContain("保存假设 A");
+  expect(document.querySelectorAll(".agent-result-card")).toHaveLength(3);
+  expect(document.querySelector(".candidate-cards")?.textContent).toContain("保存假设 A");
   expect([...document.querySelectorAll(".candidate-card:first-child dt")].map(label => label.textContent)).toEqual(["答对","门槛通过","修好","新错"]);
   await click("查看目标 1 题");
   expect(document.querySelector('[role=dialog]')?.textContent).toContain("持久化问题");
@@ -90,5 +97,5 @@ it.each([
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   await render(<EvolutionPage data={{ evaluation: run, badCases: [bad], optimization }} />);
   await click("Candidates 对比");await click("Candidate D");
-  expect(document.querySelector(".d-story")?.textContent).toContain(expected);
+  expect(status === "evaluated" ? await hoverText(".d-result-conclusion") : document.querySelector(".d-story")?.textContent).toContain(expected);
 });

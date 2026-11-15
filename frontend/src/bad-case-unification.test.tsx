@@ -45,6 +45,6 @@ it('offers Sandbox for one valid candidate while disclosing rejected candidates'
  expect(document.querySelector('.ui-agent-stats')).toBeNull();
  await click('Candidates 对比');
  expect(document.querySelectorAll('.candidate-cards > .candidate-card')).toHaveLength(1);
- expect(document.querySelector('.agent-round-strategy')?.textContent).toContain('原始合法假设');
+ expect(document.querySelector('.candidate-cards')?.textContent).toContain('原始合法假设');
  expect(document.querySelector('details[open]')).toBeNull();
 });

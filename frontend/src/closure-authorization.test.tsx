@@ -29,7 +29,7 @@ it('latest candidate cards preserve provenance with history entry removed',async
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const candidates=[1,2].flatMap(round=>['A','B','C'].map(label=>({id:`fixture-${round}-${label}`,status:round===1?'evaluated':'generated',config:{top_k:6},reasoning:{round,candidate_label:label,hypothesis:`saved ${round}-${label}`},result:{}})));
  await render(<EvolutionPage data={{evaluation:run,optimization:{id:'fixture-E',candidates}}}/>);await click('Candidates 对比');
- expect(document.querySelectorAll('.candidate-card')).toHaveLength(3);expect(document.querySelector('.agent-strategy-plans')?.textContent).toContain('saved 2-A');
+ expect(document.querySelectorAll('.candidate-card')).toHaveLength(3);expect(document.querySelector('.candidate-cards')?.textContent).toContain('saved 2-A');
  expect([...document.querySelectorAll('button')].some(button=>button.textContent==='查看历史实验')).toBe(false);
  expect(document.querySelector('[role=dialog]')).toBeNull();
  expect(candidates[0].reasoning.hypothesis).toBe('saved 1-A');
