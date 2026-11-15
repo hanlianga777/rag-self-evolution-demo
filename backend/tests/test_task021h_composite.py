@@ -99,7 +99,7 @@ class PrerequisiteTests(unittest.TestCase):
 
     def test_missing_prerequisite_risk_check_is_rejected(self):
         value=self.suggestion();del value['changes'][0]['side_effect_check']['different_premise_evidence']
-        with self.assertRaisesRegex(ValueError,'前提'):self.validate(value)
+        with self.assertRaisesRegex(ValueError,'side_effect_check.different_premise_evidence'):self.validate(value)
 
     def test_old_decline_is_archived_but_latest_decision_is_idempotent(self):
         old={'status':'no_effective_composite','outcome':'declined','facts':{'version':'winner-refinement-1'},

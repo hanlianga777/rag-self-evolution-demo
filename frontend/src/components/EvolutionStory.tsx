@@ -208,10 +208,14 @@ function DResultStory({experiment,evaluation,badCases,footer}:{experiment:any;ev
 
 }
 
+function hasSideEffectText(value:unknown):boolean {
+  return typeof value==='string' ? !!value.trim() : Array.isArray(value) && value.some(item=>typeof item==='string' && item.trim());
+}
+
 export function DSideEffects({changes,summary,candidates=[]}:{changes:any[];summary?:string;candidates?:any[]}) {
-  return <>{changes.filter(change=>Object.values(change.side_effect_check || {}).some(value=>typeof value==='string' && value.trim())).map((change,index)=>{
+  return <>{changes.filter(change=>Object.values(change.side_effect_check || {}).some(hasSideEffectText)).map((change,index)=>{
     const side=change.side_effect_check;
-    const fields=Object.entries({历史伴随:side.historical_effects,已修好题:side.winner_fixed_risk,门槛风险:side.gate_risk,规避方式:side.mitigation,相同前提:side.same_premise_evidence,不同前提:side.different_premise_evidence,风险清单:side.risk_checklist}).filter(([,value])=>typeof value==='string' && value.trim());
+    const fields=Object.entries({历史伴随:side.historical_effects,已修好题:side.winner_fixed_risk,门槛风险:side.gate_risk,规避方式:side.mitigation,相同前提:side.same_premise_evidence,不同前提:side.different_premise_evidence,风险清单:side.risk_checklist}).filter(([,value])=>hasSideEffectText(value));
     const sources:any[]=(change.source_candidates || []).map((id:string)=>candidates.find(candidate=>candidate.id===id));
     const topK=sources[0]?.config?.top_k ?? sources[0]?.reasoning?.changed_parameters?.top_k;
     const history=summary && change.parameter==='top_k' && typeof topK==='number' && sources.length && sources.every(source=>completeResult(source) && (source.config?.top_k ?? source.reasoning?.changed_parameters?.top_k)===topK && Array.isArray(source.result.new_regression_question_ids) && source.result.new_regression_question_ids.length>0) ? sources.map(source=>{
@@ -221,7 +225,7 @@ export function DSideEffects({changes,summary,candidates=[]}:{changes:any[];summ
       const p99=gates.find((gate:any)=>gate.metric==='latency_p99_seconds' && gate.passed===false);
       return `${schemeName(source)} 新增了 ${questionList(result.new_regression_question_ids)}，安全拒答${!p99 && safetyGate?.passed===false ? '降到 ' : ' '}${typeof safety==='number' ? `${safety}%` : '未知'}${typeof p99?.actual==='number' ? `、P99 ${p99.actual.toFixed(1)} 秒` : ''}`;
     }).join('；') : '';
-    return <article className="d-side-effects" key={index}><h4>{storyParameterNames[change.parameter] || '参数调整'} · 副作用检查</h4>{history ? <p>前几轮里，Top-K {topK} 出现时伴随过副作用：{history}。这些只是同时出现，不能证明是 Top-K 造成的，所以 D 把这些题列为重点盯防。</p> : (summary ? fields.slice(0,1) : fields).map(([label,value])=><p key={label}><span className="ui-body-muted">{label}：</span><StoryText value={value}/></p>)}{summary && <p>实际结果：{summary}</p>}</article>;
+    return <article className="d-side-effects" key={index}><h4>{storyParameterNames[change.parameter] || '参数调整'} · 副作用检查</h4>{history ? <p>前几轮里，Top-K {topK} 出现时伴随过副作用：{history}。这些只是同时出现，不能证明是 Top-K 造成的，所以 D 把这些题列为重点盯防。</p> : (summary ? fields.slice(0,1) : fields).map(([label,value])=>Array.isArray(value) ? <div key={label}><span className="ui-body-muted">{label}：</span><ul style={{listStyleType:'disc',paddingLeft:'1.5em'}}>{value.map((item:string,index:number)=><li key={index}><StoryText value={item}/></li>)}</ul></div> : <p key={label}><span className="ui-body-muted">{label}：</span><StoryText value={value}/></p>)}{summary && <p>实际结果：{summary}</p>}</article>;
   })}</>;
 }
 
@@ -311,7 +315,7 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false,onRep
     {decision && <p className="ui-headline d-result-conclusion">{storyText(decision)}</p>}
     <div className={d ? "d-agent-prediction agent-round-strategy" : "ui-body-muted"} role="status">{d && <h3>Agent 的预测</h3>}<p>{agentDisplayText(reason || "未保存说明")}</p>{suggestion.combination_mode && <p>{suggestion.combination_mode === "partial_fusion" ? "部分融合" : "Winner 加有效参数"}：{suggestion.mode_reason || "未知"}</p>}</div>
     {!d && dProgressLabel(experiment)==='Agent 判断不做 D' && <p className="ui-headline d-result-conclusion"><StoryText value={recommendationReason(experiment)} evaluation={evaluation} badCases={badCases}/></p>}
-    </section>{completeResult(d) && <DResultStory experiment={experiment} evaluation={evaluation} badCases={badCases} footer={footer}/>} {!completeResult(d) && changes.some((change:any)=>Object.values(change.side_effect_check || {}).some(value=>typeof value==='string' && value.trim())) && <section className="ui-card"><h3>副作用检查</h3><div className="d-issue-grid"><DSideEffects changes={changes}/></div></section>} {!completeResult(d) && footer && <div className="d-story-footer">{footer}</div>}</article>;
+    </section>{completeResult(d) && <DResultStory experiment={experiment} evaluation={evaluation} badCases={badCases} footer={footer}/>} {!completeResult(d) && changes.some((change:any)=>Object.values(change.side_effect_check || {}).some(hasSideEffectText)) && <section className="ui-card"><h3>副作用检查</h3><div className="d-issue-grid"><DSideEffects changes={changes}/></div></section>} {!completeResult(d) && footer && <div className="d-story-footer">{footer}</div>}</article>;
 }
 
 export function recommendationTradeoff(experiment:any):string {

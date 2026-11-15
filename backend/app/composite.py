@@ -186,9 +186,12 @@ def validate_d_refinement(suggestion, winner, history, baseline_config, facts):
         side=row.get('side_effect_check')
         if (not isinstance(side,dict) or any(not isinstance(side.get(k),str) or not side[k].strip() for k in ('historical_effects','winner_fixed_risk','gate_risk','mitigation'))
             or not isinstance(side.get('protected_overlap'),list)):raise ValueError('改动缺副作用检查：历史伴随现象、保护题重叠、Winner 修好题、Hard Gate 及规避措施必填')
-        if facts.get('version')==D_FACTS_VERSION and any(not isinstance(side.get(k),str) or not side[k].strip()
-                for k in ('same_premise_evidence','different_premise_evidence','risk_checklist')):
-            raise ValueError('副作用检查须分别写前提相同证据、前提不同证据和重点保护题/临界 Hard Gate 风险清单；没有证据写未观察到')
+        if facts.get('version')==D_FACTS_VERSION:
+            for field in ('same_premise_evidence','different_premise_evidence','risk_checklist'):
+                text=side.get(field)
+                if not (isinstance(text,str) and text.strip() or isinstance(text,list) and text
+                        and all(isinstance(item,str) and item.strip() for item in text)):
+                    raise ValueError(f'side_effect_check.{field} 须为非空字符串或字符串数组（每项须为非空字符串）；没有证据写未观察到')
         if any(type(row.get(k)) is not int or row[k]<0 for k in ('expected_fixed_count','possible_broken_count')):raise ValueError('预期修好/可能弄坏几道须为非负整数')
         profile=next(p for p in facts['parameter_profiles'][key] if type(p['value']) is type(value) and p['value']==value)
         overlap={q for p in profile['observations'] for q in p['new_failure_question_ids']} & protected
