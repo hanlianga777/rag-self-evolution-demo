@@ -28,7 +28,7 @@ export function PageSamples() {
   return <div style={{ display: "grid", gap: 40 }}>
     <section>
       <h2 className="ui-sample-title">概览 · 项目概览</h2>
-      <div className="page-title" style={{ marginBottom: 16 }}><div><h1><IconTile name="overview" />RAG 自进化项目概览</h1></div></div>
+      <div className="page-title" style={{ marginBottom: 16 }}><div><h1><IconTile name="overview" />RAG 自进化概览</h1></div></div>
       <ValueChain steps={[
         { kicker: "问题", icon: "bad", title: "RAG 上线后答错难发现，调参靠试，修好一题又弄坏另一题", detail: "不知道该改哪里，也不敢上线" },
         { kicker: "方法", icon: "agent", title: "冻结考卷量化 → Agent 在白名单内调参 → 人工批准发布", detail: "每一步可量化、可归因、可回滚" },

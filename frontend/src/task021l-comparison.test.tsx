@@ -15,10 +15,10 @@ const before={question_id:'Q04',question:'如何存放？',test_category:'positi
 const after={...before,passed:true,model_answer:'## 存放\n1. **只在室内**。（《操作_说明.pdf》，存放，第8页）\n2. 完全充电。（同上）\n\n**证据边界：**其他条件未知。',judge_result:{atomic_results:[{atomic_id:'Q04-R1',state:'MET',answer_quotes:['**只在室内**。（《操作_说明.pdf》，存放，第8页）']},{atomic_id:'Q04-R2',state:'MET',answer_quotes:['完全充电']},{atomic_id:'auxiliary_0',state:'MET'}]},diagnostic_view:{evidence_checks:[{quote:'只在室内',candidate_hit:true,rerank_rank:6,final_rank:6}]},programmatic_metrics:{latency_ms:15000,retrieval_trace:{final:Array(6).fill(source)}}};
 const run=(id:string)=>({id,status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'judge'},config:{top_k:id==='base'?4:6},cases:[{question_id:'Q04',question:before.question,test_category:'positive',passed:id!=='base'},{question_id:'Q06',question:'没有修好的题',test_category:'positive',passed:false}]});
 const data={evaluation:{id:'base'},optimization:{candidates:[{id:'D',status:'evaluated',reasoning:{candidate_label:'D'},result:{evaluation_run_id:'after',evaluation_complete:true,total:2}}],recommendation:{recommended_candidate:'D'}}};
-it('preloads the light list and every case before local filtering/searching',async()=>{
+it('loads the light list first and loads only the selected answer while filtering locally',async()=>{
  const fetcher=vi.fn(async(input:string)=>{const path=new URL(input).pathname;return new Response(JSON.stringify(path.endsWith('/comparison-cases')?run(path.includes('/base/')?'base':'after'):{status:'completed',case:path.includes('/base/')?before:after}));});vi.stubGlobal('fetch',fetcher);
  await mount(<SavedAnswerComparison data={data} onOpenCitation={()=>{}}/>);
- expect(fetcher.mock.calls).toHaveLength(6);expect(fetcher.mock.calls.every(([p])=>/comparison-cases|\/cases\/Q0[46]/.test(p))).toBe(true);
+ expect(fetcher.mock.calls).toHaveLength(4);expect(fetcher.mock.calls.every(([p])=>/comparison-cases|\/cases\/Q0[46]/.test(p))).toBe(true);
  expect(document.querySelector('.comparison-rail')?.textContent).toContain('修好的1');
  expect(document.querySelector('.comparison-chain .ui-headline')?.textContent).toContain('放宽 Top-K 后进入上下文');
  expect(document.querySelector('.comparison-steps')?.textContent).toContain('Top-K 4 → 6');

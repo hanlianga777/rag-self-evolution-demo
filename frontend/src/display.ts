@@ -1,3 +1,4 @@
+import { parameterHelp } from "./helpText";
 export const isMachineQualified = (status?: string) => status === "machine_qualified" || status === "owner_delegated_approved";
 
 export const vocabulary: Record<string, string> = {
@@ -134,11 +135,9 @@ export const parameterNames: Record<string, string> = {
 };
 
 export const descriptions: Record<string, string> = {
-  generation_thinking: "可选择 OFF / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "不限 / 8192 / 4096；缺少 tokenizer 时按字符数估算 token",
-  candidate_k: "初始候选召回数量", top_k: "进入回答上下文的证据数量", min_score: "进入上下文前的最低相关分",
-  hybrid_search: "组合向量与BM25", hybrid_alpha: "Embedding Retrieval 在 Hybrid Search 中的权重", rerank: "模型 Rerank、原排序或仅原问题的 BM25 排序",
-  query_rewrite: "生成标准化检索问法", multi_query: "生成互补检索问法", hyde: "先写一段假设答案，再拿去检索",
-  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "分级回答：能确定的先回答，条件缺失时追问，资料无关时转人工，并保留安全警告",
+  ...parameterHelp,
+  query_decompose: "拆解独立意图并分别检索；默认关闭",
+  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射",
 };
 
 export function localShortTime(value?: string): string {

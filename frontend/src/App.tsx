@@ -3,7 +3,7 @@ import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, ty
 import { Bot, Menu } from "lucide-react";
 import { ICONS } from "./ui/icons";
 import { appDataVersion, identityKey, loadAppData } from "./api";
-import { onIdle, warmPageData, warmupRoute } from "./pageWarmup";
+import { onIdle, warmPageData } from "./pageWarmup";
 import { PageWarmupContext } from "./preload";
 import { OverviewPage } from "./pages/OverviewPage";
 import { PageShell } from "./components/PageShell";
@@ -28,8 +28,8 @@ const VerificationPage = lazy(() => pageModules.verification().then(module => ({
 const VersionsPage = lazy(() => pageModules.versions().then(module => ({ default: module.VersionsPage })));
 
 const navigation: { id: Page; label: string; icon: typeof ICONS.overview }[] = [
-  { id: "overview", label: "RAG 自进化项目概览", icon: ICONS.overview }, { id: "knowledge", label: "知识库", icon: ICONS.knowledge },
-  { id: "settings", label: "Pipeline 配置", icon: ICONS.pipeline }, { id: "governance", label: "Golden Dataset", icon: ICONS.golden },
+  { id: "overview", label: "RAG 自进化概览", icon: ICONS.overview }, { id: "knowledge", label: "知识库", icon: ICONS.knowledge },
+  { id: "governance", label: "Golden Dataset", icon: ICONS.golden }, { id: "settings", label: "Pipeline 配置", icon: ICONS.pipeline },
   { id: "evaluation", label: "Baseline", icon: ICONS.baseline }, { id: "evolution", label: "Agent 工作台", icon: ICONS.agent },
   { id: "versions", label: "发布", icon: ICONS.release }, { id: "verification", label: "问答验证", icon: ICONS.verify },
 ];
@@ -40,6 +40,7 @@ export default function App() {
   const [pages, setPages] = useState<Partial<Record<Page, AppData>>>({}); const [error, setError] = useState(""); const [page, setPage] = useState<Page>(pageFromHash);
   const [pagesWarming, setPagesWarming] = useState(true);
   const data = pages[page];
+  useEffect(() => { document.title = `${navigation.find(item => item.id === page)?.label} · RAG Evolution`; }, [page]);
   const [openedDocument, setOpenedDocument] = useState<{ name?: string; citation?: Citation }>(); const [menuOpen, setMenuOpen] = useState(false);
   const requests = useRef(0); const completed = useRef(new Set<string>()); const operation = useOperation();
   const foreground = useRef<Promise<void>>(Promise.resolve());
@@ -68,14 +69,18 @@ export default function App() {
   const prefetch = useCallback((target: Page) => {
     const module = target !== "overview" ? pageModules[target]() : Promise.resolve();
     void module.catch(()=>{});
-    if (latestPages.current[target]) return Promise.resolve(latestPages.current[target]);
+    if (latestPages.current[target]) {
+      const saved = latestPages.current[target]!;
+      return warmPageData(target, saved).then(() => saved).catch(() => saved);
+    }
     if (!prefetched.current.has(target)) prefetched.current.set(target, loadAppData(true, target).then(async next => {
-      await Promise.all([module, warmPageData(target, next)]);
+      await module;
       setPages(previous => {
         const current = Object.values(previous)[0];
         if (previous[target] || current && identityKey(current.workspace) !== identityKey(next.workspace)) return previous;
         return { ...previous, [target]: next };
       });
+      await warmPageData(target, next);
       return next;
     }).catch(() => undefined).finally(() => prefetched.current.delete(target)));
     return prefetched.current.get(target)!;
@@ -88,17 +93,11 @@ export default function App() {
     const cancelIdle = onIdle(async () => {
       await foreground.current;
       if (cancelled) return;
-      const warmed = await Promise.all(warmupRoute.map(target => prefetch(target)));
+      // Unvisited pages load on navigation hover or entry, after the foreground paint.
       if (!cancelled) setPagesWarming(false);
-      const verification = warmed[warmupRoute.indexOf("verification")];
-      if (!cancelled && verification) {
-        // All page content gets priority over the full saved-answer detail reads.
-        const { preloadComparison } = await import("./components/SavedAnswerComparison");
-        if (!cancelled) void preloadComparison(verification).catch(() => {});
-      }
     });
     return () => { cancelled = true; cancelIdle(); };
-  }, [workspaceIdentity, prefetch]);
+  }, [workspaceIdentity]);
   const navigate = (next: Page) => { void prefetch(next); if (location.hash !== `#${next}`) location.hash = next; setPage(next); setMenuOpen(false); };
   const openCitation = (citation: Citation) => { setOpenedDocument({ citation }); navigate("knowledge"); };
   const skeleton = <PageShell className="page page-loading" header={<div className="page-title"><h1>{navigation.find(item=>item.id===page)?.label}</h1></div>}><div className="golden-skeleton" role="status" aria-label="正在加载页面内容">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div></PageShell>;

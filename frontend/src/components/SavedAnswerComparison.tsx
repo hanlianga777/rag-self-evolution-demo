@@ -3,7 +3,7 @@ import { LocalPagination, useLocalPage } from "./LocalPagination";
 import { DataTable } from "./DataTable";
 import { TableVerdict } from "./Primitives";
 import { ClampText } from "../ui/ClampText";
-import { HoverCard } from "../ui/HoverCard";
+import { InfoTip } from "../ui/HoverCard";
 import {useEffect, useState} from 'react';
 import {cachedJson, errorMessage} from '../api';
 import {detailJson, useHoverPrefetch} from '../preload';
@@ -35,13 +35,8 @@ export function preloadComparison(data:any) {
   if(baselineBlocked || !runId || !completeResult(candidate))return Promise.resolve(undefined);
   return goldenFetch<any>(binding,cachePath,async()=>{
     const next=readRuns(await Promise.all(paths.map(path=>detailJson<any>(path))));
-    const allDetails:Record<string,any>={},errors:Record<string,string>={};
-    for(let offset=0;offset<next.rows.length;offset+=4) await Promise.all(next.rows.slice(offset,offset+4).map(async(row:any)=>{
-      const key=JSON.stringify([binding,row.question_id]);
-      try { allDetails[key]=await Promise.all([baselineId,runId].map(run=>detailJson<any>(`/api/evaluations/${encodeURIComponent(run)}/cases/${encodeURIComponent(row.question_id)}`))); }
-      catch(reason) { errors[key]=errorMessage(reason); }
-    }));
-    return {runs:next,details:allDetails,errors};
+    // The question list is the first screen; answer bodies load only for the selected row.
+    return {runs:next,details:{},errors:{}};
   });
 }
 
@@ -81,6 +76,14 @@ export function SavedAnswerComparison({data,onOpenCitation,questionId}:{data:any
       setDetailErrors(previous=>{const next={...previous};delete next[detailKey];return next;});
     } catch(reason) {setDetailErrors(previous=>({...previous,[detailKey]:errorMessage(reason)}));}
   };
+  useEffect(()=>{
+    if(!id || ready)return;
+    let cancelled=false;
+    void Promise.all(detailPaths.map(path=>detailJson<any>(path))).then(value=>{
+      if(!cancelled)setDetails((previous:any)=>({...previous,[detailKey]:value}));
+    }).catch(reason=>{if(!cancelled)setDetailErrors(previous=>({...previous,[detailKey]:errorMessage(reason)}));});
+    return ()=>{cancelled=true;};
+  },[detailKey]);
   const points=before && after?comparisonPoints(before,after,savedDetail[1].question):[],why=explanation(before,after,current?.before.config,current?.after.config,points);
   const missing=points.filter(point=>!point.after).map(point=>String.fromCodePoint(0x2460+point.number-1)).join('、');
   const headline=after?.passed===false ? `仍未修好：${missing ? `缺少要点 ${missing}` : '具体缺失要点未保存'}` : why.headline;
@@ -94,7 +97,7 @@ export function SavedAnswerComparison({data,onOpenCitation,questionId}:{data:any
         const met=points.filter(point=>side==='before'?point.before:point.after).length;
         return <article className="comparison-ans" key={`${id}-${side}`}><header className="comparison-ans-h"><div className="comparison-name">{side==='before'?'Before':'After'} · {name}</div><span className="comparison-badge neutral">要点 {points.length?`${met} / ${points.length}`:'未知'}</span></header><ComparisonAnswer row={row} points={points} side={side} onOpenCitation={onOpenCitation}/></article>;
       })}</div>
-      <section className="comparison-data"><div className="comparison-h3-row"><h3>两次回答的配置差异</h3><HoverCard content="数字来自两次评测保存的本题判分、耗时和检索记录。时间行共用总耗时刻度；较好的一方加粗。"><span className="comparison-info" tabIndex={0} aria-label="数据说明">i</span></HoverCard></div><div className="comparison-cfg">{configChanges(current.before.config,current.after.config).sort((a,b)=>Number(b.key===why.key)-Number(a.key===why.key)).map(change=><span className={`comparison-chip ${why.key===change.key?'key':''}`} key={change.key}>{change.label}<b>{change.before} → {change.after}</b>{why.key===change.key && <small>本题关键</small>}</span>)}</div><div className="comparison-telemetry"><div className="comparison-legend"><span>Before</span><span>After</span></div><DataTable className="comparison-dtable"><thead><tr><th>指标</th><th className="num">Before</th><th className="num">After</th><th>对比条</th><th>变化</th></tr></thead><tbody>{metricRows(before,after,points).map(row=><tr key={row.label}><td>{row.label}</td><td className="num">{row.better==='before'?<strong>{row.beforeText}</strong>:row.beforeText}</td><td className="num">{row.better==='after'?<strong>{row.afterText}</strong>:row.afterText}</td><td className="comparison-bar">{row.before!=null && row.after!=null && row.scale>0 && <div className="comparison-pair"><i style={{width:`${Math.min(100,row.before/row.scale*100)}%`}}/><i style={{width:`${Math.min(100,row.after/row.scale*100)}%`}}/></div>}</td><td className="num muted">{row.delta}</td></tr>)}</tbody></DataTable></div></section>
+      <section className="comparison-data"><div className="comparison-h3-row"><h3>两次回答的配置差异</h3><InfoTip content="数字来自两次评测保存的本题判分、耗时和检索记录。时间行共用总耗时刻度；较好的一方加粗。" label="数据" /></div><div className="comparison-cfg">{configChanges(current.before.config,current.after.config).sort((a,b)=>Number(b.key===why.key)-Number(a.key===why.key)).map(change=><span className={`comparison-chip ${why.key===change.key?'key':''}`} key={change.key}>{change.label}<b>{change.before} → {change.after}</b>{why.key===change.key && <small>本题关键</small>}</span>)}</div><div className="comparison-telemetry"><div className="comparison-legend"><span>Before</span><span>After</span></div><DataTable className="comparison-dtable"><thead><tr><th>指标</th><th className="num">Before</th><th className="num">After</th><th>对比条</th><th>变化</th></tr></thead><tbody>{metricRows(before,after,points).map(row=><tr key={row.label}><td>{row.label}</td><td className="num">{row.better==='before'?<strong>{row.beforeText}</strong>:row.beforeText}</td><td className="num">{row.better==='after'?<strong>{row.afterText}</strong>:row.afterText}</td><td className="comparison-bar">{row.before!=null && row.after!=null && row.scale>0 && <div className="comparison-pair"><i style={{width:`${Math.min(100,row.before/row.scale*100)}%`}}/><i style={{width:`${Math.min(100,row.after/row.scale*100)}%`}}/></div>}</td><td className="num muted">{row.delta}</td></tr>)}</tbody></DataTable></div></section>
     </>:null}</div>
   </div>}</section>;
 }

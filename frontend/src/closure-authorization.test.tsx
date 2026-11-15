@@ -25,13 +25,14 @@ it('old policy blocks batch execution and preserves historical data',async()=>{
  expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='运行本轮 A/B/C Sandbox')?.disabled).toBe(true);
  expect(document.body.textContent).toContain('旧实验只读');
 });
-it('latest candidate cards and history Drawer keep round provenance',async()=>{
+it('latest candidate cards preserve provenance with history entry removed',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const candidates=[1,2].flatMap(round=>['A','B','C'].map(label=>({id:`fixture-${round}-${label}`,status:round===1?'evaluated':'generated',config:{top_k:6},reasoning:{round,candidate_label:label,hypothesis:`saved ${round}-${label}`},result:{}})));
  await render(<EvolutionPage data={{evaluation:run,optimization:{id:'fixture-E',candidates}}}/>);await click('Candidate 对比');
  expect(document.querySelectorAll('.candidate-card')).toHaveLength(3);expect(document.querySelector('.candidate-card')?.textContent).toContain('saved 2-A');
- await click('查看历史实验');expect(document.querySelector('[role=dialog]')?.textContent).toContain('saved 1-A');
- expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('saved 2-A');
+ expect([...document.querySelectorAll('button')].some(button=>button.textContent==='查看历史实验')).toBe(false);
+ expect(document.querySelector('[role=dialog]')).toBeNull();
+ expect(candidates[0].reasoning.hypothesis).toBe('saved 1-A');
 });
 it.each([true,false,'error'])('removes the Judge-only entry and its automatic preflight (%s)',async(eligible)=>{
  const calls=vi.fn(async(url:string)=>{

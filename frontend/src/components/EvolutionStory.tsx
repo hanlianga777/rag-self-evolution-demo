@@ -91,7 +91,7 @@ export function remainingQuestionIds(experiment:any):string[]|null {
 
 export function missedEvidenceRank(candidate:any,row:any):number|undefined {
   const stage=candidate?.config?.rerank===false ? 'candidates' : 'reranked';
-  return row?.evidence_positions?.find((pos:any)=>pos.final==='未进入' && typeof pos[stage]==='number' && pos[stage]>candidate?.config?.top_k)?.[stage];
+  return (Array.isArray(row?.evidence_positions) ? row.evidence_positions : []).find((pos:any)=>pos.final==='未进入' && typeof pos[stage]==='number' && pos[stage]>candidate?.config?.top_k)?.[stage];
 }
 
 // D's saved baseline repairs include repairs already made by the winner.

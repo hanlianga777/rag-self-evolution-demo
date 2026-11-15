@@ -1,3 +1,4 @@
+import { pagePurpose } from "../helpText";
 import { IconLabel, IconTile } from "../ui/icons";
 import { KnowledgeFlow, type FlowLane } from "../ui/knowledge/KnowledgeFlow";
 import { thinkingLabel } from "../components/PipelineFields";
@@ -5,12 +6,12 @@ import { KnowledgeCoverage } from "../ui/pages3";
 import { LocalPagination, useLocalPage } from "../components/LocalPagination";
 import { DataTable } from "../components/DataTable";
 import { PageShell } from "../components/PageShell";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileText, Search } from "lucide-react";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { LoadingSkeleton, Badge, DrawerSection, Section, Status, EmptyState, TruncatedText } from "../components/Primitives";
 import { apiUrl, cachedJson, getJson, invalidateReads } from "../api";
-import { detailJson, PageWarmupContext, useDetailPrefetch, useHoverPrefetch } from "../preload";
+import { detailJson, useHoverPrefetch } from "../preload";
 import { goldenCached, goldenFetch } from "../goldenCache";
 import { displayText } from "../display";
 import type { Citation } from "../types";
@@ -19,10 +20,9 @@ type CorpusOperation = { id: string; status: string; stage: string; completed: n
 const stageName: Record<string, string> = { queued: "排队", validate: "校验文件", build: "准备索引", parse: "解析 PDF", chunk: "生成 Parent / Child", coverage: "K-means 覆盖规划", embedding: "生成 Embedding", index: "更新索引", activate: "切换当前 Corpus", completed: "已完成", failed: "更新失败" };
 
 export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChanged }: { data: any; openedDocument?: { name?: string; citation?: Citation }; onOpenedDocument?: () => void; onChanged?: () => void }) {
-  const pagesWarming = useContext(PageWarmupContext);
   const knowledgeScope = JSON.stringify([data.workspace?.current_corpus_fingerprint, data.documents]);
   const retainedPipeline = goldenCached<any>(knowledgeScope, "/api/pipeline");
-  const [pipelineReady, setPipelineReady] = useState(!!retainedPipeline);
+  const [pipelineReady, setPipelineReady] = useState(!!retainedPipeline || !!data.overview?.knowledge?.identity);
   const [selected, setSelected] = useState<any>();
   const [knowledge, setKnowledge] = useState<any>(retainedPipeline?.knowledge || data.overview?.knowledge || {});
   const [clusterId, setClusterId] = useState<string>();
@@ -39,7 +39,7 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
   useEffect(() => {
     // A changed document set must not join an older in-flight Pipeline read.
     if (previousDocuments.current !== documentVersion) { invalidateReads(); previousDocuments.current = documentVersion; }
-    let cancelled = false; setPipelineReady(!!goldenCached(knowledgeScope, "/api/pipeline")); void goldenFetch<any>(knowledgeScope, "/api/pipeline").then(value => { if (!cancelled) { setPipelineReady(true); setIndex(value.index || {}); setKnowledge(value.knowledge || {}); setRetrieval(value.active_version?.config || value.config || {}); if (value.knowledge?.operation?.status === "running") { setOperation(value.knowledge.operation); setBusy(true); } } }).catch(reason => { if (!cancelled) { setPipelineReady(true); setError(String(reason)); } }); return () => { cancelled = true; };
+    let cancelled = false; setPipelineReady(!!goldenCached(knowledgeScope, "/api/pipeline") || !!data.overview?.knowledge?.identity); void goldenFetch<any>(knowledgeScope, "/api/pipeline").then(value => { if (!cancelled) { setPipelineReady(true); setIndex(value.index || {}); setKnowledge(value.knowledge || {}); setRetrieval(value.active_version?.config || value.config || {}); if (value.knowledge?.operation?.status === "running") { setOperation(value.knowledge.operation); setBusy(true); } } }).catch(reason => { if (!cancelled) { setPipelineReady(true); setError(String(reason)); } }); return () => { cancelled = true; };
   }, [documentVersion]);
   useEffect(() => { let cancelled = false; setCluster(undefined); setSlotId(undefined); if (clusterId) void detailJson(`/api/knowledge/clusters/${clusterId}`).then(value => { if (!cancelled) setCluster(value); }).catch(reason => { if (!cancelled) { setCluster({load_error:String(reason)}); setError(String(reason)); } }); return () => { cancelled = true; }; }, [clusterId, knowledge.identity?.corpus_snapshot_id, knowledge.coverage?.plan_id]);
   useEffect(() => { let cancelled = false; setSlot(undefined); if (slotId) void detailJson(`/api/knowledge/slots/${slotId}`).then(value => { if (!cancelled) setSlot(value); }).catch(reason => { if (!cancelled) { setSlot({load_error:String(reason)}); setError(String(reason)); } }); return () => { cancelled = true; }; }, [slotId, knowledge.identity?.corpus_snapshot_id, knowledge.coverage?.plan_id]);
@@ -94,22 +94,6 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
   };
   const clusters = knowledge.coverage?.clusters || [];
   const hover = useHoverPrefetch();
-  useDetailPrefetch((data.documents || []).map((doc: any) => `/api/documents/${doc.id}`));
-  const topicKey = JSON.stringify([knowledge.identity?.corpus_snapshot_id, knowledge.coverage?.plan_id, clusters.map((item: any) => item.cluster_id)]);
-  useEffect(() => {
-    if (pagesWarming) return;
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      for (const item of clusters) {
-        if (cancelled) break;
-        try {
-          const value = await detailJson<any>(`/api/knowledge/clusters/${item.cluster_id}`);
-          if (!cancelled) await Promise.all((value.slots || []).map((slot: any) => detailJson(`/api/knowledge/slots/${slot.slot_id}`).catch(() => {})));
-        } catch { /* Opening the detail retains the existing retry/error path. */ }
-      }
-    }, 150);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [topicKey, pagesWarming]);
   // Display aliases only; the saved topic names and cluster identities remain untouched.
   const topicNames: Record<string, string> = { "设备运行与操作": "设备操作", "一般提示": "安全与维护", "警告": "警告提示", "蓄电池": "电池与充电", "示教新路线的准备工作": "路线示教执行", "位置代码": "定位与分区", "开启清洁机组": "清洁与维护", "机器人如何与环境通信？": "环境与遥控", "机器人如何与环境通信?": "环境与遥控", "显示屏显示故障": "显示屏故障" };
   const topicName = (item: any) => { const name = item.semantic_label || item.label || item.cluster_id; return topicNames[name] || name; };
@@ -146,7 +130,7 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
       if (example) openChild(example); else setError("暂无带章节的代表性正文分块。");
     } catch (reason) { setError(String(reason)); }
   };
-  return <PageShell className="page knowledge-page" header={<div className="page-title"><div><h1><IconTile name="knowledge" />知识库</h1><p className="ui-kicker page-purpose">把设备说明书解析成可以检索的知识片段，让每一句回答都能追溯到说明书的原页。</p></div><div><div className="header-actions"><button className="secondary" disabled={busy} onClick={() => uploadInput.current?.click()}>新增文档</button><button className="secondary" disabled={busy} onClick={() => setModelAction({ title: "确认重建 Knowledge Pipeline", url: "/api/knowledge/rebuild", method: "POST" })}>重建 Knowledge Pipeline</button></div><input ref={uploadInput} type="file" accept="application/pdf,.pdf" aria-label="选择 PDF 文档" hidden onChange={event => upload(event.target.files?.[0])} /></div></div>}>
+  return <PageShell className="page knowledge-page" header={<div className="page-title"><div><h1><IconTile name="knowledge" />知识库</h1><p className="ui-kicker page-purpose">{pagePurpose.knowledge}</p></div><div><div className="header-actions"><button className="secondary" disabled={busy} onClick={() => uploadInput.current?.click()}>新增文档</button><button className="secondary" disabled={busy} onClick={() => setModelAction({ title: "确认重建 Knowledge Pipeline", url: "/api/knowledge/rebuild", method: "POST" })}>重建 Knowledge Pipeline</button></div><input ref={uploadInput} type="file" accept="application/pdf,.pdf" aria-label="选择 PDF 文档" hidden onChange={event => upload(event.target.files?.[0])} /></div></div>}>
 
     <ConfirmDialog open={!!modelAction} onOpenChange={open => !open && setModelAction(null)} title={modelAction?.title || "确认更新知识库"} busy={busy} onConfirm={() => { const next = modelAction; setModelAction(null); if (next) void start(next.url, next.method, next.file); }}><p>将更新知识库并重建索引，会调用 Embedding 模型并产生费用。</p><p>知识库变更后，Golden 和 Baseline 可能需要重新确认。</p></ConfirmDialog>
     {error && <p className="error-notice" role="alert">{error}</p>}

@@ -8,17 +8,16 @@ export async function warmPageData(page: Page, data: AppData) {
   if (page === 'knowledge')
     await goldenFetch(JSON.stringify([data.workspace?.current_corpus_fingerprint, data.documents]), '/api/pipeline');
   if (page === 'settings') await pipelineFetch(pipelineIdentity(data));
-  if (page === 'evolution') {
-    const d=(data.optimization?.candidates as any[] | undefined)?.find((candidate:any)=>candidate.reasoning?.candidate_label==='D');
-    if (d?.status==='evaluated' && d.result?.evaluation_complete!==false && d.result?.evaluation_run_id)
-      await getJson(`/api/evaluations/${encodeURIComponent(d.result.evaluation_run_id)}`);
-  }
   if (page === 'governance') {
     const identity = JSON.stringify(data.workspace?.current_corpus_fingerprint);
-    const [runs] = await Promise.all([
+    const [runs, snapshots] = await Promise.all([
       goldenFetch<any[]>(identity, '/api/governance/generation-runs?light=true'),
-      goldenFetch(identity, '/api/governance/snapshots?light=true'),
+      goldenFetch<any[]>(identity, '/api/governance/snapshots?light=true'),
     ]);
+    if (snapshots.find(snapshot => snapshot.id === data.workspace?.current_golden_id)?.snapshot?.reanchor) {
+      await goldenFetch(identity, '/api/governance/snapshots');
+      return;
+    }
     const run = runs[0];
     if (run?.question_ids?.length || run?.artifacts?.hard_validation?.slot_persistence_v1) {
       const { preloadCandidates } = await import('./components/ScrollablePagedTable');
@@ -28,8 +27,6 @@ export async function warmPageData(page: Page, data: AppData) {
   if ((page === 'evaluation' || page === 'verification') && data.evaluation?.status === 'completed' && typeof data.evaluation.id === 'string')
     data.evaluation = await getJson(`/api/evaluations/${encodeURIComponent(data.evaluation.id)}`);
 }
-
-export const warmupRoute: Page[] = ['overview', 'knowledge', 'governance', 'settings', 'evaluation', 'evolution', 'versions', 'verification'];
 
 // Run after paint and support browsers without requestIdleCallback.
 export function onIdle(callback: () => void) {

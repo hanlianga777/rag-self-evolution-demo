@@ -1,3 +1,4 @@
+import { helpText } from "../../helpText";
 import { Icon, type IconName } from "../icons";
 import { Band, C, Defs, Figure, Node, Tag, Wire } from "./svgkit";
 import "./architecture.css";
@@ -13,7 +14,7 @@ import "./architecture.css";
  * 三道人工关口用卡片右上角的蓝色徽标表示，不挤占标题位置。
  */
 
-type N = { icon: IconName; title: string; lines: string[]; badge?: string; focus?: boolean; dashed?: boolean };
+type N = { tip?: string; icon: IconName; title: string; lines: string[]; badge?: string; focus?: boolean; dashed?: boolean };
 
 const VW = 1200;
 const LABEL = 120;            // 左侧段名列宽
@@ -35,9 +36,9 @@ const centerY = (b: { a0: number; a1: number }) => (b.a0 + b.a1) / 2 - H / 2;
 const KNOWLEDGE: N[] = [
   { icon: "doc", title: "文档接入", lines: ["说明书、FAQ 等资料", "按产品和类别归档"] },
   { icon: "parse", title: "版面解析", lines: ["MinerU 识别标题、表格", "和图片说明，保留页码"] },
-  { icon: "chunk", title: "Parent-Child 分块", lines: ["Child 小块用来检索", "Parent 大块给回答用"] },
+  { icon: "chunk", title: "Parent-Child 分块", tip: helpText.parent_child, lines: ["Child 小块用来检索", "Parent 大块给回答用"] },
   { icon: "search", title: "向量化与索引", lines: ["Embedding 向量索引", "加 BM25 关键词检索"] },
-  { icon: "coverage", title: "主题聚类", lines: ["K-means 分出主题簇", "按主题厚薄分配题位"] },
+  { icon: "coverage", title: "主题聚类", tip: helpText.cluster, lines: ["K-means 分出主题簇", "按主题厚薄分配题位"] },
 ];
 const K_STEP = (VW - 8 - X0 - W) / (KNOWLEDGE.length - 1);
 
@@ -104,9 +105,9 @@ export function BusinessArchitecture() {
       <Wire id={ID} d={fan(col(1) + W + 43, qY(i) + 23, col(2) + 36, g0 + H / 2)} />
     </g>)}
     <Wire id={ID} d={fan(col(0) + W + 3, B2.a0 + 4 + H / 2, col(1) - 4, qY(1) + 23)} />
-    <Node x={col(2) + 40} y={g0} w={W} h={H} icon="checks" title="硬校验与探针" lines={["证据须在原文逐字找到", "探针拿题去检索验真伪"]} />
+    <Node x={col(2) + 40} y={g0} w={W} h={H} icon="checks" title="硬校验与探针" tip={helpText.probe} lines={["证据须在原文逐字找到", "探针拿题去检索验真伪"]} />
     <Wire id={ID} d={`M${col(2) + 40 + W + 4} ${g0 + H / 2} H${col(3) + 36}`} />
-    <Node x={col(3) + 40} y={g0} w={W} h={H} icon="report" title="质检 QC" lines={["模型检查题目质量", "问题按轻重分级"]} />
+    <Node x={col(3) + 40} y={g0} w={W} h={H} icon="report" title="质检 QC" tip={helpText.qc} lines={["模型检查题目质量", "问题按轻重分级"]} />
     <Wire id={ID} d={`M${col(3) + 40 + W + 4} ${g0 + H / 2} H${col(4) + 36}`} />
     <Node x={col(4) + 40} y={g0} w={W} h={H} icon="approval" title="题卷冻结" lines={["人只看红线问题清单", "冻结后每轮都用它"]} badge="Gate 1" />
     <Wire id={ID} accent d={drop(col(4) + 40 + W / 2, g0 + H, B2.top + B2.h + 20, mid(0), e0)} />
@@ -115,9 +116,9 @@ export function BusinessArchitecture() {
     {/* 03 评测诊断 */}
     <Node x={col(0)} y={e0} w={W} h={H} icon="baseline" title="Baseline 评测" lines={["当前配置逐题作答", "记录检索、回答和耗时"]} />
     <Wire id={ID} d={`M${col(0) + W + 4} ${e0 + H / 2} H${col(1) - 5}`} />
-    <Node x={col(1)} y={e0} w={W} h={H} icon="correct" title="判分" lines={["规则算检索和耗时", "LLM-as-Judge 判对错"]} />
+    <Node x={col(1)} y={e0} w={W} h={H} icon="correct" title="判分" tip={helpText.judge} lines={["规则算检索和耗时", "LLM-as-Judge 判对错"]} />
     <Wire id={ID} d={`M${col(1) + W + 4} ${e0 + H / 2} H${col(2) - 5}`} />
-    <Node x={col(2)} y={e0} w={W} h={H} icon="gate" title="Hard Gate" lines={["质量、安全、速度", "每一项单独过线"]} />
+    <Node x={col(2)} y={e0} w={W} h={H} icon="gate" title="Hard Gate" tip={helpText.hard_gate} lines={["质量、安全、速度", "每一项单独过线"]} />
     {LAYERS.map((l, i) => <g key={l.title}>
       <Wire id={ID} d={fan(col(2) + W + 3, e0 + H / 2, col(3) - 4, lY(i) + 21)} />
       <rect x={col(3)} y={lY(i)} width={LW} height={42} rx={10} fill={C.surface} stroke={C.rule} />
@@ -138,15 +139,15 @@ export function BusinessArchitecture() {
       <text x={col(1) + 11} y={cY(i) + 32} fontSize={11} fill={C.muted}>方向互不相同</text>
       <Wire id={ID} accent d={fan(col(1) + W + 3, cY(i) + 20, col(2) - 4, o0 + H / 2)} />
     </g>)}
-    <Node x={col(2)} y={o0} w={W} h={H} icon="compare" title="Sandbox 评测" lines={["同一套考卷", "同一套判分标准"]} focus />
+    <Node x={col(2)} y={o0} w={W} h={H} icon="compare" title="Sandbox 评测" tip={helpText.sandbox} lines={["同一套考卷", "同一套判分标准"]} focus />
     <Wire id={ID} accent d={`M${col(2) + W + 4} ${o0 + H / 2} H${col(3) - 5}`} />
-    <Node x={col(3)} y={o0} w={W} h={H} icon="gate" title="Regression Check" lines={["修好的题不能抵消", "新弄坏的题"]} focus />
+    <Node x={col(3)} y={o0} w={W} h={H} icon="gate" title="Regression Check" tip={helpText.regression} lines={["修好的题不能抵消", "新弄坏的题"]} focus />
     <Wire id={ID} accent d={`M${col(3) + W + 4} ${o0 + H / 2} H${col(4) - 5}`} />
     <Node x={col(4)} y={o0} w={W} h={H} icon="report" title="本轮结论" lines={["修好、弄坏了什么", "可能是哪个参数"]} focus />
     <Wire id={ID} accent dashed d={`M${mid(4)} ${o0 + H} V${B4.a1 + 2} Q${mid(4)} ${B4.a1 + 12} ${mid(4) - 10} ${B4.a1 + 12} H${mid(0) + 10} Q${mid(0)} ${B4.a1 + 12} ${mid(0)} ${B4.a1 + 2} V${o0 + H + 4}`} />
     <Tag x={(mid(0) + mid(4)) / 2} y={B4.a1 + 16} text="未达标：经验写入下一轮策略，在评测预算内继续" accent bg="#f5f9fe" />
     <Wire id={ID} accent d={`M${col(4) + W + 4} ${o0 + H / 2} H${col(5) - 5}`} />
-    <Node x={col(5)} y={o0} w={W} h={H} icon="merge" title="Candidate D" lines={["合并合格方案的有效参数", "事先预测、事后对账"]} focus />
+    <Node x={col(5)} y={o0} w={W} h={H} icon="merge" title="Candidate D" tip={helpText.candidate_d} lines={["合并合格方案的有效参数", "事先预测、事后对账"]} focus />
     <Wire id={ID} d={`M${col(5) + W + 4} ${o0 + H / 2} H${col(6) - 5}`} />
     <Node x={col(6)} y={o0} w={W} h={H} icon="report" title="实验报告确认" lines={["人看各方案报告", "和推荐理由"]} badge="Gate 2" />
     <Wire id={ID} d={`M${mid(6)} ${o0 + H + 4} V${B5.a0 - 5}`} />
@@ -172,7 +173,7 @@ export function BusinessArchitecture() {
 export type Problem = { icon: IconName; title: string; text: string };
 
 export const PROJECT_PROBLEMS: Problem[] = [
-  { icon: "target", title: "效果说不清", text: "智能客服上线以后，答得好不好往往要等到客户投诉才知道，团队手里缺少一把稳定的尺子，每次讨论效果都只能凭印象。" },
+  { icon: "target", title: "效果说不清", text: "智能客服上线以后，答得好不好往往要等到客户投诉才知道，团队手里缺少同一套考卷和判分标准，每次讨论效果都只能凭印象。" },
   { icon: "pipeline", title: "调参靠经验", text: "检索条数、排序方式、模型思考深度这些参数彼此牵连，靠人一个个去试既慢又贵，试出来的结果也很难说清是哪一处改动起了作用。" },
   { icon: "release", title: "改了不敢上线", text: "修好一道题的同时，常常会悄悄弄坏另一道原本答对的题，没有回归检查和人工把关，谁也不敢在这样的改动上签字发布。" },
 ];

@@ -98,7 +98,7 @@ export async function loadAppData(retry = true, page?: Page): Promise<AppData> {
   const paths: Record<keyof AppData,string> = { workspace:'/api/workspace',overview:'/api/overview',documents:'/api/documents',dataset:'/api/dataset?light=true',evaluation:'/api/evaluation',badCases:'/api/bad-cases',optimization:'/api/optimization',versions:'/api/versions',readiness:'/api/readiness',monitoring:'/api/monitoring' };
   if (page) {
     paths.overview += '?light=true'; if (page !== 'evaluation' && page !== 'evolution') paths.evaluation += '?light=true'; paths.badCases += '?light=true';
-    paths.optimization += page === 'evolution' ? '?light=true&planning=true' : '?light=true';
+    paths.optimization += '?light=true';
   }
   const data: AppData = {workspace:{},overview:{},documents:[],dataset:[],evaluation:{},badCases:[],optimization:{},versions:[],readiness:{},monitoring:{}};
   const keys=page ? pageInputs[page] : Object.keys(paths) as (keyof AppData)[];

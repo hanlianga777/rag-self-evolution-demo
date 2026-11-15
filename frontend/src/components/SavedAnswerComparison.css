@@ -108,7 +108,6 @@
 .saved-answer-comparison .comparison-legend span+span::before { background:var(--accent); }
 .saved-answer-comparison .comparison-h3-row { display:flex; align-items:center; gap:6px; margin-bottom:14px; }
 .saved-answer-comparison .comparison-h3-row h3 { margin:0; }
-.saved-answer-comparison .comparison-info { display:inline-flex; width:16px; height:16px; border-radius:50%; border:1px solid var(--rule); color:var(--muted); font-size:11px; align-items:center; justify-content:center; cursor:help; margin:0; }
 .saved-answer-comparison .comparison-empty { padding:0 20px; color:var(--muted); }
 @media(max-width:1180px) { .saved-answer-comparison .comparison-why { grid-template-columns:1fr; } .saved-answer-comparison .comparison-points { border-left:0; border-top:1px solid var(--rule-2); } }
 @media(max-width:1350px) { .saved-answer-comparison .comparison-qhead { flex-direction:column; gap:8px; } .saved-answer-comparison .comparison-verdict { margin-top:0; } }

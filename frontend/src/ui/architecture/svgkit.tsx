@@ -1,4 +1,5 @@
-import { createContext, useContext, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { HoverCard } from "../HoverCard";
 import { ICONS, type IconName } from "../icons";
 
 /**
@@ -48,24 +49,14 @@ export type NodeProps = {
   tip?: string;
 };
 
-type TipState = { text: string; x: number; y: number } | null;
-const TipContext = createContext<((tip: TipState) => void) | null>(null);
-
 /** 一个节点：白底细边圆角卡；Gate 节点蓝框 + 右上角徽标；focus 浅蓝底；dashed 虚线框。 */
 export function Node({ x, y, w, h, icon, title, lines = [], badge, gate, focus, value, dot, dashed, titleSize = 12.5, corner, tip }: NodeProps) {
-  const setTip = useContext(TipContext);
   const Glyph = icon ? ICONS[icon] : null;
   const mark = badge ?? gate;
   const stroke = mark ? C.accent : focus ? "rgba(0,113,227,0.35)" : dashed ? C.faint : C.rule;
   const top = y + 20;
   const badgeWidth = mark ? textWidth(mark, 10) + 14 : 0;
-  const show = (event: MouseEvent<SVGGElement>) => {
-    if (!tip || !setTip) return;
-    const host = event.currentTarget.ownerSVGElement?.parentElement?.getBoundingClientRect();
-    if (host) setTip({ text: tip, x: event.clientX - host.left, y: event.clientY - host.top });
-  };
-  return <g className={tip ? "ui-arch-tip" : undefined} onMouseMove={show} onMouseLeave={() => tip && setTip?.(null)}>
-    {tip && <title>{tip}</title>}
+  const node = <g>
     {mark && <rect x={x - 3} y={y - 3} width={w + 6} height={h + 6} rx={13} fill="rgba(0,113,227,0.07)" />}
     <rect x={x} y={y} width={w} height={h} rx={10} fill={focus ? C.tint : C.surface} stroke={stroke} strokeWidth={mark ? 1.5 : 1} strokeDasharray={dashed ? "4 3" : undefined} />
     {mark && <g>
@@ -75,11 +66,12 @@ export function Node({ x, y, w, h, icon, title, lines = [], badge, gate, focus, 
     {Glyph && <Glyph x={x + 10} y={y + 9} width={13} height={13} color={focus || mark ? C.accent : C.muted} strokeWidth={1.8} />}
     <text x={Glyph ? x + 29 : x + 11} y={top} fontSize={titleSize} fontWeight={600} fill={C.ink}>{title}</text>
     {corner && <text x={x + w - 10} y={top} fontSize={10} textAnchor="end" fill={C.faint}>{corner}</text>}
-    {tip && <text x={x + w - 9} y={y + h - 8} fontSize={10.5} textAnchor="end" fill={C.faint}>ⓘ</text>}
+    {tip && <g aria-hidden="true"><circle cx={x + w - 12} cy={y + h - 12} r={6} fill="none" stroke={C.muted}/><text x={x + w - 12} y={y + h - 9} fontSize={10} textAnchor="middle" fill={C.muted}>i</text></g>}
     {dot && <circle cx={x + w - 11} cy={y + 15} r={3} fill={C.accent} />}
     {value && <text x={x + 11} y={top + 19} fontSize={14} fontWeight={600} fill={C.ink}>{value}</text>}
     {lines.map((line, index) => <text key={index} x={x + 11} y={top + (value ? 36 : 18) + index * 15} fontSize={11} fill={C.muted}>{line}</text>)}
   </g>;
+  return tip ? <HoverCard svg className="ui-arch-tip" content={tip}>{node}</HoverCard> : node;
 }
 
 /** 连线标签：浅灰小字，垫白底避免压线。 */
@@ -116,16 +108,8 @@ export function Band({ x, y, w, h, labelWidth, index, name, note, accent }: { x:
 }
 
 export function Figure({ label, viewBox, children, legend }: { label: string; viewBox: string; children: ReactNode; legend?: ReactNode }) {
-  const [tip, setTip] = useState<TipState>(null);
-  const host = useRef<HTMLDivElement>(null);
-  const width = host.current?.clientWidth ?? 0;
   return <figure className="ui-arch-figure" aria-label={label}>
-    <div className="ui-arch-host" ref={host}>
-      <TipContext.Provider value={setTip}>
-        <svg viewBox={viewBox} role="img" aria-label={label} className="ui-arch-svg">{children}</svg>
-      </TipContext.Provider>
-      {tip && <div className="ui-arch-tipcard" role="tooltip" style={{ left: Math.min(tip.x + 14, Math.max(0, width - 300)), top: tip.y + 16 }}>{tip.text}</div>}
-    </div>
+    <div className="ui-arch-host"><svg viewBox={viewBox} role="img" aria-label={label} className="ui-arch-svg">{children}</svg></div>
     {legend && <figcaption className="ui-arch-legend">{legend}</figcaption>}
   </figure>;
 }

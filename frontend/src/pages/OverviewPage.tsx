@@ -1,3 +1,5 @@
+import { InfoTip } from "../ui/HoverCard";
+import { pagePurpose } from "../helpText";
 import { usePageTab } from "../usePageTab";
 import { IconTile } from "../ui/icons";
 import {completeResult, remainingQuestionIds, recommendationOf, schemeName} from "../components/EvolutionStory";
@@ -115,13 +117,14 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const flow = [
     {label: "知识库", fact: stages[0][1], tips: [knowledge?.identity ? "当前知识资产已建立" : "请先建立知识处理 Pipeline", stages[1][1]], page: "knowledge"},
     {label: "Golden Dataset", fact: stages[2][1], tips: [frozen ? "正式题卷已人工确认" : "完成审核后冻结正式题卷", completeGroups ? "正向、消融、负向分类完整" : "题目分类需核对"], page: "governance"},
+    {label: "Pipeline 配置", fact: stages[1][1], tips: ["技术选型与可调参数", "确认参数后运行 Baseline"], page: "settings"},
     {label: "Baseline", fact: stages[3][1], tips: [run?.status === "completed" ? "指标来自保存的正式评测" : "等待正式评测完成", data.workspace?.baseline_unavailable_reason || "同题卷用于 Candidate 对照"], page: "evaluation"},
     {label: "Agent", fact: experiment.id ? `${storyRounds} 轮 · ${candidates.length} 个 Candidate` : stages[4][1], tips: [sandboxPaused ? "已暂停，进度已保存" : sandboxIncomplete ? "Candidate 评测尚未完成" : stages[4][1], "修复与副作用由 Sandbox 核对"], page: "evolution"},
     {label: "发布", fact: stages[5][1], tips: ["发布需要人工确认", "线上身份以保存的版本为准"], page: "versions"},
     {label: "问答验证", fact: currentReleased ? "可验证线上回答" : "可查看线上配置", tips: ["逐题比较 Baseline 与线上回答", "反馈可作为再次进化的线索"], page: "verification"},
   ].map(step => ({...step, onClick: () => navigate(step.page as Page)}));
 
-  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1><IconTile name="overview" />RAG 自进化项目概览</h1><p className="ui-kicker page-purpose">用一组数字和一条闭环，说明这套系统让智能客服变好了多少，又是怎样一步步做到的。</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button data-label="项目概览" className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button data-label="业务架构" className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button data-label="技术架构" className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
+  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1><IconTile name="overview" />RAG 自进化概览</h1><p className="ui-kicker page-purpose">{pagePurpose.overview}<InfoTip term="evaluation_standard" label="同一套考卷和判分标准" /></p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button data-label="项目概览" className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button data-label="业务架构" className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button data-label="技术架构" className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
 
 
     {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} /> : <>

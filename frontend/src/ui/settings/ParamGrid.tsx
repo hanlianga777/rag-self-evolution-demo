@@ -1,5 +1,5 @@
-import { HoverCard } from "../HoverCard";
-import { Icon, IconLabel, type IconName } from "../icons";
+import { InfoTip } from "../HoverCard";
+import { IconLabel, type IconName } from "../icons";
 import "../extra.css";
 
 /**
@@ -32,7 +32,7 @@ export function ParamGrid({ groups, onChange, legend = { baseline: "Baseline", o
         {group.items.map(item => <div key={item.key} className={`ui-pg-row${item.changed ? " changed" : ""}${item.onlineChanged ? " online-changed" : ""}`} data-parameter={item.key}>
           <div className="ui-pg-name">
             <span>{item.label}</span>
-            {item.note && <HoverCard content={item.note}><span className="ui-pg-info" tabIndex={0} aria-label={`${item.label}说明`}><Icon name="info" size={13} /></span></HoverCard>}
+            {item.note && <InfoTip content={item.note} label={item.label} />}
           </div>
           <div className="ui-pg-seg" role="radiogroup" aria-label={item.label}>
             {item.options.map(option => {
