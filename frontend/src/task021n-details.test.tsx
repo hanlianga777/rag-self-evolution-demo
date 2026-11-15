@@ -16,8 +16,8 @@ it.each([
 ])('%s keeps every non-citation character in the saved opening sentence',async(_id,answer,documentName,section,page,expected,short)=>{
  const evidence={document:documentName,page_start:page,section_path:section,content:'保存的证据'};
  await mount(<ComparisonAnswer row={{model_answer:answer,programmatic_metrics:{retrieval_trace:{final:[evidence]}}}} points={[]} side="before" onOpenCitation={()=>{}}/>);
- expect(document.querySelector('.comparison-body')?.textContent).toBe(expected);
- expect(document.querySelector('.comparison-sources li')?.textContent).toBe(`1${short}，${section}，第 ${page} 页`);
+ expect(document.querySelector('.comparison-body')?.textContent).toBe(expected.replace('”1','”①'));
+ expect(document.querySelector('.answer-source summary')?.textContent).toBe(`①${short} · 第 ${page} 页`);
 });
 
 const quote='类型=结构；要点=1. 目视及触摸检查机身、各个关节及连接处、足端组件是否完好,有裂纹或者有破损需及时更换和联系 Unitree 售后';

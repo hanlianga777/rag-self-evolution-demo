@@ -31,7 +31,7 @@ it("orders business evidence before diagnosis and preserves negative anchors and
   const heads = [...document.querySelectorAll(".case-details > section > h3")].map(h => h.textContent);
   expect(heads.indexOf("答案对比")).toBeLessThan(heads.indexOf("检索路径"));
   expect(heads.indexOf("检索路径")).toBeLessThan(heads.indexOf("优化方向"));
-  expect(document.querySelectorAll(".case-details > section")[2].textContent).toContain("不适用（负向题（Negative）不定位标准证据）");
+  expect(document.querySelectorAll(".case-details > section")[2].textContent).toContain("未保存可对齐的必答要点或标准证据。");
   expect(document.querySelectorAll(".evidence-path")).toHaveLength(0);
   expect(document.querySelector(".case-answer-stack")?.textContent).toContain("回答");
 });

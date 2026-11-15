@@ -10,7 +10,7 @@ it.each(['PASS','FAIL'])('shows explicit binary business %s without legacy quali
  root=createRoot(document.body.appendChild(document.createElement('div')));
  act(()=>root.render(<BaselineCaseDetails item={{question:'操作问题',model_answer:'保存回答',evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict},judge_result:{reason:'整体业务核验依据'}}} snapshot={{}} config={{}} gates={[]}/>));
  const section=document.querySelector('.case-review')!;
- expect(section.textContent).toContain(verdict==='PASS'?'答对':'答错');expect(document.querySelector('.case-difference')?.textContent).toContain(verdict==='PASS'?'已答对':'未知');expect(document.querySelector('details')?.textContent).toContain('整体业务核验依据');expect(section.textContent).not.toContain('历史保存判定');
+ expect(section.textContent).toContain(verdict==='PASS'?'答对':'答错');expect(document.querySelector('.case-difference')?.textContent).toContain(verdict==='PASS'?'已答对':'未知');expect([...document.querySelectorAll('details')].find(e=>e.querySelector('summary')?.textContent?.includes('判分原文'))?.textContent).toContain('整体业务核验依据');expect(section.textContent).not.toContain('历史保存判定');
 });
 it('execution failure has no invented business FAIL',()=>{
  root=createRoot(document.body.appendChild(document.createElement('div')));

@@ -28,9 +28,9 @@ it('leaves natural source labels, numeric units and ordinary prose intact',()=>{
 it('shows a human source in the answer and preserves exact original in closed audit',()=>{
  const raw='关闭设备 [DOC-001-C-00185]';root=createRoot(document.body.appendChild(document.createElement('div')));
  act(()=>root.render(<CaseAnswer text={raw} final={final}/>));
- expect(document.querySelector('.case-answer')?.textContent).toContain('设备手册.pdf');
+ expect(document.querySelector('.answer-source summary')?.textContent).toContain('设备手册');
  expect(document.querySelector('.case-answer')?.textContent).not.toContain('DOC-001');
- const audit=document.querySelector('details')!;expect(audit.open).toBe(false);expect(audit.textContent).toContain(raw);
+ const audit=document.querySelector<HTMLDetailsElement>('.answer-original')!;expect(audit.open).toBe(false);expect(audit.textContent).toContain(raw);
 });
 
 it('keeps saved Parent page ranges distinct from Child location',()=>{
@@ -51,6 +51,6 @@ it('refreshes an open light-list drawer with the saved full case when it arrives
   await act(async()=>document.querySelector<HTMLElement>('.product-diagnosis-table tbody tr')!.click());
   await act(async()=>{complete(new Response(JSON.stringify({...run,cases:[{...item,programmatic_metrics:{retrieval_trace:{final}}}]})));await response;});
   const displayed=document.querySelector('.case-answer-stack > div:nth-child(2) .case-answer');
-  expect(displayed?.textContent).toContain('设备手册.pdf');expect(displayed?.textContent).not.toContain('引用来源未核验');
+  expect(document.querySelector('.answer-source summary')?.textContent).toContain('设备手册');expect(displayed?.textContent).toContain('①');expect(displayed?.textContent).not.toContain('引用来源未核验');
  } finally {vi.unstubAllGlobals();}
 });

@@ -24,9 +24,9 @@ it('structures a saved chat answer without changing its full audit copy or sourc
  expect(document.querySelector('.qa-version-status')).toBeNull();
  expect(document.querySelector('.message-label')?.textContent).toBe('AI 助手13.4 秒');
  expect(document.querySelector('.answer-text')?.textContent).toContain('正文中的依据：保留');
- expect(document.querySelector('.answer-text')?.textContent).not.toContain('操作说明的保存证据');
- expect(document.querySelector('.message-sources')?.textContent).toContain('依据：操作说明的保存证据');
- expect([...document.querySelectorAll('.message-sources button')].map(n=>n.textContent)).toEqual(['KIRA 操作说明，第 12 页','KIRA 操作说明，第 48 页']);
+ expect(document.querySelector('.model-answer-body')?.textContent).not.toContain('操作说明的保存证据');
+ expect(document.querySelector('.answer-notes')?.textContent).toContain('依据：操作说明的保存证据');expect(document.querySelector<HTMLDetailsElement>('.answer-notes')?.open).toBe(false);
+ expect(document.querySelector('.answer-original pre')?.textContent).toBe(content);expect(document.querySelectorAll('.answer-source')).toHaveLength(0);
  expect(document.querySelector('.message-sources [title]')).toBeNull();
  expect(document.querySelector('.qa-answer-audit')).toBeNull();
  expect(document.querySelector('.qa-answer-actions .clue-button')?.classList.contains('primary')).toBe(true);

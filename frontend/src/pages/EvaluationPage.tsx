@@ -1,7 +1,6 @@
-import { InfoTip } from "../ui/HoverCard";
+import { InfoTip, HoverCard } from "../ui/HoverCard";
 import { pagePurpose, helpText } from "../helpText";
 import { judgePresentation } from "../components/judgePresentation";
-import { shortSourceName } from "./FrozenQuestionDetails";
 import { Icon, IconLabel, IconTile } from "../ui/icons";
 import { BaselineBreakdown } from "../ui/baseline/BaselineBreakdown";
 import { HardGateGrid } from "../ui/baseline/HardGateGrid";
@@ -23,6 +22,9 @@ import { Play } from "lucide-react";
 import { cachedJson, errorMessage, getJson, postJson } from "../api";
 import { Badge, DrawerSection, Metric, Section, Status, TruncatedText } from "../components/Primitives";
 import { thinkingLabel } from "../components/PipelineFields";
+import {ModelAnswer} from '../components/ModelAnswer';
+import {savedAnswerPoints} from '../components/savedAnswerPoints';
+import {circle} from '../components/answerPresentation';
 import { CaseAnswer } from "../components/CaseAnswer";
 import { ConfirmDialog, Drawer } from "../components/Dialog";
 import { displayText, gateNames, gateEnglishNames, localShortTime } from "../display";
@@ -263,7 +265,6 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
 
 export function BaselineCaseDetails({ item, snapshot, config, gates }: { item: Row; snapshot: Row; config: Row; gates: Row[] }) {
   const golden = snapshot.questions?.find((row: Row) => row.id === item.question_id) || {};
-  const evidence: Row[] = golden.evidence || golden.acceptable_evidence || [];
   const view = item.diagnostic_view || {};
 
   const passed = businessVerdict(item) === 'PASS';
@@ -278,25 +279,13 @@ export function BaselineCaseDetails({ item, snapshot, config, gates }: { item: R
   const finalRecords = metrics.retrieval_trace?.final ?? item.retrieved_chunks;
   const final: Row[] = Array.isArray(finalRecords) ? finalRecords : [];
 
-  const trace=metrics.retrieval_trace || {};
-  const savedSources:Row[]=[...(trace.candidates || []),...(trace.reranked || []),...final];
-  const matches=(source:Row,id:string)=>!!id && (source.chunk_id===id || source.parent_chunk_id===id || source.matched_child_ids?.includes(id));
-  const sourceLocation = (record: Row) => {
-    const ids=[record.chunk_id,record.source_id,...(record.source_chunk_ids || [])].filter(Boolean);
-    const source=savedSources.find(source=>ids.some(id=>matches(source,id))) || (!ids.length && record.document_id?savedSources.find(source=>source.document_id===record.document_id):null) || {};
-    const document=record.document || record.document_name || source.document || source.document_name;
-    const start=record.page_start ?? source.page_start,end=record.page_end ?? source.page_end;
-    return [document ? shortSourceName(document) : '',start!=null?`p${start}${end!=null && end!==start?`–${end}`:''}`:''].filter(Boolean).join(' · ');
-  };
-  const missing:string[]=Array.isArray(view.missing_points)?view.missing_points:[];
-  const positions:Row[]=view.retrieval_positions || view.evidence_checks?.filter((check:Row)=>'candidate_rank' in check) || [];
-  const negative=(item.test_category || golden.test_category)==='negative';
+  const points=savedAnswerPoints(item,{...golden,reference_answer:reference});
 
   return <div className="case-details bad-case-details">
     <div className="case-review"><Badge tone={passed?"good":businessVerdict(item)==="FAIL"?"bad":"neutral"}>{conclusion}</Badge>{item.baseline_review_label && <Badge tone={item.baseline_review?.status==='confirmed_regression'?'bad':item.baseline_review?.status==='fluctuation'?'warning':'neutral'}>{displayText(item.baseline_review_label)}</Badge>}</div>
     <section className="candidate-card drawer-section"><h3>业务问题</h3><p className="muted">{displayText(item.test_category || golden.test_category || '')}{item.negative_subtype && ` · ${displayText(item.negative_subtype)}`}</p><CaseAnswer text={item.question || golden.question || '历史未保存问题原文'} />{golden.business_scenario && <div className="muted-prose"><TruncatedText lines={3}>业务场景：{golden.business_scenario}</TruncatedText></div>}</section>
-    <section className="candidate-card drawer-section"><h3>答案对比</h3><div className="case-answer-stack"><div><h4>参考答案 / 必答要点</h4><CaseAnswer text={reference} />{typeof view.missing_points==='string' && <div className="muted-prose muted"><TruncatedText lines={3}>{view.missing_points}</TruncatedText></div>}{missing.length>0 && <div className="missing-points"><strong>未答到的要点</strong><ul>{missing.map(point=><li key={point}>{point}</li>)}</ul></div>}</div><div><h4>实际回答</h4><CaseAnswer text={item.model_answer || '历史未保存回答'} final={final} /></div></div><div className="muted-prose case-difference"><TruncatedText lines={3}><span>{summary.text}</span></TruncatedText></div></section>
-    <section className="candidate-card drawer-section"><h3>检索路径<InfoTip term="rerank" label="Rerank" /></h3>{negative?<p>不适用（负向题（Negative）不定位标准证据）</p>:<>{evidence.map((source,index)=>{const position=positions.find(position=>position.evidence_index===index+1);return <article className="evidence-path" key={index}><div className="muted-prose"><TruncatedText lines={3}>{source.evidence_key_points?.join('；') || '历史未保存关键事实摘要'}</TruncatedText></div><p className="muted">{sourceLocation(source) || '保存记录缺少来源位置'}</p>{position?<ol aria-label={`第 ${index+1} 段标准证据检索路径`}><li>{position.candidate_rank!=null?`召回第 ${position.candidate_rank} 位`:'未进候选'}</li><li>{position.rerank_rank!=null?`Rerank 第 ${position.rerank_rank} 位`:'保存记录缺少 Rerank 位次'}</li><li>{position.final_rank!=null?`进入 Top-K 第 ${position.final_rank} 位`:`未进 Top-K ${final.length} 条`}</li></ol>:<p className="muted">保存记录缺少该段证据的检索位置。</p>}</article>})}{!evidence.length && <p>历史冻结题卷未保存标准证据。</p>}</>}</section>
+    <section className="candidate-card drawer-section"><h3>答案对比</h3><div className="case-answer-stack"><div><h4>参考答案 / 必答要点<InfoTip term="judge" label="判分" /></h4>{points.length?<ol className="answer-point-list">{points.map(point=><li key={point.number}><HoverCard content={<>{point.met===true?'答到':point.met===false?'没答到':'判分未知'}：{point.reason}</>}><button type="button" className={`answer-point-badge ${point.met===true?'met':point.met===false?'missed':'unknown'}`} aria-label={`要点 ${point.number} · ${point.met===true?'答到':point.met===false?'没答到':'判分未知'}`}>{circle(point.number)}</button></HoverCard><span>{point.text}</span></li>)}</ol>:<CaseAnswer text={reference} />}{typeof view.missing_points==='string' && <p className="muted">{view.missing_points}</p>}</div><div><h4>实际回答</h4><ModelAnswer text={item.model_answer || '历史未保存回答'} final={final} /></div></div><div className="muted-prose case-difference"><TruncatedText lines={3}><span>{summary.text}</span></TruncatedText></div></section>
+    <section className="candidate-card drawer-section"><h3>检索路径</h3>{points.length?<table className="point-retrieval"><thead><tr><th>必答要点</th><th>召回排第几</th><th>Rerank 后排第几</th><th>最终交给模型</th></tr></thead><tbody>{points.map(point=><tr key={point.number}><td>{circle(point.number)} {point.text}</td><td>{point.candidate}</td><td>{point.rerank}</td><td>{point.final}</td></tr>)}</tbody></table>:<p className="muted">未保存可对齐的必答要点或标准证据。</p>}</section>
     {item.judge_result?.reason && <StoryDisclosure className="candidate-card drawer-section" label={<>判分原文<InfoTip term="judge" label="判分" /></>}><p className="muted-prose">{item.judge_result.reason}</p></StoryDisclosure>}
     <section className="candidate-card drawer-section"><h3>优化方向</h3><div className="muted-prose"><TruncatedText lines={3}>{passed?'本题已答对，无失败优化目标。':view.repair_hint || savedDirections(item)}</TruncatedText></div></section>
 

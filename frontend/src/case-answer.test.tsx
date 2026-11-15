@@ -40,14 +40,14 @@ it('keeps FAIL as Bad Case while diagnosis remains part of Agent processing', ()
   const cards = document.querySelectorAll('.bad-case-details > section');
   expect(document.querySelector('.case-review')?.textContent).toContain('答错');expect(document.querySelector('.bad-case-details > details')).toBeNull();
   expect(cards[3].textContent).toContain('核验来源覆盖并提出优化假设');
-  expect(cards[2].textContent).toContain('历史冻结题卷未保存标准证据。');
+  expect(cards[2].textContent).toContain('未保存可对齐的必答要点或标准证据。');
 });
 it('formats mixed HTML and markdown lists and turns behavior enums into the saved business expectation', () => {
   render(<BaselineCaseDetails item={{ question_id: 'offline', reference_answer: 'safe_rejection', raw: { expected_response: '拒绝高压水枪；按说明书清洁。' }, model_answer: '<p>处理步骤：1. **停止使用**。 2. 查看第4.2章节和第40页 [C115]。</p>', diagnostic_view: {} }} snapshot={{}} config={{}} gates={[]} />);
   const stack = document.querySelector('.case-answer-stack')!;
   expect(stack.textContent).toContain('拒绝高压水枪；按说明书清洁。');
   expect(stack.textContent).not.toContain('safe_rejection');
-  expect(stack.querySelector('ol')?.children).toHaveLength(2);
+  expect(stack.querySelector('.model-answer-body ol')?.children).toHaveLength(2);
   expect(stack.querySelector('strong')?.textContent).toBe('停止使用');
   expect(stack.textContent).toContain('第4.2章节和第40页 [C115]');
 });
