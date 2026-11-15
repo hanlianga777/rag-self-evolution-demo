@@ -45,6 +45,7 @@ from .agent_coverage import plan_coverage, complete_coverage
 from .knowledge_pipeline import AlibabaProvider
 from .evaluation_stage import perform_stage
 from .read_view import read_view, evaluation_display
+from .display_summaries import register_routes as register_display_summary_routes
 
 # Fingerprint loaded objects, not source files that may have changed under a live process.
 EVALUATION_RUNTIME_CONTRACT = {**VERSIONS, 'judge_prompt_sha256':hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest(),
@@ -64,6 +65,7 @@ corpus = CorpusStore()
 require_consistent_switch(corpus.index_dir, os.getenv("RAG_DEMO_DB_PATH") or None)
 safe_start = os.getenv("RAG_SAFE_START", "1") == "1"
 store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None, migrate=not safe_start)
+register_display_summary_routes(app, store.database_path)
 app.add_middleware(ReadCacheMiddleware, database_path=store.database_path,
     dependencies=[corpus.index_dir, DOCUMENTS_DIR, UPLOADS_DIR,
                   store.database_path.parent / 'corpus_operations', store.database_path.parent / 'corpus_state.json',
