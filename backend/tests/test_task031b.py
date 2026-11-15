@@ -144,12 +144,12 @@ class ChunkV2Tests(unittest.TestCase):
             self.assertEqual(detail['category'], '清洁机器人说明书')
             self.assertTrue(all('清洁机器人说明书' not in c['chunk_text'] for c in detail['chunks']))
 
-    def test_category_inference_and_manual_override(self):
+    def test_category_inference_from_document_title(self):
         self.assertTrue(hasattr(kp, 'document_category'))
         for name, category in [('清洁机器人.pdf','清洁机器人说明书'), ('B2四足机器人.pdf','巡检机器人说明书'),
                                ('B2遥控器.pdf','遥控器说明书'), ('电池充电器.pdf','电池与充电器说明书'), ('x.pdf','其他')]:
             self.assertEqual(kp.document_category({'name': name, 'product': None}), category)
-        self.assertEqual(kp.document_category({'name':'清洁机器人.pdf', 'category':'其他'}), '其他')
+        self.assertEqual(kp.document_category({'name':'清洁机器人.pdf', 'category':'其他'}), '清洁机器人说明书')
 
 
 class PromptV3Tests(unittest.TestCase):

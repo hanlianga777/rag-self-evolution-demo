@@ -346,6 +346,20 @@ def knowledge():
                 'operation': operation, 'sample_children': corpus.chunks()[:3] if index.get('knowledge_identity') else []}
 
 
+@app.get('/api/knowledge/chunk-diagnostics')
+def knowledge_chunk_diagnostics():
+    from .knowledge_browser import chunk_diagnostics
+    with CORPUS_LOCK:
+        return chunk_diagnostics(corpus)
+
+
+@app.get('/api/knowledge/chunk-browser')
+def knowledge_chunk_browser():
+    from .knowledge_browser import chunk_browser
+    with CORPUS_LOCK:
+        return chunk_browser(corpus, store)
+
+
 @app.get('/api/knowledge/clusters/{cluster_id}')
 def knowledge_cluster(cluster_id: str):
     with CORPUS_LOCK:
@@ -354,7 +368,9 @@ def knowledge_cluster(cluster_id: str):
         cluster = next((c for c in plan['clusters'] if c['cluster_id'] == cluster_id), None)
         if cluster is None: raise HTTPException(status_code=404, detail='Cluster not found')
         chunks = {c['chunk_id']: c for c in corpus.chunks()}
-        return {**cluster, 'identity': state['identity'], 'coverage_plan_id': plan['plan_id'], 'initial_k': plan['initial_k'], 'merge_mapping': plan['merge_mapping'],
+        from .knowledge_browser import chunk_browser, cluster_browser
+        browser = cluster_browser(cluster, chunk_browser(corpus, store))
+        return {**cluster, **browser, 'identity': state['identity'], 'coverage_plan_id': plan['plan_id'], 'initial_k': plan['initial_k'], 'merge_mapping': plan['merge_mapping'],
                 'source_documents': sorted({chunks[key]['document_name'] for key in cluster['chunk_ids']}),
                 'representative_children': [chunks[key] for key in cluster['representative_chunk_ids']],
                 'slots': [s for s in plan['slots'] if s['topic_cluster'] == cluster_id]}

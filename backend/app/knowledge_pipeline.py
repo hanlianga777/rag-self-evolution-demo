@@ -161,16 +161,18 @@ MANUAL_CHAPTERS = {
 }
 
 
+# Ordered title rules: accessories take precedence over the robot model name.
+DOCUMENT_CATEGORY_RULES = [
+    (('电池', '充电器'), DOCUMENT_CATEGORIES[3]),
+    (('遥控器',), DOCUMENT_CATEGORIES[2]),
+    (('清洁', 'kira', '卡赫'), DOCUMENT_CATEGORIES[0]),
+    (('四足', '巡检', 'b2'), DOCUMENT_CATEGORIES[1]),
+]
+
+
 def document_category(document):
-    if document.get('category') in DOCUMENT_CATEGORIES:
-        return document['category']
-    name = (document.get('name') or '') + ' ' + (document.get('product') or '')
-    for words, category in [(('电池', '充电器'), DOCUMENT_CATEGORIES[3]),
-                            (('遥控器',), DOCUMENT_CATEGORIES[2]),
-                            (('清洁', 'KIRA', '卡赫'), DOCUMENT_CATEGORIES[0]),
-                            (('四足', '巡检', 'B2'), DOCUMENT_CATEGORIES[1])]:
-        if any(word in name for word in words): return category
-    return '其他'
+    name = (document.get('name') or '').casefold()
+    return next((category for words, category in DOCUMENT_CATEGORY_RULES if any(word in name for word in words)), '其他')
 
 
 def child_embedding_text(child):

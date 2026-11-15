@@ -12,30 +12,30 @@ import { BusinessImportPanel } from "./pages/BusinessImportPanel";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it("uses persisted corpus totals and actual index dimensions in the compact knowledge chain", async () => {
-  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: 384, indexed_count: 6 } }), { status: 200 }));
+it("shows the generic knowledge chain and server document categories", async () => {
+  const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: 384, indexed_count: 6 } }), { status: 200 }));
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<KnowledgePage data={{ documents: [{ id: "DOC-1", name: "说明.pdf", pages: 9, chunks: 7, parser: "PyMuPDF", chunk_strategy: "页级/段落 fallback", status: "Indexed" }] }} />));
   expect(document.querySelector(".light-stepper")).toBeNull();
   expect(document.querySelector(".metrics-grid")).toBeNull();
   expect(document.querySelectorAll(".knowledge-strategy-card")).toHaveLength(0);
-  expect(document.querySelector(".ui-kf")?.textContent).toContain("384 维");
-  expect(document.querySelector(".knowledge-notice")?.textContent).toContain("Legacy");
-  expect(document.querySelector(".ui-kf")?.textContent).toContain("9 页");
-  expect(document.querySelector(".ui-kf")?.textContent).toContain("建立索引6 已索引");
-  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["文档名", "页数", "Parent Chunks", "Child Chunks", "解析状态", "索引状态", "操作"]);
+  expect(document.querySelector(".ui-kf")?.textContent).not.toMatch(/\d/);
+  expect(document.querySelector(".knowledge-notice")?.textContent).toContain("尚未建立完整");
+  expect(document.querySelector(".ui-kf")?.textContent).toContain("按章节组 Parent");
+  expect(document.querySelector(".ui-kf")?.textContent).toContain("向量 + 关键词索引");
+  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["文档名", "文档类别", "页数", "Parent Chunks", "Child Chunks", "解析状态", "索引状态", "操作"]);
   expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
   await act(async () => root.unmount());
 });
 
 it("hides missing index measurements instead of deriving them from chunks", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: null, indexed_count: null } }), { status: 200 })));
+  vi.stubGlobal("fetch", vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: null, indexed_count: null } }), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<KnowledgePage data={{ documents: [{ id: "DOC-1", name: "说明.pdf", pages: 9, chunks: 7, parser: "PyMuPDF", status: "Indexed" }] }} />));
-  expect(document.querySelector(".ui-kf")?.textContent).toContain("建立索引— 已索引");
+  expect(document.querySelector(".ui-kf")?.textContent).not.toMatch(/\d/);
   expect(document.querySelector(".ui-kf")?.textContent).not.toContain("512");
-  expect(document.querySelector(".ui-kf")?.textContent).toContain("维度未采集");
+  expect(document.querySelector(".chunk-diagnostics")?.textContent).toContain("未知");
   await act(async () => root.unmount());
 });
 
