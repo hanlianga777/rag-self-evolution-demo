@@ -40,20 +40,19 @@ it('combines saved feedback and local-only answers, counting linked answers once
  location.hash='#verification?tab=monitoring';const fetcher=vi.fn(async()=>new Response('{}'));vi.stubGlobal('fetch',fetcher);
  await mount(<VerificationPage data={{monitoring:{events},optimization:{candidates:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
  expect(document.querySelector('.tabs [aria-pressed=true]')?.textContent).toBe('Monitoring');
- expect([...document.querySelectorAll('.monitoring-stats strong')].map(n=>n.textContent)).toEqual(['2','1','1','3.0 秒']);
+ expect([...document.querySelectorAll('.monitoring-stats strong')].map(n=>n.textContent)).toEqual(['1','2.0 秒','0.0%','1']);
  expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(2);
  expect([...document.querySelectorAll('.monitoring-table th')].map(n=>n.textContent)).toEqual(['时间','问题','耗时','引用数','标注状态','操作']);
- expect(document.querySelectorAll('.monitoring-assessment button')).toHaveLength(3);
+ expect(document.querySelectorAll('.monitoring-table button.secondary')).toHaveLength(2);
  expect(document.body.textContent).toContain('仅本机保存');expect(document.querySelector('.feedback-loop')).toBeNull();expect(fetcher).not.toHaveBeenCalled();
 });
 it('labels the three release gates and keeps only the two secondary review actions',async()=>{
  const d={id:'exp-D',reasoning:{candidate_label:'D'},config:{top_k:6},result:{gates:{passed:true,passed_count:11,total:11},new_regression_question_ids:[],all_fixed_question_ids:['Q04']}};
  await mount(<VersionsPage data={{versions:[{id:'p',status:'active',provenance:'published',config:d.config,snapshot:{candidate_id:d.id,human_release:{decision:'approved'}}},{id:'old',status:'archived'}],optimization:{candidates:[d]}}}/>);
- expect([...document.querySelectorAll('.ui-rel-steps strong')].map(n=>n.textContent)).toEqual(['Gate 2 · 推荐确认（人工审核）','发布资格（程序校验）','Gate 3 · 发布授权（人工审批）']);
+ expect([...document.querySelectorAll('.release-gate-card h3')].map(n=>n.textContent)).toEqual(['Gate 1 · 题卷红线','Gate 2 · 实验报告','Gate 3 · 发布确认']);
  expect([...document.querySelectorAll('.ui-rel-actions button')].map(n=>n.textContent)).toEqual(['查看评测报告','查看发布快照']);
- expect(document.querySelectorAll('.ui-rel-actions button.secondary svg')).toHaveLength(2);
- expect(document.querySelector('.release-history-table button.secondary')?.textContent).toBe('回滚至此版本');
- await click('回滚至此版本');expect(document.querySelector('.confirm-dialog')).not.toBeNull();
+
+ expect(document.querySelector('.release-history-table button.secondary')).toBeNull();await click('更多');await click('回滚至 历史配置 · 时间未知');expect(document.querySelector('.confirm-dialog')).not.toBeNull();
 });
 it('removes answer boundary notes and citation counts while preserving the saved row',async()=>{
  const row={model_answer:'正文。\n\n**证据边界：**边界备注。\n\n未确认条件：条件备注。',programmatic_metrics:{retrieval_trace:{final:[]}}},original=JSON.stringify(row);

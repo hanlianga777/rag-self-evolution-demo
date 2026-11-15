@@ -127,3 +127,25 @@
  .saved-answer-comparison .comparison-side { position:static; height:auto; }
  .saved-answer-comparison .comparison-qlist { min-height:0; max-height:calc(100dvh - 280px); overflow:auto; }
 }
+
+/* 032g: the rail stays in place; the detail column owns its scrolling. */
+@media(min-width:701px) {
+ .verification-compare .page-content { overflow:hidden; display:flex; flex-direction:column; }
+ .verification-compare .page-content > div { min-height:0; height:100%; }
+ .verification-compare .saved-answer-comparison,.verification-compare .comparison-workspace { height:100%; min-height:0; }
+ .saved-answer-comparison .comparison-workspace { grid-template-columns:228px minmax(0,1fr); align-items:start; gap:16px; }
+ .saved-answer-comparison .comparison-side { height:auto; max-height:100%; min-height:0; }
+ .saved-answer-comparison .comparison-rail { flex:none; max-height:100%; box-shadow:none; border:1px solid var(--line); }
+ .saved-answer-comparison .comparison-detail { height:100%; overflow-y:auto; padding-right:4px; }
+ .saved-answer-comparison .comparison-qlist { max-height:calc(100dvh - 360px); }
+}
+.saved-answer-comparison .comparison-seg { display:grid; grid-template-columns:1fr; margin:10px; }
+.saved-answer-comparison .comparison-seg button { display:flex; align-items:center; justify-content:center; }
+.saved-answer-comparison .comparison-step { grid-template-columns:84px minmax(0,1fr); padding-left:0; gap:8px; }
+.saved-answer-comparison .comparison-steps::before,.saved-answer-comparison .comparison-step::before { display:none; }
+.saved-answer-comparison .comparison-why { grid-template-columns:minmax(0,1fr); flex:none; border:1px solid var(--line); box-shadow:none; }
+.saved-answer-comparison .comparison-points { border-left:0; border-top:1px solid var(--line); }
+.saved-answer-comparison .comparison-after-verdict { display:inline-flex; align-items:center; justify-content:center; gap:5px; min-width:74px; white-space:nowrap; }
+.saved-answer-comparison .comparison-newtag { margin:0; font-size:11px; }
+.saved-answer-comparison .comparison-ptable th:last-child { width:94px; }
+.verification-page:has(.saved-answer-comparison) .tabs button { border-radius:999px; }

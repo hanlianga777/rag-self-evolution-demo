@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 :root {
+  --chat-user-bg: #eef2f5;
+  --chat-user-line: #cbd7e5;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   font-size:var(--ui-fs-body); color:var(--ink); background:var(--canvas); font-synthesis:none;
   --drawer-width: 800px;

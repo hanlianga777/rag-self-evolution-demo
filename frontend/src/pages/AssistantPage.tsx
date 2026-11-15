@@ -5,7 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { MessageCirclePlus, Send, Trash2 } from "lucide-react";
 import { readSession, writeSession } from "../session";
 import { ConfirmDialog } from "../components/Dialog";
-import { postJson } from "../api";
+import { streamPreview } from "../api";
 import { isConversation, loadConversations, saveConversations } from "../conversations";
 import type { ChatMessage, Citation, Conversation } from "../types";
 
@@ -16,7 +16,7 @@ function id(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().to
 function newConversation(): Conversation { return { id: id("chat"), title: "新对话", updatedAt: now(), messages: [] }; }
 function matchBadCase(question: string, badCases: any[]) { return badCases.find(item => (item.result?.question || item.question || "").trim() === question.trim()); }
 
-export function AssistantPage({ examples = [], examplesLoading = false, examplesFailed = false, productionVersion, isReleased = false, badCases, onOpenBadCase, onOpenCitation, onAnswered }: { examples?: ChatExample[]; examplesLoading?: boolean; examplesFailed?: boolean; productionVersion?: string; productionLabel?: string; isReleased?: boolean; badCases: any[]; onOpenBadCase: (caseId: string) => void; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void; onAnswered?: () => void }) {
+export function AssistantPage({ examples = [], examplesLoading = false, examplesFailed = false, badCases, onOpenBadCase, onOpenCitation, onAnswered }: { examples?: ChatExample[]; examplesLoading?: boolean; examplesFailed?: boolean; productionVersion?: string; productionLabel?: string; isReleased?: boolean; badCases: any[]; onOpenBadCase: (caseId: string) => void; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void; onAnswered?: () => void }) {
   const [saved] = useState(() => readSession("rag-qa-assistant", { activeId: undefined as string | undefined, draft: "", conversations: null as Conversation[] | null }));
   const [conversations, setConversations] = useState<Conversation[]>(() => Array.isArray(saved.conversations) && saved.conversations.every(isConversation) ? saved.conversations : loadConversations());
   const [blankConversation, setBlankConversation] = useState(newConversation);
@@ -30,6 +30,11 @@ export function AssistantPage({ examples = [], examplesLoading = false, examples
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [thinkingStartedAt, setThinkingStartedAt] = useState<number>();
+  const [streaming, setStreaming] = useState("");
+  const [streamConversation, setStreamConversation] = useState("");
+  const follow = useRef(true);
+  const abort = useRef<AbortController>();
+  useEffect(() => () => abort.current?.abort(), []);
   const messageListRef = useRef<HTMLDivElement>(null);
   const active = useMemo(() => conversations.find(item => item.id === activeId) || blankConversation, [activeId, blankConversation, conversations]);
 
@@ -39,7 +44,8 @@ export function AssistantPage({ examples = [], examplesLoading = false, examples
     if (typeof list.scrollTo === "function") list.scrollTo({ top: list.scrollHeight, behavior });
     else list.scrollTop = list.scrollHeight;
   }, []);
-  useEffect(() => { scrollMessages("smooth"); }, [active.id, active.messages.length, busy, scrollMessages]);
+  useEffect(() => { follow.current=true; scrollMessages(); }, [active.id, scrollMessages]);
+  useEffect(() => { if(follow.current) scrollMessages(); }, [active.messages.length, busy, streaming, scrollMessages]);
   useEffect(() => { saveConversations(conversations); }, [conversations]);
   const updateConversation = (conversationId: string, change: (conversation: Conversation) => Conversation) => setConversations(current => current.map(item => item.id === conversationId ? change(item) : item));
   const create = () => { setBlankConversation(newConversation()); setActiveId(undefined); setDraft(""); setError(""); setNotice(""); };
@@ -54,18 +60,19 @@ export function AssistantPage({ examples = [], examplesLoading = false, examples
     const user: ChatMessage = { id: id("user"), role: "user", content: question, createdAt: now() };
     const ticket = ++requestId.current;
     const requestStartedAt = Date.now();
+    follow.current=true; setStreaming(""); setStreamConversation(active.id); abort.current=new AbortController();
     setBusy(true); setThinkingStartedAt(requestStartedAt); setError(""); setNotice("");
     const started = { ...active, title: active.messages.length ? active.title : question.slice(0, 18), updatedAt: user.createdAt, messages: [...active.messages, user] };
     if (activeId) updateConversation(active.id, () => started); else { setConversations(current => [started, ...current]); setActiveId(started.id); }
     setDraft("");
     try {
-      const result: any = await postJson("/api/preview", { question });
+      const result: any = await streamPreview(question, text=>{ if(ticket===requestId.current) {setStreaming(value=>value+text);setThinkingStartedAt(undefined);} }, ()=>{if(ticket===requestId.current){setStreaming("");setThinkingStartedAt(Date.now());}}, abort.current.signal);
       if (ticket !== requestId.current) return;
       const assistant: ChatMessage = { id: id("assistant"), role: "assistant", content: result.baseline.answer, question, createdAt: now(), mode: result.mode, model: result.model, latencyMs: typeof result.latency_ms === "number" ? result.latency_ms : null, fallbackReason: result.fallback_reason, sources: result.baseline.sources, evidence: result.baseline.evidence, metrics: result.baseline };
       updateConversation(started.id, conversation => ({ ...conversation, updatedAt: assistant.createdAt, messages: [...conversation.messages, assistant] }));
       onAnswered?.();
     } catch (reason) { if (ticket === requestId.current) setError(reason instanceof Error ? reason.message : "请求失败，请重试"); }
-    finally { if (ticket === requestId.current) { setBusy(false); setThinkingStartedAt(undefined); } }
+    finally { if (ticket === requestId.current) { setBusy(false); setThinkingStartedAt(undefined); setStreaming(""); } }
   };
   const submit = (event: FormEvent) => { event.preventDefault(); void ask(draft); };
   const submitClue = (message: ChatMessage) => {
@@ -76,19 +83,17 @@ export function AssistantPage({ examples = [], examplesLoading = false, examples
     else setNotice("线索已保存在本机；需人工标注后才可纳入黄金数据集。当前不会生成根因或优化结论。");
   };
 
-  return <div className="page assistant-page"><div className="assistant-workspace"><aside className="conversation-sidebar" aria-label="会话列表"><button className="secondary new-conversation" onClick={create}><MessageCirclePlus size={15} />新建对话</button><div className="conversation-list">{conversations.map(conversation => <div className={`conversation-item ${conversation.id === activeId ? "selected" : ""}`} key={conversation.id}><button onClick={() => { setActiveId(conversation.id); setError(""); setNotice(""); }}><TruncatedText lines={1} hoverOnly>{conversation.title}</TruncatedText><span>{conversation.messages.length} 条消息</span></button><button className="icon-button conversation-delete quiet-danger" aria-label={`删除会话 ${conversation.title}`} onClick={() => remove(conversation.id)}><Trash2 size={13} /></button></div>)}</div></aside><section className="chat-panel" aria-label="当前对话"><div className="chat-header"><div>对话</div><button className="text-button quiet-danger" onClick={() => setClearConfirm(true)}>清空本机记录</button></div><div className={active.messages.length ? "message-list" : "message-list is-empty"} ref={messageListRef}>{active.messages.length ? active.messages.map(message => <Message key={message.id} message={message} onOpenCitation={onOpenCitation} onSubmitClue={submitClue} />) : <div className="empty-chat"><p className="chat-guide">{isReleased ? "向线上版本提问" : "向当前配置提问"} · 回答会附出处，可点开说明书原页</p><div className="chat-examples">{["正常问答", "应拒答 / 安全", "需要追问"].map(label => {
+  return <div className="page assistant-page"><div className="assistant-workspace"><aside className="conversation-sidebar" aria-label="会话列表"><button className="secondary new-conversation" onClick={create}><MessageCirclePlus size={15} />新建对话</button><div className="conversation-list">{conversations.map(conversation => <div className={`conversation-item ${conversation.id === activeId ? "selected" : ""}`} key={conversation.id}><button onClick={() => { setActiveId(conversation.id); setError(""); setNotice(""); }}><TruncatedText lines={1} hoverOnly>{conversation.title}</TruncatedText><span>{conversation.messages.length} 条消息</span></button><button className="icon-button conversation-delete quiet-danger" aria-label={`删除会话 ${conversation.title}`} onClick={() => remove(conversation.id)}><Trash2 size={13} /></button></div>)}</div></aside><section className="chat-panel" aria-label="当前对话"><div className="chat-header"><div>对话</div><button className="text-button quiet-danger" onClick={() => setClearConfirm(true)}>清空本机记录</button></div><div className={active.messages.length ? "message-list" : "message-list is-empty"} ref={messageListRef} onScroll={event=>{const list=event.currentTarget;follow.current=list.scrollHeight-list.clientHeight-list.scrollTop<40;}}>{active.messages.length ? active.messages.map(message => <Message key={message.id} message={message} onOpenCitation={onOpenCitation} onSubmitClue={submitClue} />) : <div className="empty-chat"><div className="chat-examples">{["正常问答", "应拒答 / 安全", "需要追问"].map(label => {
       const question = examples.find(item => item.label === label)?.question;
       return <button className="chat-example" key={label} disabled={!question || busy} onClick={() => question && void ask(question)}><span>{label}</span><strong>{question || (examplesLoading ? <span className="chat-example-skeleton" role="status" aria-label="正在读取示例"><span /><span /></span> : null)}</strong></button>;
-    })}</div>{examplesFailed && <p className="chat-examples-unavailable">示例暂时读不到，可直接输入问题</p>}</div>}{busy && thinkingStartedAt && <Thinking startedAt={thinkingStartedAt} />}{notice && <p className="notice" role="status">{notice}</p>}{error && <p className="error-notice" role="alert">回答失败：{error}。请重试。</p>}</div><form className="chat-composer" onSubmit={submit}><input aria-label="向机器人知识库提问" placeholder="请输入你的问题…" maxLength={1000} value={draft} onChange={event => setDraft(event.target.value)} /><button className="primary" disabled={busy || !draft.trim()}>{busy ? "正在回答…" : <><Send size={15} />发送</>}</button></form></section></div><ConfirmDialog danger open={clearConfirm} onOpenChange={setClearConfirm} title="确认清空本机记录" onConfirm={() => { clear(); setClearConfirm(false); }}><p>将清空本机保存的全部会话。</p></ConfirmDialog></div>;
+    })}</div>{examplesFailed && <p className="chat-examples-unavailable">示例暂时读不到，可直接输入问题</p>}</div>}{busy && active.id===streamConversation && (streaming ? <article className="chat-message assistant streaming-answer"><div className="message-label"><span className="assistant-label">AI 助手</span></div><ModelAnswer text={streaming}/></article> : thinkingStartedAt ? <Thinking /> : null)}{notice && <p className="notice" role="status">{notice}</p>}{error && <p className="error-notice" role="alert">回答失败：{error}。请重试。</p>}</div><form className="chat-composer" onSubmit={submit}><input aria-label="向机器人知识库提问" placeholder="请输入你的问题…" maxLength={1000} value={draft} onChange={event => setDraft(event.target.value)} /><button className="primary" disabled={busy || !draft.trim()}>{busy ? "正在回答…" : <><Send size={15} />发送</>}</button></form></section></div><ConfirmDialog danger open={clearConfirm} onOpenChange={setClearConfirm} title="确认清空本机记录" onConfirm={() => { clear(); setClearConfirm(false); }}><p>将清空本机保存的全部会话。</p></ConfirmDialog></div>;
 }
 
-function Thinking({ startedAt }: { startedAt: number }) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => { const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100); return () => window.clearInterval(timer); }, [startedAt]);
-  return <article className="chat-message assistant thinking-message" aria-live="polite"><div className="message-label"><span>AI助手</span></div><p>正在检索与回答生成 · {elapsed.toFixed(1)}s<span className="thinking-dots" aria-hidden="true">...</span></p></article>;
+function Thinking() {
+  return <article className="chat-message assistant thinking-message" aria-live="polite"><div className="message-label"><span className="assistant-label">AI 助手</span></div><p>思考中<span className="thinking-dots" aria-hidden="true">…</span></p></article>;
 }
 
 function Message({ message, onOpenCitation, onSubmitClue }: { message: ChatMessage; onOpenCitation: (citation: Citation) => void; onSubmitClue: (message: ChatMessage) => void }) {
   if (message.role === "user") return <article className="chat-message user"><p>{message.content}</p></article>;
-  return <article className="chat-message assistant"><div className="message-label"><span>AI 助手</span><span className="qa-latency">{secondsText(answerLatency(message))}</span></div><div className="answer-text"><ModelAnswer text={message.content} final={Array.isArray((message.metrics?.retrieval_trace as any)?.final)?(message.metrics?.retrieval_trace as any).final:message.evidence || []} onOpenCitation={onOpenCitation}/></div><div className="qa-answer-actions">{message.improvementClue ? <span className="clue-confirmation">{message.improvementClue.badCaseId ? "已打开预置问题案例证据。" : "已提交本机优化线索，等待人工标注。"}</span> : <button className="primary small clue-button" onClick={() => onSubmitClue(message)}>提交优化线索</button>}</div></article>;
+  return <article className="chat-message assistant"><div className="message-label"><span className="assistant-label">AI 助手</span><span className="qa-latency">{secondsText(answerLatency(message))}</span></div><div className="answer-text"><ModelAnswer text={message.content} final={Array.isArray((message.metrics?.retrieval_trace as any)?.final)?(message.metrics?.retrieval_trace as any).final:message.evidence || []} onOpenCitation={onOpenCitation}/></div><div className="qa-answer-actions">{message.improvementClue ? <span className="clue-confirmation">{message.improvementClue.badCaseId ? "已打开预置问题案例证据。" : "已提交本机优化线索，等待人工标注。"}</span> : <button className="primary small clue-button" onClick={() => onSubmitClue(message)}>提交优化线索</button>}</div></article>;
 }

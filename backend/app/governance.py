@@ -3470,14 +3470,17 @@ class GovernanceStore:
             rows = connection.execute("SELECT * FROM monitoring_events ORDER BY created_at DESC").fetchall()
         return [{**dict(row), "bad_case": bool(row["bad_case"]), "determinable": bool(row["determinable"]), "metrics": _load(row["metrics_json"], None), "source": _load(row["source_json"], {})} for row in rows]
 
-    def assess_monitoring_event(self, event_id: str, *, bad_case: bool, severity: str):
+    def assess_monitoring_event(self, event_id: str, *, bad_case: bool, severity: str, reason: str | None = None):
         if severity not in {"ordinary", "critical"}:
             raise ValueError("Unsupported monitoring severity")
         with self.connection() as connection:
             row = connection.execute("SELECT * FROM monitoring_events WHERE id = ?", (event_id,)).fetchone()
             if row is None:
                 raise KeyError(event_id)
-            connection.execute("UPDATE monitoring_events SET bad_case = ?, severity = ?, determinable = 1 WHERE id = ?", (int(bad_case), severity, event_id))
+            metrics = _load(row["metrics_json"], {}) or {}
+            if reason is not None:
+                metrics["human_assessment"] = {"reason": reason.strip(), "at": _now()}
+            connection.execute("UPDATE monitoring_events SET bad_case = ?, severity = ?, determinable = 1, metrics_json = ? WHERE id = ?", (int(bad_case), severity, _json(metrics), event_id))
         event = next(item for item in self.monitoring_events() if item["id"] == event_id)
         self._create_monitoring_trigger_if_needed(event)
         return event

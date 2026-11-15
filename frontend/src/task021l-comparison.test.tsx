@@ -20,9 +20,9 @@ it('loads the light list first and loads only the selected answer while filterin
  await mount(<SavedAnswerComparison data={data} onOpenCitation={()=>{}}/>);
  expect(fetcher.mock.calls).toHaveLength(4);expect(fetcher.mock.calls.every(([p])=>/comparison-cases|\/cases\/Q0[46]/.test(p))).toBe(true);
  expect(document.querySelector('.comparison-rail')?.textContent).toContain('修好的1');
- expect(document.querySelector('.comparison-chain .ui-headline')?.textContent).toContain('放宽 Top-K 后进入上下文');
+ expect([...document.querySelectorAll('.comparison-step .comparison-t')].map(n=>n.textContent)).toEqual(['配置变化','证据位置变化','结果变化']);
  expect(document.querySelector('.comparison-steps')?.textContent).toContain('Top-K 4 → 6');
- expect(document.querySelector('.comparison-chain .ui-headline')?.textContent).toContain('补上要点 ①');
+ expect(document.querySelector('.comparison-steps')?.textContent).toContain('补上了必答要点 ①');expect(document.querySelector('.comparison-newtag')?.closest('td')?.cellIndex).toBe(2);
  expect(document.querySelectorAll('.comparison-ptable .ui-clamp')).toHaveLength(0);
  expect(document.querySelector('mark')?.textContent).toContain('只在室内');
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='仍未修好1')!.click());

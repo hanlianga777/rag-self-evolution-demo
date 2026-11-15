@@ -24,6 +24,16 @@ DEFAULT_TASK_THINKING = {
 }
 _thinking_task = ContextVar('provider_thinking_task', default=None)
 _judge_thinking = ContextVar('provider_judge_thinking', default=None)
+_answer_content = ContextVar("answer_content", default=None)
+
+
+@contextmanager
+def answer_content(callback=None):
+    token = _answer_content.set(callback)
+    try: yield
+    finally: _answer_content.reset(token)
+
+
 _judge_fail_fast = ContextVar('provider_judge_fail_fast', default=False)
 
 
@@ -313,6 +323,8 @@ class DeepSeekProvider:
                     'request_id':(getattr(response,'headers',None) or {}).get('x-request-id')})
                 if stream:
                     content, usage, ttft_started, raw_events, finish_reason = [], {}, None, [], None
+                    callback = _answer_content.get()
+                    if callback: callback(None)
                     response_model, response_id = None, None
                     for raw_line in response:
                         line = raw_line.decode("utf-8").strip()
@@ -329,6 +341,7 @@ class DeepSeekProvider:
                             if ttft_started is None:
                                 ttft_started = time.perf_counter()
                             content.append(delta)
+                            if callback: callback(delta)
                         if isinstance(event.get("usage"), dict):
                             usage = event["usage"]
                     body = {"choices": [{"message": {"content": "".join(content)},'finish_reason':finish_reason}], "usage": usage, "model": response_model, "id": response_id}

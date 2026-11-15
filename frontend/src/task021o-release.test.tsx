@@ -40,7 +40,7 @@ it('labels released status and the archived initial config without calling it cu
  expect(document.querySelector('.versions-page')?.textContent).not.toContain('待发布 Candidate');
  expect(document.querySelector('.release-history-table tbody tr:last-child')?.textContent).toContain('初始配置');
  expect(document.querySelector('.release-history-table tbody tr:last-child')?.textContent).not.toContain('当前线上配置');
- expect([...document.querySelectorAll('button')].find(b=>b.textContent==='回滚至此版本')?.disabled).toBe(false);
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='更多')!.click());expect([...document.querySelectorAll('button')].find(b=>b.textContent?.startsWith('回滚至 '))?.disabled).toBe(false);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看评测报告')!.click());
  expect(document.querySelector('[role="dialog"]')?.textContent).not.toMatch(/待发布|尚未发布/);
 });

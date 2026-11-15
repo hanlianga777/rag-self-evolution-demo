@@ -18,7 +18,7 @@ from fastapi import Query, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from .read_cache import ReadCacheMiddleware
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import Response, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
@@ -220,6 +220,7 @@ class MonitoringEventRequest(BaseModel):
 
 
 class MonitoringAssessmentRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=2000)
     bad_case: bool
     severity: str = Field(pattern="^(ordinary|critical)$")
 
@@ -1721,7 +1722,7 @@ def record_monitoring_event(payload: MonitoringEventRequest):
 @app.post("/api/monitoring/events/{event_id}/assessment", dependencies=[Depends(require_trusted_origin)])
 def assess_monitoring_event(event_id: str, payload: MonitoringAssessmentRequest):
     try:
-        event = store.assess_monitoring_event(event_id, bad_case=payload.bad_case, severity=payload.severity)
+        event = store.assess_monitoring_event(event_id, bad_case=payload.bad_case, severity=payload.severity, reason=payload.reason)
         return {"event": event, "trigger": store.optimization_trigger_for_event(event_id)}
     except KeyError:
         raise HTTPException(status_code=404, detail="Monitoring event not found")
@@ -2218,11 +2219,57 @@ def start_evaluation(payload: BaselineRunRequest | None = None):
 @evaluation_display
 def preview(payload: PreviewRequest):
     result = ai_service.preview(payload.question)
+    return record_preview(payload.question, result)
+
+
+def record_preview(question, result):
     baseline = result.get("baseline", {})
     if result.get("mode") in {"live", "local"} and not result.get("fallback_reason"):
-        event = store.record_monitoring_event(question=payload.question, answer=baseline.get("answer", ""), bad_case=False, severity="ordinary", determinable=False, source={"production_version_id": baseline["version"], "production_config": baseline["config"], "corpus_fingerprint": baseline.get("corpus_fingerprint")} if baseline.get("version") and baseline.get("config") else None, metrics={key: baseline.get(key) for key in ("stages", "token_usage", "estimated_cost", "cost_estimation", "ttft_ms", "retrieval_trace", "latency_ms", "input_tokens", "output_tokens")})
+        event = store.record_monitoring_event(question=question, answer=baseline.get("answer", ""), bad_case=False, severity="ordinary", determinable=False, source={"production_version_id": baseline["version"], "production_config": baseline["config"], "corpus_fingerprint": baseline.get("corpus_fingerprint")} if baseline.get("version") and baseline.get("config") else None, metrics={key: baseline.get(key) for key in ("stages", "token_usage", "estimated_cost", "cost_estimation", "ttft_ms", "retrieval_trace", "latency_ms", "input_tokens", "output_tokens")})
         result["monitoring_event_id"] = event["id"]
     return result
+
+
+@app.post("/api/preview/stream", dependencies=[Depends(require_trusted_origin)])
+def preview_stream(payload: PreviewRequest):
+    from queue import Queue, Empty
+    events = Queue()
+    def produce():
+        try:
+            baseline = ai_service.baseline_preview(payload.question, on_token=lambda text: events.put({"type": "reset"} if text is None else {"type": "delta", "text": text}))
+            result = {"baseline": baseline, "mode": baseline.get("mode"), "model": baseline.get("model"), "latency_ms": baseline.get("latency_ms"), "fallback_reason": baseline.get("fallback_reason")}
+            events.put({"type": "done", "result": light_value(record_preview(payload.question, result))})
+        except Exception:
+            # Never send provider bodies or internal paths to the browser.
+            events.put({"type": "error", "message": "回答服务暂时不可用，请重试"})
+        finally:
+            events.put(None)
+    threading.Thread(target=contextvars.copy_context().run, args=(produce,), daemon=True).start()
+    def frames():
+        while True:
+            try: event = events.get(timeout=10)
+            except Empty:
+                yield ": waiting\n\n"
+                continue
+            if event is None: break
+            yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
+    return StreamingResponse(frames(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.api_route("/api/source-pdf", methods=["GET", "HEAD"])
+def source_pdf(name: str):
+    from .corpus import DOCUMENTS_DIR
+    root = DOCUMENTS_DIR.resolve()
+    path = (root / name).resolve()
+    if Path(name).name != name or not path.is_relative_to(root) or path.suffix.lower() != ".pdf" or not path.is_file():
+        raise HTTPException(status_code=404, detail="说明书 PDF 不存在")
+    return FileResponse(path, media_type="application/pdf")
+
+
+@app.get("/api/release-review")
+def release_review(candidate_id: str | None = None):
+    from .release_view import release_review_view
+    return release_review_view(store, candidate_id)
 
 
 @app.post("/api/preview/baseline", dependencies=[Depends(require_trusted_origin)])

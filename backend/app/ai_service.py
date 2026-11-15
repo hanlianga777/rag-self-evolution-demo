@@ -177,7 +177,7 @@ class AiService:
         return {**self.readiness(), "probe": self.last_probe["status"]}
 
     @provider_task('answer')
-    def answer(self, question: str, config: dict | None = None) -> dict:
+    def answer(self, question: str, config: dict | None = None, *, on_token=None) -> dict:
         config = {**DEFAULT_PIPELINE_CONFIG, **(config or {})}
         started_at = time.perf_counter()
         stages, trace = [], {}
@@ -230,7 +230,8 @@ class AiService:
             "Tiered": "采用分级回答：证据能明确回答时，直接给出步骤和结论；证据只覆盖一部分，或缺少设备型号、当前状态、连接方式等关键条件时，先说清能确定的部分，再追问1–2个最关键的缺失信息，不猜测；证据完全不相关或超出知识库范围时，明确说明无法回答，建议联系售后或人工；证据中的安全警告必须完整保留。",
         }[config["prompt_strategy"]]
         boundary = generation_boundary(self.generation_prompt_version)
-        with measure(stages, "generation"), thinking_task(generation_task, effort):
+        from .providers import answer_content
+        with measure(stages, "generation"), thinking_task(generation_task, effort), answer_content(on_token):
             response = self.provider.complete_with_metrics(
                 boundary + "\n回答策略：" + strategy if self.generation_prompt_version == "generation-vnext-3" else f"你是机器人官方 PDF 知识助手。{strategy}{boundary}回答使用中文，简洁、可执行。",
                 f"问题：{question}\n证据：\n{context}",
@@ -1026,10 +1027,10 @@ class AiService:
         from .golden_v2 import validate_golden_candidate
         return validate_golden_candidate(candidate, chunks, validation_context={'seen': seen})
 
-    def baseline_preview(self, question: str) -> dict:
+    def baseline_preview(self, question: str, *, on_token=None) -> dict:
         production = self.store.active_production() or {"id": "baseline-v1", "config": {"top_k": 4, "min_score": None}}
         config = {**production["config"], **({"knowledge_identity": production.get("snapshot", {})["knowledge_identity"]} if production.get("snapshot", {}).get("knowledge_identity") else {})}
-        result = self.answer(question, config)
+        result = self.answer(question, config, **({"on_token": on_token} if on_token else {}))
         fingerprint = result.get("corpus_fingerprint")
         return {"pipeline": "baseline", "source": "production", "question": question, "version": production["id"], "corpus_fingerprint": fingerprint, "config": config, "sources": [], **result, "evidence": result["retrieval"], "fallback_reason": None}
 
