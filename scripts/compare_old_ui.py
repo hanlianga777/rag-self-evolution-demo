@@ -1,4 +1,4 @@
-"""Serve the e37e7fa frontend through a local read-only API proxy."""
+"""Serve the snapshot-032-ui-20261115 frontend through a local read-only API proxy."""
 import http.client
 import io
 import json
@@ -13,7 +13,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = Path(__file__).resolve().parents[1]
-ARCHIVE = Path.home() / 'RAG归档' / '前端对照-e37e7fa'
+ARCHIVE = Path.home() / 'RAG归档' / '前端对照-032'
 STATE = ARCHIVE / 'services.json'
 HOP_HEADERS = {'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
                'te', 'trailer', 'transfer-encoding', 'upgrade', 'host', 'content-length'}
@@ -84,14 +84,14 @@ def stop():
                 break
             time.sleep(0.1)
         STATE.unlink()
-    print('旧版对照服务已停止（只处理本脚本记录的进程）。')
+    print('032版对照服务已停止（只处理本脚本记录的进程）。')
 
 
 def start():
     if STATE.exists():
         services = json.loads(STATE.read_text())
         if all(owned(service['pid'], service['marker']) for service in services):
-            print('旧版对照已运行：http://127.0.0.1:5175；停止：bash scripts/start_compare_old_ui.sh stop')
+            print('032版对照已运行：http://127.0.0.1:5175；停止：bash scripts/start_compare_old_ui.sh stop')
             return
         stop()
     for port in (8011, 5175):
@@ -101,7 +101,7 @@ def start():
     ARCHIVE.mkdir(parents=True, exist_ok=True)
     frontend = ARCHIVE / 'frontend'
     if not frontend.exists():
-        archive = subprocess.check_output(['git', 'archive', 'e37e7fa', 'frontend'], cwd=ROOT)
+        archive = subprocess.check_output(['git', 'archive', 'refs/remotes/origin/snapshot-032-ui-20261115', 'frontend'], cwd=ROOT)
         with tarfile.open(fileobj=io.BytesIO(archive)) as source:
             source.extractall(ARCHIVE, filter='data')
     if not (frontend / 'node_modules').exists():
@@ -135,7 +135,7 @@ def start():
     except BaseException:
         stop()
         raise
-    print(f'旧版：http://127.0.0.1:5175；只读代理：http://127.0.0.1:8011；日志：{ARCHIVE}')
+    print(f'032版：http://127.0.0.1:5175；只读代理：http://127.0.0.1:8011；日志：{ARCHIVE}')
     print('停止：bash scripts/start_compare_old_ui.sh stop')
 
 

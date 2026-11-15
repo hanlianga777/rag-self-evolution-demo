@@ -116,6 +116,17 @@ def evaluation_display(function):
             except ValueError:pass
         return value
 
+    def compatible(value):
+        # Old clients call .find() on this field; keep the saved missing marker
+        # as a note. Raw audit JSON strings and persisted facts remain unchanged.
+        if isinstance(value,list):return [compatible(item) for item in value]
+        if isinstance(value,dict):
+            result={key:compatible(item) for key,item in value.items()}
+            if result.get('evidence_positions') == '记录缺失':
+                result.update(evidence_positions=[],evidence_positions_note='记录缺失')
+            return result
+        return value
+
     @wraps(function)
-    def read(*args,**kwargs):return clean(function(*args,**kwargs))
+    def read(*args,**kwargs):return compatible(clean(function(*args,**kwargs)))
     return read
