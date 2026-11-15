@@ -7,13 +7,6 @@ import {EvolutionPage} from './pages/EvolutionPage';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 let root:ReturnType<typeof createRoot>;
-async function hoverText(selector:string) {
- const node=document.querySelector<HTMLElement>(selector);
- if (!node) return document.body.textContent;
- await act(async()=>{node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,160));});
- const id=node.closest('.agent-excerpt')?.getAttribute('aria-describedby');
- return (id ? document.getElementById(id)?.textContent : null) || [...document.querySelectorAll('[role=tooltip]')].at(-1)?.textContent || node.textContent;
-}
 async function mount(node:React.ReactNode){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));}
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 const questionId='CSV-20261101100758945425-24';
@@ -25,16 +18,16 @@ const experiment=(extra:any={})=>({id:'experiment',candidates:[{...winner,id:'EX
 it('keeps question labels distinct, hides technical IDs and translates parameters and metrics',()=>{
  const text=storyText(`${questionId}/Q29，DOC-001-C-00096，top_k=6，rerank=query_only，hybrid_alpha=0.6，hyde，safe_rejection，safe_rejection_rate，latency_p99_seconds`);
  expect(text).toContain('Q24/Q29');expect(text).toContain('相关说明段落');
- for(const name of ['Top-K 6','Rerank 方式：只按问题','向量权重','HyDE','安全拒答率','回答耗时 P99'])expect(text).toContain(name);
+ for(const name of ['Top-K 6','Rerank 方式：只按问题','Embedding Retrieval 权重','HyDE','安全拒答率','回答耗时 P99'])expect(text).toContain(name);
  expect(text).not.toMatch(/CSV-|DOC-|top_k|rerank|query_only|safe_rejection|hybrid_alpha|hyde|latency_p99_seconds/);
  expect(storyText('safe_rejection')).toBe('安全拒答率');
- expect(storyText('p99=65.614秒，Top4截断')).toBe('最慢耗时 65.6 秒，回答证据前 4 条 截断');
+ expect(storyText('p99=65.614秒，Top4截断')).toBe('P99 65.614 秒，回答证据前 4 条 截断');
 });
 it('normalizes displayed Agent reviews and predictions while preserving saved evidence',async()=>{
  const exp=experiment(),original=JSON.stringify(exp);
  await mount(<EvolutionRoute evaluation={evaluation} experiment={exp} badCases={[]}/>);
- expect(document.querySelector('.route-review')?.textContent).toContain(`Q24/Q29并附带修Q38；Top-K 6，Rerank 只按问题，DOC-001-C-00096。`);
- expect(document.querySelector('.d-story')?.textContent).toContain(storyText(declinedReason,true));
+ expect(document.querySelector('.route-review')?.textContent).toContain(`${questionId}/Q29并附带修Q38；Top-K 6，Rerank query_only，DOC-001-C-00096。`);
+ expect(document.querySelector('.d-story')?.textContent).toContain(declinedReason.replace('safe_rejection','安全拒答率'));
  expect(JSON.stringify(exp)).toBe(original);
 });
 it('keeps repair and regression summaries ahead of the independently scrolling details',async()=>{
@@ -59,41 +52,29 @@ it.each(['declined','lost','won','running','generated','failed','unknown'])('exp
  if(outcome==='unknown')d.result={...d.result,evaluation_complete:false} as any;
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
  await mount(<EvolutionPage data={{evaluation,optimization:exp}}/>);
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidates 对比')!.click());await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
- const route=document.querySelector('.d-story')?.textContent || '';
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='进化路线')!.click());await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
+ const route=document.querySelector('.ui-evo .d-story')?.textContent || '';
  await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='回归与推荐')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
- const disclosure=document.querySelector<HTMLDetailsElement>('.agent-saved-recommendation')!;
- expect(disclosure.open).toBe(false);
- await act(async()=>{disclosure.open=true;disclosure.dispatchEvent(new Event('toggle'));});
- const final=disclosure.textContent || '';
- expect(document.querySelector('.agent-recommendation-points')?.textContent).toContain('一、质量：');
- expect(document.querySelector('.agent-recommendation-points')?.textContent).toContain('四、回归：');
+ const final=document.querySelector('.page-content')!.textContent || '';
  for(const text of [route,final]){
   expect(text).not.toContain('D未同时满足');
   if(outcome==='declined'){expect(text).toContain('Agent 判断不做 D');expect(text).toContain('保留R3-C');expect(text).not.toContain('没有胜过');}
-  else if(outcome==='lost'){const full=await hoverText('.d-result-conclusion');expect(full).toContain('Bad Case 数与R3-C 相同');expect(full).toContain('保留R3-C');}
+  else if(outcome==='lost'){expect(text).toContain('Bad Case 数与R3-C 相同');expect(text).toContain('保留R3-C');}
   else if(outcome==='won')expect(text).toContain('D 胜过 Winner，推荐 D');
   else {expect(text).not.toContain('D 已完成评测');expect(text).not.toContain('D 胜过 Winner');}
- }
- if(['running','generated','failed','unknown'].includes(outcome)){
-  expect(final).toContain('尚无完整评测结论');expect(final).toContain('保留R3-C');
-  expect(final).toContain(outcome==='running'?'D 评测中':outcome==='failed'?'D 评测中断':'D 已生成');
  }
 });
 it.each([
  ['declined','Agent 判断不做 D'],['generated','D 已生成'],['running','D 评测中'],
-])('shows round-qualified recommendation in overview and current D state in its decision panel (%s)',async(status,label)=>{
+])('shows current D state and round-qualified recommendation in progress (%s)',async(status,label)=>{
  const exp=experiment();
  if(status!=='declined')exp.candidates.push({...winner,id:'EXP-20261105143048349606-D',status,reasoning:{candidate_label:'D'} as any});
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
  await mount(<EvolutionPage data={{evaluation,optimization:exp}}/>);
- expect(document.querySelector('.ui-agent-stats')).toBeNull();
- expect(document.querySelector('.agent-overview')?.textContent).toContain('第 3 轮 Candidate C');
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidates 对比')!.click());
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
- expect(document.querySelector('.d-story')?.textContent).toContain(status==='declined'?label:status==='running'?'运行中':'等待完整评测');
+ expect(document.querySelector('.ui-agent-stats')?.textContent).toContain(label);
+ expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('R3-C');
  expect([...document.querySelectorAll('button')].some(b=>/^历史实验 · \d/.test(b.textContent || ''))).toBe(false);
- expect([...document.querySelectorAll('.page-title button')].some(b=>b.textContent==='查看历史实验')).toBe(false);
- expect(document.querySelectorAll('.page-title button')).toHaveLength(status==='running'?1:0);
+ expect([...document.querySelectorAll('.page-title button')].some(b=>b.textContent==='查看历史实验')).toBe(true);
+ expect(document.querySelectorAll('.page-title button')).toHaveLength(status==='running'?2:1);
  expect(document.querySelector('[aria-label="页面更多操作"]')).toBeNull();
 });

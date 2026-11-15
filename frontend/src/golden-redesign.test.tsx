@@ -63,7 +63,7 @@ it("hides frozen editing controls and renders numbered answers and source eviden
   await act(async () => root.render(<GovernancePage data={frozenData} />));
   expect(document.querySelector(".ui-gp")?.textContent).toContain("已冻结 · 11-01");
   expect(document.querySelector(".review-filters")?.textContent).not.toContain("需要人工关注 0");
-  expect(document.querySelectorAll(".review-table th")).toHaveLength(11);
+  expect(document.querySelectorAll(".review-table th")).toHaveLength(6);
   expect(document.querySelector(".review-table")?.textContent).toContain("95");
   expect(document.querySelector(".review-table")?.textContent).not.toContain("人工审核");
   await act(async () => document.querySelector<HTMLElement>(".review-table tbody tr")!.click());

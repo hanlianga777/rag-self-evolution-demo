@@ -234,7 +234,7 @@ td { border-bottom-color: var(--ui-rule-2); }
 .ui-ov-status-item { display: inline-flex; align-items: center; gap: 8px; }
 .ui-ov-divider { width: 1px; height: 18px; background: var(--ui-rule); }
 .ui-ov-action { margin-left: auto; }
-.ui-ov-flow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 8px; }
+.ui-ov-flow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; background: var(--ui-surface); border-radius: var(--ui-r-card); box-shadow: var(--ui-shadow-1); padding: 8px; }
 .ui-ov-step-wrap { position: relative; display: flex; align-items: stretch; min-width: 0; }
 .ui-ov-step-wrap .ui-hover-trigger { display: flex; flex: 1; min-width: 0; }
 .ui-ov-step { flex: 1; min-width: 0; display: flex; gap: 10px; align-items: flex-start; text-align: left; border: 0; background: transparent; border-radius: 10px; padding: 12px 14px; transition: background-color var(--ui-t-fast) var(--ui-ease); }
@@ -502,21 +502,3 @@ body .evolution-page .route-candidate { height:auto; }
 body .evolution-page .route-candidate-body { overflow:visible; }
 body .evolution-page .route-diagnoses > article { height:auto; overflow:visible; }
 body .evolution-page .agent-hypotheses > section { max-height:none; overflow:visible; }
-
-/* Shared, keyboard accessible explanation control. */
-button.ui-info-tip { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 16px; width: 16px; height: 16px; min-height: 0; padding: 0; margin-inline-start: 5px; border: 1px solid var(--ui-muted); border-radius: 50%; background: var(--ui-surface); color: var(--ui-muted); font: 600 12px/1 Georgia, serif; cursor: help; vertical-align: middle; }
-button.ui-info-tip:focus-visible { outline: 2px solid var(--ui-navy); outline-offset: 3px; }
-.ui-arch-tip { cursor: help; }
-
-.page-shell-header .page-title > div:first-child { min-width: 0; flex: 1; }
-.page-shell-header .page-title > button, .page-shell-header .page-title > .header-actions { flex-shrink: 0; white-space: nowrap; }
-.ui-ov-step { padding-inline: 8px; gap: 6px; }
-@media (max-width: 1320px) {
-  .ui-ov-flow { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-  .ui-ov-step { flex-direction: column; }
-  .ui-ov-step-wrap:nth-child(3) .ui-ov-arrow { display: block; }
-}
-@media (max-width: 900px) {
-  .ui-ov-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ui-ov-step-wrap:nth-child(even) .ui-ov-arrow { display: none; }
-}

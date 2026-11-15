@@ -7,7 +7,7 @@
 export type ParamChange = { key: string; label: string; from?: string; to: string };
 export type CandidateView = {
   id: string; label: string; round: number; name: string; direction: string; efficiency: boolean;
-  intent?: string; safetyPassed?: boolean | null;
+  intent?: string;
   params: ParamChange[]; fixed: string[]; broken: string[]; gateFailures: string[];
   qualified: boolean | null; winner: boolean; correct: number | null; total: number | null;
   p50: number | null; p99: number | null; complete: boolean;
@@ -18,7 +18,7 @@ export type RoundView = { round: number; candidates: CandidateView[]; summary: s
 export type EvolutionModel = { rounds: RoundView[]; winnerId: string | null; d: CandidateView | null; budget: { used: number; max: number } | null };
 
 export const PARAM_LABELS: Record<string, string> = {
-  candidate_k: "候选数", top_k: "保留条数", generation_thinking: "思考档位", multi_query: "多路查询",
+  candidate_k: "Candidate K", top_k: "Top-K", generation_thinking: "Thinking", multi_query: "Multi-Query",
   query_rewrite: "Query Rewrite", query_decompose: "Query Decompose", hyde: "HyDE", hybrid_search: "Hybrid Search",
   hybrid_alpha: "向量权重", rerank: "Rerank", prompt_strategy: "回答策略", min_score: "最低相关分", retrieval_max_tokens: "Retrieval Max Tokens",
 };
@@ -74,24 +74,23 @@ export function candidateView(candidate: any, baselineConfig: Record<string, unk
     key, label: PARAM_LABELS[key] ?? key, to: paramValue(key, value),
     from: baselineConfig && key in baselineConfig ? paramValue(key, baselineConfig[key]) : undefined,
   })).filter(item => item.from === undefined || item.from !== item.to);
-  const qualification = result.qualification ?? result.release_qualification;
-  const total = typeof result.total_cases === "number" ? result.total_cases : typeof result.case_count === "number" ? result.case_count : typeof result.total === "number" ? result.total : null;
+  const qualification = result.release_qualification ?? result.qualification;
+  const total = typeof result.total_cases === "number" ? result.total_cases : typeof result.case_count === "number" ? result.case_count : 50;
   const bad = typeof result.bad_case_count === "number" ? result.bad_case_count : null;
   return {
     id: candidate.id, label: reasoning.candidate_label || candidate.id.slice(-1), round: reasoning.round || 1, name: nameOf(candidate),
     direction: reasoning.direction || reasoning.optimization_direction || "", efficiency: /效率/.test(reasoning.direction || ""),
     intent: firstSentence(reasoning.hypothesis || reasoning.proposal || reasoning.core_idea),
-    safetyPassed: (() => { const gates = (result.gates?.gates || []).filter((g: any) => /safe|safety|injection/.test(g.metric || "")); return gates.some((g: any) => g.passed === false) ? false : gates.length && gates.every((g: any) => g.passed === true) ? true : null; })(),
     params,
     fixed: firstList(result.all_fixed_question_ids, result.regression?.all_fixed_question_ids),
     broken: firstList(result.new_regression_question_ids, result.newly_failed, result.comparison?.newly_failed, result.regression?.new_regression_question_ids),
     gateFailures: gateFailures(result, gateLabel),
-    newFailures: complete(candidate) && Array.isArray(result.new_regression_question_ids) ? result.new_regression_question_ids.length : undefined,
+    newFailures: Array.isArray(result.new_regression_question_ids) ? result.new_regression_question_ids.length : undefined,
     regression: result.regression_review,
     gates: typeof result.gates?.passed_count === 'number' && typeof result.gates?.total === 'number' ? { passed: result.gates.passed_count, total: result.gates.total } : undefined,
     qualified: typeof qualification?.qualified === "boolean" ? qualification.qualified : null,
     winner: candidate.id === winnerId,
-    correct: bad === null || total === null || !complete(candidate) ? null : total - bad, total,
+    correct: bad === null ? null : total - bad, total,
     p50: latency(result, "latency_p50_seconds"), p99: latency(result, "latency_p99_seconds"),
     complete: complete(candidate),
   };

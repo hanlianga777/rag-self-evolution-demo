@@ -21,19 +21,19 @@ it('shows saved results in the summary and reuses route lessons without inventin
  d.result={...d.result,total:50,bad_case_count:2,metrics:{latency_p50_seconds:8,safe_rejection_rate:100},gates:{passed_count:11,total:11,gates:[]},new_regression_question_ids:[]};
  const data={evaluation:{id:'base',status:'completed',config:sampleBaselineConfig,result:{total:50,bad_case_count:6,metrics:{latency_p50_seconds:16,safe_rejection_rate:95}}},optimization:exp,workspace:{},overview:{dataset:{total:50,approved:50}}};
  await mount(<OverviewPage data={data} navigate={()=>{}}/>);
- const summary=document.querySelector('.ui-ov-hero')!;expect(document.querySelector('.ui-ov-big')?.textContent).toMatch(/44.*48/);expect(summary.textContent).toMatch(/P50.*16\.0.*8\.0/);expect(summary.textContent).toContain('11 / 11');
+ const summary=document.querySelector('.ui-ov-hero')!;expect(document.querySelector('.ui-ov-big')?.textContent).toMatch(/44.*48/);expect(summary.textContent).toMatch(/P50.*16\.0.*8\.0/);expect(summary.textContent).toContain('Hard Gate 11 / 11');
  const model=buildEvolutionModel(exp,sampleBaselineConfig,key=>key,item=>item.id);
  for(const round of model.rounds.filter(r=>r.round<=2 && r.lesson))expect(document.querySelector('[aria-label="优化过程"]')!.textContent).toContain(round.lesson!.text);
  await act(async()=>root.render(<OverviewPage data={{}} navigate={()=>{}}/>));
  expect(document.querySelector('.ui-ov-hero')!.textContent).toContain('未知');expect(document.querySelector('.ui-ov-big')!.textContent).not.toMatch(/44.*48/);
 });
 it('hides idle Sandbox progress while keeping parameters and diagnosis on the route',async()=>{
- history.replaceState(null,'','#evolution');await mount(<EvolutionPage data={{evaluation:{id:'base',status:'completed',config:sampleBaselineConfig,result:{total:50,bad_case_count:6}},optimization:{...sampleExperiment,id:"exp",baseline_run_id:'base',recommendation:{recommended_candidate:sampleExperiment.candidates[0].id}},workspace:{}}}/>);
+ history.replaceState(null,'','#evolution');await mount(<EvolutionPage data={{evaluation:{id:'base',status:'completed',config:sampleBaselineConfig,result:{total:50,bad_case_count:6}},optimization:{...sampleExperiment,id:"exp",baseline_run_id:'base'},workspace:{}}}/>);
  expect(document.querySelector('.page-title')!.textContent).not.toContain('查看 Sandbox 进度');
- await click('Candidates 对比');expect(document.querySelector('.baseline-actions')).toBeNull();await click('查看 Candidate 与完整报告');
+ await click('进化路线');expect(document.querySelector('.baseline-actions')).toBeNull();await act(async()=>document.querySelector<HTMLElement>('.ui-evo-card')!.click());
  await click('查看可调参数');expect(document.querySelector('[role=dialog]')!.textContent).toContain('可调参数');
  await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());await click('回归与推荐');
- expect(document.querySelector('.agent-recommendation-points')).not.toBeNull();expect(document.querySelector('.agent-recommendation-points')!.closest('details')).toBeNull();
+ expect(document.querySelector('.regression-summary-table')).not.toBeNull();expect(document.querySelector('.regression-summary-table')!.closest('details')).toBeNull();
 });
 const questions=[{id:'slow',question:'慢的正向原题',test_category:'positive'},{id:'fast',question:'快的正向原题',test_category:'positive'},{id:'safety',question:'安全拒答原题',test_category:'negative',negative_subtype:'safety_critical'},{id:'clarify',question:'追问原题',test_category:'negative',negative_subtype:'clarify'},{id:'outside',question:'未冻结原题',test_category:'positive'}];
 const run={id:'base',status:'completed',dataset_version_id:'golden',dataset_snapshot:{question_ids:['slow','fast','safety','clarify'],questions},cases:questions.map((q,i)=>({question_id:q.id,passed:true,programmatic_metrics:{latency_ms:i===0?900:100}}))};

@@ -58,8 +58,8 @@ it("keeps the Baseline Bad Case table compact and detail ready", async () => {
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<EvaluationPage data={{ evaluation: run, badCases: [] }} />); await Promise.resolve(); });
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(item => item.textContent)).toEqual(["题号", "问题", "题型", "负向子类", "主题簇i", "问题层级与细分类型", "缺了什么", "严重程度i", ""]);
-  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("具体失败原因未知");
+  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(item => item.textContent)).toEqual(["题号", "问题", "分类", "缺了什么", "严重程度", ""]);
+  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("记录缺失：分类");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("Hallucination");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("发生故障后如何恢复运行？");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("Not Passed");

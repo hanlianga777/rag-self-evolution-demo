@@ -1,37 +1,69 @@
-import { Icon } from '../icons';
-import type { CandidateView } from './model';
+import { Icon, IconLabel } from "../icons";
+import { QuestionList, type QuestionTone } from "../Primitives";
+import type { CandidateView } from "./model";
 
-export function FinalRecommendation({chosen, runnerUp, reason, others, qualifiedCandidates, onRelease, releaseLabel = '去发布', onOpen}: {
-  totalCandidates?: number; qualifiedCount?: number; regressionSummary?: React.ReactNode; qualifiedCandidates?: CandidateView[];
+/**
+ * Agent 工作台 →「最终推荐」。
+ * 重点只比较"同为合格"的两个方案：Winner（Round 3 · Candidate C）与 Candidate D。
+ * - C 不是失败方案：它更快；D 多修好 Q04，P99 更高但仍在 Hard Gate 内。按"质量优先、Regression 与 Hard Gate 满足"推荐 D。
+ * - 其余 Candidate 的落选理由放在下方一张表里（与进化路线同一套数据），不再是九段长文。
+ * reason 用现有 recommendationReason() 的输出，不另写结论。
+ */
+export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason, others, questionText, onRelease, releaseLabel = "去发布", onOpen, totalCandidates, qualifiedCount, regressionSummary }: {
+  totalCandidates?: number; qualifiedCount?: number; regressionSummary?: React.ReactNode;
   chosen: CandidateView; runnerUp: CandidateView | null; baselineCorrect: number | null; reason: string; others: CandidateView[];
   questionText?: (id: string) => string | undefined; onRelease?: () => void; releaseLabel?: string; onOpen?: (id: string) => void;
 }) {
-  const eligible = qualifiedCandidates || [runnerUp, chosen].filter((c): c is CandidateView => !!c && c.complete && c.qualified === true);
-  const rejected = others.filter(c => !eligible.some(item => item.id === c.id));
-  const failedSafety = chosen.gateFailures.filter(text => /安全|拒答|注入/.test(text));
+  const rows: { label: string; a: string; b: string; better: "a" | "b" | null }[] = runnerUp ? [
+    { label: "答对", a: cnt(runnerUp), b: cnt(chosen), better: cmp(runnerUp.correct, chosen.correct, "higher") },
+    { label: "新增 Bad Case", a: String(runnerUp.broken.length), b: String(chosen.broken.length), better: cmp(runnerUp.broken.length, chosen.broken.length, "lower") },
+    { label: "P50", a: sec(runnerUp.p50), b: sec(chosen.p50), better: cmp(runnerUp.p50, chosen.p50, "lower") },
+    { label: "P99", a: sec(runnerUp.p99), b: sec(chosen.p99), better: cmp(runnerUp.p99, chosen.p99, "lower") },
+  ] : [];
+  const extra = runnerUp ? chosen.fixed.filter(id => !runnerUp.fixed.includes(id)) : [];
   return <section className="ui-fin" aria-label="最终推荐">
-    <div className="ui-fin-top"><div><span className="ui-kicker">最终推荐</span><h2>{chosen.name}</h2></div>{onRelease && <button className="primary" onClick={onRelease}><Icon name="release" size={15}/>{releaseLabel}</button>}</div>
-    <div className="agent-recommendation-points">
-      <p><strong>一、质量：</strong>答对 {cnt(chosen)} 题；{chosen.gates ? `门槛通过 ${chosen.gates.passed} / ${chosen.gates.total}` : '门槛数量未知'}。</p>
-      <p><strong>二、安全：</strong>{failedSafety.length ? failedSafety.join('；') : chosen.safetyPassed === true ? '安全门槛全部通过' : chosen.safetyPassed === false ? '安全门槛未全部通过' : '安全门槛记录未知'}。</p>
-      <p><strong>三、速度：</strong>中位耗时 {sec(chosen.p50)}；最慢耗时 {sec(chosen.p99)}。</p>
-      <p><strong>四、回归：</strong>新错 {chosen.newFailures ?? '未知'} 题；严重新增 {chosen.regression?.new_critical_failures ?? '未知'} 题，普通新增 {chosen.regression?.new_ordinary_failures ?? '未知'} 题。{chosen.qualified === true ? '保存的最终资格合格。' : chosen.qualified === false ? '保存的最终资格不合格。' : '最终资格未知。'}</p>
+    <div className="ui-fin-top">
+      <div>
+        <span className="ui-rel-k"><IconLabel name="recommend">最终推荐</IconLabel></span>
+        <h2>{totalCandidates != null ? `${totalCandidates} 个 Candidate 中只有 ${qualifiedCount ?? 0} 个通过回归检查，最终推荐 ${chosen.name}` : chosen.name}</h2>
+        <p className="ui-fin-reason">{reason}</p>
+      </div>
+      {onRelease && <button type="button" className="primary" onClick={onRelease}><Icon name="release" size={15} />{releaseLabel}</button>}
     </div>
-    <details className="agent-saved-recommendation"><summary>推荐依据</summary><p>{reason}</p></details>
-    <QualifiedCandidateComparison candidates={eligible} chosenId={chosen.id} onOpen={onOpen}/>
-    {rejected.length > 0 && <div className="ui-fin-others table-scroll"><h3>落选原因</h3><table aria-label="落选原因"><thead><tr><th>方案</th><th>没过的门槛或新错</th><th>原因</th></tr></thead><tbody>{rejected.map(c=><tr key={c.id}><td><button className="secondary small" onClick={()=>onOpen?.(c.id)} disabled={!onOpen}>{c.name}</button></td><td>{rejectionFailures(c)}</td><td>{!c.complete ? '评测尚未完成' : c.qualified === false ? '保存的最终资格不合格' : c.qualified === true ? '保存的最终推荐未选择该方案' : '具体原因未保存'}</td></tr>)}</tbody></table></div>}
+
+    {regressionSummary}
+    {runnerUp && <div className="ui-fin-compare">
+      <table>
+        <thead><tr><th>合格 Candidate 对比</th><th>{runnerUp.name}<small>Winner · 合格</small></th><th className="pick">{chosen.name}<small>推荐</small></th></tr></thead>
+        <tbody>
+          {rows.map(row => <tr key={row.label}><td>{row.label}</td><td className={`ui-num${row.better === "a" ? " better" : ""}`}>{row.a}{row.label === "答对" && baselineCorrect != null && runnerUp.correct != null && <small className="ui-body-muted">较 Baseline {delta(runnerUp.correct - baselineCorrect)}</small>}</td><td className={`ui-num pick${row.better === "b" ? " better" : ""}`}>{row.b}{row.label === "答对" && baselineCorrect != null && chosen.correct != null && <small className="ui-body-muted">较 Baseline {delta(chosen.correct - baselineCorrect)}</small>}</td></tr>)}
+          <tr><td>比 Winner 多修好</td><td>—</td><td className="pick"><QuestionList items={extra.map(id => ({ id, tone: "fixed" as QuestionTone, question: questionText?.(id) }))} /></td></tr>
+        </tbody>
+      </table>
+      {onOpen && <button type="button" className="secondary" onClick={()=>onOpen(runnerUp.id)}>查看 Winner 详情</button>}
+    </div>}
+
+    {others.length > 0 && <div className="ui-fin-others">
+      <h3><IconLabel name="rejected">落选原因（{others.length}）</IconLabel></h3>
+      <div className="candidate-rejections">{others.map(item=><button type="button" key={item.id} onClick={()=>onOpen?.(item.id)} disabled={!onOpen}><strong>{item.name}</strong><span>{rejectionReason(item)}</span><Icon name="go" size={14}/></button>)}</div>
+    </div>}
   </section>;
 }
-const cnt = (c: CandidateView) => c.correct == null ? '未知' : `${c.correct} / ${c.total ?? '未知'}`;
-const sec = (n: number | null) => n == null ? '未知' : `${n.toFixed(1)} 秒`;
 
-function rejectionFailures(c: CandidateView): string {
-  if (!c.complete) return '评测未完成';
-  const review = c.regression;
-  const exceeded = review?.limits ? (['critical', 'ordinary'] as const).filter(key => typeof review[`new_${key}_failures`] === 'number' && review[`new_${key}_failures`] > review.limits![key]).map(key => `${key === 'critical' ? '严重' : '普通'}新增 ${review[`new_${key}_failures`]} 题，上限 ${review.limits![key]} 题`) : [];
-  return [...c.gateFailures.map(text => `门槛未通过：${text}`), ...exceeded, ...(c.newFailures != null ? [`新错 ${c.newFailures} 题`] : [])].join('；') || '未知';
+const delta = (value: number) => value > 0 ? `+${value}` : String(value);
+const cnt = (item: CandidateView) => item.correct == null ? "未知" : `${item.correct} / ${item.total ?? 50}`;
+const sec = (value: number | null) => value == null ? "未知" : `${value.toFixed(1)} 秒`;
+function cmp(a: number | null, b: number | null, better: "higher" | "lower"): "a" | "b" | null {
+  if (a == null || b == null || a === b) return null;
+  return (better === "higher" ? a > b : a < b) ? "a" : "b";
 }
 
-export function QualifiedCandidateComparison({candidates, chosenId, onOpen}: {candidates: CandidateView[]; chosenId?: string; onOpen?: (id: string) => void}) {
-  return <div className="ui-fin-compare table-scroll"><table aria-label="合格方案对比"><thead><tr>{['合格方案对比','答对','新错','门槛通过','中位耗时','最慢耗时'].map(t=><th key={t}>{t}</th>)}</tr></thead><tbody>{candidates.map(c=><tr key={c.id}><td><button className="secondary small" onClick={()=>onOpen?.(c.id)} disabled={!onOpen}>{c.name}{c.id === chosenId ? ' · 推荐' : ''}</button></td><td>{cnt(c)}</td><td>{c.newFailures ?? '未知'}</td><td>{c.gates ? `${c.gates.passed}/${c.gates.total}` : '未知'}</td><td>{sec(c.p50)}</td><td>{sec(c.p99)}</td></tr>)}{!candidates.length && <tr><td colSpan={6}>尚无保存的合格方案</td></tr>}</tbody></table></div>;
+function rejectionReason(item: CandidateView): string {
+  if (!item.complete) return '评测尚未完成，不能据此确定资格。';
+  if (item.qualified===true) return '本次保存的最终推荐未选择该方案，具体取舍见完整报告。';
+  const review=item.regression;
+  const failures=review?.limits ? (['critical','ordinary'] as const).filter(key=>review[`new_${key}_failures`]>review.limits![key]) : [];
+  const regression=failures.length===1 ? `新增 ${item.broken.length} 个 Bad Case，超过${failures[0]==='critical' ? '严重' : '普通'}新增最多 ${review!.limits![failures[0]]} 个的上限。` : failures.length ? `新增 ${item.broken.length} 个 Bad Case；${failures.map(key=>`${key==='critical' ? '严重' : '普通'}新增 ${review![`new_${key}_failures`]} 个，超过最多 ${review!.limits![key]} 个的上限`).join('；')}。` : '';
+  const gates=item.gateFailures.length ? `${item.gateFailures.join('；')}，未通过 Hard Gate。` : '';
+  return [regression,gates].filter(Boolean).join(' ') || (item.broken.length ? `新增 ${item.broken.length} 个 Bad Case，保存记录未提供超限明细，具体落选原因见完整报告。` : '保存记录未提供具体落选原因，见完整报告。');
 }

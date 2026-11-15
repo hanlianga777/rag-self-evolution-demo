@@ -100,10 +100,12 @@ it("shows persisted partial slots, failure details, and only the refill action",
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify((url.includes("/questions") || url.includes("/candidates?")) ? goldenFixture(url, rows) : []), { status: 200 })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.querySelector(".generation-progress")?.textContent).toContain("Hard Valid 12/20");
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.body.textContent).toContain("已处理 20/20 · 100%");
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
   expect(document.querySelector(".ui-gp-left > strong")?.textContent).toBe("12 题");
@@ -112,7 +114,8 @@ it("shows persisted partial slots, failure details, and only the refill action",
   expect(document.body.textContent).not.toContain("生成 V1 Mini 8 / 4 / 8");
   expect(document.querySelector(".review-batch")).toBeNull();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-NEW");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("题位 20 / 20");
   await act(async () => document.querySelector<HTMLDetailsElement>(".slot-audit summary")!.click());
@@ -133,11 +136,13 @@ for (const count of [10, 12, 19]) {
     const root = createRoot(document.body.appendChild(document.createElement("div")));
     await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: rows, snapshots: [] }} />));
     expect(document.querySelector(".review-table")?.textContent).toContain(`题目 ${count}`);
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
     expect(document.querySelector(".generation-progress")?.textContent).toContain(`Hard Valid ${count}/20`);
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-partial");
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("题位 20 / 20");
     await act(async () => root.unmount());
@@ -211,9 +216,8 @@ it("confirms an evaluated qualified winner and then offers composite D", async (
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") requests.push({ url, body: JSON.parse(init.body as string || "{}") }); return new Response(JSON.stringify(experiment), { status: 200 }); }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: { status: "completed" }, badCases: [{}] }} />));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Candidates 对比")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Candidate 对比")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "回归与推荐")!.click());
-  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,70));});
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("确认报告"))!.click());
   expect(requests).toHaveLength(0);
   await act(async()=>document.querySelector<HTMLButtonElement>(".confirm-dialog button.primary")!.click());
@@ -222,15 +226,13 @@ it("confirms an evaluated qualified winner and then offers composite D", async (
 });
 
 it.each([{ max: 13, canContinue: true }, { max: 12, canContinue: false }])("keeps saved partial rounds and requires a full next batch plus D reserve ($max slots)", async ({ max, canContinue }) => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
   const experiment = { id: "EXP2", candidates: [], recommendation: { result: { status: "No Qualified Candidate" } }, evaluation_budget: { used: 9, max, reserved_for_d: 1 }, rounds: [{ round: 3, complete: true, evaluated: 2, total: 2 }] };
-  const saved=JSON.stringify(experiment);
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(experiment))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: {}, badCases: [] }} />));
-  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,70));});
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Candidates 对比")!.click());
-  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="概览")!.click());expect(JSON.stringify(experiment)).toBe(saved);expect(experiment.rounds[0]).toEqual({round:3,complete:true,evaluated:2,total:2});
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Candidates 对比")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "进化路线")!.click());
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="概览")!.click());expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("Round 3 · 2/2");
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Candidate 对比")!.click());
   expect(document.body.textContent?.includes("继续优化下一轮")).toBe(canContinue);
   await act(async () => root.unmount());
 });

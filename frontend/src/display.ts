@@ -1,4 +1,3 @@
-import { parameterHelp } from "./helpText";
 export const isMachineQualified = (status?: string) => status === "machine_qualified" || status === "owner_delegated_approved";
 
 export const vocabulary: Record<string, string> = {
@@ -81,43 +80,13 @@ const savedNarratives: Record<string, string> = {
   "If V1G-110926448917-08 still fails checks 5/6/8 with DOC-004-C-00032 absent from Final under top_k=6, or if any of the 50-question regression or 11 gates fail, this hypothesis is not supported.": "若 TopK 为 6 时，Q08 的最终上下文仍缺少 DOC-004-C-00032 且检查项 5、6、8 仍失败，或 50 题 Regression、11 项 Gate 中任一项未通过，则该假设不获支持。",
 };
 
-// Display-only normalization; no saved Agent fields are rewritten.
-export function agentQuestionId(id: string): string {
-  const number = id.match(/^Q(\d+)$/i)?.[1] || id.match(/^(?:CSV|V1G|GD|GGEN)-[\dA-Za-z-]*?-Q?(\d{1,3})(?:-R[\dA-Za-z-]+)?$/)?.[1];
-  return number ? `Q${number.padStart(2, '0')}` : id;
-}
-
+// Display-only normalization shared by saved Agent explanations and generated summaries.
 export function agentDisplayText(value: string): string {
-  const names: Record<string, string> = {
-    ...parameterNames, ...Object.fromEntries(Object.entries(gateNames).map(([key, name]) => [key, name.replace(/（[^）]*）/g, '')])),
-    generation_thinking: '思考档位', hybrid_alpha: '向量权重', alpha: '向量权重',
-    latency_p99: '最慢耗时', latency_p50: '中位耗时', p99: '最慢耗时', p50: '中位耗时',
-    safe_rejection: '安全拒答率', query_only: '只按问题', reranked: '重排结果', candidates: '候选列表',
-    Grounded: '有据生成', Tiered: '分级回答', Thinking: '思考档位', thinking: '思考档位', clarify: '追问', final: '交给模型的证据', candidate: '候选',
-    reasoning_tokens: '推理词元', query_processing: '查询处理', insufficient_evidence: '证据不足',
-    winner_plus_verified: '在 Winner 上添加已验证参数', partial_fusion: '部分融合', prerequisite_differences: '前提差异',
-    context_selection: '上下文选择', candidate_recall: '候选召回', search_space: '允许调整范围',
-    high: 'High', max: 'Max', low: 'Low',
-  };
-  let text = presentationText(value).replace(/（(?:Positive|Ablation|Negative)）/g, '').replace(/Embedding Retrieval\s*权重/g, '向量权重').replace(/(?:CSV|V1G|GD|GGEN)-[\dA-Za-z-]+/g, agentQuestionId);
-  text = text.replace(/(^|[、；（(/\s])-(\d{2})(?![\dA-Za-z.%℃°-])/gm, (match, prefix, number, offset, source) => {
-    const before = source.slice(0, offset), after = source.slice(offset + match.length);
-    // Whitespace alone cannot distinguish a negative value from an abbreviated ID.
-    // Accept it only in a question list; keep quantities, dates and ranges intact.
-    if (/(?:温度|数值|偏差|阈值)\s*[（(]?$/.test(before)) return match;
-    if (/^\s*(?:到|至|~|～|秒|度|%|℃)/.test(after)) return match;
-    if (prefix === '；' && !/Q\d+[^。\n]*$/.test(before)) return match;
-    if (/\s/.test(prefix) && prefix !== '\n' && !/Q\d+[^。；;\n]*$/.test(before)) return match;
-    return `${prefix}Q${number}`;
-  });
-  text = text.replace(new RegExp(`\\b(?:${Object.keys(names).sort((a, b) => b.length - a.length).join('|')})\\b(\\s*=\\s*)?`, 'g'),
+  const names: Record<string, string> = { ...parameterNames, ...gateNames, high: "High", max: "Max", low: "Low", safe_rejection: "安全拒答率", p99: "P99", p50: "P50" };
+  return presentationText(value).replace(new RegExp(`\\b(?:${Object.keys(names).join('|')})\\b(\\s*=\\s*)?`, 'g'),
     (key, equals) => `${names[key.replace(/\s*=\s*$/, '')]}${equals ? ' ' : ''}`)
-    .replace(/(?<![\d.])(\d+(?:\.\d+)?)\s*s\b/g, (_match, seconds) => `${Number(seconds) % 1 ? Number(seconds).toFixed(1) : Number(seconds)} 秒`)
-    .replace(/(?<![\d.])(\d+\.\d{3})\s*秒/g, (_match, seconds) => `${Number(seconds).toFixed(1)} 秒`)
-    .replace(/思考档位\s*档位/g, '思考档位')
     .replace(/方案\s*([ABCD])\b/g, 'Candidate $1').replace(/错题/g, 'Bad Case').replace(/方案/g, 'Candidate').replace(/赢家/g, 'Winner')
     .replace(/([\p{Script=Han}])(Bad Case|Candidate|Winner)/gu, '$1 $2').replace(/(Bad Case|Candidate|Winner)([\p{Script=Han}])/gu, '$1 $2');
-  return text;
 }
 
 export function narrativeText(value: string): string {
@@ -165,9 +134,11 @@ export const parameterNames: Record<string, string> = {
 };
 
 export const descriptions: Record<string, string> = {
-  ...parameterHelp,
-  query_decompose: "拆解独立意图并分别检索；默认关闭",
-  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射",
+  generation_thinking: "可选择 OFF / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "不限 / 8192 / 4096；缺少 tokenizer 时按字符数估算 token",
+  candidate_k: "初始候选召回数量", top_k: "进入回答上下文的证据数量", min_score: "进入上下文前的最低相关分",
+  hybrid_search: "组合向量与BM25", hybrid_alpha: "Embedding Retrieval 在 Hybrid Search 中的权重", rerank: "模型 Rerank、原排序或仅原问题的 BM25 排序",
+  query_rewrite: "生成标准化检索问法", multi_query: "生成互补检索问法", hyde: "先写一段假设答案，再拿去检索",
+  metadata_filter: "按可靠元数据筛选", alias_mapping: "使用已审核别名映射", prompt_strategy: "分级回答：能确定的先回答，条件缺失时追问，资料无关时转人工，并保留安全警告",
 };
 
 export function localShortTime(value?: string): string {

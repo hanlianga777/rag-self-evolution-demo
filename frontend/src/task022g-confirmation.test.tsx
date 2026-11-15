@@ -26,16 +26,11 @@ it.each(['completed', 'partial', 'not_run'])('confirms before any Baseline start
   const run = { id: status === 'not_run' ? undefined : '022g-baseline', status, cases: [], dataset_snapshot: {}, result: {} };
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => response(url.includes('/bad-cases') ? [] : url.includes('preflight') ? { can_start: true, can_resume: status === 'partial', resume_source_id: status === 'partial' ? run.id : null } : init?.method === 'POST' ? { id: 'new', status: 'running' } : run));
   vi.stubGlobal('fetch', fetcher); await mount(<EvaluationPage data={{ evaluation: run }} />);
-  if (status === 'completed') {
-    expect([...document.querySelectorAll('button')].some(b => b.textContent === '重新评测 Baseline')).toBe(false);
-    expect(fetcher.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
-    return;
-  }
-  const label = status === 'partial' ? '恢复 Baseline' : '运行 Baseline 评测';
+  const label = status === 'completed' ? '重新评测 Baseline' : status === 'partial' ? '恢复 Baseline' : '运行 Baseline 评测';
   await cancelWithoutRequest(fetcher, label); await click(label);
   expect(document.querySelector('.confirm-dialog')?.textContent).toContain('会调用模型并产生费用');
   expect(document.querySelector('.confirm-dialog')?.textContent).toContain('不会影响当前线上版本');
-  if (status !== 'partial') expect(document.querySelector('.confirm-dialog')?.textContent).toContain('当前 Pipeline 配置评测整套题卷');
+  if (status !== 'partial') expect(document.querySelector('.confirm-dialog')?.textContent).toContain('当前 Pipeline 配置对 50 题重新评测');
   await click('确认');
   const posts = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST'); expect(posts).toHaveLength(1);
   expect(posts[0][0]).toMatch(/\/api\/evaluations\/run$/);
@@ -65,12 +60,7 @@ it.each(['regenerate', 'reselect', 'resume'])('confirms revision operation %s wi
 it('confirms monitoring Agent generation before starting its linked context', async () => {
   const fetcher = vi.fn(async () => response({ id: 'exp', baseline_run_id: 'b', status: 'pending_agent' })); vi.stubGlobal('fetch', fetcher);
   await mount(<VerificationPage data={{ workspace: { current_baseline_id: 'b' }, monitoring: { triggers: [{ id: 'trigger', status: 'human_confirmed', optimization_run_id: 'exp' }] } }} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
-  await click('Monitoring'); fetcher.mockClear(); await click('启动此上下文 Agent · Round 1');
-  expect(document.querySelector('.confirm-dialog')?.textContent).toContain('会调用模型并产生费用');
-  expect(fetcher.mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === 'GET')).toBe(true);
-  await click('取消'); expect(document.querySelector('.confirm-dialog')).toBeNull();
-  expect(fetcher.mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === 'GET')).toBe(true);
-  expect(fetcher.mock.calls.every((call: any[]) => String(call[0]).endsWith('/api/experiments/exp'))).toBe(true);
+  await click('Monitoring'); await cancelWithoutRequest(fetcher, '启动此上下文 Agent · Round 1');
 });
 it('uses the shared dialog for a paid immediate resume', async () => {
   const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher); await mount(<PricePauseNotice pause={{ paused: true }} evaluationId="b" />);

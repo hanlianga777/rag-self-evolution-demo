@@ -20,7 +20,7 @@ it("offers one human release action after recommendation without posting before 
   expect(actions[0].disabled).toBe(false);
   await act(async () => actions[0].click());
   expect(document.querySelector(".confirm-dialog")?.textContent).toContain("发布确认");
-  expect(vi.mocked(fetch).mock.calls.filter(([,init])=>init?.method==="POST")).toHaveLength(0);
+  expect(fetch).not.toHaveBeenCalled();
   await act(async () => document.querySelector<HTMLButtonElement>(".confirm-dialog .primary")!.click());
   expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/api/candidates/EXP-fixture-A/publish"), expect.objectContaining({ method: "POST", body: JSON.stringify({ decision: "approved" }) }));
   expect(document.body.textContent).not.toContain("候选方案 Approval");
@@ -50,10 +50,9 @@ it("requires every saved release eligibility guard and a separate rollback confi
   }
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/versions?page=1&limit=50") ? [] : url.endsWith("/optimization") ? {} : { id: "old" }))));
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [{ id: "new", status: "active" }, { id: "old", status: "archived" }] }} /></OperationProvider>));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(node => node.textContent === "更多")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(node => node.textContent === "回滚至 历史配置 · 时间未知")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(node => node.textContent === "回滚至此版本")!.click());
   expect(document.querySelector(".confirm-dialog")?.textContent).toContain("确认回滚 线上版本");
-  expect(vi.mocked(fetch).mock.calls.filter(([,init])=>init?.method==="POST")).toHaveLength(0);
+  expect(fetch).not.toHaveBeenCalled();
   await act(async () => document.querySelector<HTMLButtonElement>(".confirm-dialog .primary")!.click());
   expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/api/versions/old/rollback"), expect.objectContaining({ method: "POST", body: JSON.stringify({ decision: "approved" }) }));
 });

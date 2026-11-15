@@ -15,12 +15,12 @@ it('shows the latest D decision and keeps the old raw decision inside technical 
  const exp={id:'experiment',candidates:[d],result:{composite:current,composite_history:[old]},recommendation:{d_outcome:'declined'}};
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
  await mount(<EvolutionPage data={{evaluation:{id:'base',config:{}},optimization:exp}}/>);
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidates 对比')!.click());await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='进化路线')!.click());await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
  expect(document.querySelector('.d-story')?.textContent).toContain('最新结论');
- expect(document.querySelector('.d-story > .d-prediction')?.textContent).not.toContain('旧结论');
+ expect(document.querySelector('.d-story')?.textContent).not.toContain('旧结论');
  const details=[...document.querySelectorAll('details')].find(e=>e.querySelector('summary')?.textContent==='技术详情');
- expect(details?.open).toBe(false);
- expect(details?.textContent).toContain('旧结论：风险大所以放弃');
+ expect(details).toBeUndefined();
+ expect(document.body.textContent).not.toContain('旧结论：风险大所以放弃');
  expect(exp.result.composite_history[0]).toEqual(old);
 });
 it('does not let a stale recommendation decline override the current failed decision',async()=>{

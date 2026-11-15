@@ -16,8 +16,8 @@ it.each([
 ])('%s keeps every non-citation character in the saved opening sentence',async(_id,answer,documentName,section,page,expected,short)=>{
  const evidence={document:documentName,page_start:page,section_path:section,content:'保存的证据'};
  await mount(<ComparisonAnswer row={{model_answer:answer,programmatic_metrics:{retrieval_trace:{final:[evidence]}}}} points={[]} side="before" onOpenCitation={()=>{}}/>);
- expect(document.querySelector('.comparison-body')?.textContent).toBe(expected.replace('”1','”①'));
- expect(document.querySelector('.answer-source summary')?.textContent).toBe(`①${short} · 第 ${page} 页`);
+ expect(document.querySelector('.comparison-body')?.textContent).toBe(expected);
+ expect(document.querySelector('.comparison-sources li')?.textContent).toBe(`1${short}，${section}，第 ${page} 页`);
 });
 
 const quote='类型=结构；要点=1. 目视及触摸检查机身、各个关节及连接处、足端组件是否完好,有裂纹或者有破损需及时更换和联系 Unitree 售后';
@@ -48,8 +48,8 @@ it.each([1,2,3])('shows %i missing and newly met points once in the comparison t
  await mount(<SavedAnswerComparison data={{evaluation:{id:'n-base'},optimization:{recommendation:{recommended_candidate:'D'},candidates:[{id:'D',status:'evaluated',result:{evaluation_run_id:'n-after',evaluation_complete:true,total:1}}]}}} onOpenCitation={()=>{}}/>);
  const rows=[...document.querySelectorAll('.comparison-ptable tbody tr')];
  expect(rows).toHaveLength(count);
- expect(rows.map(row=>row.querySelector('td')?.textContent)).toEqual(['结构完好','电池无损','摇杆在中位'].slice(0,count).map((text,i)=>`${i+1}${text}`));
- for(const row of rows){expect(row.querySelector('td:nth-child(2)')?.textContent).toBe('错');expect(row.querySelector('td:nth-child(3)')?.textContent).toBe('对新满足');}
+ expect(rows.map(row=>row.querySelector('td')?.textContent)).toEqual(['结构完好','电池无损','摇杆在中位'].slice(0,count).map((text,i)=>`${i+1}${text}新满足`));
+ for(const row of rows){expect(row.querySelector('td:nth-child(2)')?.textContent).toBe('错');expect(row.querySelector('td:nth-child(3)')?.textContent).toBe('对');}
  expect(document.querySelectorAll('.comparison-flag')).toHaveLength(0);
  expect(document.querySelectorAll('.comparison-newtag')).toHaveLength(count);
 });

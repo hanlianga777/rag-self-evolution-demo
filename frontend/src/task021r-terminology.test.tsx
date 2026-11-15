@@ -18,9 +18,9 @@ it('uses the requested industry labels and real thinking values',()=>{
  expect(baselineName({config:{generation_thinking:'high'}})).toContain('High');
  expect(schemeName({reasoning:{round:3,candidate_label:'D'}})).toBe('Candidate D');
 });
-it('keeps technical records in disclosures rather than primary technical sections',()=>{
+it('removes technical entry sections from every source page',()=>{
  const sources=import.meta.glob('./{pages,components}/*.tsx',{query:'?raw',import:'default',eager:true});
- for(const [file,text] of Object.entries(sources))expect(text,file).not.toMatch(/<TechnicalDetails\b/);
+ for(const [file,text] of Object.entries(sources))expect(text,file).not.toMatch(/<TechnicalDetails\b|label=["']技术详情["']/);
 });
 it('shows Before/After without the paid comparison entry',()=>{
  const html=renderToStaticMarkup(createElement(VerificationPage,{data:{},onOpenCitation:()=>{},onOpenDocument:()=>{}}));
@@ -34,7 +34,7 @@ it('normalizes displayed parameter notation and keeps saved Agent evidence uncha
  const reasoning={candidate_label:'D',explanation:original,core_idea:original};
  const data={candidates:[{id:'d',status:'evaluated',reasoning,result:{evaluation_complete:true}}]};
  const before=JSON.stringify(data);
- expect(renderToStaticMarkup(createElement(DStory,{experiment:data}))).toContain(original.replace("方案 D", "Candidate D").replace("rerank=query_only", "Rerank 方式：只按问题"));
- expect(renderToStaticMarkup(createElement(StrategyPresentation,{reasoning}))).toContain(original.replace("方案 D", "Candidate D").replace("rerank=query_only", "Rerank 只按问题"));
+ expect(renderToStaticMarkup(createElement(DStory,{experiment:data}))).toContain(original.replace("方案 D", "Candidate D").replace("rerank=query_only", "Rerank query_only"));
+ expect(renderToStaticMarkup(createElement(StrategyPresentation,{reasoning}))).toContain(original.replace("方案 D", "Candidate D").replace("rerank=query_only", "Rerank query_only"));
  expect(JSON.stringify(data)).toBe(before);
 });

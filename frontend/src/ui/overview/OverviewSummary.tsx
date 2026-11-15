@@ -1,13 +1,13 @@
 import { Icon, IconLabel, IconTile, iconForStep, type IconName } from "../icons";
-import { HoverCard, InfoTip } from "../HoverCard";
+import { HoverCard } from "../HoverCard";
 import { StatTransition, StatusBadge, type StatusKind } from "../Primitives";
 
 /**
- * 概览 →「优化成果」首屏。
+ * 概览 →「项目概览」首屏。
  * - 主成果：答对 from → to（最大字号），下方三枚事实：修好 N、新增 Bad Case 0、Hard Gate x/y；
  * - 次要指标：P99、P50、安全拒答率、评测预算；
  * - 一条真实状态：Candidate D 推荐待发布 ｜ 当前线上：Baseline（初始配置）（状态由调用方从同一份线上版本数据算出，不写死）；
- * - 流程条：7 步，每步只写一个事实；悬停看补充；点击跳转。
+ * - 流程条：6 步，每步只写一个事实；悬停看补充；点击跳转。
  */
 export type FlowStep = { label: string; fact: string; tips?: string[]; onClick?: () => void; icon?: IconName };
 export type Pair = { from: number | null; to: number | null };
@@ -27,7 +27,7 @@ export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates
         <div className="ui-ov-facts">
           <span className="ui-ov-fact good"><Icon name="fixed" size={14} />修好 <b className="ui-num">{fixedCount ?? "未知"}</b></span>
           <span className="ui-ov-fact"><Icon name="bad" size={14} />新增 Bad Case <b className="ui-num">{newBadCount ?? "未知"}</b></span>
-          <span className="ui-ov-fact"><Icon name="gate" size={14} />Hard Gate <InfoTip term="hard_gate" label="Hard Gate" /><b className="ui-num">{gates ? `${gates.passed} / ${gates.total}` : "未知"}</b></span>
+          <span className="ui-ov-fact"><Icon name="gate" size={14} />Hard Gate <b className="ui-num">{gates ? `${gates.passed} / ${gates.total}` : "未知"}</b></span>
         </div>
         <div className="ui-ov-status">
           <span className="ui-ov-status-item"><StatusBadge kind={status.kind} /> {status.candidate}</span>
@@ -37,8 +37,8 @@ export function OverviewSummary({ correct, total, fixedCount, newBadCount, gates
         </div>
       </div>
       <dl className="ui-ov-side">
-        <div><dt><IconLabel name="p99">P99</IconLabel><InfoTip term="p99" label="P99" /></dt><dd><StatTransition from={p99.from} to={p99.to} unit=" 秒" better="lower" digits={1} /></dd></div>
-        <div><dt><IconLabel name="p50">P50</IconLabel><InfoTip term="p50" label="P50" /></dt><dd><StatTransition from={p50.from} to={p50.to} unit=" 秒" better="lower" digits={1} /></dd></div>
+        <div><dt><IconLabel name="p99">P99</IconLabel></dt><dd><StatTransition from={p99.from} to={p99.to} unit=" 秒" better="lower" digits={1} /></dd></div>
+        <div><dt><IconLabel name="p50">P50</IconLabel></dt><dd><StatTransition from={p50.from} to={p50.to} unit=" 秒" better="lower" digits={1} /></dd></div>
         <div><dt><IconLabel name="refusal">安全拒答率</IconLabel></dt><dd><StatTransition from={safeRefusal.from} to={safeRefusal.to} unit="%" /></dd></div>
         <div><dt><IconLabel name="budget">评测预算</IconLabel></dt><dd className="ui-num"><b>{budget ? budget.used : "未知"}</b>{budget && <span className="ui-ov-of"> / {budget.max} 次</span>}</dd></div>
       </dl>

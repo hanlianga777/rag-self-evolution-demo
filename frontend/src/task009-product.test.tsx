@@ -19,7 +19,7 @@ it('shares six backend categories and keeps latency outside case totals',async()
  expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
  expect(document.querySelector('.ui-bcl')?.textContent).toContain('超出了 Hard Gate');expect(document.querySelector('.diagnosis-list')?.textContent).toContain('Q04');
  expect(document.querySelector('.diagnosis-list')?.textContent).not.toContain('CSV-');
- expect(document.querySelector('.diagnosis-list')?.textContent).toContain('检索层');expect(document.querySelectorAll('.diagnosis-list button:not(.ui-info-tip)')).toHaveLength(0);
+ expect(document.querySelector('.diagnosis-list')?.textContent).toContain('候选有证据，最终未保留');expect(document.querySelectorAll('.diagnosis-list button')).toHaveLength(0);
  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('.ui-bcl button')].find(b=>b.textContent?.includes('生成层'))!.click());expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
  await act(async()=>document.querySelector<HTMLElement>('.diagnosis-list tbody tr')!.click());expect(onSelect).toHaveBeenCalledWith(rows[1]);
 });

@@ -22,9 +22,8 @@ it('separates saved version identity, provenance, retrieval parameters and answe
  const cells=document.querySelectorAll('.release-history-table tbody tr:first-child td');
  expect(cells[0].querySelector('button')?.textContent).toBe('Candidate D');
  expect(cells[0].querySelector('.release-history-meta')?.textContent).toMatch(/^推荐发布 · /);
- expect(cells[2].textContent).toBe('生产中');
- await act(async()=>document.querySelector<HTMLButtonElement>('.release-history-table tbody tr:first-child button')!.click());
- expect(document.querySelector('[role=dialog] .parameter-list')?.textContent).toContain('24');expect(document.querySelector('[role=dialog] .parameter-list')?.textContent).toContain('High');expect(document.querySelector('[role=dialog] .parameter-list')?.textContent).toContain('有据生成');
+ expect(cells[2].querySelector('.release-history-main')?.textContent).toBe('Candidate K 24 · Top-K 6 · Thinking High');
+ expect(cells[2].querySelector('.release-history-meta')?.textContent).toBe('回答策略 有据生成');
  expect(document.querySelector('.release-history-table tbody tr:nth-child(2) td:first-child')?.textContent).toBe('Baseline初始配置');
 });
 it('shows only saved remaining failures and online Bad Cases inside the next-input card without writes',async()=>{
@@ -33,13 +32,13 @@ it('shows only saved remaining failures and online Bad Cases inside the next-inp
  await mount(<VerificationPage data={{workspace:{current_baseline_id:'baseline'},optimization,monitoring:{events:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
  const card=document.querySelector('.monitoring-next-inputs');
  expect(document.querySelectorAll('.monitoring-layout > .panel')).toHaveLength(2);
- expect(card?.textContent).toContain('回流说明');
+ expect(card?.textContent).toContain('下一轮已知输入');
  expect(card?.textContent).toContain('关键证据重排后排第 7 位，Top-K 6 拿不到');
  expect(card?.textContent).toContain('关键证据重排后排第 24 位，Top-K 6 拿不到');
  expect([...card!.querySelectorAll('.ui-q')].map(n=>n.textContent)).toEqual(['Q06','Q27']);
  expect(card?.querySelector('.monitoring-online-bad-cases')?.textContent).toContain('暂无');
- expect(card?.querySelectorAll('.monitoring-feedback-flow li')).toHaveLength(5);
- expect(card?.textContent).toContain('下一版题卷经 Gate 1 冻结');expect(card?.textContent).toContain('和本轮仍未修好的题一起成为下一轮 Agent 的输入');
+ expect(document.querySelectorAll('.feedback-next-inputs')).toHaveLength(1);
+ expect(card?.querySelector('.feedback-next-inputs')?.textContent).toBe('这些问题会作为下一轮受控优化的输入，仍要重新走评测、回归和三道 Gate。');
  expect(fetcher).not.toHaveBeenCalled();expect(JSON.stringify(optimization)).toBe(before);
  await act(async()=>card!.querySelector<HTMLButtonElement>('button')!.click());
  expect(location.hash).toContain('tab=compare&q=Q06');

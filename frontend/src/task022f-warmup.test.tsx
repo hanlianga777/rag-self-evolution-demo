@@ -1,72 +1,75 @@
 // @vitest-environment jsdom
-import { act } from 'react';
-import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import {act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {expect,it,vi} from 'vitest';
 import App from './App';
-import { invalidateReads } from './api';
-import { invalidateGolden } from './goldenCache';
-(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-
-it('loads unvisited pages on navigation hover and reuses visited content during blocked revalidation', async () => {
-  invalidateReads(); invalidateGolden(); location.hash = '#overview'; sessionStorage.clear();
-  const reads: string[] = [], writes: string[] = []; let block = false;
-  vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
-    const url = new URL(input), path = url.pathname; reads.push(path + url.search);
-    if (init?.method && init.method !== 'GET') writes.push(path);
-    if (block) return new Promise<Response>(() => {});
-    const value = path === '/api/documents' || path === '/api/bad-cases' || path === '/api/versions' || path.includes('generation-runs') || path.includes('snapshots') ? [] : {};
-    return new Response(JSON.stringify(value));
-  }));
-  const host = document.body.appendChild(document.createElement('div')), root = createRoot(host);
-  try {
-    await act(async () => root.render(<App />));
-    await act(async () => new Promise(resolve => setTimeout(resolve, 150)));
-    expect(reads.some(path => path.includes('/api/pipeline'))).toBe(false);
-    expect(reads.some(path => path.includes('/api/governance/'))).toBe(false);
-    expect(reads.some(path => path.includes('/api/evaluations/'))).toBe(false);
-    const link = host.querySelector<HTMLAnchorElement>('nav[aria-label="主导航"] a[href="#governance"]')!;
-    await act(async () => { link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 250)); });
-    expect(reads).toContain('/api/governance/generation-runs?light=true');
-    expect(location.hash).toBe('#overview');
-    await act(async () => link.click());
-    expect(host.querySelector('.governance-page:not(.page-loading)')).not.toBeNull();
-    await act(async () => host.querySelector<HTMLAnchorElement>('nav[aria-label="主导航"] a[href="#overview"]')!.click());
-    block = true;
-    await act(async () => link.click());
-    expect(host.querySelector('.governance-page:not(.page-loading)')).not.toBeNull();
-    expect(host.querySelector('.page-loading')).toBeNull();
-    expect(writes).toEqual([]);
-  } finally { act(() => root.unmount()); host.remove(); location.hash = ''; vi.unstubAllGlobals(); invalidateReads(); invalidateGolden(); }
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
+it.each(['overview','knowledge','evolution','verification'])('warms page content before complete Before/After using only GETs, then opens both without waiting for revalidation (%s)',async(start)=>{
+ const {invalidateReads}=await import('./api');const {invalidateGolden}=await import('./goldenCache');invalidateReads();invalidateGolden();
+ location.hash=`#${start}`;sessionStorage.clear();
+ const reads:string[]=[],writes:string[]=[];let block=false;
+ let releasePipeline!:()=>void;
+ const pipelineReady=new Promise<void>(resolve=>{releasePipeline=resolve;});
+ const workspace={current_baseline_id:'base',current_golden_id:'golden',current_experiment_id:'exp',current_corpus_fingerprint:'corpus'};
+ const candidate={id:'D',status:'evaluated',reasoning:{candidate_label:'D'},result:{evaluation_complete:true,total:1,evaluation_run_id:'after'}};
+ const experiment={id:'exp',candidates:[candidate],recommendation:{recommended_candidate:'D'}};
+ const question={id:'Q04',question:'保存的问题',test_category:'positive',raw:{},evidence:[]};
+ vi.stubGlobal('fetch',vi.fn(async(input:string,init?:RequestInit)=>{
+  const url=new URL(input),p=url.pathname;reads.push(p+url.search);if(init?.method && init.method!=='GET')writes.push(p);
+  if(block)return new Promise<Response>(()=>{});
+  if(p==='/api/pipeline')await pipelineReady;
+  const isBefore=p.includes('/base/');
+  const value=p==='/api/workspace'?workspace:p==='/api/documents' || p==='/api/bad-cases'?[]:p==='/api/optimization'?experiment:p==='/api/evaluation'?{id:'base',status:'completed'}:p==='/api/versions'?[]:p.includes('generation-runs')?[{id:'run',status:'completed',profile:{name:'mini',expected_count:1},question_ids:['Q04'],artifacts:{}}]:p.includes('/snapshots')?[{id:'golden',snapshot:{generation_run_id:'run',question_ids:['Q04'],questions:[question]}}]:p.includes('/candidates')?{rows:[question],total:1,candidate_index:[question],data_version:'v1'}:p==='/api/evaluations/base'?{id:'base',status:'completed',dataset_version_id:'golden',cases:[]}:p.endsWith('/comparison-cases')?{id:isBefore?'base':'after',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'same'},cases:[{question_id:'Q04',question:'保存的问题',passed:!isBefore}]}:p.includes('/cases/')?{status:'completed',case:{question_id:'Q04',passed:!isBefore,model_answer:'已保存回答'}}:{};
+  return new Response(JSON.stringify(value));
+ }));
+ const node=document.body.appendChild(document.createElement('div')),root=createRoot(node);
+ try {
+  await act(async()=>root.render(<App/>));
+  await act(async()=>new Promise(r=>setTimeout(r,1800)));
+  expect(reads).toContain('/api/pipeline');
+  expect(reads).toContain('/api/evaluations/after');
+  expect(reads.some(path=>path.endsWith('/comparison-cases'))).toBe(start==='verification');
+  releasePipeline();
+  await act(async()=>new Promise(r=>setTimeout(r,1800)));
+  expect(reads).toContain('/api/evaluations/base/cases/Q04');expect(reads).toContain('/api/evaluations/after/cases/Q04');
+  expect(reads).toContain('/api/governance/candidates?run_id=run&status=all&group=all&limit=100&offset=0');expect(writes).toEqual([]);
+  expect(reads).toContain('/api/optimization?light=true&planning=true');expect(reads).toContain('/api/evaluation');expect(reads).toContain('/api/bad-cases?light=true');
+  block=true;
+  await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#evolution"]')!.click());
+  expect(node.querySelector('.page-loading')).toBeNull();expect(node.querySelector('.agent-overview')).not.toBeNull();
+  for(const [tab,selector] of [['Candidate 对比','.sandbox-core-table'],['回归与推荐','.regression-summary-table']]){
+   await act(async()=>[...node.querySelectorAll('button')].find(e=>e.textContent===tab)!.click());expect(node.querySelector(selector)).not.toBeNull();expect(node.querySelector('.page-loading')).toBeNull();
+  }
+  await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#governance"]')!.click());
+  expect(node.querySelector('.review-table')?.textContent).toContain('保存的问题');expect(node.querySelector('.golden-initial-skeleton')).toBeNull();
+  await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#verification"]')!.click());
+  await act(async()=>[...node.querySelectorAll('button')].find(e=>e.textContent==='Before/After')!.click());
+  expect(node.querySelector('.comparison-answers')?.textContent).toContain('已保存回答');expect(node.querySelector('.case-detail-skeleton')).toBeNull();
+ }finally{releasePipeline();act(()=>root.unmount());node.remove();location.hash='';vi.unstubAllGlobals();invalidateReads();invalidateGolden();}
 });
-
-it('publishes primary page data without waiting for an optional Pipeline read', async () => {
-  invalidateReads(); invalidateGolden(); location.hash = '#overview';
-  let release!: () => void; const pending = new Promise<void>(resolve => { release = resolve; });
-  const reads: string[] = [];
-  vi.stubGlobal('fetch', vi.fn(async (input: string) => {
-    const path = new URL(input).pathname; reads.push(path);
-    if (path === '/api/pipeline') await pending;
-    return new Response(JSON.stringify(path === '/api/documents' || path.includes('generation-runs') || path.includes('snapshots') ? [] : {}));
-  }));
-  const host = document.body.appendChild(document.createElement('div')), root = createRoot(host);
-  let mounted = true;
-  try {
-    await act(async () => root.render(<App />));
-    const link = host.querySelector<HTMLAnchorElement>('nav[aria-label="主导航"] a[href="#knowledge"]')!;
-    await act(async () => { link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 200)); });
-    expect(reads).toContain('/api/pipeline');
-    await act(async () => link.click());
-    expect(host.querySelector('.knowledge-page:not(.page-loading)')).not.toBeNull();
-    act(() => root.unmount()); mounted = false; const count = reads.length;
-    await act(async () => { release(); await new Promise(resolve => setTimeout(resolve, 150)); });
-    expect(reads).toHaveLength(count);
-  } finally { release(); if (mounted) act(() => root.unmount()); host.remove(); location.hash = ''; vi.unstubAllGlobals(); invalidateReads(); invalidateGolden(); }
+it('loads a clicked destination immediately while a background read is pending and stops scheduling after unmount',async()=>{
+ const {invalidateReads}=await import('./api');const {invalidateGolden}=await import('./goldenCache');invalidateReads();invalidateGolden();location.hash='#overview';
+ let release!:()=>void;const pending=new Promise<void>(resolve=>{release=resolve;});const reads:string[]=[];
+ vi.stubGlobal('fetch',vi.fn(async(input:string)=>{
+  const path=new URL(input).pathname;reads.push(path);
+  if(path==='/api/pipeline')await pending;
+  return new Response(JSON.stringify(path==='/api/documents' || path.includes('generation-runs') || path.includes('snapshots')?[]:{}));
+ }));
+ const node=document.body.appendChild(document.createElement('div')),root=createRoot(node);let mounted=true;
+ try {
+  await act(async()=>root.render(<App/>));await act(async()=>new Promise(r=>setTimeout(r,100)));
+  expect(reads).toContain('/api/pipeline');
+  await act(async()=>node.querySelector<HTMLAnchorElement>('a[href="#governance"]')!.click());
+  expect(node.querySelector('.page-title h1')?.textContent).toContain('Golden Dataset');expect(node.querySelector('.page-loading')).toBeNull();
+  act(()=>root.unmount());mounted=false;const count=reads.length;
+  await act(async()=>{release();await new Promise(r=>setTimeout(r,150));});expect(reads).toHaveLength(count);
+ }finally{release();if(mounted)act(()=>root.unmount());node.remove();location.hash='';vi.unstubAllGlobals();invalidateReads();invalidateGolden();}
 });
-
-it('warms saved Baseline cases into page data even when the summary already has diagnostics', async () => {
-  const { warmPageData } = await import('./pageWarmup');
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id: 'base', status: 'completed', cases: [{ question_id: 'Q04' }], product_diagnostics: { saved: true } }))));
-  const data: any = { evaluation: { id: 'base', status: 'completed', product_diagnostics: { summary: true } } };
-  try { await warmPageData('evaluation', data); expect(data.evaluation.cases?.[0]?.question_id).toBe('Q04'); }
-  finally { invalidateReads(); vi.unstubAllGlobals(); }
+it('warms saved Baseline cases into the page input even when its summary already has diagnostics',async()=>{
+ const {warmPageData}=await import('./pageWarmup');
+ const {invalidateReads}=await import('./api');
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({id:'base',status:'completed',cases:[{question_id:'Q04'}],product_diagnostics:{saved:true}}))));
+ const data:any={evaluation:{id:'base',status:'completed',product_diagnostics:{summary:true}}};
+ try {await warmPageData('evaluation',data);expect(data.evaluation.cases?.[0]?.question_id).toBe('Q04');}
+ finally {invalidateReads();vi.unstubAllGlobals();}
 });

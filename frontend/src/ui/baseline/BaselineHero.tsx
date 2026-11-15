@@ -1,4 +1,3 @@
-import { InfoTip } from "../HoverCard";
 import { IconLabel } from "../icons";
 import { StatusBadge } from "../Primitives";
 
@@ -23,14 +22,14 @@ export function BaselineHero({ gates, correct, total, badCount, layers, thinking
       <div className="ui-bl-cell"><span><IconLabel name="gate">Hard Gate</IconLabel></span><strong className="ui-num">{gates.passed} / {gates.total}</strong><StatusBadge kind={allPassed ? "qualified" : "failed"} label={allPassed ? "全部通过" : "未全部通过"} /></div>
       <div className="ui-bl-cell"><span><IconLabel name="correct">答对</IconLabel></span><strong className="ui-num">{correct} / {total}</strong><small>{badCount} 个 Bad Case</small></div>
       <div className="ui-bl-cell"><span><IconLabel name="layers">Bad Case 分层</IconLabel></span><div className="ui-bl-layers">{layers.map(item => <span key={item.label}>{item.label} <b className="ui-num">{item.count}</b></span>)}</div></div>
-      <div className="ui-bl-cell"><span><IconLabel name="thinking">Thinking 档位</IconLabel></span><strong>{thinking ?? "未知"}</strong><small className="ui-num baseline-latencies"><span>中位耗时 P50<InfoTip term="p50" label="P50" /> {p50 != null ? `${p50.toFixed(1)} 秒` : "未知"}</span><span>最慢耗时 P99<InfoTip term="p99" label="P99" /> {p99 != null ? `${p99.toFixed(1)} 秒` : "未知"}</span></small></div>
+      <div className="ui-bl-cell"><span><IconLabel name="thinking">Thinking 档位</IconLabel></span><strong>{thinking ?? "未知"}</strong><small className="ui-num">P50 {p50 != null ? `${p50.toFixed(1)} 秒` : "未知"} · P99 {p99 != null ? `${p99.toFixed(1)} 秒` : "未知"}</small></div>
     </div>
     {stages.length > 0 && <div className="ui-bl-time">
       <div className="ui-bl-time-head"><span><IconLabel name="time">耗时构成</IconLabel></span></div>
       <div className="ui-bl-bar" role="img" aria-label={sorted.map(item => `${item.label} ${pctOf(item)}`).join("，")}>
         {sorted.map((item, index) => <i key={item.label} className={index === 0 ? "top" : ""} style={{ flexGrow: item.seconds }} />)}
       </div>
-      <div className="ui-bl-legend">{sorted.map((item, index) => <span key={item.label} className={index === 0 ? "top" : ""}><i aria-hidden="true" />{item.label} <b className="ui-num">{pctOf(item)}</b></span>)}</div>{generation && <small className="ui-bl-time-note"><strong>设计巧思：</strong>先建立质量基准，再让 Agent 在受控范围内兼顾质量与速度。</small>}
+      <div className="ui-bl-legend">{sorted.map((item, index) => <span key={item.label} className={index === 0 ? "top" : ""}><i aria-hidden="true" />{item.label} <b className="ui-num">{pctOf(item)}</b></span>)}</div>{generation && <small className="ui-bl-time-note"><strong>设计巧思：</strong>在 Baseline 阶段将 Thinking 档位调至最高的 Max，让模型以最充分的推理能力走完整条 RAG 问答链路，先验证知识检索与证据组织足以支撑预期的回答质量；耗时中有 {pctOf(generation)} 来自回答生成，这也为后续由 Agent 在受控范围内尝试降档、兼顾质量与速度留出了空间。</small>}
     </div>}
   </section>;
 }

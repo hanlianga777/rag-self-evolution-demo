@@ -7,13 +7,6 @@ import {EvolutionPage} from './pages/EvolutionPage';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
 let root:ReturnType<typeof createRoot>;
-async function hoverText(selector:string) {
- const node=document.querySelector<HTMLElement>(selector);
- if (!node) return document.body.textContent;
- await act(async()=>{node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,160));});
- const id=node.closest('.agent-excerpt')?.getAttribute('aria-describedby');
- return (id ? document.getElementById(id)?.textContent : null) || [...document.querySelectorAll('[role=tooltip]')].at(-1)?.textContent || node.textContent;
-}
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 async function mount(node:React.ReactNode){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));}
 const q=(n:number)=>`CSV-20261101100758945425-${String(n).padStart(2,'0')}`;
@@ -30,7 +23,7 @@ const expected='Candidate D 修好了 Q04，但新弄坏了 Q25；Bad Case 数�
 it('compares saved predictions with repairs relative to the winner, with identical route/card data',async()=>{
  mockRun();const experiment=exp(),original=JSON.stringify(experiment);
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
- const full=document.querySelector('.d-result-predictions')!.textContent;
+ const full=document.querySelector('[aria-label="预测与实际"]')!.textContent;
  expect(full).toContain('Q04、Q06');expect(full).toContain('修好 Q04；Q06 未修好');
  expect(full).toContain('未预测到的新问题');expect(full).toContain('Q25');
  expect(full).toContain('5 题全部守住');
@@ -38,14 +31,14 @@ it('compares saved predictions with repairs relative to the winner, with identic
  expect(document.querySelector('[role=tooltip]')!.textContent).toContain('Q15：守住');expect(document.querySelector('[role=tooltip]')!.textContent).toContain('Q17：守住');expect(document.querySelector('[role=tooltip]')!.textContent).toContain('Q38：守住');
  expect(full).toContain('100%');const gateSummary=document.querySelectorAll<HTMLElement>('.prediction-summary')[3];await act(async()=>{gateSummary.focus();await new Promise(resolve=>setTimeout(resolve,160));});expect(document.querySelector('[role=tooltip]')!.textContent).toContain('32.1 秒');expect(full).toContain('守住');
  await act(async()=>root.render(<DStory experiment={experiment} evaluation={evaluation} compact/>));
- expect(document.querySelector('.d-result-predictions')!.textContent).toBe(full);
+ expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).toBe(full);
  expect(JSON.stringify(experiment)).toBe(original);
 });
 it('explains all remaining failures from saved positions and new failures from the saved judge',async()=>{
  const fetcher=mockRun();await mount(<DStory experiment={exp()} evaluation={evaluation}/>);
  const reasons=document.querySelector('.d-result-causes')!.textContent;
- expect(await hoverText('.d-unresolved-card:nth-child(1) .agent-excerpt')).toContain('重排结果里排第 7 位，即使把 Top-K 放宽到 6 也拿不到');
- expect(await hoverText('.d-unresolved-card:nth-child(2) .agent-excerpt')).toContain('重排结果里排第 24 位，即使把 Top-K 放宽到 6 也拿不到');
+ expect(reasons).toContain('重排结果里排第 7 位，即使把 Top-K 放宽到 6 也拿不到');
+ expect(reasons).toContain('重排结果里排第 24 位，即使把 Top-K 放宽到 6 也拿不到');
  expect(reasons).toContain('回答含与依据矛盾的内容');expect(reasons).not.toContain('答案新增');
  expect(document.querySelector('.d-result-causes .ui-q.is-broken')?.getAttribute('aria-label')).toBe('Q25 新增 Bad Case');
  expect(document.querySelector('.d-result-causes')?.tagName).toBe('SECTION');
@@ -56,7 +49,7 @@ it('explains all remaining failures from saved positions and new failures from t
 it('uses one concrete saved conclusion in the D node, route final node and final tab',async()=>{
  const experiment=exp();mockRun();expect(recommendationReason(experiment)).toBe(expected);
  await mount(<EvolutionRoute experiment={experiment} evaluation={evaluation} badCases={[]}/>);
- expect(await hoverText('.d-result-conclusion')).toBe('保留 Winner。'+expected);
+ expect(document.querySelector('.d-result-conclusion')!.textContent).toBe(expected);
  expect(document.querySelector('.evolution-route > .panel:last-of-type')!.textContent).toContain(expected);
  await act(async()=>root.render(<EvolutionPage data={{evaluation,optimization:experiment}}/>));
  await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='回归与推荐')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
@@ -69,7 +62,7 @@ it.each(['missing','wrong identity','error'])('never calls missing protected-cas
  await mount(<DStory experiment={exp()} evaluation={evaluation}/>);
  const text=document.querySelector('[aria-label="预测与实际"]')!.textContent;
  expect(text).toContain('题待核对');expect(document.querySelector('[aria-label="预测与实际"] tbody tr:nth-child(2)')!.textContent).not.toContain('全部守住');
- if(kind!=='missing')expect(document.querySelector('.d-result-causes')!.textContent).toContain('逐条原因未保存');
+ if(kind!=='missing')expect(document.querySelector('.d-result-causes')!.textContent).toContain('具体失败原因未知');
 });
 it('reports a watched question flipping and a gate breach instead of claiming they held',async()=>{
  const value=run();value.cases.find(c=>c.question_id===q(15))!.passed=false;mockRun(value);
@@ -77,7 +70,7 @@ it('reports a watched question flipping and a gate breach instead of claiming th
  experiment.candidates[1].result.metrics!.safe_rejection_rate=90;
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  const text=document.querySelector('[aria-label="预测与实际"]')!.textContent;
- expect(text).toContain('Q15 未通过');expect(text).toContain('90%');expect(text).toContain('1/2 项守住');
+ expect(text).toContain('Q15 新增');expect(text).toContain('90%');expect(text).toContain('1/2 项守住');
 });
 it('does not invent predictions, evidence positions or unchanged losing-result counts',async()=>{
  mockRun();const experiment=exp();experiment.candidates[1].reasoning.changes=[];
@@ -93,13 +86,13 @@ it('keeps actual repairs separate from the prediction list and does not invent a
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  const table=document.querySelector('[aria-label="预测与实际"]')!;
  expect(table.textContent).toContain('修好 Q04');
- expect(document.querySelector('.d-result-predictions')!.textContent).toContain('风险清单未保存，未预测到的新问题未知');
+ expect(table.querySelector('tbody tr')!.textContent).toContain('风险清单未保存，未预测到的新问题未知');
 });
 it('keeps results without a saved run source usable and marks case explanations unknown',async()=>{
  const fetcher=mockRun();const experiment=exp();delete experiment.candidates[1].result.evaluation_run_id;
  await mount(<DStory experiment={experiment} evaluation={evaluation}/>);
  expect(fetcher).not.toHaveBeenCalled();expect(document.querySelector('[aria-label="预测与实际"]')!.textContent).toContain('题待核对');
- expect(document.querySelector('.d-result-causes')!.textContent).toContain('逐条原因未保存');
+ expect(document.querySelector('.d-result-causes')!.textContent).toContain('具体失败原因未知');
 });
 it('does not present baseline repairs as improvements over the winner when that comparison is missing',async()=>{
  mockRun();const experiment=exp();delete experiment.candidates[1].result.winner_comparison;

@@ -9,7 +9,7 @@ import { CandidateWorkspace } from "./pages/CandidateWorkspace";
 import { OperationProvider } from "./operation";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-const tableValue=(label:string)=>{const index=[...document.querySelectorAll(".review-table th")].findIndex(e=>e.childNodes[0]?.textContent===label);return document.querySelector(`.review-table tbody td:nth-child(${index+1})`)?.textContent;};
+const tableValue=(label:string)=>{const index=[...document.querySelectorAll(".review-table th")].findIndex(e=>e.textContent===label);return document.querySelector(`.review-table tbody td:nth-child(${index+1})`)?.textContent;};
 afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("shows frozen reanchored evidence and the saved recall diagnosis", async () => {
@@ -304,7 +304,8 @@ it("restores a running generation and reads persisted slot progress", async () =
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-live", status: "queued", question_ids: [], artifacts: {} }], dataset: [] }} />); });
   expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-live"), expect.objectContaining({ signal: expect.any(AbortSignal) }));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.body.textContent).toContain("Q03");
   expect(document.body.textContent).toContain("已处理 2/20 · 10%");
   expect((([...document.querySelectorAll("button")].find(button => button.textContent === "新建测试集")) as HTMLButtonElement).disabled).toBe(true);
@@ -316,7 +317,8 @@ it("shows the current automatic refill round and remaining slots", async () => {
   vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url.replace("?light=true", "").endsWith("/api/governance/generation-runs") ? [run] : new URL(url).pathname.endsWith("/GGEN-refill") ? run : url.endsWith("/api/dataset") || new URL(url).pathname.endsWith("/api/governance/revisions") || url.endsWith("/api/governance/snapshots") ? [] : goldenFixture(url, [])), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [] }} />));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.querySelector(".generation-progress")?.textContent).toContain("Round 2/3 · 剩余 6 道");
   await act(async () => root.unmount());
 });
@@ -339,13 +341,13 @@ it("shows 20 compact review rows, honest filters, and three full-run exports", a
   expect(document.body.textContent).toContain("需要人工关注 8");
   expect(document.querySelector(".review-filters")?.textContent).not.toContain("QC 未通过");
   expect(document.querySelector<HTMLButtonElement>(".gate-one-action .primary")?.disabled).toBe(true);
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
-  expect(document.querySelectorAll('.drawer a[download]')).toHaveLength(3);
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  expect(document.querySelectorAll('.snapshot-history a[download]')).toHaveLength(3);
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
   await act(async () => { ([...document.querySelectorAll(".review-filters button")].find(button => button.textContent?.includes("需要人工关注")) as HTMLButtonElement).click(); });
   expect(document.querySelectorAll(".review-table tbody tr")).toHaveLength(8);
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
-  expect(document.querySelectorAll('.drawer a[download]')).toHaveLength(3);
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  expect(document.querySelectorAll('.snapshot-history a[download]')).toHaveLength(3);
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
   await act(async () => { ([...document.querySelectorAll(".review-table tbody tr[role=button]")][0] as HTMLButtonElement).click(); });
   expect(document.body.textContent).toContain("质量检查尚未达到可批准状态");
@@ -358,7 +360,8 @@ it("shows persisted quality rerun progress and resumes polling after refresh", a
   vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(url.endsWith("/api/documents") ? [] : (url.includes("/candidates?") || /\/questions\/[^/]+$/.test(url)) ? goldenFixture(url, questions) : run), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [run], dataset: questions }} />); });
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.body.textContent).toContain("4 / 20");
   expect(document.body.textContent).toContain("运行中");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "批量重跑异常项")).toBe(false);

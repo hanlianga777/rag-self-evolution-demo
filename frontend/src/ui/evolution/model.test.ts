@@ -10,13 +10,13 @@ it("groups 9 candidates into 3 rounds and finds the winner and D", () => {
   expect(model.rounds.map(r => r.candidates.map(c => c.label).join(""))).toEqual(["ABC", "ABC", "ABC"]);
   expect(model.winnerId).toBe("EXP-20261105143048349606-R3-C");
   expect(model.rounds[2].candidates[2].winner).toBe(true);
-  expect(model.d?.correct).toBeNull();
+  expect(model.d?.correct).toBe(48);
   expect(model.budget).toEqual({ used: 10, max: 12 });
 });
 
 it("shows parameter changes relative to the Baseline configuration", () => {
   const r3c = model.rounds[2].candidates[2];
-  expect(r3c.params.map(p => `${p.label} ${p.from} → ${p.to}`)).toEqual(["候选数 12 → 24", "思考档位 Max → High"]);
+  expect(r3c.params.map(p => `${p.label} ${p.from} → ${p.to}`)).toEqual(["Candidate K 12 → 24", "Thinking Max → High"]);
   expect(model.rounds[0].candidates[1].params[0]).toMatchObject({ label: "向量权重", from: "0.5", to: "0.3" });
   expect(paramValue("multi_query", false)).toBe("关闭");
   expect(paramValue("prompt_strategy", "Tiered")).toBe("分级回答");
@@ -27,7 +27,7 @@ it("lists fixed / broken questions, gate failures, and correct counts from saved
   expect(r1a.fixed).toEqual(["Q24", "Q29", "Q38"]);
   expect(r1a.broken).toEqual(["Q07"]);
   expect(r1a.gateFailures).toEqual(["P99 86.5 秒（上限 60 秒）"]);
-  expect(r1a.correct).toBeNull();
+  expect(r1a.correct).toBe(46);
   expect(model.rounds[0].candidates[2].efficiency).toBe(true);
 });
 

@@ -7,13 +7,6 @@ import { EvolutionPage } from "./pages/EvolutionPage";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let root: ReturnType<typeof createRoot>;
-async function hoverText(selector:string) {
- const node=document.querySelector<HTMLElement>(selector);
- if (!node) return document.body.textContent;
- await act(async()=>{node.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,160));});
- const id=node.closest('.agent-excerpt')?.getAttribute('aria-describedby');
- return (id ? document.getElementById(id)?.textContent : null) || [...document.querySelectorAll('[role=tooltip]')].at(-1)?.textContent || node.textContent;
-}
 afterEach(() => { if (root) act(() => root.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 const render = async (node: ReactNode) => { root = createRoot(document.body.appendChild(document.createElement("div"))); await act(async () => { root.render(node); await Promise.resolve(); }); };
 const click = async (label: string) => act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === label)!.click());
@@ -40,8 +33,8 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   expect(document.querySelector(".ui-hg-card ul")?.textContent).toContain("≥ 90%");
   expect(document.querySelectorAll(".ui-hg-card")).toHaveLength(4);
   await click("Bad Case 诊断");
-  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(cell => cell.textContent)).toEqual(["题号", "问题", "题型", "负向子类", "主题簇i", "问题层级与细分类型", "缺了什么", "严重程度i", ""]);
-  expect(document.querySelector(".product-diagnosis-table tbody tr td:nth-child(6)")?.textContent).toContain("检索层");
+  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(cell => cell.textContent)).toEqual(["题号", "问题", "分类", "缺了什么", "严重程度", ""]);
+  expect(document.querySelector(".product-diagnosis-table tbody tr td:nth-child(3)")?.textContent).toBe("检索失败");
   await act(async()=>document.querySelector<HTMLElement>(".product-diagnosis-table tbody tr")!.click());
   expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["业务问题", "答案对比", "检索路径", "优化方向"]);
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("技术详情");
@@ -65,18 +58,24 @@ it("keeps Agent diagnosis source-backed, lists saved hypotheses once, and restor
   const input = { evaluation: run, badCases: [bad], optimization: { id: "EXP-stored", candidates, evaluation_budget: { used: 3, max: 12, reserved_for_d: 1 }, result: { root_cause_cluster: "保存的诊断" } } }, frozen = JSON.stringify(input);
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space }))));
   await render(<EvolutionPage data={input} />);
-  expect(document.querySelectorAll(".tabs button")).toHaveLength(3);
-  expect(document.querySelector(".agent-case-destinations")).toBeNull();
+  expect(document.querySelectorAll(".tabs button")).toHaveLength(4);
+  expect(document.querySelectorAll(".agent-case-destinations tbody tr")).toHaveLength(1);
+  expect(document.querySelector(".agent-case-destinations")?.textContent).toContain("Candidate A");
+  expect(document.querySelector(".agent-case-destinations")?.textContent).not.toContain("Evidence Miss");
   expect(document.querySelectorAll(".diagnosis-cards")).toHaveLength(0);
-  await click("Candidates 对比");
+  await click("进化路线");
+  expect(document.querySelectorAll(".candidate-card")).toHaveLength(0);
+  expect(document.querySelectorAll(".agent-design-intent")).toHaveLength(3);expect(document.querySelector(".route-planning")).toBeNull();
+  expect(document.body.textContent).toContain("保存假设 A");
+
+  await click("Candidate 对比");
   expect(document.querySelectorAll(".candidate-card")).toHaveLength(3);
-  expect(document.querySelectorAll(".agent-result-card")).toHaveLength(3);
-  expect(document.querySelector(".candidate-cards")?.textContent).toContain("保存假设 A");
-  expect([...document.querySelectorAll(".candidate-card:first-child dt")].map(label => label.textContent)).toEqual(["答对","门槛通过","修好","新错"]);
-  await click("查看目标 1 题");
-  expect(document.querySelector('[role=dialog]')?.textContent).toContain("持久化问题");
-  await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());
-  await click("Candidates 对比");
+  expect([...document.querySelectorAll(".candidate-card:first-child .candidate-story-block > .field-label")].map(label => label.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
+  expect(document.querySelector(".candidate-card")?.textContent).toContain("Q-stored");
+  const target=document.querySelector<HTMLElement>('.candidate-card .candidate-story-block:nth-child(3) .ui-q')!;
+  await act(async()=>{target.focus();await new Promise(resolve=>setTimeout(resolve,150));});
+  expect(document.querySelector('[role=tooltip]')?.textContent).toContain("持久化问题");
+  await click("Candidate 对比");
   expect([...document.querySelectorAll(".ui-ct tbody th")].slice(0,6).map(cell => cell.textContent)).toEqual(["答对", "新增 Bad Case", "Hard Gate", "安全拒答率", "P50", "P99"]);
   expect(document.querySelector('.ui-ct-more')).toBeNull();
   for(const label of ["Regression Check"]) expect(document.querySelector(".ui-ct")?.textContent).toContain(label);
@@ -96,6 +95,6 @@ it.each([
   const optimization = { id: "EXP-stored", candidates: [winner, d], result: { report_confirmation: { winner_id: winner.id } }, recommendation: { result: { recommended_candidate: status === "evaluated" ? winner.id : null } } };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ search_space: {} }))));
   await render(<EvolutionPage data={{ evaluation: run, badCases: [bad], optimization }} />);
-  await click("Candidates 对比");await click("Candidate D");
-  expect(status === "evaluated" ? await hoverText(".d-result-conclusion") : document.querySelector(".d-story")?.textContent).toContain(expected);
+  await click("进化路线");await click("Candidate D");
+  expect(document.querySelector(".d-story")?.textContent).toContain(expected);
 });

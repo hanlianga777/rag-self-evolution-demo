@@ -25,7 +25,7 @@ const baseline = () => ({ id: 'base', status: 'completed', config: { generation_
   result: { total: 1, bad_case_count: 1, gates: { passed_count: 1, total: 1, gates: [gate('positive_correctness')] } },
   product_diagnostics: { objective_metrics: { recall_at_k: 50, precision_at_k: 25, mrr: .5, stage_breakdown: [{ stage: 'generation', label: '回答生成', total_ms: 90, share_percent: 90 }] } } });
 
-it('opens report cases in place and keeps report metrics without rerun', async () => {
+it('opens report cases in place and keeps rerun confirmation in the metrics title row', async () => {
   const run = baseline(), original = JSON.stringify(run);
   vi.stubGlobal('fetch', vi.fn(async (url: string) => response(url.includes('preflight') ? { can_start: true } : run)));
   await mount(<EvaluationPage data={{ evaluation: run }} />);
@@ -35,13 +35,13 @@ it('opens report cases in place and keeps report metrics without rerun', async (
   await act(async () => document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());
   const more = document.querySelector('.baseline-more')!;
   expect(more.textContent).not.toMatch(/综合分|耗时拆解|Candidate K|回答生成模型和档位/);
-  expect(more.querySelectorAll('.ui-info-tip')).toHaveLength(6);
-  expect(more.textContent).not.toContain('重新评测 Baseline');
-  const tip=more.querySelector<HTMLElement>('[aria-label="Recall@K说明"]')!;
-  await act(async()=>tip.dispatchEvent(new FocusEvent('focusin',{bubbles:true})));
-  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,150));});
-  expect(document.querySelector('[role=tooltip]')?.textContent).toContain('标准证据');
-  expect(document.querySelector('.ui-bl-time-note')?.textContent).toBe('设计巧思：先建立质量基准，再让 Agent 在受控范围内兼顾质量与速度。');
+  expect(more.textContent).toContain('标准证据原文');
+  expect(more.textContent).toContain('未命中记为 0');
+  expect(more.querySelector('.section-head .header-actions button')?.textContent).toBe('重新评测 Baseline');
+  await click('重新评测 Baseline');
+  expect(document.querySelector('.confirm-dialog')?.textContent).toContain('会调用模型并产生费用');
+  await click('取消');
+  expect(document.querySelector('.ui-bl-time-note')?.textContent).toContain('耗时中有 90.0% 来自回答生成');
   expect(document.querySelector('.ui-bl-turn')).toBeNull();
   expect(more.tagName).not.toBe('DETAILS');
   expect(more.textContent).not.toContain('评测信息');
@@ -59,10 +59,12 @@ it('explains each gate in its own module and shows the saved threshold and formu
   vi.stubGlobal('fetch', vi.fn(async () => response(run)));
   await mount(<EvaluationPage data={{ evaluation: run }} />); await click('Hard Gate');
   const rows = [...document.querySelectorAll<HTMLElement>('.ui-hg-card li')];
-  expect(rows.every(row=>row.querySelector('.ui-info-tip'))).toBe(true);
+  expect(rows[0].textContent).toContain('回答的事实与说明书一致');
+  expect(rows[1].textContent).toContain('问法改成口语或带干扰后，事实仍然答对');
+  expect(rows[0].textContent).toContain('Correctness');
+  expect(rows[2].textContent).toContain('所有负向题');
   await act(async () => rows[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-  const definition = document.querySelector('[role=dialog]')!;
-  expect(definition.textContent).toContain('按消融题计算平均分');
+  const definition = document.querySelector('[role=dialog] .gate-definition')!;
   expect(definition.textContent).toContain('0–4 分乘以 25');
   expect(definition.textContent).toContain('≥ 77%');
   expect(document.querySelector('[role=dialog]')?.textContent).toContain('保存公式');
@@ -70,22 +72,19 @@ it('explains each gate in its own module and shows the saved threshold and formu
 
 const overviewData = () => ({ evaluation: { id: 'before', status: 'completed', config: {}, result: { total: 2, bad_case_count: 1 } },
   optimization: { id: 'exp', baseline_run_id: 'before', candidates: [{ id: 'D', status: 'evaluated', reasoning: { candidate_label: 'D' }, result: { total: 2, bad_case_count: 0, all_fixed_question_ids: ['Q01'], evaluation_run_id: 'after' } }], recommendation: { recommended_candidate: 'D' } }, overview: { dataset: { total: 2, approved: 2 } } });
-it.each([false, true])('settles saved question text and parameter tags when cause detail reads resolve or fail (%s)', async fail => {
+it.each([false, true])('keeps question and cause pending separately and settles failure without a false loading result (%s)', async fail => {
   const pending: Record<string, (value: Response) => void> = {};
   vi.stubGlobal('fetch', vi.fn((url: string) => new Promise<Response>(resolve => { pending[new URL(url).pathname] = resolve; })));
   await mount(<OverviewPage data={overviewData()} navigate={() => {}} />);
   const fixed = () => document.querySelector('.ui-ovs-fixed')!;
   expect(fixed().textContent).not.toMatch(/题目未保存|—|未知|待核对/);
-  expect(fixed().querySelectorAll('[role=status]')).toHaveLength(1);
+  expect(fixed().querySelectorAll('[role=status]')).toHaveLength(2);
   await act(async () => Object.entries(pending).forEach(([url, resolve]) => resolve(response({ id: url.includes('before') ? 'before' : 'after', status: 'completed', dataset_version_id: 'same', judge: { evaluation_identity: 'same' }, cases: [{ question_id: 'Q01', question: '已读到的问题' }] }))));
   expect(fixed().textContent).toContain('已读到的问题');
-  expect(fixed().querySelectorAll('[role=status]')).toHaveLength(0);
-  expect(fixed().querySelector('.ui-ovs-fixed-params')).toBeNull();
-  expect(fixed().textContent).not.toContain('—');
+  expect(fixed().querySelectorAll('[role=status]')).toHaveLength(1);
   await act(async () => Object.entries(pending).filter(([url]) => url.includes('/cases/')).forEach(([, resolve]) => resolve(fail ? new Response('failed', { status: 500 }) : response({ case: { passed: true }, question: {} }))));
   expect(fixed().querySelector('[role=status]')).toBeNull();
-  expect(fixed().textContent).toContain('已读到的问题');
-  expect(fixed().querySelector('.ui-ovs-fixed-params')).toBeNull();
+  expect(fixed().textContent).toContain('—');
 });
 
 it('shows a skeleton instead of an empty comparison while the saved list is pending', async () => {
@@ -98,8 +97,7 @@ it('shows a skeleton instead of an empty comparison while the saved list is pend
 it.each(['settings', 'knowledge'])('hides unconfirmed configuration while the %s request is pending', async page => {
   vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
   await mount(page === 'settings' ? <SettingsPage data={{}} /> : <KnowledgePage data={{ documents: [] }} />);
-  if(page==='settings')expect(document.querySelector('.loading-skeleton')).not.toBeNull();
-  else {expect(document.querySelector('[aria-label=知识处理链路]')).not.toBeNull();expect(document.querySelector('.knowledge-coverage')?.textContent).toContain('知识主题覆盖待更新');}
+  expect(document.querySelector('.loading-skeleton')).not.toBeNull();
   expect(document.querySelector('.page-content')?.textContent).not.toMatch(/0 项可调参数|新 Baseline 待评测|Candidate K 未知|维度未采集/);
 });
 

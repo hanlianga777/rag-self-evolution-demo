@@ -15,10 +15,12 @@ it('shows corrected regression and frozen severity while retaining final qualifi
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/baseline-q')?baseline:url.endsWith('/run-q')?current:{search_space:{}}))));
  root=createRoot(document.body.appendChild(document.createElement('div')));
  await act(async()=>root.render(<EvolutionPage data={{evaluation:baseline,optimization:{id:'exp-q',candidates:[{id:'exp-q-R3-A',status:'evaluated',reasoning:{round:3,candidate_label:'A'},result}]}}}/>));
- await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='Candidates 对比')!.click());
- expect(document.querySelector('.agent-result-card .badge')?.textContent).toBe('不合格');
- await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='查看 Candidate 与完整报告')!.click());
- expect(document.querySelector('[role=dialog]')?.textContent).toContain('逐题变化');
+ await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='回归与推荐')!.click());
+ const table=document.querySelector('.regression-summary-table')!;
+ expect(table).not.toBeNull();
+ expect([...table.querySelectorAll('tbody tr:first-child td')].map(c=>c.textContent)).toEqual(['R3-A','1','0','3','未判定','未通过']);
+ await act(async()=>document.querySelector<HTMLButtonElement>('.regression-candidate')!.click());
+ expect(document.querySelector('[role=dialog]')?.textContent).toContain('逐题追踪');
  expect(document.querySelector('.regression-cases-table')?.textContent).toContain('普通退化');
  expect(document.querySelector('.regression-cases-table')?.textContent).not.toContain('严重退化');
  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='严重')!.click());

@@ -80,33 +80,6 @@ export async function postJson<T>(path: string, body?: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function streamPreview(question: string, onDelta: (text: string) => void, onReset: () => void, signal?: AbortSignal): Promise<any> {
-  const response = await fetch(apiUrl('/api/preview/stream'), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({question}), signal});
-  if (!response.ok) { const body=await response.json().catch(()=>({})); throw new Error(requestError(body.detail,response.status)); }
-  if (!response.body) throw new Error('回答流未建立，请重试');
-  const reader=response.body.getReader(), decoder=new TextDecoder();
-  let pending='',result:any;
-  try {
-    while(true) {
-      const {done,value}=await reader.read();
-      pending+=decoder.decode(value,{stream:!done});
-      const frames=pending.split(/\r?\n\r?\n/);pending=frames.pop() || '';
-      for(const frame of frames) {
-        const data=frame.split(/\r?\n/).filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart()).join('\n');
-        if(!data) continue;
-        const event=JSON.parse(data);
-        if(event.type==='delta') onDelta(event.text);
-        if(event.type==='reset') onReset();
-        if(event.type==='error') throw new Error(event.message);
-        if(event.type==='done') { result=event.result; invalidateReads(); }
-      }
-      if(done) break;
-    }
-  } finally { await reader.cancel().catch(()=>{});reader.releaseLock(); }
-  if(!result) throw new Error('回答中断，请重试');
-  return result;
-}
-
 export const identityKey = (value: any) => JSON.stringify([value?.current_baseline_id, value?.current_experiment_id, value?.current_golden_id, value?.current_corpus_fingerprint]);
 
 const appVersions = new WeakMap<AppData, string>();
@@ -124,8 +97,8 @@ const pageInputs: Record<Page, (keyof AppData)[]> = {
 export async function loadAppData(retry = true, page?: Page): Promise<AppData> {
   const paths: Record<keyof AppData,string> = { workspace:'/api/workspace',overview:'/api/overview',documents:'/api/documents',dataset:'/api/dataset?light=true',evaluation:'/api/evaluation',badCases:'/api/bad-cases',optimization:'/api/optimization',versions:'/api/versions',readiness:'/api/readiness',monitoring:'/api/monitoring' };
   if (page) {
-    paths.overview += '?light=true'; if (page !== 'evolution') paths.evaluation += '?light=true'; paths.badCases += '?light=true';
-    paths.optimization += '?light=true';
+    paths.overview += '?light=true'; if (page !== 'evaluation' && page !== 'evolution') paths.evaluation += '?light=true'; paths.badCases += '?light=true';
+    paths.optimization += page === 'evolution' ? '?light=true&planning=true' : '?light=true';
   }
   const data: AppData = {workspace:{},overview:{},documents:[],dataset:[],evaluation:{},badCases:[],optimization:{},versions:[],readiness:{},monitoring:{}};
   const keys=page ? pageInputs[page] : Object.keys(paths) as (keyof AppData)[];

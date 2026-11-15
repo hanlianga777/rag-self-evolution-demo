@@ -1,5 +1,3 @@
-import { InfoTip } from "../ui/HoverCard";
-import { pagePurpose } from "../helpText";
 import { usePageTab } from "../usePageTab";
 import { IconTile } from "../ui/icons";
 import {completeResult, remainingQuestionIds, recommendationOf, schemeName} from "../components/EvolutionStory";
@@ -10,9 +8,9 @@ import { KnowledgeDiagrams } from "../components/KnowledgeDiagrams";
 import { OverviewSummary } from "../ui/overview/OverviewSummary";
 import { displayText, productionName, gateNames } from "../display";
 import { OverviewStory, type FixedItem } from "../ui/overview/OverviewStory";
-import { buildEvolutionModel, shortId, PARAM_LABELS, paramValue } from "../ui/evolution/model";
+import { buildEvolutionModel, shortId } from "../ui/evolution/model";
 import { getJson } from "../api";
-import { comparisonPoints, explanation } from "../components/comparisonData";
+import { comparisonPoints, explanation, configChanges } from "../components/comparisonData";
 import type { Page } from "../types";
 
 export function OverviewPage({ data, navigate }: { data: any; navigate: (page: Page) => void }) {
@@ -72,12 +70,7 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     turns.push({label: "Candidate D", text: `在 Winner 上精修，${extra ? extra.length ? `多修好 ${extra.join("、")}` : "没有多修好的题" : "修复差异待核对"}；${dReleased ? "已发布" : "待发布"}`, key: true, onClick: openRoute});
   }
   const fixedIds: string[] = completeResult(finalCandidate)?.all_fixed_question_ids || [];
-  const changedParameters = finalCandidate?.reasoning?.changed_parameters_vs_baseline ?? finalCandidate?.reasoning?.changed_parameters ?? {};
-  const changes = Object.entries(changedParameters).filter(([key, value]) => JSON.stringify(run?.config?.[key]) !== JSON.stringify(value)).map(([key, value]) => ({
-    key, label: ({candidate_k: "候选数", top_k: "保留条数", generation_thinking: "思考档位"} as Record<string, string>)[key] || PARAM_LABELS[key] || "其他参数",
-    from: paramValue(key, run?.config?.[key]), to: paramValue(key, value),
-  }));
-  const comparisonBinding = JSON.stringify([run?.id, finalCandidate?.id, finalCandidate?.result?.evaluation_run_id, fixedIds, run?.config, changedParameters]);
+  const comparisonBinding = JSON.stringify([run?.id, finalCandidate?.id, finalCandidate?.result?.evaluation_run_id, fixedIds]);
   const [fixedRecord, setFixedRecord] = useState<{binding: string; items: FixedItem[]}>({binding: "", items: []});
   useEffect(() => {
     if (pagesWarming) return;
@@ -87,22 +80,23 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
     void Promise.all([baselineId, afterId].map(id => getJson<any>(`/api/evaluations/${encodeURIComponent(id)}/comparison-cases`))).then(async ([before, after]) => {
       if (cancelled) return;
       if (before.id !== baselineId || after.id !== afterId || before.status !== "completed" || after.status !== "completed" || !before.judge?.evaluation_identity || before.judge.evaluation_identity !== after.judge?.evaluation_identity || !before.dataset_version_id || before.dataset_version_id !== after.dataset_version_id) throw new Error('保存的比较身份不一致');
-      const items: FixedItem[] = fixedIds.map(id => ({id: shortId(id), question: before.cases?.find((row: any) => shortId(row.question_id) === shortId(id))?.question}));
+      const items: FixedItem[] = fixedIds.map(id => ({id: shortId(id), question: before.cases?.find((row: any) => shortId(row.question_id) === shortId(id))?.question, causeLoading: true}));
       setFixedRecord({binding: comparisonBinding, items});
       const detailed = await Promise.all(items.map(async item => {
         const sourceId = before.cases?.find((row: any) => shortId(row.question_id) === item.id)?.question_id;
-        if (!sourceId) return item;
+        if (!sourceId) return {...item, causeLoading: false};
         try {
           const [left, right] = await Promise.all([baselineId, afterId].map(id => getJson<any>(`/api/evaluations/${encodeURIComponent(id)}/cases/${encodeURIComponent(sourceId)}`)));
           const why = explanation(left.case, right.case, before.config, after.config, comparisonPoints(left.case, right.case, right.question));
-          return {...item, relatedParameter: why.key};
-        } catch { return item; }
+          const change = configChanges(before.config, after.config).find(change => change.key === why.key);
+          return {...item, causeLoading: false, cause: change ? `${change.label} ${change.before} → ${change.after}` : undefined};
+        } catch { return {...item, causeLoading: false}; }
       }));
       if (!cancelled) setFixedRecord({binding: comparisonBinding, items: detailed});
     }).catch(() => { if (!cancelled) setFixedRecord({binding: comparisonBinding, items: fixedIds.map(id => ({id: shortId(id), question: formal?.questions?.find((row: any) => shortId(row.id) === shortId(id))?.question}))}); });
     return () => { cancelled = true; };
   }, [comparisonBinding, pagesWarming]);
-  const fixed: FixedItem[] = (fixedRecord.binding === comparisonBinding ? fixedRecord.items : fixedIds.map(id => ({id: shortId(id), question: formal?.questions?.find((row: any) => shortId(row.id) === shortId(id))?.question, questionLoading: !!run?.id && !!finalCandidate?.result?.evaluation_run_id}))).map((item: FixedItem) => ({...item, parameters: item.relatedParameter && changes.some(change => change.key === item.relatedParameter) ? changes.filter(change => change.key === item.relatedParameter) : changes}));
+  const fixed: FixedItem[] = fixedRecord.binding === comparisonBinding ? fixedRecord.items : fixedIds.map(id => ({id: shortId(id), question: formal?.questions?.find((row: any) => shortId(row.id) === shortId(id))?.question, questionLoading: !!run?.id && !!finalCandidate?.result?.evaluation_run_id, causeLoading: !!run?.id && !!finalCandidate?.result?.evaluation_run_id}));
   const storyBaseline=metrics ? run : undefined;
   const storyRounds=new Set(candidates.filter((c:any)=>["A","B","C"].includes(c.reasoning?.candidate_label)).map((c:any)=>c.reasoning?.round || 1)).size;
   const baseResult = completeResult(storyBaseline);
@@ -121,14 +115,13 @@ export function OverviewPage({ data, navigate }: { data: any; navigate: (page: P
   const flow = [
     {label: "知识库", fact: stages[0][1], tips: [knowledge?.identity ? "当前知识资产已建立" : "请先建立知识处理 Pipeline", stages[1][1]], page: "knowledge"},
     {label: "Golden Dataset", fact: stages[2][1], tips: [frozen ? "正式题卷已人工确认" : "完成审核后冻结正式题卷", completeGroups ? "正向、消融、负向分类完整" : "题目分类需核对"], page: "governance"},
-    {label: "Pipeline 配置", fact: stages[1][1], tips: ["技术选型与可调参数", "确认参数后运行 Baseline"], page: "settings"},
     {label: "Baseline", fact: stages[3][1], tips: [run?.status === "completed" ? "指标来自保存的正式评测" : "等待正式评测完成", data.workspace?.baseline_unavailable_reason || "同题卷用于 Candidate 对照"], page: "evaluation"},
     {label: "Agent", fact: experiment.id ? `${storyRounds} 轮 · ${candidates.length} 个 Candidate` : stages[4][1], tips: [sandboxPaused ? "已暂停，进度已保存" : sandboxIncomplete ? "Candidate 评测尚未完成" : stages[4][1], "修复与副作用由 Sandbox 核对"], page: "evolution"},
     {label: "发布", fact: stages[5][1], tips: ["发布需要人工确认", "线上身份以保存的版本为准"], page: "versions"},
     {label: "问答验证", fact: currentReleased ? "可验证线上回答" : "可查看线上配置", tips: ["逐题比较 Baseline 与线上回答", "反馈可作为再次进化的线索"], page: "verification"},
   ].map(step => ({...step, onClick: () => navigate(step.page as Page)}));
 
-  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1><IconTile name="overview" />RAG 自进化概览</h1><p className="ui-kicker page-purpose">{pagePurpose.overview}<InfoTip term="evaluation_standard" label="同一套考卷和判分标准" /></p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button data-label="优化成果" className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>优化成果</button><button data-label="业务架构" className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button data-label="技术架构" className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
+  return <PageShell className={`page overview-page ${tab !== "project" ? "architecture-view" : ""}`} header={<div className="page-title"><div><h1><IconTile name="overview" />RAG 自进化项目概览</h1><p className="ui-kicker page-purpose">用一组数字和一条闭环，说明这套系统让智能客服变好了多少，又是怎样一步步做到的。</p></div></div>} tabs={<div className="tabs" aria-label="概览内容"><button data-label="项目概览" className={tab === "project" ? "active" : ""} aria-pressed={tab === "project"} onClick={() => setTab("project")}>项目概览</button><button data-label="业务架构" className={tab === "business" ? "active" : ""} aria-pressed={tab === "business"} onClick={() => setTab("business")}>业务架构</button><button data-label="技术架构" className={tab === "technical" ? "active" : ""} aria-pressed={tab === "technical"} onClick={() => setTab("technical")}>技术架构</button></div>} resetKey={tab}>
 
 
     {tab !== "project" ? <ArchitecturePanel slot={tab} active={newKnowledge} /> : <>
