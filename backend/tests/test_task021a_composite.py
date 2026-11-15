@@ -14,7 +14,7 @@ class RefinementTests(unittest.TestCase):
         clock=patch('app.paid_schedule.utc_now',return_value=__import__('datetime').datetime(2026,11,7,tzinfo=__import__('datetime').timezone.utc))
         clock.start();self.addCleanup(clock.stop)
         context.CompositeTests.setUp(self)
-        self.winner_config = {**DEFAULT_PIPELINE_CONFIG, 'candidate_k':24, 'generation_thinking':'high'}
+        self.winner_config = {**DEFAULT_PIPELINE_CONFIG, 'candidate_k':24, 'generation_thinking':'off'}
         self.snapshot['questions'] = [{'id':q,'evidence':[{'source_chunk_ids':['c']}]} for q in ('q','q2','q3')]
         self.snapshot['question_ids'] = ['q','q2','q3']
         with self.store.connection() as db:

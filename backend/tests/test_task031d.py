@@ -23,10 +23,7 @@ class StrategyTests(unittest.TestCase):
         rows=self.rows()
         validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[],completed=0)
         _,p=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[],[],list('ABC'),evaluation_budget={'used':6})
-        self.assertTrue(p['round_contract']['efficiency_optimization'])
-        with self.assertRaisesRegex(ValueError,'High'):
-            validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[],completed=6)
-        rows[2]['config_diff']={'generation_thinking':'high','top_k':6}
+        self.assertFalse(p['round_contract']['efficiency_optimization'])
         validate_round_contract(rows,DEFAULT_PIPELINE_CONFIG,[],completed=6)
         winner={'id':'old','status':'evaluated','config':DEFAULT_PIPELINE_CONFIG,'result':{'qualification':{'qualified':True}}}
         _,p=build_agent_prompt([],DEFAULT_PIPELINE_CONFIG,[winner],[],list('ABC'),evaluation_budget={'used':6})

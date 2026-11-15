@@ -39,13 +39,13 @@ def read_baseline(database, run_id):
         cases = [{'question_id': row['question_id'], **json.loads(row['result_json']), 'run_id': run_id}
                  for row in db.execute('SELECT question_id,result_json FROM evaluation_case_results WHERE run_id=? ORDER BY id', (run_id,))]
     snapshot = json.loads(source['dataset_snapshot_json'])
-    if (source['status'] != 'completed' or source['config'].get('run_target') != 'baseline'
+    if (source['status'] != 'completed'
             or source['result'].get('evaluation_complete') is not True
             or source['result'].get('technical_failed') != 0
             or len(cases) != len(snapshot['question_ids'])
             or {case['question_id'] for case in cases} != set(snapshot['question_ids'])
             or any(type(case.get('passed')) is not bool for case in cases)):
-        raise ValueError('需要完整且无技术失败的 Baseline')
+        raise ValueError('需要完整且无技术失败的已保存评测')
     return source, cases
 
 
@@ -191,7 +191,7 @@ def import_calibration(store, source_id, state, effort='low'):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline', required=True)
-    parser.add_argument('--judge-thinking', required=True, choices=('low', 'high', 'max'))
+    parser.add_argument('--judge-thinking', required=True, choices=('off', 'low', 'high', 'max'))
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--database', type=Path)
     parser.add_argument('--apply', action='store_true', help='显式开始判分，会调用已配置的模型；默认仅预览')

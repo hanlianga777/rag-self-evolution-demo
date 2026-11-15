@@ -153,7 +153,7 @@ def validate_round_contract(candidates, baseline, prior_candidates, baseline_gat
             harmed=previous['config_diff']
             if harmed and diff == harmed:
                 raise ValueError('不得照搬已证明伤害 Hard Gate 的相同改动')
-    if efficiency_optimization(prior_candidates, completed) and not compensated_high:
+    if baseline.get('generation_thinking', 'max') == 'max' and efficiency_optimization(prior_candidates, completed) and not compensated_high:
         raise ValueError('Agent 策略 · 效率优化：6次评测后无合格方案，须有一个Max降到High并实际修改检索补偿参数的Candidate')
 
 
@@ -337,7 +337,7 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
               '先读程序生成的基线诊断摘要、速度事实、逐题变化及已被证明有害的改动清单gate_harming_changes。每轮恰好ABC三套，direction由你根据事实自行确定，不预设方向。同轮修改参数互斥。不得照搬gate_harming_changes。'
-              'Agent策略规则：预算已用6次且仍无合格方案时，round_contract.efficiency_optimization为true，下一轮必须有一个Candidate把Thinking从Max降到High并实际修改检索参数补偿质量；参数和值由你依据前几轮经验决定。未触发时不强制效率方案。'
+              '生成回答固定关闭思考，不能调整思考档位；如需提速，从检索开销和上下文长度寻找依据。'
               '有害改动仅禁止完整配置差异原样重复；叠加其他参数的组合只提示风险，不能推断单参数有害。'
               '先写前几轮复盘prior_round_review：summary首轮写无；plans逐一覆盖所有已完成历史方案，每条含candidate_id、changes、fixed_question_ids、new_failure_question_ids（均用保存的正式question_id）、evidence_reason（证据位置、速度、单/多参数归因）、conclusion（有效/有害/待验证及依据）；多参数必须说明无法单独确定并给most_likely_parameter和attribution_reason；baseline_remaining_assessment总结Baseline剩余错题；conclusions为[{id,conclusion}]。首轮plans为空，conclusions从Baseline事实归纳。每套方案必须用review_conclusion_ids引用其中结论。'
               '第二部分bad_case_summary：groups逐字采用bad_case_groups的layer/subtype/question_ids/count，focus指出最集中问题，conclusions为[{id,conclusion}]。第三部分每个Candidate必须有bad_case_conclusion_ids引用第二部分，predicted_fixed_question_ids写预计修好的正式题号数组；并写参数值、针对的问题、风险、依据。第四部分本轮结论将在试跑完成后另行请你根据保存结果撰写，previous_round_conclusions是下一轮必须吸收的经验。'
@@ -404,9 +404,9 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
                 'failed_gates':failed_gates,'candidate_labels':labels,'baseline_configuration':base_config},
         'bad_cases':rows,
         'baseline_performance':performance_facts(baseline_result or {},baseline_cases or []),
-        'priority_parameters':PRIORITY_PARAMETERS,
-        'allowed_parameter_values':search_space_contract(),
-        'round_contract':{'count':3,'efficiency_optimization':efficiency_optimization(prior_candidates, budget['used']),'parameters_disjoint':True},
+        'priority_parameters':{key:[p for p in values if p != 'generation_thinking'] for key,values in PRIORITY_PARAMETERS.items()},
+        'allowed_parameter_values':{key:rule for key,rule in search_space_contract().items() if key != 'generation_thinking'},
+        'round_contract':{'count':3,'efficiency_optimization':base_config.get('generation_thinking', 'max') == 'max' and efficiency_optimization(prior_candidates, budget['used']),'parameters_disjoint':True},
         'previous_round_conclusions':round_conclusions or {},
         'gate_harming_changes':gate_harming_changes(prior_candidates,gates),
         'prior_sandbox_results':prior_results,

@@ -35,7 +35,6 @@ def drafts():
         candidate.update(review_conclusion_ids=['L1'],intervention_direction='candidate_recall' if candidate['id']=='C' else 'context_selection', evidence_assertions=[{'target_id':'Q1','observation':'recall_missing' if candidate['id']=='C' else 'ranking_omission'}], parameter_dependencies=[], target_group='fixture检索组', root_cause='Retrieval', root_cause_evidence=candidate['target_bad_cases'], expected_improvement='fixture预期覆盖')
     for row,direction in zip(result['candidates'],('排序与过滤','效率（降档 + 检索补偿）','检索召回增强')):
         row['direction']=direction
-    result['candidates'][1]['config_diff']['generation_thinking']='high'
     return result
 
 
@@ -93,8 +92,8 @@ class OptimizationContractTests(unittest.TestCase):
         self.assertNotIn("all_bad_case_audit",provider.prompt)
         self.assertIn("all_bad_case_audit",audit)
         self.assertIsNone(provider.prompt["goal"]["failed_gates"])
-        self.assertEqual(provider.prompt["allowed_parameter_values"], search_space_contract())
-        self.assertEqual(set(provider.prompt["allowed_parameter_values"]), set(ALLOWED_SEARCH_SPACE))
+        self.assertEqual(provider.prompt["allowed_parameter_values"], {k:v for k,v in search_space_contract().items() if k != "generation_thinking"})
+        self.assertEqual(set(provider.prompt["allowed_parameter_values"]), set(ALLOWED_SEARCH_SPACE) - {"generation_thinking"})
         self.assertNotIn("excluded_automatic_parameters",provider.prompt)
         self.assertEqual({key: provider.prompt["allowed_parameter_values"]["multi_query"][key] for key in ("type", "allowed")}, {"type": "boolean false or integer", "allowed": [False, 2, 4, 6]})
 
@@ -236,7 +235,7 @@ class OptimizationContractTests(unittest.TestCase):
         response=drafts()
         for row in response['candidates']:row['hypothesis']+=' second round'
         response['candidates'][0]['config_diff']={'query_rewrite':True}
-        response['candidates'][1]['config_diff']={'generation_thinking':'low','hyde':True}
+        response['candidates'][1]['config_diff']={'hyde':True}
         response['candidates'][2]['config_diff']={'prompt_strategy':'Tiered'}
         response['candidates'][2]['direction']='回答策略'
         result=OptimizationAgent(self.store,FixedProvider(json.dumps(response))).generate('EVAL-test',experiment_id=generated['id'])

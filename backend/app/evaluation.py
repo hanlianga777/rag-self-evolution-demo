@@ -282,6 +282,8 @@ class EvaluationRunner:
             config['knowledge_identity'] = index_info['knowledge_identity']
             config.setdefault('candidate_k', index_info['knowledge_config']['candidate_k'])
             config.setdefault('top_k', index_info['knowledge_config']['top_k'])
+        if not source:
+            config['generation_thinking'] = 'off'
         judge_meta = {"model": self.runtime.model, **VERSIONS, "temperature":0, "baseline_version": production.get("id"), "execution_snapshot": {"embedding_model": index_info.get("embedding_model"), "vector_index": index_info.get("vector_index"), "generation_model": self.runtime.model, "temperature": 0.2}}
         from .paid_run import current_paid_run
         limits=current_paid_run().output_limits if current_paid_run() else (source or {}).get('judge',{}).get('execution_snapshot',{}).get('request_limits')

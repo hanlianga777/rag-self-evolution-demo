@@ -2088,13 +2088,13 @@ def stop_evaluation(run_id: str):
 
 
 @app.get('/api/evaluations/{source_id}/judge-replay/preflight')
-def judge_replay_preflight(source_id: str, judge_thinking: Literal['low','high','max'] | None = None):
+def judge_replay_preflight(source_id: str, judge_thinking: Literal['off','low','high','max'] | None = None):
     try:return EvaluationRunner(store,ai_service).judge_replay_preflight(source_id,judge_thinking=judge_thinking)
     except (ValueError,KeyError) as error:raise HTTPException(409,str(error)) from error
 
 
 class JudgeReplayRequest(BaseModel):
-    judge_thinking: Literal['low','high','max'] | None = None
+    judge_thinking: Literal['off','low','high','max'] | None = None
 
 
 @app.post('/api/evaluations/{source_id}/judge-replay',status_code=201,dependencies=[Depends(require_trusted_origin)])

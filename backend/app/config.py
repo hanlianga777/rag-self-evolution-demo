@@ -9,8 +9,8 @@ class Settings:
     base_url: str
     model: str
     timeout_seconds: float = 240.0
-    baseline_thinking: str = "max"
-    judge_thinking: str = "low"
+    baseline_thinking: str = "off"
+    judge_thinking: str = "off"
 
     @property
     def configured(self) -> bool:
@@ -35,12 +35,12 @@ def load_settings(env: dict[str, str] | None = None, env_file: Path | None = Non
         raise ValueError("DEEPSEEK_TIMEOUT_SECONDS must be between 0 and 600")
     model = values.get("DEEPSEEK_MODEL", "deepseek-flash")
     if model == "deepseek-v4-flash": model = "deepseek-flash"
-    baseline_thinking = values.get("BASELINE_THINKING", "max")
+    baseline_thinking = values.get("BASELINE_THINKING", "off")
     if baseline_thinking not in {"off", "low", "high", "max"}:
         raise ValueError("BASELINE_THINKING must be off/low/high/max")
-    judge_thinking = values.get("JUDGE_THINKING", "low")
-    if judge_thinking not in {"low", "high", "max"}:
-        raise ValueError("JUDGE_THINKING must be low/high/max")
+    judge_thinking = values.get("JUDGE_THINKING", "off")
+    if judge_thinking not in {"off", "low", "high", "max"}:
+        raise ValueError("JUDGE_THINKING must be off/low/high/max")
     return Settings(
         api_key=values.get("DEEPSEEK_API_KEY", "").strip(),
         base_url=values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/"),

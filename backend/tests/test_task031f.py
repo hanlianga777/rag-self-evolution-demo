@@ -18,7 +18,7 @@ from test_optimization_contract import drafts, trace_case
 class InheritanceTests(unittest.TestCase):
     def setUp(self):
         self.base = dict(DEFAULT_PIPELINE_CONFIG)
-        self.inherited = {'generation_thinking':'high','prompt_strategy':'Tiered'}
+        self.inherited = {'retrieval_max_tokens':8192,'prompt_strategy':'Tiered'}
         self.prior = [{'id':'R1-A','status':'evaluated','config':{**self.base, **self.inherited},
                        'reasoning':{'round':1,'candidate_label':'A','changed_parameters':self.inherited},
                        'result':{'qualification':{'qualified':True}}}]
@@ -57,18 +57,18 @@ class InheritanceTests(unittest.TestCase):
                 if kind=='unknown':test.response['candidates'][0]['inherited_from']='missing'
                 elif kind=='unqualified':test.prior[0]['result']['qualification']['qualified']=False
                 elif kind=='later':test.prior[0]['reasoning']['round']=2
-                elif kind=='value':test.response['candidates'][0]['inherited_parameters']={'generation_thinking':'max'}
-                elif kind=='type':test.response['candidates'][0]['inherited_parameters']={'generation_thinking':True}
+                elif kind=='value':test.response['candidates'][0]['inherited_parameters']={'retrieval_max_tokens':4096}
+                elif kind=='type':test.response['candidates'][0]['inherited_parameters']={'retrieval_max_tokens':True}
                 else:test.response['candidates'][0]['inherited_parameters']={'top_k':6}
                 with test.assertRaises(ValueError):test.prepare()
 
     def test_new_change_can_tune_inherited_parameter_against_inherited_base(self):
         c=self.response['candidates'][0]
-        c['changed_parameters']={'generation_thinking':'low'}
-        c['adjustments']=[{'parameter':'generation_thinking','baseline_value':'high','candidate_value':'low','expected_impact':'预计修好Q1'}]
+        c['changed_parameters']={'retrieval_max_tokens':4096}
+        c['adjustments']=[{'parameter':'retrieval_max_tokens','baseline_value':8192,'candidate_value':4096,'expected_impact':'预计修好Q1'}]
         _, batch=self.prepare()
-        self.assertEqual(batch[0][1]['generation_thinking'],'low')
-        self.assertEqual(batch[0][2]['changed_parameters_vs_baseline']['generation_thinking'],'low')
+        self.assertEqual(batch[0][1]['retrieval_max_tokens'],4096)
+        self.assertEqual(batch[0][2]['changed_parameters_vs_baseline']['retrieval_max_tokens'],4096)
 
     def test_reject_repeated_config_overlap_new_changes_and_wrong_adjustment(self):
         for kind in ('duplicate','overlap','adjustment','range','missing_prediction'):
@@ -171,7 +171,7 @@ class SavedGenerationTests(unittest.TestCase):
             self.assertEqual(pipeline_config(config),batch[0][1])
             with store.connection() as db:
                 reasoning=json.loads(db.execute('SELECT reasoning_json FROM candidate_configs WHERE id=?',(exp+'-R2-A',)).fetchone()[0])
-                reasoning['inherited_parameters']['generation_thinking']='low'
+                reasoning['inherited_parameters']['retrieval_max_tokens']=4096
                 db.execute('UPDATE candidate_configs SET reasoning_json=? WHERE id=?',(json.dumps(reasoning),exp+'-R2-A'))
             with self.assertRaises(ValueError):runner.candidate_inputs(exp+'-R2-A')
 

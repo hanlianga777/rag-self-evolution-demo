@@ -18,10 +18,11 @@ from .evaluation_contract import abstention_valid, claim_consistent, normalize, 
 
 
 DEFAULT_TASK_THINKING = {
-    'baseline': 'max', 'generation': 'max', 'answer': 'max', 'candidate': 'max',
-    'judge': 'low', 'agent': 'high', 'query_rewrite': 'low', 'multi_query': 'low',
-    'hyde': 'high', 'query_decompose': 'high', 'query': 'low', 'auxiliary': 'high',
+    'baseline': 'off', 'generation': 'off', 'answer': 'off', 'candidate': 'off',
+    'judge': 'off', 'agent': 'high', 'query_rewrite': 'off', 'multi_query': 'off',
+    'hyde': 'off', 'query_decompose': 'off', 'query': 'off', 'auxiliary': 'off',
 }
+DETERMINISTIC_TASKS = frozenset(DEFAULT_TASK_THINKING) - {'judge', 'agent'}
 _thinking_task = ContextVar('provider_thinking_task', default=None)
 _judge_thinking = ContextVar('provider_judge_thinking', default=None)
 _answer_content = ContextVar("answer_content", default=None)
@@ -47,9 +48,9 @@ def judge_fail_fast(enabled=True):
 @contextmanager
 def judge_thinking(effort=None):
     """Freeze Judge effort for one run without changing settings or other tasks."""
-    effort = thinking_config('judge')['reasoning_effort'] if effort is None else effort
-    if effort not in {'low', 'high', 'max'}:
-        raise ValueError('JUDGE_THINKING must be low/high/max')
+    effort = thinking_config('judge').get('reasoning_effort', 'off') if effort is None else effort
+    if effort not in {'off', 'low', 'high', 'max'}:
+        raise ValueError('JUDGE_THINKING must be off/low/high/max')
     token = _judge_thinking.set(effort)
     try: yield
     finally: _judge_thinking.reset(token)
@@ -71,9 +72,11 @@ def thinking_config(task=None, effort=None):
         if _task.get() in {'judge', 'agent'}: task, effort = _task.get(), None
     if task == 'judge':
         effort = _judge_thinking.get() or (load_settings().judge_thinking if effort is None else effort)
-        if effort not in {'low', 'high', 'max'}:
-            raise ProviderRequestError('请求本地校验：Judge Thinking必须为low/high/max')
-    effort = DEFAULT_TASK_THINKING.get(task, 'high') if effort is None else effort
+        if effort not in {'off', 'low', 'high', 'max'}:
+            raise ProviderRequestError('请求本地校验：Judge Thinking必须为off/low/high/max')
+    if task in DETERMINISTIC_TASKS:
+        effort = 'off'  # Historical config values never override new execution policy.
+    effort = DEFAULT_TASK_THINKING.get(task, 'off') if effort is None else effort
     if effort not in {'off', 'low', 'high', 'max'}:
         raise ProviderRequestError('请求本地校验：Thinking必须为off/low/high/max')
     return {'task': task, 'thinking': {'type': 'disabled' if effort == 'off' else 'enabled'},
@@ -253,7 +256,7 @@ class DeepSeekProvider:
         }
         thinking = thinking_config()
         payload.update({key: value for key, value in thinking.items() if key != 'task'})
-        if thinking['thinking']['type'] == 'disabled': payload['temperature'] = temperature
+        if thinking['thinking']['type'] == 'disabled': payload['temperature'] = 0
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
         if stream:

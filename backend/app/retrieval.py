@@ -95,7 +95,7 @@ class LocalRetriever:
                 score = len(shared) / math.sqrt(max(1, len(query_terms) * len(terms)))
                 if score:
                     ranked.append({"document": document["name"], "chunk": index, "content": chunk, "score": round(score, 3)})
-        return sorted(ranked, key=lambda item: item["score"], reverse=True)[:limit]
+        return sorted(ranked, key=lambda item: (-item["score"], item["document"], item["chunk"]))[:limit]
 
 
 class VectorRetriever:
@@ -236,7 +236,7 @@ class VectorRetriever:
             if not chunk_id:
                 continue
             score = 0.0
-            for term in query_terms:
+            for term in sorted(query_terms):
                 frequency = 1 if term in terms else 0
                 if not frequency:
                     continue
@@ -308,7 +308,7 @@ class VectorRetriever:
                         query_hits["vector"].append(hit["chunk_id"])
                         vector_scores[hit["chunk_id"]] = max(vector_scores.get(hit["chunk_id"], float("-inf")), float(hit["score"]))
             with measure(stages, "bm25", "retrieval"):
-                for chunk_id, score in sorted(self._bm25(query).items(), key=lambda item: item[1], reverse=True)[:candidate_k]:
+                for chunk_id, score in sorted(self._bm25(query).items(), key=lambda item: (-item[1], item[0]))[:candidate_k]:
                     if chunk_id in by_id:
                         query_hits["bm25"].append(chunk_id)
                         bm25_scores[chunk_id] = max(bm25_scores.get(chunk_id, float("-inf")), score)
@@ -320,7 +320,7 @@ class VectorRetriever:
             trace['query_merge'] = {'method': 'max_score_per_chunk_then_shared_fusion_candidate_cap',
                                     'candidate_k': candidate_k, 'rerank_question': question}
         with measure(stages, "hybrid_fusion" if config.get("hybrid_search", True) else "candidate_selection", "retrieval"):
-            candidate_ids = set(vector_scores) | set(bm25_scores)
+            candidate_ids = sorted(set(vector_scores) | set(bm25_scores))
             vector_normalized = self._normalize({key: vector_scores.get(key, 0.0) for key in candidate_ids})
             bm25_normalized = self._normalize({key: bm25_scores.get(key, 0.0) for key in candidate_ids})
             alpha = float(config.get("hybrid_alpha", .5))

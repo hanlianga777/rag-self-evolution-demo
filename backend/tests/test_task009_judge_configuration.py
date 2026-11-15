@@ -31,11 +31,11 @@ class JudgeConfigurationTests(unittest.TestCase):
         self.addCleanup(self.env.stop)
 
     def test_settings_default_file_and_validation(self):
-        self.assertEqual(load_settings({}, self.empty).judge_thinking, 'low')
+        self.assertEqual(load_settings({}, self.empty).judge_thinking, 'off')
         self.empty.write_text('JUDGE_THINKING=low\n')
         self.assertEqual(load_settings({}, self.empty).judge_thinking, 'low')
         self.assertEqual(load_settings({'JUDGE_THINKING': 'high'}, self.empty).judge_thinking, 'high')
-        for effort in ('off', '', 'typo'):
+        for effort in ('', 'typo'):
             with self.assertRaisesRegex(ValueError, 'JUDGE_THINKING'):
                 load_settings({'JUDGE_THINKING': effort}, self.empty)
 
@@ -52,9 +52,8 @@ class JudgeConfigurationTests(unittest.TestCase):
                 self.assertEqual(thinking_config('judge')['reasoning_effort'], 'max')
             self.assertEqual(thinking_config('judge')['reasoning_effort'], 'low')
         self.assertEqual(thinking_config('judge')['reasoning_effort'], 'high')
-        with self.assertRaises(ValueError):
-            with judge_thinking('off'):
-                self.fail('invalid Judge effort must not enter context')
+        with judge_thinking('off'):
+            self.assertEqual(thinking_config('judge')['thinking'], {'type':'disabled'})
 
     def test_concurrent_runs_do_not_share_effort(self):
         async def run(effort):
@@ -64,7 +63,7 @@ class JudgeConfigurationTests(unittest.TestCase):
         async def all_runs():
             return await asyncio.gather(run('low'), run('high'), run('max'))
         self.assertEqual(asyncio.run(all_runs()), ['low', 'high', 'max'])
-        self.assertEqual(thinking_config('judge')['reasoning_effort'], 'low')
+        self.assertEqual(thinking_config('judge').get('reasoning_effort', 'off'), 'off')
 
 
 class JudgeScriptTests(unittest.TestCase):

@@ -19,7 +19,7 @@ DEFAULT_PIPELINE_CONFIG = {
     "multi_query": False,
     "hyde": False,
     "prompt_strategy": "Grounded",
-    "generation_thinking": "max",
+    "generation_thinking": "off",
     "retrieval_max_tokens": False,
 }
 
@@ -50,7 +50,7 @@ ALLOWED_SEARCH_SPACE = {
     "multi_query": (False, 2, 4, 6),
     "hyde": (True, False),
     "prompt_strategy": ("Grounded", "Completeness", "Tiered"),
-    "generation_thinking": ("off", "low", "high", "max"),
+    "generation_thinking": ("off",),
     "retrieval_max_tokens": (False, 8192, 4096),
 }
 
