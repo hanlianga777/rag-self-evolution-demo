@@ -185,7 +185,8 @@ def frozen_run_judge(function):
         from .providers import judge_thinking
         run = self.store.evaluation_run(run_id)
         effort = (run or {}).get('judge', {}).get('judge_thinking', {}).get('reasoning_effort')
-        with judge_thinking(effort):
+        from .request_reuse import reuse_scope
+        with judge_thinking(effort), reuse_scope(self.store, run):
             return function(self, run_id, *args, **kwargs)
     return execute
 
@@ -758,6 +759,8 @@ class EvaluationRunner:
             experiment = self.store.experiment(owner['experiment_id'])
             baseline_cases = {c['question_id']: c for c in self.store.evaluation_case_results(experiment['baseline_run_id'])}
         lineage = {k:run['result'][k] for k in ('resume_source_id','execution_owner_pid','auto_recovery','judge_replay','manual_resume','experiment_config_identity','final_retry_started','price_pause') if k in run['result']}
+        from .request_reuse import matching_configuration, reused_case
+        reusable_cases = matching_configuration(self.store, run) if config.get('candidate_id') and experiment['result'].get('causal_evidence') else {}
         summary_cache = {}
         def progress(*, complete=False):
             from .telemetry import cost_fields
@@ -832,6 +835,11 @@ class EvaluationRunner:
                     if 'execution' in checkpoint and (not isinstance(checkpoint['execution'].get('answer'),str) or not isinstance(checkpoint['execution'].get('retrieval_trace',{}).get('final'),list)):
                         raise ValueError('生成检查点缺少完整答案/最终上下文')
                     try:
+                        if item['id'] in reusable_cases and 'scored_result' not in checkpoint:
+                            source = reusable_cases[item['id']]
+                            checkpoint['scored_result'] = reused_case(source)
+                            checkpoint['execution'] = {'answer':source['model_answer'], 'retrieval_trace':source['programmatic_metrics'].get('retrieval_trace', {}),
+                                                       'reused_from':checkpoint['scored_result']['reused_from']}
                         phase='generation'
                         if 'execution' not in checkpoint and lineage.get('judge_replay'):
                             raise ValueError('Judge-only Replay execution missing; generation is forbidden')
@@ -860,6 +868,9 @@ class EvaluationRunner:
                         persist()
                         continue
                     result=checkpoint['scored_result']
+                    result['programmatic_metrics']['request_reuse'] = {
+                        'generation':checkpoint['execution'].get('reused_from'),
+                        'judge':result.get('judge_result', {}).get('reused_from')}
                     try:
                         from .sqlite_support import retry_storage
                         retry_storage(lambda:self.store.record_evaluation_case(run_id,item['id'],result,with_bad_case=True))

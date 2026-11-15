@@ -34,8 +34,15 @@ def restore_initial_config(store):
     return store.active_production()
 
 
-def arm_chain(store, baseline_id):
+def arm_chain(store, baseline_id, *, round_policy=None, paid_run=None, causal_evidence=False):
     previous = chain_status(store)
+    if previous and previous.get('baseline_id') != baseline_id and causal_evidence:
+        experiment = store.experiment(previous.get('experiment_id'), light=True) if previous.get('experiment_id') else None
+        if not experiment or experiment['result'].get('optimization_cycle', {}).get('status') != 'recommended':
+            raise ValueError('前次串联尚未结束，不能启动新实验')
+        history = _settings(store).get(KEY+'_history', [])
+        _write(store, KEY+'_history', history + [previous])
+        previous = {}
     if previous and previous.get('baseline_id') != baseline_id and previous.get('status') not in {'completed','failed'}:
         raise ValueError('已有Baseline串联记录，禁止重复启动')
     if previous.get('baseline_id') == baseline_id:
@@ -45,6 +52,9 @@ def arm_chain(store, baseline_id):
         raise ValueError('串联只能绑定显式Baseline')
     state = {'baseline_id':baseline_id, 'snapshot_id':run['dataset_version_id'], 'status':'waiting_baseline', 'designated':False,
              'actor':'用户', 'audit_note':'用户 2026-11-14 预先授权', 'authorized_at':datetime.now(timezone.utc).isoformat(), 'budget':12}
+    if round_policy: state['round_policy'] = round_policy
+    if paid_run: state['paid_run'] = paid_run
+    if causal_evidence: state['causal_evidence'] = True
     _write(store, KEY, state)
     return state
 
@@ -74,7 +84,8 @@ def advance_chain(store, runtime):
             state = chain_status(store)
             if not state.get('experiment_id'):
                 experiment_id = 'EXP-' + datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
-                context = {'strategy_contract':'agent-strategy-3', 'chain_baseline_id':run['id'], 'audit_note':state['audit_note']}
+                context = {'strategy_contract':'agent-strategy-4' if state.get('round_policy') else 'agent-strategy-3', 'chain_baseline_id':run['id'], 'audit_note':state['audit_note']}
+                context.update({k:state[k] for k in ('round_policy','paid_run','causal_evidence') if k in state})
                 db.execute('INSERT INTO experiments VALUES (?,?,?,?,?)', (experiment_id,run['id'],'analyzing',json.dumps(context,ensure_ascii=False),datetime.now(timezone.utc).isoformat()))
                 state['experiment_id'] = experiment_id
                 db.execute('UPDATE paid_schedule_settings SET value_json=? WHERE key=?', (json.dumps(state,ensure_ascii=False),KEY))

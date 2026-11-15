@@ -313,7 +313,15 @@ class DeepSeekProvider:
                         record_usage({'provider':'DeepSeek','requested_model':self.settings.model,'status':'rejected' if rejected else 'unknown',
                             'call_started_at':started,**thinking_config(),**error.response_metadata})
                     raise
-        return request_with_retries(lambda:checkpoint_request('DeepSeek',self.settings.model,request.full_url,json.loads(request.data),send,reuse=_task.get()!='judge'))
+        action = lambda: request_with_retries(lambda:checkpoint_request('DeepSeek',self.settings.model,request.full_url,json.loads(request.data),send,reuse=_task.get()!='judge'))
+        if _task.get() == 'judge':
+            return action()  # Cache only the validated judgment, never a raw invalid reply.
+        from .request_reuse import reuse_result
+        result = reuse_result('generation' if _task.get() == 'answer' else 'retrieval', [request.full_url, json.loads(request.data)], action)
+        if result.get('reused_from'):
+            result.update(usage={}, input_tokens=0, output_tokens=0)
+            if _answer_content.get(): _answer_content.get()(result['content'])
+        return result
 
     def _complete_request(self, request, stream):
         from .paid_run import current_paid_run

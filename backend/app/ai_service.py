@@ -1,5 +1,6 @@
 from .corpus import manifest_identity
 import time
+import math
 import json
 import re
 import hashlib
@@ -237,7 +238,7 @@ class AiService:
                 f"问题：{question}\n证据：\n{context}",
                 stream=True, temperature=0,
             )
-        return {"answer": response["content"], "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000), "ttft_ms": response["ttft_ms"], "retrieval": citations, "citation_markers": {f"[{n}]": int(n) - 1 for n in re.findall(r"\[([1-9]\d*)\]", response["content"]) if int(n) <= len(citations)}, "input_tokens": response["input_tokens"], "output_tokens": response["output_tokens"], "stages": stages, "token_usage": {"auxiliary_queries": auxiliary_usage, "generation": response.get("usage", {})}, **cost_fields(self.model, [*auxiliary_usage, response.get("usage", {})]), **retrieval_fields}
+        return {"answer": response["content"], "reused_from": response.get("reused_from"), "mode": "live", "model": self.provider.settings.model, "latency_ms": round((time.perf_counter() - started_at) * 1000) + (response.get("generation_ms", 0) if response.get("reused_from") else 0), "timing_provenance": "检索本次实测，生成复用来源实测" if response.get("reused_from") else "本次实测", "ttft_ms": response["ttft_ms"], "retrieval": citations, "citation_markers": {f"[{n}]": int(n) - 1 for n in re.findall(r"\[([1-9]\d*)\]", response["content"]) if int(n) <= len(citations)}, "input_tokens": response["input_tokens"], "output_tokens": response["output_tokens"], "stages": stages, "token_usage": {"auxiliary_queries": auxiliary_usage, "generation": response.get("usage", {})}, **cost_fields(self.model, [*auxiliary_usage, *([response["usage"]] if response.get("usage") else [])]), **retrieval_fields}
 
     @provider_task('query')
     def _retrieval_queries(self, question: str, config: dict, trace=None, stages=None) -> list[str]:
@@ -278,7 +279,20 @@ class AiService:
         return queries
 
     @provider_task('judge')
-    def judge(self, question: str, expected: str, answer: str, category: str, *, context: dict | None = None) -> dict:
+    def judge(self, question, expected, answer, category, *, context=None):
+        from .request_reuse import reuse_result
+        context = context or {}
+        # Scores and candidate-pool bookkeeping do not change the evidence shown
+        # to generation. Frozen canonical sources and scoring versions are in scope.
+        semantic = {k:v for k,v in context.items() if k not in {'retrieval_candidates','final_context','judge_correction','programmatic_evidence_observation'} and not k.startswith('_')}
+        semantic['final_context'] = generation_context(context.get('final_context', []))
+        result = reuse_result('judge', [question,expected,answer,category,semantic],
+                              lambda:self._judge_uncached(question,expected,answer,category,context=context))
+        if result.get('reused_from'):
+            result.update(token_usage=[], estimated_cost=0, response_recovery=[])
+        return result
+
+    def _judge_uncached(self, question: str, expected: str, answer: str, category: str, *, context: dict | None = None) -> dict:
         from .providers import ProviderInvalidResponse
         from .evaluation_stage import _request_checkpoint, judge_request_count
         checkpoint_context = _request_checkpoint.get()
@@ -294,6 +308,11 @@ class AiService:
             for attempt in range(remaining):
                 try:
                     result = self.provider.judge(question, expected, answer, **({"context": context} if context is not None else {}))
+                    if 'verdict' in result:
+                        quality = result.get('quality')
+                        if (not isinstance(quality,dict) or type(quality.get('correctness')) is not int or not 0 <= quality['correctness'] <= 4
+                                or any(type(quality.get(k)) not in (int,float) or not math.isfinite(quality[k]) or not 0 <= quality[k] <= 1 for k in ('faithfulness','completeness'))):
+                            raise ProviderInvalidResponse('quality metrics required by unchanged Hard Gates are invalid', raw_provider_response=result.get('raw_provider_response'))
                     break
                 except ProviderInvalidResponse as error:
                     recovery.append({'error':str(error), 'previous_response':error.raw_provider_response,

@@ -29,7 +29,8 @@ def policy_cost(directory):
 
 def guarded_begin(run, provider, model, payload):
     policy = run.request_policy
-    if policy.get('kind') != 'off_peak_usd_cap_v1': raise RuntimeError('Unknown paid request policy')
+    if policy.get('kind') not in {'off_peak_usd_cap_v1','scheduled_usd_cap_v1'}: raise RuntimeError('Unknown paid request policy')
+    scheduled = policy['kind'] == 'scheduled_usd_cap_v1'
     if provider != 'DeepSeek': return run._begin(provider, model, payload)
     from .governance import GovernanceStore
     from .paid_schedule import schedule_status
@@ -40,17 +41,17 @@ def guarded_begin(run, provider, model, payload):
         checkpoint=_request_checkpoint.get()
         if checkpoint is not None:checkpoint[4]()
         status = schedule_status(store)
-        if status['off_peak_only'] is not True: raise RuntimeError('Off-peak setting must remain enabled')
-        if status['peak_now'] is not False:
+        if not scheduled and status['off_peak_only'] is not True: raise RuntimeError('Off-peak setting must remain enabled')
+        if (not scheduled or status['off_peak_only']) and status['peak_now'] is not False:
             time.sleep(1)
             continue
         # One lock covers all ledgers in the task, including recovery processes.
         with (Path(policy['ledger_directory']) / 'budget.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             status = schedule_status(store)
-            if status['off_peak_only'] is not True: raise RuntimeError('Off-peak setting must remain enabled')
-            if status['peak_now'] is not False: continue
-            rates = price_config()['periods']['off_peak']
+            if not scheduled and status['off_peak_only'] is not True: raise RuntimeError('Off-peak setting must remain enabled')
+            if (not scheduled or status['off_peak_only']) and status['peak_now'] is not False: continue
+            rates = price_config()['periods']['peak' if scheduled else 'off_peak']
             bound = ((len(json.dumps(payload).encode()) + 1024) * rates['input_per_million']
                      + payload['max_tokens'] * rates['output_per_million']) / 1_000_000
             if policy_cost(policy['ledger_directory'])['budget_used_upper_usd'] + bound > policy['budget_usd']:

@@ -103,3 +103,30 @@ def baseline_bad_case_rows(store, baseline):
         return []
     return prepare_baseline_rows(baseline, [row for row in store.bad_case_rows(baseline['id'])
                                             if row['run_id'] == baseline['id']])
+
+
+def case_comparisons(baseline_cases, candidate_cases, questions=None):
+    """Compare saved evidence as actually rendered, never infer from configuration."""
+    import re
+    from .ai_service import generation_context
+    questions = questions or {}
+    saved = {c['question_id']:c for c in candidate_cases}
+    rows = []
+    for baseline in baseline_cases:
+        key = baseline['question_id']
+        current = saved.get(key)
+        if not current:
+            continue
+        left = (baseline.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
+        right = (current.get('programmatic_metrics') or {}).get('retrieval_trace') or {}
+        changed = (generation_context(left['final']) != generation_context(right['final'])
+                   if isinstance(left.get('final'),list) and isinstance(right.get('final'),list) else None)
+        match = re.search(r'(\d{1,3})$', key)
+        display = baseline.get('display_question_id') or (f'Q{int(match[1]):02d}' if match else '未知')
+        state = ('修好' if baseline.get('passed') is False and current.get('passed') is True else
+                 '新错' if baseline.get('passed') is True and current.get('passed') is False else
+                 '仍错' if current.get('passed') is False else '仍对')
+        rows.append({'题号':display, '题目键':key, '变化':state, '证据变化':changed,
+                     '缺少要点':unmet_required_points(current, questions.get(key, {})),
+                     '判分原因':current.get('judge_result',{}).get('reason') or '未知'})
+    return rows

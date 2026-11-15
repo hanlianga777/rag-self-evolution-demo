@@ -101,7 +101,7 @@ def conclude_round(store, runtime, experiment_id):
     _, facts = build_agent_prompt([], baseline['config'], evaluated, [], list('ABC'),
         baseline_cases=store.evaluation_case_results(baseline['id']),
         candidate_cases={c['id']:store.evaluation_case_results(c['result'].get('evaluation_run_id')) if c['result'].get('evaluation_run_id') else [] for c in evaluated},
-        golden_questions=json.loads(baseline['dataset_snapshot_json']).get('questions', []))
+        golden_questions=json.loads(baseline['dataset_snapshot_json']).get('questions', []), causal_evidence=experiment['result'].get('causal_evidence') is True)
     prompt = {'round':number, 'prior_sandbox_results':facts['prior_sandbox_results'],
               'predictions':{c['id']:c['reasoning'].get('predicted_fixed_question_ids', []) for c in evaluated},
               'skipped_candidates':[c['id'] for c in current if c['status']=='skipped'],
@@ -111,6 +111,11 @@ def conclude_round(store, runtime, experiment_id):
               'matched_question_ids是实际修好与predictions交集，prediction_match_count为交集数量；unmatched_reason解释预测不符原因；'
               'parameter_assessment写哪些参数有效/有害/待验证；evidence_reason说明检索位置或耗时依据，多参数写无法单独确定及最可能参数和理由；'
               'conclusion总结有效/有害/待验证；lessons为非空字符串数组，写带入下一轮的经验。格式{"plans":[],"lessons":[]}。')
+    if experiment['result'].get('causal_evidence'):
+        prompt['case_comparisons'] = facts['case_comparisons']
+        system += ('逐题对比case_comparisons是程序事实。每个plans新增case_reviews数组，逐一覆盖修好、新错、仍错题，每项含question（Q29形式）、state（修好、新错、仍错）、reason（一句中文原因）、attributed_parameter（中文参数名或未知）、assessment（有效、无效、不确定）。'
+                   '证据没有变化或未知，不能声称检索参数改变了判定，assessment须无效或不确定。parameter_assessment只写有效、无效、不确定；evidence_reason附逐题依据。多参数写无法单独确定。'
+                   '所有业务说明使用中文短句、中文参数名和Q29形式题号，不出现内部编号或英文下划线字段名；机器结构键保留协议。')
     from .optimization_cycle import check_cycle_stop
     from .paid_schedule import wait_for_off_peak
     for index in range(4):
@@ -131,7 +136,16 @@ def conclude_round(store, runtime, experiment_id):
                 _request_checkpoint.reset(token)
                 _save(store, experiment_id, number, saved)
         try:
-            review = validate_round_conclusion(json.loads(attempt['raw']), evaluated)
+            response = json.loads(attempt['raw'])
+            if experiment['result'].get('causal_evidence'):
+                mapping = {r['题号']:r['题目键'] for rows in facts['case_comparisons'].values() for r in rows}
+                response = business_output(normalize_question_references(response, mapping), mapping,
+                    {c['id']:f"第{c['reasoning'].get('round',1)}轮方案{c['reasoning'].get('candidate_label','')}" for c in evaluated})
+            review = validate_round_conclusion(response, evaluated)
+            if experiment['result'].get('causal_evidence'):
+                for plan in review['plans']:
+                    candidate = next(c for c in evaluated if c['id'] == plan['candidate_id'])
+                    validate_case_review(plan, facts['case_comparisons'][candidate['id']], candidate['reasoning'].get('changed_parameters', {}))
             saved.update(status='saved', review=review)
             saved.update(cost_fields(getattr(getattr(runtime.provider,'settings',None),'model',None), [u for a in saved['attempts'] for u in a.get('token_usage', [])]))
             _save(store, experiment_id, number, saved)
@@ -155,3 +169,77 @@ def validate_d_mode(suggestion, winner, history):
         raise ValueError('部分融合须引用两个以上合格方案的有效且不冲突参数')
     if any(c.get('source_type') not in {'verified','partial','已验证','部分取用'} for c in changes):
         raise ValueError('本次D只取已验证有效参数，不能新增未验证取值')
+
+
+def validate_causal_proposals(response, comparisons):
+    from .display_summaries import PARAMETER_NAMES
+    retrieval = set(PARAMETER_NAMES) - {'prompt_strategy','generation_thinking'}
+    names = {PARAMETER_NAMES[k] for k in retrieval}
+    candidates = response.get('candidates', [])
+    directions = [c.get('direction') for c in candidates]
+    if len(directions) != len(set(directions)):
+        raise ValueError('同轮方案方向必须不同')
+    if any(len(c.get('config_diff', {})) > 2 for c in candidates):
+        raise ValueError('每个方案相对基础方案最多改两个参数')
+    for plan in response.get('prior_round_review', {}).get('plans', []):
+        facts = comparisons.get(plan.get('candidate_id'), [])
+        claims = plan.get('causal_claims')
+        required = {r['题号'] for r in facts if r['变化'] in {'修好','新错'}}
+        if not isinstance(claims,list) or not required <= {c.get('question_id') for c in claims}:
+            raise ValueError('逐题归因必须覆盖修好与新错题')
+        for claim in claims:
+            if claim.get('conclusion') not in {'有效','无效','不确定','未改变证据'}:
+                raise ValueError('逐题归因结论只能为有效、无效、不确定或未改变证据')
+            row = next((r for r in facts if claim.get('question_id') in {r['题号'], r['题目键']}), None)
+            if not row:
+                raise ValueError('归因必须引用保存的逐题对比')
+            if (row['证据变化'] is not True and claim.get('parameter') in retrieval | names
+                    and claim.get('conclusion') not in {'无效','不确定','未改变证据'}):
+                raise ValueError('证据未变，不得归因于检索参数')
+
+
+def validate_case_review(plan, rows, changes):
+    """Require an explicit, checked cause per changed or still failing case."""
+    facts = {r['题号']:r for r in rows if r['变化'] != '仍对'}
+    reviews = plan.get('case_reviews')
+    if not isinstance(reviews,list) or len(reviews) != len(facts) or {r.get('question') for r in reviews} != set(facts):
+        raise ValueError('逐题复盘必须覆盖修好、新错、仍错题')
+    from .display_summaries import PARAMETER_NAMES
+    retrieval = set(PARAMETER_NAMES) - {'prompt_strategy','generation_thinking'}
+    for row in reviews:
+        fact = facts[row['question']]
+        if row.get('state') != fact['变化'] or not isinstance(row.get('reason'),str) or not row['reason'].strip():
+            raise ValueError('逐题复盘状态或原因缺失')
+        if (row.get('attributed_parameter') in retrieval | {PARAMETER_NAMES[k] for k in retrieval}
+                and fact['证据变化'] is not True and row.get('assessment') not in {'无效','不确定'}):
+            raise ValueError('证据未变或未知，不得声称检索参数有效')
+    if plan.get('parameter_assessment') not in {'有效','无效','不确定'}:
+        raise ValueError('参数判断只能是有效、无效或不确定')
+    if len(changes) > 1 and plan['parameter_assessment'] == '有效' and '无法单独确定' not in plan.get('evidence_reason',''):
+        raise ValueError('多参数必须注明无法单独确定')
+
+
+def normalize_question_references(value, mapping):
+    """Resolve display aliases only in typed question-reference fields."""
+    fields = {'fixed_question_ids','new_failure_question_ids','matched_question_ids','predicted_fixed_question_ids'}
+    if isinstance(value,dict):
+        return {k:([mapping.get(q,q) for q in v] if k in fields and isinstance(v,list) else normalize_question_references(v,mapping)) for k,v in value.items()}
+    if isinstance(value,list):return [normalize_question_references(v,mapping) for v in value]
+    return value
+
+
+def business_output(value, mapping, candidates=None):
+    """Translate saved prose without changing protocol keys, facts or config values."""
+    from .display_summaries import PARAMETER_NAMES
+    fields = {'summary','baseline_remaining_assessment','conclusion','focus','action_name','strategy_name','core_idea','hypothesis','why','proposal','risk','reason','expected_impact','expected_improvement','unmatched_reason','parameter_assessment','evidence_reason','attribution_reason','most_likely_parameter','lessons'}
+    replacements = {**PARAMETER_NAMES, **{v:k for k,v in mapping.items()}, **(candidates or {})}
+    def prose(text):
+        for source,target in sorted(replacements.items(),key=lambda pair:-len(pair[0])):
+            text=text.replace(source,target)
+        return text
+    def walk(item, human=False):
+        if isinstance(item,str):return prose(item) if human else item
+        if isinstance(item,list):return [walk(v,human) for v in item]
+        if isinstance(item,dict):return {k:walk(v,human or k in fields) for k,v in item.items()}
+        return item
+    return walk(value)

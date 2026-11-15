@@ -332,7 +332,7 @@ def enhancement_latency_deltas(baseline_config, baseline_result, candidates):
 
 
 def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, labels, *, baseline_gates=None, evaluation_budget=None, failed_parameter_signatures=None,
-                       baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None, round_conclusions=None, round_policy=None):
+                       baseline_result=None, baseline_cases=None, candidate_cases=None, golden_questions=None, round_conclusions=None, round_policy=None, causal_evidence=False):
     """Build the exact Agent request without a Provider or persistence side effect."""
     system = ('你是RAG优化Agent。根据保存的错题诊断提出优化方案。'
               '一个方案=一个思路+必要的几个参数，可以跨环节联动。对照表表示优先尝试，不限制其他参数。'
@@ -443,6 +443,22 @@ def build_agent_prompt(bad_cases, base_config, prior_candidates, failed_gates, l
             prompt['best_qualified_candidate'] = {'candidate_id':winner['id'],'configuration':winner['config'],
                 'remaining_bad_cases':bad_case_groups((candidate_cases or {}).get(winner['id'],[])), 'hard_gates':hard_gates,
                 **{key:metrics.get(key,result.get(key)) for key in ('latency_p50_seconds','latency_p99_seconds')}}
+    if causal_evidence:
+        from .agent_inputs import case_comparisons
+        from .policy import candidate_rank
+        eligible = [c for c in prior_candidates if c['status']=='evaluated' and (candidate_cases or {}).get(c['id'])]
+        winner = min(eligible, key=candidate_rank, default=None)
+        prompt['case_comparisons'] = {c['id']:case_comparisons(baseline_cases or [], (candidate_cases or {}).get(c['id'], []), questions) for c in eligible}
+        prompt['best_case_comparison'] = prompt['case_comparisons'].get(winner['id'], []) if winner else case_comparisons(baseline_cases or [], baseline_cases or [], questions)
+        prompt['comparison_source'] = winner['id'] if winner else 'Baseline'
+        system += ('每个方案相对基础方案最多改两个参数，ABC方向必须不同。逐题对比case_comparisons和best_case_comparison是程序算出的事实。'
+                   '证据变化为否时，严禁把该题修好或新错归因于检索参数；证据未知时写不确定。'
+                   'prior_round_review.plans每条新增causal_claims数组，每项含question_id（Q29形式）、parameter（中文参数名）、conclusion（有效、无效、不确定或未改变证据）。'
+                   '每道修好、新错题都要有归因条目；未变的证据不能支持检索参数因果判断。'
+                   'previous_round_conclusions必须读取并用于本轮选择。所有说明、理由、风险使用中文业务短句、中文参数名、Q29形式题号；不出现内部编号或英文下划线字段名。结构键和config_diff等机器字段保留协议格式。'
+                   '相同配置允许提出，执行时复用已保存结果，不重复付费。')
+        system = system.replace('历史相同配置仍拒绝', '历史相同配置复用保存结果')
+        system += '机器题号数组也可写Q29形式，程序会按冻结题卷解析；参数配置对象仍用协议字段名。'
     return system,prompt
 
 
@@ -562,12 +578,22 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
             candidate['config_diff'] = changes
         inherited_base(candidate, base_config, prior_candidates, round_number, audit.get('round_policy'))
     result = {**result, 'candidates': candidates}
+    if audit.get('causal_evidence'):
+        from .agent_strategy import normalize_question_references, business_output
+        mapping = {r['题号']:r['题目键'] for rows in [audit.get('best_case_comparison', []), *audit.get('case_comparisons', {}).values()] for r in rows}
+        result = normalize_question_references(result, mapping)
+        candidates = result['candidates']
+        result = business_output(result, mapping, {c['id']:f"第{c.get('reasoning',{}).get('round',1)}轮方案{c.get('reasoning',{}).get('candidate_label','')}" for c in prior_candidates})
+        candidates = result['candidates']
     audit['prior_round_review'] = validate_prior_round_review(result, prior_candidates)
     validate_round_contract(candidates,base_config,prior_candidates,(audit.get('baseline_gate_results') or {}).get('gates'),completed=completed,
                             labels=labels if audit.get('strategy_contract') == 'agent-strategy-4' else None)
     if audit.get('strategy_contract') in {'agent-strategy-3','agent-strategy-4'}:
         from .agent_strategy import validate_strategy
         validate_strategy(result, prior_candidates, audit, {item['question_id'] for item in bad_cases})
+    if audit.get('causal_evidence'):
+        from .agent_strategy import validate_causal_proposals
+        validate_causal_proposals(result, audit.get('case_comparisons', {}))
     audit.update(response_contract_version='agent-response-2',rejected_candidates=[],response_warnings=[])
     if len(candidates)<len(labels) and not isinstance(result.get('insufficient_evidence'),str):
         audit['response_warnings'].append({'field':'insufficient_evidence','reason':'model_did_not_provide_explanation'})
@@ -585,7 +611,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
             candidate = dict(candidate)  # Preserve the parsed Provider reply in the audit.
             effective_base = inherited_base(candidate, base_config, prior_candidates, round_number, audit.get('round_policy'))
             signature = parameter_signature(effective_base, candidate['config_diff']) if isinstance(candidate.get('config_diff'), dict) else None
-            if signature in failed_signatures:
+            if signature in failed_signatures and not audit.get('causal_evidence'):
                 raise ValueError('以前失败的参数组合不得重复')
             for field in ("hypothesis", "why", "risk", "expected_improvement", "target_bad_cases", "config_diff"):
                 value = candidate.get(field)
@@ -626,7 +652,7 @@ def prepare_response(content,base_config,bad_cases,prior_candidates,completed,ro
             if config.get("hybrid_search") is False and "hybrid_alpha" not in diff:
                 config.pop("hybrid_alpha", None)
             audit["validation_stage"] = "search_space"
-            check = validate_candidate_config(config, prior_configs=prior, completed_evals=completed)
+            check = validate_candidate_config(config, prior_configs=() if audit.get('causal_evidence') else prior, completed_evals=completed)
             if not check["valid"]:
                 audit["validation_issues"] = check["issues"]
                 if check["issues"]:
@@ -823,7 +849,10 @@ class OptimizationAgent:
             baseline_gates=persisted_gates,evaluation_budget=evaluation_budget,failed_parameter_signatures=audit['failed_parameter_signatures'],
             baseline_result=baseline['result'],baseline_cases=saved_cases(baseline_run_id),
             candidate_cases={c['id']:saved_cases(c.get('result',{}).get('evaluation_run_id')) for c in prior_candidates},
-            golden_questions=list(questions.values()),round_conclusions=context.get('round_conclusions'),round_policy=context.get('round_policy'))
+            golden_questions=list(questions.values()),round_conclusions=context.get('round_conclusions'),round_policy=context.get('round_policy'),causal_evidence=context.get('causal_evidence') is True)
+        audit['causal_evidence'] = context.get('causal_evidence') is True
+        audit['case_comparisons'] = prompt.get('case_comparisons', {})
+        audit['best_case_comparison'] = prompt.get('best_case_comparison', [])
         audit['strategy_contract'] = context.get('strategy_contract')
         audit['round_policy'] = context.get('round_policy', {})
         if audit['round_policy'].get('mode') == 'full_rounds':
