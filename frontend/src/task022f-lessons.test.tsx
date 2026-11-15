@@ -35,17 +35,16 @@ it('omits unsupported lessons when saved parameters, results or the first-zero/W
  const missing=savedCandidates();delete (missing[2].result.gates.gates[0] as any).actual;expect(build(missing).rounds[0].lesson).toBeUndefined();
  const model=buildEvolutionModel({candidates:savedCandidates()}, {},x=>x,c=>c.id);expect(model.rounds[2].lesson).toBeUndefined();
 });
-it('opens evidence in HoverCard through keyboard focus and shows verified Top-K evidence on the D chip',async()=>{
+it('opens evidence in HoverCard through keyboard focus and shows verified 保留条数 evidence on the D chip',async()=>{
  const cs=savedCandidates();cs.push({...candidate(3,'D',{top_k:6},['Q04'],[],11),reasoning:{candidate_label:'D',winner_id:'R3-C',changed_parameters:{top_k:6}}} as any);
  const node=document.body.appendChild(document.createElement('div')),root=createRoot(node);
  try {
   await act(async()=>root.render(<><EvolutionTimeline model={build(cs)} baseline={{correct:44,total:50,badCases:[]}}/><DStory experiment={experiment(cs)} evaluation={{config:{top_k:4}}}/></>));
-  const lesson=node.querySelector<HTMLElement>('.ui-evo-body .ui-body-muted')!;expect(lesson.getAttribute('title')).toBeNull();
-  await act(async()=>{lesson.focus();await new Promise(r=>setTimeout(r,150));});expect(document.querySelector('[role=tooltip]')?.textContent).toContain('Round 1 · Candidate A：修好');
+  expect(node.querySelectorAll('.agent-round-strategy ol > li')).toHaveLength(3);expect(node.querySelector('.agent-round-strategy .ui-hover-trigger')).toBeNull();
   const chip=node.querySelector<HTMLElement>('.d-param-changes [tabindex]' )!;
   await act(async()=>{chip.focus();await new Promise(r=>setTimeout(r,150));});expect(document.querySelector('[role=tooltip]')?.textContent).toContain('Round 2 · Candidate B 验证过 Top-K 6 能修好 Q04/Q06');
   cs[4].reasoning.changed_parameters={top_k:4};
   await act(async()=>root.render(<DStory experiment={experiment(cs)} evaluation={{config:{top_k:4}}}/>));
-  expect(node.querySelector('.d-param-changes .ui-param')?.closest('.ui-hover-trigger')).toBeNull();
+  expect(node.querySelector('.d-param-changes .ui-param')).toBeNull();
  }finally{act(()=>root.unmount());node.remove();}
 });

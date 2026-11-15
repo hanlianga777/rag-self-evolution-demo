@@ -16,15 +16,15 @@ it('keeps report summary out of gate/case tabs and separates symptoms and causes
  await click('Hard Gate');expect(document.querySelector('.baseline-metrics')).toBeNull();expect(document.querySelector('.stage-stepper')).toBeNull();
  await click('Bad Case 诊断');expect(document.querySelector('.baseline-conclusion')).toBeNull();
  expect(document.body.textContent).toContain('缺了什么');expect(document.querySelector('.ui-bcl')?.textContent).toContain('检索层');expect(document.body.textContent).not.toContain('诊断可信度');
- expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('版本尚未核实');expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('记录缺失');expect(document.querySelector('.quality-audit')).toBeNull();expect(document.querySelector('.diagnosis-list tbody')?.textContent).not.toContain('评测争议');
+ expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('版本尚未核实');expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('未知');expect(document.querySelector('.quality-audit')).toBeNull();expect(document.querySelector('.diagnosis-list tbody')?.textContent).not.toContain('评测争议');
  expect(document.body.textContent).not.toMatch(/\bNone\b|undefined|null/);
 });
 it('retains five workstation stages and forbids old-rule candidate actions',async()=>{
  await mount(<EvolutionPage data={{evaluation:{...run,requires_policy_upgrade:true},workspace:{requires_policy_upgrade:true},badCases:[{id:'bc',run_id:'saved',result:item}],optimization:{id:'e',candidates:['A','B','C'].map(candidate_label=>({id:candidate_label,status:'generated',config:{},reasoning:{candidate_label,round:1},result:{}}))}}}/>);
  expect(document.body.textContent).not.toMatch(/诊断可信度|Confirmed|Needs Review|Disputed|评测争议/);
  const tabs=[...document.querySelectorAll('.tabs button')].map(b=>b.textContent);
- expect(tabs).toEqual(['概览','进化路线','Candidate 对比','回归与推荐']);
- await click('Candidate 对比');expect([...document.querySelectorAll<HTMLButtonElement>('.candidate-card-action button')].every(b=>b.disabled)).toBe(true);
+ expect(tabs).toEqual(['概览','进化路线','回归与推荐']);
+ await click('进化路线');expect([...document.querySelectorAll<HTMLButtonElement>('.candidate-card-action button')].every(b=>b.disabled)).toBe(true);
  expect(document.body.textContent).not.toContain('Qualified Winner');
  expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method||init.method==='GET')).toBe(true);
 });

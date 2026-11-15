@@ -18,14 +18,14 @@ async function mount(node:React.ReactNode){root=createRoot(document.body.appendC
 async function click(label:string){await act(async()=>[...document.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label') || b.textContent)===label)!.click());}
 it('uses saved Baseline shares and gates and shows additional metrics directly',async()=>{
  await mount(<EvaluationPage data={{evaluation:baseline}}/>);
- const hero=document.querySelector('[aria-label="Baseline 报告摘要"]');expect(hero).not.toBeNull();expect(document.querySelector('.ui-bl-turn')).toBeNull();expect(hero?.textContent).toContain('44 / 50');expect(hero?.textContent).toContain('Max');expect(hero?.textContent).toContain('P50 16.7 秒 · P99 42.2 秒');expect(hero?.textContent).toContain('生成层问题 1');
+ const hero=document.querySelector('[aria-label="Baseline 报告摘要"]');expect(hero).not.toBeNull();expect(document.querySelector('.ui-bl-turn')).toBeNull();expect(hero?.textContent).toContain('44 / 50');expect(hero?.textContent).toContain('最高');expect(hero?.textContent).toContain('P50 16.7 秒 · P99 42.2 秒');expect(hero?.textContent).toContain('生成层问题 1');
  expect(document.querySelector('.ui-bl-bar')?.getAttribute('aria-label')).toContain('回答生成 95.8%');
  const more=document.querySelector('.baseline-more');expect(more).not.toBeNull();expect(more?.tagName).not.toBe('DETAILS');expect(more?.textContent).not.toContain('耗时拆解');expect(more?.textContent).toContain('Recall@K');expect(more?.textContent).not.toContain('综合分');
- expect(more?.textContent).toContain('第一条包含标准证据原文');
+ expect(more?.querySelector('[aria-label="MRR说明"]')).not.toBeNull();
 });
 it('opens the existing release confirmation and cancelling makes no write request',async()=>{
  await mount(<VersionsPage data={{evaluation:baseline,versions:[initial],optimization}}/>);
- const panel=document.querySelector('[aria-label="待发布 Candidate"]');expect(panel).not.toBeNull();expect(panel?.textContent).toContain('44');expect(panel?.textContent).toContain('48');expect(panel?.querySelector('.ui-rel-steps li:nth-child(2)')?.textContent).toContain('Hard Gate 11/11 · 新增 Bad Case 0');expect(panel?.querySelectorAll('.ui-rel-steps li')).toHaveLength(3);
+ const panel=document.querySelector('[aria-label="待发布 Candidate"]');expect(panel).not.toBeNull();expect(panel?.textContent).toContain('44');expect(panel?.textContent).toContain('48');expect(document.querySelector('.release-eligibility')?.textContent).toContain('上线门槛全部通过');expect(document.querySelectorAll('.human-gates article')).toHaveLength(3);
  await click('确认发布');expect(document.querySelector('.confirm-dialog')?.textContent).toContain('发布确认');await click('取消');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });
 it('uses the saved previous configuration after release and preserves snapshot, history and rollback controls',async()=>{

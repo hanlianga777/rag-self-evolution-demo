@@ -34,14 +34,10 @@ it('opens report cases in place and keeps rerun confirmation in the metrics titl
   expect(document.querySelector('[role=dialog]')?.textContent).toContain('保存的问题');
   await act(async () => document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());
   const more = document.querySelector('.baseline-more')!;
-  expect(more.textContent).not.toMatch(/综合分|耗时拆解|Candidate K|回答生成模型和档位/);
-  expect(more.textContent).toContain('标准证据原文');
-  expect(more.textContent).toContain('未命中记为 0');
-  expect(more.querySelector('.section-head .header-actions button')?.textContent).toBe('重新评测 Baseline');
-  await click('重新评测 Baseline');
-  expect(document.querySelector('.confirm-dialog')?.textContent).toContain('会调用模型并产生费用');
-  await click('取消');
-  expect(document.querySelector('.ui-bl-time-note')?.textContent).toContain('耗时中有 90.0% 来自回答生成');
+  expect(more.textContent).not.toMatch(/综合分|耗时拆解|候选数|回答生成模型和档位/);
+  expect(more.querySelector('[aria-label="Recall@K说明"]')).not.toBeNull();expect(more.querySelector('[aria-label="MRR说明"]')).not.toBeNull();
+  expect([...more.querySelectorAll('button')].some(b=>b.textContent?.includes('评测 Baseline'))).toBe(false);
+  expect(document.querySelector('.ui-bl-time-note')?.textContent).toBe('设计巧思：先验证回答质量，再让 Agent 在受控范围内兼顾质量与速度。');
   expect(document.querySelector('.ui-bl-turn')).toBeNull();
   expect(more.tagName).not.toBe('DETAILS');
   expect(more.textContent).not.toContain('评测信息');
@@ -59,15 +55,12 @@ it('explains each gate in its own module and shows the saved threshold and formu
   vi.stubGlobal('fetch', vi.fn(async () => response(run)));
   await mount(<EvaluationPage data={{ evaluation: run }} />); await click('Hard Gate');
   const rows = [...document.querySelectorAll<HTMLElement>('.ui-hg-card li')];
-  expect(rows[0].textContent).toContain('回答的事实与说明书一致');
-  expect(rows[1].textContent).toContain('问法改成口语或带干扰后，事实仍然答对');
-  expect(rows[0].textContent).toContain('Correctness');
-  expect(rows[2].textContent).toContain('所有负向题');
-  await act(async () => rows[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-  const definition = document.querySelector('[role=dialog] .gate-definition')!;
-  expect(definition.textContent).toContain('0–4 分乘以 25');
-  expect(definition.textContent).toContain('≥ 77%');
-  expect(document.querySelector('[role=dialog]')?.textContent).toContain('保存公式');
+  expect(rows.every(row=>row.querySelector('.term-info'))).toBe(true);
+  await act(async()=>rows[1].dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));
+  const dialog=document.querySelector('[role=dialog]')!;
+  expect([...dialog.querySelectorAll('.drawer-section > h3')].map(h=>h.textContent)).toEqual(['门槛是什么','这次结果','哪几题拉低了它']);
+  expect(dialog.textContent).toContain('≥ 77%');expect(dialog.textContent).toContain('平均分');expect(dialog.textContent).not.toContain('保存公式');
+
 });
 
 const overviewData = () => ({ evaluation: { id: 'before', status: 'completed', config: {}, result: { total: 2, bad_case_count: 1 } },
@@ -98,7 +91,7 @@ it.each(['settings', 'knowledge'])('hides unconfirmed configuration while the %s
   vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
   await mount(page === 'settings' ? <SettingsPage data={{}} /> : <KnowledgePage data={{ documents: [] }} />);
   expect(document.querySelector('.loading-skeleton')).not.toBeNull();
-  expect(document.querySelector('.page-content')?.textContent).not.toMatch(/0 项可调参数|新 Baseline 待评测|Candidate K 未知|维度未采集/);
+  expect(document.querySelector('.page-content')?.textContent).not.toMatch(/0 项可调参数|新 Baseline 待评测|候选数 未知|维度未采集/);
 });
 
 it('keeps the manual chunk picker pending until product documents arrive, then retains selection controls', async () => {

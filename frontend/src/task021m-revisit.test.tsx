@@ -29,7 +29,7 @@ it('renders retained regression evidence while completed runs revalidate after a
 });
 
 it('shows cached knowledge topic details immediately when reopened after a minute',async()=>{
-  const cluster={cluster_id:'T01',label:'设备主题',size:5,source_documents:['保存的手册.pdf'],slots:[],merge_mapping:[]};
+  const cluster={cluster_id:'T01',label:'设备主题',size:5,source_documents:['保存的手册.pdf'],parents:[{chunk_id:'p',document_name:'保存的手册.pdf',page_start:1}],questions:[],slots:[],merge_mapping:[]};
   let hold=false;
   const pending:Array<()=>void>=[];
   vi.stubGlobal('fetch',vi.fn(async(input:string)=>{

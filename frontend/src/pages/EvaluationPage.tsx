@@ -1,3 +1,5 @@
+import {AnswerEvidence} from '../components/AnswerEvidence';
+import {HoverCard} from '../ui/HoverCard';
 import { pagePurpose } from "../helpText";
 import { judgePresentation } from "../components/judgePresentation";
 import { shortSourceName } from "./FrozenQuestionDetails";
@@ -38,18 +40,10 @@ const gateThreshold = (gate: Row) => `${gate.operator === ">=" ? "≥" : "≤"} 
 
 
 // Display definitions follow evaluation.py aggregation; thresholds always come from the saved run.
-const gateDescription = (metric: string) => {
-  const ablation = metric.startsWith('ablation_');
-  if (metric.endsWith('_correctness')) return ablation ? '问法改成口语或带干扰后，事实仍然答对' : '回答的事实与说明书一致';
-  if (metric.endsWith('_faithfulness')) return ablation ? '问法变化或带干扰后，回答仍有实际检索证据支持' : '回答的技术事实有实际检索证据支持，没有编造或矛盾';
-  if (metric.endsWith('_completeness')) return ablation ? '问法变化或带干扰后，仍覆盖必要事实和安全条件' : '回答覆盖题目要求的必要事实和安全条件';
-  return ({safe_rejection_rate:'所有负向题是否按预期拒答、追问、说明证据不足或抵抗注入', safety_critical_accuracy:'安全关键负向题是否满足预期行为，并守住必要安全条件', prompt_injection_resistance:'提示注入负向题是否抵抗诱导并满足预期行为', latency_p50_seconds:'保存回答耗时的第 50 百分位，不含判分时间', latency_p99_seconds:'保存回答耗时的第 99 百分位，不含判分时间'} as Record<string,string>)[metric] || '保存的评测指标';
-};
-const gateCalculation = (metric: string) => {
-  if (metric.endsWith('_correctness')) return '该题型逐题 Correctness 原始 0–4 分乘以 25 后取算术平均；质量分由 Judge 独立评分，不替代逐题对错。';
-  if (metric.endsWith('_faithfulness') || metric.endsWith('_completeness')) return '该题型逐题 Judge 的 0–1 质量分乘以 100 后取算术平均；不替代逐题对错。';
-  if (metric.startsWith('latency_')) return `全部题目保存的回答耗时从小到大排序，按从 0 开始的 floor((n−1)×${metric.includes('p50') ? '0.50' : '0.99'}) 位置取值，并由毫秒换算为秒。`;
-  return `${metric === 'safe_rejection_rate' ? '全部负向题' : metric === 'safety_critical_accuracy' ? '冻结 negative_subtype 为 safety_critical 的负向题' : '冻结 negative_subtype 为 prompt_injection 的负向题'}中，预期行为通过的题目数 ÷ 纳入题目数 × 100%；优先取 behavior_contract.effective_pass，旧记录取 behavior_pass。`;
+const gateDescription = (metric:string) => {
+ const quality=metric.startsWith('positive_') || metric.startsWith('ablation_');
+ if(quality)return `${metric.startsWith('positive_')?'正向题':'消融题'} · ${{correctness:'判分模型给每道正向题的答对程度打分，取所有正向题的平均分。',faithfulness:'每道正向题是否只说证据里有的内容、没有编造，0 到 1 分，取平均分。',completeness:'每道正向题覆盖了多少必答要点，0 到 1 分，取平均分。'}[metric.split('_').at(-1)!]?.replaceAll('正向题',metric.startsWith('ablation_')?'消融题':'正向题') || '逐题平均分'} 质量类指标是“每题得分的平均值”，所以会出现带小数的百分比。`;
+ return ({safe_rejection_rate:'负向题里做对（该拒就拒、该问就问）的比例，按题数计算。',safety_critical_accuracy:'安全关键类负向题做对的比例，按题数计算。',prompt_injection_resistance:'提示注入类负向题做对的比例，按题数计算。',latency_p50_seconds:'把所有问题的回答耗时从快到慢排好，排在正中间的那一个：一半的问题比它快。',latency_p99_seconds:'99% 的问题都能在这个时间内答完，代表最坏情况下用户要等多久。'} as Record<string,string>)[metric] || '未知';
 };
 
 // The supplied grid is display-only. Keep the original row drilldowns at the page boundary.
@@ -199,10 +193,10 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
   const stale = data.workspace?.requires_new_golden || data.workspace?.requires_new_baseline && (completed || data.workspace?.current_golden_id && snapshot.id !== data.workspace.current_golden_id);
 
   const versionedRerun = !!run.id && !canResume && !["queued", "running"].includes(run.status);
-  const startButton = <button className="secondary" disabled={busy || preflight?.can_start !== true} onClick={() => setStartConfirm(true)}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "重新评测 Baseline" : "运行 Baseline 评测"}</button>;
+  const startButton = <button className="secondary" disabled={busy || preflight?.can_start !== true} onClick={() => setStartConfirm(true)}><Play size={15} />{["queued","running"].includes(run.status) ? "后台评测进行中" : canResume ? "恢复 Baseline" : run.id ? "新建 Baseline 评测" : "运行 Baseline 评测"}</button>;
   return <PageShell className={`page evaluation-page evaluation-${tab}`} header={<div className="page-title"><div><h1><IconTile name="baseline" />Baseline</h1><p className="ui-kicker page-purpose">{pagePurpose.evaluation}</p></div></div>} tabs={<div className="tabs"><button data-label="Baseline 报告" className={tab === "report" ? "active" : ""} aria-pressed={tab === "report"} onClick={() => setTab("report")}>Baseline 报告</button><button data-label={displayText("Hard Gate")} className={tab === "gates" ? "active" : ""} aria-pressed={tab === "gates"} onClick={() => setTab("gates")}>{displayText("Hard Gate")}</button><button data-label="Bad Case 诊断" className={tab === "cases" ? "active" : ""} aria-pressed={tab === "cases"} onClick={() => setTab("cases")}>Bad Case 诊断</button></div>} resetKey={tab}>
 
-    {!versionedRerun && <div className="header-actions page-data-actions">{startButton}</div>}
+    {!completed && <div className="header-actions page-data-actions">{startButton}</div>}
     <ConfirmDialog open={startConfirm} onOpenChange={setStartConfirm} title={canResume ? "确认恢复 Baseline" : "确认重新运行 Baseline"} busy={busy} onConfirm={() => { setStartConfirm(false); void prepareStart(); }}><p>{canResume ? "将恢复原 Baseline 的未完成题目，已完成的题目保留。" : "会用当前 Pipeline 配置对 50 题重新评测，产生新版本正式评测。"}</p><p>会调用模型并产生费用。</p><p>不会影响当前线上版本。</p></ConfirmDialog>
     <PricePauseNotice pause={run.result?.price_pause} evaluationId={run.id} onChanged={async () => { setRun(await getJson<Row>(`/api/evaluations/${run.id}?light=true`)); }} />
     {preflight?.reason && (/活动评测|后台.*运行|active/i.test(preflight.reason) ? <p className="pending-note" role="status">后台正在运行评测，完成后可重新运行 Baseline</p> : <p className="error-notice" role="alert">无法启动 Baseline：{preflight.reason}</p>)}
@@ -210,7 +204,7 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
 
     {run.result?.auto_recovery?.authorized && !completed && <p className="workbench-status" role="status">{run.result.auto_recovery.state==='retrying'?`后台自动重试${run.result.auto_recovery.phase==='judge'?'Judge':'问答请求'} · 本题第${run.result.auto_recovery.retry_count}次恢复，已完成题目不会重复调用。`:run.result.auto_recovery.state==='stopped'?'后台已保存进度并停止：存在不可自动恢复的错误，详见评测依据。':'后台任务持续执行；刷新或关闭页面不停止Worker。'}</p>}
     {(error || run.error_message) && <p className="error-notice" role="alert">评测执行异常：{error || run.error_message}；未完成题目没有业务判定，不计入 Bad Case。</p>}
-    {result.technical_error_count > 0 && <StoryDisclosure label={<>题目级技术异常 {result.technical_error_count}（不计入 Bad Case）</>}><p>已处理 {result.attempted} / {result.total} 题；有效业务判定 {result.completed} 题。存在技术异常时，综合分与 Hard Gate 不可用于资格判断。</p><ul>{result.technical_errors?.map((item: Row) => <li key={item.question_id}>{item.question_id} · {item.phase} · {item.error}</li>)}</ul></StoryDisclosure>}
+    {result.technical_error_count > 0 && <section className="error-notice" role="status"><h3>评测尚不完整</h3><p>已处理 {result.attempted ?? result.completed ?? '未知'} / {result.total ?? '未知'} 题，其中 {result.technical_error_count} 题执行异常，未形成有效业务判定；不能据此判断上线资格。</p></section>}
 
     {stale && run.id && <p className="error-notice">当前知识库状态已变化；以下是历史 Run，不能作为当前发布依据。</p>}
     {!run.id ? <Section title="尚未运行 Baseline"><p>正式评测需要已批准 Golden {displayText("Snapshot")} 与可用 Provider。</p></Section> : <>
@@ -242,20 +236,20 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
       {tab === "report" && <div className="baseline-report">
         {breakdownReady && <BaselineBreakdown categories={categoryScores} badCases={businessCases.map(row => {
           const item = caseData(row), category = item.diagnostic_view?.diagnosis_category;
-          return { id: productQuestionLabel(row), question: item.question, layer: category === '检索层问题' ? '检索层' : category === '生成层问题' ? '生成层' : category || '未知' };
+          return { id: productQuestionLabel(row), question: item.question, layer: category === '检索层问题' ? '检索层' : category === '生成层问题' ? '生成层' : category || '未知', subtype:item.diagnostic_view?.subfeature };
         })} onOpen={id => { setSelectedCase(businessCases.find(row => productQuestionLabel(row) === id) || null); }} />}
         <div className="baseline-more">
-          <ProductDiagnostics diagnostics={run.product_diagnostics} judgeThinking={judgeThinking} action={versionedRerun ? <div className="header-actions">{startButton}</div> : undefined} />
+          <ProductDiagnostics diagnostics={run.product_diagnostics} judgeThinking={judgeThinking}  />
         </div>
 
       </div>}
       {tab === "gates" && <BaselineGates gates={gates} onSelect={gate=>setSelectedGate(details.find(row=>row.metric===gate.metric) || gate)} />}
 
-      {tab === "cases" && <><Section title={<IconLabel name="bad">{`${badCount ?? '未知'} 个 Bad Case`}</IconLabel>}><BadCaseOverview showJudgeReason rows={businessCases} questions={snapshot.questions} categories={run.diagnostic_categories || data.evaluation?.diagnostic_categories} priorities={run.product_diagnostics?.optimization_priorities} latencyGates={gates} onSelect={setSelectedCase} /></Section></>}
+      {tab === "cases" && <><Section title={<IconLabel name="bad">{`Bad Case`}</IconLabel>}><BadCaseOverview showJudgeReason rows={businessCases} questions={snapshot.questions} categories={run.diagnostic_categories || data.evaluation?.diagnostic_categories} priorities={run.product_diagnostics?.optimization_priorities} latencyGates={gates} onSelect={setSelectedCase} /></Section></>}
 
     </>}
 
-    <Drawer className="workbench-drawer" open={!!selectedGate} onOpenChange={open => !open && setSelectedGate(null)} title={selectedGate ? gateNames[selectedGate.metric] || selectedGate.metric : "Hard Gate 详情"}><div className="drawer-body">{selectedGate && <><section className="gate-definition" aria-label="指标含义与门槛"><h3>{group(selectedGate.metric)} · {(gateNames[selectedGate.metric] || selectedGate.metric).replace(/^(正向（Positive）|消融（Ablation）)/, '')}</h3><p>{gateDescription(selectedGate.metric)}。</p><p>{gateCalculation(selectedGate.metric)}</p><p>本次保存的门槛：{gateThreshold(selectedGate)}。</p></section><DrawerSection title="指标状态"><p>{group(selectedGate.metric)} · {gateValue(selectedGate)} / {gateThreshold(selectedGate)} · <Status value={selectedGate.status} /></p></DrawerSection><DrawerSection title="业务影响"><p>{selectedGate.metric.startsWith("latency_") ? "响应体验是否达到既有性能 Hard Gate。" : selectedGate.metric.startsWith("positive_") || selectedGate.metric.startsWith("ablation_") ? "对应题组的正确性、依据和完整性 Hard Gate；通过不代表逐题无失败。" : "拒答、安全关键或注入防护是否达到既有安全 Hard Gate。"}</p></DrawerSection><DrawerSection title="评测版本与数据来源"><p>{run.judge?.scoring_policy || "历史规则未采集"} · 保存的逐题Judge与回答阶段观测</p></DrawerSection><DrawerSection title="指标定义与公式"><p>{selectedGate.formula || "历史记录未保存计算说明"}</p><p>纳入题数：{selectedGate.included_cases ?? "保存记录缺少题数"} · Judge：{run.judge?.model || "未采集"}</p></DrawerSection><DrawerSection title="贡献题目"><p className="muted">数值为本指标贡献；状态为题目整体判定。</p><div className="run-list gate-contributions">{(selectedGate.contributing_cases || []).map((item: Row) => <div key={item.question_id}><p className="gate-question">{cases.find(row => row.question_id === item.question_id)?.question || "历史题目未记录"}</p><span>{format(item.value, selectedGate.metric.startsWith("latency_") ? " 秒" : "%")}</span><Status value={typeof item.passed === "boolean" ? item.passed ? "passed" : "failed" : "not_evaluable"} /><button className="text-button" disabled={!cases.some(row => row.question_id === item.question_id)} onClick={() => { setSelectedGate(null); setSelectedCase(cases.find(row => row.question_id === item.question_id) || null); }}>查看案例</button></div>)}</div></DrawerSection><DrawerSection title="关联 Baseline 配置"><p>Candidate K {config.candidate_k ?? "未采集"} · Top-K {config.top_k ?? "未采集"}</p></DrawerSection></>}</div></Drawer>
+    <Drawer className="workbench-drawer" open={!!selectedGate} onOpenChange={open => !open && setSelectedGate(null)} title={selectedGate ? gateNames[selectedGate.metric] || selectedGate.metric : "Hard Gate 详情"}><div className="drawer-body">{selectedGate && <><DrawerSection title="门槛是什么"><p>{gateDescription(selectedGate.metric)}</p><p>要求：{gateThreshold(selectedGate)}</p></DrawerSection><DrawerSection title="这次结果"><p>{gateValue(selectedGate)} · <Status value={selectedGate.status}/></p></DrawerSection><DrawerSection title="哪几题拉低了它"><div className="run-list gate-contributions">{(selectedGate.contributing_cases || []).filter((item:Row)=>selectedGate.metric.startsWith('latency_') ? item.value>selectedGate.threshold : item.value<selectedGate.threshold).map((item:Row)=><div key={item.question_id}><p>{cases.find(row=>row.question_id===item.question_id)?.question || '题目未记录'}</p><span>{format(item.value,selectedGate.metric.startsWith('latency_')?' 秒':'%')}</span><button className="text-button" onClick={()=>setSelectedCase(cases.find(row=>row.question_id===item.question_id) || null)}>查看案例</button></div>)}{!(selectedGate.contributing_cases || []).some((item:Row)=>selectedGate.metric.startsWith('latency_') ? item.value>selectedGate.threshold : item.value<selectedGate.threshold) && <p>没有保存的低于门槛题目。</p>}</div></DrawerSection></>}</div></Drawer>
     <Drawer className="workbench-drawer" open={!!selectedCase} onOpenChange={open => !open && setSelectedCase(null)} title={selectedDetail ? `${productQuestionLabel(selectedDetail)} · ${selectedDetail.diagnostic_view?.diagnosis_category || '案例诊断'}${selectedDetail.diagnostic_view?.severity_label?` · ${selectedDetail.diagnostic_view.severity_label}`:''}` : '案例诊断'}><div className="drawer-body">{selectedDetail && (!run.cases ? error ? <p role="alert">案例详情读取失败：{error}</p> : <div className="case-detail-skeleton" role="status" aria-label="正在读取保存的案例详情">{[1,2,3].map(index=><span key={index} aria-hidden="true"/>)}</div> : <BaselineCaseDetails item={{...selectedDetail,optimization_strategy:(data.optimization?.candidates || []).filter((candidate:Row)=>(candidate.reasoning?.observed_evidence || candidate.reasoning?.target_bad_cases || []).some((id:string)=>id===selectedDetail.question_id || relatedBad.some(row=>row.id===id && row.question_id===selectedDetail.question_id))).map((candidate:Row)=>`${candidate.reasoning?.candidate_label || '未采集'}：${candidate.reasoning?.hypothesis || '假设未采集'}`).join('；')}} snapshot={snapshot} config={config} gates={details} />)}</div></Drawer>
   </PageShell>;
 }
@@ -295,8 +289,7 @@ export function BaselineCaseDetails({ item, snapshot, config, gates }: { item: R
     <div className="case-review"><Badge tone={passed?"good":businessVerdict(item)==="FAIL"?"bad":"neutral"}>{conclusion}</Badge>{item.baseline_review_label && <Badge tone={item.baseline_review?.status==='confirmed_regression'?'bad':item.baseline_review?.status==='fluctuation'?'warning':'neutral'}>{displayText(item.baseline_review_label)}</Badge>}</div>
     <section className="candidate-card drawer-section"><h3>业务问题</h3><p className="muted">{displayText(item.test_category || golden.test_category || '')}{item.negative_subtype && ` · ${displayText(item.negative_subtype)}`}</p><CaseAnswer text={item.question || golden.question || '历史未保存问题原文'} />{golden.business_scenario && <div className="muted-prose"><TruncatedText lines={3}>业务场景：{golden.business_scenario}</TruncatedText></div>}</section>
     <section className="candidate-card drawer-section"><h3>答案对比</h3><div className="case-answer-stack"><div><h4>参考答案 / 必答要点</h4><CaseAnswer text={reference} />{typeof view.missing_points==='string' && <div className="muted-prose muted"><TruncatedText lines={3}>{view.missing_points}</TruncatedText></div>}{missing.length>0 && <div className="missing-points"><strong>未答到的要点</strong><ul>{missing.map(point=><li key={point}>{point}</li>)}</ul></div>}</div><div><h4>实际回答</h4><CaseAnswer text={item.model_answer || '历史未保存回答'} final={final} /></div></div><div className="muted-prose case-difference"><TruncatedText lines={3}><span>{summary.text}</span></TruncatedText></div></section>
-    <section className="candidate-card drawer-section"><h3>检索路径</h3>{negative?<p>不适用（负向题（Negative）不定位标准证据）</p>:<>{evidence.map((source,index)=>{const position=positions.find(position=>position.evidence_index===index+1);return <article className="evidence-path" key={index}><div className="muted-prose"><TruncatedText lines={3}>{source.evidence_key_points?.join('；') || '历史未保存关键事实摘要'}</TruncatedText></div><p className="muted">{sourceLocation(source) || '保存记录缺少来源位置'}</p>{position?<ol aria-label={`第 ${index+1} 段标准证据检索路径`}><li>{position.candidate_rank!=null?`召回第 ${position.candidate_rank} 位`:'未进候选'}</li><li>{position.rerank_rank!=null?`Rerank 第 ${position.rerank_rank} 位`:'保存记录缺少 Rerank 位次'}</li><li>{position.final_rank!=null?`进入 Top-K 第 ${position.final_rank} 位`:`未进 Top-K ${final.length} 条`}</li></ol>:<p className="muted">保存记录缺少该段证据的检索位置。</p>}</article>})}{!evidence.length && <p>历史冻结题卷未保存标准证据。</p>}</>}</section>
-    {item.judge_result?.reason && <StoryDisclosure className="candidate-card drawer-section" label="判分原文"><p className="muted-prose">{item.judge_result.reason}</p></StoryDisclosure>}
+    <AnswerEvidence row={item} question={golden}/>
     <section className="candidate-card drawer-section"><h3>优化方向</h3><div className="muted-prose"><TruncatedText lines={3}>{passed?'本题已答对，无失败优化目标。':view.repair_hint || savedDirections(item)}</TruncatedText></div></section>
 
   </div>;

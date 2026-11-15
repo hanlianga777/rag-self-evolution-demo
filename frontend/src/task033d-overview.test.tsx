@@ -23,7 +23,7 @@ it('shows every saved recommendation change under every fixed question, includin
   const rows = [...document.querySelectorAll('.ui-ovs-fixed li')];
   expect(rows).toHaveLength(2);
   for (const row of rows) {
-    expect([...row.querySelectorAll('.ui-ovs-fixed-params span')].map(n => n.textContent)).toEqual(['Candidate K 12 → 24', 'Top-K 4 → 6', 'Thinking 档位 Max → High']);
+    expect([...row.querySelectorAll('.ui-ovs-fixed-params span')].map(n => n.textContent)).toEqual(['候选数 12 → 24', '保留条数 4 → 6', '思考档位 最高 → 高']);
     expect(row.textContent).not.toContain('—');
   }
   expect(document.querySelector('[aria-label="修好的题目"] h3')?.textContent).toContain('仍未修好：Q03');

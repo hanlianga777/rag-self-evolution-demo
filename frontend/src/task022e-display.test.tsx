@@ -22,7 +22,7 @@ it('builds missing points from saved judgments, preserves grouped numbering, and
   const multi = { ...item, judge_result: { ...item.judge_result, atomic_results: [{ atomic_id: 'Q04-R1-1', state: 'NOT_MET' }, { atomic_id: 'Q04-R1-2', state: 'NOT_MET' }, { atomic_id: 'Q04-R3', state: 'NOT_MET' }] } };
   expect(coreEvidence(multi)).toBe('缺要点 ①：只在室内存放设备');
   await mount(<BadCaseOverview rows={[multi]} showJudgeReason onSelect={() => {}} />);
-  const cell = document.querySelector('.diagnosis-list td:nth-child(4)')!;
+  const cell = document.querySelector('.diagnosis-list td:nth-child(7)')!;
   expect(cell.textContent).toContain('缺要点 ①：只在室内存放设备');
   await act(async()=>{cell.querySelector('.ui-hover-trigger')!.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,160));});
  expect(document.querySelector('[role=tooltip]')?.textContent).toContain('③：每月充电');
@@ -41,21 +41,21 @@ it('keeps Judge prose intact in a visible section for both passed and failed cas
   await mount(<CaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
   expect(document.querySelector('.case-difference')?.textContent).toBe('缺要点 ①：只在室内存放设备');
   const raw = [...document.querySelectorAll('.story-disclosure')].find(e => e.querySelector('.disclosure-heading')?.textContent?.includes('判分原文'))!;
-  expect(raw?.querySelector('summary')).toBeNull();
-  expect(raw?.textContent).toContain(item.judge_result.reason);
+  expect(raw).toBeUndefined();
+  expect(document.querySelector('.bad-case-details')?.textContent).not.toContain(item.judge_result.reason);
   await act(async () => root.render(<CaseDetails item={{ ...item, passed: true }} snapshot={{}} config={{}} gates={[]} />));
   expect(document.querySelector('.case-difference')?.textContent).toContain('已答对');
 });
 
 it('formats saved Agent parameters everywhere without touching originals or substrings', async () => {
   const prose = 'top_k=6 candidate_k=24 multi_query=2 high / max / low safe_rejection p99 / p50';
-  const expected = 'Top-K 6 Candidate K 24 Multi-Query 2 High / Max / Low 安全拒答率 P99 / P50';
+  const expected = '保留条数 6 候选数 24 多路查询 2 High / Max / Low 安全拒答率 P99 / P50';
   expect((display as any).agentDisplayText?.(prose)).toBe(expected);
   expect((display as any).agentDisplayText?.('safe_rejection_rate latency_p99_seconds latency_p50_seconds')).toBe('安全拒答率 回答耗时 P99 回答耗时 P50');
   expect((display as any).agentDisplayText?.('highlight max_tokens low_latency')).toBe('highlight max_tokens low_latency');
   const reasoning = { core_idea: prose, strategy_name: '策略', risks: [{ reason: prose }], adjustments: [{ parameter: 'top_k', expected_impact: prose }] };
   await mount(<StrategyPresentation reasoning={reasoning} />);
-  expect(document.querySelector('.strategy-presentation')?.textContent).toContain(expected);
+  expect(document.querySelector('.strategy-presentation')?.textContent).toContain(expected.replace('High / Max / Low','高 / 最高 / 低'));
   expect(document.querySelector('.strategy-presentation')?.textContent).not.toContain('candidate_k');
   expect(reasoning.core_idea).toBe(prose);
 });
@@ -76,8 +76,8 @@ it('moves only the versioned Baseline rerun into the retrieval metrics card and 
   expect(document.querySelector('.page-title')?.textContent).not.toContain('重新运行 Baseline');
   const more = document.querySelector('.baseline-more')!;
   const button = [...more.querySelectorAll('button')].find(b => b.textContent?.includes('重新评测 Baseline'))!;
-  expect(button).toBeTruthy();
-  expect(button.disabled).toBe(true);
+  expect(button).toBeUndefined();
+  expect(document.querySelector('.baseline-more')).not.toBeNull();
   expect(document.body.textContent).toContain('保存的预检阻断');
   expect((fetch as any).mock.calls.every(([, init]: any[]) => !init?.method || init.method === 'GET')).toBe(true);
 });

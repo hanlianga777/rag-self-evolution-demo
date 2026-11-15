@@ -19,11 +19,11 @@ async function mount(){root=createRoot(document.body.appendChild(document.create
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
 it('shows only round and saved lesson above route cards',async()=>{
  await mount();await click('进化路线');expect(document.querySelectorAll('.ui-evo-round-head p')).toHaveLength(0);
- expect(document.querySelectorAll('.agent-round-strategy .ui-hover-trigger')).toHaveLength(1);
+ expect(document.querySelectorAll('.agent-round-strategy ol > li')).toHaveLength(3);expect(document.querySelector('.agent-round-strategy .ui-hover-trigger')).toBeNull();
  expect(document.body.textContent).not.toContain('本轮没有合格 Candidate：');
 });
 it('keeps complete fixed IDs on cards and moves target counts to the target drawer',async()=>{
- await mount();await click('Candidate 对比');
+ await mount();await click('进化路线');await click('Round 3');
  const cards=[...document.querySelectorAll('.candidate-cards .candidate-card')];const c=cards[2];
  expect(c.querySelector('small')).toBeNull();expect(cards.map(c=>c.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['未通过','未通过','合格']);
  const result=c.querySelector('.candidate-story-block:last-child')!;

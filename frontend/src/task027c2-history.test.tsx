@@ -32,7 +32,7 @@ it('labels versions chronologically and places four actions beside the selected 
   expect(rows[0].textContent).not.toContain('当前使用'); expect(rows[1].textContent).toContain('当前使用');
   const toolbar = dialog.querySelector('.snapshot-history-toolbar')!;
   expect(toolbar.closest('.section-head')?.querySelector('h2')?.textContent).toBe('选中版本题目');
-  expect([...toolbar.querySelectorAll('a,button')].map(el => el.textContent)).toEqual(['导出 Markdown', '导出 CSV', '导出 JSON', '查看审计']);
+  expect([...toolbar.querySelectorAll('a,button')].map(el => el.textContent)).toEqual(['导出 Markdown', '导出 CSV', '导出 JSON']);
   expect([...toolbar.querySelectorAll('a')].every(el => el.href.includes('/new/export?'))).toBe(true);
   await act(async () => rows[1].querySelector('button')!.click());
   expect([...toolbar.querySelectorAll('a')].every(el => el.href.includes('/old/export?'))).toBe(true);
@@ -43,7 +43,7 @@ it.each([false, true])('keeps disabled actions visible and explains missing sour
   const version = incomplete ? { id: 'run', status: 'completed', question_ids: ['q'], profile: { expected_count: 2 } } : { id: 'GD-orphan', status: 'approved', snapshot: { question_ids: ['q'], questions: [question] } };
   await mount({ generationRuns: incomplete ? [version] : [], snapshots: incomplete ? [] : [version], dataset: [question] }); await openRetainedHistory();
   const toolbar = document.querySelector('.snapshot-history-toolbar')!;
-  expect(toolbar.querySelectorAll('button:disabled')).toHaveLength(incomplete ? 3 : 4);
+  expect(toolbar.querySelectorAll('button:disabled')).toHaveLength(3);
   expect(toolbar.querySelectorAll('a[href]')).toHaveLength(0);
   const trigger = toolbar.querySelector('.ui-hover-trigger')!;
   await act(async () => { trigger.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); await new Promise(r => setTimeout(r, 150)); });

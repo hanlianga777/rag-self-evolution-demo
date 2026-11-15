@@ -44,13 +44,13 @@ it.each(['','?tab=qa','?tab=compare','?tab=monitoring'])('opens the requested ve
 });
 it('shows real next-round inputs, one empty state and clickable remaining questions without writes',async()=>{
  location.hash='#verification?tab=monitoring';await mount(<VerificationPage data={{evaluation:{id:'base'},optimization:exp(),monitoring:{events:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- expect(document.querySelectorAll('.feedback-loop-node')).toHaveLength(0);expect([...document.querySelectorAll('.monitoring-remaining .ui-q')].map(n=>n.textContent)).toEqual(['Q06','Q27']);expect(document.querySelector('.monitoring-stats')?.textContent).toContain('标记为 Bad Case0');
+ expect(document.querySelectorAll('.feedback-loop-node')).toHaveLength(0);expect([...document.querySelectorAll('.monitoring-remaining .ui-q')].map(n=>n.textContent)).toEqual(['Q06','Q27']);expect(document.querySelector('.monitoring-stats')?.textContent).toContain('人工标注的 Bad Case 数0');
  expect(document.querySelector('.feedback-empty')?.textContent).toBe('暂无线上问答记录。');expect(document.body.textContent).not.toMatch(/当前尚无实际问答记录|当前尚无反馈记录|符合现有触发规则/);
  await click('Q27');expect(location.hash).toBe('#verification?tab=compare&q=Q27');expect(document.querySelector('.tabs [aria-pressed="true"]')?.textContent).toBe('Before/After');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method||init.method==='GET')).toBe(true);
 });
 it('counts only human-confirmed bad cases and retains feedback assessment controls',async()=>{
  location.hash='#verification?tab=monitoring';const events=[{id:'a',question:'保存的问题',bad_case:true,determinable:true},{id:'b',question:'未判定',bad_case:true,determinable:false},{id:'c',question:'正常',bad_case:false,determinable:true}];await mount(<VerificationPage data={{monitoring:{events}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- expect([...document.querySelectorAll('.monitoring-stats strong')].map(n=>n.textContent)).toEqual(['3','2','1','—']);expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(3);expect(document.querySelectorAll('.monitoring-assessment button')).toHaveLength(9);expect(document.querySelector('.feedback-empty')).toBeNull();
+ expect([...document.querySelectorAll('.monitoring-stats strong')].map(n=>n.textContent)).toEqual(['3','未知','0%','1']);expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(3);expect(document.querySelectorAll('.monitoring-assessment button')).toHaveLength(9);expect(document.querySelector('.feedback-empty')).toBeNull();
 });
 it('keeps online dots independently of editable draft selection without D result highlighting',async()=>{
  const baseline={candidate_k:8,top_k:2,generation_thinking:'max',hyde:false},online={...baseline,candidate_k:16,top_k:4,generation_thinking:'low'};

@@ -37,8 +37,8 @@ it('compares saved predictions with repairs relative to the winner, with identic
 it('explains all remaining failures from saved positions and new failures from the saved judge',async()=>{
  const fetcher=mockRun();await mount(<DStory experiment={exp()} evaluation={evaluation}/>);
  const reasons=document.querySelector('.d-result-causes')!.textContent;
- expect(reasons).toContain('重排结果里排第 7 位，即使把 Top-K 放宽到 6 也拿不到');
- expect(reasons).toContain('重排结果里排第 24 位，即使把 Top-K 放宽到 6 也拿不到');
+ expect(reasons).toContain('重排结果里排第 7 位，即使把 保留条数 放宽到 6 也拿不到');
+ expect(reasons).toContain('重排结果里排第 24 位，即使把 保留条数 放宽到 6 也拿不到');
  expect(reasons).toContain('回答含与依据矛盾的内容');expect(reasons).not.toContain('答案新增');
  expect(document.querySelector('.d-result-causes .ui-q.is-broken')?.getAttribute('aria-label')).toBe('Q25 新增 Bad Case');
  expect(document.querySelector('.d-result-causes')?.tagName).toBe('SECTION');

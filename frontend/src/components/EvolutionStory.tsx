@@ -12,8 +12,8 @@ import {cachedJson, getJson} from '../api';
 import { ClampText } from '../ui/ClampText';
 import {savedSnapshot} from '../evaluationProgress';
 
-export const storyParameterNames:Record<string,string>={...parameterNames,candidate_k:'Candidate K',top_k:'Top-K',generation_thinking:'Thinking 档位',multi_query:'Multi-Query 条数',query_rewrite:'Query Rewrite',query_decompose:'Query Decompose',hyde:'HyDE',hybrid_search:'Hybrid Search',hybrid_alpha:'Embedding Retrieval 权重',rerank:'Rerank 方式',prompt_strategy:'回答策略',retrieval_max_tokens:'证据长度上限',min_score:'最低相关度'};
-export const storyValue=(value:unknown):string => typeof value==='string' && ['off','low','high','max'].includes(value) ? ({off:'OFF',low:'Low',high:'High',max:'Max'}[value]!) : formatValue(value);
+export const storyParameterNames:Record<string,string>={...parameterNames};
+export const storyValue=(value:unknown):string => formatValue(value);
 
 export const recommendationOf = (experiment:any) => experiment?.recommendation?.result || experiment?.recommendation || {};
 export const schemeName = (candidate:any, id?:string, includeRound = true):string => {
@@ -39,11 +39,11 @@ export function storyText(value:unknown):string {
     .replace(/(?:BC|GD|GGEN)-?[\dA-Za-z-]*\d[\dA-Za-z-]*/g,'相关记录')
     .replace(/\bL\d+\b/g,'').replace(/\b[a-f0-9]{32,64}\b/gi,'')
     .replace(/\brerank\s*=\s*query_only\b/g,'Rerank 方式：只按问题');
-  for(const [key,name] of Object.entries({...storyParameterNames,...gateNames,safe_rejection:'安全拒答率'}).sort(([a],[b])=>b.length-a.length)){
+  for(const [key,name] of Object.entries({...storyParameterNames,...gateNames,safe_rejection:'安全拒答率',reasoning_tokens:'思考用量',new_regressions:'新增问题',most_likely_parameter:'最可能起作用的参数',attribution_reason:'判断依据',query_processing:'查询处理',bad_cases:'Bad Case',bad_case:'Bad Case',insufficient_evidence:'证据不足',context_selection:'上下文选择',search_space:'白名单范围',latency_p99:'最慢耗时',winner_plus_verified:'沿用获胜方案并加上有效参数',partial_fusion:'部分融合'}).sort(([a],[b])=>b.length-a.length)){
     text=text.replace(new RegExp(`\\b${key}\\s*=\\s*`,'g'),`${name} `).replaceAll(key,name);
   }
   text=text.replace(/thinking/gi,'Thinking').replace(/topk/gi,'Top-K').replace(/Top-K\s*=\s*/g,'Top-K ').replace(/([\u4e00-\u9fff])(Thinking|Max|High|\d+)/g,'$1 $2').replace(/(Thinking|Max|High|\d+)([\u4e00-\u9fff])/g,'$1 $2');
-  return narrativeText(text).replace(/\bp99\b/g,'最慢回答 P99').replace(/\bTop(\d+)\b/gi,'回答证据前 $1 条').replace(/\bquery_only\b/g,'只按问题').replace(/\bcompleted\b/g,'已完成').replace(/\brunning\b/g,'运行中').replace(/\bqueued\b/g,'排队中').replace(/Golden Chunk/g,'标准说明').replace(/\b(?:candidates|reranked|final)\b/g,word=>({candidates:'候选列表',reranked:'Rerank 列表',final:'回答证据'}[word]!)).trim() || '说明未保存';
+  return narrativeText(text).replace(/\b(?:Required|Forbidden|FAIL|PASS)\b/g,word=>({Required:'必答',Forbidden:'禁止',FAIL:'未通过',PASS:'通过'}[word]!)).replace(/\s*=\s*/g,'：').replace(/\bp99\b/g,'最慢回答 P99').replace(/\bTop(\d+)\b/gi,'回答证据前 $1 条').replace(/\bquery_only\b/g,'只按问题').replace(/\bcompleted\b/g,'已完成').replace(/\brunning\b/g,'运行中').replace(/\bqueued\b/g,'排队中').replace(/Golden Chunk/g,'标准说明').replace(/\b(?:candidates|reranked|final)\b/g,word=>({candidates:'候选列表',reranked:'Rerank 列表',final:'回答证据'}[word]!)).replace(/\b(?:Grounded|Tiered|Completeness|Max|High|Low|OFF|Off|Thinking|Rerank|Top-K|Candidate K|Query Rewrite|Multi-Query|HyDE|Hybrid Search)\b/g,word=>({Grounded:'有据生成',Tiered:'分级回答',Completeness:'完整性优先',Max:'最高',High:'高',Low:'低',OFF:'关闭',Off:'关闭',Thinking:'思考档位',Rerank:'重排序','Top-K':'保留条数','Candidate K':'候选数','Query Rewrite':'问题改写','Multi-Query':'多路查询',HyDE:'假设答案检索','Hybrid Search':'混合检索'}[word]!)).replace(/思考档位\s*档位/g,'思考档位').replace(/\bcandidate_missing\b/g,'候选方案缺失').trim() || '说明未保存';
 }
 
 export function StoryText({value,evaluation,badCases=[]}:{value:unknown;evaluation?:any;badCases?:any[]}) {
@@ -163,7 +163,7 @@ function DResultStory({experiment,evaluation,badCases,footer}:{experiment:any;ev
   const remaining=(facts.remaining_failures || []).filter((row:any)=>rowFor(row.question_id)?.passed===false || rowFor(row.question_id)?.passed!==true && (fixed===null || !fixed.includes(row.question_id)));
   const missedReason=(row:any)=>{
     const rank=missedEvidenceRank(d,row);
-    return rank!==undefined ? `关键说明在 Winner 的${d.config?.rerank===false ? '候选' : '重排'}结果里排第 ${rank} 位，即使把 Top-K 放宽到 ${d.config.top_k} 也拿不到；这个位置提示下一轮应先检查${d.config?.rerank===false ? '召回顺序' : '重排顺序'}，而不是继续增加条数。` : '保存的证据位置不足，原因未知。';
+    return rank!==undefined ? `关键说明在 Winner 的${d.config?.rerank===false ? '候选' : '重排'}结果里排第 ${rank} 位，即使把 保留条数 放宽到 ${d.config.top_k} 也拿不到；这个位置提示下一轮应先检查${d.config?.rerank===false ? '召回顺序' : '重排顺序'}，而不是继续增加条数。` : '保存的证据位置不足，原因未知。';
   };
   const issueReason=(id:string)=>judgePresentation(rowFor(id) || {}, savedSnapshot(evaluation).questions?.find((question:any)=>question.id===id)).text;
 
@@ -200,7 +200,7 @@ function DResultStory({experiment,evaluation,badCases,footer}:{experiment:any;ev
     </tbody></table></div>{error && <p role="status">{error}</p>}{!saved && !error && <p className="ui-body-muted">{runId ? '正在读取保存的逐题结果…' : '逐题结果来源未保存，保护题结果与判分原因未知。'}</p>}</section>
     <section className="d-result-comparison ui-card"><h3>{schemeName(winner)} vs D</h3><QualityComparison baseline={winner} baselineLabel={schemeName(winner)} candidate={d} candidateLabel="Candidate D" includeNewFailures hideGates/></section>
     </div><section className="d-result-causes ui-card"><h3>还没解决的问题</h3><div className="d-issue-grid">
-      {remaining.map((row:any)=>{const rank=missedEvidenceRank(d,row),topK=d.config?.top_k,failed=rowFor(row.question_id)?.passed===false || fixed!==null && !fixed.includes(row.question_id);return <article className="d-unresolved-card" key={row.question_id}><h4><QuestionBadge id={shortQuestionId(row.question_id)} tone="open" question={questionText(row.question_id,evaluation,badCases)}/> <span>{!failed ? '实际是否修好未知' : targets.includes(row.question_id) ? '预测会修好，实际没修好' : '未列为修复目标，实际仍未修好'}</span></h4><p>{missedReason(row)}</p>{typeof rank==='number' && <div className="d-ranking" aria-label={`Winner 证据排名：第 ${rank} 位，截止线 Top-K ${topK}`}><div className="d-rank-labels"><span>截止线 Top-K {topK}</span><span>证据排第 {rank} 位</span></div><div className="d-rank-bar"><i style={{width:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><b style={{left:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><em style={{left:`${rank/Math.max(rank+2,topK+2)*100}%`}}/></div></div>}</article>;})}
+      {remaining.map((row:any)=>{const rank=missedEvidenceRank(d,row),topK=d.config?.top_k,failed=rowFor(row.question_id)?.passed===false || fixed!==null && !fixed.includes(row.question_id);return <article className="d-unresolved-card" key={row.question_id}><h4><QuestionBadge id={shortQuestionId(row.question_id)} tone="open" question={questionText(row.question_id,evaluation,badCases)}/> <span>{!failed ? '实际是否修好未知' : targets.includes(row.question_id) ? '预测会修好，实际没修好' : '未列为修复目标，实际仍未修好'}</span></h4><p>{missedReason(row)}</p>{typeof rank==='number' && <div className="d-ranking" aria-label={`Winner 证据排名：第 ${rank} 位，截止线 保留条数 ${topK}`}><div className="d-rank-labels"><span>截止线 保留条数 {topK}</span><span>证据排第 {rank} 位</span></div><div className="d-rank-bar"><i style={{width:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><b style={{left:`${topK/Math.max(rank+2,topK+2)*100}%`}}/><em style={{left:`${rank/Math.max(rank+2,topK+2)*100}%`}}/></div></div>}</article>;})}
       {broken?.map(id=><article className="d-unresolved-card" key={id}><h4><QuestionBadge id={shortQuestionId(id)} tone="broken" question={questionText(id,evaluation,badCases)}/> 新增 Bad Case</h4><p>{issueReason(id)}</p></article>)}
       {!remaining.length && !broken?.length && <p className="ui-body-muted">没有保存的未修好或新增 Bad Case 原因。</p>}
       <DSideEffects changes={d.reasoning?.changes || []} candidates={experiment.candidates} summary={`${watched.length && held===watched.length ? `${held} 道受保护题全部守住` : protectedSummary}，安全拒答 ${typeof safety==='number' ? `${safety}%` : '未知'}。`}/>
@@ -225,7 +225,7 @@ export function DSideEffects({changes,summary,candidates=[]}:{changes:any[];summ
       const p99=gates.find((gate:any)=>gate.metric==='latency_p99_seconds' && gate.passed===false);
       return `${schemeName(source)} 新增了 ${questionList(result.new_regression_question_ids)}，安全拒答${!p99 && safetyGate?.passed===false ? '降到 ' : ' '}${typeof safety==='number' ? `${safety}%` : '未知'}${typeof p99?.actual==='number' ? `、P99 ${p99.actual.toFixed(1)} 秒` : ''}`;
     }).join('；') : '';
-    return <article className="d-side-effects" key={index}><h4>{storyParameterNames[change.parameter] || '参数调整'} · 副作用检查</h4>{history ? <p>前几轮里，Top-K {topK} 出现时伴随过副作用：{history}。这些只是同时出现，不能证明是 Top-K 造成的，所以 D 把这些题列为重点盯防。</p> : (summary ? fields.slice(0,1) : fields).map(([label,value])=>Array.isArray(value) ? <div key={label}><span className="ui-body-muted">{label}：</span><ul style={{listStyleType:'disc',paddingLeft:'1.5em'}}>{value.map((item:string,index:number)=><li key={index}><StoryText value={item}/></li>)}</ul></div> : <p key={label}><span className="ui-body-muted">{label}：</span><StoryText value={value}/></p>)}{summary && <p>实际结果：{summary}</p>}</article>;
+    return <article className="d-side-effects" key={index}><h4>{storyParameterNames[change.parameter] || '参数调整'} · 副作用检查</h4>{history ? <p>前几轮里，保留条数 {topK} 出现时伴随过副作用：{history}。这些只是同时出现，不能证明是 保留条数 造成的，所以 D 把这些题列为重点盯防。</p> : (summary ? fields.slice(0,1) : fields).map(([label,value])=>Array.isArray(value) ? <div key={label}><span className="ui-body-muted">{label}：</span><ul style={{listStyleType:'disc',paddingLeft:'1.5em'}}>{value.map((item:string,index:number)=><li key={index}><StoryText value={item}/></li>)}</ul></div> : <p key={label}><span className="ui-body-muted">{label}：</span><StoryText value={value}/></p>)}{summary && <p>实际结果：{summary}</p>}</article>;
   })}</>;
 }
 
@@ -285,7 +285,7 @@ export function EvolutionRoute({evaluation,experiment,badCases,children,onDetail
     })}
     <Section title="Candidate D · 融合精修"><DStory experiment={experiment} evaluation={evaluation} badCases={badCases} compact/></Section>
     <Section title="最终推荐"><h3>{recommended ? schemeName(recommended) : '等待保存的最终推荐'}</h3><QualityComparison baseline={evaluation} candidate={recommended}/><p><StoryText value={recommendationReason(experiment)} evaluation={evaluation} badCases={badCases}/></p><a className="primary" href="#versions">{recommended?.release_state?.human_release ? '查看发布记录' : '去发布'}</a></Section>
-    {children && <details className="disclosure route-planning"><summary>Agent 规划 · 逐题覆盖详情</summary>{children}</details>}
+    {children && <section className="route-planning"><h3>Agent 规划 · 逐题覆盖详情</h3>{children}</section>}
   </div>;
 }
 
@@ -307,13 +307,14 @@ export function DStory({experiment,evaluation={},badCases=[],compact=false,onRep
   })() : '';
   const status=d?.status==='failed' ? 'stopped' : completeResult(d) ? d.result.qualification?.qualified===true ? 'qualified' : d.result.qualification?.qualified===false ? 'failed' : 'evaluated' : ['running','queued'].includes(d?.status) ? 'running' : 'waiting';
   const footer=!compact && (onReport || onRecommendation) ? <>{onReport && <button className="secondary" onClick={onReport}><Icon name="report" size={15}/>查看 D 完整报告</button>}{onRecommendation && <button className="secondary" onClick={onRecommendation}><Icon name="recommend" size={15}/>查看最终推荐</button>}</> : null;
+  if(state.causal_evidence)return <StructuredD experiment={experiment} evaluation={evaluation} footer={footer}/>;
   return <article className="d-story"><section className="ui-card d-design"><header className="section-head"><h3>{d ? 'D 的设计' : title}</h3>{d && <StatusBadge kind={status} label={d.status==='failed' ? '评测中断，尚无完整结果' : status==='waiting' ? '等待完整评测' : completeResult(d) && d.result.qualification?.qualified==null ? '资格未知' : undefined}/>}</header>
     {d && <div className="d-param-changes">{Object.entries(suggestion.changed_parameters || suggestion.proposed_config_diff || {}).map(([key, value]) => {
-      const chip = <ParamChip label={storyParameterNames[key] || key} from={paramValue(key, evaluation.config?.[key])} to={paramValue(key, value)} keyParam={key === 'top_k' && winner?.config?.top_k !== d.config?.top_k} keyLabel="唯一新增" />;
+      const chip = <span>{storyParameterNames[key] || '参数'}：{paramValue(key,evaluation.config?.[key])} → {paramValue(key,value)}</span>;
       return key === 'top_k' && value === 6 && topKEvidence ? <HoverCard key={key} content={topKEvidence}><span tabIndex={0}>{chip}</span></HoverCard> : <span key={key}>{chip}</span>;
     })}</div>}
     {decision && <p className="ui-headline d-result-conclusion">{storyText(decision)}</p>}
-    <div className={d ? "d-agent-prediction agent-round-strategy" : "ui-body-muted"} role="status">{d && <h3>Agent 的预测</h3>}<p>{agentDisplayText(reason || "未保存说明")}</p>{suggestion.combination_mode && <p>{suggestion.combination_mode === "partial_fusion" ? "部分融合" : "Winner 加有效参数"}：{suggestion.mode_reason || "未知"}</p>}</div>
+    <div className={d ? "d-agent-prediction agent-round-strategy" : "ui-body-muted"} role="status">{d && <h3>Agent 的预测</h3>}<p>{storyText(reason || "未保存说明")}</p>{suggestion.combination_mode && <p>{suggestion.combination_mode === "partial_fusion" ? "部分融合" : "Winner 加有效参数"}：{storyText(suggestion.mode_reason || "未知")}</p>}</div>
     {!d && dProgressLabel(experiment)==='Agent 判断不做 D' && <p className="ui-headline d-result-conclusion"><StoryText value={recommendationReason(experiment)} evaluation={evaluation} badCases={badCases}/></p>}
     </section>{completeResult(d) && <DResultStory experiment={experiment} evaluation={evaluation} badCases={badCases} footer={footer}/>} {!completeResult(d) && changes.some((change:any)=>Object.values(change.side_effect_check || {}).some(hasSideEffectText)) && <section className="ui-card"><h3>副作用检查</h3><div className="d-issue-grid"><DSideEffects changes={changes}/></div></section>} {!completeResult(d) && footer && <div className="d-story-footer">{footer}</div>}</article>;
 }
@@ -330,9 +331,15 @@ export function recommendationTradeoff(experiment:any):string {
     const value=change.reason || change.rationale;
     if(typeof value!=='string' || !value.trim())return '';
     const saved=value.match(/^剩余(.+?)属于已进入候选\/重排但被Top(\d+)截断的context_selection问题；历史保存结果中top_k=(\d+)伴随修好(.+?)，且该值在search_space允许范围内，不撤销Winner的/);
-    if(saved && changes.length===1 && change.parameter==='top_k')return `${saved[1]} 的关键证据已经进入候选，却被“只取 ${saved[2]} 条”的上限截掉；前几轮的结果显示 Top-K ${saved[3]} 能修好${saved[1].split('、').length===2 ? '这两题' : '这些题'}，所以 D 只在 Winner 上加了这一项。`;
+    if(saved && changes.length===1 && change.parameter==='top_k')return `${saved[1]} 的关键证据已经进入候选，却被“只取 ${saved[2]} 条”的上限截掉；前几轮的结果显示 保留条数 ${saved[3]} 能修好${saved[1].split('、').length===2 ? '这两题' : '这些题'}，所以 D 只在 Winner 上加了这一项。`;
     return storyText(value).replaceAll('context_selection','上下文选择').replaceAll('search_space','允许调整范围');
   }).filter(Boolean).join('；');
   const tradeoff=fixed?.length && broken && typeof actual==='number' && typeof before==='number' && typeof gate?.threshold==='number' && gate.passed===true ? `Candidate D 在 ${schemeName(winner)} 的基础上多修好了 ${questionList(fixed)}，新增 Bad Case ${broken.length ? `为 ${broken.length}` : '仍为 0'}；它的 P99 是 ${actual.toFixed(1)} 秒，${actual>before ? `比 ${schemeName(winner)} 慢一些，但仍在` : '仍在'} ${gate.threshold} 秒门槛以内，按质量优先的规则推荐 D。` : base;
   return [tradeoff,adoption ? `采纳依据：${adoption}` : ''].filter(Boolean).join(' ');
+}
+
+function StructuredD({experiment,evaluation,footer}:{experiment:any;evaluation:any;footer:React.ReactNode}) {
+ const d=experiment.candidates?.find((c:any)=>c.reasoning?.candidate_label==='D'),state=experiment.result || {},reason=d?.reasoning || state.composite?.suggestion || {},result=completeResult(d);
+ const reviews=result?.case_reviews || reason.case_reviews || state.composite?.case_reviews || [];
+ return <article className="d-story"><section className="ui-card"><h3>合并了什么</h3><p>{storyText(reason.explanation || reason.hypothesis || '组合决策尚未形成。')}</p>{Object.entries(reason.changed_parameters || reason.proposed_config_diff || {}).map(([key,value])=><p key={key}>{parameterNames[key] || '参数'}：{formatValue(evaluation.config?.[key])} → {formatValue(value)}</p>)}</section><section className="ui-card"><h3>事先预测</h3><ol>{(reason.changes || []).map((change:any,i:number)=><li key={i}>{storyText(change.why_merge || change.reason)}；预计修好 {questionList(change.target_question_ids || null)}；风险：{storyText(change.side_effect_check?.risk_checklist)}</li>)}</ol>{!reason.changes?.length && <p>预测尚未保存。</p>}</section><section className="ui-card"><h3>事后对账</h3>{result?<><p>修好 {questionList(result.all_fixed_question_ids ?? null)}；新增 {questionList(result.new_regression_question_ids ?? null)}；仍错 {questionList(result.continued_failure_question_ids ?? null)}。</p>{reviews.map((row:any,i:number)=><p key={i}>{shortQuestionId(row.question || row.question_id || '')}：{storyText(row.reason)}</p>)}</>:<p>评测尚未完成，实际结果未知。</p>}</section><section className="ui-card"><h3>结论</h3><p>{result?storyText(recommendationReason(experiment)):'等待完整评测及 Agent 结论。'}</p>{footer}</section></article>;
 }

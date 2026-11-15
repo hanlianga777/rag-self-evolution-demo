@@ -29,14 +29,14 @@ it('links multiple saved candidate hypotheses to the same actual problem and kee
  const candidates=['A','B'].map((label,i)=>({id:label,status:'generated',config:{candidate_k:24+i},reasoning:{candidate_label:label,observed_evidence:[badCases[0].id],hypothesis:'假设'+label,proposal:'candidate_missing=true 原始提出理由'}}));
  const data={evaluation,badCases,optimization:{id:'EXP',candidates}};const before=JSON.stringify(data);
  await mount(<EvolutionPage data={data}/>);
- expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(2);const rows=[...document.querySelectorAll('.agent-case-destinations tbody tr')];expect(rows[0].textContent).toContain('Candidate A、Candidate B');expect(rows[1].textContent).not.toContain('Candidate A');expect(document.querySelector('.experiment-plan')).toBeNull();
- await click('进化路线');expect(document.querySelectorAll('.agent-design-intent')).toHaveLength(2);
- await click('Candidate 对比');await click('查看 Candidate 与完整报告');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('.story-disclosure'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
+ expect(document.querySelector('.agent-case-destinations')).toBeNull();
+ await click('进化路线');expect(document.querySelectorAll('.candidate-card-body')).toHaveLength(2);
+ await click('进化路线');await click('查看 Candidate 与完整报告');expect(document.querySelector('.drawer')?.textContent).not.toContain('candidate_missing');expect(JSON.stringify(data)).toBe(before);
 });
 it('compares a pending release against current Production rather than unrelated Baseline configuration',async()=>{
  const candidate={id:'A',config:{candidate_k:24},reasoning:{candidate_label:'A'},release_state:{sandbox:true,qualified:true,recommended:true,round_complete:true}};
  await mount(<VersionsPage data={{evaluation:{config:{candidate_k:99}},versions:[{id:'initial',status:'active',provenance:'bootstrap',config:{candidate_k:12}}],optimization:{candidates:[candidate],recommendation:{recommended_candidate:candidate.id}}}}/>);
- const diff=document.querySelector('.ui-rel-changes')!;expect(diff.textContent).toContain('12');expect(diff.textContent).toContain('24');expect(diff.textContent).not.toContain('99');
+ const diff=document.querySelector('.release-diff')!;expect(diff.textContent).toContain('12');expect(diff.textContent).toContain('24');expect(diff.textContent).not.toContain('99');
 });
 it('shows the real feedback chain with a compact empty state and no pretend monitoring rows',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({events:[],triggers:[]}))));

@@ -28,7 +28,7 @@ it('explains alternatives from saved repairs, regressions and gates rather than 
 });
 it('hides the entire thinking comparison section when no columns exist',async()=>{
  await mount(<ProductDiagnostics diagnostics={{thinking_comparison:{columns:[],note:'尚无可比较的回答档位记录'}}}/>);
- expect(document.body.textContent).not.toContain('Thinking 档位对照');
+ expect(document.body.textContent).not.toContain('思考档位对照');
  expect(document.body.textContent).not.toContain('尚无可比较');
  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看对照')).toBe(false);
  expect(document.body.textContent).toContain('检索与用量');
@@ -49,7 +49,7 @@ it('marks the production config separately from the baseline draft after release
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/pipeline')?{active_version_id:'production-new',active_version:{provenance:'published',snapshot:{candidate_id:'EXP-D'}},config:{candidate_k:24,top_k:6,generation_thinking:'high'},baseline_config:{candidate_k:12,top_k:4,generation_thinking:'max'},search_space:{candidate_k:{allowed:[12,24]},top_k:{allowed:[4,6]},generation_thinking:{allowed:['high','max']}}}:{}))));
  await mount(<SettingsPage data={{workspace:{active_version:'production-new'}}}/>);
  expect(document.querySelector('.ui-pg-legend')?.textContent).toContain('蓝点 = 当前线上');
- for(const [key,value] of [['candidate_k','24'],['top_k','6'],['generation_thinking','High']]) {
+ for(const [key,value] of [['candidate_k','24'],['top_k','6'],['generation_thinking','高']]) {
   const row=document.querySelector(`[data-parameter="${key}"]`)!;
   expect(row.querySelector('.dot.online')?.closest('button')?.textContent).toBe(value);
   expect(row.querySelector('.dot.base')?.closest('button')).not.toBe(row.querySelector('.dot.online')?.closest('button'));

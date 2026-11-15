@@ -102,11 +102,11 @@ it("shows persisted partial slots, failure details, and only the refill action",
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ dataset: rows, generationRuns: [run], snapshots: [] }} />));
   await openRetainedHistory();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
+  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);
   expect(document.querySelector(".generation-progress")?.textContent).toContain("Hard Valid 12/20");
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
   await openRetainedHistory();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
+  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);
   expect(document.body.textContent).toContain("已处理 20/20 · 100%");
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
   expect(document.querySelector(".ui-gp-left > strong")?.textContent).toBe("12 题");
@@ -116,16 +116,16 @@ it("shows persisted partial slots, failure details, and only the refill action",
   expect(document.querySelector(".review-batch")).toBeNull();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   await openRetainedHistory();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-NEW");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("题位 20 / 20");
-  expect(document.querySelector('.slot-audit .disclosure-heading')).not.toBeNull();
-  expect(document.querySelector('.slot-audit summary')).toBeNull();
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("原文证据");
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain("unsupported answer anchor");
+  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);
+  expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('Run ID：');
+  expect(document.querySelector('.generation-status .run-summary')?.textContent).toContain("/ 20");
+  expect(document.querySelector('.slot-audit')).toBeNull();
+  expect(document.querySelector('.slot-audit')).toBeNull();
+  expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("原文证据");
+  expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("unsupported answer anchor");
   await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>(".review-table tbody tr[role=button]")].at(-1)!.click());
-  expect(document.body.textContent).toContain("unsupported answer anchor");
+  expect(document.body.textContent).toContain("尚未形成可供审核的题目");expect(document.body.textContent).not.toContain("unsupported answer anchor");
   await act(async () => root.unmount());
 });
 
@@ -138,14 +138,14 @@ for (const count of [10, 12, 19]) {
     await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: rows, snapshots: [] }} />));
     expect(document.querySelector(".review-table")?.textContent).toContain(`题目 ${count}`);
   await openRetainedHistory();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
+  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);
     expect(document.querySelector(".generation-progress")?.textContent).toContain(`Hard Valid ${count}/20`);
   await act(async () => document.querySelector<HTMLButtonElement>('.drawer-head [aria-label="关闭"]')!.click());
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     await openRetainedHistory();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-partial");
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("题位 20 / 20");
+  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);
+    expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('Run ID：');
+    expect(document.querySelector('.generation-status .run-summary')?.textContent).toContain("/ 20");
     await act(async () => root.unmount());
   });
 }
@@ -217,7 +217,7 @@ it("confirms an evaluated qualified winner and then offers composite D", async (
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { if (init?.method === "POST") requests.push({ url, body: JSON.parse(init.body as string || "{}") }); return new Response(JSON.stringify(experiment), { status: 200 }); }));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: { status: "completed" }, badCases: [{}] }} />));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Candidate 对比")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "进化路线")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "回归与推荐")!.click());
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("确认报告"))!.click());
   expect(requests).toHaveLength(0);
@@ -233,7 +233,7 @@ it.each([{ max: 13, canContinue: true }, { max: 12, canContinue: false }])("keep
   await act(async () => root.render(<EvolutionPage data={{ optimization: experiment, evaluation: {}, badCases: [] }} />));
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "进化路线")!.click());
   await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="概览")!.click());expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("Round 3 · 2/2");
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Candidate 对比")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "进化路线")!.click());
   expect(document.body.textContent?.includes("继续优化下一轮")).toBe(canContinue);
   await act(async () => root.unmount());
 });

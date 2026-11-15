@@ -22,7 +22,7 @@ it("renders project results and the new architecture tabs without writes", async
   expect(document.querySelector('input[type="file"]')).toBeNull();
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "技术架构")!.click());
   const tech = document.querySelector('[role="img"][aria-label^="技术架构"]');
-  for (const label of ["RAG Pipeline", "交互层", "治理服务层", "知识处理层", "DeepSeek", "Query Rewrite", "Multi-Query", "HyDE", "Candidate K", "Hybrid Search", "Embedding 权重", "Rerank", "Top-K", "MinScore", "上下文容量", "Prompt 策略", "Thinking 档位"]) expect(tech?.textContent).toContain(label);
+  for (const label of ["RAG Pipeline", "交互层", "治理服务层", "知识处理层", "DeepSeek", "问题改写", "多路查询", "假设答案检索", "候选数", "混合检索", "Embedding 权重", "重排序", "保留条数", "最低相关分", "上下文容量", "回答策略", "思考档位"]) expect(tech?.textContent).toContain(label);
   expect(document.body.textContent).not.toMatch(/平价|断点续跑/);
   expect(fetch).not.toHaveBeenCalled();
   const ids = [...document.querySelectorAll('svg [id]')].map(node => node.id);

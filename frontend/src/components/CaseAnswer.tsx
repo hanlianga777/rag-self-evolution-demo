@@ -1,6 +1,7 @@
 import { TruncatedText } from './Primitives';
 import { answerCitationDisplay } from '../answerCitations';
-import { StoryDisclosure } from './Storytelling';
+import {ComparisonAnswer} from './ComparisonAnswer';
+import type {Citation} from '../types';
 import { createElement, Fragment, type ReactNode } from 'react';
 
 // Display only: keep the persisted answer and its exact audit copy untouched.
@@ -57,12 +58,9 @@ function markdown(text: string, clamp = false): ReactNode[] {
   return blocks();
 }
 
-export function CaseAnswer({ text, final }: { text: string; final?: Parameters<typeof answerCitationDisplay>[1] }) {
-  if (final !== undefined) {
-    const display=answerCitationDisplay(text,final);
-    if (display.changed) return <><CaseAnswer text={display.text}/>{display.unverified > 0 && <p className="error-notice">{display.unverified}处引用未与本次保存的Final对应，不能据此认定回答有据。</p>}<StoryDisclosure label="原始回答与引用审计"><pre className="technical-record">{text}</pre></StoryDisclosure></>;
-  }
-  return answerMarkup(text, true);
+export function CaseAnswer({text,final,onOpenCitation}:{text:string;final?:Parameters<typeof answerCitationDisplay>[1];onOpenCitation?:(citation:Citation)=>void}) {
+  if(final!==undefined)return <ComparisonAnswer row={{model_answer:answerCitationDisplay(text,final).text,programmatic_metrics:{retrieval_trace:{final}}}} points={[]} side="before" onOpenCitation={onOpenCitation}/>;
+  return answerMarkup(text);
 }
 
 /** Parsed React nodes, also used by the saved comparison's exact-quote decoration. */

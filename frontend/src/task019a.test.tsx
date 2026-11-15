@@ -12,14 +12,14 @@ const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendCh
 afterEach(()=>{if(root)act(()=>root.unmount());vi.unstubAllGlobals();document.body.innerHTML='';});
 it('uses real Golden fields and omits unavailable columns without placeholder cells',async()=>{
  await mount(<QuestionTable rows={[{id:'q',slot:'Q07',question:'如何操作',test_category:'negative',negative_subtype:'clarify',source_summary:'不适用（负向题（Negative）无标准证据）',scoring_summary:{required:3,auxiliary:1},probe:{score:100},qc:{score:90},baseline_result:{passed:false,diagnosis_category:'检索层问题'}}]} onDetail={()=>{}}/>);
- expect([...document.querySelectorAll('th')].map(e=>e.textContent)).toEqual(['题号','题型','问题','出处','评分要点','Probe','QC','']);
+ expect([...document.querySelectorAll('th')].map(e=>e.textContent)).toEqual(['题号','题型','问题','主题簇','负向子类','考查环节','出处','评分要点','Probei','QCi','']);
  expect(document.querySelector('tbody')?.textContent).toContain('3 条');
  expect(document.querySelector('tbody .ui-verdict')).toBeNull();expect(document.querySelector('thead')?.textContent).not.toContain('Baseline');
  expect(document.querySelector('tbody')?.textContent).not.toContain('暂无');
 });
 it('shows saved changes, repaired and harmed questions with the corresponding retrospective',async()=>{
  await mount(<EvolutionRoute evaluation={{config:{hyde:false}}} badCases={[{question_id:'Q15',question:'修好的原问题'},{question_id:'Q07',question:'弄坏的原问题'}]} experiment={{candidates:[{id:'R1-A',status:'evaluated',config:{hyde:true},reasoning:{candidate_label:'A',round:1},result:{all_fixed_question_ids:['Q15'],new_regression_question_ids:['Q07']}}],result:{prior_round_reviews:{'2':{status:'saved',review:{conclusions:[{id:'L1',conclusion:'检索改动有速度成本'}]}}}}}}/>);
- expect(document.body.textContent).toContain('Agent 本轮复盘');expect(document.body.textContent).toContain('修好：修好的原问题');expect(document.body.textContent).toContain('弄坏：弄坏的原问题');expect(document.body.textContent).toContain('HyDE');expect(document.body.textContent).toContain('检索改动有速度成本');
+ expect(document.body.textContent).toContain('Agent 本轮复盘');expect(document.body.textContent).toContain('修好：修好的原问题');expect(document.body.textContent).toContain('弄坏：弄坏的原问题');expect(document.body.textContent).toContain('假设答案检索');expect(document.body.textContent).toContain('检索改动有速度成本');
 });
 it('persists visible unattended authorization with actor and never offers automatic publish',async()=>{
  const fetcher=vi.fn(async(_url:string,init?:RequestInit)=>new Response(JSON.stringify(init?.method==='POST'?{enabled:true,actor:'当前用户',authorized_at:'2026-11-05T12:00:00Z'}:{off_peak_only:true,unattended_authorization:{enabled:false,actor:null,authorized_at:null}})));

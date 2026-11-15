@@ -24,9 +24,9 @@ it('structures a saved chat answer without changing its full audit copy or sourc
  expect(document.querySelector('.qa-version-status')).toBeNull();
  expect(document.querySelector('.message-label')?.textContent).toBe('AI 助手13.4 秒');
  expect(document.querySelector('.answer-text')?.textContent).toContain('正文中的依据：保留');
- expect(document.querySelector('.answer-text')?.textContent).not.toContain('操作说明的保存证据');
- expect(document.querySelector('.message-sources')?.textContent).toContain('依据：操作说明的保存证据');
- expect([...document.querySelectorAll('.message-sources button')].map(n=>n.textContent)).toEqual(['KIRA 操作说明，第 12 页','KIRA 操作说明，第 48 页']);
+ expect(document.querySelector('.answer-text')?.textContent).toContain('操作说明的保存证据');
+ expect(document.querySelector('.answer-text')?.textContent).toContain('依据：操作说明的保存证据');
+ expect([...document.querySelectorAll('.comparison-sources button')].map(n=>n.textContent)).toEqual(['KIRA 操作说明 · 第 48 页','KIRA 操作说明 · 第 12 页']);
  expect(document.querySelector('.message-sources [title]')).toBeNull();
  expect(document.querySelector('.qa-answer-audit')).toBeNull();
  expect(document.querySelector('.qa-answer-actions .clue-button')?.classList.contains('primary')).toBe(true);
@@ -40,7 +40,7 @@ it('combines saved feedback and local-only answers, counting linked answers once
  location.hash='#verification?tab=monitoring';const fetcher=vi.fn(async()=>new Response('{}'));vi.stubGlobal('fetch',fetcher);
  await mount(<VerificationPage data={{monitoring:{events},optimization:{candidates:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
  expect(document.querySelector('.tabs [aria-pressed=true]')?.textContent).toBe('Monitoring');
- expect([...document.querySelectorAll('.monitoring-stats strong')].map(n=>n.textContent)).toEqual(['2','1','1','3.0 秒']);
+ expect([...document.querySelectorAll('.monitoring-stats strong')].map(n=>n.textContent)).toEqual(['2','2.0 秒','100%','1']);
  expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(2);
  expect([...document.querySelectorAll('.monitoring-table th')].map(n=>n.textContent)).toEqual(['时间','问题','耗时','引用数','标注状态','操作']);
  expect(document.querySelectorAll('.monitoring-assessment button')).toHaveLength(3);
@@ -49,7 +49,7 @@ it('combines saved feedback and local-only answers, counting linked answers once
 it('labels the three release gates and keeps only the two secondary review actions',async()=>{
  const d={id:'exp-D',reasoning:{candidate_label:'D'},config:{top_k:6},result:{gates:{passed:true,passed_count:11,total:11},new_regression_question_ids:[],all_fixed_question_ids:['Q04']}};
  await mount(<VersionsPage data={{versions:[{id:'p',status:'active',provenance:'published',config:d.config,snapshot:{candidate_id:d.id,human_release:{decision:'approved'}}},{id:'old',status:'archived'}],optimization:{candidates:[d]}}}/>);
- expect([...document.querySelectorAll('.ui-rel-steps strong')].map(n=>n.textContent)).toEqual(['Gate 2 · 推荐确认（人工审核）','发布资格（程序校验）','Gate 3 · 发布授权（人工审批）']);
+ expect([...document.querySelectorAll('.human-gates h3')].map(n=>n.textContent)).toEqual(['Gate 1 · 题卷红线','Gate 2 · 实验报告','Gate 3 · 发布确认']);
  expect([...document.querySelectorAll('.ui-rel-actions button')].map(n=>n.textContent)).toEqual(['查看评测报告','查看发布快照']);
  expect(document.querySelectorAll('.ui-rel-actions button.secondary svg')).toHaveLength(2);
  expect(document.querySelector('.release-history-table button.secondary')?.textContent).toBe('回滚至此版本');
@@ -61,8 +61,8 @@ it('removes answer boundary notes and citation counts while preserving the saved
  expect(document.querySelector('.comparison-body')?.textContent).toBe('正文。');expect(document.querySelector('.comparison-more')).toBeNull();expect(JSON.stringify(row)).toBe(original);
 });
 it('normalizes parameter prose without touching saved Agent reasoning',()=>{
- const text='降thinking档位，TopK=6，topk=4，Thinking 档位从Max降到High，修好2题。';
- expect(storyText(text)).toBe('降 Thinking 档位，Top-K 6，Top-K 4，Thinking 档位从 Max 降到 High，修好 2 题。');
+ const text='降thinking档位，TopK=6，topk=4，思考档位从Max降到High，修好2题。';
+ expect(storyText(text)).toBe('降 思考档位，保留条数 6，保留条数 4，思考档位从 最高 降到 高，修好 2 题。');
 });
 
 it('keeps unsplittable basis prose and distinct repeated saved answers',()=>{

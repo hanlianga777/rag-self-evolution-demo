@@ -13,31 +13,22 @@ import { BusinessImportPanel } from "./pages/BusinessImportPanel";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it("uses persisted corpus totals and actual index dimensions in the compact knowledge chain", async () => {
-  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: 384, indexed_count: 6 } }), { status: 200 }));
-  vi.stubGlobal("fetch", fetcher);
-  const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<KnowledgePage data={{ documents: [{ id: "DOC-1", name: "说明.pdf", pages: 9, chunks: 7, parser: "PyMuPDF", chunk_strategy: "页级/段落 fallback", status: "Indexed" }] }} />));
-  expect(document.querySelector(".light-stepper")).toBeNull();
-  expect(document.querySelector(".metrics-grid")).toBeNull();
-  expect(document.querySelectorAll(".knowledge-strategy-card")).toHaveLength(0);
-  expect(document.querySelector(".ui-kf")?.textContent).toContain("384 维");
-  expect(document.querySelector(".knowledge-notice")?.textContent).toContain("Legacy");
-  expect(document.querySelector(".ui-kf")?.textContent).toContain("9 页");
-  expect(document.querySelector(".ui-kf")?.textContent).toContain("建立索引6 已索引");
-  expect([...document.querySelectorAll("thead th")].map(item => item.textContent)).toEqual(["文档名", "页数", "Parent Chunks", "Child Chunks", "解析状态", "索引状态", "操作"]);
-  expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
-  await act(async () => root.unmount());
+it('keeps the knowledge flow generic when index measurements exist',async()=>{
+ const knowledge={index:{dimension:384,child_count:35},target_config:{child_tokens:400},coverage:{clusters:[]}};
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({knowledge,index:knowledge.index}))));
+ const root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<KnowledgePage data={{documents:[]}}/>));
+ const flow=document.querySelector('.ui-kf')!;
+ expect(flow.textContent).toContain('Parent 分块');expect(flow.textContent).toContain('Child 分块');expect(flow.textContent).toContain('主题聚类');expect(flow.textContent).not.toMatch(/\d/);
+ expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);await act(async()=>root.unmount());
 });
 
-it("hides missing index measurements instead of deriving them from chunks", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ index: { embedding_model: "BAAI/bge-small-zh-v1.5", vector_index: "FAISS IndexFlatIP", dimension: null, indexed_count: null } }), { status: 200 })));
-  const root = createRoot(document.body.appendChild(document.createElement("div")));
-  await act(async () => root.render(<KnowledgePage data={{ documents: [{ id: "DOC-1", name: "说明.pdf", pages: 9, chunks: 7, parser: "PyMuPDF", status: "Indexed" }] }} />));
-  expect(document.querySelector(".ui-kf")?.textContent).toContain("建立索引— 已索引");
-  expect(document.querySelector(".ui-kf")?.textContent).not.toContain("512");
-  expect(document.querySelector(".ui-kf")?.textContent).toContain("维度未采集");
-  await act(async () => root.unmount());
+it('keeps the knowledge flow generic when index measurements are absent',async()=>{
+ const knowledge={index:{},target_config:{},coverage:{clusters:[]}};
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({knowledge,index:knowledge.index}))));
+ const root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<KnowledgePage data={{documents:[]}}/>));
+ const flow=document.querySelector('.ui-kf')!;
+ expect(flow.textContent).toContain('Parent 分块');expect(flow.textContent).toContain('Child 分块');expect(flow.textContent).toContain('主题聚类');expect(flow.textContent).not.toMatch(/\d/);
+ expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);await act(async()=>root.unmount());
 });
 
 it("groups pipeline configuration by purpose and marks parameters by their contract keys", async () => {
@@ -64,12 +55,12 @@ it("keeps current frozen Golden separate from the latest work Run and hides an e
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: "GD-current" }, generationRuns: [workRun], snapshots, dataset: [row], documents: [] }} />));
   await openRetainedHistory();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
+  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);
   const summary = document.querySelector(".drawer-body")!;
   expect(summary.textContent).toContain("3 题");
-  expect(summary.textContent).toContain("分类完整");
-  expect(summary.textContent).toContain("Frozen");
-  expect(summary.textContent).toContain("Legacy");
+  expect(summary.textContent).toContain("当前使用");
+  expect(summary.textContent).toContain("已批准");
+  expect(summary.textContent).not.toContain("构造与质量记录");
   expect(document.querySelector(".review-table tbody")?.textContent).toContain("待审核的新题");
   expect(document.querySelectorAll(".ui-gp-steps li")).toHaveLength(6);
   expect(document.querySelector(".exception-summary")).toBeNull();

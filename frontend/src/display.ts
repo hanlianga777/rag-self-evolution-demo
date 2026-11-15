@@ -113,7 +113,7 @@ export const gateEnglishNames: Record<string, string> = {
 export const shortDate = (value?: string) => value && !Number.isNaN(Date.parse(value))
   ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit" }).format(new Date(value)).replace("/", "-") : "日期未知";
 export function baselineName(run: any): string {
-  const level = { off: "OFF", low: "Low", high: "High", max: "Max" }[run?.config?.generation_thinking as string] || "档位未知";
+  const level = { off: "关闭", low: "低", high: "高", max: "最高" }[run?.config?.generation_thinking as string] || "档位未知";
   return `Baseline · ${level} · ${shortDate(run?.created_at)}`;
 }
 export function productionName(version: any): string {
@@ -126,12 +126,7 @@ export function questionSource(row: any): string {
   return row?.raw?.generation_run_id ? "AI 生成" : "来源未知";
 }
 
-export const parameterNames: Record<string, string> = {
-  candidate_k: "Candidate K", top_k: "Top-K", min_score: "MinScore", hybrid_search: "Hybrid Search", hybrid_alpha: "Embedding Retrieval 权重",
-  generation_thinking: "Thinking 档位", query_decompose: "Query Decompose", retrieval_max_tokens: "上下文容量",
-  rerank: "Rerank", query_rewrite: "Query Rewrite", multi_query: "Multi-Query", hyde: "HyDE",
-  metadata_filter: "元数据筛选", alias_mapping: "别名映射", prompt_strategy: "Prompt 策略",
-};
+export const parameterNames:Record<string,string> = {"candidate_k": "候选数", "top_k": "保留条数", "min_score": "最低相关分", "hybrid_search": "混合检索", "hybrid_alpha": "语义检索权重", "generation_thinking": "思考档位", "query_decompose": "问题拆解", "retrieval_max_tokens": "资料总长度上限", "rerank": "重排序", "query_rewrite": "问题改写", "multi_query": "多路查询", "hyde": "假设答案检索", "metadata_filter": "元数据筛选", "alias_mapping": "别名映射", "prompt_strategy": "回答策略"};
 
 export const descriptions: Record<string, string> = {
   generation_thinking: "可选择 OFF / Low / High / Max", query_decompose: "拆解独立意图并分别检索；默认关闭", retrieval_max_tokens: "不限 / 8192 / 4096；缺少 tokenizer 时按字符数估算 token",

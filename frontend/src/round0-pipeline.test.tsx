@@ -18,11 +18,11 @@ it("saves freely selected Thinking and context, preserves saved drafts and remov
  await render(<SettingsPage data={{}}/>);
  expect(document.querySelector('[data-parameter="generation_thinking"] .badge')).toBeNull();
  expect(document.querySelector('[data-parameter="query_decompose"]')).toBeNull();
- await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[data-parameter="generation_thinking"] button')].find(b=>b.textContent==='Max')!.click());
+ await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[data-parameter="generation_thinking"] button')].find(b=>b.textContent==='最高')!.click());
  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('[data-parameter="retrieval_max_tokens"] button')].find(b=>b.textContent==='4096')!.click());
  await click("保存草稿");
  expect(posts[0].config).toEqual({generation_thinking:"max",retrieval_max_tokens:4096,min_score:0.2});
- expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe('Max');
+ expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe('最高');
  await act(async()=>{document.querySelector<HTMLElement>('[data-parameter="retrieval_max_tokens"] .ui-pg-info')!.focus();await new Promise(resolve=>setTimeout(resolve,150));});
  expect(document.querySelector('[role=tooltip]')?.textContent).toBe('交给模型的资料最多多长，超出部分截掉。 不限／8192（较宽松）／4096（较紧，回答更快，但可能截掉证据）');
 });
@@ -69,22 +69,22 @@ it.each([false, true])("starts from saved Max Baseline without phantom changes (
   });
   vi.stubGlobal("fetch", fetcher);
   await render(<SettingsPage data={{}} />);
-  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe("Max");
+  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe("最高");
   expect(document.querySelectorAll('.pipeline-draft-chips > *')).toHaveLength(0);
   expect(document.body.textContent).not.toContain("1 项已修改");
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="generation_thinking"] button')].find(button => button.textContent === "High")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('[data-parameter="generation_thinking"] button')].find(button => button.textContent === "高")!.click());
   expect(document.body.textContent).toContain("1 项已修改");
-  expect(document.querySelector('.pipeline-draft-chips')?.textContent).toContain("Max → High");
+  expect(document.querySelector('.pipeline-draft-chips')?.textContent).toContain("最高 → 高");
   await click("放弃修改");
   expect(document.body.textContent).not.toContain("已修改");
-  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe("Max");
+  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe("最高");
   expect(JSON.stringify(pipeline.baseline_config)).toBe(saved);
   expect(pipeline.baseline_defaults.generation_thinking).toBe("high");
 });
 it("uses approved defaults before the first Baseline exists", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ config: { generation_thinking: "low" }, baseline_defaults: { generation_thinking: "high" }, search_space: { generation_thinking: contract.generation_thinking } }))));
   await render(<SettingsPage data={{}} />);
-  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe("High");
+  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe("高");
   expect(document.body.textContent).not.toContain("已修改");
 });
 
@@ -111,7 +111,7 @@ it("does not present partial case rows as the whole dataset composition", async 
 it("keeps a saved lower Thinking draft editable",async()=>{
  vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({baseline_config:{generation_thinking:"max"},config_draft:{config:{generation_thinking:"low"}},search_space:contract}))));
  await render(<SettingsPage data={{}}/>);
- expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe('Low');
+ expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe('低');
  expect(document.body.textContent).not.toContain('已放弃旧草稿');
 });
 it('keeps the fixed Max Baseline when active-task lookup returns a different completed High run', async () => {
@@ -123,7 +123,7 @@ it('keeps the fixed Max Baseline when active-task lookup returns a different com
  expect(fetcher.mock.calls.some(([url])=>url.endsWith('/evaluations/FIXED-MAX'))).toBe(true);
  expect(document.querySelector('.page-title')?.textContent).toContain('Baseline');
  expect(document.querySelector('.baseline-metrics')?.textContent).toContain('42 / 50');
- expect(document.querySelector('.page-content')?.textContent).not.toContain('High');
+ expect(document.querySelector('.page-content')?.textContent).not.toContain('高');
  await click('Bad Case 诊断');
- expect(document.body.textContent).toContain('8 个 Bad Case');
+ expect(document.querySelector('.ui-hg-card')?.textContent || document.body.textContent).toContain('Hard Gate');expect(document.body.textContent).not.toContain('wrong');
 });

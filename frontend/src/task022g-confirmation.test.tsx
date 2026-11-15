@@ -26,7 +26,12 @@ it.each(['completed', 'partial', 'not_run'])('confirms before any Baseline start
   const run = { id: status === 'not_run' ? undefined : '022g-baseline', status, cases: [], dataset_snapshot: {}, result: {} };
   const fetcher = vi.fn(async (url: string, init?: RequestInit) => response(url.includes('/bad-cases') ? [] : url.includes('preflight') ? { can_start: true, can_resume: status === 'partial', resume_source_id: status === 'partial' ? run.id : null } : init?.method === 'POST' ? { id: 'new', status: 'running' } : run));
   vi.stubGlobal('fetch', fetcher); await mount(<EvaluationPage data={{ evaluation: run }} />);
-  const label = status === 'completed' ? '重新评测 Baseline' : status === 'partial' ? '恢复 Baseline' : '运行 Baseline 评测';
+  if(status==='completed'){
+    expect([...document.querySelectorAll('button')].some(b=>b.textContent?.includes('新建 Baseline 评测') || b.textContent?.includes('重新评测'))).toBe(false);
+    expect(fetcher.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
+    return;
+  }
+  const label = status === 'completed' ? '新建 Baseline 评测' : status === 'partial' ? '恢复 Baseline' : '运行 Baseline 评测';
   await cancelWithoutRequest(fetcher, label); await click(label);
   expect(document.querySelector('.confirm-dialog')?.textContent).toContain('会调用模型并产生费用');
   expect(document.querySelector('.confirm-dialog')?.textContent).toContain('不会影响当前线上版本');

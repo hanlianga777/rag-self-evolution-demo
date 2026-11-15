@@ -2,8 +2,8 @@ export type Point = {number:number; text:string; before:boolean; after:boolean; 
 export const categoryName = (value:string) => ({positive:'正向题（Positive）',ablation:'消融题（Ablation）',negative:'负向题（Negative）'}[value] || '题型未知');
 export const verdict = (row:any) => row?.passed===true ? '答对' : row?.passed===false ? '答错' : '未知';
 export const finalEvidence = (row:any):any[] | undefined => row?.programmatic_metrics?.retrieval_trace?.final;
-export const parameterNames:Record<string,string> = {top_k:'Top-K',candidate_k:'Candidate K',generation_thinking:'Thinking 档位',rerank:'Rerank',min_score:'最低相关度',hybrid_search:'Hybrid Search',hybrid_alpha:'Hybrid Search 权重',query_rewrite:'Query Rewrite',multi_query:'Multi-Query',hyde:'HyDE 检索',prompt_strategy:'回答提示策略',retrieval_max_tokens:'检索上下文长度',retrieval_mode:'检索方式',temperature:'回答温度',max_tokens:'回答长度上限',context_budget:'上下文预算'};
-export const parameterValue = (value:any):string => ({max:'Max',high:'High',medium:'Medium',low:'Low',off:'OFF',true:'开启',false:'关闭'}[String(value)] || (value == null ? '未知' : typeof value==='object' ? JSON.stringify(value) : String(value)));
+export const parameterNames:Record<string,string> = {"candidate_k": "候选数", "top_k": "保留条数", "min_score": "最低相关分", "hybrid_search": "混合检索", "hybrid_alpha": "语义检索权重", "generation_thinking": "思考档位", "query_decompose": "问题拆解", "retrieval_max_tokens": "资料总长度上限", "rerank": "重排序", "query_rewrite": "问题改写", "multi_query": "多路查询", "hyde": "假设答案检索", "metadata_filter": "元数据筛选", "alias_mapping": "别名映射", "prompt_strategy": "回答策略"};
+export const parameterValue = (value:any):string => ({max:'最高',high:'高',medium:'中',low:'低',off:'关闭',Grounded:'有据生成',Tiered:'分级回答',Completeness:'完整性优先',true:'开启',false:'关闭'}[String(value)] || (value == null ? '未知' : typeof value==='object' ? JSON.stringify(value) : String(value)));
 export function configChanges(before:any,after:any){return [...new Set([...Object.keys(before || {}),...Object.keys(after || {})])].filter(key=>key in parameterNames && JSON.stringify(before?.[key])!==JSON.stringify(after?.[key])).map(key=>({key,label:parameterNames[key] || '其他配置',before:parameterValue(before?.[key]),after:parameterValue(after?.[key])}));}
 
 export function comparisonPoints(before:any,after:any,question:any={}):Point[] {
@@ -36,11 +36,11 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
     const characters=Array.from(cleaned),excerpt=/[\u4e00-\u9fff]{4}/.test(cleaned) && !/[={}\[\]]/.test(cleaned)?(characters.length>24?characters.slice(0,23).join('')+'…':cleaned):'关键说明';
     const {a,b}=pair;
     let movement:string;
-    if(expanded)movement=`Before Rerank 第 ${a.rerank_rank} 位，被 Top-K 截掉；After Rerank ${b.rerank_rank != null ? `第 ${b.rerank_rank} 位` : '位置未知'}，进入 Top-K 第 ${b.final_rank} 位`;
-    else if(recalled)movement=`Before没进候选，After${b.final_rank!=null?`进入 Top-K 第 ${b.final_rank} 位`:'进入候选'}`;
+    if(expanded)movement=`Before 重排 第 ${a.rerank_rank} 位，被 保留条数 截掉；After 重排 ${b.rerank_rank != null ? `第 ${b.rerank_rank} 位` : '位置未知'}，进入 保留条数 第 ${b.final_rank} 位`;
+    else if(recalled)movement=`Before没进候选，After${b.final_rank!=null?`进入 保留条数 第 ${b.final_rank} 位`:'进入候选'}`;
     else {
       const stage=a.final_rank!==b.final_rank?'final_rank':a.rerank_rank!==b.rerank_rank?'rerank_rank':'candidate_rank';
-      const label={final_rank:'进入回答的位置',rerank_rank:'Rerank 位置',candidate_rank:'候选位置'}[stage];
+      const label={final_rank:'进入回答的位置',rerank_rank:'重排 位置',candidate_rank:'候选位置'}[stage];
       const position=(rank:number|null|undefined)=>rank==null?(stage==='final_rank'?'未进入':'未知'):`第 ${rank} 位`;
       movement=`${label}：${position(a[stage])}→${position(b[stage])}`;
     }
@@ -51,8 +51,8 @@ export function explanation(before:any,after:any,beforeConfig:any,afterConfig:an
   const added = points.filter(point => point.fresh).map(point => String.fromCodePoint(0x2460 + point.number - 1)).join('、');
   const outcome = added ? `补上要点 ${added}` : '满足本题保存的判定要求';
   const headline = before?.passed === false && after?.passed === true
-    ? change && expanded ? `关键证据被截掉 → 放宽 Top-K 后进入上下文 → ${outcome}`
-      : change && recalled ? `关键证据未召回 → 扩大 Candidate K 后进入上下文 → ${outcome}`
+    ? change && expanded ? `关键证据被截掉 → 放宽 保留条数 后进入上下文 → ${outcome}`
+      : change && recalled ? `关键证据未召回 → 扩大 候选数 后进入上下文 → ${outcome}`
       : `判定未通过 → ${outcome}`
     : steps.map(step => step.text.replace(/^“.*?”：/, '')).join('；') || '保存记录未提供变化依据。';
   return {key:change ? key : undefined,steps,headline};

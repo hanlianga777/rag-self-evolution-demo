@@ -18,7 +18,7 @@ it('preloads every Golden row and the pool; filters and tabs reuse memory with m
  await act(async()=>root.render(<GovernancePage data={{workspace:{current_corpus_fingerprint:'fixture'},generationRuns:[{id:'G',status:'completed',profile:{expected_count:50},question_ids:rows.map(r=>r.id),artifacts:{}}],dataset:rows}}/>));
  expect(document.querySelectorAll('.review-table tbody tr')).toHaveLength(50);
  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,200));});
- const count=fetcher.mock.calls.length;
+ await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));const count=fetcher.mock.calls.length;
  for(const label of ['正向','消融','负向','机器合格','全部']){
   const button=[...document.querySelectorAll<HTMLButtonElement>('.review-filters button')].find(b=>b.textContent?.startsWith(label))!;
   await act(async()=>button.click());
@@ -59,7 +59,7 @@ it('preloads more than 200 rows, restarts changed versions, and scrolls only in 
  function List(){const list=usePagedCandidates('big','/api/governance/candidates?status=all');return <><p>{list.rows.length} saved</p><button onClick={list.loadMore}>more</button><ul>{list.rows.slice(0,list.visibleCount).map((r:any)=><li key={r.id}>{r.id}</li>)}</ul></>}
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<List/>));
  expect(document.querySelector('p')?.textContent).toBe('205 saved');expect(document.querySelectorAll('li')).toHaveLength(200);expect(document.body.textContent).not.toContain('v1-');
- const count=fetcher.mock.calls.length;await act(async()=>document.querySelector('button')!.click());expect(document.querySelectorAll('li')).toHaveLength(205);expect(fetcher).toHaveBeenCalledTimes(count);
+ await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));const count=fetcher.mock.calls.length;await act(async()=>document.querySelector('button')!.click());expect(document.querySelectorAll('li')).toHaveLength(205);expect(fetcher).toHaveBeenCalledTimes(count);
 });
 
 it('keeps a complete cached list visible during reentry and replaces it only on a new data_version',async()=>{
@@ -80,8 +80,8 @@ it('paginates more than 200 version and feedback records locally after all backe
  const fetcher=vi.fn(async(input:string)=>{const url=new URL(input),page=Number(url.searchParams.get('page') || 1),slice=(rows:any[])=>rows.slice((page-1)*50,page*50);return new Response(JSON.stringify(url.pathname==='/api/versions'?slice(versions):url.pathname==='/api/monitoring'?{events:slice(events),triggers:[]}:url.pathname==='/api/documents'?[]:{}));});vi.stubGlobal('fetch',fetcher);
  const release=await loadAppData(true,'versions'),feedback=await loadAppData(true,'verification');
  expect(release.versions).toHaveLength(205);expect((feedback.monitoring as any).events).toHaveLength(205);
- const count=fetcher.mock.calls.length;
- root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<VersionsPage data={release}/>));expect(document.querySelectorAll('tbody tr')).toHaveLength(200);expect([...document.querySelectorAll('button')].some(b=>b.textContent?.includes('查看全部'))).toBe(false);
+ await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));let count=fetcher.mock.calls.length;
+ root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<VersionsPage data={release}/>));count=fetcher.mock.calls.length;expect(document.querySelectorAll('tbody tr')).toHaveLength(200);expect([...document.querySelectorAll('button')].some(b=>b.textContent?.includes('查看全部'))).toBe(false);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('tbody tr')).toHaveLength(5);
  await act(async()=>root.render(<VerificationPage data={feedback} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>));await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Monitoring')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(200);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(5);expect(fetcher).toHaveBeenCalledTimes(count);
@@ -101,12 +101,12 @@ it('keeps open page details on an unchanged read version and replaces them after
 
 it('refreshes feedback when a new answer is saved, so opening its tab stays local',async()=>{
  const {VerificationPage}=await import('./pages/VerificationPage');location.hash='#verification?tab=qa';let answered=false;
- const fetcher=vi.fn(async(input:string)=>new Response(JSON.stringify(input.endsWith('/api/preview')?(answered=true,{baseline:{answer:'合成回答，未调用模型',sources:[]}}):{events:answered?[{id:'new',question:'新保存的合成问答'}]:[],triggers:[]})));vi.stubGlobal('fetch',fetcher);
+ const fetcher=vi.fn(async(input:string)=>input.endsWith('/api/preview/stream')?(answered=true,new Response('data: '+JSON.stringify({type:'done',result:{baseline:{answer:'合成回答，未调用模型',sources:[]}}})+'\n\n')):new Response(JSON.stringify({events:answered?[{id:'new',question:'新保存的合成问答'}]:[],triggers:[]})));vi.stubGlobal('fetch',fetcher);
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<VerificationPage data={{monitoring:{events:[],triggers:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>));
  const input=document.querySelector<HTMLInputElement>('[aria-label="向机器人知识库提问"]')!;
  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'新保存的合成问答');input.dispatchEvent(new Event('input',{bubbles:true}));});
  await act(async()=>document.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
- const count=fetcher.mock.calls.length;
+ await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));const count=fetcher.mock.calls.length;
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Monitoring')!.click());
  expect(document.querySelector('.monitoring-table')?.textContent).toContain('新保存的合成问答');expect(fetcher).toHaveBeenCalledTimes(count);
 });
@@ -124,7 +124,7 @@ it('refreshes the resident candidate pool after a saved quality change before sw
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='运行 QC')!.click());
  await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
  await act(async()=>document.querySelector<HTMLButtonElement>('.candidate-workspace [aria-label="关闭"]')!.click());
- const count=fetcher.mock.calls.length;
+ await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));const count=fetcher.mock.calls.length;
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='候选池')!.click());
  expect(document.querySelector('[aria-label="候选质量筛选"]')?.textContent).toContain('可用 1');expect(fetcher).toHaveBeenCalledTimes(count);
 });
@@ -139,7 +139,7 @@ it('keeps the complete comparison list when one prefetched case fails and retrie
  });vi.stubGlobal('fetch',fetcher);
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<SavedAnswerComparison data={{evaluation:{id:'base'},optimization:{recommendation:{recommended_candidate:'D'},candidates:[{id:'D',status:'evaluated',result:{evaluation_run_id:'after',total:2,evaluation_complete:true}}]}}} onOpenCitation={()=>{}}/>));
  expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(1);
- const count=fetcher.mock.calls.length;await act(async()=>document.querySelectorAll<HTMLButtonElement>('.comparison-seg button')[1].click());expect(document.querySelector('.comparison-qlist')?.textContent).toContain('需要重试的题目');expect(document.querySelector('[role=alert]')?.textContent).toContain('单题读取失败');expect(fetcher).toHaveBeenCalledTimes(count);expect(document.querySelector('.case-detail-skeleton')).toBeNull();
+ await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));const count=fetcher.mock.calls.length;await act(async()=>document.querySelectorAll<HTMLButtonElement>('.comparison-seg button')[1].click());expect(document.querySelector('.comparison-qlist')?.textContent).toContain('需要重试的题目');expect(document.querySelector('[role=alert]')?.textContent).toContain('单题读取失败');expect(fetcher).toHaveBeenCalledTimes(count);expect(document.querySelector('.case-detail-skeleton')).toBeNull();
  fail=false;await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重试本题')!.click());expect(document.querySelector('[role=alert]')).toBeNull();expect(document.querySelector('.comparison-answers')?.textContent).toContain('保存的回答');
 });
 
@@ -156,7 +156,7 @@ it('paginates the preloaded Before/After rail locally beyond 200 questions',asyn
  const rows=Array.from({length:205},(_,i)=>({question_id:`Q${i}`,question:`保存的问题${i}`,test_category:'positive'}));
  const fetcher=vi.fn(async(input:string)=>{const base=input.includes('/base/');return new Response(JSON.stringify(input.endsWith('/comparison-cases')?{id:base?'base':'after',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'same'},cases:rows.map(row=>({...row,passed:!base}))}:{status:'completed',case:{...rows.find(row=>input.endsWith('/'+row.question_id)),passed:!base,model_answer:'保存的回答'}}));});vi.stubGlobal('fetch',fetcher);
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<SavedAnswerComparison data={{evaluation:{id:'base'},optimization:{recommendation:{recommended_candidate:'D'},candidates:[{id:'D',status:'evaluated',result:{evaluation_run_id:'after',total:205,evaluation_complete:true}}]}}} onOpenCitation={()=>{}}/>));
- expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(200);const count=fetcher.mock.calls.length;
+ expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(200);await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));const count=fetcher.mock.calls.length;
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(5);expect(document.querySelector('.comparison-qhead')?.textContent).toContain('保存的问题200');expect(fetcher).toHaveBeenCalledTimes(count);
  await act(async()=>root.render(<SavedAnswerComparison questionId="Q201" data={{evaluation:{id:'base'},optimization:{recommendation:{recommended_candidate:'D'},candidates:[{id:'D',status:'evaluated',result:{evaluation_run_id:'after',total:205,evaluation_complete:true}}]}}} onOpenCitation={()=>{}}/>));expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(5);expect(document.querySelector('.comparison-qhead')?.textContent).toContain('保存的问题201');expect(fetcher).toHaveBeenCalledTimes(count);
 });
@@ -166,7 +166,7 @@ it('paginates regression cases locally and resets the page when severity changes
  const rows=Array.from({length:205},(_,i)=>({question_id:`Q${i}`,question:`Regression问题${i}`,severity:'ordinary',passed:false}));
  const fetcher=vi.fn(async()=>new Response(JSON.stringify({status:'completed',judge:{evaluation_identity:'same'},dataset_version_id:'golden',cases:rows})));vi.stubGlobal('fetch',fetcher);
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<CandidateCaseComparison baselineId="base" candidates={[{id:'C',status:'evaluated',result:{evaluation_run_id:'after',new_regression_question_ids:rows.map(row=>row.question_id),regression_review:{case_severities:Object.fromEntries(rows.map(row=>[row.question_id,'ordinary']))}}}]} kind="regression" onSelect={()=>{}}/>));
- expect(document.querySelectorAll('tbody tr')).toHaveLength(200);const count=fetcher.mock.calls.length;
+ expect(document.querySelectorAll('tbody tr')).toHaveLength(200);await act(async()=>new Promise(resolve=>setTimeout(resolve,200)));const count=fetcher.mock.calls.length;
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('tbody tr')).toHaveLength(5);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='普通')!.click());expect(document.querySelectorAll('tbody tr')).toHaveLength(200);expect(fetcher).toHaveBeenCalledTimes(count);
 });

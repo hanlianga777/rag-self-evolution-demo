@@ -31,7 +31,7 @@ it('presents ordered business cards without the retired technical audit and leav
   const item = { question_id: 'Q-test', question: '设备如何加水？', model_answer: '1. **等待停止**。 2. 检查水位。', reference_answer: '<p>自动停止 [C115]</p>', passed: false, primary_root_cause: 'Generation', failure_tags: ['Generation Failure'], diagnosis: { status: 'confirmed', reason: 'source_scope / claim_assessment.pending' }, diagnostic_view: { target_eligible: true }, judge_result: { correctness: 2, reason: '原始Judge' }, programmatic_metrics: { claim_assessment: { raw: '原始Matcher' }, retrieval_trace: { final: [] } } };
   const before = JSON.stringify(item);
   render(<BaselineCaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
-  expect([...document.querySelectorAll('.bad-case-details > section > h3')].map(el => el.textContent)).toEqual(['业务问题', '答案对比', '检索路径', '判分原文', '优化方向']);
+  expect([...document.querySelectorAll('.bad-case-details > section > h3')].map(el => el.textContent)).toEqual(['业务问题', '答案对比', '必答要点与检索路径', '优化方向']);
   expect([...document.querySelectorAll('.bad-case-details > section')].map(el => el.textContent).join('')).not.toContain('claim_assessment.pending');
   expect(JSON.stringify(item)).toBe(before);
 });
@@ -40,7 +40,7 @@ it('keeps FAIL as Bad Case while diagnosis remains part of Agent processing', ()
   const cards = document.querySelectorAll('.bad-case-details > section');
   expect(document.querySelector('.case-review')?.textContent).toContain('答错');expect(document.querySelector('.bad-case-details > details')).toBeNull();
   expect(cards[3].textContent).toContain('核验来源覆盖并提出优化假设');
-  expect(cards[2].textContent).toContain('历史冻结题卷未保存标准证据。');
+  expect(cards[2].textContent).toContain('本题未保存可对齐的逐要点判分，检索路径未知。');
 });
 it('formats mixed HTML and markdown lists and turns behavior enums into the saved business expectation', () => {
   render(<BaselineCaseDetails item={{ question_id: 'offline', reference_answer: 'safe_rejection', raw: { expected_response: '拒绝高压水枪；按说明书清洁。' }, model_answer: '<p>处理步骤：1. **停止使用**。 2. 查看第4.2章节和第40页 [C115]。</p>', diagnostic_view: {} }} snapshot={{}} config={{}} gates={[]} />);

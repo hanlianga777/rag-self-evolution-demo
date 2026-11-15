@@ -10,10 +10,10 @@ export const draftDefaults: Record<string, unknown> = { generation_thinking: "hi
 export function thinkingLabel(value: unknown): string {
   if (value && typeof value === "object") {
     const saved = value as { thinking?: { type?: string }; reasoning_effort?: string };
-    if (saved.thinking?.type === "disabled") return "OFF";
+    if (saved.thinking?.type === "disabled") return "关闭";
     return saved.thinking?.type === "enabled" ? thinkingLabel(saved.reasoning_effort) : "历史未知";
   }
-  const labels: Record<string, string> = { off: "OFF", low: "Low", high: "High", max: "Max" };
+  const labels: Record<string, string> = { off: "关闭", low: "低", high: "高", max: "最高" };
   return typeof value === "string" && labels[value] || "历史未知";
 }
 

@@ -27,7 +27,7 @@ it('computes category scores from saved verdicts and opens the same Bad Case det
  await mount(<OperationProvider restore={false}><EvaluationPage data={{evaluation:run,badCases:[]}}/></OperationProvider>);
  expect([...document.querySelectorAll('.ui-blb-val')].map(e=>e.textContent)).toEqual(['1 / 1','0 / 1','1 / 1']);
  expect(document.querySelector('.ui-blb-bads')?.textContent).toContain('消融原文');
- expect(document.querySelector('.ui-blb-layer')?.textContent).toBe('检索层');
+ expect(document.querySelector('.ui-blb-layer')?.textContent).toBe('检索层细分未知');
  await act(async()=>document.querySelector<HTMLButtonElement>('.ui-blb-bads button')!.click());
  expect(document.querySelector('.tabs .active')?.textContent).toBe('Baseline 报告');
  expect(document.querySelector('[role=dialog]')).not.toBeNull();

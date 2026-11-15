@@ -11,15 +11,15 @@ import { OperationProvider } from "./operation";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => { document.body.innerHTML = ""; localStorage.clear(); sessionStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-it("shows assistant waiting inline and renders a complete synchronous answer at once", async () => {
+it("shows assistant waiting inline and renders the streamed answer from a completion frame", async () => {
   let respond!: (value: Response) => void;
   vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => { respond = resolve; })));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><AssistantPage examples={[{label:"正常问答",question:"冻结正向示例"}]} badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} /></OperationProvider>));
   await act(async () => document.querySelector<HTMLButtonElement>(".empty-chat button")!.click());
-  expect(document.querySelector(".thinking-message")?.textContent).toContain("正在检索与回答生成");
+  expect(document.querySelector(".thinking-message")?.textContent).toContain("思考中…");
   expect(document.querySelector(".ui-run")).toBeNull();
-  await act(async () => respond(new Response(JSON.stringify({ baseline: { answer: "完整回答内容", sources: [], evidence: [] }, model: "DeepSeek", mode: "live" }), { status: 200 })));
+  await act(async () => respond(new Response('data: '+JSON.stringify({type:'done',result:{ baseline: { answer: "完整回答内容", sources: [], evidence: [] }, model: "DeepSeek", mode: "live" }})+'\n\n', { status: 200 })));
   expect(document.querySelector(".thinking-message")).toBeNull();
   expect(document.body.textContent).toContain("完整回答内容");
   expect(document.querySelector(".typing-cursor")).toBeNull();
@@ -54,9 +54,9 @@ it("restores Generation counters inline without creating partial candidates", as
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><GovernancePage data={{ generationRuns: [run], dataset: [] }} /></OperationProvider>));
   await openRetainedHistory();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
+  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);
   expect(document.querySelector(".run-summary")?.textContent).toContain("QC 跳过 7");
-  expect(document.querySelector(".run-summary")?.textContent).toContain("运行耗时");
+  expect(document.querySelector(".run-summary")?.textContent).toContain("已处理");
   expect(document.querySelectorAll(".review-table tbody button")).toHaveLength(0);
   expect(document.querySelector(".ui-run")).toBeNull();
   await act(async () => root.unmount());

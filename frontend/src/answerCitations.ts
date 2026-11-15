@@ -15,7 +15,7 @@ export function answerCitationDisplay(text: string, final: SavedSource[]) {
     }
   }
   let unverified=0, changed=false;
-  const displayed=text.replace(/\[(DOC-\d+-[CP]-\d+)(?:\s*[|｜][^\]\n]*)?\]|【(DOC-\d+-[CP]-\d+)(?:\s*[|｜][^】\n]*)?】/g, (_whole, square: string, corner: string) => {
+  const displayed=text.replace(/\[(DOC-\d+(?:-V\d+)?-[CP]-\d+)(?:\s*[|｜][^\]\n]*)?\]|【(DOC-\d+(?:-V\d+)?-[CP]-\d+)(?:\s*[|｜][^】\n]*)?】/g, (_whole, square: string, corner: string) => {
     changed=true;const values=labels.get(square || corner);
     if (values?.size === 1) return `[${[...values][0]}]`;
     unverified++;return '[引用来源未核验]';

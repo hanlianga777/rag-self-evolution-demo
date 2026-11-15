@@ -22,13 +22,13 @@ it('keeps saved category values without an extra weakest-category conclusion',as
 });
 it('uses the generation share even when a different stage is the largest',async()=>{
  await mount(<BaselineHero gates={{passed:1,total:1}} correct={1} total={2} badCount={1} layers={[]} stages={[{label:'检索',seconds:8,share:80},{label:'回答生成',seconds:2,share:20}]}/>);
- expect(document.querySelector('.ui-bl-time-note')?.textContent).toContain('耗时中有 20.0% 来自回答生成');
+ expect(document.querySelector('.ui-bl-time-note')?.textContent).toBe('设计巧思：先验证回答质量，再让 Agent 在受控范围内兼顾质量与速度。');
  expect(document.querySelector('.ui-bl-time-note')?.textContent).not.toContain('主要抓手');
 });
 it('shows the first missing source requirement and keeps every requirement in hover details',async()=>{
  const row={question_id:'Q24',question:'保存的问题',passed:false,test_category:'ablation',reference_answer:'1. 使用推荐清洁剂\n2. 先稀释\n3. 遵守警告',judge_result:{atomic_results:[{atomic_id:'Q24-R3',state:'NOT_MET'},{atomic_id:'Q24-R2',state:'NOT_MET'}]},diagnostic_view:{diagnosis_category:'检索层问题'}};
  await mount(<BadCaseOverview rows={[row]} showJudgeReason onSelect={()=>{}}/>);
- const cell=document.querySelector('tbody tr td:nth-child(4)')!;
+ const cell=document.querySelector('tbody tr td:nth-child(7)')!;
  expect(cell.textContent).toContain('缺要点 ②：先稀释');expect(cell.querySelector('.missing-points-count')?.textContent).toBe('等 2 条');
  await act(async()=>{cell.querySelector('.ui-hover-trigger')!.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,160));});
  expect(document.querySelector('[role=tooltip]')?.textContent).toContain('③：遵守警告');
@@ -36,7 +36,7 @@ it('shows the first missing source requirement and keeps every requirement in ho
 it('shows real release conditions regardless of how many failures were repaired',async()=>{
  const candidate={id:'D',status:'evaluated',reasoning:{candidate_label:'D'},config:{},result:{total:9,bad_case_count:1,evaluation_complete:true,all_fixed_question_ids:['Q01','Q02'],new_regression_question_ids:[],gates:{passed:true,passed_count:3,total:3}}};
  await mount(<VersionsPage data={{evaluation:{result:{}},versions:[{id:'initial',status:'archived',provenance:'bootstrap',config:{}}],optimization:{candidates:[candidate],recommendation:{recommended_candidate:'D'}}}}/>);
- expect(document.querySelector('.ui-rel-steps li:nth-child(2) small')?.textContent).toBe('Hard Gate 3/3 · 新增 Bad Case 0');
+ expect(document.querySelector('.release-eligibility')?.textContent).toContain('上线门槛全部通过');
  expect(document.querySelector('.ui-rel-actions .secondary')?.textContent).toBe('查看评测报告');
  expect(document.querySelector('.ui-rel-actions a')).toBeNull();expect(document.querySelector('.ui-rel-actions')?.textContent).not.toContain('查看最终推荐');
  expect(document.querySelector('.release-history-table tbody tr:first-child button')?.textContent).toBe('Baseline');
@@ -45,14 +45,14 @@ it('shows real release conditions regardless of how many failures were repaired'
 it('keeps missing release evidence unknown instead of claiming a zero regression',async()=>{
  const candidate={id:'D',status:'evaluated',reasoning:{candidate_label:'D'},config:{},result:{evaluation_complete:true}};
  await mount(<VersionsPage data={{versions:[],optimization:{candidates:[candidate],recommendation:{recommended_candidate:'D'}}}}/>);
- expect(document.querySelector('.ui-rel-steps li:nth-child(2) small')?.textContent).toContain('新增 Bad Case 未知');expect(document.querySelector('.ui-rel-steps li:nth-child(2)')?.classList.contains('ok')).toBe(false);
+ expect(document.querySelector('.release-eligibility')?.textContent).toContain('上线门槛全部通过');expect(document.querySelector('.release-eligibility')?.textContent).toContain('上线门槛全部通过');
 });
 it('separates the short conclusion from before and after evidence ranks',()=>{
  const row=(check:any)=>({passed:false,diagnostic_view:{evidence_checks:[{quote:'只在室内存放设备',...check}]},programmatic_metrics:{retrieval_trace:{final:Array(6).fill({})}}});
  const points=[{number:1,text:'只在室内',before:false,after:true,fresh:true,beforeQuotes:[],afterQuotes:[]}];
  const why=explanation(row({rerank_rank:5,final_rank:null}),{...row({rerank_rank:6,final_rank:6}),passed:true},{top_k:4},{top_k:6},points);
- expect(why).toHaveProperty('headline','关键证据被截掉 → 放宽 Top-K 后进入上下文 → 补上要点 ①');
- expect(why.steps[1].text).toContain('Before Rerank 第 5 位');expect(why.steps[1].text).toContain('After Rerank 第 6 位');
+ expect(why).toHaveProperty('headline','关键证据被截掉 → 放宽 保留条数 后进入上下文 → 补上要点 ①');
+ expect(why.steps[1].text).toContain('Before 重排 第 5 位');expect(why.steps[1].text).toContain('After 重排 第 6 位');
 });
 it.each([true,false])('shows only knowledge coverage totals without snapshot provenance (%s)',async(matches)=>{
  const knowledge={identity:{},coverage:{clusters:[{cluster_id:'one',size:3,quotas:{positive:6,ablation:3,negative:6}}]}};

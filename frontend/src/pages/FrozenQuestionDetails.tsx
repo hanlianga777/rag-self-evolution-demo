@@ -34,7 +34,7 @@ export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true,
   }
   const scenario = String(row.raw?.business_scenario || row.raw?.import_context?.scenario || "").trim();
   const sources = [...evidence, ...(row.raw?.business_requirements?.sources || []), ...(qc.qc_input_evidence || [])];
-  const readable = (text: string) => text.replace(/DOC-\d+-C-\d+/g, id => sourceLabel(sources.find((source: Candidate) => source.chunk_id === id) || {}));
+  const readable = (text:string) => text.replace(/DOC-\d+(?:-V\d+)?-C-\d+/g,id=>sourceLabel(sources.find((source:Candidate)=>source.chunk_id===id) || {})).replace(/conditional_checks|auxiliary_information|acceptable_equivalents|required_checks|source_chunk_ids|expected_behavior|prohibited/g,key=>({conditional_checks:'条件要点',auxiliary_information:'补充信息',acceptable_equivalents:'可接受的同义表达',required_checks:'必答要点',source_chunk_ids:'来源片段',expected_behavior:'预期行为',prohibited:'禁止项'}[key]!));
   const validityReason = readable(probe.question_validity_reason || (probePassed ? "题目与证据校验通过。" : displayText(probe.reason || "暂无")));
   const retrievalReason = readable(probe.retrieval_observation || (retrievalObservation ? "最终检索上下文证据未齐（P1 召回观察）。" : "暂无"));
   const requirements = row.raw?.business_requirements || {};

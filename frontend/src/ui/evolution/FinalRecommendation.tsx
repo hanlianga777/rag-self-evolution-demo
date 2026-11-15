@@ -26,7 +26,7 @@ export function FinalRecommendation({ chosen, runnerUp, baselineCorrect, reason,
       <div>
         <span className="ui-rel-k"><IconLabel name="recommend">最终推荐</IconLabel></span>
         <h2>{totalCandidates != null ? `${totalCandidates} 个 Candidate 中只有 ${qualifiedCount ?? 0} 个通过回归检查，最终推荐 ${chosen.name}` : chosen.name}</h2>
-        <p className="ui-fin-reason">{reason}</p>
+        <ol className="ui-fin-reason"><li>一、质量：答对 {cnt(chosen)}。{reason}</li><li>二、安全：{chosen.gateFailures.length?chosen.gateFailures.join('；'):chosen.gates?`上线门槛 ${chosen.gates.passed}/${chosen.gates.total}`:'未知'}。</li><li>三、速度：中位耗时 {sec(chosen.p50)}；最慢耗时 {sec(chosen.p99)}。</li><li>四、回归：新增严重 {chosen.regression?.new_critical_failures ?? '未知'}；新增一般 {chosen.regression?.new_ordinary_failures ?? '未知'}。</li></ol>
       </div>
       {onRelease && <button type="button" className="primary" onClick={onRelease}><Icon name="release" size={15} />{releaseLabel}</button>}
     </div>

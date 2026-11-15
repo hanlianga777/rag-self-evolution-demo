@@ -11,7 +11,7 @@ beforeEach(()=>{sessionStorage.clear();history.replaceState(null,'','#evolution'
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 async function mount(){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<EvolutionPage data={data}/>));}
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
-it.each([['candidates','comparison','Candidate 对比'],['sandbox','comparison','Candidate 对比'],['regression','review','回归与推荐'],['recommendation','review','回归与推荐']])('migrates legacy %s URL and saved selection to %s',async(old,next,label)=>{
+it.each([['candidates','route','进化路线'],['sandbox','route','进化路线'],['regression','review','回归与推荐'],['recommendation','review','回归与推荐']])('migrates legacy %s URL and saved selection to %s',async(old,next,label)=>{
  history.replaceState(null,'',`#evolution?tab=${old}`);await mount();
  expect(document.querySelector('.tabs .active')?.textContent).toBe(label);expect(location.hash).toBe(`#evolution?tab=${next}`);
  await act(async()=>{location.hash=`evolution?stage=${old}`;window.dispatchEvent(new HashChangeEvent('hashchange'));});
@@ -21,9 +21,9 @@ it.each([['candidates','comparison','Candidate 对比'],['sandbox','comparison',
 });
 it('keeps round cards, comparison metrics, candidate drawer and regression trace reachable in three tabs',async()=>{
  const before=JSON.stringify(data);await mount();
- expect([...document.querySelectorAll('.tabs button')].map(b=>b.textContent)).toEqual(['概览','进化路线','Candidate 对比','回归与推荐']);
+ expect([...document.querySelectorAll('.tabs button')].map(b=>b.textContent)).toEqual(['概览','进化路线','回归与推荐']);
  await click('进化路线');await click('Candidate D');expect(document.querySelectorAll('.d-story')).toHaveLength(1);
- await click('Candidate 对比');expect(document.querySelectorAll('.candidate-cards .candidate-card')).toHaveLength(3);expect(document.querySelector('.sandbox-core-table')).not.toBeNull();expect(document.querySelector('.d-story')).toBeNull();
+ await click('进化路线');await click('Round 1');expect(document.querySelectorAll('.candidate-cards .candidate-card')).toHaveLength(3);expect(document.querySelector('.sandbox-core-table')).not.toBeNull();expect(document.querySelector('.d-story')).toBeNull();
  await click('Round 1');expect(document.querySelector('.story-round-switch [aria-pressed=true]')?.textContent).toBe('Round 1');expect(document.querySelector('.candidate-card-header small')).toBeNull();
  expect(document.querySelector('.ui-ct-more')).toBeNull();expect(document.querySelector('.ui-ct')?.textContent).toContain('全部原 Bad Case 修好');expect(document.querySelector('.ui-ct')?.textContent).not.toContain('运行状态');
  await click('查看 Candidate 与完整报告');expect(document.querySelector('[role=dialog]')?.textContent).toContain('Candidate 详情');await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());

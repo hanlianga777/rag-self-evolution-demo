@@ -18,21 +18,21 @@ it.each([false,true])("keeps compact progress on overview and saved Sandbox and 
   expect(document.querySelector('details > summary')?.textContent).not.toBe("实验进度");
   for(const button of [...document.querySelectorAll<HTMLButtonElement>(".tabs button")]) {
     await act(async()=>button.click());
-    expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(4);
+    expect(document.querySelectorAll(".page-shell-header .tabs button")).toHaveLength(3);
     if(button.textContent === "概览")expect(document.querySelector(".ui-agent-stats")?.textContent).toContain("7/50");else expect(document.querySelector(".page-shell-header .ui-agent-stats")).toBeNull();
   }
-  const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "Candidate 对比")!;
+  const sandbox=[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(button => button.textContent === "进化路线")!;
   await act(async()=>sandbox.click());
-  expect(document.querySelector(".tabs button.active")?.textContent).toBe("Candidate 对比");
+  expect(document.querySelector(".tabs button.active")?.textContent).toBe("进化路线");
   expect(document.querySelector(".sandbox-core-table")?.textContent).toContain(paused?"已暂停 7/50":"运行中 7/50");
   expect((fetch as any).mock.calls.every(([,init]:any)=>!init?.method)).toBe(true);
 });
 it("removes repeated strategy fields and keeps one before/after parameter list",async()=>{
   await mount();
-  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(b=>b.textContent==="Candidate 对比")!.click());
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>(".tabs button")].find(b=>b.textContent==="进化路线")!.click());
   const card=document.querySelector(".candidate-card")!;
   expect(card.textContent).toContain("扩大候选范围");
   expect(card.querySelector(".candidate-field-content")?.textContent).toContain("检索召回增强");
-  expect([...card.querySelectorAll(".ui-field")].find(field=>field.querySelector(".ui-kicker")?.textContent==="改动参数")?.textContent).toContain("Top-K 4 → 8");
+  expect([...card.querySelectorAll(".ui-field")].find(field=>field.querySelector(".ui-kicker")?.textContent==="改动参数")?.textContent).toContain("保留条数 4 → 8");
   expect([...card.querySelectorAll(".field-label")].map(e=>e.textContent)).toEqual(["思路","改动参数","针对的题","预期效果","风险","结果"]);
 });

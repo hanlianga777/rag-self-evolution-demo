@@ -18,7 +18,7 @@ export function HardGateGrid({ summary, groups }: { summary?: string; groups: Ga
         return <section key={group.name} className="ui-hg-card" aria-label={group.name}>
           <header><h3><IconLabel name="gate">{group.name}</IconLabel></h3><span className={`ui-verdict ${passed === group.items.length ? "ok" : "bad"}`}>{passed} / {group.items.length} 通过</span></header>
           <ul>{group.items.map(item => <li key={`${item.label}:${item.english || ""}`}>
-            <span className="ui-hg-name"><span>{item.label} <small className="ui-hg-english">{item.english}</small></span>{item.description && <small className="ui-hg-description">{item.description}</small>}</span>
+            <span className="ui-hg-name"><span>{item.label} <small className="ui-hg-english">{item.english}</small></span>{item.description && <HoverCard content={item.description}><span className="term-info" tabIndex={0} aria-label={`${item.label}说明`}>i</span></HoverCard>}</span>
             <span className="ui-hg-bar" aria-hidden="true">
               {item.ratio != null && <i style={{ width: `${Math.max(0, Math.min(1, item.ratio)) * 100}%` }} className={item.pass ? "" : "bad"} />}
               {item.threshold != null && <b style={{ left: `${Math.max(0, Math.min(1, item.threshold)) * 100}%` }} />}

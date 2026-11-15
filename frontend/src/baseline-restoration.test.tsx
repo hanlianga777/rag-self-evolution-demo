@@ -17,10 +17,10 @@ it("restores compact Baseline summary without treating aggregate Gate success as
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("92.5");
   expect(document.querySelectorAll(".baseline-metrics > div")).toHaveLength(4);
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(th => th.textContent)).toEqual(["题号", "问题", "分类", "缺了什么", "严重程度", ""]);
+  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(th => th.textContent)).toEqual(["题号", "问题", "题型", "负向子类", "主题", "层级与细分", "缺了什么", "严重程度i", ""]);
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("Hallucination");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("业务问题");
-  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("记录缺失");
+  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("未知");
   expect(document.querySelector(".quality-audit")).toBeNull();
   expect(document.querySelector(".baseline-metrics")).toBeNull();
   expect(JSON.stringify(run)).toBe(frozen);
@@ -29,9 +29,9 @@ it("restores compact Baseline summary without treating aggregate Gate success as
 it("orders business evidence before diagnosis and preserves negative anchors and stored primary", async () => {
   await render(<CaseDetails item={{ question_id: "q", question: "业务问题", test_category: "negative", primary_root_cause: "Generation", model_answer: "回答", programmatic_metrics: { retrieval_trace: { candidates: [], final: [] }, evidence_coverage: { candidate_recall: { any_hit: false }, final_context: { any_hit: false }, diagnostic_basis: "保存的证据观察" } } }} snapshot={{ questions: [{ id: "q", acceptable_evidence: [{ source_chunk_ids: ["child"], evidence_key_points: ["业务材料锚点"] }] }] }} config={{}} gates={[]} />);
   const heads = [...document.querySelectorAll(".case-details > section > h3")].map(h => h.textContent);
-  expect(heads.indexOf("答案对比")).toBeLessThan(heads.indexOf("检索路径"));
-  expect(heads.indexOf("检索路径")).toBeLessThan(heads.indexOf("优化方向"));
-  expect(document.querySelectorAll(".case-details > section")[2].textContent).toContain("不适用（负向题（Negative）不定位标准证据）");
+  expect(heads.indexOf("答案对比")).toBeLessThan(heads.indexOf("必答要点与检索路径"));
+  expect(heads.indexOf("必答要点与检索路径")).toBeLessThan(heads.indexOf("优化方向"));
+  expect(document.querySelectorAll(".case-details > section")[2].textContent).toContain("不适用（负向题不定位标准证据）");
   expect(document.querySelectorAll(".evidence-path")).toHaveLength(0);
   expect(document.querySelector(".case-answer-stack")?.textContent).toContain("回答");
 });
@@ -50,14 +50,14 @@ it("offers a fresh versioned run for an incompatible partial baseline", async ()
   const run={id:"old",status:"partial",requires_policy_upgrade:true,result:{completed:3,total:50},dataset_snapshot:{question_ids:["q"]},cases:[]};
   vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url.endsWith("/api/bad-cases")?[]:run))));
   await render(<EvaluationPage data={{evaluation:run}}/>);
-  expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("重新评测 Baseline"))).toBe(true);
+  expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("新建 Baseline 评测"))).toBe(true);
 });
 
 it("also labels the historical completed baseline as a new-version rerun", async () => {
   const run={id:"old-completed",status:"completed",requires_policy_upgrade:true,result:{completed:50},dataset_snapshot:{question_ids:["q"]},cases:[]};
   vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url.endsWith("/api/bad-cases")?[]:run))));
   await render(<EvaluationPage data={{evaluation:run}}/>);
-  expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("重新评测 Baseline"))).toBe(true);
+  expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("新建 Baseline 评测"))).toBe(false);
 });
 
 it("keeps partial technical exceptions separate from business failures on all Baseline tabs", async () => {
@@ -65,10 +65,10 @@ it("keeps partial technical exceptions separate from business failures on all Ba
   vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url.endsWith("/api/bad-cases")?[]:run))));
   await render(<EvaluationPage data={{evaluation:run}}/>);
   expect(document.body.textContent).toContain("已完成 49 / 50");
-  expect(document.body.textContent).toContain("题目级技术异常 1（不计入 Bad Case）");
+  expect(document.body.textContent).toContain("评测尚不完整");
   expect(document.body.textContent).not.toContain("Baseline 群组Gate通过");
   for(const label of ["Hard Gate","Bad Case 诊断"]){
     await act(async()=>[...document.querySelectorAll<HTMLButtonElement>("button")].find(b=>b.textContent===label)!.click());
-    expect(document.body.textContent).toContain("题目级技术异常 1（不计入 Bad Case）");
+    expect(document.body.textContent).toContain("评测尚不完整");
   }
 });

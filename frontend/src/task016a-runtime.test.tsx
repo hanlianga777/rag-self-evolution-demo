@@ -102,7 +102,7 @@ it("shows scheduled D as queued and keeps configuration identifiers inside techn
   expect(document.querySelector(".price-pause-notice")?.textContent).toContain("已暂停，稍后自动继续");
   const planning = document.querySelector('.agent-overview')!;
   expect(planning.textContent).toContain("修复 1 题");
-  expect(planning.textContent).toContain("已有经完整评测验证的 Candidate");
+  expect(planning.textContent).toContain("最终方案尚未形成");
   expect(document.body.textContent).not.toContain("CONFIG-private");
   await click("进化路线");await click("Candidate D");
   expect(document.body.textContent).toContain("Candidate D · 排队中");

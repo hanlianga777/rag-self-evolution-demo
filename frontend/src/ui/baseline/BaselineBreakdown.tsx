@@ -9,7 +9,7 @@ import "../extra.css";
  * 右：6 个 Bad Case 一行一个（题号、题目一行浅灰、所在层），点击就地打开现有的题目抽屉。
  */
 export type CategoryScore = { label: string; correct: number; total: number };
-export type BaselineBadCase = { id: string; question?: string; layer: string };
+export type BaselineBadCase = { id: string; question?: string; layer: string; subtype?:string };
 
 export function BaselineBreakdown({ categories, badCases, onOpen }: { categories: CategoryScore[]; badCases: BaselineBadCase[]; onOpen?: (id: string) => void }) {
   return <div className="ui-blb">
@@ -27,13 +27,13 @@ export function BaselineBreakdown({ categories, badCases, onOpen }: { categories
       </ul>
     </section>
     <section className="ui-blb-card" aria-label="Bad Case">
-      <h3><IconLabel name="bad">{badCases.length} 个 Bad Case</IconLabel></h3>
+      <h3><IconLabel name="bad">Bad Case</IconLabel></h3>
       <ul className="ui-blb-bads">
         {badCases.map(item => <li key={item.id}>
           <button type="button" onClick={onOpen ? () => onOpen(item.id) : undefined} disabled={!onOpen} aria-label={`查看 ${item.id} 的诊断`}>
             <QuestionBadge id={item.id} tone="open" />
             <ClampText className="ui-blb-q" text={item.question ?? "题目未保存"} lines={1} hoverOnly />
-            <span className="ui-blb-layer">{item.layer}</span>
+            <span className="ui-blb-layer">{item.layer}<small>{item.subtype || "细分未知"}</small></span>
           </button>
         </li>)}
       </ul>

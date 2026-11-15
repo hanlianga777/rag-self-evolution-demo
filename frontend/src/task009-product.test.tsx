@@ -28,12 +28,12 @@ it('shows saved comparison columns, differences and excludes judge timing',async
  await mount(<ProductDiagnostics diagnostics={{objective_metrics:{stage_breakdown:[{stage:'generation',label:'回答生成',total_ms:100,share_percent:100},{stage:'judge',label:'判分',total_ms:900,share_percent:90}],recall_at_k:80},thinking_comparison:{columns,different_cases:[{question_id:'Q37',question:'缺少状态',diagnosis_category:'回答问题',results:{max:{passed:true},high:{passed:false}}}],note:'差异题已纳入本轮优化。'}}}/>);
  expect(document.querySelector('[aria-label="耗时拆解"]')).toBeNull();
  expect(document.querySelector('.product-objective-metrics .metric strong')?.textContent).toBe('80%');
- await click('查看对照');expect(document.querySelectorAll('.thinking-cards > .panel')).toHaveLength(3);await click('显示全部 1 项');expect(document.querySelector('.drawer')?.textContent).toContain('安全拒答率');expect(document.querySelector('.drawer')?.textContent).toContain('Q37');
+ await click('查看对照');expect(document.querySelectorAll('.thinking-cards > .panel')).toHaveLength(3);expect(document.querySelector('.thinking-gates tbody')).not.toBeNull();expect(document.querySelector('.drawer')?.textContent).toContain('安全拒答率');expect(document.querySelector('.drawer')?.textContent).toContain('Q37');
 });
 it('renders real strategy fields and explicitly leaves absent data empty',async()=>{
  await mount(<StrategyPresentation reasoning={{strategy_name:'「补齐召回」（检索优先）',core_idea:'覆盖漏掉的口语问法',adjustments:[{parameter:'top_k',baseline_value:4,candidate_value:6,expected_impact:'预计改善 Q04'}],risks:[{question_ids:['Q37'],metric:'latency_p50_seconds',reason:'保留更多内容可能更慢'}]}}/>);
  expect(document.body.textContent).toContain('预计改善 Q04');expect(document.body.textContent).toContain('保留更多内容可能更慢');
- await act(async()=>root.render(<StrategyPresentation reasoning={{hypothesis:'历史字段'}}/>));expect(document.body.textContent).toContain('尚未保存策略名');expect(document.body.textContent).not.toContain('历史字段');
+ await act(async()=>root.render(<StrategyPresentation reasoning={{hypothesis:'历史字段'}}/>));expect(document.body.textContent).toContain('尚未保存策略名');expect(document.body.textContent).toContain('历史字段');
 });
 it('keeps legacy prompt labels and promotes gate-blocking categories with saved latency',async()=>{
  expect(formatValue('Abstention')).toBe('谨慎拒答');expect(formatValue('Tiered')).toBe('分级回答');
@@ -50,7 +50,7 @@ it('sorts stages, folds tiny shares and uses seconds and plain comparison labels
  expect(timing.tiny.map(stage=>stage.stage)).toEqual(['tiny2','tiny1']);
  expect(document.querySelector('[aria-label="耗时拆解"]')).toBeNull();
  await click('查看对照');const dialog=document.querySelector('[role="dialog"]')!;
- expect(dialog.textContent).toContain('Max');expect(dialog.textContent).toContain('High · 当前回答档位');
+ expect(dialog.textContent).toContain('最高');expect(dialog.textContent).toContain('高 · 当前回答档位');
  expect(dialog.textContent).toContain('4.7 秒');expect(dialog.textContent).not.toContain('毫秒');
  expect(dialog.textContent).toContain('回答耗时 P99');expect(dialog.textContent).toContain('每题回答费用');
  expect(dialog.textContent).toContain('回答问题 · 澄清不足');

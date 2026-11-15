@@ -1,3 +1,5 @@
+import {useState} from 'react';
+import {CitationViewer} from './CitationViewer';
 import {Children, cloneElement, isValidElement, type ReactNode} from 'react';
 import {answerMarkup} from './CaseAnswer';
 import {finalEvidence, type Point} from './comparisonData';
@@ -26,6 +28,7 @@ export function citationText(answer:string,evidence:any[]) {
   const tail = String.raw`(?:[，,]?\s*${chapter})*(?:[，,]\s*[^\n。；;*《》]{1,48}?[，,]\s*(?=${page}))?(?:[，,]?\s*[（(]?${page}[）)]?)?`;
   const savedFiles=[...new Set<string>(evidence.map(item=>item.document || item.document_name).filter(Boolean))].map(name=>name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
   const pattern = new RegExp([
+    String.raw`\[[^\]\n]+第\s*\d+(?:[—–-]\d+)?\s*页[^\]\n]*\]`,
     String.raw`[（(](?:来源[：:]\s*)?(?:DOC-\d+\s*)?(?:《[^》]+》|${same}|“[^”]+”)(?:《[^》]+》|“[^”]+”|[^（）()\n])*[）)]`,
     String.raw`(?:DOC-\d+\s*)?《[^》]+》${tail}`,
     ...(savedFiles.length?[`(?:${savedFiles.join('|')})${tail}`]:[]),
@@ -66,11 +69,14 @@ export function citationText(answer:string,evidence:any[]) {
 }
 const plainQuote=(text:string)=>citationText(text,[]).text.replace(sourceToken,'').replace(/[（(]同上[^）)\n]*[）)]/g,'').replace(/\*\*|__|[*_`#>]|\s/g,'');
 
-export function ComparisonAnswer({row,points,side,onOpenCitation}:{row:any;points:Point[];side:'before'|'after';onOpenCitation:(citation:Citation)=>void}) {
+export function ComparisonAnswer({row,points,side,onOpenCitation}:{row:any;points:Point[];side:'before'|'after';onOpenCitation?:(citation:Citation)=>void}) {
+  const [citation,setCitation]=useState<Citation|null>(null);
+  const openCitation=onOpenCitation || setCitation;
   const final=finalEvidence(row),trace=row.programmatic_metrics?.retrieval_trace;
   const evidence=[...(final || []),...(row.retrieved_chunks || []),...(trace?.candidates || []),...(trace?.reranked || [])];
   const answer=(row.model_answer || '回答未保存').split(/\r?\n/).filter((line:string)=>!/^(?:证据边界|未确认条件)[：:]/.test(line.replace(/[*_#>]/g,'').trim())).join('\n');
   const display=citationText(answer,evidence),tree=answerMarkup(display.text);
+  if(!display.sources.length)for(const source of final || [])if(!display.sources.some(item=>item.document===(source.document || source.document_name) && item.page===source.page_start))display.sources.push({number:display.sources.length+1,document:source.document || source.document_name || '来源未记录',section:'',page:source.page_start,citation:source});
   const flatten=(node:ReactNode):string=>typeof node==='string' || typeof node==='number'?String(node):isValidElement<{children?:ReactNode}>(node)?flatten(node.props.children):Array.isArray(node)?node.map(flatten).join(''):'';
   const text=flatten(tree),indexes:number[]=[],characters:string[]=[];
   // Map normalized visible characters back to React text offsets, across bold/list nodes.
@@ -109,5 +115,5 @@ export function ComparisonAnswer({row,points,side,onOpenCitation}:{row:any;point
     if(!isValidElement<{children?:ReactNode;className?:string}>(node))return node;
     return cloneElement(node,{},decorate(node.props.children));
   }
-  return <><div className="comparison-body">{decorate(tree)}</div><footer className="comparison-sources"><div className="comparison-source-title">引用来源</div><ol>{display.sources.map(source=><li key={source.number}><sup className="comparison-cite">{source.number}</sup>{source.citation?<button onClick={()=>onOpenCitation({...source.citation,content_preview:source.citation.content || source.citation.content_preview,savedEvidence:true} as Citation)}>{readableSourceName(source.document)}{source.section && `，${source.section}`}{source.page!=null && `，第 ${source.page}${source.end?`–${source.end}`:''} 页`}</button>:<span>{readableSourceName(source.document)}{source.section && `，${source.section}`}{source.page!=null && `，第 ${source.page}${source.end?`–${source.end}`:''} 页`}（原文未保存）</span>}</li>)}</ol></footer></>;
+  return <><div className="comparison-body">{decorate(tree)}</div><footer className="comparison-sources"><div className="comparison-source-title">引用来源</div><ol>{display.sources.map(source=><li key={source.number}><sup className="comparison-cite">{source.number}</sup>{source.citation?<button onClick={()=>openCitation({...source.citation,page_start:source.page ?? source.citation.page_start,content_preview:source.citation.content || source.citation.content_preview,savedEvidence:true} as Citation)}>{readableSourceName(source.document)}{source.page!=null && ` · 第 ${source.page}${source.end?`–${source.end}`:''} 页`}</button>:<span>{readableSourceName(source.document)}{source.page!=null && ` · 第 ${source.page}${source.end?`–${source.end}`:''} 页`}（原文未保存）</span>}</li>)}</ol></footer>{!onOpenCitation && <CitationViewer citation={citation} onClose={()=>setCitation(null)}/>}</>;
 }

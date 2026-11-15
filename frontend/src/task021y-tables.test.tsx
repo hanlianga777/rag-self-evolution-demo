@@ -14,30 +14,15 @@ async function mount(node: React.ReactNode) {
   await act(async () => root.render(node));
 }
 
-it('uses saved API parameters in one knowledge chain and keeps the sample Child/Parent entry', async () => {
-  const sourceDocument = { id: 'doc', name: 'manual.pdf', pages: 12, chunks: 19, status: 'Indexed', parser: 'Parser A' };
-  const knowledge = { identity: { corpus_snapshot_id: 'saved' }, documents: 1, pages: 12,
-    target_config: { parser: 'Parser A', parser_mode: 'vlm', parent_tokens: 900, child_tokens: 240, overlap_tokens: 30, rerank_model: 'rank-A' },
-    coverage: { final_k: 3, method: 'saved-cluster-method', clusters: [] },
-    sample_children: [{ document_id: 'doc', chunk_id: 'child-1', parent_chunk_id: 'parent-1', section_path: '章节', chunk_text: 'saved Child'.repeat(30) }] };
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.includes('/api/documents/') ? { chunks: knowledge.sample_children, parents: [{ chunk_id: 'parent-1', chunk_text: 'saved Parent' }] } : { knowledge, index: { parent_count: 6, child_count: 19, indexed_count: 18, dimension: 768, embedding_model: 'embed-A' }, config: { hybrid_search: false, rerank: true } }))));
-  await mount(<KnowledgePage data={{ documents: [sourceDocument] }} />);
-  const chain = document.querySelector('[aria-label="知识处理链路"]');
-  expect(chain).not.toBeNull();
-  expect(chain?.textContent).toContain('1 份 · 12 页');
-  expect(chain?.textContent).toContain('900 Tokens');
-  expect(chain?.textContent).toContain('240 Tokens · 重叠 30');
-  expect(chain?.textContent).toContain('768');
-  expect(chain?.textContent).toContain('embed-A');
-  expect(chain?.textContent).toContain('saved-cluster-method');
-  expect(chain?.textContent).toContain('rank-A');
-  expect(chain?.textContent).not.toContain('Hybrid');
-  expect(document.querySelectorAll('.asset-card,.flow-step')).toHaveLength(0);
-  const sample = [...window.document.querySelectorAll('button')].find(button => button.textContent === '查看分块示例');
-  expect(sample).toBeDefined();
-  await act(async () => sample!.click());
-  expect(window.document.querySelector('[role="dialog"]')?.textContent).toContain('saved Parent');
-  expect((fetch as any).mock.calls.every(([, init]: any[]) => !init?.method || init.method === 'GET')).toBe(true);
+it('opens the three-column browser with saved Parent and Child without writes',async()=>{
+ const parent={chunk_id:'p',document_id:'doc',document_name:'manual.pdf',page_start:1,chunk_text:'saved Parent',children:[{chunk_id:'c',chunk_text:'Parent',page_start:1}]};
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('chunk-browser')?{documents:[{id:'doc',name:'manual.pdf'}],parents:[parent],questions:[]}:url.endsWith('chunk-diagnostics')?{parent_count:1,child_count:1}:{knowledge:{coverage:{clusters:[]}},index:{}}))));
+ await mount(<KnowledgePage data={{documents:[{id:"doc",name:"manual.pdf",category:"操作说明书"}]}}/>);
+ expect(document.querySelector('.ui-kf')?.textContent).not.toMatch(/\d/);
+ await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='分块浏览器')!.click());
+ expect(document.querySelector('.parent-verbatim')?.textContent).toContain('saved');expect(document.querySelector('.parent-verbatim mark')?.textContent).toContain('Parent');
+ expect(document.querySelectorAll('.chunk-browser-grid > section')).toHaveLength(3);
+ expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });
 
 it('keeps the implemented clustering default without inventing parser, retrieval or model selection', async () => {
@@ -46,8 +31,8 @@ it('keeps the implemented clustering default without inventing parser, retrieval
   const text = document.querySelector('[aria-label="知识处理链路"]')?.textContent;
   expect(text).toBeDefined();
   expect(text).not.toMatch(/MinerU|qwen3|Hybrid/);
-  expect(text).toContain('K-means 聚类');
-  expect(text).toContain('未记录');
+  expect(text).toContain('主题聚类');
+  expect(text).not.toMatch(/\d/);
 });
 
 it('opens a compact Golden row by clicking truncated text or pressing Enter while retaining saved fields', async () => {

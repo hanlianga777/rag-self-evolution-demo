@@ -14,20 +14,13 @@ beforeEach(() => { invalidateReads(); invalidateGolden(); history.replaceState(n
 afterEach(async () => { if (root) await act(async () => root.unmount()); document.body.innerHTML = ''; vi.unstubAllGlobals(); invalidateReads(); invalidateGolden(); });
 async function mount(node: React.ReactNode) { root = createRoot(document.body.appendChild(document.createElement('div'))); await act(async () => root.render(node)); }
 async function click(label: string) { await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent === label)!.click()); }
-it.each([true, false])('uses online configuration and opens a meaningful Child (preferred=%s)', async preferred => {
- const sourceDocument = { id: 'DOC-001', name: '说明书.pdf', product: 'KIRA B 50', parser: 'MinerU · VLM', status: 'Current' };
- const chunks = [{document_id:sourceDocument.id,chunk_id:'cover',chunk_text:'封面'}, {document_id:sourceDocument.id,chunk_id:'fallback',parent_chunk_id:'parent',section_path:'维护',chunk_text:'正文'.repeat(110)}, ...(preferred ? [{document_id:sourceDocument.id,chunk_id:'DOC-001-C-00180',parent_chunk_id:'parent',section_path:'存放',chunk_text:'只在室内存放设备'}] : [])];
- const knowledge = {identity:{corpus_snapshot_id:'corpus'},sample_children:[chunks[0]],coverage:{final_k:1,clusters:[{cluster_id:'T008',label:'机器人如何与环境通信？',size:3,quotas:{positive:2,ablation:1,negative:2}}]}};
- const saved = JSON.stringify(knowledge);
- vi.stubGlobal('fetch',vi.fn(async (url:string) => new Response(JSON.stringify(url.includes('/documents/') ? {chunks,parents:[{chunk_id:'parent',chunk_text:'保存的 Parent',chapter:'操作元件',subsections:['正面','清洁头','背面']}]} : url.includes('/clusters/') ? {} : {knowledge,index:{child_count:3},config:{candidate_k:8,top_k:2,generation_thinking:'max'},active_version:{config:{candidate_k:24,top_k:6,generation_thinking:'high',query_rewrite:true,multi_query:preferred?6:false,hyde:false,hybrid_search:true,rerank:true,min_score:0}}}))));
- location.hash='#knowledge?view=technical'; await mount(<KnowledgePage data={{documents:[sourceDocument]}}/>);
- expect(document.querySelector('.page-shell-header .tabs')).toBeNull();
- expect(document.querySelector('[aria-label="知识处理链路"]')?.textContent).toContain('离线入库'); expect(document.querySelector('[aria-label="知识处理链路"]')?.textContent).toContain('在线检索');
- const online=documentQuery('.ui-kf svg[role="img"]');expect(online).toContain('Candidate K 24');expect(online).toContain('Top-K 6');expect(online).toContain('Thinking High');expect(online).toContain('已启用 Query Rewrite');expect(online).not.toContain('Thinking Max');if(preferred)expect(online).toContain('Multi-Query 6 路');else expect(online).not.toContain('Multi-Query');
- expect(document.querySelector('.knowledge-coverage-counts')).toBeNull();expect([...document.querySelectorAll('.page-title .header-actions button')].map(b=>b.textContent)).toEqual(['新增文档','重建 Knowledge Pipeline']);expect(document.querySelector('.ui-kc-name')?.textContent).toBe('环境与遥控');expect(document.querySelector('.coverage-note')).toBeNull();
- expect(document.querySelector('details.knowledge-coverage')).toBeNull();expect(document.querySelector('.knowledge-coverage h2')?.textContent).toBe('知识主题覆盖');expect([...document.querySelectorAll('.knowledge-page tbody button.secondary.small')].some(b=>b.textContent==='查看')).toBe(true);
- await click('查看分块示例');expect(document.querySelector('.parent-context')?.textContent).toContain(preferred?'DOC-001-C-00180':'fallback');expect(document.querySelector('.parent-context')?.textContent).toContain('保存的 Parent');expect(document.querySelector('.parent-context')?.textContent).toContain('操作元件：正面、清洁头、背面');
- const info=documentQuery('.document-inspector .parameter-list');expect(info).toContain('产品KIRA B 50');expect(info).not.toMatch(/未记录|当前|Current|\/ 版本|\/ 索引/);expect(JSON.stringify(knowledge)).toBe(saved);
+it.each([true,false])('uses a generic flow and browses unchanged Child/Parent (extra child=%s)',async extra=>{
+ const parent={chunk_id:'p',document_id:'doc',document_name:'manual.pdf',page_start:1,chunk_text:'原文段落甲乙丙丁',children:[{chunk_id:'c',chunk_text:'甲乙',page_start:1},...(extra?[{chunk_id:'c2',chunk_text:'丙丁',page_start:1}]:[])]};const saved=JSON.stringify(parent);
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('chunk-browser')?{documents:[{id:'doc',name:'manual.pdf'}],parents:[parent],questions:[]}:url.endsWith('chunk-diagnostics')?{parent_count:1,child_count:parent.children.length}:{knowledge:{coverage:{clusters:[]}},index:{}}))));
+ await mount(<KnowledgePage data={{documents:[{id:'doc',name:'manual.pdf',category:'机器人说明书'}]}}/>);
+ expect(document.querySelector('.ui-kf')?.textContent).not.toMatch(/\d/);expect(document.querySelector('tbody')?.textContent).toContain('机器人说明书');
+ await click('分块浏览器');expect(document.querySelector('.parent-verbatim')?.textContent).toContain('原文段落');expect(document.querySelectorAll('.child-legend li')).toHaveLength(extra?2:1);expect(JSON.stringify(parent)).toBe(saved);
+ expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });
 function documentQuery(selector:string) { return document.querySelector(selector)?.textContent || ''; }
 it('hides Baseline presentation while preserving row data and detail actions',async()=>{
@@ -44,5 +37,5 @@ it('keeps history audit and all exports bound to the selected version',async()=>
  const rows=[...document.querySelectorAll('.snapshot-version-row')];expect(rows).toHaveLength(2);for(const r of rows)expect([...r.querySelectorAll('button')].map(b=>b.textContent)).toEqual(['查看']);
  await act(async()=>rows[1].querySelector<HTMLButtonElement>('button')!.click());expect(documentQuery('.snapshot-version-preview')).toContain('历史题');expect(document.querySelector('.snapshot-version-preview td.id')?.textContent).toBe('Q01');
  const links=[...document.querySelectorAll<HTMLAnchorElement>('.snapshot-history-toolbar a')];expect(links.map(a=>a.getAttribute('href'))).toEqual(['markdown','csv','json'].map(format=>expect.stringContaining(`/old/export?format=${format}`)));
- await click('查看审计');expect(fetcher.mock.calls.some(([url])=>url.endsWith('/generation-runs/old'))).toBe(true);expect(document.querySelector('[role="dialog"]')?.textContent).toContain('old');
+ expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);expect(document.querySelector('.snapshot-history-toolbar')?.textContent).toContain('导出');
 });

@@ -51,7 +51,7 @@ it('puts only the saved recommendation first, shows unmet checks, and keeps publ
  await mount(<VersionsPage data={{evaluation:baseline,versions:[{id:'v',status:'active',provenance:'bootstrap',config:{top_k:4}}],optimization:{candidates:[candidate(1,'A'),c],recommendation:{recommended_candidate:c.id},result:{report_confirmation:{winner_id:c.id}}}}}/>);
  expect(document.querySelector('.page-content .ui-rel h2')?.textContent).toBe('待发布 Candidate');
  expect(document.querySelector('.ui-rel')?.textContent).not.toContain('Round 1');
- expect(document.querySelector('.ui-rel')?.textContent).toContain('新增 Bad Case 1');
+ expect(document.querySelector('.ui-rel')?.textContent).toContain('新增 Bad Case1');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent==='确认发布')?.disabled).toBe(true);
 });
 it('keeps internal IDs, conclusion labels, English states and forbidden narratives off the story',()=>{
@@ -77,8 +77,8 @@ it('waits for a completed candidate before fetching its saved answers',async()=>
 it('switches historical rounds on both merged detailed tabs while preserving the expanded progress',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({}))));
  await mount(<EvolutionPage data={{evaluation:baseline,optimization:{id:'experiment',candidates:[candidate(1,'A'),candidate(3,'C',true)]}}}/>);
- for(const tab of ['Candidate 对比','回归与推荐']){
+ for(const tab of ['进化路线','回归与推荐']){
   await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===tab)!.click());
-  if(tab==='Candidate 对比'){await act(async()=>[...document.querySelectorAll('.story-round-switch button')].find(b=>b.textContent==='Round 1')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));expect(document.querySelector('.story-round-switch button[aria-pressed="true"]')?.textContent).toBe('Round 1');}else{expect(document.querySelector('.story-round-switch')).toBeNull();expect(document.querySelector('.regression-summary-table')?.textContent).toContain('R1-A');expect(document.querySelector('.regression-summary-table')?.textContent).toContain('R3-C');}expect(document.querySelector('.page-shell-header .ui-agent-stats')).toBeNull();
+  if(tab==='进化路线'){await act(async()=>[...document.querySelectorAll('.story-round-switch button')].find(b=>b.textContent==='Round 1')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));expect(document.querySelector('.story-round-switch button[aria-pressed="true"]')?.textContent).toBe('Round 1');}else{expect(document.querySelector('.story-round-switch')).toBeNull();expect(document.querySelector('.regression-summary-table')?.textContent).toContain('R1-A');expect(document.querySelector('.regression-summary-table')?.textContent).toContain('R3-C');}expect(document.querySelector('.page-shell-header .ui-agent-stats')).toBeNull();
  }
 });

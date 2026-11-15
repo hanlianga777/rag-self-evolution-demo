@@ -17,13 +17,9 @@ export type CandidateView = {
 export type RoundView = { round: number; candidates: CandidateView[]; summary: string; fastestId: string | null; thought?: string; lesson?: { text: string; source: string } };
 export type EvolutionModel = { rounds: RoundView[]; winnerId: string | null; d: CandidateView | null; budget: { used: number; max: number } | null };
 
-export const PARAM_LABELS: Record<string, string> = {
-  candidate_k: "Candidate K", top_k: "Top-K", generation_thinking: "Thinking", multi_query: "Multi-Query",
-  query_rewrite: "Query Rewrite", query_decompose: "Query Decompose", hyde: "HyDE", hybrid_search: "Hybrid Search",
-  hybrid_alpha: "向量权重", rerank: "Rerank", prompt_strategy: "回答策略", min_score: "最低相关分", retrieval_max_tokens: "Retrieval Max Tokens",
-};
+export const PARAM_LABELS:Record<string,string> = {"candidate_k": "候选数", "top_k": "保留条数", "min_score": "最低相关分", "hybrid_search": "混合检索", "hybrid_alpha": "语义检索权重", "generation_thinking": "思考档位", "query_decompose": "问题拆解", "retrieval_max_tokens": "资料总长度上限", "rerank": "重排序", "query_rewrite": "问题改写", "multi_query": "多路查询", "hyde": "假设答案检索", "metadata_filter": "元数据筛选", "alias_mapping": "别名映射", "prompt_strategy": "回答策略"};
 
-const THINKING: Record<string, string> = { off: "Off", low: "Low", medium: "Medium", high: "High", max: "Max" };
+const THINKING: Record<string, string> = { off: "关闭", low: "低", medium: "中", high: "高", max: "最高" };
 const STRATEGY: Record<string, string> = { Grounded: "有据生成", Tiered: "分级回答" };
 
 export function paramValue(key: string, value: unknown): string {

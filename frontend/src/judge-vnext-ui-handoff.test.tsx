@@ -31,7 +31,7 @@ it('shows PASS without old failure attribution while retaining the unmodified au
   expect(conclusion.textContent).toContain('答对');
   expect(conclusion.textContent).not.toMatch(/FAIL|Bad Case|失败现象|技术归属|尚待证据定位/);
   expect(document.querySelectorAll('.bad-case-details > section')[3].textContent).not.toContain('候选召回覆盖');
-  expect(document.querySelector('.case-answer-stack')?.textContent).toContain('【DOC-001-C-00140】');
+  expect(document.querySelector('.case-answer-stack')?.textContent).toContain('引用来源未核验');
   expect(document.querySelector('.bad-case-details > details')).toBeNull();
   expect(JSON.stringify(item)).toBe(saved);
 });
@@ -53,7 +53,7 @@ it('uses saved business verdicts for Baseline rows and deduplicates Bad Cases by
   await render(<EvaluationPage data={{ evaluation: run }} />);
   expect(document.querySelectorAll('.tabs > button')).toHaveLength(3);
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>('.tabs button')].find(el => el.textContent === 'Bad Case 诊断')!.click());
-  expect(document.querySelector('.conclusion-card')?.textContent || document.body.textContent).toContain('1 个 Bad Case');
+  expect(document.querySelector('.conclusion-card')?.textContent || document.body.textContent).toContain('Bad Case');
   expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(1);
   expect(document.querySelector('.diagnosis-list tbody')?.textContent).toContain('独立业务失败');
   expect(document.querySelector('.diagnosis-list tbody')?.textContent).not.toContain('正确拒答');

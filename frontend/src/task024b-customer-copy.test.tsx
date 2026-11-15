@@ -28,7 +28,7 @@ it('translates result and runtime codes while retaining professional names',()=>
   expect(displayText(code)).toBe(label);
   expect(renderToStaticMarkup(<Status value={code}/>)).toContain(label);
  }
- for(const word of ['Bad Case','Candidate','Winner','Hard Gate','Top-K','Rerank','P50','P99'])expect(displayText(word)).toBe(word);
+ for(const word of ['Bad Case','Candidate','Winner','Hard Gate','保留条数','Rerank','P50','P99'])expect(displayText(word)).toBe(word);
 });
 it('keeps the component architecture views after removing the duplicate knowledge diagram',()=>{
  for(const kind of ['business','technical'] as const){

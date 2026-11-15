@@ -1,4 +1,5 @@
-import { useState } from "react";
+import {RoundStrategy,RoundConclusion} from '../../components/RoundStrategy';
+import { Fragment, useEffect, useState } from "react";
 import { storyText } from "../../components/EvolutionStory";
 import { agentDisplayText } from "../../display";
 import type { ReactNode } from "react";
@@ -16,26 +17,25 @@ import type { CandidateView, EvolutionModel } from "./model";
  */
 export type BaselineView = { correct: number | null; total: number; badCases: { id: string; layer: string; question?: string }[] };
 
-export function EvolutionTimeline({ model, questionText, onOpen, children }: {
-  model: EvolutionModel; baseline?: BaselineView; questionText?: (id: string) => string | undefined;
+export function EvolutionTimeline({ model, experiment, sandbox, renderCandidate, onRoundChange, questionText, onOpen, children }: {
+  model: EvolutionModel; experiment?:any; renderCandidate?:(id:string)=>ReactNode; onRoundChange?:(round:number)=>void; sandbox?:(round:number)=>ReactNode; baseline?: BaselineView; questionText?: (id: string) => string | undefined;
   onOpen?: (candidateId: string) => void; onOpenDiagnosis?: () => void; children?: ReactNode;
 }) {
   const [selection, setSelection] = useState<number | "D">(1);
   const selected = model.rounds.some(round => round.round === selection) ? selection : selection === "D" ? "D" : model.rounds[0]?.round;
+  useEffect(()=>{if(typeof selected==='number')onRoundChange?.(selected);},[selected,onRoundChange]);
   return <section className="ui-evo" aria-label="进化路线">
     <div className="story-round-switch route-round-switch" role="group" aria-label="进化轮次">
-      {model.rounds.map(round => <button type="button" className="secondary" key={round.round} aria-pressed={selected === round.round} onClick={() => setSelection(round.round)}>Round {round.round}</button>)}
-      <button type="button" className="secondary" aria-pressed={selected === "D"} onClick={() => setSelection("D")}>Candidate D</button>
+      {model.rounds.map(round => <button type="button" className="secondary" key={round.round} aria-pressed={selected === round.round} onClick={event => {setSelection(round.round);onRoundChange?.(round.round);const scroll=event.currentTarget.closest<HTMLElement>(".page-content");if(scroll)scroll.scrollTop=0;}}>Round {round.round}</button>)}
+      <button type="button" className="secondary" aria-pressed={selected === "D"} onClick={event => {setSelection("D");const scroll=event.currentTarget.closest<HTMLElement>(".page-content");if(scroll)scroll.scrollTop=0;}}>Candidate D</button>
     </div>
 
+    {!model.rounds.length && <div><RoundStrategy experiment={experiment} round={1}/><p>候选方案尚未生成。</p><RoundConclusion experiment={experiment} round={1}/>{sandbox?.(1)}</div>}
     {model.rounds.filter(round => round.round === selected).map(round => <div className="ui-evo-round" key={round.round}>
       <div className="ui-evo-rail" aria-hidden="true"><span className={`ui-evo-dot${round.candidates.some(item => item.winner) ? " win" : ""}`} /></div>
       <div className="ui-evo-body">
-        <section className="agent-round-strategy" aria-label="本轮策略">
-          <h3>本轮策略</h3><p><strong>本轮思路：</strong>{round.thought ? storyText(round.thought) : "—"}</p>
-          {round.lesson ? <HoverCard content={<div style={{ whiteSpace: "pre-line", maxWidth: 520 }}>{round.lesson.source}</div>}><p className="ui-body-muted" tabIndex={0}>本轮经验：{round.lesson.text}</p></HoverCard> : <p className="ui-body-muted">本轮经验：—</p>}
-        </section>
-        <div className="ui-evo-cards">{round.candidates.map(item => <CandidateCard key={item.id} item={item} fastest={item.id === round.fastestId} questionText={questionText} onOpen={onOpen} />)}</div>
+        <RoundStrategy experiment={experiment} round={round.round}/>
+        <div className="ui-evo-cards candidate-cards">{round.candidates.map(item => renderCandidate?<Fragment key={item.id}>{renderCandidate(item.id)}</Fragment>:<CandidateCard key={item.id} item={item} fastest={item.id === round.fastestId} questionText={questionText} onOpen={onOpen}/>)}</div><RoundConclusion experiment={experiment} round={round.round}/>{sandbox?.(round.round)}
       </div>
     </div>)}
 
@@ -57,7 +57,7 @@ function CandidateCard({ item, fastest, questionText, onOpen }: { item: Candidat
       {item.efficiency && <span className="ui-evo-tag">效率方向</span>}
     </div>
     <div className="agent-design-intent"><strong>设计用意</strong><p>{item.intent ? storyText(item.intent) : "—"}</p></div>
-    <div className="ui-evo-params">{item.params.length ? item.params.map(param => <ParamChip key={param.key} label={param.label} from={param.from} to={param.to} />) : <span className="ui-evo-none">参数变化未保存</span>}</div>
+    <div className="ui-evo-params plain-parameter-diff">{item.params.length ? item.params.map(param => <div key={param.key}>{param.label}：{param.from} → {param.to}</div>) : <span className="ui-evo-none">参数变化未保存</span>}</div>
     <dl className="ui-evo-facts">
       <dt>修好</dt><dd><QuestionList items={item.fixed.map(id => ({ id, tone: "fixed" as QuestionTone, question: questionText?.(id) }))} /></dd>
       <dt>新增 Bad Case</dt><dd>{item.complete && item.newFailures === 0 ? "0" : <QuestionList items={item.broken.map(id => ({ id, tone: "broken" as QuestionTone, question: questionText?.(id), detail: "Baseline 答对 → 本 Candidate 答错" }))} />}</dd>

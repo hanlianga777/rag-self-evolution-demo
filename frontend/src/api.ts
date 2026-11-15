@@ -41,7 +41,7 @@ export function getJson<T>(path: string, fetcher: Fetcher = fetch): Promise<T> {
       // Mutable lists and running jobs always go to the server; retain completed detail records only.
       const record = value as any;
       const completed = record?.status === 'completed' && !record.candidates?.some((item:any)=>['running','queued'].includes(item.status)) && !['running','queued'].includes(record.result?.optimization_cycle?.status) && !['running','queued','scheduled','waiting'].includes(record.result?.composite_schedule?.status);
-      if (cache === readCache(fetcher) && ((/^\/api\/(evaluations|experiments)\/[^/?]+(?:\/comparison-cases|\/cases\/[^/?]+)?$/.test(path) && completed) || /^\/api\/(documents|knowledge\/clusters|knowledge\/slots|governance\/questions|bad-cases)\/[^/?]+$/.test(path))) {
+      if (cache === readCache(fetcher) && ((/^\/api\/(evaluations|experiments)\/[^/?]+(?:\/comparison-cases|\/cases\/[^/?]+)?$/.test(path) && completed) || /^\/api\/(documents|knowledge\/clusters|knowledge\/slots|governance\/questions|bad-cases)\/[^/?]+$/.test(path) || /^\/api\/knowledge\/chunk-(browser|diagnostics)$/.test(path))) {
         cache.values.delete(path);
         cache.values.set(path, { value, at: Date.now() });
         if (cache.values.size > 512) cache.values.delete(cache.values.keys().next().value!);

@@ -16,8 +16,8 @@ it("groups 9 candidates into 3 rounds and finds the winner and D", () => {
 
 it("shows parameter changes relative to the Baseline configuration", () => {
   const r3c = model.rounds[2].candidates[2];
-  expect(r3c.params.map(p => `${p.label} ${p.from} → ${p.to}`)).toEqual(["Candidate K 12 → 24", "Thinking Max → High"]);
-  expect(model.rounds[0].candidates[1].params[0]).toMatchObject({ label: "向量权重", from: "0.5", to: "0.3" });
+  expect(r3c.params.map(p => `${p.label} ${p.from} → ${p.to}`)).toEqual(["候选数 12 → 24", "思考档位 最高 → 高"]);
+  expect(model.rounds[0].candidates[1].params[0]).toMatchObject({ label: "语义检索权重", from: "0.5", to: "0.3" });
   expect(paramValue("multi_query", false)).toBe("关闭");
   expect(paramValue("prompt_strategy", "Tiered")).toBe("分级回答");
 });

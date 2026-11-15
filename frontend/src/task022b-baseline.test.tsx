@@ -35,7 +35,7 @@ it('maps saved gate values, thresholds and verdicts to cards while preserving mo
   expect(items[3].querySelector<HTMLElement>('.ui-hg-bar i')?.style.width).toBe('70%');
   expect(items[3].querySelector<HTMLElement>('.ui-hg-bar b')?.style.left).toBe('90%');
   await click(items[0]);
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('保存的公式');
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('门槛是什么');
   await click(document.querySelector('[aria-label="关闭"]')!);
   await act(async () => items[3].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('42.0 秒');
@@ -71,9 +71,9 @@ it('groups existing categories, filters the saved rows, resets to all and keeps 
   expect(onSelect).toHaveBeenCalledWith(rows[2]);
   await click(document.querySelector('.ui-bcl-all')!);
   expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(4);
-  expect([...document.querySelectorAll('thead th')].map(cell => cell.textContent)).toEqual(['题号', '问题', '分类', '缺了什么', '严重程度', '']);
-  expect(document.querySelector('.diagnosis-list td:nth-child(4) .ui-clamp')?.getAttribute('style')).toContain('-webkit-line-clamp: 2');
-  expect(document.querySelector('.diagnosis-list td:nth-child(5) .ui-verdict')?.textContent).toBe('严重');
+  expect([...document.querySelectorAll('thead th')].map(cell => cell.textContent)).toEqual(['题号', '问题', '题型', '负向子类', '主题', '层级与细分', '缺了什么', '严重程度i', '']);
+  expect(document.querySelector('.diagnosis-list td:nth-child(7) .ui-clamp')?.getAttribute('style')).toContain('-webkit-line-clamp: 2');
+  expect(document.querySelector('.diagnosis-list td:nth-child(8) .severity-label')?.textContent).toBe('严重');
 });
 
 it('keeps unknown cases in all and never declares missing or failing timing data within the gates', async () => {

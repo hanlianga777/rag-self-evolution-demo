@@ -29,7 +29,7 @@ export function BaselineHero({ gates, correct, total, badCount, layers, thinking
       <div className="ui-bl-bar" role="img" aria-label={sorted.map(item => `${item.label} ${pctOf(item)}`).join("，")}>
         {sorted.map((item, index) => <i key={item.label} className={index === 0 ? "top" : ""} style={{ flexGrow: item.seconds }} />)}
       </div>
-      <div className="ui-bl-legend">{sorted.map((item, index) => <span key={item.label} className={index === 0 ? "top" : ""}><i aria-hidden="true" />{item.label} <b className="ui-num">{pctOf(item)}</b></span>)}</div>{generation && <small className="ui-bl-time-note"><strong>设计巧思：</strong>在 Baseline 阶段将 Thinking 档位调至最高的 Max，让模型以最充分的推理能力走完整条 RAG 问答链路，先验证知识检索与证据组织足以支撑预期的回答质量；耗时中有 {pctOf(generation)} 来自回答生成，这也为后续由 Agent 在受控范围内尝试降档、兼顾质量与速度留出了空间。</small>}
+      <div className="ui-bl-legend">{sorted.map((item, index) => <span key={item.label} className={index === 0 ? "top" : ""}><i aria-hidden="true" />{item.label} <b className="ui-num">{pctOf(item)}</b></span>)}</div>{generation && <small className="ui-bl-time-note"><strong>设计巧思：</strong>先验证回答质量，再让 Agent 在受控范围内兼顾质量与速度。</small>}
     </div>}
   </section>;
 }

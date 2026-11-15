@@ -1,3 +1,4 @@
+import {streamResponse} from './preview-stream-test-fixture';
 // @vitest-environment jsdom
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -29,12 +30,12 @@ it("centres the actual published snapshot while a newer recommendation remains u
 
 it("shows only changed parameters on the release main screen and opens full configuration in a Drawer", async () => {
   await render(<VersionsPage data={{ versions: [production, { id: "baseline-v1", status: "archived", config: { prompt_strategy: "Grounded", rerank: false } }] }} />);
-  expect(document.querySelector(".ui-rel-changes")?.textContent).toContain("有据生成");
-  expect(document.querySelector(".ui-rel-changes")?.textContent).toContain("谨慎拒答");
-  expect(document.querySelector(".page-content")?.textContent).not.toContain("Rerank");
+  expect(document.querySelector(".release-diff")?.textContent).toContain("有据生成");
+  expect(document.querySelector(".release-diff")?.textContent).toContain("谨慎拒答");
+  expect(document.querySelector(".page-content")?.textContent).not.toContain("重排序");
   expect(document.querySelector(".release-panel-layout details")).toBeNull();
   await click("查看发布快照");
-  expect(document.querySelector(".drawer")?.textContent).toContain("Rerank");
+  expect(document.querySelector(".drawer")?.textContent).toContain("重排序");
   expect(document.querySelector(".drawer pre")).toBeNull();
 });
 
@@ -47,7 +48,7 @@ it("does not invent manual publication evidence for incomplete historical snapsh
 });
 
 it("keeps answer telemetry out of chat and preserves request metadata in the local saved record", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ baseline: { answer: "实际完整回答", evidence: [], sources: [], version: "PROD-audit", config: { prompt_strategy: "Abstention" }, latency_ms: 130, input_tokens: 41, output_tokens: 12, source: { provider_id: "internal-provider", corpus_fingerprint: "internal-corpus" } }, model: "internal-model", mode: "live", latency_ms: 130 }))));
+  vi.stubGlobal("fetch", vi.fn(async () => streamResponse({ baseline: { answer: "实际完整回答", evidence: [], sources: [], version: "PROD-audit", config: { prompt_strategy: "Abstention" }, latency_ms: 130, input_tokens: 41, output_tokens: 12, source: { provider_id: "internal-provider", corpus_fingerprint: "internal-corpus" } }, model: "internal-model", mode: "live", latency_ms: 130 })));
   await render(<AssistantPage examples={[{label:"正常问答",question:"冻结正向示例"}]} productionVersion="PROD-audit" isReleased badCases={[]} onOpenBadCase={() => {}} onOpenCitation={() => {}} onOpenDocument={() => {}} />);
   await act(async () => document.querySelector<HTMLButtonElement>(".empty-chat button")!.click());
   expect(document.querySelector(".message-list")?.textContent).toContain("实际完整回答");
@@ -70,8 +71,8 @@ it("orders verification tabs and reduces Monitoring to question, state, judgemen
   expect(document.querySelector(".monitoring-table")?.textContent).not.toContain("33 ms");
   expect(document.querySelector(".stage-stepper")).toBeNull();
   await act(async () => document.querySelector<HTMLButtonElement>(".monitoring-table tbody .text-button")!.click());
-  expect(document.querySelector(".drawer")?.textContent).toContain("PROD-source");
-  expect(document.querySelector(".drawer")?.textContent).toContain("33 ms");
+  expect(document.querySelector(".drawer")?.textContent).toContain("未单独采集引用正文");
+  expect(document.querySelector(".drawer .technical-record")).toBeNull();
 });
 
 it("requires human judgement and confirmation before starting only the linked Monitoring context", async () => {
@@ -87,7 +88,11 @@ it("requires human judgement and confirmation before starting only the linked Mo
   await click("Monitoring");
   expect(posts).toHaveLength(0);
   await click("Bad Case");
-  expect(posts[0]).toEqual({ url: expect.stringContaining("/api/monitoring/events/M1/assessment"), body: { bad_case: true, severity: "ordinary" } });
+  expect(posts).toHaveLength(0);
+  await act(async()=>{const field=document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Bad Case 原因"]')!;Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!.call(field,'引用依据不足');field.dispatchEvent(new Event('input',{bubbles:true}));});
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='保存 Bad Case 标注')!.click());
+  expect(posts[0]).toEqual({url:expect.stringContaining('/api/monitoring/events/M1/assessment'),body:{bad_case:true,severity:'ordinary',reason:'引用依据不足'}});
+  await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());
   await click("人工确认");
   expect(posts).toHaveLength(2);
   expect(posts[1].body).toEqual({ decision: "approved" });

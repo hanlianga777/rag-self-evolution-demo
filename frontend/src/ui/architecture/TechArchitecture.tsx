@@ -14,10 +14,10 @@ import "./architecture.css";
 
 type P = { title: string; icon: IconName; params: string[]; tip: string };
 const STEPS: P[] = [
-  { title: "查询理解", icon: "search", params: ["Query Rewrite", "Multi-Query", "HyDE"], tip: "把用户的口语问题变成更好检索的说法：改写成规范问法、生成几个互补问法，或先写一段假设答案再拿去检索。" },
-  { title: "检索召回", icon: "network", params: ["Candidate K", "Hybrid Search", "Embedding 权重"], tip: "先从知识库里多捞一些候选段落：向量检索看语义，BM25 看原词，两者按权重融合。" },
-  { title: "筛选排序", icon: "rerank", params: ["Rerank", "Top-K", "MinScore", "上下文容量"], tip: "用重排模型给候选段落重新打分排序，按最低分过滤，再把命中的小块换成所在的完整段落（Parent），取前 Top-K 段交给模型。" },
-  { title: "回答生成", icon: "cite", params: ["Prompt 策略", "Thinking 档位"], tip: "按回答策略组织答案：先结论、再步骤、安全警告在前，句末用角标标出处；Thinking 档位决定模型想多深。" },
+  { title: "查询理解", icon: "search", params: ["问题改写", "多路查询", "假设答案检索"], tip: "把用户的口语问题变成更好检索的说法：改写成规范问法、生成几个互补问法，或先写一段假设答案再拿去检索。" },
+  { title: "检索召回", icon: "network", params: ["候选数", "混合检索", "Embedding 权重"], tip: "先从知识库里多捞一些候选段落：向量检索看语义，BM25 看原词，两者按权重融合。" },
+  { title: "筛选排序", icon: "rerank", params: ["重排序", "保留条数", "最低相关分", "上下文容量"], tip: "用重排模型给候选段落重新打分排序，按最低分过滤，再把命中的小块换成所在的完整段落（Parent），取前 保留条数 段交给模型。" },
+  { title: "回答生成", icon: "cite", params: ["回答策略", "思考档位"], tip: "按回答策略组织答案：先结论、再步骤、安全警告在前，句末用角标标出处；思考档位决定模型想多深。" },
 ];
 
 type M = { title: string; vendor: string; line: string; tip: string; icon: IconName };
@@ -30,7 +30,7 @@ const MODEL_GROUPS: { name: string; items: M[] }[] = [
     { title: "qwen3-rerank", vendor: "阿里云百炼", icon: "rerank", line: "候选段落重排", tip: "通义千问的重排模型：把问题和每个候选段落成对打分再排序，比只看向量相似度更准，能把真正相关的段落排到前面。" },
   ] },
   { name: "生成模型", items: [
-    { title: "DeepSeek", vendor: "深度求索", icon: "model", line: "改写、HyDE、回答", tip: "深度求索（DeepSeek）的对话模型，负责查询改写、HyDE、多路查询和最终回答。中文表达好，可以调节思考档位，价格低，适合需要反复评测的场景。" },
+    { title: "DeepSeek", vendor: "深度求索", icon: "model", line: "改写、假设答案检索、回答", tip: "深度求索（DeepSeek）的对话模型，负责查询改写、假设答案检索、多路查询和最终回答。中文表达好，可以调节思考档位，价格低，适合需要反复评测的场景。" },
   ] },
   { name: "评测模型", items: [
     { title: "DeepSeek", vendor: "深度求索", icon: "correct", line: "LLM-as-Judge 判分", tip: "LLM-as-Judge：拿每道题的必答要点和证据原文，对照回答打分（答对程度、要点覆盖、是否忠于证据、有无安全问题）。演示阶段和生成模型同一家族；生产环境建议换成独立模型，并加人工抽检。" },

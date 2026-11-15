@@ -10,7 +10,7 @@ import { CandidateWorkspace } from "./pages/CandidateWorkspace";
 import { OperationProvider } from "./operation";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-const tableValue=(label:string)=>{const index=[...document.querySelectorAll(".review-table th")].findIndex(e=>e.textContent===label);return document.querySelector(`.review-table tbody td:nth-child(${index+1})`)?.textContent;};
+const tableValue=(label:string)=>{const index=[...document.querySelectorAll(".review-table th")].findIndex(e=>e.firstChild?.textContent===label);return document.querySelector(`.review-table tbody td:nth-child(${index+1})`)?.textContent;};
 afterEach(() => { invalidateGolden(); document.body.innerHTML = ""; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("shows frozen reanchored evidence and the saved recall diagnosis", async () => {
@@ -306,7 +306,7 @@ it("restores a running generation and reads persisted slot progress", async () =
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [{ id: "GGEN-live", status: "queued", question_ids: [], artifacts: {} }], dataset: [] }} />); });
   expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("/api/governance/generation-runs/GGEN-live"), expect.objectContaining({ signal: expect.any(AbortSignal) }));
   await openRetainedHistory();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
+  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);
   expect(document.body.textContent).toContain("Q03");
   expect(document.body.textContent).toContain("已处理 2/20 · 10%");
   expect((([...document.querySelectorAll("button")].find(button => button.textContent === "新建测试集")) as HTMLButtonElement).disabled).toBe(true);
@@ -319,7 +319,7 @@ it("shows the current automatic refill round and remaining slots", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ generationRuns: [run], dataset: [] }} />));
   await openRetainedHistory();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
+  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);
   expect(document.querySelector(".generation-progress")?.textContent).toContain("Round 2/3 · 剩余 6 道");
   await act(async () => root.unmount());
 });
@@ -362,7 +362,7 @@ it("shows persisted quality rerun progress and resumes polling after refresh", a
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<GovernancePage data={{ generationRuns: [run], dataset: questions }} />); });
   await openRetainedHistory();
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
+  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='查看审计')).toBe(false);
   expect(document.body.textContent).toContain("4 / 20");
   expect(document.body.textContent).toContain("运行中");
   expect([...document.querySelectorAll("button")].some(button => button.textContent === "批量重跑异常项")).toBe(false);

@@ -1,12 +1,11 @@
-import {answerLatency, answerParts, chatSources, secondsText} from "../components/chatPresentation";
-import {readableSourceName} from "../components/ComparisonAnswer";
+import {answerLatency, secondsText} from "../components/chatPresentation";
 import { TruncatedText } from "../components/Primitives";
 import { CaseAnswer } from "../components/CaseAnswer";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageCirclePlus, Send, Trash2 } from "lucide-react";
 import { readSession, writeSession } from "../session";
 import { ConfirmDialog } from "../components/Dialog";
-import { postJson } from "../api";
+import {previewStream} from "../previewStream";
 import { isConversation, loadConversations, saveConversations } from "../conversations";
 import type { ChatMessage, Citation, Conversation } from "../types";
 
@@ -30,6 +29,9 @@ export function AssistantPage({ examples = [], examplesLoading = false, examples
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [streamText,setStreamText]=useState("");
+  const follow=useRef(true),abort=useRef<AbortController>();
+  useEffect(()=>()=>abort.current?.abort(),[]);
   const [thinkingStartedAt, setThinkingStartedAt] = useState<number>();
   const messageListRef = useRef<HTMLDivElement>(null);
   const active = useMemo(() => conversations.find(item => item.id === activeId) || blankConversation, [activeId, blankConversation, conversations]);
@@ -40,7 +42,7 @@ export function AssistantPage({ examples = [], examplesLoading = false, examples
     if (typeof list.scrollTo === "function") list.scrollTo({ top: list.scrollHeight, behavior });
     else list.scrollTop = list.scrollHeight;
   }, []);
-  useEffect(() => { scrollMessages("smooth"); }, [active.id, active.messages.length, busy, scrollMessages]);
+  useEffect(() => { if(follow.current)scrollMessages("auto"); }, [active.id, active.messages.length, busy, streamText, scrollMessages]);
   useEffect(() => { saveConversations(conversations); }, [conversations]);
   const updateConversation = (conversationId: string, change: (conversation: Conversation) => Conversation) => setConversations(current => current.map(item => item.id === conversationId ? change(item) : item));
   const create = () => { setBlankConversation(newConversation()); setActiveId(undefined); setDraft(""); setError(""); setNotice(""); };
@@ -55,18 +57,28 @@ export function AssistantPage({ examples = [], examplesLoading = false, examples
     const user: ChatMessage = { id: id("user"), role: "user", content: question, createdAt: now() };
     const ticket = ++requestId.current;
     const requestStartedAt = Date.now();
-    setBusy(true); setThinkingStartedAt(requestStartedAt); setError(""); setNotice("");
+    setBusy(true); setStreamText(""); follow.current=true; setThinkingStartedAt(requestStartedAt); setError(""); setNotice("");
     const started = { ...active, title: active.messages.length ? active.title : question.slice(0, 18), updatedAt: user.createdAt, messages: [...active.messages, user] };
     if (activeId) updateConversation(active.id, () => started); else { setConversations(current => [started, ...current]); setActiveId(started.id); }
     setDraft("");
     try {
-      const result: any = await postJson("/api/preview", { question });
+      abort.current=new AbortController();
+      const result:any=await previewStream(question,async frame=>{
+        if(ticket!==requestId.current)return;
+        if(frame.type==='reset'){setStreamText('');return;}
+        for(const character of frame.text || ''){
+          if(ticket!==requestId.current)return;
+          setThinkingStartedAt(undefined);setStreamText(text=>text+character);
+          await new Promise(resolve=>window.setTimeout(resolve,8));
+        }
+      },abort.current.signal);
+      setStreamText('');
       if (ticket !== requestId.current) return;
       const assistant: ChatMessage = { id: id("assistant"), role: "assistant", content: result.baseline.answer, question, createdAt: now(), mode: result.mode, model: result.model, latencyMs: typeof result.latency_ms === "number" ? result.latency_ms : null, fallbackReason: result.fallback_reason, sources: result.baseline.sources, evidence: result.baseline.evidence, metrics: result.baseline };
       updateConversation(started.id, conversation => ({ ...conversation, updatedAt: assistant.createdAt, messages: [...conversation.messages, assistant] }));
       onAnswered?.();
     } catch (reason) { if (ticket === requestId.current) setError(reason instanceof Error ? reason.message : "请求失败，请重试"); }
-    finally { if (ticket === requestId.current) { setBusy(false); setThinkingStartedAt(undefined); } }
+    finally { if (ticket === requestId.current) { setBusy(false); setStreamText(""); setThinkingStartedAt(undefined); } }
   };
   const submit = (event: FormEvent) => { event.preventDefault(); void ask(draft); };
   const submitClue = (message: ChatMessage) => {
@@ -77,20 +89,17 @@ export function AssistantPage({ examples = [], examplesLoading = false, examples
     else setNotice("线索已保存在本机；需人工标注后才可纳入黄金数据集。当前不会生成根因或优化结论。");
   };
 
-  return <div className="page assistant-page"><div className="assistant-workspace"><aside className="conversation-sidebar" aria-label="会话列表"><button className="secondary new-conversation" onClick={create}><MessageCirclePlus size={15} />新建对话</button><div className="conversation-list">{conversations.map(conversation => <div className={`conversation-item ${conversation.id === activeId ? "selected" : ""}`} key={conversation.id}><button onClick={() => { setActiveId(conversation.id); setError(""); setNotice(""); }}><TruncatedText lines={1} hoverOnly>{conversation.title}</TruncatedText><span>{conversation.messages.length} 条消息</span></button><button className="icon-button conversation-delete quiet-danger" aria-label={`删除会话 ${conversation.title}`} onClick={() => remove(conversation.id)}><Trash2 size={13} /></button></div>)}</div></aside><section className="chat-panel" aria-label="当前对话"><div className="chat-header"><div>对话</div><button className="text-button quiet-danger" onClick={() => setClearConfirm(true)}>清空本机记录</button></div><div className={active.messages.length ? "message-list" : "message-list is-empty"} ref={messageListRef}>{active.messages.length ? active.messages.map(message => <Message key={message.id} message={message} onOpenCitation={onOpenCitation} onOpenDocument={onOpenDocument} onSubmitClue={submitClue} />) : <div className="empty-chat"><p className="chat-guide">{isReleased ? "向线上版本提问" : "向当前配置提问"} · 回答会附出处，可点开说明书原页</p><div className="chat-examples">{["正常问答", "应拒答 / 安全", "需要追问"].map(label => {
+  return <div className="page assistant-page"><div className="assistant-workspace"><aside className="conversation-sidebar" aria-label="会话列表"><button className="secondary new-conversation" onClick={create}><MessageCirclePlus size={15} />新建对话</button><div className="conversation-list">{conversations.map(conversation => <div className={`conversation-item ${conversation.id === activeId ? "selected" : ""}`} key={conversation.id}><button onClick={() => { setActiveId(conversation.id); setError(""); setNotice(""); }}><TruncatedText lines={1} hoverOnly>{conversation.title}</TruncatedText><span>{conversation.messages.length} 条消息</span></button><button className="icon-button conversation-delete quiet-danger" aria-label={`删除会话 ${conversation.title}`} onClick={() => remove(conversation.id)}><Trash2 size={13} /></button></div>)}</div></aside><section className="chat-panel" aria-label="当前对话"><div className="chat-header"><div>对话</div><button className="text-button quiet-danger" onClick={() => setClearConfirm(true)}>清空本机记录</button></div><div className={active.messages.length ? "message-list" : "message-list is-empty"} ref={messageListRef} onScroll={event=>{const list=event.currentTarget;follow.current=list.scrollHeight-list.scrollTop-list.clientHeight<40;}}>{active.messages.length ? active.messages.map(message => <Message key={message.id} message={message} onOpenCitation={onOpenCitation} onOpenDocument={onOpenDocument} onSubmitClue={submitClue} />) : <div className="empty-chat"><div className="chat-examples">{["正常问答", "应拒答 / 安全", "需要追问"].map(label => {
       const question = examples.find(item => item.label === label)?.question;
       return <button className="chat-example" key={label} disabled={!question || busy} onClick={() => question && void ask(question)}><span>{label}</span><strong>{question || (examplesLoading ? <span className="chat-example-skeleton" role="status" aria-label="正在读取示例"><span /><span /></span> : null)}</strong></button>;
-    })}</div>{examplesFailed && <p className="chat-examples-unavailable">示例暂时读不到，可直接输入问题</p>}</div>}{busy && thinkingStartedAt && <Thinking startedAt={thinkingStartedAt} />}{notice && <p className="notice" role="status">{notice}</p>}{error && <p className="error-notice" role="alert">回答失败：{error}。请重试。</p>}</div><form className="chat-composer" onSubmit={submit}><input aria-label="向机器人知识库提问" placeholder="请输入你的问题…" maxLength={1000} value={draft} onChange={event => setDraft(event.target.value)} /><button className="primary" disabled={busy || !draft.trim()}>{busy ? "正在回答…" : <><Send size={15} />发送</>}</button></form></section></div><ConfirmDialog danger open={clearConfirm} onOpenChange={setClearConfirm} title="确认清空本机记录" onConfirm={() => { clear(); setClearConfirm(false); }}><p>将清空本机保存的全部会话。</p></ConfirmDialog></div>;
+    })}</div>{examplesFailed && <p className="chat-examples-unavailable">示例暂时读不到，可直接输入问题</p>}</div>}{busy && streamText && <article className="chat-message assistant"><div className="message-label"><span>AI 助手</span></div><CaseAnswer text={streamText} final={[]}/></article>}{busy && thinkingStartedAt && <Thinking />}{notice && <p className="notice" role="status">{notice}</p>}{error && <p className="error-notice" role="alert">回答失败：{error}。请重试。</p>}</div><form className="chat-composer" onSubmit={submit}><input aria-label="向机器人知识库提问" placeholder="请输入你的问题…" maxLength={1000} value={draft} onChange={event => setDraft(event.target.value)} /><button className="primary" disabled={busy || !draft.trim()}>{busy ? "正在回答…" : <><Send size={15} />发送</>}</button></form></section></div><ConfirmDialog danger open={clearConfirm} onOpenChange={setClearConfirm} title="确认清空本机记录" onConfirm={() => { clear(); setClearConfirm(false); }}><p>将清空本机保存的全部会话。</p></ConfirmDialog></div>;
 }
 
-function Thinking({ startedAt }: { startedAt: number }) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => { const timer = window.setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 100); return () => window.clearInterval(timer); }, [startedAt]);
-  return <article className="chat-message assistant thinking-message" aria-live="polite"><div className="message-label"><span>AI助手</span></div><p>正在检索与回答生成 · {elapsed.toFixed(1)}s<span className="thinking-dots" aria-hidden="true">...</span></p></article>;
+function Thinking() {
+  return <article className="chat-message assistant thinking-message" aria-live="polite"><div className="message-label"><span>AI 助手</span></div><p>思考中…<span className="thinking-dots" aria-hidden="true">...</span></p></article>;
 }
 
 function Message({ message, onOpenCitation, onOpenDocument, onSubmitClue }: { message: ChatMessage; onOpenCitation: (citation: Citation) => void; onOpenDocument: (name: string) => void; onSubmitClue: (message: ChatMessage) => void }) {
   if (message.role === "user") return <article className="chat-message user"><p>{message.content}</p></article>;
-  const {body,basis}=answerParts(message.content), sources=chatSources(message);
-  return <article className="chat-message assistant"><div className="message-label"><span>AI 助手</span><span className="qa-latency">{secondsText(answerLatency(message))}</span></div><div className="answer-text"><CaseAnswer text={body} final={(message.metrics?.retrieval_trace as any)?.final ?? message.evidence ?? []}/></div>{(basis || sources.length > 0) && <div className="message-sources">{basis && <p className="qa-basis">{basis}</p>}{sources.length > 0 && <><div className="comparison-source-title">引用来源</div><ol>{sources.map((source,index) => <li key={`${source.document}:${source.page}`}><span className="qa-source-number">{index+1}</span><button className="document-link" onClick={() => source.citation ? onOpenCitation(source.citation) : onOpenDocument(source.document)}>{readableSourceName(source.document)}{source.page != null && `，第 ${source.page} 页`}</button></li>)}</ol></>}</div>}<div className="qa-answer-actions">{message.improvementClue ? <span className="clue-confirmation">{message.improvementClue.badCaseId ? "已打开预置问题案例证据。" : "已提交本机优化线索，等待人工标注。"}</span> : <button className="primary small clue-button" onClick={() => onSubmitClue(message)}>提交优化线索</button>}</div></article>;
+  return <article className="chat-message assistant"><div className="message-label"><span>AI 助手</span><span className="qa-latency">{secondsText(answerLatency(message))}</span></div><div className="answer-text"><CaseAnswer text={message.content} final={(message.metrics?.retrieval_trace as any)?.final ?? message.evidence ?? []} onOpenCitation={onOpenCitation}/></div><div className="qa-answer-actions">{message.improvementClue ? <span className="clue-confirmation">{message.improvementClue.badCaseId ? "已打开预置问题案例证据。" : "已提交本机优化线索，等待人工标注。"}</span> : <button className="primary small clue-button" onClick={() => onSubmitClue(message)}>提交优化线索</button>}</div></article>;
 }
