@@ -27,8 +27,8 @@ export function PageSamples() {
   const model = buildEvolutionModel(sampleExperiment, sampleBaselineConfig, metric => GATE[metric] ?? metric, nameOf);
   return <div style={{ display: "grid", gap: 40 }}>
     <section>
-      <h2 className="ui-sample-title">概览 · 项目概览</h2>
-      <div className="page-title" style={{ marginBottom: 16 }}><div><h1><IconTile name="overview" />RAG 自进化项目概览</h1></div></div>
+      <h2 className="ui-sample-title">概览 · 优化成果</h2>
+      <div className="page-title" style={{ marginBottom: 16 }}><div><h1><IconTile name="overview" />RAG 自进化概览</h1></div></div>
       <ValueChain steps={[
         { kicker: "问题", icon: "bad", title: "RAG 上线后答错难发现，调参靠试，修好一题又弄坏另一题", detail: "不知道该改哪里，也不敢上线" },
         { kicker: "方法", icon: "agent", title: "冻结考卷量化 → Agent 在白名单内调参 → 人工批准发布", detail: "每一步可量化、可归因、可回滚" },
@@ -56,10 +56,10 @@ export function PageSamples() {
           { label: "Candidate D", text: "在 Winner 上精修，多修好 Q04；推荐并已发布", key: true },
         ]}
         fixed={[
-          { id: "Q04", question: sampleQuestions.Q04, cause: "Top-K 4 → 6" },
-          { id: "Q24", question: sampleQuestions.Q24, cause: "Candidate K 12 → 24" },
-          { id: "Q29", question: sampleQuestions.Q29, cause: "Candidate K 12 → 24" },
-          { id: "Q38", question: sampleQuestions.Q38, cause: "Thinking Max → High" },
+          { id: "Q04", question: sampleQuestions.Q04, parameters: [{key:"top_k",label:"Top-K",before:"4",after:"6"}] },
+          { id: "Q24", question: sampleQuestions.Q24, parameters: [{key:"candidate_k",label:"Candidate K",before:"12",after:"24"}] },
+          { id: "Q29", question: sampleQuestions.Q29, parameters: [{key:"candidate_k",label:"Candidate K",before:"12",after:"24"}] },
+          { id: "Q38", question: sampleQuestions.Q38, parameters: [{key:"generation_thinking",label:"Thinking 档位",before:"Max",after:"High"}] },
         ]}
         onOpenFixed={() => {}}
       />

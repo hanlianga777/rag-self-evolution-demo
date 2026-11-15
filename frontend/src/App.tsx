@@ -28,8 +28,8 @@ const VerificationPage = lazy(() => pageModules.verification().then(module => ({
 const VersionsPage = lazy(() => pageModules.versions().then(module => ({ default: module.VersionsPage })));
 
 const navigation: { id: Page; label: string; icon: typeof ICONS.overview }[] = [
-  { id: "overview", label: "RAG 自进化项目概览", icon: ICONS.overview }, { id: "knowledge", label: "知识库", icon: ICONS.knowledge },
-  { id: "settings", label: "Pipeline 配置", icon: ICONS.pipeline }, { id: "governance", label: "Golden Dataset", icon: ICONS.golden },
+  { id: "overview", label: "RAG 自进化概览", icon: ICONS.overview }, { id: "knowledge", label: "知识库", icon: ICONS.knowledge },
+  { id: "governance", label: "Golden Dataset", icon: ICONS.golden }, { id: "settings", label: "Pipeline 配置", icon: ICONS.pipeline },
   { id: "evaluation", label: "Baseline", icon: ICONS.baseline }, { id: "evolution", label: "Agent 工作台", icon: ICONS.agent },
   { id: "versions", label: "发布", icon: ICONS.release }, { id: "verification", label: "问答验证", icon: ICONS.verify },
 ];

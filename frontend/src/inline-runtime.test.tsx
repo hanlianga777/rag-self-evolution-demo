@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { openRetainedHistory } from './retained-history-test-fixture';
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
@@ -52,7 +53,7 @@ it("restores Generation counters inline without creating partial candidates", as
   vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify(run), { status: 200 }))));
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><GovernancePage data={{ generationRuns: [run], dataset: [] }} /></OperationProvider>));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
+  await openRetainedHistory();
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.querySelector(".run-summary")?.textContent).toContain("QC 跳过 7");
   expect(document.querySelector(".run-summary")?.textContent).toContain("运行耗时");

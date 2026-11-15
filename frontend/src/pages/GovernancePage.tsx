@@ -1,3 +1,4 @@
+import { pagePurpose } from "../helpText";
 import { usePageTab } from "../usePageTab";
 import { HoverCard } from "../ui/HoverCard";
 import { Icon, IconLabel, IconTile } from "../ui/icons";
@@ -279,7 +280,7 @@ export function GovernancePage({ data }: { data: any }) {
 
   };
   const loadingWorkspace = !metadataLoaded || checkingSnapshot || !reanchorDetailsLoaded || !!workRun && !current.length && listing;
-  return <PageShell className={`page governance-page governance-${tab} ${!workRun && tab === "run" ? "is-empty" : ""}`} header={<div className="page-title"><div><h1><IconTile name="golden" />Golden Dataset</h1><p className="ui-kicker page-purpose">黄金测试集是评测用的标准考卷，50 道题冻结之后，每一轮优化都用它来打分，前后结果才有可比性。</p></div>{!loadingWorkspace && <div className="header-actions"><button className="secondary" onClick={() => setHistoryOpen(true)}>历史版本</button></div>}</div>} tabs={<div className="tabs"><button data-label="当前测试集" aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前测试集</button><button data-label="候选池" aria-pressed={tab === "import"} className={tab === "import" ? "active" : ""} onClick={() => setTab("import")}>候选池</button></div>} resetKey={tab}>
+  return <PageShell className={`page governance-page governance-${tab} ${!workRun && tab === "run" ? "is-empty" : ""}`} header={<div className="page-title"><div><h1><IconTile name="golden" />Golden Dataset</h1><p className="ui-kicker page-purpose">{pagePurpose.governance}</p></div></div>} tabs={<div className="tabs"><button data-label="当前测试集" aria-pressed={tab === "run"} className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>当前测试集</button><button data-label="候选池" aria-pressed={tab === "import"} className={tab === "import" ? "active" : ""} onClick={() => setTab("import")}>候选池</button></div>} resetKey={tab}>
 
 {!loadingWorkspace && tab === "run" && <div className="header-actions page-data-actions">{!frozen && workRun?.status === "needs_regeneration" && <button className="primary" disabled={busy} onClick={() => setRegenerateConfirm(true)}>补齐失败题（{expectedCount - current.length}）</button>}</div>}
 {!loadingWorkspace && !frozen && tab === "run" && workRun?.status !== "needs_regeneration" && <div className="golden-new-run-actions"><label className="profile-selector"><CustomSelect ariaLabel="测试集 Profile" value={profile} onChange={value => setProfile(value as typeof profile)} options={profileOptions} /></label><button className="secondary" disabled={busy || running || qualityRunning} onClick={() => setNewRunConfirm(true)}>新建测试集</button></div>}

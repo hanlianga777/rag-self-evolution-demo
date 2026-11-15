@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { openRetainedHistory } from './retained-history-test-fixture';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -39,7 +40,7 @@ it('keeps history audit and all exports bound to the selected version',async()=>
  const snapshots=runs.map(run=>({id:'GD-'+run.id,status:'approved',snapshot:{generation_run_id:run.id,question_ids:['q'],questions:[row]}}));
  const lightSnapshots=snapshots.map(s=>({...s,snapshot:{...s.snapshot,questions:[{id:row.id,test_category:row.test_category}]}}));
  const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('generation-runs?')?runs:url.includes('snapshots?')?lightSnapshots:url.endsWith('/snapshots')?snapshots:url.endsWith('/old')?runs[1]:goldenFixture(url,[row]))));vi.stubGlobal('fetch',fetcher);
- await mount(<GovernancePage data={{generationRuns:runs,snapshots:lightSnapshots,dataset:[row],workspace:{current_golden_id:'GD-new'}}}/>);await click('历史版本');
+ await mount(<GovernancePage data={{generationRuns:runs,snapshots:lightSnapshots,dataset:[row],workspace:{current_golden_id:'GD-new'}}}/>);await openRetainedHistory();
  const rows=[...document.querySelectorAll('.snapshot-version-row')];expect(rows).toHaveLength(2);for(const r of rows)expect([...r.querySelectorAll('button')].map(b=>b.textContent)).toEqual(['查看']);
  await act(async()=>rows[1].querySelector<HTMLButtonElement>('button')!.click());expect(documentQuery('.snapshot-version-preview')).toContain('历史题');expect(document.querySelector('.snapshot-version-preview td.id')?.textContent).toBe('Q01');
  const links=[...document.querySelectorAll<HTMLAnchorElement>('.snapshot-history-toolbar a')];expect(links.map(a=>a.getAttribute('href'))).toEqual(['markdown','csv','json'].map(format=>expect.stringContaining(`/old/export?format=${format}`)));

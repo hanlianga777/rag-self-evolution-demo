@@ -14,7 +14,7 @@ it("renders project results and the new architecture tabs without writes", async
   expect(document.querySelector(".ui-vc")).toBeNull();
   expect(document.querySelector(".page-content")?.firstElementChild?.classList.contains("ui-ov")).toBe(true);
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "业务架构")!.click());
-  expect(document.querySelector(".ui-problems")?.textContent).toContain("智能客服上线以后");
+  expect(document.querySelector(".ui-problems")).toBeNull();
   const business = document.querySelector('[role="img"][aria-label^="业务架构"]');
   for (const label of ["知识准备", "考卷生产", "评测诊断", "Agent 优化", "发布与监控", "Gate 1", "Gate 2", "Gate 3"]) expect(business?.textContent).toContain(label);
   expect(document.querySelector(".architecture-figure")).toBeNull();

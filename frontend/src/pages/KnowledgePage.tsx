@@ -1,3 +1,4 @@
+import { pagePurpose } from "../helpText";
 import { IconLabel, IconTile } from "../ui/icons";
 import { KnowledgeFlow, type FlowLane } from "../ui/knowledge/KnowledgeFlow";
 import { thinkingLabel } from "../components/PipelineFields";
@@ -146,7 +147,7 @@ export function KnowledgePage({ data, openedDocument, onOpenedDocument, onChange
       if (example) openChild(example); else setError("暂无带章节的代表性正文分块。");
     } catch (reason) { setError(String(reason)); }
   };
-  return <PageShell className="page knowledge-page" header={<div className="page-title"><div><h1><IconTile name="knowledge" />知识库</h1><p className="ui-kicker page-purpose">把设备说明书解析成可以检索的知识片段，让每一句回答都能追溯到说明书的原页。</p></div><div><div className="header-actions"><button className="secondary" disabled={busy} onClick={() => uploadInput.current?.click()}>新增文档</button><button className="secondary" disabled={busy} onClick={() => setModelAction({ title: "确认重建 Knowledge Pipeline", url: "/api/knowledge/rebuild", method: "POST" })}>重建 Knowledge Pipeline</button></div><input ref={uploadInput} type="file" accept="application/pdf,.pdf" aria-label="选择 PDF 文档" hidden onChange={event => upload(event.target.files?.[0])} /></div></div>}>
+  return <PageShell className="page knowledge-page" header={<div className="page-title"><div><h1><IconTile name="knowledge" />知识库</h1><p className="ui-kicker page-purpose">{pagePurpose.knowledge}</p></div><div><div className="header-actions"><button className="secondary" disabled={busy} onClick={() => uploadInput.current?.click()}>新增文档</button><button className="secondary" disabled={busy} onClick={() => setModelAction({ title: "确认重建 Knowledge Pipeline", url: "/api/knowledge/rebuild", method: "POST" })}>重建 Knowledge Pipeline</button></div><input ref={uploadInput} type="file" accept="application/pdf,.pdf" aria-label="选择 PDF 文档" hidden onChange={event => upload(event.target.files?.[0])} /></div></div>}>
 
     <ConfirmDialog open={!!modelAction} onOpenChange={open => !open && setModelAction(null)} title={modelAction?.title || "确认更新知识库"} busy={busy} onConfirm={() => { const next = modelAction; setModelAction(null); if (next) void start(next.url, next.method, next.file); }}><p>将更新知识库并重建索引，会调用 Embedding 模型并产生费用。</p><p>知识库变更后，Golden 和 Baseline 可能需要重新确认。</p></ConfirmDialog>
     {error && <p className="error-notice" role="alert">{error}</p>}

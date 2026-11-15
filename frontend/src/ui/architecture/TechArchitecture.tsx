@@ -1,3 +1,4 @@
+import { helpText } from "../../helpText";
 import { ICONS, type IconName } from "../icons";
 import { Band, C, Defs, Figure, Node, Tag, Wire } from "./svgkit";
 import "./architecture.css";
@@ -69,16 +70,16 @@ export function TechArchitecture(_: { layers?: unknown } = {}) {
   const kn = [
     { title: "版面解析", icon: "parse" as IconName, lines: ["标题、表格、页码"] },
     { title: "去噪", icon: "split" as IconName, lines: ["去页眉页脚和目录"] },
-    { title: "Parent-Child 分块", icon: "chunk" as IconName, lines: ["小块检索、大块回答"] },
+    { title: "Parent-Child 分块", icon: "chunk" as IconName, lines: ["小块检索、大块回答"], tip: helpText.parent_child },
     { title: "向量化", icon: "boxes" as IconName, lines: ["章节路径 + 正文"] },
     { title: "建立索引", icon: "data" as IconName, lines: ["FAISS + BM25"] },
-    { title: "主题聚类", icon: "coverage" as IconName, lines: ["K-means 主题簇"] },
+    { title: "主题聚类", icon: "coverage" as IconName, lines: ["K-means 主题簇"], tip: helpText.cluster },
   ];
   const kw = (AW - 5 * 26) / 6, kx = (i: number) => X0 + i * (kw + 26);
   const ev = [
-    { title: "规则计算", icon: "checks" as IconName, lines: ["Recall@K · Precision@K · MRR", "耗时 · Token 成本"], tip: "不用模型、由程序直接算的客观指标：标准证据有没有被检索到、排第几，以及回答耗时和花费。" },
-    { title: "LLM-as-Judge 判分", icon: "correct" as IconName, lines: ["答对程度 · 要点覆盖", "忠于证据 · 安全"], tip: "让判分模型拿着必答要点和证据原文逐题对照回答打分。这些分数汇总后就是 Hard Gate 里的质量指标。" },
-    { title: "Hard Gate", icon: "gate" as IconName, lines: ["质量 · 安全 · 速度", "每一项单独过线"], tip: "上线门槛：每一项都要单独达标，综合分再高也不能抵消某一项没过。" },
+    { title: "规则计算", icon: "checks" as IconName, lines: ["Recall@K · Precision@K · MRR", "耗时 · Token 成本"], tip: `Recall@K：${helpText.recall} Precision@K：${helpText.precision} MRR：${helpText.mrr}` },
+    { title: "LLM-as-Judge 判分", icon: "correct" as IconName, lines: ["答对程度 · 要点覆盖", "忠于证据 · 安全"], tip: helpText.judge },
+    { title: "Hard Gate", icon: "gate" as IconName, lines: ["质量 · 安全 · 速度", "每一项单独过线"], tip: helpText.hard_gate },
   ];
   const ew = (AW - 2 * 14) / 3, ex = (i: number) => X0 + i * (ew + 14);
   // 模型与存储：五组按宽度比例排开

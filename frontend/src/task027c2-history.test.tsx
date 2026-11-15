@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { openRetainedHistory } from './retained-history-test-fixture';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -22,7 +23,7 @@ it('labels versions chronologically and places four actions beside the selected 
   const runs = ['new', 'old'].map(id => ({ id, status: 'completed', profile: { expected_count: 1 }, question_ids: ['q'] }));
   const snapshots = runs.map((run, i) => ({ id: 'GD-' + run.id, status: 'approved', created_at: `2026-11-0${4 - i}T11:55:33Z`, snapshot: { generation_run_id: run.id, question_ids: ['q'], questions: [question] } }));
   const data = { generationRuns: runs, snapshots, dataset: [question], workspace: { current_golden_id: 'GD-old' } }, saved = JSON.stringify(data);
-  await mount(data); await click('历史版本');
+  await mount(data); await openRetainedHistory();
   const dialog = document.querySelector('[role=dialog]')!;
   expect(dialog.textContent).not.toContain('版本操作'); expect(dialog.textContent).not.toContain('GD-');
   const rows = [...dialog.querySelectorAll('.snapshot-version-row')];
@@ -40,7 +41,7 @@ it('labels versions chronologically and places four actions beside the selected 
 
 it.each([false, true])('keeps disabled actions visible and explains missing source or incomplete paper (incomplete=%s)', async incomplete => {
   const version = incomplete ? { id: 'run', status: 'completed', question_ids: ['q'], profile: { expected_count: 2 } } : { id: 'GD-orphan', status: 'approved', snapshot: { question_ids: ['q'], questions: [question] } };
-  await mount({ generationRuns: incomplete ? [version] : [], snapshots: incomplete ? [] : [version], dataset: [question] }); await click('历史版本');
+  await mount({ generationRuns: incomplete ? [version] : [], snapshots: incomplete ? [] : [version], dataset: [question] }); await openRetainedHistory();
   const toolbar = document.querySelector('.snapshot-history-toolbar')!;
   expect(toolbar.querySelectorAll('button:disabled')).toHaveLength(incomplete ? 3 : 4);
   expect(toolbar.querySelectorAll('a[href]')).toHaveLength(0);

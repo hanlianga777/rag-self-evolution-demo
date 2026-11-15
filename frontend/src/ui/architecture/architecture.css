@@ -113,3 +113,6 @@
 .ui-arch-tipcard { position: absolute; z-index: 5; max-width: 300px; padding: 9px 12px; border-radius: 10px; background: #1d1d1f; color: #fff; font-size: 12px; line-height: 1.6; pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,.18); white-space: pre-line; }
 .ui-arch-legend .badge { width: 30px; height: 12px; border-radius: 6px; background: var(--ui-accent); }
 .ui-arch-legend .fork { width: 18px; height: 12px; border-left: 1.5px solid var(--ui-faint); border-top: 1.5px solid var(--ui-faint); border-bottom: 1.5px solid var(--ui-faint); border-radius: 4px 0 0 4px; }
+
+/* Keep the bottom model explanations inside the visible page. */
+.architecture-technical .ui-arch-tipcard { transform: translateY(calc(-100% - 24px)); }
