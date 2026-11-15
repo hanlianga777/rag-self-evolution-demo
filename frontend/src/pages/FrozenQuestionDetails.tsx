@@ -14,7 +14,20 @@ const behaviorText: Record<string, string> = {
 export const goldenScore = (value: unknown) => typeof value === "number" ? value.toLocaleString("zh-CN", { maximumFractionDigits: 1 }) : "暂无";
 export const shortSourceName = (name: string) => readableSourceName(name).replace("KIRA B 50 操作说明", "KIRA 操作说明").replace("B2 电池与充电器使用说明", "B2 电池说明").replace("B2 遥控器使用说明", "B2 遥控器说明");
 export const sourceLabel = (source: Candidate) => source.document_name ? `${shortSourceName(source.document_name)} · ${source.page_start != null ? `p${source.page_start}${source.page_end != null && source.page_end !== source.page_start ? `–${source.page_end}` : ""}` : "页码暂无"}` : "暂无";
-export const questionSources = (row: Candidate) => [...new Set([...(row.evidence_details || []).flatMap((source: Candidate) => source.chunks || []), ...(row.raw?.business_requirements?.sources || [])].map(sourceLabel))].join("；") || (row.test_category === "negative" ? "不适用 · 无标准证据" : "保存记录缺少来源");
+export const questionSources = (row: Candidate) => [...new Set([...(row.business_requirements?.sources || row.raw?.business_requirements?.sources || []), ...(row.evidence_details || []).flatMap((source: Candidate) => source.chunks || [])].filter((source: Candidate) => source.document_name).map(sourceLabel))].join("；") || (row.test_category === "negative" ? "不适用 · 无标准证据" : "保存记录缺少来源");
+export function goldenQuality(row: Candidate, kind: "probe" | "qc") {
+  const result = row[kind], details = result?.probe_details;
+  if (details?.probe_execution_status === "failed") return "执行失败";
+  if (typeof result?.score === "number") return goldenScore(result.score);
+  if (kind === "probe" && details?.diagnostic_only) {
+    if (details.classification === "SUPPORTED") return "已召回";
+    if (details.classification === "RETRIEVAL_INCOHERENT") return "未召回全";
+    if (details.review_status === "cached_text_scope_reviewed") return "已核对";
+    return result.retrieval_observation || "未知";
+  }
+  const status = result?.status || row[`${kind}_status`];
+  return ({ probe_passed: "通过", needs_revision: "未通过", qc_passed: "通过", qc_failed: "未通过", probe_pending: "未运行", qc_pending: "未运行", passed: "通过", failed: "未通过" } as Record<string, string>)[status] || "未知";
+}
 
 export function FrozenQuestionDetails({ row, busy = false, onRun, frozen = true, showSource = true }: { row: Candidate; busy?: boolean; onRun?: (id: string, name: "probe" | "qc") => void; frozen?: boolean; showSource?: boolean }) {
   const [qualityConfirm, setQualityConfirm] = useState<{ id: string; name: "probe" | "qc" } | null>(null);
