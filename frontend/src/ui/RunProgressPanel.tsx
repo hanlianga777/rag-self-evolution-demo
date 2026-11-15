@@ -1,6 +1,6 @@
 import { ClampText } from "./ClampText";
 import { Icon } from "./icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StatusBadge, type StatusKind } from "./Primitives";
 
 /**
@@ -18,12 +18,12 @@ import { StatusBadge, type StatusKind } from "./Primitives";
 export type RunStatus = "running" | "waiting" | "paused" | "stopped" | "failed" | "completed";
 
 const STATE: Record<RunStatus, { badge: StatusKind; text: string; label?: string }> = {
-  running: { badge: "running", text: "正在评测" },
-  waiting: { badge: "waiting", text: "稍后自动继续" },
-  paused: { badge: "paused", text: "已完成的题已保留" },
-  stopped: { badge: "stopped", text: "已完成的题已保留，可以继续运行" },
+  running: { badge: "running", label: "运行中", text: "正在评测" },
+  waiting: { badge: "waiting", label: "等待中", text: "稍后自动继续" },
+  paused: { badge: "paused", label: "已暂停", text: "已完成的题已保留" },
+  stopped: { badge: "stopped", label: "已停止", text: "已完成的题已保留，可以继续运行" },
   failed: { badge: "failed", label: "运行出错", text: "可以继续运行" },
-  completed: { badge: "completed", text: "全部题目已完成" },
+  completed: { badge: "completed", label: "已完成", text: "全部题目已完成" },
 };
 
 export function formatDuration(ms: number) {
@@ -32,11 +32,12 @@ export function formatDuration(ms: number) {
   return h ? `${h} 小时 ${m} 分` : m ? `${m} 分 ${s} 秒` : `${s} 秒`;
 }
 
-export function RunProgressPanel({ title, subtitle = "Sandbox 评测", status, current, total, elapsedMs, remainingMs, errorText, onContinue, onStop, stopping = false, defaultMinimized = false }: {
+export function RunProgressPanel({ title, subtitle = "Sandbox 评测", status, current, total, elapsedMs, remainingMs, errorText, onContinue, onStop, stopping = false, defaultMinimized = false, autoMinimize = false }: {
   title: string; subtitle?: string; status: RunStatus; current?: number; total?: number; elapsedMs?: number; remainingMs?: number; errorText?: string;
-  onContinue?: () => void; onStop?: () => void; stopping?: boolean; defaultMinimized?: boolean;
+  onContinue?: () => void; onStop?: () => void; stopping?: boolean; defaultMinimized?: boolean; autoMinimize?: boolean;
 }) {
   const [minimized, setMinimized] = useState(defaultMinimized);
+  useEffect(() => { if (autoMinimize) setMinimized(true); }, [autoMinimize]);
   const [confirmStop, setConfirmStop] = useState(false);
   const state = STATE[status];
   const known = typeof current === "number" && typeof total === "number" && total > 0;
@@ -46,7 +47,7 @@ export function RunProgressPanel({ title, subtitle = "Sandbox 评测", status, c
 
   if (minimized) {
     return <button type="button" className={`ui-run-pill${status === "running" ? "" : " idle"}`} onClick={() => setMinimized(false)} aria-label={`展开运行状态：${title}`}>
-      {title}{known && <span>{current} / {total}</span>}
+      {title}{known && <span>{current} / {total}</span>}<span className="ui-run-pill-state">{state.label}</span>
     </button>;
   }
 
@@ -69,12 +70,12 @@ export function RunProgressPanel({ title, subtitle = "Sandbox 评测", status, c
     {confirmStop ? <div className="ui-run-confirm">
       确认停止？已完成的题会保留，之后可以继续运行。
       <div className="ui-run-actions">
-        <button type="button" onClick={() => setConfirmStop(false)}>取消</button>
-        <button type="button" className="go" onClick={() => { setConfirmStop(false); onStop?.(); }}>确认停止</button>
+        <button type="button" className="secondary" onClick={() => setConfirmStop(false)}>取消</button>
+        <button type="button" className="secondary go" onClick={() => { setConfirmStop(false); onStop?.(); }}>确认停止</button>
       </div>
     </div> : <div className="ui-run-actions">
-      <button type="button" className="go" disabled={!canContinue} onClick={() => onContinue?.()}><Icon name="play" size={14} />继续运行</button>
-      <button type="button" disabled={!canStop} onClick={() => setConfirmStop(true)}><Icon name="stop" size={13} />{stopping ? "正在停止…" : "停止运行"}</button>
+      <button type="button" className="secondary go" disabled={!canContinue} onClick={() => onContinue?.()}><Icon name="play" size={14} />继续运行</button>
+      <button type="button" className="secondary" disabled={!canStop} onClick={() => setConfirmStop(true)}><Icon name="stop" size={13} />{stopping ? "正在停止…" : "停止运行"}</button>
     </div>}
   </section>;
 }

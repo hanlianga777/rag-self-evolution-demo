@@ -16,9 +16,9 @@ it('keeps migrated history out of current status and the candidate audit display
  const card=document.querySelector('.candidate-card')!;
  const detail=[...card.querySelectorAll('button')].find(b=>b.textContent?.includes('查看 Candidate 与完整报告'))!;
  expect(detail).toBeTruthy();await act(async()=>detail.click());
- const disclosure=[...document.querySelectorAll('summary')].find(s=>s.textContent?.includes('原始 Candidate 审计'))!;
+ const disclosure=[...document.querySelectorAll('.disclosure-heading')].find(s=>s.textContent?.includes('原始 Candidate 审计'))!;
  expect(disclosure).toBeTruthy();
- await act(async()=>{const details=disclosure.closest('details')!;details.open=true;details.dispatchEvent(new Event('toggle',{bubbles:true}));});
+ expect(disclosure.closest('.story-disclosure')?.querySelector('summary')).toBeNull();
  expect(document.querySelector('.technical-record')?.textContent).toContain('candidate_label');
  expect(document.body.textContent).not.toContain('HIDDEN_OLD');
  expect(document.body.textContent).not.toContain('已跳过');

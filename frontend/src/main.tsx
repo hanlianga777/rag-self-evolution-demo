@@ -9,3 +9,5 @@ import "./typography.css";
 import "./pages/task024a-polish.css";
 
 createRoot(document.getElementById("root")!).render(<StrictMode><OperationProvider><App /></OperationProvider></StrictMode>);
+
+import "./pages/task033b-polish.css";

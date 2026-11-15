@@ -24,14 +24,14 @@ it('uses one finite filter per dimension, real counts and resets on returning to
  await click('Hard Gate');await click('Bad Case 诊断');expect(document.querySelectorAll('.diagnosis-list tbody tr')).toHaveLength(2);
  expect(document.body.textContent).not.toContain('恢复全部');expect(document.body.textContent).not.toContain('每类首例');
 });
-it('links multiple saved candidate hypotheses to the same actual problem and keeps raw rationale folded',async()=>{
+it('links multiple saved candidate hypotheses to the same actual problem and keeps raw rationale in the visible audit',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const candidates=['A','B'].map((label,i)=>({id:label,status:'generated',config:{candidate_k:24+i},reasoning:{candidate_label:label,observed_evidence:[badCases[0].id],hypothesis:'假设'+label,proposal:'candidate_missing=true 原始提出理由'}}));
  const data={evaluation,badCases,optimization:{id:'EXP',candidates}};const before=JSON.stringify(data);
  await mount(<EvolutionPage data={data}/>);
  expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(2);const rows=[...document.querySelectorAll('.agent-case-destinations tbody tr')];expect(rows[0].textContent).toContain('Candidate A、Candidate B');expect(rows[1].textContent).not.toContain('Candidate A');expect(document.querySelector('.experiment-plan')).toBeNull();
  await click('进化路线');expect(document.querySelectorAll('.agent-design-intent')).toHaveLength(2);
- await click('Candidate 对比');await click('查看 Candidate 与完整报告');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('details'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
+ await click('Candidate 对比');await click('查看 Candidate 与完整报告');expect([...document.querySelectorAll('.drawer p')].filter(p=>p.textContent?.includes('candidate_missing')).every(p=>p.closest('.story-disclosure'))).toBe(true);expect(JSON.stringify(data)).toBe(before);
 });
 it('compares a pending release against current Production rather than unrelated Baseline configuration',async()=>{
  const candidate={id:'A',config:{candidate_k:24},reasoning:{candidate_label:'A'},release_state:{sandbox:true,qualified:true,recommended:true,round_complete:true}};

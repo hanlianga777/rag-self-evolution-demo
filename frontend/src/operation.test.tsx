@@ -116,6 +116,8 @@ it("shows up to three concurrent operations and minimizing one does not stop its
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<OperationProvider restore={false}><Harness /></OperationProvider>));
   await act(async () => document.querySelector("button")!.click());
+  expect(document.querySelectorAll(".ui-run-pill")).toHaveLength(3);
+  await act(async () => document.querySelectorAll<HTMLButtonElement>(".ui-run-pill").forEach(button => button.click()));
   expect(document.querySelectorAll(".ui-run")).toHaveLength(3);
   await act(async () => document.querySelector<HTMLButtonElement>("[aria-label='最小化运行状态']")!.click());
   expect(document.querySelectorAll(".ui-run")).toHaveLength(2);

@@ -25,12 +25,12 @@ it('leaves natural source labels, numeric units and ordinary prose intact',()=>{
  const raw='长按2秒及以上，66 cm。[设备手册 · 第86页] 文中DOC-001-C-00185是索引说明。';
  expect(answerCitationDisplay(raw,final)).toEqual({text:raw,unverified:0,changed:false});
 });
-it('shows a human source in the answer and preserves exact original in closed audit',()=>{
+it('shows a human source in the answer and preserves exact original in visible audit',()=>{
  const raw='关闭设备 [DOC-001-C-00185]';root=createRoot(document.body.appendChild(document.createElement('div')));
  act(()=>root.render(<CaseAnswer text={raw} final={final}/>));
  expect(document.querySelector('.case-answer')?.textContent).toContain('设备手册.pdf');
  expect(document.querySelector('.case-answer')?.textContent).not.toContain('DOC-001');
- const audit=document.querySelector('details')!;expect(audit.open).toBe(false);expect(audit.textContent).toContain(raw);
+ const audit=document.querySelector('.story-disclosure')!;expect(audit.querySelector('summary')).toBeNull();expect(audit.textContent).toContain(raw);
 });
 
 it('keeps saved Parent page ranges distinct from Child location',()=>{

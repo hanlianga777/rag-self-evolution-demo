@@ -17,8 +17,8 @@ it("separates saved Before/After configuration from live answers and keeps the a
   expect(document.querySelector(".story-disclosure")?.textContent).toContain("谨慎拒答");
   expect(document.querySelector(".experiment-results")?.textContent).toContain("B-new");
   expect(document.querySelector(".experiment-results")?.textContent).toContain("P-old");
-  expect(document.querySelectorAll(".answer-audit details")).toHaveLength(2);
-  expect(document.querySelectorAll(".answer-audit details[open]")).toHaveLength(0);
+  expect(document.querySelectorAll(".answer-audit .story-disclosure")).toHaveLength(2);
+  expect(document.querySelectorAll(".answer-audit summary")).toHaveLength(0);
   expect(fetch).not.toHaveBeenCalled();
 });
 it("explains the older published baseline and keeps empty history out of the decision screen", async () => {
@@ -26,5 +26,5 @@ it("explains the older published baseline and keeps empty history out of the dec
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={data} /></OperationProvider>));
   expect(document.querySelector(".page-content")?.textContent).toContain("来自历史 Baseline");
   await act(async () => root.render(<OperationProvider restore={false}><VersionsPage data={{ versions: [] }} /></OperationProvider>));
-  expect(document.querySelector(".release-history")).toBeNull();
+  expect(document.querySelector('.release-history .story-empty')?.textContent).toContain('尚无版本记录');expect(document.querySelector('.release-history summary')).toBeNull();
 });

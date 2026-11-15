@@ -118,8 +118,8 @@ it("shows persisted partial slots, failure details, and only the refill action",
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Run ID：GGEN-NEW");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("题位 20 / 20");
-  await act(async () => document.querySelector<HTMLDetailsElement>(".slot-audit summary")!.click());
-  expect(document.querySelector<HTMLDetailsElement>(".slot-audit")?.open).toBe(true);
+  expect(document.querySelector('.slot-audit .disclosure-heading')).not.toBeNull();
+  expect(document.querySelector('.slot-audit summary')).toBeNull();
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("原文证据");
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("unsupported answer anchor");
   await act(async () => document.querySelector<HTMLButtonElement>(".drawer-head button")!.click());

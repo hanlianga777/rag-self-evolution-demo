@@ -1,0 +1,59 @@
+/* 033b: preserve the existing layout; let content determine its scroll height. */
+.page-shell:not(.evolution-page) > .page-content > * { flex-shrink:0; }
+.versions-page .page-content > .release-history { flex:none; min-height:auto; overflow:visible; margin:12px 0 0; }
+.page-shell .page-content { padding-bottom:28px; }
+.governance-page .page-content { overflow-y:auto; }
+.governance-page :is(.golden-workspace,.golden-pool) { flex:none; min-height:auto; }
+.governance-page :is(.golden-workspace,.golden-pool) > .panel { flex:none; overflow:visible; }
+
+.disclosure-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 12px; color:var(--ui-ink); font-size:var(--ui-fs-card); font-weight:600; line-height:1.5; }
+.disclosure-heading .history-count { margin-left:auto; color:var(--ui-muted); font-size:var(--ui-fs-meta); font-weight:400; }
+:is(.story-disclosure,.disclosure) > .disclosure-heading { cursor:default; }
+.baseline-more > .disclosure-heading { padding:14px 0; margin:0; }
+.knowledge-coverage > .disclosure-heading { padding:0; }
+
+/* Retain every column and allow controls to wrap inside their own cell. */
+.page-shell .table-scroll table, .drawer .table-scroll table { min-width:0 !important; width:100%; table-layout:fixed; }
+.page-shell .table-scroll :is(th,td), .drawer .table-scroll :is(th,td) { padding-left:8px; padding-right:8px; white-space:normal; overflow-wrap:anywhere; }
+.table-scroll :is(.header-actions,.monitoring-assessment) { flex-wrap:wrap; }
+.table-scroll td :is(.text-button,.secondary,.badge) { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.table-scroll td :is(.clamp-text-host,.ui-hover-trigger) { min-width:0; max-width:100%; }
+.verification-page .monitoring-table th { white-space:normal; }
+.verification-page .monitoring-table th:last-child { width:27%; }
+.verification-page .monitoring-assessment { gap:4px; }
+.verification-page .monitoring-assessment button { white-space:normal; padding:2px 4px; }
+
+/* Match the same field rows across adjacent cards. */
+.ui-rel-swap { align-items:stretch; }
+.ui-rel-side { display:grid; grid-template-rows:auto minmax(24px,auto) 1fr; align-content:start; min-width:0; }
+.ui-rel-side > strong { min-height:24px; margin-top:0; overflow-wrap:anywhere; }
+.ui-rel-side dl { align-self:start; }
+.ui-rel-side dl > div { display:grid; grid-template-rows:minmax(18px,auto) auto; align-content:start; min-width:0; }
+.ui-rel-side :is(dt,dd) { overflow-wrap:anywhere; }
+.ui-rel-steps li > div { display:grid; grid-template-rows:minmax(38px,auto) auto; min-width:0; }
+.ui-rel-steps strong { line-height:19px; }
+.ui-hg-card header { min-height:28px; align-items:start; }
+.ui-hg-card li { grid-template-columns:minmax(0,1fr) 70px 110px 7px; align-items:center; }
+.ui-hg-name { min-width:0; }
+.ui-hg-val { width:110px; }
+.ui-ov-side > div { display:grid; grid-template-rows:20px auto; align-content:center; }
+.ui-hg-card ul { display:grid; grid-template-rows:repeat(3,minmax(88px,1fr)); }
+.ui-ov-side :is(dt,dd) { margin:0; }
+
+/* Light runtime cards use the existing card tokens and secondary actions. */
+.ui-run, .ui-run-pill { background:var(--ui-surface); color:var(--ui-ink); border:1px solid var(--ui-rule); border-radius:var(--ui-r-card); box-shadow:var(--ui-shadow-1); }
+.ui-run-title { color:var(--ui-ink); font-size:var(--ui-fs-card); font-weight:600; line-height:1.5; }
+.ui-run-sub, .ui-run-time { color:var(--ui-muted); font-size:var(--ui-fs-meta); }
+.ui-run-state, .ui-run-progress { color:var(--ui-ink-2); font-size:var(--ui-fs-body); }
+.ui-run-progress b { color:var(--ui-ink); }
+.ui-run-min { color:var(--ui-muted); }
+.ui-run-min:hover { background:var(--ui-rule-2); color:var(--ui-ink); }
+.ui-run-state .ui-status, .ui-run-state .ui-status.neutral, .ui-run-state .ui-status.amber { background:var(--ui-accent-tint); color:var(--ui-accent); }
+.ui-run-state .ui-status.good { background:var(--ui-green-tint); color:var(--ui-green); }
+.ui-run-state .ui-status.bad { background:var(--ui-red-tint); color:var(--ui-red); }
+.ui-run-bar { background:var(--ui-rule-2); }
+.ui-run-bar > i, .ui-run-pill::before { background:var(--ui-accent); }
+.ui-run-actions button.secondary, .ui-run-actions button.secondary.go { background:var(--ui-surface); border:1px solid var(--ui-rule); color:var(--ui-ink-2); font-size:var(--ui-fs-body); font-weight:400; }
+.ui-run-actions button.secondary:not(:disabled):hover { background:var(--ui-rule-2); border-color:var(--ui-faint); }
+.ui-run-confirm { background:var(--ui-rule-2); color:var(--ui-ink-2); font-size:var(--ui-fs-body); }
+.operation-stack { gap:12px; }

@@ -39,7 +39,7 @@ export function TruncatedText({ children, lines = 2, hoverOnly = false }: { chil
 
 export function FixedTableCard({ children }: { children: ReactNode }) { return <div className="table-scroll fixed-table">{children}</div>; }
 
-export function Disclosure({ label, children }: { label: string; children: ReactNode }) { return <details className="disclosure"><summary><ChevronDown size={14} aria-hidden="true" />{label}</summary>{children}</details>; }
+export function Disclosure({ label, children }: { label: string; children: ReactNode }) { return <section className="disclosure"><h3 className="disclosure-heading">{label}</h3>{children}</section>; }
 
 export type SelectOption = { value: string; label: string; description?: string; title?: string };
 

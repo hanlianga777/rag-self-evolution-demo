@@ -31,7 +31,7 @@ it('presents ordered business cards without the retired technical audit and leav
   const item = { question_id: 'Q-test', question: '设备如何加水？', model_answer: '1. **等待停止**。 2. 检查水位。', reference_answer: '<p>自动停止 [C115]</p>', passed: false, primary_root_cause: 'Generation', failure_tags: ['Generation Failure'], diagnosis: { status: 'confirmed', reason: 'source_scope / claim_assessment.pending' }, diagnostic_view: { target_eligible: true }, judge_result: { correctness: 2, reason: '原始Judge' }, programmatic_metrics: { claim_assessment: { raw: '原始Matcher' }, retrieval_trace: { final: [] } } };
   const before = JSON.stringify(item);
   render(<BaselineCaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
-  expect([...document.querySelectorAll('.bad-case-details > section > h3')].map(el => el.textContent)).toEqual(['业务问题', '答案对比', '检索路径', '优化方向']);
+  expect([...document.querySelectorAll('.bad-case-details > section > h3')].map(el => el.textContent)).toEqual(['业务问题', '答案对比', '检索路径', '判分原文', '优化方向']);
   expect([...document.querySelectorAll('.bad-case-details > section')].map(el => el.textContent).join('')).not.toContain('claim_assessment.pending');
   expect(JSON.stringify(item)).toBe(before);
 });

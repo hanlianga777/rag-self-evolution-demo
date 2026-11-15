@@ -1,11 +1,8 @@
-import { useId, useState, type ComponentProps, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import type { ComponentProps, ReactNode } from "react";
 
-/** Scoped to the evaluation / release / verification workspaces. */
-export function StoryDisclosure({ label, children, className = "", ...props }: Omit<ComponentProps<"details">, "children"> & { label: ReactNode; children: ReactNode }) {
-  const [expanded, setExpanded] = useState(!!props.open);
-  const id = useId();
-  return <details {...props} className={`story-disclosure ${className}`} onToggle={event => { setExpanded(event.currentTarget.open); props.onToggle?.(event); }}><summary aria-expanded={expanded} aria-controls={id}><span>{label}</span><ChevronDown size={14} aria-hidden="true" /></summary><div id={id} className="story-disclosure-content">{children}</div></details>;
+/** Saved evidence stays visible; section headings are not disclosure controls. */
+export function StoryDisclosure({ label, children, className = "", ...props }: ComponentProps<"section"> & { label: ReactNode; children: ReactNode }) {
+  return <section {...props} className={`story-disclosure ${className}`}><h3 className="disclosure-heading">{label}</h3><div className="story-disclosure-content">{children}</div></section>;
 }
 
 export function FilterButtons({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string; count?: number }[]; onChange: (value: string) => void }) {

@@ -11,8 +11,10 @@ afterEach(()=>{if(root)act(()=>root.unmount());document.body.innerHTML='';vi.uns
 const render=async(node:React.ReactNode)=>{root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node))};
 const click=async(label:string)=>act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label)!.click());
 const openSavedReport = async () => {
- const disclosure = [...document.querySelectorAll<HTMLDetailsElement>('.drawer details')].find(node => node.querySelector('summary')?.textContent === '完整逐题报告与原始 Candidate 审计')!;
- await act(async () => { disclosure.open = true; disclosure.dispatchEvent(new Event('toggle')); });
+ await act(async () => {});
+ const audit = [...document.querySelectorAll('.drawer .story-disclosure')].find(node => node.querySelector('.disclosure-heading')?.textContent === '完整逐题报告与原始 Candidate 审计');
+ expect(audit).toBeTruthy();
+ expect(audit?.querySelector('summary')).toBeNull();
 };
 const evaluation={id:'offline',status:'completed',cases:[],result:{metrics:{positive_correctness:75,safe_rejection_rate:100,latency_p50_seconds:2},comparison_metrics:{recall_at_k:0},gates:{gates:[]}}};
 it('keeps the report while removing the technical-metrics entry',async()=>{
@@ -48,7 +50,7 @@ it('preloads version history without dropping the active runtime summary',async(
  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='下一页')).toBe(false);
  expect(fetcher.mock.calls.some(([url]:any)=>url.endsWith('/api/versions?page=2&limit=50'))).toBe(true);
  await click('查看发布快照');expect(document.querySelector('[role=dialog]')?.textContent).toContain('当前线上配置');
- expect(document.body.textContent).not.toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(3);await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());await click('查看全部 51 条记录');expect(document.querySelectorAll('tbody tr')).toHaveLength(51);
+ expect(document.body.textContent).not.toContain('runtime-active');expect(document.querySelectorAll('tbody tr')).toHaveLength(51);await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());expect([...document.querySelectorAll('button')].some(b=>b.textContent?.includes('查看全部'))).toBe(false);
 });
 it('preloads monitoring events once and switches its tab without requests',async()=>{
  const {VerificationPage}=await import('./pages/VerificationPage');

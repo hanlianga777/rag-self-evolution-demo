@@ -36,9 +36,9 @@ it("keeps Baseline conclusions and saved identity inside the report, and preserv
   expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(cell => cell.textContent)).toEqual(["题号", "问题", "分类", "缺了什么", "严重程度", ""]);
   expect(document.querySelector(".product-diagnosis-table tbody tr td:nth-child(3)")?.textContent).toBe("检索失败");
   await act(async()=>document.querySelector<HTMLElement>(".product-diagnosis-table tbody tr")!.click());
-  expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["业务问题", "答案对比", "检索路径", "优化方向"]);
+  expect([...document.querySelectorAll(".case-details > section > h3")].map(header => header.textContent)).toEqual(["业务问题", "答案对比", "检索路径", "判分原文", "优化方向"]);
   expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("技术详情");
-  expect(document.querySelector<HTMLDetailsElement>(".bad-case-details > details")?.open).toBe(false);
+  expect(document.querySelector(".bad-case-details > details")).toBeNull();expect(document.querySelector(".bad-case-details > .story-disclosure")?.textContent).toContain("判分原文");
   expect(JSON.stringify(input)).toBe(frozen);
   expect((fetch as any).mock.calls.every((call: any[]) => !call[1]?.method || call[1].method === "GET")).toBe(true);
 });

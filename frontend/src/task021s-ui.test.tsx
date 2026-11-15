@@ -70,7 +70,9 @@ it('never creates a fresh Baseline when the saved resume preflight refuses it',a
  await act(async()=>document.querySelector<HTMLButtonElement>('.confirm-dialog .primary')!.click());
  expect(fetcher).toHaveBeenCalledOnce();expect(document.querySelector('.ui-run[role=alert]')?.textContent).toContain('断点不兼容');
  await act(async()=>op.start('没有续跑入口',{id:'other',status:'stopped'}));
- expect(document.querySelectorAll<HTMLButtonElement>('.go')[1].disabled).toBe(true);
+ expect(document.querySelectorAll('.ui-run-pill')).toHaveLength(2);
+ await act(async()=>document.querySelectorAll<HTMLButtonElement>('.ui-run-pill')[1].click());
+ expect(document.querySelector<HTMLButtonElement>('.go')!.disabled).toBe(true);
  await act(async()=>root.unmount());
 });
 it('pins truncated prose without activating the surrounding row, while short prose keeps the row action',async()=>{

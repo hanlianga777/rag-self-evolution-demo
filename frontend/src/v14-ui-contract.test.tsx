@@ -27,8 +27,10 @@ const fill = async (question: string) => act(async () => { const input = documen
 
 const clickText = async (label: string) => act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === label)!.click());
 const openSavedReport = async () => {
- const disclosure = [...document.querySelectorAll<HTMLDetailsElement>('.drawer details')].find(node => node.querySelector('summary')?.textContent === '完整逐题报告与原始 Candidate 审计')!;
- await act(async () => { disclosure.open = true; disclosure.dispatchEvent(new Event('toggle')); });
+ await act(async () => {});
+ const audit = [...document.querySelectorAll('.drawer .story-disclosure')].find(node => node.querySelector('.disclosure-heading')?.textContent === '完整逐题报告与原始 Candidate 审计');
+ expect(audit).toBeTruthy();
+ expect(audit?.querySelector('summary')).toBeNull();
 };
 const previewPlan = (profile = "mini", corpus = { D: "fixture" }) => ({ plan_id: `PLAN-${profile}`, planner_version: "fixture-v2", profile: { name: profile }, corpus_fingerprint: corpus, chunk_clusters: { C1: 0 }, initial_k: 2, final_k: 1, merge_mapping: [{ from: 1, to: 0 }], clusters: [{ cluster_id: 0, size: 1, anchor_quota: 20, quotas: { positive: 8, ablation: 4, negative: 8 }, representative_chunk_ids: ["C1"] }], slots: [{ slot_id: "Q01", topic_cluster: 0, document_id: "D", material_chunk_ids: ["C1"], construction_type: "Fact" }], reuse_statistics: { reused_slots: 0 }, gaps: [] });
 

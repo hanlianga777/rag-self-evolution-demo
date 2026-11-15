@@ -260,6 +260,7 @@ export function OperationProvider({ children, restore = true }: { children: Reac
   const visible = operations.filter(item => !item.dismissed).slice(-3);
   const console = !!visible.length && <div className="operation-stack" aria-label="运行状态">{visible.map(item => <div key={item.id} className="operation-panel">
     <RunProgressPanel
+      autoMinimize={visible.length > 1}
       title={operationTitle(item.title)}
       subtitle={item.status === "running" && !item.pricePause?.paused ? item.stage || (item.kind === "revision" ? "局部修订" : item.experimentId ? "Sandbox 批次" : "评测") : item.kind === "revision" ? "局部修订" : item.candidateId || item.experimentId ? "Sandbox 评测" : "Baseline"}
       status={item.status === "running" && item.pricePause?.paused ? "waiting" : item.status}

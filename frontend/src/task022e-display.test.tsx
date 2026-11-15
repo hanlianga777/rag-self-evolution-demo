@@ -37,11 +37,11 @@ it('distinguishes forbidden hits, failed negative behavior and unknown records w
   expect(coreEvidence({ judge_result: { reason: '看似应该拒答，但给了步骤' } })).toContain('未知');
 });
 
-it('keeps Judge prose intact in a closed card for both passed and failed case details', async () => {
+it('keeps Judge prose intact in a visible section for both passed and failed case details', async () => {
   await mount(<CaseDetails item={item} snapshot={{}} config={{}} gates={[]} />);
   expect(document.querySelector('.case-difference')?.textContent).toBe('缺要点 ①：只在室内存放设备');
-  const raw = [...document.querySelectorAll('details')].find(e => e.querySelector('summary')?.textContent?.includes('判分原文'))!;
-  expect(raw?.open).toBe(false);
+  const raw = [...document.querySelectorAll('.story-disclosure')].find(e => e.querySelector('.disclosure-heading')?.textContent?.includes('判分原文'))!;
+  expect(raw?.querySelector('summary')).toBeNull();
   expect(raw?.textContent).toContain(item.judge_result.reason);
   await act(async () => root.render(<CaseDetails item={{ ...item, passed: true }} snapshot={{}} config={{}} gates={[]} />));
   expect(document.querySelector('.case-difference')?.textContent).toContain('已答对');
