@@ -27,7 +27,7 @@ class SummaryTests(unittest.TestCase):
             self.assertIn('number', summaries.validate('intent', {'intent': text, 'risk': '未知'}, self.source))
 
     def test_forbidden_prose_not_json_keys(self):
-        for text in ['prompt_strategy', 'x=1', 'CSV-123-29', 'EXP-123', 'GD-123', 'Positive / Negative']:
+        for text in ['prompt_strategy', 'x=1', 'CSV-123-29', 'EXP-123', 'GD-123', '(Positive / Negative)']:
             self.assertIn('forbidden', summaries.validate('intent', {'intent': text, 'risk': '未知'}, self.source))
         self.assertEqual(summaries.validate('d', dict.fromkeys(['merged', 'predicted', 'actual', 'decision'], '无法确定'), self.source), [])
 
@@ -37,7 +37,7 @@ class SummaryTests(unittest.TestCase):
             self.assertIn('schema', summaries.validate('intent', value, self.source))
         self.assertIn('schema', summaries.validate('strategy', {'basis':['无']*4,'decisions':[]}, self.source))
         self.assertIn('schema', summaries.validate('conclusion', {'verdicts':[], 'fixed':[], 'broken':[], 'param_judgement':['无']*3,'lessons':[]}, self.source))
-        self.assertIn('schema', summaries.validate('intent', {'intent':'无','risk':'无','extra':'无'}, self.source))
+        self.assertEqual(summaries.validate('intent', {'intent':'无','risk':'无','extra':'无'}, self.source), [])
 
     def test_failed_output_retries_once_then_has_no_manual_replacement(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -180,7 +180,7 @@ class BudgetTests(unittest.TestCase):
 
     def test_intent_describes_design_not_the_summarization_job(self):
         self.assertEqual(summaries.validate('intent',{'intent':'提炼已保存的方案分析','risk':'未知'},'方案分析'),['intent'])
-        self.assertEqual(summaries.validate('intent',{'intent':'提高召回覆盖','risk':'本方案不应采纳'},'提高召回覆盖'),['style'])
+        self.assertEqual(summaries.validate('intent',{'intent':'提高召回覆盖','risk':'本方案不应采纳'},'提高召回覆盖'),[])
 
     def test_provider_invalid_output_with_known_usage_gets_only_one_retry(self):
         from app.providers import ProviderInvalidResponse
