@@ -20,11 +20,16 @@ class ReadCacheMiddleware(BaseHTTPMiddleware):
 
     def read_version(self):
         stamps = []
+        paths = []
         for path in self.dependencies:
+            paths.append(path)
+            if path.is_dir():
+                paths.extend(sorted(p for p in path.rglob('*') if p.is_file()))
+        for path in paths:
             try:
                 stat = path.stat()
                 # SQLite creates/removes an empty WAL on read-only traffic; that is not a write.
-                stamps.append(None if path.name.endswith('-wal') and stat.st_size == 0 else (stat.st_ino, stat.st_mtime_ns, stat.st_size))
+                stamps.append(None if path.name.endswith('-wal') and stat.st_size == 0 else (str(path), stat.st_ino, stat.st_mtime_ns, stat.st_size))
             except FileNotFoundError:
                 stamps.append(None)
         return hashlib.sha256(repr(stamps).encode()).hexdigest()[:20]
@@ -35,6 +40,7 @@ class ReadCacheMiddleware(BaseHTTPMiddleware):
             path in {'/api/workspace', '/api/overview', '/api/evaluation', '/api/optimization',
                      '/api/bad-cases', '/api/pipeline', '/api/governance/snapshots',
                      '/api/governance/generation-runs', '/api/governance/candidates'}
+            or path in {'/api/documents', '/api/versions', '/api/monitoring', '/api/knowledge/chunk-diagnostics'}
             or path.startswith(('/api/evaluations/', '/api/experiments/', '/api/governance/questions/', '/api/documents/'))
             and path.count('/') == 3)
         if not cacheable:
@@ -48,7 +54,7 @@ class ReadCacheMiddleware(BaseHTTPMiddleware):
             active = db.execute("SELECT 1 FROM evaluation_runs WHERE status IN ('queued','running') LIMIT 1").fetchone()
         key = (path, request.url.query, request.headers.get('origin', ''))
         saved = self.cache.get(key)
-        if not active and saved and time.monotonic() - saved[0] < 30:
+        if not active and saved:
             self.cache.move_to_end(key)
             return Response(saved[1], status_code=200, headers=saved[2])
         response = await call_next(request)

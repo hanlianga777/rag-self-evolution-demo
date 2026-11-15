@@ -1,6 +1,6 @@
 """Read-only explanation of saved evidence; never rescore or rewrite a Run."""
 from .evaluation_contract import normalize
-from .read_view import memoized_view
+from .read_view import memoized_view, read_once
 from .diagnostic_categories import DIAGNOSTIC_CATEGORIES, category_definition
 
 TYPICAL = tuple(row['label'] for row in DIAGNOSTIC_CATEGORIES)
@@ -49,7 +49,7 @@ def _text(value):
     import unicodedata
     if not isinstance(value, str):
         return ''
-    return ''.join(c.lower() for c in unicodedata.normalize('NFKC', value) if c.isalnum())
+    return read_once(('normalized_text', value), lambda: ''.join(c.lower() for c in unicodedata.normalize('NFKC', value) if c.isalnum()))
 
 
 def standard_evidence(item):

@@ -2889,22 +2889,25 @@ class GovernanceStore:
 
     def _regression_review(self, connection, row, result):
         """Read-only current-rule view; persisted regression and qualifications stay intact."""
+        from .read_view import read_once
         unavailable = {**evaluate_regression(new_critical_failures=None, new_ordinary_failures=None),
                        'fixed_count': None, 'case_severities': {}}
         if row['status'] != 'evaluated' or result.get('evaluation_complete') is False:
             return unavailable
-        baseline = connection.execute('SELECT status,dataset_version_id,dataset_snapshot_json,judge_json FROM evaluation_runs WHERE id=?', (result.get('baseline_run_id'),)).fetchone()
+        baseline_key = ('regression_baseline', str(self.database_path), result.get('baseline_run_id'))
+        baseline = read_once(baseline_key, lambda: connection.execute('SELECT status,dataset_version_id,dataset_snapshot_json,judge_json FROM evaluation_runs WHERE id=?', (result.get('baseline_run_id'),)).fetchone())
         current = connection.execute('SELECT status,dataset_version_id,judge_json FROM evaluation_runs WHERE id=?', (result.get('evaluation_run_id'),)).fetchone()
         if not baseline or not current or baseline['status'] != 'completed' or current['status'] != 'completed':
             return unavailable
         identity = _load(baseline['judge_json'], {}).get('evaluation_identity')
         if not identity or identity != _load(current['judge_json'], {}).get('evaluation_identity') or not baseline['dataset_version_id'] or baseline['dataset_version_id'] != current['dataset_version_id']:
             return unavailable
-        golden = {q['id']: q for q in _load(baseline['dataset_snapshot_json'], {}).get('questions', [])}
+        golden = read_once((*baseline_key, 'questions'), lambda: {q['id']: q for q in _load(baseline['dataset_snapshot_json'], {}).get('questions', [])})
         def cases(run_id):
             return {item['question_id']: {'passed': item['passed'], 'severity': item['severity'], 'negative_subtype': item['negative_subtype']}
                     for item in connection.execute("SELECT question_id, json_extract(result_json,'$.passed') AS passed, json_extract(result_json,'$.severity') AS severity, json_extract(result_json,'$.negative_subtype') AS negative_subtype FROM evaluation_case_results WHERE run_id=?", (run_id,))}
-        before, after = cases(result.get('baseline_run_id')), cases(result.get('evaluation_run_id'))
+        before = read_once((*baseline_key, 'cases'), lambda: cases(result.get('baseline_run_id')))
+        after = cases(result.get('evaluation_run_id'))
         if not before or set(before) != set(after) or set(before) != set(golden) or any(type(v['passed']) is not int or v['passed'] not in (0, 1) for v in [*before.values(), *after.values()]):
             return unavailable
         severities = {q: 'critical' if protected_question(case, golden[q]) else 'ordinary'

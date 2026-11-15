@@ -142,6 +142,8 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
     return () => {cancelled=true;};
   }, [run.id, selectedCase?.question_id]);
   useEffect(()=>{
+    // Completed reports load first; the start guard still runs once details arrive.
+    if (run.status === 'completed' && !run.cases) return;
     let cancelled=false;
     const load=async()=>{
       setPreflight(null);
@@ -152,13 +154,13 @@ export function EvaluationPage({ data, navigate }: { data: any; navigate?: (page
     };
     void Promise.resolve().then(()=>{if(!cancelled)void load();});window.addEventListener('focus',load);
     return()=>{cancelled=true;window.removeEventListener('focus',load);};
-  },[run.id,run.status]);
+  },[run.id,run.status,!!run.cases]);
 
   useEffect(()=>{let cancelled=false;void Promise.resolve().then(()=>{if(!cancelled)return getJson<Row>('/api/evaluation?active_task=true&light=true').then(value=>{if(!cancelled && value.id && ["queued","running"].includes(value.status))setRun(current=>mergeEvaluationProgress(current,value))}).catch(()=>{});});return()=>{cancelled=true};},[]);
   useEffect(() => {
     if (!run.id) return;
     let cancelled = false;
-    if (run.status === "completed" && run.cases) {
+    if (run.status === "completed") {
       void getJson<Row>(`/api/evaluations/${run.id}`).then(value => { if (!cancelled) setRun(value); }).catch(reason => { if (!cancelled) setError(errorMessage(reason)); });
       return () => { cancelled = true; };
     }

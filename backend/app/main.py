@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from .ai_service import AiService
 from . import business_import
-from .corpus import CorpusStore, UPLOADS_DIR, current_manifest
+from .corpus import CorpusStore, DOCUMENTS_DIR, UPLOADS_DIR, current_manifest
 from .full_text import CORPUS_LOCK
 from .corpus_management import CorpusManager, require_consistent_switch
 from .config import load_settings
@@ -65,7 +65,8 @@ require_consistent_switch(corpus.index_dir, os.getenv("RAG_DEMO_DB_PATH") or Non
 safe_start = os.getenv("RAG_SAFE_START", "1") == "1"
 store = GovernanceStore(os.getenv("RAG_DEMO_DB_PATH") or None, migrate=not safe_start)
 app.add_middleware(ReadCacheMiddleware, database_path=store.database_path,
-    dependencies=[corpus.index_dir / 'manifest.json', store.database_path.parent / 'corpus_state.json',
+    dependencies=[corpus.index_dir, DOCUMENTS_DIR, UPLOADS_DIR,
+                  store.database_path.parent / 'corpus_operations', store.database_path.parent / 'corpus_state.json',
                   Path(__file__).resolve().parents[2] / '.env'])
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=3)
 ai_service = AiService(store, corpus, DeepSeekProvider(load_settings()), os.getenv("RAG_FORCE_MOCK") == "1")

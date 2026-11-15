@@ -15,6 +15,14 @@ def read_view():
     finally:_view.reset(token)
 
 
+def read_once(key, load):
+    """Reuse internal read-only inputs within this response, never across requests."""
+    cache = _view.get()
+    if cache is None:return load()
+    if key not in cache:cache[key] = load()
+    return cache[key]
+
+
 def memoized_view(function):
     @wraps(function)
     def read(*args,**kwargs):

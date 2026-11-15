@@ -1,0 +1,241 @@
+阶段,对象,口径,轮次,耗时毫秒
+优化前,默认首页,新浏览器上下文冷启动,1,775
+优化前,默认首页,新浏览器上下文冷启动,2,123.1
+优化前,默认首页,新浏览器上下文冷启动,3,124.5
+优化前,默认首页,新浏览器上下文冷启动,4,206.3
+优化前,默认首页,新浏览器上下文冷启动,5,776.7
+优化前,RAG 自进化概览,首访,1,63.6
+优化前,RAG 自进化概览,首访,2,75
+优化前,RAG 自进化概览,首访,3,70.8
+优化前,RAG 自进化概览,首访,4,69
+优化前,RAG 自进化概览,首访,5,51.8
+优化前,RAG 自进化概览,回访,1,28.5
+优化前,RAG 自进化概览,回访,2,29
+优化前,RAG 自进化概览,回访,3,31.4
+优化前,RAG 自进化概览,回访,4,29.6
+优化前,RAG 自进化概览,回访,5,30.5
+优化前,知识库,首访,1,71.5
+优化前,知识库,首访,2,62.6
+优化前,知识库,首访,3,56.4
+优化前,知识库,首访,4,68.2
+优化前,知识库,首访,5,55.7
+优化前,知识库,回访,1,80.5
+优化前,知识库,回访,2,329.8
+优化前,知识库,回访,3,207.2
+优化前,知识库,回访,4,297.7
+优化前,知识库,回访,5,252.1
+优化前,Golden Dataset,首访,1,671.8
+优化前,Golden Dataset,首访,2,304.9
+优化前,Golden Dataset,首访,3,295.9
+优化前,Golden Dataset,首访,4,299.6
+优化前,Golden Dataset,首访,5,308.5
+优化前,Golden Dataset,回访,1,61.2
+优化前,Golden Dataset,回访,2,61.6
+优化前,Golden Dataset,回访,3,60.7
+优化前,Golden Dataset,回访,4,62
+优化前,Golden Dataset,回访,5,61.4
+优化前,Pipeline 配置,首访,1,49.5
+优化前,Pipeline 配置,首访,2,49.9
+优化前,Pipeline 配置,首访,3,59.2
+优化前,Pipeline 配置,首访,4,56.4
+优化前,Pipeline 配置,首访,5,43.7
+优化前,Pipeline 配置,回访,1,24
+优化前,Pipeline 配置,回访,2,20.9
+优化前,Pipeline 配置,回访,3,26.9
+优化前,Pipeline 配置,回访,4,21.3
+优化前,Pipeline 配置,回访,5,27.2
+优化前,Baseline,首访,1,2148.7
+优化前,Baseline,首访,2,380.3
+优化前,Baseline,首访,3,379.6
+优化前,Baseline,首访,4,362.6
+优化前,Baseline,首访,5,364.2
+优化前,Baseline,回访,1,31.4
+优化前,Baseline,回访,2,30.9
+优化前,Baseline,回访,3,30.3
+优化前,Baseline,回访,4,31.1
+优化前,Baseline,回访,5,39.8
+优化前,Agent 工作台,首访,1,212.3
+优化前,Agent 工作台,首访,2,196.8
+优化前,Agent 工作台,首访,3,178.3
+优化前,Agent 工作台,首访,4,195.1
+优化前,Agent 工作台,首访,5,178.6
+优化前,Agent 工作台,回访,1,27.7
+优化前,Agent 工作台,回访,2,19
+优化前,Agent 工作台,回访,3,21.8
+优化前,Agent 工作台,回访,4,19.1
+优化前,Agent 工作台,回访,5,19.3
+优化前,发布,首访,1,485.6
+优化前,发布,首访,2,197.2
+优化前,发布,首访,3,130.8
+优化前,发布,首访,4,147.3
+优化前,发布,首访,5,146
+优化前,发布,回访,1,27.5
+优化前,发布,回访,2,28.9
+优化前,发布,回访,3,29.9
+优化前,发布,回访,4,30.4
+优化前,发布,回访,5,28.9
+优化前,问答验证,首访,1,470.1
+优化前,问答验证,首访,2,529.6
+优化前,问答验证,首访,3,481.5
+优化前,问答验证,首访,4,412.8
+优化前,问答验证,首访,5,429.3
+优化前,问答验证,回访,1,29.5
+优化前,问答验证,回访,2,30
+优化前,问答验证,回访,3,29.3
+优化前,问答验证,回访,4,30.8
+优化前,问答验证,回访,5,31.5
+优化后,默认首页,新浏览器上下文冷启动,1,1981.1
+优化后,默认首页,新浏览器上下文冷启动,2,142.7
+优化后,默认首页,新浏览器上下文冷启动,3,141.3
+优化后,默认首页,新浏览器上下文冷启动,4,141.2
+优化后,默认首页,新浏览器上下文冷启动,5,139.2
+优化后,RAG 自进化概览,首访,1,68
+优化后,RAG 自进化概览,首访,2,89.3
+优化后,RAG 自进化概览,首访,3,76.3
+优化后,RAG 自进化概览,首访,4,81.7
+优化后,RAG 自进化概览,首访,5,65.1
+优化后,RAG 自进化概览,回访,1,28.6
+优化后,RAG 自进化概览,回访,2,25.5
+优化后,RAG 自进化概览,回访,3,27.8
+优化后,RAG 自进化概览,回访,4,31
+优化后,RAG 自进化概览,回访,5,29.7
+优化后,知识库,首访,1,63.7
+优化后,知识库,首访,2,69.7
+优化后,知识库,首访,3,172
+优化后,知识库,首访,4,60.2
+优化后,知识库,首访,5,66
+优化后,知识库,回访,1,62.2
+优化后,知识库,回访,2,64.3
+优化后,知识库,回访,3,152.8
+优化后,知识库,回访,4,130.1
+优化后,知识库,回访,5,100.3
+优化后,Golden Dataset,首访,1,693.7
+优化后,Golden Dataset,首访,2,298.6
+优化后,Golden Dataset,首访,3,305.4
+优化后,Golden Dataset,首访,4,300.6
+优化后,Golden Dataset,首访,5,306.9
+优化后,Golden Dataset,回访,1,69.2
+优化后,Golden Dataset,回访,2,68.3
+优化后,Golden Dataset,回访,3,69.6
+优化后,Golden Dataset,回访,4,67.8
+优化后,Golden Dataset,回访,5,69.3
+优化后,Pipeline 配置,首访,1,61
+优化后,Pipeline 配置,首访,2,56.4
+优化后,Pipeline 配置,首访,3,51.1
+优化后,Pipeline 配置,首访,4,55.2
+优化后,Pipeline 配置,首访,5,47.6
+优化后,Pipeline 配置,回访,1,18.2
+优化后,Pipeline 配置,回访,2,29.1
+优化后,Pipeline 配置,回访,3,17
+优化后,Pipeline 配置,回访,4,15.8
+优化后,Pipeline 配置,回访,5,16.5
+优化后,Baseline,首访,1,1363.5
+优化后,Baseline,首访,2,281.9
+优化后,Baseline,首访,3,280.4
+优化后,Baseline,首访,4,280.7
+优化后,Baseline,首访,5,281.9
+优化后,Baseline,回访,1,28.1
+优化后,Baseline,回访,2,30.1
+优化后,Baseline,回访,3,26.9
+优化后,Baseline,回访,4,30.6
+优化后,Baseline,回访,5,28.8
+优化后,Agent 工作台,首访,1,694.3
+优化后,Agent 工作台,首访,2,211.8
+优化后,Agent 工作台,首访,3,228.7
+优化后,Agent 工作台,首访,4,210.4
+优化后,Agent 工作台,首访,5,178.7
+优化后,Agent 工作台,回访,1,30.4
+优化后,Agent 工作台,回访,2,28.6
+优化后,Agent 工作台,回访,3,31.8
+优化后,Agent 工作台,回访,4,37.7
+优化后,Agent 工作台,回访,5,29.2
+优化后,发布,首访,1,78.1
+优化后,发布,首访,2,80.2
+优化后,发布,首访,3,80.8
+优化后,发布,首访,4,63.8
+优化后,发布,首访,5,97.3
+优化后,发布,回访,1,29.2
+优化后,发布,回访,2,29.9
+优化后,发布,回访,3,28.8
+优化后,发布,回访,4,29.4
+优化后,发布,回访,5,30.2
+优化后,问答验证,首访,1,414.8
+优化后,问答验证,首访,2,97.3
+优化后,问答验证,首访,3,129.8
+优化后,问答验证,首访,4,112.9
+优化后,问答验证,首访,5,113.3
+优化后,问答验证,回访,1,30.2
+优化后,问答验证,回访,2,27.2
+优化后,问答验证,回访,3,28.2
+优化后,问答验证,回访,4,29
+优化后,问答验证,回访,5,21.6
+优化前,/api/evaluation/preflight?resume_source_id=EVAL-20261114165832146406,无响应缓存命中HTTP读取,1,720.289
+优化前,/api/evaluation/preflight?resume_source_id=EVAL-20261114165832146406,无响应缓存命中HTTP读取,2,715.914
+优化前,/api/evaluation/preflight?resume_source_id=EVAL-20261114165832146406,无响应缓存命中HTTP读取,3,732.164
+优化前,/api/evaluation/preflight?resume_source_id=EVAL-20261114165832146406,无响应缓存命中HTTP读取,4,713.525
+优化前,/api/evaluation/preflight?resume_source_id=EVAL-20261114165832146406,无响应缓存命中HTTP读取,5,711.032
+优化前,/api/evaluations/EVAL-20261114165832146406,无响应缓存命中HTTP读取,1,1238.803
+优化前,/api/evaluations/EVAL-20261114165832146406,无响应缓存命中HTTP读取,2,977.365
+优化前,/api/evaluations/EVAL-20261114165832146406,无响应缓存命中HTTP读取,3,1007.698
+优化前,/api/evaluations/EVAL-20261114165832146406,无响应缓存命中HTTP读取,4,983.597
+优化前,/api/evaluations/EVAL-20261114165832146406,无响应缓存命中HTTP读取,5,1010.276
+优化前,/api/evaluation?active_task=true&light=true,无响应缓存命中HTTP读取,1,163.785
+优化前,/api/evaluation?active_task=true&light=true,无响应缓存命中HTTP读取,2,167.471
+优化前,/api/evaluation?active_task=true&light=true,无响应缓存命中HTTP读取,3,174.554
+优化前,/api/evaluation?active_task=true&light=true,无响应缓存命中HTTP读取,4,160.919
+优化前,/api/evaluation?active_task=true&light=true,无响应缓存命中HTTP读取,5,387.637
+优化前,/api/evaluation,无响应缓存命中HTTP读取,1,544.543
+优化前,/api/evaluation,无响应缓存命中HTTP读取,2,552.867
+优化前,/api/evaluation,无响应缓存命中HTTP读取,3,536.353
+优化前,/api/evaluation,无响应缓存命中HTTP读取,4,537.168
+优化前,/api/evaluation,无响应缓存命中HTTP读取,5,549.359
+优化前,/api/optimization?light=true,无响应缓存命中HTTP读取,1,655.201
+优化前,/api/optimization?light=true,无响应缓存命中HTTP读取,2,614.67
+优化前,/api/optimization?light=true,无响应缓存命中HTTP读取,3,634.794
+优化前,/api/optimization?light=true,无响应缓存命中HTTP读取,4,832.849
+优化前,/api/optimization?light=true,无响应缓存命中HTTP读取,5,636.85
+优化前,/api/overview?light=true,无响应缓存命中HTTP读取,1,279.319
+优化前,/api/overview?light=true,无响应缓存命中HTTP读取,2,262.75
+优化前,/api/overview?light=true,无响应缓存命中HTTP读取,3,264.499
+优化前,/api/overview?light=true,无响应缓存命中HTTP读取,4,257.42
+优化前,/api/overview?light=true,无响应缓存命中HTTP读取,5,265.524
+优化前,/api/knowledge/chunk-diagnostics,无响应缓存命中HTTP读取,1,4.55
+优化前,/api/knowledge/chunk-diagnostics,无响应缓存命中HTTP读取,2,3.942
+优化前,/api/knowledge/chunk-diagnostics,无响应缓存命中HTTP读取,3,4.202
+优化前,/api/knowledge/chunk-diagnostics,无响应缓存命中HTTP读取,4,4.106
+优化前,/api/knowledge/chunk-diagnostics,无响应缓存命中HTTP读取,5,4.325
+优化后,/api/evaluation/preflight?resume_source_id=EVAL-20261114165832146406,无响应缓存命中HTTP读取,1,692.137
+优化后,/api/evaluation/preflight?resume_source_id=EVAL-20261114165832146406,无响应缓存命中HTTP读取,2,689.538
+优化后,/api/evaluation/preflight?resume_source_id=EVAL-20261114165832146406,无响应缓存命中HTTP读取,3,708.003
+优化后,/api/evaluation/preflight?resume_source_id=EVAL-20261114165832146406,无响应缓存命中HTTP读取,4,680.265
+优化后,/api/evaluation/preflight?resume_source_id=EVAL-20261114165832146406,无响应缓存命中HTTP读取,5,684.835
+优化后,/api/evaluations/EVAL-20261114165832146406,无响应缓存命中HTTP读取,1,764.849
+优化后,/api/evaluations/EVAL-20261114165832146406,无响应缓存命中HTTP读取,2,823.886
+优化后,/api/evaluations/EVAL-20261114165832146406,无响应缓存命中HTTP读取,3,867.513
+优化后,/api/evaluations/EVAL-20261114165832146406,无响应缓存命中HTTP读取,4,798.683
+优化后,/api/evaluations/EVAL-20261114165832146406,无响应缓存命中HTTP读取,5,775.285
+优化后,/api/evaluation?active_task=true&light=true,无响应缓存命中HTTP读取,1,179.515
+优化后,/api/evaluation?active_task=true&light=true,无响应缓存命中HTTP读取,2,159.144
+优化后,/api/evaluation?active_task=true&light=true,无响应缓存命中HTTP读取,3,168.358
+优化后,/api/evaluation?active_task=true&light=true,无响应缓存命中HTTP读取,4,158.161
+优化后,/api/evaluation?active_task=true&light=true,无响应缓存命中HTTP读取,5,158.852
+优化后,/api/evaluation,无响应缓存命中HTTP读取,1,443.718
+优化后,/api/evaluation,无响应缓存命中HTTP读取,2,437.745
+优化后,/api/evaluation,无响应缓存命中HTTP读取,3,437.884
+优化后,/api/evaluation,无响应缓存命中HTTP读取,4,432.854
+优化后,/api/evaluation,无响应缓存命中HTTP读取,5,630.451
+优化后,/api/optimization?light=true,无响应缓存命中HTTP读取,1,407.458
+优化后,/api/optimization?light=true,无响应缓存命中HTTP读取,2,378.956
+优化后,/api/optimization?light=true,无响应缓存命中HTTP读取,3,382.343
+优化后,/api/optimization?light=true,无响应缓存命中HTTP读取,4,406.103
+优化后,/api/optimization?light=true,无响应缓存命中HTTP读取,5,379.693
+优化后,/api/overview?light=true,无响应缓存命中HTTP读取,1,256.027
+优化后,/api/overview?light=true,无响应缓存命中HTTP读取,2,253.973
+优化后,/api/overview?light=true,无响应缓存命中HTTP读取,3,251.898
+优化后,/api/overview?light=true,无响应缓存命中HTTP读取,4,250.43
+优化后,/api/overview?light=true,无响应缓存命中HTTP读取,5,252.684
+优化后,/api/knowledge/chunk-diagnostics,无响应缓存命中HTTP读取,1,5.795
+优化后,/api/knowledge/chunk-diagnostics,无响应缓存命中HTTP读取,2,5.384
+优化后,/api/knowledge/chunk-diagnostics,无响应缓存命中HTTP读取,3,5.559
+优化后,/api/knowledge/chunk-diagnostics,无响应缓存命中HTTP读取,4,5.549
+优化后,/api/knowledge/chunk-diagnostics,无响应缓存命中HTTP读取,5,5.356
