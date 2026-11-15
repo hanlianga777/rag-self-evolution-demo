@@ -9,10 +9,12 @@ import { BadCaseOverview } from './components/ProductDiagnostics';
 let root: ReturnType<typeof createRoot>;
 afterEach(() => { if(root)act(()=>root.unmount()); document.body.innerHTML='';vi.unstubAllGlobals(); });
 const mount=async(node:React.ReactNode)=>{root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(node));};
-it('shows the supplied budget before creating an experiment',async()=>{
+it('keeps budget counters off the compact overview and blocks creation without targets',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{status:'not_run',evaluation_budget:{used:0,max:12,reserved_for_d:1}}}}/>);
- expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('0 / 12');
+ expect(document.querySelector('.ui-agent-stats')).toBeNull();
+ expect(document.querySelector('.agent-overview')?.textContent).toContain('尚无最终推荐');
+ expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('生成 A / B / C'))?.disabled).toBe(true);
  expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method || init.method==='GET')).toBe(true);
 });
 it('uses true errors in the overview while keeping saved correctness',async()=>{

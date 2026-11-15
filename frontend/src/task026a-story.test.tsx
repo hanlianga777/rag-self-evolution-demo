@@ -29,10 +29,10 @@ it('hides protected counts while pending, then shows verified counts without mut
  expect(actual().textContent).toBe('2 题全部守住');expect(document.querySelector('[aria-label="预测与实际"]')?.textContent).toContain('修好 Q04；Q06 未修好');
  expect(document.querySelector('.d-target-unfixed')?.textContent).toContain('Q06 未修好');expect(JSON.stringify(experiment)).toBe(original);
 });
-it('preheats only the completed D full run, usable even while other pages are warming',async()=>{
+it('defers D detail reads until its view opens and reuses the saved full run while warming',async()=>{
  const experiment=exp();experiment.candidates.unshift({id:'A',status:'evaluated',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'unneeded'}} as any);
  const fetcher=vi.fn(async(_input:string)=>new Response(JSON.stringify(savedRun)));vi.stubGlobal('fetch',fetcher);
- await warmPageData('evolution',{optimization:experiment} as any);expect(fetcher.mock.calls.map(c=>new URL(String(c[0])).pathname)).toEqual(['/api/evaluations/after']);
+ await warmPageData('evolution',{optimization:experiment} as any);expect(fetcher.mock.calls.map(c=>new URL(String(c[0])).pathname)).toEqual([]);
  await mount(<PageWarmupContext.Provider value={true}><DStory experiment={experiment}/></PageWarmupContext.Provider>);
  expect(document.querySelector('[aria-label="预测与实际"] tbody tr:nth-child(2) td:last-child')?.textContent).toBe('2 题全部守住');
 });
@@ -44,13 +44,14 @@ it.each(['','?tab=qa','?tab=compare','?tab=monitoring'])('opens the requested ve
 });
 it('shows real next-round inputs, one empty state and clickable remaining questions without writes',async()=>{
  location.hash='#verification?tab=monitoring';await mount(<VerificationPage data={{evaluation:{id:'base'},optimization:exp(),monitoring:{events:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- expect(document.querySelectorAll('.feedback-loop-node')).toHaveLength(0);expect([...document.querySelectorAll('.monitoring-remaining .ui-q')].map(n=>n.textContent)).toEqual(['Q06','Q27']);expect(document.querySelector('.monitoring-stats')?.textContent).toContain('标记为 Bad Case0');
+ expect(document.querySelectorAll('.feedback-loop-node')).toHaveLength(0);expect([...document.querySelectorAll('.monitoring-remaining .ui-q')].map(n=>n.textContent)).toEqual(['Q06','Q27']);expect(document.querySelector('.monitoring-stats')?.textContent).toContain('人工标注的 Bad Case 数0');
  expect(document.querySelector('.feedback-empty')?.textContent).toBe('暂无线上问答记录。');expect(document.body.textContent).not.toMatch(/当前尚无实际问答记录|当前尚无反馈记录|符合现有触发规则/);
  await click('Q27');expect(location.hash).toBe('#verification?tab=compare&q=Q27');expect(document.querySelector('.tabs [aria-pressed="true"]')?.textContent).toBe('Before/After');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method||init.method==='GET')).toBe(true);
 });
 it('counts only human-confirmed bad cases and retains feedback assessment controls',async()=>{
  location.hash='#verification?tab=monitoring';const events=[{id:'a',question:'保存的问题',bad_case:true,determinable:true},{id:'b',question:'未判定',bad_case:true,determinable:false},{id:'c',question:'正常',bad_case:false,determinable:true}];await mount(<VerificationPage data={{monitoring:{events}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>);
- expect([...document.querySelectorAll('.monitoring-stats strong')].map(n=>n.textContent)).toEqual(['3','2','1','—']);expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(3);expect(document.querySelectorAll('.monitoring-assessment button')).toHaveLength(9);expect(document.querySelector('.feedback-empty')).toBeNull();
+ expect([...document.querySelectorAll('.monitoring-stats strong')].map(n=>n.textContent)).toEqual(['3','—','未知','1']);expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(3);expect([...document.querySelectorAll('.monitoring-table button')].filter(b=>b.textContent==='标注')).toHaveLength(3);
+ await click('标注');expect(document.querySelector('[role=dialog]')?.textContent).toContain('标注');expect((fetch as any).mock.calls.every(([,init]:any[])=>!init?.method||init.method==='GET')).toBe(true);expect(document.querySelector('.feedback-empty')).toBeNull();
 });
 it('keeps online dots independently of editable draft selection without D result highlighting',async()=>{
  const baseline={candidate_k:8,top_k:2,generation_thinking:'max',hyde:false},online={...baseline,candidate_k:16,top_k:4,generation_thinking:'low'};

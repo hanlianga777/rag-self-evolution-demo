@@ -116,3 +116,12 @@ it('treats omitted evidence detail in light responses as unknown rather than an 
   expect(missedEvidenceRank(candidate, { evidence_positions: { omitted_count: 2 } })).toBeUndefined();
   expect(missedEvidenceRank(candidate, { evidence_positions: [{ final: '未进入', reranked: 8 }] })).toBe(8);
 });
+it('names the overview tab without the retired project overview wording', async () => {
+  const { OverviewPage } = await import('./pages/OverviewPage');
+  const host = document.body.appendChild(document.createElement('div')), root = createRoot(host);
+  try {
+    act(() => root.render(<OverviewPage data={{}} navigate={() => {}} />));
+    const labels = [...host.querySelectorAll('.tabs button')].map(node => node.textContent);
+    expect(labels).toEqual(['优化成果', '业务架构', '技术架构']);
+  } finally { act(() => root.unmount()); host.remove(); }
+});

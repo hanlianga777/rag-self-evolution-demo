@@ -50,7 +50,7 @@ it('refreshes an active Agent using progress without refetching the coverage pla
   vi.stubGlobal('fetch',fetcher);
   root=createRoot(document.body.appendChild(document.createElement('div')));
   const candidate={id:'a',status:'running',reasoning:{candidate_label:'A',round:1},result:{evaluation_run_id:'sandbox-013'}};
-  await act(async()=>root.render(<EvolutionPage data={{workspace:{},evaluation:{id:'baseline',status:'completed'},optimization:{id:'exp-013',candidates:[candidate],result:{optimization_cycle:{status:'running'}},evaluation_budget:{used:1,max:12}},badCases:[]}}/>));
+  await act(async()=>root.render(<EvolutionPage data={{workspace:{},evaluation:{id:'baseline',status:'completed'},optimization:{coverage_plan:{status:"complete",matrix:[]},id:'exp-013',candidates:[candidate],result:{optimization_cycle:{status:'running'}},evaluation_budget:{used:1,max:12}},badCases:[]}}/>));
   await act(async()=>vi.advanceTimersByTimeAsync(1000));
   expect(fetcher.mock.calls.some(([url])=>url.endsWith('/api/experiments/exp-013?light=true'))).toBe(true);
   expect(fetcher.mock.calls.some(([url])=>url.includes('planning=true'))).toBe(false);
@@ -88,4 +88,46 @@ it('polls an active revision without reloading saved drafts', async () => {
   await act(async()=>root.render(<CandidateWorkspace row={row} peers={[row]} revision={revision} busy={false} onRun={()=>{}} onReview={async()=>false} onRefresh={async()=>{}} operation={{watchRevision:()=>{}} as any}/>));
   expect(fetcher.mock.calls.some(([url])=>url.endsWith('/api/governance/revisions/revision-light?light=true'))).toBe(true);
   expect(fetcher.mock.calls.some(([url])=>url.endsWith('/api/governance/revisions/revision-light'))).toBe(false);
+});
+
+it.each([
+  {id:'other-experiment',current_baseline_id:'planning-baseline'},
+  {id:'planning-experiment',current_baseline_id:'other-baseline'},
+])('keeps paid Sandbox blocked when lazy planning identity does not match (%j)',async identity=>{
+  vi.useFakeTimers();
+  const {EvolutionPage}=await import('./pages/EvolutionPage');
+  const candidate={id:'planning-A',status:'generated',reasoning:{candidate_label:'A',round:1}};
+  const optimization={id:'planning-experiment',candidates:[candidate],evaluation_budget:{used:0,max:12,reserved_for_d:1}};
+  const fetcher=vi.fn((url:string)=>response(url.includes('planning=true')?{...optimization,...identity,coverage_plan:{status:'complete',matrix:[]}}:{search_space:{}}));
+  vi.stubGlobal('fetch',fetcher);
+  root=createRoot(document.body.appendChild(document.createElement('div')));
+  await act(async()=>root.render(<EvolutionPage data={{evaluation:{id:'planning-baseline',status:'completed'},optimization}}/>));
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='Candidates 对比')!.click());
+  const run=()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='运行 Sandbox')!;
+  expect(run().disabled).toBe(true);
+  await act(async()=>vi.advanceTimersByTimeAsync(50));
+  expect(fetcher.mock.calls.some(([url])=>url.includes('planning=true'))).toBe(true);
+  expect(run().disabled).toBe(true);
+  await act(async()=>run().click());
+  expect(document.querySelector('.confirm-dialog')).toBeNull();
+  expect(fetcher.mock.calls.every((call:any[])=>!call[1]?.method)).toBe(true);
+});
+
+it('enables paid Sandbox only after matching lazy planning arrives and still requires explicit consent',async()=>{
+  vi.useFakeTimers();
+  const {EvolutionPage}=await import('./pages/EvolutionPage');
+  const candidate={id:'ready-A',status:'generated',reasoning:{candidate_label:'A',round:1}};
+  const optimization={id:'ready-experiment',candidates:[candidate],evaluation_budget:{used:0,max:12,reserved_for_d:1}};
+  const fetcher=vi.fn((url:string)=>response(url.includes('planning=true')?{...optimization,current_baseline_id:'ready-baseline',coverage_plan:{status:'complete',matrix:[]}}:{search_space:{}}));
+  vi.stubGlobal('fetch',fetcher);
+  root=createRoot(document.body.appendChild(document.createElement('div')));
+  await act(async()=>root.render(<EvolutionPage data={{evaluation:{id:'ready-baseline',status:'completed'},optimization}}/>));
+  await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='Candidates 对比')!.click());
+  const run=()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='运行 Sandbox')!;
+  expect(run().disabled).toBe(true);
+  await act(async()=>vi.advanceTimersByTimeAsync(50));
+  expect(run().disabled).toBe(false);
+  await act(async()=>run().click());
+  expect(document.querySelector('.confirm-dialog')).not.toBeNull();
+  expect(fetcher.mock.calls.every((call:any[])=>!call[1]?.method)).toBe(true);
 });

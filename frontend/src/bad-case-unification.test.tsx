@@ -21,12 +21,13 @@ it('uses failed business requirements and saved plans instead of internal diagno
 it('retains all ten planning targets under identity block and hides technical classifications',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  await render(<EvolutionPage data={{evaluation,badCases:rows,workspace:{requires_policy_upgrade:true}}}/>);
- expect(document.querySelectorAll('.agent-case-destinations .ui-q')).toHaveLength(10);
- expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(10);
+ expect(document.querySelector('.agent-case-destinations')).toBeNull();
+ expect(agentDiagnosisRows(rows)).toHaveLength(10);
+ expect(agentDiagnosisRows(rows).map(row=>row.question_id)).toEqual(rows.map(row=>row.question_id));
  expect(document.body.textContent).not.toMatch(/已确认可干预|可探索 \d|saved_diagnostic_identity_changed/);
  expect([...document.querySelectorAll('button')].find(b=>b.textContent?.includes('生成 A / B / C'))?.disabled).toBe(true);
- expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(10);
- expect(document.querySelector('.agent-case-destinations')?.textContent).toContain('排序与上下文选择');
+ expect(agentDiagnosisRows(rows).map(row=>row.question_id)).toEqual(rows.map(row=>row.question_id));
+ expect(savedDirections(rows[0])).toContain('排序与上下文选择');
 });
 it('shows a single business count without a shortcut that triggers Agent expectations',async()=>{
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/api/bad-cases')?rows:url.endsWith('/api/evaluations/baseline')?evaluation:{}))));
@@ -38,12 +39,12 @@ it('shows a single business count without a shortcut that triggers Agent expecta
 });
 it('offers Sandbox for one valid candidate while disclosing rejected candidates',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
- await render(<EvolutionPage data={{evaluation,badCases:rows,optimization:{id:'partial',evaluation_budget:{used:0,max:12,reserved_for_d:1},candidates:[{id:'valid-a',status:'generated',reasoning:{candidate_label:'A',round:1,hypothesis:'原始合法假设'}}],result:{generation_status:'partial',rejected_candidates:[{id:'B',reason:'参数类型错误'}]}}}}/>);
+ await render(<EvolutionPage data={{evaluation,badCases:rows,optimization:{coverage_plan:{status:"complete",matrix:[]},id:'partial',evaluation_budget:{used:0,max:12,reserved_for_d:1},candidates:[{id:'valid-a',status:'generated',reasoning:{candidate_label:'A',round:1,hypothesis:'原始合法假设'}}],result:{generation_status:'partial',rejected_candidates:[{id:'B',reason:'参数类型错误'}]}}}}/>);
  expect(document.body.textContent).toContain('保留 1 个合法 Candidate，拒绝 1 个 Candidate');
  expect([...document.querySelectorAll('button')].find(b=>b.textContent?.includes('运行本轮 A/B/C Sandbox'))?.disabled).toBe(false);
- expect(document.querySelector('.ui-agent-stats > div:nth-child(2) dd')?.textContent).toBe('1');
- await click('Candidate 对比');
+ expect(document.querySelector('.ui-agent-stats')).toBeNull();
+ await click('Candidates 对比');
  expect(document.querySelectorAll('.candidate-cards > .candidate-card')).toHaveLength(1);
- expect(document.querySelector('.candidate-card')?.textContent).toContain('原始合法假设');
+ expect(document.querySelector('.agent-round-strategy')?.textContent).toContain('原始合法假设');
  expect(document.querySelector('details[open]')).toBeNull();
 });

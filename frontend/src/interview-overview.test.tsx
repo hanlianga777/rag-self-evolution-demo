@@ -21,7 +21,8 @@ it.each(["generating", "needs_regeneration", "failed"])("keeps the frozen Golden
   expect(document.querySelector(".ui-ov-action")?.textContent).toBe("运行优化 Agent");
   await act(async()=>document.querySelector<HTMLButtonElement>(".ui-ov-action")!.click()); expect(navigate).toHaveBeenCalledWith("evolution");
   expect(document.querySelector(".overview-work-run")).toBeNull();
-  expect(document.querySelectorAll(".ui-ov-step")).toHaveLength(6);
+  expect(document.querySelectorAll(".ui-ov-step")).toHaveLength(7);
+  expect(document.querySelectorAll(".ui-ov-step")[2].textContent).toContain("Pipeline");
   expect(JSON.stringify(data)).toBe(before);
   expect(fetch).not.toHaveBeenCalled();
 });

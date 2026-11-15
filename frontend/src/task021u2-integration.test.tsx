@@ -17,9 +17,9 @@ it('uses compact parameter radios, keeps dependencies and omits internal setting
  await mount(<SettingsPage data={{}}/>);
  expect(document.querySelectorAll('.ui-pg-group')).toHaveLength(4);
  expect(document.querySelectorAll('[data-parameter="top_k"] [role=radio]')).toHaveLength(2);
- expect([...document.querySelectorAll<HTMLButtonElement>('[data-parameter="hybrid_alpha"] button')].every(b=>b.disabled)).toBe(true);
+ expect([...document.querySelectorAll<HTMLButtonElement>('[data-parameter="hybrid_alpha"] [role=radio]')].every(b=>b.disabled)).toBe(true);
  expect(document.body.textContent).not.toMatch(/运行设置|无人值守|平价|当前线上配置/);
- await act(async()=>document.querySelector<HTMLButtonElement>('[data-parameter="candidate_k"] button:last-child')!.click());
+ await act(async()=>document.querySelector<HTMLButtonElement>('[data-parameter="candidate_k"] [role=radio]:last-child')!.click());
  expect(document.querySelectorAll('[data-parameter="top_k"] [role=radio]')).toHaveLength(3);
  expect(document.querySelector('.pipeline-draft-actions .ui-param')?.textContent).toContain('4 → 12');
 });

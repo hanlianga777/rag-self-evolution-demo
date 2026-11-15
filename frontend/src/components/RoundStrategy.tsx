@@ -27,7 +27,7 @@ export function RoundStrategy({experiment, round, baseline = {}}: {experiment: a
       return <article key={candidate.id}><h4>{name(experiment, candidate.id)}</h4>{r.inherited_from && <div className="muted agent-inherited"><p>在{parentName}的基础上</p><ChangedParameters before={baseline} after={{...baseline, ...inherited}}/></div>}
         <div className="agent-new-changes"><ChangedParameters before={{...baseline, ...inherited}} after={candidate.config || {...baseline, ...inherited, ...(r.changed_parameters || r.changed_parameters_vs_baseline)}}/></div>
         <p><strong>要解决的问题：</strong>{prose(r.hypothesis || r.core_idea)}</p><p><strong>预计修好：</strong>{questions(r.predicted_fixed_question_ids)}</p>
-        <p><strong>风险：</strong>{prose(risks.filter(Boolean).join('；'))}</p><details><summary>依据</summary><p>{prose(r.proposal || refs.join('；'))}</p></details>
+        <p><strong>风险：</strong>{prose(risks.filter(Boolean).join('；').replace(/。\s*；/g, '；'))}</p><details><summary>依据</summary><p>{prose(r.proposal || refs.join('；'))}</p></details>
       </article>;
     })}</div>
   </section>;

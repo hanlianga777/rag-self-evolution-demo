@@ -48,8 +48,8 @@ it.each([1,2,3])('shows %i missing and newly met points once in the comparison t
  await mount(<SavedAnswerComparison data={{evaluation:{id:'n-base'},optimization:{recommendation:{recommended_candidate:'D'},candidates:[{id:'D',status:'evaluated',result:{evaluation_run_id:'n-after',evaluation_complete:true,total:1}}]}}} onOpenCitation={()=>{}}/>);
  const rows=[...document.querySelectorAll('.comparison-ptable tbody tr')];
  expect(rows).toHaveLength(count);
- expect(rows.map(row=>row.querySelector('td')?.textContent)).toEqual(['结构完好','电池无损','摇杆在中位'].slice(0,count).map((text,i)=>`${i+1}${text}新满足`));
- for(const row of rows){expect(row.querySelector('td:nth-child(2)')?.textContent).toBe('错');expect(row.querySelector('td:nth-child(3)')?.textContent).toBe('对');}
+ expect(rows.map(row=>row.querySelector('td')?.textContent)).toEqual(['结构完好','电池无损','摇杆在中位'].slice(0,count).map((text,i)=>`${i+1}${text}`));
+ for(const row of rows){expect(row.querySelector('td:nth-child(2)')?.textContent).toBe('错');expect(row.querySelector('td:nth-child(3)')?.textContent).toBe('对新满足');}
  expect(document.querySelectorAll('.comparison-flag')).toHaveLength(0);
  expect(document.querySelectorAll('.comparison-newtag')).toHaveLength(count);
 });

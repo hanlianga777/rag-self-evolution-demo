@@ -27,7 +27,7 @@ it('normalizes displayed Agent reviews and predictions while preserving saved ev
  const exp=experiment(),original=JSON.stringify(exp);
  await mount(<EvolutionRoute evaluation={evaluation} experiment={exp} badCases={[]}/>);
  expect(document.querySelector('.route-review')?.textContent).toContain(`${questionId}/Q29并附带修Q38；Top-K 6，Rerank query_only，DOC-001-C-00096。`);
- expect(document.querySelector('.d-story')?.textContent).toContain(declinedReason.replace('safe_rejection','安全拒答率'));
+ expect(document.querySelector('.d-story')?.textContent).toContain(storyText(declinedReason,true));
  expect(JSON.stringify(exp)).toBe(original);
 });
 it('keeps repair and regression summaries ahead of the independently scrolling details',async()=>{
@@ -52,10 +52,15 @@ it.each(['declined','lost','won','running','generated','failed','unknown'])('exp
  if(outcome==='unknown')d.result={...d.result,evaluation_complete:false} as any;
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
  await mount(<EvolutionPage data={{evaluation,optimization:exp}}/>);
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='进化路线')!.click());await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
- const route=document.querySelector('.ui-evo .d-story')?.textContent || '';
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidates 对比')!.click());await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
+ const route=document.querySelector('.d-story')?.textContent || '';
  await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='回归与推荐')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
- const final=document.querySelector('.page-content')!.textContent || '';
+ const disclosure=document.querySelector<HTMLDetailsElement>('.agent-saved-recommendation')!;
+ expect(disclosure.open).toBe(false);
+ await act(async()=>{disclosure.open=true;disclosure.dispatchEvent(new Event('toggle'));});
+ const final=disclosure.textContent || '';
+ expect(document.querySelector('.agent-recommendation-points')?.textContent).toContain('一、质量：');
+ expect(document.querySelector('.agent-recommendation-points')?.textContent).toContain('四、回归：');
  for(const text of [route,final]){
   expect(text).not.toContain('D未同时满足');
   if(outcome==='declined'){expect(text).toContain('Agent 判断不做 D');expect(text).toContain('保留R3-C');expect(text).not.toContain('没有胜过');}
@@ -63,16 +68,23 @@ it.each(['declined','lost','won','running','generated','failed','unknown'])('exp
   else if(outcome==='won')expect(text).toContain('D 胜过 Winner，推荐 D');
   else {expect(text).not.toContain('D 已完成评测');expect(text).not.toContain('D 胜过 Winner');}
  }
+ if(['running','generated','failed','unknown'].includes(outcome)){
+  expect(final).toContain('尚无完整评测结论');expect(final).toContain('保留R3-C');
+  expect(final).toContain(outcome==='running'?'D 评测中':outcome==='failed'?'D 评测中断':'D 已生成');
+ }
 });
 it.each([
  ['declined','Agent 判断不做 D'],['generated','D 已生成'],['running','D 评测中'],
-])('shows current D state and round-qualified recommendation in progress (%s)',async(status,label)=>{
+])('shows round-qualified recommendation in overview and current D state in its decision panel (%s)',async(status,label)=>{
  const exp=experiment();
  if(status!=='declined')exp.candidates.push({...winner,id:'EXP-20261105143048349606-D',status,reasoning:{candidate_label:'D'} as any});
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(exp))));
  await mount(<EvolutionPage data={{evaluation,optimization:exp}}/>);
- expect(document.querySelector('.ui-agent-stats')?.textContent).toContain(label);
- expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('R3-C');
+ expect(document.querySelector('.ui-agent-stats')).toBeNull();
+ expect(document.querySelector('.agent-overview')?.textContent).toContain('第 3 轮 Candidate C');
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidates 对比')!.click());
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
+ expect(document.querySelector('.d-story')?.textContent).toContain(status==='declined'?label:status==='running'?'运行中':'等待完整评测');
  expect([...document.querySelectorAll('button')].some(b=>/^历史实验 · \d/.test(b.textContent || ''))).toBe(false);
  expect([...document.querySelectorAll('.page-title button')].some(b=>b.textContent==='查看历史实验')).toBe(false);
  expect(document.querySelectorAll('.page-title button')).toHaveLength(status==='running'?1:0);

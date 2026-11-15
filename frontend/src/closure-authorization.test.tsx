@@ -12,7 +12,7 @@ async function click(text:string){await act(async()=>[...document.querySelectorA
 const run={id:'fixture-B',status:'completed',config:{top_k:3},cases:[],result:{gates:{passed:true,passed_count:11,total:11},bad_case_count:0},dataset_snapshot:{id:'fixture-g',question_ids:['q']}};
 it('starts an eligible Baseline only after the fee confirmation',async()=>{
  const calls=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/preflight')?{can_start:true,can_resume:false}:url.endsWith('/api/bad-cases')?[]:run)));vi.stubGlobal('fetch',calls);
- await render(<EvaluationPage data={{evaluation:run}}/>);await click('重新评测 Baseline');
+ await render(<EvaluationPage data={{evaluation:{...run,id:undefined,status:"not_run"}}}/>);await click('运行 Baseline 评测');
  expect(document.querySelector('[role=dialog]')).not.toBeNull();
  expect(calls.mock.calls.some((c:any[])=>c[1]?.method==='POST')).toBe(false);
  await click('确认');
@@ -28,8 +28,8 @@ it('old policy blocks batch execution and preserves historical data',async()=>{
 it('latest candidate cards preserve provenance with history entry removed',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const candidates=[1,2].flatMap(round=>['A','B','C'].map(label=>({id:`fixture-${round}-${label}`,status:round===1?'evaluated':'generated',config:{top_k:6},reasoning:{round,candidate_label:label,hypothesis:`saved ${round}-${label}`},result:{}})));
- await render(<EvolutionPage data={{evaluation:run,optimization:{id:'fixture-E',candidates}}}/>);await click('Candidate 对比');
- expect(document.querySelectorAll('.candidate-card')).toHaveLength(3);expect(document.querySelector('.candidate-card')?.textContent).toContain('saved 2-A');
+ await render(<EvolutionPage data={{evaluation:run,optimization:{id:'fixture-E',candidates}}}/>);await click('Candidates 对比');
+ expect(document.querySelectorAll('.candidate-card')).toHaveLength(3);expect(document.querySelector('.agent-strategy-plans')?.textContent).toContain('saved 2-A');
  expect([...document.querySelectorAll('button')].some(button=>button.textContent==='查看历史实验')).toBe(false);
  expect(document.querySelector('[role=dialog]')).toBeNull();
  expect(candidates[0].reasoning.hypothesis).toBe('saved 1-A');

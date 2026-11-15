@@ -20,15 +20,15 @@ it('uses server full eligibility and sends the explicit resume ID',async()=>{
  expect(document.body.textContent).toContain('恢复 Baseline');await authorize('恢复 Baseline');
  const post=f.mock.calls.find(([,init])=>init?.method==='POST')!;expect(JSON.parse(post[1]!.body as string)).toEqual({resume_source_id:'explicit-old'});
 });
-it('forces fresh when full identity differs even if old policy flag says current',async()=>{
+it('keeps an incompatible saved Baseline read-only when full identity differs',async()=>{
  const f=await render({can_start:true,can_resume:false,resume_source_id:null,reason:null,resume_reason:'Pipeline配置不同'});
  expect([...document.querySelectorAll('button')].some(b=>b.textContent==='恢复 Baseline')).toBe(false);
- await authorize('重新评测 Baseline');const post=f.mock.calls.find(([,init])=>init?.method==='POST')!;
- expect(JSON.parse(post[1]!.body as string)).toEqual({fresh:true});
+ expect([...document.querySelectorAll('button')].some(b=>b.textContent==='重新评测 Baseline')).toBe(false);
+ expect(f.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
 });
 it('disables unavailable Golden/Corpus and never posts without authorization',async()=>{
  const f=await render({can_start:false,can_resume:false,resume_source_id:null,reason:'Corpus已变化，需确认新的Golden'});
  expect(document.body.textContent).toContain('Corpus已变化，需确认新的Golden');
- expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='重新评测 Baseline')?.disabled).toBe(true);
+ expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='重新评测 Baseline')).toBeUndefined();
  expect(f.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
 });

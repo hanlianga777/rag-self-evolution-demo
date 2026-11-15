@@ -26,9 +26,9 @@ it('keeps the report while removing the technical-metrics entry',async()=>{
 it('keeps insufficient candidate evidence explicit and renders saved candidate reasoning in one Drawer',async()=>{
  const candidate={id:'a',status:'generated',config:{top_k:3},reasoning:{candidate_label:'A',hypothesis:'保存假设',proposal:'保存理由',root_cause:'Generation',root_cause_evidence:['case1'],intervention_direction:'Generation',evidence_assertions:[{target_id:'case1',observation:'保存的原文观察'}],expected_improvement:'保存改善',risk:'保存风险',target_bad_cases:['case1']}};
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/candidates/')?candidate:{search_space:{}}))));
- await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[candidate],result:{generation_status:'insufficient_evidence',insufficient_evidence:'其余候选缺少Trace依据'}}}}/>);
+ await render(<EvolutionPage data={{evaluation,optimization:{coverage_plan:{status:"complete",matrix:[]},id:'exp',candidates:[candidate],result:{generation_status:'insufficient_evidence',insufficient_evidence:'其余候选缺少Trace依据'}}}}/>);
  expect(document.body.textContent).toContain('其余候选缺少Trace依据');
- await click('Candidate 对比');await click('查看 Candidate 与完整报告');await openSavedReport();
+ await click('Candidates 对比');await click('查看 Candidate 与完整报告');await openSavedReport();
  expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
  const text=document.querySelector('[role="dialog"]')!.textContent;
  for(const saved of ['保存假设','保存理由','保存的原文观察','保存改善','保存风险','intervention_direction','root_cause_evidence'])expect(text).toContain(saved);
@@ -60,7 +60,7 @@ it('preloads monitoring events once and switches its tab without requests',async
 it('separates saved formal blockers from confirmed regression without clearing pending risk',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const result={comparison_version:'offline',regression:{status:'FAIL',new_critical_failures:0,new_ordinary_failures:2},formal_blocking_question_ids:['q1','q2'],confirmed_regression_question_ids:[],pending_regression_question_ids:['q1'],disputed_regression_question_ids:['q2'],unclassified_regression_question_ids:[]};
- await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result}]}}}/>);await click('Candidate 对比');
+ await render(<EvolutionPage data={{evaluation,optimization:{coverage_plan:{status:"complete",matrix:[]},id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result}]}}}/>);await click('Candidates 对比');
  expect(document.querySelector('.ui-ct-more')).toBeNull();
  expect(document.querySelector('.sandbox-core-table')?.textContent).toContain('正式阻断 · 严重 0 / 普通 2');expect(document.body.textContent).not.toMatch(/已确认失败|待复核|争议|未分类/);expect(document.body.textContent).toContain('未通过');expect(result.pending_regression_question_ids).toEqual(['q1']);expect(result.disputed_regression_question_ids).toEqual(['q2']);
 });
@@ -81,39 +81,42 @@ it('renders all Full100 diagnosis rows immediately and resets after filtering',a
 it('keeps all hundred saved Candidate report cases accessible in the existing Drawer',async()=>{
  const cases=Array.from({length:100},(_,i)=>({question_id:`Q${i+1}`,question:`Candidate题目${i+1}`,passed:true}));
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('/api/evaluations/')?{cases}:{search_space:{}}))));
- await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'candidate-run'}}]}}}/>);
- await click('Candidate 对比');await click('查看 Candidate 与完整报告');await openSavedReport();
+ await render(<EvolutionPage data={{evaluation,optimization:{coverage_plan:{status:"complete",matrix:[]},id:'exp',candidates:[{id:'a',status:'evaluated',reasoning:{candidate_label:'A'},result:{evaluation_run_id:'candidate-run'}}]}}}/>);
+ await click('Candidates 对比');await click('查看 Candidate 与完整报告');await openSavedReport();
  expect(document.querySelectorAll('.drawer tbody tr')).toHaveLength(100);expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目100');
  expect([...document.querySelectorAll('.drawer button')].some(b=>b.textContent==='下一页')).toBe(false);
  expect(document.querySelector('.drawer tbody')?.textContent).toContain('Candidate题目1');expect(cases).toHaveLength(100);
 });
-it('shows every current business failure in Agent including pending diagnoses',async()=>{
+it('retains all current business failures in the candidate target drawer including pending diagnoses',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const badCases=Array.from({length:10},(_,i)=>({run_id:'offline',question_id:`fresh-${i}`,result:{question:`真实问题${i}`,passed:false,evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL'},diagnostic_view:{primary_root_cause:i?'Unknown':'Ranking',target_eligible:!i,is_technical_bad_case:!i,analysis_category:i?'insufficient_evidence':'rag_failure',optimization_directions:i?[]:['context_selection']}}}));
- await render(<EvolutionPage data={{evaluation,badCases}}/>);
- expect(document.querySelectorAll('.agent-case-destinations .ui-q')).toHaveLength(10);
- expect([...document.querySelectorAll('button')].find(button=>button.textContent?.includes('生成 A / B / C'))?.disabled).toBe(false);
- expect(document.querySelectorAll('.agent-case-destinations tbody tr')).toHaveLength(10);
+ const candidate={id:'all-targets',status:'generated',reasoning:{candidate_label:'A',observed_evidence:badCases.map(row=>row.question_id)}};
+ await render(<EvolutionPage data={{evaluation,badCases,optimization:{id:'all-target-experiment',coverage_plan:{status:'complete',matrix:[]},candidates:[candidate]}}}/>);
+ expect(document.querySelector('.agent-case-destinations')).toBeNull();
+ await click('Candidates 对比');await click('查看目标 10 题');
+ expect(document.querySelectorAll('[role=dialog] tbody tr')).toHaveLength(10);
+ for(let i=0;i<10;i++)expect(document.querySelector('[role=dialog]')?.textContent).toContain(`真实问题${i}`);
+ expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('已确认可干预');
 });
 it('connects an unknown exploratory target to its saved candidate without calling it confirmed',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({search_space:{}}))));
  const badCases=[{run_id:'offline',question_id:'new-explore',result:{question:'未知原因的维护遗漏',passed:false,evaluation_outcome:{contract_version:'business-vnext-1',execution_complete:true,verdict:'FAIL'},diagnostic_view:{primary_root_cause:'Unknown',target_eligible:false,is_technical_bad_case:false,analysis_category:'insufficient_evidence',optimization_directions:[],experiment_plan:{status:'exploratory',directions:['candidate_recall'],next_action:'controlled_sandbox'}}}}];
- const optimization={id:'exp',result:{diagnostic_tasks:[{question_id:'new-explore',status:'exploratory',experiment_plan:{directions:['candidate_recall']}}]},candidates:[{id:'a',status:'generated',config:{candidate_k:24},reasoning:{candidate_label:'A',observed_evidence:['new-explore'],experiment_kind:'exploratory',hypothesis:'扩大候选池验证缺失来源',falsification:'目标仍失败则不支持'}}]};
+ const optimization={coverage_plan:{status:'complete',matrix:[]},id:'exp',result:{diagnostic_tasks:[{question_id:'new-explore',status:'exploratory',experiment_plan:{directions:['candidate_recall']}}]},candidates:[{id:'a',status:'generated',config:{candidate_k:24},reasoning:{candidate_label:'A',observed_evidence:['new-explore'],experiment_kind:'exploratory',hypothesis:'扩大候选池验证缺失来源',falsification:'目标仍失败则不支持'}}]};
  await render(<EvolutionPage data={{evaluation,badCases,optimization}}/>);
- expect(document.querySelector('.agent-case-destinations')?.textContent).toContain('分类未知');
- expect(document.querySelector('.agent-case-destinations')?.textContent).toContain('Candidate A');
- await act(async()=>document.querySelector<HTMLElement>('.agent-case-destinations tbody tr')!.click());
+ expect(document.querySelector('.agent-case-destinations')).toBeNull();
+ await click('Candidates 对比');expect(document.querySelector('.agent-round-strategy')?.textContent).toContain('扩大候选池验证缺失来源');
+ await click('查看目标 1 题');
  expect(document.querySelector('[role=dialog]')?.textContent).toContain('未知原因的维护遗漏');
- await act(async()=>document.querySelector<HTMLButtonElement>('[aria-label=关闭]')!.click());
- await click('进化路线');expect(document.querySelector('.agent-design-intent')?.textContent).toContain('扩大候选池验证缺失来源');
+ expect(document.querySelector('[role=dialog]')?.textContent).not.toContain('已确认');
+ expect(badCases[0].result.diagnostic_view.primary_root_cause).toBe('Unknown');
  expect(document.body.textContent).not.toContain('诊断待完成的先补证');
 });
 it('opens Sandbox fee confirmation without a budget and submits only explicit consent',async()=>{
  const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.endsWith('/run')?{id:'offline-run'}:url.includes('/optimization')?{id:'exp',candidates:[]}:{})));
  vi.stubGlobal('fetch',fetcher);
  const candidate={id:'c',status:'generated',config:{rerank:'query_only'},reasoning:{candidate_label:'C',round:1},resume_plan:{can_resume:true,completed:0,total:50}};
- await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[candidate],evaluation_budget:{used:2,max:12,reserved_for_d:1}}}}/>);
- await click('Candidate 对比');
+ await render(<EvolutionPage data={{evaluation,optimization:{coverage_plan:{status:"complete",matrix:[]},id:'exp',candidates:[candidate],evaluation_budget:{used:2,max:12,reserved_for_d:1}}}}/>);
+ await click('Candidates 对比');
  expect(document.querySelector('input[aria-label="Sandbox人民币累计硬上限"]')).toBeNull();
  await click('运行 Sandbox');
  expect(document.querySelector('.confirm-dialog')).not.toBeNull();
@@ -125,7 +128,7 @@ it('opens Sandbox fee confirmation without a budget and submits only explicit co
 it('shows the saved unknown-charge reason when A cannot resume',async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>new Response('{}')));
  const candidate={id:'a',status:'failed',config:{},reasoning:{candidate_label:'A'},resume_plan:{can_resume:false,reason:'需先对账：历史请求执行结果未知'}};
- await render(<EvolutionPage data={{evaluation,optimization:{id:'exp',candidates:[candidate]}}}/>);await click('Candidate 对比');await click('继续 Sandbox');
+ await render(<EvolutionPage data={{evaluation,optimization:{coverage_plan:{status:"complete",matrix:[]},id:'exp',candidates:[candidate]}}}/>);await click('Candidates 对比');await click('继续 Sandbox');
  expect(document.querySelector('[role="alert"]')?.textContent).toContain('需先对账');
  expect(document.activeElement).toBe(document.querySelector('[role="alert"]'));
  expect(document.querySelector('[role="dialog"]')).toBeNull();

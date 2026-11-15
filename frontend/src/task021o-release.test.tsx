@@ -20,11 +20,11 @@ it('explains alternatives from saved repairs, regressions and gates rather than 
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{id:'exp',status:'completed',evaluation_budget:{used:10,max:12},candidates:[broken,slow,c,d],result:{composite:{status:'generated',candidate_id:'D'},report_confirmation:{winner_id:'C'}},recommendation:{result:{status:'Recommended',recommended_candidate:'D',not_recommended:[{candidate_id:'broken',reason:'资格未通过'},{candidate_id:'slow',reason:'资格未通过'}]}}}}}/>);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='回归与推荐')!.click());
- const rows=[...document.querySelectorAll('.candidate-rejections > button')].map(e=>e.textContent);
- expect(rows[0]).toContain('新增 1 个 Bad Case');expect(document.querySelector('.ui-fin-others h3')?.textContent).toContain('落选原因');
+ const rows=[...document.querySelectorAll('.ui-fin-others tbody tr')].map(e=>e.textContent);
+ expect(rows[0]).toContain('新错 1 题');expect(document.querySelector('.ui-fin-others h3')?.textContent).toContain('落选原因');
  expect(rows[1]).toContain('回答耗时 P99 86.5 秒');expect(rows[1]).toContain('上限 60 秒');
- expect(document.querySelector('.ui-fin-compare thead')?.textContent).toContain('Winner · 合格');expect(document.querySelector('.ui-fin-compare tbody tr:last-child')?.textContent).toContain('Q04');
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='概览')!.click());expect(document.querySelector('.ui-agent-stats')?.textContent).toContain('10 / 12');
+ expect(document.querySelector('.ui-fin-compare thead')?.textContent).toContain('合格方案对比');expect(document.querySelectorAll('.ui-fin-compare tbody tr')).toHaveLength(2);expect(document.querySelector('.ui-fin-compare tbody tr:last-child')?.textContent).toContain('D');
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='概览')!.click());expect(document.querySelector('.agent-overview')).not.toBeNull();expect(document.querySelector('.agent-case-destinations')).toBeNull();
 });
 it('hides the entire thinking comparison section when no columns exist',async()=>{
  await mount(<ProductDiagnostics diagnostics={{thinking_comparison:{columns:[],note:'尚无可比较的回答档位记录'}}}/>);
@@ -60,8 +60,8 @@ it('links to published records once the recommended candidate has been released'
  const d={...candidate('EXP-D',{qualification:{qualified:true}}),release_state:{human_release:true}};
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({search_space:{}})})));
  await mount(<EvolutionPage data={{evaluation:{id:'b',status:'completed'},optimization:{id:'exp',candidates:[d],recommendation:{recommended_candidate:'EXP-D'}}}}/>);
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='进化路线')!.click());await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
- expect(document.querySelector('.ui-evo a[href="#versions"]')).toBeNull(); expect(document.querySelector('.ui-evo')?.textContent).toContain('查看最终推荐');
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidates 对比')!.click());await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Candidate D')!.click());
+ expect(document.querySelector('.d-story a[href="#versions"]')).toBeNull(); expect(document.querySelector('.d-story')?.textContent).toContain('查看最终推荐');
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='回归与推荐')!.click());
  const release=[...document.querySelectorAll('button')].find(b=>b.textContent==='查看发布记录')!;expect(release).toBeDefined();await act(async()=>release.click());expect(location.hash).toBe('#versions');
 });

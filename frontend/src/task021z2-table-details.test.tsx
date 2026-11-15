@@ -23,7 +23,7 @@ it('keeps source pages visible with four short document names and exposes every 
   ];
   await mount(<QuestionTable rows={sources.map((source_summary, i) => ({ id: String(i), question: '原题', source_summary }))} onDetail={() => {}} />);
   const rows = [...document.querySelectorAll('tbody tr')];
-  expect(rows[0].querySelector('td:nth-child(4)')?.textContent).toBe('KIRA 操作说明 · p54–55 +1');
+  expect(rows[0].children[[...document.querySelectorAll('thead th')].findIndex(th=>th.textContent==='出处')]?.textContent).toBe('KIRA 操作说明 · p54–55 +1');
   await act(async()=>{rows[0].querySelector('.ui-hover-trigger')!.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,160));});
   expect(document.querySelector('[role=tooltip]')?.textContent).toBe(sources[0]);
   expect(rows[1].textContent).toContain('B2 用户手册 · p8');
@@ -56,6 +56,6 @@ it('places the sample button in the knowledge chain heading', async () => {
   await mount(<KnowledgePage data={{ documents: [] }} />);
   const heading = document.querySelector('.ui-kf h3')?.parentElement;
   const sample = heading?.querySelector('button.secondary');
-  expect(sample?.textContent).toBe('查看分块示例');
+  expect(sample?.textContent).toBe('分块浏览器');
   expect((sample as HTMLButtonElement)?.disabled).toBe(true);
 });

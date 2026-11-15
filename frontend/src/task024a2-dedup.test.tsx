@@ -10,41 +10,47 @@ let data:any;
 beforeEach(()=>{
  sessionStorage.clear();history.replaceState(null,'','#evolution');vi.stubGlobal('fetch',vi.fn(async()=>new Response('{}')));
  data={workspace:{},evaluation:{id:'base',status:'completed',config:sampleBaselineConfig,result:{total:50,bad_case_count:6}},badCases:[{id:'target',run_id:'base',question_id:'Q29',question:'目标题完整原文',passed:false}],optimization:structuredClone({...sampleExperiment,id:'exp',recommendation:{recommended_candidate:sampleExperiment.candidates[0].id}})};
- for(const c of data.optimization.candidates){c.result.gates.total=11;c.result.gates.passed_count=c.result.qualification.qualified?11:10;c.result.gates.passed=c.result.qualification.qualified;}
+ for(const c of data.optimization.candidates){c.result.total=50;c.result.gates.total=11;c.result.gates.passed_count=c.result.qualification.qualified?11:10;c.result.gates.passed=c.result.qualification.qualified;}
  Object.assign(data.optimization.candidates.at(-1).reasoning,{target_bad_cases:['target']});
  Object.assign(data.optimization.candidates.at(-1).result,{total:50,target_bad_cases_fixed:1});
 });
 afterEach(()=>{act(()=>root?.unmount());document.body.innerHTML='';vi.unstubAllGlobals();});
 async function mount(){root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<EvolutionPage data={data}/>));}
 async function click(text:string){await act(async()=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text)!.click());}
-it('shows only round and saved lesson above route cards',async()=>{
- await mount();await click('进化路线');expect(document.querySelectorAll('.ui-evo-round-head p')).toHaveLength(0);
- expect(document.querySelectorAll('.agent-round-strategy .ui-hover-trigger')).toHaveLength(1);
+it('shows saved strategy once above the three result cards',async()=>{
+ await mount();await click('Candidates 对比');
+ expect(document.querySelectorAll('.agent-round-strategy')).toHaveLength(1);
+ expect(document.querySelectorAll('.agent-strategy-plans > article')).toHaveLength(3);
+ expect(document.querySelectorAll('.agent-result-card')).toHaveLength(3);
+ expect(document.querySelectorAll('.agent-round-conclusion')).toHaveLength(1);
  expect(document.body.textContent).not.toContain('本轮没有合格 Candidate：');
 });
-it('keeps complete fixed IDs on cards and moves target counts to the target drawer',async()=>{
- await mount();await click('Candidate 对比');
- const cards=[...document.querySelectorAll('.candidate-cards .candidate-card')];const c=cards[2];
- expect(c.querySelector('small')).toBeNull();expect(cards.map(c=>c.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['未通过','未通过','合格']);
- const result=c.querySelector('.candidate-story-block:last-child')!;
- expect(result.textContent).toContain('答对47 / 50');expect(result.textContent).toContain('修好Q24Q29Q38');expect(result.textContent).toContain('新增 Bad Case无');
- for(const label of ['修复原问题','Regression Check','Hard Gate','P50','P99','可发布'])expect(result.textContent).not.toContain(label);
- expect(c.querySelectorAll('.candidate-story-block')[2].textContent).toBe('针对的题Q29');
+it('keeps saved repair counts on result cards and full target IDs in the target drawer',async()=>{
+ await mount();await click('Candidates 对比');
+ const cards=[...document.querySelectorAll('.candidate-cards .candidate-card')],c=cards[2];expect(cards).toHaveLength(3);
+ expect(cards.map(c=>c.querySelector('.candidate-card-header .badge')?.textContent)).toEqual(['不合格','不合格','合格']);
+ expect(c.querySelector('.agent-candidate-metrics')?.textContent).toContain('答对47 / 50');
+ expect(c.querySelector('.agent-candidate-metrics')?.textContent).toContain('修好3');
+ expect(c.querySelector('.agent-candidate-metrics')?.textContent).toContain('新错0');
  expect([...c.querySelectorAll('button')].map(b=>b.textContent)).toEqual(['查看目标 1 题','查看 Candidate 与完整报告']);
  await act(async()=>c.querySelector<HTMLButtonElement>('.candidate-card-footer button')!.click());
  expect(document.querySelector('[role=dialog]')?.textContent).toContain('指定目标修好 1 / 1');
  expect(document.querySelector('[role=dialog]')?.textContent).toContain('目标题完整原文');
+ expect(document.querySelector('[role=dialog]')?.textContent).toContain('Q29');
 });
-it('summarizes actual qualifiers and links to the recommendation without repeating baseline rows',async()=>{
+it('lists saved qualified candidates and individual rejection rows without repeating baseline rows',async()=>{
  await mount();await click('回归与推荐');
- const summary=document.querySelector('.ui-fin-top h2')!;expect(summary?.textContent).toBe('10 个 Candidate 中只有 2 个通过回归检查，最终推荐 Candidate D');
+ expect(document.querySelector('.ui-fin-top h2')?.textContent).toBe('Candidate D');
  expect(document.querySelector('.ui-fin-compare')?.textContent).toContain('R3-C');
- const table=document.querySelector('.regression-summary-table')!;
- expect(table.closest('details')).toBeNull();expect(table.textContent).not.toContain('Round 3');expect(table.textContent).not.toContain('上限');expect(table.textContent).not.toContain('Regression 判定');
+ expect(document.querySelectorAll('.ui-fin-compare tbody tr')).toHaveLength(2);
  expect(document.querySelector('.ui-fin-compare')?.textContent).not.toContain('Baseline 答对');
- expect(document.querySelector('.ui-fin-compare')?.textContent).toContain('47 / 50较 Baseline +3');expect(document.querySelector('.ui-fin-compare')?.textContent).toContain('48 / 50较 Baseline +4');
- expect(document.querySelector('.ui-fin-others h3')?.textContent).toContain('（8）');expect(document.querySelectorAll('.candidate-rejections > button')).toHaveLength(8);
- data.optimization.candidates.at(-1).result.qualification.qualified=false;
+ expect(document.querySelector('.ui-fin-compare')?.textContent).toContain('47 / 50');
+ expect(document.querySelector('.ui-fin-compare')?.textContent).toContain('48 / 50');
+ expect(document.querySelector('.ui-fin-others h3')?.textContent).toBe('落选原因');
+ expect(document.querySelectorAll('.ui-fin-others tbody tr')).toHaveLength(8);
+ expect(document.querySelector('.agent-recommendation-points')?.textContent).toContain('保存的最终资格合格');
+ data.optimization.candidates.find((c:any)=>c.reasoning.candidate_label==='D').result.qualification.qualified=false;
  await act(async()=>root.render(<EvolutionPage data={{...data,optimization:{...data.optimization}}}/>));
- expect(document.querySelector('.ui-fin-top h2')?.textContent).toContain('只有 1 个通过回归检查');
+ expect(document.querySelectorAll('.ui-fin-compare tbody tr')).toHaveLength(1);
+ expect(document.querySelector('.agent-recommendation-points')?.textContent).toContain('保存的最终资格不合格');
 });

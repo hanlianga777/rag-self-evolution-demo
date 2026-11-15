@@ -14,11 +14,11 @@ const d={id:'exp-D',status:'evaluated',reasoning:{candidate_label:'D',winner_id:
 it('puts the saved decision once above equal comparison cards and keeps unresolved causes open',async()=>{
  await mount(<DStory evaluation={{config:{top_k:4}}} experiment={{candidates:[winner,d],recommendation:{recommended_candidate:d.id},result:{d_facts:{remaining_failures:[{question_id:'Q06'}]}}}}/>);
  const header=document.querySelector('.d-story > .ui-card')!;
- expect(header?.textContent).toContain('多修好 Q04，零新增 Bad Case，推荐 Candidate D');
+ expect(header?.textContent).toContain('① 合并了什么');expect(document.querySelector('.d-result-conclusion')?.textContent).toContain('推荐 Candidate D');
  expect(header.querySelector('.ui-status')?.textContent).toBe('合格');
- expect(document.querySelectorAll('.d-story .ui-headline')).toHaveLength(1);
- expect(document.querySelectorAll('.d-result-story > .ui-card-row > .ui-card')).toHaveLength(2);
- expect(document.querySelectorAll('[aria-label="预测与实际"] tbody tr')).toHaveLength(3);
+ expect(document.querySelectorAll('.d-story .d-decision')).toHaveLength(1);
+ expect(document.querySelectorAll('.d-result-story > .ui-card-row > .ui-card')).toHaveLength(2);expect(document.querySelector('.d-result-comparison')?.tagName).toBe('DETAILS');
+ expect(document.querySelectorAll('[aria-label="预测与实际"] tbody tr')).toHaveLength(4);
  expect([...document.querySelectorAll('[aria-label="Candidate 质量对比"] tbody tr')].map(r=>r.firstChild?.textContent)).toEqual(['答对数','新增 Bad Case 数','最慢回答 P99','安全拒答率']);
  const causes=document.querySelector('section.d-result-causes')!;
  expect(causes).not.toBeNull();expect(causes.querySelector('summary')).toBeNull();expect(causes.closest('.d-result-comparison')).toBeNull();
@@ -30,12 +30,9 @@ it('keeps candidate fields uniform and exposes complete risk prose without the q
  const candidates=['A','B','C'].map(label=>({...winner,id:`exp-R3-${label}`,reasoning:{round:3,candidate_label:label,risks,core_idea:'保存的思路'},result}));
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({}))));
  await mount(<EvolutionPage data={{evaluation:{id:'base',config:{top_k:4}},optimization:{id:'exp',candidates}}}/>);
- await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='Candidate 对比')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
- for(const card of document.querySelectorAll('.candidate-card')){
-  expect(card.querySelectorAll('.ui-field.lines-2')).toHaveLength(6);
-  const risk=[...card.querySelectorAll('.ui-field')].find(f=>f.querySelector('.ui-kicker')?.textContent==='风险')!;
-  expect(risk.textContent).not.toContain('完整内容见');expect(risk.textContent).toContain('安全风险');expect(risk.textContent).toContain('延迟风险');expect(risk.querySelectorAll('.ui-clamp')).toHaveLength(1);expect(risk.textContent).toContain('受保护题风险');
-  expect(card.querySelector('.candidate-result + .ui-clamp')).toBeNull();expect(card.querySelectorAll('.candidate-result > div')).toHaveLength(3);
-  expect(card.querySelector('.ui-q.is-fixed')?.textContent).toBe('Q04');
- }
+ await act(async()=>[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='Candidates 对比')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));
+ const cards=[...document.querySelectorAll('.agent-result-card')];expect(cards).toHaveLength(3);
+ for(const card of cards){expect(card.querySelectorAll('.agent-candidate-metrics > div')).toHaveLength(4);expect(card.textContent).toContain('修好1');}
+ const plans=[...document.querySelectorAll('.agent-strategy-plans > article')];expect(plans).toHaveLength(3);
+ for(const plan of plans){expect(plan.textContent).toContain('安全风险');expect(plan.textContent).toContain('延迟风险');expect(plan.textContent).toContain('受保护题风险');expect(plan.textContent).not.toContain('完整内容见');}
 });

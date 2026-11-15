@@ -21,7 +21,7 @@ installer="$root/scripts/install_login_bootstrap.sh"
 
 grep -Fq 'app.build_index --if-needed' "$api_runner" || fail "API runner does not preserve the incremental index check"
 grep -Fq 'exec python3 -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8010' "$api_runner" || fail "API runner is not an exec-owned loopback uvicorn process"
-grep -Fq 'exec ./node_modules/.bin/vite --host 127.0.0.1 --port 5174 --strictPort' "$web_runner" || fail "web runner is not an exec-owned strict loopback Vite process"
+grep -Fq 'exec ./node_modules/.bin/vite preview --host 127.0.0.1 --port 5174 --strictPort' "$web_runner" || fail "web runner is not an exec-owned strict loopback static preview process"
 
 grep -Fq 'LC_ALL=C ps -p "$1" -o lstart=' "$starter" || fail "recorded supervisor timestamps are locale-dependent"
 grep -Fq 'while true' "$api_supervisor" || fail "API does not restart after an unexpected exit"

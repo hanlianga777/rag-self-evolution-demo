@@ -27,4 +27,4 @@ trap cleanup EXIT INT TERM
 
 echo "RAG Evolution API： http://127.0.0.1:8010/docs"
 echo "RAG Evolution Demo： http://127.0.0.1:5174"
-(cd frontend && npm run dev -- --host 127.0.0.1)
+"$project_root/scripts/run_web_service.sh"

@@ -84,7 +84,7 @@ it('paginates more than 200 version and feedback records locally after all backe
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<VersionsPage data={release}/>));expect(document.querySelectorAll('tbody tr')).toHaveLength(3);await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='查看全部 200 条记录')!.click());expect(document.querySelectorAll('tbody tr')).toHaveLength(200);
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('tbody tr')).toHaveLength(5);
  await act(async()=>root.render(<VerificationPage data={feedback} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>));await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Monitoring')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(200);
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(5);expect(fetcher).toHaveBeenCalledTimes(count);
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('.monitoring-table tbody tr')).toHaveLength(5);expect(fetcher.mock.calls.slice(count).filter(([input])=>/\/api\/(versions|monitoring)(?:\?|$)/.test(input))).toHaveLength(0);
 });
 
 it('keeps open page details on an unchanged read version and replaces them after a new version',async()=>{
@@ -101,7 +101,7 @@ it('keeps open page details on an unchanged read version and replaces them after
 
 it('refreshes feedback when a new answer is saved, so opening its tab stays local',async()=>{
  const {VerificationPage}=await import('./pages/VerificationPage');location.hash='#verification?tab=qa';let answered=false;
- const fetcher=vi.fn(async(input:string)=>new Response(JSON.stringify(input.endsWith('/api/preview')?(answered=true,{baseline:{answer:'合成回答，未调用模型',sources:[]}}):{events:answered?[{id:'new',question:'新保存的合成问答'}]:[],triggers:[]})));vi.stubGlobal('fetch',fetcher);
+ const fetcher=vi.fn(async(input:string)=>input.endsWith('/api/preview/stream')?(answered=true,new Response(`data: ${JSON.stringify({type:'done',result:{baseline:{answer:'合成回答，未调用模型',sources:[],evidence:[]}}})}\n\n`)):new Response(JSON.stringify({events:answered?[{id:'new',question:'新保存的合成问答'}]:[],triggers:[]})));vi.stubGlobal('fetch',fetcher);
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<VerificationPage data={{monitoring:{events:[],triggers:[]}}} onOpenCitation={()=>{}} onOpenDocument={()=>{}}/>));
  const input=document.querySelector<HTMLInputElement>('[aria-label="向机器人知识库提问"]')!;
  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'新保存的合成问答');input.dispatchEvent(new Event('input',{bubbles:true}));});
@@ -129,7 +129,7 @@ it('refreshes the resident candidate pool after a saved quality change before sw
  expect(document.querySelector('[aria-label="候选质量筛选"]')?.textContent).toContain('可用 1');expect(fetcher).toHaveBeenCalledTimes(count);
 });
 
-it('keeps the complete comparison list when one prefetched case fails and retries only on request',async()=>{
+it('keeps the complete comparison list when selected details fail and retries only on request',async()=>{
  const {SavedAnswerComparison}=await import('./components/SavedAnswerComparison');let fail=true;
  const fetcher=vi.fn(async(input:string)=>{
   const base=input.includes('/base/'),rows=[{question_id:'Q1',question:'正常题目',passed:!base},{question_id:'Q2',question:'需要重试的题目',passed:false}];
@@ -139,7 +139,7 @@ it('keeps the complete comparison list when one prefetched case fails and retrie
  });vi.stubGlobal('fetch',fetcher);
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<SavedAnswerComparison data={{evaluation:{id:'base'},optimization:{recommendation:{recommended_candidate:'D'},candidates:[{id:'D',status:'evaluated',result:{evaluation_run_id:'after',total:2,evaluation_complete:true}}]}}} onOpenCitation={()=>{}}/>));
  expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(1);
- const count=fetcher.mock.calls.length;await act(async()=>document.querySelectorAll<HTMLButtonElement>('.comparison-seg button')[1].click());expect(document.querySelector('.comparison-qlist')?.textContent).toContain('需要重试的题目');expect(document.querySelector('[role=alert]')?.textContent).toContain('单题读取失败');expect(fetcher).toHaveBeenCalledTimes(count);expect(document.querySelector('.case-detail-skeleton')).toBeNull();
+ const count=fetcher.mock.calls.length;await act(async()=>document.querySelectorAll<HTMLButtonElement>('.comparison-seg button')[1].click());expect(document.querySelector('.comparison-qlist')?.textContent).toContain('需要重试的题目');expect(document.querySelector('[role=alert]')?.textContent).toContain('单题读取失败');expect(fetcher.mock.calls.slice(count).map(([url])=>url)).toEqual([expect.stringContaining('/base/cases/Q2'),expect.stringContaining('/after/cases/Q2')]);expect(document.querySelector('.case-detail-skeleton')).toBeNull();
  fail=false;await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重试本题')!.click());expect(document.querySelector('[role=alert]')).toBeNull();expect(document.querySelector('.comparison-answers')?.textContent).toContain('保存的回答');
 });
 
@@ -151,14 +151,14 @@ it('paginates a knowledge document list over 200 locally and resets its page on 
  const input=document.querySelector<HTMLInputElement>('[aria-label="搜索文档"]')!;await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'文档-0.');input.dispatchEvent(new Event('input',{bubbles:true}));});expect(document.querySelectorAll('tbody tr')).toHaveLength(1);expect(document.querySelector('tbody')?.textContent).toContain('文档-0.pdf');
 });
 
-it('paginates the preloaded Before/After rail locally beyond 200 questions',async()=>{
+it('paginates the preloaded Before/After rail locally and loads only selected details beyond 200 questions',async()=>{
  const {SavedAnswerComparison}=await import('./components/SavedAnswerComparison');
  const rows=Array.from({length:205},(_,i)=>({question_id:`Q${i}`,question:`保存的问题${i}`,test_category:'positive'}));
  const fetcher=vi.fn(async(input:string)=>{const base=input.includes('/base/');return new Response(JSON.stringify(input.endsWith('/comparison-cases')?{id:base?'base':'after',status:'completed',dataset_version_id:'golden',judge:{evaluation_identity:'same'},cases:rows.map(row=>({...row,passed:!base}))}:{status:'completed',case:{...rows.find(row=>input.endsWith('/'+row.question_id)),passed:!base,model_answer:'保存的回答'}}));});vi.stubGlobal('fetch',fetcher);
  root=createRoot(document.body.appendChild(document.createElement('div')));await act(async()=>root.render(<SavedAnswerComparison data={{evaluation:{id:'base'},optimization:{recommendation:{recommended_candidate:'D'},candidates:[{id:'D',status:'evaluated',result:{evaluation_run_id:'after',total:205,evaluation_complete:true}}]}}} onOpenCitation={()=>{}}/>));
  expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(200);const count=fetcher.mock.calls.length;
- await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(5);expect(document.querySelector('.comparison-qhead')?.textContent).toContain('保存的问题200');expect(fetcher).toHaveBeenCalledTimes(count);
- await act(async()=>root.render(<SavedAnswerComparison questionId="Q201" data={{evaluation:{id:'base'},optimization:{recommendation:{recommended_candidate:'D'},candidates:[{id:'D',status:'evaluated',result:{evaluation_run_id:'after',total:205,evaluation_complete:true}}]}}} onOpenCitation={()=>{}}/>));expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(5);expect(document.querySelector('.comparison-qhead')?.textContent).toContain('保存的问题201');expect(fetcher).toHaveBeenCalledTimes(count);
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='下一页')!.click());expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(5);expect(document.querySelector('.comparison-qhead')?.textContent).toContain('保存的问题200');expect(fetcher.mock.calls.slice(count).map(([url])=>url)).toEqual([expect.stringContaining('/base/cases/Q200'),expect.stringContaining('/after/cases/Q200')]);
+ await act(async()=>root.render(<SavedAnswerComparison questionId="Q201" data={{evaluation:{id:'base'},optimization:{recommendation:{recommended_candidate:'D'},candidates:[{id:'D',status:'evaluated',result:{evaluation_run_id:'after',total:205,evaluation_complete:true}}]}}} onOpenCitation={()=>{}}/>));expect(document.querySelectorAll('.comparison-qlist li')).toHaveLength(5);expect(document.querySelector('.comparison-qhead')?.textContent).toContain('保存的问题201');expect(fetcher.mock.calls.slice(count+2).map(([url])=>url)).toEqual([expect.stringContaining('/base/cases/Q201'),expect.stringContaining('/after/cases/Q201')]);expect(fetcher.mock.calls.filter(([url])=>url.endsWith('/comparison-cases'))).toHaveLength(2);
 });
 
 it('paginates regression cases locally and resets the page when severity changes',async()=>{

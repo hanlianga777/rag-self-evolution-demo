@@ -46,7 +46,7 @@ it("groups pipeline configuration by purpose and marks parameters by their contr
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<SettingsPage data={{ documents: [{ parser: "PyMuPDF", chunk_strategy: "Section-aware" }], versions: [{ status: "active", snapshot: { generation_model: "generation-model" } }], readiness: { status: "ready", model: "provider-model" }, evaluation: { judge: { model: "judge-model", temperature: 0.9, execution_snapshot: { generation_model: "generation-model", temperature: 0.2 } } } }} />));
   expect(document.querySelector(".light-stepper")).toBeNull();
-  expect([...document.querySelectorAll(".settings-page h2")].map(item => item.textContent)).toEqual(["固定技术基座", "Agent 可选参数"]);
+  expect([...document.querySelectorAll(".settings-page h2")].map(item => item.textContent)).toEqual(["技术选型", "Agent 可选参数"]);
   expect(document.querySelector('[data-parameter="top_k"]')?.textContent).not.toContain("Baseline 未采集");
   expect(document.body.textContent).toContain("Baseline 待评测");
   expect(document.querySelector(".provider-status-row")).toBeNull();
@@ -62,8 +62,7 @@ it("keeps current frozen Golden separate from the latest work Run and hides an e
   vi.stubGlobal("fetch", fetcher);
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<GovernancePage data={{ workspace: { current_golden_id: "GD-current" }, generationRuns: [workRun], snapshots, dataset: [row], documents: [] }} />));
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "历史版本")!.click());
-  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "查看审计")!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "完整出题记录")!.click());
   const summary = document.querySelector(".drawer-body")!;
   expect(summary.textContent).toContain("3 题");
   expect(summary.textContent).toContain("分类完整");

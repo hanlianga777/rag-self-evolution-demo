@@ -17,10 +17,10 @@ it("restores compact Baseline summary without treating aggregate Gate success as
   expect(document.querySelector(".baseline-metrics")?.textContent).toContain("92.5");
   expect(document.querySelectorAll(".baseline-metrics > div")).toHaveLength(4);
   await act(async () => [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Bad Case 诊断")!.click());
-  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(th => th.textContent)).toEqual(["题号", "问题", "分类", "缺了什么", "严重程度", ""]);
+  expect([...document.querySelectorAll(".product-diagnosis-table thead th")].map(th => th.textContent)).toEqual(["题号", "问题", "题型", "负向子类", "主题簇i", "问题层级与细分类型", "缺了什么", "严重程度i", ""]);
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).not.toContain("Hallucination");
   expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("业务问题");
-  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("记录缺失");
+  expect(document.querySelector(".product-diagnosis-table tbody")?.textContent).toContain("具体失败原因未知");
   expect(document.querySelector(".quality-audit")).toBeNull();
   expect(document.querySelector(".baseline-metrics")).toBeNull();
   expect(JSON.stringify(run)).toBe(frozen);
@@ -46,18 +46,18 @@ it("shows Partial progress and timeout without calling it unrun or identity stal
   expect(document.body.textContent).not.toContain("历史评测 · 当前身份已失效");
 });
 
-it("offers a fresh versioned run for an incompatible partial baseline", async () => {
+it("preserves an incompatible partial baseline without a rerun entry", async () => {
   const run={id:"old",status:"partial",requires_policy_upgrade:true,result:{completed:3,total:50},dataset_snapshot:{question_ids:["q"]},cases:[]};
   vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url.endsWith("/api/bad-cases")?[]:run))));
   await render(<EvaluationPage data={{evaluation:run}}/>);
-  expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("重新评测 Baseline"))).toBe(true);
+  expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("重新评测 Baseline"))).toBe(false);
 });
 
-it("also labels the historical completed baseline as a new-version rerun", async () => {
+it("preserves the historical completed baseline without a rerun entry", async () => {
   const run={id:"old-completed",status:"completed",requires_policy_upgrade:true,result:{completed:50},dataset_snapshot:{question_ids:["q"]},cases:[]};
   vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url.endsWith("/api/bad-cases")?[]:run))));
   await render(<EvaluationPage data={{evaluation:run}}/>);
-  expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("重新评测 Baseline"))).toBe(true);
+  expect([...document.querySelectorAll("button")].some(b=>b.textContent?.includes("重新评测 Baseline"))).toBe(false);
 });
 
 it("keeps partial technical exceptions separate from business failures on all Baseline tabs", async () => {

@@ -124,11 +124,15 @@ Q04 的 Before/After 用保存的回答与评分要点，解释 Top-K 4 → 6 �
 
 ```bash
 cp .env.example .env    # 填入 DEEPSEEK_API_KEY、DASHSCOPE_API_KEY、MINERU_API_KEY
-./start.sh              # 自动安装依赖并启动前后端
+./start.sh              # 自动安装依赖、构建前端，再启动 API 和静态演示服务
 ```
 
 - Demo：http://127.0.0.1:5174
 - API 文档：http://127.0.0.1:8010/docs
+
+`start_demo.command` 和现有 supervisor 入口同样先运行 `npm run build`，再用 Vite preview 在 5174 提供构建产物；构建失败时不启动静态服务。改完源码后重新启动前端才会更新演示内容。
+
+开发时保留热更新模式：在后端已运行、5174 空闲时执行 `npm --prefix frontend run dev -- --host 127.0.0.1`。仅预览已有构建产物可执行 `npm --prefix frontend run preview`。
 
 评测运行会调用付费模型 API。页面中的运行操作都有确认步骤，演示时可直接查看已保存的评测结果。
 

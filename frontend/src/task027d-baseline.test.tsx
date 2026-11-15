@@ -70,19 +70,22 @@ it('explains each gate in its own module and shows the saved threshold and formu
 
 const overviewData = () => ({ evaluation: { id: 'before', status: 'completed', config: {}, result: { total: 2, bad_case_count: 1 } },
   optimization: { id: 'exp', baseline_run_id: 'before', candidates: [{ id: 'D', status: 'evaluated', reasoning: { candidate_label: 'D' }, result: { total: 2, bad_case_count: 0, all_fixed_question_ids: ['Q01'], evaluation_run_id: 'after' } }], recommendation: { recommended_candidate: 'D' } }, overview: { dataset: { total: 2, approved: 2 } } });
-it.each([false, true])('keeps question and cause pending separately and settles failure without a false loading result (%s)', async fail => {
+it.each([false, true])('settles saved question text and parameter tags when cause detail reads resolve or fail (%s)', async fail => {
   const pending: Record<string, (value: Response) => void> = {};
   vi.stubGlobal('fetch', vi.fn((url: string) => new Promise<Response>(resolve => { pending[new URL(url).pathname] = resolve; })));
   await mount(<OverviewPage data={overviewData()} navigate={() => {}} />);
   const fixed = () => document.querySelector('.ui-ovs-fixed')!;
   expect(fixed().textContent).not.toMatch(/题目未保存|—|未知|待核对/);
-  expect(fixed().querySelectorAll('[role=status]')).toHaveLength(2);
+  expect(fixed().querySelectorAll('[role=status]')).toHaveLength(1);
   await act(async () => Object.entries(pending).forEach(([url, resolve]) => resolve(response({ id: url.includes('before') ? 'before' : 'after', status: 'completed', dataset_version_id: 'same', judge: { evaluation_identity: 'same' }, cases: [{ question_id: 'Q01', question: '已读到的问题' }] }))));
   expect(fixed().textContent).toContain('已读到的问题');
-  expect(fixed().querySelectorAll('[role=status]')).toHaveLength(1);
+  expect(fixed().querySelectorAll('[role=status]')).toHaveLength(0);
+  expect(fixed().querySelector('.ui-ovs-fixed-params')).toBeNull();
+  expect(fixed().textContent).not.toContain('—');
   await act(async () => Object.entries(pending).filter(([url]) => url.includes('/cases/')).forEach(([, resolve]) => resolve(fail ? new Response('failed', { status: 500 }) : response({ case: { passed: true }, question: {} }))));
   expect(fixed().querySelector('[role=status]')).toBeNull();
-  expect(fixed().textContent).toContain('—');
+  expect(fixed().textContent).toContain('已读到的问题');
+  expect(fixed().querySelector('.ui-ovs-fixed-params')).toBeNull();
 });
 
 it('shows a skeleton instead of an empty comparison while the saved list is pending', async () => {
@@ -95,7 +98,8 @@ it('shows a skeleton instead of an empty comparison while the saved list is pend
 it.each(['settings', 'knowledge'])('hides unconfirmed configuration while the %s request is pending', async page => {
   vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
   await mount(page === 'settings' ? <SettingsPage data={{}} /> : <KnowledgePage data={{ documents: [] }} />);
-  expect(document.querySelector('.loading-skeleton')).not.toBeNull();
+  if(page==='settings')expect(document.querySelector('.loading-skeleton')).not.toBeNull();
+  else {expect(document.querySelector('[aria-label=知识处理链路]')).not.toBeNull();expect(document.querySelector('.knowledge-coverage')?.textContent).toContain('知识主题覆盖待更新');}
   expect(document.querySelector('.page-content')?.textContent).not.toMatch(/0 项可调参数|新 Baseline 待评测|Candidate K 未知|维度未采集/);
 });
 

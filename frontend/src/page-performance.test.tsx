@@ -75,7 +75,7 @@ it('shows the destination shell and skeleton while first-page data is pending', 
   vi.stubGlobal('fetch',vi.fn(async (input:RequestInfo | URL) => { await ready; return new Response(JSON.stringify(String(input).includes('/documents') ? [] : {})); }));
   try {
     await act(async () => root.render(<App />));
-    expect(document.querySelector('.page-shell .page-title h1')?.textContent).toContain('项目概览');
+    expect(document.querySelector('.page-shell .page-title h1')?.textContent).toContain('RAG 自进化概览');
     expect(document.querySelector('[role=status][aria-label="正在加载页面内容"]')).not.toBeNull();
     expect(document.querySelector('.spin')).toBeNull();
   } finally { await act(async()=>{release();});act(()=>root.unmount());document.body.innerHTML='';location.hash='';vi.unstubAllGlobals(); }

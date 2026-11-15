@@ -37,6 +37,6 @@ export function judgePresentation(row: Row, question: Row = {}): { text: string;
   parts.push(...new Set<string>((judge.issues || []).flatMap((issue: Row) => issueNames[issue.failure_kind] && !(negative && behaviorFailed && ['forbidden_action', 'unsafe_operation'].includes(issue.failure_kind)) ? [issueNames[issue.failure_kind]] : [])));
   const guard = item.programmatic_metrics?.safety_guard;
   if (guard?.status === 'confirmed_violation' && guard.findings?.[0]?.description) parts.push(`安全边界未通过：${guard.findings[0].description}`);
-  const text = parts.join('；') || '具体失败原因未知：保存记录缺少可展示的逐条判定';
+  const text = parts.join('；').replace(/。\s*；/g, '；') || '具体失败原因未知：保存记录缺少可展示的逐条判定';
   return {text, detail: [...parts.filter(part => !part.startsWith('缺要点')), ...missing.map(point => `${mark(point.number)}：${point.text}`)].join('\n') || text, missingCount: missing.length};
 }

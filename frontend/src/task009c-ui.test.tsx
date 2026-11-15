@@ -59,10 +59,11 @@ it('keeps the freeze action hidden while the current paper is being read', async
  expect(document.querySelector('.gate-one-action')).toBeNull();
 });
 
-it('reads Agent progress from the saved budget and keeps the internal Baseline ID in details', async () => {
+it('keeps Agent budget counters off overview and hides internal Baseline identity', async () => {
  vi.stubGlobal('fetch', vi.fn(async () => response({ search_space: {} })));
  await mount(<EvolutionPage data={{ evaluation: { id: 'internal-agent-baseline', status: 'completed', created_at: '2026-11-01T02:00:00Z', config: { generation_thinking: 'high' } }, optimization: { id: 'exp', evaluation_budget: { used: 4, max: 17, reserved_for_d: 2 }, candidates: [] } }} />);
- expect(document.querySelector('.ui-agent-stats > div:nth-child(3)')?.textContent).toContain('4 / 17');
+ expect(document.querySelector('.ui-agent-stats')).toBeNull();
+ expect([...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('生成 A / B / C'))?.disabled).toBe(true);
  expect(document.querySelector('.agent-identity')?.textContent).toContain('Baseline · High · 11-01');
  expect(document.querySelector('.agent-identity')?.textContent).not.toContain('internal-agent-baseline');
 });
@@ -70,8 +71,8 @@ it('names a runtime version from its saved date and hides its internal ID', asyn
  await mount(<VersionsPage data={{ versions: [{ id: 'runtime-internal-123', created_at: '2026-10-14T03:00:00Z', status: 'active', provenance: 'bootstrap', config: {} }] }} />);
  expect(document.querySelector('.release-history-table')?.textContent).toContain('当前线上配置');
  expect(document.querySelector('.page-content')?.textContent).not.toContain('runtime-internal-123');
- expect(document.querySelector<HTMLDetailsElement>('details')?.open).toBe(true);
- expect(document.querySelector('details > summary')?.textContent).toContain('版本历史与回滚');
+ expect(document.querySelector<HTMLDetailsElement>('details')?.open).toBe(false);
+ expect(document.querySelector('details > summary')?.textContent).toContain('版本历史');
 });
 it('uses an honest empty monitoring state and never invents records', async () => {
  sessionStorage.clear();

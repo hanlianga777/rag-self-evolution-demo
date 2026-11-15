@@ -21,19 +21,20 @@ it("keeps only the selected governance workspace visible", async () => {
   await act(async () => root.render(<GovernancePage data={{ dataset: [], generationRuns: [], snapshots: [] }} />));
   expect(document.body.textContent).toContain("当前测试集");
   expect(document.body.textContent).not.toContain("历史 Candidate（未验证）");
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "历史版本")!.click());
-  expect(document.body.textContent).toContain("历史 Candidate（未验证）");
-  expect(document.querySelector('button[aria-pressed="true"]')?.textContent).toBe("当前测试集");
+  expect([...document.querySelectorAll("button")].some(button => button.textContent === "历史版本")).toBe(false);
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "候选池")!.click());
+  expect(document.body.textContent).toContain("上传业务用例");
+  expect(document.querySelector('button[aria-pressed="true"]')?.textContent).toBe("候选池");
   await act(async () => root.unmount());
 });
 
 it("shows one Evolution stage instead of four stacked cards", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => root.render(<EvolutionPage data={{ evaluation: {}, badCases: [] }} />));
-  expect(document.querySelector(".agent-overview")).not.toBeNull(); expect(document.querySelectorAll(".tabs button")).toHaveLength(4);
+  expect(document.querySelector(".agent-overview")).not.toBeNull(); expect(document.querySelectorAll(".tabs button")).toHaveLength(3);
   expect(document.body.textContent).not.toContain("Sandbox 对比");
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Candidate 对比")!.click());
-  expect(document.body.textContent).toContain("Sandbox 对比");
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Candidates 对比")!.click());
+  expect(document.querySelector(".agent-overview")).toBeNull();
   expect(document.querySelector(".diagnosis-cards")).toBeNull();
   await act(async () => root.unmount());
 });
@@ -42,8 +43,7 @@ it("shows no effective composite without inventing a D candidate", async () => {
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   const optimization = { id: "EXP-1", candidates: [], result: { report_confirmation: { winner_id: "C-1" }, composite: { status: "no_effective_composite" } } };
   await act(async () => root.render(<EvolutionPage data={{ evaluation: {}, badCases: [], optimization }} />));
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Candidate 对比")!.click());
-  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "进化路线")!.click());
+  await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Candidates 对比")!.click());
   await act(async () => [...document.querySelectorAll("button")].find(button => button.textContent === "Candidate D")!.click());
   expect(document.body.textContent).toContain("保留已确认 Winner");
   expect(document.body.textContent).toContain("Agent 判断不做 D");

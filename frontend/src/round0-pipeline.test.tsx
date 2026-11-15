@@ -23,8 +23,8 @@ it("saves freely selected Thinking and context, preserves saved drafts and remov
  await click("保存草稿");
  expect(posts[0].config).toEqual({generation_thinking:"max",retrieval_max_tokens:4096,min_score:0.2});
  expect(document.querySelector('[data-parameter="generation_thinking"] button[aria-checked="true"]')?.textContent).toBe('Max');
- await act(async()=>{document.querySelector<HTMLElement>('[data-parameter="retrieval_max_tokens"] .ui-pg-info')!.focus();await new Promise(resolve=>setTimeout(resolve,150));});
- expect(document.querySelector('[role=tooltip]')?.textContent).toContain('字符数估算');
+ await act(async()=>{document.querySelector<HTMLElement>('[data-parameter="retrieval_max_tokens"] .ui-info-tip')!.focus();await new Promise(resolve=>setTimeout(resolve,150));});
+ expect(document.querySelector('[role=tooltip]')?.textContent).toContain('交给模型的资料最多多长');
 });
 it("reports saved Run values and absent historical Thinking as unknown in report and drawer", async () => {
   const run = { id: "R-OLD", status: "completed", dataset_version_id: "G-OLD", config: { candidate_k: 12, top_k: 4, hybrid_search: true, rerank: true }, judge: { model: "judge-old", generation_prompt_version: "generation-vnext-1", execution_snapshot: { generation_model: "gen-old" } }, result: {}, dataset_snapshot: { id: "G-OLD" } };

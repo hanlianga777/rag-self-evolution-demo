@@ -22,7 +22,7 @@ it('builds missing points from saved judgments, preserves grouped numbering, and
   const multi = { ...item, judge_result: { ...item.judge_result, atomic_results: [{ atomic_id: 'Q04-R1-1', state: 'NOT_MET' }, { atomic_id: 'Q04-R1-2', state: 'NOT_MET' }, { atomic_id: 'Q04-R3', state: 'NOT_MET' }] } };
   expect(coreEvidence(multi)).toBe('缺要点 ①：只在室内存放设备');
   await mount(<BadCaseOverview rows={[multi]} showJudgeReason onSelect={() => {}} />);
-  const cell = document.querySelector('.diagnosis-list td:nth-child(4)')!;
+  const cell = document.querySelector('.diagnosis-list td:nth-child(7)')!;
   expect(cell.textContent).toContain('缺要点 ①：只在室内存放设备');
   await act(async()=>{cell.querySelector('.ui-hover-trigger')!.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,160));});
  expect(document.querySelector('[role=tooltip]')?.textContent).toContain('③：每月充电');
@@ -69,15 +69,14 @@ it('hides frozen editing buttons and keeps the unfrozen quality controls', async
   expect(document.querySelectorAll('button')).toHaveLength(2);
 });
 
-it('moves only the versioned Baseline rerun into the retrieval metrics card and retains the preflight path', async () => {
+it('removes the versioned Baseline rerun while retaining the read-only preflight reason', async () => {
   const run = { id: '022e-rerun', status: 'completed', cases: [], result: {}, dataset_snapshot: {} };
   vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.includes('preflight') ? { can_start: false, reason: '保存的预检阻断' } : run))));
   await mount(<EvaluationPage data={{ evaluation: run }} />);
   expect(document.querySelector('.page-title')?.textContent).not.toContain('重新运行 Baseline');
   const more = document.querySelector('.baseline-more')!;
   const button = [...more.querySelectorAll('button')].find(b => b.textContent?.includes('重新评测 Baseline'))!;
-  expect(button).toBeTruthy();
-  expect(button.disabled).toBe(true);
+  expect(button).toBeUndefined();
   expect(document.body.textContent).toContain('保存的预检阻断');
   expect((fetch as any).mock.calls.every(([, init]: any[]) => !init?.method || init.method === 'GET')).toBe(true);
 });
