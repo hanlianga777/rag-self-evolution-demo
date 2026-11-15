@@ -134,6 +134,9 @@ cp .env.example .env    # 填入 DEEPSEEK_API_KEY、DASHSCOPE_API_KEY、MINERU_A
 
 开发时保留热更新模式：在后端已运行、5174 空闲时执行 `npm --prefix frontend run dev -- --host 127.0.0.1`。仅预览已有构建产物可执行 `npm --prefix frontend run preview`。
 
+旧版只读对照（e37e7fa）：`bash scripts/start_compare_old_ui.sh`，打开 http://127.0.0.1:5175（API 经 8011 只读代理）。
+停止旧版对照：`bash scripts/start_compare_old_ui.sh stop`；旧版代码、构建和日志保存在 `~/RAG归档/前端对照-e37e7fa/`。
+
 评测运行会调用付费模型 API。页面中的运行操作都有确认步骤，演示时可直接查看已保存的评测结果。
 
 ---
