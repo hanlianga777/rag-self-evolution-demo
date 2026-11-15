@@ -47,6 +47,20 @@ def reuse_result(kind, payload, action):
         return deepcopy(result)
 
 
+def carry_generation_reuse(store, source, target):
+    """Carry exact request entries only after Judge-only replay validation."""
+    if (source['dataset_snapshot_json'] != target['dataset_snapshot_json'] or source['config'] != target['config']
+            or any(source['judge'].get(k) != target['judge'].get(k) for k in
+                   ('model', 'generation_prompt_version', 'generation_boundary_sha256', 'execution_snapshot'))):
+        return 0
+    source_identity = digest([json.loads(source['dataset_snapshot_json']), source['config'].get('knowledge_identity'), source['judge']])
+    with reuse_scope(store, target):
+        _, target_identity, _ = _scope.get()
+        with store.connection() as db:
+            return db.execute("INSERT OR IGNORE INTO model_request_reuse SELECT ?,kind,request_hash,origin,result_json FROM model_request_reuse WHERE identity=? AND kind IN ('generation','retrieval')",
+                              (target_identity, source_identity)).rowcount
+
+
 def matching_configuration(store, run):
     """Reuse a whole completed result only under the identical frozen contract."""
     from .policy import ALLOWED_SEARCH_SPACE

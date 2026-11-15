@@ -184,7 +184,7 @@ def frozen_run_judge(function):
     def execute(self, run_id, *args, **kwargs):
         from .providers import judge_thinking
         run = self.store.evaluation_run(run_id)
-        effort = (run or {}).get('judge', {}).get('judge_thinking', {}).get('reasoning_effort')
+        effort = (run or {}).get('judge', {}).get('judge_thinking', {}).get('reasoning_effort', 'off')
         from .request_reuse import reuse_scope
         with judge_thinking(effort), reuse_scope(self.store, run):
             return function(self, run_id, *args, **kwargs)
@@ -226,7 +226,7 @@ class EvaluationRunner:
         from .providers import judge_thinking
         from contextlib import nullcontext
         source=self.store.evaluation_run(resume_source_id) if resume_source_id else None
-        context=judge_thinking(source['judge'].get('judge_thinking',{}).get('reasoning_effort')) if source else nullcontext()
+        context=judge_thinking(source['judge'].get('judge_thinking',{}).get('reasoning_effort', 'off')) if source else nullcontext()
         with context:
             return self._baseline_inputs(resume_source_id)
 
@@ -602,7 +602,7 @@ class EvaluationRunner:
         source=self.store.evaluation_run(source_id)
         if not source:raise ValueError('Replay source not found')
         from .providers import judge_thinking as freeze_judge, thinking_config
-        with freeze_judge(source['judge'].get('judge_thinking',{}).get('reasoning_effort')):
+        with freeze_judge(source['judge'].get('judge_thinking',{}).get('reasoning_effort', 'off')):
             snapshot,items,config,judge=self.baseline_inputs(source_id)
         if snapshot.get('scoring_revision') and config.get('run_target')=='sandbox_candidate':
             config={k:v for k,v in config.items() if k!='candidate_id'}
@@ -631,6 +631,8 @@ class EvaluationRunner:
             if snapshot.get('scoring_revision') and config.get('run_target')=='sandbox_candidate':
                 config.pop('candidate_id',None);config['run_target']='baseline'
             run_id=self.store.create_baseline_run(snapshot,config,judge,automatic=automatic,judge_replay=plan)
+            from .request_reuse import carry_generation_reuse
+            carry_generation_reuse(self.store, source, self.store.evaluation_run(run_id))
         return run_id,items,config
 
     def start_replay(self, source_id):
@@ -953,7 +955,7 @@ class EvaluationRunner:
         if baseline is None or baseline["status"] != "completed":
             raise ValueError("Candidate 必须基于已完成的 Baseline 运行")
         from .providers import judge_thinking
-        with judge_thinking(baseline['judge'].get('judge_thinking',{}).get('reasoning_effort')):
+        with judge_thinking(baseline['judge'].get('judge_thinking',{}).get('reasoning_effort', 'off')):
             self._require_generation_contract(baseline['judge'])
         if not policy_current(baseline['judge']):
             raise ValueError('评测规则已升级，请建立新Baseline；旧 Candidate 只读')

@@ -286,7 +286,9 @@ class AiService:
         # to generation. Frozen canonical sources and scoring versions are in scope.
         semantic = {k:v for k,v in context.items() if k not in {'retrieval_candidates','final_context','judge_correction','programmatic_evidence_observation'} and not k.startswith('_')}
         semantic['final_context'] = generation_context(context.get('final_context', []))
-        result = reuse_result('judge', [question,expected,answer,category,semantic],
+        from .evaluation_contract import BUSINESS_JUDGE_PROMPT, VERSIONS
+        contract = [thinking_config('judge'), VERSIONS, hashlib.sha256(BUSINESS_JUDGE_PROMPT.encode()).hexdigest()]
+        result = reuse_result('judge', [question,expected,answer,category,semantic,contract],
                               lambda:self._judge_uncached(question,expected,answer,category,context=context))
         if result.get('reused_from'):
             result.update(token_usage=[], estimated_cost=0, response_recovery=[])

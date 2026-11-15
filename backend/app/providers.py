@@ -19,7 +19,7 @@ from .evaluation_contract import abstention_valid, claim_consistent, normalize, 
 
 DEFAULT_TASK_THINKING = {
     'baseline': 'off', 'generation': 'off', 'answer': 'off', 'candidate': 'off',
-    'judge': 'off', 'agent': 'high', 'query_rewrite': 'off', 'multi_query': 'off',
+    'judge': 'low', 'agent': 'high', 'query_rewrite': 'off', 'multi_query': 'off',
     'hyde': 'off', 'query_decompose': 'off', 'query': 'off', 'auxiliary': 'off',
 }
 DETERMINISTIC_TASKS = frozenset(DEFAULT_TASK_THINKING) - {'judge', 'agent'}

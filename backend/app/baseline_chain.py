@@ -38,7 +38,8 @@ def arm_chain(store, baseline_id, *, round_policy=None, paid_run=None, causal_ev
     previous = chain_status(store)
     if previous and previous.get('baseline_id') != baseline_id and causal_evidence:
         experiment = store.experiment(previous.get('experiment_id'), light=True) if previous.get('experiment_id') else None
-        if not experiment or experiment['result'].get('optimization_cycle', {}).get('status') != 'recommended':
+        failed_before_agent = previous.get('status') == 'failed' and not previous.get('experiment_id')
+        if not failed_before_agent and (not experiment or experiment['result'].get('optimization_cycle', {}).get('status') != 'recommended'):
             raise ValueError('前次串联尚未结束，不能启动新实验')
         history = _settings(store).get(KEY+'_history', [])
         _write(store, KEY+'_history', history + [previous])

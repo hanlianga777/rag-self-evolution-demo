@@ -22,6 +22,7 @@ class JudgeReplayTests(unittest.TestCase):
         args=self.example();result=self.check(args)
         self.assertTrue(result['can_replay']);self.assertEqual(result['generation_calls'],0)
         self.assertNotIn('judge_result',result['executions']['q-new'])
+        self.assertEqual(result['executions']['q-new']['reused_from'], {'run_id':'old','question_id':'q-new','kind':'saved_generation'})
         self.assertTrue(result['eligibility'][0]['stage_sha256']['final'])
     def test_missing_data_cross_identity_and_unknown_execution_rejected(self):
         mutations=[lambda a:a[1][0]['programmatic_metrics']['retrieval_trace'].pop('reranked'),

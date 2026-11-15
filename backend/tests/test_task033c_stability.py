@@ -20,7 +20,7 @@ class StableRequests(unittest.TestCase):
             env.write_text('')
             settings = load_settings({}, env)
             self.assertEqual(settings.baseline_thinking, 'off')
-            self.assertEqual(settings.judge_thinking, 'off')
+            self.assertEqual(settings.judge_thinking, 'low')
             self.assertEqual(load_settings({'JUDGE_THINKING':'off'}, env).judge_thinking, 'off')
         with judge_thinking('off'):
             self.assertEqual(thinking_config('judge'), {'task':'judge', 'thinking':{'type':'disabled'}})

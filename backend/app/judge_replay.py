@@ -97,6 +97,7 @@ def replay_eligibility(source,cases,snapshot,config,judge,chunks,fingerprint):
             if any(case.get(k)!=question.get(k) for k in ('question','test_category','negative_subtype')) or case.get('reference_answer')!=(question.get('reference_answer') or question.get('expected_behavior','拒答或澄清')):reasons.append('saved_question_or_reference_changed')
             origin='scored_case_generation'
         else:execution=cp.get('execution') or {};origin='generation_checkpoint'
+        execution = {**execution, 'reused_from':{'run_id':source['id'], 'question_id':key, 'kind':'saved_generation'}}
         trace=execution.get('retrieval_trace') or {}
         if not isinstance(trace,dict):trace={};reasons.append('retrieval_trace_not_an_object')
         if not isinstance(execution.get('answer'),str) or not execution.get('answer','').strip():reasons.append('complete_generated_answer_missing')

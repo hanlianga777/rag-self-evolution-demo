@@ -1552,7 +1552,7 @@ def requires_foundation_upgrade(judge):
     if not policy_current(judge): return True
     try:
         from .providers import judge_thinking
-        with judge_thinking(judge.get('judge_thinking',{}).get('reasoning_effort')):
+        with judge_thinking(judge.get('judge_thinking',{}).get('reasoning_effort', 'off')):
             EvaluationRunner(store, ai_service)._require_generation_contract(judge)
     except ValueError:
         return True
