@@ -37,7 +37,7 @@ class PaidRun:
     def save(self):
         temporary = self.path.with_suffix(self.path.suffix+'.tmp')
         data = {'identity':self.identity, 'budget_yuan':self.budget, 'price_snapshot':self.prices,
-                'spent_yuan':self.spent, 'budget_enforcement':bool(getattr(self,'request_policy',None)), 'available_yuan':None,
+                'spent_yuan':self.spent, 'budget_enforcement':bool(getattr(self,'request_policy',None) and self.request_policy.get('budget_usd') is not None), 'available_yuan':None,
                 'cost_unknown':any(c['status'] not in {'ok','rejected'} or c['status']=='ok' and c.get('upper_estimate_yuan') is None for c in self.calls),
                 'stopped':self.stopped, 'calls':self.calls,'output_limits':self.output_limits,'stages':self.stages}
         if getattr(self,'request_policy',None):data['request_policy']=self.request_policy

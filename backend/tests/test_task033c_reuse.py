@@ -189,6 +189,31 @@ class IntegratedReuseTests(RequestReuseTests):
 
 
 class BudgetTests(unittest.TestCase):
+    def test_explicit_no_cap_keeps_accounting_and_unknown_history_after_reload(self):
+        from app.paid_run import PaidRun, controlled_run, accounting_only, paid_request, payment_usage
+        from app.paid_schedule import set_settings
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as directory:
+            store = GovernanceStore(Path(directory)/'test.db')
+            set_settings(store, False)
+            policy = {'kind':'scheduled_usd_cap_v1', 'ledger_directory':directory,
+                      'database_path':str(store.database_path), 'budget_usd':None}
+            path = Path(directory)/'run.ledger.json'
+            ledger = PaidRun(path, identity='same', identity_check=lambda:'same', request_policy=policy)
+            ledger.calls.append({'provider':'DeepSeek', 'model':'deepseek-flash', 'status':'unknown',
+                                 'reservation_usd':100, 'task':'judge'})
+            ledger.save()
+            ledger = PaidRun.load_accounting(path, lambda:'same')
+            with controlled_run(ledger), accounting_only():
+                with paid_request('DeepSeek', 'deepseek-flash', {'messages':[], 'max_tokens':10}):
+                    payment_usage({'provider':'DeepSeek', 'requested_model':'deepseek-flash', 'status':'ok',
+                                   'prompt_tokens':10, 'completion_tokens':1, 'prompt_cache_hit_tokens':0,
+                                   'prompt_cache_miss_tokens':10, 'call_started_at':datetime.now(timezone.utc).isoformat()})
+            saved = json.loads(path.read_text())
+            self.assertEqual([c['status'] for c in saved['calls']], ['unknown','ok'])
+            self.assertFalse(saved['budget_enforcement'])
+            self.assertIsNone(saved['request_policy']['budget_usd'])
+
     def test_peak_disabled_schedule_keeps_setting_and_enforces_shared_cap(self):
         from app.paid_run import PaidRun,controlled_run,accounting_only,paid_request,payment_usage
         from app.paid_schedule import set_settings,schedule_status

@@ -1,4 +1,4 @@
-"""Explicit, persistent per-task USD cap; ordinary accounting stays unchanged."""
+"""Explicit per-task USD cap (None disables it), retaining request accounting."""
 import fcntl
 import json
 import math
@@ -54,7 +54,7 @@ def guarded_begin(run, provider, model, payload):
             rates = price_config()['periods']['peak' if scheduled else 'off_peak']
             bound = ((len(json.dumps(payload).encode()) + 1024) * rates['input_per_million']
                      + payload['max_tokens'] * rates['output_per_million']) / 1_000_000
-            if policy_cost(policy['ledger_directory'])['budget_used_upper_usd'] + bound > policy['budget_usd']:
+            if policy['budget_usd'] is not None and policy_cost(policy['ledger_directory'])['budget_used_upper_usd'] + bound > policy['budget_usd']:
                 raise RuntimeError('Paid task USD limit reached')
             call = run._begin(provider, model, payload)
             call.update(reservation_usd=bound, price_check=status)
